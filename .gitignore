@@ -1,0 +1,7 @@
+# Generated reports and dumps
+out/
+*.tsv
+*_features.txt
+
+__pycache__/
+*.pyc
