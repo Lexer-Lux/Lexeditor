@@ -3828,7 +3828,7 @@ index 2452d5f..133a8e4 100644
  
  	text_colors[TEXTCOLOR_GRAY] = 0x08;
 diff --git a/src/ff8_opengl.cpp b/src/ff8_opengl.cpp
-index a678015..e17f6de 100644
+index a678015..5740e3c 100644
 --- a/src/ff8_opengl.cpp
 +++ b/src/ff8_opengl.cpp
 @@ -22,6 +22,7 @@
@@ -3909,8 +3909,31 @@ index a678015..e17f6de 100644
  }
  
  ff8_draw_menu_sprite_texture_infos *ff8_draw_icon_or_key4(int a1, ff8_draw_menu_sprite_texture_infos *draw_infos, int *icon_sp1_data, int icon_id, uint16_t x, uint16_t y, int a6, int a7)
-@@ -1223,6 +1244,8 @@ uint32_t ff8_retry_configured_drive(char* filename, uint8_t* data)
+@@ -1221,8 +1242,31 @@ uint32_t ff8_retry_configured_drive(char* filename, uint8_t* data)
+ 	return res;
+ }
  
++bool lexeditor_ff8_hide_startup_frame()
++{
++    static bool finished = false;
++    if (!ff8 || !enable_ff8_fast_start || finished) return false;
++    VOBJ(game_obj, game_object, common_externals.get_game_object());
++    const auto loop = reinterpret_cast<uintptr_t>(VREF(game_object, game_loop_obj).main_loop);
++    if (loop == ff8_externals.main_menu_main_loop) {
++        finished = true;
++        return false;
++    }
++    const bool startup = loop == ff8_externals.pubintro_main_loop ||
++        loop == ff8_externals.credits_main_loop ||
++        loop == ff8_externals.go_to_main_menu_main_loop;
++    // An alternate direct-to-game launch also ends the one-time startup gate.
++    const auto *mode = getmode_cached();
++    if (!startup && mode != nullptr && (mode->driver_mode == MODE_FIELD ||
++        mode->driver_mode == MODE_WORLDMAP || mode->driver_mode == MODE_BATTLE ||
++        mode->driver_mode == MODE_MENU)) finished = true;
++    return startup;
++}
++
  uint32_t ff8_credits_main_loop_gfx_begin_scene(uint32_t unknown, struct game_obj *game_object)
  {
 +	// The logo gate otherwise prevents the native completion check from running.
@@ -3918,7 +3941,7 @@ index a678015..e17f6de 100644
  	if (drawFFNxLogoFrame(game_object)) {
  		ff8_externals.input_fill_keystate();
  
-@@ -1848,7 +1871,13 @@ void ff8_field_calc_triangle_condition()
+@@ -1848,7 +1892,13 @@ void ff8_field_calc_triangle_condition()
  
  void ff8_init_hooks(struct game_obj *_game_object)
  {
@@ -3932,7 +3955,7 @@ index a678015..e17f6de 100644
  
  	game_object->dddevice = &_fake_dddevice;
  	game_object->front_surface[0] = &_fake_dd_front_surface;
-@@ -2048,8 +2077,8 @@ void ff8_init_hooks(struct game_obj *_game_object)
+@@ -2048,8 +2098,8 @@ void ff8_init_hooks(struct game_obj *_game_object)
  	// Worldmap
  	replace_call(ff8_externals.worldmap_input_update_sub_559240 + (FF8_US_VERSION ? 0xC2 : 0xBF), ff8_get_analog_value_wm); // lX
  	replace_call(ff8_externals.worldmap_input_update_sub_559240 + (FF8_US_VERSION ? 0xD2 : 0xCF), ff8_get_analog_value); // lY
@@ -4562,13 +4585,14 @@ index 0000000..e77ad85
 +int lexeditor_ff8_modern_world_axis(std::int8_t port, int type, std::int8_t offset);
 diff --git a/src/lexeditor_ff8_party_switch.cpp b/src/lexeditor_ff8_party_switch.cpp
 new file mode 100644
-index 0000000..9ee598f
+index 0000000..f4011f3
 --- /dev/null
 +++ b/src/lexeditor_ff8_party_switch.cpp
-@@ -0,0 +1,191 @@
+@@ -0,0 +1,205 @@
 +#include "lexeditor_ff8_party_switch.h"
 +#include <windows.h>
 +#include <array>
++#include <algorithm>
 +#include <cstdint>
 +#include <cstring>
 +#include "cfg.h"
@@ -4608,15 +4632,28 @@ index 0000000..9ee598f
 +    native<void>(0x4B9AD0,5,0,0,0);
 +    // The underlying command controller was never closed or advanced.
 +}
-+std::uint32_t __cdecl draw(void *ctx,std::uint32_t ordering) {
++std::uint32_t __cdecl draw(std::uint32_t ordering, std::uint32_t primitives, void *, int) {
 +    static const unsigned char cursor[]={0xCB,0x20,0};
++    std::array<const unsigned char *,8> names{};
++    int width=80;
 +    for(int i=0;i<count;++i) {
-+        // Native character-name control codes preserve renamed characters.
-+        unsigned char name[]={3,static_cast<unsigned char>(0x30+choices[i]),0};
-+        if(i==chosen) ordering=native<std::uint32_t>(0x4A7250,ctx,ordering,24,32+i*16,cursor,7);
-+        ordering=native<std::uint32_t>(0x4A7250,ctx,ordering,38,32+i*16,name,7);
++        // 004A7250 stops on control codes <=0x18; it cannot expand 03/ID.
++        // Use the same native name resolver as the game's target-name path.
++        names[i]=native<const unsigned char *>(0x47EB50,choices[i]);
++        const auto size=native<std::uint32_t>(0x4A0F50,names[i]);
++        width=std::max(width,static_cast<int>(size&0xFFFF)+30);
 +    }
-+    return ordering;
++    auto *context=mem<std::uint8_t *>(0x1D6D490);
++    mem<std::uint8_t>(reinterpret_cast<std::uintptr_t>(context)+0x23)=8;
++    auto *rect=reinterpret_cast<std::int16_t *>(context+0x34);
++    rect[0]=20; rect[1]=26; rect[2]=static_cast<std::int16_t>(std::min(width,296));
++    rect[3]=static_cast<std::int16_t>(count*16+12);
++    primitives=native<std::uint32_t>(0x4A7510,ordering,primitives,0x1000,0);
++    for(int i=0;i<count;++i) {
++        if(i==chosen) primitives=native<std::uint32_t>(0x4A7250,ordering,primitives,24,32+i*16,cursor,7);
++        primitives=native<std::uint32_t>(0x4A7250,ordering,primitives,38,32+i*16,names[i],7);
++    }
++    return primitives;
 +}
 +void __cdecl finish();
 +void abort_swap() {
@@ -4806,18 +4843,19 @@ index b2cc508..b922155 100644
  }
  
 diff --git a/src/renderer.cpp b/src/renderer.cpp
-index ce629d7..6eceabc 100644
+index ce629d7..73daba0 100644
 --- a/src/renderer.cpp
 +++ b/src/renderer.cpp
-@@ -38,6 +38,7 @@
+@@ -38,6 +38,8 @@
  #include "log.h"
  #include "cfg.h"
  #include "utils.h"
++bool lexeditor_ff8_hide_startup_frame();
 +#include "lexeditor_ff8_bars.h"
  #include "renderer.h"
  
  CMRC_DECLARE(FFNx);
-@@ -404,7 +405,7 @@ void Renderer::destroyAll()
+@@ -404,7 +406,7 @@ void Renderer::destroyAll()
              bgfx::destroy(handle);
      }
  
@@ -4826,7 +4864,7 @@ index ce629d7..6eceabc 100644
          overlay.destroy();
  };
  
-@@ -442,6 +443,24 @@ void Renderer::resetState()
+@@ -442,8 +444,35 @@ void Renderer::resetState()
      resetViewMatrixFlag();
  };
  
@@ -4850,8 +4888,19 @@ index ce629d7..6eceabc 100644
 +
  void Renderer::renderFrame()
  {
++    // Keep startup initialization and rendering work, but do not present logos.
++    if (lexeditor_ff8_hide_startup_frame()) {
++        ++backendViewId;
++        bgfx::setViewFrameBuffer(backendViewId, BGFX_INVALID_HANDLE);
++        bgfx::setViewRect(backendViewId, 0, 0, window_size_x, window_size_y);
++        bgfx::setViewClear(backendViewId, BGFX_CLEAR_COLOR | BGFX_CLEAR_DEPTH, 0x000000FF, 1.0f);
++        bgfx::touch(backendViewId);
++        return;
++    }
      /*  y0    y2
-@@ -1029,7 +1048,7 @@ void Renderer::init()
+      x0 +-----+ x2
+         |    /|
+@@ -1029,7 +1058,7 @@ void Renderer::init()
  
      bgfx::frame();
  
@@ -4860,7 +4909,7 @@ index ce629d7..6eceabc 100644
      {
          backendProgramHandles[RendererProgram::OVERLAY] = bgfx::createProgram(
              getShader(vertexOverlayPath.c_str()),
-@@ -1454,7 +1473,7 @@ void Renderer::discardAllBindings()
+@@ -1454,7 +1483,7 @@ void Renderer::discardAllBindings()
  
  void Renderer::drawOverlay()
  {

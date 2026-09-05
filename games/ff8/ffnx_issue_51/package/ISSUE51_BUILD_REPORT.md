@@ -10,12 +10,12 @@
 - Exact call-site patches: 4
 - Total transactional patch sites: 32
 - Driver: `.build/bin/FFNx.dll`
-- Driver SHA-256: `3f7950e05f78584397cc0008503880f4a15d7fbb6342e766323b59e49499a7e5`
-- Driver size: 38,537,216 bytes
+- Driver SHA-256: `655ca256e95bfc48e6d5a8d1e969ca75276f278d6d830d9d573142eee607a473`
+- Driver size: 38,537,728 bytes
 - Driver format: PE32, x86, machine `0x014C`
 - PDB: `.build/bin/FFNx.pdb`
-- PDB SHA-256: `1bcc371c67ff2c3c85ec472cfbcf4c99dd11c7f8728e62d1c2a3aaf20d63ffb5`
-- Source patch SHA-256: `aa228e2642290749611d3fd5c2084d23768a05723d249f1b6472285fc64054fb`
+- PDB SHA-256: `760bb4e93c9f4259e4bfc53ea430931702ba24eaf0a2fe2ef97e020d43af222f`
+- Source patch SHA-256: `e7f2a705f6ce7ee0fa034d82ecd77a22af9aba170b509293691554bf983d4e7b`
 - GPL license SHA-256: `230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809`
 
 ## Toolchain
@@ -67,10 +67,13 @@ Both feature and deployment options default to OFF in source. This reviewed deri
 
 ## 2026-09-05 tweak repair build
 
-Follow-up: XP bars use yellow fill and an inset without the white outline.
-Battle HP bars capture native visible row, HP glyph and ATB glyph draw calls.
-Sprite bounds and the active viewport supply their positions. The red/black
-line is scaled by maximum HP out of 9999 and fills from right to left. Native
-row visibility checks pass. These changes still need visual in-game testing.
+Latest follow-up: Party Switch resolves native saved character names and uses
+the four-argument menu renderer plus a native panel. Fast Start masks only
+startup publisher/credits presentation, with a one-way gate ending at the
+main menu or gameplay. The native transition remains deferred and unchanged.
+The prior native HUD HP capture and yellow inset XP bars remain included.
+Name-renderer execution and compiled startup-gate tests pass. Live appearance
+of these latest repairs remains unverified. Shared Magic with Party Switch
+still requires integration and stays blocked for this test.
 
 Rebuilt with MSVC x86 Release. Corrected XP result-state ownership and result-page gating, resolved HP/menu driver modes, added the FF8-only Fast Start logo flag, captured native EXP result panel geometry with the active viewport and FFNx output transform, and added guarded native Modern Controls and Party Switch modules. Modern Controls separates right-stick camera input from native movement/zoom and automatic follow. Party Switch uses separately scheduled generic replacement primitives rather than the special encounter callback. Compiled camera policy/native follow and three-slot replacement execution tests passed. Shared Magic with Party Switch remains blocked pending combination validation. The linked runtime verifier and native result-state execution checks passed. The source patch matches the build tree. In-game appearance and startup acceptance remain unverified.
