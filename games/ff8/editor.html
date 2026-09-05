@@ -1725,7 +1725,7 @@
   }
 
   function renderPlatformSettings(){
-    $("#main").replaceChildren(platformConfigView({config:state.platformConfig,query:state.platformQuery,disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
+    $("#main").replaceChildren(platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
   }
   function renderSettings(){
     const toolbar=$("#toolbar");toolbar.hidden=false;toolbar.replaceChildren(subtabBar({tabs:[{id:"gameplay",label:"Gameplay"},{id:"platform",label:"FFNx"}],active:state.settingsTab,label:"Tweak settings",change:value=>{state.settingsTab=value;renderSettings()}}));
