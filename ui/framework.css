@@ -1,0 +1,4428 @@
+@font-face {
+  font-family: "Lexend";
+  src: url("assets/fonts/Lexend-Variable.ttf") format("truetype-variations");
+  font-style: normal;
+  font-weight: 100 900;
+  /* "swap" paints the fallback first and switches to Lexend when it loads,
+     which is the font change visible on the loading screen. The file is
+     served locally and loads in milliseconds, so blocking briefly shows the
+     text once, in the right face, instead of changing it under the reader. */
+  font-display: block;
+}
+
+:root {
+  --lex-bg: #f7f8f9;
+  --lex-panel: #ffffff;
+  --lex-panel-2: #eef1f3;
+  --lex-border: #c8cdd2;
+  --lex-text: #171a1d;
+  --lex-muted: #68717a;
+  --lex-accent: #30363c;
+  --lex-accent-text: #ffffff;
+  --lex-highlight: #56616c;
+  --lex-success: #34784b;
+  --lex-font: "Lexend", "Segoe UI", system-ui, sans-serif;
+  --lex-heading-font: "Lexend", "Segoe UI", system-ui, sans-serif;
+  --lex-symbol-font: "Segoe UI Symbol", "Segoe UI Emoji", "Segoe UI", sans-serif;
+  --lex-radius: 5px;
+  --lex-panel-gap: clamp(10px, 1vw, 16px);
+}
+
+html.lex-transition-entry body {
+  visibility: hidden !important;
+}
+
+/* Painted by the root element, so the message is up on the first frame and
+   stays up while the document parses. framework.js takes over silently. */
+html.lex-transition-loading {
+  background:#080a0d;
+}
+html.lex-transition-loading::before {
+  position:fixed;
+  z-index:100000;
+  left:30px;
+  bottom:27px;
+  width:min(850px,70vw);
+  color:#fff;
+  content:attr(data-lex-quote);
+  font:650 clamp(17px,2vw,28px)/1.3 "Lexend","Segoe UI",system-ui,sans-serif;
+  text-wrap:balance;
+}
+html.lex-transition-loading::after {
+  position:fixed;
+  z-index:100000;
+  right:30px;
+  bottom:28px;
+  width:32px;
+  height:32px;
+  content:"";
+  border:4px solid #fff5;
+  border-right-color:#fff;
+  border-radius:50%;
+  animation:lex-plugin-loading-spin .75s linear infinite;
+}
+html.lex-loading-live::before,
+html.lex-loading-live::after { content:none; }
+
+html.lex-transition-entry body > .lex-plugin-loading-screen,
+html.lex-transition-entry body > .lex-plugin-loading-screen * {
+  visibility: visible !important;
+}
+
+.lex-plugin-loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: block;
+  box-sizing: border-box;
+  padding: 0;
+  color: #fff;
+  background: #080a0d94;
+  backdrop-filter: brightness(.62);
+  opacity: 1;
+  /* The blocker fades on its own; its contents slide in from the edges they
+     sit against, so the screen assembles instead of appearing all at once. */
+  animation:lex-plugin-loading-enter .34s ease both;
+  transition: opacity .3s ease;
+}
+
+@keyframes lex-plugin-loading-enter { from { opacity:0; } to { opacity:1; } }
+@keyframes lex-plugin-loading-quote-enter {
+  from { opacity:0;translate:-42px 0; }
+  to { opacity:1;translate:0 0; }
+}
+@keyframes lex-plugin-loading-pulse-enter {
+  from { opacity:0;translate:42px 0; }
+  to { opacity:1;translate:0 0; }
+}
+
+/* Arriving from the home screen's own loading screen: already faded in. */
+.lex-plugin-loading-screen.continued { animation:none; }
+.lex-plugin-loading-screen.continued .lex-plugin-loading-quote,
+.lex-plugin-loading-screen.continued .lex-plugin-loading-pulse { animation-delay:0s; }
+.lex-plugin-loading-screen.closing { opacity: 0; pointer-events: none; }
+.lex-plugin-loading-screen.closing .lex-plugin-loading-quote { animation:lex-plugin-loading-quote-enter .26s ease both reverse; }
+.lex-plugin-loading-screen.closing .lex-plugin-loading-pulse { animation:lex-plugin-loading-pulse-enter .26s ease both reverse,lex-plugin-loading-spin .75s linear infinite; }
+.lex-plugin-transition-surface {
+  position:fixed;
+  inset:0;
+  z-index:99999;
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  height:100%;
+  min-height:0;
+  overflow:hidden;
+  background:var(--lex-bg);
+  contain:layout paint;
+  isolation:isolate;
+  backface-visibility:hidden;
+  will-change:transform;
+}
+.lex-plugin-transition-surface.settled {
+  /* Once the pan ends, let sticky headers follow the page scroll container. */
+  overflow:visible;
+  position:relative;
+  inset:auto;
+  z-index:auto;
+  flex:1 1 auto;
+  transform:none !important;
+}
+.lex-plugin-transition-backdrop {
+  position:fixed;
+  inset:0;
+  z-index:99998;
+  width:100%;
+  height:100%;
+  border:0;
+  background:#080a0d;
+  pointer-events:none;
+  contain:strict;
+  backface-visibility:hidden;
+  will-change:transform;
+}
+.lex-plugin-loading-quote {
+  animation:lex-plugin-loading-quote-enter .34s .1s ease both;
+  position:absolute;
+  left:30px;
+  bottom:27px;
+  width:min(850px,70vw);
+  margin:0;
+  font:650 clamp(17px,2vw,28px)/1.3 "Lexend","Segoe UI",system-ui,sans-serif;
+  text-align:left;
+  text-wrap: balance;
+}
+.lex-plugin-loading-pulse {
+  position:absolute;
+  right:30px;
+  bottom:28px;
+  display:block;
+  width: 32px;
+  height: 32px;
+  margin:0;
+  border: 4px solid #fff5;
+  border-right-color: #fff;
+  border-radius: 50%;
+  animation: lex-plugin-loading-pulse-enter .34s .1s ease both, lex-plugin-loading-spin .75s linear infinite;
+}
+@keyframes lex-plugin-loading-spin { to { rotate: 360deg; } }
+
+.lex-ui-symbol {
+  font-family: var(--lex-symbol-font) !important;
+  font-style: normal;
+  text-transform: none;
+}
+
+.lex-save-icon {
+  position:relative;
+  display:inline-grid;
+  place-items:center;
+  padding:0;
+  font-style:normal;
+  text-transform:none;
+}
+
+.lex-command-primary {
+  box-sizing:border-box;
+  width:38px;
+  min-width:38px;
+  height:38px;
+  min-height:38px;
+  padding:0;
+  color:var(--lex-text);
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  background:var(--lex-panel-2);
+  cursor:pointer;
+}
+
+#global-save.lex-command-primary,
+#global-game-process.lex-command-primary {
+  width:38px !important;
+  min-width:38px !important;
+  height:38px !important;
+  min-height:38px !important;
+  padding:0 !important;
+}
+
+.lex-command-primary:hover:not(:disabled) {
+  color:var(--lex-accent-text);
+  border-color:var(--lex-accent);
+  background:var(--lex-accent);
+}
+
+.lex-settings-save-control {
+  box-sizing:border-box;
+  width:38px;
+  min-width:38px;
+  height:36px;
+  color:var(--lex-text);
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  background:var(--lex-panel-2);
+  cursor:pointer;
+}
+
+.lex-settings-save-control:hover:not(:disabled) {
+  color:var(--lex-accent-text);
+  border-color:var(--lex-accent);
+  background:var(--lex-accent);
+}
+
+.lex-save-icon:disabled {
+  opacity: .32;
+  filter: grayscale(1);
+  cursor: default;
+}
+
+.lex-save-count {
+  position:absolute;
+  top:-6px;
+  right:-7px;
+  display:grid;
+  min-width:18px;
+  height:18px;
+  padding:0 4px;
+  place-items:center;
+  color:#fff;
+  background:#c52a25;
+  border:2px solid var(--lex-panel, #171717);
+  border-radius:999px;
+  font:700 11px/1 Arial,sans-serif;
+  text-shadow:none;
+  pointer-events:none;
+}
+
+.lex-save-count[hidden] { display:none; }
+
+.lex-save-icon svg {
+  display:block;
+  width:22px;
+  height:22px;
+}
+
+.lex-save-throbber {
+  display:block;
+  width:19px;
+  height:19px;
+  border:3px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-right-color:currentColor;
+  border-radius:50%;
+  animation:lex-plugin-loading-spin .7s linear infinite;
+}
+
+body.lex-save-busy :is(button,input,select,textarea,[role="button"]):not(.lex-save-icon) {
+  pointer-events:none !important;
+  filter:grayscale(.72);
+  opacity:.48;
+}
+
+body.lex-save-busy .lex-save-icon.saving {
+  opacity:1;
+  filter:none;
+}
+
+.lex-game-process {
+  display:inline-grid;
+  place-items:center;
+}
+
+.lex-game-process svg { width:22px; height:22px; }
+.lex-game-process.running { color:#e24a43; }
+
+.lex-searcher-active .lex-shell-command-row > :not(.lex-window-actions):not(.lex-searcher-bar),
+.lex-searcher-active .lex-nav-frame {
+  opacity:.34;
+  filter:grayscale(1);
+  pointer-events:none;
+}
+
+.lex-searcher-bar {
+  position:absolute;
+  z-index:20;
+  left:0;
+  right:118px;
+  top:0;
+  bottom:0;
+  display:grid;
+  grid-template-columns:38px minmax(0,1fr) 38px;
+  align-items:center;
+  gap:8px;
+  padding:5px 10px;
+  color:var(--lex-text);
+  background:color-mix(in srgb,var(--lex-panel,#171717) 92%,transparent);
+}
+
+.lex-searcher-context,.lex-searcher-cancel {
+  display:grid;
+  width:34px;
+  height:34px;
+  padding:7px;
+  place-items:center;
+  border:0;
+  border-radius:4px;
+}
+.lex-searcher-context { color:#66aefb; background:#163454; }
+.lex-searcher-context svg { width:20px; height:20px; }
+.lex-searcher-cancel { color:#fff; background:#a51e1e; font:700 26px/1 Arial,sans-serif; }
+.lex-searcher-prompt { overflow:hidden; text-align:center; text-overflow:ellipsis; white-space:nowrap; }
+.lex-search-candidate { position:relative; isolation:isolate; cursor:pointer; }
+.lex-search-candidate > * { position:relative; z-index:2; }
+.lex-search-candidate::before {
+  position:absolute;
+  z-index:1;
+  inset:0;
+  width:0;
+  content:"";
+  border-right:3px solid color-mix(in srgb,var(--lex-accent,#4678b8) 88%,white);
+  background:linear-gradient(90deg,
+    color-mix(in srgb,var(--lex-accent,#4678b8) 35%,transparent),
+    color-mix(in srgb,var(--lex-accent,#4678b8) 68%,transparent));
+  box-shadow:10px 0 20px color-mix(in srgb,var(--lex-accent,#4678b8) 52%,transparent);
+  pointer-events:none;
+}
+.lex-search-candidate:hover { background:color-mix(in srgb,var(--lex-accent,#4678b8) 16%,transparent); }
+.lex-search-candidate.selecting::before { width:100%; transition:width var(--lex-search-hold) linear; }
+
+.lex-new-button {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  min-width: 32px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  color: var(--lex-muted);
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel-2);
+  cursor: pointer;
+}
+
+.lex-new-button-plus {
+  font: 800 20px/1 var(--lex-symbol-font);
+}
+
+.lex-new-button:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
+.lex-info-help {
+  display: inline-grid;
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  place-items: center;
+  color: var(--lex-bg);
+  border: 0;
+  border-radius: 50%;
+  background: var(--lex-highlight);
+  cursor: help;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  text-shadow: none;
+  vertical-align: middle;
+}
+
+button.lex-info-help { cursor: pointer; }
+.lex-info-help:focus-visible {
+  color: var(--lex-accent-text);
+  background: var(--lex-accent);
+  outline: 2px solid color-mix(in srgb, var(--lex-highlight) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.lex-info-help:hover {
+  color: var(--lex-accent-text);
+  background: var(--lex-accent);
+}
+
+.lex-info-help > span {
+  display: block;
+}
+
+.lex-help-popover {
+  position:fixed;
+  z-index:5000;
+  width:max-content;
+  max-width:min(360px,calc(100vw - 16px));
+  padding:9px 11px;
+  color:var(--lex-text);
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  background:var(--lex-panel);
+  box-shadow:0 8px 24px #0005;
+  font:500 13px/1.35 var(--lex-font);
+  text-align:left;
+  text-shadow:none;
+  pointer-events:none;
+  animation:lex-help-popover-in .1s ease-out;
+}
+
+.lex-help-popover::before {
+  position:absolute;
+  left:calc(var(--lex-help-anchor) - 6px);
+  width:10px;
+  height:10px;
+  content:"";
+  border-left:1px solid var(--lex-border);
+  border-top:1px solid var(--lex-border);
+  background:var(--lex-panel);
+  transform:rotate(45deg);
+}
+.lex-help-popover[data-side="below"]::before { top:-6px; }
+.lex-help-popover[data-side="above"]::before { bottom:-6px;transform:rotate(225deg); }
+@keyframes lex-help-popover-in { from { opacity:0;transform:translateY(3px); } }
+
+.lex-hoverable {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: inherit;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  text-shadow: inherit;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.lex-hoverable:hover,
+.lex-hoverable:focus-visible {
+  color:var(--lex-highlight);
+  background:transparent;
+  text-decoration:underline;
+  text-decoration-thickness:.08em;
+  text-underline-offset:.16em;
+  outline: 0;
+}
+
+html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
+  cursor: alias;
+}
+
+.lex-close-button {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  color: var(--lex-muted);
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel-2);
+  cursor: pointer;
+}
+
+.lex-close-button:hover {
+  color: #fff;
+  border-color: #c42b1c;
+  background: #c42b1c;
+}
+
+.lex-close-icon,
+.lex-close-icon::before,
+.lex-close-icon::after {
+  position: absolute;
+  display: block;
+  content: "";
+}
+
+.lex-close-icon { inset: 0; pointer-events: none; }
+.lex-close-icon::before,
+.lex-close-icon::after {
+  top: 14px;
+  left: 8px;
+  width: 12px;
+  border-top: 1.5px solid currentColor;
+}
+.lex-close-icon::before { transform: rotate(45deg); }
+.lex-close-icon::after { transform: rotate(-45deg); }
+
+[hidden] {
+  display: none !important;
+}
+
+.lex-toast {
+  position:fixed;
+  z-index:100020;
+  left:50%;
+  bottom:24px;
+  max-width:min(620px,calc(100vw - 40px));
+  padding:11px 16px;
+  color:var(--lex-text);
+  border:1px solid var(--lex-border);
+  background:var(--lex-panel-2);
+  box-shadow:0 8px 28px #0009;
+  opacity:0;
+  transform:translate(-50%,12px);
+  transition:opacity .16s ease,transform .16s ease;
+}
+.lex-toast.visible { opacity:1;transform:translate(-50%,0); }
+
+/* The default lives on :root so the setting, which is applied to the root
+   element, is inherited here instead of being overwritten by this block. */
+:root { --lex-command-row-height: 9vh; }
+
+.lex-shell-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: stretch;
+  gap: var(--lex-panel-gap);
+  user-select: none;
+}
+
+.lex-shell-command-row {
+  position: relative;
+  display: grid;
+  box-sizing: border-box;
+  grid-template-columns: clamp(190px, 10vw, 210px) minmax(0, 1fr) auto auto auto;
+  height: var(--lex-command-row-height);
+  min-height: var(--lex-command-row-height);
+  /* The row has to honour the height the setting asks for, so its contents
+     are bounded by it rather than propping it open from inside. */
+  max-height: var(--lex-command-row-height);
+  align-items: center;
+  gap: 7px;
+  padding-inline: 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.lex-nav-frame {
+  display: block;
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding-inline: var(--lex-panel-gap, 8px);
+}
+
+.lex-shell-header nav {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: stretch;
+  gap: 0;
+  overflow: visible;
+}
+
+.lex-shell-header nav button {
+  position:relative;
+  font-weight:800;
+  letter-spacing:.03em;
+  text-transform:uppercase;
+  flex: 1 1 0;
+  min-height: min(46px, var(--lex-command-row-height));
+  margin: 0;
+  padding: 8px 14px;
+  white-space: nowrap;
+  color: var(--lex-muted);
+  border: 0;
+  border-right: 0;
+  border-radius: 0;
+  background: var(--lex-panel);
+  cursor: pointer;
+  font-size: var(--lex-tab-font-size, 1.08em);
+}
+
+.lex-shell-header nav button:first-child {
+  border-left: 0;
+}
+
+.lex-shell-header nav button:hover {
+  color: var(--lex-text);
+  background: var(--lex-panel-2);
+  border-radius:8px 8px 0 0;
+  transform:translateY(-3px);
+}
+
+.lex-shell-header nav button.active {
+  color: var(--lex-accent-text);
+  border-color: var(--lex-accent);
+  background: var(--lex-accent);
+  border-radius:8px 8px 0 0;
+  transform:translateY(-3px);
+}
+
+.lex-shell-header nav button.lex-settings-tab {
+  margin-left: 10px;
+  background: color-mix(in srgb, var(--lex-panel-2) 72%, var(--lex-bg));
+}
+
+.lex-shell-header nav button.lex-settings-tab:hover {
+  background: color-mix(in srgb, var(--lex-panel-2) 86%, var(--lex-highlight));
+}
+
+.lex-shell-header nav button.lex-settings-tab.active {
+  background: color-mix(in srgb, var(--lex-accent) 72%, var(--lex-panel-2));
+}
+
+.lex-brand-button {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  max-width: 100%;
+}
+
+.lex-brand-button h1 {
+  margin: 0;
+  line-height: 1;
+}
+
+.lex-brand-slot {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  padding: 6px 12px;
+}
+
+.lex-shell-left-actions,
+.lex-shell-center-actions,
+.lex-shell-right-actions,
+.lex-window-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.lex-shell-left-actions {
+  justify-self: start;
+  width: 100%;
+  min-width: 0;
+}
+
+.lex-shell-center-actions {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  transform: translateX(-50%);
+}
+
+.lex-shell-right-actions { justify-self: end; }
+
+.lex-plugin-context {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lex-project-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.lex-project-select {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  max-width: none;
+  min-height: 36px;
+  padding: 4px 52px 4px 10px;
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel-2);
+  color: var(--lex-text);
+  font-family: var(--lex-font);
+  line-height: 1.15;
+  text-align: left;
+  cursor: pointer;
+}
+.lex-project-name { flex: 0 0 auto; color: var(--lex-highlight); white-space: nowrap; }
+.lex-project-path {
+  align-self:center;flex:0 1 auto;min-width:0;overflow:hidden;color:var(--lex-muted);
+  font:500 12px/1.25 "Lexend", "Segoe UI", system-ui, sans-serif;text-shadow:none;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.lex-project-select::after {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  width: 7px;
+  height: 7px;
+  content: "";
+  border-right: 2px solid var(--lex-highlight);
+  border-bottom: 2px solid var(--lex-highlight);
+  transform: translateY(-70%) rotate(45deg);
+}
+.lex-project-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 1100;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 4px;
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel);
+  box-shadow: 0 10px 28px #0008;
+  font-family: var(--lex-font);
+}
+.lex-project-menu-item {
+  display: grid;
+  grid-template-columns:minmax(0,1fr) 34px 34px;
+  width: 100%;
+  padding:0;
+  border: 0;
+  border-radius: 2px;
+  color: var(--lex-text);
+  background: transparent;
+  text-align: left;
+  font: inherit;
+}
+.lex-project-menu-item-select {
+  display:grid;
+  grid-template-columns:auto minmax(40px,1fr);
+  gap:9px;
+  min-width:0;
+  padding:7px 9px;
+  border:0;
+  color:inherit;
+  background:transparent;
+  text-align:left;
+  font:inherit;
+}
+.lex-project-rename {
+  display:grid;
+  place-items:center;
+  width:34px;
+  border:0;
+  color:var(--lex-muted);
+  background:transparent;
+  font:inherit;
+}
+.lex-project-rename:hover { color:var(--lex-highlight);background:var(--lex-panel-2); }
+.lex-project-menu-item:hover,
+.lex-project-menu-item.active { background: var(--lex-panel-2); }
+.lex-project-menu-name { color: var(--lex-highlight); white-space: nowrap; }
+.lex-project-menu-path {
+  align-self: center;
+  overflow: hidden;
+  color: var(--lex-muted);
+  font: 500 12px/1.25 "Lexend", "Segoe UI", system-ui, sans-serif;
+  text-overflow: ellipsis;
+  text-shadow: none;
+  white-space: nowrap;
+}
+.lex-project-menu-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 4px;
+  border-top: 1px solid var(--lex-border);
+}
+.lex-project-menu-action {
+  min-height: 34px;
+  border: 0;
+  border-radius: 0;
+  color: var(--lex-highlight);
+  background: transparent;
+  font: inherit;
+}
+.lex-project-menu-action + .lex-project-menu-action { border-left: 1px solid var(--lex-border); }
+.lex-project-menu-actions:has(>.lex-project-menu-action:nth-child(3):not([hidden])) {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.lex-project-select > .lex-project-source-status {
+  position:absolute;
+  top:50%;
+  right:29px;
+  width:14px;
+  min-width:14px;
+  height:14px;
+  transform:translateY(-50%);
+}
+.lex-project-reference.lex-project-menu-item-select {
+  grid-template-columns:auto auto minmax(40px,1fr) auto;
+}
+.lex-project-source-mode,
+.lex-project-source-status {
+  display:inline-grid;
+  place-items:center;
+  min-width:1.2em;
+  line-height:1;
+}
+.lex-project-source-status.enabled { color:#59d66f; }
+.lex-project-source-status.disabled { color:#ef5d61; }
+.lex-project-menu-action:hover { background: var(--lex-panel-2); }
+.lex-project-dialog input { width: 100%; box-sizing: border-box; }
+
+@media (max-width: 1100px) {
+  .lex-project-select {
+    grid-template-columns: auto;
+    max-width: 220px;
+  }
+  .lex-project-path { display: none; }
+}
+
+.lex-unit-field {
+  min-width: 0;
+}
+
+.lex-unit-field-static {
+  display:inline-flex;
+  align-items:center;
+  gap:.35em;
+}
+
+.lex-unit-field-boxed {
+  position:relative;
+  display:block;
+  min-width:0;
+}
+
+.lex-unit-field-boxed > input,
+.lex-unit-field-boxed > select,
+.lex-unit-field-boxed > textarea,
+.lex-unit-field-boxed > output {
+  box-sizing:border-box;
+  width:100%;
+  padding-inline-end:var(--lex-unit-reserve) !important;
+}
+
+.lex-unit-field-prefix.lex-unit-field-boxed > input,
+.lex-unit-field-prefix.lex-unit-field-boxed > select,
+.lex-unit-field-prefix.lex-unit-field-boxed > textarea,
+.lex-unit-field-prefix.lex-unit-field-boxed > output {
+  padding-inline:var(--lex-unit-reserve) .65em !important;
+}
+
+.lex-unit-field-boxed > .lex-unit {
+  position:absolute;
+  z-index:1;
+  inset-inline-end:.65em;
+  top:50%;
+  transform:translateY(-50%);
+  pointer-events:none;
+}
+
+.lex-unit-field-prefix.lex-unit-field-boxed > .lex-unit {
+  inset-inline:auto;
+  inset-inline-start:.65em;
+}
+
+.lex-record-id {
+  display:inline-flex;
+  min-width:0;
+  align-items:baseline;
+  justify-content:flex-end;
+  color:color-mix(in srgb, var(--lex-text) 62%, var(--lex-panel)) !important;
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
+  white-space:nowrap;
+}
+
+.lex-numbered-id-cell .lex-column-cell-content,
+.lex-numbered-id-cell .lex-record-id { width:100%; }
+.lex-numbered-id-cell .lex-record-id { justify-content:flex-start; }
+
+.lex-record-id-prefix {
+  flex:0 0 auto;
+}
+
+.lex-detail-panel {
+  --lex-detail-label-width:clamp(125px, 18%, 230px);
+  display:grid !important;
+  /* Every Detail reserves the same top tenth for identity. Plugins may scale
+     the contents inside it, but they must not make the heading consume more
+     of the editing surface. */
+  grid-template-rows:10% minmax(0,1fr) !important;
+  min-width: 0;
+  min-height: 0;
+}
+
+.lex-detail-panel.no-heading { grid-template-rows:minmax(0,1fr) !important; }
+
+.lex-detail-panel-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height:0;
+  height:100%;
+  padding: 10px 14px 10px 10px;
+  overflow:hidden;
+}
+.lex-detail-panel-heading.no-icon .lex-detail-panel-identity { grid-column-start:1; }
+.lex-detail-panel-heading.no-actions .lex-detail-panel-identity { grid-column:2 / -1; }
+.lex-detail-panel-heading.no-icon.no-actions .lex-detail-panel-identity { grid-column:1 / -1; }
+
+.lex-detail-panel-icon {
+  display: grid;
+  /* Plugins that declare --lex-detail-icon-size get that size. Everything
+     else keeps sizing itself to the heading row. */
+  width: var(--lex-detail-icon-size, auto);
+  height: var(--lex-detail-icon-size, 100%);
+  aspect-ratio: 1;
+  min-width: 0;
+  min-height: 0;
+  place-items: center;
+  overflow: hidden;
+}
+
+.lex-detail-panel-identity {
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:6px 14px;
+  min-width:0;
+}
+.lex-detail-panel-identity:has(> .lex-detail-panel-id) { padding-right:clamp(50px,10%,120px); }
+.lex-detail-panel-title { min-width:0;margin:0;font-size:clamp(21px,2.5vw,32px);line-height:1.1; }
+.lex-detail-panel-meta { font-size:clamp(15px,1.45vw,20px); }
+.lex-detail-panel-meta { color: var(--lex-muted); }
+.lex-detail-panel-id { color:color-mix(in srgb,var(--lex-muted) 42%,var(--lex-panel)); }
+.lex-detail-panel-id { position:absolute;top:calc(50% - 2px);right:0;display:flex;align-items:center;justify-self:end;margin-left:auto;font-size:clamp(30px,3.6vw,48px);font-weight:300;line-height:1;text-align:right;transform:translateY(-50%); }
+.lex-detail-panel-id .lex-record-id { align-items:center;line-height:1; }
+.lex-detail-panel-meta { grid-column:1 / -1; }
+.lex-detail-panel-actions {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: 6px;
+}
+
+.lex-detail-panel-body {
+  display:flex;
+  flex-direction:column;
+  min-width:0;
+  min-height:0;
+  overflow:auto;
+
+  /* Corner pins overhang their field by a few pixels by design. Without
+     this the panel grew a horizontal scrollbar for that overhang alone. */
+  overflow-x:clip;
+}
+
+.lex-detail-section {
+  position:relative;
+  min-width:0;
+  border:1px solid var(--lex-border);
+  background:var(--lex-panel);
+}
+
+.lex-detail-section-title {
+  position:static;
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin:0;
+  padding:8px 10px;
+  color:var(--lex-text);
+  border-bottom:1px solid var(--lex-border);
+  background:transparent;
+  font:750 .86em/1 var(--lex-heading-font);
+  letter-spacing:.08em;
+}
+
+.lex-detail-section-content { min-width:0; }
+
+.lex-detail-field {
+  --lex-field-type-gutter:20px;
+  position:relative;
+  display:grid;
+  box-sizing:border-box;
+  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr);
+  align-items:center;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding-inline-start:var(--lex-field-type-gutter);
+  /* The gutter exists to hold the vertical type rail on the LEFT, but with
+     nothing matching it on the right every field sat 20px off centre in its
+     panel. Mirroring it keeps the rail its room and leaves equal air on both
+     sides, which is what the eye actually reads as centred. */
+  padding-inline-end:var(--lex-field-type-gutter);
+  overflow:visible;
+  border-bottom:1px solid color-mix(in srgb,var(--lex-border) 45%,transparent);
+}
+
+.lex-field-type-rail {
+  /* The rail must always be tall enough for a four character type code.
+     Left to size itself it settled at 11px for STR, which clipped the
+     vertical label into glyph fragments and made it jump 16px on hover when
+     the font was recomputed. */
+  min-height:2.7em;
+  position:absolute;
+  z-index:5;
+  top:0;
+  /* Centred in the field's own gutter, which is sized to leave even air on
+     both sides of the label without spilling past the panel's padding. */
+  left:0;
+  width:var(--lex-field-type-gutter);
+  height:100%;
+  max-height:100%;
+  display:block;
+  color:var(--lex-muted);
+  font:700 9px/1 "Lexend", "Segoe UI", sans-serif;
+  letter-spacing:.08em;
+  pointer-events:none;
+  opacity:0;
+  transform:none;
+  transition:opacity .14s ease,color .14s ease;
+}
+
+/* The lock sits inside the value box, right-aligned and the normal way up.
+   It used to live in the vertical type rail, which is why it was rotated. */
+.lex-has-readonly-lock { position:relative; }
+.lex-detail-field-control.lex-has-readonly-lock { --lex-readonly-lock-inset:10px; }
+.lex-field-readonly-lock {
+  position:absolute;
+  z-index:2;
+  top:50%;
+  /* The host carries padding the input does not span, so a plain right:6px
+     put the lock past the box border. Offset by that padding so it sits
+     inside the value box with a real margin. */
+  right:calc(6px + var(--lex-readonly-lock-inset, 0px));
+  width:11px;
+  height:11px;
+  fill:currentColor;
+  opacity:.75;
+  transform:translateY(-50%);
+  pointer-events:none;
+}
+
+.lex-field-type-name {
+  position:absolute;
+  top:50%;
+  left:50%;
+  display:block;
+  white-space:nowrap;
+  padding:3px 2px;
+  background:transparent;
+  writing-mode:horizontal-tb;
+  text-orientation:mixed;
+  letter-spacing:.05em;
+  transform:translate(-50%,-50%) rotate(-90deg);
+  transform-origin:center;
+  transition:left .16s ease,opacity .12s ease,font-size .12s ease;
+}
+
+/* The range is the same rail label, not a second floating chip: focusing the
+   input swaps the type name out for the values it accepts, in place. */
+.lex-field-type-range {
+  position:absolute;
+  top:50%;
+  left:50%;
+  display:block;
+  /* One line, always. In vertical writing mode wrapping adds a second
+     column, which is what made the range read as multiple rows. */
+  white-space:nowrap;
+  padding:3px 2px;
+  background:transparent;
+  writing-mode:horizontal-tb;
+  text-orientation:mixed;
+  letter-spacing:.02em;
+  opacity:0;
+  transform:translate(-50%,-50%) rotate(-90deg);
+  transform-origin:center;
+  transition:left .16s ease,opacity .12s ease;
+}
+
+.lex-detail-field:hover .lex-field-type-rail,
+.lex-detail-field:focus-within .lex-field-type-rail {
+  color:var(--lex-highlight);
+  opacity:1;
+}
+.lex-detail-field:not(:focus-within) .lex-field-type-range { display:block;opacity:0; }
+.lex-field-type-rail:hover { z-index:6; }
+.lex-field-type-rail:hover > span { font-size:13px !important; }
+.lex-detail-field:focus-within:has(.lex-field-type-range) .lex-field-type-name { left:25%; }
+.lex-detail-field:focus-within .lex-field-type-range { left:75%;opacity:1; }
+
+.lex-detail-field.lex-boolean-field {
+  grid-template-columns:minmax(0,1fr) auto;
+}
+/* The arrow has to reach the box it points at, so the two insets between the
+   label column and the checkbox are removed for boolean rows only. */
+.lex-boolean-field > .lex-detail-field-label { padding-right:0; }
+.lex-boolean-field > .lex-detail-field-control { padding-left:0; }
+.lex-boolean-field .lex-detail-field-label { min-width:0; }
+.lex-field-boolean-arrow {
+  position:relative;
+  flex:1 1 auto;
+  min-width:24px;
+  height:1px;
+  margin-left:3px;
+  margin-right:-22px;
+  background:color-mix(in srgb,var(--lex-border) 72%,transparent);
+}
+.lex-field-boolean-arrow::after {
+  position:absolute;
+  right:0;
+  top:-3px;
+  width:6px;
+  height:6px;
+  content:"";
+  border-top:1px solid var(--lex-border);
+  border-right:1px solid var(--lex-border);
+  transform:rotate(45deg);
+}
+.lex-boolean-field .lex-detail-field-control {
+  display:flex;
+  min-width:58px;
+  justify-content:flex-end;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control { width:auto; }
+input[type="checkbox"] { accent-color:var(--lex-accent); }
+
+.lex-boolean-mark { font:800 1.08em/1 "Lexend", "Segoe UI Symbol", sans-serif; }
+.lex-boolean-mark.true { color:#159447; }
+.lex-boolean-mark.false { color:#c83232; }
+
+.lex-detail-field:last-child { border-bottom:0; }
+.lex-detail-field-label,
+.lex-detail-field-control { position:relative;min-width:0;padding:8px 10px; }
+.lex-detail-field-label { display:flex;align-items:center;gap:6px; }
+.lex-detail-field-control > :is(input,select,textarea,.lex-source-control) { width:100%; }
+.lex-detail-field-control > .lex-column-pin { position:absolute;z-index:3;top:4px;right:4px; }
+.lex-tabbed-panel { display:flex;min-width:0;min-height:0;flex-direction:column;overflow:hidden; }
+.lex-tabbed-panel > .lex-tabbed-panel-tabs { flex:0 0 auto; }
+.lex-tabbed-panel-content { min-width:0;min-height:0;flex:1 1 auto;overflow:auto; }
+.lex-detail-field-control:has(> .lex-source-control) > .lex-column-pin {
+  right:calc(var(--lex-field-reference-rail-width, 9em) + 12px);
+}
+
+.lex-subtab-bar {
+  display:flex;
+  flex:0 0 auto;
+  min-width:0;
+  border-bottom:1px solid var(--lex-border);
+  background:var(--lex-panel-2);
+}
+
+.lex-subtab-button {
+  flex:1 1 0;
+  min-width:0;
+  box-sizing:border-box;
+  height:min(31px, calc(var(--lex-command-row-height) * .6667));
+  min-height:min(31px, calc(var(--lex-command-row-height) * .6667));
+  padding:4px 16px;
+  color:var(--lex-muted);
+  border:0;
+  border-right:0;
+  border-radius:0;
+  background:transparent;
+  font:800 .98em/1 var(--lex-heading-font);
+  letter-spacing:.03em;
+  text-transform:uppercase;
+  cursor:pointer;
+}
+
+.lex-subtab-button:hover { color:var(--lex-text);border-radius:8px 8px 0 0;background:color-mix(in srgb,var(--lex-panel-2) 72%,var(--lex-highlight));transform:translateY(-3px); }
+.lex-subtab-button.active { color:var(--lex-accent-text);border-radius:8px 8px 0 0;background:var(--lex-accent);transform:translateY(-3px); }
+.lex-subtab-button:focus-visible { position:relative;z-index:1;outline:2px solid var(--lex-highlight);outline-offset:-2px; }
+
+.lex-curve-editor {
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  grid-template-areas:
+    "heading"
+    "plot"
+    "formula"
+    "status";
+  gap:8px 12px;
+  min-width:0;
+  padding:10px;
+  border:1px solid var(--lex-border);
+  background:var(--lex-panel-2);
+}
+
+.lex-curve-heading {
+  grid-area:heading;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  min-width:0;
+}
+
+.lex-curve-heading h4 { margin:0;font:700 1.1em/1 var(--lex-heading-font); }
+.lex-curve-heading-formula { margin-left:.55em;color:var(--lex-muted);font-size:.72em;font-weight:400; }
+.lex-curve-extrema { display:flex;gap:12px;color:var(--lex-muted);white-space:nowrap; }
+.lex-curve-extrema output { color:var(--lex-text);font-variant-numeric:tabular-nums; }
+/* The drawing space now stretches to fill the plot, so every stroke inside
+   it must opt out of that scaling or the lines would thin and thicken with
+   the box. */
+.lex-curve-svg path,
+.lex-curve-svg line,
+.lex-curve-svg polyline { vector-effect:non-scaling-stroke; }
+
+/* The stat name reads as a background image behind its own curve: centred on
+   both axes, heavy, and faint enough that the plot stays legible over it. */
+.lex-curve-watermark {
+  position:absolute;
+  inset:0;
+  z-index:0;
+  display:grid;
+  place-items:center;
+  font:900 clamp(22px, 30cqh, 96px)/1 var(--lex-font);
+  letter-spacing:.06em;
+  color:var(--lex-text);
+  opacity:.13;
+  pointer-events:none;
+  user-select:none;
+  overflow:hidden;
+  white-space:nowrap;
+}
+/* The stat name reads as a watermark behind its own plot: very large, heavy,
+   centred both ways, and faint enough that the curve in front stays legible. */
+.lex-curve-watermark {
+  position:absolute;
+  z-index:2;
+  inset:0;
+  display:grid;
+  place-items:center;
+  /* It was painted in the text colour with a hard 2px drop shadow, so on a
+     dark theme it LIGHTENED the plot and the shadow made it read as a label
+     rather than a watermark. A flat darkening would have solved the first
+     problem and vanished on a black background, so instead it blends by
+     DIFFERENCE against white: the result is |backdrop - white| mixed in at
+     13%, which darkens a light plot, lightens a black one, and can never
+     come out invisible whatever the theme sets behind it. */
+  color:#fff;
+  mix-blend-mode:difference;
+  text-shadow:none;
+  opacity:.13;
+  font:900 clamp(28px,4.4vw,74px)/1 var(--lex-heading-font,var(--lex-font));
+  letter-spacing:.02em;
+  pointer-events:none;
+  user-select:none;
+}
+/* Every graph needs its own edge, or the plot backgrounds of neighbouring
+   graphs run together into one unreadable grey field. */
+.lex-curve-plot {
+  position:relative;
+  isolation:isolate;
+  border:1px solid color-mix(in srgb,var(--lex-border) 70%,transparent);
+}
+.lex-curve-svg, .lex-curve-axis, .lex-curve-axis-name { position:relative;z-index:1; }
+/* The stat name IS the title now, so the small heading label is redundant. */
+.ff8-character-curve .lex-curve-heading-title { display:none; }
+
+.lex-curve-plot { container-type:size; }
+.lex-curve-plot > .lex-curve-svg { position:relative; z-index:1; }
+
+.lex-curve-plot { position:relative;grid-area:plot;min-width:0;aspect-ratio:2/1;padding:14px 20px 20px 31px; }
+.lex-curve-svg { display:block;width:100%;height:100%;overflow:visible;border:1px solid var(--lex-border);background:color-mix(in srgb,var(--lex-bg) 58%,var(--lex-panel)); }
+.lex-curve-grid-lines { fill:none;stroke:color-mix(in srgb,var(--lex-border) 42%,transparent);stroke-width:1;vector-effect:non-scaling-stroke; }
+.lex-curve-fill { fill:var(--lex-curve-fill,color-mix(in srgb,var(--lex-accent) 22%,transparent));stroke:none; }
+.lex-curve-line { stroke:var(--lex-highlight);stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round;shape-rendering:geometricPrecision;vector-effect:non-scaling-stroke; }
+.lex-curve-path-formula { display:none;fill:var(--lex-text);font:600 10px/1 var(--lex-font);pointer-events:none; }
+.lex-curve-guide { stroke:var(--lex-accent);stroke-width:1.5;stroke-dasharray:3 3;vector-effect:non-scaling-stroke;pointer-events:none; }
+.lex-curve-guide:not([x1]) { display:none; }
+.lex-curve-point-marker { fill:none;stroke:var(--lex-accent);stroke-width:2;vector-effect:non-scaling-stroke;pointer-events:none; }
+.lex-curve-point-marker:not([d]) { display:none; }
+/* The plot reserves a margin on every side so the scale numbers and the axis
+   names sit outside the drawing instead of over the curve. */
+/* The margin used to be one value on all four sides, so the top and right
+   reserved as much room as the left needs for "4,080" - pure waste that made
+   the plot look adrift in its box. Only the left carries the Y numbers and
+   only the bottom carries the X numbers and the axis name, so those two keep
+   their room and the other two are cut to a hairline. --lex-curve-margin is
+   kept as the left value because existing rules position labels against it. */
+.lex-curve-plot {
+  /* One margin on all four sides. It used to be four different values -
+     fat on the left for "4,080", fat at the bottom for LEVEL, hairlines
+     elsewhere - which read as a lopsided frame. The scale numbers and the
+     axis names now sit INSIDE the drawing, inset from its border, so the
+     frame can be even the whole way round at the right-hand value. */
+  --lex-curve-margin:.75em;
+  --lex-curve-margin-bottom:.75em;
+  --lex-curve-margin-top:.75em;
+  --lex-curve-margin-right:.75em;
+  /* Labels sat 2px from the border, reading as touching it. */
+  --lex-curve-label-inset:7px;
+}
+.lex-curve-axis { position:absolute;color:var(--lex-muted);font-size:.72em;line-height:1; }
+/* The vertical extremes belong in the left margin, level with the ends of
+   the drawing they describe. */
+.lex-curve-axis-top { display:block;top:calc(var(--lex-curve-margin-top) + 3px);left:calc(var(--lex-curve-margin) + var(--lex-curve-label-inset)); }
+.lex-curve-axis-bottom { display:block;bottom:calc(var(--lex-curve-margin-bottom) + 3px);left:calc(var(--lex-curve-margin) + var(--lex-curve-label-inset)); }
+/* The domain's first value sits beside the range's, not on top of it: the
+   bottom-left corner carries both "0" (the Y minimum) and "1" (level one). */
+.lex-curve-axis-start { bottom:calc(var(--lex-curve-margin-bottom) + 3px);left:calc(var(--lex-curve-margin) + var(--lex-curve-label-inset) + 2.4em); }
+.lex-curve-axis-end { right:calc(var(--lex-curve-margin-right) + var(--lex-curve-label-inset));bottom:calc(var(--lex-curve-margin-bottom) + 3px); }
+.lex-curve-axis-name {
+  position:absolute;
+  color:var(--lex-muted);
+  font-size:.68em;
+  letter-spacing:.08em;
+  line-height:1;
+  pointer-events:none;
+}
+/* LEVEL sat 1px off the bottom border and HP 1px off the left, which reads
+   as the labels touching the edge of the box. Both now share the label
+   inset the scale numbers use. */
+/* The names ride inside the drawing too, so no side of the frame has to be
+   fattened to hold them. */
+.lex-curve-axis-name-x {
+  bottom:calc(var(--lex-curve-margin-bottom) + 3px);
+  left:50%;
+  transform:translateX(-50%);
+}
+.lex-curve-axis-name-y {
+  top:50%;
+  left:calc(var(--lex-curve-margin) + 3px);
+  transform:translateY(-50%) rotate(180deg);
+  writing-mode:vertical-rl;
+}
+.lex-curve-hover-extrema { display:none;position:absolute;z-index:3;right:0;bottom:0;left:0;justify-content:space-between;color:var(--lex-muted);font-size:.75em;line-height:1;pointer-events:none; }
+.lex-curve-variables { display:grid;grid-template-columns:minmax(0,1fr);align-content:space-between;gap:4px;min-width:0; }
+.lex-curve-variable-overlay { position:absolute;z-index:4;top:14px;right:20px;bottom:20px;width:clamp(92px,28%,142px);padding:6px;background:color-mix(in srgb,var(--lex-bg) 78%,transparent);opacity:0;pointer-events:none;transition:opacity .12s ease; }
+.lex-curve-plot:hover .lex-curve-variable-overlay,.lex-curve-plot:focus-within .lex-curve-variable-overlay { opacity:1;pointer-events:auto; }
+.lex-curve-variable { display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:6px;min-width:0; }
+.lex-curve-variable > span { color:var(--lex-muted);font-size:.85em; }
+.lex-curve-variable-a { color:#f05b5b !important; fill:#f05b5b !important; }
+.lex-curve-variable-b { color:#63a8ff !important; fill:#63a8ff !important; }
+.lex-curve-variable-c { color:#f1d34f !important; fill:#f1d34f !important; }
+.lex-curve-variable-d { color:#62c66b !important; fill:#62c66b !important; }
+.lex-curve-variable > :is(input,select,.lex-source-control) { width:100%;min-width:0; }
+.lex-curve-formula { grid-area:formula;height:2.8em;box-sizing:border-box;overflow:hidden;padding:4px 6px;color:var(--lex-text);background:transparent;font-variant-numeric:tabular-nums;line-height:1.35; }
+.lex-curve-tooltip { position:absolute;z-index:6;min-width:max-content;padding:2px 5px;color:var(--lex-text);background:color-mix(in srgb,var(--lex-bg) 86%,transparent);font-size:.78em;line-height:1;pointer-events:none;transform:translate(-50%,-115%); }
+.lex-curve-tooltip:empty { display:none; }
+.lex-curve-variable-highlight { filter:brightness(1.45) drop-shadow(0 0 4px currentColor); }
+.lex-curve-status { grid-area:status;min-height:1em;color:#d96c65; }
+.lex-curve-status:empty { display:none; }
+
+@media (max-width:760px) { .lex-curve-variable-overlay { width:clamp(84px,31%,120px); } }
+
+.lex-unit-field > input,
+.lex-unit-field > select { min-width: 0; }
+.lex-unit {
+  display:inline-flex;
+  align-items:center;
+  padding-block:.35em;
+  color: var(--lex-highlight);
+  font: inherit;
+  font-size:.82em;
+  line-height:1;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.lex-unit-multiplier {
+  font-family:"Lexend", "Segoe UI Symbol", sans-serif;
+  font-size:1.08em;
+  line-height:1;
+}
+
+.lex-readonly-field:disabled {
+  opacity:1;
+  color:var(--lex-muted) !important;
+  -webkit-text-fill-color:var(--lex-muted);
+  background:color-mix(in srgb, var(--lex-panel-2) 72%, var(--lex-panel)) !important;
+  cursor:default;
+}
+
+.lex-number {
+  font-family:"Lexend", "Segoe UI", system-ui, sans-serif;
+  font-kerning:none;
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"kern" 0,"tnum" 1;
+  letter-spacing:0;
+  white-space:nowrap;
+}
+
+.lex-magnitude {
+  display:inline-grid;
+  grid-template-columns:var(--lex-magnitude-integers) max-content var(--lex-magnitude-fractions);
+  justify-content:end;
+  width:calc(var(--lex-magnitude-integers) + var(--lex-magnitude-fractions) + .65ch);
+}
+.lex-magnitude-integer { text-align:right; }
+.lex-magnitude-fraction { text-align:left; }
+.lex-magnitude-decimal { width:.65ch;text-align:center; }
+
+.lex-window-actions {
+  flex: 0 0 auto;
+  gap: 1px;
+  margin-left: auto;
+}
+
+.lex-window-button {
+  position: relative;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--lex-text);
+  border: 1px solid var(--lex-border);
+  border-radius: 2px;
+  background: var(--lex-panel-2);
+  cursor: pointer;
+}
+
+.lex-window-button:hover {
+  color: var(--lex-highlight);
+  border-color: var(--lex-highlight);
+}
+
+.lex-window-close:hover {
+  color: #fff;
+  border-color: #c42b1c;
+  background: #c42b1c;
+}
+
+.lex-window-icon,
+.lex-window-icon::before,
+.lex-window-icon::after {
+  position: absolute;
+  display: block;
+  content: "";
+}
+
+.lex-window-icon {
+  inset: 0;
+  pointer-events: none;
+}
+
+[data-window-action="minimize"] .lex-window-icon::before {
+  top: 18px;
+  left: 12px;
+  width: 10px;
+  border-top: 1px solid currentColor;
+}
+
+[data-window-action="maximize"] .lex-window-icon::before {
+  top: 12px;
+  left: 12px;
+  width: 9px;
+  height: 9px;
+  border: 1px solid currentColor;
+}
+
+body[data-window-maximized="true"] [data-window-action="maximize"] .lex-window-icon::before {
+  top: 14px;
+  left: 11px;
+  width: 8px;
+  height: 8px;
+}
+
+body[data-window-maximized="true"] [data-window-action="maximize"] .lex-window-icon::after {
+  top: 11px;
+  left: 14px;
+  width: 8px;
+  height: 8px;
+  border: 1px solid currentColor;
+  background: var(--lex-panel-2);
+}
+
+body[data-window-maximized="true"] [data-window-action="maximize"]:hover .lex-window-icon::after {
+  background: inherit;
+}
+
+[data-window-action="close"] .lex-window-icon::before,
+[data-window-action="close"] .lex-window-icon::after {
+  top: 17px;
+  left: 11px;
+  width: 12px;
+  border-top: 1px solid currentColor;
+}
+
+[data-window-action="close"] .lex-window-icon::before { transform: rotate(45deg); }
+[data-window-action="close"] .lex-window-icon::after { transform: rotate(-45deg); }
+
+.lex-window-resize-handle {
+  position: fixed;
+  z-index: 1000;
+}
+
+.lex-window-drag-region {
+  user-select: none;
+}
+
+.lex-window-resize-handle.top,
+.lex-window-resize-handle.bottom {
+  right: 8px;
+  left: 8px;
+  height: 5px;
+  cursor: ns-resize;
+}
+
+.lex-window-resize-handle.left,
+.lex-window-resize-handle.right {
+  top: 8px;
+  bottom: 8px;
+  width: 5px;
+  cursor: ew-resize;
+}
+
+.lex-window-resize-handle.top { top: 0; }
+.lex-window-resize-handle.right { right: 0; }
+.lex-window-resize-handle.bottom { bottom: 0; }
+.lex-window-resize-handle.left { left: 0; }
+
+.lex-window-resize-handle.top-left,
+.lex-window-resize-handle.top-right,
+.lex-window-resize-handle.bottom-right,
+.lex-window-resize-handle.bottom-left {
+  width: 10px;
+  height: 10px;
+}
+
+.lex-window-resize-handle.top-left { top: 0; left: 0; cursor: nwse-resize; }
+.lex-window-resize-handle.top-right { top: 0; right: 0; cursor: nesw-resize; }
+.lex-window-resize-handle.bottom-right { right: 0; bottom: 0; cursor: nwse-resize; }
+.lex-window-resize-handle.bottom-left { bottom: 0; left: 0; cursor: nesw-resize; }
+
+body[data-window-maximized="true"] .lex-window-resize-handle {
+  display: none;
+}
+
+.lex-history-button {
+  width: 38px;
+  min-width: 38px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  color: var(--lex-text);
+  background: var(--lex-panel-2);
+  cursor: pointer;
+  font: 700 18px/1 var(--lex-symbol-font);
+}
+.lex-history-button svg { display:block;width:21px;height:21px;margin:auto; }
+
+.lex-help-button {
+  display: inline-grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--lex-highlight);
+  border: 1px solid var(--lex-border);
+  border-radius: 50%;
+  background: var(--lex-panel-2);
+  cursor: pointer;
+  font: 900 17px/1 var(--lex-symbol-font);
+  place-items: center;
+}
+
+.lex-help-button svg { display: block; width: 20px; height: 20px; }
+
+.lex-help-button:hover,
+.lex-help-button.active {
+  color: var(--lex-accent-text);
+  border-color: var(--lex-accent);
+  background: var(--lex-accent);
+}
+
+.lex-settings-button {
+  display: inline-grid;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  color: var(--lex-highlight);
+  border: 1px solid var(--lex-border);
+  border-radius: 50%;
+  background: var(--lex-panel-2);
+  cursor: pointer;
+}
+
+.lex-settings-button svg {
+  display: block;
+  fill: currentColor;
+}
+
+.lex-settings-button:hover {
+  color: var(--lex-accent-text);
+  border-color: var(--lex-accent);
+  background: var(--lex-accent);
+}
+
+.lex-developer-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+}
+
+.lex-developer-button {
+  display: inline-grid;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 7px;
+  place-items: center;
+  color: var(--lex-highlight);
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel-2);
+  cursor: pointer;
+}
+
+.lex-developer-button:hover,
+.lex-developer-button.active {
+  color: var(--lex-accent-text);
+  border-color: var(--lex-accent);
+  background: var(--lex-accent);
+}
+
+.lex-developer-button svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+
+#plugin-restart svg { fill: none; }
+
+body[data-lex-github-open="true"] > :not(.lex-shell-header):not(.lex-github-workspace):not(.lex-window-resize-handle):not(.lex-dialog-backdrop) {
+  display: none !important;
+}
+
+.lex-github-workspace {
+  display: flex;
+  height: calc(100vh - 104px);
+  min-height: 420px;
+  padding: 0 16px 16px;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--lex-text);
+  background: var(--lex-bg);
+  font-family: var(--lex-font);
+  user-select: text;
+}
+
+.lex-github-subtabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 0 0 auto;
+  margin: 0 -16px 9px;
+  background: var(--lex-accent);
+}
+
+.lex-github-workflow-tab {
+  position: relative;
+  min-height: 40px;
+  padding: 7px 12px;
+  color: color-mix(in srgb, var(--lex-accent-text) 72%, transparent);
+  border: 0;
+  border-right: 1px solid color-mix(in srgb, var(--lex-bg) 30%, transparent);
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  font: 900 13px/1 var(--lex-heading-font);
+}
+
+.lex-github-workflow-tab:last-child {
+  border-right: 0;
+}
+
+.lex-github-workflow-tab:hover {
+  color: var(--lex-accent-text);
+  background: color-mix(in srgb, var(--lex-bg) 14%, transparent);
+}
+
+.lex-github-workflow-tab.active {
+  color: var(--lex-accent-text);
+}
+
+.lex-github-workflow-tab.active::after {
+  position: absolute;
+  right: 28%;
+  bottom: 4px;
+  left: 28%;
+  height: 3px;
+  content: "";
+  background: var(--lex-highlight);
+}
+
+.lex-github-toolbar {
+  display: grid;
+  grid-template-columns: max-content minmax(180px, 1fr) minmax(120px, auto) 36px;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+
+.lex-github-toolbar input,
+.lex-github-toolbar button,
+.lex-github-editor input,
+.lex-github-editor textarea,
+.lex-github-editor button,
+.lex-github-comments-panel textarea,
+.lex-github-comments-panel button {
+  min-height: 36px;
+  padding: 7px 10px;
+  color: var(--lex-text);
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel-2);
+  font: 600 13px/1.3 var(--lex-font);
+}
+
+.lex-github-toolbar button,
+.lex-github-editor button,
+.lex-github-comments-panel button {
+  color: var(--lex-accent-text);
+  border-color: var(--lex-accent);
+  background: var(--lex-accent);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.lex-github-toolbar button:disabled,
+.lex-github-editor button:disabled,
+.lex-github-comments-panel button:disabled {
+  cursor: default;
+  opacity: .5;
+}
+
+.lex-github-repository {
+  display: block;
+  max-width: 240px;
+  min-width: 0;
+  color: var(--lex-highlight);
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lex-github-status {
+  min-width: 0;
+  padding: 0;
+  color: var(--lex-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lex-github-status.error,
+.lex-github-empty.error {
+  color: #d96c65;
+}
+
+.lex-github-layout {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.lex-github-issue-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) 18px max-content;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 36px;
+  padding: 5px 8px;
+  color: var(--lex-text);
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--lex-border) 55%, transparent);
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.lex-github-issue-row:hover {
+  background: var(--lex-panel-2);
+}
+
+.lex-github-issue-row.selected {
+  box-shadow: inset 4px 0 var(--lex-accent);
+  background: color-mix(in srgb, var(--lex-accent) 18%, var(--lex-panel));
+}
+
+.lex-github-comment-meta,
+.lex-github-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.lex-github-issue-number,
+.lex-github-detail-number {
+  color: var(--lex-muted);
+  font: 700 12px/1.2 "Cascadia Mono", Consolas, monospace;
+}
+
+.lex-github-state {
+  display: inline-flex;
+  padding: 2px 5px;
+  color: #fff;
+  border-radius: 999px;
+  background: #6e7781;
+  font: 800 9px/1.2 var(--lex-font);
+}
+
+.lex-github-state.open { background: #238636; }
+.lex-github-state.closed { background: #8957e5; }
+
+.lex-github-issue-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 800;
+}
+
+.lex-github-label-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.lex-github-label-chip,
+.lex-github-label-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 7px;
+  color: var(--lex-text);
+  border: 1px solid var(--github-label);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--github-label) 18%, var(--lex-panel));
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.lex-github-label-option {
+  cursor: pointer;
+}
+
+.lex-github-label-option input {
+  width: 14px;
+  height: 14px;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--github-label);
+}
+
+.lex-github-priority-mark {
+  color: transparent;
+  font: 1000 19px/1 var(--lex-heading-font);
+  text-align: center;
+}
+
+.lex-github-priority-mark.active {
+  color: var(--lex-highlight);
+}
+
+.lex-github-updated {
+  color: var(--lex-muted);
+  font-size: 11px;
+}
+
+.lex-github-editor {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  flex-direction: column;
+  overflow: auto;
+}
+
+.lex-github-title-row {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.lex-github-editor .lex-github-title-input {
+  width: 100%;
+  color: var(--lex-text);
+  font-size: 17px;
+}
+
+.lex-github-editor .lex-github-body-input {
+  width: 100%;
+  min-height: 240px;
+  flex: 1 0 240px;
+  resize: vertical;
+  color: var(--lex-text);
+  font: 13px/1.45 "Cascadia Mono", Consolas, monospace;
+}
+
+.lex-github-edit-actions {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.lex-github-edit-status {
+  color: var(--lex-muted);
+  font-size: 12px;
+}
+
+.lex-github-labels-section {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--lex-border);
+}
+
+.lex-github-labels-section h3,
+.lex-github-comments-head h3 {
+  margin: 0 0 8px;
+  color: var(--lex-highlight);
+  font: 900 13px/1.2 var(--lex-heading-font);
+}
+
+.lex-github-comments-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.lex-github-comments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 10px 2px;
+  border-bottom: 1px solid var(--lex-border);
+}
+
+.lex-github-comments-head h3 {
+  margin: 0;
+}
+
+.lex-github-comments-panel .lex-github-priority-toggle {
+  width: 34px;
+  min-width: 34px;
+  min-height: 30px;
+  padding: 0;
+  color: var(--lex-muted);
+  border-color: var(--lex-border);
+  background: var(--lex-panel-2);
+  font: 1000 22px/1 var(--lex-heading-font);
+}
+
+.lex-github-comments-panel .lex-github-priority-toggle:hover,
+.lex-github-comments-panel .lex-github-priority-toggle.active {
+  color: var(--lex-bg);
+  border-color: var(--lex-highlight);
+  background: var(--lex-highlight);
+}
+
+.lex-github-comments-feed {
+  min-height: 0;
+  padding: 0 10px 10px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.lex-github-comment {
+  margin-top: 10px;
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel-2);
+}
+
+.lex-github-comment-meta {
+  padding: 7px 10px;
+  color: var(--lex-muted);
+  border-bottom: 1px solid var(--lex-border);
+  font-size: 11px;
+}
+
+.lex-github-comment-body {
+  padding: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.lex-github-comment-composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 9px;
+  border-top: 1px solid var(--lex-border);
+  background: var(--lex-panel);
+}
+
+.lex-github-comments-panel .lex-github-comment-input {
+  width: 100%;
+  min-height: 62px;
+  max-height: 150px;
+  resize: vertical;
+}
+
+.lex-github-comment-post {
+  align-self: end;
+}
+
+.lex-github-empty {
+  padding: 20px;
+  color: var(--lex-muted);
+  text-align: center;
+}
+
+@media (max-width: 1100px) {
+  .lex-github-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .lex-github-repository {
+    grid-column: 1 / -1;
+    max-width: none;
+  }
+}
+
+.lex-history-button:hover:not(:disabled) {
+  border-color: var(--lex-highlight);
+  color: var(--lex-highlight);
+}
+
+.lex-history-button:disabled {
+  cursor: default;
+  opacity: .38;
+}
+
+.lex-panel-layout {
+  display: grid;
+  grid-template-columns: var(--lex-panel-layout-template, minmax(0, 1fr));
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  align-items: start;
+}
+
+.lex-panel-layout.lex-panel-layout-static {
+  gap: var(--lex-panel-layout-gap, var(--lex-panel-gap, 14px));
+}
+
+.lex-panel-layout-pane {
+  min-width: 0;
+  min-height: 0;
+  align-self: start;
+}
+
+.lex-paged-list-detail {
+  grid-template-rows:minmax(0, 1fr) auto;
+  height:100%;
+  min-height:0;
+  overflow:hidden;
+}
+.lex-paged-list-detail.has-pager {
+  height:100%;
+}
+.lex-paged-list-detail > .lex-list,
+.lex-paged-list-detail > .lex-barrelled-master,
+.lex-paged-list-detail > .lex-detail {
+  min-height:0;
+  height:auto;
+  max-height:100%;
+  align-self:start;
+}
+
+.lex-paged-list-detail > .lex-panel-layout-divider {
+  height:auto;
+  min-height:0;
+  max-height:none;
+  align-self:stretch;
+}
+
+.lex-barrelled-master {
+  position: relative;
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lex-barrel-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--lex-barrels, 1), minmax(0, 1fr));
+  gap: 7px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.lex-barrel-grid > .lex-list {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.lex-barrel-control {
+  position: absolute;
+  top: 50%;
+  /* After rotation, half of the control's unrotated height sits to the right.
+     Pull that half-height onto the divider edge without covering its handle. */
+  right:calc(100% - 21px);
+  left:auto;
+  z-index: 5;
+  display: flex;
+  flex-direction:column;
+  min-height: 30px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  padding: 3px 5px;
+  color: var(--lex-muted);
+  border: 1px solid var(--lex-border);
+  border-radius: 3px;
+  background: var(--lex-panel-2);
+  opacity: 0;
+  pointer-events: none;
+  transform:translateY(-50%) rotate(-90deg);
+  transform-origin:center;
+  transition: opacity .1s ease;
+  white-space: nowrap;
+}
+
+.lex-barrel-buttons { display:flex;align-items:center;gap:4px; }
+
+.lex-panel-layout-divider:hover > .lex-barrel-control,
+.lex-barrel-control:hover,
+.lex-barrel-control.open,
+.lex-panel-layout-divider:focus-visible > .lex-barrel-control,
+.lex-panel-layout-divider:focus-within > .lex-barrel-control,
+.lex-panel-layout-divider.dragging > .lex-barrel-control,
+.lex-panel-layout-dragging .lex-panel-layout-divider > .lex-barrel-control {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lex-barrel-control button {
+  position: relative;
+  display: inline-grid;
+  width: 24px;
+  min-width: 24px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  place-items: center;
+  text-shadow: none;
+}
+
+.lex-barrel-control button::before,
+.lex-barrel-control button::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 2px;
+  content: "";
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+
+.lex-barrel-control .lex-barrel-decrease::after { display: none; }
+.lex-barrel-control .lex-barrel-increase::after { transform: translate(-50%, -50%) rotate(90deg); }
+
+.lex-barrel-control button:disabled {
+  opacity: .35;
+}
+
+.lex-barrel-label {
+  font-size: .78em;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.lex-barrel-count {
+  min-width: 1.4em;
+  color: var(--lex-text);
+  font-weight: 800;
+  text-align: center;
+}
+
+.lex-panel-layout-divider {
+  position: relative;
+  z-index: 2;
+  width:100%;
+  min-width:0;
+  min-height: 44px;
+  outline: 0;
+  cursor: col-resize;
+  touch-action: none;
+  align-self:stretch;
+}
+
+.lex-panel-layout-divider::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 10px;
+  height: 24px;
+  content: "";
+  border: 0;
+  border-radius: 0;
+  color: var(--lex-muted);
+  background: radial-gradient(circle, currentColor 1.2px, transparent 1.5px) 0 0 / 5px 6px;
+  transform: translate(-50%, -50%);
+  transition: color .12s ease;
+}
+
+.lex-panel-layout-divider:hover::before,
+.lex-panel-layout-divider:focus-visible::before,
+.lex-panel-layout-divider.dragging::before {
+  color: var(--lex-highlight);
+}
+
+body.lex-panel-layout-dragging,
+body.lex-panel-layout-dragging * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+.lex-list {
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel);
+}
+
+.lex-list.lex-fitted-page {
+  overflow-y: hidden;
+}
+
+.lex-list.lex-fitted-page[data-lex-fixed-rows] > .lex-list-row {
+  box-sizing:border-box;
+  height:var(--lex-fitted-row-height);
+  min-height:0;
+}
+
+.lex-column-list.lex-fitted-page[data-lex-fixed-rows] > .lex-column-list-row > .lex-column-list-cell {
+  min-height:0;
+}
+
+.lex-list-row {
+  color: var(--lex-text);
+  border-bottom: 1px solid color-mix(in srgb, var(--lex-border) 45%, transparent);
+  cursor: pointer;
+}
+
+.lex-list-row:not([aria-selected]) {
+  cursor: default;
+}
+
+.lex-list-row:hover {
+  background: var(--lex-panel-2);
+}
+
+.lex-list-row:last-child {
+  border-bottom: 0;
+}
+
+.lex-list-row.selected,
+.lex-list-row.sel {
+  color: var(--lex-highlight);
+  background: color-mix(in srgb, var(--lex-accent) 24%, var(--lex-panel));
+}
+
+.lex-detail {
+  min-width: 0;
+  overflow: auto;
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel);
+}
+
+.lex-column-list {
+  display: grid;
+  grid-template-columns: var(--lex-column-list-template);
+  grid-auto-rows: max-content;
+  align-content: start;
+  height:max-content;
+  align-self:start;
+}
+
+.lex-column-list-header,
+.lex-column-list-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: subgrid;
+  align-items: stretch;
+  min-width: 0;
+  overflow:visible;
+}
+
+.lex-column-list-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  color: var(--lex-highlight);
+  background: var(--lex-panel-2);
+}
+
+.lex-column-list-head-cell,
+.lex-column-list-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 8px 10px;
+  overflow: hidden;
+  border-right: 1px solid color-mix(in srgb, var(--lex-border) 55%, transparent);
+  text-align: center;
+  text-overflow: ellipsis;
+}
+
+.lex-column-list-head-cell {
+  padding:6px 10px;
+  font-size:1.06em;
+  font-weight:750;
+  /* 1.1 cropped descenders against the cell's overflow:hidden. */
+  line-height:1.35;
+}
+
+.lex-column-cell-content {
+  position:relative;
+  display:inline-flex;
+  overflow:hidden;
+  max-width:100%;
+  min-width:0;
+  align-items:center;
+  justify-content:inherit;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.lex-column-pointer-cell,
+.lex-column-pointer-cell > .lex-column-cell-content {
+  overflow:visible;
+}
+
+.lex-column-cell-content > :not(input):not(select):not(textarea) {
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.lex-column-list-cell:has(input[type="checkbox"]) .lex-source-control > input[type="checkbox"] {
+  justify-self:center;
+}
+
+.lex-editable-table .lex-column-cell-content { width:100%; }
+.lex-column-list-cell:has(.lex-source-control) .lex-column-cell-content { width:100%; }
+
+/* Editable table controls occupy the complete cell. Their compact provenance
+   lane overlays the right edge instead of shortening the input or select. */
+.lex-editable-table .lex-source-control {
+  --lex-reference-rail-width:clamp(1.8em,20%,3.2em) !important;
+  position:relative;
+  display:block;
+  width:100%;
+}
+.lex-editable-table .lex-source-control > :is(input:not([type="checkbox"]),select,textarea,.lex-unit-field,.lex-readonly-field) {
+  box-sizing:border-box;
+  width:100%;
+  padding-right:calc(var(--lex-reference-rail-width) + .4em);
+}
+.lex-editable-table .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  position:absolute;
+  z-index:2;
+  top:1px;
+  right:2px;
+  bottom:1px;
+  width:var(--lex-reference-rail-width);
+  min-width:0;
+  justify-content:center;
+}
+
+.lex-editable-table input[type="checkbox"] {
+  width:18px;
+  height:18px;
+  justify-self:center;
+}
+
+.lex-column-list-head-cell {
+  white-space: nowrap;
+}
+
+.lex-column-list-head-cell[draggable="true"] { cursor:grab; }
+.lex-column-list-head-cell[draggable="true"]:active { cursor:grabbing; }
+
+.lex-column-pin {
+  display:inline-grid;
+  flex:0 0 .66em;
+  width:.66em;
+  min-width:.66em;
+  height:.66em;
+  min-height:.66em;
+  padding:0;
+  place-items:center;
+  color:transparent;
+  border:0;
+  background:transparent;
+  opacity:0;
+  cursor:pointer;
+}
+/* A subtle lift so a pin reads as sitting on the field rather than in it. */
+.lex-column-pin > svg { filter:drop-shadow(0 1px 1px rgb(0 0 0 / .45)); }
+
+:where(.lex-pinnable-property,.detail-title-row,.field-row,.price-card label):hover .lex-column-pin,
+.lex-column-pin:focus-visible { color:var(--lex-muted);opacity:.75; }
+.lex-column-pin.pinned { color:var(--lex-accent);opacity:1; }
+.lex-column-pin > svg { display:block;width:.62em;height:.62em;fill:currentColor; }
+.lex-column-pin > svg { filter:drop-shadow(1px 1px 1px rgb(0 0 0 / 45%)); }
+.lex-column-pin-off { display:none; }
+.lex-column-pin.pinned:active { color:var(--lex-muted); }
+.lex-column-pin.pinned:active .lex-column-pin-on { display:none; }
+.lex-column-pin.pinned:active .lex-column-pin-off { display:block; }
+
+.lex-column-list-head-cell:last-child,
+.lex-column-list-cell:last-child {
+  border-right: 0;
+}
+
+.lex-column-list-row:last-child .lex-column-list-cell {
+  border-bottom:0 !important;
+}
+
+/* A disabled row dims its own contents. The row and column rules belong to
+   the table, not the record, so they keep their normal strength. */
+.lex-column-list-row.lex-row-disabled { background:color-mix(in srgb,var(--lex-bg) 42%,transparent); }
+.lex-column-list-row.lex-row-disabled > .lex-column-list-cell { color:var(--lex-muted); }
+.lex-column-list-row.lex-row-disabled > .lex-column-list-cell > * { opacity:.45; }
+
+.lex-column-align-start {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.lex-column-align-end {
+  justify-content: flex-end;
+  text-align: right;
+}
+
+.lex-column-sort {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+}
+
+.lex-column-heading {
+  display:inline-flex;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  align-items:center;
+  justify-content:center;
+  gap:.35em;
+}
+
+.lex-column-heading .lex-column-sort {
+  width:auto;
+  flex:0 1 auto;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.lex-column-heading > .lex-info-help {
+  flex:0 0 18px;
+  margin-left:0;
+}
+
+.lex-column-list-head-cell.lex-column-align-start .lex-column-heading {
+  justify-content:flex-start;
+}
+
+.lex-column-list-head-cell.lex-column-align-end .lex-column-heading {
+  justify-content:flex-end;
+}
+
+.header-label {
+  display:inline-flex;
+  min-width:0;
+  max-width:100%;
+  align-items:center;
+  justify-content:center;
+  gap:.35em;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.lex-sort-indicator {
+  position:static;
+  display:inline-flex;
+  flex:0 0 auto;
+  margin-right:.3em;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--lex-symbol-font);
+  transform:none;
+}
+
+.lex-column-list-head-cell.lex-column-align-start .lex-column-sort {
+  text-align: left;
+}
+
+.lex-column-list-head-cell.lex-column-align-end .lex-column-sort {
+  text-align: right;
+}
+
+.lex-column-sort:hover,
+.lex-column-sort.sorted {
+  color: var(--lex-highlight);
+  background: transparent;
+}
+
+.lex-column-list-head-cell.sorted {
+  color:var(--lex-highlight);
+  background:color-mix(in srgb, var(--lex-accent) 18%, var(--lex-panel-2));
+}
+
+.lex-column-list-head-cell.dragging { opacity:.45;cursor:grabbing; }
+.lex-column-list-head-cell.drag-target { box-shadow:inset 3px 0 var(--lex-accent); }
+
+.lex-editable-table :is(input,select,textarea) {
+  width:100%;
+  min-width:0;
+  min-height:0;
+  padding:.28em .42em;
+  color:inherit;
+  border:1px solid transparent;
+  border-radius:0;
+  outline:0;
+  background:transparent;
+  box-shadow:none;
+  font:inherit;
+  text-align:center;
+  text-shadow:inherit;
+}
+.lex-editable-table select:not(:focus) { appearance:none;background-image:none; }
+
+.lex-editable-table :is(input,select,textarea):hover {
+  border-color:color-mix(in srgb, var(--lex-highlight) 42%, transparent);
+}
+
+.lex-editable-table :is(input,select,textarea):focus {
+  border-color:var(--lex-highlight);
+  background:var(--lex-panel-2) !important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--lex-highlight) 35%, transparent);
+}
+.lex-editable-table .lex-column-list-cell:focus-within :is(input,select,textarea) {
+  border-color:var(--lex-highlight);
+  background:var(--lex-panel-2) !important;
+  box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--lex-highlight) 35%, transparent);
+}
+
+.lex-pager {
+  --lex-page-position-size: 20px;
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 900;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  box-sizing: border-box;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  color: var(--lex-muted);
+  border: 0;
+  border-top: 1px solid var(--lex-border);
+  border-radius: 0;
+  background: var(--lex-panel);
+  box-shadow: none;
+}
+
+#toolbar:empty {
+  display: none !important;
+}
+
+body:has(.lex-pager) #main {
+  padding-bottom: calc(var(--lex-pager-height, 56px) + var(--lex-panel-gap, 14px)) !important;
+}
+
+.lex-pager-left,
+.lex-pager-right {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.lex-pager-left {
+  grid-column: 1;
+  justify-self: stretch;
+}
+
+.lex-pager-right {
+  grid-column: 3;
+  justify-self: end;
+  justify-content: flex-end;
+  max-width: 100%;
+}
+
+.lex-pager-search {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 12px;
+  color: var(--lex-highlight);
+  border: 1px solid var(--lex-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lex-bg) 90%, var(--lex-panel));
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+
+.lex-pager-search:focus-within {
+  border-color: var(--lex-highlight);
+  background: var(--lex-bg);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lex-highlight) 20%, transparent);
+}
+
+.lex-pager-search svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.lex-pager-search input[type="search"] {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  color: var(--lex-text);
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+}
+
+.lex-pager-search input[type="search"]:focus {
+  outline: 0;
+}
+
+.lex-pager-right select,
+.lex-pager-right button {
+  min-height: 32px;
+}
+
+.lex-bottom-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.lex-bottom-filter select,
+.lex-pager-right select {
+  box-sizing:border-box;
+  padding:5px 28px 5px 9px;
+  color:var(--lex-text);
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  background:var(--lex-panel-2);
+  box-shadow:none;
+  text-shadow:none;
+  font:inherit;
+}
+
+.lex-data-map-notes .lex-column-cell-content {
+  display:-webkit-box;
+  overflow:hidden;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:4;
+}
+
+.lex-page-sized-table {
+  grid-template-rows:auto repeat(var(--lex-page-row-count),minmax(0,1fr));
+}
+
+.lex-page-sized-table .lex-column-list-row {
+  min-height:0;
+  font-size:clamp(11px,calc((100vh - 245px) / var(--lex-page-row-count) * .42),18px);
+}
+
+.lex-pager-controls {
+  display: flex;
+  grid-column: 2;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+.lex-pager.single-page {
+  grid-template-columns:minmax(0,1fr) auto;
+}
+
+.lex-pager.single-page .lex-pager-right {
+  grid-column:2;
+}
+
+.lex-page-row-override {
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  color:var(--lex-muted);
+  font-size:.8em;
+  white-space:nowrap;
+}
+
+.lex-page-row-override input {
+  box-sizing:border-box;
+  width:4.5em;
+  min-height:32px;
+  padding:4px 6px;
+  color:var(--lex-text);
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  outline:0;
+  background:var(--lex-panel-2);
+  box-shadow:none;
+  font:inherit;
+  text-align:center;
+  text-shadow:none;
+}
+
+.lex-page-row-override.inherited,
+.lex-page-row-override.inherited input {
+  color:var(--lex-muted);
+}
+
+.lex-hide-empty {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:3px 0;
+  color:var(--lex-muted);
+  border:0;
+  border-radius:0;
+  background:transparent;
+  font-size:.8em;
+  white-space:nowrap;
+  cursor:pointer;
+}
+
+.lex-hide-empty.active {
+  color:var(--lex-text);
+}
+
+.lex-hide-empty input {
+  width:14px;
+  height:14px;
+  margin:0;
+  accent-color:var(--lex-accent);
+}
+
+.lex-pager-right .lex-new-button.lex-pager-add {
+  min-height:32px;
+}
+
+/* A property made of several numbers. Each pair reads label-then-box like an
+   ordinary property row; the pairs wrap into as many columns as the caller
+   asks for, so nine junction values do not become nine tiny stacked captions. */
+.lex-multi-number {
+  display:grid;
+  width:100%;
+  min-width:0;
+  grid-template-columns:repeat(var(--lex-multi-number-columns,3),minmax(0,1fr));
+  gap:5px 10px;
+}
+
+.lex-multi-number-item {
+  display:grid;
+  min-width:0;
+  align-items:center;
+  grid-template-columns:minmax(2.6em,auto) minmax(0,1fr);
+  gap:6px;
+}
+
+.lex-multi-number-label {
+  overflow:hidden;
+  color:var(--lex-muted);
+  font-size:.86em;
+  line-height:1.05;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.lex-multi-number-control { min-width:0; }
+.lex-multi-number-control > * { width:100%; }
+
+/* A read-only project refuses record edits, so its controls must not invite
+   one. The refusal itself is enforced in script; this is the affordance. */
+html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-column-list,.lex-multi-number,.flag-list)
+  :is(input:not([type="search"]),select,textarea) {
+  opacity:.72;
+  cursor:not-allowed;
+}
+
+.lex-page-summary {
+  flex: 0 1 auto;
+  overflow: hidden;
+  max-width: 100%;
+  color: var(--lex-text);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-inline:2px;
+}
+
+.lex-source-control {
+  --lex-reference-rail-width:5em;
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) var(--lex-reference-rail-width);
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+.lex-source-control > :is(input,select,textarea,output,.lex-unit-field,.lex-readonly-field) {
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+}
+.lex-source-control > .lex-column-pin {
+  position:absolute;
+  z-index:3;
+  top:4px;
+  right:calc(var(--lex-reference-rail-width) + 12px);
+}
+/* Nothing to show in the rail means nothing to reserve. Reserving it anyway
+   left every reference-free field short by the rail width, so no two rows in
+   a detail pane ended at the same place. */
+.lex-source-control.no-reference {
+  grid-template-columns:minmax(0,1fr);
+}
+.lex-source-control.no-reference > .lex-reference-placeholder { display:none; }
+.lex-source-control-internal {
+  --lex-internal-reference-width:2.35em;
+  position:relative;
+  display:block;
+}
+.lex-source-control-internal > :first-child { width:100%;box-sizing:border-box; }
+.lex-source-control-internal > .lex-column-pin { top:3px;right:3px; }
+.lex-source-control-internal > :is(input,select,textarea) {
+  padding-right:calc(var(--lex-internal-reference-width) + .95em);
+}
+.lex-source-control-internal.no-reference { --lex-internal-reference-width:0px !important; }
+.lex-source-control-internal > .lex-unit-field > :is(input,select,textarea) {
+  padding-right:calc(var(--lex-unit-reserve,2.4em) + var(--lex-internal-reference-width) + .7em) !important;
+}
+.lex-source-control-internal > .lex-unit-field > .lex-unit {
+  /* Resolve the reference rail in the same font size as its container.
+     Shrink the painted unit only; a smaller em moved it into the reference. */
+  font-size:inherit;
+  padding-block:0;
+  right:calc(var(--lex-internal-reference-width) + .55em);
+  transform:translateY(-50%) scale(.78);
+  transform-origin:right center;
+}
+.lex-source-control-internal > :is(.lex-reference-values,.lex-reference-placeholder) {
+  position:absolute;
+  z-index:2;
+  top:50%;
+  /* right:0 pinned the reference hard against the box edge with no breathing
+     room, which read as sitting too far right. */
+  right:6px;
+  bottom:auto;
+  transform:translateY(-50%);
+  width:var(--lex-internal-reference-width);
+  min-width:0;
+  justify-content:flex-end;
+  gap:.15em;
+  pointer-events:auto;
+}
+.lex-source-control-internal:has(> select) > :is(.lex-reference-values,.lex-reference-placeholder) {
+  right:1.65em;
+}
+.lex-source-control-internal:has(> select):not(.no-reference) > select {
+  padding-right:calc(var(--lex-internal-reference-width) + 2.1em);
+}
+.lex-source-control-internal > .lex-source-strip.lex-reference-values { align-items:flex-end; }
+.lex-source-control-internal .lex-reference-value {
+  font-size:clamp(8px,calc(1em - (var(--lex-reference-count,1) - 1) * 2px),1em);
+}
+.lex-source-control-internal .lex-reference-tag { margin-right:.12em; }
+.lex-source-strip {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+  overflow:hidden;
+}
+.lex-source-strip.lex-reference-values {
+  display:grid;
+  grid-auto-rows:max-content;
+  align-content:center;
+  justify-items:start;
+  gap:0;
+  align-self:center;
+  max-height:none;
+  overflow:visible;
+  line-height:1;
+}
+/* Centred on the control but free to use the taller row around it, so a
+   three-deep stack stays legible without changing any row's height. */
+.lex-source-control:not(.lex-source-control-internal) > .lex-reference-values {
+  position:absolute;
+  z-index:2;
+  top:50%;
+  right:0;
+  bottom:auto;
+  height:max-content;
+  width:var(--lex-reference-rail-width);
+  min-width:0;
+  transform:translateY(-50%);
+}
+.lex-editable-table .lex-source-control > .lex-reference-values {
+  position:absolute;
+  top:1px;
+  right:2px;
+  bottom:1px;
+  align-self:auto;
+  justify-content:center;
+}
+.lex-reference-placeholder {
+  display:block;
+  width:var(--lex-reference-rail-width);
+  min-width:var(--lex-reference-rail-width);
+  visibility:hidden;
+}
+.lex-source-strip button {
+  width:auto;
+  max-width:100%;
+  min-height:0;
+  padding:0;
+  overflow:hidden;
+  border:0;
+  background:transparent;
+  color:var(--lex-text);
+  font:inherit;
+  font-size:clamp(11px,.9em,1em);
+  line-height:1.2;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+/* Each entry gets an equal share of the rail's fixed height, and the type
+   shrinks with the entry count so a three-deep stack fits its share whole
+   instead of having its last line's descenders sheared off. */
+.lex-reference-values .lex-reference-value {
+  display:flex;
+  align-items:center;
+  min-height:0;
+  font-size:clamp(7px,calc(11px - (var(--lex-reference-count,1) - 1) * 1px),11px);
+  line-height:1;
+}
+.lex-source-strip button:hover {
+  color:var(--lex-accent);
+  text-decoration:underline;
+}
+.lex-reference-tag {
+  margin-right:.28em;
+  /* V, R1, R2 are control markers, not words, so they use the shared symbol
+     font like every other marker. In the FF8 pixel font the V is drawn with a
+     clipped-looking top-left arm, which read as a rendering bug on every
+     reference stack in the editor. */
+  font-family:var(--lex-symbol-font);
+  font-weight:700;
+}
+.lex-reference-value[data-reference-index="0"] .lex-reference-tag { color:#62b74f !important; }
+.lex-reference-value[data-reference-index="1"] .lex-reference-tag { color:#d64b4b !important; }
+.lex-reference-value[data-reference-index="2"] .lex-reference-tag { color:#4f8fe8 !important; }
+.lex-reference-value[data-reference-index="3"] .lex-reference-tag { color:#d6b83f !important; }
+
+.lex-pager button {
+  min-width: 42px;
+  min-height: 32px;
+  padding: 5px 10px;
+  font-family: var(--lex-symbol-font);
+  font-weight: 800;
+}
+
+.lex-page-position {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 78px;
+  gap: 3px;
+  color: var(--lex-text);
+  font-size: var(--lex-page-position-size);
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+}
+
+.lex-pager .lex-page-position input.lex-page-number {
+  width: max(2ch, calc(var(--lex-page-digits, 1) * 1ch + 4px));
+  min-width: 2ch;
+  max-width: 8ch;
+  padding: 2px 1px;
+  color: var(--lex-text);
+  border: 1px solid transparent;
+  border-radius: var(--lex-radius);
+  background: transparent;
+  font: inherit;
+  font-size: var(--lex-page-position-size);
+  line-height: 1;
+  text-align: center;
+}
+
+.lex-pager .lex-page-position input.lex-page-number:hover,
+.lex-pager .lex-page-position input.lex-page-number:focus {
+  border-color: var(--lex-accent);
+  outline: none;
+  background: var(--lex-panel-2);
+}
+
+body:has(.lex-data-map-table) #main {
+  padding-bottom: var(--lex-pager-height, 56px);
+}
+
+.lex-data-map-view {
+  height: 100%;
+  min-height: 0;
+}
+
+.lex-data-map-table {
+  max-height: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.lex-data-map-table .lex-column-list-cell {
+  align-items: flex-start;
+  white-space: normal;
+}
+
+.lex-data-map-table .lex-column-list-cell:last-child,
+.lex-data-map-table .lex-column-list-head-cell:last-child {
+  justify-content: center;
+  text-align: center;
+}
+
+.lex-data-map-table code {
+  color: inherit;
+  overflow-wrap: anywhere;
+}
+
+.lex-data-map-link {
+  padding: 0;
+  color: var(--lex-highlight);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font: 600 12px/1.35 "Cascadia Mono", Consolas, monospace;
+  overflow-wrap: anywhere;
+  text-align: left;
+  text-decoration: underline;
+}
+
+.lex-integration-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lex-status-mark,
+.lex-mixture-mark {
+  position: relative;
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  place-items: center;
+  color: white;
+  border: 1px solid rgb(255 255 255 / 36%);
+  border-radius: 50%;
+  font: 900 16px/1 var(--lex-symbol-font);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 24%);
+}
+
+.lex-integration-status.integrated .lex-status-mark {
+  background: #3f7d43;
+}
+
+.lex-integration-status.not-integrated .lex-status-mark {
+  background: #a43b36;
+}
+
+.lex-mixture-mark {
+  background: linear-gradient(135deg, #3f7d43 0 49%, #a43b36 51% 100%);
+}
+
+.lex-mixture-mark::before,
+.lex-mixture-mark::after {
+  position: absolute;
+  color: white;
+  font: 900 11px/1 var(--lex-symbol-font);
+}
+
+.lex-mixture-mark::before {
+  top: 3px;
+  left: 3px;
+  content: "✓";
+}
+
+.lex-mixture-mark::after {
+  right: 3px;
+  bottom: 2px;
+  content: "×";
+}
+
+.lex-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 72%);
+}
+
+.lex-dialog {
+  width: min(720px, 96vw);
+  max-height: 88vh;
+  overflow: auto;
+  padding: 18px;
+  color: var(--lex-text);
+  border: 1px solid var(--lex-border);
+  border-radius: calc(var(--lex-radius) + 2px);
+  background: var(--lex-panel);
+  box-shadow: 0 22px 80px rgb(0 0 0 / 50%);
+}
+
+.lex-return-dialog {
+  width: min(520px, 96vw);
+}
+
+.lex-important-dialog {
+  width: min(860px, 96vw);
+  padding: 24px;
+}
+
+.lex-important-list { max-height: 56vh; margin: 0 0 18px; padding: 0; overflow: auto; list-style: none; font-size: clamp(16px, 1.8vw, 21px); line-height: 1.45; }
+.lex-important-list li { padding: 10px 0; border-bottom: 1px solid var(--lex-border); }
+.lex-important-item-link { padding: 0; color: var(--lex-highlight); border: 0; background: transparent; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.lex-important-item-link:hover,.lex-important-item-link:focus-visible { color: var(--lex-accent-text); background: var(--lex-accent); outline: 2px solid var(--lex-highlight); outline-offset: 2px; }
+.lex-important-item { color: var(--lex-highlight); }
+
+.lex-important-dialog h2 {
+  margin: 0 0 14px;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.15;
+}
+
+.lex-important-message {
+  max-height: 56vh;
+  overflow: auto;
+  color: var(--lex-text);
+  font-size: clamp(16px, 1.8vw, 21px);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.lex-important-dialog .lex-dialog-action {
+  min-width: 108px;
+  min-height: 42px;
+  padding: 10px 18px;
+  font-size: 16px;
+}
+
+.lex-return-dialog h2 {
+  margin: 0 0 10px;
+}
+
+.lex-return-dialog p {
+  margin: 0 0 14px;
+}
+
+.lex-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.lex-dialog-action {
+  padding: 9px 14px;
+  color: var(--lex-text);
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel-2);
+  cursor: pointer;
+  font: 700 13px/1 var(--lex-font);
+}
+
+.lex-dialog-action.primary {
+  color: var(--lex-accent-text);
+  border-color: var(--lex-accent);
+  background: var(--lex-accent);
+}
+
+.lex-dialog-action:disabled {
+  cursor: default;
+  opacity: .5;
+}
+
+.lex-dialog-status {
+  min-height: 20px;
+  color: var(--lex-highlight);
+}
+
+.lex-global-settings {
+  box-sizing:border-box;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  width: min(1480px, 96vw);
+  max-height:none;
+  overflow:visible;
+}
+
+.lex-global-settings.lex-settings-must-scroll {
+  max-height:calc(100vh - 24px);
+  overflow:auto;
+}
+
+.lex-global-settings-backdrop { padding:12px; }
+
+.lex-global-settings > :is(.lex-global-settings-head,.lex-settings-columns,.lex-dialog-status,.lex-dialog-actions) {
+  grid-column: 1 / -1;
+}
+
+.lex-settings-columns {
+  position:relative;
+  display:grid;
+  grid-template-columns:minmax(440px,2fr) minmax(230px,1fr) minmax(440px,1.5fr);
+  gap:8px;
+  align-items:start;
+}
+
+.lex-settings-lane-user {
+  grid-template-columns:repeat(2,minmax(210px,1fr));
+}
+
+.lex-settings-lane-user>h3,
+.lex-settings-lane-lexer>h3 { grid-column:1 / -1; }
+
+.lex-settings-lane-lexer {
+  grid-template-columns:repeat(2,minmax(200px,1fr));
+}
+
+.lex-settings-lane {
+  display:grid;
+  gap:7px;
+  align-content:start;
+  min-width:0;
+  padding:8px;
+  border:1px solid var(--lex-border);
+  background:color-mix(in srgb,var(--lex-bg) 84%,transparent);
+}
+
+.lex-settings-lane>h3 { margin:0 4px 2px; letter-spacing:.08em; }
+.lex-settings-lane-developer { background:color-mix(in srgb,var(--lex-highlight) 7%,var(--lex-bg)); }
+.lex-settings-lane-lexer { background:color-mix(in srgb,#7b4aa8 13%,var(--lex-bg)); }
+.lex-settings-lane-lexer.active { border-color:color-mix(in srgb,#bd85ef 62%,var(--lex-border)); }
+
+.lex-global-settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.lex-global-settings-head h2 {
+  margin: 0;
+}
+
+.lex-global-setting {
+  margin-top: 0;
+  padding: 10px;
+  border: 1px solid var(--lex-border);
+  background: var(--lex-bg);
+}
+
+.lex-global-setting.active-developer-setting {
+  border-color:color-mix(in srgb,var(--lex-accent) 58%,var(--lex-border));
+  background:color-mix(in srgb,var(--lex-accent) 15%,var(--lex-bg));
+}
+
+.lex-global-setting.lex-lexer-setting {
+  border-color:color-mix(in srgb,#bd85ef 52%,var(--lex-border));
+  background:color-mix(in srgb,#7b4aa8 17%,var(--lex-bg));
+}
+
+.lex-setting-control-pair {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:6px;
+  align-items:end;
+}
+.lex-setting-control-pair > * { min-width:0; }
+.lex-setting-control-pair :is(select,input[type="number"]) {
+  width:100%;
+  min-width:0;
+}
+.lex-setting-control-pair>:only-child { grid-column:1 / -1; }
+.lex-setting-default-control {
+  display:grid;
+  box-sizing:border-box;
+  width:100%;
+  gap:3px;
+  min-width:0;
+  padding:0;
+  border:0;
+  background:transparent;
+}
+.lex-setting-default-control>span { color:color-mix(in srgb,#bd85ef 78%,var(--lex-text)); font-size:.68em; font-weight:850; letter-spacing:.08em; }
+.lex-setting-default-control input[type="checkbox"] { accent-color:#9d5dcc; }
+.lex-global-setting .lex-setting-control-pair .lex-setting-default-control :is(select,input[type="number"]) { border-color:#9d5dcc; }
+.lex-setting-default-control .lex-unit { color:#9d5dcc; }
+.lex-setting-default-control.copied { animation:lex-default-copied .55s ease; }
+@keyframes lex-default-copied { 50% { box-shadow:0 0 0 3px color-mix(in srgb,#bd85ef 65%,transparent); } }
+.lex-setting-copy { cursor:default; }
+.lex-setting-copy:active { user-select:none; }
+
+.lex-global-setting label {
+  display: block;
+  font-weight: 800;
+}
+
+.lex-global-setting p {
+  margin: 3px 0 7px;
+  color: var(--lex-muted);
+}
+
+.lex-global-setting :is(select,input[type="number"]) {
+  min-width: 190px;
+  padding: 6px 8px;
+  color: var(--lex-text);
+  border: 1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  outline:0;
+  background: var(--lex-panel-2);
+  box-shadow:none;
+  font:inherit;
+  text-shadow:none;
+}
+
+.lex-global-setting .lex-setting-control-pair > :is(select,input,.lex-unit-field),
+.lex-global-setting .lex-setting-control-pair .lex-unit-field > :is(input,select),
+.lex-global-setting .lex-setting-control-pair :is(select,input[type="number"]) {
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+}
+
+.lex-setting-dependency-arrows {
+  position:absolute;
+  inset:0;
+  z-index:30;
+  width:100%;
+  height:100%;
+  overflow:visible;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .12s ease;
+}
+.lex-setting-dependency-arrows.visible { opacity:.58; }
+.lex-setting-dependency-arrows path:not([d^="M 0"]) {
+  fill:none;
+  stroke:var(--lex-highlight);
+  stroke-width:2;
+  stroke-dasharray:7 6;
+  animation:lex-setting-flow .7s linear infinite;
+}
+.lex-setting-dependency-arrows marker path { fill:var(--lex-highlight); }
+@keyframes lex-setting-flow { to { stroke-dashoffset:-13; } }
+
+@media (max-width:1100px) {
+  .lex-settings-columns { grid-template-columns:1fr; }
+  .lex-settings-lane-user { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); }
+  .lex-settings-lane-lexer { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); }
+}
+
+.lex-theme-sound-table {
+  width:100%;
+  border-collapse:collapse;
+}
+.lex-theme-sound-table :is(th,td) {
+  padding:8px 10px;
+  border-bottom:1px solid var(--lex-border);
+  text-align:left;
+}
+.lex-theme-sound-table tbody tr:last-child td { border-bottom:0; }
+.lex-theme-sound-table .available { color:var(--lex-success); }
+.lex-theme-sound-table .missing { color:#c45f57; }
+
+.lex-source-dialog {
+  width: min(1180px, 96vw);
+  height: min(820px, 92vh);
+  display: flex;
+  flex-direction: column;
+}
+
+.lex-source-dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.lex-source-dialog-head h2 {
+  margin: 0;
+}
+
+.lex-source-dialog-head button {
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  color: var(--lex-text);
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-panel-2);
+  cursor: pointer;
+  font-family: var(--lex-symbol-font);
+  font-size: 20px;
+}
+
+.lex-source-dialog textarea {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  padding: 10px;
+  color: var(--lex-text);
+  border: 1px solid var(--lex-border);
+  border-radius: var(--lex-radius);
+  background: var(--lex-bg);
+  resize: none;
+  font: 13px/1.45 "Cascadia Mono", Consolas, monospace;
+}
+
+.lex-platform-config,
+.lex-platform-config-unavailable {
+  display:flex;
+  flex-direction:column;
+  width:100%;
+  height:100%;
+  min-height:0;
+  padding:var(--lex-panel-gap);
+  color:var(--lex-text);
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  background:var(--lex-panel);
+}
+.lex-platform-config-unavailable { height:auto; gap:10px; }
+.lex-platform-config-unavailable :is(h2,p) { margin:0; }
+.lex-platform-config-unavailable code { overflow-wrap:anywhere; color:var(--lex-muted); }
+.lex-platform-config-head { display:flex; align-items:flex-end; gap:18px; padding-bottom:var(--lex-panel-gap); }
+.lex-platform-config-head > div { min-width:0; flex:1; }
+.lex-platform-config-head :is(h2,p) { margin:0 0 4px; }
+.lex-platform-config-head code { display:block; overflow:hidden; color:var(--lex-muted); text-overflow:ellipsis; white-space:nowrap; }
+.lex-platform-config-search { display:grid; min-width:min(320px,35%); gap:4px; }
+.lex-platform-config-search input { width:100%; min-width:0; }
+.lex-platform-config-sections { min-height:0; flex:1 1 auto; overflow:auto; }
+.lex-platform-config-section { border-top:1px solid var(--lex-border); }
+.lex-platform-config-section > summary { padding:10px 6px; cursor:pointer; font-weight:700; }
+.lex-platform-config-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(310px,1fr)); gap:var(--lex-panel-gap); padding:0 0 var(--lex-panel-gap); }
+.lex-platform-config-field { min-width:0; }
+.lex-platform-config-field :is(input[type=text],input[type=number],select) { width:100%; min-width:0; }
+@media (max-width:700px) {
+  .lex-platform-config-head { align-items:stretch; flex-direction:column; }
+  .lex-platform-config-search { width:100%; min-width:0; }
+}
+
+@media (max-width: 850px) {
+  .lex-panel-layout {
+    grid-template-columns: 1fr !important;
+    gap: 14px;
+  }
+
+  .lex-panel-layout-divider {
+    display: none;
+  }
+}
+
+@media (max-width: 1000px) {
+  .lex-panel-layout.lex-panel-layout-stack-1000 {
+    grid-template-columns: 1fr !important;
+    gap: 14px;
+  }
+
+  .lex-panel-layout-stack-1000 > .lex-panel-layout-divider {
+    display: none;
+  }
+}
+
+/* Shared multi-toggle property row. Wraps rather than shrinking, so a row of
+   eight switches never collapses into unreadable two-line micro-labels. */
+.lex-toggle-row {
+  display:grid;
+  grid-template-columns:repeat(
+    var(--lex-toggle-columns, auto-fill),
+    minmax(var(--lex-toggle-minimum, 150px), 1fr));
+  align-items:stretch;
+  gap:6px 14px;
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+.lex-toggle {
+  display:flex;
+  min-width:0;
+  align-items:center;
+  gap:7px;
+  color:var(--lex-text);
+  cursor:pointer;
+}
+/* When a property holds SEVERAL checkboxes they ran together as loose text,
+   so which name belonged to which box was guesswork. Each grouped toggle
+   gets its own bounded, tinted box; a lone checkbox keeps the plain look,
+   which is why this is scoped to toggles that actually have a neighbour. */
+.lex-toggle:has(+ .lex-toggle),
+.lex-toggle + .lex-toggle {
+  padding:3px 8px;
+  border:1px solid color-mix(in srgb,var(--lex-border) 62%,transparent);
+  border-radius:3px;
+  background:color-mix(in srgb,var(--lex-panel) 62%,transparent);
+}
+.lex-toggle:has(+ .lex-toggle):hover,
+.lex-toggle + .lex-toggle:hover {
+  border-color:color-mix(in srgb,var(--lex-accent) 55%,transparent);
+}
+/* A ticked box reads at a glance without hunting for the tick. */
+.lex-toggle:has(+ .lex-toggle):has(input:checked),
+.lex-toggle + .lex-toggle:has(input:checked) {
+  border-color:color-mix(in srgb,var(--lex-accent) 45%,transparent);
+  background:color-mix(in srgb,var(--lex-accent) 13%,var(--lex-panel));
+}
+
+.lex-toggle-name {
+  flex:0 1 auto;
+  min-width:0;
+  overflow:hidden;
+  line-height:1.2;
+  text-overflow:ellipsis;
+}
+/* Plugins commonly style bare inputs to width:100%. In a toggle that would
+   eat the whole row and starve the label, so the box is sized explicitly. */
+.lex-toggle > input[type="checkbox"] {
+  flex:0 0 auto;
+  box-sizing:border-box;
+  width:var(--lex-toggle-box, 1.05em);
+  min-width:var(--lex-toggle-box, 1.05em);
+  height:var(--lex-toggle-box, 1.05em);
+  min-height:0;
+  margin:0;
+}
+.lex-toggle:has(> input:disabled) { color:var(--lex-muted);cursor:default; }
+.lex-toggle .lex-info-help { flex:0 0 auto; }
+
+/* The enabled switch stays operable on a greyed row: dimming a disabled
+   record must not take away the control that re-enables it. */
+.lex-column-list-row.lex-row-disabled > .lex-column-list-cell[data-column-key="enabled"] { color:var(--lex-text); }
+.lex-column-list-row.lex-row-disabled > .lex-column-list-cell[data-column-key="enabled"] > * { opacity:1; }
+.lex-column-list-cell[data-column-key="enabled"] { pointer-events:auto; }
+.lex-enabled-toggle { display:grid;place-items:center; }
+
+/* Filler rows exist only to carry the table's rules past the last record. */
+.lex-column-list-row.lex-filler-row { pointer-events:none; }
+.lex-column-list-row.lex-filler-row > .lex-column-list-cell { color:transparent; }
+
+/* ---- Toasts -------------------------------------------------------- */
+.lex-toast-stack {
+  position:fixed;
+  z-index:100001;
+  right:18px;
+  bottom:18px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:8px;
+  pointer-events:none;
+}
+.lex-toast {
+  max-width:min(460px,60vw);
+  padding:9px 14px;
+  color:var(--lex-text);
+  border:1px solid var(--lex-border);
+  border-radius:var(--lex-radius);
+  background:var(--lex-panel-2);
+  box-shadow:0 6px 18px #0006;
+  font-size:.95em;
+  overflow-wrap:anywhere;
+  animation:lex-toast-enter .18s ease both;
+}
+@keyframes lex-toast-enter { from { opacity:0;translate:0 10px } to { opacity:1;translate:0 0 } }
+.lex-toast.leaving { opacity:0;translate:0 6px;transition:opacity .2s ease,translate .2s ease; }
+
+/* ---- Copy affordance ------------------------------------------------ */
+.lex-copy-value {
+  position:absolute;
+  z-index:4;
+  top:50%;
+  left:-2px;
+  display:grid;
+  width:19px;
+  height:19px;
+  padding:0;
+  place-items:center;
+  color:var(--lex-muted);
+  border:0;
+  background:transparent;
+  opacity:0;
+  cursor:pointer;
+  transform:translate(-100%,-50%);
+  transition:opacity .12s ease,color .12s ease;
+}
+.lex-copy-value > svg { width:100%;height:100%; }
+.lex-detail-field:hover > .lex-detail-field-control > .lex-copy-value { opacity:.7; }
+.lex-copy-value:hover { color:var(--lex-accent);opacity:1; }
+
+/* ---- Rejected input ------------------------------------------------- */
+.lex-field-type-rail.rejected {
+  color:var(--lex-accent) !important;
+  opacity:1 !important;
+  animation:lex-rail-reject .4s ease;
+}
+@keyframes lex-rail-reject {
+  0%,100% { translate:0 0 }
+  20% { translate:-3px 0 }
+  40% { translate:3px 0 }
+  60% { translate:-2px 0 }
+  80% { translate:2px 0 }
+}
+
+/* ---- Label / value divide ------------------------------------------ */
+/* One column for the whole pane, so it runs unbroken from the top of the
+   first section to the bottom of the last instead of restarting per row. */
+/* The label-gutter tint used to paint the body's whole height, leaving a
+   grey block under the last field. Detail panels stay flat. */
+
+/* ---- Rows ------------------------------------------------------------ */
+.lex-column-list-row:hover { box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--lex-highlight) 45%,transparent); }
+
+/* ---- Boolean reference sits under its own checkbox ------------------ */
+/* The reference sits in the space already under the checkbox. It must not
+   push the checkbox off its own centre line to get there. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  position:relative;
+  display:grid;
+  grid-template-columns:auto;
+  justify-items:center;
+}
+.lex-boolean-field .lex-source-control > .lex-reference-values {
+  position:absolute;
+  top:calc(100% + 6px);
+  right:auto;
+  bottom:auto;
+  left:50%;
+  width:max-content;
+  min-width:0;
+  max-height:none;
+  justify-items:center;
+  /* It is a small provenance tag under a 20px checkbox, not a second value:
+     it was set as wide as the box itself and butted right up against it. */
+  font-size:.62em;
+  line-height:1.15;
+  padding-block:1px;
+  translate:-50% 0;
+}
+
+/* ---- Pins ------------------------------------------------------------ */
+.lex-column-pin > svg {
+  width:100%;
+  height:100%;
+  /* Stuck in at the bottom-left point; hovering out lifts it up and right. */
+  transform-origin:14% 86%;
+  translate:2px -2px;
+  transition:translate .16s ease;
+}
+.lex-column-pin.pinned > svg { translate:0 0; }
+.lex-column-pin-off { display:none; }
+.lex-column-pin:hover > svg { animation:lex-pin-wiggle .5s ease-in-out infinite; }
+.lex-column-pin.pinned:hover > svg { animation-name:lex-pin-wiggle-stuck; }
+@keyframes lex-pin-wiggle-stuck {
+  0%,100% { rotate:0deg } 25% { rotate:-9deg } 75% { rotate:9deg }
+}
+@keyframes lex-pin-wiggle {
+  0%,100% { rotate:0deg } 25% { rotate:-11deg } 75% { rotate:11deg }
+}
+.lex-column-pin:hover > svg { transform-origin:14% 86%; }
+.lex-column-pin:not(.pinned):hover > svg { transform-origin:50% 50%; }
+
+/* ---- Column highlighting -------------------------------------------- */
+.lex-column-list-cell.lex-column-lit,
+.lex-column-list-head-cell.lex-column-lit {
+  background:color-mix(in srgb,var(--lex-highlight) 16%,transparent);
+}
+.lex-detail-field.lex-column-lit {
+  background:color-mix(in srgb,var(--lex-highlight) 12%,transparent);
+}
+
+/* ---- Keyboard shortcut panel ---------------------------------------- */
+.lex-shortcut-panel {
+  display:grid;
+  gap:6px;
+  min-width:min(460px,90vw);
+  padding:18px 20px;
+}
+.lex-shortcut-panel h2 { margin:0 0 6px;font-size:1.15em; }
+.lex-shortcut-row {
+  display:grid;
+  grid-template-columns:minmax(140px,auto) minmax(0,1fr);
+  align-items:center;
+  gap:14px;
+  padding:5px 8px;
+  border-radius:var(--lex-radius);
+}
+.lex-shortcut-keys { display:flex;gap:5px;flex-wrap:wrap; }
+.lex-shortcut-keys kbd {
+  padding:2px 7px;
+  border:1px solid var(--lex-border);
+  border-bottom-width:2px;
+  border-radius:4px;
+  background:var(--lex-panel-2);
+  font:600 .85em/1.4 inherit;
+}
+.lex-shortcut-label { color:var(--lex-muted); }
+.lex-shortcut-row.lex-shortcut-fired {
+  background:color-mix(in srgb,var(--lex-accent) 32%,transparent);
+  transition:background .1s ease;
+}
+.lex-shortcut-row.lex-shortcut-fired .lex-shortcut-label { color:var(--lex-text); }
+
+/* ---- Tab ordinals ---------------------------------------------------- */
+.lex-shell-header nav button { position:relative; }
+.lex-tab-ordinal {
+  position:absolute;
+  top:50%;
+  right:7px;
+  color:var(--lex-muted);
+  font-size:.8em;
+  font-weight:700;
+  line-height:1;
+  pointer-events:none;
+  translate:0 -50%;
+}
+
+.lex-enabled-icon { width:15px;height:15px;display:block; }
+.lex-column-list-head-cell[data-column-key="enabled"] { padding-inline:6px; }
+
+/* ---- Numeric value fill / slider ------------------------------------ */
+.lex-has-value-fill .lex-detail-field-control { position:relative; }
+.lex-unit-field:has(> .lex-value-fill) { position:relative; }
+.lex-value-fill {
+  position:absolute;
+  z-index:0;
+  left:1px;
+  right:1px;
+  bottom:1px;
+  height:calc(100% - 2px);
+  background:linear-gradient(to right,
+    color-mix(in srgb,var(--lex-accent) 30%,transparent) 0 calc(var(--lex-value-ratio,0) * 100%),
+    transparent calc(var(--lex-value-ratio,0) * 100%));
+  pointer-events:none;
+  transition:height .12s ease,bottom .12s ease;
+}
+.lex-value-handle {
+  position:absolute;
+  /* The fill is prepended behind the input, so without this the input sits
+     over the handle and swallows the press: the slider could never be
+     dragged, only clicked. */
+  z-index:4;
+  top:0;
+  bottom:0;
+  left:calc(var(--lex-value-ratio,0) * 100%);
+  /* A flat slab spanning the full box height reads as a bar, not a grip. */
+  top:3px;
+  bottom:3px;
+  width:7px;
+  border:1px solid color-mix(in srgb,var(--lex-bg) 55%,transparent);
+  border-radius:4px;
+  box-shadow:0 1px 2px rgb(0 0 0 / .35);
+  background:var(--lex-accent);
+  opacity:0;
+  cursor:ew-resize;
+  pointer-events:none;
+  transform:translateX(-50%);
+  transition:opacity .12s ease;
+}
+/* The input is a later sibling, so it paints over the handle and swallowed
+   every press: the slider could be clicked but never dragged. While the
+   slider is actually offered, the fill rises above the input. It stays
+   pointer-events:none and translucent, so only the handle becomes grabbable
+   and the value underneath stays readable. */
+/* The fill is prepended to the source control, which is a grid whose second
+   column is the reference rail. Spanning the whole grid let the slider run
+   well past the right edge of the number box it belongs to - the handle
+   travelled the rail as well. An external rail is excluded here; an internal
+   one needs nothing, because there the input already spans the control. */
+.lex-source-control:not(.no-reference):not(.lex-source-control-internal) > .lex-value-fill {
+  right:calc(var(--lex-reference-rail-width) + 8px + 1px);
+}
+
+.lex-detail-field:hover .lex-value-fill,
+.lex-detail-field:focus-within .lex-value-fill,
+.lex-value-dragging .lex-value-fill { height:calc(100% + 5px);bottom:-4px;z-index:3; }
+.lex-detail-field:hover .lex-value-handle,
+.lex-detail-field:focus-within .lex-value-handle,
+.lex-value-dragging .lex-value-handle { opacity:.38;pointer-events:auto; }
+.lex-has-value-fill :is(input,select) { position:relative;z-index:1;background:transparent; }
+
+/* ---- Sort indicator in the type rail -------------------------------- */
+.lex-detail-field[data-lex-sort] .lex-field-type-rail { opacity:.55; }
+.lex-detail-field[data-lex-sort]:hover .lex-field-type-rail::after,
+.lex-detail-field[data-lex-sort]:focus-within .lex-field-type-rail::after { content:none; }
+.lex-detail-field[data-lex-sort] .lex-field-type-rail > span { display:none; }
+.lex-detail-field[data-lex-sort]:hover .lex-field-type-rail > .lex-field-type-name,
+.lex-detail-field[data-lex-sort]:focus-within .lex-field-type-rail > .lex-field-type-name { display:block; }
+.lex-detail-field[data-lex-sort] .lex-field-type-rail::after {
+  display:block;
+  font-size:11px;
+  line-height:1;
+  content:"\25B2";
+}
+.lex-detail-field[data-lex-sort="desc"] .lex-field-type-rail::after { content:"\25BC"; }
+
+/* ---- Per-toggle type rail ------------------------------------------- */
+.lex-toggle-rail {
+  display:grid;
+  flex:0 0 auto;
+  place-items:center;
+  width:14px;
+  color:var(--lex-muted);
+}
+.lex-toggle-type {
+  font:700 8px/1 "Lexend","Segoe UI",sans-serif;
+  letter-spacing:.06em;
+  writing-mode:vertical-rl;
+  text-orientation:upright;
+  letter-spacing:-.05em;
+}
+.lex-toggle-rail > .lex-info-help { display:none;margin:0; }
+.lex-toggle:hover > .lex-toggle-rail > .lex-toggle-type { display:none; }
+.lex-toggle:hover > .lex-toggle-rail > .lex-info-help { display:inline-grid;width:14px;min-width:14px;height:14px;min-height:14px;font-size:10px; }
+.lex-toggle > .lex-info-help { display:none; }
+
+/* Command-row controls scale down with the configured menu bar height. */
+.lex-shell-command-row :is(button, .lex-project-control) {
+  max-height: calc(var(--lex-command-row-height) - 6px);
+}
+.lex-shell-command-row :is(.lex-save-icon, .lex-game-process, .lex-settings-button,
+  .lex-help-button, .lex-developer-button, .lex-window-button, .lex-history-button) {
+  width: min(36px, calc(var(--lex-command-row-height) - 6px));
+  height: min(36px, calc(var(--lex-command-row-height) - 6px));
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The hovered formula token lights its own input in the variable drawer. */
+.lex-curve-variable.lex-curve-variable-active {
+  background:color-mix(in srgb,var(--lex-highlight) 22%,transparent);
+  border-radius:var(--lex-radius);
+}
+
+/* ---- Information screen --------------------------------------------- */
+/* One ordinary detail panel, centred, rather than a bespoke card layout. */
+.lex-information-panel {
+  --lex-detail-icon-size:44px;
+  width:min(760px, 50%);
+  min-width:min(100%, 420px);
+  margin-inline:auto;
+  align-self:start;
+}
+@media (max-width:1100px) { .lex-information-panel { width:min(100%, 760px); } }
+.lex-detail-panel-icon > svg { width:78%;height:78%;display:block; }
+
+/* Range extremes drawn on the line, matching the formula's typography. */
+.lex-curve-range-value {
+  /* The accent is the shade already used for the guide line and the point
+     marker in this plot, so the extremes read as part of that same set
+     rather than as more body text. */
+  fill:var(--lex-accent);
+  /* Same style as the formula text on the curve - weight, size, family - so
+     the three read as one set. Only the colour differs. */
+  font:600 10px/1 var(--lex-font);
+  font-variant-numeric:tabular-nums;
+  paint-order:stroke;
+  pointer-events:none;
+}
+
+/* A reference row is a whole row like any mod, not a bare label. */
+.lex-project-reference { grid-column:1 / -1;align-items:center; }
+.lex-project-folder {
+  display:grid;
+  place-items:center;
+  width:34px;
+  border:0;
+  color:var(--lex-muted);
+  background:transparent;
+  cursor:pointer;
+}
+.lex-project-folder > svg { width:17px;height:17px; }
+.lex-project-folder:hover { color:var(--lex-highlight);background:var(--lex-panel-2); }
+
+/* ---- Double-click editing ------------------------------------------- */
+/* A bare cursor:cell was the ONLY hint that a cell could be edited, so which
+   cells respond to a double click was invisible until you happened to hover
+   the right one. Hovering an editable cell now underlines its content the way
+   an editable field reads, and the row being hovered is enough context to
+   find the rest. Read-only projects get no hint, because there editing is
+   refused. */
+.lex-column-list-cell.lex-cell-editable { cursor:cell; }
+.lex-column-list-cell.lex-cell-editable:hover > .lex-column-cell-content {
+  border-bottom:1px dashed color-mix(in srgb,var(--lex-accent) 70%,transparent);
+}
+.lex-column-list-cell.lex-cell-editable:hover {
+  background:color-mix(in srgb,var(--lex-accent) 8%,transparent);
+}
+[data-lex-project-readonly="true"] .lex-column-list-cell.lex-cell-editable {
+  cursor:default;
+}
+[data-lex-project-readonly="true"] .lex-column-list-cell.lex-cell-editable:hover {
+  background:none;
+}
+[data-lex-project-readonly="true"] .lex-column-list-cell.lex-cell-editable:hover > .lex-column-cell-content {
+  border-bottom:0;
+}
+.lex-column-list-cell.lex-cell-editing {
+  box-shadow:inset 0 0 0 2px var(--lex-accent);
+}
+.lex-cell-editing .lex-column-cell-content > :is(input,select) {
+  width:100%;
+  min-width:0;
+  box-sizing:border-box;
+}
+
+/* A header that does not fit truncates from the right with an ellipsis.
+   Centre-cropping ate both ends and produced labels like "ernate prerequis". */
+.lex-column-list-head-cell { min-width:0; }
+.lex-column-list-head-cell .header-label {
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.lex-column-list-head-cell .lex-column-sort { min-width:0;max-width:100%; }
+
+/* ---- Units, ids, pins, rails, header buttons ------------------------ */
+
+/* The unit rides beside the value, so it reads as an annotation rather than
+   part of the number: smaller type held off the value's own line. */
+.lex-unit {
+  padding-block: .35em;
+  font-size: .78em;
+  line-height: 1;
+  opacity: .82;
+}
+
+/* Record ids matter least on the screen, so the heading's id recedes toward
+   the panel rather than competing with the record's name. */
+.lex-detail-panel-id {
+  color: color-mix(in srgb, var(--lex-muted) 55%, var(--lex-panel)) !important;
+  font-weight: 400;
+}
+
+/* A pin slides down-left into the page when stuck, and back out when pulled. */
+.lex-column-pin > svg { transition: translate .16s ease, rotate .16s ease; }
+.lex-column-pin:not(.pinned) > svg { translate: 3px -3px; }
+.lex-column-pin.pinned > svg { translate: 0 0; }
+
+/* Pointing at the type rail turns it into the same help popup every other
+   marker uses, instead of being a separate silent affordance. */
+.lex-field-type-rail { pointer-events: auto; cursor: help; }
+.lex-detail-field:hover > .lex-field-type-rail > .lex-field-type-name { opacity:1; }
+/* The help badge occupies the same slot as the type name. Dimming the name
+   left the two drawn on top of each other; the rail swaps instead, exactly
+   as the toggle rail already does. */
+.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-name,
+.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-range { opacity:0; }
+/* Hovering only hints at the range. Once the field has focus the range is
+   the thing being read, so it must not stay dimmed under the cursor. */
+.lex-detail-field:focus-within > .lex-field-type-rail > .lex-field-type-range { opacity: 1; }
+/* The help marker is a round badge, so it must stay square. Stretching it to
+   the rail's full height made it 13px wide and up to 38px tall. */
+.lex-field-type-rail > .lex-info-help {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  box-sizing: border-box;
+  width: 13px;
+  min-width: 13px;
+  height: 13px;
+  min-height: 13px;
+  place-items: center;
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0;
+}
+.lex-field-type-rail:hover > .lex-info-help { opacity:1; }
+
+/* Every menu-bar control reacts the same way to being pointed at. */
+.lex-shell-command-row :is(.lex-history-button, .lex-window-button,
+  .lex-settings-button, .lex-help-button, .lex-developer-button,
+  .lex-save-icon, .lex-game-process) {
+  transition: color .12s ease, background-color .12s ease, opacity .12s ease;
+}
+.lex-shell-command-row :is(.lex-history-button, .lex-window-button,
+  .lex-settings-button, .lex-help-button, .lex-developer-button,
+  .lex-save-icon, .lex-game-process):hover:not(:disabled) {
+  color: var(--lex-highlight);
+  background: var(--lex-panel-2);
+}
+
+/* A rebuilt table renders once before the fit pass measures it. Clamping it to
+   its pane means that frame can no longer overflow and snap back, which is the
+   flash seen when a pin is added or removed. */
+.lex-panel-layout-pane > .lex-column-list,
+.lex-barrel-grid > .lex-column-list {
+  max-height: 100%;
+  overflow: hidden;
+}
+
+/* The Information screen states facts; it has no data types to annotate. */
+.lex-information-panel .lex-field-type-rail { display: none; }
+.lex-information-panel .lex-detail-field { padding-inline-start: 12px; }
+.lex-information-panel .lex-detail-panel-body { background-image: none; }
+
+/* ---- Corrections ----------------------------------------------------- */
+
+/* The value slider must live inside its own box. Hanging it below meant the
+   only grabbable strip was the part sticking out, and the input painted over
+   the handle everywhere else. */
+.lex-detail-field:hover .lex-value-fill,
+.lex-detail-field:focus-within .lex-value-fill,
+.lex-value-dragging .lex-value-fill { height: calc(100% - 2px); bottom: 1px; }
+.lex-value-handle { z-index: 3; width: 7px; }
+.lex-detail-field:hover .lex-value-handle,
+.lex-value-dragging .lex-value-handle { width: 9px; }
+.lex-has-value-fill :is(input, select) { z-index: 1; }
+.lex-detail-field:hover .lex-value-handle,
+.lex-detail-field:focus-within .lex-value-handle,
+.lex-value-dragging .lex-value-handle { z-index: 4; pointer-events: auto; }
+.lex-detail-field.lex-value-dragging .lex-value-handle { opacity:.38; }
+
+/* The rail is anchored at its own centre, so growing on hover grows evenly in
+   both directions rather than dropping downward. */
+.lex-field-type-rail {
+  transform:none;
+  transform-origin: center center;
+  transition: opacity .14s ease, color .14s ease;
+}
+
+/* Toggle rails follow the same rule as every other type label: hidden until
+   the property is pointed at. */
+.lex-toggle-rail { opacity: 0; transition: opacity .12s ease; }
+.lex-detail-field:hover .lex-toggle-rail,
+.lex-detail-field:focus-within .lex-toggle-rail { opacity: 1; }
+
+/* Column highlighting is a hint, not a repaint. */
+.lex-column-list-cell,
+.lex-column-list-head-cell,
+.lex-detail-field { transition: background-color .14s ease; }
+.lex-column-list-cell.lex-column-lit,
+.lex-column-list-head-cell.lex-column-lit {
+  background: color-mix(in srgb, var(--lex-highlight) 7%, transparent);
+}
+.lex-detail-field.lex-column-lit {
+  background: color-mix(in srgb, var(--lex-highlight) 6%, transparent);
+}
+
+/* ---- Curve layout ---------------------------------------------------- */
+/* The plot matches the drawing's own 2:1 ratio, so `meet` has nothing to
+   letterbox: no grey band above or below the graph. */
+.lex-curve-plot { aspect-ratio: 2 / 1; min-height: 0; }
+.lex-curve-editor { grid-template-rows: auto auto auto auto; align-content: start; }
+.lex-curve-svg { width: 100%; height: 100%; display: block; }
+
+/* The extremes are drawn on the line now; the red hover pair is redundant. */
+.lex-curve-hover-extrema { display: none !important; }
+
+/* The rail and its help marker cross-fade instead of swapping instantly. */
+.lex-field-type-rail > .lex-field-type-name,
+.lex-field-type-rail > .lex-field-type-range { transition: left .16s ease, opacity .16s ease, font-size .12s ease; }
+/* The transition belongs on the HOVER state, not the base rule. On the base
+   rule it also governed the way OUT, so the badge was still fading while the
+   type name - hidden with display:none, which is instant - had already come
+   back, and both were briefly readable at once. Fading in only means they
+   can never coexist in either direction. */
+.lex-field-type-rail > .lex-info-help { transition: none; }
+.lex-detail-field:hover > .lex-field-type-rail > .lex-info-help {
+  transition: opacity .16s ease .04s;
+}
+/* Pointing at the type text replaces that text with its help mark. Keep this
+   final rule after the focus/range rules so a focused input cannot draw the
+   range through the question mark. */
+.lex-field-type-rail:hover:has(> .lex-info-help) > :is(.lex-field-type-name,.lex-field-type-range) {
+  opacity:0 !important;
+}
+.lex-field-type-rail:hover > .lex-info-help { opacity:1 !important; }
+.lex-sort-indicator { font-size: .78em; opacity: .8; }
+
+/* ---- Loading screen handover ---------------------------------------- */
+/* The root paints the screen from the first frame; framework.js then appends
+   an identical element. Giving the appended one no entry animation makes the
+   swap invisible instead of a second fade-in. */
+html.lex-loading-live .lex-plugin-loading-screen,
+html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-quote,
+html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
+  animation-name: none !important;
+  opacity: 1 !important;
+  translate: 0 0 !important;
+}
+html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
+  animation: lex-plugin-loading-spin .75s linear infinite !important;
+}
+
+/* ---- Page fit ------------------------------------------------------- */
+/* The fit deliberately waits two quiet layout frames before measuring, so a
+   freshly built table paints at the wrong row height until then. Holding the
+   rows back for those frames removes the resize flash on pin toggles and
+   re-renders; the header stays put so the panel never blanks. */
+.lex-column-list.lex-fitted-page:not([data-lex-fixed-rows]) > .lex-column-list-row {
+  visibility: hidden;
+}
+.lex-column-list.lex-fitted-page[data-lex-fixed-rows] > .lex-column-list-row {
+  visibility: visible;
+}
+
+/* ---- Sort caret ------------------------------------------------------ */
+.lex-sort-indicator {
+  /* Absolute, because font-size:0 below would collapse any em sizing. */
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  margin-right: 5px;
+  /* font-size:0 hides the glyph without killing currentColor, which the
+     clipped background depends on. */
+  font-size: 0;
+  overflow: hidden;
+  background: currentColor;
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
+  opacity: .55;
+}
+.lex-column-list-head-cell.sorted .lex-sort-indicator { opacity: .85; }
+.lex-sort-indicator.ascending { clip-path: polygon(50% 0, 0 100%, 100% 100%); }
+
+/* ---- Field rail contract -------------------------------------------- */
+/* Keep the metadata in one fixed slot. The type and range are ordinary
+   horizontal labels rotated as a whole; writing-mode vertical splits the
+   glyphs and lets the range paint below the field. */
+.lex-detail-field {
+  --lex-field-type-gutter:22px;
+  padding-inline-start:var(--lex-field-type-gutter);
+  padding-inline-end:0;
+}
+.lex-field-type-rail {
+  left:0;
+  width:var(--lex-field-type-gutter);
+  min-height:0;
+  height:100%;
+  display:block;
+  overflow:visible;
+  background:transparent;
+  pointer-events:auto;
+  cursor:pointer;
+  transform:none;
+}
+.lex-field-type-rail > :is(.lex-field-type-name,.lex-field-type-range) {
+  top:50%;
+  left:50% !important;
+  display:block;
+  box-sizing:border-box;
+  width:max-content;
+  max-width:none;
+  padding:0;
+  background:transparent;
+  writing-mode:horizontal-tb;
+  text-orientation:mixed;
+  white-space:nowrap;
+  transform:translate(-50%,-50%) rotate(-90deg);
+  transform-origin:center;
+}
+.lex-detail-field:hover > .lex-field-type-rail,
+.lex-detail-field:focus-within > .lex-field-type-rail { opacity:1; }
+.lex-detail-field:focus-within > .lex-field-type-rail > .lex-field-type-name { opacity:0 !important; }
+.lex-detail-field:focus-within > .lex-field-type-rail > .lex-field-type-range { opacity:1 !important; }
+.lex-field-type-rail > .lex-info-help {
+  top:50%;
+  left:50%;
+  width:18px;
+  min-width:18px;
+  height:18px;
+  min-height:18px;
+  margin:0;
+  padding:0;
+  transform:translate(-50%,-50%);
+  pointer-events:auto;
+  cursor:pointer;
+}
+.lex-field-type-rail:hover > .lex-field-type-name,
+.lex-field-type-rail:hover > .lex-field-type-range { opacity:0 !important; }
+.lex-field-type-rail:hover > .lex-info-help { opacity:1 !important; }
+/* A sorted field uses the same centre point as its type/help marker. */
+.lex-detail-field[data-lex-sort] .lex-field-type-rail::after {
+  position:absolute;
+  top:50%;
+  left:50%;
+  display:block;
+  width:9px;
+  height:9px;
+  margin:0;
+  content:"\25B2";
+  color:var(--lex-highlight);
+  font:700 10px/9px var(--lex-symbol-font);
+  text-align:center;
+  transform:translate(-50%,-50%);
+}
+.lex-detail-field[data-lex-sort="desc"] .lex-field-type-rail::after { content:"\25BC"; }
+.lex-detail-field[data-lex-sort] .lex-field-type-rail > :is(.lex-field-type-name,.lex-field-type-range) { opacity:0; }
+.lex-detail-field[data-lex-sort]:hover .lex-field-type-rail::after,
+.lex-detail-field[data-lex-sort]:focus-within .lex-field-type-rail::after { opacity:0; }
+/* Reference markers share one label column, so V, R1, and R2 values start
+   on the same x-coordinate in every stack depth. */
+.lex-reference-values .lex-reference-value { align-items:center; }
+.lex-reference-values .lex-reference-tag {
+  flex:0 0 22px;
+  width:22px;
+  min-width:22px;
+  max-width:22px;
+  margin-right:0;
+  text-align:left;
+}
+
+/* ---- Transition end -------------------------------------------------- */
+/* The backdrop is now held until the destination has actually painted and
+   then dropped in a single frame. Fading it was only stretching the gap out
+   rather than closing it, so no opacity transition is wanted here. */
+.lex-plugin-transition-surface.settled.leaving { opacity: 0; }
+
+/* Authoritative plot sizing. Two earlier rules set the curve SVG to
+   width/height 100%, which cancelled the margin the scale numbers and axis
+   names live in, so this sits last and wins. */
+.lex-curve-plot > .lex-curve-svg {
+  position:absolute;
+  top:var(--lex-curve-margin-top);
+  left:var(--lex-curve-margin);
+  /* An SVG is a replaced element, so width:auto would take its intrinsic
+     size and leave the inset over-constrained. The box is stated outright. */
+  width:calc(100% - var(--lex-curve-margin) - var(--lex-curve-margin-right));
+  height:calc(100% - var(--lex-curve-margin-top) - var(--lex-curve-margin-bottom));
+  z-index:1;
+}
+
+
+/* Bar view is a second reading of the same samples. Only the visibility of
+   the two layers changes, so switching never redraws or refits anything. */
+.lex-curve-bars { display:none; }
+.lex-curve-bars > rect { fill:var(--lex-curve-fill,color-mix(in srgb,var(--lex-accent) 22%,transparent)); }
+.lex-curve-plot.lex-curve-bar-mode .lex-curve-bars { display:block; }
+.lex-curve-plot.lex-curve-bar-mode :is(.lex-curve-line,.lex-curve-fill,
+  .lex-curve-path-formula) { display:none; }
+.lex-curve-mode-toggle {
+  position:absolute;
+  z-index:5;
+  right:calc(var(--lex-curve-margin-right) + 2px);
+  bottom:calc(var(--lex-curve-margin-bottom) + 2px);
+  padding:1px 5px;
+  border:1px solid color-mix(in srgb,var(--lex-border) 70%,transparent);
+  border-radius:3px;
+  background:color-mix(in srgb,var(--lex-bg) 72%,transparent);
+  color:var(--lex-muted);
+  font:600 8px/1.5 var(--lex-font);
+  letter-spacing:.06em;
+  cursor:pointer;
+  opacity:0;
+  transition:opacity .12s ease;
+}
+/* It appears when the reader is actually at this graph, so a wall of them
+   does not turn into a wall of buttons. */
+.lex-curve-plot:hover .lex-curve-mode-toggle,
+.lex-curve-mode-toggle:focus-visible { opacity:1; }
+.lex-curve-mode-toggle:hover { color:var(--lex-text);border-color:var(--lex-accent); }
+
+/* Each tab and subtab shows the key that selects it, in a squircle to its
+   right. A plain border-radius rounds on a circular arc, which at this size
+   reads as a pill or a circle; an elliptical radius keeps the sides flatter
+   and turns the corner later, which is the squircle look. */
+.lex-tab-shortcut {
+  /* Absolute, so the badge does not push the tab LABEL off centre - the
+     label is centred in its button and a verifier pins that to within half
+     a pixel. The badge rides at the right edge instead of taking flow. */
+  position:absolute;
+  top:50%;
+  right:1px;
+  transform:translateY(-50%);
+  display:grid;
+  place-items:center;
+  box-sizing:border-box;
+  min-width:10px;
+  width:10px;
+  height:14px;
+  padding:0;
+  border:1px solid color-mix(in srgb,var(--lex-border) 70%,transparent);
+  border-radius:38% / 30%;
+  background:color-mix(in srgb,var(--lex-bg) 55%,transparent);
+  color:var(--lex-muted);
+  font-size:8px;
+  font-variant-numeric:tabular-nums;
+  line-height:1;
+  visibility:hidden;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .1s ease;
+}
+nav button:hover .lex-tab-shortcut,
+nav button:focus-visible .lex-tab-shortcut,
+.lex-subtab-button:hover .lex-tab-shortcut,
+.lex-subtab-button:focus-visible .lex-tab-shortcut {
+  visibility:visible;
+  opacity:1;
+}
+nav button.active:hover .lex-tab-shortcut,
+nav button.active:focus-visible .lex-tab-shortcut,
+.lex-subtab-button.active:hover .lex-tab-shortcut,
+.lex-subtab-button.active:focus-visible .lex-tab-shortcut {
+  border-color:color-mix(in srgb,var(--lex-accent) 55%,transparent);
+  color:var(--lex-text);
+}
+
+/* The badge is positioned against its own tab. Reserve the same space on
+   both sides, so the label stays centred and the badge never covers it. */
+.lex-shell-header nav button[data-tab]:has(> .lex-tab-shortcut),
+.lex-subtab-button:has(> .lex-tab-shortcut) {
+  position:relative;
+  padding-inline:12px;
+}
+.lex-shell-header nav button[data-tab] > .lex-tab-label,
+.lex-subtab-button > .lex-tab-label {
+  min-width:0;
+  max-width:100%;
+}
+.lex-tab-label-text {
+  display:block;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+/* A tab owns one shortcut badge. If a host restores stale decorated markup,
+   do not paint a second badge over the label while the shell replaces it. */
+.lex-tab-shortcut ~ .lex-tab-shortcut { display:none !important; }
+
+.lex-data-map-file{display:flex;align-items:center;gap:.5em;min-width:0;width:100%}.lex-data-map-location{display:grid;place-items:center;flex:0 0 1.6em;width:1.6em;height:1.6em;padding:.2em;border:0;background:transparent;color:inherit;cursor:pointer}.lex-data-map-location svg{width:100%;height:100%}.lex-data-map-file>code,.lex-data-map-file>.lex-data-map-link{min-width:0;overflow-wrap:anywhere}
+
+.lex-leading-list-detail > .lex-panel-layout-pane { min-height:0; max-height:100%; overflow:auto; }

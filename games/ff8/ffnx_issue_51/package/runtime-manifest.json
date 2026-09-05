@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 2,
+  "distribution": "lexeditor-ffnx-derivative",
+  "sourceCommit": "c056db2783f376a340fcefa6a48cc33618998876",
+  "driver": "AF3DN.P",
+  "driverSha256": "3f7950e05f78584397cc0008503880f4a15d7fbb6342e766323b59e49499a7e5",
+  "architecture": "x86",
+  "runtimeEnabled": true,
+  "hookCount": 28,
+  "identity": "Lexeditor issue 51 shared magic core; base=c056db2783f376a340fcefa6a48cc33618998876; runtime=on; hooks=28",
+  "exports": [
+    "lexeditor_issue_51_compile_gate_enabled",
+    "lexeditor_issue_51_config_contract",
+    "lexeditor_issue_51_config_version",
+    "lexeditor_issue_51_core_linked",
+    "lexeditor_issue_51_hook_count",
+    "lexeditor_issue_51_identity",
+    "lexeditor_issue_51_runtime_requested",
+    "new_dll_graphics_driver"
+  ],
+  "provenance": {
+    "license": "COPYING.TXT",
+    "licenseSha256": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
+    "sourcePatch": "ISSUE51_DERIVATIVE_SOURCE.patch",
+    "sourcePatchSha256": "aa228e2642290749611d3fd5c2084d23768a05723d249f1b6472285fc64054fb",
+    "buildReport": "ISSUE51_BUILD_REPORT.md",
+    "buildReportSha256": "cee21f5b777949e71c2604853ff99dce843b30425b1f1a862f1ad849658973d1"
+  }
+}

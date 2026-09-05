@@ -1,0 +1,24 @@
+{
+  "status": [
+    {"id":0, "name":"Death"},
+    {"id":1, "name":"Poison"},
+    {"id":2, "name":"Petrify"},
+    {"id":3, "name":"Blind"},
+    {"id":4, "name":"Mute"},
+    {"id":5, "name":"Berserk"},
+    {"id":6, "name":"Zombie"},
+    {"id":7, "name":"Sleep"},
+    {"id":8, "name":"Haste"},
+    {"id":9, "name":"Slow"},
+    {"id":10, "name":"Stop"},
+    {"id":11, "name":"Regen"},
+    {"id":12, "name":"Reflect"},
+    {"id":13, "name":"Doom"},
+    {"id":14, "name":"Sub-petrify"},
+    {"id":15, "name":"Float"},
+    {"id":16, "name":"Drain"},
+    {"id":17, "name":"Confusion"},
+    {"id":18, "name":"Ejection"},
+    {"id":19, "name":"Unused"}
+  ]
+}

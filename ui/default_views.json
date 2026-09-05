@@ -1,0 +1,14 @@
+{
+  "ff8": {
+    "enemies": {
+      "lexeditor:barrels:ff8-enemies": "3",
+      "lexeditor:columns:ff8-enemies": "[\"id\",\"name\"]",
+      "lexeditor:list-detail:ff8-enemies": "66",
+      "lexeditor:rows:ff8-enemies": "48"
+    },
+    "weapons": {
+      "lexeditor:list-detail:ff8-weapons": "42.00000000000001",
+      "lexeditor:rows:ff8-weapons": "33"
+    }
+  }
+}

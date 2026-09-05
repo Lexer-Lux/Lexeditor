@@ -1,7 +1,28 @@
 # Generated reports and dumps
 out/
+logs/
+.venv/
+$out/
+_scratch/
+worklog/
 *.tsv
 *_features.txt
 
 __pycache__/
 *.pyc
+*.obj
+*.bak
+
+# Reproducible tool build outputs; keep the packaged runtime under tools/rpf-cli/bin.
+tools/rpf-cli/build/
+tools/rpf-cli/source/RpfCli/bin/
+tools/rpf-cli/source/RpfCli/obj/
+tools/magic-rdr/MagicRDR_*.zip
+
+# Downloaded or private RDR2 fonts. Source and release bundles do not include
+# these binaries.
+games/rdr2/assets/fonts/*.ttf
+games/rdr2/assets/fonts/*.otf
+games/rdr2/assets/fonts/*.woff
+games/rdr2/assets/fonts/*.woff2
+!games/rdr2/assets/fonts/README.md

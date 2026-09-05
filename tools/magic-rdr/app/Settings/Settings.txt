@@ -1,0 +1,12 @@
+RPFLoadLastRPF:True
+RPFLastRPFPath:D:\XboxGames\Red Dead Redemption\Red Dead Redemtion GOTY - Xbox 360 [RF][DVD1]\Backup\rdr2_layer0.rpf
+ListViewSorting:Ascending
+ListViewSortingColumn:Name
+TreeViewShowLines:True
+TreeViewShowPlusMinus:True
+WPFUseCustomColor:True
+WPFCustomColor1:#FFFF8000
+WPFCustomColor2:#FF425C94
+TextureBackgroundColor:Color [Black]
+TextureImageSizeMode:AutoSize
+SAVFilePath:C:\Users\fumol\AppData\Roaming\yuzu\nand\user\save\0000000000000000\016EEDEDCF138B3E31DEC1C934AAC5E1\01007820196A6000

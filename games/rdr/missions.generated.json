@@ -1,0 +1,1243 @@
+{
+  "schemaVersion": 1,
+  "contract": "LexerRDR.mission-rewards",
+  "game": "rdr",
+  "summary": {
+    "missions": 57,
+    "cashRewards": 20,
+    "fameRewards": 39,
+    "honorRewards": 36
+  },
+  "sources": [
+    {
+      "role": "mission identity registry",
+      "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\scripting\\designerdefined\\long_update_thread.c",
+      "sha256": "70b33c7ffff5684f8b39d3fe82687dffde0186690f2d0377c39b7e214b66fe12",
+      "lines": "15591-15693"
+    },
+    {
+      "role": "completion reward table",
+      "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+      "sha256": "86bdadc93c90c66ad0865398218a0ac796cf988fe4bd529a2fb0a27f3764b317",
+      "lines": "1496-1506, 4272-4341, 4891-5509"
+    }
+  ],
+  "limits": {
+    "step": 1,
+    "rewards": {
+      "cash": {
+        "minimum": 0,
+        "maximum": 999999
+      },
+      "fame": {
+        "minimum": 0,
+        "maximum": 999999
+      },
+      "honor": {
+        "minimum": -999999,
+        "maximum": 999999
+      }
+    },
+    "runtimeConsumer": "LexerRDR.asi",
+    "installedArchivesReadOnly": true
+  },
+  "missions": [
+    {
+      "id": 1,
+      "name": "Intro 01",
+      "scriptName": "Intro01",
+      "localizationKey": "miss1_short",
+      "assetPath": "$/content/Frontier/Missions/Intro01/Intro01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/intro01/intro01.wsc",
+      "region": "Missions",
+      "registryLine": 15591,
+      "rewards": {
+        "cash": 0,
+        "fame": 150,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000001"
+      }
+    },
+    {
+      "id": 2,
+      "name": "Ranch 01",
+      "scriptName": "Ranch01",
+      "localizationKey": "miss2_short",
+      "assetPath": "$/content/Frontier/Missions/Ranch01/Ranch01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/ranch01/ranch01.wsc",
+      "region": "Missions",
+      "registryLine": 15592,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 50
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000002"
+      }
+    },
+    {
+      "id": 3,
+      "name": "Ranch 03",
+      "scriptName": "Ranch03",
+      "localizationKey": "miss3_short",
+      "assetPath": "$/content/Frontier/Missions/Ranch03/Ranch03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/ranch03/ranch03.wsc",
+      "region": "Missions",
+      "registryLine": 15593,
+      "rewards": {
+        "cash": 0,
+        "fame": 20,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000003"
+      }
+    },
+    {
+      "id": 4,
+      "name": "Ranch 02",
+      "scriptName": "Ranch02",
+      "localizationKey": "miss4_short",
+      "assetPath": "$/content/Frontier/Missions/Ranch02/Ranch02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/ranch02/ranch02.wsc",
+      "region": "Missions",
+      "registryLine": 15594,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 50
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000004"
+      }
+    },
+    {
+      "id": 5,
+      "name": "Ranch 07",
+      "scriptName": "Ranch07",
+      "localizationKey": "miss5_short",
+      "assetPath": "$/content/Frontier/Missions/Ranch07/Ranch07",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/ranch07/ranch07.wsc",
+      "region": "Missions",
+      "registryLine": 15595,
+      "rewards": {
+        "cash": 5,
+        "fame": 0,
+        "honor": 100
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000005"
+      }
+    },
+    {
+      "id": 6,
+      "name": "Ranch 06",
+      "scriptName": "Ranch06",
+      "localizationKey": "miss6_short",
+      "assetPath": "$/content/Frontier/Missions/Ranch06/Ranch06",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/ranch06/ranch06.wsc",
+      "region": "Missions",
+      "registryLine": 15596,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 150
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000006"
+      }
+    },
+    {
+      "id": 7,
+      "name": "Ranch 08",
+      "scriptName": "Ranch08",
+      "localizationKey": "miss7_short",
+      "assetPath": "$/content/Frontier/Missions/Ranch08/Ranch08",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/ranch08/ranch08.wsc",
+      "region": "Missions",
+      "registryLine": 15597,
+      "rewards": {
+        "cash": 5,
+        "fame": 0,
+        "honor": 100
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000007"
+      }
+    },
+    {
+      "id": 8,
+      "name": "Marshal 01",
+      "scriptName": "Marshal01",
+      "localizationKey": "miss8_short",
+      "assetPath": "$/content/Frontier/Missions/Marshal01/Marshal01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/marshal01/marshal01.wsc",
+      "region": "Missions",
+      "registryLine": 15598,
+      "rewards": {
+        "cash": 20,
+        "fame": 75,
+        "honor": 100
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000008"
+      }
+    },
+    {
+      "id": 9,
+      "name": "Marshal 02",
+      "scriptName": "Marshal02",
+      "localizationKey": "miss9_short",
+      "assetPath": "$/content/Frontier/Missions/Marshal02/Marshal02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/marshal02/marshal02.wsc",
+      "region": "Missions",
+      "registryLine": 15599,
+      "rewards": {
+        "cash": 25,
+        "fame": 150,
+        "honor": 100
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000009"
+      }
+    },
+    {
+      "id": 10,
+      "name": "Merchant 01",
+      "scriptName": "Merchant01",
+      "localizationKey": "miss10_short",
+      "assetPath": "$/content/Frontier/Missions/Merchant01/Merchant01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/merchant01/merchant01.wsc",
+      "region": "Missions",
+      "registryLine": 15600,
+      "rewards": {
+        "cash": 0,
+        "fame": 75,
+        "honor": 100
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000000A"
+      }
+    },
+    {
+      "id": 11,
+      "name": "Merchant 02",
+      "scriptName": "Merchant02",
+      "localizationKey": "miss11_short",
+      "assetPath": "$/content/Frontier/Missions/Merchant02/Merchant02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/merchant02/merchant02.wsc",
+      "region": "Missions",
+      "registryLine": 15602,
+      "rewards": {
+        "cash": 1,
+        "fame": 25,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000000B"
+      }
+    },
+    {
+      "id": 12,
+      "name": "Grave 01",
+      "scriptName": "Grave01",
+      "localizationKey": "miss12_short",
+      "assetPath": "$/content/Frontier/Missions/Grave01/Grave01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/grave01/grave01.wsc",
+      "region": "Missions",
+      "registryLine": 15603,
+      "rewards": {
+        "cash": 0,
+        "fame": 25,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000000C"
+      }
+    },
+    {
+      "id": 13,
+      "name": "Grave 02",
+      "scriptName": "Grave02",
+      "localizationKey": "miss13_short",
+      "assetPath": "$/content/Frontier/Missions/Grave02/Grave02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/grave02/grave02.wsc",
+      "region": "Missions",
+      "registryLine": 15604,
+      "rewards": {
+        "cash": 10,
+        "fame": 75,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000000D"
+      }
+    },
+    {
+      "id": 14,
+      "name": "Grave 03",
+      "scriptName": "Grave03",
+      "localizationKey": "miss14_short",
+      "assetPath": "$/content/Frontier/Missions/Grave03/Grave03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/grave03/grave03.wsc",
+      "region": "Missions",
+      "registryLine": 15605,
+      "rewards": {
+        "cash": 10,
+        "fame": 150,
+        "honor": 100
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000000E"
+      }
+    },
+    {
+      "id": 15,
+      "name": "Merchant 05",
+      "scriptName": "Merchant05",
+      "localizationKey": "miss15_short",
+      "assetPath": "$/content/Frontier/Missions/Merchant05/Merchant05",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/merchant05/merchant05.wsc",
+      "region": "Missions",
+      "registryLine": 15606,
+      "rewards": {
+        "cash": 3,
+        "fame": 200,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000000F"
+      }
+    },
+    {
+      "id": 16,
+      "name": "Merchant 03",
+      "scriptName": "Merchant03",
+      "localizationKey": "miss16_short",
+      "assetPath": "$/content/Frontier/Missions/Merchant03/Merchant03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/merchant03/merchant03.wsc",
+      "region": "Missions",
+      "registryLine": 15607,
+      "rewards": {
+        "cash": 25,
+        "fame": 75,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000010"
+      }
+    },
+    {
+      "id": 17,
+      "name": "Merchant 04",
+      "scriptName": "Merchant04",
+      "localizationKey": "miss17_short",
+      "assetPath": "$/content/Frontier/Missions/Merchant04/Merchant04",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/merchant04/merchant04.wsc",
+      "region": "Missions",
+      "registryLine": 15608,
+      "rewards": {
+        "cash": 5,
+        "fame": 200,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000011"
+      }
+    },
+    {
+      "id": 18,
+      "name": "Outlaw 01",
+      "scriptName": "Outlaw01",
+      "localizationKey": "miss18_short",
+      "assetPath": "$/content/Frontier/Missions/Outlaw01/Outlaw01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/outlaw01/outlaw01.wsc",
+      "region": "Missions",
+      "registryLine": 15609,
+      "rewards": {
+        "cash": 0,
+        "fame": 50,
+        "honor": 100
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000012"
+      }
+    },
+    {
+      "id": 19,
+      "name": "Outlaw 02",
+      "scriptName": "Outlaw02",
+      "localizationKey": "miss19_short",
+      "assetPath": "$/content/Frontier/Missions/Outlaw02/Outlaw02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/outlaw02/outlaw02.wsc",
+      "region": "Missions",
+      "registryLine": 15610,
+      "rewards": {
+        "cash": 0,
+        "fame": 250,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000013"
+      }
+    },
+    {
+      "id": 20,
+      "name": "Outlaw 03",
+      "scriptName": "Outlaw03",
+      "localizationKey": "miss20_short",
+      "assetPath": "$/content/Frontier/Missions/Outlaw03/Outlaw03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/outlaw03/outlaw03.wsc",
+      "region": "Missions",
+      "registryLine": 15611,
+      "rewards": {
+        "cash": 0,
+        "fame": 150,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000014"
+      }
+    },
+    {
+      "id": 21,
+      "name": "Marshal 04",
+      "scriptName": "Marshal04",
+      "localizationKey": "miss21_short",
+      "assetPath": "$/content/Frontier/Missions/Marshal04/Marshal04",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/marshal04/marshal04.wsc",
+      "region": "Missions",
+      "registryLine": 15601,
+      "rewards": {
+        "cash": 50,
+        "fame": 250,
+        "honor": 200
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000015"
+      }
+    },
+    {
+      "id": 22,
+      "name": "Ranch 04",
+      "scriptName": "Ranch04",
+      "localizationKey": "miss22_short",
+      "assetPath": "$/content/Frontier/Missions/Ranch04/Ranch04",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/ranch04/ranch04.wsc",
+      "region": "Missions",
+      "registryLine": 15612,
+      "rewards": {
+        "cash": 0,
+        "fame": 75,
+        "honor": 150
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000016"
+      }
+    },
+    {
+      "id": 23,
+      "name": "Marshal 03",
+      "scriptName": "Marshal03",
+      "localizationKey": "miss23_short",
+      "assetPath": "$/content/Frontier/Missions/Marshal03/Marshal03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/marshal03/marshal03.wsc",
+      "region": "Missions",
+      "registryLine": 15613,
+      "rewards": {
+        "cash": 0,
+        "fame": 150,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000017"
+      }
+    },
+    {
+      "id": 24,
+      "name": "Fort 01",
+      "scriptName": "Fort01",
+      "localizationKey": "miss24_short",
+      "assetPath": "$/content/Frontier/Missions/Fort01/Fort01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/fort01/fort01.wsc",
+      "region": "Missions",
+      "registryLine": 15614,
+      "rewards": {
+        "cash": 50,
+        "fame": 150,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000018"
+      }
+    },
+    {
+      "id": 25,
+      "name": "Fort 02",
+      "scriptName": "Fort02",
+      "localizationKey": "miss25_short",
+      "assetPath": "$/content/Frontier/Missions/Fort02/Fort02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/frontier/missions/fort02/fort02.wsc",
+      "region": "Missions",
+      "registryLine": 15640,
+      "rewards": {
+        "cash": 0,
+        "fame": 150,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000019"
+      }
+    },
+    {
+      "id": 26,
+      "name": "Mexico Army 02",
+      "scriptName": "MexArmy02",
+      "localizationKey": "miss26_short",
+      "assetPath": "$/content/Mexico/Missions/MexArmy02/MexArmy02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/mexarmy02/mexarmy02.wsc",
+      "region": "Missions",
+      "registryLine": 15641,
+      "rewards": {
+        "cash": 50,
+        "fame": 250,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000001A"
+      }
+    },
+    {
+      "id": 27,
+      "name": "Mexico Army 01",
+      "scriptName": "MexArmy01",
+      "localizationKey": "miss27_short",
+      "assetPath": "$/content/Mexico/Missions/MexArmy01/MexArmy01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/mexarmy01/mexarmy01.wsc",
+      "region": "Missions",
+      "registryLine": 15642,
+      "rewards": {
+        "cash": 50,
+        "fame": 250,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000001B"
+      }
+    },
+    {
+      "id": 28,
+      "name": "Mexico Army 03",
+      "scriptName": "MexArmy03",
+      "localizationKey": "miss28_short",
+      "assetPath": "$/content/Mexico/Missions/MexArmy03/MexArmy03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/mexarmy03/mexarmy03.wsc",
+      "region": "Missions",
+      "registryLine": 15643,
+      "rewards": {
+        "cash": 100,
+        "fame": 300,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000001C"
+      }
+    },
+    {
+      "id": 29,
+      "name": "Mexico Army 04",
+      "scriptName": "MexArmy04",
+      "localizationKey": "miss29_short",
+      "assetPath": "$/content/Mexico/Missions/MexArmy04/MexArmy04",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/mexarmy04/mexarmy04.wsc",
+      "region": "Missions",
+      "registryLine": 15644,
+      "rewards": {
+        "cash": 75,
+        "fame": 200,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000001D"
+      }
+    },
+    {
+      "id": 30,
+      "name": "Gun 01",
+      "scriptName": "Gun01",
+      "localizationKey": "miss30_short",
+      "assetPath": "$/content/Mexico/Missions/Gun01/Gun01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/gun01/gun01.wsc",
+      "region": "Missions",
+      "registryLine": 15645,
+      "rewards": {
+        "cash": 0,
+        "fame": 75,
+        "honor": 100
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000001E"
+      }
+    },
+    {
+      "id": 31,
+      "name": "Gun 05",
+      "scriptName": "Gun05",
+      "localizationKey": "miss31_short",
+      "assetPath": "$/content/Mexico/Missions/Gun05/Gun05",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/gun05/gun05.wsc",
+      "region": "Missions",
+      "registryLine": 15647,
+      "rewards": {
+        "cash": 50,
+        "fame": 100,
+        "honor": 125
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000001F"
+      }
+    },
+    {
+      "id": 32,
+      "name": "Gun 03",
+      "scriptName": "Gun03",
+      "localizationKey": "miss32_short",
+      "assetPath": "$/content/Mexico/Missions/Gun03/Gun03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/gun03/gun03.wsc",
+      "region": "Missions",
+      "registryLine": 15646,
+      "rewards": {
+        "cash": 0,
+        "fame": 75,
+        "honor": 50
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000020"
+      }
+    },
+    {
+      "id": 33,
+      "name": "Gun 02",
+      "scriptName": "Gun02",
+      "localizationKey": "miss33_short",
+      "assetPath": "$/content/Mexico/Missions/Gun02/Gun02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/gun02/gun02.wsc",
+      "region": "Missions",
+      "registryLine": 15648,
+      "rewards": {
+        "cash": 0,
+        "fame": 150,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000021"
+      }
+    },
+    {
+      "id": 34,
+      "name": "Mexico Girl 01",
+      "scriptName": "MexGirl01",
+      "localizationKey": "miss34_short",
+      "assetPath": "$/content/Mexico/Missions/MexGirl01/MexGirl01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/mexgirl01/mexgirl01.wsc",
+      "region": "Missions",
+      "registryLine": 15649,
+      "rewards": {
+        "cash": 0,
+        "fame": 75,
+        "honor": 100
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000022"
+      }
+    },
+    {
+      "id": 35,
+      "name": "mexgirl 03",
+      "scriptName": "mexgirl03",
+      "localizationKey": "miss35_short",
+      "assetPath": "$/content/mexico/missions/mexgirl03/mexgirl03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/mexgirl03/mexgirl03.wsc",
+      "region": "missions",
+      "registryLine": 15650,
+      "rewards": {
+        "cash": 0,
+        "fame": 200,
+        "honor": 50
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000023"
+      }
+    },
+    {
+      "id": 36,
+      "name": "Mexico Army 05",
+      "scriptName": "MexArmy05",
+      "localizationKey": "miss36_short",
+      "assetPath": "$/content/Mexico/Missions/MexArmy05/MexArmy05",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/mexarmy05/mexarmy05.wsc",
+      "region": "Missions",
+      "registryLine": 15651,
+      "rewards": {
+        "cash": 0,
+        "fame": 250,
+        "honor": 50
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000024"
+      }
+    },
+    {
+      "id": 37,
+      "name": "Rebel 03",
+      "scriptName": "Rebel03",
+      "localizationKey": "miss37_short",
+      "assetPath": "$/content/Mexico/Missions/Rebel03/Rebel03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/rebel03/rebel03.wsc",
+      "region": "Missions",
+      "registryLine": 15652,
+      "rewards": {
+        "cash": 0,
+        "fame": 150,
+        "honor": 125
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000025"
+      }
+    },
+    {
+      "id": 38,
+      "name": "Rebel 04",
+      "scriptName": "Rebel04",
+      "localizationKey": "miss38_short",
+      "assetPath": "$/content/Mexico/Missions/Rebel04/Rebel04",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/rebel04/rebel04.wsc",
+      "region": "Missions",
+      "registryLine": 15653,
+      "rewards": {
+        "cash": 0,
+        "fame": 200,
+        "honor": 125
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000026"
+      }
+    },
+    {
+      "id": 39,
+      "name": "Rebel 02",
+      "scriptName": "Rebel02",
+      "localizationKey": "miss39_short",
+      "assetPath": "$/content/Mexico/Missions/Rebel02/Rebel02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/rebel02/rebel02.wsc",
+      "region": "Missions",
+      "registryLine": 15654,
+      "rewards": {
+        "cash": 0,
+        "fame": 300,
+        "honor": 125
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000027"
+      }
+    },
+    {
+      "id": 40,
+      "name": "Rebel 06",
+      "scriptName": "Rebel06",
+      "localizationKey": "miss40_short",
+      "assetPath": "$/content/Mexico/Missions/Rebel06/Rebel06",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/rebel06/rebel06.wsc",
+      "region": "Missions",
+      "registryLine": 15655,
+      "rewards": {
+        "cash": 0,
+        "fame": 300,
+        "honor": 125
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000028"
+      }
+    },
+    {
+      "id": 41,
+      "name": "Rebel 05",
+      "scriptName": "Rebel05",
+      "localizationKey": "miss41_short",
+      "assetPath": "$/content/Mexico/Missions/Rebel05/Rebel05",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/mexico/missions/rebel05/rebel05.wsc",
+      "region": "Missions",
+      "registryLine": 15656,
+      "rewards": {
+        "cash": 0,
+        "fame": 300,
+        "honor": 125
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000029"
+      }
+    },
+    {
+      "id": 42,
+      "name": "FBI 05",
+      "scriptName": "FBI05",
+      "localizationKey": "miss42_short",
+      "assetPath": "$/content/North/Missions/FBI05/FBI05",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/fbi05/fbi05.wsc",
+      "region": "Missions",
+      "registryLine": 15670,
+      "rewards": {
+        "cash": 0,
+        "fame": 150,
+        "honor": 25
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000002A"
+      }
+    },
+    {
+      "id": 43,
+      "name": "FBI 01",
+      "scriptName": "Fbi01",
+      "localizationKey": "miss43_short",
+      "assetPath": "$/content/North/Missions/Fbi01/Fbi01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/fbi01/fbi01.wsc",
+      "region": "Missions",
+      "registryLine": 15671,
+      "rewards": {
+        "cash": 0,
+        "fame": 150,
+        "honor": 125
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000002B"
+      }
+    },
+    {
+      "id": 44,
+      "name": "Native 03",
+      "scriptName": "Native03",
+      "localizationKey": "miss44_short",
+      "assetPath": "$/content/North/Missions/Native03/Native03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/native03/native03.wsc",
+      "region": "Missions",
+      "registryLine": 15672,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 25
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000002C"
+      }
+    },
+    {
+      "id": 45,
+      "name": "Anthro 01",
+      "scriptName": "Anthro01",
+      "localizationKey": "miss45_short",
+      "assetPath": "$/content/North/Missions/Anthro01/Anthro01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/anthro01/anthro01.wsc",
+      "region": "Missions",
+      "registryLine": 15673,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 25
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000002D"
+      }
+    },
+    {
+      "id": 46,
+      "name": "Anthro 03",
+      "scriptName": "Anthro03",
+      "localizationKey": "miss46_short",
+      "assetPath": "$/content/North/Missions/Anthro03/Anthro03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/anthro03/anthro03.wsc",
+      "region": "Missions",
+      "registryLine": 15674,
+      "rewards": {
+        "cash": 100,
+        "fame": 0,
+        "honor": 25
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000002E"
+      }
+    },
+    {
+      "id": 47,
+      "name": "FBI 02",
+      "scriptName": "Fbi02",
+      "localizationKey": "miss47_short",
+      "assetPath": "$/content/North/Missions/Fbi02/Fbi02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/fbi02/fbi02.wsc",
+      "region": "Missions",
+      "registryLine": 15675,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x0000002F"
+      }
+    },
+    {
+      "id": 48,
+      "name": "FBI 04",
+      "scriptName": "FBI04",
+      "localizationKey": "miss48_short",
+      "assetPath": "$/content/North/Missions/FBI04/FBI04",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/fbi04/fbi04.wsc",
+      "region": "Missions",
+      "registryLine": 15676,
+      "rewards": {
+        "cash": 0,
+        "fame": 500,
+        "honor": 250
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000030"
+      }
+    },
+    {
+      "id": 49,
+      "name": "Home 01",
+      "scriptName": "Home01",
+      "localizationKey": "miss49_short",
+      "assetPath": "$/content/North/Missions/Home01/Home01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/home01/home01.wsc",
+      "region": "Missions",
+      "registryLine": 15685,
+      "rewards": {
+        "cash": 100,
+        "fame": 0,
+        "honor": 150
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000031"
+      }
+    },
+    {
+      "id": 50,
+      "name": "Home 02 Wife 02",
+      "scriptName": "Home02_Wife02",
+      "localizationKey": "miss50_short",
+      "assetPath": "$/content/North/Missions/Home02/Home02_Wife02/Home02_Wife02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/home02/home02_wife02/home02_wife02.wsc",
+      "region": "Missions",
+      "registryLine": 15688,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 150
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000032"
+      }
+    },
+    {
+      "id": 51,
+      "name": "Home 02 Wife 03",
+      "scriptName": "Home02_Wife03",
+      "localizationKey": "miss51_short",
+      "assetPath": "$/content/North/Missions/Home02/Home02_Wife03/Home02_Wife03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/home02/home02_wife03/home02_wife03.wsc",
+      "region": "Missions",
+      "registryLine": 15689,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 150
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000033"
+      }
+    },
+    {
+      "id": 52,
+      "name": "Home 02 Son 01",
+      "scriptName": "Home02_Son01",
+      "localizationKey": "miss52_short",
+      "assetPath": "$/content/North/Missions/Home02/Home02_Son01/Home02_Son01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/home02/home02_son01/home02_son01.wsc",
+      "region": "Missions",
+      "registryLine": 15690,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 150
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000034"
+      }
+    },
+    {
+      "id": 53,
+      "name": "Home 02 Son 02",
+      "scriptName": "Home02_Son02",
+      "localizationKey": "miss53_short",
+      "assetPath": "$/content/North/Missions/Home02/Home02_Son02/Home02_Son02",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/home02/home02_son02/home02_son02.wsc",
+      "region": "Missions",
+      "registryLine": 15691,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 150
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000035"
+      }
+    },
+    {
+      "id": 54,
+      "name": "Home 02 Son 03",
+      "scriptName": "Home02_Son03",
+      "localizationKey": "miss54_short",
+      "assetPath": "$/content/North/Missions/Home02/Home02_Son03/Home02_Son03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/home02/home02_son03/home02_son03.wsc",
+      "region": "Missions",
+      "registryLine": 15692,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 150
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000036"
+      }
+    },
+    {
+      "id": 55,
+      "name": "Home 02 Ranch 01",
+      "scriptName": "Home02_Ranch01",
+      "localizationKey": "miss55_short",
+      "assetPath": "$/content/North/Missions/Home02/Home02_Ranch01/Home02_Ranch01",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/home02/home02_ranch01/home02_ranch01.wsc",
+      "region": "Missions",
+      "registryLine": 15686,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000037"
+      }
+    },
+    {
+      "id": 56,
+      "name": "Home 02 Ranch 03",
+      "scriptName": "Home02_Ranch03",
+      "localizationKey": "miss56_short",
+      "assetPath": "$/content/North/Missions/Home02/Home02_Ranch03/Home02_Ranch03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/home02/home02_ranch03/home02_ranch03.wsc",
+      "region": "Missions",
+      "registryLine": 15687,
+      "rewards": {
+        "cash": 100,
+        "fame": 0,
+        "honor": 150
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000038"
+      }
+    },
+    {
+      "id": 57,
+      "name": "Home 03",
+      "scriptName": "Home03",
+      "localizationKey": "miss57_short",
+      "assetPath": "$/content/North/Missions/Home03/Home03",
+      "archive": "game/content.rpf",
+      "archivePath": "content/release64/north/missions/home03/home03.wsc",
+      "region": "Missions",
+      "registryLine": 15693,
+      "rewards": {
+        "cash": 0,
+        "fame": 0,
+        "honor": 0
+      },
+      "rewardSource": {
+        "file": "C:\\RDRMod\\_analysis\\decompiled\\content\\release64\\frontier\\missions\\ranch01\\ranch01.c",
+        "function": "Function_115",
+        "case": "0x00000039"
+      }
+    }
+  ]
+}

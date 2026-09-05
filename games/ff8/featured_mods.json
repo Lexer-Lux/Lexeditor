@@ -1,0 +1,12 @@
+[
+  {
+    "id": "lexers-mod-for-ff8",
+    "name": "Lexer's Mod for FF8",
+    "featured": true,
+    "source": {
+      "repository": "https://github.com/Lexer-Lux/LexersModForFF8",
+      "releaseFeed": "https://api.github.com/repos/Lexer-Lux/LexersModForFF8/releases/latest",
+      "assetPattern": "*.iroj"
+    }
+  }
+]

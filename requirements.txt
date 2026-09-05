@@ -1,0 +1,5 @@
+Pillow==12.3.0
+fonttools>=4.59,<5
+pywebview==6.2.1
+texfury==1.6.2
+tomli>=2.0,<3; python_version < "3.11"

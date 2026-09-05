@@ -1,0 +1,239 @@
+{
+  "contributions": [
+    {
+      "name": "HobbitDur",
+      "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas and editor references.",
+      "url": "https://github.com/HobbitDur/FF8UltimateEditor"
+    },
+    {
+      "name": "Julian Xhokaxhiu (TrueOdin), Tang-Tang Zhou (vertex2995), Jérôme Arzel (myst6re), CosmosXIII and FFNx contributors",
+      "role": "FFNx runtime, game hooks and reverse-engineering references.",
+      "url": "https://github.com/julianxhokaxhiu/FFNx"
+    },
+    {
+      "name": "Robin Engström and ff8-decomp contributors",
+      "role": "FF8 decompilation used to check game behavior and ability categories.",
+      "url": "https://github.com/roengstrom/ff8-decomp"
+    },
+    {
+      "name": "Jérôme Arzel (myst6re) and Deling contributors",
+      "role": "Deling field archives, background rendering, dialogue, scripts, walkmesh, encounters and world-map format references.",
+      "url": "https://github.com/myst6re/deling"
+    },
+    {
+      "name": "MaKiPL (Maki), Sebanisu and the OpenVIII team",
+      "role": "OpenVIII text encoding, field formats, world-map records, rail data and texture format references.",
+      "url": "https://github.com/MaKiPL/OpenVIII"
+    },
+    {
+      "name": "Aali132, quantumpencil, Maxime Bacoux, myst6re, Chris Rizzitello, John Pritchard and Julian Xhokaxhiu",
+      "role": "Authors credited in FFNx exe_data.cpp, used for executable text and card-name overrides.",
+      "url": "https://github.com/julianxhokaxhiu/FFNx/blob/master/src/exe_data.cpp"
+    }
+  ],
+  "thanks": [
+    {
+      "name": "Nihil",
+      "role": "FF8 Ultimate Editor: beta testing, unknown values and Jumbo Cactuar.",
+      "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/Ifrit/IfritAI/ifritaiwidget.py"
+    },
+    {
+      "name": "myst6re",
+      "role": "FF8 Ultimate Editor: reverse engineering; Deling, Hyne and VincentTim. Also acknowledged by FFNx.",
+      "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/ToolUpdate/list.json"
+    },
+    {
+      "name": "Riccardo",
+      "role": "Shumi Translator beta testing.",
+      "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/ShumiTranslator/shumitranslator.py"
+    },
+    {
+      "name": "Qhimm",
+      "role": "FF8SND / ff8-sound-remixed sound decoding reference used by Julia.",
+      "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/Julia/juliamanager.py"
+    },
+    {
+      "name": "Mcindus",
+      "role": "Tripod card art acknowledged by CCGroup.",
+      "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/CCGroup/ccgroup.py"
+    },
+    {
+      "name": "ducladoncladon",
+      "role": "Xylomod card art acknowledged by CCGroup.",
+      "url": "https://github.com/HobbitDur/FF8UltimateEditor/blob/master/CCGroup/ccgroup.py"
+    },
+    {
+      "name": "JumboCactuar",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/Nihil-1/JumboCactuar"
+    },
+    {
+      "name": "Junkshop",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/HobbitDur/junkshop-enhanced"
+    },
+    {
+      "name": "Quezacotl",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/HobbitDur/quezacotl-enhanced"
+    },
+    {
+      "name": "Siren",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/HobbitDur/Siren-enhanced"
+    },
+    {
+      "name": "DarkShinryu and Doomtrain contributors",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/DarkShinryu/doomtrain"
+    },
+    {
+      "name": "IfritGui",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/HobbitDur/IfritGui"
+    },
+    {
+      "name": "Hyne",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/myst6re/hyne"
+    },
+    {
+      "name": "DelingCli",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/myst6re/deling"
+    },
+    {
+      "name": "Deling",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/myst6re/deling"
+    },
+    {
+      "name": "VincentTim",
+      "role": "External tool referenced by FF8 Ultimate Editor.",
+      "url": "https://github.com/myst6re/vincent-tim"
+    },
+    {
+      "name": "Aali",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=2862"
+    },
+    {
+      "name": "Chrysalis",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=674"
+    },
+    {
+      "name": "CosmosXIII",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://github.com/CosmosXIII"
+    },
+    {
+      "name": "DLPB",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://forums.qhimm.com/index.php?action=profile;u=6439"
+    },
+    {
+      "name": "dziugo",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=1660"
+    },
+    {
+      "name": "ficedula",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=68"
+    },
+    {
+      "name": "Iros",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://forums.qhimm.com/index.php?action=profile;u=21785"
+    },
+    {
+      "name": "JWP",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=3772"
+    },
+    {
+      "name": "Kranmer",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=4909"
+    },
+    {
+      "name": "Maki",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=23937"
+    },
+    {
+      "name": "quantumpencil",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=23810"
+    },
+    {
+      "name": "Nax",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://github.com/nax"
+    },
+    {
+      "name": "Satsuki",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=24647"
+    },
+    {
+      "name": "Sebanisu",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=22866"
+    },
+    {
+      "name": "sithlord48",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "http://forums.qhimm.com/index.php?action=profile;u=6501"
+    },
+    {
+      "name": "TurBoss",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://github.com/TurBoss"
+    },
+    {
+      "name": "unab0mb",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://forums.qhimm.com/index.php?action=profile;u=31071"
+    },
+    {
+      "name": "tangtang95",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://github.com/tangtang95"
+    },
+    {
+      "name": "Lord UrQuan",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://github.com/eve-atum"
+    },
+    {
+      "name": "LaZar00",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://github.com/LaZar00"
+    },
+    {
+      "name": "ChthonVII",
+      "role": "Acknowledged by FFNx, whose runtime and source this plugin uses.",
+      "url": "https://github.com/ChthonVII"
+    }
+  ],
+  "licenses": [
+    {
+      "name": "FF8 Ultimate Editor — GNU GPL v3",
+      "url": "/assets/licenses/FF8UltimateEditor-GPL-3.0.txt"
+    },
+    {
+      "name": "FFNx — GNU GPL v3",
+      "url": "/assets/licenses/FFNx-GPL-3.0.txt"
+    },
+    {
+      "name": "OpenVIII — MIT License",
+      "url": "/assets/licenses/OpenVIII-MIT.txt"
+    },
+    {
+      "name": "Deling — GNU GPL v3 or later",
+      "url": "/assets/licenses/Deling-GPL-3.0.txt"
+    }
+  ]
+}

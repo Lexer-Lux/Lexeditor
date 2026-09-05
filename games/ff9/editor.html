@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - Final Fantasy 9</title>
+  <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    :root{--lex-radius:5px}
+    *{box-sizing:border-box}body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:radial-gradient(circle at 48% 12%,#211941,#090713 70%);font:15px/1.35 "Segoe UI",sans-serif}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}.ff9-layout,.lex-paged-list-detail{height:100%}.ff9-table,.ff9-detail{height:100%;min-height:0}.ff9-table{background:linear-gradient(145deg,#4b3a7d,#2a224d)}
+    .ff9-detail .lex-detail-panel-heading{background:linear-gradient(135deg,#604c96,#30255b)}.ff9-detail .lex-detail-panel-body{padding:10px;gap:10px}.ff9-detail input{font:inherit}
+    .ff9-card{max-width:980px;padding:22px 24px;border:2px solid var(--lex-border);background:linear-gradient(135deg,#594585,#2b2050 72%);box-shadow:inset 2px 2px #ffffff2d,inset -2px -2px #0008}.ff9-card h2{margin:0 0 12px;font:30px/1.15 Georgia,serif}.ff9-card p{max-width:820px;margin:8px 0}.ff9-path{display:block;margin:7px 0;overflow-wrap:anywhere;color:#fff}.ff9-warning{display:inline-block;margin-top:10px;padding:5px 9px;color:#171717;background:#efc64f;font-weight:700}.ff9-source{color:var(--lex-muted)}
+    #toolbar{display:flex;margin:var(--lex-panel-gap) var(--lex-panel-gap) 0;gap:8px}#toolbar:empty{display:none}.ff9-readonly{white-space:normal;overflow-wrap:anywhere}.lex-data-map-view{height:100%;overflow:auto}.lex-data-map-table{background:#382d68}.lex-column-list-header{background:#1e1838}
+    :root{--lex-radius:5px}body{background:var(--lex-bg);font:15px/1.35 var(--lex-font)}.ff9-table,.ff9-detail .lex-detail-panel-heading,.ff9-card,.lex-data-map-table,.lex-column-list-header{background:var(--lex-panel);box-shadow:none}.ff9-card h2{font-family:var(--lex-heading-font)}
+  </style>
+</head>
+<body>
+  <header id="lexeditor-shell"></header>
+  <div id="toolbar"></div>
+  <main id="main"></main>
+  <script src="/shared/framework.js"></script>
+  <script>
+  "use strict";
+  const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,readonlyField,recordId,pagedListDetail,booleanMark,subtabBar,platformConfigView,infoHelp,clone,infoIcon}=LexeditorUI;
+  const $=selector=>document.querySelector(selector);
+  async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const payload=await response.json();if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
+  const tabs=[
+    {id:"accessories",label:"Accessories"},{id:"abilities",label:"Abilities"},{id:"armor",label:"Armor"},{id:"items",label:"Items"},{id:"magic",label:"Magic"},{id:"weapons",label:"Weapons"},
+    {id:"characters",label:"Characters"},{id:"enemies",label:"Enemies"},{id:"encounters",label:"Encounters"},{id:"shops",label:"Shops"},{id:"synthesis",label:"Synthesis"},{id:"tweaks",label:"Tweaks"}
+  ];
+  const tabDatasets={accessories:["items"],abilities:["abilities"],armor:["armor"],items:["items","item-effects"],magic:["actions"],weapons:["weapons"],characters:["characters"],shops:["shops"],synthesis:["synthesis"]};
+  const state={tab:"items",dashboard:null,dataMap:null,catalog:[],datasets:{},datasetChoice:{},platformConfig:null,savedPlatformConfig:null,platformQuery:"",activeSource:"mine",selected:{},query:{},page:{},pageSize:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],busy:false,error:""};
+  const prefCache={};
+  const catalogRow=key=>state.catalog.find(value=>value.key===key);
+  const choices=tab=>tabDatasets[tab]||[];
+  function activeKey(){const available=choices(state.tab);return state.datasetChoice[state.tab]||available[0]||null}
+  function viewRows(data,key){let rows=data.rows;if(state.tab==="accessories")rows=rows.filter(row=>row.values.Accessory===true);const query=(state.query[key]||"").toLocaleLowerCase();if(query)rows=rows.filter(row=>`${row.id} ${row.name} ${Object.values(row.values).join(" ")}`.toLocaleLowerCase().includes(query));const sort=state.sort[key]||{key:"name",dir:1};return [...rows].sort((left,right)=>{const a=sort.key==="name"?left.name:sort.key==="id"?left.id:left.values[sort.key],b=sort.key==="name"?right.name:sort.key==="id"?right.id:right.values[sort.key];return (typeof a==="string"?a.localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"}):Number(a)-Number(b))*sort.dir})}
+  function changedFields(data,row){const original=data.originalByLine[String(row.line)];const values={};for(const field of data.fields)if(field.editable&&JSON.stringify(row.values[field.key])!==JSON.stringify(original.values[field.key]))values[field.key]=row.values[field.key];return values}
+  const platformFields=config=>Object.fromEntries((config?.sections||[]).flatMap(section=>section.fields).map(field=>[field.id,field.value]));
+  function platformChanges(){const current=platformFields(state.platformConfig),saved=platformFields(state.savedPlatformConfig),changes={};for(const [id,value] of Object.entries(current))if(JSON.stringify(value)!==JSON.stringify(saved[id]))changes[id]=value;return changes}
+  function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=Object.keys(platformChanges()).length;for(const data of Object.values(state.datasets))if(data?.rows)for(const row of data.rows)count+=Object.keys(changedFields(data,row)).length;return count}
+  function installData(payload){payload.originalRows=clone(payload.rows);payload.originalByLine=Object.fromEntries(payload.originalRows.map(row=>[String(row.line),row]));state.datasets[payload.key]=payload;if(!payload.rows.some(row=>row.line===state.selected[payload.key]))state.selected[payload.key]=payload.rows[0]?.line??null;return payload}
+  async function loadDataset(key,force=false){if(!key)return null;if(!force&&state.datasets[key])return state.datasets[key];const meta=catalogRow(key);if(!meta?.available){state.datasets[key]={key,unavailable:true,error:`${meta?.relativePath||key} is not present in the project or a Memoria/Hades export.`};return state.datasets[key]}try{return installData(await api(`/api/dataset?key=${encodeURIComponent(key)}`))}catch(error){state.datasets[key]={key,unavailable:true,error:error.message};return state.datasets[key]}}
+  function fieldValue(row,field){const value=row.values[field.key];if(field.kind==="boolean")return booleanMark(value);return value===""?"—":String(value)}
+  function columnsFor(data,key){const useful=data.fields.filter(field=>!["id","comment","name"].includes(field.key.toLocaleLowerCase())).slice(0,3);return [{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,width:"minmax(9em,1.6fr)"},...useful.map(field=>({key:field.key,label:field.label,sortable:true,width:"minmax(0,1fr)",numeric:["integer","number"].includes(field.kind),sortValue:row=>row.values[field.key],render:row=>fieldValue(row,field)}))]}
+  function prefsFor(data,key,columns){if(!prefCache[key])prefCache[key]=columnPreferences(`ff9-${key}`,columns,()=>render());return prefCache[key]}
+  function tablePanel(data,key,rows,selected,select){const columns=columnsFor(data,key);return columnList({rows,key:row=>row.line,selected,select,sortState:state.sort[key]||{key:"name",dir:1},sort:column=>{const current=state.sort[key]||{key:"name",dir:1};state.sort[key]=current.key===column?{key:column,dir:-current.dir}:{key:column,dir:1};state.page[key]=0;render()},columnPreferences:prefsFor(data,key,columns),columns,class:"ff9-table","aria-label":`${data.label} table`})}
+  const EXPLAINED_READ_ONLY={
+    "shops:Comment":"Final Fantasy 9 has no shop names. Memoria's shop export carries only Comment, Id and Items, and it fills Comment with a generated placeholder such as “Shop 0000” so the rows can be told apart. Lexeditor shows it as the shop's name, but the game never reads it, so editing it would rename nothing.",
+  };
+  const readOnlyNote=(data,field)=>EXPLAINED_READ_ONLY[`${data.key}:${field.key}`]||null;
+  function setValue(data,row,field,value){row.values[field.key]=value;shell.refresh()}
+  function fieldControl(data,row,field){const note=readOnlyNote(data,field);let control;if(note||!field.editable||field.kind==="stored")control=readonlyField(String(row.values[field.key]??""),{className:"ff9-readonly"});else if(field.kind==="boolean")control=el("input",{type:"checkbox",checked:!!row.values[field.key],onchange:event=>setValue(data,row,field,event.target.checked)});else if(field.kind==="integer"||field.kind==="number")control=el("input",{type:"number",min:field.min,max:field.max,step:field.step||1,value:row.values[field.key],oninput:event=>{if(event.target.value!=="")setValue(data,row,field,field.kind==="integer"?Number.parseInt(event.target.value,10):Number(event.target.value))}});else control=el("input",{type:"text",value:row.values[field.key]??"",oninput:event=>setValue(data,row,field,event.target.value)});return detailField({label:field.label.toLocaleUpperCase(),help:note?infoHelp(note):null,control,dataType:note?"READ ONLY":field.declaredType,min:field.min,max:field.max})}
+  function detail(data,row){const editable=data.fields.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=data.fields.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));return detailPanel({className:"ff9-detail",title:row.name,identity:recordId(row.id),meta:`${data.label} · ${data.source} CSV`,body})}
+  function unavailable(key){const meta=catalogRow(key);const data=state.datasets[key];return el("section",{class:"ff9-card"},el("h2",{},meta?.label||tabs.find(tab=>tab.id===state.tab)?.label||"FF9 data"),el("p",{},data?.error||"This format is not available."),el("p",{},"Lexeditor can safely edit this area after Hades Workshop or Memoria exports the matching CSV. The installed vanilla p0data containers are left untouched."),el("code",{class:"ff9-path"},meta?.projectPath||state.dashboard.project.root),el("span",{class:"ff9-warning"},"NO PROVED EDITABLE SOURCE"))}
+  function renderDataset(data,key){if(!data||data.unavailable){$("#main").replaceChildren(unavailable(key));return}const rows=viewRows(data,key);const selected=rows.find(row=>row.line===state.selected[key])||rows[0];if(selected)state.selected[key]=selected.line;const layout=pagedListDetail({rows,key:row=>row.line,slots:true,selected:selected?.line??null,page:state.page[key]||0,pageSize:state.pageSize[key]||12,noun:"records",className:"ff9-layout",splitKey:`ff9-${state.tab}-${key}`,rowsKey:`ff9-${state.tab}-${key}`,defaultSplit:44,minLeft:340,minRight:420,search:{key:`ff9-${key}`,value:state.query[key]||"",label:`Search ${data.label}`,change:value=>{state.query[key]=value;state.page[key]=0;render()}},sync:next=>{state.page[key]=next.page;state.pageSize[key]=next.pageSize;if(next.selected!==null)state.selected[key]=next.selected},change:next=>{state.page[key]=next.page;state.pageSize[key]=next.pageSize;if(next.selected!==null)state.selected[key]=next.selected;render()},master:view=>tablePanel(data,key,view.rows,view.selected,view.select),detail:row=>detail(data,row)});$("#main").replaceChildren(layout)}
+  function setToolbar(nodes=[]){$("#toolbar").replaceChildren(...nodes)}
+  function toolbar(){const keys=choices(state.tab);if(keys.length<=1){setToolbar();return}const buttons=keys.map(key=>({id:key,label:catalogRow(key)?.label||key}));const strip=subtabBar({tabs:buttons,active:activeKey(),label:`${tabs.find(tab=>tab.id===state.tab)?.label} datasets`,change:key=>{state.datasetChoice[state.tab]=key;state.page[key]=0;loadDataset(key).then(render)}});setToolbar([strip])}
+  function info(){
+    const game=state.dashboard.game,base=state.dashboard.baseline,runtime=state.dashboard.runtime||{};
+    const value=text=>readonlyField(String(text??""),{format:false});
+    $("#main").replaceChildren(detailPanel({className:"lex-information-panel ff9-information",
+      icon:infoIcon(),title:"Information",meta:"Installation, baseline data, and the Memoria helper",body:[
+      detailSection({title:"GAME",body:[
+        detailField({label:"STATE",control:value(game.ready?"Ready":"Incomplete"),
+          help:infoHelp(game.ready?"The installed game layout is confirmed.":"The installed game layout is incomplete.")}),
+        detailField({label:"FOLDER",control:value(game.root)}),
+        detailField({label:"STEAM APP",control:value(`${game.steamAppId} · build ${game.steamBuildId||"unknown"}`)}),
+      ]}),
+      detailSection({title:"GAME DATA",body:[
+        detailField({label:"BASELINE",control:value(base.message),
+          help:infoHelp("Saves create or update only the selected project's StreamingAssets/Data overlay. Lexeditor never writes the installed game's p0data containers.")}),
+        detailField({label:"PROJECT",control:value(state.dashboard.project.root)}),
+      ]}),
+      detailSection({title:"MEMORIA",body:[
+        detailField({label:"STATE",control:value(runtime.installed?"Installed":"Not installed"),
+          help:infoHelp(runtime.message||"")}),
+        detailField({label:"VERSION",control:value(runtime.version||"—")}),
+      ]}),
+    ]}));
+  }
+  function tweaks(){setToolbar();$("#main").replaceChildren(platformConfigView({config:state.platformConfig,query:state.platformQuery,disabled:state.busy||state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}))}
+  function planned(){const label=tabs.find(tab=>tab.id===state.tab)?.label||"FF9 data";$("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},label),el("p",{},"The installed vanilla source for this area remains inside p0data asset containers. No safe editable CSV source is present."),el("span",{class:"ff9-warning"},"FORMAT NOT INTEGRATED")))}
+  function dataMap(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,open:row=>row.target&&navigate(row.target),changeQuery:value=>{state.mapQuery=value;state.mapPage=0;dataMap()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;dataMap()},changePage:page=>{state.mapPage=page;dataMap()},changeSort:key=>{const [active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];dataMap()}});state.mapPage=view.page;setToolbar(view.controls);$("#main").replaceChildren(view.content);shell.refresh()}
+  async function render(){if(!state.dashboard)return;if(state.tab==="info"){setToolbar();info()}else if(state.tab==="datamap")dataMap();else if(state.tab==="tweaks")tweaks();else if(state.activeSource!=="mine"){setToolbar();planned()}else{toolbar();const key=activeKey();if(!key)planned();else renderDataset(await loadDataset(key),key)}shell.refresh()}
+  function navigate(tab){state.tab=tab;render()}
+  async function save(){if(state.busy)return;state.busy=true;shell.refresh();try{for(const [key,data] of Object.entries(state.datasets)){if(!data?.rows)continue;const changes=data.rows.map(row=>({line:row.line,values:changedFields(data,row)})).filter(change=>Object.keys(change.values).length);if(changes.length)installData(await api("/api/save",{key,sha256:data.sha256,changes}))}const changes=platformChanges();if(Object.keys(changes).length){state.platformConfig=await api("/api/platform-config/save",{sha256:state.savedPlatformConfig.sha256,changes});state.savedPlatformConfig=clone(state.platformConfig)}state.error=""}catch(error){state.error=error.message;throw error}finally{state.busy=false;render()}}
+  async function discard(){for(const key of Object.keys(state.datasets))await loadDataset(key,true);state.platformConfig=clone(state.savedPlatformConfig);render()}
+  async function switchProjectSource(value){state.activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";await render()}
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff9",name:"Final Fantasy IX",themeName:"ff9",theme:{}},tabs,activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF9 Data Map",info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF9 plugin information",projectSources:()=>[{key:"vanilla",label:"Vanilla",path:state.dashboard?.game?.root||"Installed p0data containers"}],projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,dirtyCount,readonly:()=>state.busy||state.activeSource!=="mine",save,discard});
+  Promise.all([api("/api/dashboard"),api("/api/datamap"),api("/api/catalog"),api("/api/platform-config")]).then(([dashboard,map,catalog,platformConfig])=>{state.dashboard=dashboard;state.dataMap=map;state.catalog=catalog.datasets;state.platformConfig=platformConfig;state.savedPlatformConfig=clone(platformConfig);render().then(()=>LexeditorUI.finishPluginLoading())}).catch(error=>{$("#main").textContent=`Failed to load FF9 data: ${error.message}`;LexeditorUI.finishPluginLoading()});
+  </script>
+</body>
+</html>

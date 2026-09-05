@@ -1,0 +1,15 @@
+{
+  "absentGameDesaturationPercent": 75.0,
+  "developerMode": false,
+  "globalMessageRarity": 3.0,
+  "hoverableAltClick": false,
+  "loadingTransitionMinimumSeconds": 2.5,
+  "mainMenuHeightPercent": 5.0,
+  "panelGapPercent": 0.5,
+  "residentHandleWidthPercent": 5.0,
+  "selectionHoldMs": 500,
+  "soundEnabled": false,
+  "soundVolumePercent": 25.0,
+  "tableRowsPerPage": 40,
+  "updateCheckFrequency": "monthly"
+}

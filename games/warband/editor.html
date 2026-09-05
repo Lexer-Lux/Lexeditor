@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - Warband</title>
+  <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    :root {
+      --lex-bg:#e8d9b4; --lex-panel:#f4e7c5; --lex-panel-2:#dcc99a; --lex-border:#8b6b39;
+      --lex-text:#2b2114; --lex-muted:#6e5b3d; --lex-accent:#7a2020; --lex-accent-text:#fff5d8;
+      --lex-highlight:#a8661c; --lex-success:#556b2f; --lex-font:"Segoe UI",system-ui,sans-serif;
+      --lex-heading-font:Georgia,serif; --lex-radius:4px;
+    }
+    *{box-sizing:border-box} body{margin:0;color:var(--lex-text);background:linear-gradient(#eadcb8,#d9c28f);font:14px/1.45 var(--lex-font);overflow-x:hidden}
+    .lex-shell-header{color:#f4dfb1;background:#4b1717;border-bottom-color:#a66b24}
+    .lex-brand-button{color:#f4dfb1}
+    .lex-shell-header .lex-nav-button:hover{background:#6b2424}.lex-shell-header .lex-nav-button.active{color:white;background:#a63c32}
+    .lex-shell-header :is(.lex-history-button,.lex-save-icon,.lex-game-process){color:#f4dfb1;border-color:#8c4a35;background:#6b2424}
+    #toolbar{display:flex;align-items:center;gap:9px;min-height:52px;padding:8px 16px;border-bottom:1px solid var(--lex-border);background:#d8c38f;box-shadow:0 2px 8px #5a3b1a22}#toolbar input,#toolbar select,#toolbar button{padding:7px 9px;color:var(--lex-text);border:1px solid var(--lex-border);border-radius:4px;background:#fff5d8}#toolbar input{min-width:280px}#toolbar .count{margin-left:auto;color:var(--lex-muted)}
+    main{padding:var(--lex-panel-gap);min-height:calc(100vh - 112px)}
+    body:has(.warband-paged-table){display:flex;height:100vh;min-height:0;flex-direction:column;overflow:hidden}body:has(.warband-paged-table)>#lexeditor-shell,body:has(.warband-paged-table)>#toolbar{flex:0 0 auto}body:has(.warband-paged-table)>main{flex:1 1 auto;height:auto;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}.lex-master-detail{height:calc(100vh - 150px)}.lex-master-detail.warband-paged-table{height:100%}.lex-list,.lex-detail{background:#f7edcf;box-shadow:inset 0 0 0 1px #fff7de}.lex-list-row{padding:9px 11px}.lex-list-row .sub{color:var(--lex-muted);font-size:11px}.lex-list-row.selected{color:#6b1717;background:#e4c98d}
+    .warband-record-list{--lex-fitted-row-height:36px}.lex-column-list-header{background:#d1b879}.lex-column-list-row{height:var(--lex-fitted-row-height,auto);padding:0}.lex-column-list-cell{padding:7px 10px;border-bottom:1px solid #c8ae78}.warband-record-list .lex-column-list-cell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lex-column-list-row:hover{background:#f0dba8}
+    .detail{padding:18px}.detail h2{margin:0 0 12px;font:700 22px var(--lex-heading-font);color:#651919}.detail-grid{display:grid;grid-template-columns:170px 1fr;gap:8px 14px}.detail-grid .label{color:var(--lex-muted);font-weight:700}.detail input,.detail textarea{width:100%;padding:8px;color:var(--lex-text);border:1px solid var(--lex-border);border-radius:4px;background:#fffaf0}.detail textarea{min-height:55vh;resize:none;font:13px/1.45 "Cascadia Mono",Consolas,monospace}.manual-page{margin-bottom:24px}.manual-page h3{margin:0 0 8px;color:#651919;font:700 18px var(--lex-heading-font)}.manual-page p{white-space:pre-wrap}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.card{padding:16px;border:1px solid var(--lex-border);border-radius:5px;background:#f5e9c9}.card h2{margin:0 0 12px;color:#651919;font:700 20px var(--lex-heading-font)}.path-row{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid #d9c69b}.path-row code{overflow:hidden;text-overflow:ellipsis}.ok{color:#45631e}.error{color:#9d2424}
+    .build-log{max-height:42vh;overflow:auto;padding:12px;color:#d8dee9;border:1px solid #444;background:#101216;font:13px/1.4 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
+    .warband-bitmap-text{display:inline-flex;align-items:flex-start;vertical-align:middle;white-space:nowrap}.warband-glyph-slot{position:relative;display:inline-block;flex:none;height:var(--wb-line-height)}.warband-glyph{position:absolute;display:block;background-color:currentColor;-webkit-mask-image:url('/api/warband-font/atlas');mask-image:url('/api/warband-font/atlas');-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+    .warband-item-detail{--lex-detail-icon-size:96px;display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;border:1px solid var(--lex-border);background:#f7edcf}.warband-item-detail>.lex-detail-panel-heading{padding:10px 10px 12px;border-bottom:1px solid #c8ae78}.warband-item-detail .lex-detail-panel-title{color:#651919;font:700 24px/1.1 var(--lex-heading-font)}.warband-item-detail .lex-detail-panel-id{margin-top:4px;color:var(--lex-muted);font:11px Consolas,monospace}.warband-item-detail .lex-detail-panel-icon{width:auto;height:100%;max-height:100%;aspect-ratio:1;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-item-thumbnail{position:relative;width:100%;height:100%;overflow:hidden}.warband-item-thumbnail canvas{display:block;width:100%;height:100%;pointer-events:none}.warband-item-thumbnail .warband-preview-message{padding:8px}.warband-item-preview-action{display:grid;width:38px;height:38px;place-items:center;color:#651919;border:1px solid #8b6b39;background:#f4e7c5;cursor:pointer}.warband-mesh-list{padding:9px 2px;color:var(--lex-muted)}.warband-mesh-list b{color:#651919}.warband-preview-stage{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-preview-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.warband-preview-stage canvas.dragging{cursor:grabbing}.warband-preview-message{position:absolute;inset:0;display:grid;place-items:center;padding:28px;color:#ead8ac;text-align:center}.warband-preview-facts{display:flex;gap:16px;padding:8px 2px 0;color:var(--lex-muted);font:11px Consolas,monospace}.warband-preview-spin{width:22px;height:22px;border:3px solid #d5b46955;border-top-color:#d5b469;border-radius:50%;animation:warband-spin .7s linear infinite}@keyframes warband-spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div id="lexeditor-shell"></div>
+  <div id="toolbar"></div>
+  <main id="main"><div>Loading Warband data…</div></main>
+  <script src="/shared/framework.js"></script>
+  <script>
+  "use strict";
+  const {el,columnList,list,masterDetail,pagedListDetail,pager,clone,showAlert,hoverable,detailPanel}=LexeditorUI;
+  const $=selector=>document.querySelector(selector);
+  const state={
+    booting:true,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
+    manual:null,font:null,selectedModule:"",selectedSetting:"",selectedItem:"",selectedTroop:"",selectedUpgrade:"",selectedFile:"",catalogFile:null,catalogDraft:"",
+    settingEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
+    pages:{items:0,troops:0,upgrades:0,datamap:0},pageSizes:{items:20,troops:20,upgrades:20},sorts:{items:["name",1],troops:["name",1],upgrades:["from",1],datamap:["filename",1]},
+    build:{cursor:0,lines:[],running:false,returnCode:null},status:"Ready"
+  };
+
+  async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(value.error)throw new Error(value.error);return value;}
+  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
+  function historyCapture(){return {settingEdits:clone(state.settingEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
+  async function historyRestore(snapshot){state.settingEdits=clone(snapshot.settingEdits);state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
+  function effectiveSetting(row){return state.settingEdits[row.line]??row.value;}
+  function setStatus(text){state.status=text;const target=$("#plugin-status");if(target)target.textContent=text;}
+  function bitmapText(text,pixels){
+    if(!state.font?.available)return document.createTextNode(text);
+    const scale=pixels/state.font.fontSize,root=el("span",{class:"warband-bitmap-text","aria-label":text,style:`--wb-line-height:${state.font.lineSpacing*scale}px`});
+    for(const character of text){const metrics=state.font.characters[String(character.codePointAt(0))];if(!metrics){root.append(el("span",{class:"warband-glyph-slot",style:`width:${pixels*.52}px`},character));continue;}
+      const slot=el("span",{class:"warband-glyph-slot",style:`width:${Math.max(1,metrics.postshift*scale)}px`});
+      if(metrics.w>metrics.u&&metrics.h>metrics.v)slot.append(el("i",{class:"warband-glyph","aria-hidden":"true",style:`left:${metrics.preshift*scale}px;top:${(state.font.fontSize-metrics.yadjust)*scale}px;width:${(metrics.w-metrics.u)*scale}px;height:${(metrics.h-metrics.v)*scale}px;-webkit-mask-size:${state.font.width*scale}px ${state.font.height*scale}px;mask-size:${state.font.width*scale}px ${state.font.height*scale}px;-webkit-mask-position:${-metrics.u*scale}px ${-metrics.v*scale}px;mask-position:${-metrics.u*scale}px ${-metrics.v*scale}px`}));
+      root.append(slot);
+    }
+    return root;
+  }
+  function applyInstalledWarbandFont(){
+    const brand=document.querySelector(".lex-brand-button");if(brand&&!brand.dataset.bitmapFont){brand.dataset.bitmapFont="1";brand.replaceChildren(bitmapText("LEXEDITOR",24));}
+    document.querySelectorAll("nav button").forEach(button=>{if(button.dataset.bitmapFont)return;const target=button.querySelector(".lex-tab-label-text");if(!target)return;const label=target.textContent;button.dataset.bitmapFont="1";button.setAttribute("aria-label",label);target.replaceChildren(bitmapText(label,18));});
+  }
+  function search(rows,query,fields){const needle=query.trim().toLowerCase();return needle?rows.filter(row=>fields.some(field=>String(row[field]??"").toLowerCase().includes(needle))):rows;}
+  function sorted(rows,view){const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(a[key]??"").localeCompare(String(b[key]??""),undefined,{numeric:true}));}
+  function sort(view,key){const [active,direction]=state.sorts[view];state.sorts[view]=[key,active===key?-direction:1];render();}
+  function renderTableView(view,rows,columns,options={}){
+    const query=state.filters[view]||"",filtered=sorted(search(rows,query,columns.map(column=>column.key)),view);
+    const keyOf=options.key||((row)=>columns.map(column=>String(row[column.key]??"")).join("|"));
+    const selected=options.selected?.()||"",setSelected=options.setSelected||(()=>{});
+    const detail=row=>el("div",{class:"lex-detail detail"},el("h2",{},row.name||(row.from&&row.to?`${row.from} → ${row.to}`:String(keyOf(row)))),
+      el("div",{class:"detail-grid"},...columns.flatMap(column=>[el("div",{class:"label"},typeof column.label==="string"?column.label:column.key),el("div",{},String(row[column.key]??"—"))])));
+    $("#toolbar").replaceChildren();
+    $("#main").replaceChildren(pagedListDetail({rows:filtered,key:keyOf,slots:false,page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
+      search:{key:`warband-${view}`,value:query,placeholder:`Search ${view}…`,change:value=>{state.filters[view]=value;state.pages[view]=0;render();}},filters:options.filters||[],
+      master:({rows,selected,select})=>columnList({rows,key:keyOf,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,class:"warband-record-list", "aria-label":`${view} records`}),
+      detail,sync:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");},change:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");render();}}));
+  }
+
+  function openTroop(troopId){
+    const troop=state.troops.rows.find(row=>row.id===troopId);if(!troop)return;
+    state.filters.troops="";state.filters.cut=false;state.selectedTroop=troop.id;
+    state.pages.troops=0;navigate("troops");
+  }
+  function troopLink(troopId,label){
+    if(!state.troops.rows.some(row=>row.id===troopId))return label;
+    return hoverable({targetType:"warband-troop",targetId:troopId,targetLabel:label,label,activate:()=>openTroop(troopId)});
+  }
+
+  function itemColumns(){return [{key:"name",label:"Name"},{key:"id",label:"ID"},{key:"type",label:"Type"},{key:"inventoryMesh",label:"Inventory mesh"}];}
+  function renderItems(){
+    const view="items",columns=itemColumns(),query=state.filters.items||"";
+    const filtered=sorted(search(state.items.rows,query,["name","id","type","inventoryMesh"]),view);
+    $("#toolbar").replaceChildren();
+    $("#main").replaceChildren(pagedListDetail({rows:filtered,key:row=>row.id,slots:false,page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
+      search:{key:"warband-items",value:query,placeholder:"Search items…",change:value=>{state.filters.items=value;state.pages.items=0;renderItems();}},
+      master:({rows,selected,select})=>columnList({rows,key:row=>row.id,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts.items[0],dir:state.sorts.items[1]},sort:key=>sort("items",key),selected,selectedClass:"selected",select,class:"warband-record-list","aria-label":"Warband items"}),
+      detail:()=>warbandItemDetail(state.items.rows.find(row=>row.id===state.selectedItem)),sync:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";},change:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";renderItems();}}));
+  }
+
+  function warbandEyeIcon(){
+    const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("width","22");svg.setAttribute("height","22");
+    const path=document.createElementNS(ns,"path");path.setAttribute("fill","none");path.setAttribute("stroke","currentColor");path.setAttribute("stroke-width","1.8");path.setAttribute("d","M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z");svg.append(path);return svg;
+  }
+
+  function warbandItemDetail(item){
+    if(window.__warbandPreview){window.__warbandPreview.forEach(controller=>controller.dispose());delete window.__warbandPreview;}
+    if(!item)return detailPanel({className:"warband-item-detail",title:"Select an item"});
+    const thumbnailMessage=el("div",{class:"warband-preview-message"},item.inventoryMesh?el("span",{class:"warband-preview-spin"}):"No inventory mesh");
+    const thumbnailCanvas=el("canvas",{"aria-label":`${item.name} inventory icon`});
+    const thumbnail=el("div",{class:"warband-item-thumbnail"},thumbnailCanvas,thumbnailMessage);
+    const message=el("div",{class:"warband-preview-message"},item.inventoryMesh?el("span",{class:"warband-preview-spin"}):"This item does not name an inventory mesh.");
+    const canvas=el("canvas",{tabindex:"0","aria-label":`${item.name} inventory mesh preview`});
+    const stage=el("div",{class:"warband-preview-stage"},canvas,message);
+    const facts=el("div",{class:"warband-preview-facts"});
+    const previewAction=item.inventoryMesh?el("button",{class:"warband-item-preview-action",title:"Focus the full 3D preview","aria-label":"Focus the full 3D preview",onclick:()=>{stage.scrollIntoView({block:"nearest"});canvas.focus();}},warbandEyeIcon()):null;
+    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:item.name,identity:item.id,actions:previewAction,
+      body:[el("div",{class:"warband-mesh-list"},el("b",{},"Meshes: "),item.meshes.length?item.meshes.join(" · "):"None"),stage,facts]});
+    if(item.inventoryMesh)requestAnimationFrame(()=>loadWarbandPreview(item,detail,thumbnailCanvas,thumbnailMessage,canvas,message,facts));
+    return detail;
+  }
+
+  async function loadWarbandPreview(item,detail,thumbnailCanvas,thumbnailMessage,canvas,message,facts){
+    try{
+      const data=await api(`/api/item-preview?mesh=${encodeURIComponent(item.inventoryMesh)}`);
+      if(!detail.isConnected||state.selectedItem!==item.id)return;
+      const controllers=await Promise.all([createWarbandRenderer(thumbnailCanvas,data,false),createWarbandRenderer(canvas,data,true)]);
+      if(!detail.isConnected||state.selectedItem!==item.id){controllers.forEach(controller=>controller.dispose());return;}
+      window.__warbandPreview=controllers;thumbnailMessage.remove();message.remove();facts.replaceChildren(el("span",{},data.resource),el("span",{},data.material||"No material"),el("span",{},`${data.summary.vertices} vertices · ${data.summary.triangles} triangles`));
+    }catch(error){if(detail.isConnected&&state.selectedItem===item.id){thumbnailMessage.replaceChildren(document.createTextNode("×"));thumbnailMessage.title=error.message;message.replaceChildren(document.createTextNode(error.message));}}
+  }
+
+  async function createWarbandRenderer(canvas,data,interactive=true){
+    const gl=canvas.getContext("webgl2",{antialias:true,alpha:false});if(!gl)throw new Error("This window cannot start the WebGL 2 model renderer.");
+    const compile=(type,source)=>{const shader=gl.createShader(type);gl.shaderSource(shader,source);gl.compileShader(shader);if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(shader));return shader;};
+    const vertex=compile(gl.VERTEX_SHADER,`#version 300 es\nin vec3 aPosition;in vec3 aNormal;in vec2 aUv;uniform float uYaw,uPitch,uZoom,uAspect;out vec3 vNormal;out vec2 vUv;vec3 ry(vec3 v,float a){float c=cos(a),s=sin(a);return vec3(c*v.x+s*v.z,v.y,-s*v.x+c*v.z);}vec3 rx(vec3 v,float a){float c=cos(a),s=sin(a);return vec3(v.x,c*v.y-s*v.z,s*v.y+c*v.z);}void main(){vec3 p=rx(ry(aPosition,uYaw),uPitch),n=rx(ry(aNormal,uYaw),uPitch);vNormal=n;vUv=aUv;gl_Position=vec4(p.x*uZoom/uAspect,p.y*uZoom,p.z*.25,1.0);}`);
+    const fragment=compile(gl.FRAGMENT_SHADER,`#version 300 es\nprecision highp float;in vec3 vNormal;in vec2 vUv;uniform sampler2D uDiffuse;uniform float uHasTexture;out vec4 outColor;vec3 linearize(vec3 c){return pow(max(c,vec3(0.0)),vec3(2.2));}void main(){vec3 n=normalize(vNormal);if(!gl_FrontFacing)n=-n;vec3 base=mix(vec3(.55,.48,.36),linearize(texture(uDiffuse,vUv).rgb),uHasTexture);float key=max(dot(n,normalize(vec3(-.3,.7,.65))),0.0),fill=max(dot(n,normalize(vec3(.7,.2,.5))),0.0);vec3 color=base*(.28+.82*key+.20*fill);color=color/(color+vec3(.62));outColor=vec4(pow(color,vec3(1.0/2.2)),1.0);}`);
+    const program=gl.createProgram();gl.attachShader(program,vertex);gl.attachShader(program,fragment);gl.linkProgram(program);if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(program));
+    const g=data.geometry,b=g.bounds,center=b.min.map((value,index)=>(value+b.max[index])/2),largest=Math.max(...b.max.map((value,index)=>value-b.min[index]),.0001),scale=1.8/largest;
+    const positions=new Float32Array(g.positions.length*3),normals=new Float32Array(g.normals.length*3),uvs=new Float32Array(g.texCoords.length*2);g.positions.forEach((row,index)=>{positions[index*3]=(row[0]-center[0])*scale;positions[index*3+1]=(row[2]-center[2])*scale;positions[index*3+2]=-(row[1]-center[1])*scale;});g.normals.forEach((row,index)=>{normals[index*3]=row[0];normals[index*3+1]=row[2];normals[index*3+2]=-row[1];});g.texCoords.forEach((row,index)=>{uvs[index*2]=row[0];uvs[index*2+1]=row[1];});
+    const vao=gl.createVertexArray();gl.bindVertexArray(vao);const buffers=[];const attribute=(name,size,data)=>{const location=gl.getAttribLocation(program,name),buffer=gl.createBuffer();buffers.push(buffer);gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);gl.enableVertexAttribArray(location);gl.vertexAttribPointer(location,size,gl.FLOAT,false,0,0);};attribute("aPosition",3,positions);attribute("aNormal",3,normals);attribute("aUv",2,uvs);const indices=new Uint32Array(g.triangles.flat()),indexBuffer=gl.createBuffer();buffers.push(indexBuffer);gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,indexBuffer);gl.bufferData(gl.ELEMENT_ARRAY_BUFFER,indices,gl.STATIC_DRAW);
+    const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([170,148,112,255]));gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.generateMipmap(gl.TEXTURE_2D);let hasTexture=0;if(data.texture){const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error("The Warband DDS texture could not be loaded."));image.src=data.texture;});gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,image);gl.generateMipmap(gl.TEXTURE_2D);hasTexture=1;}
+    const uniform=name=>gl.getUniformLocation(program,name),yawU=uniform("uYaw"),pitchU=uniform("uPitch"),zoomU=uniform("uZoom"),aspectU=uniform("uAspect"),hasTextureU=uniform("uHasTexture");let yaw=0,pitch=-.18,zoom=1,dragging=false,lastX=0,lastY=0,disposed=false;
+    const draw=()=>{if(disposed)return;const rect=canvas.getBoundingClientRect(),ratio=Math.min(devicePixelRatio||1,2),width=Math.max(1,Math.floor(rect.width*ratio)),height=Math.max(1,Math.floor(rect.height*ratio));if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}gl.viewport(0,0,width,height);gl.clearColor(.07,.055,.035,1);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.enable(gl.DEPTH_TEST);gl.useProgram(program);gl.uniform1f(yawU,yaw);gl.uniform1f(pitchU,pitch);gl.uniform1f(zoomU,zoom);gl.uniform1f(aspectU,width/height);gl.uniform1f(hasTextureU,hasTexture);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);gl.bindVertexArray(vao);gl.drawElements(gl.TRIANGLES,indices.length,gl.UNSIGNED_INT,0);};
+    const down=event=>{dragging=true;lastX=event.clientX;lastY=event.clientY;canvas.classList.add("dragging");canvas.setPointerCapture(event.pointerId);},move=event=>{if(!dragging)return;yaw+=(event.clientX-lastX)*.012;pitch=Math.max(-1.45,Math.min(1.45,pitch+(event.clientY-lastY)*.012));lastX=event.clientX;lastY=event.clientY;draw();},up=event=>{dragging=false;canvas.classList.remove("dragging");if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);},wheel=event=>{event.preventDefault();zoom=Math.max(.35,Math.min(2.8,zoom*Math.exp(-event.deltaY*.001)));draw();};if(interactive){canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);canvas.addEventListener("wheel",wheel,{passive:false});canvas.addEventListener("dblclick",()=>{yaw=0;pitch=-.18;zoom=1;draw();});}let observerFrame=0;const observer=new ResizeObserver(()=>{if(observerFrame)cancelAnimationFrame(observerFrame);observerFrame=requestAnimationFrame(()=>{observerFrame=0;draw();});});observer.observe(canvas);requestAnimationFrame(draw);
+    return{dispose(){disposed=true;observer.disconnect();buffers.forEach(buffer=>gl.deleteBuffer(buffer));gl.deleteTexture(texture);gl.deleteVertexArray(vao);gl.deleteProgram(program);}};
+  }
+  function renderTroops(){
+    const base=state.filters.cut?state.troops.rows.filter(row=>row.status==="CUT"):state.troops.rows;
+    const cutFilter=el("label",{class:"lex-bottom-filter"},el("input",{type:"checkbox",checked:state.filters.cut,onchange:event=>{state.filters.cut=event.target.checked;state.pages.troops=0;render();}})," Cut only");
+    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{key:troop=>troop.id,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter]});
+  }
+  function renderUpgrades(){renderTableView("upgrades",state.upgrades.rows,[{key:"from",label:"From",render:row=>troopLink(row.fromId,row.from)},{key:"to",label:"To",render:row=>troopLink(row.toId,row.to)},{key:"branch",label:"Branch"},{key:"line",label:"Line"}],{key:row=>`${row.fromId}|${row.toId}|${row.branch}|${row.line}`,selected:()=>state.selectedUpgrade,setSelected:value=>{state.selectedUpgrade=value;}});}
+
+  async function selectModule(name){state.selectedModule=name;state.manual=await api(`/api/manual?module=${encodeURIComponent(name)}`);renderManuals();}
+  function renderManuals(){
+    $("#toolbar").replaceChildren(el("span",{class:"count"},`${state.modules.modules.length} installed modules`));
+    const master=list({rows:state.modules.modules,key:name=>name,selected:state.selectedModule,select:selectModule,render:name=>el("div",{},el("b",{},name))});
+    const detail=el("div",{class:"lex-detail detail"},state.manual?el("div",{},el("h2",{},`${state.manual.module} — ${state.manual.pages.length} pages`),...state.manual.pages.map(page=>el("section",{class:"manual-page"},el("h3",{},page.title),el("p",{},page.body.trim())))):el("div",{},"Select an installed mod to read its manual."));
+    $("#main").replaceChildren(masterDetail(master,detail,"",{splitKey:"warband-manuals",defaultSplit:38}));
+  }
+
+  function settingRows(){return search(state.settings.rows,state.filters.settings,["section","key","value","description"]);}
+  function selectSetting(row){state.selectedSetting=String(row.line);renderSettings();}
+  async function saveSettings(){
+    const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));if(!edits.length)return;
+    const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};await buildSavedModule();shell.history.clear();setStatus(`Saved ${result.saved} settings and build verified`);renderSettings();shell.refresh();
+  }
+  function discardSettings(){state.settingEdits={};setStatus("Restored the last saved settings");renderSettings();shell.refresh()}
+  function renderSettings(){
+    const rows=settingRows(),selected=rows.find(row=>String(row.line)===state.selectedSetting)||rows[0];if(selected)state.selectedSetting=String(selected.line);
+    $("#toolbar").replaceChildren(LexeditorUI.settingsSaveControl({dirtyCount:()=>Object.keys(state.settingEdits).length,save:saveSettings,discard:discardSettings}));
+    const master=list({rows,key:row=>String(row.line),selected:state.selectedSetting,select:selectSetting,render:row=>el("div",{},el("b",{},row.key),el("div",{class:"sub"},row.section))});
+    const detail=el("div",{class:"lex-detail detail"},selected?el("div",{},el("h2",{},selected.key),el("div",{class:"detail-grid"},el("div",{class:"label"},"Section"),el("div",{},selected.section),el("div",{class:"label"},"Value"),el("input",{value:effectiveSetting(selected),oninput:event=>{if(event.target.value===selected.value)delete state.settingEdits[selected.line];else state.settingEdits[selected.line]=event.target.value;shell.refresh();}}),el("div",{class:"label"},"Description"),el("div",{},selected.description||"No description."))):"No matching setting.");
+    const layout=masterDetail(master,detail,"",{splitKey:"warband-settings",defaultSplit:38});
+    const bottom=pager({page:0,pages:1,total:rows.length,pageSize:Math.max(1,rows.length),noun:"settings",search:{key:"warband-settings",value:state.filters.settings,placeholder:"Search settings…",change:value=>{state.filters.settings=value;renderSettings();}}});
+    $("#main").replaceChildren(layout,bottom);
+  }
+
+  async function selectCatalog(row){
+    if(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text&&!confirm("Discard the unsaved source-file edit?"))return;
+    state.selectedFile=row.filename;state.catalogFile=await api(`/api/catalog/file?name=${encodeURIComponent(row.filename)}`);state.catalogDraft=state.catalogFile.text||"";shell.history.clear();renderDataMap();
+  }
+  function closeCatalog(){
+    if(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text&&!confirm("Discard the unsaved source-file edit?"))return;
+    state.selectedFile="";state.catalogFile=null;state.catalogDraft="";shell.history.clear();renderDataMap();
+  }
+  function sourceDialog(){
+    if(!state.catalogFile)return null;
+    const backdrop=el("div",{class:"lex-dialog-backdrop"});
+    const panel=el("div",{class:"lex-dialog lex-source-dialog"},
+      el("div",{class:"lex-source-dialog-head"},el("h2",{},state.catalogFile.filename),el("button",{onclick:closeCatalog,"aria-label":"Close source editor"},"×")),
+      el("p",{},state.catalogFile.editable?`${state.catalogFile.path} [${state.catalogFile.encoding}]`:state.catalogFile.reason),
+      state.catalogFile.editable?el("textarea",{value:state.catalogDraft,oninput:event=>{state.catalogDraft=event.target.value;shell.refresh();}},state.catalogDraft):"");
+    backdrop.append(panel);backdrop.addEventListener("click",event=>{if(event.target===backdrop)closeCatalog();});return backdrop;
+  }
+  function renderDataMap(){
+    document.querySelector(".lex-source-dialog")?.closest(".lex-dialog-backdrop")?.remove();
+    const view=LexeditorUI.dataMap({
+      rows:state.datamap.rows,query:state.filters.datamap,status:state.filters.mapStatus,page:state.pages.datamap,
+      sort:state.sorts.datamap,pageSize:100,
+      changeQuery:value=>{state.filters.datamap=value;state.pages.datamap=0;renderDataMap();},
+      changeStatus:value=>{state.filters.mapStatus=value;state.pages.datamap=0;renderDataMap();},
+      changePage:page=>{state.pages.datamap=page;renderDataMap();},
+      changeSort:key=>{const [active,direction]=state.sorts.datamap;state.sorts.datamap=[key,active===key?-direction:1];renderDataMap();},
+      open:selectCatalog
+    });
+    state.pages.datamap=view.page;$("#toolbar").replaceChildren(...view.controls);$("#main").replaceChildren(view.content);
+    const dialog=sourceDialog();if(dialog)document.body.append(dialog);
+  }
+
+  function renderDashboard(){
+    $("#toolbar").replaceChildren(el("span",{},"Plugin and path health"));
+    const health=el("section",{class:"card"},el("h2",{},"Status"),state.dashboard.problems.length?el("div",{class:"error"},...state.dashboard.problems.map(problem=>el("div",{},problem))):el("div",{class:"ok"},"All configured paths found."));
+    const log=el("section",{class:"card"},el("h2",{},"Log"),el("pre",{class:"build-log"},state.build.lines.join("")||"No save or build has run in this session."));
+    const manuals=el("section",{class:"card"},el("h2",{},"Mod manuals"),el("button",{type:"button",onclick:()=>navigate("manuals")},"Read installed mod manuals"));$("#main").replaceChildren(el("div",{class:"cards"},health,manuals,log));
+  }
+
+  async function buildSavedModule(){
+    const started=await api("/api/build/start",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+    if(!started.started)throw new Error(started.reason||"The Warband build could not start.");
+    state.build={cursor:0,lines:[],running:true,returnCode:null};setStatus("Saving and building…");
+    while(state.build.running){
+      await new Promise(resolve=>setTimeout(resolve,200));
+      const result=await api(`/api/build/status?cursor=${state.build.cursor}`);
+      state.build.cursor=result.cursor;state.build.lines.push(...result.lines);state.build.running=result.running;state.build.returnCode=result.returnCode;
+    }
+    if(state.build.returnCode!==0||!state.build.lines.join("").includes("Build verified:")){
+      throw new Error("The source was saved, but the module build failed. Open Info to read the log.");
+    }
+    setStatus("Saved and build verified");
+  }
+
+  async function saveAll(){
+    try{
+      if(Object.keys(state.settingEdits).length){const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};setStatus(`Saved ${result.saved} settings`);}
+      if(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text){const result=await api("/api/catalog/file/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:state.catalogFile.filename,text:state.catalogDraft,encoding:state.catalogFile.encoding})});state.catalogFile.text=state.catalogDraft;setStatus(`Saved ${state.catalogFile.filename}; backup created`);}
+      await buildSavedModule();
+      shell.history.clear();shell.refresh();render();
+    }catch(error){setStatus("Save failed");showAlert({title:"Save failed",items:[{item:"Save",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
+  }
+
+  const views={items:renderItems,manuals:renderManuals,upgrades:renderUpgrades,troops:renderTroops,tweaks:renderSettings,datamap:renderDataMap,dashboard:renderDashboard};
+  function navigate(tab){state.tab=tab;render();}
+  function renderVanilla(){$("#toolbar").replaceChildren();$("#main").replaceChildren(el("section",{class:"card"},el("h2",{},"Vanilla"),el("p",{},"The installed Native module is read-only. Its generated text files do not contain the Module System source used by this editor."),el("p",{},"Select a mod to edit Items, Troops, Troop Trees, or Tweaks.")))}
+  function render(){document.querySelectorAll("nav button").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting)return;if(state.activeSource!=="mine"&&!['manuals','datamap','dashboard'].includes(state.tab))renderVanilla();else views[state.tab]();shell.refresh();}
+  async function switchProjectSource(value){state.activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";shell.history?.clear();render()}
+  const shell=LexeditorUI.mountShell({
+    host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"warband",themeName:"warband",theme:{bg:"#e8d9b4",panel:"#f4e7c5","panel-2":"#dcc99a",border:"#8b6b39",text:"#2b2114",muted:"#6e5b3d",accent:"#7a2020","accent-text":"#fff5d8",highlight:"#a8661c",success:"#556b2f",font:'"Segoe UI",system-ui,sans-serif',"heading-font":"Georgia,serif"}},
+    tabs:[["items","Items"],["upgrades","Troop Trees"],["troops","Troops"],["tweaks","Tweaks"]].map(([id,label])=>({id,label})),
+    activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the Warband Data Map",info:()=>navigate("dashboard"),infoActive:()=>state.tab==="dashboard",infoTitle:"Open Warband information and log",projectSources:()=>[{key:"vanilla",label:"Vanilla",path:`${state.dashboard?.paths?.Game||"Installed Warband"}/Modules/Native`}],projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,dirtyCount,readonly:()=>state.activeSource!=="mine",save:saveAll,
+    history:{capture:historyCapture,restore:historyRestore,render,enabled:()=>!state.booting&&state.activeSource==="mine",limit:50}
+  });
+
+  async function boot(){
+    try{
+      [state.dashboard,state.settings,state.troops,state.items,state.upgrades,state.modules,state.datamap,state.font]=await Promise.all([api("/api/dashboard"),api("/api/settings"),api("/api/troops"),api("/api/items"),api("/api/upgrades"),api("/api/modules"),api("/api/datamap"),api("/api/warband-font")]);
+      state.booting=false;applyInstalledWarbandFont();render();LexeditorUI.finishPluginLoading();
+    }catch(error){state.booting=false;LexeditorUI.finishPluginLoading();$("#main").textContent=`Failed to load Warband plugin: ${error.message}`;setStatus("Load failed");}
+  }
+  window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&dirtyCount())event.preventDefault();});
+  boot();
+  </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <Version>1.3.0</Version>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="PsoConverter.cs" />
+    <Compile Include="NamesContainer.Cli.cs" />
+    <Compile Include="..\Helper\*.cs" Link="Helper\%(Filename)%(Extension)" />
+    <Compile Include="..\Core\*.cs"
+             Exclude="..\Core\CoreResource.Designer.cs;..\Core\NamesContainer.cs"
+             Link="Core\%(Filename)%(Extension)" />
+    <Compile Include="..\Rbf\*.cs" Link="Rbf\%(Filename)%(Extension)" />
+    <Compile Include="..\Rbf\Data\*.cs" Link="Rbf\Data\%(Filename)%(Extension)" />
+    <Compile Include="..\Rbf\Types\*.cs" Link="Rbf\Types\%(Filename)%(Extension)" />
+    <Compile Include="..\Pso\RageLib\Data\*.cs"
+             Exclude="..\Pso\RageLib\Data\DataReader.cs;..\Pso\RageLib\Data\Endianess.cs"
+             Link="Pso\RageLib\Data\%(Filename)%(Extension)" />
+    <Compile Include="..\Pso\RageLib\Hash\Jenkins.cs" Link="Pso\RageLib\Hash\Jenkins.cs" />
+    <Compile Include="..\Pso\RageLib.GTA5\PSO\*.cs" Link="Pso\RageLib.GTA5\PSO\%(Filename)%(Extension)" />
+    <Compile Include="..\Pso\RageLib.GTA5\PSOWrappers\*.cs" Link="Pso\RageLib.GTA5\PSOWrappers\%(Filename)%(Extension)" />
+    <Compile Include="..\Pso\RageLib.GTA5\PSOWrappers\Data\*.cs" Link="Pso\RageLib.GTA5\PSOWrappers\Data\%(Filename)%(Extension)" />
+    <Compile Include="..\Pso\RageLib.GTA5\PSOWrappers\Types\*.cs" Link="Pso\RageLib.GTA5\PSOWrappers\Types\%(Filename)%(Extension)" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\bin\oo2core_5_win64.dll" Link="oo2core_5_win64.dll" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\bin\names.txt" Link="names.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\Pso\Lists\*.txt" Link="pso-names\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
