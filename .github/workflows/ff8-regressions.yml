@@ -1,32 +1,49 @@
-name: FF8 regression checks
+name: Validate editor repair
 on:
   push:
     branches: [fix/ff8-ui-battle-regressions]
-  workflow_dispatch:
+    paths: [.github/fixes/search-header-repair.py]
 permissions:
-  contents: read
+  contents: write
+concurrency:
+  group: lexeditor-search-header-repair
+  cancel-in-progress: false
 jobs:
-  source-checks:
-    runs-on: ubuntu-latest
+  repair:
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Check Python syntax
-        run: python -m compileall -q games/ff8
-      - name: Run focused regressions when present
+      - name: Read exact source revision without initializing unrelated gitlinks
+        env:
+          SOURCE_SHA: ${{ github.sha }}
         run: |
-          if [ -f tools/verify_ff8_ui_battle_regressions.py ]; then
-            python tools/verify_ff8_ui_battle_regressions.py
-          fi
-      - name: Archive tracked source for reproducing checks
-        if: always()
-        run: git archive --format=zip --output=lexeditor-source.zip HEAD
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: lexeditor-source-${{ github.sha }}
-          path: lexeditor-source.zip
-          retention-days: 1
-          if-no-files-found: error
+          git init .
+          git remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git fetch --no-tags --depth=1 origin "$SOURCE_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Apply hash-checked source repair
+        run: python .github/fixes/search-header-repair.py
+      - name: Browser test dependencies
+        run: |
+          python -m venv "$RUNNER_TEMP/repair-venv"
+          "$RUNNER_TEMP/repair-venv/bin/python" -m pip install playwright==1.57.0
+          "$RUNNER_TEMP/repair-venv/bin/python" -m playwright install --with-deps chromium
+      - name: Run regression checks
+        run: |
+          node --check ui/framework.js
+          python -m py_compile tools/verify_ff8_ui_battle_regressions.py
+          python tools/verify_global_searchers.py
+          "$RUNNER_TEMP/repair-venv/bin/python" tools/verify_ff8_ui_battle_regressions.py
+          git diff --check
+      - name: Commit only tested editor changes to the repair branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = 'games/ff8/editor.html ui/framework.js '
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- games/ff8/editor.html ui/framework.js
+          git rm -- .github/fixes/search-header-repair.py
+          git commit -m 'Fix search input focus loss and remove FF8 FFNx summary header'
+          gh auth setup-git
+          git push origin HEAD:refs/heads/fix/ff8-ui-battle-regressions
