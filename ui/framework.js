@@ -4598,46 +4598,53 @@
     return node;
   };
 
-  let pendingBottomSearchFocus = null;
-  let pendingBottomSearchTimer = 0;
   const bottomSearchChangeTimers = new Map();
-  const restoreBottomSearchFocus = key => {
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const pending = pendingBottomSearchFocus;
-      if (!pending || pending.key !== key) return;
-      const next = [...document.querySelectorAll("[data-lex-bottom-search]")]
-        .find(node => node.dataset.lexBottomSearch === key);
-      if (!next) return;
-      next.focus();
-      if (Number.isInteger(pending.start)) next.setSelectionRange(
-        pending.start, Number.isInteger(pending.end) ? pending.end : pending.start);
-    }));
-  };
   const bottomSearch = options => {
     const key = String(options.key || options.label || "records");
+    let composing = false;
     const control = element("input", {
       type: "search", value: options.value || "", placeholder: "",
       "aria-label": options.label || options.placeholder || "Search records",
       "data-lex-bottom-search": key,
-      oninput: event => {
-        const value = event.target.value;
-        const start = event.target.selectionStart;
-        const end = event.target.selectionEnd;
-        pendingBottomSearchFocus = {key, start, end};
-        clearTimeout(pendingBottomSearchTimer);
-        pendingBottomSearchTimer = setTimeout(() => { pendingBottomSearchFocus = null; }, 900);
-        clearTimeout(bottomSearchChangeTimers.get(key));
-        const apply = () => {
-          bottomSearchChangeTimers.delete(key);
-          options.change?.(value);
-          restoreBottomSearchFocus(key);
-        };
-        const delay = Math.max(0, Number(options.delay) || 0);
-        if (delay) bottomSearchChangeTimers.set(key, setTimeout(apply, delay));
-        else apply();
-      },
     });
-    restoreBottomSearchFocus(key);
+    const change = event => {
+      clearTimeout(bottomSearchChangeTimers.get(key));
+      bottomSearchChangeTimers.delete(key);
+      // Replacing an input in the middle of an IME composition discards text.
+      if (composing || event?.isComposing) return;
+      const apply = () => {
+        bottomSearchChangeTimers.delete(key);
+        // A delayed filter must not render an old page after navigation.
+        if (composing || !control.isConnected) return;
+        const focused = document.activeElement === control;
+        const start = control.selectionStart;
+        const end = control.selectionEnd;
+        const direction = control.selectionDirection;
+        options.change?.(control.value);
+        // Most list views rebuild their pager when filtering. Restore focus
+        // before this input event returns, not two animation frames later:
+        // keystrokes arriving between frames would otherwise go to <body>.
+        if (!focused || control.isConnected) return;
+        const active = document.activeElement;
+        if (active && active !== document.body && active !== document.documentElement) return;
+        const next = [...document.querySelectorAll("[data-lex-bottom-search]")]
+          .find(node => node.dataset.lexBottomSearch === key);
+        if (!next) return;
+        next.focus({preventScroll: true});
+        if (Number.isInteger(start)) next.setSelectionRange(
+          start, Number.isInteger(end) ? end : start, direction || "none");
+      };
+      const delay = Math.max(0, Number(options.delay) || 0);
+      if (delay) bottomSearchChangeTimers.set(key, setTimeout(apply, delay));
+      else apply();
+    };
+    control.addEventListener("input", change);
+    control.addEventListener("compositionstart", () => {
+      composing = true;
+      clearTimeout(bottomSearchChangeTimers.get(key));
+      bottomSearchChangeTimers.delete(key);
+    });
+    control.addEventListener("compositionend", () => { composing = false; change(); });
     return element("label", {class: "lex-pager-search"}, searchIcon(), control);
   };
 
@@ -5519,7 +5526,7 @@
       search:{key:`platform-${config.runtime || "settings"}`,value:options.query || "",label:`Search ${config.runtime} settings`,change:applySearch},
     });
     return element("section", {class: "lex-platform-config"},
-      element("header", {class: "lex-platform-config-head"},
+      options.showHeader === false ? null : element("header", {class: "lex-platform-config-head"},
         element("div", {}, element("h2", {}, `${config.runtime} settings`), element("p", {}, config.message), element("code", {}, config.path))),
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
