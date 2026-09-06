@@ -30,7 +30,7 @@ jobs:
       - name: Run global and FF9 Python tests
         run: |
           python -m unittest discover -s tests -p 'test_global*.py' -v
-          pytest -q tests/test_ff9_csv.py tests/test_ff9_http.py tests/test_ff9_runtime.py
+          PYTHONPATH=. pytest -q tests/test_ff9_csv.py tests/test_ff9_http.py tests/test_ff9_runtime.py
       - name: Run FF9 JavaScript checks
         run: |
           node --check ui/framework.js
