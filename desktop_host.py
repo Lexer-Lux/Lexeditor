@@ -710,8 +710,8 @@ class HostApi:
         therefore the only update path, and it only ever reports: nothing here
         installs anything.
         """
-        if not self._settings.snapshot().get("lexerMode"):
-            raise PermissionError("Lexer Mode is not enabled")
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Developer Mode requires Lexer's active GitHub account")
         with self._lock:
             cached = self._helper_versions
         reused = cached is not None and not refresh
@@ -762,8 +762,8 @@ class HostApi:
 
     def open_helper_release_notes(self, plugin_id: str) -> dict:
         """Open a known cached release in the external browser, never arbitrary URLs."""
-        if not self._settings.snapshot().get("lexerMode"):
-            raise PermissionError("Lexer Mode is not enabled")
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Developer Mode requires Lexer's active GitHub account")
         from urllib.parse import urlsplit
         with self._lock:
             row = next((r for r in (self._helper_versions or []) if r["pluginId"] == plugin_id), None)

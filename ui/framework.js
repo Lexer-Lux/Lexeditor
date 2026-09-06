@@ -3439,7 +3439,6 @@
     let githubWorkspace = null;
     let navigationHistory = null;
     let developerMode = false;
-    let lexerMode = false;
     const toast = message => {
       const node = element("div", {class: "lex-toast", role: "status"}, message);
       document.body.append(node);
@@ -3495,7 +3494,7 @@
         // changes still play it, because those really are moves.
         onfocus: event => { if (event.target.matches(":focus-visible")) playThemeSound("move"); },
         onpointerdown: event => {
-          if (event.button !== 2 || !lexerMode) return;
+          if (event.button !== 2 || !developerMode) return;
           savedDefault = false;
           clearTimeout(defaultHoldTimer);
           defaultHoldTimer = setTimeout(() => {
@@ -3632,18 +3631,16 @@
         initializeGitHub();
       }
     };
-    const setLexerMode = enabled => { lexerMode = !!enabled; };
     const initializeDeveloperMode = async () => {
       try {
         const value = rememberSharedSettings(await callWindow("lexeditor_settings"));
-        setDeveloperMode(value?.developerMode); setLexerMode(value?.lexerMode);
+        setDeveloperMode(value?.developerMode);
       }
-      catch (_error) { setDeveloperMode(false); setLexerMode(false); }
+      catch (_error) { setDeveloperMode(false); }
     };
     window.addEventListener("lexeditor-settings-changed", event => {
       rememberSharedSettings(event.detail);
       setDeveloperMode(event.detail?.developerMode);
-      setLexerMode(event.detail?.lexerMode);
     });
     if (window.pywebview?.api) initializeDeveloperMode();
     else window.addEventListener("pywebviewready", initializeDeveloperMode, {once: true});

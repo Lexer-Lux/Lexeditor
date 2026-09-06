@@ -39,11 +39,11 @@ STUB = """
     game_process_status:async()=>null,
     lexeditor_settings:async()=>window.__lexSettings,
     save_lexeditor_settings:async v=>Object.assign(window.__lexSettings,v),
-    save_lexer_setting_defaults:async v=>Object.assign(window.__lexSettings.defaultValues,v),
+    save_developer_setting_defaults:async v=>Object.assign(window.__lexSettings.defaultValues,v),
     save_lexeditor_view_preference:async()=>window.__lexSettings,
     clear_lexeditor_view_preference:async()=>window.__lexSettings
   }};
-  window.__lexSettings={updateCheckFrequency:'monthly',developerMode:true,lexerMode:false,
+  window.__lexSettings={updateCheckFrequency:'monthly',developerMode:true,developerMode:true,
     lexerAuthorized:false,lexerLogin:'',hoverableAltClick:false,selectionHoldMs:500,
     tableRowsPerPage:40,panelGapPercent:.5,residentHandleWidthPercent:5,mainMenuHeightPercent:7,
     soundEnabled:false,soundVolumePercent:25,absentGameDesaturationPercent:75,
