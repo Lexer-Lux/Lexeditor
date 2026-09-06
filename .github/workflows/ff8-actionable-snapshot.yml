@@ -1,0 +1,40 @@
+name: FF8 actionable source snapshot
+on:
+  push:
+    branches: [work/ff8-actionable-batch-2]
+    paths: [.github/workflows/ff8-actionable-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch exact branch revision
+        run: |
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin "$GITHUB_SHA"
+          git -C editor checkout --detach FETCH_HEAD
+      - name: Build source snapshot
+        working-directory: editor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os, subprocess, zipfile
+          names = subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
+          text_ext = {'.py','.cpp','.c','.h','.hpp','.html','.js','.json','.md','.patch','.yml','.yaml','.txt','.css','.toml','.ini','.ps1','.bat','.csv','.glsl','.def','.cmake'}
+          with zipfile.ZipFile('../ff8-actionable-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              z.writestr('SNAPSHOT_REVISION.txt', os.environ['GITHUB_SHA'])
+              for name in names:
+                  if not name: continue
+                  p=Path(name)
+                  if p.is_file() and (p.suffix.lower() in text_ext or name in {'.gitattributes','.gitignore','.gitmodules'} or name == 'games/ff8/ffnx_issue_51/package/AF3DN.P'):
+                      z.write(p,name)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ff8-actionable-source
+          path: ff8-actionable-source.zip
+          retention-days: 2
+          if-no-files-found: error
