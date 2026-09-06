@@ -29,18 +29,48 @@ class Dataset:
 
 
 DATASETS = (
-    Dataset("items", "items", "Items", "Items/Items.csv", "Item identity, prices, equipment classes, abilities, and usability"),
-    Dataset("weapons", "weapons", "Weapons", "Items/Weapons.csv", "Weapon category, model, script, power, elements, rate, and sound"),
-    Dataset("armor", "armor", "Armor", "Items/Armors.csv", "Physical and magical defence and evasion"),
-    Dataset("item-effects", "items", "Item effects", "Items/ItemEffects.csv", "Targeting, script, power, rate, element, and status"),
-    Dataset("abilities", "abilities", "Support abilities", "Characters/Abilities/AbilityGems.csv", "Support-ability gem costs and boosted versions"),
-    Dataset("actions", "magic", "Battle actions", "Battle/Actions.csv", "Battle action targeting, animation, script, power, status, MP, and type"),
-    Dataset("characters", "characters", "Character base stats", "Characters/BaseStats.csv", "Base dexterity, strength, magic, will, and gem capacity"),
-    Dataset("character-parameters", "characters", "Character parameters", "Characters/CharacterParameters.csv", "Starting row, victory pose, category, command and equipment sets, model formula, and name keyword"),
-    Dataset("default-equipment", "characters", "Starting equipment", "Characters/DefaultEquipment.csv", "Initial weapon, headgear, wristwear, armor, and accessory for each equipment set"),
-    Dataset("leveling", "characters", "Level growth", "Characters/Leveling.csv", "Experience thresholds and HP/MP growth for levels 1 through 99"),
-    Dataset("shops", "shops", "Shop inventories", "Items/ShopItems.csv", "Shop IDs and ordered item inventories"),
-    Dataset("synthesis", "synthesis", "Synthesis recipes", "Items/Synthesis.csv", "Recipe shops, price, result, and ingredients"),
+    Dataset('items', 'items', 'Items', 'Items/Items.csv', 'Item identity, prices, equipment classes, abilities, and usability'),
+    Dataset('weapons', 'weapons', 'Weapons', 'Items/Weapons.csv', 'Weapon category, model, script, power, elements, rate, and sound'),
+    Dataset('armor', 'armor', 'Armor', 'Items/Armors.csv', 'Physical and magical defence and evasion'),
+    Dataset('item-effects', 'items', 'Item effects', 'Items/ItemEffects.csv', 'Targeting, script, power, rate, element, and status'),
+    Dataset('initial-items', 'items', 'Initial inventory', 'Items/InitialItems.csv', 'Starting item IDs and quantities'),
+    Dataset('mix-items', 'synthesis', 'Mix recipes', 'Items/MixItems.csv', 'Mix recipe results and ingredients'),
+    Dataset('item-stats', 'items', 'Equipment stats', 'Items/Stats.csv', 'Equipment stat bonuses and elemental properties'),
+    Dataset('shops', 'shops', 'Shop inventories', 'Items/ShopItems.csv', 'Shop IDs and ordered item inventories'),
+    Dataset('synthesis', 'synthesis', 'Synthesis recipes', 'Items/Synthesis.csv', 'Recipe shops, price, result, and ingredients'),
+    Dataset('abilities', 'abilities', 'Support abilities', 'Characters/Abilities/AbilityGems.csv', 'Support-ability gem costs and boosted versions'),
+    Dataset('ability-zidane', 'abilities', 'Zidane abilities', 'Characters/Abilities/Zidane.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-vivi', 'abilities', 'Vivi abilities', 'Characters/Abilities/Vivi.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-garnet', 'abilities', 'Garnet abilities', 'Characters/Abilities/Garnet.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-steiner', 'abilities', 'Steiner abilities', 'Characters/Abilities/Steiner.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-freya', 'abilities', 'Freya abilities', 'Characters/Abilities/Freya.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-quina', 'abilities', 'Quina abilities', 'Characters/Abilities/Quina.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-eiko', 'abilities', 'Eiko abilities', 'Characters/Abilities/Eiko.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-amarant', 'abilities', 'Amarant abilities', 'Characters/Abilities/Amarant.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-beatrix-1', 'abilities', 'Beatrix abilities 1', 'Characters/Abilities/Beatrix1.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-beatrix-2', 'abilities', 'Beatrix abilities 2', 'Characters/Abilities/Beatrix2.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-blank-1', 'abilities', 'Blank abilities 1', 'Characters/Abilities/Blank1.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-blank-2', 'abilities', 'Blank abilities 2', 'Characters/Abilities/Blank2.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-cinna-1', 'abilities', 'Cinna abilities 1', 'Characters/Abilities/Cinna1.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-cinna-2', 'abilities', 'Cinna abilities 2', 'Characters/Abilities/Cinna2.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-marcus-1', 'abilities', 'Marcus abilities 1', 'Characters/Abilities/Marcus1.csv', 'Ability IDs and AP requirements'),
+    Dataset('ability-marcus-2', 'abilities', 'Marcus abilities 2', 'Characters/Abilities/Marcus2.csv', 'Ability IDs and AP requirements'),
+    Dataset('characters', 'characters', 'Character base stats', 'Characters/BaseStats.csv', 'Base dexterity, strength, magic, will, and gem capacity'),
+    Dataset('battle-parameters', 'characters', 'Battle parameters', 'Characters/BattleParameters.csv', 'Models, animations, battle geometry, status anchors, and weapon sounds'),
+    Dataset('character-parameters', 'characters', 'Character parameters', 'Characters/CharacterParameters.csv', 'Starting row, victory pose, category, command and equipment sets, model formula, and name keyword'),
+    Dataset('command-sets', 'characters', 'Command sets', 'Characters/CommandSets.csv', 'Per-character command set assignments'),
+    Dataset('commands', 'characters', 'Commands', 'Characters/Commands.csv', 'Battle command types and ability lists'),
+    Dataset('default-equipment', 'characters', 'Starting equipment', 'Characters/DefaultEquipment.csv', 'Initial weapon, headgear, wristwear, armor, and accessory for each equipment set'),
+    Dataset('leveling', 'characters', 'Level growth', 'Characters/Leveling.csv', 'Experience thresholds and HP/MP growth for levels 1 through 99'),
+    Dataset('actions', 'magic', 'Battle actions', 'Battle/Actions.csv', 'Battle action targeting, animation, script, power, status, MP, and type'),
+    Dataset('magic-sword-sets', 'magic', 'Magic Sword sets', 'Battle/MagicSwordSets.csv', 'Supporter, beneficiary, and ability set mapping'),
+    Dataset('status-data', 'magic', 'Status data', 'Battle/StatusData.csv', 'Status priority, timing, colors, and tick behavior'),
+    Dataset('status-sets', 'magic', 'Status sets', 'Battle/StatusSets.csv', 'Named status-set membership'),
+    Dataset('sfx-shp', 'effects', 'SHP definitions', 'SpecialEffects/Common/SHP.csv', 'Shape-particle definitions and textures'),
+    Dataset('sfx-sps', 'effects', 'SPS definitions', 'SpecialEffects/Common/SPS.csv', 'Sprite-particle definitions, textures, colors, and timing'),
+    Dataset('tetra-cards', 'tetra-master', 'Tetra Master cards', 'TetraMaster/TripleTriad.csv', 'Card attack, defence, type, and arrow data'),
+    Dataset('world-transport', 'world', 'Transport controls', 'World/TransportControls.csv', 'World transport movement and collision parameters'),
+    Dataset('world-weather', 'world', 'Weather colors', 'World/WeatherColors.csv', 'World light, fog, and ambient weather colors'),
 )
 DATASET_BY_KEY = {value.key: value for value in DATASETS}
 
@@ -75,7 +105,7 @@ def _write_csv_line(values: list[str]) -> str:
 def _comment_text(suffix: list[str]) -> str:
     text = " ".join(value for value in suffix if value).strip()
     text = re.sub(r"^#\s*", "", text)
-    text = re.sub(r"^\d+\s*-\s*", "", text)
+    text = re.sub(r"^\du+\s*-\s*", "", text)
     return text.strip()
 
 
@@ -107,12 +137,33 @@ class MemoriaCsvDocument:
         for index, line in enumerate(self.lines[:-1]):
             if not line.startswith("#") or ";" not in line or line.startswith("#!"):
                 continue
-            columns = _parse_csv_line(line[1:].strip())
+            columns = [value.strip() for value in _parse_csv_line(line[1:].strip())]
             type_line = self.lines[index + 1]
             if not type_line.startswith("#") or ";" not in type_line or type_line.startswith("#!"):
                 continue
-            types = _parse_csv_line(type_line[1:].strip())
-            if len(columns) >= 2 and len(types) == len(columns):
+            types = [value.strip() for value in _parse_csv_line(type_line[1:].strip())]
+            # Some Memoria schemas describe optional trailing structures whose
+            # type expressions themselves contain semicolons (BattleParameters).
+            # The active #! directives determine how many fields each row actually
+            # stores, so trim the schema to the first concrete record rather than
+            # guessing the optional layout.
+            data_count = 0
+            for candidate in self.lines[index + 2:]:
+                if not candidate or candidate.lstrip().startswith("#"):
+                    continue
+                values = _parse_csv_line(candidate)
+                data_count = next((i for i, value in enumerate(values)
+                                   if value.lstrip().startswith("#")), len(values))
+                break
+            if data_count and data_count <= len(columns) and data_count <= len(types):
+                columns = columns[:data_count]
+                types = types[:data_count]
+            while columns and not columns[-1]:
+                columns.pop()
+                if len(types) > len(columns):
+                    types = types[:len(columns)]
+            if len(columns) >= 2 and len(types) >= len(columns):
+                types = types[:len(columns)]
                 if len(set(columns)) != len(columns) or any(not name for name in columns):
                     raise ValueError(f"Memoria CSV has duplicate or empty column names: {self.path}")
                 return columns, types
@@ -129,7 +180,7 @@ class MemoriaCsvDocument:
             data = values[:len(self.columns)]
             suffix = values[len(self.columns):]
             by_name = dict(zip(self.columns, data))
-            identity = by_name.get("Id", by_name.get("id", str(len(rows))))
+            identity = by_name.get("Id", by_name.get("id", str(len(rows)))
             name = by_name.get("Comment") or by_name.get("Name") or _comment_text(suffix)
             rows.append({"line": line_number, "id": identity,
                          "name": name or f"Record {identity}", "raw": by_name, "suffix": suffix})
@@ -170,7 +221,8 @@ class MemoriaCsvDocument:
         fields = {field["key"]: field for field in self.fields}
         return [{
             "line": row["line"],
-            "id": index + 1 if dataset.key == "leveling" else (int(row["id"]) if str(row["id"]).lstrip("-+").isdigit() else row["id"]),
+            "id": (index + 1 if not any(key.casefold() == "id" for key in row["raw"])
+                   else (int(row["id"]) if str(row["id"]).lstrip("-+").isdigit() else row["id"])),
             "name": row["name"],
             "values": {key: self._public_value(value, fields[key]) for key, value in row["raw"].items()},
         } for index, row in enumerate(rows)]

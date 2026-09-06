@@ -12,7 +12,8 @@ import re
 from urllib.parse import parse_qs, urlparse
 
 from . import paths
-from .memoria_csv import DATASETS, MemoriaDataStore, catalog
+from .memoria_csv import MemoriaDataStore, catalog
+from .battle_scene import BattleSceneStore
 from .memoria_baseline import ensure as ensure_baseline
 from . import memoria_manager
 
@@ -28,8 +29,8 @@ POST_ROUTES = {"/api/save", "/api/runtime/install",
 
 
 UNRESOLVED_AREAS = (
-    ("StreamingAssets/p0data*.bin", "Vanilla Unity asset containers", "Direct container editing is not integrated; verified Memoria CSV datasets are listed separately."),
-    ("Battle scenes", "Enemies and encounters", "No editable Memoria battle-scene export is present."),
+    ("StreamingAssets/p0data*.bin", "Vanilla Unity asset containers",
+     "Battle-scene records are decoded read-only from p0data2 and written only as Memoria project overlays; other container data remains outside the integrated surface."),
 )
 
 
@@ -58,6 +59,13 @@ def data_map() -> dict:
         integrated.append({
             "filename": row["relativePath"], "controls": row["controls"],
             "notes": f"{row['label']}. Writes a project overlay; the game baseline is never overwritten.",
+            "status": "integrated" if row["available"] else "partial",
+            "openable": row["available"], "target": row["tab"], "datasetKey": row["key"],
+        })
+    for row in BattleSceneStore().status_rows():
+        integrated.append({
+            "filename": row["relativePath"], "controls": row["controls"],
+            "notes": row["notes"],
             "status": "integrated" if row["available"] else "partial",
             "openable": row["available"], "target": row["tab"], "datasetKey": row["key"],
         })
@@ -152,10 +160,10 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/datamap":
                 self.json_response(data_map())
             elif path == "/api/catalog":
-                self.json_response({"datasets": catalog()})
+                self.json_response({"datasets": catalog() + BattleSceneStore().status_rows()})
             elif path == "/api/dataset":
                 key = parse_qs(parsed.query).get("key", [""])[0]
-                self.json_response(MemoriaDataStore().load(key))
+                self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else MemoriaDataStore().load(key))
             elif path == "/api/runtime":
                 self.json_response(memoria_manager.status(paths.GAME_ROOT))
             elif path == "/api/runtime/available":
@@ -171,8 +179,6 @@ class Handler(BaseHTTPRequestHandler):
             if path not in POST_ROUTES:
                 self.json_response({"error": "Not found"}, 404)
                 return
-            # Installing an executable must not be reachable from a foreign
-            # website via forms, cross-origin requests or DNS rebinding.
             port = self.server.server_address[1]
             allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
             host = self.headers.get("Host", "").casefold()
@@ -200,8 +206,11 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/runtime/settings":
                 result = memoria_manager.open_settings(paths.GAME_ROOT)
             else:
-                result = MemoriaDataStore().save(str(payload.get("key", "")),
-                                                str(payload.get("sha256", "")), payload.get("changes", []))
+                key = str(payload.get("key", ""))
+                if key in {"enemies", "encounters"}:
+                    result = BattleSceneStore().save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
+                else:
+                    result = MemoriaDataStore().save(key, str(payload.get("sha256", "")), payload.get("changes", []))
             self.json_response(result)
         except FileNotFoundError as error:
             self.json_response({"error": str(error)}, 409)

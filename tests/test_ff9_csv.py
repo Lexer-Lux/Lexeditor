@@ -118,10 +118,8 @@ def test_project_cannot_be_installed_baseline(store):
 
 
 def test_all_datasets_have_pinned_baseline_paths():
-    assert len(csv.DATASETS) == 12
-    # The central baseline can cover more Memoria files than this editor batch;
-    # every editable dataset still must be pinned.
-    assert {d.relative_path for d in csv.DATASETS} <= set(baseline.FILES)
+    assert len(csv.DATASETS) == 42
+    assert {d.relative_path for d in csv.DATASETS} == set(baseline.FILES)
 
 
 def test_bad_baseline_download_does_not_replace_file(tmp_path, monkeypatch):
@@ -135,3 +133,22 @@ def test_bad_baseline_download_does_not_replace_file(tmp_path, monkeypatch):
     assert target.read_bytes() == b"old"
     result = baseline.ensure(tmp_path, downloader=lambda _: data)
     assert result["ready"] and target.read_bytes() == data
+
+
+def test_optional_trailing_composite_schema_uses_active_record_width(tmp_path):
+    path = tmp_path / "BattleParameters.csv"
+    path.write_text(
+        "#! IncludeWeaponSound\n"
+        "# Id;Name;WeaponSounds;WeaponOffset;TranceParameters;\n"
+        "# Int32;String;Int32[];Float[X,Y];{Anim[2];WeaponBone(Int32)}\n"
+        "0;Test;1, 2;# actor\n", encoding="utf-8")
+    doc = csv.MemoriaCsvDocument(path)
+    assert doc.columns == ["Id", "Name", "WeaponSounds"]
+    assert [field["key"] for field in doc.fields] == doc.columns
+
+
+def test_schema_column_names_are_trimmed(tmp_path):
+    path = tmp_path / "Commands.csv"
+    path.write_text("# Id\t;Value\t\n# Int32;UInt8\n0;7\n", encoding="utf-8")
+    doc = csv.MemoriaCsvDocument(path)
+    assert doc.columns == ["Id", "Value"]
