@@ -27,6 +27,13 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin master
           git merge --no-edit origin/master
+      - name: Regenerate reviewed offline credits
+        run: |
+          python tools/generate_credits.py
+          git add ui/credits.json
+          if ! git diff --cached --quiet; then
+            git commit -m 'Regenerate offline credits from reviewed attribution sources'
+          fi
           git push origin HEAD:fix/global-resume-20260906
       - name: Export auditable source snapshot for offline development
         id: source
@@ -76,6 +83,7 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_global*.py' -v
       - run: python tools/generate_credits.py --check
       - run: node --check ui/framework.js
+      - run: node --check ui/design-review.js
       - run: python -m playwright install --with-deps chromium
       - run: python tests/global_browser_check.py
       - run: python tests/global_design_review_check.py
