@@ -23,6 +23,20 @@ $references = @(
 if ($LASTEXITCODE -ne 0) { throw "Fixture compiler failed" }
 Copy-Item -LiteralPath (Join-Path $appRoot 'Rpf6ReadCli.exe.config') -Destination $fixtureConfig -Force
 
+function Invoke-ExpectedFailure([scriptblock]$Command) {
+    $previousPreference = $ErrorActionPreference
+    try {
+        # Windows PowerShell 5 converts native stderr to a terminating
+        # NativeCommandError when ErrorActionPreference is Stop. These calls are
+        # deliberately invalid, so allow the process to finish and inspect its code.
+        $ErrorActionPreference = 'Continue'
+        & $Command
+        return $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+}
+
 $temp = Join-Path $env:TEMP ('lexeditor-rdr-rpf-copy-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force $temp | Out-Null
 try {
@@ -61,15 +75,15 @@ try {
     if (-not [Linq.Enumerable]::SequenceEqual([byte[]]$actual, [byte[]]$expected)) { throw 'built replacement did not round-trip exactly' }
 
     Push-Location $appRoot
-    try { & $cli build-copy $source $source $manifest 2>$null | Out-Null } finally { Pop-Location }
-    if ($LASTEXITCODE -eq 0) { throw 'build-copy allowed source archive overwrite' }
+    try { $overwriteExit = Invoke-ExpectedFailure { & $cli build-copy $source $source $manifest 2>$null | Out-Null } } finally { Pop-Location }
+    if ($overwriteExit -eq 0) { throw 'build-copy allowed source archive overwrite' }
     if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne $sourceHash) { throw 'failed overwrite test changed source archive' }
 
     Set-Content -LiteralPath $manifest -Encoding UTF8 -NoNewline ("root/missing.xml`t$after")
     Remove-Item -LiteralPath $built -Force
     Push-Location $appRoot
-    try { & $cli build-copy $source $built $manifest 2>$null | Out-Null } finally { Pop-Location }
-    if ($LASTEXITCODE -eq 0 -or (Test-Path -LiteralPath $built)) { throw 'unknown entry produced an archive' }
+    try { $missingExit = Invoke-ExpectedFailure { & $cli build-copy $source $built $manifest 2>$null | Out-Null } } finally { Pop-Location }
+    if ($missingExit -eq 0 -or (Test-Path -LiteralPath $built)) { throw 'unknown entry produced an archive' }
     if ((Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash -ne $sourceHash) { throw 'unknown-entry test changed source archive' }
 
     Write-Host 'PASS RDR RPF copy builder: source immutable, replacement exact, invalid targets fail closed'
