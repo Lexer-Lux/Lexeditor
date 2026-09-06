@@ -15,7 +15,7 @@ jobs:
         run: |
           git init .
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git -c protocol.version=2 fetch --no-tags --filter=blob:none origin "$GITHUB_SHA" 6c625fc491dd51e365c73a8e3b135805adfeadfe
+          git -c protocol.version=2 fetch --no-tags origin "$GITHUB_SHA" master
           git checkout --detach "$GITHUB_SHA"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -48,7 +48,7 @@ jobs:
           changed=set(git('diff','--cached','--name-only','6c625fc491dd51e365c73a8e3b135805adfeadfe').decode().splitlines())
           assert changed <= allowed, f'Unrelated changes: {changed-allowed}'
           PY
-          git diff --cached --check
+          git diff --cached --check 6c625fc491dd51e365c73a8e3b135805adfeadfe
       - name: Validate the combined source against the RDR2 regression suite
         run: |
           python tests/test_rdr2_issue_repairs.py
