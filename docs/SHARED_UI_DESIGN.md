@@ -1,40 +1,48 @@
-# Shared UI and formula proposals
+# Shared UI review and approved graph treatment
 
-Open **Blank → Design Review**. Both examples are in-memory; none of their controls
-save preferences, change game data, launch games, or replace a real plugin's layout.
-The existing Blank Graphs tab remains available for current shared graph behavior.
+Open **Blank → Design Review**. The controls there are in-memory review fixtures:
+they do not save preferences, change game data, launch games, or replace a plugin's
+production layout.
 
 ## Shared layout (#99)
 
-**A — Separate preview lane.** The top command row places the mod selector at left
-and Undo, Redo, Save and Play together at right. The next row holds game tabs, with
-Tweaks distinct and last. Below, list, properties and collapsible model preview
-have separate lanes. Hiding the preview returns its width to properties. On a
-narrow window the preview moves below the properties. This favors simultaneous
-model inspection and editing, at the cost of less property width when open.
+The two earlier menu-bar proposals were rejected. They are retired. The production
+menu bar is intentionally unchanged while these new alternatives are reviewed.
 
-**B — Property-first.** Keep the same command/utility placement, but use only two
-horizontal lanes: list and properties. Put the collapsible preview below the
-properties. This favors long names and wide fields, at the cost of scrolling to
-inspect a model. In both alternatives, circular Help, Information and Settings
-buttons are grouped immediately beside the window controls. Identity is shown
-once in each relevant region; field controls remain in the details.
+**C — Tab-first compact header.** Keep the familiar horizontal game-section tabs
+as the primary row. Put the current mod selector and Undo/Redo/Save/Play actions
+in that same compact row rather than adding another redesigned menu strip. The
+record list and editable properties stay below. The optional 3D preview is a
+collapsible drawer inside the detail pane, so hiding it gives all width back to
+properties. This preserves the existing navigation hierarchy while reducing
+header height.
 
-Select a record, change layout, and hide/show the preview to compare actual space.
-Choose A or B, or specify a combination, before changing the production shell.
-The preview is a labeled location placeholder, not a newly implemented 3D engine.
+**D — Vertical workspace rail.** Move game-section navigation and the mod selector
+off the menu bar into a narrow left workspace rail. Keep Undo/Redo/Save/Play in a
+small command row immediately over the editor. The 3D preview becomes a
+collapsible right drawer that falls below the editor at narrow widths. This frees
+horizontal header space and keeps editing actions adjacent to the content they
+affect.
 
-## Formula typography (#299)
+Both alternatives keep Help, Information and Settings grouped beside the native
+window controls. Neither is applied to the real shell until one is approved or
+revised.
 
-**A — Stacked fraction and raised power** gives numerator and denominator their own
-lines. It distinguishes grouping well but needs more vertical clearance.
-**B — Inline fraction and raised power** preserves a compact single line but is
-less clear for long or nested fractions. Both inherit the active typeface, have a
-transparent background and shadow, and follow a movable curve point/tangent.
-Minimum and maximum labels use the same font, weight and shadow. No opaque box
-or centered formula panel is introduced.
+## Formula readability (#299)
 
-Use the multiplier and label-position sliders to compare the formula near different
-slopes. The example is deliberately bounded; production rollout must also test long
-expressions, nested fractions, extreme slopes, zoom and game font metrics. Select
-a presentation first. Existing game graphs have not been silently restyled.
+**Design A is approved and implemented in the shared curve editor.** The formula
+uses the active game/interface font at natural weight, a subtle shadow and a fully
+transparent background. It follows the curve rather than sitting in a box or a
+centered overlay. Powers are raised. Fraction markup is preserved as a stacked
+numerator/denominator treatment when supplied, and minimum/maximum labels use the
+same typographic treatment.
+
+The curve editor measures the natural rendered formula width instead of stretching
+character spacing to fill the path. Long expressions may reduce font size within
+a readability floor and shift along the guide to avoid clipping. Invalid formula
+results clear stale graphics, and extrema are computed from the evaluated curve
+rather than assuming endpoints are ordered.
+
+The Design Review page keeps position and multiplier sliders only to exercise the
+approved treatment at different slopes; there is no remaining A/B typography
+choice.
