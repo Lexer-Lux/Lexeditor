@@ -24,6 +24,30 @@ Exact metadata: [source record](sources/issue-5356485731-4e0d1d2ec28feaaa8a45967
 
 - [ ] State whether Reptile is only an editor classification or should affect attacks, statuses, AI or Scan; give the intended rule and initial enemies to classify.
 
+## issue 5356485731 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/323
+
+Created: 2026-09-04T06:32:42Z; updated: 2026-09-06T14:09:33Z
+
+Exact metadata: [source record](sources/issue-5356485731-5984909c194361d2da6d321d7e3d59ed0220b55b58a8ec11b5c270c8022d8a8b.json).
+
+Add an optional Reptile tweak. While enabled, let enemies be tagged as reptiles in the Enemies editor. Each ice move used on a reptile multiplies its ATB speed by **0.92**; each fire move multiplies it by **1.08**.
+
+**Status: Implementation remains.** These rules are already specified; no replacement design is needed.
+
+## issue 5356485731 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/323
+
+Created: 2026-09-04T06:32:42Z; updated: 2026-09-06T14:09:33Z
+
+Exact metadata: [source record](sources/issue-5356485731-e3a3e92f9c58c8d528fca3ca97dbd02435883fc020e77caf543ee00b4f783ee5.json).
+
+**Status: The requested tag’s gameplay meaning is not specified.** No new combat behavior is implemented.
+
+- [ ] State whether Reptile is only an editor classification or should affect attacks, statuses, AI or Scan; give the intended rule and initial enemies to classify.
+
 ## comment 5559532116 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/323#issuecomment-5559532116
