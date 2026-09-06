@@ -1,0 +1,548 @@
+name: Apply shared UI batch
+on:
+  push:
+    branches: [fix/shared-ui-batch-20260906]
+    paths: [.github/workflows/apply-shared-ui-batch.yml]
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply requested shared UI fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          def text(path):
+              return Path(path).read_text(encoding="utf-8")
+
+          def write(path, value):
+              Path(path).write_text(value, encoding="utf-8", newline="\n")
+
+          def replace_once(path, old, new, marker=None):
+              value = text(path)
+              if marker and marker in value:
+                  return
+              count = value.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one replacement, got {count}: {old[:100]!r}")
+              write(path, value.replace(old, new, 1))
+
+          def regex_once(path, pattern, replacement, marker=None, flags=re.S):
+              value = text(path)
+              if marker and marker in value:
+                  return
+              updated, count = re.subn(pattern, replacement, value, count=1, flags=flags)
+              if count != 1:
+                  raise SystemExit(f"{path}: regex expected one replacement, got {count}: {pattern[:120]!r}")
+              write(path, updated)
+
+          # -----------------------------------------------------------------
+          # GitHub workspace: every game uses the central Lexeditor issues,
+          # filtered by the game's canonical label.
+          # -----------------------------------------------------------------
+          replace_once(
+              "github_integration.py",
+              '''    def list_issues(self, repository: GitHubRepository,\n                    state: str = "open", limit: int = 500) -> dict:\n        """List repository issues for the embedded workspace."""\n''',
+              '''    def list_issues(self, repository: GitHubRepository,\n                    state: str = "open", limit: int = 500,\n                    label: str | None = None) -> dict:\n        """List repository issues for the embedded workspace, optionally by game label."""\n''',
+              marker="optionally by game label",
+          )
+          replace_once(
+              "github_integration.py",
+              '''        payload = self._json([\n            "issue", "list", "--repo", repository.full_name,\n            "--state", normalized_state, "--limit", str(normalized_limit),\n            "--json", "number,title,state,labels,updatedAt,author",\n        ])\n''',
+              '''        arguments = [\n            "issue", "list", "--repo", repository.full_name,\n            "--state", normalized_state, "--limit", str(normalized_limit),\n            "--json", "number,title,state,labels,updatedAt,author",\n        ]\n        clean_label = str(label or "").strip()\n        if clean_label:\n            arguments.extend(["--label", clean_label])\n        payload = self._json(arguments)\n''',
+              marker='arguments.extend(["--label", clean_label])',
+          )
+
+          replace_once(
+              "desktop_host.py",
+              '''    def _github_repository(self, plugin_id: str):\n        """Resolve one configured repository before the owner check."""\n        plugin = self._plugins.get(plugin_id)\n        if plugin is None:\n            raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")\n        if plugin.github is None:\n            raise ValueError(f"{plugin.name} has no configured GitHub repository")\n        return plugin.github\n\n    def github_repository(self, plugin_id: str) -> dict | None:\n        """Show safe repository metadata only to an allowed active owner."""\n        plugin = self._plugins.get(plugin_id)\n        if plugin is None:\n            raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")\n        if plugin.github is None:\n            return None\n        repository = self._github_repository(plugin_id)\n        return self._github.visible_repository(repository)\n''',
+              '''    @staticmethod\n    def _github_issue_label(plugin_id: str) -> str:\n        """Map editor plugin IDs to the labels used by the central issue tracker."""\n        return {"rdr": "rdr1", "ff7_2013": "ff7"}.get(plugin_id, plugin_id)\n\n    def _github_repository(self, plugin_id: str):\n        """Every game edits the one canonical Lexeditor issue tracker."""\n        if plugin_id not in self._plugins:\n            raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")\n        return LEXEDITOR_REPOSITORY\n\n    def github_repository(self, plugin_id: str) -> dict | None:\n        """Show the central issue repository and this game's issue-label filter."""\n        repository = self._github_repository(plugin_id)\n        visible = self._github.visible_repository(repository)\n        if not visible:\n            return None\n        return {**visible, "issueLabel": self._github_issue_label(plugin_id)}\n''',
+              marker="_github_issue_label",
+          )
+          replace_once(
+              "desktop_host.py",
+              '''        if not self._settings.snapshot().get("lexerMode"):\n            raise PermissionError("Lexer Mode is not enabled")\n        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):\n            raise PermissionError("Lexer's active GitHub account is required")\n''',
+              '''        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):\n            raise PermissionError("Developer Mode requires the authorized GitHub account")\n''',
+              marker='Developer Mode requires the authorized GitHub account',
+          )
+          # The same old two-line gate occurs in helper_versions/open release notes.
+          value = text("desktop_host.py")
+          value = value.replace(
+              '        if not self._settings.snapshot().get("lexerMode"):\n            raise PermissionError("Lexer Mode is not enabled")\n',
+              '        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):\n            raise PermissionError("Developer Mode requires the authorized GitHub account")\n',
+          )
+          write("desktop_host.py", value)
+          replace_once(
+              "desktop_host.py",
+              '''    def github_issues(self, plugin_id: str, state: str = "open") -> dict:\n        """List issues for the active game's embedded owner workspace."""\n        return self._github.list_issues(self._github_repository(plugin_id), state)\n''',
+              '''    def github_issues(self, plugin_id: str, state: str = "open") -> dict:\n        """List only this game's issues from the central Lexeditor tracker."""\n        return self._github.list_issues(\n            self._github_repository(plugin_id), state,\n            label=self._github_issue_label(plugin_id),\n        )\n''',
+              marker="List only this game's issues",
+          )
+          replace_once(
+              "desktop_host.py",
+              '''        rows = []\n        lexer_mode = bool(self._settings.snapshot().get("lexerMode"))\n        for managed in self._installations.rows(bypass=not self._enforce_installations):\n            plugin = managed["plugin"]\n            if plugin.plugin_id == "blank" and not lexer_mode:\n                continue\n''',
+              '''        rows = []\n        developer_mode = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY))\n        for managed in self._installations.rows(bypass=not self._enforce_installations):\n            plugin = managed["plugin"]\n            if plugin.plugin_id == "blank" and not developer_mode:\n                continue\n''',
+              marker="developer_mode = bool(self._github.visible_repository",
+          )
+          regex_once(
+              "desktop_host.py",
+              r'''    def lexeditor_settings\(self\) -> dict:\n.*?    def save_lexeditor_view_preference''',
+              '''    def lexeditor_settings(self) -> dict:\n        """Return shared settings; Developer Mode follows the active GitHub identity."""\n        payload = self._settings.snapshot()\n        identity = self._github.visible_repository(LEXEDITOR_REPOSITORY)\n        payload["developerAuthorized"] = bool(identity)\n        payload["developerLogin"] = (identity or {}).get("login", "")\n        payload["developerMode"] = bool(identity)\n        return payload\n\n    def save_lexeditor_settings(self, values: dict | str, *legacy_values) -> dict:\n        """Save bounded user settings. Developer Mode is never a stored toggle."""\n        if isinstance(values, dict):\n            payload = values\n        else:\n            names = ("hoverableAltClick", "selectionHoldMs",\n                     "tableRowsPerPage", "panelGapPercent", "mainMenuHeightPercent",\n                     "soundEnabled", "soundVolumePercent")\n            payload = {"updateCheckFrequency": values, **dict(zip(names, legacy_values))}\n        self._settings.save(\n            str(payload.get("updateCheckFrequency", "daily")),\n            hoverable_alt_click=None if "hoverableAltClick" not in payload else bool(payload["hoverableAltClick"]),\n            selection_hold_ms=payload.get("selectionHoldMs"),\n            table_rows_per_page=payload.get("tableRowsPerPage"),\n            panel_gap_percent=payload.get("panelGapPercent"),\n            main_menu_height_percent=payload.get("mainMenuHeightPercent"),\n            sound_enabled=None if "soundEnabled" not in payload else bool(payload["soundEnabled"]),\n            sound_volume_percent=payload.get("soundVolumePercent"),\n        )\n        return self.lexeditor_settings()\n\n    def save_developer_setting_defaults(self, values: dict) -> dict:\n        """Save distributable defaults only for the authorized repository owner."""\n        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):\n            raise PermissionError("Developer Mode requires the authorized GitHub account")\n        self._settings.save_developer_defaults(values)\n        return self.lexeditor_settings()\n\n    def save_lexeditor_view_preference''',
+              marker="def save_developer_setting_defaults",
+          )
+
+          # -----------------------------------------------------------------
+          # Settings persistence: Developer Mode is identity-derived; no Lexer Mode.
+          # -----------------------------------------------------------------
+          value = text("settings_manager.py")
+          value = value.replace('    "lexerMode": False,\n', '')
+          value = value.replace(
+              'LEXER_DEFAULT_KEYS = tuple(key for key in DEFAULTS if key not in {"lexerMode", "viewPreferences"})',
+              'PACKAGED_DEFAULT_KEYS = tuple(key for key in DEFAULTS if key not in {"developerMode", "viewPreferences"})')
+          value = value.replace('for key in LEXER_DEFAULT_KEYS if key in payload', 'for key in PACKAGED_DEFAULT_KEYS if key in payload')
+          value = value.replace('            "lexerMode": payload.get("lexerMode") is True,\n', '')
+          value = value.replace(
+              '            "developerMode": payload.get("developerMode", defaults["developerMode"]) is True,',
+              '            "developerMode": False,')
+          # Replace save signature + developer/lexer persistence while preserving every other bounded setting.
+          value = value.replace(
+              '''    def save(self, update_check_frequency: str, developer_mode: bool | None = None,\n             lexer_mode: bool | None = None,\n             hoverable_alt_click: bool | None = None,\n''',
+              '''    def save(self, update_check_frequency: str,\n             hoverable_alt_click: bool | None = None,\n''')
+          value = value.replace(
+              '''        if developer_mode is None:\n            developer_mode = current["developerMode"]\n        if lexer_mode is None:\n            lexer_mode = current["lexerMode"]\n''', '')
+          value = value.replace('                "version": 8,\n                "updateCheckFrequency": update_check_frequency,\n                "developerMode": bool(developer_mode),\n                "lexerMode": bool(lexer_mode),\n',
+                                '                "version": 9,\n                "updateCheckFrequency": update_check_frequency,\n')
+          value = value.replace('    def save_lexer_defaults(self, values: dict) -> dict:\n        """Save checked-in application defaults after host authorization."""',
+                                '    def save_developer_defaults(self, values: dict) -> dict:\n        """Save checked-in application defaults after host authorization."""')
+          value = value.replace('if key not in LEXER_DEFAULT_KEYS:', 'if key not in PACKAGED_DEFAULT_KEYS:')
+          value = value.replace('{"version": 8, **current}', '{"version": 9, **current}')
+          write("settings_manager.py", value)
+
+          # -----------------------------------------------------------------
+          # Shared Detail: generic model-preview drawer, human-scale labels,
+          # bidirectional property/column hover, safe reset animation + sliders.
+          # -----------------------------------------------------------------
+          replace_once(
+              "ui/framework.js",
+              '''  // One shared Detail heading owns the optional icon or live-preview slot,\n  // record identity, metadata, and actions. Games supply themed content.\n  const detailPanel = (options = {}) => {\n    const title = options.title instanceof Node\n      ? options.title\n      : element("h2", {class: "lex-detail-panel-title"}, String(options.title ?? ""));\n    const identity = element("div", {class: "lex-detail-panel-identity"},\n      title,\n      options.identity ? element("div", {class: "lex-detail-panel-id"}, options.identity) : null,\n      options.meta ? element("div", {class: "lex-detail-panel-meta"}, options.meta) : null);\n    const heading = options.heading === false ? null : element("div", {\n      class: ["lex-detail-panel-heading", options.icon ? "" : "no-icon", options.actions ? "" : "no-actions"].filter(Boolean).join(" "),\n    },\n      options.icon ? element("div", {class: "lex-detail-panel-icon"}, options.icon) : null,\n      identity,\n      options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null);\n    return element("section", {\n      ...(options.attrs || {}),\n      class: ["lex-detail-panel", "lex-detail", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),\n    }, heading, element("div", {class: "lex-detail-panel-body"}, options.body || []));\n  };\n''',
+              '''  // One shared Detail heading owns the optional icon/live-preview slot,\n  // record identity, metadata, actions, and the standard slide-out model drawer.\n  const detailPanel = (options = {}) => {\n    const title = options.title instanceof Node\n      ? options.title\n      : element("h2", {class: "lex-detail-panel-title"}, String(options.title ?? ""));\n    const identity = element("div", {class: "lex-detail-panel-identity"},\n      title,\n      options.identity ? element("div", {class: "lex-detail-panel-id"}, options.identity) : null,\n      options.meta ? element("div", {class: "lex-detail-panel-meta"}, options.meta) : null);\n    const previewContent = typeof options.modelPreview === "function" ? options.modelPreview() : options.modelPreview;\n    const iconSlot = options.icon ? element("div", {\n      class: ["lex-detail-panel-icon", previewContent ? "lex-model-preview-trigger" : ""].filter(Boolean).join(" "),\n    }, element("span", {class: "lex-detail-panel-icon-content"}, options.icon)) : null;\n    const closeMark = previewContent ? element("span", {class: "lex-model-preview-close", "aria-hidden": "true"}, "×") : null;\n    if (iconSlot && closeMark) iconSlot.append(closeMark);\n    const heading = options.heading === false ? null : element("div", {\n      class: ["lex-detail-panel-heading", options.icon ? "" : "no-icon", options.actions ? "" : "no-actions"].filter(Boolean).join(" "),\n    },\n      iconSlot,\n      identity,\n      options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null);\n    const drawer = previewContent ? element("div", {\n      class: "lex-model-preview-drawer", "aria-hidden": "true",\n    }, previewContent) : null;\n    const root = element("section", {\n      ...(options.attrs || {}),\n      class: ["lex-detail-panel", "lex-detail", heading ? "" : "no-heading", previewContent ? "lex-has-model-preview" : "", options.className || ""].filter(Boolean).join(" "),\n    }, heading, drawer, element("div", {class: "lex-detail-panel-body"}, options.body || []));\n    if (iconSlot && drawer) {\n      iconSlot.tabIndex = 0;\n      iconSlot.setAttribute("role", "button");\n      const label = options.modelPreviewLabel || "Model preview";\n      const setOpen = open => {\n        const next = !!open;\n        if (root.classList.contains("lex-model-preview-open") === next) return;\n        root.classList.toggle("lex-model-preview-open", next);\n        drawer.setAttribute("aria-hidden", String(!next));\n        iconSlot.setAttribute("aria-expanded", String(next));\n        iconSlot.setAttribute("aria-label", next ? `Close ${label}` : `Open ${label}`);\n        iconSlot.title = next ? `Close ${label}` : `Open ${label}`;\n        root.dispatchEvent(new CustomEvent(next ? "lex-model-preview-open" : "lex-model-preview-close", {bubbles:false}));\n      };\n      iconSlot.setAttribute("aria-expanded", "false");\n      iconSlot.setAttribute("aria-label", `Open ${label}`);\n      iconSlot.title = `Open ${label}`;\n      iconSlot.addEventListener("click", event => { event.preventDefault(); setOpen(!root.classList.contains("lex-model-preview-open")); });\n      iconSlot.addEventListener("keydown", event => {\n        if (!["Enter", " "].includes(event.key)) return;\n        event.preventDefault();\n        setOpen(!root.classList.contains("lex-model-preview-open"));\n      });\n      root.lexModelPreviewOpen = () => setOpen(true);\n      root.lexModelPreviewClose = () => setOpen(false);\n    }\n    return root;\n  };\n''',
+              marker="lexModelPreviewOpen",
+          )
+
+          # Add a fixed-box text fitter used by property labels and bool tiles.
+          replace_once(
+              "ui/framework.js",
+              '''  // Every value box on a panel should end at the same edge, so the reference\n''',
+              '''  // Labels stay inside their existing box: wrap first, then reduce the font\n  // only as far as needed. A long name never makes a Detail row taller.\n  const autoFitBoxText = (node, options = {}) => {\n    if (!(node instanceof Element)) return node;\n    if (node.__lexAutoFitBoxUpdate) { node.__lexAutoFitBoxUpdate(); return node; }\n    const minimum = Math.max(7, Number(options.minimum) || 8);\n    const update = () => {\n      if (!node.isConnected) return;\n      node.style.fontSize = "";\n      const maximum = parseFloat(getComputedStyle(node).fontSize) || 14;\n      let low = minimum, high = maximum, best = minimum;\n      for (let pass = 0; pass < 8; pass++) {\n        const size = (low + high) / 2;\n        node.style.fontSize = `${size}px`;\n        const fits = node.scrollWidth <= node.clientWidth + 1 && node.scrollHeight <= node.clientHeight + 1;\n        if (fits) { best = size; low = size; } else high = size;\n      }\n      node.style.fontSize = `${Math.min(maximum, best)}px`;\n    };\n    node.__lexAutoFitBoxUpdate = update;\n    if (typeof ResizeObserver === "function") {\n      node.__lexAutoFitBoxObserver = new ResizeObserver(update);\n      node.__lexAutoFitBoxObserver.observe(node);\n    }\n    document.fonts?.ready?.then(update);\n    requestAnimationFrame(update);\n    return node;\n  };\n\n  // Every value box on a panel should end at the same edge, so the reference\n''',
+              marker="const autoFitBoxText",
+          )
+          replace_once(
+              "ui/framework.js",
+              '''    const typeRail = element("div", {class: "lex-field-type-rail"},\n      typeName, typeRange, helpMarker);\n''',
+              '''    const typeRail = element("div", {class: "lex-field-type-rail"}, typeName, typeRange);\n''',
+              marker='typeRail = element("div", {class: "lex-field-type-rail"}, typeName, typeRange)',
+          )
+          replace_once(
+              "ui/framework.js",
+              '''    const node = element("div", {\n      ...(options.attrs || {}),\n      class: ["lex-detail-field", "lex-pinnable-property", booleanField ? "lex-boolean-field" : "", options.className || ""].filter(Boolean).join(" "),\n      "data-lex-type": dataType,\n      "data-lex-property": options.property\n        || pin?.getAttribute?.("data-lex-pin-column") || null,\n      "data-lex-readonly": String(readOnly),\n    }, element("div", {class: "lex-detail-field-label"},\n      options.label, arrow),\n    element("div", {class: "lex-detail-field-control"}, control,\n      pin && pin.parentElement !== control ? pin : null), typeRail);\n''',
+              '''    const labelTextNode = element("span", {class: "lex-detail-field-label-text"}, options.label);\n    const labelNode = element("div", {class: "lex-detail-field-label"}, helpMarker, labelTextNode, arrow);\n    const node = element("div", {\n      ...(options.attrs || {}),\n      class: ["lex-detail-field", "lex-pinnable-property", booleanField ? "lex-boolean-field" : "", options.className || ""].filter(Boolean).join(" "),\n      "data-lex-type": dataType,\n      "data-lex-property": options.property\n        || pin?.getAttribute?.("data-lex-pin-column") || null,\n      "data-lex-readonly": String(readOnly),\n    }, labelNode,\n    element("div", {class: "lex-detail-field-control"}, control,\n      pin && pin.parentElement !== control ? pin : null), typeRail);\n    autoFitBoxText(labelTextNode, {minimum:7});\n    if (node.dataset.lexProperty) bindColumnHighlight(node, node.dataset.lexProperty);\n''',
+              marker="const labelTextNode =",
+          )
+          replace_once(
+              "ui/framework.js",
+              '''      const paint = () => fill.style.setProperty("--lex-value-ratio", String(ratio()));\n      input.addEventListener("input", paint);\n''',
+              '''      const paint = () => fill.style.setProperty("--lex-value-ratio", String(ratio()));\n      input.__lexValueSliderPaint = paint;\n      input.addEventListener("input", paint);\n''',
+              marker="input.__lexValueSliderPaint = paint",
+          )
+          replace_once(
+              "ui/framework.js",
+              '''      node.classList.add("lex-has-value-fill");\n      (control instanceof Element && control.matches(".lex-unit-field") ? control : input.parentElement)\n        ?.prepend(fill);\n      requestAnimationFrame(paint);\n''',
+              '''      node.classList.add("lex-has-value-fill");\n      let valueHost = control instanceof Element && control.matches(".lex-unit-field") ? control : input.parentElement;\n      if (valueHost?.classList?.contains("lex-detail-field-control")) {\n        const wrapper = element("span", {class: "lex-value-box"});\n        input.before(wrapper);\n        wrapper.append(input);\n        valueHost = wrapper;\n      }\n      valueHost?.prepend(fill);\n      requestAnimationFrame(paint);\n''',
+              marker="let valueHost = control",
+          )
+          replace_once(
+              "ui/framework.js",
+              '''      source.lexRevert(event);\n      showToast("Restored the vanilla value");\n''',
+              '''      source.lexRevert(event);\n      input?.__lexValueSliderPaint?.();\n      node.classList.remove("lex-reset-flash");\n      void node.offsetWidth;\n      node.classList.add("lex-reset-flash");\n      setTimeout(() => node.classList.remove("lex-reset-flash"), 560);\n      showToast("Restored the vanilla value");\n''',
+              marker="lex-reset-flash",
+          )
+          regex_once(
+              "ui/framework.js",
+              r'''      // Each switch carries its own type rail, matching every other property:.*?      return label;\n''',
+              '''      const name = element("span", {class: "lex-toggle-name"}, toggle.label);\n      const label = element("label", {\n        class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),\n        "data-lex-toggle": toggle.key || toggle.label || "",\n      }, input, name, toggle.help ? infoHelp(toggle.help) : null);\n      autoFitBoxText(name, {minimum:7});\n      return label;\n''',
+              marker='autoFitBoxText(name, {minimum:7})',
+          )
+
+          # Enabled is a first-class pinnable generated column.
+          replace_once(
+              "ui/framework.js",
+              '''  const withEnabledColumn = (declared, rows, change) => {\n    const columns = declared || [];\n    if (!hasEnabledProperty(rows)) return columns;\n    if (columns.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)) return columns;\n    return [enabledColumn(change), ...columns];\n  };\n\n  const columnPreferences = (viewKey, definitions, changed = () => {}) => {\n    const key = `lexeditor:columns:${String(viewKey || "view")}`;\n    const source = numberedIdColumns(definitions || [], []);\n''',
+              '''  const withEnabledColumn = (declared, rows, change) => {\n    const columns = declared || [];\n    const withoutEnabled = columns.filter(column => String(column.key).toLocaleLowerCase() !== ENABLED_KEY);\n    if (!hasEnabledProperty(rows)) return withoutEnabled;\n    if (!columns.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)) {\n      return [enabledColumn(change), ...withoutEnabled];\n    }\n    return [enabledColumn(change), ...withoutEnabled];\n  };\n\n  const columnPreferences = (viewKey, definitions, changed = () => {}) => {\n    const key = `lexeditor:columns:${String(viewKey || "view")}`;\n    const declared = definitions || [];\n    const preferenceColumns = declared.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)\n      ? declared\n      : [{key: ENABLED_KEY, label: "Enabled", generated: true, pinned: true}, ...declared];\n    const source = numberedIdColumns(preferenceColumns, []);\n''',
+              marker="const preferenceColumns =",
+          )
+          regex_once(
+              "ui/framework.js",
+              r'''      // A changed column set changes the table's real minimum width\..*?      changed\(\[\.\.\.order\]\);''',
+              '''      // Pinning changes columns, not the user's panel proportions.\n      changed([...order]);''',
+              marker="Pinning changes columns, not the user's panel proportions",
+          )
+
+          # Remove the old hover-only shortcut badge; the permanent shared badge is enough.
+          regex_once(
+              "ui/framework.js",
+              r'''\n    // Hovering a tab reveals the number that jumps to it\..*?\n    const removeControlHelp =''',
+              '''\n    const removeControlHelp =''',
+              marker="const removeControlHelp = installControlHelp",
+          )
+
+          # Developer Mode is the sole developer state and is identity-derived.
+          value = text("ui/framework.js")
+          value = value.replace('    let lexerMode = false;\n', '')
+          value = value.replace('if (event.button !== 2 || !lexerMode) return;', 'if (event.button !== 2 || !developerMode) return;')
+          value = value.replace(
+              '''    const setLexerMode = enabled => { lexerMode = !!enabled; };\n    const initializeDeveloperMode = async () => {\n      try {\n        const value = rememberSharedSettings(await callWindow("lexeditor_settings"));\n        setDeveloperMode(value?.developerMode); setLexerMode(value?.lexerMode);\n      }\n      catch (_error) { setDeveloperMode(false); setLexerMode(false); }\n    };\n    window.addEventListener("lexeditor-settings-changed", event => {\n      rememberSharedSettings(event.detail);\n      setDeveloperMode(event.detail?.developerMode);\n      setLexerMode(event.detail?.lexerMode);\n    });\n''',
+              '''    const initializeDeveloperMode = async () => {\n      try {\n        const value = rememberSharedSettings(await callWindow("lexeditor_settings"));\n        setDeveloperMode(value?.developerMode);\n      }\n      catch (_error) { setDeveloperMode(false); }\n    };\n    window.addEventListener("lexeditor-settings-changed", event => {\n      rememberSharedSettings(event.detail);\n      setDeveloperMode(event.detail?.developerMode);\n    });\n''')
+          write("ui/framework.js", value)
+
+          # Rewrite the Settings-dialog scope block without a Lexer-mode checkbox.
+          value = text("ui/framework.js")
+          value = value.replace('scope:"lexer"', 'scope:"default"')
+          value = value.replace('        {key:"developerMode", scope:"developer", title:"Developer Mode", description:"Shows development tools such as the GitHub workspace and plugin Restart control.", type:"checkbox"},\n', '')
+          value = value.replace('definitions.filter(definition => definition.scope !== "lexer")', 'definitions.filter(definition => definition.scope !== "default")')
+          value = value.replace('(definition.scope !== "lexer" && !supportsCurrent(definition))', '(definition.scope !== "default" && !supportsCurrent(definition))')
+          regex = re.compile(r'''      const currentControls = new Map\(\), defaultControls = new Map\(\), defaultCards = \[\];\n.*?      for \(const definition of definitions\) \{''', re.S)
+          replacement = '''      const currentControls = new Map(), defaultControls = new Map(), defaultCards = [];\n      const lane = (scope, title) => element("section", {class:`lex-settings-lane lex-settings-lane-${scope}`},\n        element("h3", {}, title));\n      const userLane = lane("user", "GLOBAL SETTINGS");\n      const defaultsLane = lane("defaults", "DEVELOPER DEFAULTS");\n      const defaultsEnabled = !!settings.developerMode && !!settings.developerAuthorized;\n      defaultsLane.append(element("p", {class:"lex-settings-auth-status"}, defaultsEnabled\n        ? `Developer Mode active: ${settings.developerLogin}.`\n        : "Developer Mode activates automatically when the authorized GitHub account is signed in."));\n      const setDefaultVisibility = () => {\n        defaultCards.forEach(control => {\n          control.hidden = !defaultsEnabled;\n          const supported = control.dataset.lexSettingSupported !== "false";\n          control.setAttribute("aria-disabled", String(!supported || !defaultsEnabled));\n          control.querySelectorAll?.("input,select").forEach(input => { input.disabled = !defaultsEnabled || !supported; });\n        });\n        defaultsLane.classList.toggle("active", defaultsEnabled);\n      };\n      const copyToDefault = (definition, defaultControl) => {\n        if (!defaultsEnabled) {\n          message.textContent = "Sign in to GitHub with the authorized account to change packaged defaults."; return;\n        }\n        if (!supportsDefault(definition)) {\n          message.textContent = "Restart LEXEDITOR to enable this newly added setting."; return;\n        }\n        const source = controlNode(currentControls.get(definition.key));\n        const target = controlNode(defaultControls.get(definition.key));\n        if (definition.type === "checkbox") target.checked = source.checked;\n        else target.value = source.value;\n        defaultControl.hidden = false; defaultControl.classList.remove("copied"); void defaultControl.offsetWidth; defaultControl.classList.add("copied");\n        message.textContent = `${definition.title} will become the packaged default when you save.`;\n      };\n      for (const definition of definitions) {'''
+          if "const defaultsEnabled = !!settings.developerMode" not in value:
+              value, count = regex.subn(replacement, value, count=1)
+              if count != 1: raise SystemExit("framework.js: settings scope block not found")
+          value = value.replace('if (definition.scope === "lexer") {', 'if (definition.scope === "default") {')
+          value = value.replace('lexerLane.append(card);', 'defaultsLane.append(card);')
+          value = value.replace('(definition.scope === "developer" ? developerLane : userLane).append(card);', 'userLane.append(card);')
+          value = value.replace('      lexerMode.addEventListener("change", setDefaultVisibility);\n', '')
+          value = value.replace('        dirty += Number(lexerMode.checked !== !!savedSettings.lexerMode);\n        if (lexerMode.checked && !lexerMode.disabled) {', '        if (defaultsEnabled) {')
+          value = value.replace('        lexerMode.checked = !!savedSettings.lexerMode;\n        setDefaultVisibility();\n        developerSetting.classList.toggle("active-developer-setting", developerMode.checked);\n', '        setDefaultVisibility();\n')
+          value = value.replace('            settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", {...values, lexerMode: lexerMode.checked}));\n            if (lexerMode.checked) {', '            settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", values));\n            if (defaultsEnabled) {')
+          value = value.replace('              settings = rememberSharedSettings(await callWindow("save_lexer_setting_defaults", defaults));', '              settings = rememberSharedSettings(await callWindow("save_developer_setting_defaults", defaults));')
+          value = re.sub(r'''      const developerMode = controlNode\(currentControls\.get\("developerMode"\)\);\n      const developerSetting = developerMode\.closest\("\.lex-global-setting"\);\n      developerSetting\.classList\.toggle\("active-developer-setting", developerMode\.checked\);\n      developerMode\.addEventListener\("change", \(\) => developerSetting\.classList\.toggle\("active-developer-setting", developerMode\.checked\)\);\n''', '', value)
+          value = value.replace('element("div", {class:"lex-settings-columns"}, userLane, developerLane, lexerLane)', 'element("div", {class:"lex-settings-columns"}, userLane, defaultsLane)')
+          write("ui/framework.js", value)
+
+          # Project selector: current editable mod always shows edit + enabled state;
+          # disabled sources get a real greyed overlay.
+          value = text("ui/framework.js")
+          value = value.replace(
+              '''      mode.hidden = !selectedSource;\n      mode.textContent = selectedSource?.readOnly === false ? "📝" : "🔒";\n      mode.setAttribute("aria-label", selectedSource?.readOnly === false ? "Editable" : "Read only");\n      name.textContent = selectedSource?.label || current?.name || "Select a mod";\n      status.hidden = !selectedSource;\n      status.textContent = selectedSource?.enabled === false ? "×" : "✓";\n      status.className = `lex-project-source-status ${selectedSource?.enabled === false ? "disabled" : "enabled"}`;\n      status.setAttribute("aria-label", selectedSource?.enabled === false ? "Disabled" : "Enabled");\n''',
+              '''      const activeEditable = selectedSource ? selectedSource.readOnly === false : !!current;\n      const activeEnabled = selectedSource ? selectedSource.enabled !== false : current?.enabled !== false;\n      mode.hidden = !selectedSource && !current;\n      mode.textContent = activeEditable ? "📝" : "🔒";\n      mode.setAttribute("aria-label", activeEditable ? "Editable" : "Read only");\n      name.textContent = selectedSource?.label || current?.name || "Select a mod";\n      status.hidden = !selectedSource && !current;\n      status.textContent = activeEnabled ? "✓" : "×";\n      status.className = `lex-project-source-status ${activeEnabled ? "enabled" : "disabled"}`;\n      status.setAttribute("aria-label", activeEnabled ? "Enabled" : "Disabled");\n''')
+          value = value.replace(
+              'return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`}, select, rename, folder);',
+              'select.prepend(element("span", {class:"lex-project-source-mode", "aria-label":"Editable"}, "📝"), element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`, "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));\n        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}${row.enabled===false?" disabled":""}`}, select, rename, folder);')
+          value = value.replace(
+              'class: `lex-project-menu-item-select lex-project-menu-item lex-project-reference${String(row.key) === activeSource ? " active" : ""}`,',
+              'class: `lex-project-menu-item-select lex-project-menu-item lex-project-reference${String(row.key) === activeSource ? " active" : ""}${row.enabled === false ? " disabled" : ""}`,')
+          write("ui/framework.js", value)
+
+          # References: Lexer's mod is always LL and receives its own lime treatment.
+          replace_once(
+              "ui/framework.js",
+              '''  const shortReferenceName = source => {\n    if (source.shortName) return source.shortName;\n    if (String(source.name || "").toLocaleLowerCase() === "vanilla") return "V";\n''',
+              '''  const shortReferenceName = source => {\n    const named = String(source.name || "").trim();\n    if (source.shortName) return source.shortName;\n    if (/^(?:lexer(?:'s)?(?: mod)?|lexer-lux)$/i.test(named)) return "LL";\n    if (named.toLocaleLowerCase() === "vanilla") return "V";\n''',
+              marker='return "LL"',
+          )
+          replace_once(
+              "ui/framework.js",
+              '''      return element("button", {\n        type: "button",\n        class: ["lex-reference-value", `lex-reference-slot-${source.referenceIndex}`, source.className || ""].filter(Boolean).join(" "),\n''',
+              '''      const shortName = shortReferenceName(source);\n      return element("button", {\n        type: "button",\n        class: ["lex-reference-value", `lex-reference-slot-${source.referenceIndex}`, shortName === "LL" ? "lex-reference-ll" : "", source.className || ""].filter(Boolean).join(" "),\n''',
+              marker='shortName === "LL" ? "lex-reference-ll"',
+          )
+          value = text("ui/framework.js").replace('element("span", {class: "lex-reference-tag"}, shortReferenceName(source)),', 'element("span", {class: "lex-reference-tag"}, shortName),')
+          write("ui/framework.js", value)
+
+          # Curves: a deliberate top drawer for variables; path-text remains hidden.
+          replace_once(
+              "ui/framework.js",
+              '''    const root = element("article", {\n''',
+              '''    const variableToggle = curveVariableKeys.length ? element("button", {\n      type:"button", class:"lex-curve-variable-toggle", "aria-expanded":"false",\n      onclick:event=>{\n        event.preventDefault(); event.stopPropagation();\n        const open = root.classList.toggle("lex-curve-variables-open");\n        variableToggle.setAttribute("aria-expanded", String(open));\n      },\n    }, "VARIABLES") : null;\n    const root = element("article", {\n''',
+              marker="lex-curve-variable-toggle",
+          )
+          replace_once(
+              "ui/framework.js",
+              '''      element("header", {class: "lex-curve-heading"},\n        title,\n        options.extremaInTitle || options.overlayExtrema ? null : element("div", {class: "lex-curve-extrema"},\n''',
+              '''      element("header", {class: "lex-curve-heading"},\n        title,\n        variableToggle,\n        options.extremaInTitle || options.overlayExtrema ? null : element("div", {class: "lex-curve-extrema"},\n''',
+              marker="title,\n        variableToggle",
+          )
+
+          # Growable paged tables always fill their pane instead of collapsing
+          # around a short last page when the barrel count changes.
+          replace_once(
+              "ui/framework.js",
+              '''        resize: (height, measurement) => {\n          masterNode.style.height = `${height}px`;\n          root.classList.toggle("lex-full-table-page", !!measurement?.full);\n          detailNode.style.height = measurement?.full ? `${height}px` : "";\n        },\n''',
+              '''        resize: (height, measurement) => {\n          if (!slotBased) {\n            masterNode.style.height = "100%";\n            detailNode.style.height = "100%";\n            trailingNode && (trailingNode.style.height = "100%");\n            root.classList.add("lex-full-table-page");\n            return;\n          }\n          masterNode.style.height = `${height}px`;\n          root.classList.toggle("lex-full-table-page", !!measurement?.full);\n          detailNode.style.height = measurement?.full ? `${height}px` : "";\n          if (trailingNode) trailingNode.style.height = measurement?.full ? `${height}px` : "";\n        },\n''',
+              marker='if (!slotBased) {\n            masterNode.style.height = "100%"',
+          )
+          # Add a generic third/trailing pane to pagedListDetail.
+          replace_once(
+              "ui/framework.js",
+              '''    let leadingNode = typeof options.leadingPanel === "function" && picked ? options.leadingPanel(picked) : null;\n    let masterNodes = [];\n''',
+              '''    let leadingNode = typeof options.leadingPanel === "function" && picked ? options.leadingPanel(picked) : null;\n    let trailingNode = typeof options.trailingPanel === "function" && picked ? options.trailingPanel(picked) : null;\n    let masterNodes = [];\n''',
+              marker="let trailingNode =",
+          )
+          replace_once(
+              "ui/framework.js",
+              '''      if (leadingNode) {\n        const nextLeading = options.leadingPanel(record);\n        nextLeading.classList.add("lex-panel-layout-pane");\n        leadingNode.replaceWith(nextLeading);\n        leadingNode = nextLeading;\n        refreshReferences(nextLeading);\n      }\n      refreshReferences(replacement);\n''',
+              '''      if (leadingNode) {\n        const nextLeading = options.leadingPanel(record);\n        nextLeading.classList.add("lex-panel-layout-pane");\n        leadingNode.replaceWith(nextLeading);\n        leadingNode = nextLeading;\n        refreshReferences(nextLeading);\n      }\n      if (trailingNode) {\n        const nextTrailing = options.trailingPanel(record);\n        nextTrailing.classList.add("lex-panel-layout-pane");\n        trailingNode.replaceWith(nextTrailing);\n        trailingNode = nextTrailing;\n        refreshReferences(nextTrailing);\n      }\n      refreshReferences(replacement);\n''',
+              marker="const nextTrailing = options.trailingPanel",
+          )
+          regex_once(
+              "ui/framework.js",
+              r'''    const root = leadingNode \? panelLayout\(\[leadingNode, masterNode, detailNode\],.*?\n    \}\);\n    root\.classList\.add\("lex-paged-list-detail"\);''',
+              '''    let root;\n    if (leadingNode) {\n      root = panelLayout([leadingNode, masterNode, detailNode],\n        `lex-list-detail lex-master-detail lex-list-detail-resizable lex-leading-list-detail ${options.className || ""}`, {\n          defaultSizes: [options.defaultLeadingWidth || 25, 30, 45],\n          minSizes: [Math.max(220, Number(options.minLeading) || 300), barrelPanelMinimum, Math.max(240, Number(options.minRight) || 360)],\n          storageKey: options.splitKey ? `lexeditor:leading-list-detail:${options.splitKey}` : "",\n          dividerClass: "lex-list-detail-divider",\n          dividerAccessories: [null, barrelControl],\n          dividerLabels: ["Resize secondary panel and list", "Resize list and detail panels"],\n          eventName: "lex-list-detail-resize",\n        });\n    } else if (trailingNode) {\n      root = panelLayout([masterNode, detailNode, trailingNode],\n        `lex-list-detail lex-master-detail lex-list-detail-resizable lex-trailing-list-detail ${options.className || ""}`, {\n          defaultSizes: options.defaultSizes || [34, 38, 28],\n          minSizes: [barrelPanelMinimum, Math.max(240, Number(options.minRight) || 340), Math.max(220, Number(options.minTrailing) || 260)],\n          storageKey: options.splitKey ? `lexeditor:trailing-list-detail:${options.splitKey}` : "",\n          dividerClass: "lex-list-detail-divider",\n          dividerAccessories: [barrelControl, null],\n          dividerLabels: ["Resize list and detail panels", "Resize detail and trailing panels"],\n          eventName: "lex-list-detail-resize",\n        });\n    } else {\n      root = listDetail(masterNode, detailNode, options.className || "", {\n        splitKey: options.splitKey,\n        defaultSplit: options.defaultSplit,\n        minLeft: barrelPanelMinimum,\n        minRight: options.minRight,\n        minimumSplit: Math.min(78, 22 * barrels),\n        dividerAccessories: [barrelControl],\n      });\n    }\n    root.classList.add("lex-paged-list-detail");''',
+              marker="lex-trailing-list-detail",
+          )
+
+          # -----------------------------------------------------------------
+          # Blank reference implementation: no Design Review / Editable Table
+          # special type; three-panel view uses the same paged/barrel component.
+          # -----------------------------------------------------------------
+          value = text("games/blank/editor.html")
+          value = value.replace('  <link rel="stylesheet" href="/shared/design-review.css">\n', '')
+          value = value.replace('  <script src="/shared/design-review.js"></script>\n', '')
+          value = value.replace('    .blank-editable-table :is(input,select){width:100%;text-align:center}\n', '')
+          value = value.replace('    .blank-graphs .lex-curve-editor{display:block;min-width:0}\n    .blank-graphs .lex-curve-plot{height:330px;aspect-ratio:auto}\n    .blank-graphs .lex-curve-path-formula{display:block;filter:drop-shadow(1px 1px 1px var(--lex-panel))}\n    .blank-graphs .lex-curve-formula{display:none}\n', '')
+          value = re.sub(r'  function editableTablePanel\(\).*?\n  function tweaksPanel', '  function tweaksPanel', value, count=1, flags=re.S)
+          value = value.replace('  function inspectorPanel(){const row=selectedRow();', '  function inspectorPanel(row=selectedRow()){')
+          value = value.replace(
+              '''  function pagedTwoPanel(){const records=sortedRows();return pagedListDetail({rows:records,key:row=>row.id,slots:false,add:addRecord,addTitle:"Add a Blank record",addDisabled:activeSource!=="mine",selected,page,pageSize,noun:"records",className:"blank-layout",splitKey:"blank-two",rowsKey:"blank-two",defaultSplit:50,minLeft:320,minRight:360,search:{key:"blank-records",value:query,label:"Search Blank records",change:value=>{query=value;page=0;render()}},sync:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected},change:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected;render()},master:state=>tablePanel(state.rows,state.selected,state.select),detail:row=>recordPanel(true,row)})}\n''',
+              '''  function pagedView(three=false){const records=sortedRows();return pagedListDetail({rows:records,key:row=>row.id,slots:false,add:addRecord,addTitle:"Add a Blank record",addDisabled:activeSource!=="mine",selected,page,pageSize,noun:"records",className:"blank-layout",splitKey:three?"blank-three":"blank-two",rowsKey:three?"blank-three":"blank-two",defaultSplit:50,minLeft:320,minRight:360,minTrailing:260,defaultSizes:[34,38,28],search:{key:"blank-records",value:query,label:"Search Blank records",change:value=>{query=value;page=0;render()}},sync:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected},change:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected;render()},master:state=>tablePanel(state.rows,state.selected,state.select),detail:row=>recordPanel(true,row),trailingPanel:three?(row=>inspectorPanel(row)):null})}\n''')
+          # replace the compressed render and tab list
+          value = value.replace('function render(){let layout;if(tab==="design")layout=LexeditorDesignReview.render();else if(tab==="datamap")', 'function render(){let layout;if(tab==="datamap")')
+          value = value.replace('else if(tab==="three")layout=panelLayout([tablePanel(),recordPanel(),inspectorPanel()],"blank-layout",{layoutKey:"blank-three",defaultSizes:[34,38,28],minSizes:[280,340,260],stackAt:980});', 'else if(tab==="three")layout=pagedView(true);')
+          value = value.replace('else if(tab==="editable")layout=panelLayout([editableTablePanel()],"blank-layout",{layoutKey:"blank-editable",defaultSizes:[100]});', '')
+          value = value.replace('else layout=pagedTwoPanel();', 'else layout=pagedView(false);')
+          value = value.replace('tabs:[{id:"design",label:"Design Review"},{id:"one",label:"1 Panel"},{id:"two",label:"2 Panels"},{id:"three",label:"3 Panels"},{id:"subtabs",label:"Tabbed Panel"},{id:"editable",label:"Editable Table"},{id:"tweaks",label:"Tweaks"},{id:"graphs",label:"Graphs"}]', 'tabs:[{id:"one",label:"1 Panel"},{id:"two",label:"2 Panels"},{id:"three",label:"3 Panels"},{id:"subtabs",label:"Tabbed Panel"},{id:"tweaks",label:"Tweaks"},{id:"graphs",label:"Graphs"}]')
+          write("games/blank/editor.html", value)
+
+          # -----------------------------------------------------------------
+          # Warband: use shared Detail internals and shared model-preview drawer.
+          # -----------------------------------------------------------------
+          value = text("games/warband/editor.html")
+          value = value.replace(
+              'const {el,columnList,list,masterDetail,pagedListDetail,pager,clone,showAlert,hoverable,detailPanel}=LexeditorUI;',
+              'const {el,columnList,list,masterDetail,pagedListDetail,pager,clone,showAlert,hoverable,detailPanel,detailSection,detailField,readonlyField}=LexeditorUI;')
+          value = value.replace(
+              '''    const detail=row=>row?el("div",{class:"lex-detail detail"},el("h2",{},row.name||(row.from&&row.to?`${row.from} → ${row.to}`:String(keyOf(row)))),\n      el("div",{class:"detail-grid"},...columns.flatMap(column=>[el("div",{class:"label"},typeof column.label==="string"?column.label:column.key),el("div",{},String(row[column.key]??"—"))]))):el("div",{class:"lex-detail detail"},"No matching records.");\n''',
+              '''    const detail=row=>row?detailPanel({className:"warband-shared-detail",title:row.name||(row.from&&row.to?`${row.from} → ${row.to}`:String(keyOf(row))),body:[detailSection({title:"PROPERTIES",body:columns.map(column=>{const value=row[column.key];return detailField({label:typeof column.label==="string"?column.label:column.key,property:column.key,control:readonlyField(value??"—",{format:typeof value==="number"}),dataType:typeof value==="number"?"INT":"STRING"})})})]}):detailPanel({className:"warband-shared-detail",title:"No matching records"});\n''')
+          # Replace the old always-open bespoke preview function body only.
+          pattern = re.compile(r'  function warbandItemDetail\(item\)\{.*?\n  \}\n  async function loadWarbandIcon', re.S)
+          if "modelPreview:preview" not in value:
+              replacement = '''  function warbandItemDetail(item){\n    disposeWarbandPreview();\n    if(!item)return detailPanel({className:"warband-item-detail",title:"Select an item"});\n    const thumbnailMessage=el("div",{class:"warband-icon-message"},item.inventoryMesh?"Preparing icon…":"No mesh");\n    const thumbnail=el("div",{class:"warband-item-thumbnail"},thumbnailMessage);\n    const message=el("div",{class:"warband-preview-message"},item.inventoryMesh?el("span",{class:"warband-preview-spin"}):"This item does not name an inventory mesh.");\n    const canvas=el("canvas",{tabindex:"0","aria-label":`${item.name} inventory mesh preview`});\n    const stage=el("div",{class:"warband-preview-stage"},canvas,message);\n    const facts=el("div",{class:"warband-preview-facts"});\n    const preview=el("div",{class:"warband-model-preview"},stage,facts);\n    let data=null,generation=0,open=false;\n    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,modelPreview:preview,modelPreviewLabel:`${item.name} model preview`,\n      body:[el("div",{class:"warband-mesh-list"},el("b",{},"Meshes: "),item.meshes.length?item.meshes.join(" · "):"None")]});\n    async function showPreview(){\n      if(!open||!data)return;\n      const token=++generation;\n      try{\n        const controller=await createWarbandRenderer(canvas,data,true);\n        if(!detail.isConnected||!open||token!==generation){controller.dispose();return;}\n        window.__warbandPreview=[controller];message.hidden=true;\n      }catch(error){if(detail.isConnected&&open&&token===generation){message.hidden=false;message.textContent=error.message;}}\n    }\n    detail.addEventListener("lex-model-preview-open",()=>{open=true;showPreview();});\n    detail.addEventListener("lex-model-preview-close",()=>{open=false;generation++;disposeWarbandPreview();});\n    if(item.inventoryMesh)requestAnimationFrame(async()=>{\n      loadWarbandIcon(item,detail,thumbnail,thumbnailMessage);\n      try{\n        data=await api(`/api/item-preview?mesh=${encodeURIComponent(item.inventoryMesh)}`);\n        if(!detail.isConnected)return;\n        facts.replaceChildren(el("span",{},data.resource),el("span",{},data.material),el("span",{},`${data.summary.vertices} vertices · ${data.summary.triangles} triangles`));\n        if(open)await showPreview();\n      }catch(error){if(detail.isConnected){message.textContent=error.message;}}\n    });\n    return detail;\n  }\n  async function loadWarbandIcon'''
+              value, count = pattern.subn(replacement, value, count=1)
+              if count != 1: raise SystemExit("warbandItemDetail block not found")
+          write("games/warband/editor.html", value)
+
+          # -----------------------------------------------------------------
+          # CSS: authoritative fixes go last so game themes inherit them.
+          # -----------------------------------------------------------------
+          css_path = Path("ui/framework.css")
+          css = css_path.read_text(encoding="utf-8")
+          marker = "/* ---- 2026-09-06 shared UI follow-up ------------------------------ */"
+          if marker not in css:
+              css += r'''
+
+/* ---- 2026-09-06 shared UI follow-up ------------------------------ */
+/* Detail labels are exactly one tenth of the pane. Their text wraps and is
+   auto-fitted by framework.js; rows never grow just because a name is long. */
+.lex-detail-panel { --lex-detail-label-width:10% !important; position:relative; overflow:hidden; }
+.lex-detail-field { grid-template-columns:minmax(0,var(--lex-detail-label-width)) minmax(0,1fr) !important; }
+.lex-detail-field-label { display:grid !important; grid-template-columns:minmax(18px,.34fr) minmax(0,.66fr); align-items:center; min-width:0; height:100%; overflow:hidden; padding:0 3px; }
+.lex-detail-field-label > .lex-info-help { grid-column:1; grid-row:1; justify-self:center; align-self:center; }
+.lex-detail-field-label-text { grid-column:2; grid-row:1; display:grid; width:100%; height:100%; min-width:0; place-items:center; overflow:hidden; white-space:normal; overflow-wrap:anywhere; text-align:center; line-height:1.02; }
+.lex-field-boolean-arrow { grid-column:2; grid-row:1; justify-self:end; align-self:center; position:static !important; transform:none !important; }
+.lex-detail-field[data-lex-sort] .lex-detail-field-label,
+.lex-detail-field[data-lex-sort] .lex-detail-field-label-text,
+.lex-detail-field[data-lex-sort] .lex-info-help { visibility:visible !important; opacity:1 !important; display:grid !important; }
+.lex-detail-field[data-lex-sort] .lex-field-type-rail > :is(.lex-field-type-name,.lex-field-type-range) { opacity:0 !important; }
+
+/* Info bubble: both the circle and ? glyph use true geometric centring. */
+.lex-info-help { display:grid !important; place-items:center !important; padding:0 !important; line-height:1 !important; text-align:center !important; }
+.lex-info-help > span { display:grid; width:100%; height:100%; place-items:center; line-height:1; transform:translateY(-.015em); }
+
+/* Grouped booleans are ordinary horizontal tiles. The parent property is the
+   FLAGS type; individual flags do not grow their own sideways type rails. */
+.lex-toggle-rail,.lex-toggle-type { display:none !important; }
+.lex-toggle-row { grid-auto-rows:minmax(30px,1fr); }
+.lex-toggle { position:relative; min-height:30px; overflow:hidden; }
+.lex-toggle-name { display:grid; align-items:center; min-width:0; height:100%; overflow:hidden; white-space:normal; overflow-wrap:anywhere; text-overflow:clip; line-height:1.02; }
+.lex-toggle > .lex-info-help { margin-left:auto; }
+
+/* A boolean's ref rail lives immediately beneath the checkbox but still has a
+   little bottom breathing room. It does not hover six pixels away from it. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control { grid-template-rows:minmax(18px,1fr) auto; align-items:center; height:100%; padding:2px 0 3px; }
+.lex-boolean-field .lex-source-control > :not(.lex-reference-values):not(.lex-reference-placeholder) { grid-row:1; }
+.lex-boolean-field .lex-source-control > .lex-reference-values,
+.lex-boolean-field .lex-source-control > .lex-reference-placeholder { position:static !important; grid-row:2; top:auto !important; left:auto !important; right:auto !important; bottom:auto !important; translate:none !important; margin:1px 0 2px; padding:0; line-height:1; }
+.lex-reference-value.lex-reference-ll,.lex-reference-value.lex-reference-ll .lex-reference-tag { color:#7CFC00 !important; }
+.lex-reference-value.lex-reference-ll { border-color:color-mix(in srgb,#7CFC00 60%,var(--lex-border)); }
+
+/* Property/column highlighting is bidirectional and still visible when there
+   is no counterpart on the other pane. */
+.lex-detail-field:hover,.lex-detail-field.lex-column-lit { background:color-mix(in srgb,var(--lex-highlight) 14%,transparent) !important; }
+.lex-column-list-head-cell:hover,.lex-column-list-cell:hover,
+.lex-column-list-head-cell.lex-column-lit,.lex-column-list-cell.lex-column-lit { background:color-mix(in srgb,var(--lex-highlight) 16%,transparent) !important; }
+
+/* Inline edit preserves the table's exact geometry and typography. */
+.lex-column-list-cell.lex-cell-editing { box-shadow:none !important; overflow:hidden; }
+.lex-column-list-cell.lex-cell-editing .lex-column-cell-content { display:block; width:100%; height:100%; min-width:0; }
+.lex-column-list-cell.lex-cell-editing .lex-column-cell-content > :is(input,select,textarea) { box-sizing:border-box; width:100% !important; height:100% !important; min-width:0 !important; margin:0 !important; padding:inherit !important; color:inherit !important; border:0 !important; border-radius:0 !important; outline:0 !important; background:transparent !important; box-shadow:none !important; font:inherit !important; line-height:inherit !important; text-align:inherit !important; }
+
+/* Bounded-value fill is clipped to the actual input box, never the whole
+   property control. */
+.lex-value-box { position:relative; display:block; box-sizing:border-box; width:100%; min-width:0; height:100%; overflow:hidden; }
+.lex-value-box > input { position:relative; z-index:1; box-sizing:border-box; width:100%; height:100%; background:transparent !important; }
+.lex-value-box > .lex-value-fill { position:absolute; inset:0; overflow:hidden; border-radius:inherit; }
+.lex-detail-field-control { overflow:visible; }
+.lex-has-value-fill > .lex-detail-field-control { overflow:hidden; }
+
+/* Reset feedback is an overlay. It fades to transparency, revealing whatever
+   background is correct at that instant (hovered, highlighted, or normal). */
+.lex-detail-field::after { content:""; position:absolute; inset:0; z-index:12; background:var(--lex-accent); opacity:0; pointer-events:none; }
+.lex-detail-field.lex-reset-flash::after { animation:lex-reset-flash .55s ease-out; }
+@keyframes lex-reset-flash { from { opacity:.9; } to { opacity:0; } }
+
+/* Standard model-preview drawer. The header icon is the open control and the
+   close X occupies exactly that same icon slot. */
+.lex-detail-panel-icon.lex-model-preview-trigger { position:relative; cursor:pointer; user-select:none; }
+.lex-detail-panel-icon.lex-model-preview-trigger:focus-visible { outline:2px solid var(--lex-highlight); outline-offset:-2px; }
+.lex-detail-panel-icon-content { display:grid; width:100%; height:100%; place-items:center; }
+.lex-model-preview-close { position:absolute; inset:0; display:grid; place-items:center; opacity:0; font:700 clamp(20px,2em,34px)/1 var(--lex-symbol-font); pointer-events:none; }
+.lex-model-preview-open .lex-detail-panel-icon-content { opacity:0; }
+.lex-model-preview-open .lex-model-preview-close { opacity:1; }
+.lex-model-preview-drawer { position:absolute; z-index:20; top:10%; right:0; bottom:0; left:0; min-width:0; min-height:0; padding:var(--lex-panel-gap); overflow:auto; border-top:1px solid var(--lex-border); background:var(--lex-panel); transform:translateX(-102%); opacity:0; pointer-events:none; transition:transform .22s ease,opacity .18s ease; }
+.lex-model-preview-open .lex-model-preview-drawer { transform:translateX(0); opacity:1; pointer-events:auto; }
+.warband-model-preview { display:flex; flex-direction:column; width:100%; height:100%; min-height:0; }
+
+/* Project states use an explicit mark and a desaturation veil. */
+.lex-project-menu-item.disabled,.lex-project-reference.disabled { position:relative; filter:grayscale(1); opacity:.62; }
+.lex-project-menu-item.disabled::after,.lex-project-reference.disabled::after { content:""; position:absolute; inset:0; z-index:5; background:color-mix(in srgb,var(--lex-panel) 40%,transparent); pointer-events:none; }
+.lex-project-menu-item-select > .lex-project-source-mode,
+.lex-project-menu-item-select > .lex-project-source-status { flex:0 0 auto; }
+
+/* Graph standard: natural text, large title, real margins and a top drawer. */
+.lex-curve-editor { position:relative; overflow:hidden; grid-template-areas:"heading" "plot" "formula" "status" !important; grid-template-rows:auto auto auto auto !important; }
+.lex-curve-heading { min-height:42px; }
+.lex-curve-heading-title { font-size:clamp(24px,2.1vw,36px) !important; line-height:1 !important; text-transform:uppercase !important; }
+.lex-curve-path-formula { display:none !important; }
+.lex-curve-formula { display:block !important; min-height:2.2em; padding:6px 8px; white-space:normal; overflow-wrap:anywhere; }
+.lex-curve-variable-toggle { margin-left:auto; padding:4px 8px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:var(--lex-radius); background:var(--lex-panel-2); font:700 .72em/1 var(--lex-font); cursor:pointer; }
+.lex-curve-variables { position:absolute !important; z-index:15; top:42px; right:0; left:0; width:auto !important; padding:9px 10px !important; border-block:1px solid var(--lex-border); background:var(--lex-panel-2) !important; box-shadow:0 5px 14px #0004; transform:translateY(calc(-100% - 44px)); opacity:0 !important; pointer-events:none !important; transition:transform .2s ease,opacity .16s ease; }
+.lex-curve-editor.lex-curve-variables-open .lex-curve-variables { transform:translateY(0); opacity:1 !important; pointer-events:auto !important; }
+.lex-curve-plot { --lex-curve-margin:42px; --lex-curve-margin-left:42px; --lex-curve-margin-right:54px; --lex-curve-margin-top:18px; --lex-curve-margin-bottom:40px; padding:0 !important; aspect-ratio:2/1 !important; }
+.lex-curve-plot > .lex-curve-svg { top:var(--lex-curve-margin-top) !important; left:var(--lex-curve-margin-left) !important; width:calc(100% - var(--lex-curve-margin-left) - var(--lex-curve-margin-right)) !important; height:calc(100% - var(--lex-curve-margin-top) - var(--lex-curve-margin-bottom)) !important; }
+.lex-curve-axis-start { bottom:10px !important; left:var(--lex-curve-margin-left) !important; transform:translateX(-50%) !important; }
+.lex-curve-axis-end { bottom:10px !important; right:var(--lex-curve-margin-right) !important; left:auto !important; transform:translateX(50%) !important; }
+.lex-curve-axis-name-x { bottom:7px !important; left:50% !important; transform:translateX(-50%) !important; }
+.lex-curve-axis-name-y { top:50% !important; right:7px !important; left:auto !important; writing-mode:horizontal-tb !important; transform:translateY(-50%) rotate(-90deg) !important; transform-origin:center; }
+.lex-curve-axis-top { top:var(--lex-curve-margin-top) !important; right:15px !important; left:auto !important; transform:translate(50%,-50%) rotate(-90deg) !important; transform-origin:center; }
+.lex-curve-axis-bottom { bottom:var(--lex-curve-margin-bottom) !important; right:15px !important; left:auto !important; transform:translate(50%,50%) rotate(-90deg) !important; transform-origin:center; }
+.lex-curve-plot::before,.lex-curve-plot::after { content:none !important; display:none !important; }
+
+/* A growable paged view owns the pane height even on a short last page. */
+.lex-paged-list-detail,.lex-barrelled-master,.lex-barrel-grid { min-height:0; height:100%; }
+.lex-full-table-page > .lex-panel-layout-pane { min-height:0; }
+
+/* There is one shortcut badge implementation. */
+.lex-tab-ordinal { display:none !important; }
+'''
+              css_path.write_text(css, encoding="utf-8", newline="\n")
+
+          # -----------------------------------------------------------------
+          # Manual + source layout cleanup.
+          # -----------------------------------------------------------------
+          manual_path = Path("docs/UI-MANUAL.md")
+          manual = manual_path.read_text(encoding="utf-8")
+          manual = manual.replace("reference rail", "ref rail").replace("Reference rail", "Ref rail")
+          manual = manual.replace("filled circular `?`", "filled circular **info bubble** (`?`)")
+          # Broad human-readable representation rule replaces the narrower 0/1 rule.
+          manual = re.sub(
+              r'A value with only two valid states is a boolean control\..*?(?=\n\n)',
+              'Every stored variable must be presented in the most human-friendly control available, not in its raw storage encoding. Booleans are normally checkboxes or compact checkless toggles, never numeric 0/1 fields. Bitfields and flag bytes are decomposed into one property made from named checkboxes, enums, and other meaningful controls; raw bytes or integers are only acceptable when no more legible representation exists.',
+              manual, count=1, flags=re.S)
+          # Replace the old Settings-scopes section wholesale when present.
+          manual = re.sub(
+              r'### Settings scopes\n.*?(?=\n### |\n## |\Z)',
+              '''### Developer Mode and packaged defaults\n\nDeveloper Mode is not a preference or a separate Lexer Mode. It activates automatically when the authorized `Lexer-Lux` GitHub account is the active GitHub CLI login. Developer-only controls (GitHub issues, Restart, shipped-view/default authoring) appear only in that state. There is no `I am Lexer` toggle.\n\nPackaged defaults remain explicitly authored values. Developer Mode may copy a current setting or current view into those defaults, but ordinary users only edit their own local settings.\n''',
+              manual, count=1, flags=re.S)
+          additions = '''\n\n## Shared interaction standards\n\n### Human-friendly variable controls\n\nThe editor displays the *meaning* of a value rather than its serialization. Use checkboxes for ordinary booleans and **checkless toggles** when the surrounding control already supplies an unambiguous on/off state. Split bitflags into named checkbox/enum controls inside one property. Do not expose 0/1, bit masks, bytes, or packed integers when a safer semantic control can represent them.\n\n### Info bubbles and ref rails\n\nThe circular `?` is the **info bubble**. It is geometrically centered in its circle and occupies the shared label/ref area without displacing the property name. The **ref rail** is the stable comparison lane for Vanilla and reference mods. Vanilla is `V`; Lexer's mod is always `LL` and lime green. Ref rails reserve their space even when the current value matches, so editing cannot move the live control.\n\n### Model preview drawer\n\nA model-capable Detail uses the shared `modelPreview` slot. The header icon is the preview button. Clicking it slides the preview drawer out over the Detail body; while open, an `×` occupies exactly the same icon slot and closes the drawer. Plugins provide model data/rendering only. They do not create a second preview-panel interaction.\n\n### Table editing and property linking\n\nThere is one Table type. Any cell whose column declares an editor is editable by double-click in place; entering edit mode must not change the cell font, row height, column width, padding, or overall geometry. A separate “Editable Table” type is forbidden. Hovering a column highlights its matching Detail property and hovering the property highlights the column. A hovered column/property also highlights itself when no counterpart exists.\n\n### Detail labels\n\nThe Detail property-name region is 10% of the panel. Property names and labels inside grouped boolean boxes may wrap and automatically reduce type size to fit their existing box, but they must not increase the row height. Sorting indicators never replace or hide the property name or info bubble.\n\n### Graphs\n\nGraph titles are large and uppercase. There is one title only. Axis names and numeric range labels live in the graph margins; every right-axis text element, including range numbers, is rotated 90° counter-clockwise. Formula text uses natural glyph proportions and is never stretched or squashed to follow the curve. Variable controls live in a drawer that slides in from the top.\n'''
+          if "## Shared interaction standards" not in manual:
+              manual += additions
+          # Remove legacy visible mode terminology even if an older paragraph survived.
+          manual = manual.replace("Lexer Mode", "Developer Mode").replace("Lexer mode", "Developer Mode").replace("I am Lexer", "authorized GitHub identity")
+          manual_path.write_text(manual, encoding="utf-8", newline="\n")
+
+          adding = Path("docs/ADDING_A_GAME.md")
+          adding_text = adding.read_text(encoding="utf-8")
+          shared_rule = '''\n\n## Shared UI primitives are mandatory\n\nBlank is the reference gallery for shared behavior, not a separate implementation. New plugins must compose Tables, Detail panels/fields, ref rails, info bubbles, model-preview drawers, graph editors, paging/barrels, and project controls from `ui/framework.js`/`ui/framework.css`. Do not copy those components into a game editor. If a shared behavior is missing, extend the framework first so Blank, Warband, and every other plugin inherit the same fix.\n'''
+          if "## Shared UI primitives are mandatory" not in adding_text:
+              adding.write_text(adding_text + shared_rule, encoding="utf-8", newline="\n")
+
+          Path("worklog/reference").mkdir(parents=True, exist_ok=True)
+          for source in ["docs/FF8-MOD-LAYOUT.md", "docs/warband-acceptance.md", "docs/warband-managed-wse2.md"]:
+              src = Path(source)
+              if src.exists():
+                  dst = Path("worklog/reference") / src.name
+                  src.replace(dst)
+          # Keep links valid after the moves.
+          for path in Path(".").rglob("*"):
+              if not path.is_file() or ".git" in path.parts or path.suffix.lower() not in {".md",".py",".js",".html",".yml",".yaml",".json"}:
+                  continue
+              try: value = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError: continue
+              newer = value.replace("docs/FF8-MOD-LAYOUT.md", "worklog/reference/FF8-MOD-LAYOUT.md")\
+                           .replace("docs/warband-acceptance.md", "worklog/reference/warband-acceptance.md")\
+                           .replace("docs/warband-managed-wse2.md", "worklog/reference/warband-managed-wse2.md")
+              if newer != value: path.write_text(newer, encoding="utf-8", newline="\n")
+
+          # Delete the review experiment and its dedicated regression.
+          for path in ["ui/design-review.css", "ui/design-review.js", "tests/global_design_review_check.py"]:
+              Path(path).unlink(missing_ok=True)
+
+          # Remove stale visible mode wording from moved game-specific docs.
+          for path in Path("worklog/reference").glob("*.md"):
+              value = path.read_text(encoding="utf-8")
+              value = value.replace("Lexer Mode", "Developer Mode").replace("Lexer mode", "Developer Mode").replace("I am Lexer", "authorized GitHub identity")
+              path.write_text(value, encoding="utf-8", newline="\n")
+          PY
+      - name: Static and syntax checks
+        shell: bash
+        run: |
+          set -euxo pipefail
+          node --check ui/framework.js
+          python -m compileall -q desktop_host.py github_integration.py settings_manager.py
+          ! git grep -n -E 'LexeditorDesignReview|design-review\.(js|css)|Design Review' -- ':!worklog/**'
+          ! git grep -n -E 'Lexer Mode|I am Lexer|lexerMode|lexerAuthorized|lexerLogin' -- '*.py' '*.js' '*.md'
+          test ! -e ui/design-review.js
+          test ! -e ui/design-review.css
+          test ! -e tests/global_design_review_check.py
+          test ! -e docs/warband-acceptance.md
+          test -e worklog/reference/warband-acceptance.md
+          grep -q 'lex-model-preview-drawer' ui/framework.js
+          grep -q 'label=self._github_issue_label(plugin_id)' desktop_host.py
+          grep -q 'lex-trailing-list-detail' ui/framework.js
+          grep -q 'shortName === "LL"' ui/framework.js
+          grep -q 'Shared interaction standards' docs/UI-MANUAL.md
+          git diff --check
+      - name: Commit fixes
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix shared editor UI behaviors"
+          git push origin HEAD:fix/shared-ui-batch-20260906
