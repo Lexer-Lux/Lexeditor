@@ -1,0 +1,99 @@
+{
+  "body_sha256": "5c1cec5d348491eb148ad8d7663b6128fb7fba138096562ab610b6967e60c223",
+  "issue": 192,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Incomplete study/tag progress should drain gradually after losing the target; completed tags must remain. The decay rate should be configurable, including zero to pause it.\n\n**Status: Built candidate ready for gameplay test.** Runtime PR #212 now retains explicit incomplete ped/plant progress and, after a 150 ms loss grace, decays it at `StudyProgressDecayPercentPerSecond` (default 50% of a full bar per real second). `0` pauses decay; completed tags do not decay. Permanent source CI and both Windows build variants pass.\n\n- [ ] With default 50, build partial progress on an animal/person, lose the target for about one second, and confirm the bar drains gradually rather than disappearing immediately.\n- [ ] Repeat with a plant.\n- [ ] Set decay to 0 and confirm incomplete progress survives target loss.\n- [ ] Complete a tag and confirm completed state does not decay.\n\nCandidate: runtime PR #212 / Windows run 34050295402. Preserve the existing INI when installing.",
+    "closed_at": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/192/comments",
+    "created_at": "2026-08-06T05:48:36Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/192/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/192",
+    "id": 5356305099,
+    "issue_dependencies_summary": {
+      "blocked_by": 1,
+      "blocking": 0,
+      "total_blocked_by": 1,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      },
+      {
+        "color": "fbca04",
+        "default": false,
+        "description": "Needs Testing: an implemented candidate is available and the human test checklist is ready.",
+        "id": 12074236871,
+        "name": "untested",
+        "node_id": "LA_kwDOTn28Ks8AAAACz647xw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/untested"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/192/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0K6yw",
+    "number": 192,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/192/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": "reopened",
+    "sub_issues_summary": {
+      "completed": 1,
+      "percent_completed": 20,
+      "total": 5
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/192/timeline",
+    "title": "Deliver gradual decay of unfinished Recon progress",
+    "updated_at": "2026-09-06T18:03:19Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/192",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}
