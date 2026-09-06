@@ -15,7 +15,6 @@ jobs:
         with:
           fetch-depth: 0
       - name: Apply fixes
-        id: apply
         shell: bash
         run: |
           set +e
@@ -27,10 +26,6 @@ jobs:
           end = "\n          PY\n"
           body = source.split(start, 1)[1].split(end, 1)[0]
           body = '\n'.join(line[10:] if line.startswith('          ') else line for line in body.splitlines())
-          # The original source batch expected one legacy Lexer-mode gate, but
-          # current master has the same exact two-line gate twice. The following
-          # generic replacement immediately after it intentionally handles both,
-          # so skip only that over-strict preflight operation.
           body, removed = re.subn(
               r'''\nreplace_once\(\n\s+"desktop_host\.py",\n\s+''' + "'''" + r'''        if not self\._settings\.snapshot\(\)\.get\("lexerMode"\):.*?marker='Developer Mode requires the authorized GitHub account',\n\)\n''',
               '\n', body, count=1, flags=re.S,
@@ -79,6 +74,7 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add -A
+            git add -f worklog/reference 2>/dev/null || true
             git commit -m "Record shared UI batch check failure"
             git push origin HEAD:fix/shared-ui-batch-20260906
             exit "$code"
@@ -86,10 +82,28 @@ jobs:
       - name: Commit fixes
         shell: bash
         run: |
-          set -euxo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -f .github/ui-batch-error.txt
-          git add -A
-          git commit -m "Fix shared editor UI behaviors"
-          git push origin HEAD:fix/shared-ui-batch-20260906
+          set +e
+          {
+            set -x
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            rm -f .github/ui-batch-error.txt
+            git add -A
+            git add -f worklog/reference
+            git status --short
+            git commit -m "Fix shared editor UI behaviors"
+            git push origin HEAD:fix/shared-ui-batch-20260906
+          } > /tmp/ui-batch-commit.log 2>&1
+          code=$?
+          cat /tmp/ui-batch-commit.log
+          if [ "$code" -ne 0 ]; then
+            cp /tmp/ui-batch-commit.log .github/ui-batch-error.txt
+            git reset --hard HEAD
+            cp /tmp/ui-batch-commit.log .github/ui-batch-error.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/ui-batch-error.txt
+            git commit -m "Record shared UI batch commit failure"
+            git push origin HEAD:fix/shared-ui-batch-20260906
+            exit "$code"
+          fi
