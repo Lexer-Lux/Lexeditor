@@ -7,16 +7,25 @@ from unittest.mock import patch
 class CoverageTests(unittest.TestCase):
     def test_ff7_same_file_different_editors_and_missing_config(self):
         from games.ff7 import server
+        from tools.verify_ff7_datasets import write_kernel
         with tempfile.TemporaryDirectory() as name:
-            root=Path(name)
-            with patch.object(server,'GAME_ROOT',root),patch.object(server,'_kernel_paths',return_value=(root/'kernel.bin',Path('kernel.bin'),root/'project/kernel.bin')):
+            root=Path(name);game=root/'game';project=root/'project'
+            source=game/'data/lang-en/kernel/KERNEL.BIN'
+            write_kernel(source)
+            # Exercise the real loader rather than mocking its removed private helper.
+            with patch.object(server,'GAME_ROOT',game),patch.object(server,'PROJECT_ROOT',project):
                 rows=server.data_map()['rows']
                 editable=[row for row in rows if row['coverage']=='structured']
                 self.assertEqual({row['target'] for row in editable},set(server.CATEGORIES))
                 self.assertEqual(len({row['id'] for row in editable}),len(editable))
                 self.assertTrue(all(row['status']=='partial' for row in editable))
+                self.assertEqual(len({row['filename'] for row in editable}),1)
                 config=next(row for row in rows if row['filename']=='FFNx.toml')
                 self.assertEqual(config['coverage'],'unavailable');self.assertFalse(config['openable'])
+                source.write_bytes(b'truncated fixture')
+                broken=server.data_map()['rows']
+                self.assertTrue(all(row['coverage']=='unavailable' for row in broken))
+                self.assertTrue(all(not row['openable'] for row in broken))
 
     def test_ff9_dataset_target_and_missing_data(self):
         from games.ff9 import server
