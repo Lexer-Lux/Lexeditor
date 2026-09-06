@@ -220,104 +220,53 @@ def _field(key: str, label: str, offset: int, fmt: str) -> Field:
                (1 << (bits - 1)) - 1 if signed else (1 << bits) - 1)
 
 
-# Memoria v2025.07.04, Assembly-CSharp/Global/BTL_SCENE.cs:
+# Memoria v2025.07.04, Assembly-CSharp/Global/BTL_SCENE.cs.
+# Offsets mirror BinaryReader calls in ReadBattleScene exactly.
 ENEMY_FIELDS = (
-    _field("Moto", "Moto", 0, "<H"),
-    _field("DieAt", "Die at", 1, "<B"),
-    _field("Messages", "Messages", 2, "<H"),
-    _field("Win", "Win", 4, "<X"),
-    _field("Epense", "Expense", 5, "<B"),
-    _field("Radius", "Radius", 6, "<H"),
-    _field("ByteFlags", "Byte flags", 8, "<B"),
-    _field("Flags", "Flags", 10, "<H"),
-    _field("Exp", "Experience", 12, "<I"),
-    _field("Gil", "Gil", 16, "<I"),
-    _field("Draw0", "Drop 1", 20, "<B"),
-    _field("Draw1", "Drop 2", 21, "<B"),
-    _field("Draw2", "Drop 3", 22, "<B"),
-    _field("Draw3", "Drop 4", 23, "<B"),
-    _field("Steal0", "Steal 1", 24, "<B"),
-    _field("Steal1", "Steal 2", 25, "<B"),
-    _field("Steal2", "Steal 3", 26, "<B"),
-    _field("Steal3", "Steal 4", 27, "<B"),
-    _field("Geographics", "Geographics", 28, "<H"),
-    _field("Flags1", "Enemy flags", 30, "<B"),
-    _field("AP", "AP", 31, "<B"),
-    _field("StatusU0", "Initial status low", 32, "<I"),
-    _field("StatusU1", "Initial status high", 36, "<I"),
-    _field("StatusR0", "Status resist low", 40, "<I"),
-    _field("StatusR1", "Status resist high", 44, "<I"),
-    _field("StatusA0", "Status auto low", 48, "<I"),
-    _field("StatusA1", "Status auto high", 52, "<I"),
-    _field("MaxHP", "Max HP", 56, "<I"),
-    _field("MaxMP", "Max MP", 60, "<I"),
-    _field("ElementGR0", "Element guard low", 64, "<I"),
-    _field("ElementGR1", "Element guard high", 68, "<I"),
-    _field("ElementAsorb", "Element absorb", 72, "<B"),
-    _field("ElementHalf", "Element half", 73, "<B"),
-    _field("ElementWeak", "Element weak", 74, "<B"),
-    _field("Level", "Level", 75, "<B"),
-    _field("Category", "Category", 76, "<H"),
-    _field("Hit", "Hit", 78, "<B"),
-    _field("Attack", "Attack", 79, "<B"),
-    _field("AttackCount", "Attack count", 80, "<B"),
-    _field("Strength", "Strength", 81, "<B"),
-    _field("Magic", "Magic", 82, "<B"),
-    _field("MagicDefence", "Magic defence", 83, "<B"),
-    _field("Evasion", "Physical evasion", 84, "<B"),
-    _field("MagicEvasion", "Magic evasion", 85, "<B"),
-    _field("BlueMagic", "Blue magic", 86, "<B"),
-    _field("Camera", "Camera", 87, "<B"),
-    _field("Sound", "Sound", 88, "<H"),
-    _field("WinScript", "Win script", 90, "<H"),
-    _field("WinFootage", "Win footage", 92, "<H"),
-    _field("DieSfx", "Die SFX", 94, "<H"),
-    _field("Contributeds", "Contributes", 96, "<I"),
-    _field("StrAsure", "Str assure", 100, "<H"),
-    _field("MglAsure", "Mgl assure", 102, "<H"),
-    _field("Wap", "Wap", 104, "<B"),
-    _field("WapBp", "Wap back", 105, "<B"),
-    _field("Wii", "Wii", 106, "<h"),
-    _field("WiiBp", "Wii back", 108, "<h"),
-    _field("Raduis", "Shadow radius", 110, "<H"),
-    _field("RotY", "Shadow rotation", 112, "<h"),
-    _field("Cart", "Card", 114, "<B"),
+    _field("ResistStatus", "Resist status", 0, "<I"),
+    _field("AutoStatus", "Auto status", 4, "<I"),
+    _field("InitialStatus", "Initial status", 8, "<I"),
+    _field("MaxHP", "Max HP", 12, "<H"), _field("MaxMP", "Max MP", 14, "<H"),
+    _field("WinGil", "Gil", 16, "<H"), _field("WinExp", "Experience", 18, "<H"),
+    *tuple(_field(f"WinItem{i+1}", f"Drop {i+1}", 20+i, "<B") for i in range(4)),
+    *tuple(_field(f"StealItem{i+1}", f"Steal {i+1}", 24+i, "<B") for i in range(4)),
+    _field("Radius", "Radius", 28, "<H"), _field("Geo", "Geometry", 30, "<h"),
+    *tuple(_field(f"Motion{i+1}", f"Motion {i+1}", 32+i*2, "<H") for i in range(6)),
+    _field("Mesh1", "Mesh 1", 44, "<H"), _field("Mesh2", "Mesh 2", 46, "<H"),
+    _field("Flags", "Enemy flags", 48, "<H"), _field("AP", "AP", 50, "<H"),
+    _field("Speed", "Speed", 52, "<B"), _field("Strength", "Strength", 53, "<B"),
+    _field("Magic", "Magic", 54, "<B"), _field("Spirit", "Spirit", 55, "<B"),
+    _field("ElementPad", "Element pad", 56, "<B"), _field("ElementTrans", "Element trans", 57, "<B"),
+    _field("CurrentCapacity", "Current capacity", 58, "<B"), _field("MaxCapacity", "Max capacity", 59, "<B"),
+    _field("GuardElement", "Guard element", 60, "<B"), _field("AbsorbElement", "Absorb element", 61, "<B"),
+    _field("HalfElement", "Half element", 62, "<B"), _field("WeakElement", "Weak element", 63, "<B"),
+    _field("Level", "Level", 64, "<B"), _field("Category", "Category", 65, "<B"),
+    _field("HitRate", "Hit rate", 66, "<B"), _field("PhysicalDefence", "Physical defence", 67, "<B"),
+    _field("PhysicalEvade", "Physical evade", 68, "<B"), _field("MagicalDefence", "Magical defence", 69, "<B"),
+    _field("MagicalEvade", "Magical evade", 70, "<B"), _field("BlueMagic", "Blue Magic", 71, "<B"),
+    *tuple(_field(f"Bone{i+1}", f"Bone {i+1}", 72+i, "<B") for i in range(4)),
+    _field("DieSfx", "Death SFX", 76, "<H"), _field("Konran", "Confuse motion", 78, "<B"),
+    _field("MessageCount", "Message count", 79, "<B"),
+    *tuple(_field(f"IconBone{i+1}", f"Icon bone {i+1}", 80+i, "<B") for i in range(6)),
+    *tuple(_field(f"IconY{i+1}", f"Icon Y {i+1}", 86+i, "<b") for i in range(6)),
+    *tuple(_field(f"IconZ{i+1}", f"Icon Z {i+1}", 92+i, "<b") for i in range(6)),
+    _field("StartSfx", "Start SFX", 98, "<H"), _field("ShadowX", "Shadow X", 100, "<H"),
+    _field("ShadowZ", "Shadow Z", 102, "<H"), _field("ShadowBone", "Shadow bone", 104, "<B"),
+    _field("WinCard", "Card reward", 105, "<B"), _field("ShadowOffsetX", "Shadow offset X", 106, "<h"),
+    _field("ShadowOffsetZ", "Shadow offset Z", 108, "<h"), _field("ShadowBone2", "Shadow bone 2", 110, "<B"),
 )
-
 PATTERN_FIELDS = (
-    _field("Rate", "Rate", 0, "<B"),
-    _field("MonsterCount", "Monster count", 1, "<B"),
-    _field("Camera", "Camera", 2, "<H"),
-    _field("Flags", "Flags", 4, "<H"),
-    _field("AP", "AP", 6, "<H"),
-    _field("Pease0", "Placement 1 enabled", 8, "<B"),
-    _field("Type0", "Enemy 1 type", 9, "<B"),
-    _field("Flags0", "Enemy 1 flags", 10, "<H"),
-    _field("X0", "Enemy 1 X", 12, "<h"),
-    _field("Y0", "Enemy 1 Y", 14, "<h"),
-    _field("Z0", "Enemy 1 Z", 16, "<h"),
-    _field("Rot0", "Enemy 1 rotation", 18, "<h"),
-    _field("Pease1", "Placement 2 enabled", 20, "<B"),
-    _field("Type1", "Enemy 2 type", 21, "<B"),
-    _field("Flags1", "Enemy 2 flags", 22, "<H"),
-    _field("X1", "Enemy 2 X", 24, "<h"),
-    _field("Y1", "Enemy 2 Y", 26, "<h"),
-    _field("Z1", "Enemy 2 Z", 28, "<h"),
-    _field("Rot1", "Enemy 2 rotation", 30, "<h"),
-    _field("Pease2", "Placement 3 enabled", 32, "<B"),
-    _field("Type2", "Enemy 3 type", 33, "<B"),
-    _field("Flags2", "Enemy 3 flags", 34, "<H"),
-    _field("X2", "Enemy 3 X", 36, "<h"),
-    _field("Y2", "Enemy 3 Y", 38, "<h"),
-    _field("Z2", "Enemy 3 Z", 40, "<h"),
-    _field("Rot2", "Enemy 3 rotation", 42, "<h"),
-    _field("Pease3", "Placement 4 enabled", 44, "<B"),
-    _field("Type3", "Enemy 4 type", 45, "<B"),
-    _field("Flags3", "Enemy 4 flags", 46, "<H"),
-    _field("X3", "Enemy 4 X", 48, "<h"),
-    _field("Y3", "Enemy 4 Y", 50, "<h"),
-    _field("Z3", "Enemy 4 Z", 52, "<h"),
-    _field("Rot3", "Enemy 4 rotation", 54, "<h"),
+    _field("Rate", "Rate", 0, "<B"), _field("MonsterCount", "Monster count", 1, "<B"),
+    _field("Camera", "Camera", 2, "<B"), _field("AP", "AP", 4, "<I"),
+    *tuple(field for slot in range(4) for field in (
+        _field(f"Slot{slot+1}Type", f"Enemy {slot+1} type", 8+slot*12, "<B"),
+        _field(f"Slot{slot+1}Flags", f"Enemy {slot+1} flags", 9+slot*12, "<B"),
+        _field(f"Slot{slot+1}Pease", f"Enemy {slot+1} pease", 10+slot*12, "<B"),
+        _field(f"Slot{slot+1}X", f"Enemy {slot+1} X", 12+slot*12, "<h"),
+        _field(f"Slot{slot+1}Y", f"Enemy {slot+1} Y", 14+slot*12, "<h"),
+        _field(f"Slot{slot+1}Z", f"Enemy {slot+1} Z", 16+slot*12, "<h"),
+        _field(f"Slot{slot+1}Rotation", f"Enemy {slot+1} rotation", 18+slot*12, "<h"),
+    )),
 )
 
 
@@ -343,6 +292,10 @@ class BattleScene:
     def write(self, base: int, field: Field, value: Any) -> None:
         if isinstance(value, bool) or not isinstance(value, int) or not field.min <= value <= field.max:
             raise ValueError(f"{field.label} must be a whole number from {field.min} through {field.max}")
+        if field.key == "MonsterCount" and value > 4:
+            raise ValueError("Monster count must be from 0 through 4")
+        if field.key.startswith("Slot") and field.key.endswith("Type") and value >= self.type_count:
+            raise ValueError(f"{field.label} must refer to an enemy type in this scene (0 through {max(0, self.type_count - 1)})")
         struct.pack_into(field.fmt, self.data, base + field.offset, value)
 
 
@@ -362,7 +315,7 @@ class BattleSceneStore:
 
     @staticmethod
     def relative(scene: str) -> Path:
-        return Path("BattleMap") / "BattleScene" / f"EVT_BATTLE_{scene}" / "dbfile0000.raw,u6"
+        return Path("BattleMap") / "BattleScene" / f"EVT_BATTLE_{scene}" / "dbfile0000.raw16"
 
     def _source(self, scene: str) -> tuple[bytes, str, Path | None]:
         project = self.project_root / self.relative(scene)
@@ -378,7 +331,7 @@ class BattleSceneStore:
         note = "Reads vanilla battle-scene TextAssets from p0data2; saves Memoria raw16 project overlays."
         return [
             {"key": "enemies", "tab": "enemies", "label": "Enemies", "relativePath": "StreamingAssets/p0data2.bin → BattleMap/BattleScene/*/dbfile0000.raw16", "controls": "Enemy HP/MP, rewards, stats, elements, defences, Blue Magic, geometry, SFX, card and shadow fields", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "BattleMap/BattleScene"), "notes": note},
-            {"key": "encounters", "tab": "encounters", "label": "Encounters", "relativePath": "StreamingAssets/p0data2.bin → BattleMap/BattleScene/*/dbfile0000.raw,u6", "controls": "Pattern rate, monster count, camera, AP and four enemy placements", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "BattleMap/BattleScene"), "notes": note},
+            {"key": "encounters", "tab": "encounters", "label": "Encounters", "relativePath": "StreamingAssets/p0data2.bin → BattleMap/BattleScene/*/dbfile0000.raw16", "controls": "Pattern rate, monster count, camera, AP and four enemy placements", "available": available, "source": "vanilla" if available else None, "sourcePath": str(self.archive_path) if available else None, "projectPath": str(self.project_root / "BattleMap/BattleScene"), "notes": note},
         ]
 
     @staticmethod
