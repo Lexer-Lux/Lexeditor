@@ -20,7 +20,9 @@
     .ff7-info-grid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px}.ff7-info-grid code{overflow-wrap:anywhere}
     .ff7-map,.ff7-tweaks{display:flex;flex-direction:column;height:100%;min-height:0}.ff7-map-controls{display:flex;gap:8px;padding:0 0 var(--lex-panel-gap)}.ff7-map .lex-data-map-view{flex:1;min-height:0}
     .ff7-config-body{flex:1;min-height:0;overflow:auto}.ff7-config-error{padding:8px;border:1px solid var(--lex-border)}
+    .ff7-workspace{display:flex;flex-direction:column;height:100%;min-height:0}.ff7-record-body{flex:1;min-height:0}.ff7-subtabs{flex-wrap:wrap;flex:none}.ff7-subtabs [aria-selected="true"]{font-weight:bold;border-bottom:3px solid var(--lex-border)}
     .ff7-tweak-panel{display:flex;flex-direction:column;flex:1;min-height:0}
+    .ff7-subtabs{flex-wrap:wrap;gap:0}.ff7-subtabs .lex-subtab-button{flex:1 0 max-content;height:auto;min-height:34px;padding:7px 12px;white-space:nowrap}
   </style>
 </head>
 <body>
@@ -31,10 +33,12 @@
   "use strict";
   const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,recordId,infoHelp,pagedListDetail,provenanceControl,platformConfigView,clone,EditHistory}=LexeditorUI;
   const identity=window.__lexeditorPlugin||{id:"ff7",name:"Final Fantasy 7 (Original)",edition:"Steam"};
-  const integrated=["accessories","armor","characters","items","materia","weapons","enemies","encounters","enemyAttacks","shops","prices","texts"];
+  const integrated=["accessories","armor","characters","items","materia","weapons","enemies","encounters","enemyAttacks","shops","prices","texts","characterNames","growthCurves","growthBonuses","characterAI","enemyAI","formationAI","recruits","defaultNames","fieldEncounters","worldEncounters","yuffieEncounters","chocoboRatings"];
   const unresolved=["tweaks"];
-  const labels={accessories:"Accessories",armor:"Armor",characters:"Characters",items:"Items",materia:"Materia",weapons:"Weapons",enemies:"Enemies",encounters:"Encounters",shops:"Shops",prices:"Prices",texts:"Text",enemyAttacks:"Enemy attacks",tweaks:"Tweaks"};
-  const tabs=[...integrated,...unresolved].map(id=>({id,label:labels[id]}));
+  const labels={accessories:"Accessories",armor:"Armor",characters:"Characters",items:"Items",materia:"Materia",weapons:"Weapons",enemies:"Enemies",encounters:"Encounters",shops:"Shops",prices:"Prices",texts:"Text",enemyAttacks:"Enemy attacks",tweaks:"Tweaks",characterNames:"Initial names",growthCurves:"Growth curves",growthBonuses:"Growth bonuses",characterAI:"Character AI",enemyAI:"Enemy AI",formationAI:"Formation AI",recruits:"Recruits",defaultNames:"Default names",fieldEncounters:"Field encounters",worldEncounters:"World encounters",yuffieEncounters:"Yuffie encounters",chocoboRatings:"Chocobo ratings"};
+  const groups={characters:["characters","characterNames","growthCurves","growthBonuses","characterAI","recruits","defaultNames"],enemies:["enemies","enemyAttacks","enemyAI"],encounters:["encounters","formationAI","fieldEncounters","worldEncounters","yuffieEncounters","chocoboRatings"],shops:["shops","prices"]};
+  const parentTab=id=>Object.keys(groups).find(key=>groups[key].includes(id))||id;
+  const tabs=[...new Set([...integrated,...unresolved].map(parentTab))].map(id=>({id,label:labels[id]}));
   const api=async(path,options={})=>{const response=await fetch(path,options),body=await response.json();if(!response.ok)throw new Error(body.error||response.statusText);return body};
   const state={loaded:false,tab:"items",dashboard:null,dataMap:null,data:null,records:{},saved:{},invalid:{},platformConfig:null,savedPlatformConfig:null,platformQuery:"",platformError:"",platformRevision:0,platformLoading:false,activeSource:"mine",selected:{},page:{},pageSize:{},query:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],saving:false};
   const main=document.querySelector("#main");
@@ -63,11 +67,12 @@
       apply:value=>{if(readonly())return;delete state.invalid[key];row.values[field.key]=Number(value);input.value=String(value);shellRefresh()}});
   }
   function textControl(row,field){
-    const input=el("textarea",{rows:3,value:row.values[field.key],disabled:readonly(),
+    const input=el("textarea",{rows:field.language?12:3,spellcheck:"false",value:row.values[field.key],disabled:readonly(),
       "aria-label":`${field.label} for ${row.name}`,oninput:event=>{
         if(readonly())return;
         row.values[field.key]=event.target.value;shellRefresh();
       }});
+    input.value=String(row.values[field.key]);
     const vanilla=rowById(state.tab,row.id,state.data.vanilla).values[field.key];
     return provenanceControl({control:input,current:()=>row.values[field.key],vanilla,internal:true,
       apply:value=>{if(readonly())return;row.values[field.key]=String(value);input.value=String(value);shellRefresh()}});
@@ -76,14 +81,14 @@
     const metadata=category(),groups=[...new Set(metadata.fields.map(field=>field.group||"Kernel data"))];
     return detailPanel({className:"ff7-detail",title:row.values.name||row.name,identity:recordId(row.id),meta:identity.edition,body:[
       detailSection({title:"DESCRIPTION",body:detailField({label:"HELP TEXT",control:el("div",{class:"ff7-description"},row.description||"No description stored.")})}),
-      ...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>detailField({className:"ff7-field",label:field.label,help:infoHelp(field.dataType==="text"?"English game text. Use byte escapes for control codes; unsupported characters and oversized text are refused on save.":`Stored as a bounded ${field.dataType}. Storage range: ${field.minimum} to ${field.maximum}${field.step>1?`; step ${field.step}`:""}.`),control:field.dataType==="text"?textControl(row,field):numberControl(row,field),dataType:field.dataType==="text"?"TEXT":"INT",min:field.minimum,max:field.maximum}))})),
+      ...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>detailField({className:"ff7-field",label:field.label,help:infoHelp(field.dataType==="text"?"English game text; AI uses named assembly instructions and labels. Use byte escapes for control codes; unsupported characters and oversized text are refused on save.":`Stored as a bounded ${field.dataType}. Storage range: ${field.minimum} to ${field.maximum}${field.step>1?`; step ${field.step}`:""}.`),control:field.dataType==="text"?textControl(row,field):numberControl(row,field),dataType:field.dataType==="text"?"TEXT":"INT",min:field.minimum,max:field.maximum}))})),
     ]});
   }
   function listTable(rows,selected,select){
-    const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,render:row=>row.values.name||row.name},{key:"description",label:"Description",sortable:true}];
+    const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,grow:2,render:row=>el("span",{title:row.values.name||row.name},row.values.name||row.name)},{key:"description",label:"Description",sortable:true,grow:3,pinned:false,render:row=>el("span",{title:row.description},row.description)}];
     const prefs=columnPreferences(`ff7-${state.tab}`,columns,()=>render());
     const sort=state.sort[state.tab]||{key:"name",dir:1};
-    return columnList({rows,key:row=>row.id,selected,select,sortState:sort,sort:key=>{state.sort[state.tab]=sort.key===key?{key,dir:-sort.dir}:{key,dir:1};render()},columnPreferences:prefs,columns,class:"ff7-table","aria-label":`${labels[state.tab]} records`});
+    return columnList({rows,key:row=>row.id,selected,select:row=>{const id=typeof row==="object"?row.id:row;if(id!==state.selected[state.tab])LexeditorUI.playThemeSound?.("move");select(row)},sortState:sort,sort:key=>{state.sort[state.tab]=sort.key===key?{key,dir:-sort.dir}:{key,dir:1};render()},columnPreferences:prefs,columns,class:"ff7-table","aria-label":`${labels[state.tab]} records`});
   }
   function unavailableView(){
     const error=state.data.errors?.[state.tab];
@@ -148,7 +153,12 @@
     return el("section",{class:"ff7-message"},el("h2",{},identity.name),el("div",{class:"ff7-info-grid"},el("b",{},"Edition"),el("span",{},identity.edition),el("b",{},"Game root"),el("code",{},state.dashboard.game.root||"Unavailable"),el("b",{},"Source"),el("code",{},baseline.source||"Unavailable"),el("b",{},"Project output"),el("code",{},baseline.projectPath||"Unavailable"),el("b",{},"Vanilla SHA-256"),el("code",{},baseline.sha256||"Unavailable")),el("p",{},baseline.message),...(state.dashboard.problems||[]).map(problem=>el("p",{},problem)),sounds);
   }
   function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,open:row=>{const target=row.target||row.category;if(target)navigate(target)},query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return el("section",{class:"ff7-map"},el("div",{class:"ff7-map-controls"},...view.controls),view.content)}
-  function render(){if(!state.loaded)return;let content;if(state.tab==="info")content=infoView();else if(state.tab==="datamap")content=mapView();else if(state.tab==="tweaks")content=tweakView();else if(integrated.includes(state.tab))content=integratedView();else content=unresolvedView();main.replaceChildren(content);shellRefresh()}
+  function dataWorkspace(){
+    const sub=groups[parentTab(state.tab)];
+    const nav=sub?el("nav",{class:"lex-subtab-bar ff7-subtabs",role:"tablist","aria-label":labels[parentTab(state.tab)]+" datasets"},...sub.map(id=>el("button",{type:"button",role:"tab",class:"lex-subtab-button"+(id===state.tab?" active":""),"aria-selected":String(id===state.tab),onclick:()=>{if(id!==state.tab)LexeditorUI.playThemeSound?.("confirm");navigate(id)}},labels[id]))):null;
+    return el("section",{class:"ff7-workspace"},nav,el("div",{class:"ff7-record-body"},integratedView()));
+  }
+  function render(){if(!state.loaded)return;let content;if(state.tab==="info")content=infoView();else if(state.tab==="datamap")content=mapView();else if(state.tab==="tweaks")content=tweakView();else if(integrated.includes(state.tab))content=dataWorkspace();else content=unresolvedView();main.replaceChildren(content);shellRefresh()}
   function navigate(tab){state.tab=tab;render();if(tab==="tweaks")void refreshPlatformConfig()}
   async function save(){
     if(readonly())return;
@@ -159,8 +169,8 @@
       const subset=(keys,source)=>Object.fromEntries(keys.filter(key=>Object.hasOwn(source,key)).map(key=>[key,source[key]]));
       const kernelRecords=subset(kernelKeys,state.records);
       if(JSON.stringify(kernelRecords)!==JSON.stringify(subset(kernelKeys,state.saved))){
-        const result=await api("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({records:kernelRecords,sourceSha256:state.data.sourceSha256,activeSha256:state.data.activeSha256})});
-        Object.assign(state.saved,clone(kernelRecords));state.data.activeSha256=result.sha256;state.data.usingProject=true;state.dashboard.baseline.projectPath=result.path;
+        const result=await api("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({records:kernelRecords,sourceSha256:state.data.sourceSha256,activeSha256:state.data.activeSha256,usingProject:state.data.usingProject})});
+        Object.assign(state.records,result.records||kernelRecords);Object.assign(state.saved,clone(result.records||kernelRecords));state.data.activeSha256=result.sha256;state.data.usingProject=true;state.dashboard.baseline.projectPath=result.path;
         editHistory.clear();
       }
       // Each source has its own verified atomic replacement and saved snapshot.
@@ -169,7 +179,7 @@
         const records=subset(report.categories,state.records);
         if(JSON.stringify(records)===JSON.stringify(subset(report.categories,state.saved)))continue;
         const result=await api("/api/extended/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({family,records,sourceSha256:report.sourceSha256,activeSha256:report.activeSha256,usingProject:report.usingProject})});
-        Object.assign(state.saved,clone(records));Object.assign(report,result);editHistory.clear();
+        Object.assign(state.records,result.records||records);Object.assign(state.saved,clone(result.records||records));const {records:canonical,...snapshot}=result;Object.assign(report,snapshot);editHistory.clear();
       }
       const changes=platformChanges();
       if(Object.keys(changes).length){state.platformConfig=await api("/api/platform-config/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sha256:state.savedPlatformConfig.sha256,changes})});state.savedPlatformConfig=clone(state.platformConfig);state.platformError="";syncConfigMap(state.platformConfig)}
@@ -179,7 +189,7 @@
   async function discard(){state.records=clone(state.saved);state.invalid={};state.platformConfig=clone(state.savedPlatformConfig);state.platformRevision++;editHistory.clear();render()}
   async function switchProjectSource(value){state.activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";state.records=clone(state.activeSource==="vanilla"?state.data.vanilla:state.saved);state.invalid={};state.platformRevision++;editHistory.clear();render()}
   const editHistory=new EditHistory({capture:()=>state.records,restore:snapshot=>{state.records=clone(snapshot);state.invalid={}},render:async()=>render(),enabled:()=>state.loaded&&!readonly(),changed:shellRefresh});
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:identity.id,name:identity.name,themeName:identity.id,theme:{}},tabs,activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF7 Data Map",info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 plugin information",projectSources:()=>[{key:"vanilla",label:"Vanilla",path:state.dashboard?.baseline?.source||"Installed unchanged KERNEL.BIN"}],projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,dirtyCount,readonly,save,discard,history:editHistory});
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:identity.id,name:identity.name,themeName:identity.id,theme:{}},tabs,activeTab:()=>parentTab(state.tab),navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF7 Data Map",info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 plugin information",projectSources:()=>[{key:"vanilla",label:"Vanilla",path:state.dashboard?.baseline?.source||"Installed unchanged KERNEL.BIN"}],projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,dirtyCount,readonly,save,discard,history:editHistory});
   editHistory.observe(document);
   Promise.allSettled([api("/api/dashboard"),api("/api/datamap"),api("/api/data"),api("/api/platform-config")]).then(results=>{
     const [dashboard,map,data,config]=results;
