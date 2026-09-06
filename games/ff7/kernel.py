@@ -327,7 +327,11 @@ def resolve_kernel(game_root: Path) -> tuple[Path, Path]:
         Path("ff7/workingdir/data/lang-en/kernel/kernel.bin"),
         Path("data/lang-en/kernel/KERNEL.BIN"),
     )
-    found = [(game_root / relative, relative) for relative in candidates if (game_root / relative).is_file()]
+    from .storage import case_path
+    found = [(source, source.relative_to(game_root)) for relative in candidates
+             if (source := case_path(game_root, relative)) is not None]
+    if any(not source.resolve().is_relative_to(game_root.resolve()) for source, _ in found):
+        raise ValueError("KERNEL.BIN source resolves outside the selected installation")
     if len(found) != 1:
         raise FileNotFoundError(f"Expected one supported English KERNEL.BIN under {game_root}")
     return found[0]

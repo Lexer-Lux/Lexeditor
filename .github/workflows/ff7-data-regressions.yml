@@ -1,0 +1,131 @@
+name: FF7 data regressions
+
+on:
+  pull_request:
+    paths:
+      - 'games/ff7/**'
+      - 'games/ff7_2013/**'
+      - 'platform_config.py'
+      - 'process_probe.py'
+      - 'ui/framework.js'
+      - 'ui/framework.css'
+      - 'tools/verify_ff7_*.py'
+      - 'tools/FF7-checks.cmd'
+      - 'tools/ff7_tests/**'
+      - '.github/workflows/ff7-data-regressions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ff7-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  binary-and-http:
+    name: Binary and HTTP - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      # Avoid traversing the unrelated incomplete RDR submodule.
+      - name: Check out the exact event commit
+        shell: bash
+        run: |
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Export source-only component test snapshot
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff7-component-sources
+          retention-days: 3
+          path: |
+            *.py
+            games/__init__.py
+            games/ff7/*.py
+            games/ff7/*.html
+            games/ff7_2013/*.py
+            ui/**/*.js
+            ui/**/*.css
+            ui/**/*.json
+            tools/verify_ff7_*.py
+            tools/FF7-checks.cmd
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify binary formats, preservation and HTTP behavior
+        run: |
+          python tools/verify_ff7_datasets.py
+          python tools/verify_ff7_extended.py
+          python tools/verify_ff7_completion.py
+
+  browser-scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - group: kernel-and-tweaks
+            tests: PageTests.test_character_save_invalid_input_and_vanilla_for_both_editions PageTests.test_inflight_config_refresh_cannot_discard_new_edit PageTests.test_kernel_api_failure_keeps_auxiliary_tabs_and_runtime_detection PageTests.test_platform_api_failure_does_not_hide_characters
+          - group: mixed-save
+            tests: PageTests.test_partial_save_keeps_only_failed_family_dirty
+          - group: scenes
+            tests: PageTests.test_scene_fields_save_without_kernel_and_keep_ai
+          - group: text-and-shops
+            tests: PageTests.test_text_and_shop_ui_persistence
+    name: Browser - ${{ matrix.group }}
+    steps:
+      - name: Check out the exact event commit
+        shell: bash
+        run: |
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Verify page logic with synthetic data and component doubles
+        run: python tools/verify_ff7_ui.py ${{ matrix.tests }}
+
+  real-shared-ui:
+    name: Real shared UI, saves and sounds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact event commit
+        shell: bash
+        run: |
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Exercise actual shared controls and both edition layouts
+        run: python tools/verify_ff7_rendered.py
+      - name: Retain synthetic UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff7-rendered-fixtures
+          retention-days: 7
+          path: out/ff7-rendered/

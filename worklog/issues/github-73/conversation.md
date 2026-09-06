@@ -50,6 +50,34 @@ Exact metadata: [source record](sources/issue-5306402966-c187b1c9f17d961f0d4c18f
 
 FF7/FF8 need separate FFNx settings subtabs with backups and preserved unknown settings. FF9 should instead direct you to Memoria’s existing launcher, as you already decided. Integration and the FF9 Play handoff remain; no further design approval is needed.
 
+## issue 5306402966 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/73
+
+Created: 2026-09-01T00:42:35Z; updated: 2026-09-06T16:45:34Z
+
+Exact metadata: [source record](sources/issue-5306402966-b67a1f76fe06231a7db835cc88c7d2919041c8c493bb27610b82c012482ff39e.json).
+
+**Actionable — partly implemented.** FF8 controls exist. FF7’s subtab and safer refresh handling are in unmerged PR #359.
+
+FF7/FF8 need separate FFNx settings subtabs with backups and preserved unknown settings. FF9 should instead direct you to Memoria’s existing launcher, as you already decided. Integration and the FF9 Play handoff remain; no further design approval is needed.
+
+## issue 5306402966 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/73
+
+Created: 2026-09-01T00:42:35Z; updated: 2026-09-06T16:45:34Z
+
+Exact metadata: [source record](sources/issue-5306402966-ef4dc52ed690bd689a89a680b0f6b488789229031fcec21575531ac5659b1dad.json).
+
+**Actionable — mixed-game issue; FF7 implementation is now merged.** PR #359 was merged into master as `3e2d2b924ac299f085b7f568c2394419ea0b3b63`.
+
+**FF7, both editions:** Tweaks → FFNx is implemented with FF7-only setting filtering on reads and writes, backups, preserved unknown settings/comments, strict source snapshots, running-game protection, automatic detection of a newly created configuration, and protection against asynchronous refreshes discarding pending edits. Current-head binary/HTTP and Chromium CI passed; installed-game acceptance is separate.
+
+**FF8 and FF9:** FF8 controls exist. Preserve the remaining FF8 integration work and FF9 Play handoff in their respective branches. FF9 should direct the user to Memoria’s existing launcher, not add a Memoria settings editor. No further design approval is needed. This FF7 pass does not claim to have completed or tested those other-game portions.
+
+FF7 acceptance: with the game closed, change/save/reopen a harmless setting and confirm its backup; restore it. Check that FF8-only options never appear, unsaved values survive focus changes, external file changes refuse a stale save, and a running game refuses configuration writes. These behaviors have automated tests, but the installed-game checks were not performed in the recovery environment.
+
 ## comment 5486891895 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/73#issuecomment-5486891895

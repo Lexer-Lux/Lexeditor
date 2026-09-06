@@ -30,7 +30,8 @@ def html_for(game):
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text()+'</script>')
-    html=html.replace('<script src="/cards_ui.js"></script>','<script>'+(ROOT/'games/ff8/cards_ui.js').read_text()+'</script>')
+    if '<script src="/cards_ui.js"></script>' in html:
+        html=html.replace('<script src="/cards_ui.js"></script>','<script>'+(ROOT/'games/ff8/cards_ui.js').read_text()+'</script>')
     # No third-party requests are made by these HTML documents in this harness.
     return html
 
@@ -49,6 +50,7 @@ with sync_playwright() as p:
                 else:
                     page.evaluate('''rows=>{
                       state.dataMap={rows};state.datamap={rows};state.booting=false;
+                      if(Object.hasOwn(state,"loaded"))state.loaded=true;
                       state.dashboard={runtime:{installed:true},baseline:{},game:{},manifest:{},paths:{},problems:[]};
                       if(typeof state.data!=="object" || !state.data)state.data={};
                       if(typeof state.config!=="undefined")state.config={datasets:{mine:{readonly:false,label:"My Mod"}}};
@@ -88,6 +90,16 @@ with sync_playwright() as p:
                     page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
                     page.wait_for_timeout(200)
                     assert page.locator('.lex-data-map-open').count()==0,game
+                if game in ('ff7','ff7_2013'):
+                    # Late FFNx discovery must update the explicit coverage contract.
+                    for available in (True,False):
+                        row=page.evaluate("""available=>{
+                          state.dataMap.rows=[{category:"tweaks",coverage:"unavailable",openable:false}];
+                          syncConfigMap({available,path:"FFNx.toml",message:"Fixture"});
+                          return state.dataMap.rows[0];
+                        }""",available)
+                        assert row['coverage']==('structured' if available else 'unavailable'),game
+                        assert row['openable']==available,game
                 assert not errors,(game,errors)
                 results.append({'game':game,'width':width,'height':height,'layout':metrics,'status':'passed'})
                 page.close()

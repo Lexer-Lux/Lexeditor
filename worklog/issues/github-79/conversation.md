@@ -67,6 +67,41 @@ Exact metadata: [source record](sources/issue-5311976419-2d2826a1f6d495afbac6b4a
 
 Enemies, encounters, shops and wider character/text editing remain unfinished. Integration and in-game validation are still needed; the Characters work alone is not complete FF7 support.
 
+## issue 5311976419 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/79
+
+Created: 2026-09-01T12:44:24Z; updated: 2026-09-06T16:45:17Z
+
+Exact metadata: [source record](sources/issue-5311976419-24044cd7b2819983a07b222bd573d33bcb29ca9a858b36af40946a81d40e4d2c.json).
+
+**Implemented and merged — needs installed-game acceptance.** PR #359 was merged into `master` as `3e2d2b924ac299f085b7f568c2394419ea0b3b63`, including completion commit `613d2b73c51956d921a032341317d0d37a815feb`.
+
+The previously missing editors are now connected: character/enemy/formation AI; character growth curves and bonuses; inline/default names; separate Cait Sith/Vincent recruitment data; field and world encounter tables, Yuffie thresholds and Chocobo ratings; enemy/attack/formation records; shops/prices; and all 18 English kernel2 text sections. Existing equipment/materia editors remain available. The page has 24 dataset categories plus FFNx, grouped into subtabs, with independent availability and verified project saves.
+
+**Verification:** all current-head FF7 and shared CI jobs passed. FF7 runs 57 binary/HTTP tests on Windows and Linux plus ten Chromium scenarios, including actual shared controls, save/reopen, layout, sound dispatch and muting. The source artifact was downloaded and its 19 changed/new source/test files matched the locally tested versions by SHA-256. These are synthetic-data checks, not installed-game proof.
+
+**Installed acceptance checklist:**
+- [ ] Update the normal Lexeditor checkout to the merged master and run `tools\FF7-checks.cmd` for both installed editions. This reads installed data, writes only disposable temporary project copies, verifies readback/source hashes and emits a JSON report. Missing or unreadable datasets remain failures, not a full-success result.
+- [ ] In a disposable mod, edit/save/reopen representative character, AI, enemy, formation, field/world encounter, shop, price and text values. Confirm original installed files remain unchanged.
+- [ ] Validate deployed outputs and native editor behavior in the actual games. This environment did not perform deployment or gameplay acceptance.
+
+Format limits remain explicit: initial values do not rewrite existing saves; unknown executable builds are refused; fixed AI pools and scene blocks reject overflow rather than corrupting data. This is encounter-table editing, not arbitrary field scripting, world geometry or terrain reassignment. Saving a project is not automatic deployment.
+
+Current documentation and primary format references: `codex/ff7-data.md`. Earlier recovery comments are historical: their missing-editor lists have been implemented by the completion pass. This issue remains open for the acceptance checks above, not because those editors are still absent.
+
+## issue 5311976419 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/79
+
+Created: 2026-09-01T12:44:24Z; updated: 2026-09-06T16:45:17Z
+
+Exact metadata: [source record](sources/issue-5311976419-4ade731ddfa45b2057b17eca20dde1160249de071353106cc3f67db99ec8e6bb.json).
+
+**Actionable — partly implemented.** Unmerged PR #359 adds starting-character stats, limit-learning fields and safer project saves for both editions. Starting stats do not rewrite existing saves.
+
+Enemies, encounters, shops and wider character/text editing remain unfinished. Integration and in-game validation are still needed; the Characters work alone is not complete FF7 support.
+
 ## comment 5559373025 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/79#issuecomment-5559373025

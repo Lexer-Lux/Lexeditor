@@ -1,0 +1,126 @@
+{
+  "body_sha256": "b18935bf88e66914ff9b8c500092e12aa42b406fdceabbf30cff6008cbc5f984",
+  "issue": 73,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "**Actionable — mixed-game issue; FF7 implementation is now merged.** PR #359 was merged into master as `3e2d2b924ac299f085b7f568c2394419ea0b3b63`.\n\n**FF7, both editions:** Tweaks → FFNx is implemented with FF7-only setting filtering on reads and writes, backups, preserved unknown settings/comments, strict source snapshots, running-game protection, automatic detection of a newly created configuration, and protection against asynchronous refreshes discarding pending edits. Current-head binary/HTTP and Chromium CI passed; installed-game acceptance is separate.\n\n**FF8 and FF9:** FF8 controls exist. Preserve the remaining FF8 integration work and FF9 Play handoff in their respective branches. FF9 should direct the user to Memoria’s existing launcher, not add a Memoria settings editor. No further design approval is needed. This FF7 pass does not claim to have completed or tested those other-game portions.\n\nFF7 acceptance: with the game closed, change/save/reopen a harmless setting and confirm its backup; restore it. Check that FF8-only options never appear, unsaved values survive focus changes, external file changes refuse a stale save, and a running game refuses configuration writes. These behaviors have automated tests, but the installed-game checks were not performed in the recovery environment.",
+    "closed_at": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/comments",
+    "created_at": "2026-09-01T00:42:35Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/73",
+    "id": 5306402966,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Agent work remains: research, repair, implementation, build, delivery or test preparation.",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "c5def5",
+        "default": false,
+        "description": "Final Fantasy VII plugins",
+        "id": 12062139503,
+        "name": "ff7",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWkbw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff7"
+      },
+      {
+        "color": "6f7478",
+        "default": false,
+        "description": "Final Fantasy VIII plugin",
+        "id": 12062139654,
+        "name": "ff8",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlBg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff8"
+      },
+      {
+        "color": "8a6bbe",
+        "default": false,
+        "description": "Final Fantasy IX plugin",
+        "id": 12062139822,
+        "name": "ff9",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlrg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff9"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPElIlg",
+    "number": 73,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/timeline",
+    "title": "Add FFNx subtabs and use Memoria’s existing launcher",
+    "updated_at": "2026-09-06T16:45:34Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

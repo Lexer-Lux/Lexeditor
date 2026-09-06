@@ -13,6 +13,7 @@ from service_session import LocalPluginSession, request_json
 
 from . import paths
 from .kernel import Kernel, resolve_kernel
+from .storage import target_path, replace_project
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
@@ -35,21 +36,24 @@ def seed_project_layout(game_root: Path, template_root: Path,
     if expected not in supported:
         raise RuntimeError(f"Unsupported FF7 project kernel path: {relative}")
 
-    template_kernel = template_root / relative
-    template_kernel.parent.mkdir(parents=True, exist_ok=True)
-    temporary = template_kernel.with_suffix(template_kernel.suffix + ".tmp")
-    shutil.copy2(source, temporary)
-    Kernel(temporary)
-    temporary.replace(template_kernel)
+    original = Kernel(source).original
+    template_kernel = target_path(game_root, template_root, source, relative)
+    def check_template():
+        target_path(game_root, template_root, source, relative)
+        if source.read_bytes() != original:
+            raise ValueError("Installed FF7 kernel changed during template preparation")
+    existed = template_kernel.exists()
+    replace_project(template_kernel, original,
+                    template_kernel.read_bytes() if existed else original, existed, check_template)
     readme = template_root / "README.txt"
     readme.write_text(
         "Final Fantasy VII Lexeditor mod project\n\n"
-        "Lexeditor edits this project's English KERNEL.BIN copy. "
-        "The installed game remains unchanged.\n",
+        "Lexeditor edits project copies of supported English kernel, battle, field, world and executable data. "
+        "The installed game remains unchanged. Saving is not game deployment.\n",
         encoding="utf-8",
     )
 
-    default_kernel = default_root / relative
+    default_kernel = target_path(game_root, default_root, source, relative)
     if not default_kernel.is_file():
         default_kernel.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(template_kernel, default_kernel)
@@ -109,6 +113,12 @@ def launch() -> int:
     return run_host({"ff7": PLUGIN}, "ff7")
 
 
+def kernel_save_payload(data: dict) -> dict:
+    """Use the same strict snapshot and readable-category contract as the page."""
+    return {**{key:data[key] for key in ('sourceSha256','activeSha256','usingProject')},
+            'records':{key:data['records'][key] for key in data['kernelCategories'] if key in data['records']}}
+
+
 def smoke() -> list[str]:
     """Read, edit, save, and read back one installed FF7 kernel record."""
     source, relative = resolve_kernel(paths.GAME_ROOT)
@@ -131,8 +141,9 @@ def smoke() -> list[str]:
                 raise RuntimeError("FF7 editor did not advertise its proved capabilities")
             data_map = request_json(session.url + "api/datamap")
             rows = data_map.get("rows", [])
-            if len([row for row in rows if row.get("status") == "integrated"]) != 5:
-                raise RuntimeError("FF7 Data Map did not expose the five integrated kernel sections")
+            kernel_targets = {row.get("target") for row in rows if row.get("coverage") == "structured"}
+            if not {"items", "weapons", "armor", "accessories", "materia", "characters"} <= kernel_targets:
+                raise RuntimeError("FF7 Data Map did not expose readable kernel editors")
             data = request_json(session.url + "api/data")
             expected_counts = {"items": 128, "weapons": 128, "armor": 32, "accessories": 32, "materia": 96}
             if {key: len(data["records"][key]) for key in expected_counts} != expected_counts:
@@ -141,7 +152,7 @@ def smoke() -> list[str]:
             changed = original + 1 if original < 255 else original - 1
             data["records"]["weapons"][0]["values"]["attackStrength"] = changed
             request = urllib.request.Request(session.url + "api/save",
-                data=json.dumps({"records": data["records"]}).encode("utf-8"),
+                data=json.dumps(kernel_save_payload(data)).encode("utf-8"),
                 headers={"Content-Type": "application/json"}, method="POST")
             with urllib.request.urlopen(request, timeout=10) as response:
                 saved = json.loads(response.read().decode("utf-8"))
@@ -156,7 +167,7 @@ def smoke() -> list[str]:
         if not session.wait_closed():
             raise RuntimeError("FF7 child port is still open after host shutdown")
     return [
-        "FF7 managed plugin identity and five kernel sections confirmed",
+        "FF7 managed identity, readable kernel editors and strict save snapshots confirmed",
         "416 installed English records decoded with their names",
         "bounded weapon edit saved to the project and survived binary readback",
         "host-owned child service stopped cleanly",
@@ -167,13 +178,14 @@ PLUGIN = GamePlugin(
     plugin_id="ff7",
     name="Final Fantasy 7 (Original)",
     subtitle="FFVII",
-    description="Edits the proved item, equipment, and materia sections of the current Steam release.",
+    description="Edits character, battle, encounter, shop and text data for the current Steam release.",
     accent="#3155b7",
     cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-original.png",
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=FF7Session,
+    process_names=("FFVII_LAUNCHER.exe", "FFVII.exe", "ff7.exe", "ff7_en.exe", "ff7_en"),
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FF7_PROJECT",
         default_root=paths.PROJECT_ROOT,

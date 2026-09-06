@@ -163,6 +163,10 @@ class IconTests(unittest.TestCase):
 
 class LaunchTests(unittest.TestCase):
     def setUp(self):
+        # This suite isolates process/window behavior. Package integrity has
+        # real-bundle coverage in test_wse2_manager.py.
+        guard=patch('games.warband.wse2_manager.require_managed')
+        guard.start();self.addCleanup(guard.stop)
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup);self.root=Path(self.temp.name)
         self.module=self.root/'Modules'/'My Mod';self.module.mkdir(parents=True);(self.module/'module.ini').write_text('module_name = Test')
         (self.root/'mb_warband_wse2.exe').write_bytes(b'fixture-not-executable')

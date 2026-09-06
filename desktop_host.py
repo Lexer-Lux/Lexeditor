@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import math
 import os
 import random
 import subprocess
@@ -32,10 +31,8 @@ from windows_host import (
 ROOT = Path(__file__).resolve().parent
 CHOOSER = ROOT / "ui" / "chooser.html"
 ICON = ROOT / "assets" / "lexeditor.ico"
-from runtime_bootstrap import user_data_dir, open_path
-
-STORAGE = user_data_dir() / "webview-cache"
-WINDOW_STATE_PATH = user_data_dir() / "window-state.json"
+STORAGE = ROOT / "out" / "webview2"
+WINDOW_STATE_PATH = Path(os.environ.get("LOCALAPPDATA", ROOT / "out")) / "Lexeditor" / "window-state.json"
 DEFAULT_WINDOW_BOUNDS = [80, 80, 1440, 900]
 LOADING_QUOTES = ROOT / "ui" / "loading_quotes.json"
 DEFAULT_VIEWS = ROOT / "ui" / "default_views.json"
@@ -85,7 +82,7 @@ def choose_loading_quote(payload: dict, plugin_id: str, global_rarity: float,
         source = payload.get(key, []) if isinstance(payload, dict) else []
         if not isinstance(source, list):
             return []
-        return list(dict.fromkeys(line.strip() for line in source if isinstance(line, str) and line.strip()))
+        return [str(line).strip() for line in source if str(line).strip()]
 
     # A plugin can borrow another plugin's section, so a game and its remaster
     # share one pool instead of duplicating every line: "shares" maps a plugin
@@ -104,14 +101,9 @@ def choose_loading_quote(payload: dict, plugin_id: str, global_rarity: float,
                     game_lines.append(line)
     global_lines = clean_lines("global")
     try:
-        rarity = float(global_rarity)
-        if not math.isfinite(rarity):
-            raise ValueError("non-finite rarity")
-        rarity = max(1.0, rarity)
+        rarity = max(1.0, float(global_rarity))
     except (TypeError, ValueError):
         rarity = 3.0
-    if not game_lines and not global_lines:
-        return "Loading editor…"  # Missing/broken configuration is not session exhaustion.
     if used is not None:
         game_lines = [line for line in game_lines if line not in used]
         global_lines = [line for line in global_lines if line not in used]
@@ -351,7 +343,7 @@ class HostApi:
         if plugin_id != "__home__" and plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
         try:
-            payload = json.loads(LOADING_QUOTES.read_text(encoding="utf-8-sig"))
+            payload = json.loads(LOADING_QUOTES.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
             payload = {}
         rarity = self._settings.snapshot().get("globalMessageRarity", 3.0)
@@ -393,8 +385,6 @@ class HostApi:
         """Give window move and resize to Windows after an HTML pointer press."""
         import ctypes
 
-        if os.name != "nt":
-            return {"started": False, "reason": "Use the native window frame"}
         window = self._bound_window()
         native = getattr(window, "native", None)
         if native is None:
@@ -447,7 +437,7 @@ class HostApi:
             row_extra = {
                 "helperName": plugin.helper_name or helper.get("runtime") or "",
                 "helperInstalled": bool(helper.get("installed")),
-                "helperInstallable": plugin.helper_install is not None,
+                "helperInstallable": plugin.helper_install is not None or plugin.helper_install_for_root is not None,
             }
             if plugin.session_factory is None:
                 problems = problems + ["Shared UI session is not implemented"]
@@ -688,7 +678,7 @@ class HostApi:
         root = Path(configured).resolve()
         if not root.is_dir():
             raise RuntimeError(f"The configured game folder is unavailable: {root}")
-        open_path(root)
+        os.startfile(str(root))
         return {"opened": True, "path": str(root)}
 
     def install_helper(self, plugin_id: str) -> dict:
@@ -700,9 +690,15 @@ class HostApi:
         plugin = self._plugins.get(plugin_id)
         if plugin is None:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if plugin.helper_install is None:
+        if plugin.helper_install_for_root is not None:
+            current = self._installations.snapshot(plugin_id)
+            if not current.get("root") or current.get("scanInProgress"):
+                raise RuntimeError("Locate the game and finish its scan before installing its helper.")
+            result = plugin.helper_install_for_root(Path(current["root"])) or {}
+        elif plugin.helper_install is not None:
+            result = plugin.helper_install() or {}
+        else:
             raise RuntimeError(f"{plugin.name} has no installable helper")
-        result = plugin.helper_install() or {}
         snapshot = self._installations.snapshot(plugin_id)
         return {
             "helper": result,
@@ -724,33 +720,68 @@ class HostApi:
             raise PermissionError("Lexer Mode is not enabled")
         with self._lock:
             cached = self._helper_versions
-        if cached is not None and not refresh:
-            return {"helpers": cached, "cached": True}
-        rows = []
-        for plugin_id, plugin in sorted(self._plugins.items()):
-            if not (plugin.helper_name or plugin.helper_status or plugin.helper_upstream):
-                continue
-            row = {"pluginId": plugin_id, "plugin": plugin.name,
-                   "helper": plugin.helper_name or "Helper", "installed": False,
-                   "installedVersion": "", "pinned": "", "latest": ""}
-            try:
-                installed = plugin.helper_status() if plugin.helper_status else {}
-                row["installed"] = bool(installed.get("installed"))
-                row["installedVersion"] = str(installed.get("version") or "")
-            except Exception as error:
-                row["installedError"] = str(error)
-            try:
-                if plugin.helper_upstream:
+        reused = cached is not None and not refresh
+        if reused:
+            rows = [dict(row) for row in cached]
+        else:
+            rows = []
+            for plugin_id, plugin in sorted(self._plugins.items()):
+                if not (plugin.helper_name and (plugin.helper_upstream or plugin.helper_status or plugin.helper_status_for_root)):
+                    continue
+                row = {"pluginId": plugin_id, "plugin": plugin.name,
+                       "helper": plugin.helper_name, "pinned": plugin.helper_pinned}
+                try:
+                    if plugin.helper_upstream is None:
+                        raise RuntimeError("No upstream release check is registered.")
                     row.update(plugin.helper_upstream() or {})
-                else:
-                    row["error"] = "This helper has no upstream version provider."
-            except Exception as error:  # One failed lookup must not hide other rows.
-                row["error"] = str(error)
-            row["behind"] = bool(row.get("behind"))
-            rows.append(row)
+                except Exception as error:
+                    row["error"] = str(error)
+                row["behind"] = bool(row.get("behind"))
+                # Existing managers report a repository rather than a release URL.
+                source, latest = str(row.get("source", "")), str(row.get("latest", ""))
+                if not row.get("releaseNotes") and source.startswith("https://github.com/") and latest:
+                    from urllib.parse import quote
+                    row["releaseNotes"] = source.rstrip("/") + "/releases/tag/" + quote(latest, safe="")
+                rows.append(row)
+            with self._lock:
+                self._helper_versions = [dict(row) for row in rows]
+        # Installed state is always fresh even when upstream metadata is cached.
+        # A failed remote lookup must never hide the pin or local install state.
+        for row in rows:
+            plugin = self._plugins[row["pluginId"]]
+            try:
+                snapshot = self._installations.snapshot(row["pluginId"])
+                helper = snapshot.get("helper") or {}
+                if not snapshot.get("root"):
+                    helper = {}
+                row["installedVersion"] = str(helper.get("version", ""))
+                row["installed"] = bool(helper.get("installed"))
+                row["installedStatus"] = helper.get("integrity") or ("installed" if helper.get("installed") else "not installed")
+                row["installedMessage"] = str(helper.get("message", ""))
+                row["packageVersion"] = row.get("packageVersion") or helper.get("packageVersion", "")
+                if helper.get("error"):
+                    row["installedError"] = str(helper["error"])
+            except Exception as error:
+                row["installedVersion"] = ""
+                row["installedError"] = str(error)
+        return {"helpers": rows, "cached": reused}
+
+    def open_helper_release_notes(self, plugin_id: str) -> dict:
+        """Open a known cached release in the external browser, never arbitrary URLs."""
+        if not self._settings.snapshot().get("lexerMode"):
+            raise PermissionError("Lexer Mode is not enabled")
+        from urllib.parse import urlsplit
         with self._lock:
-            self._helper_versions = rows
-        return {"helpers": rows, "cached": False}
+            row = next((r for r in (self._helper_versions or []) if r["pluginId"] == plugin_id), None)
+        if row is None:
+            raise ValueError("Check helper versions before opening release notes.")
+        url = str(row.get("releaseNotes", ""))
+        parsed = urlsplit(url)
+        parts = parsed.path.strip("/").split("/")
+        if (parsed.scheme != "https" or parsed.netloc != "github.com" or len(parts) < 5
+                or parts[2:4] != ["releases", "tag"] or parsed.query or parsed.fragment):
+            raise ValueError("No valid GitHub release-notes URL is available.")
+        return {"opened": bool(webbrowser.open(url, new=2)), "url": url}
 
     def open_mod_folder(self, plugin_id: str, path: str) -> dict:
         """Open one of this plugin's own mod folders.
@@ -770,7 +801,7 @@ class HostApi:
             raise ValueError("That folder is not one of this plugin's mods")
         if not wanted.is_dir():
             raise RuntimeError(f"The mod folder is unavailable: {wanted}")
-        open_path(wanted)
+        os.startfile(str(wanted))
         return {"opened": True, "path": str(wanted)}
 
     def open_home_link(self, target: str) -> dict:
@@ -1037,7 +1068,7 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
         import webview
     except ImportError as error:
         raise RuntimeError(
-            "Lexeditor’s embedded runtime is missing. Reinstall the application or its development dependencies."
+            "Lexeditor's embedded runtime is missing. Run install.ps1."
         ) from error
 
     geometry = load_window_geometry()
@@ -1061,7 +1092,7 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
         min_size=(900, 620),
         hidden=hidden,
         maximized=False,
-        frameless=os.name == "nt",
+        frameless=True,
         easy_drag=False,
         background_color="#171a1f",
         text_select=True,
@@ -1082,7 +1113,7 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
     window.events.closing += api.window_closing
     window.events.closed += lambda *_args: api.dispose()
     webview.start(
-        gui="edgechromium" if os.name == "nt" else None,
+        gui="edgechromium",
         private_mode=False,
         storage_path=str(STORAGE),
         icon=str(ICON),
