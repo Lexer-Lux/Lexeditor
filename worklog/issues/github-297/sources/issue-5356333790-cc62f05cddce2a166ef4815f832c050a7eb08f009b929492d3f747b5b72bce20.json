@@ -1,0 +1,99 @@
+{
+  "body_sha256": "4259f0da4ac22c9f416328e483df4eb280db99d6cb6071e09b505fe6e693b289",
+  "issue": 297,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Use the correct law/bounty artwork and preserve the map marker’s white, alerted dark-red and hostile red states.\n\n**Status: Built candidate ready for visual/gameplay test.** Runtime PR #212 now classifies exact `REL_COP` and `REL_BOUNTY_HUNTER` roles. Law map blips use Rockstar `BLIP_STYLE_COP` with the resident law glyph; bounty hunters use `BLIP_STYLE_BOUNTY_HUNTER` with the resident bounty-hunter glyph. The authored bounty style inherits the cop style, so the actual map marker keeps Rockstar's own wanted/search state behavior.\n\nThe separate overhead role glyph remains white by design because there is no safe conditional-color readback for that independent HUD sprite; matching its state color is still outside this candidate.\n\nPermanent source checks passed in run 34052368724. Complete Windows release and development builds both passed in run 34052368730.\n\n- [ ] Verify tagged lawmen show law/star artwork overhead and the authored law style on the map.\n- [ ] Verify tagged bounty hunters show bounty-hunter artwork overhead and the authored bounty style on the map.\n- [ ] Exercise calm/search/hostile states and confirm the **map marker** still follows the expected authored color/state transitions.\n- [ ] Confirm generic humans did not acquire law/bounty art.\n- [ ] Confirm the overhead role glyph remains white; report if matching the map-state color is still desired after testing.\n\nCandidate: runtime PR #212. No installation or gameplay acceptance is claimed yet.",
+    "closed_at": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/297/comments",
+    "created_at": "2026-08-20T19:16:51Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/297/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/297",
+    "id": 5356333790,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      },
+      {
+        "color": "fbca04",
+        "default": false,
+        "description": "Needs Testing: an implemented candidate is available and the human test checklist is ready.",
+        "id": 12074236871,
+        "name": "untested",
+        "node_id": "LA_kwDOTn28Ks8AAAACz647xw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/untested"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/297/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0Mq3g",
+    "number": 297,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/297/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/297/timeline",
+    "title": "Deliver law and bounty-hunter Recon artwork",
+    "updated_at": "2026-09-06T18:42:11Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/297",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}
