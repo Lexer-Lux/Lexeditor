@@ -1,0 +1,90 @@
+{
+  "body_sha256": "1162eb57029d333f8837532447de4ef9510cad2795bb03ac9e7a19b3b0af550e",
+  "issue": 234,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "## How horse movement actually behaves\n\nThe useful mental model is **a latched requested gait/speed plus a separate full-gallop/sprint request**, not “hold the stick farther = proportional speed” and not the same walk/run/sprint switch used on foot.\n\n### Player input\n\nOn controller, steering comes from the left stick. Repeated taps of the horse accelerate button (`A`/`X`) raise the horse's requested pace through progressively faster locomotion states; tapping the brake (`RB`/`R1`) steps it back down. Holding the brake brings the horse to a stop. Holding/tapping acceleration aggressively requests the fastest gallop rather than merely another ordinary cruise step. Keyboard maps the same idea to movement plus Sprint/Slow Horse (`Shift`/`Ctrl` by default).\n\nThis is why a horse can keep a moderate pace without the player continuously supplying a proportional analogue throttle. Community descriptions disagree on names/counts for the intermediate animation states—people call them walk/trot/canter/jog/run differently—but consistently observe multiple persistent speed steps between walk and maximum gallop. The labels are less important than the state-machine behavior.\n\nAt high gallop, rhythmic acceleration input is special: timing taps to the stride reduces stamina cost compared with simply forcing maximum pace. Holding the accelerate input is effectively the easy “go flat out” command and burns horse stamina. Companion/formation riding also has separate speed-matching behavior, so it must not be mistaken for ordinary free-roam gait selection.\n\n### What determines the speed you actually get\n\nThe requested gait is only one layer. Actual movement is then constrained by the horse/engine state: the horse's authored speed/acceleration characteristics, current stamina, terrain and slope, path/obstacle avoidance, turning, fear/agitation, rider/mission state, settlements/camp restrictions, formation/cinematic tasks and other engine-owned locomotion rules. Bonding additionally unlocks handling maneuvers and stamina-management benefits; it should not be modelled as merely another raw top-speed multiplier.\n\nRDR2 exposes generic ped movement natives such as `SET_PED_MAX_MOVE_BLEND_RATIO`, but the public NativeDB does **not** document that as “horse gait N.” Using a raw blend or velocity cap as the whole horse rework risks exactly the wrong result: animation/hoof cadence, pathing and requested gait can disagree with physical travel speed.\n\n### What this means for our rework\n\nThe clean design surface should treat these separately:\n\n1. **Cruising gait selection:** what each accelerate/decelerate tap selects and whether the selected pace latches.\n2. **Maximum gallop/sprint:** the separate stamina-consuming top-speed request and its tap/hold behavior.\n3. **Stamina economics:** drain at fast gaits, rhythmic-tap efficiency, recovery and exhaustion limits.\n4. **Horse performance:** authored speed/acceleration differences and any overhaul multiplier, without using it to redefine the input state machine.\n5. **Handling/context:** turning, braking, obstacles, terrain, towns/camps, formation/cinematic riding and fear states should remain engine-owned unless a specific problem calls for changing them.\n\nSo if the goal is to make horse movement mirror the simplified human controls, the safest proposal is **not** “force a movement blend ratio every frame.” It is to intercept the player's requested pace: e.g. ordinary forward movement chooses the agreed cruise gait, Hold Sprint requests the top gallop, release returns to cruise, and Slow/Brake still steps down/stops. Then tune stamina and maximum-performance separately.\n\n### Confidence / remaining measurement\n\nThe input/gait behavior above is observable vanilla behavior and is consistent across current player-control references. Exact internal thresholds, blend ratios and authored gait names are not exposed by the public NativeDB, so those numbers should be measured with a small runtime speed/gait trace before implementing a rework rather than invented from community labels.\n\nThis issue asked for the horse-movement explanation **before** designing the rework. That research deliverable is complete; no horse-control gameplay change is claimed here.",
+    "closed_at": "2026-09-06T18:48:01Z",
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/234/comments",
+    "created_at": "2026-08-10T06:05:18Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/234/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/234",
+    "id": 5356315482,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 1,
+      "total_blocked_by": 0,
+      "total_blocking": 1
+    },
+    "labels": [
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/234/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0LjWg",
+    "number": 234,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/234/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "closed",
+    "state_reason": "completed",
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/234/timeline",
+    "title": "Explain horse movement before its rework",
+    "updated_at": "2026-09-06T18:48:01Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/234",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}
