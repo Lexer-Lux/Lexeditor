@@ -27,13 +27,14 @@ jobs:
           git -C ffnx remote add origin https://github.com/julianxhokaxhiu/FFNx.git
           git -C ffnx fetch --depth=1 origin c056db2783f376a340fcefa6a48cc33618998876
           git -C ffnx checkout --detach FETCH_HEAD
-          git -C ffnx submodule update --init --depth=1
+          git -C ffnx submodule update --init
           git -C ffnx apply --ignore-space-change ../editor/games/ff8/ffnx_issue_51/package/ISSUE51_DERIVATIVE_SOURCE.patch
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/cache@v4
         with:
           path: D:\vcpkg-cache
           key: ffnx-c056db-x86-vs2026-deps-v1
+          save-always: true
       - name: Configure pinned x86 derivative
         shell: pwsh
         env:
@@ -47,12 +48,13 @@ jobs:
           nuget sources add -Name github -Source https://nuget.pkg.github.com/julianxhokaxhiu/index.json -Username $env:GITHUB_REPOSITORY_OWNER -Password $env:GH_TOKEN -StorePasswordInClearText
           python -m pip install cmake==4.2.0 ninja
           cmd /c ffnx\vcpkg\bootstrap-vcpkg.bat
-          cmake -S ffnx -B ffnx/.build -G Ninja -DCMAKE_BUILD_TYPE=Release -D_DLL_VERSION=1.24.3-lexeditor51-runtime -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x86-windows-static -DFFNX_DEPLOY_TO_GAME_DIRS=OFF -DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON
+          cmake -S ffnx -B ffnx/.build -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-D_DLL_VERSION=1.24.3-lexeditor51-runtime' "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" '-DVCPKG_TARGET_TRIPLET=x86-windows-static' '-DFFNX_DEPLOY_TO_GAME_DIRS=OFF' '-DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON'
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: native-dependency-logs
+          include-hidden-files: true
           path: |
             ffnx/vcpkg/buildtrees/**/*.log
             ffnx/.build/*.log
