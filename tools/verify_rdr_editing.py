@@ -83,6 +83,28 @@ class EditingTests(unittest.TestCase):
         self.assertEqual(self.shop_save(0, "QuantityPerPurchase")["saved"], 1)
         self.assertEqual(server.shops_payload()["rows"][0]["totalAvailableQuantity"], -1)
 
+    def test_shop_handoff_is_deterministic_reversible_and_does_not_clobber_custom_price(self):
+        plan = server.shop_test_plan()
+        self.assertTrue(plan["available"])
+        self.assertEqual(plan["status"], "baseline")
+        identity = plan["id"]
+        source_bytes = Path(next(row for row in server.shops_payload(True)["rows"] if row["id"] == identity)["sourcePath"]).read_bytes()
+        staged = server.stage_shop_test()
+        self.assertEqual(staged["test"]["id"], identity)
+        self.assertEqual(staged["test"]["status"], "staged")
+        self.assertEqual(staged["test"]["currentPriceModifier"], plan["testPriceModifier"])
+        self.assertEqual(server.shop_test_plan()["id"], identity)
+        restored = server.restore_shop_test()
+        self.assertEqual(restored["test"]["status"], "baseline")
+        self.assertEqual(restored["test"]["currentPriceModifier"], plan["baselinePriceModifier"])
+        active = next(row for row in server.shops_payload()["rows"] if row["id"] == identity)
+        server.save_shop(active["source"], active["rootHash"], active["itemIndex"], active["name"],
+                         [{"field": "PriceModifier", "value": 3.0}])
+        self.assertEqual(server.shop_test_plan()["status"], "custom")
+        with self.assertRaisesRegex(ValueError, "will not overwrite"):
+            server.stage_shop_test()
+        self.assertEqual(Path(active["sourcePath"]).read_bytes(), source_bytes)
+
     def test_item_numeric_bounds_and_enums(self):
         for field, values in {
             "MaxItemCount": (-2, 100001, "1.5", "nan", True),

@@ -677,6 +677,101 @@ def shops_payload(vanilla_only: bool = False) -> dict:
     }
 
 
+def shop_test_plan() -> dict:
+    """Choose one stable real prepared shop record for a reversible price test.
+
+    Identity always comes from vanilla prepared data, so staging the test cannot
+    silently move the handoff to another item.  If that exact price is already
+    customized by the project, the helper refuses to overwrite it.
+    """
+    vanilla_rows = shops_payload(True)["rows"]
+    if not vanilla_rows:
+        return {"available": False, "reason": "No prepared ShopInventory records are available."}
+    candidates = sorted(
+        (row for row in vanilla_rows
+         if row.get("name") and row.get("shop") and math.isfinite(row.get("priceModifier", float("nan")))
+         and row.get("quantityPerPurchase", 0) > 0 and row.get("totalAvailableQuantity", 0) != 0),
+        key=lambda row: (row["shop"].casefold(), row["name"].casefold(), row["source"],
+                         row["rootHash"], row["itemIndex"]),
+    )
+    if not candidates:
+        return {"available": False, "reason": "Prepared shops contain no usable priced stock record."}
+    baseline = candidates[0]
+    active = {row["id"]: row for row in shops_payload()["rows"]}.get(baseline["id"])
+    if active is None:
+        return {"available": False, "reason": "The selected prepared shop record is missing from the active project."}
+    original = float(baseline["priceModifier"])
+    # Use a conspicuous but bounded multiplier. The alternative keeps a vanilla
+    # 2.0 record equally obvious rather than turning the test into a no-op.
+    test_value = 2.0 if original != 2.0 else 0.5
+    test_value = struct.unpack("<f", struct.pack("<f", test_value))[0]
+    current = float(active["priceModifier"])
+    if current == original:
+        status = "baseline"
+    elif current == test_value:
+        status = "staged"
+    else:
+        status = "custom"
+    return {
+        "available": True,
+        "id": baseline["id"],
+        "shop": baseline["shop"],
+        "item": baseline["name"],
+        "category": baseline["category"],
+        "source": baseline["source"],
+        "rootHash": baseline["rootHash"],
+        "itemIndex": baseline["itemIndex"],
+        "baselinePriceModifier": original,
+        "testPriceModifier": test_value,
+        "currentPriceModifier": current,
+        "status": status,
+        "stageAllowed": status in {"baseline", "staged"},
+        "restoreAllowed": status in {"baseline", "staged"},
+        "projectPath": active["projectPath"],
+        "instruction": (
+            "Stage changes only this item's PriceModifier. Deploy Project, visit this exact shop/item, "
+            "then Restore Shop Test and redeploy to return the field to its vanilla multiplier."
+        ),
+    }
+
+
+def _save_shop_test(target: str) -> dict:
+    plan = shop_test_plan()
+    if not plan.get("available"):
+        raise RuntimeError(plan.get("reason") or "No shop test candidate is available")
+    if plan["status"] == "custom":
+        raise ValueError(
+            "The shop test candidate already has a non-test custom price. Reload Shops and preserve that edit; "
+            "Lexeditor will not overwrite it for a test."
+        )
+    if target == "test":
+        value = plan["testPriceModifier"]
+    elif target == "baseline":
+        value = plan["baselinePriceModifier"]
+    else:
+        raise ValueError("Unknown shop-test target")
+    result = save_shop(
+        plan["source"], plan["rootHash"], plan["itemIndex"], plan["item"],
+        [{"field": "PriceModifier", "value": value}],
+    )
+    refreshed = shop_test_plan()
+    expected = "staged" if target == "test" else "baseline"
+    if refreshed.get("status") != expected:
+        raise RuntimeError(f"Shop test did not read back as {expected}")
+    return {**result, "test": refreshed,
+            "message": ("Shop test price staged; Deploy Project before launching RDR1."
+                        if target == "test" else
+                        "Shop test price restored; redeploy the project to restore the game copy.")}
+
+
+def stage_shop_test() -> dict:
+    return _save_shop_test("test")
+
+
+def restore_shop_test() -> dict:
+    return _save_shop_test("baseline")
+
+
 def save_shop(source: str, root_hash: str, item_index: int,
               expected_name: str, edits: list[dict]) -> dict:
     _integer(item_index, "Shop item index", 0, 2147483647)
@@ -1307,6 +1402,7 @@ def dashboard_payload() -> dict:
         "manifest": manifest,
         "redHook": redhook_payload(),
         "deployment": _deployment_payload(),
+        "shopTest": shop_test_plan(),
         "problems": paths.check()
         + ([] if PREPARED_ROOT.is_dir() else [f"Prepared RDR data is missing: {PREPARED_ROOT}"])
         + ([] if CONTENT_PREPARED_ROOT.is_dir() else [
@@ -1462,6 +1558,10 @@ class Handler(BaseHTTPRequestHandler):
                     GAME_ROOT, paths.RPF6_TOOL, ARCHIVE_SPECS))
             elif path == "/api/deployment/revert":
                 self.json_response(revert_archives(GAME_ROOT, ARCHIVE_SPECS))
+            elif path == "/api/shop-test/stage":
+                self.json_response(stage_shop_test())
+            elif path == "/api/shop-test/restore":
+                self.json_response(restore_shop_test())
             else:
                 self.json_response({"error": "not found"}, 404)
         except Exception as error:
