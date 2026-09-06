@@ -57,10 +57,10 @@ require(
 )
 
 # #60 — the old white block-fill prototype and overlapping title/formula are
-# explicitly forbidden. FF8 uses game-coloured fills, a centered pointer-safe
-# title row, and the equation is not laid over the chart/title. Live graph hover
-# evaluation is provided by the shared framework curve editor.
-require(EDITOR, '--lex-curve-fill:#aa7f13;--lex-curve-fill-alt:#5f667a;', "FF8 curve fill must remain game-coloured")
+# explicitly forbidden. FF8 uses a translucent game-red fill, a centered
+# pointer-safe title row, and the equation is not laid over the chart/title.
+# Live graph hover evaluation is provided by the shared framework curve editor.
+require(EDITOR, '--lex-curve-fill:#aa243266;', "FF8 curve fill must remain game-coloured rather than white")
 require(EDITOR, '.curve-editor-formula{display:none;}', "curve equation must not overlap the chart/title")
 require(
     EDITOR,
