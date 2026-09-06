@@ -6,32 +6,16 @@ on:
 permissions:
   contents: read
 jobs:
-  export-ffnx:
+  verifier-wheels:
     runs-on: ubuntu-24.04
     steps:
-      - name: Fetch pinned FFNx revision
+      - name: Download exact verifier dependencies
         run: |
-          git init ffnx
-          git -C ffnx remote add origin https://github.com/julianxhokaxhiu/FFNx.git
-          git -C ffnx fetch --depth=1 origin c056db2783f376a340fcefa6a48cc33618998876
-          git -C ffnx checkout --detach FETCH_HEAD
-      - name: Archive pinned tracked source
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          import subprocess, zipfile
-          root=Path('ffnx')
-          names=subprocess.check_output(['git','-C',str(root),'ls-files','-z']).decode().split('\0')
-          with zipfile.ZipFile('ffnx-pinned-source.zip','w',zipfile.ZIP_DEFLATED) as z:
-              z.writestr('PINNED_REVISION.txt','c056db2783f376a340fcefa6a48cc33618998876')
-              for name in names:
-                  if not name: continue
-                  p=root/name
-                  if p.is_file(): z.write(p,name)
-          PY
+          python -m pip download --only-binary=:all: --dest wheels \
+            pefile==2024.8.26 capstone==5.0.6 unicorn==2.1.4
       - uses: actions/upload-artifact@v4
         with:
-          name: ffnx-pinned-source
-          path: ffnx-pinned-source.zip
+          name: ff8-verifier-wheels
+          path: wheels
           retention-days: 2
           if-no-files-found: error
