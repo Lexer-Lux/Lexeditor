@@ -71,7 +71,7 @@ def main():
                     page.screenshot(path=str(ARTIFACTS/f'items-{width}.png'),full_page=True)
                     page.evaluate('navigate("datamap")');page.wait_for_timeout(600)
                     assert page.locator('.lex-paged-list-detail').count()==1
-                    page.get_by_role('combobox',name='Editor coverage',exact=True).select_option('source')
+                    page.get_by_role('combobox',name='Filter files by coverage',exact=True).select_option('source')
                     page.wait_for_timeout(400)
                     assert 'Source only' in page.locator('#main').inner_text()
                     assert 'Structured editable' not in page.locator('.warband-record-list').inner_text()
@@ -80,6 +80,9 @@ def main():
                       const rows=[...list.querySelectorAll('.lex-column-list-row')].map(r=>r.getBoundingClientRect());
                       return {viewport:innerHeight,bodyHeight:document.body.scrollHeight,listHeight:list.clientHeight,listScroll:list.scrollHeight,last:rows.at(-1)?.bottom,boxBottom:box.bottom,rowCount:rows.length};
                     }''')
+                    page.screenshot(path=str(ARTIFACTS/f'datamap-{width}.png'),full_page=True)
+                    if metrics['bodyHeight']>height+2:
+                        print(page.evaluate("() => [...document.querySelectorAll('body,#main,#toolbar,.lex-paged-list-detail,.lex-data-map-detail,.lex-pager,.lex-panel-layout')].map(e=>({tag:e.tagName,cls:e.className,id:e.id,height:e.getBoundingClientRect().height,top:e.getBoundingClientRect().top,bottom:e.getBoundingClientRect().bottom,scroll:e.scrollHeight,css:({padding:getComputedStyle(e).padding,overflow:getComputedStyle(e).overflow,display:getComputedStyle(e).display})}))"))
                     assert metrics['bodyHeight']<=height+2,metrics
                     assert metrics['listScroll']<=metrics['listHeight']+2,metrics
                     assert metrics['last']<=metrics['boxBottom']+1,metrics

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from functools import lru_cache
 import json
 import mimetypes
 import os
@@ -1095,10 +1096,12 @@ def open_redhook_page() -> dict:
     return {**status, "opened": True, "dryRun": False}
 
 
-def _normalize_data_map_rows(rows) -> list[dict]:
+def _normalize_data_map_rows(rows, *, trusted: bool = False, interfaces=None) -> list[dict]:
     if not isinstance(rows, list):
         raise ValueError("RDR data map rows must be a list")
     normalized = []
+    if interfaces is None:
+        interfaces = {} if trusted else {row["filename"].casefold(): row for row in _provisional_data_map_rows()}
     for index, source in enumerate(rows):
         if not isinstance(source, dict):
             raise ValueError(f"RDR data map row {index + 1} must be an object")
@@ -1110,17 +1113,32 @@ def _normalize_data_map_rows(rows) -> list[dict]:
             status = "not-integrated"
         target_value = source.get("target")
         target = str(target_value).strip() if target_value else ""
+        # A generated research file is not evidence of an implemented editor.
+        capability = source if trusted else interfaces.get(filename.casefold(), {})
+        coverage = capability.get("coverage", "unavailable")
+        status = capability.get("status", "not-integrated")
+        target = capability.get("target", "")
+        notes = str(source.get("notes") or source.get("description") or "").strip()
+        if not trusted:
+            notes = capability.get("notes", "No verified format-specific interface is connected to this source. " + notes)
         normalized.append({
             "filename": filename,
             "controls": str(source.get("controls") or source.get("system") or "").strip(),
-            "notes": str(source.get("notes") or source.get("description") or "").strip(),
+            "notes": notes, "coverage": coverage,
             "status": status,
             "target": target,
-            "openable": bool(source.get("openable", target)) and bool(target),
+            "openable": coverage in {"structured", "view"} and bool(target),
             "openLabel": str(source.get("openLabel") or "Open its format-specific editor"),
         })
     normalized.sort(key=lambda row: row["filename"].casefold())
     return normalized
+
+
+@lru_cache(maxsize=256)
+def _map_has_shop_records(filename: str, stamp: int, size: int) -> bool:
+    # The signature invalidates only changed resources, not every Data Map visit.
+    source = Path(filename)
+    return bool(_shop_records(source.read_bytes(), PurePosixPath(source.name), False))
 
 
 def _provisional_data_map_rows() -> list[dict]:
@@ -1132,45 +1150,61 @@ def _provisional_data_map_rows() -> list[dict]:
                     "filename": source.relative_to(PREPARED_ROOT).as_posix(),
                     "controls": "Prepared tuning data",
                     "notes": "Prepared from tune_d11generic.rpf; a format-specific editor is not mapped yet.",
-                    "status": "not-integrated",
+                    "status": "not-integrated", "coverage": "unavailable",
                 })
     for source_id, definition in INVENTORY_SOURCES.items():
+        available = (CONTENT_PREPARED_ROOT / definition["relative"]).is_file()
         rows.append({
             "filename": definition["relative"].as_posix(),
             "controls": f'{definition["label"]} inventory records',
-            "notes": "Direct scalar item fields are available in the Items editor.",
-            "status": "integrated",
+            "notes": "Only direct scalar item fields are editable in Items; nested XML structure is preserved." if available else "Prepared inventory XML is missing.",
+            "status": "partial" if available else "not-integrated",
+            "coverage": "structured" if available else "unavailable",
             "target": "items",
             "openable": True,
         })
     if GRINGO_UNPACKED_ROOT.is_dir():
         for source in GRINGO_UNPACKED_ROOT.rglob("*.wgd"):
+            relative = PurePosixPath(source.relative_to(GRINGO_UNPACKED_ROOT).as_posix())
+            try:
+                stat = source.stat()
+                supported = _map_has_shop_records(str(source), stat.st_mtime_ns, stat.st_size)
+            except (ValueError, OSError, IndexError, struct.error):
+                supported = False
+            writable = supported and paths.RPF6_TOOL.is_file() and (GRINGO_PACKED_ROOT / relative).is_file()
             rows.append({
-                "filename": "gringores/" + source.relative_to(GRINGO_UNPACKED_ROOT).as_posix(),
-                "controls": "Shop inventory and shopkeeper interaction records",
-                "notes": "ShopInventory price, purchase quantity, and stock fields are available in Shops.",
-                "status": "partial",
-                "target": "shops",
-                "openable": True,
+                "filename": "gringores/" + relative.as_posix(),
+                "controls": "ShopInventory records" if supported else "Gringo interaction resource",
+                "notes": ("Only the proved ShopInventory price, quantity and stock fields are exposed."
+                          if writable else "Shop records can be viewed; the packed source or resource writer is missing."
+                          if supported else "This resource contains no supported ShopInventory records; Shops does not edit it."),
+                "status": "partial" if supported else "not-integrated",
+                "coverage": "structured" if writable else "view" if supported else "unavailable",
+                "target": "shops" if supported else "", "openable": supported,
             })
     rows.extend((
         {"filename": "LexerRDR.ini", "controls": "LexerRDR runtime settings",
-         "notes": "Typed project settings are available in Settings.", "status": "integrated",
+         "notes": "Typed project settings are available in Settings." if SETTINGS_FILE.is_file() else "Project settings file is missing.", "status": "integrated" if SETTINGS_FILE.is_file() else "not-integrated",
+         "coverage": "structured" if SETTINGS_FILE.is_file() else "unavailable",
          "target": "settings", "openable": True},
         {"filename": "LexerRDR.loot.json", "controls": "ASI corpse item and money overrides",
-         "notes": "Schema-validated loot controls are available in Loot Tables.", "status": "integrated",
+         "notes": "Schema-validated loot controls are available in Loot Tables." if LOOT_FILE.is_file() else "Loot override file is missing.", "status": "integrated" if LOOT_FILE.is_file() else "not-integrated",
+         "coverage": "structured" if LOOT_FILE.is_file() else "unavailable",
          "target": "loot", "openable": True},
     ))
-    return _normalize_data_map_rows(rows)
+    return _normalize_data_map_rows(rows, trusted=True)
 
 
 def data_map_payload() -> dict:
     if DATA_MAP_FILE.is_file():
         document = json.loads(DATA_MAP_FILE.read_text(encoding="utf-8-sig"))
         source_rows = document.get("rows", document.get("files", [])) if isinstance(document, dict) else document
-        rows = _normalize_data_map_rows(source_rows)
+        available = _provisional_data_map_rows()
+        rows = _normalize_data_map_rows(source_rows, interfaces={row["filename"].casefold(): row for row in available})
+        known = {row["filename"].casefold() for row in rows}
+        rows.extend(row for row in available if row["filename"].casefold() not in known)
         metadata = dict(document) if isinstance(document, dict) else {}
-        metadata.update({"rows": rows, "source": str(DATA_MAP_FILE),
+        metadata.update({"rows": rows, "counts": {status: sum(row["status"] == status for row in rows) for status in ("integrated", "partial", "not-integrated")}, "source": str(DATA_MAP_FILE),
                          "provisional": bool(metadata.get("provisional", False))})
         return metadata
     return {

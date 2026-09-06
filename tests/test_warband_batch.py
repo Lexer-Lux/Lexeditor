@@ -174,7 +174,7 @@ class LaunchTests(unittest.TestCase):
         command=launch_command(self.root,self.module);self.assertEqual(command[1:],['--module','My Mod','--no-intro'])
     def test_no_silent_native_fallback(self):
         (self.root/'mb_warband_wse2.exe').unlink()
-        with self.assertRaisesRegex(RuntimeError,'not yet verified'):launch_command(self.root,self.module)
+        with self.assertRaisesRegex(RuntimeError,'Neither mb_warband'):launch_command(self.root,self.module)
     def test_not_installed_never_launches_wrong_mod(self):
         outside=self.root/'project'/'Module';outside.mkdir(parents=True);(outside/'module.ini').write_text('')
         with self.assertRaisesRegex(RuntimeError,'not installed'):launch_command(self.root,outside.parent)

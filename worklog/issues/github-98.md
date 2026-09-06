@@ -1,22 +1,23 @@
 # #98 — Coverage and paging
 
-Branch: `fix/warband-issue-batch`.
+Completed the cross-plugin audit in codex/data-map-coverage.md. All seven UI
+implementations (including both FF7 editions) use the shared Data Map component,
+which now composes the fitted Table + Detail view instead of fixed 100-row slicing.
+Warband no longer duplicates its map shell. Claims distinguish structured partial
+support, read-only interfaces, source-only access and unavailable files. FF7 links
+individual KERNEL categories; FF9 links the exact CSV dataset; FF8 links the actual
+subview. RDR generated metadata is reconciled against actual supported sources.
+RDR2 preservation-only component layers and inactive projectile runtime controls
+are no longer called editable.
 
-Warband Data Map now distinguishes structured editing, read-only views, source-only
-access and unavailable source. Links explicitly open a browser/editor or source.
-Missing source on installed modules no longer causes the whole plugin boot to fail.
-The screen uses shared `pagedListDetail` with measured minimum row height rather
-than the old fixed 100-row Data Map pager. Items and Troops also opt into fitted rows.
+Local coverage tests passed. Actual plugin HTML/CSS/map adapters were rendered
+with in-memory fixtures at 900x620, 1200x800 and 1600x1000; notes scroll only in the
+detail pane, the master has complete rows, and there is one shared pager. Added
+pagination stability and source/read-only link checks. No installed game files
+are touched by these tests. Final CI and merge evidence are recorded separately.
 
-Local rendered fixture checks passed at 1200x800, 900x620 and 1600x1000. Data Map
-reported respectively 15, 10 and 20 complete rows, body height equal to viewport,
-and no master-list scroll overflow. Screenshots were inspected. These are fixture
-UI checks, not proof of installed-game data coverage.
-
-The issue also asks for a cross-plugin audit. That portion remains agent work and
-is not silently claimed by this Warband-only batch. Other game agents may edit it.
-
-Prepared owner test: open Data Map on this branch, filter Source only, inspect
-module_skills.py, use Edit source, then close without changing it. Resize the window
-and page forward/back; expect complete rows, reachable controls and no master
-scrollbar. Installed modules without Python source should show Unavailable.
+Prepared test after updating master: open Warband Data Map, select module_skills.py,
+confirm Source only and explicitly labelled source editing, then close without
+changes. Select Items/Troops rows and follow their read-only view links. Resize,
+filter, sort and page; no master scrollbar or partial row should appear. Check
+another plugin's Data Map: an unavailable source cannot claim editable support.
