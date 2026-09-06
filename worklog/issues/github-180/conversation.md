@@ -59,6 +59,30 @@ Exact metadata: [source record](sources/issue-5356302029-c4f3db52ef49adebefcf96c
 
 Remove the custom card-glint code and setting while preserving vanilla flashes, card pickups and the separate casing glints. No new design answer or repeat test is needed from you.
 
+## issue 5356302029 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/180
+
+Created: 2026-08-06T03:45:31Z; updated: 2026-09-06T17:34:19Z
+
+Exact metadata: [source record](sources/issue-5356302029-211dbd13d2e5ae95ca8323bf2ea7568b75e4583daf943240218ed0c011977df8.json).
+
+**Actionable — removal remains.** You asked to remove this feature because vanilla cigarette cards already flash. Later implementation notes did not supersede that decision.
+
+Remove the custom card-glint code and setting while preserving vanilla flashes, card pickups and the separate casing glints. No new design answer or repeat test is needed from you.
+
+## issue 5356302029 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/180
+
+Created: 2026-08-06T03:45:31Z; updated: 2026-09-06T17:34:19Z
+
+Exact metadata: [source record](sources/issue-5356302029-ee9a69d1b8ab923bf35ee1067c614b4338fffbc667807907fbbec5ca651b194f.json).
+
+**Completed and merged.** Runtime PR Lexer-Lux/Lexers-Mod-For-RDR2#211 removed the redundant custom cigarette-card glint implementation and setting while retaining unrelated spent-casing glints. Permanent regression checks passed on the merged runtime candidate.
+
+Vanilla cigarette-card flashing remains the intended behavior; no repeat design or acceptance test was requested for this removal.
+
 ## comment 5550130360 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/180#issuecomment-5550130360
