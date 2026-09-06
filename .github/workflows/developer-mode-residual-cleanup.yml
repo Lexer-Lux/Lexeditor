@@ -1,0 +1,108 @@
+name: Developer Mode residual cleanup
+
+on:
+  push:
+    branches: [fix/ui-standardization-20260906]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ui-standardization-20260906
+          fetch-depth: 0
+      - name: Clean runtime and active regressions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def read(path): return Path(path).read_text(encoding='utf-8')
+          def write(path,text): Path(path).write_text(text,encoding='utf-8',newline='\n')
+          def once(path,old,new,label):
+              t=read(path); n=t.count(old)
+              if n != 1: raise SystemExit(f'{label}: expected one match, found {n}')
+              write(path,t.replace(old,new,1))
+
+          # Shell authorization has one state: authenticated Developer Mode.
+          p='ui/framework.js'; t=read(p)
+          t=t.replace('    let developerMode = false;\n    let lexerMode = false;\n','    let developerMode = false;\n')
+          t=t.replace('if (event.button !== 2 || !lexerMode) return;','if (event.button !== 2 || !developerMode) return;')
+          t=t.replace('    const setLexerMode = enabled => { lexerMode = !!enabled; };\n','')
+          t=t.replace('        setDeveloperMode(value?.developerMode); setLexerMode(value?.lexerMode);','        setDeveloperMode(value?.developerMode);')
+          t=t.replace('      catch (_error) { setDeveloperMode(false); setLexerMode(false); }','      catch (_error) { setDeveloperMode(false); }')
+          t=t.replace('      setDeveloperMode(event.detail?.developerMode);\n      setLexerMode(event.detail?.lexerMode);','      setDeveloperMode(event.detail?.developerMode);')
+          write(p,t)
+
+          # Helper-version tools are privileged by the same GitHub identity.
+          p='desktop_host.py'; t=read(p)
+          old='''        if not self._settings.snapshot().get("lexerMode"):\n            raise PermissionError("Lexer Mode is not enabled")\n'''
+          new='''        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):\n            raise PermissionError("Developer Mode requires Lexer's active GitHub account")\n'''
+          if t.count(old) != 2: raise SystemExit(f'helper authorization: expected 2 matches, found {t.count(old)}')
+          t=t.replace(old,new)
+          write(p,t)
+
+          p='settings_manager.py'; t=read(p)
+          t=t.replace('"""Save the per-user settings. Lexer-scope values stay packaged defaults."""',
+                      '"""Save per-user preferences. Authenticated authoring state is never persisted."""')
+          write(p,t)
+
+          # Unit tests now mock the authorization source, not deleted settings bits.
+          p='tests/test_global_issues.py'; t=read(p)
+          t=t.replace("        h._settings=Mock();h._settings.snapshot.return_value={'lexerMode':True}\n",
+                      "        h._settings=Mock();h._github=Mock();h._github.visible_repository.return_value={'repository':'Lexer-Lux/Lexeditor','login':'Lexer-Lux'}\n")
+          t=t.replace("        h=self.host();h._settings.snapshot.return_value={'lexerMode':False}\n",
+                      "        h=self.host();h._github.visible_repository.return_value=None\n")
+          write(p,t)
+
+          p='tests/test_wse2_helper_panel.py'; t=read(p)
+          t=t.replace("        self.api._settings=SimpleNamespace(snapshot=lambda:{'lexerMode':True,'updateCheckFrequency':'never'})\n",
+                      "        self.api._settings=SimpleNamespace(snapshot=lambda:{'updateCheckFrequency':'never'})\n        self.api._github=Mock();self.api._github.visible_repository.return_value={'repository':'Lexer-Lux/Lexeditor','login':'Lexer-Lux'}\n")
+          t=t.replace("    def test_lexer_permission_and_read_only_checker(self):",
+                      "    def test_developer_permission_and_read_only_checker(self):")
+          t=t.replace("        self.api._settings=SimpleNamespace(snapshot=lambda:{'lexerMode':False})\n",
+                      "        self.api._github.visible_repository.return_value=None\n")
+          write(p,t)
+
+          p='tests/wse2_helper_browser_check.py'; t=read(p)
+          t=t.replace("SETTINGS={'lexerMode':True,'developerMode':False,'lexerAuthorized':True,'lexerLogin':'Lexer-Lux',",
+                      "SETTINGS={'developerMode':True,'developerAuthorized':True,'developerLogin':'Lexer-Lux',")
+          t=t.replace("{detail:{lexerMode:false}}","{detail:{developerMode:false}}")
+          write(p,t)
+
+          # Lightweight fixture/verifier migrations to the renamed public contract.
+          migrations={
+            'tools/shot.py': [('save_lexer_setting_defaults','save_developer_setting_defaults'),('lexerMode:false','developerMode:true')],
+            'tools/verify_ffnx_settings_issue_23.py': [('save_lexer_defaults','save_packaged_defaults')],
+            'tools/verify_settings_save_controls_issue_68.py': [('save_lexer_setting_defaults','save_developer_setting_defaults'),('lexerMode: lexerMode.checked','')],
+            'tools/verify_theme_sound_volume_23.py': [('developerMode:false,lexerMode:false,','developerMode:false,')],
+            'tools/verify_ff8_current_ui_visual.py': [('developerMode:false,lexerMode:true,lexerAuthorized:true,lexerLogin:\'Lexer-Lux\'','developerMode:true,developerAuthorized:true,developerLogin:\'Lexer-Lux\''),('defaultValues:{developerMode:false,','defaultValues:{')],
+            'tools/verify_helper_versions_panel.py': [('I AM LEXER','DEV'),('lexerMode','developerMode'),('lexerAuthorized','developerAuthorized'),('lexerLogin','developerLogin')],
+            'tools/verify_default_view_authoring.py': [('return {"developerMode": self.enabled, "lexerMode": self.enabled}','return {}'),('Default authoring bypassed its owner/Lexer Mode gate','Default authoring bypassed its Developer Mode owner gate'),('Packaged view defaults require Lexer Mode and the authorized Lexeditor owner','Packaged view defaults require the authorized Lexeditor developer')],
+          }
+          for p,repls in migrations.items():
+              t=read(p)
+              for old,new in repls: t=t.replace(old,new)
+              write(p,t)
+          PY
+      - name: Show remaining legacy references
+        run: |
+          git grep -n -E 'lexerMode|lex-lexer-mode|I am Lexer|I AM LEXER|save_lexer_setting_defaults|save_lexer_defaults' -- . ':!worklog/**' || true
+      - name: Validate active runtime and tests
+        run: |
+          node --check ui/framework.js
+          python -m compileall -q desktop_host.py settings_manager.py tests tools/verify_developer_mode_issue_29.py
+          python tools/verify_developer_mode_issue_29.py
+          python tools/verify_default_view_authoring.py
+          python -m unittest tests.test_global_issues tests.test_wse2_helper_panel -v
+      - name: Commit cleanup
+        run: |
+          git rm -f .github/workflows/developer-mode-residual-cleanup.yml
+          git config user.name 'Lexeditor UI maintenance'
+          git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+          git add -A
+          git commit -m 'Remove remaining Lexer Mode runtime state'
+          git push origin HEAD:fix/ui-standardization-20260906
