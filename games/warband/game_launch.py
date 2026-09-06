@@ -49,14 +49,21 @@ class _OwnedProcess:
         self.returncode = None
 
     def poll(self):
-        if self.returncode is None and self._api.WaitForSingleObject(self._handle, 0) == 0:
-            self.returncode = self._api.GetExitCodeProcess(self._handle)
+        if self.returncode is None:
+            result = self._api.WaitForSingleObject(self._handle, 0)
+            if result == 0:
+                self.returncode = self._api.GetExitCodeProcess(self._handle)
+            elif result != 258:
+                raise OSError("Could not query the owned Warband process exit state.")
         return self.returncode
 
     def wait(self, timeout=None):
         milliseconds = 0xFFFFFFFF if timeout is None else max(0, int(timeout * 1000))
-        if self._api.WaitForSingleObject(self._handle, milliseconds) == 258:
+        result = self._api.WaitForSingleObject(self._handle, milliseconds)
+        if result == 258:
             raise subprocess.TimeoutExpired("Warband", timeout)
+        if result != 0:
+            raise OSError("Could not wait for the owned Warband process to exit.")
         return self.poll()
 
     def terminate(self):
@@ -82,6 +89,7 @@ class WindowsGameJob:
         k.QueryInformationJobObject.argtypes=[wintypes.HANDLE,ctypes.c_int,ctypes.c_void_p,wintypes.DWORD,ctypes.c_void_p];k.QueryInformationJobObject.restype=wintypes.BOOL
         k.TerminateJobObject.argtypes=[wintypes.HANDLE,wintypes.UINT];k.TerminateJobObject.restype=wintypes.BOOL
         k.CloseHandle.argtypes=[wintypes.HANDLE];k.CloseHandle.restype=wintypes.BOOL
+        k.IsProcessInJob.argtypes=[wintypes.HANDLE,wintypes.HANDLE,ctypes.POINTER(wintypes.BOOL)];k.IsProcessInJob.restype=wintypes.BOOL
         self.callback_type=ctypes.WINFUNCTYPE(wintypes.BOOL,wintypes.HWND,wintypes.LPARAM)
         u.EnumWindows.argtypes=[self.callback_type,wintypes.LPARAM];u.EnumWindows.restype=wintypes.BOOL
         u.IsWindowVisible.argtypes=[wintypes.HWND];u.IsWindowVisible.restype=wintypes.BOOL
@@ -94,6 +102,7 @@ class WindowsGameJob:
         if not self.handle:
             raise ctypes.WinError(ctypes.get_last_error())
         self.process=None
+        self._tracked_processes: dict[int, _OwnedProcess] = {}
         self.executable = os.path.normcase(str(Path(command[0]).resolve()))
         k.ResumeThread.argtypes=[wintypes.HANDLE]; k.ResumeThread.restype=wintypes.DWORD
         k.OpenProcess.argtypes=[wintypes.DWORD,wintypes.BOOL,wintypes.DWORD];k.OpenProcess.restype=wintypes.HANDLE
@@ -106,6 +115,7 @@ class WindowsGameJob:
                 command[0], subprocess.list2cmdline(command), None, None, False,
                 4, None, str(cwd), subprocess.STARTUPINFO())  # CREATE_SUSPENDED
             self.process = _OwnedProcess(process, pid, _winapi)
+            self._tracked_processes[pid] = self.process
             if not k.AssignProcessToJobObject(self.handle, wintypes.HANDLE(process)):
                 raise ctypes.WinError(ctypes.get_last_error())
             if k.ResumeThread(wintypes.HANDLE(thread)) == 0xFFFFFFFF:
@@ -130,7 +140,7 @@ class WindowsGameJob:
         finally:
             self.kernel.CloseHandle(handle)
 
-    def pids(self) -> list[int]:
+    def _job_pids(self) -> list[int]:
         if not self.handle:
             return []
         # JobObjectBasicProcessIdList is two DWORDs followed by ULONG_PTRs.
@@ -146,6 +156,46 @@ class WindowsGameJob:
                 continue
             return list((ctypes.c_size_t*count).from_buffer(buffer,8))
         raise RuntimeError("The launched game exceeded the process tracking limit.")
+
+    def pids(self) -> list[int]:
+        """Retain ownership until each observed process signals full termination.
+
+        A job's active PID list can empty before the terminating process releases
+        its working directory and file handles. Pin process handles while they
+        are members, then use their wait state rather than membership as exit
+        evidence. This also prevents a recycled PID from becoming our process.
+        """
+        if not self.handle:
+            return []
+        for pid in self._job_pids():
+            if pid in self._tracked_processes:
+                continue
+            # SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION.
+            handle = self.kernel.OpenProcess(0x101000, False, pid)
+            if not handle:
+                error = ctypes.get_last_error()
+                if error == 87:  # The process already exited (ERROR_INVALID_PARAMETER).
+                    continue
+                raise ctypes.WinError(error)
+            try:
+                member = wintypes.BOOL()
+                if not self.kernel.IsProcessInJob(handle, self.handle, ctypes.byref(member)):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                if member.value:
+                    self._tracked_processes[pid] = _OwnedProcess(handle, pid, self.process._api)
+                    handle = None  # Ownership transferred to the tracked wrapper.
+            finally:
+                if handle:
+                    self.kernel.CloseHandle(handle)
+        active = []
+        for pid, process in list(self._tracked_processes.items()):
+            if process.poll() is None:
+                active.append(pid)
+            else:
+                if process is not self.process:
+                    process.close()
+                del self._tracked_processes[pid]
+        return active
 
     def window_pid(self) -> int | None:
         members={pid for pid in self.pids() if self._same_executable(pid)};found=[]
@@ -165,12 +215,17 @@ class WindowsGameJob:
         return found[0] if found else None
 
     def terminate(self) -> None:
-        if self.handle and not self.kernel.TerminateJobObject(self.handle,1):
-            raise ctypes.WinError(ctypes.get_last_error())
+        if self.handle:
+            self.pids()  # Pin current children before asynchronous termination begins.
+            if not self.kernel.TerminateJobObject(self.handle,1):
+                raise ctypes.WinError(ctypes.get_last_error())
 
     def close(self) -> None:
         if self.handle:
             self.kernel.CloseHandle(self.handle);self.handle=None
+        for process in getattr(self, "_tracked_processes", {}).values():
+            process.close()
+        self._tracked_processes = {}
         if getattr(self, "process", None):
             self.process.close()
 
