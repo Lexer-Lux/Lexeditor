@@ -1,0 +1,40 @@
+name: Apply RDR1 runtime repository link repair
+on:
+  push:
+    branches: [fix/rdr1-runtime-repo-link]
+    paths: ['.github/workflows/apply-rdr1-runtime-repo-link.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Replace stale RDR runtime repository and verify
+        shell: python
+        run: |
+          from pathlib import Path
+          path = Path('games/rdr/plugin.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'full_name="Lexer-Lux/rdr-overhaul"'
+          new = 'full_name="Lexer-Lux/Lexers-Mod-For-RDR"'
+          assert text.count(old) == 1, 'stale repository declaration was not unique'
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          assert new in path.read_text(encoding='utf-8')
+      - name: Verify source
+        run: |
+          python -m compileall -q games/rdr
+          git diff --check
+          grep -F 'full_name="Lexer-Lux/Lexers-Mod-For-RDR"' games/rdr/plugin.py
+      - name: Commit exact repair and remove one-shot workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/rdr/plugin.py
+          git rm .github/workflows/apply-rdr1-runtime-repo-link.yml
+          git commit -m "fix(rdr1): point editor at native runtime repository"
+          git push origin HEAD:fix/rdr1-runtime-repo-link
