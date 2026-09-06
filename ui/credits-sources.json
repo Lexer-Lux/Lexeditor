@@ -21,9 +21,33 @@
         "name": "fontTools contributors",
         "role": "Font metadata and conversion.",
         "url": "https://github.com/fonttools/fonttools"
+      },
+      {
+        "name": "texfury contributors",
+        "role": "RDR2 texture-dictionary decoding used by the model preview.",
+        "url": "https://pypi.org/project/texfury/"
+      },
+      {
+        "name": "Tomli contributors",
+        "role": "TOML parsing fallback on Python versions without tomllib.",
+        "url": "https://github.com/hukkin/tomli"
+      },
+      {
+        "name": "Lexend Project authors",
+        "role": "Bundled Lexend interface font.",
+        "url": "https://github.com/googlefonts/lexend"
       }
     ],
-    "licenses": []
+    "licenses": [
+      {
+        "name": "Lexend — SIL Open Font License 1.1",
+        "sourcePath": "ui/assets/fonts/OFL.txt"
+      },
+      {
+        "name": "Lexend — source notice",
+        "sourcePath": "ui/assets/fonts/SOURCE.md"
+      }
+    ]
   },
   "plugins": {
     "blank": {
