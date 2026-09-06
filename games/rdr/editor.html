@@ -94,8 +94,15 @@
     {field:"TotalAvailableQuantity",key:"totalAvailableQuantity",label:"Available stock",step:"1",min:"-1",max:"2147483647",help:"-1 is reserved for records that use unlimited stock"}
   ];
   function matchingShops(){const needle=state.shopQuery.trim().toLowerCase();return (state.shops?.rows||[]).filter(item=>(!needle||[item.name,item.shop,item.category].some(value=>String(value||"").toLowerCase().includes(needle)))&&(!state.shopName||item.shop===state.shopName)&&(!state.shopCategory||item.category===state.shopCategory));}
-  function shopValue(item,field){const key=`${item.id}|${field.field}`;return Object.prototype.hasOwnProperty.call(state.shopEdits,key)?state.shopEdits[key]:String(item[field.key]);}
-  function editShop(item,field,value){const key=`${item.id}|${field.field}`;if(value===String(item[field.key]))delete state.shopEdits[key];else state.shopEdits[key]=value;shell.refresh();}
+  function shopBaseline(item,field){
+    const value=item[field.key];
+    if(field.key!=="priceModifier"||!Number.isFinite(value))return String(value);
+    // Show the shortest decimal which represents the stored float32 value.
+    for(let digits=1;digits<=9;digits++){const text=String(Number(value.toPrecision(digits)));if(Math.fround(Number(text))===value)return text;}
+    return String(value);
+  }
+  function shopValue(item,field){const key=`${item.id}|${field.field}`;return Object.prototype.hasOwnProperty.call(state.shopEdits,key)?state.shopEdits[key]:shopBaseline(item,field);}
+  function editShop(item,field,value){const key=`${item.id}|${field.field}`;if(value===shopBaseline(item,field))delete state.shopEdits[key];else state.shopEdits[key]=value;shell.refresh();}
   function selectShopItem(item){state.shopSelected=item.id;renderShops();}
   function shopRow(item){return el("div",{class:"rdr-record-row"},recordCell("rdr-record-name",item.name),recordCell("rdr-record-id",item.shop),recordCell("rdr-record-type",item.category),recordCell("rdr-record-source",`x${item.quantityPerPurchase} / ${item.totalAvailableQuantity}`));}
   function shopDetail(){
@@ -170,19 +177,20 @@
     return el("input",{type:"text",value,oninput:event=>editSetting(section,setting,event.target.value),spellcheck:false});
   }
   async function saveSettings(){
+    validateSettings();
     const edits=Object.entries(state.settingEdits).map(([identity,value])=>{const [section,key]=identity.split("\u0000");return {section,key,value};});if(!edits.length)return;
-    await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};shell.history.clear();setStatus("Saved LexerRDR.ini settings");renderSettings();shell.refresh();
+    await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};shell.history.clear();setStatus("Saved LexerRDR.ini in the workspace; runtime loading is not verified");renderSettings();shell.refresh();
   }
   function discardSettings(){state.settingEdits={};setStatus("Restored the last saved settings");renderSettings();shell.refresh()}
   function renderSettings(){
     $("#toolbar").replaceChildren(el("span",{},state.settings?.available?"LexerRDR.ini — project settings for LexerRDR.asi":"LexerRDR.ini is not available"),el("span",{class:"count"},state.settings?.file||""),LexeditorUI.settingsSaveControl({dirtyCount:()=>Object.keys(state.settingEdits).length,save:saveSettings,discard:discardSettings,readonly:()=>!state.settings?.available}));
-    if(!state.settings?.available){$("#main").replaceChildren(el("div",{class:"empty"},el("div",{},el("h2",{},"LexerRDR.ini is missing"),el("p",{},"Create the project settings file before editing runtime values."))));shell.refresh();return;}
+    if(!state.settings?.available){$("#main").replaceChildren(el("div",{class:"empty"},el("div",{},el("h2",{},"LexerRDR.ini is missing"),el("p",{},state.settings?.reason||"The runtime settings file must be present before its values can be edited."))));shell.refresh();return;}
     const sections=state.settings.sections.map(section=>el("section",{class:"settings-section"},el("h2",{},section.name),section.help?el("div",{class:"source-note"},section.help):null,...section.settings.map(setting=>el("div",{class:"field"},el("label",{},setting.key,setting.help?el("small",{},setting.help):null),settingControl(section,setting)))));
     $("#main").replaceChildren(el("div",{class:"settings-layout"},...sections));shell.refresh();
   }
 
   function lootNumber(parent,key,label,step="1",minimum="0",maximum="100000"){
-    return el("div",{class:"field"},el("label",{},label),el("input",{type:"number",step,min:minimum,max:maximum,value:String(parent[key]),oninput:event=>{parent[key]=step==="1"?Number.parseInt(event.target.value,10):Number(event.target.value);state.lootDirty=true;shell.refresh();}}));
+    return el("div",{class:"field"},el("label",{},label),el("input",{type:"number",step,min:minimum,max:maximum,value:String(parent[key]),oninput:event=>{parent[key]=event.target.value.trim()===""?"":Number(event.target.value);state.lootDirty=true;shell.refresh();}}));
   }
   function lootFlag(parent,key,label){return el("div",{class:"field"},el("label",{},label),el("input",{type:"checkbox",checked:!!parent[key],onchange:event=>{parent[key]=event.target.checked;state.lootDirty=true;shell.refresh();},"aria-label":label}));}
   function renderLoot(){
@@ -191,8 +199,8 @@
     const doc=state.lootDocument,bonus=doc.corpseBonusItem,money=doc.money,base=money.baseRoll;
     const bonusRows=bonus.entries.map(entry=>el("tr",{},
       el("td",{class:"mono"},String(entry.itemEnum)),
-      el("td",{},el("input",{type:"number",min:"0",max:"100000",step:"1",value:String(entry.quantity),oninput:event=>{entry.quantity=Number.parseInt(event.target.value,10);state.lootDirty=true;shell.refresh();}})),
-      el("td",{},el("input",{type:"number",min:"0",max:"100000",step:"1",value:String(entry.weight),oninput:event=>{entry.weight=Number.parseInt(event.target.value,10);state.lootDirty=true;shell.refresh();}}))));
+      el("td",{},el("input",{type:"number",min:"0",max:"100000",step:"1",value:String(entry.quantity),oninput:event=>{entry.quantity=event.target.value.trim()===""?"":Number(event.target.value);state.lootDirty=true;shell.refresh();}})),
+      el("td",{},el("input",{type:"number",min:"0",max:"100000",step:"1",value:String(entry.weight),oninput:event=>{entry.weight=event.target.value.trim()===""?"":Number(event.target.value);state.lootDirty=true;shell.refresh();}}))));
     const bonusTable=el("table",{class:"loot-table"},
       el("thead",{},el("tr",{},el("th",{},"Item enum"),el("th",{},"Quantity"),el("th",{},"Weight"))),
       el("tbody",{},...bonusRows));
@@ -201,7 +209,7 @@
       el("div",{class:"source-note"},el("strong",{},"This is not an RPF replacement. "),"LexerRDR.asi owns this schema-versioned project file. Only the five item IDs proven in Function_117 are accepted."),
       lootNumber(bonus,"chancePercent","Bonus roll chance (%)","1","0","100"),bonusTable);
     const moneyCard=el("section",{class:"card"},el("h2",{},"Money paths",el("span",{class:"asi-badge"},"ASI override")),el("div",{class:"source-note"},`Function_123: ${money.decoratorPaths.map(path=>`${path.decorator} = ${path.operation}`).join(" · ")}`),el("div",{class:"field-grid"},lootNumber(base.range,"minimum","Base minimum","0.01"),lootNumber(base.range,"maximum","Base maximum","0.01"),lootFlag(base,"applyStatScale","Apply stat scale"),lootFlag(base,"applyItem17Multiplier","Apply item 17 multiplier"),lootFlag(base,"applyFinalMultiplier","Apply final multiplier")));
-    const evidence=el("section",{class:"card"},el("h2",{},"Installed-script evidence"),el("div",{class:"path-row"},el("b",{},"Archive"),el("code",{},doc.source.archive)),el("div",{class:"path-row"},el("b",{},"Script"),el("code",{},doc.source.script)),el("pre",{class:"manifest"},doc.source.functions.map(fn=>`${fn.name} @ ${fn.positionHex} / ${fn.positionDecimal}\n${fn.role}`).join("\n\n")));
+    const evidence=el("section",{class:"card"},el("h2",{},"Installed-script evidence"),el("div",{class:"path-row"},el("b",{},"Archive"),el("code",{},doc.source?.archive||"Not supplied")),el("div",{class:"path-row"},el("b",{},"Script"),el("code",{},doc.source?.script||"Not supplied")),el("pre",{class:"manifest"},(doc.source?.functions||[]).map(fn=>`${fn.name} @ ${fn.positionHex} / ${fn.positionDecimal}\n${fn.role}`).join("\n\n")));
     $("#main").replaceChildren(el("div",{class:"stack"},el("div",{class:"loot-layout"},source,moneyCard),evidence));shell.refresh();
   }
 
@@ -229,7 +237,11 @@
     const redHook=state.dashboard.redHook;
     const intro=redHook.skipIntroLogos;
     const redHookCard=el("section",{class:"card"},el("h2",{},"RedHook"),redHook.installed?el("div",{class:"ok"},"RedHook is installed."):el("div",{class:"error"},`RedHook is required. Missing: ${redHook.missing.join(", ")}.`),redHook.installed?(intro.enabled?el("div",{class:"ok"},"Startup logo movies are disabled."):el("div",{class:"error"},intro.problem||"Startup logo skipping is not enabled.")):null,el("div",{class:"path-row"},el("b",{},"Game root"),el("code",{title:redHook.gameRoot},redHook.gameRoot)),!redHook.installed?el("button",{type:"button",onclick:()=>openRedHook()},"Open official RedHook page"):null);
-    $("#main").replaceChildren(el("div",{class:"cards"},statusCard,redHookCard));shell.refresh();
+    const deliveryCard=el("section",{class:"card"},el("h2",{},"Saved files and game delivery"),
+      el("p",{},"Save updates the workspace only. It does not install XML/WGD overrides or prove that LexerRDR.asi loaded a changed INI/JSON file."),
+      el("p",{},"Game deployment is not verified. Do not overwrite installed archives. The native runtime and its loader must be checked before an in-game test."),
+      ...Object.entries(state.dashboard.paths).filter(([name])=>["Editable overrides","Inventory overrides","Shop overrides","Settings","Loot ASI override","Mission ASI override"].includes(name)).map(([name,path])=>el("div",{class:"path-row"},el("b",{},name),el("code",{title:path},path))));
+    $("#main").replaceChildren(el("div",{class:"cards"},statusCard,redHookCard,deliveryCard));shell.refresh();
   }
 
   async function openRedHook(){try{await api("/api/redhook/open",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});setStatus("Opened the official RedHook page");}catch(error){setStatus(`Could not open RedHook: ${error.message}`);alert(state.status);}}
@@ -242,9 +254,51 @@
     document.body.append(modal);
   }
 
+  function numberEdit(raw,label,{minimum,maximum,step}={}){
+    if(raw===null||typeof raw==="boolean"||String(raw).trim()==="")throw new Error(`${label} needs a number`);
+    const value=Number(raw);
+    if(!Number.isFinite(value)||(Number(step)===1&&!Number.isInteger(value)))throw new Error(`${label} needs a finite ${Number(step)===1?"integer":"number"}`);
+    if(minimum!==undefined&&value<Number(minimum)||maximum!==undefined&&value>Number(maximum))throw new Error(`${label} is outside its allowed range`);
+    return value;
+  }
+  function validateSettings(){
+    for(const [identity,value] of Object.entries(state.settingEdits)){
+      const [section,key]=identity.split("\u0000"),setting=state.settings?.sections?.find(row=>row.name===section)?.settings.find(row=>row.key===key);
+      if(!setting)throw new Error(`Setting ${section}/${key} is no longer loaded`);
+      if(setting.control==="number")numberEdit(value,`${section}/${key}`,setting);
+      if(setting.control==="checkbox"&&!["true","false"].includes(String(value).toLowerCase()))throw new Error(`${key} must be true or false`);
+    }
+  }
+  function validatePendingEdits(){
+    for(const [identity,value] of Object.entries(state.itemEdits)){
+      const split=identity.lastIndexOf("|"),item=state.items?.rows.find(row=>row.id===identity.slice(0,split)),field=item?.fields.find(row=>row.field===identity.slice(split+1));
+      if(!field)throw new Error(`Item field ${identity} is no longer loaded`);
+      if(field.control==="number")numberEdit(value,`${item.name} ${field.field}`,field);
+      if(field.control==="select"&&!field.options.includes(value))throw new Error(`${field.field} needs a known choice`);
+    }
+    for(const [identity,value] of Object.entries(state.shopEdits)){
+      const split=identity.lastIndexOf("|"),field=SHOP_FIELDS.find(row=>row.field===identity.slice(split+1));
+      if(!field)throw new Error(`Shop field ${identity} is no longer loaded`);
+      numberEdit(value,field.label,{minimum:field.min,maximum:field.max,step:field.step});
+    }
+    for(const [identity,value] of Object.entries(state.missionEdits)){
+      const kind=identity.slice(identity.lastIndexOf("|")+1);
+      numberEdit(value,`Mission ${identity}`,{...state.missions.limits.rewards[kind],step:1});
+    }
+    validateSettings();
+    if(state.lootDirty){
+      const bonus=state.lootDocument.corpseBonusItem,range=state.lootDocument.money.baseRoll.range;
+      numberEdit(bonus.chancePercent,"Bonus chance",{minimum:0,maximum:100,step:1});
+      for(const entry of bonus.entries)for(const key of ["quantity","weight"])numberEdit(entry[key],`Item ${entry.itemEnum} ${key}`,{minimum:0,maximum:100000,step:1});
+      const minimum=numberEdit(range.minimum,"Money minimum",{minimum:0,maximum:100000}),maximum=numberEdit(range.maximum,"Money maximum",{minimum:0,maximum:100000});
+      if(minimum>maximum)throw new Error("Money minimum must not exceed maximum");
+    }
+  }
+
   async function saveAll(){
-    if(!dirtyCount())return;
+    if(!dirtyCount()||state.activeSource!=="mine")return;
     try{
+      validatePendingEdits();
       const saved=[];
       const itemGroups={};
       for(const [key,value] of Object.entries(state.itemEdits)){const split=key.lastIndexOf("|");const id=key.slice(0,split),field=key.slice(split+1);(itemGroups[id]||(itemGroups[id]=[])).push({field,value});}
@@ -263,7 +317,7 @@
         for(const mission of state.missions.missions){
           const rewards={};
           for(const reward of MISSION_REWARDS){
-            const raw=missionValue(mission,reward.key),value=Number(raw);
+            const raw=missionValue(mission,reward.key),value=numberEdit(raw,`${mission.name} ${reward.label}`,{...state.missions.limits.rewards[reward.key],step:1});
             if(!Number.isInteger(value))throw new Error(`${mission.name} ${reward.label.toLowerCase()} must be an integer`);
             if(value!==mission.baseRewards[reward.key])rewards[reward.key]=value;
           }
@@ -276,23 +330,26 @@
         await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});saved.push("LexerRDR.ini");
       }
       if(state.lootDirty){await api("/api/loot/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({document:state.lootDocument})});saved.push("LexerRDR.loot.json");}
-      [state.files,state.items,state.shops,state.missions,state.settings,state.loot]=await Promise.all([api("/api/files"),api("/api/items"),api("/api/shops"),api("/api/missions"),api("/api/settings"),api("/api/loot")]);
-      state.itemEdits={};state.shopEdits={};state.missionEdits={};state.settingEdits={};state.lootDocument=clone(state.loot.document);state.lootDirty=false;shell.history.clear();setStatus(`Saved ${saved.join(", ")}`);render();
+      [state.files,state.items,state.shops,state.missions,state.settings,state.loot]=await Promise.all([api("/api/files"),api("/api/items"),api("/api/shops"),api("/api/missions"),optionalRuntime("/api/settings"),optionalRuntime("/api/loot")]);
+      state.itemEdits={};state.shopEdits={};state.missionEdits={};state.settingEdits={};state.lootDocument=clone(state.loot.document);state.lootDirty=false;shell.history.clear();setStatus(`Saved to workspace: ${saved.join(", ")}. In-game deployment is not verified.`);render();
     }catch(error){setStatus("Save failed");showAlert({title:"Save failed",items:[{item:"Save",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
   }
 
   function navigate(tab){state.tab=tab;render();}
   function renderVanillaOnly(){$("#toolbar").replaceChildren();$("#main").replaceChildren(el("section",{class:"card"},el("h2",{},"Vanilla"),el("p",{},"This page contains LexerRDR mod data and has no Vanilla game-file equivalent."),el("p",{},"Select a mod to edit this page.")));shell.refresh()}
   function render(){document.querySelectorAll("nav button").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting)return;if(state.activeSource!=="mine"&&["loot","settings"].includes(state.tab))renderVanillaOnly();else if(state.tab==="items")renderItems();else if(state.tab==="shops")renderShops();else if(state.tab==="loot")renderLoot();else if(state.tab==="missions")renderMissions();else if(state.tab==="settings")renderSettings();else if(state.tab==="datamap")renderDataMap();else renderProject();}
-  async function switchProjectSource(value){const next=String(value||"mine")==="vanilla"?"vanilla":"mine";if(next===state.activeSource)return;state.activeSource=next;state.itemEdits={};state.shopEdits={};state.missionEdits={};state.settingEdits={};state.lootDirty=false;if(next==="vanilla"){state.items=clone(state.vanilla.items);state.shops=clone(state.vanilla.shops);state.missions=clone(state.vanilla.missions)}else[state.items,state.shops,state.missions]=await Promise.all([api("/api/items"),api("/api/shops"),api("/api/missions")]);shell.history?.clear();render()}
+  async function switchProjectSource(value){const next=String(value||"mine")==="vanilla"?"vanilla":"mine";if(next===state.activeSource)return;state.activeSource=next;state.itemEdits={};state.shopEdits={};state.missionEdits={};state.settingEdits={};state.lootDocument=clone(state.loot?.document);state.lootDirty=false;if(next==="vanilla"){state.items=clone(state.vanilla.items);state.shops=clone(state.vanilla.shops);state.missions=clone(state.vanilla.missions)}else[state.items,state.shops,state.missions]=await Promise.all([api("/api/items"),api("/api/shops"),api("/api/missions")]);shell.history?.clear();render()}
   const shell=LexeditorUI.mountShell({
     host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"rdr",themeName:"rdr",theme:{bg:"#11100f",panel:"#1a1816","panel-2":"#211e1a",border:"#4e4237",text:"#e8ded0",muted:"#aa9b89",accent:"#a92b20","accent-text":"#fff5e8",highlight:"#c99a50",success:"#69955d",font:'RDRLino,"Segoe UI",sans-serif',"heading-font":"Redemption,Georgia,serif"}},
     tabs:[{id:"items",label:"Items"},{id:"shops",label:"Shops"},{id:"loot",label:"Loot Tables"},{id:"missions",label:"Missions"},{id:"settings",label:"Tweaks"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the RDR Data Map",info:()=>navigate("project"),infoActive:()=>state.tab==="project",infoTitle:"Open RDR setup information",projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Prepared unchanged RDR game data"}],projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,dirtyCount,readonly:()=>state.activeSource!=="mine",save:saveAll,
     history:{capture:historyCapture,restore:historyRestore,render,enabled:()=>!state.booting&&state.activeSource==="mine",limit:50}
   });
 
+  async function optionalRuntime(path){
+    try{return await api(path);}catch(error){return {available:false,file:path,sections:[],reason:error.message};}
+  }
   async function boot(){
-    try{[state.files,state.dashboard,state.items,state.shops,state.missions,state.settings,state.loot,state.vanilla.items,state.vanilla.shops,state.vanilla.missions]=await Promise.all([api("/api/files"),api("/api/dashboard"),api("/api/items"),api("/api/shops"),api("/api/missions"),api("/api/settings"),api("/api/loot"),api("/api/items?dataset=vanilla"),api("/api/shops?dataset=vanilla"),api("/api/missions?dataset=vanilla")]);if(state.dashboard.redHook.installed)await configureRedHook();state.lootDocument=state.loot.available?clone(state.loot.document):null;state.booting=false;render();if(!state.dashboard.redHook.installed){await openRedHook();renderRedHookNotice();}LexeditorUI.finishPluginLoading();}
+    try{[state.files,state.dashboard,state.items,state.shops,state.missions,state.settings,state.loot,state.vanilla.items,state.vanilla.shops,state.vanilla.missions]=await Promise.all([api("/api/files"),api("/api/dashboard"),api("/api/items"),api("/api/shops"),api("/api/missions"),optionalRuntime("/api/settings"),optionalRuntime("/api/loot"),api("/api/items?dataset=vanilla"),api("/api/shops?dataset=vanilla"),api("/api/missions?dataset=vanilla")]);if(state.dashboard.redHook.installed)await configureRedHook();state.lootDocument=state.loot.available?clone(state.loot.document):null;state.booting=false;render();if(!state.dashboard.redHook.installed){await openRedHook();renderRedHookNotice();}LexeditorUI.finishPluginLoading();}
     catch(error){state.booting=false;LexeditorUI.finishPluginLoading();$("#main").textContent=`Failed to load RDR plugin: ${error.message}`;setStatus("Load failed");}
   }
   window.addEventListener("beforeunload",event=>{if(!window.__lexeditorNavigating&&dirtyCount())event.preventDefault();});
