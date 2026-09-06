@@ -30,7 +30,7 @@ def main():
                     html=html.replace(f'<script src="{name}"></script>','<script>'+(ROOT/'ui'/name).read_text()+'</script>')
                 page.set_content(html,wait_until='domcontentloaded')
                 page.evaluate('''({settings,helpers,plugin})=>{
-                    window.__testSettings=settings;window.__helperCalls=[];window.__installs=[];window.__notes=[];
+                    window.__testSettings=settings;window.__testPlugin=plugin;window.__helperCalls=[];window.__installs=[];window.__notes=[];
                     window.pywebview={api:{
                         plugins:async()=>[plugin],window_state:async()=>({maximized:false}),
                         lexeditor_settings:async()=>settings,loading_quote:async()=>({quote:''}),
@@ -68,6 +68,20 @@ def main():
                 assert page.evaluate('window.__installs')==[]
                 page.get_by_role('button',name='INSTALL / REPAIR WSE2').click()
                 page.wait_for_function('window.__installs.length===1')
+                assert page.evaluate('window.__installs')==['warband']
+                # The same repair remains reachable if a mod/project warning masks
+                # the Home card's broken status. Missing games cannot offer install.
+                page.wait_for_function('document.querySelector("#modal").hidden')
+                page.evaluate('window.__testPlugin.status="warning"; window.__testPlugin.statusText="Project warning"; window.dispatchEvent(new Event("focus"))')
+                page.wait_for_function('document.querySelector("[data-plugin=warband]")._plugin.status==="warning"')
+                page.locator('[data-plugin="warband"]').click()
+                page.get_by_role('button',name='INSTALL / REPAIR WSE2').wait_for()
+                page.screenshot(path=str(OUTPUT/f'install-warning-{width}.png'))
+                page.locator('#modal').get_by_role('button',name='CLOSE',exact=True).click()
+                page.evaluate('window.__testPlugin.root=null; window.dispatchEvent(new Event("focus"))')
+                page.wait_for_function('document.querySelector("[data-plugin=warband]")._plugin.root===null')
+                page.locator('[data-plugin="warband"]').click()
+                assert page.get_by_role('button',name='INSTALL / REPAIR WSE2').count()==0
                 assert page.evaluate('window.__installs')==['warband']
                 page.evaluate('window.dispatchEvent(new CustomEvent("lexeditor-settings-changed",{detail:{lexerMode:false}}))')
                 assert page.locator('#chooser-lexer').is_hidden()

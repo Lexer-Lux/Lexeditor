@@ -17,7 +17,8 @@ from games.warband.game_launch import launch_command, WarbandGameController
 class ManagedPackageTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name) / 'game'; self.root.mkdir()
+        # Expand Windows short TEMP paths before matching injected write failures.
+        self.root = Path(self.temp.name).resolve() / 'game'; self.root.mkdir()
         self.mod = self.root / 'Modules' / 'Selected mod'; self.mod.mkdir(parents=True)
         (self.mod/'module.ini').write_text('module_name = Chosen')
         (self.root/'mb_warband.exe').write_bytes(b'original stock game')
@@ -132,6 +133,7 @@ class ManagedPackageTests(unittest.TestCase):
             return original(path,data)
         with patch.object(m,'_atomic',side_effect=fail):
             with self.assertRaisesRegex(RuntimeError,'previous files restored'):self.install()
+        self.assertEqual(hit, [True], 'The disk-failure fixture must actually fire')
         self.assertEqual((self.root/'postFX.fx').read_bytes(),b'old shader')
         self.assertFalse((self.root/'mb_warband_wse2.exe').exists())
         self.assertFalse((self.root/'.lexeditor/wse2/pending.json').exists())
