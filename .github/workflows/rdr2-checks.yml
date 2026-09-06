@@ -1,25 +1,19 @@
 name: RDR2 checks
-
 on:
   push:
-    branches: [fix/rdr2-issue-batch]
+    branches: [master]
+    paths: ['games/rdr2/**', 'tests/test_rdr2*', '.github/workflows/rdr2-checks.yml']
   pull_request:
-    paths:
-      - 'games/rdr2/**'
-      - 'tests/*rdr2*'
-      - '.github/workflows/rdr2-checks.yml'
+    paths: ['games/rdr2/**', 'tests/test_rdr2*', '.github/workflows/rdr2-checks.yml']
   workflow_dispatch:
-
 permissions:
   contents: read
-  issues: read
-
 jobs:
-  baseline:
+  editor-regressions:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check out public source without initializing optional gitlinks
+      - name: Check out the public revision without initializing optional gitlinks
         run: |
           git init .
           git -c protocol.version=2 fetch --depth=1 "https://github.com/${GITHUB_REPOSITORY}.git" "$GITHUB_SHA"
@@ -27,32 +21,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify casing transactions, cache invalidation, and alcohol saves
+        run: python tests/test_rdr2_issue_repairs.py
+      - name: Execute production boot and dataset-switch regressions
+        run: node tests/test_rdr2_boot.js
       - name: Check RDR2 Python syntax
         run: python -m compileall -q games/rdr2
-      - name: Archive this public source revision
-        run: |
-          mkdir -p handoff
-          git archive --format=zip HEAD -o handoff/lexeditor-source.zip
-          git rev-parse HEAD > handoff/commit.txt
-      - name: Snapshot the RDR2 issue scope for regression analysis
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const issues = await github.paginate(github.rest.issues.listForRepo, {
-              ...context.repo, state: 'open', labels: 'rdr2', per_page: 100
-            });
-            const records = [];
-            for (const issue of issues.filter(i => !i.pull_request)) {
-              const comments = await github.paginate(github.rest.issues.listComments, {
-                ...context.repo, issue_number: issue.number, per_page: 100
-              });
-              records.push({issue, comments});
-            }
-            fs.writeFileSync('handoff/rdr2-issues.json', JSON.stringify(records, null, 2));
-            core.info(`${records.length} open RDR2 issues captured without changing them.`);
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rdr2-source-${{ github.sha }}
-          path: handoff/
-          retention-days: 7
