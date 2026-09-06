@@ -1818,11 +1818,7 @@
         detailField({label:"VERSION",control:value(runtime.version||"—")}),
       ]}),
     ];
-    const credits=dashboard.credits||{};
-    const creditRows=rows=>rows.map(row=>el("div",{class:"ff8-credit"},el("a",{href:row.url,target:"_blank",rel:"noopener noreferrer"},row.name),el("p",{},row.role)));
-    body.push(detailSection({title:"CONTRIBUTIONS",body:creditRows(credits.contributions||[])}),
-      detailSection({title:"SPECIAL THANKS",body:creditRows(credits.thanks||[])}),
-      detailSection({title:"LICENSES",body:(credits.licenses||[]).map(row=>el("a",{href:row.url,target:"_blank",rel:"noopener noreferrer"},row.name))}));
+    body.push(LexeditorUI.creditsPanel("ff8"));
     if(LexeditorUI.sharedSettings()?.developerMode){
       body.push(detailSection({title:"PLUGIN SFX",body:[LexeditorUI.soundCoverageTable(dashboard.themeSounds?.rows||[])]}));
     }

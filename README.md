@@ -23,3 +23,9 @@ Start Menu shortcuts:
     powershell -ExecutionPolicy Bypass -File install.ps1
 
 Then start `Lexeditor.cmd`. You can also select a game directly:
+
+
+## Contribute a game
+
+[Add a game plugin](docs/ADDING_A_GAME.md) explains registration, safe project writes,
+shared controls, Data Map coverage and verification.

@@ -131,6 +131,7 @@ def upstream_release(fetch_json: JsonFetcher = _fetch_json) -> dict:
         "published": str(payload.get("published_at", "")),
         "behind": bool(latest) and latest != PINNED_RELEASE,
         "source": REPOSITORY,
+        "releaseNotes": str(payload.get("html_url") or ""),
     }
 
 

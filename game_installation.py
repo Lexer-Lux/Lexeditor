@@ -7,7 +7,10 @@ import json
 import os
 import re
 import threading
-import winreg
+try:
+    import winreg
+except ImportError:
+    winreg = None
 from pathlib import Path
 
 from plugin_api import GamePlugin
@@ -447,6 +450,8 @@ class GameInstallationManager:
 
     @staticmethod
     def _logical_drives() -> list[Path]:
+        if os.name != "nt":
+            return []
         mask = ctypes.windll.kernel32.GetLogicalDrives()
         drives = []
         for index in range(26):
@@ -472,16 +477,20 @@ class GameInstallationManager:
     @staticmethod
     def _steam_candidates(app_id: str, install_names: tuple[str, ...]) -> list[Path]:
         steam_roots: list[Path] = []
-        for hive, key_name, value_name in (
+        for hive, key_name, value_name in (() if winreg is None else (
             (winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam", "SteamPath"),
             (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Valve\Steam", "InstallPath"),
             (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Valve\Steam", "InstallPath"),
-        ):
+        )):
             try:
                 with winreg.OpenKey(hive, key_name) as key:
                     steam_roots.append(Path(winreg.QueryValueEx(key, value_name)[0]))
             except OSError:
                 pass
+        if os.name != "nt":
+            steam_roots.extend([Path.home() / ".local/share/Steam", Path.home() / ".steam/steam",
+                                Path.home() / ".var/app/com.valvesoftware.Steam/data/Steam",
+                                Path.home() / "Library/Application Support/Steam"])
         libraries: list[Path] = []
         for steam_root in steam_roots:
             libraries.append(steam_root)
@@ -511,6 +520,8 @@ class GameInstallationManager:
     @staticmethod
     def _uninstall_candidates(game_name: str) -> list[Path]:
         candidates = []
+        if winreg is None:
+            return []
         needle = game_name.casefold()
         locations = (
             (winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall"),

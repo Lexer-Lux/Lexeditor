@@ -1,6 +1,7 @@
 "use strict";
 
 (() => {
+  const sharedAssetBase = new URL(".", document.currentScript?.src || document.baseURI);
   const embeddedEditor = window.parent !== window && window.name === "lexeditor-editor";
   if (embeddedEditor) {
     let nextCall = 0;
@@ -377,7 +378,11 @@
       window.addEventListener("resize", close, {once: true});
       window.addEventListener("scroll", close, {once: true, capture: true});
       document.addEventListener("keydown", escape);
-      popup.cleanup = () => document.removeEventListener("keydown", escape);
+      popup.cleanup = () => {
+        document.removeEventListener("keydown", escape);
+        window.removeEventListener("resize", close);
+        window.removeEventListener("scroll", close, true);
+      };
       activeHelpPopup = popup;
       position();
     };
@@ -386,6 +391,58 @@
     marker.addEventListener("focus", open);
     marker.addEventListener("blur", closeHelpPopup);
     return marker;
+  };
+
+  let creditsPromise = null;
+  const creditsPanel = pluginId => {
+    const section = element("section", {class: "lex-plugin-credits", "aria-label": "Credits"},
+      element("h2", {}, "Credits"), element("p", {role: "status"}, "Loading local credits…"));
+    const link = row => {
+      let url;
+      try { url = new URL(row.url); } catch (_) { return element("strong", {}, row.name); }
+      return url.protocol === "https:" ? element("a", {href: url.href, target: "_blank", rel: "noopener noreferrer"}, row.name)
+        : element("strong", {}, row.name);
+    };
+    creditsPromise ||= fetch(new URL("credits.json", sharedAssetBase)).then(response => {
+      if (!response.ok) throw new Error("The packaged credits file is missing.");
+      return response.json();
+    }).catch(error => { creditsPromise = null; throw error; });
+    creditsPromise.then(data => {
+      const game = data.plugins[pluginId];
+      if (!game) throw new Error(`Credits have not been supplied for ${pluginId}.`);
+      section.replaceChildren(element("h2", {}, "Credits"));
+      const rows = (title, entries) => {
+        if (!entries?.length) return;
+        section.append(element("h3", {}, title), ...entries.map(row =>
+          element("div", {class: "lex-credit-entry"}, link(row), element("p", {}, row.role))));
+      };
+      rows("Game integration", game.contributions);
+      rows("Special thanks", game.thanks);
+      rows("Shared application", data.shared?.contributions);
+      const notices = [...(game.licenses || []), ...(data.shared?.licenses || [])];
+      section.append(element("h3", {}, "Licenses and notices"), element("p", {},
+        "These notices are included locally; opening them does not require an internet connection. Game assets remain the property of their respective owners."));
+      if (notices.length) notices.forEach(row => section.append(element("details", {},
+        element("summary", {}, row.name), element("pre", {tabindex: 0}, row.text))));
+      else section.append(element("p", {}, "No third-party code license is embedded in this plugin’s metadata. Consult the separate helper’s own distribution for its license."));
+      // A frozen distribution supplies notices for the exact Python packages it bundles.
+      fetch(new URL("distribution-notices.json", sharedAssetBase)).then(response => response.ok ? response.json() : [])
+        .then(entries => entries.forEach(row => section.append(element("details", {},
+          element("summary", {}, row.name), element("pre", {tabindex: 0}, row.text))))).catch(() => {});
+    }).catch(error => section.replaceChildren(element("h2", {}, "Credits"),
+      element("p", {role: "alert"}, error.message)));
+    return section;
+  };
+
+  const syncInfoCredits = (pluginId, active) => {
+    const main = document.querySelector("#main");
+    if (!main) return;
+    main.classList.toggle("lex-showing-info", !!active);
+    if (!active || main.querySelector(".lex-plugin-credits")) return;
+    // Existing Info pages vary, but all use the shared shell. Keep credits inside
+    // their scrollable detail body when present, and never create a second header.
+    const parent = main.querySelector(".lex-information-panel .lex-detail-panel-body") || main;
+    parent.append(creditsPanel(pluginId));
   };
 
   const unitField = (control, unit, attrs = {}) => {
@@ -3625,6 +3682,7 @@
       github.classList.toggle("active", !!githubWorkspace?.state.open);
       help?.classList.toggle("active", !!options.helpActive?.());
       info?.classList.toggle("active", !!options.infoActive?.());
+      syncInfoCredits(options.plugin?.id, !!options.infoActive?.());
       if (dirty !== lastReportedDirty) {
         lastReportedDirty = dirty;
         callWindow("set_dirty_count", dirty).catch(() => {});
@@ -5531,5 +5589,5 @@
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {element, el: element, newButton, infoHelp, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {element, el: element, newButton, infoHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();

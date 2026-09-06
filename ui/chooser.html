@@ -117,6 +117,8 @@
     .lexer-helper-name { display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-weight:700; }
     .lexer-helper-state { color:var(--lex-muted); font-size:10px; letter-spacing:.06em; }
     .lexer-helper.behind .lexer-helper-state { color:var(--lex-highlight); }
+    .lexer-helper a { color:inherit; text-decoration:underline; }
+    .lexer-helper time { display:block; margin:.3em 0; }
     .lexer-helper-versions { color:var(--lex-text); font-size:12px; }
     .lexer-helper-source,.lexer-helper-error { overflow-wrap:anywhere; color:var(--lex-muted); font-size:11px; }
     .lexer-helper-error { color:#e08a80; }
@@ -191,12 +193,18 @@
       const name=document.createElement("div");name.className="lexer-helper-name";
       const label=document.createElement("span");label.textContent=`${helper.helper||helper.runtime||"Helper"} — ${helper.plugin||helper.pluginId||""}`;
       const state=document.createElement("span");state.className="lexer-helper-state";
-      state.textContent=helper.error?"UNAVAILABLE":helper.behind?"NEWER RELEASE":"UP TO DATE";
+      state.textContent=helper.error?"UNAVAILABLE":!helper.latest?"UNKNOWN":helper.behind?"NEWER RELEASE":"UP TO DATE";
       name.append(label,state);row.append(name);
       if(helper.error){const problem=document.createElement("div");problem.className="lexer-helper-error";problem.textContent=helper.error;row.append(problem);}
-      else{const versions=document.createElement("div");versions.className="lexer-helper-versions";
-        versions.textContent=helper.behind?`Pinned ${helper.pinned} → published ${helper.latest}`:`Pinned ${helper.pinned}`;row.append(versions);}
-      if(helper.source){const source=document.createElement("div");source.className="lexer-helper-source";source.textContent=helper.source;row.append(source);}
+      const versions=document.createElement("div");versions.className="lexer-helper-versions";
+      const installed=helper.installedError?"Could not read installation":helper.installed?(helper.installedVersion||"Installed; version unknown"):"Not installed";
+      versions.textContent=`Pinned: ${helper.pinned||"Unknown"} · Installed: ${installed} · Latest: ${helper.latest||"Unavailable"}`;
+      row.append(versions);
+      if(helper.installedError){const error=document.createElement("p");error.className="lexer-helper-error";error.textContent=helper.installedError;row.append(error);}
+      if(helper.published){const date=document.createElement("time");date.dateTime=helper.published;date.textContent=`Published: ${helper.published.replace("T"," ").replace("Z"," UTC")}`;row.append(date);}
+      const notes=helper.releaseNotes||helper.source;
+      if(notes){try{const url=new URL(notes);if(url.protocol==="https:"){const source=document.createElement("a");source.className="lexer-helper-source";source.href=url.href;source.target="_blank";source.rel="noopener noreferrer";source.textContent=helper.releaseNotes?"Release notes":"Project page";row.append(source);}}catch{}}
+
       return row;
     }
     async function loadHelperVersions(refresh=false){

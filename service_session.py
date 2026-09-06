@@ -12,6 +12,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Callable
+from runtime_bootstrap import service_command
 
 
 def free_port(configured_name: str | None = None) -> int:
@@ -65,7 +66,7 @@ class LocalPluginSession:
         environment["LEXEDITOR_WINDOW_HOST"] = "webview2"
         creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         self.process = subprocess.Popen(
-            [sys.executable, "-m", self.module],
+            service_command(self.module),
             cwd=str(self.app_root),
             env=environment,
             stdout=subprocess.PIPE,
