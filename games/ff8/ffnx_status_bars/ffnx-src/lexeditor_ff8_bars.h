@@ -1,6 +1,6 @@
 #pragma once
 
-// Install FF8 renderer observations. This function is safe when both options
+// Install FF8 renderer observations. This function is safe when all options
 // are disabled; it does not patch a renderer in that case.
 void lexeditor_ff8_bars_install();
 

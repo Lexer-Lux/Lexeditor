@@ -914,6 +914,73 @@
     .enemy-tabbed-column.lex-panel-layout-pane>.lex-tabbed-panel-content{flex:1;min-height:0;overflow:auto}
     .enemy-tabbed-column>.lex-subtab-bar{display:flex}
     .enemy-tabbed-column>.lex-subtab-bar>.lex-subtab-button{flex:1 0 auto;min-width:max-content;padding-inline:5px}
+
+    /* Compact Enemies: preserve the stored slots, but show one row per tier. */
+    .enemy-properties-compact{width:100%;min-width:0}
+    .enemy-properties-numeric.enemy-properties-row{grid-template-columns:repeat(var(--enemy-property-count),minmax(0,1fr))!important;gap:6px;padding:5px 0 8px}
+    .enemy-properties-booleans.enemy-properties-row{grid-template-columns:repeat(var(--enemy-flag-columns),minmax(0,1fr))!important;grid-template-rows:repeat(2,auto);gap:5px 8px;padding:2px 0 3px}
+    .enemy-properties-compact .enemy-property{grid-template-rows:27px 30px;gap:2px}
+    .enemy-properties-compact .enemy-property-name{justify-content:center;text-align:center;font-size:11px;line-height:1.08}
+    .enemy-properties-compact .enemy-property-name .lex-info-help{position:absolute;left:0;top:0;opacity:0}
+    .enemy-properties-compact .enemy-property:hover .lex-info-help,.enemy-properties-compact .enemy-property:focus-within .lex-info-help{opacity:1}
+    .enemy-properties-compact .enemy-property-boolean{display:flex;flex-direction:row-reverse;justify-content:flex-end;align-items:center;gap:4px;min-height:30px}
+    .enemy-properties-compact .enemy-property-boolean>.lex-source-control{width:auto;flex:0 0 auto;--lex-reference-rail-width:1.3em;gap:2px}
+    .enemy-properties-compact .enemy-property-boolean .enemy-property-name{flex:1;text-align:left;justify-content:flex-start;padding-right:9px}
+    .enemy-properties-compact .enemy-property-boolean input{width:16px;height:16px;min-height:16px;margin:0}
+    .enemy-properties-compact .enemy-property input:not([type=checkbox]){font-size:13px;min-height:28px}
+    .enemy-tier-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:13px}
+    .enemy-tier-table th:first-child{width:42px}
+    .enemy-tier-table th{padding:3px 1px;font-size:11px;font-weight:normal;text-align:center}
+    .enemy-tier-table td{padding:4px 3px;border-bottom:1px solid #ffffff20;vertical-align:middle}
+    .enemy-tier-table tbody tr:last-child td{border-bottom:0}
+    .enemy-tier-entry{display:grid;grid-template-columns:minmax(0,1fr) 36px;align-items:center;gap:2px;min-width:0}
+    .enemy-tier-entry>.lex-source-control,.enemy-card-choices>.lex-source-control,.enemy-defence-tile>.lex-source-control{display:flex!important;flex-direction:column;justify-content:center;gap:1px!important;min-width:0;align-items:stretch}
+    .enemy-tier-entry .lex-source-strip,.enemy-card-choices .lex-source-strip,.enemy-defence-tile .lex-source-strip{font-size:10px;justify-content:center;min-width:0;max-width:100%;overflow-wrap:anywhere}
+    .enemy-tier-entry .lex-source-strip .lex-reference-value{min-width:0}
+    .enemy-tier-entry :is(.ff8-entity-search,.ff8-item-search){display:flex!important;align-items:center;justify-content:center!important;gap:1px!important;padding:0!important;border:0!important;background:transparent!important;min-height:25px;width:100%;min-width:0}
+    .enemy-tier-entry :is(.ff8-entity-search-name,.ff8-item-link){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+    .enemy-tier-entry .ff8-item-display{display:flex;min-width:0;align-items:center}
+    .enemy-tier-entry .ff8-item-display>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .enemy-tier-entry .ff8-item-icon-slot{--ff8-item-icon-size:14px}
+    .enemy-tier-entry :is(.ff8-item-finder,.ff8-entity-search-button){width:17px;height:20px;min-width:17px;flex:0 0 17px;margin:0}
+    .enemy-tier-entry :is(.ff8-item-finder,.ff8-entity-search-button) svg{width:15px;height:15px}
+    .enemy-tier-entry .lex-unit-field{width:100%;--lex-unit-reserve:.7em}
+    .enemy-tier-entry input{width:100%;min-width:0;height:27px;min-height:27px;padding:2px 10px 2px 1px!important;font-size:12px;text-align:center}
+    .enemy-tier-entry .lex-unit{right:1px;font-size:10px}
+    .enemy-card-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;width:100%;min-width:0}
+    .enemy-card-choice{position:relative;min-width:0}
+    .enemy-card-finder{display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;min-width:0;padding:0;color:inherit;background:transparent;border:0;cursor:pointer}
+    .enemy-card-art{position:relative;display:grid;place-items:center;width:min(100%,104px);aspect-ratio:1;overflow:hidden;background:#373737}
+    .enemy-card-art img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+    .enemy-card-placeholder{font:12px/1.2 Arial,sans-serif;text-align:center;padding:4px}
+    .enemy-card-placeholder[hidden],.enemy-immunity-label[hidden],.enemy-status-fallback[hidden]{display:none!important}
+    .enemy-card-name{display:flex;align-items:center;justify-content:center;gap:3px;max-width:100%;font-size:14px;line-height:1.1;text-align:center;min-height:30px}
+    .enemy-card-name>span{overflow-wrap:anywhere;min-width:0}
+    .enemy-card-name svg{width:16px;height:16px;flex:0 0 16px}
+    .enemy-card-clear{position:absolute;top:0;right:0;width:20px;height:20px;min-height:20px;padding:0;border:0;color:#fff;background:#222c;font:16px/1 Arial,sans-serif;cursor:pointer}
+    .enemy-card-finder:focus-visible,.enemy-card-clear:focus-visible{outline:2px solid #fff;outline-offset:2px}
+    .enemy-card-choice button:disabled{cursor:default;opacity:.5}
+    .enemy-defence-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:8px 6px;align-items:start;width:100%;min-width:0}
+    .enemy-defence-grid.enemy-statuses{grid-template-columns:repeat(auto-fit,minmax(58px,1fr))}
+    .enemy-defence-tile{display:flex;flex-direction:column;gap:2px;min-width:0;align-items:stretch}
+    .enemy-defence-toggle.ff8-icon-toggle{position:relative;width:100%;height:38px;min-height:38px;display:grid;place-items:center;overflow:hidden}
+    .enemy-defence-toggle input{position:absolute;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+    .enemy-defence-toggle input:disabled{cursor:default}
+    .enemy-defence-toggle:focus-within{outline:2px solid white;outline-offset:1px}
+    .enemy-defence-toggle .ff8-concept-icon{width:100%;height:32px;max-width:none;object-fit:contain;pointer-events:none}
+    .enemy-defence-name{min-height:14px;font-size:10px;line-height:1.05;text-align:center;white-space:normal}
+    .enemy-status-fallback{font-size:11px;line-height:1.1;text-align:center;overflow-wrap:anywhere}
+    .enemy-immunity-label{position:absolute;inset:0;display:grid;place-items:center;color:white;background:#2229;font:bold clamp(8px,.75vw,11px)/1 Arial,sans-serif;text-shadow:1px 1px #000;pointer-events:none}
+    .enemy-defence-tile .lex-unit-field{width:100%;--lex-unit-reserve:1em}
+    .enemy-defence-tile input[type=number]{width:100%;min-width:0;min-height:28px;height:28px;padding:2px 12px 2px 2px;font-size:12px;text-align:center;appearance:textfield;-moz-appearance:textfield}
+    .enemy-defence-tile input[type=number]::-webkit-inner-spin-button,.enemy-defence-tile input[type=number]::-webkit-outer-spin-button{appearance:none;margin:0}
+    .enemy-defence-tile .lex-unit{right:2px;font-size:11px}
+    .enemy-defence-tile input:disabled{opacity:.45;color:#ccc!important;background:#555!important;cursor:not-allowed}
+    .enemy-battle-text-content .enemy-scan-section{margin:14px 0 30px!important}
+    .enemy-battle-text-content .enemy-scan-section textarea{width:100%;min-height:100px;resize:vertical}
+
+    .enemy-table-controls,.enemy-card-choices,.enemy-defence-grid,.enemy-properties-compact{margin:0;padding:0;border:0;min-inline-size:0}
+    .enemy-tier-entry .lex-source-control>.lex-reference-values,.enemy-card-choices>.lex-source-control>.lex-reference-values,.enemy-defence-tile>.lex-source-control>.lex-reference-values{position:static!important;inset:auto!important;transform:none!important;width:auto!important;max-width:100%;align-self:center;justify-items:center}
   </style>
 </head>
 <body>
@@ -1393,12 +1460,114 @@
   function choiceName(entries,value){return entries.find(entry=>Number(entry.id??entry.value)===Number(value))?.name??String(value)}
   function enemyAbilityValueControl(row,entry){const choices=state.data.enemyTables.choices,origin=()=>{state.selected.enemies=row.id;navigate("enemies")},set=value=>{entry.abilityId=Number(value);renderEnemies();shell.refresh()};if(Number(entry.type)===2)return magicSearchControl(entry.abilityId,`Select Magic for ${row.name}.`,set,origin);if(Number(entry.type)===4)return itemSearchControl(entry.abilityId,`Select the Item for ${row.name}.`,set,origin);const entries=Number(entry.type)===0?[{id:0,name:"Not defined"}]:choices.enemyAbilities;return selectControl(entry.abilityId,entries,set)}
   function enemyAbilitiesSection(row,tier=null){const choices=state.data.enemyTables.choices,rows=(tier?[[tier,row.tables.abilities[tier]]]:Object.entries(row.tables.abilities)).flatMap(([entryTier,entries])=>entries.map(entry=>({...entry,tier:entryTier,key:`${entryTier}-${entry.slot}`}))),columns=[...(tier?[]:[{key:"tier",label:"Tier"}]),{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"type",label:"Type",sortValue:entry=>entry.type,render:entry=>enemyTableSource(selectControl(entry.type,choices.abilityTypes,value=>{entry.type=value;entry.abilityId=0;renderEnemies()}),row,value=>value?.tables.abilities[entry.tier][entry.slot]?.type,value=>entry.type=Number(value),value=>choiceName(choices.abilityTypes,value))},{key:"ability",label:"Ability",sortValue:entry=>entry.abilityId,render:entry=>enemyTableSource(enemyAbilityValueControl(row,entry),row,value=>value?.tables.abilities[entry.tier][entry.slot]?.abilityId,value=>entry.abilityId=Number(value))},{key:"animation",label:"Anim.",headerTitle:"Animation",render:entry=>enemyTableSource(numberControl(entry.animation,0,255,1,value=>entry.animation=value),row,value=>value?.tables.abilities[entry.tier][entry.slot]?.animation,value=>entry.animation=Number(value))}],template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 44px":"90px 58px minmax(120px,.8fr) minmax(180px,1.4fr) 90px",table=columnList({rows,key:entry=>entry.key,class:"ff8-record-list enemy-ability-table",editable:true,template,columns});return detailSection({className:"enemy-table-section",title:tier?`${tier.toLocaleUpperCase()} LEVEL`:"ABILITIES",body:table})}
-  function enemyPairSection(row,kind,title,valueLabel){const tables=row.tables[kind],rows=Object.entries(tables).flatMap(([tier,entries])=>entries.map(entry=>({...entry,tier,key:`${tier}-${entry.slot}`}))),origin=()=>{state.selected.enemies=row.id;navigate("enemies")},table=columnList({rows,key:entry=>entry.key,class:"ff8-record-list enemy-pair-table",editable:true,template:"90px 58px minmax(180px,1fr) 90px",columns:[{key:"tier",label:"Tier"},{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"value",label:valueLabel,sortValue:entry=>entry.valueId,render:entry=>{const set=value=>{entry.valueId=Number(value);renderEnemies();shell.refresh()},control=kind==="draw"?magicSearchControl(entry.valueId,`Select Magic for ${row.name}.`,set,origin):itemSearchControl(entry.valueId,`Select the Item for ${row.name}.`,set,origin);return enemyTableSource(control,row,value=>value?.tables[kind][entry.tier][entry.slot]?.valueId,set)}},{key:"quantity",label:"Quantity",render:entry=>enemyTableSource(numberControl(entry.quantity,0,255,1,value=>entry.quantity=value),row,value=>value?.tables[kind][entry.tier][entry.slot]?.quantity,value=>entry.quantity=Number(value))}]});return detailSection({className:"enemy-table-section",title,body:table})}
-  function enemySimpleTables(row){const cards=columnList({rows:row.tables.cards,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(180px,1fr)",columns:[{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"card",label:"Card",sortValue:entry=>entry.cardId,render:entry=>enemyTableSource(selectControl(entry.cardId,state.data.enemyTables.choices.cards,value=>entry.cardId=value),row,value=>value?.tables.cards[entry.slot]?.cardId,value=>entry.cardId=Number(value),value=>choiceName(state.data.enemyTables.choices.cards,value))}]});const devour=columnList({rows:row.tables.devour,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"value",label:"Stored Devour ID",sortValue:entry=>entry.devourId,render:entry=>enemyTableSource(numberControl(entry.devourId,0,255,1,value=>entry.devourId=value),row,value=>value?.tables.devour[entry.slot]?.devourId,value=>entry.devourId=Number(value))}]});const renzokuken=columnList({rows:row.tables.renzokuken,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"value",label:"Value",render:entry=>enemyTableSource(numberControl(entry.value,0,65535,1,value=>entry.value=value),row,value=>value?.tables.renzokuken[entry.slot]?.value,value=>entry.value=Number(value))}]});return [detailSection({className:"enemy-table-section",title:"CARDS",body:cards}),detailSection({className:"enemy-table-section",title:"DEVOUR",help:infoHelp("This is the exact stored Devour table ID. Its gameplay meaning is not yet proven."),body:devour}),detailSection({className:"enemy-table-section",title:"RENZOKUKEN",help:infoHelp("These are the exact stored Renzokuken table values."),body:renzokuken})]}
-  function enemyDefenceSection(row,kind,title){const element=kind==="elementDefence",elementNames=["Fire","Ice","Thunder","Earth","Poison","Wind","Water","Holy"],statusNames=(state.data.enemyTables.choices.statuses||[]).map(entry=>entry.name),slotName=entry=>element?elementNames[entry.slot]:(statusNames[entry.slot]||`Status ${entry.slot+1}`),help=element?infoHelp("One byte per element. The editor shows the resistance percent the game derives from it: 900 minus ten times the stored byte, so 100% is neutral, above 100% resists and below 100% takes extra damage. The byte allows 900% down to -1650%."):infoHelp("One byte per status. The editor shows the resistance percent the game derives from it: the stored byte minus 100, so 0% is fully vulnerable and a higher number resists more. 155% is the ceiling, and it is 155 rather than 100 only because the byte stops at 255; it means immune. Negative values are legal and mean extra vulnerable - vanilla uses -20% in places."),IMMUNE_PERCENT=element?0:155,NEUTRAL_PERCENT=element?100:0,immuneValue=entry=>element?Number(entry.percent)<=0:Number(entry.percent)>=155,rows=row.tables[kind],table=columnList({rows,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"minmax(120px,1fr) minmax(96px,.7fr) minmax(70px,auto)",columns:[{key:"kind",label:element?"Element":"Status",sortValue:entry=>slotName(entry),render:entry=>slotName(entry)},{key:"percent",label:"Defence",render:entry=>{const setPercent=value=>{entry.percent=value;entry.stored=element?Math.round((900-value)/10):Math.round(value+100)},control=unitField(numberControl(entry.percent,element?-1650:-100,element?900:155,element?10:1,setPercent),"%");return enemyTableSource(control,row,value=>value?.tables[kind][entry.slot]?.percent,setPercent,value=>`${value}%`)}},{key:"immune",label:"Immune",sortValue:entry=>immuneValue(entry)?0:1,render:entry=>{const input=el("input",{type:"checkbox",checked:immuneValue(entry),"aria-label":`${slotName(entry)} immune`,onchange:event=>{const immune=event.target.checked;entry.percent=immune?IMMUNE_PERCENT:NEUTRAL_PERCENT;entry.stored=element?Math.round((900-entry.percent)/10):Math.round(entry.percent+100);renderEnemies();shell.refresh()}});return el("label",{class:"ff8-immune-toggle",title:element?"No damage from this element":"Cannot be inflicted with this status"},input)}}]});return detailSection({className:"enemy-table-section",title,help,body:table})}
+  function enemyPairSection(row,kind,title,valueLabel){
+    const tiers=[['low','LOW'],['medium','MED'],['high','HIGH']], draw=kind==='draw';
+    const origin=()=>{state.selected.enemies=row.id;navigate('enemies')};
+    const table=el('table',{class:`enemy-tier-table enemy-${kind}-table`,'aria-label':`${title} by level tier`});
+    if(!draw)table.append(el('thead',{},el('tr',{},el('th',{scope:'col'},'LEVEL'),
+      ...[1,2,3,4].map(slot=>el('th',{scope:'col'},`SLOT ${slot}`)))));
+    table.append(el('tbody',{},...tiers.map(([tier,label])=>el('tr',{'data-tier':tier},
+      el('th',{scope:'row'},label),...(row.tables[kind][tier]||[]).map(entry=>{
+        // Keep the actual stored entry, not a spread copy: saveAll reads this
+        // array. Display labels never sort, compact, or renumber DAT slots.
+        const read=value=>value?.tables[kind]?.[tier]?.find(value=>value.slot===entry.slot);
+        const set=value=>{entry.valueId=Number(value);shell.refresh()};
+        const prompt=`Select ${valueLabel} for ${row.name}, ${label.toLowerCase()} level.`;
+        const choice=draw?magicSearchControl(entry.valueId,prompt,set,origin):itemSearchControl(entry.valueId,prompt,set,origin);
+        choice.title=choice.textContent.trim();
+        const value=enemyTableSource(choice,row,value=>read(value)?.valueId,set);
+        const quantity=numberControl(entry.quantity,0,255,1,value=>entry.quantity=Math.round(value),
+          {'aria-label':`${title} ${tier} choice ${entry.slot+1} quantity`});
+        quantity.addEventListener('blur',()=>quantity.value=String(entry.quantity));
+        return el('td',{'data-slot':entry.slot},el('div',{class:'enemy-tier-entry'},value,
+          enemyTableSource(unitField(quantity,'×',{unitClass:'enemy-quantity-unit'}),row,
+            value=>read(value)?.quantity,value=>entry.quantity=Number(value))));
+      })))));
+    return detailSection({className:'enemy-table-section enemy-tier-section',title,body:el('fieldset',{class:'enemy-table-controls',disabled:state.activeSource!=='mine'},table)});
+  }
+  function enemyCardChoices(row){
+    const choices=state.data.enemyTables.choices.cards;
+    return el('fieldset',{class:'enemy-card-choices',disabled:state.activeSource!=='mine'},...row.tables.cards.map(entry=>{
+      const id=Number(entry.cardId),card=rowOf(state.data,'cards',id)||choices.find(value=>Number(value.id)===id);
+      const name=card?.name||`Card ${id}`,origin=()=>{state.selected.enemies=row.id;navigate('enemies')};
+      const set=value=>{entry.cardId=Number(value);shell.refresh()};
+      const placeholder=el('span',{class:'enemy-card-placeholder','aria-hidden':'true'},id===255?'—':'?');
+      const art=el('span',{class:'enemy-card-art'},placeholder);
+      if(id>=0&&id<110){
+        const image=el('img',{src:`/assets/cards/${id}.png`,alt:name,
+          onload:()=>{placeholder.hidden=true},onerror:()=>{image.remove();placeholder.textContent='Art unavailable'}});
+        art.append(image);
+      }
+      const choose=el('button',{type:'button',class:'enemy-card-finder',disabled:state.activeSource!=='mine',
+        'aria-label':`Choose card for slot ${entry.slot+1}: ${name}`,
+        title:`Choose card for slot ${entry.slot+1}: ${name}`,onclick:()=>beginSearcher({type:'cards',
+          prompt:`Select card ${entry.slot+1} for ${row.name}.`,target:()=>navigate('cards'),origin,accept:set})},
+        art,el('span',{class:'enemy-card-name'},el('span',{},name),searchIcon()));
+      // 255 is a real sentinel in the existing schema, not card zero. Keep it
+      // selectable even though the Cards tab only contains the 110 real cards.
+      const clear=el('button',{type:'button',class:'enemy-card-clear',disabled:state.activeSource!=='mine'||id===255,
+        title:'Set to Immune (stored card ID 255)','aria-label':`Clear card slot ${entry.slot+1}`,
+        onclick:()=>{set(255);renderEnemies()}},'×');
+      const control=el('div',{class:'enemy-card-choice','data-slot':entry.slot},choose,clear);
+      return enemyTableSource(control,row,value=>value?.tables.cards.find(value=>value.slot===entry.slot)?.cardId,
+        set,value=>rowOf(state.data,'cards',Number(value))?.name||choiceName(choices,value));
+    }));
+  }
+  function enemySimpleTables(row){const cards=enemyCardChoices(row);const devour=columnList({rows:row.tables.devour,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"value",label:"Stored Devour ID",sortValue:entry=>entry.devourId,render:entry=>enemyTableSource(numberControl(entry.devourId,0,255,1,value=>entry.devourId=value),row,value=>value?.tables.devour[entry.slot]?.devourId,value=>entry.devourId=Number(value))}]});const renzokuken=columnList({rows:row.tables.renzokuken,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"value",label:"Value",render:entry=>enemyTableSource(numberControl(entry.value,0,65535,1,value=>entry.value=value),row,value=>value?.tables.renzokuken[entry.slot]?.value,value=>entry.value=Number(value))}]});return [detailSection({className:"enemy-table-section",title:"CARDS",body:cards}),detailSection({className:"enemy-table-section",title:"DEVOUR",help:infoHelp("This is the exact stored Devour table ID. Its gameplay meaning is not yet proven."),body:devour}),detailSection({className:"enemy-table-section",title:"RENZOKUKEN",help:infoHelp("These are the exact stored Renzokuken table values."),body:renzokuken})]}
+  const enemyDefencePrevious=new WeakMap();
+  function enemyDefenceSection(row,kind,title){
+    const element=kind==='elementDefence',names=['Fire','Ice','Thunder','Earth','Poison','Wind','Water','Holy'];
+    const aliases={Blind:'Darkness',Mute:'Silence','Sub-petrify':'Petrify'};
+    const neutral=element?100:0,immune=element?0:155;
+    const help=infoHelp(element?
+      'The stored byte is shown as 900 − 10 × byte. 100% is neutral; exactly 0% is immune. Negative values remain distinct and editable. Toggle an icon for full immunity; toggle again to restore the previous value.':
+      'Status defence is the stored byte − 100 (−100% to 155%). 155% means immune. Toggle an icon for full immunity; toggle again to restore the previous value.');
+    const grid=el('fieldset',{class:`enemy-defence-grid ${element?'enemy-elements':'enemy-statuses'}`,disabled:state.activeSource!=='mine'},
+      ...row.tables[kind].map(entry=>{
+        const name=element?names[entry.slot]:(state.data.enemyTables.choices.statuses||[]).find(value=>Number(value.id)===entry.slot)?.name||`Status ${entry.slot+1}`;
+        const read=value=>value?.tables[kind]?.find(value=>value.slot===entry.slot)?.percent;
+        const isImmune=()=>Number(entry.percent)===immune;
+        const setPercent=value=>{
+          const number=Number(value);if(!Number.isFinite(number))return;
+          entry.stored=Math.max(0,Math.min(255,Math.round(element?(900-number)/10:number+100)));
+          entry.percent=element?900-entry.stored*10:entry.stored-100;
+        };
+        const input=el('input',{type:'number',min:element?-1650:-100,max:element?900:155,step:element?10:1,
+          value:entry.percent,'aria-label':`${name} defence percent`,oninput:()=>{
+            if(input.validity.valid&&input.value!==''){setPercent(input.value);shell.refresh()}
+          },onchange:()=>{if(input.value!=='')setPercent(input.value);input.value=entry.percent;sync();shell.refresh()}});
+        const mark=el('span',{class:'enemy-immunity-label','aria-hidden':'true'},'IMMUNE');
+        const checkbox=el('input',{type:'checkbox','aria-label':`${name} immune`,onchange:()=>{
+          if(checkbox.checked){if(!isImmune())enemyDefencePrevious.set(entry,entry.percent);setPercent(immune)}
+          else setPercent(enemyDefencePrevious.get(entry)??neutral);
+          input.value=entry.percent;sync();input.dispatchEvent(new Event('change',{bubbles:true}));
+        }});
+        const icon=conceptIcon(element?'element':'status',aliases[name]||name);
+        // Some defence bytes (e.g. Haste/Unused) have no mapped native menu
+        // icon. Keep a named tile, never a blank or invented game sprite.
+        const fallback=el('span',{class:'enemy-status-fallback',hidden:!!icon},name);
+        if(icon)icon.addEventListener('error',()=>{icon.remove();fallback.hidden=false},{once:true});
+        const toggle=el('label',{class:'ff8-icon-toggle enemy-defence-toggle',title:`${name}: toggle immunity`},
+          checkbox,icon,fallback,mark);
+        const tile=el('div',{class:'enemy-defence-tile','data-defence':name},toggle,
+          el('span',{class:'enemy-defence-name'},name),enemyTableSource(unitField(input,'%'),row,read,setPercent,value=>`${value}%`));
+        const sync=()=>{const checked=isImmune();checkbox.checked=checked;checkbox.disabled=state.activeSource!=='mine';
+          input.disabled=checked||state.activeSource!=='mine';tile.classList.toggle('immune',checked);mark.hidden=!checked};
+        sync();return tile;
+      }));
+    return detailSection({className:'enemy-table-section enemy-defence-section',title,help,body:grid});
+  }
   function enemyScanSection(row,prefs){const input=el("textarea",{rows:6,"aria-label":`Scan description for ${row.name}`,oninput:event=>{row.scanDescription=event.target.value;shell.refresh()}});input.value=row.scanDescription??"";return detailSection({className:"enemy-scan-section",title:"SCAN",body:detailField({label:"DESCRIPTION",control:sourceControl(input,()=>row.scanDescription,rowOf(state.vanilla,"enemies",row.id)?.scanDescription,referenceValues("enemies",row.id,value=>value?.scanDescription),value=>row.scanDescription=String(value??"")),pin:prefs?.pinButton("scanDescription","Scan description")})})}
-  function enemyPropertyLabel(field){const labels={"Medium level starts":"MED LV","High level starts":"HIGH LV","Auto Reflect":"REFLECT","Auto Shell":"SHELL","Auto Protect":"PROTECT","Surprise immunity":"NO SURPRISE","Disable miss":"NO MISS","Always yield as card":"CARD","Extra XP":"EXTRA XP","Mug rate":"MUG %","Drop rate":"DROP %"};return labels[field.label]||field.label}
-  function enemyProperties(fields,rowId,prefs){return detailSection({className:"enemy-properties-section",title:"PROPERTIES",body:el("div",{class:"enemy-properties-row",style:`--enemy-property-count:${fields.length}`},...fields.map(field=>el("label",{class:"enemy-property"},el("span",{class:"enemy-property-name",title:field.label},enemyPropertyLabel(field),field.help?infoHelp(field.help):null,prefs?.pinButton(`field:${field.field}`,field.label)),fieldSourceControl(field,"enemies",rowId,{internal:field.control!=="boolean"}))))})}
+  function enemyPropertyLabel(field){const labels={"Medium level starts":"MED LV","High level starts":"HIGH LV","Auto-Reflect":"REFLECT","Auto-Shell":"SHELL","Auto-Protect":"PROTECT","Surprise immunity":"NO SURPRISE","Diablos misses":"NO DIABLOS","Always yields a card":"ALWAYS CARD","Extra XP":"EXTRA XP","Mug rate":"MUG %","Drop rate":"DROP %"};return labels[field.label]||field.label}
+  function enemyProperties(fields,rowId,prefs){
+    const numeric=fields.filter(field=>field.control!=='boolean'),flags=fields.filter(field=>field.control==='boolean');
+    const property=field=>el('div',{class:`enemy-property${field.control==='boolean'?' enemy-property-boolean':''}`},
+      el('span',{class:'enemy-property-name',title:field.label},enemyPropertyLabel(field),field.help?infoHelp(field.help):null,
+        prefs?.pinButton(`field:${field.field}`,field.label)),fieldSourceControl(field,'enemies',rowId,{internal:field.control!=='boolean'}));
+    return detailSection({className:'enemy-properties-section',title:'PROPERTIES',body:el('fieldset',{class:'enemy-properties-compact',disabled:state.activeSource!=='mine'},
+      el('div',{class:'enemy-properties-row enemy-properties-numeric',style:`--enemy-property-count:${Math.max(1,numeric.length)}`},...numeric.map(property)),
+      el('div',{class:'enemy-properties-row enemy-properties-booleans',style:`--enemy-flag-columns:${Math.max(1,Math.ceil(flags.length/2))}`},...flags.map(property)))});
+  }
   function enemyAiCatalog(){return state.data.enemyAi.opcodes||[]}
   function enemyAiMnemonic(name){return String(name).toLocaleUpperCase().replace(/[^A-Z0-9]+/g,"_").replace(/^_+|_+$/g,"")}
   function enemyAiFormatScript(script){return script.instructions.map(instruction=>{const values=instruction.operands.map(operand=>{let value=operand.value;if(["jump16","skip16"].includes(operand.type))value=`@${instruction.targetLabel||"MISSING"}`;else if(operand.type==="bool")value=Number(value)?"true":"false";return `${operand.type}=${value}`});return `${instruction.label}: ${enemyAiMnemonic(instruction.name)}[${instruction.opcode}]${values.length?` ${values.join(" ")}`:""}`}).join("\n")}
@@ -1416,9 +1585,9 @@
   function enemyAiSourceScript(row,script){const input=el("textarea",{class:"enemy-ai-source-editor",spellcheck:"false",wrap:"off","aria-label":`${script.name} enemy AI source`,oninput:event=>{script.source=event.target.value;shell.refresh()}});input.value=script.source??"";const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:enemyAiSourceReference(state.referenceData[reference.id],row,script.id)})).filter(value=>value.value!==undefined),summary=value=>`${String(value??"").split(/\r?\n/).filter(Boolean).length} lines`;return detailSection({className:"enemy-ai-source-script",title:script.name.toLocaleUpperCase(),body:sourceControl(input,()=>script.source,enemyAiSourceReference(state.vanilla,row,script.id),references,value=>{script.source=String(value??"");shell.refresh()},summary)})}
   async function enemyAiApplySource(row){const document=enemyAiRow(state.data,row.id);try{const result=await api("/api/enemy-ai/source/compile",post({sources:document.scripts.map(script=>({id:script.id,source:script.source}))}));document.scripts=result.scripts;for(const [index,script] of document.scripts.entries()){script.source=result.sources[index];enemyAiNormalizeScript(script)}setStatus(`Compiled ${row.name} AI source`);renderEnemies();shell.refresh()}catch(error){setStatus("AI source has an error");showAlert({title:"AI source has an error",message:error.message||String(error)})}}
   function enemyAiPanel(row,table){const ai=enemyAiRow(state.data,row.id),tabs=subtabBar({className:"enemy-ai-view-tabs",tabs:[{id:"structure",label:"Structure"},{id:"source",label:"Source"}],active:state.enemyAiView,label:"Enemy AI editor view",change:value=>{state.enemyAiView=value;renderEnemies()}}),boundary=el("p",{class:"enemy-ai-boundary"},state.enemyAiView==="source"?"Source uses stable labels, exact opcode names, and typed operands. Branch operands name a label. Apply Source validates it and updates the structural view; Save also compiles it through the same fail-closed DAT compiler.":"The five conditional scripts below are decoded and rebuilt with the proved FF8 opcode table. You can replace, insert, delete, and reorder instructions. Branches target instruction labels and are recalculated when the script changes. Unsupported raw tails remain fail-closed.");if(!ai?.available)return el("div",{class:"enemy-ai-content"},tabs,el("p",{class:"readonly-note"},"This enemy has no battle-script section."));if(state.enemyAiView==="source")return el("div",{class:"enemy-ai-content"},tabs,boundary,el("div",{class:"enemy-ai-source-actions"},el("button",{type:"button",class:"enemy-ai-source-apply",onclick:()=>enemyAiApplySource(row)},"Apply Source")),...ai.scripts.map(script=>enemyAiSourceScript(row,script)));const scripts=ai.scripts.map(script=>enemyAiScript(row,script)),actions=table?[detailSection({className:"enemy-action-definitions",title:"ACTION DEFINITIONS",help:infoHelp("These are the fixed low, medium, and high-level action lists referenced by AI commands. They are data tables, not the conditional AI program."),body:["low","medium","high"].map(tier=>enemyAbilitiesSection(table,tier))})]:el("p",{class:"readonly-note"},"No structured action definitions are available for this enemy.");return el("div",{class:"enemy-ai-content"},tabs,boundary,...scripts,actions)}
-  function enemyBattleTextPanel(row){const document=enemyBattleTextRow(state.data,row.id);if(!document?.available)return el("div",{class:"enemy-battle-text-content"},el("p",{class:"readonly-note"},"This enemy has no battle-script section."));if(!document.lines.length)return el("div",{class:"enemy-battle-text-content"},el("p",{class:"readonly-note"},"This enemy has no local battle dialogue."));const vanilla=enemyBattleTextRow(state.vanilla,row.id),referenceLine=(dataset,id)=>enemyBattleTextRow(dataset,row.id)?.lines?.find(value=>value.id===id)?.text;return el("div",{class:"enemy-battle-text-content"},el("p",{class:"enemy-ai-boundary"},"These are this enemy's local scripted battle-dialogue lines. Their line numbers are the indexes used by Show Text instructions in the AI view."),...document.lines.map(line=>{const input=el("textarea",{rows:4,maxlength:400,"aria-label":`Battle text line ${line.id} for ${row.name}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});input.value=line.text;const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:referenceLine(state.referenceData[reference.id],line.id)})).filter(value=>value.value!==undefined);return detailSection({className:"enemy-battle-text-line",title:`LINE ${line.id}`,body:sourceControl(input,()=>line.text,vanilla?.lines?.find(value=>value.id===line.id)?.text,references,value=>line.text=String(value??""))})}))}
-  function enemyDetail(row,prefs){const table=enemyTableRow(state.data,row.id),body=[enemyScanSection(row,prefs)];if(row.available){const other=row.fields.filter(field=>field.group!=="Stat curves");body.push(enemyProperties(other,row.id,prefs))}else body.push(el("p",{class:"readonly-note"},"This enemy file is not available in the extracted game data."));if(table)body.push(enemyPairSection(table,"draw","DRAW","Magic"),enemyPairSection(table,"mug","MUG","Item"),enemyPairSection(table,"drops","DROPS","Item"),...enemySimpleTables(table),enemyDefenceSection(table,"elementDefence","ELEMENT DEFENCE"),enemyDefenceSection(table,"statusDefence","STATUS DEFENCE"));const detail=sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,"enemy-detail");return detail}
-  function enemyLeadingPanel(row){if(!row.available)return el("section",{class:"enemy-tabbed-column"},"Enemy data unavailable");const table=enemyTableRow(state.data,row.id);const tabs=[{id:"stats",label:"Stats"},{id:"ai",label:"AI"},{id:"battleText",label:"Battle Text"}],content=state.enemyPanelTab==="ai"?enemyAiPanel(row,table):state.enemyPanelTab==="battleText"?enemyBattleTextPanel(row):enemyStatGrowth(row.fields.filter(field=>field.group==="Stat curves"),row.id),tabbed=tabbedPanel({className:"enemy-tabbed-column",contentClassName:state.enemyPanelTab==="stats"?"enemy-curve-column":"",tabs,active:state.enemyPanelTab,label:`${row.name} enemy views`,change:value=>{state.enemyPanelTab=value;renderEnemies();shell.refresh()},content});return tabbed}
+  function enemyBattleTextPanel(row,prefs){const scan=enemyScanSection(row,prefs);const document=enemyBattleTextRow(state.data,row.id);if(!document?.available)return el("div",{class:"enemy-battle-text-content"},scan,el("p",{class:"readonly-note"},"This enemy has no battle-script section."));if(!document.lines.length)return el("div",{class:"enemy-battle-text-content"},scan,el("p",{class:"readonly-note"},"This enemy has no local battle dialogue."));const vanilla=enemyBattleTextRow(state.vanilla,row.id),referenceLine=(dataset,id)=>enemyBattleTextRow(dataset,row.id)?.lines?.find(value=>value.id===id)?.text;return el("div",{class:"enemy-battle-text-content"},scan,el("p",{class:"enemy-ai-boundary"},"These are this enemy's local scripted battle-dialogue lines. Their line numbers are the indexes used by Show Text instructions in the AI view."),...document.lines.map(line=>{const input=el("textarea",{rows:4,maxlength:400,"aria-label":`Battle text line ${line.id} for ${row.name}`,oninput:event=>{line.text=event.target.value;shell.refresh()}});input.value=line.text;const references=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:referenceLine(state.referenceData[reference.id],line.id)})).filter(value=>value.value!==undefined);return detailSection({className:"enemy-battle-text-line",title:`LINE ${line.id}`,body:sourceControl(input,()=>line.text,vanilla?.lines?.find(value=>value.id===line.id)?.text,references,value=>line.text=String(value??""))})}))}
+  function enemyDetail(row,prefs){const table=enemyTableRow(state.data,row.id),body=[];if(row.available){const other=row.fields.filter(field=>field.group!=="Stat curves");body.push(enemyProperties(other,row.id,prefs))}else body.push(el("p",{class:"readonly-note"},"This enemy file is not available in the extracted game data."));if(table)body.push(enemyPairSection(table,"draw","DRAW","Magic"),enemyPairSection(table,"mug","MUG","Item"),enemyPairSection(table,"drops","DROPS","Item"),...enemySimpleTables(table),enemyDefenceSection(table,"elementDefence","ELEMENT DEFENCE"),enemyDefenceSection(table,"statusDefence","STATUS DEFENCE"));const detail=sharedDetail({...row,name:enemyDisplayName(row.name)},prefs,body,"enemy-detail");return detail}
+  function enemyLeadingPanel(row,prefs){const table=enemyTableRow(state.data,row.id);const tabs=[{id:"stats",label:"Stats"},{id:"ai",label:"AI"},{id:"battleText",label:"Battle Text"}],content=state.enemyPanelTab==="ai"?enemyAiPanel(row,table):state.enemyPanelTab==="battleText"?enemyBattleTextPanel(row,prefs||state.columnPrefs.enemies):row.available?enemyStatGrowth(row.fields.filter(field=>field.group==="Stat curves"),row.id):el("p",{class:"readonly-note"},"Enemy data unavailable"),tabbed=tabbedPanel({className:"enemy-tabbed-column",contentClassName:state.enemyPanelTab==="stats"?"enemy-curve-column":"",tabs,active:state.enemyPanelTab,label:`${row.name} enemy views`,change:value=>{state.enemyPanelTab=value;renderEnemies();shell.refresh()},content});return tabbed}
   function renderEnemies(){const rows=filtered("enemies",["name","filename","id","scanDescription"]),sample=state.data.enemies.rows.find(row=>row.available),columns=[{key:"id",label:"ID"},{key:"name",label:"Enemy",render:row=>recordHoverLabel("enemies",row,enemyDisplayName(row.name))},{key:"scanDescription",label:"Scan description",pinned:false},...(sample?.fields||[]).map(field=>({key:`field:${field.field}`,label:field.label,pinned:false,numeric:field.control!=="boolean"&&field.lookup?.type!=="enum",sortValue:row=>row.fields.find(value=>value.field===field.field)?.value??"",render:row=>row.fields.find(value=>value.field===field.field)?.value??""}))];showPaged("enemies",rows,columns,enemyDetail,"74px minmax(180px,1fr)",{leadingPanel:enemyLeadingPanel,minLeading:340,defaultLeadingWidth:30,minLeft:260,minRight:430})}
 
   function encounterName(row){const names=row.slots.filter(slot=>slot.enabled).map(slot=>enemyDisplayName(slot.enemyName)),summary=[...new Set(names)].slice(0,3).join(", ");return summary||`Encounter ${row.id}`}
@@ -1660,7 +1829,7 @@
     $("#main").replaceChildren(detailPanel({className:"lex-information-panel ff8-information",
       icon:infoIcon(),title:"Information",meta:"Installation, extracted game data, and the FFNx helper",body}));
   }
-  const settingsPayload=()=>({flyingEvaBonus:state.data.settings.flyingEvaBonus,flyingEvaEnabled:state.data.settings.flyingEvaEnabled,autoSortInventory:state.data.settings.autoSortInventory,autoSortMagic:state.data.settings.autoSortMagic,enhancedAbilityMenu:state.data.settings.enhancedAbilityMenu,singleGf:state.data.settings.singleGf,fixedCommandMenu:state.data.settings.fixedCommandMenu,universalItem:state.data.settings.universalItem,scannedTargetScan:state.data.settings.scannedTargetScan,partySwitch:state.data.settings.partySwitch,drawOncePerEnemy:state.data.settings.drawOncePerEnemy,streamlinedDraw:state.data.settings.streamlinedDraw,formulaeRework:state.data.settings.formulaeRework,trueAtbWait:state.data.settings.trueAtbWait,betterTargeting:state.data.settings.betterTargeting,modernControls:state.data.settings.modernControls,vibrationConsolidation:state.data.settings.vibrationConsolidation,sharedMagicInventory:state.data.settings.sharedMagicInventory,damageLimitRemoval:state.data.settings.damageLimitRemoval,betterCard:state.data.settings.betterCard,fastStart:state.data.settings.fastStart,xpBars:state.data.settings.xpBars,hpBars:state.data.settings.hpBars,flatStatAbilities:state.data.settings.flatStatAbilities,maxSpellEnabled:state.data.settings.maxSpellEnabled,maxSpell:state.data.settings.maxSpell});
+  const settingsPayload=()=>({flyingEvaBonus:state.data.settings.flyingEvaBonus,flyingEvaEnabled:state.data.settings.flyingEvaEnabled,autoSortInventory:state.data.settings.autoSortInventory,autoSortMagic:state.data.settings.autoSortMagic,enhancedAbilityMenu:state.data.settings.enhancedAbilityMenu,singleGf:state.data.settings.singleGf,fixedCommandMenu:state.data.settings.fixedCommandMenu,universalItem:state.data.settings.universalItem,scannedTargetScan:state.data.settings.scannedTargetScan,partySwitch:state.data.settings.partySwitch,drawOncePerEnemy:state.data.settings.drawOncePerEnemy,streamlinedDraw:state.data.settings.streamlinedDraw,formulaeRework:state.data.settings.formulaeRework,trueAtbWait:state.data.settings.trueAtbWait,betterTargeting:state.data.settings.betterTargeting,modernControls:state.data.settings.modernControls,vibrationConsolidation:state.data.settings.vibrationConsolidation,sharedMagicInventory:state.data.settings.sharedMagicInventory,damageLimitRemoval:state.data.settings.damageLimitRemoval,betterCard:state.data.settings.betterCard,fastStart:state.data.settings.fastStart,xpBars:state.data.settings.xpBars,hpBars:state.data.settings.hpBars,gfHpBars:state.data.settings.gfHpBars,flatStatAbilities:state.data.settings.flatStatAbilities,maxSpellEnabled:state.data.settings.maxSpellEnabled,maxSpell:state.data.settings.maxSpell});
   function renderGameplaySettings(){
     if(state.activeSource!=="mine"){$("#main").replaceChildren(el("section",{class:"settings-view"},el("div",{class:"readonly-note"},"Vanilla uses no Lexeditor gameplay tweaks. Select a mod to configure Tweaks.")));return}
     const settings=state.data.settings;
@@ -1685,6 +1854,7 @@
     const fastStart=el("input",{type:"checkbox",checked:settings.fastStart,"aria-label":"Fast Start",onchange:event=>{settings.fastStart=event.target.checked;shell.refresh()}});
     const xpBars=el("input",{type:"checkbox",checked:settings.xpBars,"aria-label":"XP Bars",onchange:event=>{settings.xpBars=event.target.checked;shell.refresh()}});
     const hpBars=el("input",{type:"checkbox",checked:settings.hpBars,"aria-label":"HP Bars",onchange:event=>{settings.hpBars=event.target.checked;shell.refresh()}});
+    const gfHpBars=el("input",{type:"checkbox",checked:settings.gfHpBars,"aria-label":"GF HP Bars",onchange:event=>{settings.gfHpBars=event.target.checked;shell.refresh()}});
     const sharedMagic=el("input",{type:"checkbox",checked:settings.sharedMagicInventory,disabled:!settings.sharedMagicInventoryAvailable&&!settings.sharedMagicInventory,"aria-label":"Shared Party Magic Inventory",onchange:event=>{settings.sharedMagicInventory=event.target.checked;shell.refresh()}});
     const flatStatAbilities=el("input",{type:"checkbox",checked:settings.flatStatAbilities,"aria-label":"Flat +Stat Abilities",onchange:event=>{settings.flatStatAbilities=event.target.checked;shell.refresh()}});
     const maxSpellEnabled=el("input",{type:"checkbox",checked:settings.maxSpellEnabled,"aria-label":"Enable Max Spell",onchange:event=>{settings.maxSpellEnabled=event.target.checked;shell.refresh()}});
@@ -1713,6 +1883,7 @@
       row("REMOVE DAMAGE LIMIT","Uses FF8's existing 60,000-damage path instead of the normal 9,999 cap.",damageLimitRemoval,"boolean"),
       row("XP BARS","Shows XP progress on the main menu, Status screen, and post-battle report.",xpBars,"boolean"),
       row("HP BARS","Shows party HP bars at the bottom-right during battle.",hpBars,"boolean"),
+      row("GF HP BARS","Shows blue GF HP bars above party names, filling left to right. Uses the junctioned GF, or combined HP when multiple GFs are junctioned; includes damage during summoning.",gfHpBars,"boolean"),
       row("MODERN CONTROLS",settings.modernControlsBlocker||"Uses the right stick's horizontal magnitude for analog world-map camera rotation.",modernControls,"boolean"),
       row("VIBRATION RATIONALIZATION","Start uses the normal field and battle pause behavior instead of FFNx's separate vibration screen.",vibrationConsolidation,"boolean"),
       row("FLYING EVA BONUS","Adds the selected effective EVA to intrinsic flying targets against grounded melee attacks. A hit rate of 255 does not bypass it.",flyingControl,"value-toggle"));

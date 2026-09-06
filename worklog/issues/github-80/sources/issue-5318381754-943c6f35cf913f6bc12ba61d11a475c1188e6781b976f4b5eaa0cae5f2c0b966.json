@@ -1,0 +1,100 @@
+{
+  "body_sha256": "7a555dafd42a1803b354d58ec056f329ced41cfe07656069b6397015a0e9109e",
+  "issue": 80,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "A single toggleable Memoria tweak for FF9, exposed in the plugin's Tweaks tab. Every binding below needs a keyboard equivalent as well as the controller button.\n\n## Dialogue and cutscenes\n\n- **Circle** — instantly complete the message currently being typed out in the dialogue box, the same way X does, but *do not* advance to the next message. This exists so the player can reveal text without risking a skip.\n- **Triangle** — step back one message so the player can re-read what they missed. Strictly a display rewind: it must not re-run scripts, re-trigger decisions, or re-award anything. Replaying an item grant would let players farm items, so the history has to be a record of rendered messages, not a re-execution of the dialogue.\n- **Square (held)** — advance through available dialogue as fast as the engine allows.\n\n## Battle status panel\n\n- Remove the ATB column from the bottom-right party status table.\n- Move each character's ATB bar **above** their row and their Trance bar **below** it, each stretched to the full width of the row.\n- Redistribute the freed width across the remaining columns.\n- Add an HP bar under the HP number and an MP bar under the MP number, in their own columns.\n- ATB fills left to right as normal. When a character acts, it drains **right to left**, timed so it reaches empty exactly as the action/animation finishes and refilling begins.\n\n## Notes\n\n- Depends on Memoria being installed (see #77 for the managed installer).\n- Ships as one tweak toggle named \"Improved Interface\"; the dialogue and battle halves should be able to fail independently rather than taking the whole tweak down.\n\n## Tetra Master opponent prompt\n\nAbsorbs #76. FF9 already shows a card icon near an opponent who can play Tetra Master. Make that prompt glow, or otherwise look distinct, when the player has not yet beaten that opponent.\n\n- Use the normal prompt after that opponent has been beaten.\n- Track the result per opponent. Reuse an existing durable game value if one exists; add compatible save storage only if it does not.\n- This remains part of the single Improved Interface tweak.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/comments",
+    "created_at": "2026-09-02T00:46:07Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/80",
+    "id": 5318381754,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8a6bbe",
+        "default": false,
+        "description": "Final Fantasy IX plugin",
+        "id": 12062139822,
+        "name": "ff9",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlrg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff9"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPQAQug",
+    "number": 80,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/timeline",
+    "title": "Improved Interface tweak: dialogue navigation and battle status rework",
+    "updated_at": "2026-09-04T12:25:11Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

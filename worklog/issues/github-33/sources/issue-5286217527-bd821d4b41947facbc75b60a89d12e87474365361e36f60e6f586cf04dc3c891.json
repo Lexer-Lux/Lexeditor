@@ -1,0 +1,109 @@
+{
+  "body_sha256": "acb7df9bae7c0a0421ffd752437aa13d5d21fb6f5c04d4b0b683ae078713db54",
+  "issue": 33,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "RDR2 Online item inventory icons can resolve to missing remote images. The item detail currently shows an empty icon button, and clicking it opens a dialog containing the browser's broken-image glyph.\n\nRequired behavior:\n- Resolve the correct image source for RDO dictionaries such as INVENTORY_ITEMS_MP, including CONSOMABLE_HERB_HARRIETUM and other affected entries.\n- Determine preview availability before enabling the icon button when practical. Do not make the user open a dialog to discover a known failure.\n- When no valid image source exists, show one explicit broken-image state in the item detail itself. Do not show a blank clickable preview.\n- The dialog must open only for an image that loaded successfully, or present an intentional error state rather than raw alt text and a browser broken-image glyph.\n- Preserve valid Story, MP, satchel, and custom item icons.\n\nAcceptance:\n- Test a valid Story icon, valid RDO icon, missing RDO icon, and item with no texture declaration.\n- Render the detail states and the valid preview dialog.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/33/comments",
+    "created_at": "2026-08-29T11:16:06Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/33/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/33",
+    "id": 5286217527,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "d73a4a",
+        "default": true,
+        "description": "Something isn't working",
+        "id": 11671890128,
+        "name": "bug",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo0A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/bug"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/33/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABOxVHNw",
+    "number": 33,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/33/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/33/timeline",
+    "title": "Items: repair RDO icons and expose broken previews before click",
+    "updated_at": "2026-09-04T12:24:43Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/33",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

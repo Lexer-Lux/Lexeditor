@@ -1,0 +1,100 @@
+{
+  "body_sha256": "cfb1581c5edaafeca4f9b40982cf02f896e3621c290c7b16b07e0e644aee330b",
+  "issue": 294,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Deferred visual follow-up to Lexer-Lux/Lexeditor#293.\n\nThe neutral-human Recon tag currently uses Rockstar's `blip_ambient_npc`, which is only a plain circle/ring. That design is rejected. The suggested resident substitutions—eyewitness eye for neutral humans, companion for allies, and bounty-target skull for enemies—are also rejected as an overall solution.\n\nLater work must find or create a stronger human glyph that reads clearly as a person at the tag's smallest and largest displayed sizes. It must remain visually distinct from allies, enemies, animals, the owned horse, and plants. Do not repurpose witness, law, player-direction, companion, or bounty semantics merely because those textures already exist.\n\nAcceptance:\n- Neutral humans use a distinctive, readable human icon rather than a circle, dot, eye, skull, or companion marker.\n- The icon remains legible inside the health ring across the full configured 2D/3D size range.\n- The icon and surrounding ring remain aligned and retain the intended opacity behavior.\n- The final choice is confirmed visually in game; a texture-name or static asset check is not acceptance.\n\nThis is deliberately deferred and does not change Lexer-Lux/Lexeditor#293's current geometry work.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/294/comments",
+    "created_at": "2026-08-20T11:47:22Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/294/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/294",
+    "id": 5356332913,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/294/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0MncQ",
+    "number": 294,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/294/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/294/timeline",
+    "title": "Replace the neutral-human Recon tag icon",
+    "updated_at": "2026-09-05T10:48:24Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/294",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

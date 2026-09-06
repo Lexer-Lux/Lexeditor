@@ -1,0 +1,109 @@
+{
+  "body_sha256": "4e06097c895cfa9d5d7fe34dd2a29978f0fef4883f3bc7285a620b100b79b885",
+  "issue": 22,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Replace the wide main-menu game cards with vertical game-box-art tiles.\n\nRequested behavior:\n- Use cached game box art, preferably from the game's Steam library artwork when a Steam app ID exists.\n- Keep a neutral fallback when artwork is unavailable or the app is offline.\n- Show one status icon in a tile corner: Added, Warning, Not added, or Scanning.\n- Remove the duplicate visible `Ready`/`Added` success messages.\n- Move the game path, scan detail, problems, and other secondary information into a hover/focus panel.\n- Do not show a font control for games that declare no downloadable fonts.\n- For games with declared fonts, the hover must name every font and show a check or X for its installed state. Clicking the font control still downloads missing fonts; errors stay visible.\n- Preserve keyboard access, click behavior, automatic scan updates, sorting, and the existing locate/open dialogs.\n\nAcceptance:\n- A rendered main menu shows vertical box-art tiles at normal desktop size.\n- Added/Warning/Not added/Scanning each have one unambiguous corner indicator.\n- Fontless games have no font control.\n- A font-enabled game lists each configured font with its correct installed state on hover/focus.\n- The menu remains usable without network access or downloaded artwork.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 17,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/22/comments",
+    "created_at": "2026-08-29T09:29:50Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/22/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/22",
+    "id": 5285751312,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/22/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABOw4qEA",
+    "number": 22,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/22/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/22/timeline",
+    "title": "Main menu: use box-art tiles with unified status and useful font hover details",
+    "updated_at": "2026-09-04T10:42:05Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/22",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

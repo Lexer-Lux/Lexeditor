@@ -1,0 +1,109 @@
+{
+  "body_sha256": "014a8a1107a74f1599512eec6799af8079f1bf5a60ad06247780e23cf06a2632",
+  "issue": 87,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Add an optional FF8 tweak that replaces the normal Start or pause-button action, including its keyboard equivalent, with an in-game Journal.\n\n## Menu structure\n\n- Header: Journal.\n- The first entry is always Main Quest and states where to go or what to do next.\n- Unlocked side quests follow it and show their current objective.\n- Locked side quests come last. They show their name and how to begin them.\n- The complete Journal feature is toggleable as one per-mod Tweak.\n\n## Updates\n\nUse the game's normal toast presentation:\n\n- Side quest unlocked! — a side quest has become available in the Journal.\n- Journal updated — the Main Quest or a side quest advanced to a new stage.\n- Side quest completed! — a side quest completed.\n\nDo not repeat a toast merely because a save loaded or the menu reopened.\n\n## Required side quests\n\n- A Dog And Its Bone\n- Card Club Master\n- Chocobo Forest\n- Combat King\n- Obel Lake\n- Master Fisherman\n- Shumi Village\n- Tonberry King\n- Odin\n- Phoenix\n- Doomtrain\n- Jumbo Cactuar\n- Deep Sea Research Center\n- I Want To Believe\n- Omega Weapon\n- Top Level\n- Top Rank\n- Magazine Addict\n- Collector\n- Dog Trainer\n- Diablos\n- Blue Magic Master\n- Maximum HP\n\n## State model\n\n- Store Main Quest and side-quest definitions as declarative state machines.\n- Resolve stages from proven durable state such as current and previous field IDs, disc, persistent savemap variables and flags, party, inventory, and completed events.\n- Main Quest stages change when the player's next destination or required action changes. A cutscene does not need its own stage when the objective remains the same.\n- Keep every side quest independent so optional, concurrent, failed, completed, and missable quests do not corrupt one another.\n- Scan field JSM for durable variable reads and writes, dialogue references, and MAPJUMP or WORLDMAPJUMP transitions to propose stage conditions.\n- Human review still owns quest names, player-facing instructions, branch meaning, and ambiguous conditions.\n- Keep definitions in editable mod data so Lexeditor can expose and revise them.\n- Implement the in-game menu through the managed FFNx runtime.\n\n## De-linearization compatibility\n\nThe Journal must not hard-code one vanilla sequence. The separate De-linearization proposal can change world access, quest availability, and valid stage order. Quest conditions and unlock rules must be overrideable data and must compose with that tweak.\n\n## Acceptance direction\n\n- Start and its keyboard equivalent open Journal while the tweak is enabled.\n- Disabling the tweak restores the original Start or pause behavior.\n- New Game and representative saves from every disc select the correct Main Quest objective.\n- Every named side quest has explicit locked, unlocked, staged, completed, failed, and missable handling where applicable.\n- Locked entries give a valid method of starting the quest.\n- Toasts fire once per real transition.\n- Field, world-map, battle, scripted transitions, save/load, and De-linearization do not produce impossible objectives.\n- Every stage has a fixture or equivalent repeatable validation state.\n- No implementation begins until Lexer triages this issue.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/87/comments",
+    "created_at": "2026-09-04T10:53:51Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/87/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/87",
+    "id": 5347203364,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "6f7478",
+        "default": false,
+        "description": "Final Fantasy VIII plugin",
+        "id": 12062139654,
+        "name": "ff8",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlBg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff8"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/87/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPrfZJA",
+    "number": 87,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/87/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/87/timeline",
+    "title": "Add a state-driven quest and next-objective menu",
+    "updated_at": "2026-09-04T12:25:17Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/87",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

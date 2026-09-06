@@ -1,0 +1,118 @@
+{
+  "body_sha256": "49ba6dd7c58a13ed1554023d6ca3cf2a55dbe5579d6edfbf5998c4f12901f122",
+  "issue": 98,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Warband Data Map labels skills and most source files implemented/integrated despite no dedicated view/edit interface. Its vertical scrollbar also conflicts with fitted pagination seen in Blank. Lexer reports similar gaps across several plugins.\r\n\r\nConfirmed source findings:\r\n- Warband data_map_rows marks every catalog area except Generated output integrated. This means raw Python source editing, not a structured editor. module_skills.py has only that source-editor route.\r\n- Warband calls shared dataMap with pageSize=100. That helper uses fixed slicing and does not use fitted paging. Blank uses pagedListDetail with fit:true.\r\n\r\nDeferred repair scope: distinguish source-only, view-only, and structured editable coverage; reserve implemented status for the claimed user-facing capability; link each claim to its actual interface. Bring Data Map pagination and affected plugin layouts onto the same shared controls as Blank, with rendered checks at different window sizes. Audit other plugins for the same misleading claims and alternate control paths. Do not infer data editors exist from file read/write support.\r\n\r\nRecorded for later; no repair work authorized in this deferred item yet.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/98/comments",
+    "created_at": "2026-09-05T06:31:30Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/98/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/98",
+    "id": 5356169067,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "d73a4a",
+        "default": true,
+        "description": "Something isn't working",
+        "id": 11671890128,
+        "name": "bug",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo0A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/bug"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      },
+      {
+        "color": "7a5327",
+        "default": false,
+        "description": "Mount and Blade Warband plugin",
+        "id": 12062140211,
+        "name": "warband",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWnMw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/warband"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/98/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0Cnaw",
+    "number": 98,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/98/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/98/timeline",
+    "title": "Data Map overstates editor coverage; plugin paging differs from Blank",
+    "updated_at": "2026-09-05T06:31:30Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/98",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

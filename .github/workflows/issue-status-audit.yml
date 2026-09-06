@@ -1,0 +1,64 @@
+name: Issue status audit
+on:
+  push:
+    paths:
+      - .github/workflows/issue-status-audit.yml
+      - worklog/issue-status-audit/apply_review.py
+      - worklog/issue-status-audit/2026-09-06/plan-*.md
+concurrency:
+  group: lexeditor-human-issue-audit-2026-09-06
+  cancel-in-progress: false
+permissions:
+  contents: write
+  issues: write
+  actions: read
+jobs:
+  apply-reviewed-plan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the immutable pre-edit snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 34033412803 --repo Lexer-Lux/Lexeditor --name human-issue-audit --dir baseline
+      - name: Apply reviewed descriptions and verify each change
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python worklog/issue-status-audit/apply_review.py
+      - name: Capture the live board for final coverage review
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p audit-results
+          gh api --paginate 'repos/Lexer-Lux/Lexeditor/issues?state=all&per_page=100&sort=created&direction=asc' --jq '.[] | select(has("pull_request") | not) | {number,title,body,state,state_reason,labels:[.labels[].name],comments,created_at,updated_at,closed_at,html_url}' > audit-results/current-issues.jsonl
+          gh api --paginate 'repos/Lexer-Lux/Lexeditor/issues/comments?per_page=100&sort=created&direction=asc' --jq '.[] | {id,issue_url,body,created_at,updated_at,html_url}' > audit-results/current-comments.jsonl
+      - name: Preserve results and generated internal handoffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: human-issue-audit-results
+          path: |
+            audit-results/
+            worklog/legacy/issue-status-audit-2026-09-06/
+            worklog/issues/
+          retention-days: 30
+      - name: Preserve original public issue text in the audit archive
+        if: always()
+        run: |
+          set -euo pipefail
+          test -d worklog/legacy/issue-status-audit-2026-09-06
+          git config user.name 'Lexeditor Issue Audit'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # Add only the archive of existing PUBLIC issue text, never local game data.
+          git add -f worklog/legacy/issue-status-audit-2026-09-06
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Preserve original public issue text and audit results [skip ci]'
+          for attempt in 1 2 3; do
+            git fetch origin master
+            git rebase origin/master
+            if git push origin HEAD:master; then exit 0; fi
+          done
+          echo 'Archive push failed; originals remain in the workflow artifact.' >&2
+          exit 1

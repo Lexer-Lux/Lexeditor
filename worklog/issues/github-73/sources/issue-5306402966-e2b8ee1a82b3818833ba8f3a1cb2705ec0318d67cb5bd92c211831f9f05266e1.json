@@ -1,0 +1,127 @@
+{
+  "body_sha256": "5764b654095b1099e0244e3d5e74b2bf89417f7b14d7115cc3626e7f0a9fd023",
+  "issue": 73,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Expose the installed mod platform's own configuration in each game's Tweaks tab:\n\n- FF7 and FF7 (2013): FFNx.toml\n- FF8 (2013): FFNx.toml, beside the existing Gameplay tweaks\n- FF9: Memoria.ini\n\nRequirements:\n- Use typed controls for booleans, numbers, known choices, lists, and strings.\n- Preserve comments, ordering, and unknown settings. Change only the assigned value.\n- Refuse stale writes and saving while the game is running.\n- Create a backup before a write.\n- Do not invent or create a configuration when the runtime is absent. Show its expected path and become editable automatically after installation.\n- Include the platform configuration in each plugin's Data Map.\n\nImplemented locally. Automated lossless round-trip checks pass for FFNx TOML and Memoria INI. Rendered checks pass for FF8's installed 126-setting FFNx file and for the absent-runtime states in FF7 and FF9. Player acceptance remains.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 2,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/comments",
+    "created_at": "2026-09-01T00:42:35Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/73",
+    "id": 5306402966,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "c5def5",
+        "default": false,
+        "description": "Final Fantasy VII plugins",
+        "id": 12062139503,
+        "name": "ff7",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWkbw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff7"
+      },
+      {
+        "color": "6f7478",
+        "default": false,
+        "description": "Final Fantasy VIII plugin",
+        "id": 12062139654,
+        "name": "ff8",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlBg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff8"
+      },
+      {
+        "color": "8a6bbe",
+        "default": false,
+        "description": "Final Fantasy IX plugin",
+        "id": 12062139822,
+        "name": "ff9",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlrg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff9"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPElIlg",
+    "number": 73,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73/timeline",
+    "title": "Edit FFnX Settings Via Tweaks",
+    "updated_at": "2026-09-05T06:58:57Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/73",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

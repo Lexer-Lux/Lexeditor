@@ -1,0 +1,100 @@
+{
+  "body_sha256": "3e3a611e9fb71221ad475574664015aad0b6eb55ff58d9c27b9fc9b8acf408f6",
+  "issue": 165,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "RECOVERABLE UNIQUE WEAPONS — every OTHER one-off weapon that can be lost\n     for good after being thrown or dropped stays recoverable: if I lose one, it\n     turns up in my WEAPON LOCKER AT CAMP for me to collect. It does not\n     reappear in my hands.\n     Covers the unique hatchets and tomahawks — Viking, Hewing, Double Bit,\n     Double Bit Rusted, Hunter's, Hunter's Rusted — plus anything else loseable\n     that turns up. Never duplicate one that still exists in inventory, on the\n     horse, in the locker, or lying in the world. Preserve ordinary manual\n     retrieval and mission behaviour.\n     NOT BUILT AS SPECIFIED. What exists tracks first acquisition and waits for\n     the world pickup to disappear — that groundwork is right — but then it\n     gives the weapon straight back to me instead of putting it in the locker.\n     The locker is the whole point and it is the missing half.\n     Retest after #199 restores the thrown-weapon settings that were lost.\n\n\nNOT LIKE the Lexer-Lux/Lexeditor#164 ! Not some magical thing that brings it back to you on the spot -- just lets you retrieve it from the locker like any other weapon.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 9,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/165/comments",
+    "created_at": "2026-08-06T02:46:40Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/165/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/165",
+    "id": 5356298892,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/165/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0KijA",
+    "number": 165,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/165/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/165/timeline",
+    "title": "Recoverable Uniques",
+    "updated_at": "2026-09-05T06:58:20Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/165",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

@@ -1,0 +1,100 @@
+{
+  "body_sha256": "56f3bab0f2bf395eae3f4ea8d312e2d66f61c44b96ca8192181266cf7c6e030c",
+  "issue": 81,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Add a read-only Lexer Mode overview for every plugin with a managed helper: pinned release, installed version and newest upstream release with date and release notes. Check on opening; Check Again refreshes. One failed lookup must not hide other rows, and nothing installs automatically.\n\n**Status: Work remains.** This is not waiting for your testing.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/comments",
+    "created_at": "2026-09-02T01:05:20Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/81",
+    "id": 5318492637,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Agent work remains: research, implementation, repair, delivery or test preparation.",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPQHB3Q",
+    "number": 81,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/timeline",
+    "title": "Show pinned, installed and latest helper versions",
+    "updated_at": "2026-09-06T12:38:28Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

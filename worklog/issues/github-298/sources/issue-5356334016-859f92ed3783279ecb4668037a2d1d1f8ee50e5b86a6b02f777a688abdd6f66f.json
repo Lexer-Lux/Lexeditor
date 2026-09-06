@@ -1,0 +1,100 @@
+{
+  "body_sha256": "fa22ab8a086bb59522d2857e465db290a23793b30340f6cfe96b69d0ab41c2b4",
+  "issue": 298,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Crows around a dead body get no lower-right animal info box and cannot be studied, unlike other animals.\n\nWhat the installed log already shows (session 2026-08-22, dev build):\n\n- The crow IS the aimed entity: `aimed=1 aimedModel=0x05df8f2c` (`A_C_CROW_01`), so the reticle ray does resolve it.\n- Recon never accepted it: `bestPed=0` on every scan, and `pedNearestScreen` stayed 0.196-0.387 against `radius=0.050`, i.e. the nearest ped anchor was measured well off screen centre.\n- Rockstar's contextual animal focus never returned the crow either: `studyInteraction=0`, `studyEntity=0`, `studyAnimal=0` on every scan while the crow was aimed at.\n- `animal infobox target=0` for the whole session, so the Lexer-Lux/Lexeditor#268 contextual-action bridge never armed - it only arms once Recon has already resolved an animal target, so a crow rejected by Recon's own gates can never reach Rockstar's info box through binoculars.\n\nOpen question that decides the fix: whether the crow ped carries a valid animal type, short description and discoverable name/type pair (it has a compendium entry, `CMPNDM_CROW` / `AT_CROW`, so it should), and whether crows even appear in the ped pool snapshot Recon scans.\n\n`[CompendiumGlintProbe] Enabled=1` has been set in the installed INI so an F10 capture at a crow answers both without a rebuild.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/298/comments",
+    "created_at": "2026-08-23T06:07:15Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/298/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/298",
+    "id": 5356334016,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/298/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0MrwA",
+    "number": 298,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/298/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/298/timeline",
+    "title": "Crows cannot be studied - no animal info box",
+    "updated_at": "2026-09-05T07:05:36Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/298",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

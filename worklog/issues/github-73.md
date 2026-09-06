@@ -1,28 +1,15 @@
-# #73 — FF7 portion only
+# #73: Add FFNx subtabs and use Memoria’s existing launcher
 
-Branch: `fix/ff7-data-and-tweaks-20260906`.
+[Full request and discussion archive](github-73/conversation.md)
 
-FF7/2013 now filter out FF8-only FFNx settings on read, reject those keys on
-save and filter the writer response. Tweaks works independently of kernel
-loading. An absent configuration is detected after installation without
-restarting the page; unsaved edits and in-flight refresh races are guarded.
-A Reload settings action recovers from external changes with explicit discard
-confirmation. No shared parser, FF8 or FF9 implementation was changed.
+## Requirements and decisions
 
-Validation: the 19-test backend suite includes typed controls' metadata,
-comment/order/unknown-line preservation, backup bytes, absent-runtime behavior,
-stale/invalid/FF8-only writes and a simulated game-running refusal. Four page
-logic tests include configuration discovery, stale-save recovery, failed kernel
-requests and a refresh arriving after an edit. See #79 worklog for test doubles
-and limitations. Actual Windows process probing and visual/player acceptance
-are not claimed; other games' acceptance status is unchanged.
+Recover the complete scope from the linked verbatim sources before implementation or status changes. The short GitHub summary is not the full specification. Do not infer that missing chat text was never supplied.
 
-- [ ] Open Tweaks in both FF7 editions; shared/FF7 settings should appear, not
-      FF8-only settings. An absent FFNx.toml should show its expected path.
-- [ ] With the game closed, change a harmless setting, save and reopen; confirm
-      persistence and FFNx.toml.lexeditor.bak, then restore the original value.
-- [ ] Make an unsaved tweak, switch focus away/back, and confirm it remains.
-      Change the file externally and confirm Save refuses the stale snapshot;
-      Reload settings must ask before discarding the pending edit.
-- [ ] Confirm saving runtime settings is refused while FF7 is genuinely
-      running. Report edition, setting name and exact error on any failure.
+## Current implementation and evidence
+
+Reconcile live code, PRs and existing topic/session worklogs. This archive import makes no build, deployment or gameplay-success claim.
+
+## Next agent work
+
+Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.

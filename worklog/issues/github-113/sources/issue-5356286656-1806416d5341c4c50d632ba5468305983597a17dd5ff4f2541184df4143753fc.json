@@ -1,0 +1,100 @@
+{
+  "body_sha256": "4a30ac27f8b8598fe77c104ded3fa86432347c2f8d05a9cc856262e1b19606a1",
+  "issue": 113,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "## Confirmed system structure\n\nRDR2 does not have one universal stealth percentage. It combines perception-profile data, authored Story detection helpers, LOS, player noise, witness/crime logic, and separate AI state machines.\n\nA common hostile-detection helper is present across the decompiled Story scripts. In the configured `gang1.c` instance:\n\n- Immediate visual detection uses a 30 m base distance and rejects the player beyond 35 m. It requires perception-area qualification and `CAN_PED_SEE_ENTITY(...) == 1`.\n- A timed visual branch qualifies within 15 m for 1000 ms. Below 3.5 m, it can complete after 500 ms.\n- The noise branch requires engine stealth noise above 4 plus an unresolved player-to-observer native. Crouch or cover changes that native's stance flag. Configured suppressions can block the result in cover or crouch. A separate stealth-state branch tests noise above 8.\n- A lantern or torch has an explicit fallback at 5 m or less during the helper's 20:20–05:20 night window. It also requires the player to face the observer within 110 degrees and requires clear LOS.\n\nThese are common Story-script rules, not one universal engine rule. Law, witnesses, animals, and individual missions can use different logic or thresholds.\n\n## Runtime evidence retained\n\nThe earlier completed neutral-observer runs established supporting inputs:\n\n- `IS_TARGET_PED_IN_PERCEPTION_AREA` changed with distance, facing, and per-ped seeing range. It did not expose an accumulating awareness value.\n- Crouch and stealth movement are separate states.\n- Median player speed / engine stealth noise was `0 / 0` standing still, `0 / 0` crouched still, `1.365 / 0` crouch-walking, `1.333 / 1.827` walking, `3.955 / 5` running, and `5.616 / 10` sprinting.\n- Drawing a weapon caused no response. Aiming caused a neutral observer to flee after about 526 ms. That was a threat reaction, not a hostile awareness meter.\n\nThe partial run `StealthProbe-20260809-232527.csv` completed steps 0–24 and began step 25 before abort. It corroborated the movement/noise tiers. Its first run/sprint instructions were swapped, but the measured states identify them: the faster input had noise 10 and the slower input had noise 5. These trials will not be repeated.\n\nThe partial run did not supply hostile-detection results. Its isolated guard did not execute the authored Story detection state machine, and the visual trials had the observer turned about 180 degrees away. The sound-only geometry was also uncontrolled. The cover step lacked a ready gate, and the lantern-off step was partial while the automatic belt lantern was still on.\n\n## Short follow-up still needed\n\nThe replacement follow-up contains only seven conditions: solid cover hidden/exposed, lantern off/on at night, and clear/rain/fog. Every manual condition waits without sampling until F9 confirms it is ready. The CSV records the exact inputs used by `gang1.c` `func_2459`, including the three-state `CAN_PED_SEE_ENTITY` result and the immediate/lantern branch outcomes.\n\nIssue Lexer-Lux/Lexeditor#105 must first restore manual lantern control. The audit remains `needs a human` until this short follow-up is completed and analyzed.\n\nCanonical technical audit: `codex/stealth-perception.md`  \nAttempt evidence: `worklog/issues/github-13.md`",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 5,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/113/comments",
+    "created_at": "2026-08-06T01:45:22Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/113/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/113",
+    "id": 5356286656,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 1,
+      "total_blocked_by": 0,
+      "total_blocking": 1
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/113/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0JywA",
+    "number": 113,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/113/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/113/timeline",
+    "title": "Stealth System Audit",
+    "updated_at": "2026-09-05T06:55:26Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/113",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

@@ -1,0 +1,7 @@
+{
+  "operation": "delete_verified_issue_comments",
+  "requested_at": "2026-09-06",
+  "authorization": "Lexer explicitly requested migrating full issue comments into per-issue internal worklogs, then deleting the visible comments. No issue deletion or PR-review deletion is authorized.",
+  "scope": "Lexer-Lux/Lexeditor issues only",
+  "guards": ["archive exact content and provenance", "preserve attachments", "commit and verify before deletion", "re-read each comment and skip changed/new content", "stop on API errors"]
+}

@@ -1,0 +1,101 @@
+{
+  "body_sha256": "d8f7e1c0e46cf4a5abb540924656bc481c1d1b9d2624a50aeec01b56a406a477",
+  "issue": 132,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "**Status: Glint timing and visual controls are installed; needs your check.** Casings should not all flash in lockstep.\n\n- [ ] In Story Mode, fire and reload a revolver, then look at the ejected casings in daylight and darkness. Confirm their glints are visible and staggered rather than synchronized.\n- [ ] Report whether the duration, size and opacity look suitable, with a short clip if timing still looks wrong. The exposed glint controls are for later tuning, not proof that the current look is accepted.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/comments",
+    "created_at": "2026-08-06T02:11:07Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/132",
+    "id": 5356291547,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 1,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      },
+      {
+        "color": "fbca04",
+        "default": false,
+        "description": "Ready for Lexer's stated acceptance test; candidate delivered and agent-side checks complete.",
+        "id": 12074236871,
+        "name": "untested",
+        "node_id": "LA_kwDOTn28Ks8AAAACz647xw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/untested"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0KF2w",
+    "number": 132,
+    "parent_issue_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/222",
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/timeline",
+    "title": "Check independently timed casing glints",
+    "updated_at": "2026-09-06T13:07:17Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

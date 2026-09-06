@@ -1,0 +1,109 @@
+{
+  "body_sha256": "dd2d07b6e960d75d2a62fadd5bf27d83ab17327be266d77770e63c735e18ddf7",
+  "issue": 14,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "## Request\n\nReplace the current GitHub overlay with a shared in-editor GitHub tab.\n\n- Put a GitHub-logo tab at the right edge of the main game tab row. Show it only for the authorized owner.\n- Use `actionable`, `waiting`, and `unfeasible` as its subtabs.\n- Replace `needs a human` and `test me` with one orange `waiting` workflow label. Anything that needs Lexer belongs there.\n- Use the shared list-detail layout as the base and show three panels: a dense issue list, the selected issue editor, and comments.\n- Keep every issue-list row on one line. Show the issue number, title, and a `!` when it has `high priority`.\n- Put the issue number and editable title on one row. Do not show redundant Title or Body labels.\n- Put comments in the right panel, open that panel at the newest comment, and allow the owner to post a comment.\n- Add a clickable `!` priority control to the selected issue. It toggles the existing `high priority` label and updates the list immediately.\n- Preserve secure GitHub CLI authentication. Do not expose tokens or open a browser.\n\n## Acceptance\n\n- The rightmost logo tab replaces the old top-bar GitHub button in both game shells.\n- The three workflow subtabs load their matching issues.\n- Issue rows remain one line and substantially denser than the old cards.\n- Title/body edits, label edits, priority toggling, and new comments work inside Lexeditor.\n- Comments begin at the bottom and remain there after posting.\n- Returning to a game tab preserves unsaved editor work.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/14/comments",
+    "created_at": "2026-08-20T11:38:08Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/14/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/14",
+    "id": 5202953146,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/14/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABNh7Dug",
+    "number": 14,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/14/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/14/timeline",
+    "title": "Rebuild the embedded GitHub workspace as a three-panel tab",
+    "updated_at": "2026-09-04T10:42:05Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/14",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

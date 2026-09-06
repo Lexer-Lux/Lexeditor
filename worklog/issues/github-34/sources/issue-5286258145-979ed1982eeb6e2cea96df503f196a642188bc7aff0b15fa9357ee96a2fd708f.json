@@ -1,0 +1,109 @@
+{
+  "body_sha256": "ab2ab842d3207b0240a0074124fc2db0cd9e6a233eac93a7b5b7198c3fb92215",
+  "issue": 34,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Mouse Back and Forward must traverse the user's actual LEXEDITOR navigation history inside the current game. They must not act as unconditional Home shortcuts.\n\nThe LEXEDITOR wordmark in the shared top bar is the explicit Home control. Clicking it must always run the existing unsaved-change guard, stop the active game service when allowed, and return to the main game menu.\n\nAcceptance:\n- Back returns to the previous browsed editor destination and Forward returns to the next one.\n- History includes tab and shared special-screen navigation without losing the current plugin window.\n- The wordmark always means Home.\n- Unsaved changes cannot be discarded silently.\n- This is one shared-shell behavior across plugins.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 5,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/34/comments",
+    "created_at": "2026-08-29T11:24:28Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/34/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/34",
+    "id": 5286258145,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "d73a4a",
+        "default": true,
+        "description": "Something isn't working",
+        "id": 11671890128,
+        "name": "bug",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo0A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/bug"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/34/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABOxXl4Q",
+    "number": 34,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/34/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/34/timeline",
+    "title": "Shared shell: browser-style Back/Forward history and explicit Home wordmark",
+    "updated_at": "2026-09-04T10:42:05Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/34",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

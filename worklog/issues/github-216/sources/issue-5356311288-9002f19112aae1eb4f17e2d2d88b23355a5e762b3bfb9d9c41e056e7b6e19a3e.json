@@ -1,0 +1,100 @@
+{
+  "body_sha256": "1a92892a4e5996183fc464c8791d70e1210ca0c8c873cda20c3dfc7effba2200",
+  "issue": 216,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "## Problem\n\nVanilla RDR2 teleports the owned horse near the player when a saved game starts, even when the horse was left outside whistling range. Preserve the horse where it was when the game was closed instead of bringing it to the player on startup.\n\n## Reference\n\n- Nexus: https://www.nexusmods.com/reddeadredemption2/mods/473\n- Downloaded archive: `D:\\Downloads\\Horse Persistance-473-1-0-1618230943.rar`\n- Decompile/analyze the downloaded `horseTele.asi` and its data format as behavioral evidence. Reimplement the behavior independently; do not redistribute the reference author's assets.\n- The reference reportedly does not work for hitched horses; determine whether our implementation can safely cover them rather than silently inheriting that limitation.\n\n## Required behavior\n\n- Record the owned horse's last valid world position before shutdown/save transition as safely as ScriptHook permits.\n- On a later game startup/load, prevent the vanilla startup relocation and restore the horse to its persisted position without moving the player.\n- Do not interfere with stable retrieval, horse replacement, missions, temporary mounts, death, or intentional whistling/summoning behavior.\n- Fail safely when the stored horse identity or position is stale or invalid.\n\n## In-game acceptance\n\n1. Leave the owned horse outside whistling range, exit cleanly, restart, and load the save.\n2. Confirm the horse remains at the stored location instead of appearing near the player.\n3. Confirm the same horse can still be retrieved normally from a stable and summoned normally afterward.\n4. Verify mission transitions, horse death/replacement, and a hitched horse do not produce duplication, deletion, or invalid placement.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/216/comments",
+    "created_at": "2026-08-06T10:32:16Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/216/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/216",
+    "id": 5356311288,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/216/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0LS-A",
+    "number": 216,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/216/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/216/timeline",
+    "title": "Persist the owned horse location across game restarts",
+    "updated_at": "2026-09-05T07:01:02Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/216",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

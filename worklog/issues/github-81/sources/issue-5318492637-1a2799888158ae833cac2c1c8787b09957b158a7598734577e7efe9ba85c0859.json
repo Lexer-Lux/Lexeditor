@@ -1,0 +1,100 @@
+{
+  "body_sha256": "9f02c392c4b0c3c5d33b484f209566f898c7e5c1720bf1dc29d7c3f55418b750",
+  "issue": 81,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Helper installs are pinned. `ffnx_manager.PINNED_RELEASE` and `memoria_manager.PINNED_RELEASE` decide what Lexeditor installs. A new upstream release must not silently change the runtime.\n\nProvide a Lexer Mode view for plugins that declare a managed helper.\n\nFor each managed helper, show:\n\n- plugin and helper name\n- the release pinned by Lexeditor\n- the version currently installed in the detected game folder, when present\n- the newest upstream release and its publication date\n- whether the pin is behind\n- a link to upstream release notes\n- an inline error when the upstream lookup fails\n\nPlugins without a managed helper do not appear.\n\nThe panel checks upstream when Lexer opens it. It intentionally ignores the normal automatic update-check interval. Keep the result for the current session unless Lexer selects Check Again. The panel is read-only and must never install or update anything.\n\nAcceptance:\n\n- Only managed-helper plugins appear, whether or not their games are installed.\n- Pinned, installed, and newest versions remain distinct.\n- The newest release includes its publication date and release-notes link.\n- One failed lookup does not remove the other rows or break Home.\n- Opening the panel performs its own check regardless of the shared update interval.\n- Check Again forces a fresh lookup.\n- No control installs or updates a helper.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/comments",
+    "created_at": "2026-09-02T01:05:20Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/81",
+    "id": 5318492637,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Work remains",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPQHB3Q",
+    "number": 81,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81/timeline",
+    "title": "Helper versions overview: show every plugin's pinned vs upstream helper release",
+    "updated_at": "2026-09-04T10:53:50Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/81",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

@@ -1,0 +1,109 @@
+{
+  "body_sha256": "553358e50224bc34937c30f046b0f9204cb23d71111bc7bc30c05ca57ea38ab2",
+  "issue": 25,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Create one shared presentation contract for all game plugins.\n\nRequested behavior:\n- Sort normal game tabs alphabetically.\n- Keep Settings last among the text tabs and give it a distinct shade.\n- Put each record ID on the same title row as the record name, right-aligned and in the same title color. Do not repeat labels such as `Character ID` or `Item ID` below the title.\n- Fit list rows to the available height. Never show a clipped final row or a master-list scrollbar in a paged list-detail view.\n- Remove toolbar totals such as `24706 items` when a pager exists.\n- Put `X-Y of Z records` on the right side of the full-width bottom pager. Use the view's real record noun, such as items, effects, or tables.\n\nThis is a shared framework requirement. Plugins must provide only their record noun and view-specific columns; they must not rebuild the pager or title contract.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 6,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/25/comments",
+    "created_at": "2026-08-29T10:18:21Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/25/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/25",
+    "id": 5285953301,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/25/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABOxE_FQ",
+    "number": 25,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/25/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/25/timeline",
+    "title": "Shared list-detail presentation: tab order, title IDs, fitted rows, and pager totals",
+    "updated_at": "2026-09-04T10:42:05Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/25",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

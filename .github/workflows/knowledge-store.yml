@@ -1,0 +1,107 @@
+name: Lossless issue knowledge store
+on:
+  push:
+    branches: [master]
+    paths: [.github/knowledge-store-request.json]
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+  workflow_dispatch:
+permissions:
+  contents: write
+  issues: write
+  actions: read
+concurrency:
+  group: lexeditor-knowledge-store
+  cancel-in-progress: false
+jobs:
+  preserve:
+    if: github.repository == 'Lexer-Lux/Lexeditor'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: master
+          fetch-depth: 1
+          submodules: false
+          sparse-checkout: |
+            tools/knowledge_store.py
+            worklog
+            .github/knowledge-store-request.json
+          sparse-checkout-cone-mode: false
+      - name: Prepare isolated documentation handling
+        run: |
+          git config submodule.recurse false
+          git config fetch.recurseSubmodules false
+          git config user.name 'Lexeditor Knowledge Archive'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python3 -m py_compile tools/knowledge_store.py
+          python3 - <<'PY'
+          import importlib.util,tempfile,pathlib
+          s=importlib.util.spec_from_file_location('store','tools/knowledge_store.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+          with tempfile.TemporaryDirectory() as d:
+              m.ROOT=pathlib.Path(d)
+              original={'id':123,'body':'Exact text: café\r\n- do NOT remove this exception!','user':{'login':'test'},'updated_at':'2026-09-06T00:00:00Z'}
+              p=m.store(1,'comment',original)
+              import json
+              assert json.loads(p.read_text())['record']==original
+              assert m.store(1,'comment',original)==p
+              m.regenerate(1,{'title':'Fixture'})
+              assert original['body'].replace('\r\n','\n') in (m.ROOT/'github-1/conversation.md').read_text()
+          assert m.URL.findall('![x](https://github.com/user-attachments/assets/example)')==['https://github.com/user-attachments/assets/example']
+          PY
+      - name: Restore earliest available complete audit export
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 34033219303 --repo Lexer-Lux/Lexeditor --name human-issue-audit-34033219303 --dir /tmp/knowledge-baseline
+      - name: Preserve sources without shortening them
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = issues ] || [ "$EVENT_NAME" = issue_comment ]; then
+            python3 tools/knowledge_store.py event --event "$GITHUB_EVENT_PATH"
+          else
+            python3 tools/knowledge_store.py archive --baseline /tmp/knowledge-baseline
+          fi
+      - name: Commit and verify canonical archive before any deletion
+        run: |
+          set -euo pipefail
+          git add -f worklog/issues worklog/attachments worklog/migrations/comment-archive
+          if ! git diff --cached --quiet; then
+            git commit -m 'Preserve exact issue requests, comments, attachments and provenance [skip ci]'
+            pushed=0
+            for attempt in 1 2 3; do
+              git -c submodule.recurse=false fetch --no-recurse-submodules origin master
+              git -c submodule.recurse=false rebase origin/master
+              if git push origin HEAD:master; then pushed=1; break; fi
+            done
+            test "$pushed" = 1
+          fi
+          git -c submodule.recurse=false fetch --no-recurse-submodules origin master
+          git merge-base --is-ancestor HEAD origin/master
+          git diff --exit-code HEAD -- worklog
+      - name: Remove only exact, verified, unchanged archived issue comments
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json,subprocess
+          request=json.load(open('.github/knowledge-store-request.json'))
+          if request.get('operation')=='delete_verified_issue_comments':
+              subprocess.run(['python3','tools/knowledge_store.py','cleanup'],check=True)
+          PY
+      - name: Preserve verification and cleanup result
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: knowledge-store-result-${{ github.run_id }}
+          path: |
+            knowledge-result.json
+            worklog/migrations/comment-archive/snapshot.json
+          if-no-files-found: ignore
+          retention-days: 30

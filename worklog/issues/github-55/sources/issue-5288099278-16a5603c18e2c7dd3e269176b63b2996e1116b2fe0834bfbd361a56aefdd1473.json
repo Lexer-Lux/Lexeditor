@@ -1,0 +1,118 @@
+{
+  "body_sha256": "a947060de686fd41436ddabadf00dd4145909c12dcb88e8a536762607d471a70",
+  "issue": 55,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "**Status: Both cache checks are repaired; needs your startup check.** Valid prepared data should be reused rather than extracted every time.\n\n- [ ] With RDR1 and FF8 already prepared, fully close and reopen Lexeditor, then open each plugin. Do not delete their caches.\n- [ ] Repeat once without changing the games. Confirm neither runs full extraction again; a brief readiness check is normal. Report the game and message that repeats.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/55/comments",
+    "created_at": "2026-08-29T18:10:28Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/55/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/55",
+    "id": 5288099278,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "d73a4a",
+        "default": true,
+        "description": "Something isn't working",
+        "id": 11671890128,
+        "name": "bug",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo0A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/bug"
+      },
+      {
+        "color": "6f7478",
+        "default": false,
+        "description": "Final Fantasy VIII plugin",
+        "id": 12062139654,
+        "name": "ff8",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlBg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff8"
+      },
+      {
+        "color": "b86b3e",
+        "default": false,
+        "description": "Red Dead Redemption plugin",
+        "id": 12062139982,
+        "name": "rdr1",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmTg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr1"
+      },
+      {
+        "color": "fbca04",
+        "default": false,
+        "description": "Ready for Lexer's stated acceptance test; candidate delivered and agent-side checks complete.",
+        "id": 12074236871,
+        "name": "untested",
+        "node_id": "LA_kwDOTn28Ks8AAAACz647xw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/untested"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/55/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABOzH9zg",
+    "number": 55,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/55/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/55/timeline",
+    "title": "Reuse prepared RDR1 and FF8 data on startup",
+    "updated_at": "2026-09-06T13:06:52Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/55",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}
