@@ -17,7 +17,9 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           submodules: false
-          persist-credentials: false
+          persist-credentials: true
+      - name: Remove checkout authentication without traversing unrelated submodules
+        run: git config --local --unset-all http.https://github.com/.extraheader
       - name: Capture tracked source and current issue evidence without changing either
         env:
           GH_TOKEN: ${{ github.token }}
