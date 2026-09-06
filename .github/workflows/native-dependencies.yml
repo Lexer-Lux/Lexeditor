@@ -1,0 +1,59 @@
+name: Prepare FFNx x86 build
+on:
+  push:
+    branches: [fix/ff8-native-battle-batch]
+    paths: [.github/workflows/native-dependencies.yml]
+permissions:
+  contents: read
+  packages: read
+jobs:
+  dependencies:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 60
+    env:
+      VCPKG_BINARY_SOURCES: 'clear;nuget,github,read;files,D:\vcpkg-cache,readwrite'
+    steps:
+      - name: Read exact upstream and editor revisions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config --global core.autocrlf false
+          git config --global core.longpaths true
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin $env:GITHUB_SHA
+          git -C editor checkout --detach FETCH_HEAD
+          git init ffnx
+          git -C ffnx remote add origin https://github.com/julianxhokaxhiu/FFNx.git
+          git -C ffnx fetch --depth=1 origin c056db2783f376a340fcefa6a48cc33618998876
+          git -C ffnx checkout --detach FETCH_HEAD
+          git -C ffnx submodule update --init --depth=1
+          git -C ffnx apply --ignore-space-change ../editor/games/ff8/ffnx_issue_51/package/ISSUE51_DERIVATIVE_SOURCE.patch
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/cache@v4
+        with:
+          path: D:\vcpkg-cache
+          key: ffnx-c056db-x86-vs2026-deps-v1
+      - name: Configure pinned x86 derivative
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force D:\vcpkg-cache | Out-Null
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -prerelease -latest -property InstallationPath
+          cmd /c "call `"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x86 && set > $env:RUNNER_TEMP\vcvars.txt"
+          Get-Content "$env:RUNNER_TEMP\vcvars.txt" | ForEach-Object { if ($_ -match '^(.*?)=(.*)$') { Set-Content "env:\$($matches[1])" $matches[2] } }
+          nuget sources add -Name github -Source https://nuget.pkg.github.com/julianxhokaxhiu/index.json -Username $env:GITHUB_REPOSITORY_OWNER -Password $env:GH_TOKEN -StorePasswordInClearText
+          python -m pip install cmake==4.2.0 ninja
+          cmd /c ffnx\vcpkg\bootstrap-vcpkg.bat
+          cmake -S ffnx -B ffnx/.build -G Ninja -DCMAKE_BUILD_TYPE=Release -D_DLL_VERSION=1.24.3-lexeditor51-runtime -DCMAKE_TOOLCHAIN_FILE="$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x86-windows-static -DFFNX_DEPLOY_TO_GAME_DIRS=OFF -DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: native-dependency-logs
+          path: |
+            ffnx/vcpkg/buildtrees/**/*.log
+            ffnx/.build/*.log
+          retention-days: 1
