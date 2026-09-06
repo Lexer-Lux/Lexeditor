@@ -1,0 +1,44 @@
+name: Apply reviewed WSE2 followup
+on:
+  push:
+    branches: [fix/warband-managed-wse2]
+    paths: ['.github/workflows/wse2-followup.yml']
+permissions:
+  contents: read
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/fix/warband-managed-wse2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Apply exact locally tested patch
+        run: |
+          python - <<'PY'
+          import pathlib, hashlib, subprocess
+          patch=pathlib.Path('.github/wse2-followup.patch').read_bytes()
+          assert hashlib.sha256(patch).hexdigest()=='a1e8338e09db4d5719feb7d0bab0b90be9dc32f6d87d8f52cad360a1e3164cc1'
+          paths=['tests/test_wse2_manager.py','ui/chooser.html','tests/wse2_helper_browser_check.py','.github/workflows/wse2-checks.yml']
+          subprocess.run(['git','diff','--exit-code','6f926b87e1bec590365c24ede23bcc09acb32038','HEAD','--',*paths],check=True)
+          subprocess.run(['git','apply','--unidiff-zero','--index','--check','-'],input=patch,check=True)
+          subprocess.run(['git','apply','--unidiff-zero','--index','-'],input=patch,check=True)
+          PY
+      - run: python -m pip install Pillow 'fonttools>=4.59,<5' 'tomli>=2,<3' playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m unittest discover -s tests -p 'test_wse2*.py' -v
+      - run: python tests/wse2_helper_browser_check.py out/followup-home
+      - run: git diff --cached --check
+      - name: Publish reviewed corrections only
+        run: |
+          git rm .github/wse2-followup.patch
+          git config user.name 'Lexer'
+          git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+          git commit -m 'Keep helper repair reachable and exercise rollback under Windows canonical paths'
+          git push origin HEAD:fix/warband-managed-wse2
