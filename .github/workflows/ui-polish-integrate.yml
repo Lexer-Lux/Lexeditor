@@ -1,0 +1,63 @@
+name: Integrate current master into UI polish
+on:
+  push:
+    branches: [ui/ff8-blank-global-polish-final]
+    paths: [.github/workflows/ui-polish-integrate.yml]
+permissions:
+  contents: read
+jobs:
+  integrate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch exact UI branch and current master
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          git config --global core.autocrlf false
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=200 origin "$REVISION"
+          git -C editor checkout --detach FETCH_HEAD
+          git -C editor fetch --depth=200 origin master:refs/remotes/origin/master
+          git -C editor config user.name 'Lexeditor UI repair'
+          git -C editor config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+      - name: Form current master merge tree
+        working-directory: editor
+        run: |
+          git merge --no-commit --no-ff origin/master
+          test -z "$(git ls-files -u)"
+      - name: Install browser regression dependencies
+        run: |
+          python -m pip install pillow fonttools playwright
+          python -m playwright install --with-deps chromium
+      - name: Verify UI polish with concurrent FF8 work
+        working-directory: editor
+        run: |
+          python tools/verify_ui_polish_batch.py
+          python tools/verify_ff8_enemy_compact_ui.py --browser ''
+          python tools/verify_ff8_ui_battle_regressions.py --browser ''
+          python tools/verify_live_references_and_ff8_inputs.py
+          python tools/verify_ff8_stock_tweak_settings.py
+          python -m compileall -q tools/verify_ui_polish_batch.py tools/verify_ff8_enemy_compact_ui.py
+          node --check ui/framework.js
+          python - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          for filename in ['games/blank/editor.html','games/ff8/editor.html']:
+              text=Path(filename).read_text(encoding='utf-8')
+              for script in re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',text,re.S|re.I):
+                  subprocess.run(['node','--check'],input=script,text=True,check=True)
+          PY
+          git diff --check
+      - name: Publish integrated clean branch
+        working-directory: editor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git rm -- .github/workflows/ui-polish-integrate.yml
+          git commit -m 'Integrate current master with validated FF8 UI polish'
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push origin HEAD:refs/heads/ui/ff8-blank-global-polish-final
