@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from functools import lru_cache
 import json
 import os
 import re
@@ -18,7 +19,7 @@ from . import paths
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
 PROJECT = Path(paths.MOD_PROJECT)
 GAME_ROOT = Path(paths.WARBAND_ROOT)
-MODULE_ROOT = PROJECT / "Module"
+MODULE_ROOT = PROJECT if (PROJECT / "module.ini").is_file() else PROJECT / "Module"
 MODULE_INI = MODULE_ROOT / "module.ini"
 COMMON_RES = GAME_ROOT / "CommonRes"
 MODULE_RES = MODULE_ROOT / "Resource"
@@ -45,7 +46,7 @@ def _resource_paths() -> list[Path]:
             continue
         folder = COMMON_RES if match.group(1).casefold() == "load_resource" else MODULE_RES
         candidate = folder / (match.group(2) + ".brf")
-        if candidate.is_file():
+        if candidate.resolve().parent == folder.resolve() and candidate.is_file():
             ordered.append(candidate.resolve())
     return ordered
 
@@ -70,7 +71,12 @@ def _run_tool(command: str, source: Path, destination: Path) -> None:
 
 
 def _metadata(resource: Path) -> dict:
-    destination = CACHE_ROOT / "brf-info" / _stamp(resource)
+    return _cached_metadata(resource, _stamp(resource), CACHE_ROOT)
+
+
+@lru_cache(maxsize=256)
+def _cached_metadata(resource: Path, stamp: str, cache_root: Path) -> dict:
+    destination = cache_root / "brf-info" / stamp
     data_file = destination / "data.json"
     if not data_file.is_file():
         _run_tool("info", resource, destination)
@@ -89,7 +95,7 @@ def _find_record(kind: str, name: str) -> tuple[Path, dict] | None:
 
 
 def _texture_file(name: str) -> Path | None:
-    if not name or name.casefold() == "none":
+    if not name or name.casefold() == "none" or not re.fullmatch(r"[A-Za-z0-9_. -]+", name):
         return None
     filename = name if name.casefold().endswith(".dds") else name + ".dds"
     for root in (MODULE_TEXTURES, GAME_TEXTURES):
@@ -177,7 +183,8 @@ def _png_texture(texture: Path | None, key: str) -> Path | None:
     return destination
 
 
-def preview(mesh: str) -> dict:
+def dependencies(mesh: str) -> dict:
+    """Resolve the complete inventory dependency chain before enabling a preview."""
     mesh = str(mesh or "").strip()
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", mesh):
         raise PreviewUnavailable("This item does not name a valid Warband mesh.")
@@ -185,28 +192,43 @@ def preview(mesh: str) -> dict:
         found = _find_record("meshes", mesh)
         if found is None:
             raise PreviewUnavailable(f"The installed module does not load mesh {mesh}.")
-        resource, mesh_record = found
-        material_name = str(mesh_record.get("material", ""))
-        material_match = _find_record("materials", material_name) if material_name else None
-        material = material_match[1] if material_match else {}
-        diffuse = _texture_file(str(material.get("diffuseA", "")))
+        resource, record = found
+        material_name = str(record.get("material", ""))
+        matched = _find_record("materials", material_name) if material_name else None
+        if matched is None:
+            raise PreviewUnavailable(f"Mesh {mesh} is missing material {material_name or '(unnamed)' }.")
+        material_resource, material = matched
+        texture_name = str(material.get("diffuseA", ""))
+        diffuse = _texture_file(texture_name)
+        if diffuse is None:
+            raise PreviewUnavailable(f"Material {material_name} is missing diffuse texture {texture_name or '(unnamed)' }.")
+        if not BRF_SYNC.is_file():
+            raise PreviewUnavailable("The bundled Warband BRF reader is missing.")
         evidence = {
-            "version": 2, "mesh": mesh.casefold(), "resource": _stamp(resource),
-            "material": material_name, "texture": _stamp(diffuse) if diffuse else "",
-            "tool": _stamp(BRF_SYNC),
+            "version": 3, "module": str(MODULE_ROOT.resolve()), "mesh": mesh.casefold(),
+            "resource": _stamp(resource), "materialResource": _stamp(material_resource),
+            "material": material_name, "texture": _stamp(diffuse), "tool": _stamp(BRF_SYNC),
         }
         key = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode("utf-8")).hexdigest()
+        return {"key": key, "mesh": mesh, "resource": resource, "record": record,
+                "material": material_name, "diffuse": diffuse}
+
+
+def preview(mesh: str) -> dict:
+    with _LOCK:
+        resolved = dependencies(mesh)
+        key, resource = resolved["key"], resolved["resource"]
         cached = CACHE_ROOT / f"{key}.json"
-        texture_png = _png_texture(diffuse, key)
+        _png_texture(resolved["diffuse"], key)
         if cached.is_file():
             geometry = json.loads(cached.read_text(encoding="utf-8"))
         else:
-            geometry = _parse_obj(_export_mesh(resource, str(mesh_record.get("name", mesh))))
+            geometry = _parse_obj(_export_mesh(resource, str(resolved["record"].get("name", mesh))))
             cached.parent.mkdir(parents=True, exist_ok=True)
             cached.write_text(json.dumps(geometry, separators=(",", ":")), encoding="utf-8")
         return {
-            "mesh": mesh, "material": material_name, "resource": resource.name,
-            "texture": f"/api/item-preview/texture?key={key}" if texture_png else "",
+            "cacheKey": key, "mesh": resolved["mesh"], "material": resolved["material"],
+            "resource": resource.name, "texture": f"/api/item-preview/texture?key={key}",
             "summary": {"vertices": len(geometry["positions"]), "triangles": len(geometry["triangles"])},
             "geometry": geometry,
         }

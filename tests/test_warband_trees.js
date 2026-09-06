@@ -1,0 +1,17 @@
+'use strict';
+const assert=require('node:assert/strict');
+const {build,layout}=require('../games/warband/troop_trees.js');
+const troops=['recruit','footman','archer','knight','guard','other','other_elite'].map((id,i)=>({id,name:id,faction:i<5?'fac_a':'fac_b',status:'active'}));
+const edge=(a,b)=>({fromId:a,toId:b});
+const edges=[edge('recruit','footman'),edge('recruit','archer'),edge('footman','knight'),edge('footman','guard'),edge('other','other_elite')];
+const trees=build(troops,edges);assert.equal(trees.length,2);assert.deepEqual(trees[0].factions,['fac_b']);
+const tree=trees.find(t=>t.roots.includes('recruit')), graph=layout(tree),nodes=new Map(graph.nodes.map(n=>[n.id,n]));
+for(const e of graph.edges) assert.ok(nodes.get(e.from).y>nodes.get(e.to).y,'upgrades must grow upward');
+assert.notEqual(nodes.get('archer').x,nodes.get('footman').x);
+assert.equal(build(troops,[...edges,...edges]).flatMap(t=>t.edges).length,edges.length);
+const missing=build(troops,[edge('recruit','not_defined')])[0];assert.equal(missing.nodes.find(n=>n.id==='not_defined').missing,true);
+const cycle=layout(build(troops,[edge('recruit','archer'),edge('archer','recruit')])[0]);assert.equal(cycle.cyclic,true);assert.equal(cycle.edges.length,2);
+const merge=layout(build(troops,[edge('recruit','archer'),edge('archer','guard'),edge('recruit','guard')])[0]);
+const mergedNodes=new Map(merge.nodes.map(n=>[n.id,n]));assert.ok(mergedNodes.get('archer').y>mergedNodes.get('guard').y);
+assert.deepEqual(build(troops,[]),[]);
+console.log('Warband tree regressions passed: factions, branches, bottom-up depth, missing nodes, duplicates, cycles, merges, empty graphs.');
