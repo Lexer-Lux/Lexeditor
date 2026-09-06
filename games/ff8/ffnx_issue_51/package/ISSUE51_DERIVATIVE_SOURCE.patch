@@ -100,10 +100,10 @@ index 8eb43c8..fff731e 100644
 +
 +endif()
 diff --git a/misc/FFNx.toml b/misc/FFNx.toml
-index d0b1566..ac8e072 100644
+index d0b1566..02ec4db 100644
 --- a/misc/FFNx.toml
 +++ b/misc/FFNx.toml
-@@ -568,6 +568,24 @@ disable_animated_textures_on_field = ""
+@@ -568,6 +568,27 @@ disable_animated_textures_on_field = ""
  #~~~~~~~~~~~~~~~~~~~~~~~~~~~
  enable_devtools = false
  
@@ -124,6 +124,9 @@ index d0b1566..ac8e072 100644
 +
 +# Draw current/max HP bars for FF8's three active battle characters.
 +enable_ff8_hp_bars = false
++
++# Blue junctioned-GF HP bar above each party name.
++enable_ff8_gf_hp_bars = false
 +
  # Set hotkey to toggle the DevTools window.
  # This is specified by a virtual-key code hexadecimal value, see: https://docs.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
@@ -233,10 +236,10 @@ index 0000000..d0fb20f
 +};
 +}
 diff --git a/src/cfg.cpp b/src/cfg.cpp
-index c313df7..07229f8 100644
+index c313df7..aa2a454 100644
 --- a/src/cfg.cpp
 +++ b/src/cfg.cpp
-@@ -119,6 +119,12 @@ std::string override_mod_path;
+@@ -119,6 +119,13 @@ std::string override_mod_path;
  std::string direct_mode_path;
  std::string save_path;
  bool enable_devtools;
@@ -246,10 +249,11 @@ index c313df7..07229f8 100644
 +bool enable_ff8_better_targeting;
 +bool enable_ff8_xp_bars;
 +bool enable_ff8_hp_bars;
++bool enable_ff8_gf_hp_bars;
  long devtools_hotkey;
  double speedhack_step;
  double speedhack_max;
-@@ -290,6 +296,12 @@ void read_cfg()
+@@ -290,6 +297,13 @@ void read_cfg()
  	direct_mode_path = config["direct_mode_path"].value_or("");
  	save_path = config["save_path"].value_or("");
  	enable_devtools = config["enable_devtools"].value_or(false);
@@ -259,14 +263,15 @@ index c313df7..07229f8 100644
 +	enable_ff8_better_targeting = config["enable_ff8_better_targeting"].value_or(false);
 +	enable_ff8_xp_bars = config["enable_ff8_xp_bars"].value_or(false);
 +	enable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);
++	enable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);
  	devtools_hotkey = config["devtools_hotkey"].value_or(VK_F12);
  	speedhack_step = config["speedhack_step"].value_or(0.5);
  	speedhack_max = config["speedhack_max"].value_or(8.0);
 diff --git a/src/cfg.h b/src/cfg.h
-index 056c681..79c3666 100644
+index 056c681..a1bd918 100644
 --- a/src/cfg.h
 +++ b/src/cfg.h
-@@ -141,6 +141,12 @@ extern std::string override_mod_path;
+@@ -141,6 +141,13 @@ extern std::string override_mod_path;
  extern std::string direct_mode_path;
  extern std::string save_path;
  extern bool enable_devtools;
@@ -276,6 +281,7 @@ index 056c681..79c3666 100644
 +extern bool enable_ff8_better_targeting;
 +extern bool enable_ff8_xp_bars;
 +extern bool enable_ff8_hp_bars;
++extern bool enable_ff8_gf_hp_bars;
  extern long devtools_hotkey;
  extern double speedhack_step;
  extern double speedhack_max;
@@ -4036,10 +4042,10 @@ index 528b8f6..c9614eb 100644
              }
 diff --git a/src/lexeditor_ff8_bars.cpp b/src/lexeditor_ff8_bars.cpp
 new file mode 100644
-index 0000000..b35931e
+index 0000000..ecfb7df
 --- /dev/null
 +++ b/src/lexeditor_ff8_bars.cpp
-@@ -0,0 +1,415 @@
+@@ -0,0 +1,464 @@
 +#include "lexeditor_ff8_bars.h"
 +
 +#include <algorithm>
@@ -4095,9 +4101,10 @@ index 0000000..b35931e
 +BattleRowRenderer g_battle_row_renderer = nullptr;
 +GlyphRenderer g_hp_glyph_renderer = nullptr, g_atb_glyph_renderer = nullptr;
 +struct HpCapture {
-+    float left = 0, right = 0, bottom = 0;
++    float left = 0, right = 0, top = 0;
 +    sprite_viewport viewport{};
 +    std::uint16_t current = 0, maximum = 0;
++    std::uint32_t gf_current = 0, gf_maximum = 0;
 +    bool hp_visible = false, atb_visible = false;
 +};
 +std::array<HpCapture, 3> g_hp_rows;
@@ -4119,9 +4126,7 @@ index 0000000..b35931e
 +    const auto *sprite = table + (entry & 0xFFFF);
 +    for (unsigned i = 0; i < count; ++i, sprite += 8) {
 +        const float right = x + static_cast<std::int8_t>(sprite[5]) + sprite[4];
-+        const float bottom = y + static_cast<std::int8_t>(sprite[7]) + sprite[6];
-+        if (hp) g_hp_row->bottom = std::max(g_hp_row->bottom, bottom);
-+        else g_hp_row->right = std::max(g_hp_row->right, right);
++        if (!hp) g_hp_row->right = std::max(g_hp_row->right, right);
 +    }
 +    g_hp_row->viewport = **g_active_viewport;
 +    if (hp) g_hp_row->hp_visible = true;
@@ -4138,6 +4143,35 @@ index 0000000..b35931e
 +    capture_glyph(x, y, false);
 +    return g_atb_glyph_renderer(a, b, x, y);
 +}
++// Saved GF HP is authoritative outside a summon. During the charge the
++// engine keeps a live copy in the summoner's computed record (+18/+1A), then
++// writes it back at 0048E664. Reading only saved HP would miss incoming damage.
++void capture_gf_hp(std::uint8_t slot, HpCapture &capture)
++{
++    if (!enable_ff8_gf_hp_bars || ff8_externals.savemap == nullptr ||
++        ff8_externals.char_comp_stats_1CFF000.size() != 3) return;
++    const auto character = ff8_externals.character_data_1CFE74C[slot];
++    if (character >= CHAR_NUM) return;
++    const auto junctions = ff8_externals.savemap->chars[character].gfs;
++    const auto *stats = reinterpret_cast<const std::uint8_t *>(
++        &ff8_externals.char_comp_stats_1CFF000[slot]);
++    const bool summoning = (stats[0x1C] & 1) != 0;
++    const int summoned = static_cast<int>(stats[0x1D]) - 0x40;
++    for (int gf = 0; gf < G_FORCE_NUM; ++gf) {
++        if (!(junctions & (1U << gf)) || !(ff8_externals.savemap->gfs[gf].exists & 1)) continue;
++        // 00495D80 initializes twelve-byte GF stats; +2 is max HP, including
++        // level and learned HP abilities. Do not duplicate the game's formula.
++        auto maximum = *reinterpret_cast<const std::uint16_t *>(0x1CFF61A + gf * 12);
++        auto current = ff8_externals.savemap->gfs[gf].HPs;
++        if (summoning && summoned == gf) {
++            current = *reinterpret_cast<const std::uint16_t *>(stats + 0x18);
++            maximum = *reinterpret_cast<const std::uint16_t *>(stats + 0x1A);
++        }
++        capture.gf_maximum += maximum;
++        capture.gf_current += std::min(current, maximum);
++    }
++}
++
 +std::uint32_t __cdecl battle_row_hook(std::uint8_t *row, std::uint32_t a, std::uint32_t b, int state)
 +{
 +    const auto actor = row[0x48];
@@ -4148,8 +4182,10 @@ index 0000000..b35931e
 +        // Native name origin is row+8 (004B0C0B); HP comes from this same
 +        // displayed row, not the stat editor's computed-stat scratch buffer.
 +        capture.left = *reinterpret_cast<const std::int16_t *>(row + 8);
++        capture.top = *reinterpret_cast<const std::int16_t *>(row + 0xA);
 +        capture.maximum = *reinterpret_cast<const std::uint16_t *>(row + 0x1C);
 +        capture.current = *reinterpret_cast<const std::uint16_t *>(row + 0x1E);
++        capture_gf_hp(actor, capture);
 +        g_hp_row = &capture;
 +    }
 +    const auto result = g_battle_row_renderer(row, a, b, state);
@@ -4162,6 +4198,8 @@ index 0000000..b35931e
 +static_assert(offsetof(ff8_char_computed_stats, curr_hp) == 370);
 +static_assert(offsetof(ff8_char_computed_stats, max_hp) == 372);
 +static_assert(offsetof(savemap_ff8_character, exp) == 4);
++static_assert(offsetof(savemap_ff8_character, gfs) == 0x58);
++static_assert(offsetof(savemap_ff8_gf, HPs) == 0x12);
 +
 +std::uint32_t __cdecl main_menu_renderer_hook(
 +    void *state, std::uint32_t display_list, std::uint32_t ordering_table)
@@ -4350,20 +4388,37 @@ index 0000000..b35931e
 +        return;
 +    }
 +    for (const auto &row : g_hp_rows) {
-+        if (!row.hp_visible || !row.atb_visible || row.maximum == 0 ||
-+            row.right <= row.left || row.viewport.scale_x <= 0 || row.viewport.scale_y <= 0) continue;
++        if (!row.atb_visible || row.right <= row.left ||
++            row.viewport.scale_x <= 0 || row.viewport.scale_y <= 0) continue;
 +        const auto &v = row.viewport;
 +        const float full_width = (row.right - row.left) * v.scale_x;
-+        const float width = full_width * std::min(1.0f, row.maximum / 9999.0f);
-+        const float right = row.right * v.scale_x + v.offset_x;
-+        const float top = row.bottom * v.scale_y + v.offset_y;
-+        const ImVec2 lo(scale_x(right - width), scale_y(top));
-+        const ImVec2 hi(scale_x(right), scale_y(top + v.scale_y));
-+        auto *draw = ImGui::GetForegroundDrawList();
-+        draw->AddRectFilled(lo, hi, IM_COL32(0, 0, 0, 255));
-+        const float fraction = std::min(1.0f, row.current / static_cast<float>(row.maximum));
-+        if (fraction > 0) draw->AddRectFilled(
-+            ImVec2(hi.x - (hi.x - lo.x) * fraction, lo.y), hi, IM_COL32(224, 32, 32, 255));
++        auto draw_line = [&](std::uint32_t current, std::uint32_t maximum,
++                             float native_y, bool from_left, ImU32 color) {
++            if (!maximum) return;
++            const float width = full_width * std::min(1.0f, maximum / 9999.0f);
++            const float x = (from_left ? row.left : row.right) * v.scale_x + v.offset_x;
++            const float top = native_y * v.scale_y + v.offset_y;
++            const ImVec2 lo(scale_x(from_left ? x : x - width), scale_y(top));
++            const ImVec2 hi(scale_x(from_left ? x + width : x), scale_y(top + v.scale_y));
++            if (hi.x <= lo.x || hi.y <= lo.y) return;
++            auto *draw = ImGui::GetForegroundDrawList();
++            draw->AddRectFilled(lo, hi, IM_COL32(0, 0, 0, 255));
++            const float fraction = std::min(1.0f, current / static_cast<float>(maximum));
++            if (fraction <= 0) return;
++            const float filled = (hi.x - lo.x) * fraction;
++            draw->AddRectFilled(
++                ImVec2(from_left ? lo.x : hi.x - filled, lo.y),
++                ImVec2(from_left ? lo.x + filled : hi.x, hi.y), color);
++        };
++        // Native rows are 15 pixels high (004B0FF6) and spaced by 15
++        // (004B1978). Text starts at row_y+2 and is 12 pixels high. Glyph
++        // atlas cells can contain transparent padding beyond that row.
++        // Anchor the red line to its final pixel, never to atlas-cell bounds.
++        if (enable_ff8_hp_bars && row.hp_visible)
++            draw_line(row.current, row.maximum, row.top + 14.0f, false, IM_COL32(224, 32, 32, 255));
++        // One native pixel immediately above the name; independent toggle.
++        if (enable_ff8_gf_hp_bars)
++            draw_line(row.gf_current, row.gf_maximum, row.top + 1.0f, true, IM_COL32(48, 128, 255, 255));
 +    }
 +}
 +
@@ -4371,12 +4426,12 @@ index 0000000..b35931e
 +
 +bool lexeditor_ff8_bars_enabled()
 +{
-+    return ff8 && (enable_ff8_xp_bars || enable_ff8_hp_bars);
++    return ff8 && (enable_ff8_xp_bars || enable_ff8_hp_bars || enable_ff8_gf_hp_bars);
 +}
 +
 +void lexeditor_ff8_bars_install()
 +{
-+    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars)) {
++    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars && !enable_ff8_gf_hp_bars)) {
 +        return;
 +    }
 +
@@ -4386,7 +4441,7 @@ index 0000000..b35931e
 +        return *reinterpret_cast<const std::uint8_t *>(address) == 0xE8 &&
 +            get_relative_call(address, 0) == target;
 +    };
-+    if (enable_ff8_hp_bars && FF8_US_VERSION &&
++    if ((enable_ff8_hp_bars || enable_ff8_gf_hp_bars) && FF8_US_VERSION &&
 +        original_call(0x004B17D5, 0x004B0F10) &&
 +        original_call(0x004B1100, 0x004A7210) &&
 +        original_call(0x004B127B, 0x004A7210)) {
@@ -4432,7 +4487,7 @@ index 0000000..b35931e
 +
 +void lexeditor_ff8_bars_draw()
 +{
-+    if (enable_ff8_hp_bars) {
++    if (enable_ff8_hp_bars || enable_ff8_gf_hp_bars) {
 +        draw_battle_hp();
 +    }
 +    if (enable_ff8_xp_bars) {
@@ -4457,13 +4512,13 @@ index 0000000..b35931e
 +}
 diff --git a/src/lexeditor_ff8_bars.h b/src/lexeditor_ff8_bars.h
 new file mode 100644
-index 0000000..8e34a80
+index 0000000..0f697df
 --- /dev/null
 +++ b/src/lexeditor_ff8_bars.h
 @@ -0,0 +1,11 @@
 +#pragma once
 +
-+// Install FF8 renderer observations. This function is safe when both options
++// Install FF8 renderer observations. This function is safe when all options
 +// are disabled; it does not patch a renderer in that case.
 +void lexeditor_ff8_bars_install();
 +
@@ -4585,10 +4640,10 @@ index 0000000..e77ad85
 +int lexeditor_ff8_modern_world_axis(std::int8_t port, int type, std::int8_t offset);
 diff --git a/src/lexeditor_ff8_party_switch.cpp b/src/lexeditor_ff8_party_switch.cpp
 new file mode 100644
-index 0000000..f4011f3
+index 0000000..619a34e
 --- /dev/null
 +++ b/src/lexeditor_ff8_party_switch.cpp
-@@ -0,0 +1,205 @@
+@@ -0,0 +1,305 @@
 +#include "lexeditor_ff8_party_switch.h"
 +#include <windows.h>
 +#include <array>
@@ -4598,6 +4653,7 @@ index 0000000..f4011f3
 +#include "cfg.h"
 +#include "common.h"
 +#include "globals.h"
++#include "ff8.h"
 +#include "patch.h"
 +#include "log.h"
 +
@@ -4611,7 +4667,38 @@ index 0000000..f4011f3
 +using Controller=void(__cdecl *)();
 +Controller original=nullptr;
 +bool opened=false, pending=false;
-+int slot=-1, chosen=0;
++int slot=-1, chosen=0, incoming=-1, outgoing=-1;
++enum class Phase { idle, queued, retiring, rebuild_queued, loading };
++Phase phase=Phase::idle;
++std::uint32_t generation=0, pending_frames=0, outgoing_atb=0;
++bool restoring=false;
++std::uint8_t hud_enabled=1;
++std::array<std::uint8_t,20> selector_backup{};
++constexpr std::uintptr_t kModels=0x1D972C0, kQueue=0x1D96D68;
++constexpr std::uintptr_t kSelector=0x1D76628+5*20;
++
++// Native 00503270 allocates twelve-byte records from this thirty-entry pool.
++// Count free records, including records still owned by presentation tasks;
++// a queue-length check alone can miss an in-flight allocation.
++bool event_room(unsigned needed) {
++    const auto pool=mem<std::uint32_t>(kQueue+8);
++    const int capacity=mem<std::int16_t>(kQueue+12);
++    if(!pool || capacity<=0 || capacity>64) return false;
++    unsigned free=0;
++    for(int i=0;i<capacity;++i) if(!mem<std::uint8_t>(pool+i*12+1)) ++free;
++    return free>=needed;
++}
++bool queue_callback(void(__cdecl *callback)(std::uint32_t), std::uint32_t ticket) {
++    // 0047E200 wraps this allocator but discards its failure result. Event 0A
++    // passes the four-byte payload to its callback (00500A3D..00500A47).
++    const auto payload=native<std::uintptr_t>(0x500DF0,0x0A,0x80,reinterpret_cast<void *>(callback));
++    if(payload<=8) return false;
++    mem<std::uint32_t>(payload)=ticket;
++    return true;
++}
++void __cdecl begin_swap(std::uint32_t ticket);
++void __cdecl replace_actor(std::uint32_t ticket);
++void __cdecl finish(std::uint32_t ticket);
 +std::array<int,8> choices{};
 +int count=0;
 +std::uint16_t previous=0;
@@ -4628,11 +4715,13 @@ index 0000000..f4011f3
 +    return true;
 +}
 +void close_menu() {
++    if(!opened) return;
 +    opened=false;
-+    native<void>(0x4B9AD0,5,0,0,0);
++    std::memcpy(reinterpret_cast<void *>(kSelector),selector_backup.data(),selector_backup.size());
 +    // The underlying command controller was never closed or advanced.
 +}
 +std::uint32_t __cdecl draw(std::uint32_t ordering, std::uint32_t primitives, void *, int) {
++    if(!opened || count<=0 || count>8 || !mem<std::uint32_t>(0x1D6D490)) return primitives;
 +    static const unsigned char cursor[]={0xCB,0x20,0};
 +    std::array<const unsigned char *,8> names{};
 +    int width=80;
@@ -4640,8 +4729,9 @@ index 0000000..f4011f3
 +        // 004A7250 stops on control codes <=0x18; it cannot expand 03/ID.
 +        // Use the same native name resolver as the game's target-name path.
 +        names[i]=native<const unsigned char *>(0x47EB50,choices[i]);
-+        const auto size=native<std::uint32_t>(0x4A0F50,names[i]);
-+        width=std::max(width,static_cast<int>(size&0xFFFF)+30);
++        // Measure with the same glyph-width table as 004A7250.
++        const int size=names[i] ? native<int>(0x4B1850,names[i]) : 0;
++        width=std::max(width,size+30);
 +    }
 +    auto *context=mem<std::uint8_t *>(0x1D6D490);
 +    mem<std::uint8_t>(reinterpret_cast<std::uintptr_t>(context)+0x23)=8;
@@ -4655,26 +4745,21 @@ index 0000000..f4011f3
 +    }
 +    return primitives;
 +}
-+void __cdecl finish();
 +void abort_swap() {
 +    // Event11 inserts the ready actor removed by event12.
 +    if(slot>=0 && slot<3) native<void>(0x4AD620,slot,0x11,0x80,0);
 +    mem<std::uint8_t>(0x1D280C2)=pause1;
 +    mem<std::uint8_t>(0x1D28DF9)=pause2;
 +    mem<std::uint8_t>(0x1D28DFD)=pause3;
-+    pending=false;
-+    ffnx_warning("Party Switch: cancelled before mutation; ready turn restored.\n");
++    pending=false; phase=Phase::idle; ++generation;
++    ffnx_warning("Party Switch: cancelled before model retirement; ready turn restored.\n");
 +}
-+void __cdecl replace_actor() {
-+    if(!pending) return;
-+    if(slot<0 || slot>=3 || !eligible(chosen)) {
-+        abort_swap();
-+        return;
-+    }
-+    const int outgoing=mem<std::uint8_t>(kParty+slot);
-+    if(outgoing>=8) {
-+        abort_swap();
-+        return;
++void __cdecl begin_swap(std::uint32_t ticket) {
++    if(!pending || phase!=Phase::queued || ticket!=generation) return;
++    if(slot<0 || slot>=3 || !eligible(incoming) ||
++       mem<std::uint8_t>(kParty+slot)!=outgoing || !event_room(1) ||
++       ((mem<std::uint16_t>(kModels+slot*0x9C)&3)==1)) {
++        abort_swap(); return;
 +    }
 +    const auto actor=kActor+slot*0xD0, stats=kStats+slot*0x1D0;
 +    const auto saved=kSaved+outgoing*0x98;
@@ -4686,19 +4771,45 @@ index 0000000..f4011f3
 +        mem<std::uint8_t>(saved+0x11+i*2)=mem<std::uint8_t>(stats+0x83+i*5);
 +    }
 +    reserve[outgoing]={true,mem<std::uint16_t>(actor+0x80),mem<std::uint32_t>(actor+8)};
-+    ffnx_trace("Party Switch: slot %d, character %d -> %d; replacement started.\n",slot,outgoing,chosen);
++    outgoing_atb=mem<std::uint32_t>(actor+0x14);
++    hud_enabled=mem<std::uint8_t>(0x1D76928+slot*0x6C+0x51);
++    // Event 66 waits for model flag 1 to clear. A living party member still
++    // owns that model; the encounter-specific replacement relied on an
++    // earlier death/removal. Explicitly retire the old model first.
++    // Event 69 runs native 00502ED0 -> 0050C5F0, including native resource
++    // release. Save HP/status BEFORE it: its native cleanup marks the old
++    // participant removed/KO while the model leaves.
++    if(mem<std::uint16_t>(kModels+slot*0x9C)&1) {
++        const auto payload=native<std::uintptr_t>(0x500DF0,0x69,0x80,0);
++        if(payload<=8) { abort_swap(); return; }
++        mem<std::int16_t>(payload)=static_cast<std::int16_t>(slot);
++    }
++    native<void>(0x4B1830,slot,0);
++    phase=Phase::retiring;
++    ffnx_trace("Party Switch: slot %d, character %d -> %d; retiring old model.\n",slot,outgoing,incoming);
++}
++void __cdecl replace_actor(std::uint32_t ticket) {
++    if(!pending || phase!=Phase::rebuild_queued || ticket!=generation) return;
++    if((mem<std::uint16_t>(kModels+slot*0x9C)&1) || !event_room(5)) {
++        phase=Phase::retiring; return; // retry safely before any identity change
++    }
++    // If the reserve became unavailable while queued, reload the original
++    // participant instead. Never leave a retired model slot empty on abort.
++    restoring=!eligible(incoming);
++    const int target=restoring ? outgoing : incoming;
++    const auto actor=kActor+slot*0xD0, stats=kStats+slot*0x1D0;
 +    // These are the native single-slot replacement primitives, in their native
 +    // order. The encounter callback and its private globals are not used.
-+    mem<std::uint8_t>(kParty+slot)=static_cast<std::uint8_t>(chosen);
-+    native<void>(0x495530,chosen,slot);
-+    native<void>(0x495960,chosen,slot);
++    mem<std::uint8_t>(kParty+slot)=static_cast<std::uint8_t>(target);
++    native<void>(0x495530,target,slot);
++    native<void>(0x495960,target,slot);
 +    native<void>(0x495EC0);
 +    native<void>(0x48B5F0,slot);
 +    native<void>(0x48B310,slot);
-+    if(reserve[chosen].known) {
-+        mem<std::uint16_t>(actor+0x80)=reserve[chosen].status16;
-+        mem<std::uint32_t>(actor+8)=reserve[chosen].status32;
-+        mem<std::uint16_t>(stats+0x1B2)=reserve[chosen].status16;
++    if(reserve[target].known) {
++        mem<std::uint16_t>(actor+0x80)=reserve[target].status16;
++        mem<std::uint32_t>(actor+8)=reserve[target].status32;
++        mem<std::uint16_t>(stats+0x1B2)=reserve[target].status16;
 +    }
 +    // The native ATB initializer sets the incoming actor to zero, even if
 +    // Auto-Haste/startup randomness filled it during the participant refresh.
@@ -4707,17 +4818,28 @@ index 0000000..f4011f3
 +    native<void>(0x47DAF0,slot); // enqueue status/model refresh event67
 +    native<void>(0x47E3F0,0x0E,0x80,0); // native presentation barrier
 +    native<void>(0x47E3F0,0x70,0x80,0); // same replacement presentation completion
-+    native<void>(0x47E200,reinterpret_cast<void *>(&finish));
++    phase=Phase::loading;
++    queue_callback(&finish,ticket); // five free records were reserved above
 +}
-+void __cdecl finish() {
-+    if(!pending) return;
++void __cdecl finish(std::uint32_t ticket) {
++    if(!pending || phase!=Phase::loading || ticket!=generation) return;
++    // Rebuild cached HUD name/HP, not just the battle participant. Otherwise
++    // the panel can continue to display the outgoing character's data.
++    native<void>(0x4B18C0,reinterpret_cast<void *>(0x1D76928+slot*0x6C),slot);
++    native<void>(0x4B1830,slot,static_cast<int>(hud_enabled));
++    if(restoring) {
++        mem<std::uint32_t>(kActor+slot*0xD0+0x14)=outgoing_atb;
++        native<void>(0x4AD620,slot,0x11,0x80,0);
++    }
 +    native<void>(0x485FF0); // rebuild targetable/live masks from refreshed actor
 +    native<void>(0x4AB450); // publish those masks to battle target selection
 +    mem<std::uint8_t>(0x1D280C2)=pause1;
 +    mem<std::uint8_t>(0x1D28DF9)=pause2;
 +    mem<std::uint8_t>(0x1D28DFD)=pause3;
-+    pending=false;
-+    ffnx_trace("Party Switch: slot %d replacement finished; ATB %u.\n",slot,mem<std::uint32_t>(kActor+slot*0xD0+0x14));
++    pending=false; phase=Phase::idle;
++    ffnx_trace("Party Switch: slot %d %s; ATB %u.\n",slot,
++        restoring ? "original participant restored" : "replacement finished",
++        mem<std::uint32_t>(kActor+slot*0xD0+0x14));
 +}
 +void __cdecl controller() {
 +    auto *mode=getmode_cached();
@@ -4726,13 +4848,27 @@ index 0000000..f4011f3
 +        original(); return;
 +    }
 +    const int active=mem<std::int8_t>(0x1D76844);
-+    const auto context=mem<std::uintptr_t>(0x1D6D490);
++    const auto context=mem<std::uint32_t>(0x1D6D490);
 +    if(!context) { original(); return; }
 +    // Read exactly the same logical input record as the native controller.
 +    const auto held=mem<std::uint16_t>(context+0x10);
 +    const auto edge=static_cast<std::uint16_t>(held & ~previous);
 +    previous=held;
-+    if(pending) return;
++    if(pending) {
++        // Keep native ready-list/command-panel housekeeping alive without
++        // accepting commands during the transition.
++        const auto held16=mem<std::uint16_t>(context+0x10);
++        const auto edge16=mem<std::uint16_t>(context+0x12);
++        const auto repeat16=mem<std::uint16_t>(context+0x14);
++        mem<std::uint16_t>(context+0x10)=0;
++        mem<std::uint16_t>(context+0x12)=0;
++        mem<std::uint16_t>(context+0x14)=0;
++        original();
++        mem<std::uint16_t>(context+0x10)=held16;
++        mem<std::uint16_t>(context+0x12)=edge16;
++        mem<std::uint16_t>(context+0x14)=repeat16;
++        return;
++    }
 +    if(opened) {
 +        if(active!=slot || mem<std::uint16_t>(kActor+slot*0xD0+0x80)&1) {
 +            close_menu(); original(); return;
@@ -4743,7 +4879,11 @@ index 0000000..f4011f3
 +        if(edge&0x40) {
 +            const int id=choices[chosen];
 +            if(!eligible(id)) { close_menu(); return; }
-+            close_menu(); chosen=id; pending=true;
++            if(!event_room(1)) return; // retain selector and turn on a full queue
++            incoming=id; outgoing=mem<std::uint8_t>(kParty+slot);
++            ++generation;
++            if(!queue_callback(&begin_swap,generation)) return;
++            close_menu(); pending=true; phase=Phase::queued; pending_frames=0;
 +            pause1=mem<std::uint8_t>(0x1D280C2);
 +            pause2=mem<std::uint8_t>(0x1D28DF9);
 +            pause3=mem<std::uint8_t>(0x1D28DFD);
@@ -4751,7 +4891,6 @@ index 0000000..f4011f3
 +            // Native menu event12 removes this actor from the ready list.
 +            // Other ready actors and queued commands remain owned by the game.
 +            native<void>(0x4AD620,slot,0x12,0x80,0);
-+            native<void>(0x47E200,reinterpret_cast<void *>(&replace_actor));
 +        }
 +        return;
 +    }
@@ -4761,7 +4900,9 @@ index 0000000..f4011f3
 +        count=0;
 +        for(int id=0;id<8;++id) if(eligible(id)) choices[count++]=id;
 +        if(count) {
-+            slot=active; chosen=0; opened=true;
++            slot=active; chosen=0;
++            std::memcpy(selector_backup.data(),reinterpret_cast<const void *>(kSelector),selector_backup.size());
++            opened=true;
 +            ffnx_trace("Party Switch: selector opened for slot %d, %d reserves.\n",slot,count);
 +            native<void>(0x4B9AD0,5,0,reinterpret_cast<void *>(&draw),0);
 +            native<void>(0x4B9B90,5,2);
@@ -4772,7 +4913,7 @@ index 0000000..f4011f3
 +}
 +}
 +void lexeditor_ff8_party_switch_install() {
-+    if(!ff8 || !enable_ff8_party_switch || original) return;
++    if(!ff8 || !FF8_US_VERSION || !enable_ff8_party_switch || original) return;
 +    const unsigned char expected[]={0x83,0xEC,0x14,0x53,0x55};
 +    if(std::memcmp(reinterpret_cast<void *>(kController),expected,5)!=0) { ffnx_warning("Party Switch: unsupported controller bytes.\n"); return; }
 +    auto *code=static_cast<unsigned char *>(VirtualAlloc(nullptr,16,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE));
@@ -4790,8 +4931,22 @@ index 0000000..f4011f3
 +    if(!ff8 || !original) return;
 +    const auto *mode=getmode_cached();
 +    if(!mode || mode->driver_mode!=MODE_BATTLE) {
-+        opened=false; pending=false; slot=-1; count=0; previous=0;
++        if(pending || opened) ++generation;
++        opened=false; pending=false; phase=Phase::idle; slot=-1; count=0; previous=0;
 +        reserve={};
++        return;
++    }
++    if(pending) {
++        ++pending_frames;
++        // Poll only for resource retirement. All participant writes still
++        // execute inside the engine's own event callback, never in flip().
++        if(phase==Phase::retiring && !(mem<std::uint16_t>(kModels+slot*0x9C)&1) && event_room(6)) {
++            if(queue_callback(&replace_actor,generation)) phase=Phase::rebuild_queued;
++        }
++        if(pending_frames%600==0) {
++            ffnx_warning("Party Switch: transition waiting; phase=%d slot=%d modelFlags=%04X.\n",
++                static_cast<int>(phase),slot,mem<std::uint16_t>(kModels+slot*0x9C));
++        }
 +    }
 +}
 diff --git a/src/lexeditor_ff8_party_switch.h b/src/lexeditor_ff8_party_switch.h
@@ -4843,7 +4998,7 @@ index b2cc508..b922155 100644
  }
  
 diff --git a/src/renderer.cpp b/src/renderer.cpp
-index ce629d7..73daba0 100644
+index ce629d7..cffef14 100644
 --- a/src/renderer.cpp
 +++ b/src/renderer.cpp
 @@ -38,6 +38,8 @@
@@ -4919,7 +5074,7 @@ index ce629d7..73daba0 100644
  }
  
 diff --git a/src/renderer.h b/src/renderer.h
-index d2d01dd..a04b977 100644
+index d2d01dd..920ca0a 100644
 --- a/src/renderer.h
 +++ b/src/renderer.h
 @@ -564,6 +564,9 @@ public:
