@@ -43,6 +43,39 @@ Tagged generic enemies should get the same facing/FOV presentation as tagged ani
 
 **Status: Source implementation complete, but unbuilt.** Deliver the combined marker build before asking you to compare generic enemies, lawmen and bounty hunters.
 
+## issue 5356333396 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/296
+
+Created: 2026-08-20T19:16:49Z; updated: 2026-09-06T18:41:56Z
+
+Exact metadata: [source record](sources/issue-5356333396-4e3e0d7df0e9b1878ea7504f67202dd9659b188e634c54b170252274c887eea4.json).
+
+Tagged generic enemies should get the same facing/FOV presentation as tagged animals, without revealing untagged targets or duplicating law/bounty cones.
+
+**Status: Source implementation complete, but unbuilt.** Deliver the combined marker build before asking you to compare generic enemies, lawmen and bounty hunters.
+
+## issue 5356333396 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/296
+
+Created: 2026-08-20T19:16:49Z; updated: 2026-09-06T18:41:56Z
+
+Exact metadata: [source record](sources/issue-5356333396-b3a12dd23945b1cda3646b149e0585d660f6834c6b0b8819488e56d748abaef7.json).
+
+Tagged generic enemies should get the same facing/FOV presentation as tagged animals, without revealing untagged targets or duplicating law/bounty cones.
+
+**Status: Built candidate ready for gameplay test.** Runtime PR #212 classifies law/bounty roles separately and applies the proven Recon cone modifier only to `Generic + Enemy` humans. Lawmen and bounty hunters keep Rockstar's authored cop-style cone behavior instead of receiving a duplicate custom cone. Neutral/allied humans remain cone-free.
+
+Permanent source checks passed in run 34052368724. Complete Windows release and development builds both passed in run 34052368730.
+
+- [ ] Tag a generic hostile human and verify a facing/FOV cone appears and rotates with the target.
+- [ ] Verify an untagged hostile does not gain the Recon cone.
+- [ ] Tag a neutral/allied human and verify no enemy cone appears.
+- [ ] Tag/observe lawmen and bounty hunters and verify there is only the authored law-style cone, not a doubled/overlapping cone.
+
+Candidate: runtime PR #212. No installation or gameplay acceptance is claimed yet.
+
 ## comment 5550166702 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/296#issuecomment-5550166702
