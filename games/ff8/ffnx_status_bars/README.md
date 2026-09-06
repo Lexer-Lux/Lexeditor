@@ -1,4 +1,4 @@
-# FF8 XP and HP bars
+# FF8 XP, HP and GF HP bars
 
 This directory contains an isolated FFNx source extension. It does not patch
 `FF8_EN.exe` and it does not use Hext. Apply it only to FFNx revision
@@ -8,17 +8,19 @@ This directory contains an isolated FFNx source extension. It does not patch
 python games/ff8/ffnx_status_bars/apply_to_ffnx.py <FFNx source directory>
 ```
 
-The derivative build adds two default-off FFNx settings:
+The derivative build adds three default-off FFNx settings:
 
 - `enable_ff8_xp_bars`: level-progress bars on the main menu, Status screen,
   and post-battle report.
 - `enable_ff8_hp_bars`: current/max HP bars for the three active characters in
   battle.
+- `enable_ff8_gf_hp_bars`: blue, left-to-right HP bars above party names.
+  Multiple junctioned GFs contribute combined current/max HP.
 
-Lexeditor stores the two choices as `xpBars` and `hpBars` in each mod's
+Lexeditor stores the choices as `xpBars`, `hpBars` and `gfHpBars` in each mod's
 `lexeditor-settings.json`. At the launch barrier, it writes the selected mod's
-values to the two derivative settings in the active `FFNx.toml`. Changing mods
-therefore does not share either choice with another mod.
+values to the derivative settings in the active `FFNx.toml`. Changing mods
+therefore does not share these choices with another mod.
 
 ## Primary evidence
 
@@ -40,11 +42,19 @@ boundaries instead of duplicating the XP formula.
 
 FFNx exposes exactly three `ff8_char_computed_stats` battle records. The
 verified layout stores current HP at offset 370 and maximum HP at offset 372.
-The HP overlay reads those records only while FF8 is in battle mode.
+The HP overlay captures the visible native HUD row instead of duplicating
+its display-state calculation. The red line is at row Y + 14, the final pixel
+of the native 15-pixel row; the blue GF line is at Y + 1, immediately above
+the name at Y + 2. Glyph atlas padding is not used for vertical placement.
+
+GF HP comes from junctioned, existing saved GFs and the native computed GF
+maximum-HP table. While summoning, the active GF's live current/max HP in the
+summoner's computed record takes precedence over saved values. This reflects
+incoming damage before the game writes it back to the save-state copy.
 
 ## Integration points
 
-The applicator copies the module under `src/`, adds the two TOML settings, and
+The applicator copies the module under `src/`, adds the three TOML settings, and
 adds these calls:
 
 - `lexeditor_ff8_bars_install()` in `ff8_init_hooks()`.
@@ -58,3 +68,12 @@ default-off settings, hook locations, and state-selection rules. A live game
 test is still required to confirm the final bar positions, scale, colors,
 animation, and absence of flicker on every supported screen. This work does not
 launch or install the game.
+
+## Current derivative build
+
+The packaged issue-51 derivative uses FFNx `c056db2783f376a340fcefa6a48cc33618998876`.
+For that combined derivative, use `tools/prepare_ff8_native_build.py` on a
+clean checkout rather than the older standalone applicator above. The script
+replays the package provenance patch and copies these canonical sources.
+It does not install a driver. A new binary must be built, verified and
+packaged before source edits affect the running game.
