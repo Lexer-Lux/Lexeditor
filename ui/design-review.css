@@ -44,3 +44,19 @@
 .lex-design-review button:focus-visible,.lex-design-review input:focus-visible,.lex-design-review select:focus-visible{outline:2px solid var(--lex-accent);outline-offset:2px}
 @media(max-width:1050px){.lex-review-body:has(>.lex-review-model:not([hidden])){grid-template-columns:minmax(150px,1fr) minmax(240px,2fr)}.lex-review-body>.lex-review-model{grid-column:2}}
 @media(max-width:640px){.lex-review-body,.lex-review-body:has(>.lex-review-model:not([hidden])){grid-template-columns:1fr}.lex-review-body>.lex-review-model{grid-column:1}}
+/* New #99 alternatives after the earlier two menu-bar proposals were rejected. */
+.lex-review-tab-command-row{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;border-bottom:1px solid var(--lex-border)}
+.lex-review-tab-command-row>.lex-review-nav{flex:1 1 24rem;border-bottom:0}
+.lex-review-tab-command-row>.lex-review-commandbar{flex:1 1 24rem;border-bottom:0;justify-content:flex-end}
+.lex-review-details>.lex-review-model{margin-top:.8rem}
+.lex-review-workspace-rail{display:grid;grid-template-columns:minmax(120px,18%) minmax(0,1fr);min-width:0}
+.lex-review-side-rail{border-right:1px solid var(--lex-border);padding:.6rem;min-width:0}
+.lex-review-side-rail>.lex-review-nav{display:flex;flex-direction:column;align-items:stretch;border:0;padding:0;gap:.35rem}
+.lex-review-side-rail>.lex-review-nav button:last-child{margin:0;font-weight:bold}
+.lex-review-side-rail>.lex-review-choice{display:grid;gap:.35rem;margin:1rem 0 0}
+.lex-review-side-rail>.lex-review-choice select{min-width:0;width:100%}
+.lex-review-rail-content{min-width:0}
+.lex-review-rail-content>.lex-review-commandbar{justify-content:flex-end}
+.lex-review-rail-content>.lex-review-commandbar>.lex-review-choice{display:none}
+.lex-review-rail-content>.lex-review-model{margin:.8rem;min-height:8rem}
+@media(max-width:760px){.lex-review-workspace-rail{grid-template-columns:1fr}.lex-review-side-rail{border-right:0;border-bottom:1px solid var(--lex-border)}.lex-review-side-rail>.lex-review-nav{flex-direction:row;flex-wrap:wrap}.lex-review-side-rail>.lex-review-choice{max-width:20rem}.lex-review-tab-command-row>.lex-review-commandbar{justify-content:flex-start}}
