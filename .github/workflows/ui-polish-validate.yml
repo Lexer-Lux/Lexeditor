@@ -24,7 +24,7 @@ jobs:
       - name: Reassemble and apply reviewed UI patch
         working-directory: editor
         run: |
-          cat .github/ui-polish.part-* | base64 -d > /tmp/ui-polish.patch.gz
+          cat .github/ui-polish.part-000 .github/ui-polish.part-001 .github/ui-polish.part-002 .github/ui-polish.part-01 .github/ui-polish.part-02 .github/ui-polish.part-03 .github/ui-polish.part-04 .github/ui-polish.part-05 | base64 -d > /tmp/ui-polish.patch.gz
           gzip -t /tmp/ui-polish.patch.gz
           gzip -dc /tmp/ui-polish.patch.gz > /tmp/ui-polish.patch
           echo 'decfecc43c41bdebcdb45200df261795e8def3f83f329b5f2182ee3686c17e5a  /tmp/ui-polish.patch' | sha256sum -c -
