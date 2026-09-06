@@ -112,7 +112,7 @@
   }
   function syncConfigMap(config){
     const row=state.dataMap?.rows.find(item=>item.category==="tweaks");
-    if(row)Object.assign(row,{status:config.available?"integrated":"partial",openable:config.available,sourcePath:config.path,notes:config.message});
+    if(row)Object.assign(row,{status:config.available?"integrated":"partial",coverage:config.available?"structured":"unavailable",openable:config.available,sourcePath:config.path,notes:config.message});
   }
   async function refreshPlatformConfig(force=false){
     if(state.platformLoading||state.saving||state.activeSource!=="mine")return;
@@ -147,7 +147,7 @@
     const baseline=state.dashboard.baseline,sounds=LexeditorUI.sharedSettings()?.developerMode?LexeditorUI.soundCoverageTable(state.dashboard.themeSounds?.rows||[]):null;
     return el("section",{class:"ff7-message"},el("h2",{},identity.name),el("div",{class:"ff7-info-grid"},el("b",{},"Edition"),el("span",{},identity.edition),el("b",{},"Game root"),el("code",{},state.dashboard.game.root||"Unavailable"),el("b",{},"Source"),el("code",{},baseline.source||"Unavailable"),el("b",{},"Project output"),el("code",{},baseline.projectPath||"Unavailable"),el("b",{},"Vanilla SHA-256"),el("code",{},baseline.sha256||"Unavailable")),el("p",{},baseline.message),...(state.dashboard.problems||[]).map(problem=>el("p",{},problem)),sounds);
   }
-  function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,open:row=>navigate(row.category),query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return el("section",{class:"ff7-map"},el("div",{class:"ff7-map-controls"},...view.controls),view.content)}
+  function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,open:row=>{const target=row.target||row.category;if(target)navigate(target)},query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return el("section",{class:"ff7-map"},el("div",{class:"ff7-map-controls"},...view.controls),view.content)}
   function render(){if(!state.loaded)return;let content;if(state.tab==="info")content=infoView();else if(state.tab==="datamap")content=mapView();else if(state.tab==="tweaks")content=tweakView();else if(integrated.includes(state.tab))content=integratedView();else content=unresolvedView();main.replaceChildren(content);shellRefresh()}
   function navigate(tab){state.tab=tab;render();if(tab==="tweaks")void refreshPlatformConfig()}
   async function save(){
