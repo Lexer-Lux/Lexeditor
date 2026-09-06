@@ -23,7 +23,7 @@ jobs:
       - name: Verify and apply exact staged patch
         working-directory: editor
         run: |
-          echo '58f287d27eb7ab9b933db9b28151e3c48c8522fea14bb8d56d74797635046dc  .agent/ff8-scan324.patch' | sha256sum -c -
+          echo '58f287d27eb7ab9b933db9b28151e3c48c8522fea14bb8d56d74797635046dcf  .agent/ff8-scan324.patch' | sha256sum -c -
           git apply --check .agent/ff8-scan324.patch
           git apply .agent/ff8-scan324.patch
       - name: Run Scan and Enemies regressions
