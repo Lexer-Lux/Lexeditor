@@ -73,6 +73,7 @@ jobs:
             cp /tmp/ui-batch-check.log .github/ui-batch-error.txt
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout HEAD -- .github/workflows
             git add -A
             git add -f worklog/reference 2>/dev/null || true
             git commit -m "Record shared UI batch check failure"
@@ -88,6 +89,10 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             rm -f .github/ui-batch-error.txt
+            # The path-rewrite sweep sees the temporary runner source too. Do
+            # not let those scaffolding edits enter the product commit (or make
+            # GITHUB_TOKEN attempt a workflow-file write).
+            git checkout HEAD -- .github/workflows
             git add -A
             git add -f worklog/reference
             git status --short
@@ -97,8 +102,7 @@ jobs:
           code=$?
           cat /tmp/ui-batch-commit.log
           if [ "$code" -ne 0 ]; then
-            cp /tmp/ui-batch-commit.log .github/ui-batch-error.txt
-            git reset --hard HEAD
+            git reset --hard origin/fix/shared-ui-batch-20260906
             cp /tmp/ui-batch-commit.log .github/ui-batch-error.txt
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
