@@ -1,0 +1,120 @@
+{
+  "files": {
+    "Lexer-Lux/Lexers-Mod-For-Bannerlord:PROJECT_MEMORY.md": {
+      "destination": "codex/bannerlord/project-memory.md",
+      "destination_sha256": "0004de54d5991c2e919e01c1cf62a774c85bdbc47a9bddc134d91f554b8df42b",
+      "source_sha256": "0004de54d5991c2e919e01c1cf62a774c85bdbc47a9bddc134d91f554b8df42b"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/archive-extraction.md": {
+      "destination": "codex/rdr2/archive-extraction.md",
+      "destination_sha256": "b6a16e711e63a68e27100916404334d718054171f83b0022e477b821e6c83ecd",
+      "source_sha256": "b6a16e711e63a68e27100916404334d718054171f83b0022e477b821e6c83ecd"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/build-installation.md": {
+      "destination": "codex/rdr2/build-installation.md",
+      "destination_sha256": "20dc93e6fb2dbc084f43fdc405c6f01826acd2b1d9d934091b6c18628bf54f78",
+      "source_sha256": "20dc93e6fb2dbc084f43fdc405c6f01826acd2b1d9d934091b6c18628bf54f78"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/data-fundamentals.md": {
+      "destination": "codex/rdr2/data-fundamentals.md",
+      "destination_sha256": "1e83ecefb3611224be3661570b486eb504afaae61b188873d79be88211d8bda0",
+      "source_sha256": "1e83ecefb3611224be3661570b486eb504afaae61b188873d79be88211d8bda0"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/enemy-mobs.md": {
+      "destination": "codex/rdr2/enemy-mobs.md",
+      "destination_sha256": "72e25693a24fc5366a43a34e088a88ca83cedf225290b54c00cdcb500229ea25",
+      "source_sha256": "72e25693a24fc5366a43a34e088a88ca83cedf225290b54c00cdcb500229ea25"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/inventory-radial.md": {
+      "destination": "codex/rdr2/inventory-radial.md",
+      "destination_sha256": "7e8eda6c5c0c0f5e530888407e02a2f3d255ff0486492920626c54cb9f4064ec",
+      "source_sha256": "7e8eda6c5c0c0f5e530888407e02a2f3d255ff0486492920626c54cb9f4064ec"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/item-description-style.md": {
+      "destination": "codex/rdr2/item-description-style.md",
+      "destination_sha256": "94ea6dabd511304bec4cc029036ff0fea8793a94217ef540233fc2e711ae60b7",
+      "source_sha256": "94ea6dabd511304bec4cc029036ff0fea8793a94217ef540233fc2e711ae60b7"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/lexeditor.md": {
+      "destination": "codex/rdr2/lexeditor.md",
+      "destination_sha256": "db4d9c1bc7170efcaa909515115cc92bec921f684a8259042465445960bd5f38",
+      "source_sha256": "db4d9c1bc7170efcaa909515115cc92bec921f684a8259042465445960bd5f38"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/project-release-policy.md": {
+      "destination": "codex/rdr2/project-release-policy.md",
+      "destination_sha256": "4cec0f3095852695dede709ea160ba2cbdcb387a47cf8fdf6a3a356d6783000a",
+      "source_sha256": "4cec0f3095852695dede709ea160ba2cbdcb387a47cf8fdf6a3a356d6783000a"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/runtime-engine-limits.md": {
+      "destination": "codex/rdr2/runtime-engine-limits.md",
+      "destination_sha256": "f499364ca30dc980433037b37a5482bd50167a84db9c52728006b31a880322f4",
+      "source_sha256": "f499364ca30dc980433037b37a5482bd50167a84db9c52728006b31a880322f4"
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2:codex/stealth-perception.md": {
+      "destination": "codex/rdr2/stealth-perception.md",
+      "destination_sha256": "eb2ddd92d385c0f8e87c2393efd86bd12ece99bce7e4d49cf9af2ad91a63fd19",
+      "source_sha256": "eb2ddd92d385c0f8e87c2393efd86bd12ece99bce7e4d49cf9af2ad91a63fd19"
+    },
+    "Lexer-Lux/Lexers-Mod-For-Warband:Codex.txt": {
+      "destination": "codex/warband/reference.txt",
+      "destination_sha256": "2a55e05acb34020233870580f5975f7c9c5601a9635fedb0a4be173b0ecdd220",
+      "source_sha256": "2a55e05acb34020233870580f5975f7c9c5601a9635fedb0a4be173b0ecdd220"
+    }
+  },
+  "gaps": [
+    "Uncommitted local and unsaved chat text is not represented by GitHub snapshots; its absence here does not mean it was never supplied.",
+    "GitHub reports the standalone Lexers-Mod-For-FF8 and Lexers-Mod-For-RDR repositories empty. Existing central FF8 topics are retained; local-only codices remain to be imported when accessible.",
+    "No separate FF7 or FF9 repository was identified in the owner repository inventory.",
+    "Termina root and main-tree inspection did not identify a standalone codex. Wiki dumps and game data were not republished as the user's authored codex.",
+    "RDR2 source worklogs 113, 118 and 119 have unavailable transferred identities; their complete originals are archived without guessing central issue numbers.",
+    "Parallel branch changes after the recorded source commits require a delta import and reconciliation."
+  ],
+  "schema": 1,
+  "sources": {
+    "Lexer-Lux/Lexers-Mod-For-Bannerlord": {
+      "archive": "worklog/imports/bannerlord/Lexer-Lux--Lexers-Mod-For-Bannerlord/d1bb7b3ae25bbe0e676ea2a3f9e0e0ff67222c01",
+      "codex_files": [
+        "project-memory.md"
+      ],
+      "commit": "d1bb7b3ae25bbe0e676ea2a3f9e0e0ff67222c01",
+      "conflicts": [],
+      "files": 1,
+      "game": "bannerlord",
+      "mapped_issue_worklogs": 0,
+      "skipped": []
+    },
+    "Lexer-Lux/Lexers-Mod-For-RDR2": {
+      "archive": "worklog/imports/rdr2/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+      "codex_files": [
+        "archive-extraction.md",
+        "build-installation.md",
+        "data-fundamentals.md",
+        "enemy-mobs.md",
+        "inventory-radial.md",
+        "item-description-style.md",
+        "lexeditor.md",
+        "project-release-policy.md",
+        "runtime-engine-limits.md",
+        "stealth-perception.md"
+      ],
+      "commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+      "conflicts": [],
+      "files": 220,
+      "game": "rdr2",
+      "mapped_issue_worklogs": 123,
+      "skipped": []
+    },
+    "Lexer-Lux/Lexers-Mod-For-Warband": {
+      "archive": "worklog/imports/warband/Lexer-Lux--Lexers-Mod-For-Warband/fb57f93c6f1c6efa48df75618baf95d70404a4b2",
+      "codex_files": [
+        "reference.txt"
+      ],
+      "commit": "fb57f93c6f1c6efa48df75618baf95d70404a4b2",
+      "conflicts": [],
+      "files": 2,
+      "game": "warband",
+      "mapped_issue_worklogs": 0,
+      "skipped": []
+    }
+  }
+}

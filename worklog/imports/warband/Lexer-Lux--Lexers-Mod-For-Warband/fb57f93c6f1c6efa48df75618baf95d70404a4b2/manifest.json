@@ -1,0 +1,20 @@
+{
+  "commit": "fb57f93c6f1c6efa48df75618baf95d70404a4b2",
+  "files": [
+    {
+      "bytes": 109225,
+      "git_blob": "0eda17f3fbd90184f0627edb7ab7e25b34987b47",
+      "path": "Codex.txt",
+      "sha256": "2a55e05acb34020233870580f5975f7c9c5601a9635fedb0a4be173b0ecdd220"
+    },
+    {
+      "bytes": 32845,
+      "git_blob": "e245327d3702654621edc32535d838cb18ad9151",
+      "path": "Worklog.txt",
+      "sha256": "142beb0c4902b20f57912e6774dba8601462cd9a3adf63f2ad6fbe2f452fa99a"
+    }
+  ],
+  "note": "Documentation-only snapshot. Original files unchanged. Review private text before publication.",
+  "repository": "Lexer-Lux/Lexers-Mod-For-Warband",
+  "skipped": []
+}

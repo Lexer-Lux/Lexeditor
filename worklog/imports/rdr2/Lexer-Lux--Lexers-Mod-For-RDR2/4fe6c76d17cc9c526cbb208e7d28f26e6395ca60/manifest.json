@@ -1,0 +1,2077 @@
+{
+  "commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "files": [
+    {
+      "bytes": 11877,
+      "git_blob": "eb6373d7d0b29804002c72570848b3333cc02ad8",
+      "path": "AGENTS.md",
+      "sha256": "b4f98ff4bfe0aa652b75af3c3a91c59289d8a34a6b4b3f86db5da01111858415"
+    },
+    {
+      "bytes": 902,
+      "git_blob": "16e01646eea6489ba94559baf4dc7b27ae079b31",
+      "path": "CODEX.txt",
+      "sha256": "660285cdd81069c4997c3fd03825dc08b1012295d11a2f5651fb14baa8a09001"
+    },
+    {
+      "bytes": 40538,
+      "git_blob": "137ddf9c7bc18924d350cb9f0eda5658dfe0b7bc",
+      "path": "Worklog.txt",
+      "sha256": "4199b1da67a64e06146e09d0991386db6cec1a0bfffb7c979326b798995e5a51"
+    },
+    {
+      "bytes": 1138,
+      "git_blob": "af6bca581aeedfbbbde65eb0d39d62848256d63f",
+      "path": "codex/README.md",
+      "sha256": "88406e2d46b5d7808d92e29b7104bad2270f7c57018941a578f75c939a6ceb0c"
+    },
+    {
+      "bytes": 2491,
+      "git_blob": "6a2dd9cab3dc0422064ee8ad30c93795513b4b50",
+      "path": "codex/archive-extraction.md",
+      "sha256": "b6a16e711e63a68e27100916404334d718054171f83b0022e477b821e6c83ecd"
+    },
+    {
+      "bytes": 4623,
+      "git_blob": "f648807444f218d7dba691421d1d7f68ad7057b2",
+      "path": "codex/build-installation.md",
+      "sha256": "20dc93e6fb2dbc084f43fdc405c6f01826acd2b1d9d934091b6c18628bf54f78"
+    },
+    {
+      "bytes": 8651,
+      "git_blob": "27f184eb61364d24520c1937dc62552029efe36a",
+      "path": "codex/data-fundamentals.md",
+      "sha256": "1e83ecefb3611224be3661570b486eb504afaae61b188873d79be88211d8bda0"
+    },
+    {
+      "bytes": 4470,
+      "git_blob": "88f7b013a13d25657b0664ca85627ef7d7966f00",
+      "path": "codex/enemy-mobs.md",
+      "sha256": "72e25693a24fc5366a43a34e088a88ca83cedf225290b54c00cdcb500229ea25"
+    },
+    {
+      "bytes": 4050,
+      "git_blob": "a0126dee7ed4bb2b5986aeecaefc623be3eb1989",
+      "path": "codex/inventory-radial.md",
+      "sha256": "7e8eda6c5c0c0f5e530888407e02a2f3d255ff0486492920626c54cb9f4064ec"
+    },
+    {
+      "bytes": 2204,
+      "git_blob": "19cbcd6b27c8cadf6a6c4666b561211ee850f9c4",
+      "path": "codex/item-description-style.md",
+      "sha256": "94ea6dabd511304bec4cc029036ff0fea8793a94217ef540233fc2e711ae60b7"
+    },
+    {
+      "bytes": 2653,
+      "git_blob": "3b3c0f385940a35d68501005ab8561e88e4fcf49",
+      "path": "codex/lexeditor.md",
+      "sha256": "db4d9c1bc7170efcaa909515115cc92bec921f684a8259042465445960bd5f38"
+    },
+    {
+      "bytes": 1829,
+      "git_blob": "784991864b331ae32474a4f56abdce3e3e5625e3",
+      "path": "codex/project-release-policy.md",
+      "sha256": "4cec0f3095852695dede709ea160ba2cbdcb387a47cf8fdf6a3a356d6783000a"
+    },
+    {
+      "bytes": 29492,
+      "git_blob": "2f0ac58e8f085ee6e6803705b13826befc44c35f",
+      "path": "codex/runtime-engine-limits.md",
+      "sha256": "f499364ca30dc980433037b37a5482bd50167a84db9c52728006b31a880322f4"
+    },
+    {
+      "bytes": 15816,
+      "git_blob": "ba321c8d11b4e48d026aaeea708aefc095a47918",
+      "path": "codex/stealth-perception.md",
+      "sha256": "eb2ddd92d385c0f8e87c2393efd86bd12ece99bce7e4d49cf9af2ad91a63fd19"
+    },
+    {
+      "bytes": 564,
+      "git_blob": "fb55dac8d01637fb6971bb7d548e3d0a98ca0744",
+      "path": "worklog/README.md",
+      "sha256": "a588073333e513696491281dbaf717c246fc35fcea970f9aadf1dd61fd91c80e"
+    },
+    {
+      "bytes": 17790,
+      "git_blob": "a65ea1d159d7721d335b41a1324f15b1c58ffc5d",
+      "path": "worklog/issues/github-1.md",
+      "sha256": "4c47d5aac47a9738a9a006530c47992c645b3de53274d257b491f84c731dbf51"
+    },
+    {
+      "bytes": 9315,
+      "git_blob": "871917fcf2c26c7368096a15c96ac502188cf62d",
+      "path": "worklog/issues/github-10.md",
+      "sha256": "9a9d89e72787ac5662bfdfeec2532301b0d7dc59ad38c0f8c5bf87f476e22956"
+    },
+    {
+      "bytes": 2085,
+      "git_blob": "ca2af303f8a5711790beaf144b4ce99a73587ddd",
+      "path": "worklog/issues/github-101.md",
+      "sha256": "adc0cffebf4fe5d5636d723859cf1a7701a2147ad4bc7a8c98f6bea803b00335"
+    },
+    {
+      "bytes": 3624,
+      "git_blob": "4ada3577d5d37f5be0c6972104fe4ceca2751e9b",
+      "path": "worklog/issues/github-102.md",
+      "sha256": "ad2b70763eb32f7994036d5c974b8a36f44266bb5fcf91bfd7ee4ce395e93e40"
+    },
+    {
+      "bytes": 17720,
+      "git_blob": "491a99c026fb906e07e21c57891f0fe63cb6699c",
+      "path": "worklog/issues/github-105.md",
+      "sha256": "dc60483a2dd36f26174d4ad002bbec97d34e26f3e67163900f090d19585ad18b"
+    },
+    {
+      "bytes": 14798,
+      "git_blob": "43fd06a78858bfdaee5fd2a24105726aafe1dc7c",
+      "path": "worklog/issues/github-11.md",
+      "sha256": "b1977eb0662f954a135742d98ed00b23f1a4037851647959410e1cb9d1b75174"
+    },
+    {
+      "bytes": 5271,
+      "git_blob": "b338fc80a4855ffbe1dc31fbb928d751753066bd",
+      "path": "worklog/issues/github-112.md",
+      "sha256": "cd36a6125ac4cad5953f99dd55d198a4035cd1cfe647ece9d47f51aaffef7f94"
+    },
+    {
+      "bytes": 2751,
+      "git_blob": "bebe880819532dbb9a6d48db6b05ba1f55deaf24",
+      "path": "worklog/issues/github-113.md",
+      "sha256": "f8134c1e70974b543755681df85db3f4c29467a76b193175534e8d34ad37b0b3"
+    },
+    {
+      "bytes": 4368,
+      "git_blob": "688f426a6f5821d039e4db999e10f8faca5f2a52",
+      "path": "worklog/issues/github-115.md",
+      "sha256": "00d23f38da0135dc58d21bf9c36560b51d57888af2c67cd58272556c45b684af"
+    },
+    {
+      "bytes": 3537,
+      "git_blob": "0c6bc57b676247fc30fcbf220813d5a687aa561f",
+      "path": "worklog/issues/github-116.md",
+      "sha256": "77c6652a4231da426d5a66c09260fc28b61caa0c217c399f5037f0db2415f9e1"
+    },
+    {
+      "bytes": 11635,
+      "git_blob": "b464b4fe396fcbb7a28f51b6b27c3423a2c66eb7",
+      "path": "worklog/issues/github-117.md",
+      "sha256": "37aa89e94df766c2ab0a871009638151fb313a5e46f90dda02ca865eadd47d07"
+    },
+    {
+      "bytes": 3978,
+      "git_blob": "d7750011c2221b6c736f92323f04ecfa8a351820",
+      "path": "worklog/issues/github-118.md",
+      "sha256": "07eab32f8f3405c54c5038d4d66b7b6284299c3691bad5ca52a89470ca0cacda"
+    },
+    {
+      "bytes": 2475,
+      "git_blob": "a5509de0204cc77790ee63755542a59e40275297",
+      "path": "worklog/issues/github-119.md",
+      "sha256": "fec8d89e8edeb9c9b6a263e2d0438728f5db96220e494b5a627a550f36edf066"
+    },
+    {
+      "bytes": 3170,
+      "git_blob": "054c68fa57de8c468726e6ac1915992ddd6f75d9",
+      "path": "worklog/issues/github-12.md",
+      "sha256": "b5a946586ff5278d8dbe2c5849bf440d3646aba3d906824873b8b5b609832e8f"
+    },
+    {
+      "bytes": 4569,
+      "git_blob": "f732b5f0dac7ed1e70fc6d8105843bfc1549e827",
+      "path": "worklog/issues/github-120.md",
+      "sha256": "d06f4ea4a45199b5675895fd5d366b78b1b7643a9a22010e670e2471cd728632"
+    },
+    {
+      "bytes": 946,
+      "git_blob": "40e29648873daaeef9f37dc66d260d634a1ec968",
+      "path": "worklog/issues/github-121.md",
+      "sha256": "dd00893ee2fac120526b3c8d7cd4c1369d2a538c408b411871571926d29c93ec"
+    },
+    {
+      "bytes": 1066,
+      "git_blob": "0bba35339a04d7c8b1da3036db82a18c8810f955",
+      "path": "worklog/issues/github-122.md",
+      "sha256": "a60bc90adbd48e037f075327fd8c1ee9d566f5ec4bed5cca3815a05afd7b9b15"
+    },
+    {
+      "bytes": 1390,
+      "git_blob": "acb69d2ac7b7b3c3942522af0fc15381e8fd655c",
+      "path": "worklog/issues/github-123.md",
+      "sha256": "ad16a01d307c511efb7fe33d47296b141fe0bdc5626467ebadc8266457c88b4b"
+    },
+    {
+      "bytes": 1080,
+      "git_blob": "b9d4187c361a95a22509f12a4586f7d217b1df99",
+      "path": "worklog/issues/github-124.md",
+      "sha256": "d4fd771225975e7f94b5809e3b32f4c93a7d008fca9fc54a834c192778d8aed3"
+    },
+    {
+      "bytes": 3970,
+      "git_blob": "b72b8e1acb33351d10346418e69d57aec2783d11",
+      "path": "worklog/issues/github-125.md",
+      "sha256": "bb65f78144199b4c8543f08cab82241170ab4bd9d2d1a1b1bf4c8152b14eb753"
+    },
+    {
+      "bytes": 11574,
+      "git_blob": "019e52b3fba7a968fc5e5b5478958c8efe089a45",
+      "path": "worklog/issues/github-128.md",
+      "sha256": "67c771d634db99b9b165f81001b49c8a2cf82f6a4a4cb6cd9c89be1cd51b96dd"
+    },
+    {
+      "bytes": 8004,
+      "git_blob": "d7fd529f5bdc09e5ae1f8332ad42c060cc350cdb",
+      "path": "worklog/issues/github-13.md",
+      "sha256": "833bcd808a28a4ca2066bfd3596c8fb51c174a21aa78b013e1c9fe583e2c67ec"
+    },
+    {
+      "bytes": 8889,
+      "git_blob": "83a8ee970428b400b548c5a0e9bd9cf3fe3670b0",
+      "path": "worklog/issues/github-130.md",
+      "sha256": "ac323fef92361bb024d43475ed15126fddb3c78d5f339ea0bac62e0fdbc5499d"
+    },
+    {
+      "bytes": 12217,
+      "git_blob": "ccac7d2ed95f4743848f07f465877a16227b6672",
+      "path": "worklog/issues/github-14.md",
+      "sha256": "5c8b20f718ad3257872f9bf786004b90c7f107d6f42e06558c2cd248a83e5031"
+    },
+    {
+      "bytes": 9899,
+      "git_blob": "f2d86535197b6a62b01293a7ae180f41dee5b4c5",
+      "path": "worklog/issues/github-143.md",
+      "sha256": "9b957b58d9c95d6186854171ae0e95bc0f7da558d1b3b7f4ee081a3629b5bfae"
+    },
+    {
+      "bytes": 26292,
+      "git_blob": "f1fdc383d43623f4073af7a52be85347df877580",
+      "path": "worklog/issues/github-144.md",
+      "sha256": "904f4708e792be268d53621133caf69f900218acc0667c8179f919b4f44db3b6"
+    },
+    {
+      "bytes": 5158,
+      "git_blob": "a994cfd8e658e8c09a2f404ee7d4587b463446c1",
+      "path": "worklog/issues/github-145.md",
+      "sha256": "9ed33bc506c4c83b622d15c21ee0a9d73f095ed53b2c8b221bfd697dc8f15519"
+    },
+    {
+      "bytes": 14280,
+      "git_blob": "8a0b51708118525affa1d97d99cf01d569926f84",
+      "path": "worklog/issues/github-146.md",
+      "sha256": "e90097a3f7bff344d15db19868fbcd282fbe80dcd0f295d7d196ab9dd57dd97a"
+    },
+    {
+      "bytes": 9169,
+      "git_blob": "f954b6c32f1787c517dcb3d1742063606698bd6c",
+      "path": "worklog/issues/github-147.md",
+      "sha256": "1e6d5561a10fd395dfa057009ff96ebe58bc6e4e84773479bebc030144168cdd"
+    },
+    {
+      "bytes": 6314,
+      "git_blob": "946122674dd6ef7668fd71d3f1441952cc7d9461",
+      "path": "worklog/issues/github-148.md",
+      "sha256": "c6fe851e88703b8f323e66b45e6cb35248d2b5d4e7aca7845b7a9b5c18b7d01d"
+    },
+    {
+      "bytes": 5460,
+      "git_blob": "e44a16037a09c401e59de56a07284f79e5951092",
+      "path": "worklog/issues/github-149.md",
+      "sha256": "227795e2aa5dbc8568a311d903f2b39801e2d20338ec3e6468c60953c33a5d05"
+    },
+    {
+      "bytes": 896,
+      "git_blob": "a0c39a6289f03e0ad4fbe132496c74259a28f67a",
+      "path": "worklog/issues/github-15.md",
+      "sha256": "0fa322789902100e267184bb65406e05425ee7ef887b36425a89656978ddf15c"
+    },
+    {
+      "bytes": 1473,
+      "git_blob": "0ac97cf31e0d37591e4b87561b67cca9f0ba45e0",
+      "path": "worklog/issues/github-150.md",
+      "sha256": "4264ba11a2d8617e7a4e0eaa590437f45c603606b0539eba3677f03b7be12b32"
+    },
+    {
+      "bytes": 21114,
+      "git_blob": "43a76cfdec8b1defde6226f072d34aa374716efa",
+      "path": "worklog/issues/github-151.md",
+      "sha256": "5d9e90d2339458e5fcc24b0cfb46d0d3559241e160ff065ba54a34f9839d6eb7"
+    },
+    {
+      "bytes": 2076,
+      "git_blob": "934eb42f110b54c811418d1cde9bf859ac80cf00",
+      "path": "worklog/issues/github-152.md",
+      "sha256": "f527c8f0d5ef1e035e6d6fff5565df9fdb6c33fce97a2f540e9d11e35618622a"
+    },
+    {
+      "bytes": 2220,
+      "git_blob": "b97dbadf36def2d176f4f717776f085e76965075",
+      "path": "worklog/issues/github-153.md",
+      "sha256": "7e008a739ce791abecd82605d0edc9ad9d15dd652fa75a3ed2e9a51d585944c5"
+    },
+    {
+      "bytes": 6470,
+      "git_blob": "115d8b6f9cd400615829741bfe3f28e0f3bf33b6",
+      "path": "worklog/issues/github-154.md",
+      "sha256": "c8ef2fb970eae4a6d5fdcd0f2d94f7b9c5bb58902ca4955d8746aff702c6bf46"
+    },
+    {
+      "bytes": 4277,
+      "git_blob": "f3a68ca13464ddceff8d64f6d7bc4ca61dda94ca",
+      "path": "worklog/issues/github-156.md",
+      "sha256": "980be742f5e112c69229322ac53665b137c987c181e566292b3335b94fa8c372"
+    },
+    {
+      "bytes": 4485,
+      "git_blob": "c8b0c8e46c4c2589d7cc4e0d975f084b3e1ce5bd",
+      "path": "worklog/issues/github-157.md",
+      "sha256": "0be5df694e784330b35b25e2bfc8eb4b46e006205aecad5d8111949c2988deb2"
+    },
+    {
+      "bytes": 3889,
+      "git_blob": "33f1b63c81ed6709b11ed500e53f22f37ed1e796",
+      "path": "worklog/issues/github-158.md",
+      "sha256": "0ed9f5225e728f469f016373b3780f69ab8037e8d17e6a929f663d59fff41055"
+    },
+    {
+      "bytes": 3333,
+      "git_blob": "4f2ac02be3a79d7b50b328a5f947172d3ddca08a",
+      "path": "worklog/issues/github-159.md",
+      "sha256": "588bd3f6f268bb284a6b34b24a7f5a30a42bc4fe831447787aa3b366d0eeb9db"
+    },
+    {
+      "bytes": 8339,
+      "git_blob": "f7ce925fa209ad403c0c1ffb88e408c0da57982f",
+      "path": "worklog/issues/github-16.md",
+      "sha256": "e37d33a638454895fe67a8230fec473d01db1627cbcc442c876c1f05cb11ac4c"
+    },
+    {
+      "bytes": 3883,
+      "git_blob": "4e9b1106385ed5cf7616709a7fdca35604ae1596",
+      "path": "worklog/issues/github-160.md",
+      "sha256": "b160f77faae922fb6f58c8b132373b59a887c6ad73cea4eba18685fd08b1cff3"
+    },
+    {
+      "bytes": 7575,
+      "git_blob": "956be3318fef3040ef30bf56361f659b8226a1f8",
+      "path": "worklog/issues/github-161.md",
+      "sha256": "df936737934fcd9c6feed43909aee17b13d6596f178270fc97cec4991e3d1cc0"
+    },
+    {
+      "bytes": 3258,
+      "git_blob": "ebc39562b31b7bbdc8fbf56983482a5805fe849d",
+      "path": "worklog/issues/github-162.md",
+      "sha256": "e3c174446be0af4b0add15917d208138ee693cc4159760b7dadb16b676b39461"
+    },
+    {
+      "bytes": 4941,
+      "git_blob": "e003f671e8a56abf0d1d8debd31f069f8e507179",
+      "path": "worklog/issues/github-163.md",
+      "sha256": "8d26e8229d692c11077de5f6282f3489cbbcda925543be2d1d8cdf6f19f8c558"
+    },
+    {
+      "bytes": 4215,
+      "git_blob": "0a3a5d2304d776d3add91ba2bd2db80678f362fe",
+      "path": "worklog/issues/github-164.md",
+      "sha256": "ea1be6eef3e834864eea2b7fdf197e355ccdb8da5e6547dc57e07bec9974c116"
+    },
+    {
+      "bytes": 1554,
+      "git_blob": "d2ca674b431be0f1c823182125b7cfabb0e896c7",
+      "path": "worklog/issues/github-165.md",
+      "sha256": "0731178f96f215a123ff9088ddc1994f06f9d73f2eacb55342806e359d1a0e53"
+    },
+    {
+      "bytes": 1170,
+      "git_blob": "f194bee8a1cd3047522c10671f751edc226d40d8",
+      "path": "worklog/issues/github-166.md",
+      "sha256": "a84e8b4d54bf8c55b13f5cae5df253aed2ec3d1e61e95b656ae5ca55857b7228"
+    },
+    {
+      "bytes": 1376,
+      "git_blob": "50739dc1d0047975e06cf24a14bfc03c4caf677c",
+      "path": "worklog/issues/github-167.md",
+      "sha256": "cf2ef361d6e2e030eb331a6b3157162de800a3692cc9ba00e3e1f2981efc3e9b"
+    },
+    {
+      "bytes": 1949,
+      "git_blob": "ba1f4b4c39712bda3aec1388859c2698bc106486",
+      "path": "worklog/issues/github-168.md",
+      "sha256": "89832f01c4353ed5bdf6713b45cf9597285d9928ffc25e678d565ed764e3456f"
+    },
+    {
+      "bytes": 5582,
+      "git_blob": "72545c36e673dc2b602e4c320de95edc4adeeacf",
+      "path": "worklog/issues/github-169.md",
+      "sha256": "776621a05bc87d4e90932e98cba035cc820038bdea134a1813b1bedb22d7b7b7"
+    },
+    {
+      "bytes": 30922,
+      "git_blob": "84523b7b48bfa7ecf4877499e3718d90ad70f6d1",
+      "path": "worklog/issues/github-17.md",
+      "sha256": "c100f0df6bc2e1f3dec625dee8e0332e69bcdc215d2d5d834011b799259f601a"
+    },
+    {
+      "bytes": 3957,
+      "git_blob": "35d8a3a02046d83cff4274c38d3be9911190f338",
+      "path": "worklog/issues/github-171.md",
+      "sha256": "141a08b93e1b54a07a725bc3cb57dc1c8ce19077dd5dbcd5ef831abd45ad6467"
+    },
+    {
+      "bytes": 2582,
+      "git_blob": "c3695abb3ddbc21162fc85ea603da668b6889b2e",
+      "path": "worklog/issues/github-172.md",
+      "sha256": "cf7b5239e198aa307dfe5c5818d094048dc4f3acd76eca8e6ba127a80f200c4d"
+    },
+    {
+      "bytes": 2757,
+      "git_blob": "721949c231873e2149944784f72f34345a8df350",
+      "path": "worklog/issues/github-173.md",
+      "sha256": "e7e3fc014ac0be7578b9ccf06bf9091013515a42f579a694d5bc389fa001c2d5"
+    },
+    {
+      "bytes": 1979,
+      "git_blob": "e5026a51eb8cca8d040ec321d0b24c987c0da86f",
+      "path": "worklog/issues/github-174.md",
+      "sha256": "f62081bd1a83330292aa9db64041afda6251c0cd20dd1873a297ccd2cdf35532"
+    },
+    {
+      "bytes": 3363,
+      "git_blob": "500ac1070a479e80365ab5aff10a988bb8fbb81f",
+      "path": "worklog/issues/github-175.md",
+      "sha256": "b268fa4660a9073d6430b233486fb92d2ead4da0920297ef7f89e8d15278a264"
+    },
+    {
+      "bytes": 4179,
+      "git_blob": "ee14a4020d7af0bb81a77a21e099e1cb8476240b",
+      "path": "worklog/issues/github-176.md",
+      "sha256": "61d8db6eae4f84715fde0675a556d120b28b4e0e82b3727c76978097af718bac"
+    },
+    {
+      "bytes": 1874,
+      "git_blob": "67c5be80382124b6ace3dffda2df6d28b1a96925",
+      "path": "worklog/issues/github-177.md",
+      "sha256": "b4421f278c885304b1668627efd07978b71a52798948dc5b2456951878549639"
+    },
+    {
+      "bytes": 2161,
+      "git_blob": "3f59039b27e519f6fb7c40295728d92d0b4af2f4",
+      "path": "worklog/issues/github-178.md",
+      "sha256": "eb447677ac629c020d90eebc46a231987caa857a980a6daee51b09749e4ef901"
+    },
+    {
+      "bytes": 2366,
+      "git_blob": "c84c2b5d462cac04961d118f04eef72ccbe7d190",
+      "path": "worklog/issues/github-179.md",
+      "sha256": "21193ff7a05a0c90d61012cba97a40328f6067b13ac5544d86d99ee7ccc7878c"
+    },
+    {
+      "bytes": 9647,
+      "git_blob": "4b6b70c02a8170a013c1c976ebbd04eb0cb9e1a1",
+      "path": "worklog/issues/github-18.md",
+      "sha256": "c30494d5df50200d3a2355ad1836c9750d4148e35223e4056513c1c989974dd0"
+    },
+    {
+      "bytes": 2054,
+      "git_blob": "1412083d72f0a2276167f0a77913be7d2a95ad38",
+      "path": "worklog/issues/github-181.md",
+      "sha256": "6723fa279267ac1fd125b7be12d8e5391f122d8e3a9a14628d40914ba37bcffb"
+    },
+    {
+      "bytes": 1553,
+      "git_blob": "4becd525a06c2792acbf6c6de7e552f3f04f83a5",
+      "path": "worklog/issues/github-183.md",
+      "sha256": "b8cb11083430a02d8cdd501fecd97f308b9b0c08040621001bf926128f2f1a0b"
+    },
+    {
+      "bytes": 4585,
+      "git_blob": "16cddca2347beaedd88d6f11f1c4c8c7e5c11552",
+      "path": "worklog/issues/github-19.md",
+      "sha256": "8ec9fd5d0e10df3736aaec1db3937c4cb3f8c7228bebd586b192a0c82796aa5e"
+    },
+    {
+      "bytes": 18255,
+      "git_blob": "0689a81101b5c0cdd4047d88617d9f1a546a8afa",
+      "path": "worklog/issues/github-2.md",
+      "sha256": "9ca3db25a43a7609e7f9a99c3ebf93f59d775619f9ced7e4fc15f0d5c08d4718"
+    },
+    {
+      "bytes": 4079,
+      "git_blob": "a539a289884dd416bbb6aac17944e2bb255f9cbc",
+      "path": "worklog/issues/github-20.md",
+      "sha256": "7fcf2c428c757e8d09a4b8133c387f58afeeca0c23f290cb7eb30d6bc6d6b1ba"
+    },
+    {
+      "bytes": 110406,
+      "git_blob": "3b4ddaebbdc6ae4f8c3330f3b5a32bfca6b91784",
+      "path": "worklog/issues/github-22-custom-layer.png",
+      "sha256": "800afc8b223fc24b36dc611cd0a49eb41adb261ac70ee6146552b2c5e2b19d83"
+    },
+    {
+      "bytes": 31622,
+      "git_blob": "772a11af07d174d8e87748033d8789994ba14706",
+      "path": "worklog/issues/github-22.md",
+      "sha256": "a121d24c2481098b43efc58501b9ec525a84ccea08f9bb8424f4d3268a772351"
+    },
+    {
+      "bytes": 14415,
+      "git_blob": "3539ded6e914b24f51f113831e3fa5e02a6a6d0f",
+      "path": "worklog/issues/github-23.md",
+      "sha256": "4d283c0eaf9286657a51bf26f27246170d51e9bb9deeb71361feaf9d949b0e42"
+    },
+    {
+      "bytes": 2158,
+      "git_blob": "4e68d9850925da4906342293b973887dcf8910cf",
+      "path": "worklog/issues/github-24.md",
+      "sha256": "97da41b137b08acdda4c3ec3bd84ccb6b0d883aac9e6b5904966a90458495df6"
+    },
+    {
+      "bytes": 3545,
+      "git_blob": "569cd1cfd20da2a1c2da01d78cb36016bcb2dfc1",
+      "path": "worklog/issues/github-25.md",
+      "sha256": "b21a7252ae0f2c3e450c8963a1a823b9657bbe5811122182ee49b2b517fbff0b"
+    },
+    {
+      "bytes": 9648,
+      "git_blob": "f76bbb403c760d4bdb33387e2ba9fe9a74ea2096",
+      "path": "worklog/issues/github-26.md",
+      "sha256": "6112eaef000fd89a8bb8e1f60d7e74557a4bac7c97e42245e9203c3b95b16cc1"
+    },
+    {
+      "bytes": 2190,
+      "git_blob": "74e2bc6bdaa352a46eae69c7998382cf47545484",
+      "path": "worklog/issues/github-27.md",
+      "sha256": "9fe43570f525919d6ebe2aeb4015b2dfb10df1730da863f2549df99f5bb1cb10"
+    },
+    {
+      "bytes": 4819,
+      "git_blob": "c5a51161b73650aa929ca6b8482b292d67e46cec",
+      "path": "worklog/issues/github-29.md",
+      "sha256": "8d3c4ba40bd72ce2f5274905dea004be1f65490e72ffe1b9520b4a7b0483c431"
+    },
+    {
+      "bytes": 5069,
+      "git_blob": "dd507485f42c92e27efd240ef9fd9e029ed9ff27",
+      "path": "worklog/issues/github-3.md",
+      "sha256": "7cc78854058cb547632c2a66b3ec6b5323852beb95fdcccd68153146b6a47a7a"
+    },
+    {
+      "bytes": 5498,
+      "git_blob": "ea60e420ee21bc148a253979e9ff856da92469a2",
+      "path": "worklog/issues/github-30.md",
+      "sha256": "baef3e687e6498b1bf8209a574c03f5ab926f759a16ee36dc26b7dd084c76f72"
+    },
+    {
+      "bytes": 7386,
+      "git_blob": "7589eceec7b2864e70e01521b436a15781e107cb",
+      "path": "worklog/issues/github-31.md",
+      "sha256": "ceb2d7dbac9828a8ecb1e71ab202489b0edba3ff0124c68d5502d264fcd9057b"
+    },
+    {
+      "bytes": 3357,
+      "git_blob": "03aeda15c2845fcba1967097e379344e08e2855b",
+      "path": "worklog/issues/github-32.md",
+      "sha256": "c7ffa74dbc42ef722ef1157c720f302de1a8fe39c029b780fe6622e522ea462f"
+    },
+    {
+      "bytes": 3512,
+      "git_blob": "5bf11f223828f9e8e0e860140c648cd986ed893d",
+      "path": "worklog/issues/github-35.md",
+      "sha256": "b43ffb6a82e0e04fc3868229a23e67502487ac41feb5d57259d2d20d68b87c68"
+    },
+    {
+      "bytes": 5423,
+      "git_blob": "7e130838906204fd900c03f1ff4a6d71843e2b1a",
+      "path": "worklog/issues/github-37.md",
+      "sha256": "d29a1929646ee86b513fd56a4072f7af880e563ce979f55a861ad25302bf3937"
+    },
+    {
+      "bytes": 3320,
+      "git_blob": "70cd32194a2b67ace6f1312d3420de5d76acf724",
+      "path": "worklog/issues/github-39.md",
+      "sha256": "3710ed5adc857b0735079b3c380ccbe2be1c5451bb8cd292cc628f4d464449c0"
+    },
+    {
+      "bytes": 20777,
+      "git_blob": "099504e239178c47aaad1dc1bb256616b3231155",
+      "path": "worklog/issues/github-4.md",
+      "sha256": "cf4610ea68b8b67e0f956eefd679ea9ab9050047317e60f13c4c0b560effb55e"
+    },
+    {
+      "bytes": 729,
+      "git_blob": "af4b7ffd305a6ae5ddc74425eaec185dbd5af9b7",
+      "path": "worklog/issues/github-42.md",
+      "sha256": "c4cee91745f054e0909b334beb4dc435c007726e18944c1f942725630c8f950d"
+    },
+    {
+      "bytes": 6178,
+      "git_blob": "aaaf70fd5d8c98dc578a21e50afaec812a1f5a0e",
+      "path": "worklog/issues/github-43.md",
+      "sha256": "0f99d1d8dbb5e054a2f6b13c8f5bfca2d46c31278c16b6e70f035a18e5b9708f"
+    },
+    {
+      "bytes": 2683,
+      "git_blob": "c2bb1d70e5e59ef2390f3429027d659f309a738b",
+      "path": "worklog/issues/github-44.md",
+      "sha256": "227b4c040fd10344a1b206248683551aab5456ca1464ea1af3f6636148d5ba17"
+    },
+    {
+      "bytes": 2429,
+      "git_blob": "f43fd3103f4c71dd5997577b33b1a1bc1b456aa3",
+      "path": "worklog/issues/github-45.md",
+      "sha256": "3e3d3b7b8482d80c0948cbd2c742e6d442354f25adb72f9e3b3494ad2e10f084"
+    },
+    {
+      "bytes": 7368,
+      "git_blob": "aad70e64e42025309a42f48edd62cdb7a2016fe5",
+      "path": "worklog/issues/github-47.md",
+      "sha256": "c3129d1632160a830883e94448adaeab3a9333288140a119c4826ffb77e599a4"
+    },
+    {
+      "bytes": 741,
+      "git_blob": "1b9eb3037c31d4373cc1122e68c8720d2e04114c",
+      "path": "worklog/issues/github-48.md",
+      "sha256": "5cd5bc5c81ce453078cb3a7c034a978aeb020553514f819172adb537070da7df"
+    },
+    {
+      "bytes": 1096,
+      "git_blob": "e07abef25f9db19607e47108fc3d159fb99bf75f",
+      "path": "worklog/issues/github-49.md",
+      "sha256": "83442e3ffe6f4e6584ef86e2a0b9eb1f3402c0ce4f05d603fb1fe29f2cbb5330"
+    },
+    {
+      "bytes": 17257,
+      "git_blob": "14e002c0cc0685b9cc9e4c65029957f5d5c9d113",
+      "path": "worklog/issues/github-5.md",
+      "sha256": "b9e6bff0061a2725b726b787b104176853446158b7da1f96abe88fdad42828ca"
+    },
+    {
+      "bytes": 6476,
+      "git_blob": "e65815bfacf9f2aa0f53f1ef62e0b771d7896d0d",
+      "path": "worklog/issues/github-50.md",
+      "sha256": "4e6dfade89742dac20cc95c4f3ca963e4e5415aa3ee792ed9671a47779dd2a8e"
+    },
+    {
+      "bytes": 11408,
+      "git_blob": "7cdc50b39db51d33ae8f7244ca2d751b4548cabe",
+      "path": "worklog/issues/github-55.md",
+      "sha256": "d6605073d6eb86f46e86cba4ced4053e5fb3a518b780392abf0b9010b0a5aa52"
+    },
+    {
+      "bytes": 1920,
+      "git_blob": "f25e845a16824d5a5d8bbc541b39bad6a60ff8ad",
+      "path": "worklog/issues/github-57.md",
+      "sha256": "cf7d2b7bd87c957cd23d7a55e7ae3ab2dedc61fc2fec569400bc2290ac390990"
+    },
+    {
+      "bytes": 14399,
+      "git_blob": "192761bc3c57cc8703964770068636d2dfac1470",
+      "path": "worklog/issues/github-59.md",
+      "sha256": "03001ddd71e5b42568139d763b179293b6b210ae96e1e4400983beba7bf4b8d1"
+    },
+    {
+      "bytes": 35518,
+      "git_blob": "927057177c8bbceb6677ed4033388516cc66786d",
+      "path": "worklog/issues/github-6.md",
+      "sha256": "91abfa3b817cac62e48639d6be8ab16b9a6fcf91f9bc89a8653950e8b59c42d5"
+    },
+    {
+      "bytes": 11049,
+      "git_blob": "2b4e3802cf1a62310fb39efe2b432effbd50916b",
+      "path": "worklog/issues/github-62.md",
+      "sha256": "19dc181795edb26973aab95ea2d4270b4a2bf6870d75f739d1ac1c8080fcc2ea"
+    },
+    {
+      "bytes": 5377,
+      "git_blob": "e1b226d9a1567c37f7725bb9016a75ed93c36908",
+      "path": "worklog/issues/github-64.md",
+      "sha256": "7cb45a2f0194173baaa0504b3e2025987597e1fe7759eebee6b11245995bf08e"
+    },
+    {
+      "bytes": 22108,
+      "git_blob": "b3840b1a87928efc1fa7d51eb4cc57deff733b9b",
+      "path": "worklog/issues/github-65.md",
+      "sha256": "ed2a3a678a79e6ccf247d0e53c8b8b3478fafc1d3c20b801e1db60f3080d0adb"
+    },
+    {
+      "bytes": 7058,
+      "git_blob": "66f3453c032dfb947143b4f76c5ace01cd51801c",
+      "path": "worklog/issues/github-66.md",
+      "sha256": "dd2e2921a87bca9d58e0dcf4de66d5971ae56094fc530673ce3ed060f6cf82d2"
+    },
+    {
+      "bytes": 2204,
+      "git_blob": "81532aa372b7d482c3b429738a037f341ef0470c",
+      "path": "worklog/issues/github-67.md",
+      "sha256": "220e508409c461d9a736abb5142b2812e3d8a3ccb33758c787cc5a47cb7a8435"
+    },
+    {
+      "bytes": 4622,
+      "git_blob": "6ef95cb1d9e3d82a47e59fecb56925494a79c6f7",
+      "path": "worklog/issues/github-68.md",
+      "sha256": "33501e5068886934a3b9076e92e6145feb266e8d063f8d8b4a01c91d1696ebc0"
+    },
+    {
+      "bytes": 4072,
+      "git_blob": "62139e20fa440a936accad9137f9bc6c96ca692e",
+      "path": "worklog/issues/github-69.md",
+      "sha256": "4e309550c2c26e898eab3c6a6ecefd4daaec405c0a43318c034e4626ffbf7b61"
+    },
+    {
+      "bytes": 8914,
+      "git_blob": "3bce1345a8d563682d13e67a1c932f02efd56a45",
+      "path": "worklog/issues/github-71.md",
+      "sha256": "068f4e7b1fa67df85370f65277a98ae20de47e659d90b92bc76abb7f18c7c113"
+    },
+    {
+      "bytes": 1433,
+      "git_blob": "bf6ea26023362e4602c8ce19dcfdf385b764f4cc",
+      "path": "worklog/issues/github-73.md",
+      "sha256": "8f884ecad78423d8cc3a786f50bf273942e509f8a861a1e2a240ee95ab838bfc"
+    },
+    {
+      "bytes": 2820,
+      "git_blob": "c0584c86d2e1fe7a1742b596393546b1587a9b1f",
+      "path": "worklog/issues/github-74.md",
+      "sha256": "a265cf86a1ee05fbe7ea8cd21fea9664410a677da33a38198accb0f3b64aa474"
+    },
+    {
+      "bytes": 11881,
+      "git_blob": "879a1fd20d6eae3fc6c0e9e6bad912acf71a83a9",
+      "path": "worklog/issues/github-77.md",
+      "sha256": "de4eca853d084e71e7208df3e38a723b6d5f1163fda69f03567866b4c270b4c8"
+    },
+    {
+      "bytes": 11841,
+      "git_blob": "ff4301f8137d5423c3dcd5169c4e6e157158347a",
+      "path": "worklog/issues/github-78.md",
+      "sha256": "20b3b373c9462fba8959722ce6f485b219f8d3ab941afe421a25945b55f80547"
+    },
+    {
+      "bytes": 20527,
+      "git_blob": "4f1ece469f9ab2a60f457a01bbe816e78f1b8816",
+      "path": "worklog/issues/github-8.md",
+      "sha256": "ba79564588580dd933f854c53a95068f18b9a010bca5d1317a3ac50ad9e5fddc"
+    },
+    {
+      "bytes": 4011,
+      "git_blob": "aaaf10cb10d4477f2a5dd39d5bf888be715c3785",
+      "path": "worklog/issues/github-80.md",
+      "sha256": "83b065cc7f080cbd505b9bae2b831909489ed2cda13d9abfd3930631b933ff4f"
+    },
+    {
+      "bytes": 15889,
+      "git_blob": "21b1146dd54a7a9ebb79d4973013b2f91f4fa23c",
+      "path": "worklog/issues/github-82.md",
+      "sha256": "6faceaaf8a0f1e5f24952d40d2d1a6d3a376ad3650acf56f7a98b0cdb3f0597b"
+    },
+    {
+      "bytes": 3029,
+      "git_blob": "93821495aec7cbefb0424d038639af55034c1f71",
+      "path": "worklog/issues/github-83.md",
+      "sha256": "46d67ca509f24bc7d477080dc7b7b12f7367e8e77003b803833a02092a45c2f6"
+    },
+    {
+      "bytes": 8370,
+      "git_blob": "b976d288f65095d08291002b0782a02047a71f85",
+      "path": "worklog/issues/github-84.md",
+      "sha256": "41d19c61d46630c4f4109179d63348d78bc0711c09df320c23346620846a1ed4"
+    },
+    {
+      "bytes": 3809,
+      "git_blob": "9aa7f4d86ac1a6a42bc77fb92f3b0abe54c6ec24",
+      "path": "worklog/issues/github-85.md",
+      "sha256": "6473478e28c786de53143b6bc773fefd1615420a18375c027cdd0050c64ea32b"
+    },
+    {
+      "bytes": 24432,
+      "git_blob": "dd955615f14b61e856b4f7995c0db7b6c336e710",
+      "path": "worklog/issues/github-86.md",
+      "sha256": "a8115a33991b08311436a07a7c8dd72e0bceb71e8d2d94dcea63dfb59710118f"
+    },
+    {
+      "bytes": 6464,
+      "git_blob": "7f59b39f7bd9fca173246054a23a8234d2cafa6b",
+      "path": "worklog/issues/github-88.md",
+      "sha256": "b7116cee35abfdb20d7c56d833c95cfe6ca5a07e0c5e52d0b0c1a697b84e5db4"
+    },
+    {
+      "bytes": 9901,
+      "git_blob": "aa9158f029ecb0abea044aadbb95af6bc9a849c5",
+      "path": "worklog/issues/github-89.md",
+      "sha256": "298df1fa40b25bd34c70c8310ab2b299ec5a9200ce84e9a271f096f351735fef"
+    },
+    {
+      "bytes": 18356,
+      "git_blob": "664cd6186038eab11f732ecc2fab05cfe8328571",
+      "path": "worklog/issues/github-9.md",
+      "sha256": "a683d66c7afc8be0e52598c6fe017baedaeeff93b906f181c089c787e3a6101e"
+    },
+    {
+      "bytes": 14727,
+      "git_blob": "2461c2b6fcc7bae1c7af25821c1889053472617f",
+      "path": "worklog/issues/github-91.md",
+      "sha256": "b4bb7190e187e5f7810f9cb3833bf78c933f98cf4dd7b03e5992b6816114d99e"
+    },
+    {
+      "bytes": 1325,
+      "git_blob": "2eab223b9782d4622a21deabec0ceccb51a207eb",
+      "path": "worklog/issues/github-92.md",
+      "sha256": "4f0bc0aa7f93e0da1ed53300cf93a28dc3dcaa9cc70ba5948da1d524bab0ec98"
+    },
+    {
+      "bytes": 1109,
+      "git_blob": "37e7504c2166dfde10f80a83fd60a95ebf5e44f7",
+      "path": "worklog/issues/github-93.md",
+      "sha256": "2ba13f425d2cbbf6297dd2b50522e47721a38ad80e2410e62b7e7440276d0fdb"
+    },
+    {
+      "bytes": 39251,
+      "git_blob": "14e25cd4cead9bd7295c4f6aa8236e6875ac378a",
+      "path": "worklog/issues/github-94.md",
+      "sha256": "3f2c6b82b25591c17e8a8b3df35ac94aa44168f52e163cd0578fcea5898c1935"
+    },
+    {
+      "bytes": 17185,
+      "git_blob": "05fa088933e1c3e9e5696b0c31713f09ffcf8835",
+      "path": "worklog/issues/github-96.md",
+      "sha256": "7a33af95297431f82e4dc48fbd508f061173af0a9900a18e42e3dfcc7dc38dd6"
+    },
+    {
+      "bytes": 6467,
+      "git_blob": "291e5f729ef5176688c9384f0626dc896ab5e5e2",
+      "path": "worklog/issues/github-97.md",
+      "sha256": "595ef8c512772f1df2d80519b191dcd2ce8084ff2bbd36a7f156755f370b1d6e"
+    },
+    {
+      "bytes": 9837,
+      "git_blob": "fa9952949bcd26b00a1bb6704c16808232cecccb",
+      "path": "worklog/issues/github-98.md",
+      "sha256": "7643fdade02118cbb1cf9b787388828b166dc9fff3bb08883e38bade0eb617a3"
+    },
+    {
+      "bytes": 6298,
+      "git_blob": "ff1b32f4819f1eb5a80ed22b2ac02a1b33ab0c0d",
+      "path": "worklog/issues/github-99.md",
+      "sha256": "7ed825bc0e4912ddce34ff0e6dde819221289c0aa006537abdff6c300c6ab1fc"
+    },
+    {
+      "bytes": 18922,
+      "git_blob": "fc25ae34f7634914d9187cec00a601a074bbf6ca",
+      "path": "worklog/issues/rendered/github-147-default-24.png",
+      "sha256": "d1f5d9345c5b01076d770f8e044b910a0491659772ddc58b7183cb736350d8d2"
+    },
+    {
+      "bytes": 21603,
+      "git_blob": "32ff8657e713699bd55b30ef3601a2d40551aa8c",
+      "path": "worklog/issues/rendered/github-147-large-48.png",
+      "sha256": "01becd59ef3966fe1973187abc0348c677e50c0ab803de549c19becd5bab7dfa"
+    },
+    {
+      "bytes": 163285,
+      "git_blob": "37e1920b3c860fddbb0944ac7e50341ff81c4f3f",
+      "path": "worklog/issues/rendered/github-153-custom-icons.png",
+      "sha256": "9d115b15f4b543c91e533dab65efda303698bd26b1cbfd82441b5b72e6e57e94"
+    },
+    {
+      "bytes": 1477850,
+      "git_blob": "6135879feb74ba2e6b1a2e335510935e594e740f",
+      "path": "worklog/issues/rendered/github-17-settings-narrow.png",
+      "sha256": "4dfe63dda17bd4d8045aac8f896a14872bcb07ace1747f398343afa20b0d643c"
+    },
+    {
+      "bytes": 1446449,
+      "git_blob": "6df726f5d0d2a0871fdae1b08ba5327c282ec3c8",
+      "path": "worklog/issues/rendered/github-17-settings-wide.png",
+      "sha256": "ef3747010f4e922fe00f3c4df4462bf6d0655239c9ceb744c38b15e45d942870"
+    },
+    {
+      "bytes": 123068,
+      "git_blob": "43e0b3f3c82e0c54c659126926374e98a07330ff",
+      "path": "worklog/issues/rendered/github-55-bounty-narrow-right.png",
+      "sha256": "82c367755fb453ea611de41beef60868bfdeb4afdba62a41ee65b9e1cf3e58bf"
+    },
+    {
+      "bytes": 146289,
+      "git_blob": "16074999ff0647a08b0a80c97947c00680baf1b6",
+      "path": "worklog/issues/rendered/github-55-bounty-narrow.png",
+      "sha256": "5b6b1de0c5bea42c1434065a88abfcbb51dab2744e86f3dbe7f9be30ec527b36"
+    },
+    {
+      "bytes": 201025,
+      "git_blob": "db7378906c4f2648a77e303bbc1c298ab73e3b53",
+      "path": "worklog/issues/rendered/github-55-bounty-wide.png",
+      "sha256": "c0f7317171782d7ee4789c5624dfeebf2d62997cc06f1b7aee6407770ec56866"
+    },
+    {
+      "bytes": 106653,
+      "git_blob": "d1d59f9b2df6c16c02ee57cc2e4bf03080debf5a",
+      "path": "worklog/issues/rendered/github-62-honor-narrow.png",
+      "sha256": "65f73100ad88ce31f035e3351cbd9263f5c4a903c229833321c456ce427ffcc3"
+    },
+    {
+      "bytes": 124857,
+      "git_blob": "3523d5ac0373fe04216d02f1d509fdb014b39eab",
+      "path": "worklog/issues/rendered/github-62-honor-wide.png",
+      "sha256": "436388936c57a5d56439391b47eb73136f478091aa6a6a8c71cf97dc23072637"
+    },
+    {
+      "bytes": 2994,
+      "git_blob": "4d1b61a2959a6d55ce663dab8e1057ed30af9fb0",
+      "path": "worklog/issues/todo-1.md",
+      "sha256": "a6203255239e2978d815b21d7526994d28fa61c2cd4d49f258b1f33baf6a34c0"
+    },
+    {
+      "bytes": 3259,
+      "git_blob": "1f2568e0dab070ed57bd7d390b54002497c2dde8",
+      "path": "worklog/issues/todo-112.md",
+      "sha256": "d04e0da33fe679ded7e91793d3fcf3b4f05cce51c1a54afd2553e7c324736379"
+    },
+    {
+      "bytes": 6185,
+      "git_blob": "48c2c648581d3681390bad262b15e5b19c370f7f",
+      "path": "worklog/issues/todo-113.md",
+      "sha256": "92719c3d56a82074c0c3b6a355725bed5b67f2b73094a30295180fe14fc57eb2"
+    },
+    {
+      "bytes": 1575,
+      "git_blob": "0f002316fa7bf79797b4fb1c04d591e63de32cd2",
+      "path": "worklog/issues/todo-116.md",
+      "sha256": "79c39ba985ba23394ebc341da3b712f00ed726a6a479d9c436ff1fa3023f98d8"
+    },
+    {
+      "bytes": 976,
+      "git_blob": "e341235a2ab2898231b865e50bf79b22c5ee08dd",
+      "path": "worklog/issues/todo-150.md",
+      "sha256": "e907a09871ca4308201261cfa90e93d4e55de34ba071cc3d95c01c21e488d50c"
+    },
+    {
+      "bytes": 11931,
+      "git_blob": "0bf969c6c8b6103e67265c37cbad43ba776778de",
+      "path": "worklog/issues/todo-169.md",
+      "sha256": "55750613637d62bacd3ce118d6c21bcd8c74fc0ab6c72c34975aa30e35b16eee"
+    },
+    {
+      "bytes": 5107,
+      "git_blob": "762ae38cebfe8a4b066f3713e7e6271004436ac0",
+      "path": "worklog/issues/todo-170.md",
+      "sha256": "aa2159f71b2e449de63139c9782c0e40c3957bf1cd6df8af0b969b27dbb446e0"
+    },
+    {
+      "bytes": 1474,
+      "git_blob": "2e04f5c4f92cd2172d14a9aab5d39efb47e76ef3",
+      "path": "worklog/issues/todo-175.md",
+      "sha256": "8459acef7418a3231d80680af8bb1cbb24910b409fd859113729b9eb4b75890f"
+    },
+    {
+      "bytes": 1252,
+      "git_blob": "7cc12f865c73a6a4aab8717a44981abb03e3b193",
+      "path": "worklog/issues/todo-182.md",
+      "sha256": "f594ab4a4f36a6dde0733b6201263a5131ad7c0a8964d59745378fd341b3b22e"
+    },
+    {
+      "bytes": 3871,
+      "git_blob": "28d68f2ad48bdece57d3ef5e7f1b9a6c5356a2b7",
+      "path": "worklog/issues/todo-19.md",
+      "sha256": "ed7f2e5ff395b5c9d7935948f50ee08d20f41894e887bf190b2153d6bdaf6154"
+    },
+    {
+      "bytes": 6514,
+      "git_blob": "747fde1aa9985176679aba8d835010b7207d46c7",
+      "path": "worklog/issues/todo-190.md",
+      "sha256": "6cec3813839eb036f5daadd2a3bb4aab5b115d9287596c47a46742b6c3829034"
+    },
+    {
+      "bytes": 1005,
+      "git_blob": "6247a44633fd2c7590e86dd110a9dd7a7b3662aa",
+      "path": "worklog/issues/todo-195.md",
+      "sha256": "20ca71c52a7c0eeb15ebd96ac19eebfd67ad2b1f55d2dda4f48c637b85f58818"
+    },
+    {
+      "bytes": 1789,
+      "git_blob": "c450acd97c0ce9f2d3d8ee7979de85a2bbc81a78",
+      "path": "worklog/issues/todo-199.md",
+      "sha256": "23f5d5dd4dee39baa0b1ec4058cd62a945de1ed88881dca56eba49bd7fa6a839"
+    },
+    {
+      "bytes": 4613,
+      "git_blob": "751adb4a81c9aece5ab5022f82edfbef4caa7a63",
+      "path": "worklog/issues/todo-200.md",
+      "sha256": "7b5561437bfbac446fec521488c40220f9b0e8bacbda362f60a0424922fd5df2"
+    },
+    {
+      "bytes": 3858,
+      "git_blob": "9ed50060f8bf929cad91a75f315d6464eb89d9cc",
+      "path": "worklog/issues/todo-203.md",
+      "sha256": "9efc034fe27f2408d7e1c5c234d04ebfb96e8267ba6c8e6ac5382efe3b735185"
+    },
+    {
+      "bytes": 4242,
+      "git_blob": "c02179b37495a4bfd257293bd73735f79158e41f",
+      "path": "worklog/issues/todo-208.md",
+      "sha256": "cfe188cea0a1ddec4789a5751c9edebdaab6052a9431c0c31b7d035d8f515207"
+    },
+    {
+      "bytes": 3500,
+      "git_blob": "812b91a7e3e45b221cf31f718554d7a32abf6ff1",
+      "path": "worklog/issues/todo-42.md",
+      "sha256": "70d32537c98e1a3c39e1d352d001630c45c2e813b6814e4cdabe8d083f9b0c55"
+    },
+    {
+      "bytes": 7134,
+      "git_blob": "9506c2040b84640f3a21cd0d01634fb31d2157d6",
+      "path": "worklog/issues/todo-50.md",
+      "sha256": "90ba818e9185c91d07301e61a1b95efb421e306bdd03c4b6040a11c8398cb81f"
+    },
+    {
+      "bytes": 2226,
+      "git_blob": "04a97cb6a29517c655bb5d89f0ff5dd9bf92e8ab",
+      "path": "worklog/issues/todo-59.md",
+      "sha256": "c25356adcbfead08ee33951f2fc0f8dbfeda5774bbe44a267219f5280221556a"
+    },
+    {
+      "bytes": 4641,
+      "git_blob": "80e4c37f93ffaeaf7fd0ebd3dc7ab55c707e6a52",
+      "path": "worklog/issues/todo-8.md",
+      "sha256": "aae4f91cacd889a5e23591e055a5c38792db0e94879cb404d2953a8ef00a8994"
+    },
+    {
+      "bytes": 2143,
+      "git_blob": "c58a6b8f55404c8319a063f92f5a567030960dfd",
+      "path": "worklog/issues/todo-85.md",
+      "sha256": "7a875f60a4629722cec1a1386eda55d67fe4e64c68eced7edfdf1e469b3e8c6f"
+    },
+    {
+      "bytes": 5637,
+      "git_blob": "4842cfca96f4a11a5283a4cd66e172b969125bb7",
+      "path": "worklog/issues/todo-87.md",
+      "sha256": "e027f961cc0cf587da1fdeca1a549eb4cf105b625b4a8dafc6c665beb258e1fc"
+    },
+    {
+      "bytes": 4510,
+      "git_blob": "567994aa3d5e757a20aa45f257605da048ef63ed",
+      "path": "worklog/legacy/014-169-a-b-e-f-85-a-113-d-2026-08-05.md",
+      "sha256": "4f60ad59c6a618cdfe7437b97bbcaee4c292e90b1230aeb80b3fa531d4fb8b22"
+    },
+    {
+      "bytes": 3902,
+      "git_blob": "5baa0c94456553af2eb6a2f6de3af0ea4cb2add7",
+      "path": "worklog/legacy/015-85-b-properly-1-169-d-113-c-2026-08-05.md",
+      "sha256": "1254ebd2c31cb51f7f9d723329aab9f10f39bae7864064c75efff8ef1d026498"
+    },
+    {
+      "bytes": 4480,
+      "git_blob": "884cb857d9884bd1615428fafa97da32ee504089",
+      "path": "worklog/legacy/016-7-85-b-116-169-c-182-fixed-2026-08-05.md",
+      "sha256": "9fc748b451a4f78cb50f62c2e501f754140e1e8f30f700c2ac832897d8532588"
+    },
+    {
+      "bytes": 3812,
+      "git_blob": "b31c2bf05007320397fdb82da6fe65ef16b2d66c",
+      "path": "worklog/legacy/017-42-19-113-fixed-2026-08-05.md",
+      "sha256": "aa218855ecd31a0d857ab505b005ea74f5a766700bb3376ba8620d46aef5e36e"
+    },
+    {
+      "bytes": 2962,
+      "git_blob": "41c0d38f3a62fc2282a30b219e803855fa5c8190",
+      "path": "worklog/legacy/018-98-112-50-invented-identifier-names-found-by-audit-2026-08-05.md",
+      "sha256": "727fa3bc0ac2aeeaebe4a2f930d9141aa040b190283706c25ad575ea5c3e825c"
+    },
+    {
+      "bytes": 2632,
+      "git_blob": "f03550db3b17021f4da62fb5e7c99adbed42c701",
+      "path": "worklog/legacy/021-204-205-206-weapons-tab-fixed-2026-08-05.md",
+      "sha256": "af19ffe4d5de82d05fe8085cf1315c1c5b27ab348b17acbae2afc8e9b6fc9b00"
+    },
+    {
+      "bytes": 3498,
+      "git_blob": "6ef4fa9093308295b52c0aafd1339546a09b9826",
+      "path": "worklog/legacy/024-follow-up-candidate-build-2026-08-03.md",
+      "sha256": "c938ae07690065be600fa770251b7683a502b4d98399a5ea35a87847c8423b76"
+    },
+    {
+      "bytes": 1145,
+      "git_blob": "1a80a90ac94408097c1554b383d68b597c66e8df",
+      "path": "worklog/legacy/025-48-51-are-two-different-features-2026-08-04.md",
+      "sha256": "21236acc70d5671d7ae2a9f0eaa8495bfec4ede986aa4ec33884c226c1b66fca"
+    },
+    {
+      "bytes": 2169,
+      "git_blob": "d068c2ed3016ea2fdb37da1b31d72812d3849f93",
+      "path": "worklog/legacy/028-170-169-2026-08-04.md",
+      "sha256": "5502bfb2a2118786303f18ae1a0ca296ea55754de4fd1f918fa9075e9f1027c4"
+    },
+    {
+      "bytes": 3000,
+      "git_blob": "6e58d88da98efe6af3d137ddf4460e6e12bd02ca",
+      "path": "worklog/legacy/029-147-193-custom-textures-two-stacked-registration-bugs-2026-08-04.md",
+      "sha256": "f1a5baefea2e8527fb900c21d930f85f0d4569da72e0e04409525c57722cf8cd"
+    },
+    {
+      "bytes": 2223,
+      "git_blob": "9047cce278c8e33b8b9228e740e740e4099d89f5",
+      "path": "worklog/legacy/033-42-carrier-no-longer-rewrites-the-equipped-mask-195-blocking-202.md",
+      "sha256": "c5ecb0d189b211a876d043363af4f2d9b9d94a1793ae962dd5c75915fccc8800"
+    },
+    {
+      "bytes": 663,
+      "git_blob": "4b3ec10858a8c0d5ae3aa0fdbfd508f0944c51cd",
+      "path": "worklog/legacy/034-170-split-into-170-195-2026-08-04.md",
+      "sha256": "75f451e456bf3196d91dd457c4046e9edc40862a11c536c3e54eefe497603616"
+    },
+    {
+      "bytes": 1860,
+      "git_blob": "f6ad753a316132fb071ffd2807a6ca6a6b714e9d",
+      "path": "worklog/legacy/035-195-was-170-prone-aiming-the-reference-cannot-be-ported-2026-08.md",
+      "sha256": "569b1b3ef42bdbea25680f0f7134093b73fdbf8bc07ad36280f95c9cca1e6d82"
+    },
+    {
+      "bytes": 2041,
+      "git_blob": "b4d6fc04c6e97fa504ea6acc7f8a60a7e52dbb47",
+      "path": "worklog/legacy/036-1-visible-core-dip-112-nothing-rendering-113-tags-2026-08-04.md",
+      "sha256": "edb0635f48cc0cb183511f336aa12dffa6d97bba17403c013450ac4dfd220acb"
+    },
+    {
+      "bytes": 1500,
+      "git_blob": "8ace074dc1cd9b3e3fddb314db86cb7053b4937b",
+      "path": "worklog/legacy/037-1-player-horse-stamina-cross-drain-59-f4-leak-2026-08-04.md",
+      "sha256": "9a932273279b656c7b25f58948a84048bf255b17c18c8b6d95f760147774ecf1"
+    },
+    {
+      "bytes": 703,
+      "git_blob": "0ecd720bc355d681ca0181f961a0c130e697530e",
+      "path": "worklog/legacy/039-file-consolidation-2026-08-04.md",
+      "sha256": "3e43738765ca8d9f407fe3ce39367cd68b128966a343e7d3701a7abb8ff380fe"
+    },
+    {
+      "bytes": 1544,
+      "git_blob": "540b087d4f8d260dc909f671bb0f250b4318a0f2",
+      "path": "worklog/legacy/041-todo-txt-cleanup-2026-08-04.md",
+      "sha256": "99bc6b99c107af61a5933ac5d1e614088049e13fbef6192e97e706f3c8645de8"
+    },
+    {
+      "bytes": 149089,
+      "git_blob": "2a91896b7a81eeffde97b81ac39e9281da90059f",
+      "path": "worklog/legacy/042-current-test-batch-2026-08-03.md",
+      "sha256": "b14759a7ff882b0e9bd787a4c1b5fc7483c33948b46f13be3679d818177a86e6"
+    },
+    {
+      "bytes": 1357,
+      "git_blob": "420f41e62077bc8ca39ce8ee8a40a9111340b5d8",
+      "path": "worklog/legacy/043-what-this-project-is.md",
+      "sha256": "225282919fea74eea318406c39146ce9792cf5ec4938e2599737cb3156149987"
+    },
+    {
+      "bytes": 1454,
+      "git_blob": "37e77b67638a487538b389f073cd0003c2a2bdd5",
+      "path": "worklog/legacy/044-sop-crack-open-existing-mods-to-learn-mechanisms-lexer-2026-07-0.md",
+      "sha256": "0a1ce559336e9b07e780aaf35b42fd7513b83e820abf73168ae2c73093f41571"
+    },
+    {
+      "bytes": 1732,
+      "git_blob": "f8fa40df2bf89be70277f7f155bf69ae8f921329",
+      "path": "worklog/legacy/045-hard-rules-from-lexer.md",
+      "sha256": "3469560ffdbbe0b7671d46807de3410205727b1a81827b713a5f5d7ae02d76ee"
+    },
+    {
+      "bytes": 11978,
+      "git_blob": "a7a6d64bd04e175585dcf030eeaf859be1f10bcf",
+      "path": "worklog/legacy/046-key-technical-knowledge.md",
+      "sha256": "ea1eb13ad8e910cb0b53032e24d598a8df5bd24bd7361aff69332cc5cb4edd60"
+    },
+    {
+      "bytes": 19592,
+      "git_blob": "d48aabe8e415d5fd9bb9e6c72238d76abb14fe54",
+      "path": "worklog/legacy/047-gameplaytweaks-asi-todo-1-4-5-key-natives-findings.md",
+      "sha256": "19237ce5efe5970d64e17d8be7b06f999a7a04eeb790234c26f2c64d90b90b1f"
+    },
+    {
+      "bytes": 1108,
+      "git_blob": "1115f2e7fe4ce15d89ff50e811f92621ac1aadd7",
+      "path": "worklog/legacy/048-todo-structure-feasibility-notes-2026-07-06.md",
+      "sha256": "f6158dbbae5424d755a36fff07f117bd453b1bd32ba77ae679bfbf6cf65be59d"
+    },
+    {
+      "bytes": 5110,
+      "git_blob": "47d3befbcd22e96d2824a1d2c65d2488e2f5932a",
+      "path": "worklog/legacy/049-critical-install-facts-learned-the-hard-way-2026-07-07.md",
+      "sha256": "ffd3f9bf0eb5baa848af5524f888c48d252307338f03415e6278a3bff3aa6ff8"
+    },
+    {
+      "bytes": 2216,
+      "git_blob": "8c4ff0a198298ec9bbf05d735647a40ef5e6440e",
+      "path": "worklog/legacy/050-overnight-session-2026-07-09-lexer-asleep-do-everything.md",
+      "sha256": "60f21fd52edff57e772572c5c2b269e50d24a2293a37f33c99f14871732ba8cc"
+    },
+    {
+      "bytes": 1211,
+      "git_blob": "dcfe7c8278ff24fdf534344b2ab0bd7a881477ee",
+      "path": "worklog/legacy/051-core-effect-ramp-corrected-understanding-2026-07-09.md",
+      "sha256": "b56def65fc989225ceaf7d1430c5d9a39e8e4a696f2c5a208cde4c946d3ca031"
+    },
+    {
+      "bytes": 154,
+      "git_blob": "785b1edd6501d3da2ae1cce1681b9bf0005ff648",
+      "path": "worklog/legacy/052-openiv-rdr2-tooling-walls-confirmed-2026-07-09-unlocked-pc-sessi.md",
+      "sha256": "83619defbc1e38ea5ce420b5c4ac6026ef7b5665dea5e4a75fdccf1fd0f33989"
+    },
+    {
+      "bytes": 1275,
+      "git_blob": "138dc708da291192cb7984e8d62ecbfc7120456d",
+      "path": "worklog/legacy/053-note-these-walls-only-mattered-for-the-mistaken-sprite-approach.md",
+      "sha256": "6df21b04d9e63caeb0f32a10decc45e47b82457bd3aa9e440acfaeaeae22f12b"
+    },
+    {
+      "bytes": 76,
+      "git_blob": "d3028c989263cf42645f5941fccdbf848f881f1d",
+      "path": "worklog/legacy/054-state-pending-verification.md",
+      "sha256": "7ef03c9f956bacae079ee61c02be660d84cf483b37ce851f1e0c19926d6f4ec0"
+    },
+    {
+      "bytes": 1279,
+      "git_blob": "fa442d1b9e8ff1b6d60069d39593d6859482652f",
+      "path": "worklog/legacy/055-item-identity-and-feather-decisions-2026-07-13.md",
+      "sha256": "879d62a8b23f635e06dddaa833ea57707cd8f05c6b59c7854317af1685ee8591"
+    },
+    {
+      "bytes": 1558,
+      "git_blob": "74f65e08ae9abb95713d4e37f9549fbcbf2788a7",
+      "path": "worklog/legacy/056-editor-reference-install-update-2026-07-12.md",
+      "sha256": "681e76bf3447e6ef7893158d5d31589ea617a873f80db085a0fb2f0b68e2e025"
+    },
+    {
+      "bytes": 16872,
+      "git_blob": "9cd455474b940343ee77e1c358c234fa3f429e76",
+      "path": "worklog/legacy/057-bandit-challenge-mask-implementation-2026-07-13.md",
+      "sha256": "1cab7de7a9ceb28a637aba1e6b2e04f6c960b9f5c24ff64560f532956732946c"
+    },
+    {
+      "bytes": 2780,
+      "git_blob": "c878e2cd579c17ec76ce8d471b6fea532af6a5bf",
+      "path": "worklog/legacy/058-researched-game-data-map-2026-07-11.md",
+      "sha256": "3307fea5a091bf12aeefbb1bf116addbaaa9080d7597639ffbe97ab146947ce1"
+    },
+    {
+      "bytes": 26078,
+      "git_blob": "b6b17fe894fba2e6d8aa57e3ec59ef2b8b257944",
+      "path": "worklog/legacy/059-editor-taxonomy-and-shop-ux-2026-07-12.md",
+      "sha256": "7f3c55f56a84489b0b0c91f875b2b66f75f2fbc50ae385a7e66a317ff19035e7"
+    },
+    {
+      "bytes": 2203,
+      "git_blob": "74e50b5fe7703cf5e0f1b2c2a7df86d1918923a8",
+      "path": "worklog/legacy/060-112-streak-42-worn-state-latch-2026-08-04.md",
+      "sha256": "0378a3f46197550eed56d59a099629b62e634f8cde68921d4848b854e1c04737"
+    },
+    {
+      "bytes": 1420,
+      "git_blob": "6cfe5397c9ecad30c83b70c76e129d94eb06d6ff",
+      "path": "worklog/legacy/062-98-always-holster-50-physical-bloodstain-marker-2026-08-04.md",
+      "sha256": "d9e800bf646aef3e271bdbb910d74dbcdb1ce61f399feb549d2ad7e4ece857fc"
+    },
+    {
+      "bytes": 1191,
+      "git_blob": "de4086d7f29432c2ce7e622fdb286ec42949f9bb",
+      "path": "worklog/legacy/064-131-belt-lantern-42-camp-greying-2026-08-04.md",
+      "sha256": "2a1387ccda6d0c07c6fc778fc8c64aae00e539d46b49007c2c36dc69cb2383ef"
+    },
+    {
+      "bytes": 2089,
+      "git_blob": "7a4c609285c658cd02557f593ecf5608b89d9477",
+      "path": "worklog/legacy/068-189-camera-calibration-103-optional-feed-2026-08-04.md",
+      "sha256": "c9e4a2117bedb6f24b5169ec192b8ee1da3c3f3b31d71ccca0f39b85e90b25b3"
+    },
+    {
+      "bytes": 2051,
+      "git_blob": "19582bdc6384b0f70fe5cdfcb65c2f28220d9611",
+      "path": "worklog/legacy/070-175-probe-hud-overlap-fixed-87-200-confirmed-openiv-only-2026-08.md",
+      "sha256": "4863f5c925e502cd431badb11367b03aa1701fc3d04a9cb9b9b1cb3d6819e621"
+    },
+    {
+      "bytes": 916,
+      "git_blob": "7d54f1e61ade716c61f25cbd0170582195f84097",
+      "path": "worklog/legacy/076-session-close-2026-08-04.md",
+      "sha256": "91bbfd9369b48e1bf6a0b6487610dc8bc2617619328d109a732d572bd97d593f"
+    },
+    {
+      "bytes": 1685,
+      "git_blob": "0b4e6827b319e61547add4d9e39503e84fe25aa9",
+      "path": "worklog/legacy/077-priority-0-fixes-2026-08-04.md",
+      "sha256": "75958ff6b1f19bb5ed5de19020bbd8dd8f4fe2b973402b62fc7c9b0d141f3fae"
+    },
+    {
+      "bytes": 6259,
+      "git_blob": "43a2840a1988620a60dc9291b4ce3baa1f3313c3",
+      "path": "worklog/legacy/078-class-a-batch-59-193-11-116-170-1-195-2026-08-04.md",
+      "sha256": "c291c8414cc11ddcd4c5ad88f277f0a145e7e6e0e5fd1069bb5f41f5a040f0f9"
+    },
+    {
+      "bytes": 591,
+      "git_blob": "bd31211d2e13199897318db8c204ac0ad6efcaba",
+      "path": "worklog/legacy/093-collectible-relocation-key-collision-2026-08-05.md",
+      "sha256": "9987efc51a3aea85c7854530e33ba38379294cceef38215e9e7e72bd5c3e7982"
+    },
+    {
+      "bytes": 1025,
+      "git_blob": "a1a633aabf5b786a9c227da1d2683046f843f6f4",
+      "path": "worklog/legacy/095-github-exploratory-swarm-research-2026-08-05.md",
+      "sha256": "0d69ff0e4ad44a09b8a5a5636f4446ce1f132085093d9f02dc8064fc9aa06c69"
+    },
+    {
+      "bytes": 27156,
+      "git_blob": "6403a7b19ee54f242fed403cb4466da3dcb62c46",
+      "path": "worklog/migration-manifest.json",
+      "sha256": "108e8c1228e5e628296fa3a2f269fecaab43a11f69c7af00f58e3492a1eb6abf"
+    }
+  ],
+  "issue_mapping": {
+    "1": {
+      "id": 5356282325,
+      "number": 101,
+      "title": "Finish authored campsite activation and protection",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/101"
+    },
+    "10": {
+      "id": 5356285961,
+      "number": 110,
+      "title": "Deliver the accepted minimap zoom help update",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/110"
+    },
+    "101": {
+      "id": 5356306496,
+      "number": 197,
+      "title": "Make Oleander cause curable Toxic status",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/197"
+    },
+    "102": {
+      "id": 5356307057,
+      "number": 198,
+      "title": "Apply Toxic damage to the outer Health bar",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/198"
+    },
+    "105": {
+      "id": 5356307929,
+      "number": 201,
+      "title": "Research child vulnerability without breaking other interactions",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/201"
+    },
+    "11": {
+      "id": 5356286186,
+      "number": 111,
+      "title": "Improve the replacement inventory icons",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/111"
+    },
+    "112": {
+      "id": 5356309506,
+      "number": 208,
+      "title": "Check Auto-Bank and choose the wallet display",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/208"
+    },
+    "113": {
+      "unresolved": "Source issue unavailable; do not guess the destination number."
+    },
+    "115": {
+      "id": 5356309932,
+      "number": 210,
+      "title": "Repair conditional newspaper entries in the map Index",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/210"
+    },
+    "116": {
+      "id": 5356310129,
+      "number": 211,
+      "title": "Recognize the full campsite for developer removal",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/211"
+    },
+    "117": {
+      "id": 5356310350,
+      "number": 212,
+      "title": "Faster map zoom needs a different mechanism",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/212"
+    },
+    "118": {
+      "unresolved": "Source issue unavailable; do not guess the destination number."
+    },
+    "119": {
+      "unresolved": "Source issue unavailable; do not guess the destination number."
+    },
+    "12": {
+      "id": 5356286403,
+      "number": 112,
+      "title": "Use matching lit and unlit campsite icons",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/112"
+    },
+    "120": {
+      "id": 5356310568,
+      "number": 213,
+      "title": "Correct markers displaced outside the map",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/213"
+    },
+    "121": {
+      "id": 5356310801,
+      "number": 214,
+      "title": "Check marker-move feedback and hold-to-undo",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/214"
+    },
+    "122": {
+      "id": 5356311042,
+      "number": 215,
+      "title": "Stop the camera flying around after respawn",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/215"
+    },
+    "123": {
+      "id": 5356311288,
+      "number": 216,
+      "title": "Keep the horse’s location across restarts",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/216"
+    },
+    "124": {
+      "id": 5356311501,
+      "number": 217,
+      "title": "Merge duplicate Misc settings categories",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/217"
+    },
+    "125": {
+      "id": 5356311726,
+      "number": 218,
+      "title": "Configure Dead Eye consumption in points per second",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/218"
+    },
+    "128": {
+      "id": 5356312308,
+      "number": 220,
+      "title": "Finish the two-mode vehicle camera handoff",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/220"
+    },
+    "13": {
+      "id": 5356286656,
+      "number": 113,
+      "title": "Prepare the remaining stealth audit tests",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/113"
+    },
+    "130": {
+      "id": 5356312766,
+      "number": 222,
+      "title": "Deliver the corrected Hold E casing pickups",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/222"
+    },
+    "14": {
+      "id": 5356286914,
+      "number": 114,
+      "title": "Center the map on the player when opened",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/114"
+    },
+    "143": {
+      "id": 5356315706,
+      "number": 235,
+      "title": "Match the vanilla binocular mask",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/235"
+    },
+    "144": {
+      "id": 5356315952,
+      "number": 236,
+      "title": "Use walk and hold-to-sprint without crouch-running",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/236"
+    },
+    "145": {
+      "id": 5356316170,
+      "number": 237,
+      "title": "Configure horse core-drain durations independently",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/237"
+    },
+    "146": {
+      "id": 5356316373,
+      "number": 238,
+      "title": "Grey out items blocked by insufficient cores",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/238"
+    },
+    "147": {
+      "id": 5356316602,
+      "number": 239,
+      "title": "Choose the pocketwatch display font",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/239"
+    },
+    "148": {
+      "id": 5356316921,
+      "number": 240,
+      "title": "Check thermometer readings and placement",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/240"
+    },
+    "149": {
+      "id": 5356317206,
+      "number": 241,
+      "title": "Reject activated campsite markers without a physical camp",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/241"
+    },
+    "15": {
+      "id": 5356287172,
+      "number": 115,
+      "title": "Apply configurable wallet limits by Gambler rank",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/115"
+    },
+    "150": {
+      "id": 5356317434,
+      "number": 242,
+      "title": "Check known failure patterns before releasing fixes",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/242"
+    },
+    "151": {
+      "id": 5356317698,
+      "number": 243,
+      "title": "Restore the second holster and dual-wield slots",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/243"
+    },
+    "152": {
+      "id": 5356317947,
+      "number": 244,
+      "title": "Deliver the corrected campsite-respawn warning",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/244"
+    },
+    "153": {
+      "id": 5356318270,
+      "number": 245,
+      "title": "Deliver the repaired corpse X and complete map artwork",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/245"
+    },
+    "154": {
+      "id": 5356318543,
+      "number": 246,
+      "title": "Holstered shoulder switching lacks a supported camera state",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/246"
+    },
+    "156": {
+      "id": 5356319109,
+      "number": 248,
+      "title": "Remove crouch-running",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/248"
+    },
+    "157": {
+      "id": 5356319385,
+      "number": 249,
+      "title": "Return directly from sprinting to walking",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/249"
+    },
+    "158": {
+      "id": 5356319645,
+      "number": 250,
+      "title": "Exclude the player from lantern shadows only",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/250"
+    },
+    "159": {
+      "id": 5356319949,
+      "number": 251,
+      "title": "Restore climbing entry before testing animation stop",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/251"
+    },
+    "16": {
+      "id": 5356287453,
+      "number": 116,
+      "title": "Deliver the repaired visible bullet trails",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/116"
+    },
+    "160": {
+      "id": 5356320209,
+      "number": 252,
+      "title": "Fix falling and snapping during angled top-outs",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/252"
+    },
+    "161": {
+      "id": 5356320613,
+      "number": 253,
+      "title": "Finish sideways climbing without a misleading animation claim",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/253"
+    },
+    "162": {
+      "id": 5356320882,
+      "number": 254,
+      "title": "Implement the requested area-based Recon targeting",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/254"
+    },
+    "163": {
+      "id": 5356321235,
+      "number": 255,
+      "title": "Fix the F3 campsite-removal crash",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/255"
+    },
+    "164": {
+      "id": 5356321572,
+      "number": 256,
+      "title": "Remove ordinary Tear Down Camp prompts",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/256"
+    },
+    "165": {
+      "id": 5356321861,
+      "number": 257,
+      "title": "Investigate pose flicker while climbing",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/257"
+    },
+    "166": {
+      "id": 5356322222,
+      "number": 258,
+      "title": "Fix the slide-down and snap before mantling",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/258"
+    },
+    "167": {
+      "id": 5356322453,
+      "number": 259,
+      "title": "Revalidate ledge-grab entry on the corrected climbing build",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/259"
+    },
+    "168": {
+      "id": 5356322646,
+      "number": 260,
+      "title": "Live scaling does not work on the physical lantern",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/260"
+    },
+    "169": {
+      "id": 5356323028,
+      "number": 261,
+      "title": "Deliver the climbing surface and fall-loop repair",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/261"
+    },
+    "17": {
+      "id": 5356287698,
+      "number": 117,
+      "title": "Use readable typed settings with lifecycle tags",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/117"
+    },
+    "171": {
+      "id": 5356323445,
+      "number": 263,
+      "title": "Keep new campsite activation and marker states consistent",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/263"
+    },
+    "172": {
+      "id": 5356323659,
+      "number": 264,
+      "title": "Disable first-person dodge rolls",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/264"
+    },
+    "173": {
+      "id": 5356324138,
+      "number": 265,
+      "title": "Charge stamina for every rapid dodge roll",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/265"
+    },
+    "174": {
+      "id": 5356324367,
+      "number": 266,
+      "title": "Remove invented camera offset and distance clamps",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/266"
+    },
+    "175": {
+      "id": 5356324593,
+      "number": 267,
+      "title": "Make shoulder switching reach both sides evenly",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/267"
+    },
+    "176": {
+      "id": 5356324954,
+      "number": 268,
+      "title": "Restore animal information through binoculars",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/268"
+    },
+    "177": {
+      "id": 5356325322,
+      "number": 269,
+      "title": "Deliver the non-invasive camera transition recorder",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/269"
+    },
+    "178": {
+      "id": 5356325612,
+      "number": 270,
+      "title": "Separate crouched camera bob from lantern collision",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/270"
+    },
+    "179": {
+      "id": 5356325916,
+      "number": 271,
+      "title": "Refuse rolls when stamina cannot pay the cost",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/271"
+    },
+    "18": {
+      "id": 5356288011,
+      "number": 118,
+      "title": "Check in-game settings and repaired core-duration limits",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/118"
+    },
+    "181": {
+      "id": 5356326488,
+      "number": 273,
+      "title": "Remove vignette restored by local visual effects",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/273"
+    },
+    "183": {
+      "id": 5356327065,
+      "number": 275,
+      "title": "Fix the carried-mask startup buffer overwrite",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/275"
+    },
+    "19": {
+      "id": 5356288308,
+      "number": 119,
+      "title": "Finish and validate stealth detection indicators",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/119"
+    },
+    "2": {
+      "id": 5356284241,
+      "number": 102,
+      "title": "Show fixed-value health rings on Recon tags",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/102"
+    },
+    "20": {
+      "id": 5356288606,
+      "number": 120,
+      "title": "Check the shared development-mode toggle",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/120"
+    },
+    "22": {
+      "id": 5356289083,
+      "number": 122,
+      "title": "Deliver the repaired custom crafting menu",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/122"
+    },
+    "23": {
+      "id": 5356289284,
+      "number": 123,
+      "title": "Add independent golden overfill to cores and bars",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/123"
+    },
+    "24": {
+      "id": 5356289511,
+      "number": 124,
+      "title": "Check paying a serious bounty instead of surrendering",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/124"
+    },
+    "25": {
+      "id": 5356289791,
+      "number": 125,
+      "title": "Check that disabling core XP preserves progress",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/125"
+    },
+    "26": {
+      "id": 5356290016,
+      "number": 126,
+      "title": "Test the Baked Beans overflow-storage prototype",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/126"
+    },
+    "27": {
+      "id": 5356290266,
+      "number": 127,
+      "title": "Skip RDR2 startup movies and disclaimers",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/127"
+    },
+    "29": {
+      "id": 5356290801,
+      "number": 129,
+      "title": "Compare animal density under controlled conditions",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/129"
+    },
+    "3": {
+      "id": 5356284426,
+      "number": 103,
+      "title": "Check wagon horse stamina and its HUD icon",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/103"
+    },
+    "30": {
+      "id": 5356291059,
+      "number": 130,
+      "title": "Build tonic refilling on shared overflow storage",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/130"
+    },
+    "31": {
+      "id": 5356291314,
+      "number": 131,
+      "title": "Fix incorrect per-drink alcohol strengths",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/131"
+    },
+    "32": {
+      "id": 5356291547,
+      "number": 132,
+      "title": "Check independently timed casing glints",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/132"
+    },
+    "35": {
+      "id": 5356292236,
+      "number": 135,
+      "title": "Fix train detection before redesigning its markers",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/135"
+    },
+    "37": {
+      "id": 5356292759,
+      "number": 137,
+      "title": "Deliver card drops from smoking premium cigarettes",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/137"
+    },
+    "39": {
+      "id": 5356293234,
+      "number": 139,
+      "title": "Repair the empty pause menu before removing entries",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/139"
+    },
+    "4": {
+      "id": 5356284652,
+      "number": 104,
+      "title": "Restore animated binocular quick access",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/104"
+    },
+    "42": {
+      "id": 5356293703,
+      "number": 141,
+      "title": "Explain and build additional gunsmiths",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/141"
+    },
+    "43": {
+      "id": 5356293946,
+      "number": 142,
+      "title": "Per-cartridge projectile speed lacks a working runtime path",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/142"
+    },
+    "44": {
+      "id": 5356294202,
+      "number": 143,
+      "title": "Reveal all four gunslinger locations when the quest starts",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/143"
+    },
+    "45": {
+      "id": 5356294452,
+      "number": 144,
+      "title": "Prepare a valid vanilla casing-ejection comparison",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/144"
+    },
+    "47": {
+      "id": 5356295046,
+      "number": 146,
+      "title": "Check the repaired horse-camera centering toggle",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/146"
+    },
+    "48": {
+      "id": 5356295226,
+      "number": 147,
+      "title": "Make zero swimming stamina fatal",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/147"
+    },
+    "49": {
+      "id": 5356295411,
+      "number": 148,
+      "title": "Review shop category filters and acceptance information",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/148"
+    },
+    "5": {
+      "id": 5356284862,
+      "number": 105,
+      "title": "Finish manual control of the belt lantern",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/105"
+    },
+    "50": {
+      "id": 5356295621,
+      "number": 149,
+      "title": "Finish wanted-system research after the trace crash repair",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/149"
+    },
+    "55": {
+      "id": 5356296624,
+      "number": 154,
+      "title": "Explain each bounty-hunter wanted tier",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/154"
+    },
+    "57": {
+      "id": 5356297024,
+      "number": 156,
+      "title": "Allow card sales only after the set is mailed",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/156"
+    },
+    "59": {
+      "id": 5356297414,
+      "number": 158,
+      "title": "Independent binocular zoom stages lack a working path",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/158"
+    },
+    "6": {
+      "id": 5356285057,
+      "number": 106,
+      "title": "Finish dodge-roll input and stamina behavior",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/106"
+    },
+    "62": {
+      "id": 5356298033,
+      "number": 161,
+      "title": "Add real per-action honor amounts",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/161"
+    },
+    "64": {
+      "id": 5356298462,
+      "number": 163,
+      "title": "Remove masks reassigned to challenge rewards",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/163"
+    },
+    "65": {
+      "id": 5356298676,
+      "number": 164,
+      "title": "Check Ancient Tomahawk returns on every impact",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/164"
+    },
+    "66": {
+      "id": 5356298892,
+      "number": 165,
+      "title": "Recover lost unique weapons through the normal locker list",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/165"
+    },
+    "67": {
+      "id": 5356299117,
+      "number": 166,
+      "title": "Deliver the Hunter's Hatchet animal-kill rework",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/166"
+    },
+    "68": {
+      "id": 5356299318,
+      "number": 167,
+      "title": "Build a viable prone weapon-animation prototype",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/167"
+    },
+    "69": {
+      "id": 5356299528,
+      "number": 168,
+      "title": "Rebuild owned-gear sparkle suppression safely",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/168"
+    },
+    "71": {
+      "id": 5356299936,
+      "number": 170,
+      "title": "Provide useful road bonuses or remove ineffective speed controls",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/170"
+    },
+    "73": {
+      "id": 5356300299,
+      "number": 172,
+      "title": "Verify delivery of safe campsite respawn placement",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/172"
+    },
+    "74": {
+      "id": 5356300510,
+      "number": 173,
+      "title": "Remove the recurring exhaustion-like screen haze",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/173"
+    },
+    "77": {
+      "id": 5356300897,
+      "number": 175,
+      "title": "Restore the selected mask to the item wheel",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/175"
+    },
+    "78": {
+      "id": 5356301152,
+      "number": 176,
+      "title": "Finish exhaustion handling without consuming cores",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/176"
+    },
+    "8": {
+      "id": 5356285491,
+      "number": 108,
+      "title": "Finish independent camera profiles and vehicle framing",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/108"
+    },
+    "80": {
+      "id": 5356301550,
+      "number": 178,
+      "title": "Prepare complete map-marker gate and location tests",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/178"
+    },
+    "82": {
+      "id": 5356301794,
+      "number": 179,
+      "title": "Deliver the repaired animated holster input",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/179"
+    },
+    "83": {
+      "id": 5356302029,
+      "number": 180,
+      "title": "Remove redundant cigarette-card glints",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/180"
+    },
+    "84": {
+      "id": 5356302274,
+      "number": 181,
+      "title": "Make binocular transition speed actually change",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/181"
+    },
+    "85": {
+      "id": 5356302479,
+      "number": 182,
+      "title": "Run the installed compendium-identification probe",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/182"
+    },
+    "86": {
+      "id": 5356302676,
+      "number": 183,
+      "title": "Use distinctive animal map markers",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/183"
+    },
+    "88": {
+      "id": 5356302883,
+      "number": 184,
+      "title": "Prepare the canteen test on the repaired crafting build",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/184"
+    },
+    "89": {
+      "id": 5356303079,
+      "number": 185,
+      "title": "Finish pump interactions, coverage and icon artwork",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/185"
+    },
+    "9": {
+      "id": 5356285756,
+      "number": 109,
+      "title": "Repair prone movement and turning",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/109"
+    },
+    "91": {
+      "id": 5356303595,
+      "number": 187,
+      "title": "Deliver the repaired horse drinking and eating behavior",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/187"
+    },
+    "92": {
+      "id": 5356303792,
+      "number": 188,
+      "title": "Split the runtime into modules while keeping one plugin",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/188"
+    },
+    "93": {
+      "id": 5356304202,
+      "number": 189,
+      "title": "Keep parallel development work conflict-safe",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/189"
+    },
+    "94": {
+      "id": 5356304474,
+      "number": 190,
+      "title": "Stop untagged hostiles appearing in tagged-only mode",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/190"
+    },
+    "96": {
+      "id": 5356305099,
+      "number": 192,
+      "title": "Deliver gradual decay of unfinished Recon progress",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/192"
+    },
+    "97": {
+      "id": 5356305471,
+      "number": 193,
+      "title": "Restore reliable wall grabbing and climbing",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/193"
+    },
+    "98": {
+      "id": 5356305701,
+      "number": 194,
+      "title": "Remove the old ammo counter from the weapon wheel",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/194"
+    },
+    "99": {
+      "id": 5356305892,
+      "number": 195,
+      "title": "Check recovering lost money from the last-worn hat",
+      "url": "https://github.com/Lexer-Lux/Lexeditor/issues/195"
+    }
+  },
+  "note": "Immutable documentation and evidence snapshot; source files unchanged. Review before public import.",
+  "repository": "Lexer-Lux/Lexers-Mod-For-RDR2",
+  "skipped": []
+}

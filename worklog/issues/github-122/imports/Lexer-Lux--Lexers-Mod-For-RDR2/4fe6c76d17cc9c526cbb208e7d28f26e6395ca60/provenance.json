@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356289083,
+    "number": 122,
+    "title": "Deliver the repaired custom crafting menu",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/122"
+  },
+  "sha256": "a121d24c2481098b43efc58501b9ec525a84ccea08f9bb8424f4d3268a772351",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-22.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

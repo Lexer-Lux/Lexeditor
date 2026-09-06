@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356294452,
+    "number": 144,
+    "title": "Prepare a valid vanilla casing-ejection comparison",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/144"
+  },
+  "sha256": "3e3d3b7b8482d80c0948cbd2c742e6d442354f25adb72f9e3b3494ad2e10f084",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-45.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

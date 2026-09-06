@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356303079,
+    "number": 185,
+    "title": "Finish pump interactions, coverage and icon artwork",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/185"
+  },
+  "sha256": "298df1fa40b25bd34c70c8310ab2b299ec5a9200ce84e9a271f096f351735fef",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-89.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

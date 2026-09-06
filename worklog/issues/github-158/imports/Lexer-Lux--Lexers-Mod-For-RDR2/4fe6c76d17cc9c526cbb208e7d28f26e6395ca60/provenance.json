@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356297414,
+    "number": 158,
+    "title": "Independent binocular zoom stages lack a working path",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/158"
+  },
+  "sha256": "03001ddd71e5b42568139d763b179293b6b210ae96e1e4400983beba7bf4b8d1",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-59.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

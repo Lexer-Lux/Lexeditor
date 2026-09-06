@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356316602,
+    "number": 239,
+    "title": "Choose the pocketwatch display font",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/239"
+  },
+  "sha256": "1e6d5561a10fd395dfa057009ff96ebe58bc6e4e84773479bebc030144168cdd",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-147.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

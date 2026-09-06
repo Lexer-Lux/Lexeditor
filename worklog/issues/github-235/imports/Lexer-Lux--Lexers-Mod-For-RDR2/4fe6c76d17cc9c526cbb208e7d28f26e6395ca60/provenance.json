@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356315706,
+    "number": 235,
+    "title": "Match the vanilla binocular mask",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/235"
+  },
+  "sha256": "9b957b58d9c95d6186854171ae0e95bc0f7da558d1b3b7f4ee081a3629b5bfae",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-143.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

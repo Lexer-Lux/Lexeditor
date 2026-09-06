@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356326488,
+    "number": 273,
+    "title": "Remove vignette restored by local visual effects",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/273"
+  },
+  "sha256": "6723fa279267ac1fd125b7be12d8e5391f122d8e3a9a14628d40914ba37bcffb",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-181.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

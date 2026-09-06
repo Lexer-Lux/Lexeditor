@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356300897,
+    "number": 175,
+    "title": "Restore the selected mask to the item wheel",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/175"
+  },
+  "sha256": "de4eca853d084e71e7208df3e38a723b6d5f1163fda69f03567866b4c270b4c8",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-77.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

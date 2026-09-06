@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356303792,
+    "number": 188,
+    "title": "Split the runtime into modules while keeping one plugin",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/188"
+  },
+  "sha256": "4f0bc0aa7f93e0da1ed53300cf93a28dc3dcaa9cc70ba5948da1d524bab0ec98",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-92.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

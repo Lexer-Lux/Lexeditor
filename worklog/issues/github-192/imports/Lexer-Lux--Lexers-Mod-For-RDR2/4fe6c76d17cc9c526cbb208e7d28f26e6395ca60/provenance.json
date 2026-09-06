@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356305099,
+    "number": 192,
+    "title": "Deliver gradual decay of unfinished Recon progress",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/192"
+  },
+  "sha256": "7a33af95297431f82e4dc48fbd508f061173af0a9900a18e42e3dfcc7dc38dd6",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-96.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

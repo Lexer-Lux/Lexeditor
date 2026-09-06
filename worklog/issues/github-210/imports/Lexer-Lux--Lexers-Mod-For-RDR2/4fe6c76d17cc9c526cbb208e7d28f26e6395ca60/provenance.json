@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356309932,
+    "number": 210,
+    "title": "Repair conditional newspaper entries in the map Index",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/210"
+  },
+  "sha256": "00d23f38da0135dc58d21bf9c36560b51d57888af2c67cd58272556c45b684af",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-115.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

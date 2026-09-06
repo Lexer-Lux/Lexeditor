@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356293234,
+    "number": 139,
+    "title": "Repair the empty pause menu before removing entries",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/139"
+  },
+  "sha256": "3710ed5adc857b0735079b3c380ccbe2be1c5451bb8cd292cc628f4d464449c0",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-39.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

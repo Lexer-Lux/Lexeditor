@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356284426,
+    "number": 103,
+    "title": "Check wagon horse stamina and its HUD icon",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/103"
+  },
+  "sha256": "7cc78854058cb547632c2a66b3ec6b5323852beb95fdcccd68153146b6a47a7a",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-3.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356284652,
+    "number": 104,
+    "title": "Restore animated binocular quick access",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/104"
+  },
+  "sha256": "cf4610ea68b8b67e0f956eefd679ea9ab9050047317e60f13c4c0b560effb55e",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-4.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356323028,
+    "number": 261,
+    "title": "Deliver the climbing surface and fall-loop repair",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/261"
+  },
+  "sha256": "776621a05bc87d4e90932e98cba035cc820038bdea134a1813b1bedb22d7b7b7",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-169.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

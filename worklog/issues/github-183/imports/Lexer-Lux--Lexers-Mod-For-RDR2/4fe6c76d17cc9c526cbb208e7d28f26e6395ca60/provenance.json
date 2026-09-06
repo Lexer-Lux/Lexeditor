@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356302676,
+    "number": 183,
+    "title": "Use distinctive animal map markers",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/183"
+  },
+  "sha256": "a8115a33991b08311436a07a7c8dd72e0bceb71e8d2d94dcea63dfb59710118f",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-86.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

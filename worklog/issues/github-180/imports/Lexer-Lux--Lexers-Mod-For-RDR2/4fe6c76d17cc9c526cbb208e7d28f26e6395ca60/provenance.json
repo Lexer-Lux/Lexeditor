@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356302029,
+    "number": 180,
+    "title": "Remove redundant cigarette-card glints",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/180"
+  },
+  "sha256": "46d67ca509f24bc7d477080dc7b7b12f7367e8e77003b803833a02092a45c2f6",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-83.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

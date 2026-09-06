@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356287172,
+    "number": 115,
+    "title": "Apply configurable wallet limits by Gambler rank",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/115"
+  },
+  "sha256": "0fa322789902100e267184bb65406e05425ee7ef887b36425a89656978ddf15c",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-15.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

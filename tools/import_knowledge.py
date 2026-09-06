@@ -47,8 +47,8 @@ def safe_path(name: str) -> PurePosixPath:
 
 def download(url: str, expected: str) -> bytes:
     parsed=urllib.parse.urlparse(url)
-    if parsed.scheme!='https' or not (parsed.hostname or '').endswith('.oaiusercontent.com'):
-        raise ValueError('Only the explicitly reviewed, file-scoped transfer URL is accepted')
+    if parsed.scheme!='https' or not ((parsed.hostname or '').endswith('.oaiusercontent.com') or re.fullmatch(r'productionresults[a-z0-9]+[.]blob[.]core[.]windows[.]net', parsed.hostname or '')):
+        raise ValueError('Only a reviewed file-scoped ChatGPT or GitHub Actions artifact transfer URL is accepted')
     # No GitHub credential is sent to the file service.
     with urllib.request.urlopen(url,timeout=60) as response:
         data=response.read(60_000_001)
@@ -132,7 +132,7 @@ def import_one(spec: dict, state: dict) -> dict:
             existing=handoff.read_text('utf-8') if handoff.exists() else f'# Issue {number}\n'
             if relative not in existing:put(handoff,(existing+line).encode())
             mapped+=1
-    put(base/'reconciliation.json',dump({'conflicts':conflicts,'source_skips':manifest.get('skipped',[]),'mapped_issue_worklogs':mapped}),True)
+    put(base/'reconciliation.json',dump({'conflicts':conflicts,'source_skips':manifest.get('skipped',[]),'mapped_issue_worklogs':mapped}))
     state.setdefault('sources',{})[repo]={'game':game,'commit':commit,'archive':base.as_posix(),'files':len(files),'codex_files':links,'skipped':manifest.get('skipped',[]),'conflicts':conflicts,'mapped_issue_worklogs':mapped}
     index=Path('codex')/game/'README.md'
     section='\n## Imported source knowledge\n\n'+f'Source: `{repo}` at `{commit}`. Original files and provenance: `/{base.as_posix()}/`. Source-local paths and historical decisions require reconciliation with current code; imported notes do not establish a newly delivered build.\n\n'+''.join(f'- [{p}]({p})\n' for p in sorted(links))
