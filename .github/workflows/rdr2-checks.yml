@@ -17,10 +17,13 @@ permissions:
 jobs:
   baseline:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+      - name: Check out public source without initializing optional gitlinks
+        run: |
+          git init .
+          git -c protocol.version=2 fetch --depth=1 "https://github.com/${GITHUB_REPOSITORY}.git" "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
