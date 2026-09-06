@@ -92,3 +92,7 @@ try {
     Remove-Item -LiteralPath $fixtureExe -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $fixtureConfig -Force -ErrorAction SilentlyContinue
 }
+# The final child process above is deliberately expected to fail. Windows
+# PowerShell otherwise propagates that stale native exit code after every
+# assertion has passed.
+exit 0
