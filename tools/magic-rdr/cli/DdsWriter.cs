@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using Magic_RDR.RPF.Texture;
+using Magic_RDR.RPF;
 
 internal static class DdsWriter
 {
@@ -14,7 +14,7 @@ internal static class DdsWriter
     private const uint CapsComplex = 0x00000008;
     private const uint CapsMipmap = 0x00400000;
 
-    internal static void Write(Stream output, TextureInfo texture, byte[] pixels)
+    internal static void Write(Stream output, Texture.TextureInfo texture, byte[] pixels)
     {
         if (output == null) throw new ArgumentNullException("output");
         if (texture == null) throw new ArgumentNullException("texture");
@@ -46,20 +46,20 @@ internal static class DdsWriter
         }
     }
 
-    private static void WritePixelFormat(BinaryWriter writer, TextureType format)
+    private static void WritePixelFormat(BinaryWriter writer, Texture.TextureType format)
     {
         switch (format)
         {
-            case TextureType.DXT1:
+            case Texture.TextureType.DXT1:
                 writer.Write(PixelFourCc); writer.Write(FourCc("DXT1"));
                 WriteMasks(writer, 0, 0, 0, 0, 0); return;
-            case TextureType.DXT3:
+            case Texture.TextureType.DXT3:
                 writer.Write(PixelFourCc); writer.Write(FourCc("DXT3"));
                 WriteMasks(writer, 0, 0, 0, 0, 0); return;
-            case TextureType.DXT5:
+            case Texture.TextureType.DXT5:
                 writer.Write(PixelFourCc); writer.Write(FourCc("DXT5"));
                 WriteMasks(writer, 0, 0, 0, 0, 0); return;
-            case TextureType.L8:
+            case Texture.TextureType.L8:
                 writer.Write(PixelLuminance); writer.Write(0U);
                 WriteMasks(writer, 8, 0x000000ff, 0, 0, 0, 0); return;
             default:
