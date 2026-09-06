@@ -173,7 +173,7 @@ Use the exact FFNx base and its pinned vcpkg submodule. Apply the complete
 Configure with `FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON`,
 `FFNX_LEXEDITOR_LIVE_CONDITIONS=ON`, and `FFNX_DEPLOY_TO_GAME_DIRS=OFF`,
 then run `cmake --build .build --parallel 4`.
-The full command sequence is in `.github/workflows/native-dependencies.yml`.
+The full command sequence is in `.github/workflows/ff8-stock-build.yml`.
 The complete patch restores test/verifier support omitted by the earlier
 preparation helper; every candidate patch section was compared unchanged.
 No production compilation inputs differ from the reviewed build artifact.
