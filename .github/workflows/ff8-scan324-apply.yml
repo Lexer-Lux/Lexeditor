@@ -21,7 +21,9 @@ jobs:
           git -C editor config user.name "Lexer-Lux"
           git -C editor config user.email "89482099+Lexer-Lux@users.noreply.github.com"
       - name: Install verifier dependencies
-        run: python -m pip install --disable-pip-version-check pillow
+        run: |
+          python -m pip install --disable-pip-version-check pillow playwright
+          python -m playwright install --with-deps chromium
       - name: Verify and apply exact staged patch
         working-directory: editor
         run: |
