@@ -2,7 +2,7 @@
 
 ## Sources and requirements
 
-[Verbatim request and discussion](github-78/conversation.md), [source records](github-78/sources/), and [implementation session](github-78/implementation-2026-09-06.md) remain preserved. Replace the live thumbnail with a lit, consistently auto-fitted still render of inventoryMesh on neutral ground; retain the separate interactive preview. Serve cached PNGs through `/api/item-icon`, generate in the background, isolate module identities and invalidate only affected mesh/material/texture dependencies. Low priority was not a technical blocker; the subsequent all-Warband request resumed implementation.
+[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/78), [implementation session](github-78/implementation-2026-09-06.md) remain preserved. Replace the live thumbnail with a lit, consistently auto-fitted still render of inventoryMesh on neutral ground; retain the separate interactive preview. Serve cached PNGs through `/api/item-icon`, generate in the background, isolate module identities and invalidate only affected mesh/material/texture dependencies. Low priority was not a technical blocker; the subsequent all-Warband request resumed implementation.
 
 ## Delivered implementation and evidence
 

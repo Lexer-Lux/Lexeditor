@@ -1,17 +1,17 @@
 # #164: Check Ancient Tomahawk returns on every impact
 
-[Full request and discussion archive](github-164/conversation.md)
+[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/164)
 
 ## Requirements and decisions
 
-Recover the complete scope from the linked verbatim sources before implementation or status changes. The short GitHub summary is not the full specification. Do not infer that missing chat text was never supplied.
+Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
 
 ## Current implementation and evidence
 
-Reconcile live code, PRs and existing topic/session worklogs. This archive import makes no build, deployment or gameplay-success claim.
+Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
 
 ## Next agent work
 
-Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.
+Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
 
 - [Original Lexer-Lux/Lexers-Mod-For-RDR2 #65 worklog](github-164/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-65.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.

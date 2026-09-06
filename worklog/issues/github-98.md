@@ -2,7 +2,7 @@
 
 ## Sources and requirements
 
-[Verbatim request and discussion](github-98/conversation.md), [source records](github-98/sources/), and [implementation session](github-98/implementation-2026-09-06.md) remain preserved. Distinguish source-only, read-only and structured editable interfaces; reserve implemented claims for the actual user-facing capability and link to that interface. Raw file I/O is not a structured editor. Use the same shared fitted paging controls as Blank, without clipped final rows or master-list scrolling. Audit the same claims/layouts across all plugins, not only Warband.
+[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/98), [implementation session](github-98/implementation-2026-09-06.md) remain preserved. Distinguish source-only, read-only and structured editable interfaces; reserve implemented claims for the actual user-facing capability and link to that interface. Raw file I/O is not a structured editor. Use the same shared fitted paging controls as Blank, without clipped final rows or master-list scrolling. Audit the same claims/layouts across all plugins, not only Warband.
 
 ## Delivered implementation and evidence
 

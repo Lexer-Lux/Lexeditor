@@ -7,6 +7,3 @@ Existing RDR cache verifier passes with synthetic valid cache, invalid XML/heade
 Branch: `fix/rdr1-editor-runtime-handoff`.
 
 
-## Preserved source records
-
-[Full request and discussion archive](github-55/conversation.md)

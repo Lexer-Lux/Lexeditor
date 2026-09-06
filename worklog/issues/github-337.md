@@ -7,6 +7,3 @@ Implemented strict numeric/boolean/index/schema validation, item bounds and obse
 Branch: `fix/rdr1-editor-runtime-handoff`.
 
 
-## Preserved source records
-
-[Full request and discussion archive](github-337/conversation.md)

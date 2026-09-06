@@ -7,6 +7,3 @@ Mission API rejects boolean/fractional/string IDs, noninteger schema versions, m
 Branch: `fix/rdr1-editor-runtime-handoff`.
 
 
-## Preserved source records
-
-[Full request and discussion archive](github-344/conversation.md)

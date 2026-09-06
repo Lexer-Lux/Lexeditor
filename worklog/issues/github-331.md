@@ -7,6 +7,3 @@ Workspace handoff remains incomplete. The setup screen now lists actual XML/WGD/
 Branch: `fix/rdr1-editor-runtime-handoff`.
 
 
-## Preserved source records
-
-[Full request and discussion archive](github-331/conversation.md)

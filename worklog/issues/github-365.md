@@ -3,9 +3,8 @@
 ## Request / acceptance
 
 Verbatim user wording: [source record](../requests/wse2-managed-20260906/source.md).
-Shared checker requirements: [#81 archive](github-81/conversation.md).
-The parallel [issue archive](github-365/conversation.md) and its exact sources are
-preserved from master 80e7106d07bc78635423f41b86536d480a1d3298. Its initial placeholder
+Shared checker requirements: [#81 live issue](https://github.com/Lexer-Lux/Lexeditor/issues/81).
+The live GitHub issue is the canonical request record. Its initial placeholder
 handoff is retained verbatim in [the session archive](github-365/sessions/archive-import-handoff-80e7106.md).
 Scope: bundle a fixed custom WSE2 package, no automatic upstream updates, register
 main-menu pinned/installed/latest reporting, and preserve Steam components and
@@ -79,6 +78,3 @@ award. Keep the issue open for the prepared installed acceptance; a failure retu
 to implementation with its runtime/module/log evidence.
 
 
-## Preserved source records
-
-[Full request and discussion archive](github-365/conversation.md)

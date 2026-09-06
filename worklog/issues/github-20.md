@@ -2,7 +2,7 @@
 
 ## Sources and requirements
 
-[Verbatim request and discussion](github-20/conversation.md), [source records](github-20/sources/), and [implementation session](github-20/implementation-2026-09-06.md) remain preserved. Required: expose the first inventory mesh; resolve installed/module BRF and DDS dependencies without copying the full library; fit the heading icon; retain rotate/zoom/close/reopen; use the installed bitmap atlas and metrics for supported prominent labels, with legible native editable controls. Later corrections require preserved DDS alpha, centered shortcut badges, readable manuals and explicit missing-texture errors. Item-property editing is not part of this preview request.
+[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/20), [implementation session](github-20/implementation-2026-09-06.md) remain preserved. Required: expose the first inventory mesh; resolve installed/module BRF and DDS dependencies without copying the full library; fit the heading icon; retain rotate/zoom/close/reopen; use the installed bitmap atlas and metrics for supported prominent labels, with legible native editable controls. Later corrections require preserved DDS alpha, centered shortcut badges, readable manuals and explicit missing-texture errors. Item-property editing is not part of this preview request.
 
 ## Delivered implementation and evidence
 

@@ -11,6 +11,3 @@ Fixtures are synthetic and Chromium runs on Linux CI. This does not verify the u
 PR: #362. Branch: `fix/rdr1-editor-runtime-handoff`.
 
 
-## Preserved source records
-
-[Full request and discussion archive](github-19/conversation.md)

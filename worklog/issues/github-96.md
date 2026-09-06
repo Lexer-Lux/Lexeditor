@@ -2,7 +2,7 @@
 
 ## Sources and requirements
 
-[Verbatim request and discussion](github-96/conversation.md), [source records](github-96/sources/), and [implementation session](github-96/implementation-2026-09-06.md) remain preserved. Replace the flat upgrade list with selectable faction/tree groupings, bottom-up nodes and visible upgrade connections. Preserve distinct branches and multiple trees per faction; selecting any node shows that troop's matching right-side details. The later all-Warband instruction resumed the previously deferred work.
+[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/96), [implementation session](github-96/implementation-2026-09-06.md) remain preserved. Replace the flat upgrade list with selectable faction/tree groupings, bottom-up nodes and visible upgrade connections. Preserve distinct branches and multiple trees per faction; selecting any node shows that troop's matching right-side details. The later all-Warband instruction resumed the previously deferred work.
 
 ## Delivered implementation and evidence
 

@@ -7,6 +7,3 @@ Read live crash comments. Tab access violation and failed centering/time-scale l
 Branch: `fix/rdr1-editor-runtime-handoff`.
 
 
-## Preserved source records
-
-[Full request and discussion archive](github-333/conversation.md)

@@ -2,7 +2,7 @@
 
 ## Sources and requirements
 
-[Verbatim request and discussion](github-97/conversation.md), [source records](github-97/sources/), [native/WSE2 implementation](github-97/implementation-2026-09-06.md) and [exit-tracking correction](github-97/exit-tracking-2026-09-06.md) preserve scope and evidence. Play must start the selected built installed module in a usable game window, not merely obtain a process handle. Failed launch restores Play with an error; Stop owns/tracks/closes the actual launched session, including child handoff. Both stock Warband and WSE2 are in scope.
+[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/97), [native/WSE2 implementation](github-97/implementation-2026-09-06.md) and [exit-tracking correction](github-97/exit-tracking-2026-09-06.md) preserve scope and evidence. Play must start the selected built installed module in a usable game window, not merely obtain a process handle. Failed launch restores Play with an error; Stop owns/tracks/closes the actual launched session, including child handoff. Both stock Warband and WSE2 are in scope.
 
 ## Delivered implementation and evidence
 

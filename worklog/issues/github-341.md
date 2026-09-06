@@ -7,6 +7,3 @@ Reproduced decimal PriceModifier failure: Python float64 input 1.1 differs from 
 Branch: `fix/rdr1-editor-runtime-handoff`.
 
 
-## Preserved source records
-
-[Full request and discussion archive](github-341/conversation.md)
