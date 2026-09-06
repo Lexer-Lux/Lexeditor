@@ -1,4 +1,4 @@
-name: One-shot FF9 battle layout repair
+name: One-shot FF9 branch repair
 on:
   push:
     branches: [codex/ff9-complete-20260906]
@@ -20,17 +20,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply pinned BTL_SCENE layout
-        run: python tools/ff9/repair_battle_layout.py
-      - name: Commit repaired production file
+      - name: Apply deterministic repairs
+        shell: bash
+        run: |
+          python tools/ff9/repair_battle_layout.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('games/ff9/editor.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('const layout=pagedListDetail{rows,', 'const layout=pagedListDetail({rows,')
+          s = s.replace('master:view=>tablePanel(data,key,view.rows,view.selected,view.select)),detail:row=>detail(data,row)})',
+                        'master:view=>tablePanel(data,key,view.rows,view.selected,view.select),detail:row=>detail(data,row)})')
+          s = s.replace('navigate(row.targeti}}', 'navigate(row.target)}}')
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit repaired production files
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'Lexeditor FF9 Agent'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add games/ff9/battle_scene.py
+          git add games/ff9/battle_scene.py games/ff9/editor.html
           if ! git diff --cached --quiet; then
-            git commit -m 'Fix FF9 battle scene serialized layout'
+            git commit -m 'Repair FF9 battle layout and editor controller'
             git push origin HEAD:codex/ff9-complete-20260906
           fi
       - name: Verify repaired FF9 branch
