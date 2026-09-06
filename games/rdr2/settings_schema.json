@@ -98,8 +98,6 @@
     "CombatRoll|DevelopmentTrace",
     "Prone|DevelopmentTrace",
     "Climbing|DevelopmentTrace",
-    "Binoculars|TransitionAnimRate",
-    "Binoculars|TransitionAnimLayer",
     "Binoculars|DrawMs",
     "Binoculars|StowMs",
     "Binoculars|ShowZoomReadout",
@@ -115,7 +113,7 @@
     "WantedSystem|TraceTailSeconds",
     "WantedSystem|VisualMarkerKey"
   ],
-  "_dev_note": "Runtime-gated by developmentModeActive(): HorseNeeds|DevelopmentTrace (modules/horse_needs.cpp:89), CollectibleProbe|Enabled (script.cpp:1188), Prone|DevelopmentTrace (script.cpp:1216), BottleProbe|Enabled (script.cpp:1284), Climbing|DevelopmentTrace (script.cpp:1361), SpentCasings|DebugMarker (script.cpp:1447), CombatRoll|DevelopmentTrace (script.cpp:1453), Campsites|Key and Campsites|RespawnWindowMs (the placement keypress sits inside #if GAMEPLAYTWEAKS_DEV_MODE and is ANDed with developmentModeActive() at modules/world_economy.cpp:1194-1196), CollectibleMap|DeveloperMoveMaxDistance (its only consumer is the dev-gated F2 relocate at script.cpp:2620-2626). Declared diagnostics or authoring controls: CoreClock|WriteMode, Binoculars|ShowZoomReadout and TransitionAnim*, CompendiumGlintProbe, AlwaysHolster|Log, SpentCasings|DebugMarker, RadialAmmoCounts|HeartbeatMs, the WantedSystem trace controls, and ReconTagging|PlantMarkerLiftCm plus ReconTagging|TagHeadGapMeters. The stamina mode readout is not a setting; it follows the shared runtime development latch directly.",
+  "_dev_note": "Runtime-gated by developmentModeActive(): HorseNeeds|DevelopmentTrace (modules/horse_needs.cpp:89), CollectibleProbe|Enabled (script.cpp:1188), Prone|DevelopmentTrace (script.cpp:1216), BottleProbe|Enabled (script.cpp:1284), Climbing|DevelopmentTrace (script.cpp:1361), SpentCasings|DebugMarker (script.cpp:1447), CombatRoll|DevelopmentTrace (script.cpp:1453), Campsites|Key and Campsites|RespawnWindowMs (the placement keypress sits inside #if GAMEPLAYTWEAKS_DEV_MODE and is ANDed with developmentModeActive() at modules/world_economy.cpp:1194-1196), CollectibleMap|DeveloperMoveMaxDistance (its only consumer is the dev-gated F2 relocate at script.cpp:2620-2626). Declared diagnostics or authoring controls: CoreClock|WriteMode, Binoculars|ShowZoomReadout, CompendiumGlintProbe, AlwaysHolster|Log, SpentCasings|DebugMarker, RadialAmmoCounts|HeartbeatMs, the WantedSystem trace controls, and ReconTagging|PlantMarkerLiftCm plus ReconTagging|TagHeadGapMeters. The stamina mode readout is not a setting; it follows the shared runtime development latch directly.",
 
   "const": {
     "CoreClock|WriteMode": "No action applies in the current build: the runtime never reads this key, so reloads and restarts do not change behavior.",
@@ -159,6 +157,8 @@
   "_const_note": "Audited against the actual readers: script.cpp loadConfig is called by the GameplayTweaks.ini file-mtime watcher; module-owned bounded re-read paths cover Minimap, HumanMovement, HorseNeeds, horse core clocks, CanteenDeveloper, PremiumCigaretteCards, ReconTagging presentation, RadialAmmoCounts and ProjectileVisibility; per-use reads cover HorsePersistence and CasingEjection. The entries above are the exceptions: startup-only readers, first-use caching, a data-build input, or keys with no current runtime reader.",
 
   "hidden": {
+    "Binoculars|TransitionAnimRate": "Retired ineffective animation-speed control (#181); an old INI key is not an active feature.",
+    "Binoculars|TransitionAnimLayer": "Retired failed animation-layer probe (#181).",
     "CollectibleMap|Enabled": "Redundant: the per-category switches already turn every marker off.",
     "AnimalDensity|Enabled": "Redundant: Multiplier=1 is the feature's vanilla/off value.",
     "LostMoney|MapIcon": "GitHub #17: no reason for the player to change the blip entry name.",
@@ -459,7 +459,6 @@
     "Binoculars|MaskScale": "Size of the clear binocular opening; larger means less screen covered. Range 0.60-1.60.",
     "Binoculars|MaskOpacity": "0 is clear, 1 is black.",
     "Binoculars|ShowZoomReadout": "Shows the real current rendered FOV and native zoom factor while looking, so zoom steps can be compared directly.",
-    "Binoculars|TransitionAnimLayer": "#84 probe. Rockstar scripts use SET_ANIM_RATE on both layer 0 and layer 2 and script evidence cannot say which layer owns the binocular satchel swap. Test 0 first, then 2.",
     "CompendiumGlintProbe|Enabled": "Temporary read-only reverse-engineering probe. Enable only while collecting the ordered comparison captures documented on GitHub issue #85.",
     "ReconTagging|StudyTimeMs": "How long a living ped must be held near screen centre through binoculars, or while aiming, before it is tagged.",
     "ReconTagging|MinProjectedExtent": "Minimum on-screen size of the target, measured as the square root of its projected bounding-box area from all eight model corners. It responds continuously to size, angle, distance, FOV and zoom without size buckets.",

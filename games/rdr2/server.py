@@ -51,7 +51,6 @@ try:
     from .custom_crafting import (
         Ingredient as _CraftIngredient,
         Recipe as _CraftRecipe,
-        catalog_item_keys as _craft_catalog_item_keys,
         load_recipes as _load_craft_recipes,
         save_recipes as _save_craft_recipes,
         validate_recipes as _validate_craft_recipes,
@@ -60,7 +59,6 @@ except ImportError:
     from custom_crafting import (
         Ingredient as _CraftIngredient,
         Recipe as _CraftRecipe,
-        catalog_item_keys as _craft_catalog_item_keys,
         load_recipes as _load_craft_recipes,
         save_recipes as _save_craft_recipes,
         validate_recipes as _validate_craft_recipes,
@@ -557,8 +555,8 @@ def get_custom_crafting():
     available = CUSTOM_CRAFTING_FILE.parent.exists() and VANILLA_CRAFTING_FILE.exists()
     vanilla = _load_craft_recipes(VANILLA_CRAFTING_FILE) if VANILLA_CRAFTING_FILE.exists() else []
     custom = _load_craft_recipes(CUSTOM_CRAFTING_FILE)
-    catalog = ds_dir("mine") / CATALOG_FILE
-    catalog_keys = _craft_catalog_item_keys(catalog) if catalog.exists() else None
+    catalog = data_file_path(CATALOG_FILE, "mine")
+    catalog_keys = set(_catalog_ids()) if catalog.exists() else None
     return {
         "available": available,
         "customFile": str(CUSTOM_CRAFTING_FILE),
@@ -573,8 +571,8 @@ def save_custom_crafting(rows):
     if not isinstance(rows, list):
         raise ValueError("recipes must be a list")
     recipes = [_craft_recipe_from_json(row) for row in rows]
-    catalog = ds_dir("mine") / CATALOG_FILE
-    catalog_keys = _craft_catalog_item_keys(catalog) if catalog.exists() else None
+    catalog = data_file_path(CATALOG_FILE, "mine")
+    catalog_keys = set(_catalog_ids()) if catalog.exists() else None
     errors = _validate_craft_recipes(recipes, catalog_keys)
     if errors:
         raise ValueError("\n".join(errors))
@@ -650,7 +648,7 @@ def _read_online_localization():
 def _catalog_localization_aliases(ds, source_values):
     """Map blank primary UI keys to the Online alternate text they reference."""
     try:
-        root = ET.parse(data_file_path(CATALOG_FILE, ds)).getroot()
+        root = load_file(CATALOG_FILE, ds)["root"]
     except (OSError, ET.ParseError):
         return {}
     aliases = {}
@@ -977,8 +975,10 @@ def catalog_preview_components(item_key, model, ds="mine"):
 
 
 def provenance_cache_key(ds):
-    paths = [ds_dir(ds) / name for name in [CATALOG_FILE, CHALLENGES_FILE, GOALS_FILE, MATRIX_FILE] + LOOT_FILES]
-    paths += [SCRIPT_PROVENANCE_FILE, LOOT_USAGE_FILE, COLLECTIBLE_LOCATIONS_FILE]
+    paths = [data_file_path(name, ds) for name in [CATALOG_FILE, CHALLENGES_FILE, GOALS_FILE, MATRIX_FILE] + LOOT_FILES]
+    paths += [SCRIPT_PROVENANCE_FILE, LOOT_USAGE_FILE, COLLECTIBLE_LOCATIONS_FILE,
+              VANILLA_LOCALIZATION_FILE, ONLINE_LOCALIZATION_FILE,
+              ds_dir(ds) / LOCALIZATION_FILE]
     paths += [p for d in SCRIPT_REFERENCE_DIRS if d.exists() for p in d.glob("*.c")]
     stats = []
     for path in paths:
@@ -1282,7 +1282,9 @@ def build_static_provenance(ds, items):
     for source in sources:
         for key, rows in source.items():
             out.setdefault(key, []).extend(rows)
-    _PROVENANCE_CACHE.clear()
+    for old_key in list(_PROVENANCE_CACHE):
+        if old_key[0] == ds:
+            del _PROVENANCE_CACHE[old_key]
     _PROVENANCE_CACHE[cache_key] = out
     return out
 
@@ -4254,11 +4256,41 @@ def _weapon_shell_status(root, vanilla_root):
     current = _weapon_shell_nodes(root)
     vanilla = _weapon_shell_nodes(vanilla_root)
     targets = {name: node for name, node in vanilla.items() if (node.text or "").strip()}
+    missing = sorted(set(targets) - set(current))
     blank = sum(1 for name in targets
                 if name in current and not (current[name].text or "").strip())
-    return {"available": bool(targets), "blank": blank, "total": len(targets),
-            "blanked": bool(targets) and blank == len(targets),
+    return {"available": bool(targets) and not missing, "blank": blank,
+            "total": len(targets), "missingRecords": missing,
+            "blanked": bool(targets) and not missing and blank == len(targets),
             "mixed": 0 < blank < len(targets)}
+
+
+def _weapon_shell_layers(ds="mine"):
+    """Pair every authored shell layer with its own vanilla reference (#144)."""
+    replacements = install_replacements() if ds == "mine" else {}
+    return [(replacements.get(game_path.casefold(), relative), relative)
+            for game_path, relative in WEAPON_STACK
+            if relative.casefold().endswith(".ymt")]
+
+
+def get_weapon_shell_vfx_status(ds="mine"):
+    files, missing_files = [], []
+    for current_file, reference_file in _weapon_shell_layers(ds):
+        current_path = _safe_mod_path(current_file) if ds == "mine" else ds_dir(ds) / current_file
+        if not current_path.is_file() or not (ds_dir("vanilla") / reference_file).is_file():
+            missing_files.append(current_file)
+            continue
+        status = _weapon_shell_status(load_file(current_file, ds)["root"],
+                                      load_file(reference_file, "vanilla")["root"])
+        files.append({"file": current_file, "referenceFile": reference_file, **status})
+    total = sum(row["total"] for row in files)
+    blank = sum(row["blank"] for row in files)
+    available = bool(total) and not missing_files and all(row["available"] for row in files)
+    return {"available": available, "blank": blank, "total": total,
+            "blanked": available and blank == total, "mixed": 0 < blank < total,
+            "files": files, "missingFiles": missing_files,
+            "missingRecords": [{"file": row["file"], "weapon": name}
+                               for row in files for name in row["missingRecords"]]}
 
 
 def _set_weapon_shell_vfx(root, vanilla_root, blanked):
@@ -4302,7 +4334,7 @@ def weapon_layer_files(ds="mine"):
     files = []
     for game_path, relative in install_replacements().items():
         normalized = relative.replace("\\", "/")
-        filename = Path(normalized).name.casefold()
+        filename = Path(game_path.replace("\\", "/")).name.casefold()
         if ("/data/ai/" not in game_path.replace("\\", "/")
                 or not filename.startswith("weapon") or not filename.endswith(".ymt")):
             continue
@@ -4324,19 +4356,12 @@ def get_weapons(ds="mine"):
         for section in records:
             for record in parsed[section]:
                 records[section][record["name"]] = record
-    root = load_file(WEAPONS_FILE, ds)["root"]
     result = {"available": True,
               "file": f"{len(layers)} active weapon file{'s' if len(layers) != 1 else ''}",
               "files": layers,
               "weapons": list(records["weapons"].values()),
               "ammo": list(records["ammo"].values())}
-    vanilla_path = ds_dir("vanilla") / WEAPONS_FILE
-    if vanilla_path.exists():
-        result["shellVfx"] = _weapon_shell_status(
-            root, load_file(WEAPONS_FILE, "vanilla")["root"])
-    else:
-        result["shellVfx"] = {"available": False, "blank": 0, "total": 0,
-                              "blanked": False, "mixed": False}
+    result["shellVfx"] = get_weapon_shell_vfx_status(ds)
     return result
 
 
@@ -4461,31 +4486,54 @@ def apply_weapon_edits(section, name, edits, source_file=WEAPONS_FILE):
 
 
 def apply_weapon_shell_vfx(blanked):
-    """Blank (or restore) each weapon's vanilla shell-ejection VFX.
-
-    2026-07-20: weapons data is a STACK (see WEAPON_STACK). Loading a lone
-    base weapons.ymt reverts Rockstar's own weapon patches - the repeater
-    double-fire / lantern / off-hand-holster regressions were the game's
-    pre-patch state, not file corruption. Serialization was never the
-    problem. Until every stack file has been extracted from the archives,
-    activating any weapons replacement is refused outright.
-    """
-    missing = missing_weapon_stack_files()
+    """Restore/blank all seven shell layers; never publish a partial reference."""
+    if not isinstance(blanked, bool):
+        raise ValueError("blanked must be a boolean")
+    replacements = install_replacements()
+    stack = [(game_path, replacements.get(game_path.casefold(), relative))
+             for game_path, relative in WEAPON_STACK]
+    missing = [relative for _, relative in stack if not _safe_mod_path(relative).is_file()]
     if missing:
-        raise ValueError(
-            "Weapons edits ship the complete %d-file stack; missing extracted "
-            "files: %s. The bundled extractor cannot convert Rockstar's PSIN "
-            "weapon YMT resources to editable XML."
-            % (len(WEAPON_STACK), ", ".join(missing)))
-    root = load_file(WEAPONS_FILE)["root"]
-    vanilla_root = load_file(WEAPONS_FILE, "vanilla")["root"]
-    changed = _set_weapon_shell_vfx(root, vanilla_root, blanked)
-    if changed:
-        save_file(WEAPONS_FILE)
-    # the whole stack must be mapped so patch layers stay applied
-    for game_path, local in WEAPON_STACK:
-        ensure_file_replacement(game_path, local)
-    return changed
+        raise ValueError("Weapons edits need the complete weapon stack; missing: " + ", ".join(missing))
+    status = get_weapon_shell_vfx_status()
+    if not status["available"]:
+        raise ValueError("Complete vanilla shell references are unavailable: " +
+                         json.dumps({key: status[key] for key in ("missingFiles", "missingRecords")}))
+
+    # Validate and stage every tree before touching any file. Keep the actual
+    # mapped filenames: install.xml may legitimately use a subdirectory.
+    prepared = []
+    for current_file, reference_file in _weapon_shell_layers():
+        entry = load_file(current_file)
+        root = copy.deepcopy(entry["root"])
+        vanilla_root = load_file(reference_file, "vanilla")["root"]
+        count = _set_weapon_shell_vfx(root, vanilla_root, blanked)
+        if count:
+            _assert_weapon_projectile_flags(root, vanilla_root)
+            prepared.append((current_file, entry, root, count))
+    install_path = ds_dir("mine") / "install.xml"
+    paths = [entry["path"] for _, entry, _, _ in prepared] + [install_path]
+    originals = {path: path.read_bytes() if path.exists() else None for path in paths}
+    original_roots = {name: entry["root"] for name, entry, _, _ in prepared}
+    try:
+        for name, entry, root, _ in prepared:
+            entry["root"] = root
+            save_file(name)
+        for game_path, relative in stack:
+            ensure_file_replacement(game_path, relative)
+    except Exception:
+        # A late filesystem/serialization failure must not leave some weapons
+        # restored and others blank. Existing one-time .bak files remain intact.
+        for path, data in originals.items():
+            if data is None:
+                path.unlink(missing_ok=True)
+            else:
+                path.write_bytes(data)
+        for name, entry, _, _ in prepared:
+            entry["root"] = original_roots[name]
+            entry["mtime"] = entry["path"].stat().st_mtime_ns
+        raise
+    return sum(count for _, _, _, count in prepared)
 
 
 def _ai_scalar_rows(root):
