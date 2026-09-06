@@ -3,12 +3,16 @@ on:
   push:
     branches: [fix/rdr1-runtime-repo-link]
     paths:
+      - 'games/rdr/archive_deployment.py'
       - 'tools/magic-rdr/cli/**'
+      - 'tools/verify_rdr_archive_deployment.py'
       - 'tools/verify_rdr_rpf_copy.ps1'
       - '.github/workflows/rdr1-rpf-copy.yml'
   pull_request:
     paths:
+      - 'games/rdr/archive_deployment.py'
       - 'tools/magic-rdr/cli/**'
+      - 'tools/verify_rdr_archive_deployment.py'
       - 'tools/verify_rdr_rpf_copy.ps1'
       - '.github/workflows/rdr1-rpf-copy.yml'
 permissions:
@@ -24,6 +28,9 @@ jobs:
           git init .
           git -c protocol.version=2 fetch --depth=1 "https://github.com/${env:GITHUB_REPOSITORY}.git" $env:GITHUB_SHA
           git checkout --detach FETCH_HEAD
+      - name: Verify update-folder transaction ownership
+        shell: pwsh
+        run: python tools/verify_rdr_archive_deployment.py
       - name: Build bridge and exercise a synthetic RPF6 replacement
         shell: powershell
         run: .\tools\verify_rdr_rpf_copy.ps1
