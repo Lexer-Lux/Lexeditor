@@ -61,7 +61,7 @@ internal static class DdsWriter
                 WriteMasks(writer, 0, 0, 0, 0, 0); return;
             case Texture.TextureType.L8:
                 writer.Write(PixelLuminance); writer.Write(0U);
-                WriteMasks(writer, 8, 0x000000ff, 0, 0, 0, 0); return;
+                WriteMasks(writer, 8, 0x000000ff, 0, 0, 0); return;
             default:
                 writer.Write(PixelRgb | PixelAlpha); writer.Write(0U);
                 WriteMasks(writer, 32, 0x00ff0000, 0x0000ff00, 0x000000ff, 0xff000000); return;
