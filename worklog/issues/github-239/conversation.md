@@ -42,6 +42,39 @@ Owning a pocketwatch shows game time. Offer Classic Serif, Watch Numerals, Catal
 
 [Original display reference](https://github.com/user-attachments/assets/1704ecf8-041c-4e42-b77c-4b2b9cb258eb).
 
+## issue 5356316602 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/239
+
+Created: 2026-08-10T10:53:50Z; updated: 2026-09-06T17:14:20Z
+
+Exact metadata: [source record](sources/issue-5356316602-0a86a57a98d2932b7199f8fd6de6a8fcfa9480e3c99db9534fd272868afc7716.json).
+
+Owning a pocketwatch shows game time. Offer Classic Serif, Watch Numerals, Catalogue Numerals, Redemption and RDR Lino, with Classic Serif as the chosen default.
+
+**Status: Built candidate ready for visual check.** Runtime PR #211 now implements all five validated built-in font faces, defaults to Classic Serif (`body1`), and hot-reloads the selection. Both release and development Windows builds passed.
+
+- [ ] Back up the current ASI/INI, then use the current candidate from runtime build run 34047794918.
+- [ ] In the settings menu, verify the five choices are Classic Serif, Watch Numerals, Catalogue Numerals, Redemption and RDR Lino.
+- [ ] Confirm Classic Serif is the default and changing the font updates the pocketwatch clock within about two seconds.
+- [ ] Report any missing/wrong face or visual regression; no rebuild is required for a font change.
+
+[Original display reference](https://github.com/user-attachments/assets/1704ecf8-041c-4e42-b77c-4b2b9cb258eb).
+
+## issue 5356316602 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/239
+
+Created: 2026-08-10T10:53:50Z; updated: 2026-09-06T17:14:20Z
+
+Exact metadata: [source record](sources/issue-5356316602-1f48bf06f0b91c922d86b5157ef124d03bba4c7e9a6905fe1296e7a1fbd98e63.json).
+
+Owning a pocketwatch shows game time. Offer Classic Serif, Watch Numerals, Catalogue Numerals, Redemption and RDR Lino, with Classic Serif as the chosen default.
+
+**Actionable — code only.** The font control exists in source and both settings menus, but is not built or installed.
+
+[Original display reference](https://github.com/user-attachments/assets/1704ecf8-041c-4e42-b77c-4b2b9cb258eb).
+
 ## comment 5550146435 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/239#issuecomment-5550146435
