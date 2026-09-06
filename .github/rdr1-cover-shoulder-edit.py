@@ -37,17 +37,8 @@ def _deployment_payload() -> dict:
     return payload
 '''
 s = s.replace(marker, insert + marker, 1)
-s = s.replace('''def dashboard_payload() -> dict:\n    manifest = {}\n''', '''def dashboard_payload() -> dict:\n    manifest = {}\n''', 1)
-# Add the generated workspace path and use the feature-aware deployment wrapper.
 s = s.replace('''            "Shop overrides": str(GRINGO_OVERRIDE_ROOT),\n            "Mission ASI override": str(mission_rewards.OVERRIDE_FILE),\n''', '''            "Shop overrides": str(GRINGO_OVERRIDE_ROOT),\n            "Generated camera fixes": str(CAMERA_GENERATED_ROOT),\n            "Mission ASI override": str(mission_rewards.OVERRIDE_FILE),\n''', 1)
 s = s.replace('''        "deployment": deployment_status(GAME_ROOT, ARCHIVE_SPECS),\n''', '''        "deployment": _deployment_payload(),\n''', 1)
 s = s.replace('''            elif path == "/api/deployment":\n                self.json_response(deployment_status(GAME_ROOT, ARCHIVE_SPECS))\n''', '''            elif path == "/api/deployment":\n                self.json_response(_deployment_payload())\n''', 1)
 s = s.replace('''            elif path == "/api/deployment/deploy":\n                self.json_response(deploy_archives(\n                    GAME_ROOT, paths.RPF6_TOOL, ARCHIVE_SPECS))\n''', '''            elif path == "/api/deployment/deploy":\n                cover_problem = _prepare_cover_shoulder_override()\n                if cover_problem:\n                    raise RuntimeError(cover_problem)\n                self.json_response(deploy_archives(\n                    GAME_ROOT, paths.RPF6_TOOL, ARCHIVE_SPECS))\n''', 1)
-p.write_text(s, encoding='utf-8')
-
-p = Path('.github/workflows/rdr1-checks.yml')
-s = p.read_text(encoding='utf-8')
-needle = '          python tools/verify_rdr_items_split_issue_19.py | tee artifacts/rdr1-split.log\n'
-assert needle in s
-s = s.replace(needle, needle + '          python tools/verify_rdr_cover_shoulder.py | tee artifacts/rdr1-cover-shoulder.log\n', 1)
 p.write_text(s, encoding='utf-8')
