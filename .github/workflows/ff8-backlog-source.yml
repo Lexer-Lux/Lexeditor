@@ -11,11 +11,15 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          submodules: false
+      - name: Fetch exact revision without unrelated submodule hooks
+        run: |
+          git config --global core.autocrlf false
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin "$GITHUB_SHA"
+          git -C editor checkout --detach FETCH_HEAD
       - name: Archive source, packaged driver and live issue evidence
+        working-directory: editor
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -24,7 +28,7 @@ jobs:
           import json, os, subprocess, urllib.request, zipfile
           names = subprocess.check_output(['git','ls-files','-z']).decode().split('\0')
           keep = {'.py','.cpp','.h','.hpp','.html','.js','.json','.md','.patch','.yml','.yaml','.txt','.css','.toml','.ini','.ps1','.bat','.csv','.glsl','.def'}
-          with zipfile.ZipFile('ff8-backlog-source.zip','w',zipfile.ZIP_DEFLATED) as archive:
+          with zipfile.ZipFile('../ff8-backlog-source.zip','w',zipfile.ZIP_DEFLATED) as archive:
               archive.writestr('SNAPSHOT_REVISION.txt', os.environ['GITHUB_SHA'])
               for name in names:
                   path=Path(name)
