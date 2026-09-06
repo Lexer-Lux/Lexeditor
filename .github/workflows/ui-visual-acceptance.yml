@@ -8,6 +8,8 @@ on:
 permissions:
   contents: read
 
+# Temporary acceptance harness for PR #385. Remove after the screenshots and
+# browser regressions are reviewed.
 jobs:
   browser:
     runs-on: ubuntu-latest
