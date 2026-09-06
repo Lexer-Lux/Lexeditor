@@ -1,0 +1,9 @@
+{
+  "source_url": "https://github.com/Lexer-Lux/Lexeditor/issues/20",
+  "author": "Lexer-Lux",
+  "issue_number": 20,
+  "captured_date": "2026-09-06",
+  "capture_note": "Verbatim live issue body retrieved before completion/delivery update; earlier bodies/comments are retained in the repository legacy issue-status archive.",
+  "body_sha256": "f5811d9699eac865ec504003441283f43b481a63a0cf3a5a8ca6281c27771b10",
+  "body": "**Actionable — delivery remains.** Preview cleanup, cached heading icons and font checks are in draft PR #361, not the normal installed editor. Real BRF/DDS appearance is unverified.\n\nThe full model must fit its heading icon; the larger preview must rotate, zoom and reopen without stale assets. Missing textures need an explicit error, not a gray substitute. Game-font text and manuals must remain readable. A ready-to-run test copy still needs preparing."
+}
