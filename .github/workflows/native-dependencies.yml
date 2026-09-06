@@ -1,0 +1,125 @@
+name: Build verified FF8 native driver
+on:
+  push:
+    branches: [fix/ff8-native-battle-batch]
+    paths: [.github/workflows/native-dependencies.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 120
+    env:
+      VCPKG_BINARY_SOURCES: 'clear;files,D:\vcpkg-cache,readwrite'
+      VCPKG_DISABLE_METRICS: '1'
+    steps:
+      - name: Fetch the exact canonical source revisions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          git config --global core.autocrlf false
+          git config --global core.longpaths true
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin $env:GITHUB_SHA
+          git -C editor checkout --detach FETCH_HEAD
+          git init ffnx
+          git -C ffnx remote add origin https://github.com/julianxhokaxhiu/FFNx.git
+          git -C ffnx fetch --depth=1 origin c056db2783f376a340fcefa6a48cc33618998876
+          git -C ffnx checkout --detach FETCH_HEAD
+          git -C ffnx submodule update --init
+          python editor/tools/prepare_ff8_native_build.py ffnx --patch-output candidate/ISSUE51_DERIVATIVE_SOURCE.patch
+      - name: Snapshot source only for reproducing checks
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          import subprocess,zipfile
+          root=Path('editor')
+          names=subprocess.check_output(['git','-C',str(root),'ls-files','-z']).decode().split('\0')
+          with zipfile.ZipFile('native-canonical-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in names:
+                  p=root/name
+                  if p.is_file() and (p.suffix.lower() in {'.py','.cpp','.h','.hpp','.html','.js','.json','.md','.patch','.yml','.txt'} or name=='.gitattributes'):
+                      z.write(p,name)
+          '@ | python -
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-canonical-source
+          path: native-canonical-source.zip
+          retention-days: 2
+      - uses: actions/cache/restore@v4
+        id: cache
+        with:
+          path: D:\vcpkg-cache
+          key: ffnx-c056db-x86-v145-release-only-v1-${{ github.run_id }}
+          restore-keys: ffnx-c056db-x86-v145-release-only-v1-
+      - name: Initialize pinned Release-only toolchain
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          New-Item -ItemType Directory -Force D:\vcpkg-cache,triplets | Out-Null
+          foreach ($arch in @('x86','x64')) {
+            @("set(VCPKG_TARGET_ARCHITECTURE $arch)", 'set(VCPKG_CRT_LINKAGE static)', 'set(VCPKG_LIBRARY_LINKAGE static)', 'set(VCPKG_BUILD_TYPE release)') | Set-Content -Encoding ascii "triplets/$arch-windows-static.cmake"
+          }
+          python -m pip install cmake==4.2.0 ninja pefile==2024.8.26
+          cmd /c ffnx\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+      - name: Configure the x86 derivative and dependencies
+        id: configure
+        timeout-minutes: 90
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -prerelease -latest -property InstallationPath
+          cmd /c "call `"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x86 && set > $env:RUNNER_TEMP\vcvars.txt"
+          Get-Content "$env:RUNNER_TEMP\vcvars.txt" | ForEach-Object { if ($_ -match '^(.*?)=(.*)$') { Set-Content "env:\$($matches[1])" $matches[2] } }
+          cmake -S ffnx -B ffnx/.build -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-D_DLL_VERSION=1.24.3-lexeditor51-runtime' "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/triplets" '-DVCPKG_TARGET_TRIPLET=x86-windows-static' '-DFFNX_DEPLOY_TO_GAME_DIRS=OFF' '-DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON' '-DFFNX_LEXEDITOR_LIVE_CONDITIONS=ON'
+          foreach ($gate in @('FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME','FFNX_LEXEDITOR_LIVE_CONDITIONS')) {
+            if (-not (Select-String -Path ffnx/.build/CMakeCache.txt -Pattern "^${gate}:BOOL=ON$" -Quiet)) { throw "Required compile gate disabled: $gate" }
+          }
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: D:\vcpkg-cache
+          key: ffnx-c056db-x86-v145-release-only-v1-${{ github.run_id }}
+      - name: Compile and validate linked FFNx driver
+        if: steps.configure.outcome == 'success'
+        timeout-minutes: 20
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -prerelease -latest -property InstallationPath
+          cmd /c "call `"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x86 && set > $env:RUNNER_TEMP\vcvars-build.txt"
+          Get-Content "$env:RUNNER_TEMP\vcvars-build.txt" | ForEach-Object { if ($_ -match '^(.*?)=(.*)$') { Set-Content "env:\$($matches[1])" $matches[2] } }
+          cmake --build ffnx/.build --config Release --parallel 4
+          Copy-Item ffnx/.build/bin/FFNx.dll candidate/AF3DN.P
+          Copy-Item ffnx/.build/bin/FFNx.pdb candidate/FFNx.pdb
+          Copy-Item ffnx/COPYING.TXT candidate/LICENSE
+          "Editor source: $env:GITHUB_SHA" | Set-Content candidate/BUILD.txt
+          'FFNx source: c056db2783f376a340fcefa6a48cc33618998876' | Add-Content candidate/BUILD.txt
+          'MSVC x86 Release; static Release-only dependencies; Shared Magic and Live Conditions compiled; game deployment disabled.' | Add-Content candidate/BUILD.txt
+          Get-FileHash candidate/* -Algorithm SHA256 | Format-Table -AutoSize | Out-String -Width 300 | Add-Content candidate/BUILD.txt
+          python editor/tools/verify_ff8_linked_runtime.py --verifier ffnx/tools/verify_issue51_runtime_artifact.py --driver candidate/AF3DN.P
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ff8-native-driver-candidate
+          path: candidate/
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: native-build-logs
+          include-hidden-files: true
+          path: |
+            ffnx/vcpkg/buildtrees/**/*.log
+            ffnx/.build/**/*.log
+            ffnx/.build/CMakeCache.txt
+            candidate/
+          retention-days: 2

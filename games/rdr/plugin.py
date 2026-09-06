@@ -129,7 +129,9 @@ def smoke() -> list[str]:
             b"TimeScale = 0.25 ; keep inline\r\nUnknownKey=keep\r\n"
         )
         loot_file = project / "LexerRDR.loot.json"
-        loot_document = json.loads((PROJECT_ROOT / "LexerRDR.loot.json").read_text(encoding="utf-8"))
+        # Synthetic contract values, never the user's private runtime configuration.
+        from tools.rdr_test_support import loot_document as synthetic_loot_document
+        loot_document = synthetic_loot_document()
         loot_file.write_text(json.dumps(loot_document, indent=2) + "\n", encoding="utf-8")
         with RdrSession({
             "LEXEDITOR_RDR_PROJECT": str(project),
@@ -201,8 +203,8 @@ def smoke() -> list[str]:
                     or reward_limits.get("honor", {}).get("minimum") != -999999):
                 raise RuntimeError("RDR Missions API exposed incorrect per-reward bounds")
             source_hashes = {
-                source["file"]: hashlib.sha256(Path(source["file"]).read_bytes()).hexdigest()
-                for source in missions.get("sources", [])
+                str(PLUGIN_ROOT / "missions.generated.json"):
+                hashlib.sha256((PLUGIN_ROOT / "missions.generated.json").read_bytes()).hexdigest()
             }
             mission_result = request_json(session.url + "api/missions/save", {
                 "schemaVersion": 1,
@@ -221,7 +223,7 @@ def smoke() -> list[str]:
                 raise RuntimeError("RDR Missions override did not read back")
             if any(hashlib.sha256(Path(source).read_bytes()).hexdigest() != digest
                    for source, digest in source_hashes.items()):
-                raise RuntimeError("RDR Missions save changed a read-only decompiled source")
+                raise RuntimeError("RDR Missions save changed the read-only generated reward table")
             dashboard = request_json(session.url + "api/dashboard")
             if dashboard.get("redHook", {}).get("installed"):
                 raise RuntimeError("RDR plugin did not report the missing RedHook prerequisite")

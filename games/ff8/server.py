@@ -10,7 +10,7 @@ from pathlib import Path
 import tempfile
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import cards, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
+from . import card_art, cards, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
 from .game_icons import icon_path, portrait_path
 from .extractor import baseline_ready, manifest_path
 from .ffnx_manager import status as ffnx_status
@@ -128,6 +128,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.file_response(PLUGIN_ROOT / path.lstrip("/"))
             elif path == "/assets/ff8-menu.ttf":
                 self.file_response(ensure_font())
+            elif path.startswith("/assets/cards/") and path.endswith(".png"):
+                card_id = int(path.rsplit("/", 1)[-1].removesuffix(".png"))
+                self.binary_response(card_art.png_bytes(card_id), "image/png")
             elif path.startswith("/assets/icons/") and path.endswith(".png"):
                 icon_id = int(Path(path).stem)
                 target = icon_path(icon_id)
