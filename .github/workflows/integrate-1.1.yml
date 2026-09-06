@@ -35,12 +35,12 @@ jobs:
         run: |
           node --check ui/framework.js
           node tests/ff9_editor.test.cjs
-      - name: Run FF8 integration verifiers
+      - name: Run portable FF8 integration verifiers
         run: |
           python tools/verify_ff8_shared_party.py
           python tools/verify_ff8_no_magic_consumption.py
           python tools/verify_ff8_mug_drops.py
           python tools/verify_ff8_stock_tweak_settings.py
-          python tools/verify_ff8_max_spell_menu.py
           python tools/verify_ff8_gameplay_quarantine_issue_21.py
-# final 1.1 verification dependencies
+          echo 'Max Spell native execution verifier intentionally omitted here: it requires the private supported FF8 executable by SHA-256; its branch-side evidence remains preserved in the FF8 worklog.'
+# final 1.1 portable verification
