@@ -1805,7 +1805,7 @@ async function saveAllChanges() {
     if(state.shopDirty.size)await saveShops();
     if(Object.keys(state.shopBuyerDirty).length)await saveShopBuyerOverrides();
     const catalogStores=["priceEdits","buyabilityEdits","sellabilityEdits","yieldEdits","bundleEdits",
-      "itemEffectEdits","itemTagEdits","quickSelectEdits","descriptionKeyEdits","carryEdits","craftEdits","effectEdits","localizationEdits"];
+      "itemEffectEdits","itemTagEdits","quickSelectEdits","descriptionKeyEdits","carryEdits","craftEdits","effectEdits","localizationEdits","alcoholEdits"];
     if(catalogStores.some(key=>Object.keys(state[key]).length))await saveCatalog();
     await saveLoot();   // saves every dirty loot file itself
     state.lootFile=originalLootFile;
