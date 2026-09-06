@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import mimetypes
+import math
 import os
 import re
 import struct
@@ -395,6 +396,29 @@ def items_payload(vanilla_only: bool = False) -> dict:
     }
 
 
+def _edit_list(edits: list[dict]) -> list[dict]:
+    if not isinstance(edits, list) or any(not isinstance(edit, dict) for edit in edits):
+        raise ValueError("Edits must be a list of objects")
+    return edits
+
+
+def _number(value, label: str, minimum=None, maximum=None, *, integer=False) -> float:
+    """Validate before converting: bool and empty text are not numeric edits."""
+    if isinstance(value, bool) or not isinstance(value, (int, float, str)):
+        raise ValueError(f"{label} must be a number")
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError(f"{label} must be a number") from error
+    if not math.isfinite(number):
+        raise ValueError(f"{label} must be a finite number")
+    if integer and not number.is_integer():
+        raise ValueError(f"{label} must be an integer")
+    if minimum is not None and number < minimum or maximum is not None and number > maximum:
+        raise ValueError(f"{label} must be between {minimum} and {maximum}")
+    return number
+
+
 def _validate_scalar(original: str, kind: str, value: str, field: str) -> str:
     if "\x00" in value or len(value) > 4096:
         raise ValueError(f"{field} contains an invalid value")
@@ -404,18 +428,14 @@ def _validate_scalar(original: str, kind: str, value: str, field: str) -> str:
             raise ValueError(f"{field} must be true or false")
         return lowered
     if kind == "number":
-        try:
-            number = float(value)
-        except ValueError as error:
-            raise ValueError(f"{field} must be a number") from error
-        if number != number or number in {float("inf"), float("-inf")}:
-            raise ValueError(f"{field} must be a finite number")
-        if re.fullmatch(r"[+-]?\d+", original.strip()) and not re.fullmatch(r"[+-]?\d+", value.strip()):
-            raise ValueError(f"{field} must be an integer")
+        limits = ITEM_NUMBER_CONTROLS.get(field, {})
+        integer = limits.get("step") == 1 if limits else bool(re.fullmatch(r"[+-]?\d+", original.strip()))
+        _number(value, field, limits.get("minimum"), limits.get("maximum"), integer=integer)
     return value
 
 
 def save_item(source_id: str, index: int, expected_name: str, edits: list[dict]) -> dict:
+    _integer(index, "Inventory item index", 0, 2147483647)
     _source, vanilla, project, active = _inventory_paths(source_id)
     tree = _xml_tree(active)
     records = tree.findall("./Types/Item")
@@ -426,7 +446,7 @@ def save_item(source_id: str, index: int, expected_name: str, edits: list[dict])
         raise ValueError("The inventory source changed; reload the item before saving")
     direct = {child.tag: child for child in list(item) if isinstance(child.tag, str)}
     wanted = {}
-    for edit in edits:
+    for edit in _edit_list(edits):
         field = str(edit.get("field", ""))
         if not field or field in wanted:
             raise ValueError("Each item field must be named once")
@@ -435,6 +455,13 @@ def save_item(source_id: str, index: int, expected_name: str, edits: list[dict])
         if scalar is None:
             raise ValueError(f"Unsupported or missing item field: {field}")
         value = _validate_scalar(scalar["value"], scalar["kind"], str(edit.get("value", "")), field)
+        if field in ITEM_SELECT_FIELDS:
+            # Observed enum values from the prepared source and current project.
+            options = {candidate["value"] for dataset in (True, False)
+                       for row in items_payload(dataset)["rows"] for candidate in row["fields"]
+                       if candidate["field"] == field}
+            if value not in options:
+                raise ValueError(f"Unsupported {field} choice: {value}")
         if field == "Name" and not value.strip():
             raise ValueError("Name cannot be empty")
         wanted[field] = (node, scalar, value)
@@ -641,6 +668,7 @@ def shops_payload(vanilla_only: bool = False) -> dict:
 
 def save_shop(source: str, root_hash: str, item_index: int,
               expected_name: str, edits: list[dict]) -> dict:
+    _integer(item_index, "Shop item index", 0, 2147483647)
     relative, raw, packed, project = _shop_paths(source)
     data = bytearray(_active_shop_bytes(raw, project))
     records = _shop_records(data, relative, project.is_file())
@@ -655,29 +683,21 @@ def save_shop(source: str, root_hash: str, item_index: int,
         "TotalAvailableQuantity": ("totalAvailableQuantity", "int"),
     }
     wanted = {}
-    for edit in edits:
+    for edit in _edit_list(edits):
         field = str(edit.get("field", ""))
         if field not in allowed or field in wanted:
             raise ValueError("Each supported shop field must be named once")
         key, kind = allowed[field]
         value = edit.get("value")
+        if field not in record["_offsets"]:
+            raise ValueError(f"This shop record has no editable {field}")
         if kind == "float":
-            try:
-                parsed = float(value)
-            except (TypeError, ValueError) as error:
-                raise ValueError("PriceModifier must be a number") from error
-            if not 0 <= parsed <= 1000 or parsed != parsed:
-                raise ValueError("PriceModifier must be between 0 and 1000")
+            parsed = _number(value, "PriceModifier", 0, 1000)
+            # WGD stores IEEE float32. Compare the encoded value, not float64 input.
+            parsed = struct.unpack("<f", struct.pack("<f", parsed))[0]
         else:
-            if isinstance(value, bool):
-                raise ValueError(f"{field} must be an integer")
-            try:
-                parsed = int(str(value), 10)
-            except (TypeError, ValueError) as error:
-                raise ValueError(f"{field} must be an integer") from error
             minimum = 0 if field == "QuantityPerPurchase" else -1
-            if parsed < minimum or parsed > 2147483647:
-                raise ValueError(f"{field} is out of range")
+            parsed = int(_number(value, field, minimum, 2147483647, integer=True))
         wanted[field] = (key, kind, parsed)
     changed = 0
     for field, (key, kind, value) in wanted.items():
@@ -692,7 +712,6 @@ def save_shop(source: str, root_hash: str, item_index: int,
     if not changed:
         return {"saved": 0, "projectPath": str(project), "backup": ""}
 
-    backup = backup_file(project)
     with tempfile.TemporaryDirectory(prefix="lexeditor-rdr-shop-save-") as temp_name:
         temporary_root = Path(temp_name)
         unpacked = temporary_root / "shop.wgd.raw"
@@ -702,16 +721,14 @@ def save_shop(source: str, root_hash: str, item_index: int,
         _run_resource_tool([
             "resource-pack", str(template), str(unpacked), str(output),
         ])
-        atomic_bytes(project, output.read_bytes())
-    verified_data = _active_shop_bytes(raw, project)
-    verified = next((row for row in _shop_records(verified_data, relative, True)
-                     if row["rootHash"] == root_hash.upper()
-                     and row["itemIndex"] == item_index), None)
-    if verified is None:
-        raise RuntimeError("Saved shop item did not read back")
-    for _field, (key, _kind, value) in wanted.items():
-        if verified[key] != value:
-            raise RuntimeError(f"Saved shop field did not read back: {key}")
+        # Never publish an unverified repack. Unpack the temporary candidate and
+        # compare every byte, including fields/components that were not edited.
+        verified_data = _active_shop_bytes(raw, output)
+        if verified_data != bytes(data):
+            raise RuntimeError("Packed shop verification failed; project override was not changed")
+        payload = output.read_bytes()
+    backup = backup_file(project)
+    atomic_bytes(project, payload)
     return {
         "saved": changed,
         "source": relative.as_posix(),
@@ -822,7 +839,7 @@ def save_settings(edits: list[dict]) -> dict:
     lines = text.splitlines(keepends=True)
     _sections, final = _parse_ini(text)
     wanted = {}
-    for edit in edits:
+    for edit in _edit_list(edits):
         section = str(edit.get("section", ""))
         key = str(edit.get("key", ""))
         value = str(edit.get("value", ""))
@@ -836,6 +853,16 @@ def save_settings(edits: list[dict]) -> dict:
     if missing:
         raise ValueError("Unknown INI setting(s): " + ", ".join(
             f"{section}/{key}" for section, key in sorted(missing)))
+    for identity, value in wanted.items():
+        original = final[identity]["value"]
+        label = "/".join(identity)
+        if original.casefold() in {"true", "false"}:
+            value = _validate_scalar(original, "bool", value, label)
+        elif identity in SETTING_CONTROLS:
+            limits = SETTING_CONTROLS[identity]
+            _number(value, label, limits["minimum"], limits["maximum"],
+                    integer=limits.get("step") == 1)
+        wanted[identity] = value.strip()
     changed = 0
     for identity, value in wanted.items():
         record = final[identity]
@@ -847,7 +874,11 @@ def save_settings(edits: list[dict]) -> dict:
         changed += 1
     if not changed:
         return {"saved": 0, "file": str(SETTINGS_FILE), "backup": ""}
-    payload = "".join(lines).encode(encoding)
+    candidate = "".join(lines)
+    _sections, parsed = _parse_ini(candidate)
+    if any(parsed.get(identity, {}).get("value") != value for identity, value in wanted.items()):
+        raise ValueError("INI edit changes the setting structure; no settings were written")
+    payload = candidate.encode(encoding)
     backup = backup_file(SETTINGS_FILE)
     atomic_bytes(SETTINGS_FILE, payload)
     reread = settings_payload()
@@ -871,7 +902,7 @@ def _integer(value, label: str, minimum: int, maximum: int) -> int:
 
 
 def validate_loot_document(document: dict) -> None:
-    if not isinstance(document, dict) or document.get("schemaVersion") != 1:
+    if not isinstance(document, dict) or type(document.get("schemaVersion")) is not int or document["schemaVersion"] != 1:
         raise ValueError("Unsupported LexerRDR loot schema; expected schemaVersion 1")
     if document.get("contract") != "LexerRDR.loot":
         raise ValueError("Unsupported LexerRDR loot contract")
@@ -901,12 +932,9 @@ def validate_loot_document(document: dict) -> None:
     value_range = base.get("range")
     if not isinstance(value_range, dict):
         raise ValueError("Missing money.baseRoll.range object")
-    try:
-        minimum = float(value_range.get("minimum"))
-        maximum = float(value_range.get("maximum"))
-    except (TypeError, ValueError) as error:
-        raise ValueError("Money range values must be numbers") from error
-    if not (0 <= minimum <= maximum <= 100000):
+    minimum = _number(value_range.get("minimum"), "Money minimum", 0, 100000)
+    maximum = _number(value_range.get("maximum"), "Money maximum", 0, 100000)
+    if minimum > maximum:
         raise ValueError("Money range must be ordered and non-negative")
     paths = money.get("decoratorPaths")
     expected_paths = {
@@ -914,8 +942,10 @@ def validate_loot_document(document: dict) -> None:
         ("iAdditionalMoney", "base-plus-decorator"),
         ("nOnlyMoney", "decorator-only"),
     }
-    actual_paths = {(path.get("decorator"), path.get("operation"))
-                    for path in paths if isinstance(path, dict)} if isinstance(paths, list) else set()
+    if (not isinstance(paths, list) or len(paths) != len(expected_paths)
+            or any(not isinstance(path, dict) for path in paths)):
+        raise ValueError("Money decorator paths must contain exactly the three proven paths")
+    actual_paths = {(path.get("decorator"), path.get("operation")) for path in paths}
     if actual_paths != expected_paths:
         raise ValueError("Money decorator paths do not match the proven WSC contract")
 
@@ -940,7 +970,7 @@ def loot_payload() -> dict:
 
 def save_loot(document: dict) -> dict:
     validate_loot_document(document)
-    payload = (json.dumps(document, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+    payload = (json.dumps(document, indent=2, ensure_ascii=False, allow_nan=False) + "\n").encode("utf-8")
     backup = backup_file(LOOT_FILE)
     atomic_bytes(LOOT_FILE, payload)
     reread = json.loads(LOOT_FILE.read_text(encoding="utf-8"))
@@ -1192,6 +1222,8 @@ def dashboard_payload() -> dict:
             "Project": str(PROJECT),
             "Editable overrides": str(OVERRIDE_ROOT),
             "Inventory overrides": str(CONTENT_OVERRIDE_ROOT),
+            "Shop overrides": str(GRINGO_OVERRIDE_ROOT),
+            "Mission ASI override": str(mission_rewards.OVERRIDE_FILE),
             "Settings": str(SETTINGS_FILE),
             "Loot ASI override": str(LOOT_FILE),
             "Installed game": str(GAME_ROOT),
@@ -1240,7 +1272,13 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", "0"))
         if length < 0 or length > MAX_TEXT_BYTES * 2:
             raise ValueError("Request body is too large")
-        return json.loads(self.rfile.read(length).decode("utf-8")) if length else {}
+        def reject_constant(value):
+            raise ValueError(f"Invalid JSON number: {value}")
+        document = json.loads(self.rfile.read(length).decode("utf-8"),
+                              parse_constant=reject_constant) if length else {}
+        if not isinstance(document, dict):
+            raise ValueError("Request body must be a JSON object")
+        return document
 
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -1317,7 +1355,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/item/save":
                 self.json_response(save_item(
                     str(body.get("source", "")),
-                    int(body.get("index", -1)),
+                    body.get("index", -1),
                     str(body.get("expectedName", "")),
                     body.get("edits", []),
                 ))
@@ -1325,7 +1363,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(save_shop(
                     str(body.get("source", "")),
                     str(body.get("rootHash", "")),
-                    int(body.get("itemIndex", -1)),
+                    body.get("itemIndex", -1),
                     str(body.get("expectedName", "")),
                     body.get("edits", []),
                 ))
