@@ -39,3 +39,7 @@ The reported all-ones UI state was not reproduced against this source revision.
 These repairs prevent confirmed save/data-loss defects; they are not proof the
 original screenshot's root cause is fixed. Compare the delivered editor's
 rendered rows with the selected runtime CSV before closing #131.
+
+## 2026-09-06 — Header Save follow-through
+
+[Reproduced missing alcohol-only Save dispatch, repair and executed UI checks](github-131/sessions/20260906-header-save.md). The earlier handler-level tests did not cover this global button path; the new checks do. Original real-project display acceptance remains open.
