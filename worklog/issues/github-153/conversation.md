@@ -36,6 +36,18 @@ After the final swig and stowing animation, grant one empty bottle and show its 
 
 **Status: Source cleanup is complete, but not built or installed.** The obsolete Force Acquisition Feed setting was removed from all settings surfaces. Deliver that candidate before another bottle test.
 
+## issue 5356296441 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/153
+
+Created: 2026-08-06T02:37:47Z; updated: 2026-09-06T17:14:33Z
+
+Exact metadata: [source record](sources/issue-5356296441-6635ce3d08fc8914e7375bc902bc01f08e578aa0efdd6d4ebcbb4c71c5ccddae.json).
+
+After the final swig and stowing animation, grant one empty bottle and show its real acquisition notification.
+
+**Status: Source cleanup is complete, but not built or installed.** The obsolete Force Acquisition Feed setting was removed from all settings surfaces. Deliver that candidate before another bottle test.
+
 ## comment 5550124046 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/153#issuecomment-5550124046
@@ -77,3 +89,13 @@ Created: 2026-08-20T14:26:22Z; updated: 2026-08-20T14:26:22Z
 Exact metadata: [source record](sources/comment-5550124086-c533e4c9f9a9dadf74547eac1ab8150be3ed6413248dd35bf33f25cfef1598f2.json).
 
 Shared settings cleanup is now complete. Force Acquisition Feed is gone from the main INI, LEXEDITOR schema, generated in-game menu, and Lexer-Lux/Lexeditor#117 lifecycle contract. The full Lexer-Lux/Lexeditor#153 contract now passes and rejects the fake notification path while preserving the real final-swig, stow, inventory-count readback, and Rockstar acquisition feed. This is not built or installed, so Lexer-Lux/Lexeditor#153 remains actionable.
+
+## comment 5560838561 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/153#issuecomment-5560838561
+
+Created: 2026-09-06T17:14:33Z; updated: 2026-09-06T17:14:33Z
+
+Exact metadata: [source record](sources/comment-5560838561-8746ef9a254889f82be61364df678dbdf0fc87555d5e031cc97753b6801838af.json).
+
+Found the issue status was stale: the synthetic ForceAcquisitionFeed fallback still existed in current runtime source/settings. It is now fully removed—implementation, config reader/state, entire INI block, schema metadata and generated menu row. Settings lifecycle/menu checks caught and prevented two stale-cleanup mistakes before the final commit. Current release/development builds pass in runtime PR #211. Broader collectible-bottle/real-feed gameplay behavior remains unconfirmed, so this issue stays actionable.
