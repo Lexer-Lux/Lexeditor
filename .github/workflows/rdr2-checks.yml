@@ -1,10 +1,10 @@
 name: RDR2 checks
 on:
   push:
-    branches: [master]
-    paths: ['games/rdr2/**', 'tests/test_rdr2*', '.github/workflows/rdr2-checks.yml']
+    branches: [master, fix/rdr2-issue-batch]
+    paths: ['games/rdr2/**', 'tests/test_rdr2*', 'tests/rdr2_browser_check.py', '.github/workflows/rdr2-checks.yml']
   pull_request:
-    paths: ['games/rdr2/**', 'tests/test_rdr2*', '.github/workflows/rdr2-checks.yml']
+    paths: ['games/rdr2/**', 'tests/test_rdr2*', 'tests/rdr2_browser_check.py', '.github/workflows/rdr2-checks.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,7 +26,21 @@ jobs:
           node-version: '22'
       - name: Verify casing transactions, cache invalidation, and alcohol saves
         run: python tests/test_rdr2_issue_repairs.py
-      - name: Execute production boot and dataset-switch regressions
-        run: node tests/test_rdr2_boot.js
+      - name: Execute production boot, dataset-switch and global-save regressions
+        run: |
+          node tests/test_rdr2_boot.js
+          node tests/test_rdr2_global_save.js
       - name: Check RDR2 Python syntax
         run: python -m compileall -q games/rdr2
+      - name: Install the headless browser test dependency
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Check rendered controls with offline synthetic API responses
+        run: python tests/rdr2_browser_check.py --screenshots artifacts/rdr2-browser
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: rdr2-browser-${{ github.sha }}
+          path: artifacts/rdr2-browser/
+          retention-days: 7
