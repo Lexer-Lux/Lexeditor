@@ -1,0 +1,61 @@
+name: UI browser diagnostic
+
+on:
+  push:
+    branches: [fix/ui-standardization-20260906]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ui-standardization-20260906
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Inspect injected asset sentinels
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for p in ['ui/framework.js','ui/framework.css','games/warband/editor.html','games/ff7/editor.html']:
+              t=Path(p).read_text(encoding='utf-8')
+              print(p, 'bytes=',len(t),'script-close=',t.lower().count('</script'),'style-close=',t.lower().count('</style'))
+              for needle in ['</script','<!--','-->']:
+                  hits=[i for i in range(len(t)) if t.lower().startswith(needle.lower(),i)]
+                  if hits: print(' ',needle,hits[:20])
+          PY
+          node --check ui/framework.js
+      - name: Install browser
+        run: |
+          python -m pip install playwright Pillow
+          python -m playwright install --with-deps chromium
+      - name: Capture Warband page errors
+        run: |
+          python - <<'PY'
+          import json, base64, io, sys
+          from pathlib import Path
+          from PIL import Image
+          from playwright.sync_api import sync_playwright
+          ROOT=Path('.')
+          html=(ROOT/'games/warband/editor.html').read_text()
+          html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
+          stub='window.fetch=async()=>new Response(JSON.stringify({}));'
+          html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text()+'</script>')
+          html=html.replace('<script src="/warband/troop_trees.js"></script>','<script>'+(ROOT/'games/warband/troop_trees.js').read_text()+'</script>')
+          with sync_playwright() as p:
+              b=p.chromium.launch(headless=True)
+              page=b.new_page()
+              errors=[]
+              page.on('pageerror',lambda e: (errors.append(str(e)),print('PAGEERROR:',e)))
+              page.on('console',lambda m: print('CONSOLE',m.type,m.text) if m.type=='error' else None)
+              page.set_content(html,wait_until='domcontentloaded')
+              print('state=',page.evaluate('typeof state'))
+              print('LexeditorUI=',page.evaluate('typeof LexeditorUI'))
+              print('body=',page.locator('body').inner_text()[:1000])
+              print('errors=',json.dumps(errors))
+              b.close()
+          PY
