@@ -25,6 +25,9 @@ ROWS[0]['filename']='same-file.dat';ROWS[4]['filename']='same-file.dat'  # IDs m
 def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
     html=(ROOT/'games'/source_game/'editor.html').read_text()
+    # Synthetic set_content() documents otherwise use about:blank, which cannot
+    # resolve the shared framework's optional relative assets.
+    html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
     stub='''const replace=history.replaceState.bind(history);history.replaceState=(s,u)=>replace(s,u);
     window.fetch=()=>new Promise(()=>{});
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
