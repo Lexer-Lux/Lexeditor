@@ -1,5 +1,9 @@
 from pathlib import Path
+import sys
 import tempfile
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from games.rdr.archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives, sha256_file,
