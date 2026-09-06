@@ -50,7 +50,9 @@ jobs:
             'tools/verify_ff8_enemy_compact_ui.py','tools/verify_ui_polish_batch.py',
             'ui/framework.css','ui/framework.js',
           }
-          changed=set(subprocess.check_output(['git','diff','--name-only']).decode().splitlines())
+          tracked=set(subprocess.check_output(['git','diff','--name-only']).decode().splitlines())
+          untracked=set(subprocess.check_output(['git','ls-files','--others','--exclude-standard']).decode().splitlines())
+          changed=tracked|untracked
           assert changed==expected,(changed,expected)
           PY
       - name: Install browser regression dependencies
