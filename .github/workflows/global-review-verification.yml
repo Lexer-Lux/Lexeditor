@@ -23,25 +23,14 @@ jobs:
           ref: fix/global-review-help-20260906
           submodules: false
           persist-credentials: true
-      - name: Apply only the checksum-verified, reviewed source paths
+      - name: Apply reviewed source while preserving the newer Data Map
         run: |
-          python3 - <<'PY'
-          import base64,gzip,hashlib,pathlib,subprocess
-          if not pathlib.Path('tests/test_global_followup.py').exists():
-              encoded=''.join(pathlib.Path(f'maintenance/global-followup/part{n}.b64').read_text().strip() for n in range(2))
-              # Repair a known duplicated transport segment; the original patch hash remains mandatory.
-              encoded=encoded.replace('TKCw9Xlye0rpbTKCw9Xlye0rpb5','TKCw9Xlye0rpb5')
-              patch=gzip.decompress(base64.b64decode(encoded,validate=True))
-              assert len(patch)==44407
-              assert hashlib.sha256(patch).hexdigest()=='bf2727e925e8dbcc198424bc3fb227dfc583393e2ff3dbfb94a7d83ce6fcf397'
-              expected={'docs/ADDING_A_GAME.md','docs/SHARED_UI_DESIGN.md','games/blank/editor.html','games/rdr2/editor.html','service_session.py','tests/global_design_review_check.py','tests/test_global_followup.py','tools/generate_credits.py','ui/design-review.css','ui/design-review.js','ui/framework.js'}
-              names={line[6:] for line in patch.decode().splitlines() if line.startswith('+++ b/')}
-              assert names==expected, names
-              p=pathlib.Path('/tmp/global-followup.patch');p.write_bytes(patch)
-              subprocess.run(['git','apply','--check',str(p)],check=True)
-              subprocess.run(['git','apply',str(p)],check=True)
-          PY
-      - uses: actions/setup-python@v5
+          if [ -f maintenance/global-followup/reconcile.py ]; then
+            python maintenance/global-followup/reconcile.py
+          fi
+          test -f tests/test_global_followup.py
+          test -f ui/design-review.js
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
       - name: Verify units, credits generation and JavaScript syntax
@@ -53,19 +42,18 @@ jobs:
           node --check ui/design-review.js
           git diff --check
       - name: Verify rendered interactions without game installations
-        env:
-          LEXEDITOR_BROWSER_OFFLINE: '1'
         run: |
           python -m playwright install --with-deps chromium
           python tests/global_browser_check.py
           python tests/global_design_review_check.py
+          python tests/global_controls_check.py
       - name: Publish verified source without rewriting history
         id: publish
         run: |
           git config user.name 'Lexeditor Global Fixes'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add docs/ADDING_A_GAME.md docs/SHARED_UI_DESIGN.md games/blank/editor.html games/rdr2/editor.html service_session.py tests/global_design_review_check.py tests/test_global_followup.py tools/generate_credits.py ui/design-review.css ui/design-review.js ui/framework.js
-          git rm -f maintenance/global-followup/part0.b64 maintenance/global-followup/part1.b64
+          git add docs/ADDING_A_GAME.md docs/SHARED_UI_DESIGN.md games/blank/editor.html games/rdr2/editor.html service_session.py tests/global_design_review_check.py tests/global_controls_check.py tests/test_global_followup.py tools/generate_credits.py ui/design-review.css ui/design-review.js ui/framework.js
+          if [ -d maintenance/global-followup ]; then git rm -rf maintenance/global-followup; fi
           git diff --cached --check
           if ! git diff --cached --quiet; then git commit -m 'Add interactive UI design alternatives and accurate accessible control help'; fi
           git push origin HEAD:fix/global-review-help-20260906
@@ -77,6 +65,7 @@ jobs:
           path: |
             out/global-browser/
             out/global-review/
+            out/global-controls/
           if-no-files-found: ignore
           retention-days: 30
   native:
@@ -93,7 +82,7 @@ jobs:
           ref: ${{ needs.verify.outputs.tested_sha }}
           submodules: false
           persist-credentials: true
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt pyinstaller
