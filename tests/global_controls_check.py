@@ -54,10 +54,12 @@ def main() -> None:
           m.append(U.newButton({id:'add',title:'Add record',onclick:()=>__adds++}),__table());
         }''')
         assert page.locator('#add').get_attribute('aria-label') == 'Add record'
-        page.evaluate('LexeditorUI.installControlHelp(document.body)')
+        # Hold the disposer on window so the MutationObserver remains strongly
+        # reachable for the lifetime of this page, matching mountShell's behavior.
+        page.evaluate('window.__removeControlHelp=LexeditorUI.installControlHelp(document.body)')
         assert page.locator('#add').get_attribute('title') == 'Add record'
         page.evaluate("""()=>{const U=LexeditorUI,e=U.el;const wrap=e('label',{},'Opacity',e('input',{id:'auto-help',type:'number',min:0,max:100,step:5}));document.querySelector('#main').append(wrap)}""")
-        page.wait_for_timeout(20)
+        page.wait_for_function("document.querySelector('#auto-help')?.title")
         assert page.locator('#auto-help').get_attribute('title') == 'Set Opacity. Range: 0 to 100. Step: 5.'
         page.locator('#add').click()
         assert page.evaluate('__adds') == 1
