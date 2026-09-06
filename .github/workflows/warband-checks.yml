@@ -2,17 +2,27 @@ name: Warband checks
 on:
   push:
     branches: [fix/warband-issue-batch]
+  pull_request:
+    paths:
+      - 'games/warband/**'
+      - 'tests/*warband*'
+      - 'tools/*warband*'
+      - 'desktop_host.py'
+      - 'plugin_api.py'
+      - '.github/workflows/warband-checks.yml'
 permissions:
   contents: read
+concurrency:
+  group: warband-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  reviewed-batch:
-    if: github.ref == 'refs/heads/fix/warband-issue-batch'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    outputs:
-      applied: ${{ steps.patch.outputs.applied }}
-      commit: ${{ steps.publish.outputs.commit }}
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,63 +31,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply the exact locally reviewed source patch
-        id: patch
-        run: |
-          if [ ! -f .github/warband-reviewed.patch.xz.b64.4 ]; then
-            echo 'applied=false' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          python - <<'PY'
-          import base64, hashlib, lzma, pathlib, subprocess
-          encoded = ''.join(pathlib.Path(f'.github/warband-reviewed.patch.xz.b64.{i}').read_text().strip() for i in range(5))
-          patch = lzma.decompress(base64.b64decode(encoded, validate=True))
-          assert hashlib.sha256(patch).hexdigest() == '9899f8ae582718560a440b6fdca2d1e20dddec0b9aa9be90b20a2fdf3d49d60c', 'Reviewed patch checksum mismatch'
-          subprocess.run(['git', 'apply', '--unidiff-zero', '--index', '--check', '-'], input=patch, check=True)
-          subprocess.run(['git', 'apply', '--unidiff-zero', '--index', '-'], input=patch, check=True)
-          PY
-          echo 'applied=true' >> "$GITHUB_OUTPUT"
-      - name: Install test dependencies
-        if: steps.patch.outputs.applied == 'true'
-        run: python -m pip install Pillow 'fonttools>=4.59,<5'
-      - name: Verify the reviewed batch before committing
-        if: steps.patch.outputs.applied == 'true'
-        run: |
-          python -m compileall -q games/warband desktop_host.py plugin_api.py
-          python -m unittest discover -s tests -p test_warband_batch.py -v
-          node tests/test_warband_trees.js
-      - name: Commit only the reviewed patch on its isolated branch
-        id: publish
-        run: |
-          if [ '${{ steps.patch.outputs.applied }}' = 'true' ]; then
-            git rm .github/warband-reviewed.patch.xz.b64.*
-            git config user.name 'Lexer'
-            git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
-            git commit -m 'Implement Warband coverage, troop trees, cached icons and guarded WSE2 launch'
-            git push origin HEAD:fix/warband-issue-batch
-          fi
-          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-  windows:
-    needs: reviewed-batch
-    if: needs.reviewed-batch.outputs.applied == 'true'
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.reviewed-batch.outputs.commit }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
       - run: python -m pip install Pillow 'fonttools>=4.59,<5'
+      - run: python -m compileall -q games/warband desktop_host.py plugin_api.py
       - run: python -m unittest discover -s tests -p test_warband_batch.py -v
+      - run: node tests/test_warband_trees.js
   browser:
-    needs: reviewed-batch
-    if: needs.reviewed-batch.outputs.applied == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.reviewed-batch.outputs.commit }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
