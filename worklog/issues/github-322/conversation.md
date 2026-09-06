@@ -24,6 +24,30 @@ Exact metadata: [source record](sources/issue-5356485585-fa4c61fa6b9fc68ac442ad6
 
 - [ ] Describe the incorrect result and the steal/attack behavior you expect. Include an example enemy, what happened when Mug was used and any relevant tweak settings.
 
+## issue 5356485585 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/322
+
+Created: 2026-09-04T06:32:34Z; updated: 2026-09-06T14:09:10Z
+
+Exact metadata: [source record](sources/issue-5356485585-2967a56c89d8381d79e1ea24cb5431095af39884cd416cdc0bc79ddf69e1e767.json).
+
+**Status: The report does not identify what is wrong with Mug.** No fix or useful test can be scoped from the title alone.
+
+- [ ] Describe the incorrect result and the steal/attack behavior you expect. Include an example enemy, what happened when Mug was used and any relevant tweak settings.
+
+## issue 5356485585 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/322
+
+Created: 2026-09-04T06:32:34Z; updated: 2026-09-06T14:09:10Z
+
+Exact metadata: [source record](sources/issue-5356485585-66ae0cf29b38bbfc4296d8742d2157d41595a7939dd7fbcce475df82718d9acb.json).
+
+Add a tweak so successfully Mugging an enemy does not prevent its normal item drops when it dies.
+
+**Status: Implementation remains.** Your requested behavior is already specified; no further explanation is needed.
+
 ## comment 5559513402 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/322#issuecomment-5559513402
