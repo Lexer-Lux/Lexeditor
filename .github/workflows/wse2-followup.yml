@@ -9,33 +9,28 @@ jobs:
   publish:
     if: github.ref == 'refs/heads/fix/warband-managed-wse2'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Apply exact locally tested patch
+      - name: Apply the source bytes tested in run 34045856693
         run: |
           python - <<'PY'
           import pathlib, hashlib, subprocess
           patch=pathlib.Path('.github/wse2-followup.patch').read_bytes()
           assert hashlib.sha256(patch).hexdigest()=='a1e8338e09db4d5719feb7d0bab0b90be9dc32f6d87d8f52cad360a1e3164cc1'
-          paths=['tests/test_wse2_manager.py','ui/chooser.html','tests/wse2_helper_browser_check.py','.github/workflows/wse2-checks.yml']
+          paths=['tests/test_wse2_manager.py','ui/chooser.html','tests/wse2_helper_browser_check.py']
           subprocess.run(['git','diff','--exit-code','6f926b87e1bec590365c24ede23bcc09acb32038','HEAD','--',*paths],check=True)
-          subprocess.run(['git','apply','--unidiff-zero','--index','--check','-'],input=patch,check=True)
-          subprocess.run(['git','apply','--unidiff-zero','--index','-'],input=patch,check=True)
+          command=['git','apply','--exclude=.github/workflows/wse2-checks.yml','--unidiff-zero','--index']
+          subprocess.run(command+['--check','-'],input=patch,check=True)
+          subprocess.run(command+['-'],input=patch,check=True)
+          assert set(subprocess.check_output(['git','diff','--cached','--name-only']).decode().splitlines())==set(paths)
           PY
-      - run: python -m pip install Pillow 'fonttools>=4.59,<5' 'tomli>=2,<3' playwright
-      - run: python -m playwright install --with-deps chromium
-      - run: python -m unittest discover -s tests -p 'test_wse2*.py' -v
-      - run: python tests/wse2_helper_browser_check.py out/followup-home
       - run: git diff --cached --check
-      - name: Publish reviewed corrections only
+      - name: Publish reviewed sources only, never a workflow change
         run: |
           git rm .github/wse2-followup.patch
           git config user.name 'Lexer'
