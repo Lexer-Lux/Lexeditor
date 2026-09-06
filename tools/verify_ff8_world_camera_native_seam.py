@@ -63,9 +63,46 @@ def follow_trace(exe, vehicle=False, delta=16, manual_policy=False, shoulder=0,
     return trace
 
 
+
+def signed_word(data, address):
+    return struct.unpack('<h', data[address - 0x400000:address - 0x400000 + 2])[0]
+
+
+def vehicle_pitch_step(exe, pitch, movement_pitch=0):
+    """Execute the actual vehicle pitch-follow tail and return camera+8."""
+    m = machine(exe)
+    put(m, 0x20409E0, 0x32)
+    m.mem_write(CAMERA + 8, struct.pack('<h', pitch))
+    m.mem_write(MOVEMENT + 2, struct.pack('<h', movement_pitch))
+    base = 0x3001000
+    put(m, base, 0, RETURN, PLAYER, 0x203ED50, MOVEMENT, CAMERA)
+    put(m, base - 0x3C, 0, 0, 0)
+    m.reg_write(UC_X86_REG_EBP, base)
+    m.reg_write(UC_X86_REG_ESP, base - 0x3C)
+    m.reg_write(UC_X86_REG_ESI, 0x32)
+    m.reg_write(UC_X86_REG_ECX, 0)
+    m.reg_write(UC_X86_REG_EBX, 0)
+    m.emu_start(0x5588C8, RETURN, count=200)
+    return struct.unpack('<h', m.mem_read(CAMERA + 8, 2))[0]
+
+
 def main():
     exe = EXE.read_bytes()
     assert hashlib.sha256(exe).hexdigest() == SHA
+    # camera+8 is an independent signed vertical angle. It is consumed
+    # alongside camera+12 by the world-camera transform, while camera+10 is yaw.
+    assert exe[0x552D3D - 0x400000:0x552D49 - 0x400000] == bytes.fromhex(
+        '8B 15 00 ED 03 02 8B 0D 04 ED 03 02')
+    # Native ordinary-world logic explicitly clamps the angle at -0x200 and 0.
+    assert bytes.fromhex('66 3D 00 FE') in exe[0x558436 - 0x400000:0x5584F8 - 0x400000]
+    assert signed_word(exe, 0x00C76D28) == -112
+    assert signed_word(exe, 0x00C76D20) == -512
+    # Vehicle follow moves the same field by +/-0x20 toward its terrain-derived target.
+    assert vehicle_pitch_step(exe, -512) == -480
+    assert vehicle_pitch_step(exe, 0) == -32
+    assert vehicle_pitch_step(exe, -256) == -256
+    assert -256 < vehicle_pitch_step(exe, -256, -600) <= -224
+    assert -288 <= vehicle_pitch_step(exe, -256, 600) < -256
     for call in (0x53FBB4, 0x54101C):
         data = exe[call - 0x400000:call - 0x400000 + 5]
         assert data[0] == 0xE8
@@ -115,7 +152,7 @@ def main():
         stack = m.reg_read(UC_X86_REG_ESP)
         assert struct.unpack('<3I', m.mem_read(stack, 12)) == (0x5444BE, 123, yaw % 4096)
         cases += 1
-    print(f'Native camera seam: {cases} boundary cases, 5 right-Y cases; both caller argument layouts passed')
+    print(f'Native camera seam: {cases} yaw boundary cases, 5 right-Y cases, signed pitch field/limits and vehicle follow passed')
     # A naive post-update delta cannot overcome the native automatic follow.
     # Preserve this regression evidence so a wrapper does not claim full orbit.
     for vehicle in (False, True):

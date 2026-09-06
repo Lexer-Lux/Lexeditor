@@ -1,4 +1,4 @@
-"""Add world-only manual analog camera controls to the supported FFNx tree."""
+"""Add world-only two-axis manual analog camera controls to the supported FFNx tree."""
 from pathlib import Path
 from games.ff8.ffnx_status_bars.apply_to_ffnx import verify_revision
 
@@ -14,7 +14,7 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
              '\tenable_devtools = config["enable_devtools"].value_or(false);\n\tenable_ff8_modern_controls = config["enable_ff8_modern_controls"].value_or(false);'),
         ],
         'src/cfg.h': [('extern bool enable_devtools;', 'extern bool enable_devtools;\nextern bool enable_ff8_modern_controls;')],
-        'misc/FFNx.toml': [('enable_devtools = false', 'enable_devtools = false\n\n# Manual analog world-map camera. Battle inputs are unchanged.\nenable_ff8_modern_controls = false')],
+        'misc/FFNx.toml': [('enable_devtools = false', 'enable_devtools = false\n\n# Manual two-axis analog world-map camera. Battle inputs are unchanged.\nenable_ff8_modern_controls = false')],
         'src/ff8_opengl.cpp': [
             ('#include "ff8.h"', '#include "ff8.h"\n#include "lexeditor_ff8_modern_controls.h"'),
             ('void ff8_init_hooks(struct game_obj *_game_object)\n{',

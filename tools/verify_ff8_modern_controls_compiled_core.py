@@ -21,6 +21,28 @@ int main() {
     for(int i=0;i<87;++i) sum+=lexeditor_camera::yaw_step(raw,rem);
     const int a=std::clamp(raw-128,-127,127), mag=a<0?-a:a;
     assert(sum == (mag<=40 ? 0 : (a<0?-1:1)*(mag-40)*16));
+    int pitch_rem=0, pitch_sum=0;
+    for(int i=0;i<87;++i) pitch_sum+=lexeditor_camera::pitch_step(raw,pitch_rem);
+    assert(pitch_sum == sum);
+  }
+  {
+    lexeditor_camera::ManualPitch pitch;
+    int value=-112;
+    // Raw Y=0 moves toward the native lower pitch bound and must clamp there.
+    for(int i=0;i<64;++i) value=pitch.update(value,value,0,false,false);
+    assert(value == -0x200 && pitch.engaged);
+    // Center holds a manually chosen angle against native follow.
+    for(int i=0;i<64;++i) value=pitch.update(value,-112,128,false,false);
+    assert(value == -0x200);
+    // Native shoulder handling temporarily owns the angle.
+    value=pitch.update(value,-112,128,true,false);
+    assert(value == -112);
+    // A world-state reset relinquishes manual ownership.
+    value=pitch.update(value,-256,128,false,true);
+    assert(value == -256 && !pitch.engaged);
+    // Opposite deflection reaches but never exceeds the upper native bound.
+    for(int i=0;i<64;++i) value=pitch.update(value,value,255,false,false);
+    assert(value == 0);
   }
   lexeditor_camera::ManualYaw policy;
   unsigned before,native; int raw,shoulder,reset;
