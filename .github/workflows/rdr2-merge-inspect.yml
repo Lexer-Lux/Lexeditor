@@ -1,45 +1,64 @@
-name: Inspect RDR2 merge conflicts
+name: Reconcile RDR2 issue handoffs
 on:
   push:
     branches: [fix/rdr2-issue-batch]
     paths: [.github/workflows/rdr2-merge-inspect.yml]
 permissions:
-  contents: read
+  contents: write
 jobs:
-  inspect:
+  reconcile:
+    if: github.repository == 'Lexer-Lux/Lexeditor' && github.ref == 'refs/heads/fix/rdr2-issue-batch'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Fetch both public histories without optional gitlinks
+      - name: Fetch the inspected public histories without optional gitlinks
         run: |
           git init .
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git -c protocol.version=2 fetch --no-tags --filter=blob:none origin "$GITHUB_SHA" master
+          git -c protocol.version=2 fetch --no-tags --filter=blob:none origin "$GITHUB_SHA" 6c625fc491dd51e365c73a8e3b135805adfeadfe
           git checkout --detach "$GITHUB_SHA"
-          git config user.name 'Merge inspection'
-          git config user.email 'inspection@localhost'
-      - name: Attempt a non-committing merge and preserve exact conflict evidence
-        run: |
-          mkdir -p /tmp/rdr2-merge
-          git rev-parse origin/master > /tmp/rdr2-merge/master.txt
-          git merge --no-commit --no-ff origin/master > /tmp/rdr2-merge/merge.log 2>&1 || true
-          cat /tmp/rdr2-merge/merge.log
-          python - <<'PY'
-          import json,pathlib,subprocess
-          def git(*a): return subprocess.check_output(['git',*a])
-          paths=git('diff','--name-only','--diff-filter=U','-z').decode().split('\0')
-          conflicts=[]
-          for path in filter(None,paths):
-              record={'path':path}
-              for stage in (1,2,3):
-                  try: record[str(stage)]=git('show',f':{stage}:{path}').decode()
-                  except subprocess.CalledProcessError: record[str(stage)]=None
-              conflicts.append(record)
-          pathlib.Path('/tmp/rdr2-merge/conflicts.json').write_text(json.dumps(conflicts,indent=2))
-          print('Conflict paths:',[x['path'] for x in conflicts])
-          PY
-      - uses: actions/upload-artifact@v4
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - uses: actions/setup-python@v5
         with:
-          name: rdr2-merge-evidence
-          path: /tmp/rdr2-merge/
-          retention-days: 3
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Merge the inspected revision and preserve both append-only worklogs
+        run: |
+          git merge --no-commit --no-ff 6c625fc491dd51e365c73a8e3b135805adfeadfe || true
+          python - <<'PY'
+          import pathlib,subprocess
+          def git(*a): return subprocess.check_output(['git',*a])
+          conflicts=set(filter(None,git('diff','--name-only','--diff-filter=U','-z').decode().split('\0')))
+          expected={f'worklog/issues/github-{n}.md' for n in (131,144,181)}
+          assert conflicts == expected, f'Unexpected conflicts: {conflicts}'
+          for path in sorted(conflicts):
+              base,ours,theirs=(git('show',f':{s}:{path}') for s in (1,2,3))
+              assert ours.startswith(base) and theirs.startswith(base), path
+              ours_append=ours[len(base):]; theirs_append=theirs[len(base):]
+              assert b'RDR2 isolated batch / session rdr2-issue-batch' in ours_append
+              assert b'verified transferred issue identity' in theirs_append
+              pathlib.Path(path).write_bytes(theirs+ours_append)
+              subprocess.run(['git','add','--',path],check=True)
+              print('Preserved historical link and new session:',path)
+          assert not git('diff','--name-only','--diff-filter=U')
+          allowed={'games/rdr2/alcohol_strengths.py','games/rdr2/editor.html','games/rdr2/server.py','games/rdr2/settings_schema.json','tests/test_rdr2_issue_repairs.py','tests/test_rdr2_boot.js','.github/workflows/rdr2-checks.yml','.github/workflows/rdr2-merge-inspect.yml'} | {f'worklog/issues/github-{n}.md' for n in (131,144,181,347,357)}
+          changed=set(git('diff','--cached','--name-only','6c625fc491dd51e365c73a8e3b135805adfeadfe').decode().splitlines())
+          assert changed <= allowed, f'Unrelated changes: {changed-allowed}'
+          PY
+          git diff --cached --check
+      - name: Validate the combined source against the RDR2 regression suite
+        run: |
+          python tests/test_rdr2_issue_repairs.py
+          node tests/test_rdr2_boot.js
+          python -m compileall -q games/rdr2
+      - name: Commit only to the isolated RDR2 branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git commit -m 'Merge concurrent master updates while preserving both RDR2 worklog additions'
+          gh auth setup-git
+          git push origin HEAD:refs/heads/fix/rdr2-issue-batch
+          git rev-parse HEAD
