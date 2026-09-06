@@ -1,0 +1,20 @@
+name: Dispatch FF8 vertical camera build
+on:
+  push:
+    branches: [fix/ff8-world-camera-pitch]
+    paths: [.github/workflows/ff8-camera-pitch-dispatch.yml]
+permissions:
+  actions: write
+  contents: read
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Dispatch existing stock Windows build on this branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method POST \
+            -H 'Accept: application/vnd.github+json' \
+            repos/${{ github.repository }}/actions/workflows/ff8-stock-build.yml/dispatches \
+            -f ref=fix/ff8-world-camera-pitch
