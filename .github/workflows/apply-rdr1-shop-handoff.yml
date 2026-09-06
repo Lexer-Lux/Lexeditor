@@ -1,0 +1,31 @@
+name: Apply RDR1 shop test handoff
+on:
+  push:
+    branches: [fix/rdr1-shop-test-handoff]
+    paths: ['.github/workflows/apply-rdr1-shop-handoff.yml']
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Apply exact source integration
+        run: python .github/rdr1-shop-handoff-edit.py
+      - name: Verify portable editor contracts
+        run: |
+          python -m compileall -q games/rdr
+          python tools/verify_rdr_editing.py
+          git diff --check
+      - name: Commit source-only integration
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/rdr/server.py games/rdr/editor.html tools/verify_rdr_editing.py tools/verify_rdr_editing_browser.py
+          git rm .github/rdr1-shop-handoff-edit.py
+          git commit -m "feat(rdr1): prepare a deterministic in-game shop edit test"
+          git push origin HEAD:fix/rdr1-shop-test-handoff
