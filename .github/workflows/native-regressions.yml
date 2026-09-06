@@ -1,0 +1,85 @@
+name: FF8 native shipping and UI regressions
+on:
+  pull_request:
+    paths:
+      - 'games/ff8/**'
+      - 'tools/verify_ff8_*'
+      - 'tools/package_ff8_native_driver.py'
+      - 'tools/prepare_ff8_native_build.py'
+      - 'tools/fixtures/ff8_native/**'
+      - '.gitattributes'
+      - '.github/workflows/native-regressions.yml'
+  push:
+    branches: [master, fix/ff8-native-battle-batch]
+    paths:
+      - 'games/ff8/**'
+      - 'tools/verify_ff8_*'
+      - 'tools/package_ff8_native_driver.py'
+      - 'tools/prepare_ff8_native_build.py'
+      - 'tools/fixtures/ff8_native/**'
+      - '.gitattributes'
+      - '.github/workflows/native-regressions.yml'
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch exact source without unrelated gitlink initialization
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          git config --global core.autocrlf false
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin "$REVISION"
+          git -C editor checkout --detach FETCH_HEAD
+      - name: Install editor and browser test dependencies
+        run: |
+          python -m pip install pillow fonttools pefile==2024.8.26 playwright
+          python -m playwright install --with-deps chromium
+      - name: Execute shipping, C++ policy and settings regressions
+        working-directory: editor
+        run: |
+          python tools/verify_ff8_native_package.py
+          python tools/verify_ff8_native_compiled.py
+          python tools/verify_ff8_gf_bar_settings.py
+          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py
+          python - <<'PY'
+          import pathlib, re, subprocess
+          text = pathlib.Path('games/ff8/editor.html').read_text(encoding='utf-8')
+          for script in re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', text, re.S | re.I):
+              subprocess.run(['node', '--check'], input=script, text=True, check=True)
+          PY
+      - name: Preserve search and all merged Enemies UI fixes
+        working-directory: editor
+        run: |
+          python tools/verify_ff8_ui_battle_regressions.py --browser ''
+          python tools/verify_ff8_enemy_compact_ui.py --browser ''
+          python tools/verify_ff8_card_art.py
+      - name: Record native test boundary
+        run: echo 'Private executable tests run separately with a supplied FF8_EN.exe. No game executable is downloaded or uploaded. These checks do not claim in-game acceptance.'
+  windows-install:
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 10
+    steps:
+      - name: Fetch exact source with the Windows checkout policy
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          git config --global core.autocrlf true
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin $env:GITHUB_SHA
+          git -C editor checkout --detach FETCH_HEAD
+          python -m pip install pillow fonttools pefile==2024.8.26
+      - name: Verify shipped bytes, upgrade, backups and repeated installation on Windows
+        shell: pwsh
+        working-directory: editor
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $PSNativeCommandUseErrorActionPreference = $true
+          python tools/verify_ff8_native_package.py
+          python tools/verify_ff8_gf_bar_settings.py

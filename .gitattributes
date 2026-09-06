@@ -1,0 +1,3 @@
+# These files are SHA-256 locked by runtime_package.py. Git must not change
+# their bytes on Windows (core.autocrlf) or on Linux checkouts/build runners.
+games/ff8/ffnx_issue_51/package/** -text

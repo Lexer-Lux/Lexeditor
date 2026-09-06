@@ -46,19 +46,20 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
     replace_once(
         root / "src/cfg.cpp",
         b"bool enable_devtools;\r\n",
-        b"bool enable_devtools;\r\nbool enable_ff8_xp_bars;\r\nbool enable_ff8_hp_bars;\r\n",
+        b"bool enable_devtools;\r\nbool enable_ff8_xp_bars;\r\nbool enable_ff8_hp_bars;\r\nbool enable_ff8_gf_hp_bars;\r\n",
     )
     replace_once(
         root / "src/cfg.cpp",
         b'\tenable_devtools = config["enable_devtools"].value_or(false);\r\n',
         b'\tenable_devtools = config["enable_devtools"].value_or(false);\r\n'
         b'\tenable_ff8_xp_bars = config["enable_ff8_xp_bars"].value_or(false);\r\n'
-        b'\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\r\n',
+        b'\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\r\n'
+        b'\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);\r\n',
     )
     replace_once(
         root / "src/cfg.h",
         b"extern bool enable_devtools;\r\n",
-        b"extern bool enable_devtools;\r\nextern bool enable_ff8_xp_bars;\r\nextern bool enable_ff8_hp_bars;\r\n",
+        b"extern bool enable_devtools;\r\nextern bool enable_ff8_xp_bars;\r\nextern bool enable_ff8_hp_bars;\r\nextern bool enable_ff8_gf_hp_bars;\r\n",
     )
     replace_once(
         root / "misc/FFNx.toml",
@@ -67,7 +68,9 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
         b"# Draw level-progress bars in FF8's main, Status, and post-battle screens.\r\n"
         b"enable_ff8_xp_bars = false\r\n\r\n"
         b"# Draw current/max HP bars for FF8's three active battle characters.\r\n"
-        b"enable_ff8_hp_bars = false\r\n",
+        b"enable_ff8_hp_bars = false\r\n\r\n"
+        b"# Draw blue junctioned-GF HP bars above the FF8 party names.\r\n"
+        b"enable_ff8_gf_hp_bars = false\r\n",
     )
     replace_once(
         root / "src/ff8_opengl.cpp",

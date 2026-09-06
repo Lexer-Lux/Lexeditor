@@ -58,6 +58,7 @@ DEFAULT_STREAMLINED_DRAW = streamlined_draw.DEFAULT_STREAMLINED_DRAW
 DEFAULT_SHARED_MAGIC_INVENTORY = False
 DEFAULT_XP_BARS = False
 DEFAULT_HP_BARS = False
+DEFAULT_GF_HP_BARS = False
 DEFAULT_FLAT_STAT_ABILITIES = flat_stat_abilities.DEFAULT_FLAT_STAT_ABILITIES
 DEFAULT_MAX_SPELL_ENABLED = max_spell.DEFAULT_MAX_SPELL_ENABLED
 DEFAULT_MAX_SPELL = max_spell.DEFAULT_MAX_SPELL
@@ -70,7 +71,7 @@ ACCEPTED_TWEAKS = frozenset({
     "sharedMagicInventory", "partySwitch", "drawOncePerEnemy",
     "streamlinedDraw", "betterCard", "fixedCommandMenu", "trueAtbWait",
     "modernControls", "vibrationConsolidation", "betterTargeting",
-    "damageLimitRemoval", "fastStart", "xpBars", "hpBars",
+    "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "gfHpBars",
     "flatStatAbilities", "maxSpellEnabled",
 })
 MIN_FLYING_EVA_BONUS = 0
@@ -334,6 +335,9 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
     hp_bars = data.get("hpBars", DEFAULT_HP_BARS)
     if not isinstance(hp_bars, bool):
         hp_bars = DEFAULT_HP_BARS
+    gf_hp_bars = data.get("gfHpBars", DEFAULT_GF_HP_BARS)
+    if not isinstance(gf_hp_bars, bool):
+        gf_hp_bars = DEFAULT_GF_HP_BARS
     flat_stat_abilities_enabled = data.get(
         "flatStatAbilities", DEFAULT_FLAT_STAT_ABILITIES,
     )
@@ -381,6 +385,7 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "fastStart": fast_start_enabled,
         "xpBars": xp_bars,
         "hpBars": hp_bars,
+        "gfHpBars": gf_hp_bars,
         "flatStatAbilities": flat_stat_abilities_enabled,
         "maxSpellEnabled": max_spell_enabled,
         "maxSpell": max_spell_value,
@@ -677,12 +682,14 @@ def _atomic_bytes(target: Path, content: bytes) -> None:
 
 def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
                              better_targeting: bool, fast_start: bool = False,
-                             modern_controls: bool = False, party_switch: bool = False) -> None:
+                             modern_controls: bool = False, party_switch: bool = False,
+                             gf_hp_bars: bool = False) -> None:
     """Set derivative options without changing unrelated FFNx settings."""
     text = config.read_text(encoding="utf-8", errors="strict")
     for key, enabled in (
         ("enable_ff8_xp_bars", xp_bars),
         ("enable_ff8_hp_bars", hp_bars),
+        ("enable_ff8_gf_hp_bars", gf_hp_bars),
         ("enable_ff8_better_targeting", better_targeting),
         ("enable_ff8_fast_start", fast_start),
         ("enable_ff8_modern_controls", modern_controls),
@@ -756,6 +763,7 @@ def initialize_project(project_root: Path) -> None:
         "fastStart": False,
         "xpBars": False,
         "hpBars": False,
+        "gfHpBars": False,
         "flatStatAbilities": False,
         "maxSpellEnabled": False,
         "maxSpell": DEFAULT_MAX_SPELL,
@@ -852,6 +860,7 @@ def save(data: dict, game_root: Path | None = None,
     )
     xp_bars = _boolean(data.get("xpBars", DEFAULT_XP_BARS), "XP Bars")
     hp_bars = _boolean(data.get("hpBars", DEFAULT_HP_BARS), "HP Bars")
+    gf_hp_bars = _boolean(data.get("gfHpBars", DEFAULT_GF_HP_BARS), "GF HP Bars")
     flat_stat_abilities_enabled = _boolean(
         data.get("flatStatAbilities", DEFAULT_FLAT_STAT_ABILITIES),
         "Flat +Stat Abilities",
@@ -936,6 +945,7 @@ def save(data: dict, game_root: Path | None = None,
         "fastStart": fast_start_enabled,
         "xpBars": xp_bars,
         "hpBars": hp_bars,
+        "gfHpBars": gf_hp_bars,
         "flatStatAbilities": flat_stat_abilities_enabled,
         "maxSpellEnabled": max_spell_enabled,
         "maxSpell": max_spell_value,
@@ -948,7 +958,7 @@ def save(data: dict, game_root: Path | None = None,
     install_needed = bool(
         install_runtime
         and
-        (shared_magic_inventory or xp_bars or hp_bars or better_targeting or fast_start_enabled
+        (shared_magic_inventory or xp_bars or hp_bars or gf_hp_bars or better_targeting or fast_start_enabled
          or modern_controls or party_switch)
         and not shared_magic_status.get("sharedMagicInventoryRuntime")
     )
@@ -1014,7 +1024,7 @@ def save(data: dict, game_root: Path | None = None,
             ffnx_manager._verify_project_path(config, direct_root)
         if install_runtime:
             _set_ffnx_runtime_tweaks(
-                game / "FFNx.toml", xp_bars=xp_bars, hp_bars=hp_bars,
+                game / "FFNx.toml", xp_bars=xp_bars, hp_bars=hp_bars, gf_hp_bars=gf_hp_bars,
                 better_targeting=better_targeting,
                 fast_start=fast_start_enabled,
                 modern_controls=modern_controls, party_switch=party_switch,

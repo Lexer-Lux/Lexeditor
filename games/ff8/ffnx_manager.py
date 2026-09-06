@@ -282,14 +282,14 @@ def _set_project_paths(config: Path, direct_root: Path) -> None:
     }
     for key, target in values.items():
         value = target.as_posix().replace('"', '\\"')
-        pattern = re.compile(rf'(?m)^\s*{re.escape(key)}\s*=\s*"[^"]*"\s*$')
+        pattern = re.compile(rf'(?m)^[ \t]*{re.escape(key)}[ \t]*=[ \t]*"[^"\r\n]*"[ \t]*$')
         replacement = f'{key} = "{value}"'
         if pattern.search(text):
             text = pattern.sub(replacement, text, count=1)
         else:
             text += f"\n{replacement}\n"
     has_sfx = any(path.is_file() for path in (runtime_root / "sfx").rglob("*"))
-    sfx_pattern = re.compile(r'(?m)^\s*use_external_sfx\s*=\s*(?:true|false)\s*$')
+    sfx_pattern = re.compile(r'(?m)^[ \t]*use_external_sfx[ \t]*=[ \t]*(?:true|false)[ \t]*$')
     sfx_replacement = f"use_external_sfx = {'true' if has_sfx else 'false'}"
     if sfx_pattern.search(text):
         text = sfx_pattern.sub(sfx_replacement, text, count=1)
