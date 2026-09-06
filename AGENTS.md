@@ -16,10 +16,31 @@
 GitHub issues are for Lexer and other humans, not an agent's internal progress
 tracker. Keep titles, bodies, and new comments brief. State the requested result,
 the current status, and only the information needed to act. Game labels replace
-game-name prefixes in titles. Preserve requirements, decisions, and reference
-attachments when shortening an issue; move technical detail into the stores below.
-Do not rewrite historical human comments or replace an unresolved request with a
+game-name prefixes in titles. Brevity applies to the public summary, NEVER to
+preservation of the specification. Do not replace an unresolved request with a
 smaller feature merely to declare it finished.
+
+### Lossless capture comes before summarization
+
+- When Lexer supplies a request, preserve their complete wording, examples,
+  numbers, exceptions, rejected alternatives, attachments, and later corrections
+  before creating or shortening its GitHub summary. Save verbatim text, not
+  another paraphrase. Never label reconstructed text as an original quotation.
+- Each issue has one internal handoff: `worklog/issues/github-<number>.md`.
+  Its immutable source records live beside it in
+  `worklog/issues/github-<number>/sources/`. Use a temporary request identifier
+  before an issue number exists, then link it when the issue is created.
+- Keep an explicit requirements/acceptance section in the handoff, traceable to
+  the source records. A short current summary does not cancel archived scope.
+  Resolve contradictions using the latest explicit human decision; preserve the
+  superseded instruction as history instead of silently erasing it.
+- Before saying context is missing, search the issue's source records and
+  comments, transferred issue IDs, legacy Worklog/TODO/GOAL files, relevant game
+  codex, and available original chat/file sources. Record what was searched.
+  A short or blank GitHub body is NOT evidence that Lexer supplied no details.
+- If the original request was lost or has not been retrieved, own that as
+  retrieval/recovery work (`actionable`), not as a failure by Lexer to explain.
+  Ask only about a genuinely unresolved point after recovering existing context.
 
 ### Workflow labels
 
@@ -28,55 +49,82 @@ enhancement, and priority labels separate from workflow status.
 
 | Human status | GitHub label | Meaning |
 | --- | --- | --- |
-| Actionable | `actionable` | Agent work remains: research, implementation, repair, build, packaging, delivery, or preparing a usable test. This is the default for unfinished work. |
-| Waiting | `waiting` | A specific action or answer from Lexer blocks the next meaningful step: a design choice, required asset, genuinely necessary permission, or a prepared diagnostic capture. The issue must say exactly what Lexer must do. |
-| Needs Testing | `untested` | A specific implemented candidate is available to Lexer, relevant agent-side checks are complete, and only the described human test remains. `untested` is the existing label for Needs Testing, not a second status. |
-| Unfeasible | `unfeasible` | Evidence establishes a specific limitation of the available technical path. Explain that limitation and what would have to change. This does not mean universally impossible. |
+| Actionable | `actionable` | Agent work remains: context recovery, research, implementation, repair, build, packaging, delivery, or preparing a usable test. Default for unfinished work. |
+| Waiting | `waiting` | A specific action or answer from Lexer blocks the next meaningful step: a genuinely unresolved design choice, required asset, necessary permission, or prepared diagnostic capture. |
+| Needs Testing | `untested` | A specific candidate is available to Lexer, relevant agent-side checks are complete, and only the described human acceptance test remains. |
+| Unfeasible | `unfeasible` | Evidence establishes a specific limitation of the available technical path. Explain the limitation and what must change; this is not a claim of universal impossibility. |
 
 **Waiting means WAITING ON LEXER.** It never means low priority, expensive,
-difficult, not selected this session, out of time/tokens/budget, not yet researched,
-awaiting another agent, or simply something an agent does not want to do. Those
-issues stay `actionable`. Do not manufacture a design question or ask for approval
-again when Lexer has already supplied the decision or authorized the work.
+difficult, not selected this session, out of time/tokens/budget, not researched,
+awaiting another agent, missing local access, or something an agent does not want
+to do. Those issues stay `actionable`. Do not manufacture a design question or
+request approval again when Lexer already decided or authorized the work.
 
-An explicit user instruction to defer implementation must still be respected,
-but it is a scheduling constraint, not automatically a `waiting` label. Record
-that constraint briefly; do not disguise unfinished work as a human blocker.
-Changing a workflow label does not authorize implementation outside the request.
+Respect explicit user deferrals, but record them as scheduling constraints, not
+automatically as `waiting`. Changing status does not authorize unrelated work.
 
 ### Required actions and test readiness
 
 - Every `waiting` issue ends with an unchecked checklist of the exact actions or
-  answers needed from Lexer. Design questions belong there, not a pretend test.
-- Every `untested` issue ends with an unchecked test checklist: available build or
-  candidate, setup, controls/steps, expected visible result, and what to report.
-  Keep it short and reproducible. Supply fixtures, saves, tools, or diagnostics
-  first when the test needs them; do not make Lexer invent the test or build code.
-- A source patch, passing CI, draft PR, queued build, or unconfirmed install is
-  not a delivered test candidate. Missing build/delivery/test preparation keeps
-  the issue `actionable`, not `waiting` or `untested`.
-- A failed player test returns to `actionable`. Do not request the same test again
-  until a relevant change or a genuinely new, prepared diagnostic justifies it.
-- If agent work still remains within the issue's scope, keep it `actionable` and
-  distinguish any testable slice. Do not hide unfinished parts behind a test label.
-- Lack of investigation or unsuccessful attempts alone do not prove `unfeasible`.
-  A rejected design or cancelled request is not a technical impossibility.
-- Before changing status, re-read the live body and comments, then check relevant
-  code, PRs, and internal worklogs. Apply the latest human decisions and failures;
-  never infer installation, in-game success, or approval from static checks.
-- Close as completed only when the requested scope is actually confirmed done.
-  Remove `actionable`, `waiting`, and `untested` from closed issues. Use the correct
-  closure reason for cancelled or duplicate work; do not call it implemented.
+  answers needed from Lexer. Design questions are not pretend gameplay tests.
+- Every `untested` issue ends with a short, reproducible checklist: available
+  candidate, setup, controls/steps, expected result, and what to report. Supply
+  needed fixtures, saves, tools and diagnostics first. Lexer does not build code
+  or invent acceptance tests on the agent's behalf.
+- A source patch, passing CI, draft PR, queued build, or unconfirmed installation
+  is not a delivered candidate. Missing preparation/delivery stays `actionable`.
+- A failed human test returns to `actionable`. Do not repeat it without a relevant
+  change or a genuinely new prepared diagnostic.
+- If work remains within the requested scope, retain `actionable` and identify
+  any testable slice separately. Do not hide unfinished scope behind a test label.
+- Unsuccessful attempts or lack of investigation do not prove `unfeasible`.
+  Rejected designs and cancelled requests are not technical impossibilities.
+- Re-read live source records, comments, relevant code/PRs and worklogs before
+  changing status. Never infer delivery, in-game success or approval from CI.
+- Close as completed only when the requested scope is confirmed done. Remove
+  active workflow labels on closure and use truthful duplicate/cancellation reasons.
 
-## Internal knowledge and progress
+### Archive first; clean the visible discussion second
 
-- Keep confirmed mechanics, schemas, paths, and engine limits in topic files
-  under `codex/`. Write current facts; replace incorrect facts in place.
-- Keep internal implementation progress, remaining agent steps, attempts, logs,
-  hashes, failures, deployment evidence, and test preparation in
-  `worklog/issues/github-<number>.md`. Read and update the relevant worklog during
-  work. These are the agent handoffs; do not paste them into GitHub issues or use
-  human-facing labels to conceal unfinished internal work.
-- When an issue is confirmed complete, move lasting knowledge into `codex/`
-  and remove its temporary worklog. Keep historical handoffs in `worklog/legacy/`.
+Lexer authorizes moving issue discussion into the internal records and deleting
+archived comments to keep GitHub concise. This supersedes the earlier instruction
+to keep all historical comments visible. It does NOT authorize losing their content.
+
+- Archive every original body/comment version verbatim, including source URL,
+  author, ID, timestamps, attachments and a content hash. Preserve before-edit
+  text from webhook events and earlier snapshots when available.
+- Commit and verify the archive in the canonical repository BEFORE deleting any
+  comment. A local scratch file or expiring Actions artifact alone is insufficient.
+- Re-read each comment before deletion. Skip new or changed records that are not
+  the exact archived version. Skip records whose required attachments cannot be
+  preserved. Never delete whole issues, PR reviews or unrelated repository data
+  as a substitute for cleaning issue comments.
+- Technical attempts, stack traces, hashes and discussion history belong in the
+  internal worklog/source records, not in repeated GitHub comments. Keep the live
+  issue's current result, real status, and required human checklist concise.
+- Completion may retire the active handoff, but never delete the original request,
+  decisions or evidence archive. Retain them under `worklog/legacy/` if moved.
+
+## Central knowledge and parallel work
+
+- Lexeditor owns the canonical game knowledge: `codex/<game>/README.md` plus
+  topic files under `codex/<game>/`. Shared editor knowledge uses `codex/shared/`.
+  Mod repositories may link here; they must not become independent competing
+  sources of truth. Existing paths remain readable during migration.
+- Codex contains settled mechanics, schemas, paths and demonstrated limits.
+  Attempts, guesses, current progress and pending work stay in per-issue worklogs.
+  Imported historical notes are provenance, not automatically current fact.
+- One issue owner edits its handoff. Parallel contributors append uniquely named
+  source/session records; one integrator reconciles the handoff. Do not have every
+  agent rewrite a global Worklog.txt or shared codex index.
+- Record source repository, branch/commit, original path and content hash on
+  import. Snapshot now; after parallel branches merge, import only new/changed
+  records and reconcile conflicting facts. Never overwrite central newer work
+  with an older source copy, force-push, or delete another worker's notes.
+- Before retiring a legacy store, verify every source file is accounted for and
+  leave a forwarding pointer. Do not claim uncommitted local work was migrated
+  through GitHub; preserve it through an explicit local import when accessible.
+- Review private-source documentation before publishing into this public repo.
+  Never include credentials, private binaries, proprietary game dumps or unrelated
+  personal data. A public repository is not private merely because agents use it.
 - These stores are searched when needed, not loaded in full every turn.
