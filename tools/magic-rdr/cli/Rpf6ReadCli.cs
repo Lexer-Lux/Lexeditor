@@ -183,14 +183,14 @@ internal static class Rpf6ReadCli
         if (packed.Length < 16 || BitConverter.ToUInt32(packed, 0) != ResourceUtils.FlagInfo.RSC85Magic)
             throw new InvalidDataException("The template is not an RSC85 resource.");
         int resourceType = BitConverter.ToInt32(packed, 4);
-        if (resourceType == 2)
-            throw new InvalidDataException("Encrypted RSC85 resources are not supported by this command.");
         byte[] original = ResourceUtils.ResourceInfo.GetDataFromResourceBytes(packed);
         byte[] unpacked = File.ReadAllBytes(source);
         if (original == null || original.Length != unpacked.Length)
             throw new InvalidDataException("The unpacked resource length must match the template.");
 
         byte[] compressed = DataUtils.CompressZStandard(unpacked);
+        if (resourceType == 2)
+            compressed = DataUtils.Encrypt(compressed, AppGlobals.EncryptionKey);
         byte[] result = new byte[16 + compressed.Length];
         Buffer.BlockCopy(packed, 0, result, 0, 16);
         Buffer.BlockCopy(compressed, 0, result, 16, compressed.Length);
