@@ -55,11 +55,14 @@ def data_map() -> dict:
     """Report exact Memoria files and unresolved vanilla containers."""
     integrated = []
     for row in catalog():
+        available = bool(row["available"])
         integrated.append({
             "filename": row["relativePath"], "controls": row["controls"],
             "notes": f"{row['label']}. Writes a project overlay; the game baseline is never overwritten.",
-            "status": "integrated" if row["available"] else "partial",
-            "openable": row["available"], "target": row["tab"], "datasetKey": row["key"],
+            "status": "integrated" if available else "not-integrated",
+            "coverage": "structured" if available else "unavailable",
+            "openable": available, "target": row["tab"],
+            "dataset": row["key"], "datasetKey": row["key"],
         })
     launcher = paths.GAME_ROOT / "FF9_Launcher.exe"
     return {
