@@ -1,0 +1,117 @@
+name: Apply and verify global fixes
+on:
+  push:
+    branches: [fix/global-issues-20260906]
+    paths: [.github/workflows/apply-global-fixes.yml]
+permissions:
+  contents: write
+concurrency:
+  group: lexeditor-global-code-integration
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tested_sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: fix/global-issues-20260906
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: true
+      - name: Decode the exact reviewed patch and validate its file scope
+        run: |
+          python3 - <<'PY'
+          import base64,gzip,hashlib,pathlib,subprocess
+          encoded=''.join(pathlib.Path(f'maintenance/global-fixes/part{n}.b64').read_text().strip() for n in range(4))
+          patch=gzip.decompress(base64.b64decode(encoded,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='4e9643970464cf7204267fdac236812be04eb36604ce11d957048cff59c23538','Staged patch hash mismatch'
+          assert len(patch)==66694
+          names=[]
+          for line in patch.decode().splitlines():
+              if line.startswith('+++ b/'):names.append(line[6:])
+          assert names and all(not n.startswith(('.github/','codex/','worklog/')) and '..' not in pathlib.PurePosixPath(n).parts for n in names)
+          path=pathlib.Path('/tmp/global-fixes.patch');path.write_bytes(patch)
+          subprocess.run(['git','apply','--check',str(path)],check=True)
+          subprocess.run(['git','apply',str(path)],check=True)
+          print('Applied reviewed paths:',len(names))
+          PY
+          python tools/generate_credits.py
+      - name: Commit only reviewed application, documentation and tests
+        run: |
+          git config user.name 'Lexeditor Global Fixes'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md app.py desktop_host.py game_installation.py games/ff8/editor.html games/ff8/ffnx_manager.py games/ff9/memoria_manager.py plugin_api.py runtime_bootstrap.py service_session.py ui/chooser.html ui/framework.css ui/framework.js ui/loading_quotes.json ui/credits-sources.json ui/credits.json docs/ADDING_A_GAME.md tests/test_global_issues.py tests/global_browser_check.py tools/build_distribution.py tools/generate_credits.py
+          git diff --cached --check
+          git commit -m 'Fix loading quotes, helper versions, shared offline credits and native app bootstrap'
+          git fetch --no-recurse-submodules origin master
+          git -c submodule.recurse=false merge --no-edit origin/master
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify the integrated application
+        run: |
+          python -m pip install -r requirements.txt playwright
+          python -m playwright install --with-deps chromium
+          python -m unittest discover -s tests -p 'test_global_issues.py' -v
+          python tests/global_browser_check.py
+          python tools/generate_credits.py --check
+      - name: Publish only the tested branch without rewriting history
+        id: commit
+        run: |
+          git diff --exit-code
+          git push origin HEAD:fix/global-issues-20260906
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: global-rendered-regressions-${{ github.run_id }}
+          path: out/global-browser/
+          if-no-files-found: ignore
+          retention-days: 30
+  native:
+    needs: apply
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2022, macos-14]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ needs.apply.outputs.tested_sha }}
+          submodules: false
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install package dependencies
+        run: python -m pip install -r requirements.txt pyinstaller
+      - name: Install Linux native webview backend
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libopengl0 libxcb-cursor0 libxkbcommon-x11-0 libnss3 libasound2t64
+          python -m pip install PySide6
+      - name: Install Windows installer compiler
+        if: runner.os == 'Windows'
+        run: choco install innosetup --yes --no-progress
+      - name: Test native bootstrap
+        run: python -m unittest discover -s tests -p 'test_global_issues.py' -v
+      - name: Build and verify installed-service dispatch before making the OS installer
+        run: python tools/build_distribution.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: Lexeditor-${{ runner.os }}-${{ github.run_id }}
+          path: |
+            dist/installers/
+            build/distribution/smoke.json
+            build/Lexeditor/warn-Lexeditor.txt
+          if-no-files-found: warn
+          retention-days: 30
