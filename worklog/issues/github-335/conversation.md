@@ -35,3 +35,27 @@ Exact metadata: [source record](sources/issue-5356488083-8be4b01dbbd77c87199dfc1
 In shops, scrolling should change purchase/sale quantity within its limits, not move the highlighted item. Keyboard and controller behavior should stay unchanged.
 
 **Status: Work remains.** No ready-to-test repair is recorded.
+
+## issue 5356488083 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/335
+
+Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T17:44:28Z
+
+Exact metadata: [source record](sources/issue-5356488083-27b322b819cc4286e1857b0cde1ffc9ef948eee2510cd018cc220e1b46b96719.json).
+
+In shops, scrolling should change purchase/sale quantity within its limits, not move the highlighted item. Keyboard and controller behavior should stay unchanged.
+
+**Status: Active implementation.** Native source is now available and the runtime branch builds/tests. The existing shop feature is being traced against the PC `shopkeeper_brain` flow before a test candidate is declared ready.
+
+## issue 5356488083 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/335
+
+Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T17:44:28Z
+
+Exact metadata: [source record](sources/issue-5356488083-954014dc5434bf95e32d107331cd03bd28334b5961e649d060ee8fbcf53e5782.json).
+
+In shops, scrolling should change purchase/sale quantity within its limits, not move the highlighted item. Keyboard and controller behavior should stay unchanged.
+
+**Status: Work remains.** No ready-to-test repair is recorded.
