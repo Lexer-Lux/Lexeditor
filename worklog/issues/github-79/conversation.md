@@ -55,6 +55,18 @@ Exact metadata: [source record](sources/issue-5311976419-4768021fee44e84a86e9769
 
 Enemies, encounters, shops and wider character/text editing remain unfinished. Integration and in-game validation are still needed; the Characters work alone is not complete FF7 support.
 
+## issue 5311976419 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/79
+
+Created: 2026-09-01T12:44:24Z; updated: 2026-09-06T15:15:01Z
+
+Exact metadata: [source record](sources/issue-5311976419-2d2826a1f6d495afbac6b4acfce7da7096ccaa6d18c9993ea82547d5e6fc3e81.json).
+
+**Actionable — partly implemented.** Unmerged PR #359 adds starting-character stats, limit-learning fields and safer project saves for both editions. Starting stats do not rewrite existing saves.
+
+Enemies, encounters, shops and wider character/text editing remain unfinished. Integration and in-game validation are still needed; the Characters work alone is not complete FF7 support.
+
 ## comment 5559373025 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/79#issuecomment-5559373025
@@ -123,3 +135,39 @@ The PR now connects enemies, enemy attacks, all 1,024 battle formations, support
 This issue remains actionable: scene/character AI, field/world placement, growth-curve coefficients and the remaining executable-only character data are not edited, and real installed-edition/deployment/in-game acceptance is still outstanding. Scene block overflow is deliberately refused rather than breaking KERNEL's lookup. Source games are unchanged by binary saves.
 
 Current scope, format references and safeguards are recorded in `codex/ff7-recovery-20260906.md`; that continuation note supersedes the earlier note that scene/shop/kernel2 editors were wholly absent.
+
+## comment 5560080934 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/79#issuecomment-5560080934
+
+Created: 2026-09-06T15:01:17Z; updated: 2026-09-06T15:17:05Z
+
+Exact metadata: [source record](sources/comment-5560080934-6d83e3515238925de2ffc0e36f0e15301a59080b2818e428c9c3569b082b4574.json).
+
+Recovered and continued the interrupted work in #359. Latest continuation head: `eb1e7d3c03a2c1a64d4228fed48f7841a053c488` (main implementation `9d34c9e`), with master's shared Data Map changes preserved.
+
+The PR now connects enemies, enemy attacks, all 1,024 battle formations, supported-executable shop inventories/global prices, all 18 English kernel2 text sections, and expanded character equipment/materia/AP/growth/limit fields. These have actual UI controls and project save/readback paths, not placeholder tabs. Independent source failures and partial multi-file saves are handled without losing other pending edits. It also fixes canonical Data Map navigation and late FFNx coverage updates.
+
+19 kernel/HTTP and 15 extended binary/safety tests pass locally and in CI. All seven FF7 browser interaction scenarios passed on the synchronized implementation; the final integration revision is rerunning them. The real shared Data Map also passed locally for both FF7 editions at three window sizes. Final Windows/Linux shared regressions have passed.
+
+This issue remains actionable: scene/character AI, field/world placement, growth-curve coefficients and the remaining executable-only character data are not edited, and real installed-edition/deployment/in-game acceptance is still outstanding. Scene block overflow is deliberately refused rather than breaking KERNEL's lookup. Source games are unchanged by binary saves.
+
+Current scope, format references and safeguards are recorded in `codex/ff7-recovery-20260906.md`; that continuation note supersedes the earlier note that scene/shop/kernel2 editors were wholly absent.
+
+## comment 5560080934 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/79#issuecomment-5560080934
+
+Created: 2026-09-06T15:01:17Z; updated: 2026-09-06T15:17:05Z
+
+Exact metadata: [source record](sources/comment-5560080934-d8029510baf0ad156421ed10449a4f34046c47d97a1c591af4ac6896470a25d0.json).
+
+Recovered and continued the interrupted work in #359. Latest continuation head: `eb1e7d3c03a2c1a64d4228fed48f7841a053c488`, with master's shared Data Map changes and parallel game work preserved.
+
+The PR now connects enemies, enemy attacks, all 1,024 battle formations, supported-executable shop inventories/global prices, all 18 English kernel2 text sections, and expanded character equipment/materia/AP/growth/limit fields. These have actual UI controls and project save/readback paths, not placeholder tabs. Independent source failures and partial multi-file saves retain other pending edits. Canonical Data Map navigation and late FFNx coverage updates are fixed.
+
+**Final CI is green:** [FF7 regressions](https://github.com/Lexer-Lux/Lexeditor/actions/runs/34041628509) passed all five jobs, covering 19 kernel/HTTP tests, 15 extended binary/safety tests and seven Chromium interaction scenarios. [Shared checks](https://github.com/Lexer-Lux/Lexeditor/actions/runs/34041628490) passed Windows, Linux and the real shared Data Map browser suite. Both FF7 editions also passed local real-framework layout/navigation checks at three window sizes.
+
+This issue remains actionable: scene/character AI, field/world placement, growth-curve coefficients, inline names and remaining executable-only character initialization are not edited, and real installed-edition/deployment/in-game acceptance is still outstanding. Scene block overflow is deliberately refused rather than breaking KERNEL's lookup. Binary saves leave installed source games unchanged.
+
+Current scope, format references and safeguards are in `codex/ff7-recovery-20260906.md`; that note supersedes the earlier statement that scene/shop/kernel2 editors were wholly absent. The PR is still open and unmerged; this issue is not being closed.
