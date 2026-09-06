@@ -1,0 +1,72 @@
+name: Validate FF8 Blank UI polish
+on:
+  push:
+    branches: [ui/ff8-blank-global-polish-final]
+    paths: [.github/workflows/ui-polish-validate.yml]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch exact branch without unrelated submodules
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          git config --global core.autocrlf false
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin "$REVISION"
+          git -C editor checkout --detach FETCH_HEAD
+      - name: Apply reviewed UI patch
+        working-directory: editor
+        run: |
+          base64 -d .github/ui-polish.patch.gz.b64 | gzip -dc > /tmp/ui-polish.patch
+          patch -p1 < /tmp/ui-polish.patch
+          python - <<'PY'
+          import subprocess
+          expected={
+            'games/blank/editor.html','games/ff8/editor.html',
+            'tools/verify_ff8_enemy_compact_ui.py','tools/verify_ui_polish_batch.py',
+            'ui/framework.css','ui/framework.js',
+          }
+          changed=set(subprocess.check_output(['git','diff','--name-only']).decode().splitlines())
+          assert changed==expected,(changed,expected)
+          PY
+      - name: Install browser regression dependencies
+        run: |
+          python -m pip install pillow fonttools playwright
+          python -m playwright install --with-deps chromium
+      - name: Run focused and compatibility regressions
+        working-directory: editor
+        run: |
+          python tools/verify_ui_polish_batch.py
+          python tools/verify_ff8_enemy_compact_ui.py --browser ''
+          python tools/verify_ff8_ui_battle_regressions.py --browser ''
+          python tools/verify_live_references_and_ff8_inputs.py
+          python -m compileall -q tools/verify_ui_polish_batch.py tools/verify_ff8_enemy_compact_ui.py
+          node --check ui/framework.js
+          python - <<'PY'
+          from pathlib import Path
+          import re,subprocess
+          for filename in ['games/blank/editor.html','games/ff8/editor.html']:
+              text=Path(filename).read_text(encoding='utf-8')
+              for script in re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',text,re.S|re.I):
+                  subprocess.run(['node','--check'],input=script,text=True,check=True)
+          PY
+          git diff --check
+      - name: Publish only validated source and remove temporary workflow
+        working-directory: editor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add -- games/blank/editor.html games/ff8/editor.html tools/verify_ff8_enemy_compact_ui.py tools/verify_ui_polish_batch.py ui/framework.css ui/framework.js
+          git rm -- .github/ui-polish.patch.gz.b64 .github/workflows/ui-polish-validate.yml
+          git config user.name 'Lexeditor UI repair'
+          git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+          git commit -m 'Polish shared controls graphs paging and FF8 UI'
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push origin HEAD:refs/heads/ui/ff8-blank-global-polish-final
