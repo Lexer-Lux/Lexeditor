@@ -21,12 +21,12 @@ jobs:
           python tools/verify_rdr_cover_shoulder.py
           python tools/verify_rdr_editing.py
           git diff --check
-      - name: Commit source and remove one-shot staging
+      - name: Commit source-only repair
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add games/rdr/server.py games/rdr/camera_features.py tools/verify_rdr_cover_shoulder.py .github/workflows/rdr1-checks.yml
-          git rm .github/rdr1-cover-shoulder-edit.py .github/workflows/apply-rdr1-cover-shoulder.yml
+          git add games/rdr/server.py
+          git rm .github/rdr1-cover-shoulder-edit.py
           git commit -m "feat(rdr1): enable shoulder swapping in cover through camera data"
           git push origin HEAD:fix/rdr1-cover-shoulder-swap
