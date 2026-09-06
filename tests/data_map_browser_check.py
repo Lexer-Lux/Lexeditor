@@ -48,6 +48,8 @@ with sync_playwright() as p:
                 page=browser.new_page(viewport={'width':width,'height':height})
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 page.set_content(html_for(game),wait_until='domcontentloaded')
+                if page.evaluate('typeof state') == 'undefined' and game != 'blank':
+                    raise AssertionError((game,width,height,'plugin state missing',errors,page.locator('body').inner_text()[:1200]))
                 if game=='blank':
                     page.evaluate('navigate("datamap")')
                 else:
