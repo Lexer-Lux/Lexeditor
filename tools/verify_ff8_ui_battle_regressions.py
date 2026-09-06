@@ -124,11 +124,18 @@ def run(framework_path: Path, *, executable: str | None = None) -> None:
             assert page.evaluate("window.query") == "召喚"
             print("PASS IME composition is retained and applied at composition end")
 
-            page.evaluate("window.query = ''; window.delay = 50; window.render();")
-            page.locator(selector).focus()
-            page.keyboard.type("pending", delay=0)
-            page.evaluate("document.getElementById('fixture').replaceChildren();")
-            page.locator("#elsewhere").focus()
+            # Queue the delayed input and navigate away within one browser
+            # task. Separate Playwright round trips can exceed the debounce
+            # on a loaded CI worker and accidentally test an already-applied
+            # search rather than cancellation of a still-pending search.
+            page.evaluate("""() => {
+              window.query = ''; window.delay = 50; window.render();
+              const input = document.querySelector('[data-lex-bottom-search]');
+              input.focus(); input.value = 'pending';
+              input.dispatchEvent(new InputEvent('input', {bubbles: true}));
+              document.getElementById('fixture').replaceChildren();
+              document.getElementById('elsewhere').focus();
+            }""")
             page.wait_for_timeout(120)
             assert page.evaluate("window.query") == ""
             assert page.locator("#elsewhere").evaluate("node => document.activeElement === node")
