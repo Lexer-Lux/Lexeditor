@@ -1,0 +1,267 @@
+from pathlib import Path
+import json
+import re
+
+
+def read(path):
+    return Path(path).read_text(encoding="utf-8")
+
+
+def write(path, value):
+    Path(path).write_text(value, encoding="utf-8", newline="\n")
+
+
+def once(path, old, new):
+    value = read(path)
+    count = value.count(old)
+    if count != 1:
+        raise SystemExit(f"{path}: expected one occurrence, found {count}: {old[:100]!r}")
+    write(path, value.replace(old, new, 1))
+
+
+# Enabled is user-pinnable. Preferences carry a lightweight metadata entry;
+# only materialize the live generated checkbox column when the preference is active.
+once(
+    "ui/framework.js",
+    '''    const preferredColumns = options.columnPreferences?.active?.();
+    // The generic enabled column is not a user-choosable column, so it is
+    // added after saved preferences rather than being subject to them.
+    const columns = preferredColumns
+      ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange)
+      : numberedIdColumns(
+          withEnabledColumn(options.columns, options.rows, options.enabledChange),
+          options.rows || []);
+''',
+    '''    const preferredColumns = options.columnPreferences?.active?.();
+    // Generated metadata becomes a live column only while that preference is
+    // pinned. This is what makes ENABLED genuinely hideable like every other
+    // table column instead of being silently re-added after unpinning.
+    const materializePreferredColumn = column =>
+      String(column.key).toLocaleLowerCase() === ENABLED_KEY
+        ? enabledColumn(options.enabledChange) : column;
+    const columns = preferredColumns
+      ? numberedIdColumns(preferredColumns.map(materializePreferredColumn), options.rows || [])
+      : numberedIdColumns(
+          withEnabledColumn(options.columns, options.rows, options.enabledChange),
+          options.rows || []);
+''',
+)
+
+# The permanent shortcut badge is the only implementation. Remove the old
+# pointer-hover ordinal code rather than merely hiding it in CSS.
+js = read("ui/framework.js")
+js, count = re.subn(
+    r'''\n    // Hovering a tab reveals the number that jumps to it\.\n    nav\.addEventListener\("pointerover".*?\n    \}\);\n\n    const removeControlHelp =''',
+    "\n\n    const removeControlHelp =",
+    js,
+    count=1,
+    flags=re.S,
+)
+if count != 1:
+    raise SystemExit(f"framework.js: shortcut ordinal block matches={count}")
+write("ui/framework.js", js)
+
+# A BOOL row advertises itself as a toggle, so clicking its label/row toggles it.
+once(
+    "ui/framework.js",
+    '''    autoFitBoxText(labelTextNode, {minimum:7});
+    if (node.dataset.lexProperty) bindColumnHighlight(node, node.dataset.lexProperty);
+    // The rail runs down the side of one row, so its type name has to fit that
+''',
+    '''    autoFitBoxText(labelTextNode, {minimum:7});
+    if (node.dataset.lexProperty) bindColumnHighlight(node, node.dataset.lexProperty);
+    if (booleanField && input && !readOnly) {
+      node.classList.add("lex-clickable-boolean-field");
+      node.addEventListener("click", event => {
+        if (event.defaultPrevented || event.button !== 0) return;
+        if (event.target.closest("input,button,a,select,textarea,[role='button'],.lex-reference-value,.lex-info-help,.lex-column-pin")) return;
+        input.click();
+        input.focus({preventScroll:true});
+      });
+    }
+    // The rail runs down the side of one row, so its type name has to fit that
+''',
+)
+
+# Remove the last duplicate authorization gate and stale mode storage.
+once(
+    "desktop_host.py",
+    '''        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Developer Mode requires the authorized GitHub account")
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Lexer's active GitHub account is required")
+''',
+    '''        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Developer Mode requires the authorized GitHub account")
+''',
+)
+settings = read("settings_manager.py")
+settings = settings.replace('    "developerMode": False,\n', "")
+settings = settings.replace(
+    'PACKAGED_DEFAULT_KEYS = tuple(key for key in DEFAULTS if key not in {"developerMode", "viewPreferences"})',
+    'PACKAGED_DEFAULT_KEYS = tuple(key for key in DEFAULTS if key != "viewPreferences")',
+)
+settings = settings.replace('            "developerMode": False,\n', "")
+settings = settings.replace(
+    '        """Save the per-user settings. Lexer-scope values stay packaged defaults."""',
+    '        """Save per-user settings; developer authorization is derived from GitHub identity."""',
+)
+settings = settings.replace(
+    '            raise ValueError("Lexer defaults must be an object")',
+    '            raise ValueError("Developer defaults must be an object")',
+)
+settings = settings.replace('            "developerMode": bool(current["developerMode"]),\n', "")
+write("settings_manager.py", settings)
+defaults = json.loads(read("ui/default_settings.json"))
+defaults.pop("developerMode", None)
+write("ui/default_settings.json", json.dumps(defaults, indent=2, sort_keys=True) + "\n")
+
+# Tighten the bool ref rail: V/LL belongs next to the check/X.
+css = read("ui/framework.css")
+marker = "/* Bool refs use a compact tag beside the check/X. */"
+if marker not in css:
+    css += '''
+
+/* Bool refs use a compact tag beside the check/X. */
+.lex-boolean-field .lex-reference-values .lex-reference-tag {
+  flex:0 0 auto !important; width:auto !important; min-width:0 !important; max-width:none !important;
+  margin-right:2px !important; text-align:center !important;
+}
+.lex-boolean-field .lex-reference-value { gap:2px !important; }
+.lex-clickable-boolean-field { cursor:pointer; }
+.lex-clickable-boolean-field :is(input,button,a,select,textarea) { cursor:auto; }
+'''
+    write("ui/framework.css", css)
+
+# Update old tests that explicitly required deleted Lexer Mode / Design Review.
+path = "tests/test_global_issues.py"
+t = read(path)
+t = t.replace(
+    "        h._settings=Mock();h._settings.snapshot.return_value={'lexerMode':True}\n",
+    "        h._settings=Mock();h._settings.snapshot.return_value={}\n"
+    "        h._github=Mock();h._github.visible_repository.return_value={'login':'Lexer-Lux','repository':'Lexer-Lux/Lexeditor'}\n",
+)
+t = t.replace(
+    "        h=self.host();h._settings.snapshot.return_value={'lexerMode':False}\n"
+    "        with self.assertRaises(PermissionError):h.helper_versions()\n",
+    "        h=self.host();h._github.visible_repository.return_value=None\n"
+    "        with self.assertRaises(PermissionError):h.helper_versions()\n",
+)
+write(path, t)
+
+path = "tests/test_global_followup.py"
+t = read(path)
+t, count = re.subn(
+    r'''    def test_design_review_is_opt_in_and_has_no_write_or_launch\(self\):\n.*?(?=    def test_guide_edits_sources_not_generated_bundle)''',
+    '''    def test_design_review_and_editable_table_special_cases_are_gone(self):
+        self.assertFalse((ROOT/'ui/design-review.js').exists())
+        self.assertFalse((ROOT/'ui/design-review.css').exists())
+        blank=(ROOT/'games/blank/editor.html').read_text(encoding='utf-8')
+        self.assertNotIn('Design Review',blank)
+        self.assertNotIn('Editable Table',blank)
+        self.assertIn('pagedView(true)',blank)
+        self.assertIn('id:"graphs",label:"Graphs"',blank)
+        self.assertIn('curveEditor(',blank)
+''',
+    t,
+    count=1,
+    flags=re.S,
+)
+if count != 1:
+    raise SystemExit(f"test_global_followup design test matches={count}")
+write(path, t)
+
+# Browser regressions for the exact shared behaviors that were broken.
+path = "tests/global_controls_check.py"
+t = read(path)
+anchor = """        assert result['cancel'] and result['error'] and not result['canForward'] and result['current']=='Data Map',result
+        assert not errors, errors
+"""
+insert = """        assert result['cancel'] and result['error'] and not result['canForward'] and result['current']=='Data Map',result
+        # BOOL rows toggle from the property itself, and the Detail icon owns
+        # the standard model-preview drawer/open-close slot.
+        page.evaluate('''()=>{
+          const U=LexeditorUI,e=U.el;window.__flag=false;
+          const input=e('input',{id:'shared-bool',type:'checkbox',checked:false,onchange:event=>__flag=event.target.checked});
+          const field=U.detailField({label:'Enabled',property:'enabled',dataType:'BOOL',control:input});
+          const panel=U.detailPanel({title:'Fixture',icon:e('span',{},'M'),modelPreview:e('div',{id:'shared-preview'},'model'),body:[field]});
+          document.querySelector('#main').replaceChildren(panel);
+        }''')
+        page.locator('.lex-detail-field-label').click();assert page.evaluate('__flag') is True
+        trigger=page.locator('.lex-model-preview-trigger');trigger.click()
+        assert page.locator('.lex-detail-panel').evaluate("n=>n.classList.contains('lex-model-preview-open')")
+        assert page.locator('#shared-preview').is_visible()
+        trigger.click();assert not page.locator('.lex-detail-panel').evaluate("n=>n.classList.contains('lex-model-preview-open')")
+        # ENABLED participates in the same pin preference as declared columns.
+        page.evaluate('''()=>{
+          const U=LexeditorUI,e=U.el;localStorage.removeItem('lexeditor:columns:enabled-pin-fixture');
+          window.__pinRows=[{id:1,name:'Alpha',enabled:true}];
+          window.__pinPrefs=U.columnPreferences('enabled-pin-fixture',[{key:'name',label:'Name'}],()=>{});
+          window.__renderPin=()=>document.querySelector('#main').replaceChildren(U.columnList({rows:__pinRows,key:r=>r.id,columnPreferences:__pinPrefs,columns:[{key:'name',label:'Name'}],enabledChange:()=>{}}));
+          __renderPin();
+        }''')
+        assert page.locator('[role=columnheader][data-column-key=enabled]').count()==1
+        page.evaluate("__pinPrefs.toggle('enabled');__renderPin()")
+        assert page.locator('[role=columnheader][data-column-key=enabled]').count()==0
+        page.evaluate("__pinPrefs.toggle('enabled');__renderPin()")
+        assert page.locator('[role=columnheader][data-column-key=enabled]').count()==1
+        # Right-click revert repaints a bounded-number fill immediately.
+        page.evaluate('''()=>{
+          const U=LexeditorUI,e=U.el;window.__amount=80;
+          const input=e('input',{id:'reset-number',type:'number',min:0,max:100,step:1,value:80,oninput:event=>__amount=Number(event.target.value)});
+          const source=U.provenanceControl({control:input,current:()=>__amount,vanilla:20,apply:value=>{__amount=Number(value);input.value=String(__amount)}});
+          document.querySelector('#main').replaceChildren(U.detailField({label:'Amount',dataType:'INT',min:0,max:100,control:source}));
+        }''')
+        page.locator('.lex-detail-field').click(button='right');page.wait_for_timeout(30)
+        assert page.locator('#reset-number').input_value()=='20'
+        assert abs(float(page.locator('.lex-value-fill').evaluate("n=>getComputedStyle(n).getPropertyValue('--lex-value-ratio')"))-.2)<.001
+        assert not errors, errors
+"""
+if anchor not in t:
+    raise SystemExit("global_controls_check browser anchor not found")
+write(path, t.replace(anchor, insert, 1))
+
+# Static contract for the rest of the batch.
+Path("tests/test_shared_ui_followup.py").write_text(
+    '''from pathlib import Path
+import json
+import unittest
+ROOT=Path(__file__).resolve().parents[1]
+
+class SharedUiFollowup(unittest.TestCase):
+    def test_shared_framework_contract(self):
+        js=(ROOT/'ui/framework.js').read_text('utf-8')
+        css=(ROOT/'ui/framework.css').read_text('utf-8')
+        self.assertIn('lex-model-preview-drawer',js)
+        self.assertNotIn('lex-tab-ordinal',js)
+        self.assertIn('materializePreferredColumn',js)
+        self.assertIn('lex-clickable-boolean-field',js)
+        self.assertIn('--lex-detail-label-width:10%',css)
+        self.assertIn('lex-reference-ll',css)
+        self.assertIn('#7CFC00',css)
+        self.assertIn('lex-reset-flash',css)
+        self.assertIn('lex-curve-variables-open',css)
+
+    def test_developer_mode_is_identity_derived(self):
+        host=(ROOT/'desktop_host.py').read_text('utf-8')
+        settings=(ROOT/'settings_manager.py').read_text('utf-8')
+        defaults=json.loads((ROOT/'ui/default_settings.json').read_text('utf-8'))
+        self.assertIn('payload["developerMode"] = bool(identity)',host)
+        self.assertNotIn('lexerMode',host)
+        self.assertNotIn('"developerMode": False',settings)
+        self.assertNotIn('developerMode',defaults)
+
+    def test_blank_is_shared_reference_not_special_types(self):
+        blank=(ROOT/'games/blank/editor.html').read_text('utf-8')
+        self.assertNotIn('Design Review',blank)
+        self.assertNotIn('Editable Table',blank)
+        self.assertIn('pagedView(true)',blank)
+        self.assertFalse((ROOT/'ui/design-review.js').exists())
+
+    def test_docs_are_user_or_architecture_docs(self):
+        names={p.name for p in (ROOT/'docs').iterdir() if p.is_file()}
+        self.assertEqual(names,{'ADDING_A_GAME.md','SHARED_UI_DESIGN.md','UI-MANUAL.md'})
+        self.assertTrue((ROOT/'worklog/reference/warband-acceptance.md').exists())
+
+if __name__=='__main__': unittest.main()
+''', encoding="utf-8", newline="\n")
