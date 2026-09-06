@@ -1,0 +1,131 @@
+name: Finalize knowledge handoff
+on:
+  push:
+    branches: [master]
+    paths: [.github/workflows/knowledge-handoff-finalize.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: lexeditor-knowledge-store
+  cancel-in-progress: false
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: master
+          submodules: false
+          sparse-checkout: |
+            tools/import_knowledge.py
+            .github/knowledge-import-request.json
+            .github/workflows/knowledge-store.yml
+            codex
+            worklog
+            docs
+          sparse-checkout-cone-mode: false
+      - name: Complete provenance routing without issue mutations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import datetime,hashlib,importlib.util,json,pathlib,subprocess
+          root=pathlib.Path('.')
+          p=root/'tools/import_knowledge.py';text=p.read_text()
+          old='        if canonical:\n            merge_file(canonical,data,key,ledger,conflicts)'
+          new="        if b'KNOWLEDGE HAS MOVED TO LEXEDITOR' in data[:200]:\n            canonical=None  # Forwarding stubs must never replace the actual central knowledge.\n        if canonical:\n            merge_file(canonical,data,key,ledger,conflicts)"
+          assert old in text or new in text
+          if new not in text:text=text.replace(old,new)
+          p.write_text(text)
+          compile(text,str(p),'exec')
+          workflow=root/'.github/workflows/knowledge-store.yml';text=workflow.read_text()
+          old='        run: gh run download 34033219303 --repo Lexer-Lux/Lexeditor --name human-issue-audit-34033219303 --dir /tmp/knowledge-baseline'
+          new='        run: |\n          if [ ! -f worklog/migrations/comment-archive/snapshot.json ]; then\n            gh run download 34033219303 --repo Lexer-Lux/Lexeditor --name human-issue-audit-34033219303 --dir /tmp/knowledge-baseline\n          fi'
+          assert old in text or new in text
+          workflow.write_text(text.replace(old,new))
+          # File-scoped transfer links have served their purpose; no reusable credential is stored.
+          request=root/'.github/knowledge-import-request.json'
+          ledger=json.loads((root/'worklog/migrations/game-knowledge.json').read_text())
+          request.write_text(json.dumps({'imports':[],'gaps':ledger.get('gaps',[]),'state':'completed snapshot import; provide a newly reviewed export for a future catch-up'},indent=2)+'\n')
+          for game in ('ff7','ff8','ff9','rdr1','shared'):
+              directory=root/'codex'/game
+              topics=sorted(p for p in directory.rglob('*') if p.is_file() and p.name!='README.md' and p.suffix in {'.md','.txt'})
+              if topics:
+                  body=f'# {game.upper()} codex\n\nCanonical central topics. Full requests and pending work belong in per-issue worklogs.\n\n'+''.join(f'- [{p.stem}]({p.relative_to(directory).as_posix()})\n' for p in topics)
+                  body+='\nSee `worklog/migrations/game-knowledge.json` for separate source-repository coverage and local-only gaps. Existing central topics do not imply that an unavailable local codex has been imported.\n'
+                  (directory/'README.md').write_text(body)
+          report_path=root/'worklog/migrations/knowledge-consolidation-2026-09-06/verification.json'
+          report=json.loads(report_path.read_text())
+          result=subprocess.run(['gh','api','repos/Lexer-Lux/Lexeditor/actions/jobs/101497841433/logs','--allow-escape-sequences'],capture_output=True,timeout=90)
+          if result.returncode==0:
+              lines=result.stdout.decode('utf-8-sig',errors='replace').splitlines()
+              report['stopped_cleanup_error']=[line for line in lines if any(word in line for word in ('RuntimeError:','HTTP 403','secondary rate','rate limit','Resource not accessible'))][-8:]
+          else:report['stopped_cleanup_error']=['Log read failed: '+result.stderr.decode(errors='replace')[-500:]]
+          report['handoff_finalized_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+          report_path.write_text(json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n')
+          (root/'docs').mkdir(exist_ok=True)
+          (root/'docs/KNOWLEDGE.md').write_text('''# Requests, worklogs and codices
+
+GitHub is the concise human-facing view, not the complete specification.
+
+- Preserve a new user request verbatim before shortening it. Include examples,
+  numeric rules, exceptions, rejected alternatives and later corrections.
+- Use `worklog/issues/github-N.md` for the current handoff and acceptance criteria.
+  Link immutable originals in `worklog/issues/github-N/sources/`; full archived
+  discussion is readable in `github-N/conversation.md`.
+- Keep settled knowledge in `codex/<game>/`. Keep guesses, attempts, remaining
+  implementation and delivery evidence in the issue worklog.
+- Search the preserved originals before asking a question. Missing/unretrieved
+  context is agent recovery work, not evidence that Lexer supplied no details.
+- Delete a visible comment only after its exact version and attachments are
+  committed and verified. Re-read before deletion and preserve changed/new data.
+
+## Parallel ownership
+
+One owner edits an issue handoff. Other contributors append uniquely named session
+or source records. One integrator reconciles the handoff and shared codex indices.
+Do not let every worker overwrite a global Worklog.txt.
+
+## Catch up after branches merge
+
+1. Save/commit the worker's actual new notes; a remote snapshot cannot include
+   uncommitted local files. Preserve local-only files through an explicit import.
+2. Export documentation using the source repository's export workflow. Compare
+   its file hashes and source commit with `worklog/migrations/game-knowledge.json`.
+3. Review the new documentation before publication. Use a fresh, artifact-scoped
+   GitHub download link for the reviewed export, never an account token or game dump.
+4. Submit the reviewed import manifest and run the central import workflow. The
+   importer stores original bytes in a repository/commit namespace, preserves
+   diverged central files and reports conflicts rather than silently overwriting.
+   Forwarding stubs are never imported over real central knowledge.
+5. Reconcile conflicting claims against newer human decisions and actual code.
+   Link verified transferred issue identities; never match repositories by number
+   alone. Re-run source/attachment verification before comment cleanup.
+
+The source snapshots, hashes and reconciliation reports make this repeatable; they
+do not automatically recover chat text that was never captured. GitHub event
+archival preserves future body/comment edits, including before-edit text supplied
+by GitHub. Agents must still save the full original chat request at intake.
+''')
+          print(json.dumps({'cleanup_error':report['stopped_cleanup_error'],'imported_sources':list(ledger['sources']),'note':'No issue comments deleted by this finalization.'}))
+          PY
+      - name: Commit and verify the handoff
+        run: |
+          set -euo pipefail
+          git config user.name 'Lexeditor Knowledge Handoff'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f tools/import_knowledge.py .github/knowledge-import-request.json .github/workflows/knowledge-store.yml codex worklog/migrations docs/KNOWLEDGE.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'Finalize lossless knowledge routing and post-merge catch-up safeguards [skip ci]'
+            pushed=0
+            for attempt in 1 2 3; do
+              git -c submodule.recurse=false fetch --no-recurse-submodules origin master
+              git -c submodule.recurse=false rebase origin/master
+              if git push origin HEAD:master; then pushed=1; break; fi
+            done
+            test "$pushed" = 1
+          fi
+          git -c submodule.recurse=false fetch --no-recurse-submodules origin master
+          git merge-base --is-ancestor HEAD origin/master
