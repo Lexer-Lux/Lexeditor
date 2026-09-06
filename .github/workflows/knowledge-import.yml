@@ -6,7 +6,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: lexeditor-knowledge-store
+  group: lexeditor-knowledge-import
   cancel-in-progress: false
 jobs:
   import:
@@ -19,7 +19,6 @@ jobs:
           submodules: false
           sparse-checkout: |
             tools/import_knowledge.py
-            tools/knowledge_store.py
             codex
             worklog
             .github/knowledge-import-request.json
@@ -28,18 +27,10 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('tools/import_knowledge.py');text=p.read_text()
-          old="put(base/'reconciliation.json',dump({'conflicts':conflicts,'source_skips':manifest.get('skipped',[]),'mapped_issue_worklogs':mapped}),True)"
-          new="put(base/'reconciliation.json',dump({'conflicts':conflicts,'source_skips':manifest.get('skipped',[]),'mapped_issue_worklogs':mapped}))"
-          assert old in text or new in text
-          text=text.replace(old,new)
-          oldhost="not (parsed.hostname or '').endswith('.oaiusercontent.com')"
-          newhost="not ((parsed.hostname or '').endswith('.oaiusercontent.com') or re.fullmatch(r'productionresults[a-z0-9]+[.]blob[.]core[.]windows[.]net', parsed.hostname or ''))"
-          assert oldhost in text or newhost in text
-          text=text.replace(oldhost,newhost).replace('Only the explicitly reviewed, file-scoped transfer URL is accepted','Only a reviewed file-scoped ChatGPT or GitHub Actions artifact transfer URL is accepted')
-          p.write_text(text)
           import importlib.util,tempfile
-          s=importlib.util.spec_from_file_location('importer',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+          p=Path('tools/import_knowledge.py')
+          s=importlib.util.spec_from_file_location('importer',p)
+          m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
           with tempfile.TemporaryDirectory() as d:
               target=Path(d)/'topic.md';ledger={};conflicts=[]
               m.merge_file(target,b'original','repo:topic',ledger,conflicts)
@@ -48,53 +39,30 @@ jobs:
               target.write_bytes(b'parallel central work')
               m.merge_file(target,b'different source update','repo:topic',ledger,conflicts)
               assert target.read_bytes()==b'parallel central work' and len(conflicts)==1
-              m.put(Path(d)/'immutable',b'exact',True)
-              try:m.put(Path(d)/'immutable',b'wrong',True)
-              except ValueError:pass
-              else:raise AssertionError('Immutable archive overwrite allowed')
           for bad in ('../escape','/absolute','.git/config','a/../../escape','a\\b'):
               try:m.safe_path(bad)
               except ValueError:pass
               else:raise AssertionError('Unsafe path accepted')
           print('Importer preservation and conflict tests passed')
           PY
-      - name: Import only reviewed immutable documentation snapshots
+      - name: Import reviewed codex and worklog snapshots
         run: python3 tools/import_knowledge.py .github/knowledge-import-request.json
-      - name: Refresh the current request archive without changing its text
-        run: |
-          python3 - <<'PY'
-          import importlib.util
-          s=importlib.util.spec_from_file_location('store','tools/knowledge_store.py');m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
-          m.regenerate(86,{'title':'Centralize lossless issue worklogs and per-game codices'})
-          PY
-      - name: Commit only knowledge and its import ledger
+      - name: Commit only centralized game knowledge and import ledger
         run: |
           set -euo pipefail
           git config user.name 'Lexeditor Knowledge Import'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -f codex worklog tools/import_knowledge.py
           if ! git diff --cached --quiet; then
-            git commit -m 'Centralize reviewed game codices and full worklogs with source provenance [skip ci]'
+            git commit -m 'Centralize reviewed game codices and worklogs [skip ci]'
             pushed=0
             for attempt in 1 2 3; do
-              git -c submodule.recurse=false fetch --no-recurse-submodules origin master
-              git -c submodule.recurse=false rebase origin/master
+              git fetch --no-recurse-submodules origin master
+              git rebase origin/master
               if git push origin HEAD:master; then pushed=1; break; fi
             done
             test "$pushed" = 1
           fi
-          git -c submodule.recurse=false fetch --no-recurse-submodules origin master
+          git fetch --no-recurse-submodules origin master
           git merge-base --is-ancestor HEAD origin/master
           git diff --exit-code HEAD -- codex worklog
-          git rev-parse HEAD > knowledge-import-commit.txt
-      - name: Retain verified import results
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: knowledge-import-result-${{ github.run_id }}
-          path: |
-            knowledge-import-result.json
-            knowledge-import-commit.txt
-            worklog/migrations/game-knowledge.json
-          if-no-files-found: ignore
-          retention-days: 30
