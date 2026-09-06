@@ -51,6 +51,8 @@ def main():
                     model={**MODEL,'texture':'data:image/png;base64,'+base64.b64encode(TEXTURE).decode()}
                     stub='const replaceState=history.replaceState.bind(history);history.replaceState=(state,unused)=>replaceState(state,unused);window.fetch=async function(input){const path=String(input);const fixtures='+json.dumps(fixtures)+';if(path.startsWith("/api/item-preview?")){return new Response(JSON.stringify(path.includes("broken")?{error:"Missing diffuse texture fixture"}:'+json.dumps(model)+'),{status:path.includes("broken")?422:200});}if(path.startsWith("/api/item-icon?")){if(path.includes("broken"))return new Response(JSON.stringify({error:"Missing diffuse texture fixture"}),{status:422});const bytes=Uint8Array.from(atob("'+base64.b64encode(ICON).decode()+'"),c=>c.charCodeAt(0));return new Response(bytes,{headers:{"Content-Type":"image/png"}});}return new Response(JSON.stringify(fixtures[path]||{}));};'
                     html=(ROOT/'games/warband/editor.html').read_text()
+                    # Synthetic set_content pages need a hierarchical base for shared optional asset URLs.
+                    html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
                     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
                     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text()+'</script>')
                     html=html.replace('<script src="/warband/troop_trees.js"></script>','<script>'+(ROOT/'games/warband/troop_trees.js').read_text()+'</script>')
