@@ -1,0 +1,32 @@
+name: Fix FF8 camera staging dependency
+on:
+  push:
+    branches: [fix/ff8-world-camera-pitch]
+    paths: [.github/workflows/fix-ff8-camera-pitch-stage.yml]
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Fetch branch and repair dependency list
+        run: |
+          git init editor
+          git -C editor remote add origin https://x-access-token:${{ github.token }}@github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin fix/ff8-world-camera-pitch
+          git -C editor checkout -B fix/ff8-world-camera-pitch FETCH_HEAD
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('editor/.github/workflows/ff8-camera-pitch-stage.yml')
+          s=p.read_text()
+          old='python -m pip install pefile==2024.8.26 unicorn==2.1.4'
+          new='python -m pip install pillow pefile==2024.8.26 unicorn==2.1.4'
+          assert s.count(old)==1
+          p.write_text(s.replace(old,new,1))
+          PY
+          git -C editor rm .github/workflows/fix-ff8-camera-pitch-stage.yml
+          git -C editor add .github/workflows/ff8-camera-pitch-stage.yml
+          git -C editor config user.name Lexer
+          git -C editor config user.email 89482099+Lexer-Lux@users.noreply.github.com
+          git -C editor commit -m 'ci: install Pillow for FF8 camera regression'
+          git -C editor push origin HEAD:fix/ff8-world-camera-pitch
