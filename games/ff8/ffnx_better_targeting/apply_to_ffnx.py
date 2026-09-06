@@ -12,6 +12,12 @@ PINNED_FFNX_REVISION = "1e291885da4ddb482188b81a5198d56a1915fde6"
 
 def replace_once(path: Path, old: bytes, new: bytes) -> None:
     data = path.read_bytes()
+    # Git may materialize the pinned FFNx sources with either LF or CRLF.
+    # Match the file's existing newline convention instead of making source
+    # application depend on core.autocrlf/platform checkout behavior.
+    if b"\r\n" not in data and b"\n" in data:
+        old = old.replace(b"\r\n", b"\n")
+        new = new.replace(b"\r\n", b"\n")
     count = data.count(old)
     if count != 1:
         raise RuntimeError(f"Expected one Better Targeting anchor in {path}, found {count}")
