@@ -1,0 +1,61 @@
+name: Remove stale issue-archive pointers
+on:
+  push:
+    branches: [master]
+    paths: [.github/workflows/cleanup-worklog-archive-pointers.yml]
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: master
+          fetch-depth: 1
+          submodules: false
+      - name: Point central handoffs at live GitHub issues instead of deleted archives
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root=Path('worklog/issues')
+          changed=0
+          old_req='Recover the complete scope from the linked verbatim sources before implementation or status changes. The short GitHub summary is not the full specification. Do not infer that missing chat text was never supplied.'
+          new_req='Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.'
+          old_evidence='Reconcile live code, PRs and existing topic/session worklogs. This archive import makes no build, deployment or gameplay-success claim.'
+          new_evidence='Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.'
+          old_next='Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.'
+          new_next='Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.'
+          for p in root.glob('github-*.md'):
+              text=p.read_text('utf-8')
+              original=text
+              m=re.match(r'github-(\d+)[.]md$',p.name)
+              if not m: continue
+              n=m.group(1)
+              text=text.replace(f'[Full request and discussion archive](github-{n}/conversation.md)',f'[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/{n})')
+              text=text.replace(old_req,new_req).replace(old_evidence,new_evidence).replace(old_next,new_next)
+              # Remove empty duplicate archive-pointer sections left by the old generator.
+              text=re.sub(r'\n## Preserved source records\n\n\[Live GitHub issue and comments\]\(https://github[.]com/Lexer-Lux/Lexeditor/issues/'+re.escape(n)+r'\)\n?', '\n', text)
+              if text!=original:
+                  p.write_text(text,'utf-8'); changed+=1
+          bad=[]
+          for p in root.glob('github-*.md'):
+              text=p.read_text('utf-8')
+              if re.search(r'github-\d+/conversation[.]md|github-\d+/sources/',text): bad.append(str(p))
+          if bad: raise SystemExit('Stale archive pointers remain: '+', '.join(bad[:20]))
+          print(f'Updated {changed} central issue handoffs')
+          PY
+      - name: Commit cleaned central handoffs
+        run: |
+          set -euo pipefail
+          git config user.name 'Lexeditor Worklog Cleanup'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add worklog/issues
+          if ! git diff --cached --quiet; then
+            git commit -m 'Point central worklogs at live issues, not deleted archives [skip ci]'
+            git fetch origin master
+            git rebase origin/master
+            git push origin HEAD:master
+          fi
