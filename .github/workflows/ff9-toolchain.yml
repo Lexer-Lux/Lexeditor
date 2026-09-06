@@ -8,19 +8,25 @@ permissions:
 jobs:
   prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - name: Collect public reference assemblies and compiler
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Collect public compiler, framework references and IL tools
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p ff9-toolchain/References ff9-toolchain/dotnet
-          curl --fail --location --retry 2 https://raw.githubusercontent.com/Albeoris/Memoria/d8df6e69ddb618adc753a27d9424409d66216a35/References/Dependencies.7z -o ff9-toolchain/Dependencies.7z
-          test "$(git hash-object ff9-toolchain/Dependencies.7z)" = c460af533dd009b55951ab8ea25fac168fde7bad
-          7z x ff9-toolchain/Dependencies.7z -off9-toolchain/References -y
+          mkdir -p ff9-toolchain/dotnet ff9-toolchain/packages ff9-toolchain/wheels
+          for spec in microsoft.netframework.referenceassemblies.net35:1.0.3 microsoft.netframework.referenceassemblies.net472:1.0.3 mono.cecil:0.11.6; do
+            name=${spec%:*}; version=${spec#*:}
+            curl --fail --location --retry 2 "https://api.nuget.org/v3-flatcontainer/$name/$version/$name.$version.nupkg" -o "ff9-toolchain/packages/$name.$version.nupkg"
+            unzip -q "ff9-toolchain/packages/$name.$version.nupkg" -d "ff9-toolchain/packages/$name"
+          done
+          python -m pip download --dest ff9-toolchain/wheels UnityPy==1.23.0 dnfile==0.17.0
           root=$(dirname "$(readlink -f "$(command -v dotnet)")")
           cp "$root/dotnet" ff9-toolchain/dotnet/
           cp -r "$root/host" ff9-toolchain/dotnet/
@@ -33,6 +39,7 @@ jobs:
           printf '%s\n' "$runtime" > ff9-toolchain/runtime-version.txt
           printf '%s\n' "$sdk" > ff9-toolchain/sdk-version.txt
           find ff9-toolchain -type f \( -iname '*.ttf' -o -iname '*.otf' -o -iname '*.woff*' \) -delete
+          find ff9-toolchain/packages -name '*.nupkg' -exec sha256sum {} \; > ff9-toolchain/package-sha256.txt
           tar -czf ff9-toolchain.tar.gz ff9-toolchain
       - uses: actions/upload-artifact@v4
         with:
