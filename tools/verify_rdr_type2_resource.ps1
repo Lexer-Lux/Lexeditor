@@ -41,7 +41,7 @@ try {
     try { & $fixtureExe $template $original } finally { Pop-Location }
     if ($LASTEXITCODE -ne 0) { throw 'Could not create encrypted RSC85 type-2 fixture' }
     $header = [IO.File]::ReadAllBytes($template)
-    if ([BitConverter]::ToUInt32($header, 0) -ne 0x85435352 -or [BitConverter]::ToInt32($header, 4) -ne 2) {
+    if ([BitConverter]::ToUInt32($header, 0) -ne [uint32]2235781970 -or [BitConverter]::ToInt32($header, 4) -ne 2) {
         throw 'Synthetic WSC header is not RSC85 type 2'
     }
 
