@@ -1,0 +1,9 @@
+{
+  "source_url": "https://github.com/Lexer-Lux/Lexeditor/issues/96",
+  "author": "Lexer-Lux",
+  "issue_number": 96,
+  "captured_date": "2026-09-06",
+  "capture_note": "Verbatim live issue body retrieved before completion/delivery update; earlier bodies/comments are retained in the repository legacy issue-status archive.",
+  "body_sha256": "ccf5a41c0bcd554207b8eb07d07ebfde99774e092a98fa97d014561f5f6fbd10",
+  "body": "**Actionable — delivery remains.** Faction/tree selectors, bottom-up upgrade graphs and linked troop details are in draft PR #361, not the normal installed editor. Fixture checks pass, but your actual module is unverified.\n\nA ready-to-run test copy still needs preparing. Roots must sit below upgrades, branch links must match the module, and selecting any node must show that troop’s details."
+}

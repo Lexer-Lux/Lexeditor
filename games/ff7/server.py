@@ -63,7 +63,8 @@ def data_map() -> dict:
                     f"Integrated KERNEL.BIN section {category.section}. Saves a lossless project copy "
                     f"to {project}; names and descriptions are read-only."
                 ),
-                "status": "integrated",
+                "status": "partial", "coverage": "structured",
+                "target": category.key, "id": category.key,
                 "openable": True,
                 "sourcePath": str(source),
             })
@@ -71,19 +72,20 @@ def data_map() -> dict:
         rows.append({
             "filename": "English KERNEL.BIN",
             "controls": "Items, weapons, armor, accessories, and materia",
-            "notes": str(error), "status": "blocked", "openable": False,
+            "notes": str(error), "status": "not-integrated", "coverage": "unavailable", "openable": False,
         })
     rows.extend({
         "filename": f"Unresolved / {name}", "controls": controls,
         "notes": "No proved writable format path is connected yet.",
-        "status": "not-integrated", "openable": False,
+        "status": "not-integrated", "coverage": "unavailable", "openable": False,
     } for name, controls in UNRESOLVED_AREAS)
     config = GAME_ROOT / "FFNx.toml"
     rows.append({
         "filename": "FFNx.toml", "controls": "FFNx display, audio, rendering, mod and runtime settings",
         "notes": "The Tweaks tab edits typed values in place and preserves comments and file order."
                  if config.is_file() else "Available after FFNx creates its configuration in the game directory.",
-        "status": "integrated" if config.is_file() else "partial", "openable": config.is_file(),
+        "status": "integrated" if config.is_file() else "not-integrated", "openable": config.is_file(),
+        "coverage": "structured" if config.is_file() else "unavailable", "target": "tweaks",
     })
     return {"contract": "Lexeditor.data-map", "rows": rows}
 

@@ -1,0 +1,11 @@
+Source: current ChatGPT conversation, user Lexer, captured September 6, 2026.
+Scope: continuation authorization for Warband issues #20, #78, #96, #97 and #98.
+The following user messages are verbatim, in conversation order:
+
+So a bunch of other instances are working on other games in the LExeditor github. but since it's github, can't we edit lots of stuff at once? why don't you do all the warband issues?
+
+So you did everything?
+
+??? SO DO THEM WTF
+
+Context, not a quotation: the assistant had stopped at a draft PR and admitted that stock/native launch, the cross-plugin Data Map audit and delivery remained. The final user message authorizes continuing that work, not another priority/design clarification.

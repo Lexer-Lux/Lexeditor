@@ -57,7 +57,9 @@ def data_map() -> dict:
             "filename": row["relativePath"],
             "controls": row["controls"],
             "notes": f"{row['label']}. Writes a project overlay; the game baseline is never overwritten.",
-            "status": "integrated" if row["available"] else "partial",
+            "status": "integrated" if row["available"] else "not-integrated",
+            "coverage": "structured" if row["available"] else "unavailable",
+            "dataset": row["key"], "id": row["key"],
             "openable": row["available"],
             "target": row["tab"],
         })
@@ -68,11 +70,12 @@ def data_map() -> dict:
             "filename": "Memoria.ini", "controls": "Memoria engine, graphics, audio, battle and mod settings",
             "notes": "The Tweaks tab edits typed values in place and preserves comments and file order."
                      if config.is_file() else "Available after Memoria creates its configuration beside FF9_Launcher.exe.",
-            "status": "integrated" if config.is_file() else "partial", "openable": config.is_file(),
+            "status": "integrated" if config.is_file() else "not-integrated", "openable": config.is_file(),
+            "coverage": "structured" if config.is_file() else "unavailable",
             "target": "tweaks",
         }] + [{
             "filename": filename, "controls": controls, "notes": notes,
-            "status": "not-integrated", "openable": False,
+            "status": "not-integrated", "coverage": "unavailable", "openable": False,
         } for filename, controls, notes in UNRESOLVED_AREAS],
     }
 
