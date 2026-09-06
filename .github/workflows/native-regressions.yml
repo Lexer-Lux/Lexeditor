@@ -52,16 +52,12 @@ jobs:
           for script in re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', text, re.S | re.I):
               subprocess.run(['node', '--check'], input=script, text=True, check=True)
           PY
-      - name: Preserve search and merged Enemies UI fixes
+      - name: Preserve search and all merged Enemies UI fixes
         working-directory: editor
         run: |
-          python tools/verify_ff8_ui_battle_regressions.py
-          # The native branch predates the independently merged Enemies UI;
-          # the pull-request merge tree and master must exercise those tests.
-          if [ -f tools/verify_ff8_enemy_compact_ui.py ]; then
-            python tools/verify_ff8_enemy_compact_ui.py --browser ''
-            python tools/verify_ff8_card_art.py
-          fi
+          python tools/verify_ff8_ui_battle_regressions.py --browser ''
+          python tools/verify_ff8_enemy_compact_ui.py --browser ''
+          python tools/verify_ff8_card_art.py
       - name: Record native test boundary
         run: echo 'Private executable tests run separately with a supplied FF8_EN.exe. No game executable is downloaded or uploaded. These checks do not claim in-game acceptance.'
   windows-install:
