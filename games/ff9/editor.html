@@ -23,7 +23,7 @@
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
-  const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,readonlyField,recordId,pagedListDetail,booleanMark,subtabBar,platformConfigView,infoHelp,clone,infoIcon}=LexeditorUI;
+  const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,readonlyField,recordId,pagedListDetail,booleanMark,subtabBar,infoHelp,clone,infoIcon}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
   async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const payload=await response.json();if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
   const tabs=[
@@ -31,16 +31,14 @@
     {id:"characters",label:"Characters"},{id:"enemies",label:"Enemies"},{id:"encounters",label:"Encounters"},{id:"shops",label:"Shops"},{id:"synthesis",label:"Synthesis"},{id:"tweaks",label:"Tweaks"}
   ];
   const tabDatasets={accessories:["items"],abilities:["abilities"],armor:["armor"],items:["items","item-effects"],magic:["actions"],weapons:["weapons"],characters:["characters","character-parameters","default-equipment","leveling"],shops:["shops"],synthesis:["synthesis"]};
-  const state={tab:"items",dashboard:null,dataMap:null,catalog:[],datasets:{},datasetChoice:{},platformConfig:null,savedPlatformConfig:null,platformQuery:"",activeSource:"mine",selected:{},query:{},page:{},pageSize:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],busy:false,error:"",runtimeError:""};
+  const state={tab:"items",dashboard:null,dataMap:null,catalog:[],datasets:{},datasetChoice:{},activeSource:"mine",selected:{},query:{},page:{},pageSize:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],busy:false,error:"",runtimeError:""};
   const prefCache={};
   const catalogRow=key=>state.catalog.find(value=>value.key===key);
   const choices=tab=>tabDatasets[tab]||[];
   function activeKey(){const available=choices(state.tab);return state.datasetChoice[state.tab]||available[0]||null}
   function viewRows(data,key){let rows=data.rows;if(state.tab==="accessories")rows=rows.filter(row=>row.values.Accessory===true);const query=(state.query[key]||"").toLocaleLowerCase();if(query)rows=rows.filter(row=>`${row.id} ${row.name} ${Object.values(row.values).join(" ")}`.toLocaleLowerCase().includes(query));const sort=state.sort[key]||{key:"name",dir:1};return [...rows].sort((left,right)=>{const a=sort.key==="name"?left.name:sort.key==="id"?left.id:left.values[sort.key],b=sort.key==="name"?right.name:sort.key==="id"?right.id:right.values[sort.key];return (typeof a==="string"?a.localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"}):Number(a)-Number(b))*sort.dir})}
   function changedFields(data,row){const original=data.originalByLine[String(row.line)];const values={};for(const field of data.fields)if(field.editable&&JSON.stringify(row.values[field.key])!==JSON.stringify(original.values[field.key]))values[field.key]=row.values[field.key];return values}
-  const platformFields=config=>Object.fromEntries((config?.sections||[]).flatMap(section=>section.fields).map(field=>[field.id,field.value]));
-  function platformChanges(){const current=platformFields(state.platformConfig),saved=platformFields(state.savedPlatformConfig),changes={};for(const [id,value] of Object.entries(current))if(JSON.stringify(value)!==JSON.stringify(saved[id]))changes[id]=value;return changes}
-  function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=Object.keys(platformChanges()).length;for(const data of Object.values(state.datasets))if(data?.rows)for(const row of data.rows)count+=Object.keys(changedFields(data,row)).length;return count}
+  function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=0;for(const data of Object.values(state.datasets))if(data?.rows)for(const row of data.rows)count+=Object.keys(changedFields(data,row)).length;return count}
   function installData(payload){payload.originalRows=clone(payload.rows);payload.originalByLine=Object.fromEntries(payload.originalRows.map(row=>[String(row.line),row]));state.datasets[payload.key]=payload;if(!payload.rows.some(row=>row.line===state.selected[payload.key]))state.selected[payload.key]=payload.rows[0]?.line??null;return payload}
   async function loadDataset(key,force=false){if(!key)return null;if(!force&&state.datasets[key])return state.datasets[key];const meta=catalogRow(key);if(!meta?.available){state.datasets[key]={key,unavailable:true,error:`${meta?.relativePath||key} is not present in the project or a Memoria/Hades export.`};return state.datasets[key]}try{return installData(await api(`/api/dataset?key=${encodeURIComponent(key)}`))}catch(error){state.datasets[key]={key,unavailable:true,error:error.message};return state.datasets[key]}}
   function fieldValue(row,field){const value=row.values[field.key];if(field.kind==="boolean")return booleanMark(value);return value===""?"—":String(value)}
@@ -83,7 +81,7 @@
         detailField({label:"STATE",control:value(state.busy?"Working…":runtime.recoveryRequired?"Recovery required":runtime.installed?"Installed":"Not installed"),help:infoHelp(runtime.message||"")}),
         detailField({label:"VERSION",control:value(runtime.version||"Unknown")}),
         detailField({label:"PINNED RELEASE",control:value(runtime.pinned||"—")}),
-        detailField({label:"ACTIONS",control:actions,help:infoHelp("Play starts FF9 directly. This separate settings button opens Memoria's launcher. Installation keeps recovery copies and preserves existing INI files.")}),
+        detailField({label:"ACTIONS",control:actions,help:infoHelp("Play opens Memoria's launcher, where its own settings can be edited. Installation keeps recovery copies and preserves existing INI files.")}),
         ...(runtime.recoveryRequired?[detailField({label:"RECOVERY COPY",control:value(runtime.recoveryBackup)})]:[]),
         ...(state.runtimeError?[el("p",{role:"alert"},state.runtimeError)]:[]),
       ]}),
@@ -94,10 +92,7 @@
     if(runtimeRefresh)return runtimeRefresh;
     runtimeRefresh=(async()=>{
       state.dashboard.runtime=await api("/api/runtime");
-      const [config,map]=await Promise.all([api("/api/platform-config"),api("/api/datamap")]);
-      state.dataMap=map;
-      // Recheck after awaiting: the user may have edited a value while fetching.
-      if(!Object.keys(platformChanges()).length){state.platformConfig=config;state.savedPlatformConfig=clone(config)}
+      state.dataMap=await api("/api/datamap");
     })();
     try{await runtimeRefresh}finally{runtimeRefresh=null}
   }
@@ -111,17 +106,20 @@
     catch(error){state.runtimeError=error.message;try{await refreshRuntime()}catch(refreshError){state.runtimeError+=` ${refreshError.message}`}}
     finally{state.busy=false;await render()}
   }
-  function tweaks(){setToolbar();$("#main").replaceChildren(platformConfigView({config:state.platformConfig,query:state.platformQuery,disabled:state.busy||state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}))}
+  function tweaks(){
+    setToolbar([subtabBar({tabs:[{id:"memoria",label:"Memoria"}],active:"memoria",label:"Tweaks",change:()=>{}})]);
+    $("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},"Memoria"),el("p",{},"can't be bothered to make this when the memoria guys already did this themselves. just hit play and you can edit the settings in the launcher that comes up")));
+  }
   function planned(){const label=tabs.find(tab=>tab.id===state.tab)?.label||"FF9 data";$("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},label),el("p",{},"The installed vanilla source for this area remains inside p0data asset containers. No safe editable CSV source is present."),el("span",{class:"ff9-warning"},"FORMAT NOT INTEGRATED")))}
   function dataMap(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,open:row=>{if(row.target){if(row.datasetKey)state.datasetChoice[row.target]=row.datasetKey;navigate(row.target)}},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;dataMap()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;dataMap()},changePage:page=>{state.mapPage=page;dataMap()},changeSort:key=>{const [active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];dataMap()}});state.mapPage=view.page;setToolbar(view.controls);$("#main").replaceChildren(view.content);shell.refresh()}
   async function render(){if(!state.dashboard)return;if(state.tab==="info"){setToolbar();info()}else if(state.tab==="datamap")dataMap();else if(state.tab==="tweaks")tweaks();else if(state.activeSource!=="mine"){setToolbar();planned()}else{toolbar();const key=activeKey();if(!key)planned();else renderDataset(await loadDataset(key),key)}shell.refresh()}
-  function navigate(tab){state.tab=tab;render();if(["info","tweaks"].includes(tab)&&!state.busy)refreshRuntime().then(()=>{if(state.tab===tab)render()}).catch(error=>{state.runtimeError=error.message;if(state.tab==="info")render()})}
-  async function save(){if(state.busy)return;state.busy=true;shell.refresh();try{for(const [key,data] of Object.entries(state.datasets)){if(!data?.rows)continue;const changes=data.rows.map(row=>({line:row.line,values:changedFields(data,row)})).filter(change=>Object.keys(change.values).length);if(changes.length)installData(await api("/api/save",{key,sha256:data.sha256,changes}))}const changes=platformChanges();if(Object.keys(changes).length){state.platformConfig=await api("/api/platform-config/save",{sha256:state.savedPlatformConfig.sha256,changes});state.savedPlatformConfig=clone(state.platformConfig)}state.error=""}catch(error){state.error=error.message;throw error}finally{state.busy=false;render()}}
-  async function discard(){for(const key of Object.keys(state.datasets))await loadDataset(key,true);state.platformConfig=await api("/api/platform-config");state.savedPlatformConfig=clone(state.platformConfig);render()}
+  function navigate(tab){state.tab=tab;render();if(tab==="info"&&!state.busy)refreshRuntime().then(()=>{if(state.tab===tab)render()}).catch(error=>{state.runtimeError=error.message;if(state.tab==="info")render()})}
+  async function save(){if(state.busy)return;state.busy=true;shell.refresh();try{for(const [key,data] of Object.entries(state.datasets)){if(!data?.rows)continue;const changes=data.rows.map(row=>({line:row.line,values:changedFields(data,row)})).filter(change=>Object.keys(change.values).length);if(changes.length)installData(await api("/api/save",{key,sha256:data.sha256,changes}))}state.error=""}catch(error){state.error=error.message;throw error}finally{state.busy=false;render()}}
+  async function discard(){for(const key of Object.keys(state.datasets))await loadDataset(key,true);render()}
   async function switchProjectSource(value){state.activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";await render()}
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff9",name:"Final Fantasy IX",themeName:"ff9",theme:{}},tabs,activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the FF9 Data Map",info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF9 plugin information",projectSources:()=>[{key:"vanilla",label:"Vanilla",path:state.dashboard?.game?.root||"Installed p0data containers"}],projectActiveSource:()=>state.activeSource,selectProjectSource:switchProjectSource,dirtyCount,readonly:()=>state.busy||state.activeSource!=="mine",save,discard});
-  window.addEventListener("focus",()=>{if(state.dashboard&&!state.busy&&["info","tweaks"].includes(state.tab))refreshRuntime().then(()=>render()).catch(error=>{state.runtimeError=error.message})});
-  Promise.all([api("/api/dashboard"),api("/api/datamap"),api("/api/catalog"),api("/api/platform-config")]).then(([dashboard,map,catalog,platformConfig])=>{state.dashboard=dashboard;state.dataMap=map;state.catalog=catalog.datasets;state.platformConfig=platformConfig;state.savedPlatformConfig=clone(platformConfig);render().then(()=>LexeditorUI.finishPluginLoading())}).catch(error=>{$("#main").textContent=`Failed to load FF9 data: ${error.message}`;LexeditorUI.finishPluginLoading()});
+  window.addEventListener("focus",()=>{if(state.dashboard&&!state.busy&&state.tab==="info")refreshRuntime().then(()=>render()).catch(error=>{state.runtimeError=error.message})});
+  Promise.all([api("/api/dashboard"),api("/api/datamap"),api("/api/catalog")]).then(([dashboard,map,catalog])=>{state.dashboard=dashboard;state.dataMap=map;state.catalog=catalog.datasets;render().then(()=>LexeditorUI.finishPluginLoading())}).catch(error=>{$("#main").textContent=`Failed to load FF9 data: ${error.message}`;LexeditorUI.finishPluginLoading()});
   </script>
 </body>
 </html>

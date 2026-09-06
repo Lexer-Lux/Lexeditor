@@ -2,10 +2,17 @@
 
 ## Ownership and boundaries
 
-`games/ff9` owns this integration. Normal Play is already
-`GameInstallSpec.launch_path = "x64/FF9.exe"`; never replace it with the launcher.
-The explicit Information-panel settings action may open `FF9_Launcher.exe`.
-Do not modify FF8 or shared UI files merely to implement an FF9 feature.
+`games/ff9` owns this integration. Lexer's later decision in #73 supersedes the
+old direct-launch/embedded-INI-editor specification:
+https://github.com/Lexer-Lux/Lexeditor/issues/73#issuecomment-5550129793
+
+Normal Play uses `GameInstallSpec.launch_path = "FF9_Launcher.exe"` so Memoria's
+existing launcher supplies its own settings UI. Tweaks has a Memoria subtab with
+Lexer's requested explanatory message only. Do not recreate the Memoria settings
+editor or expose configuration-read/write endpoints in FF9. The Information-panel
+settings action also delegates to the existing launcher. Managed installation,
+recovery and preservation of existing INI bytes are separate from settings editing.
+Do not modify FF7, FF8 or shared UI files to implement this FF9 decision.
 
 The CSV editor writes project overlays, not installed `p0data` archives. Its
 12 registered datasets are not complete FF9 support. In particular, enemies,
@@ -37,8 +44,8 @@ the publisher removes. Snapshots live outside the game; manifests and originals
 must survive until recovery succeeds. Restore existing Memoria.ini/Settings.ini
 byte-for-byte because the publisher's INI merge changes comments and formatting.
 
-A persistent OS-owned lock serializes install, recover, config writes and the
-explicit settings launcher. Never unlink a lock based only on a stale PID:
+A persistent OS-owned lock serializes install, recover and the explicit settings
+launcher action. Never unlink a lock based only on a stale PID:
 concurrent recovery can otherwise remove a new owner's lock. Process death
 releases the OS lock; a pending recovery journal still blocks a fresh install.
 Never restore assemblies while FF9, a launcher or a patcher remains running.
