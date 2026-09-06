@@ -27,7 +27,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin master
           git merge --no-edit origin/master
-      - name: Apply final shared-control help coverage
+      - name: Apply final shared-control help coverage if still staged
         run: |
           if [ -f maintenance/global-resume/apply_followup.py ]; then
             python maintenance/global-resume/apply_followup.py
@@ -44,8 +44,28 @@ jobs:
           if ! git diff --cached --quiet; then
             git commit -m 'Regenerate offline credits from reviewed attribution sources'
           fi
+      - name: Remove recovery and deferred-cleanup machinery from product branch
+        run: |
+          for path in \
+            .github/workflows/apply-global-fixes.yml \
+            .github/workflows/finish-comment-cleanup.yml \
+            .github/workflows/finish-human-issues.yml \
+            .github/workflows/global-issue-verification.yml \
+            .github/workflows/global-review-verification.yml \
+            .github/workflows/global-resume-verification.yml \
+            maintenance/finish-human-issues.patch \
+            maintenance/global-fixes/part0.b64 \
+            maintenance/global-fixes/part1.b64 \
+            maintenance/global-fixes/part2.b64 \
+            maintenance/global-fixes/part3.b64 \
+            tools/finish_issue_comments.py; do
+            if git ls-files --error-unmatch "$path" >/dev/null 2>&1; then git rm "$path"; fi
+          done
+          if ! git diff --cached --quiet; then
+            git commit -m 'Remove temporary global recovery and deferred cleanup machinery'
+          fi
           git push origin HEAD:fix/global-resume-20260906
-      - name: Export auditable source snapshot for offline development
+      - name: Export auditable source snapshot
         id: source
         shell: python
         run: |
@@ -73,9 +93,9 @@ jobs:
               stream.write(f'sha={sha}\n')
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: global-recovery-source-${{ github.run_id }}
+          name: global-final-source-${{ github.run_id }}
           path: out/recovery-source/source.zip
-          retention-days: 7
+          retention-days: 14
   browser:
     needs: prepare
     runs-on: ubuntu-24.04
@@ -101,7 +121,7 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: global-recovery-browser-${{ github.run_id }}
+          name: global-final-browser-${{ github.run_id }}
           path: |
             out/global-browser/
             out/global-review/
@@ -139,10 +159,10 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
-          name: Lexeditor-recovery-${{ runner.os }}-${{ github.run_id }}
+          name: Lexeditor-final-${{ runner.os }}-${{ github.run_id }}
           path: |
             dist/installers/
             build/distribution/smoke.json
             build/Lexeditor/warn-Lexeditor.txt
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 14
