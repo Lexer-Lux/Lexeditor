@@ -1516,7 +1516,21 @@
         set,value=>rowOf(state.data,'cards',Number(value))?.name||choiceName(choices,value));
     }));
   }
-  function enemySimpleTables(row){const cards=enemyCardChoices(row);const devour=columnList({rows:row.tables.devour,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"value",label:"Stored Devour ID",sortValue:entry=>entry.devourId,render:entry=>enemyTableSource(numberControl(entry.devourId,0,255,1,value=>entry.devourId=value),row,value=>value?.tables.devour[entry.slot]?.devourId,value=>entry.devourId=Number(value))}]});const renzokuken=columnList({rows:row.tables.renzokuken,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"value",label:"Value",render:entry=>enemyTableSource(numberControl(entry.value,0,65535,1,value=>entry.value=value),row,value=>value?.tables.renzokuken[entry.slot]?.value,value=>entry.value=Number(value))}]});return [detailSection({className:"enemy-table-section",title:"CARDS",body:cards}),detailSection({className:"enemy-table-section",title:"DEVOUR",help:infoHelp("This is the exact stored Devour table ID. Its gameplay meaning is not yet proven."),body:devour}),detailSection({className:"enemy-table-section",title:"RENZOKUKEN",help:infoHelp("These are the exact stored Renzokuken table values."),body:renzokuken})]}
+  function enemySimpleTables(row){
+    const cards=enemyCardChoices(row),devourChoices=state.data.enemyTables.choices.devour||[];
+    const tierNames=['LOW','MID','HIGH'];
+    const devour=columnList({rows:row.tables.devour,key:entry=>entry.slot,class:"ff8-record-list",editable:true,
+      template:"70px minmax(160px,1fr)",columns:[
+        {key:"slot",label:"Tier",render:entry=>tierNames[entry.slot]||entry.slot+1},
+        {key:"value",label:"Result",sortValue:entry=>choiceName(devourChoices,entry.devourId),render:entry=>{
+          const id=Number(entry.devourId),choices=devourChoices.some(value=>Number(value.id)===id)?devourChoices:[...devourChoices,{id,name:`Unknown (${id})`}];
+          return enemyTableSource(selectControl(id,choices,value=>{entry.devourId=Number(value);shell.refresh()}),row,
+            value=>value?.tables.devour[entry.slot]?.devourId,value=>entry.devourId=Number(value),value=>choiceName(choices,value));
+        }}]});
+    const renzokuken=columnList({rows:row.tables.renzokuken,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"value",label:"Value",render:entry=>enemyTableSource(numberControl(entry.value,0,65535,1,value=>entry.value=value),row,value=>value?.tables.renzokuken[entry.slot]?.value,value=>entry.value=Number(value))}]});
+    return [detailSection({className:"enemy-table-section",title:"CARDS",body:cards}),detailSection({className:"enemy-table-section",title:"DEVOUR",help:infoHelp("The three bytes select the proven low-, medium-, and high-tier Devour outcomes. Tier level cut-offs vary for a few vanilla enemies, so Lexeditor does not invent universal numeric ranges."),body:devour}),detailSection({className:"enemy-table-section",title:"RENZOKUKEN",help:infoHelp("These are the exact stored Renzokuken table values."),body:renzokuken})]
+  }
+
   const enemyDefencePrevious=new WeakMap();
   function enemyDefenceSection(row,kind,title){
     const element=kind==='elementDefence',names=['Fire','Ice','Thunder','Earth','Poison','Wind','Water','Holy'];
@@ -1560,7 +1574,24 @@
       }));
     return detailSection({className:'enemy-table-section enemy-defence-section',title,help,body:grid});
   }
-  function enemyScanSection(row,prefs){const input=el("textarea",{rows:6,"aria-label":`Scan description for ${row.name}`,oninput:event=>{row.scanDescription=event.target.value;shell.refresh()}});input.value=row.scanDescription??"";return detailSection({className:"enemy-scan-section",title:"SCAN",body:detailField({label:"DESCRIPTION",control:sourceControl(input,()=>row.scanDescription,rowOf(state.vanilla,"enemies",row.id)?.scanDescription,referenceValues("enemies",row.id,value=>value?.scanDescription),value=>row.scanDescription=String(value??"")),pin:prefs?.pinButton("scanDescription","Scan description")})})}
+  const enemyScanElementNames=['Fire','Ice','Thunder','Earth','Poison','Wind','Water','Holy'];
+  function enemyGeneratedScanDetails(row){
+    const table=enemyTableRow(state.data,row.id),choices=state.data.enemyTables.choices.devour||[];
+    if(!table?.tables)return 'DETAILS';
+    const groups={Weak:[],Resist:[],Immune:[],Absorb:[]};
+    for(const entry of table.tables.elementDefence||[]){const name=enemyScanElementNames[entry.slot]||`Element ${entry.slot+1}`,value=Number(entry.percent);if(value>100)groups.Weak.push(`${name} ${value}%`);else if(value>0&&value<100)groups.Resist.push(`${name} ${value}%`);else if(value===0)groups.Immune.push(name);else if(value<0)groups.Absorb.push(`${name} ${Math.abs(value)}%`)}
+    const lines=['DETAILS'];for(const [label,values] of Object.entries(groups))if(values.length)lines.push(`${label}: ${values.join(', ')}`);if(lines.length===1)lines.push('Elements: Neutral');
+    const tiers=['Low','Mid','High'];for(const entry of table.tables.devour||[]){const found=choices.find(value=>Number(value.id)===Number(entry.devourId));lines.push(`Devour ${tiers[entry.slot]||entry.slot+1}: ${found?.name||`Unknown ${entry.devourId}`}`)}
+    return lines.join('\n');
+  }
+  function enemyScanWithDetails(description,details){const text=String(description??''),marker='{NewPage}DETAILS',index=text.indexOf(marker),base=(index>=0?text.slice(0,index):text).replace(/\s+$/,'');return `${base}${base?'{NewPage}':''}${details}`}
+  function applyEnemyScanDetails(row){row.scanDescription=enemyScanWithDetails(row.scanDescription,enemyGeneratedScanDetails(row))}
+  function enemyScanSection(row,prefs){
+    const input=el("textarea",{rows:6,"aria-label":`Scan description for ${row.name}`,oninput:event=>{row.scanDescription=event.target.value;shell.refresh()}});input.value=row.scanDescription??"";
+    const details=enemyGeneratedScanDetails(row),apply=el('button',{type:'button',class:'secondary-action',disabled:state.activeSource!=='mine',onclick:()=>{applyEnemyScanDetails(row);renderEnemies();shell.refresh()}},'UPDATE DETAILS');
+    const applyAll=el('button',{type:'button',class:'secondary-action',disabled:state.activeSource!=='mine',onclick:()=>{for(const enemy of state.data.enemies.rows)if(enemy.available)applyEnemyScanDetails(enemy);renderEnemies();shell.refresh()}},'UPDATE ALL');
+    return detailSection({className:"enemy-scan-section",title:"SCAN",body:[detailField({label:"DESCRIPTION",control:sourceControl(input,()=>row.scanDescription,rowOf(state.vanilla,"enemies",row.id)?.scanDescription,referenceValues("enemies",row.id,value=>value?.scanDescription),value=>row.scanDescription=String(value??"")),pin:prefs?.pinButton("scanDescription","Scan description")}),el('div',{class:'enemy-scan-details-actions'},apply,applyAll),el('pre',{class:'enemy-scan-details-preview'},details)]})
+  }
   function enemyPropertyLabel(field){const labels={"Medium level starts":"MED LV","High level starts":"HIGH LV","Auto-Reflect":"REFLECT","Auto-Shell":"SHELL","Auto-Protect":"PROTECT","Surprise immunity":"NO SURPRISE","Diablos misses":"NO DIABLOS","Always yields a card":"ALWAYS CARD","Extra XP":"EXTRA XP","Mug rate":"MUG %","Drop rate":"DROP %"};return labels[field.label]||field.label}
   function enemyProperties(fields,rowId,prefs){
     const numeric=fields.filter(field=>field.control!=='boolean'),flags=fields.filter(field=>field.control==='boolean');
