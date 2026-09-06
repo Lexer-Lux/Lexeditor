@@ -15,8 +15,19 @@ jobs:
         with:
           ref: fix/ui-standardization-20260906
           fetch-depth: 0
-      - name: Apply follow-up
-        run: python .github/scripts/ui_standardization_followup.py
+      - name: Fix matcher and apply follow-up
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path=Path('.github/scripts/ui_standardization_followup.py')
+          text=path.read_text(encoding='utf-8')
+          old='''    const field = label.parentElement;\\n    const input = field?.querySelector('.lex-detail-field-control input[type="checkbox"]');\\n'''
+          new='''    const input = label.parentElement?.querySelector('.lex-detail-field-control input[type="checkbox"]');\\n'''
+          if old not in text:
+              raise SystemExit('follow-up matcher repair anchor missing')
+          path.write_text(text.replace(old,new,1),encoding='utf-8')
+          PY
+          python .github/scripts/ui_standardization_followup.py
       - name: Validate
         run: |
           node --check ui/framework.js
