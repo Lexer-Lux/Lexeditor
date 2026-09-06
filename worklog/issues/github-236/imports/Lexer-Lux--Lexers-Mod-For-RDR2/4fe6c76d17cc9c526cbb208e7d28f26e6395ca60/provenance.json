@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356315952,
+    "number": 236,
+    "title": "Use walk and hold-to-sprint without crouch-running",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/236"
+  },
+  "sha256": "904f4708e792be268d53621133caf69f900218acc0667c8179f919b4f44db3b6",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-144.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

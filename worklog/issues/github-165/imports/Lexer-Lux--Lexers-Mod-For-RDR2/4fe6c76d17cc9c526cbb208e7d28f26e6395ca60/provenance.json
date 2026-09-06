@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356298892,
+    "number": 165,
+    "title": "Recover lost unique weapons through the normal locker list",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/165"
+  },
+  "sha256": "dd2e2921a87bca9d58e0dcf4de66d5971ae56094fc530673ce3ed060f6cf82d2",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-66.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356306496,
+    "number": 197,
+    "title": "Make Oleander cause curable Toxic status",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/197"
+  },
+  "sha256": "adc0cffebf4fe5d5636d723859cf1a7701a2147ad4bc7a8c98f6bea803b00335",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-101.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

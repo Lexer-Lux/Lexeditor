@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356319109,
+    "number": 248,
+    "title": "Remove crouch-running",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/248"
+  },
+  "sha256": "980be742f5e112c69229322ac53665b137c987c181e566292b3335b94fa8c372",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-156.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

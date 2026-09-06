@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356288011,
+    "number": 118,
+    "title": "Check in-game settings and repaired core-duration limits",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/118"
+  },
+  "sha256": "c30494d5df50200d3a2355ad1836c9750d4148e35223e4056513c1c989974dd0",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-18.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

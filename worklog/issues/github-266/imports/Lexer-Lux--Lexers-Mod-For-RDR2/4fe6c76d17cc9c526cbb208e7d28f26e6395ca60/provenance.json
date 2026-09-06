@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356324367,
+    "number": 266,
+    "title": "Remove invented camera offset and distance clamps",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/266"
+  },
+  "sha256": "f62081bd1a83330292aa9db64041afda6251c0cd20dd1873a297ccd2cdf35532",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-174.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

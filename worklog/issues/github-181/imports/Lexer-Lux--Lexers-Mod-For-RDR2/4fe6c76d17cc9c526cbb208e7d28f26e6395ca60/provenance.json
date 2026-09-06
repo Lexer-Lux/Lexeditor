@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356302274,
+    "number": 181,
+    "title": "Make binocular transition speed actually change",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/181"
+  },
+  "sha256": "41d19c61d46630c4f4109179d63348d78bc0711c09df320c23346620846a1ed4",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-84.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

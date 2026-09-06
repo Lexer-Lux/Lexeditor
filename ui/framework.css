@@ -4440,3 +4440,18 @@ nav button.active:focus-visible .lex-tab-shortcut,
 .lex-plugin-credits summary { cursor:pointer; padding:.4rem 0; }
 .lex-plugin-credits pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:22rem; overflow:auto; line-height:1.4; font-family:inherit; padding:.75rem; border:1px solid currentColor; }
 .lex-help-popover { max-width:calc(100vw - 24px); max-height:calc(100vh - 24px); overflow:auto; overflow-wrap:anywhere; }
+
+/* Data Map uses the same fitted Table + Detail/pager as record editors. */
+.lex-data-map-view{min-height:0;height:100%;overflow:hidden}
+.lex-data-map-view .lex-data-map-table{min-width:0;overflow:hidden;max-height:none}
+.lex-data-map-view .lex-data-map-table .lex-column-list-cell{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;align-items:center}
+.lex-data-map-detail{min-width:0;overflow:auto;overflow-wrap:anywhere}
+.lex-data-map-detail .lex-data-map-notes{white-space:pre-wrap}
+.lex-data-map-actions{display:flex;flex-wrap:wrap;gap:8px}
+.lex-data-map-coverage{font-weight:bold}
+body:has(.lex-data-map-view){display:flex;flex-direction:column;height:100vh;min-height:0;overflow:hidden}
+body:has(.lex-data-map-view)>#lexeditor-shell,body:has(.lex-data-map-view)>#toolbar{flex:0 0 auto}
+body:has(.lex-data-map-view)>#main{flex:1 1 auto;min-height:0;height:auto;overflow:hidden}
+body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
+.lex-data-map-detail .lex-detail-panel-body{padding:12px;min-height:0}
+.lex-data-map-detail .lex-data-map-actions{padding-bottom:8px}

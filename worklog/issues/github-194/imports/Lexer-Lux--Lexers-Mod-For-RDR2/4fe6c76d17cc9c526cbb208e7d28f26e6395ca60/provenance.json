@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356305701,
+    "number": 194,
+    "title": "Remove the old ammo counter from the weapon wheel",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/194"
+  },
+  "sha256": "7643fdade02118cbb1cf9b787388828b166dc9fff3bb08883e38bade0eb617a3",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-98.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

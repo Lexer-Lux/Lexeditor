@@ -815,6 +815,19 @@ class HostApi:
             return []
         return process_probe.live_processes(plugin.process_names)
 
+    def _game_controller(self, plugin_id: str):
+        """Use a plugin-owned launch policy only when explicitly registered."""
+        plugin = self._plugins.get(plugin_id)
+        factory = getattr(plugin, "game_process_factory", None)
+        if factory is None:
+            return None
+        with self._lock:
+            if not hasattr(self, "_game_controllers"):
+                self._game_controllers = {}
+            if plugin_id not in self._game_controllers:
+                self._game_controllers[plugin_id] = factory()
+            return self._game_controllers[plugin_id]
+
     def game_process_status(self, plugin_id: str) -> dict:
         """Report this game's process, whoever started it.
 
@@ -822,6 +835,9 @@ class HostApi:
         started game sit invisible behind a Play button while the helper
         manager refused to work because that same process existed.
         """
+        controller = self._game_controller(plugin_id)
+        if controller is not None:
+            return controller.status()
         with self._lock:
             process = self._game_processes.get(plugin_id)
             running = process is not None and process.poll() is None
@@ -839,6 +855,11 @@ class HostApi:
 
     def launch_game(self, plugin_id: str) -> dict:
         """Start the configured game without opening a command window."""
+        controller = self._game_controller(plugin_id)
+        if controller is not None:
+            root, _executable = self._game_executable(plugin_id)
+            project = Path(self._projects.snapshot(plugin_id)["current"])
+            return controller.launch(root, project)
         with self._lock:
             current = self._game_processes.get(plugin_id)
             if current is not None and current.poll() is None:
@@ -855,6 +876,9 @@ class HostApi:
         The Stop button has to be able to clear whatever the status call
         reported, or the editor shows a running game it cannot act on.
         """
+        controller = self._game_controller(plugin_id)
+        if controller is not None:
+            return controller.stop()
         with self._lock:
             process = self._game_processes.get(plugin_id)
             owned = process is not None and process.poll() is None

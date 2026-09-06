@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356321572,
+    "number": 256,
+    "title": "Remove ordinary Tear Down Camp prompts",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/256"
+  },
+  "sha256": "ea1be6eef3e834864eea2b7fdf197e355ccdb8da5e6547dc57e07bec9974c116",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-164.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

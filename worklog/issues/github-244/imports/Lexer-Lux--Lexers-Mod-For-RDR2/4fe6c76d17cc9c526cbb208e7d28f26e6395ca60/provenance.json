@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356317947,
+    "number": 244,
+    "title": "Deliver the corrected campsite-respawn warning",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/244"
+  },
+  "sha256": "f527c8f0d5ef1e035e6d6fff5565df9fdb6c33fce97a2f540e9d11e35618622a",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-152.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

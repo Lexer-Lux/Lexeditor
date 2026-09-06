@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356320613,
+    "number": 253,
+    "title": "Finish sideways climbing without a misleading animation claim",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/253"
+  },
+  "sha256": "df936737934fcd9c6feed43909aee17b13d6596f178270fc97cec4991e3d1cc0",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-161.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

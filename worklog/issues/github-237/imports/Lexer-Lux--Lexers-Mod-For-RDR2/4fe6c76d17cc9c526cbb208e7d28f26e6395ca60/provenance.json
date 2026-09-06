@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356316170,
+    "number": 237,
+    "title": "Configure horse core-drain durations independently",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/237"
+  },
+  "sha256": "9ed33bc506c4c83b622d15c21ee0a9d73f095ed53b2c8b221bfd697dc8f15519",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-145.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

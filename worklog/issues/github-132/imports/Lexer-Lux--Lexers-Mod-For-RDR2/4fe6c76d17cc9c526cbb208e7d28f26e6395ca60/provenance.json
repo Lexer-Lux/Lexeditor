@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356291547,
+    "number": 132,
+    "title": "Check independently timed casing glints",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/132"
+  },
+  "sha256": "c7ffa74dbc42ef722ef1157c720f302de1a8fe39c029b780fe6622e522ea462f",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-32.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}
