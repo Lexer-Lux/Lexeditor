@@ -77,6 +77,18 @@ Show a live count beneath each ammo-type icon, dim zero-stock entries and remove
 
 **Status: Latest package-path correction is not installed.** The previous test still showed the vanilla text. Deliver the corrected replacements and verify they load before another layout check.
 
+## issue 5356305701 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/194
+
+Created: 2026-08-06T05:57:20Z; updated: 2026-09-06T16:29:22Z
+
+Exact metadata: [source record](sources/issue-5356305701-f3bef3d5d48db1919620c437b2dc4c9cf696a408d8920ded0c2345e9ae08f254.json).
+
+Show a live count beneath each ammo-type icon, dim zero-stock entries and remove the duplicate vanilla X/Y counter.
+
+**Status: Latest package-path correction is not installed.** The previous test still showed the vanilla text. Deliver the corrected replacements and verify they load before another layout check.
+
 ## comment 5550134225 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/194#issuecomment-5550134225
@@ -222,3 +234,17 @@ Created: 2026-08-20T13:44:50Z; updated: 2026-08-20T13:44:50Z
 Exact metadata: [source record](sources/comment-5550134416-660b309d8770fce2bd58dc29e0255e4aa35fcd13d14fb593f6529addaddcb791.json).
 
 The vanilla X/Y survived because the package manifest used guessed UI paths. Current RpfCli can now resolve the real nested update_4 assets. The proved LML replacements are widgets/0x51EA54CF.ymt for ammo_counter and widgets/0x6C358C77.ymt for sub_slot_list. The manifest now targets those exact entries, and the verifier requires both VFS replacement lines after installation. This is source/package-complete but not installed; Lexer-Lux/Lexeditor#194 remains actionable and high priority.
+
+## comment 5560583647 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/194#issuecomment-5560583647
+
+Created: 2026-09-06T16:29:22Z; updated: 2026-09-06T16:29:22Z
+
+Exact metadata: [source record](sources/comment-5560583647-056e149a054b7b7a623247c1d2385adb0d5822c1f93bae49ece8f68f6161afe0.json).
+
+Recovered the missing corrections in Lexer-Lux/Lexers-Mod-For-RDR2#211: the two recorded widgets paths, suppression of the X/Y text binding rather than visibility, and the below-icon baseline. Also fixed negative alignment offsets becoming huge positive coordinates.
+
+Both Windows variants built with matching LML resources; the downloaded packages passed byte/hash checks. Packages and backup/rollback instructions are in [the successful build run](https://github.com/Lexer-Lux/Lexers-Mod-For-RDR2/actions/runs/34044885479). Preserve your existing INI; read READ-ME-FIRST.md.
+
+Not installed or gameplay-confirmed. Actual VFS binding/visible X/Y removal remain unverified, and native-icon dimming is still unimplemented. The issue stays actionable; no unchanged test is being presented as a confirmed fix.

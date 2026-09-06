@@ -58,6 +58,18 @@ Expose each drink’s real alcohol strength separately from its coarse drink-cla
 
 **Status: Reported broken.** The latest report says the numeric strengths all became 1. Restore and validate the real per-drink values before requesting another test.
 
+## issue 5356291314 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/131
+
+Created: 2026-08-06T02:10:38Z; updated: 2026-09-06T16:29:15Z
+
+Exact metadata: [source record](sources/issue-5356291314-11dbde815bc147eadf46584d2f7220f1ed66ce06773dad3a32567ace352d9946.json).
+
+Expose each drink’s real alcohol strength separately from its coarse drink-class tag. Preserve the requested strong-Moonshine behavior.
+
+**Status: Reported broken.** The latest report says the numeric strengths all became 1. Restore and validate the real per-drink values before requesting another test.
+
 ## comment 5550117968 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/131#issuecomment-5550117968
@@ -92,3 +104,15 @@ Partial repair candidate in #364. Confirmed unsafe save behavior is fixed: the b
 The current source data has distinct per-drink strengths; the deliberate Moonshine=1 value is preserved. I did not reproduce the reported universal-1 display, so this is not a proven diagnosis of that original symptom. Regression tests cover sparse saves, unrelated concurrent changes, precision, invalid input, and unavailable baselines.
 
 The source PR is draft, with no full browser/visual acceptance performed. Keep this issue open/actionable pending comparison of the rendered values against the selected CSV. Existing requests and the new implementation handoff are retained.
+
+## comment 5560582972 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/131#issuecomment-5560582972
+
+Created: 2026-09-06T16:29:15Z; updated: 2026-09-06T16:29:15Z
+
+Exact metadata: [source record](sources/comment-5560582972-be96b4c06d8dc17dc22e03dc5b18a1d97810cacee94f9fcd0a4f9006e46346b7.json).
+
+Fixed another reproduced defect in #364: editing only Drunkenness and pressing header Save reported success without saving. The global Save dispatcher now sends that edit; rejected writes retain it and cannot report success.
+
+The actual rendered editor passed three offline browser cases (save, failure, unavailable data), plus two new production save-handler tests. Distinct baseline values and the deliberate Moonshine=1 override remain separate. This does not establish the original all-ones symptom's cause in your real project; the issue stays actionable.
