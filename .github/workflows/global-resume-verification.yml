@@ -31,11 +31,17 @@ jobs:
           status=$?
           set -e
           if [ "$status" -ne 0 ]; then
-            echo '--- desktop_host.py conflict ---'
-            git diff --cc -- desktop_host.py || true
-            echo '--- ui/chooser.html conflict ---'
-            git diff --cc -- ui/chooser.html || true
-            exit "$status"
+            conflicts="$(git diff --name-only --diff-filter=U)"
+            unexpected="$(printf '%s\n' "$conflicts" | grep -v -E '^(desktop_host.py|ui/chooser.html)$' || true)"
+            if [ -n "$unexpected" ]; then
+              echo "Unexpected merge conflicts:"; printf '%s\n' "$unexpected"; exit "$status"
+            fi
+            # Current master contains the newer, stricter helper-version path:
+            # fresh installed-state snapshots, pinned/package versions and safe
+            # native release-note opening. Keep those refinements wholesale.
+            git checkout --theirs desktop_host.py ui/chooser.html
+            git add desktop_host.py ui/chooser.html
+            git commit -m 'Merge current master and retain newer helper-version integration'
           fi
       - name: Apply final shared-control help coverage if still staged
         run: |
