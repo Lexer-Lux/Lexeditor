@@ -37,6 +37,39 @@ Bullet trails should be visible by day and night, start at the weapon and not du
 
 **Status: Latest correction is source-only, not installed.** Its presentation is an impact-synchronized trail, not proven tracking of a live projectile. Deliver and verify the candidate before another visual test.
 
+## issue 5356287453 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/116
+
+Created: 2026-08-06T01:52:13Z; updated: 2026-09-06T18:22:08Z
+
+Exact metadata: [source record](sources/issue-5356287453-1f4da305beec10e83e2a9740c9122143af8fe4057208a47fa43cb3c33ca4e3cd.json).
+
+Bullet trails should be visible by day and night, start at the weapon and not duplicate a second trail from the player’s eyes.
+
+**Status: Latest correction is source-only, not installed.** Its presentation is an impact-synchronized trail, not proven tracking of a live projectile. Deliver and verify the candidate before another visual test.
+
+## issue 5356287453 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/116
+
+Created: 2026-08-06T01:52:13Z; updated: 2026-09-06T18:22:08Z
+
+Exact metadata: [source record](sources/issue-5356287453-2b23f490bf2dd712c61262f2da182ece02ebe9c0aaa2f96db00591ffd7e0ae67.json).
+
+Bullet trails should be visible by day and night, start at the weapon and not duplicate a second trail from the player’s eyes.
+
+**Status: Built candidate ready for visual test.** Runtime PR #213 preserves the real weapon `Gun_Muzzle` origin and fresh confirmed impact coordinate, removes the late custom travelling-marker state, and instead renders a short 100 ms dash clamped to the confirmed muzzle→impact segment at the point nearest the gameplay camera. Corona mode uses the same confirmed nearest point.
+
+Permanent source CI and both Windows release/development builds pass on PR #213. This is still an impact-synchronized presentation; it is not claimed to track a live projectile in flight.
+
+- [ ] Fire in daylight and at night: the trail should be visible in both.
+- [ ] Confirm it starts on the real weapon/muzzle path and there is no duplicate eye/chest-origin trail.
+- [ ] Confirm the visible dash is synchronized with the hit rather than visibly travelling late toward an already-confirmed impact.
+- [ ] Check close and distant shots plus different firearms for obvious clipping/offset regressions.
+
+Candidate: runtime PR #213 / source run 34050646513 / Windows run 34050646426. Preserve the existing INI when installing.
+
 ## comment 5550113264 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/116#issuecomment-5550113264

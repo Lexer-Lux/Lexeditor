@@ -1,0 +1,71 @@
+name: FF9 verification
+on:
+  push:
+    branches: [codex/ff9-issues-20260906]
+    paths:
+      - 'games/ff9/**'
+      - 'tests/*ff9*'
+      - 'tools/ff9/**'
+      - '.github/workflows/ff9-verification.yml'
+  pull_request:
+    paths:
+      - 'games/ff9/**'
+      - 'tests/*ff9*'
+      - 'tools/ff9/**'
+      - '.github/workflows/ff9-verification.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ff9-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: python -m pip install pytest
+      - name: Test FF9 Python and controller code
+        run: |
+          python -m compileall -q games/ff9
+          python -m pytest -q tests/test_ff9*.py
+          node --test tests/ff9_editor.test.cjs
+      - name: Collect exact public sources for offline integration checks
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ff9-evidence/lexeditor
+          git archive HEAD AGENTS.md '*.py' games/ff9 ui tests codex worklog/issues tools .github | tar -x -C ff9-evidence/lexeditor
+          git clone --depth 1 --filter=blob:none --sparse --branch v2025.07.04 https://github.com/Albeoris/Memoria.git ff9-evidence/memoria
+          git -C ff9-evidence/memoria sparse-checkout set Assembly-CSharp Memoria.Prime Memoria.Scripts Memoria.Patcher Memoria.Compiler Memoria.Launcher/Presets
+          git -C ff9-evidence/memoria rev-parse HEAD > ff9-evidence/memoria-source-commit.txt
+          rm -rf ff9-evidence/memoria/.git
+          python - <<'PY'
+          import hashlib, json, pathlib, urllib.request
+          root = pathlib.Path('ff9-evidence')
+          api = 'https://api.github.com/repos/Albeoris/Memoria/releases/tags/v2025.07.04'
+          req = urllib.request.Request(api, headers={'User-Agent':'Lexeditor-FF9-verification'})
+          release = json.load(urllib.request.urlopen(req, timeout=30))
+          asset = next(a for a in release['assets'] if a['name'] == 'Memoria.Patcher.exe')
+          blob = urllib.request.urlopen(asset['browser_download_url'], timeout=90).read(120*1024*1024+1)
+          assert len(blob) <= 120*1024*1024
+          assert 'sha256:' + hashlib.sha256(blob).hexdigest() == asset['digest']
+          (root / 'Memoria.Patcher.exe').write_bytes(blob)
+          (root / 'memoria-release.json').write_text(json.dumps(release,indent=2))
+          PY
+      - name: Upload test source bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff9-verification-sources
+          path: ff9-evidence
+          retention-days: 1
+          include-hidden-files: false

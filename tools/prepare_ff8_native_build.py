@@ -31,21 +31,54 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         ('ffnx_party_switch','lexeditor_ff8_party_switch.h'),
     ):
         shutil.copyfile(ROOT/f'games/ff8/{folder}/ffnx-src/{name}',source/'src'/name)
+    extension_files = [
+        'lexeditor_ff8_shared_party.h', 'lexeditor_ff8_shared_party.inc',
+        'lexeditor_ff8_stock_tweaks.h', 'lexeditor_ff8_stock_tweaks.cpp',
+    ]
+    for name in extension_files:
+        destination = source / 'src' / ('ff8' if name.endswith('.inc') else '') / name
+        shutil.copyfile(ROOT / 'games/ff8/ffnx_gameplay_extensions/ffnx-src' / name, destination)
     # The packaged provenance patch may already include the new switch after
     # this candidate has been validated and promoted; support repeat builds.
     changes={
         'src/cfg.cpp':[
+            ('bool enable_ff8_party_switch;', 'bool enable_ff8_party_switch;\nbool enable_ff8_no_magic_consumption;'),
+            ('\tenable_ff8_party_switch = config["enable_ff8_party_switch"].value_or(false);',
+             '\tenable_ff8_party_switch = config["enable_ff8_party_switch"].value_or(false);\n\tenable_ff8_no_magic_consumption = config["enable_ff8_no_magic_consumption"].value_or(false);'),
             ('bool enable_ff8_hp_bars;','bool enable_ff8_hp_bars;\nbool enable_ff8_gf_hp_bars;'),
             ('\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);',
              '\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\n\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);'),
         ],
         'src/cfg.h':[
+            ('extern bool enable_ff8_party_switch;', 'extern bool enable_ff8_party_switch;\nextern bool enable_ff8_no_magic_consumption;'),
             ('extern bool enable_ff8_hp_bars;','extern bool enable_ff8_hp_bars;\nextern bool enable_ff8_gf_hp_bars;'),
         ],
         'misc/FFNx.toml':[
+            ('enable_ff8_party_switch = false', 'enable_ff8_party_switch = false\n\n# Keep spell stock on successful field/battle casts; items still consume.\nenable_ff8_no_magic_consumption = false'),
             ('enable_ff8_hp_bars = false','enable_ff8_hp_bars = false\n\n# Blue junctioned-GF HP bar above each party name.\nenable_ff8_gf_hp_bars = false'),
         ],
     }
+    changes['src/ff8_opengl.cpp'] = [
+        ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_stock_tweaks.h"'),
+        ('\tlexeditor_ff8_party_switch_install();', '\tlexeditor_ff8_party_switch_install();\n\tlexeditor_ff8_stock_tweaks_install();'),
+    ]
+    # Stock reconciliation and actor readiness stay owned by the existing
+    # Shared Magic runtime. Add the explicit DLL-caller lifecycle there.
+    runtime = source / 'src/ff8/shared_magic_runtime.cpp'
+    text = runtime.read_text(encoding='utf-8')
+    include = '#include "lexeditor_ff8_shared_party.inc"'
+    if include not in text:
+        text += '\n' + include + '\n'
+    header = '#include "../lexeditor_ff8_shared_party.h"'
+    if header not in text:
+        text = text.replace('#include "shared_magic_runtime.h"', '#include "shared_magic_runtime.h"\n' + header, 1)
+    for anchor in ['void request_activation()\n{', 'void fail_closed_to_canonical(const char *reason)\n{']:
+        addition = anchor + '\n    lexeditor_ff8_shared_party_reset();'
+        if addition not in text:
+            if text.count(anchor) != 1:
+                raise RuntimeError('Shared Magic lifecycle anchor changed')
+            text = text.replace(anchor, addition, 1)
+    runtime.write_text(text, encoding='utf-8')
     for relative,pairs in changes.items():
         path=source/relative;raw=path.read_bytes();newline='\r\n' if b'\r\n' in raw else '\n'
         text=raw.decode('utf-8').replace('\r\n','\n')
@@ -62,6 +95,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     # loses its tests, artifact verifier and reproducible-build entry point.
     patch_paths = [line[6:] for line in patch.read_text(encoding="utf-8").splitlines()
                    if line.startswith("+++ b/")]
+    patch_paths.extend('src/' + ('ff8/' if name.endswith('.inc') else '') + name for name in extension_files)
     for name in patch_paths:
         relative = Path(name)
         if relative.is_absolute() or ".." in relative.parts or not (source / relative).is_file():

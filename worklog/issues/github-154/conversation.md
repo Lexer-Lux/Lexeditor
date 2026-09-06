@@ -40,6 +40,40 @@ Exact metadata: [source record](sources/issue-5356296624-aed93de8e5d0a45f30372da
 
 Establish those meanings and add the missing explanations before asking you to choose spawn-delay values.
 
+## issue 5356296624 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/154
+
+Created: 2026-08-06T02:38:29Z; updated: 2026-09-06T18:24:01Z
+
+Exact metadata: [source record](sources/issue-5356296624-16c2a1dc2e8259983a6e0a160e2e95b31b196a536aab3611af760282e569400f.json).
+
+**Status: The editor exists, but its explanations are still incomplete.** The latest request is for help beside each wanted tier explaining what that particular tier means, not another generic definition of wanted level.
+
+Establish those meanings and add the missing explanations before asking you to choose spawn-delay values.
+
+## issue 5356296624 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/154
+
+Created: 2026-08-06T02:38:29Z; updated: 2026-09-06T18:24:01Z
+
+Exact metadata: [source record](sources/issue-5356296624-36ed52afc2c1673206b7a12f68add524b915f9ff89501f8284fa9856b1317871.json).
+
+The Bounty Hunters editor already contains the requested per-tier explanations in current `master`; this issue's old actionable status was stale.
+
+Each cooldown row renders its own `?` beside the tier and uses the backend/fallback definitions:
+- **Clean:** active wanted/search score 0; regional bounty debt can still exist.
+- **Wanted 1:** internal wanted score 1–4,999.
+- **Wanted 2:** 5,000–14,999.
+- **Wanted 3:** 15,000–24,999.
+- **Wanted 3+:** 15,000+; special target-undetected cooldown row.
+- **Wanted 4+:** 25,000+ and includes level 5, which begins at 100,000.
+
+These are pursuit/search severity tiers, **not bounty-dollar ranges**. The table also explains that Min/Max are randomized delays in in-game hours and that Clean does not mean $0 bounty.
+
+**Status: Needs Testing.** Refresh the current editor and open Crime & Law → Bounty Hunters. Confirm each Wanted tier cell has its own `?` and that the help text above is visible/readable at both wide and narrow widths. No spawn-delay values were changed by this status correction.
+
 ## comment 5550124290 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/154#issuecomment-5550124290

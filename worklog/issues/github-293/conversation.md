@@ -44,6 +44,84 @@ Scale symbols, health rings and distance text together between the configured ne
 
 [Original screenshot](https://github.com/user-attachments/assets/e2420970-68cf-4a8a-82cf-88eba549fbdd).
 
+## issue 5356332463 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/293
+
+Created: 2026-08-20T10:24:01Z; updated: 2026-09-06T18:03:33Z
+
+Exact metadata: [source record](sources/issue-5356332463-2d6f46d1458955aa6567dc145498b2499344b15bfd0e64429a4e46fbf7d23e88.json).
+
+Scale symbols, health rings and distance text together between the configured near/far sizes. Keep a world-distance head gap; 2D tag sizes stay fixed.
+
+**Status: Built candidate ready for visual test.** Runtime PR #212 adds `TagDisplayMode` (2D fixed-size / 3D distance-scaled), a world-metre `TagHeadGapMeters`, and one shared 3D multiplier applied to glyph/radius, health rings, distance-text size and text spacing. Defaults are 1.50 near and 0.75 at the maximum display distance. Permanent source CI and both Windows build variants pass.
+
+- [ ] In 2D mode, compare a near and far tagged target: tag elements should remain the same screen size.
+- [ ] Confirm the head gap behaves as a world-space gap and therefore appears smaller with distance.
+- [ ] In 3D mode, compare near/far targets: the whole tag should shrink together from roughly 1.50 toward 0.75.
+- [ ] Confirm glyph, health rings, distance text and text spacing remain proportionate rather than scaling independently.
+
+Candidate: runtime PR #212 / Windows run 34050295402. Preserve the existing INI when installing.
+
+[Original screenshot](https://github.com/user-attachments/assets/e2420970-68cf-4a8a-82cf-88eba549fbdd).
+
+## issue 5356332463 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/293
+
+Created: 2026-08-20T10:24:01Z; updated: 2026-09-06T18:03:33Z
+
+Exact metadata: [source record](sources/issue-5356332463-65da99614afbe8f305f42fba1db5d1520022641829c200ce64802faacd5f1501.json).
+
+Scale symbols, health rings and distance text together between the configured near/far sizes. Keep a world-distance head gap; 2D tag sizes stay fixed.
+
+**Actionable — latest correction is source-only.** Defaults are 1.50 near and 0.75 far; the updated build is not installed.
+
+[Original screenshot](https://github.com/user-attachments/assets/e2420970-68cf-4a8a-82cf-88eba549fbdd).
+
+## issue 5356332463 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/293
+
+Created: 2026-08-20T10:24:01Z; updated: 2026-09-06T18:22:00Z
+
+Exact metadata: [source record](sources/issue-5356332463-0f4387163e7f5c2f846275f6407960b1755d9624b79e44eef2b5e153932e6a62.json).
+
+Scale symbols, health rings and distance text together between the configured near/far sizes. Keep a world-distance head gap; 2D tag sizes stay fixed.
+
+**Status: Built correction ready for visual test.** The user's installed build already had 2D/3D modes and distance scaling before this PR. Runtime PR #212 does **not** introduce distance scaling from scratch; it reconstructs the later correction recorded in this issue after live testing showed the raw 3D projection could swing ~65.7x while distance text stayed fixed-size.
+
+The candidate preserves/restores `TagDisplayMode` and metre-based `TagHeadGapMeters`, then bounds 3D scaling between configurable 1.50 near and 0.75 at the maximum display distance and applies the same multiplier to glyph/radius, health rings, distance-text size and text spacing. 2D stays fixed-size.
+
+- [ ] In 2D mode, compare near/far tags: element screen size should remain fixed while the world-space head gap projects smaller with distance.
+- [ ] In 3D mode, verify the already-existing grow/shrink behavior is now bounded rather than extreme.
+- [ ] Confirm glyph, health rings, distance text and spacing stay proportional.
+
+Candidate: runtime PR #212 / Windows run 34050295402. Preserve the existing INI when installing.
+
+[Original screenshot](https://github.com/user-attachments/assets/e2420970-68cf-4a8a-82cf-88eba549fbdd).
+
+## issue 5356332463 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/293
+
+Created: 2026-08-20T10:24:01Z; updated: 2026-09-06T18:22:00Z
+
+Exact metadata: [source record](sources/issue-5356332463-9e16d23a07d0111ec64cd1898e3b9b3dbb564dc5bff7f69a2bde335ce5579f72.json).
+
+Scale symbols, health rings and distance text together between the configured near/far sizes. Keep a world-distance head gap; 2D tag sizes stay fixed.
+
+**Status: Built candidate ready for visual test.** Runtime PR #212 adds `TagDisplayMode` (2D fixed-size / 3D distance-scaled), a world-metre `TagHeadGapMeters`, and one shared 3D multiplier applied to glyph/radius, health rings, distance-text size and text spacing. Defaults are 1.50 near and 0.75 at the maximum display distance. Permanent source CI and both Windows build variants pass.
+
+- [ ] In 2D mode, compare a near and far tagged target: tag elements should remain the same screen size.
+- [ ] Confirm the head gap behaves as a world-space gap and therefore appears smaller with distance.
+- [ ] In 3D mode, compare near/far targets: the whole tag should shrink together from roughly 1.50 toward 0.75.
+- [ ] Confirm glyph, health rings, distance text and text spacing remain proportionate rather than scaling independently.
+
+Candidate: runtime PR #212 / Windows run 34050295402. Preserve the existing INI when installing.
+
+[Original screenshot](https://github.com/user-attachments/assets/e2420970-68cf-4a8a-82cf-88eba549fbdd).
+
 ## comment 5550165765 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/293#issuecomment-5550165765

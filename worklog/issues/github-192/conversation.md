@@ -55,6 +55,37 @@ Incomplete study/tag progress should drain gradually after losing the target; co
 
 **Status: Latest repair is source-only.** The recorded default is 50% per second, but that build is not installed. Deliver it before another decay-rate comparison.
 
+## issue 5356305099 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/192
+
+Created: 2026-08-06T05:48:36Z; updated: 2026-09-06T18:03:19Z
+
+Exact metadata: [source record](sources/issue-5356305099-7ae4c897b1e255643aedcf0dca468f95db12ebd07a9655449a2dd742e4b9289f.json).
+
+Incomplete study/tag progress should drain gradually after losing the target; completed tags must remain. The decay rate should be configurable, including zero to pause it.
+
+**Status: Latest repair is source-only.** The recorded default is 50% per second, but that build is not installed. Deliver it before another decay-rate comparison.
+
+## issue 5356305099 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/192
+
+Created: 2026-08-06T05:48:36Z; updated: 2026-09-06T18:03:19Z
+
+Exact metadata: [source record](sources/issue-5356305099-9fb7864856634421dd2229eeeee71e289b2392304c580d76c003df68f00caedc.json).
+
+Incomplete study/tag progress should drain gradually after losing the target; completed tags must remain. The decay rate should be configurable, including zero to pause it.
+
+**Status: Built candidate ready for gameplay test.** Runtime PR #212 now retains explicit incomplete ped/plant progress and, after a 150 ms loss grace, decays it at `StudyProgressDecayPercentPerSecond` (default 50% of a full bar per real second). `0` pauses decay; completed tags do not decay. Permanent source CI and both Windows build variants pass.
+
+- [ ] With default 50, build partial progress on an animal/person, lose the target for about one second, and confirm the bar drains gradually rather than disappearing immediately.
+- [ ] Repeat with a plant.
+- [ ] Set decay to 0 and confirm incomplete progress survives target loss.
+- [ ] Complete a tag and confirm completed state does not decay.
+
+Candidate: runtime PR #212 / Windows run 34050295402. Preserve the existing INI when installing.
+
 ## comment 5550133681 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/192#issuecomment-5550133681

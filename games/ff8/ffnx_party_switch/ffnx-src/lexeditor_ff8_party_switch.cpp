@@ -1,4 +1,5 @@
 #include "lexeditor_ff8_party_switch.h"
+#include "lexeditor_ff8_shared_party.h"
 #include <windows.h>
 #include <array>
 #include <algorithm>
@@ -100,6 +101,7 @@ std::uint32_t __cdecl draw(std::uint32_t ordering, std::uint32_t primitives, voi
     return primitives;
 }
 void abort_swap() {
+    lexeditor_ff8_shared_party_cancel(slot);
     // Event11 inserts the ready actor removed by event12.
     if(slot>=0 && slot<3) native<void>(0x4AD620,slot,0x11,0x80,0);
     mem<std::uint8_t>(0x1D280C2)=pause1;
@@ -115,12 +117,18 @@ void __cdecl begin_swap(std::uint32_t ticket) {
        ((mem<std::uint16_t>(kModels+slot*0x9C)&3)==1)) {
         abort_swap(); return;
     }
+    const auto stock_ownership=lexeditor_ff8_shared_party_begin(slot);
+    if(stock_ownership==SharedPartyStockOwnership::blocked) {
+        abort_swap(); return;
+    }
     const auto actor=kActor+slot*0xD0, stats=kStats+slot*0x1D0;
     const auto saved=kSaved+outgoing*0x98;
     // Native saveback 0048B8C1..0048B8D2 persists this participant's current HP.
     mem<std::uint16_t>(saved)=static_cast<std::uint16_t>(mem<std::uint32_t>(actor+0x18));
     // Native 00486D1C..00486D2E copies each live ID/stock pair to its owner.
-    for(int i=0;i<32;++i) {
+    // Shared Magic owns these stocks and saved mirrors. Copying a retiring
+    // actor's private record would overwrite or duplicate the shared pool.
+    for(int i=0;stock_ownership==SharedPartyStockOwnership::private_stocks && i<32;++i) {
         mem<std::uint8_t>(saved+0x10+i*2)=mem<std::uint8_t>(stats+0x82+i*5);
         mem<std::uint8_t>(saved+0x11+i*2)=mem<std::uint8_t>(stats+0x83+i*5);
     }
@@ -157,6 +165,7 @@ void __cdecl replace_actor(std::uint32_t ticket) {
     mem<std::uint8_t>(kParty+slot)=static_cast<std::uint8_t>(target);
     native<void>(0x495530,target,slot);
     native<void>(0x495960,target,slot);
+    lexeditor_ff8_shared_party_materialized(slot);
     native<void>(0x495EC0);
     native<void>(0x48B5F0,slot);
     native<void>(0x48B310,slot);
@@ -288,6 +297,7 @@ void lexeditor_ff8_party_switch_tick() {
         if(pending || opened) ++generation;
         opened=false; pending=false; phase=Phase::idle; slot=-1; count=0; previous=0;
         reserve={};
+        lexeditor_ff8_shared_party_reset();
         return;
     }
     if(pending) {

@@ -46,6 +46,42 @@ Use the correct law/bounty artwork and preserve the map marker’s white, alerte
 
 **Status: Source implementation complete, but unbuilt.** The overhead glyph still remains white because matching its state color is unresolved. Deliver and explain that remaining boundary before final visual acceptance.
 
+## issue 5356333790 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/297
+
+Created: 2026-08-20T19:16:51Z; updated: 2026-09-06T18:42:11Z
+
+Exact metadata: [source record](sources/issue-5356333790-cc62f05cddce2a166ef4815f832c050a7eb08f009b929492d3f747b5b72bce20.json).
+
+Use the correct law/bounty artwork and preserve the map marker’s white, alerted dark-red and hostile red states.
+
+**Status: Built candidate ready for visual/gameplay test.** Runtime PR #212 now classifies exact `REL_COP` and `REL_BOUNTY_HUNTER` roles. Law map blips use Rockstar `BLIP_STYLE_COP` with the resident law glyph; bounty hunters use `BLIP_STYLE_BOUNTY_HUNTER` with the resident bounty-hunter glyph. The authored bounty style inherits the cop style, so the actual map marker keeps Rockstar's own wanted/search state behavior.
+
+The separate overhead role glyph remains white by design because there is no safe conditional-color readback for that independent HUD sprite; matching its state color is still outside this candidate.
+
+Permanent source checks passed in run 34052368724. Complete Windows release and development builds both passed in run 34052368730.
+
+- [ ] Verify tagged lawmen show law/star artwork overhead and the authored law style on the map.
+- [ ] Verify tagged bounty hunters show bounty-hunter artwork overhead and the authored bounty style on the map.
+- [ ] Exercise calm/search/hostile states and confirm the **map marker** still follows the expected authored color/state transitions.
+- [ ] Confirm generic humans did not acquire law/bounty art.
+- [ ] Confirm the overhead role glyph remains white; report if matching the map-state color is still desired after testing.
+
+Candidate: runtime PR #212. No installation or gameplay acceptance is claimed yet.
+
+## issue 5356333790 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/297
+
+Created: 2026-08-20T19:16:51Z; updated: 2026-09-06T18:42:11Z
+
+Exact metadata: [source record](sources/issue-5356333790-ead58dffddee693a91d8a7da801cdfbbcc6395ba280331d0d7e000cdf0a3fb52.json).
+
+Use the correct law/bounty artwork and preserve the map marker’s white, alerted dark-red and hostile red states.
+
+**Status: Source implementation complete, but unbuilt.** The overhead glyph still remains white because matching its state color is unresolved. Deliver and explain that remaining boundary before final visual acceptance.
+
 ## comment 5550167431 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/297#issuecomment-5550167431
