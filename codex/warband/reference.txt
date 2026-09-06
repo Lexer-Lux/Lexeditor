@@ -1,0 +1,1904 @@
+================================================================================
+CODEX -- LEXER'S MOD FOR WARBAND
+Research notes and technical reference. Kept outside the agent instructions file
+on purpose, to keep that file small.
+================================================================================
+
+Last updated: 2026-07-29
+Read CREDITS.txt for attribution policy. This file is facts and how-to only.
+
+CONTENTS
+  1. LOCAL ENVIRONMENT (verified on this machine)
+  2. MODULE SYSTEM -- WHAT IT IS AND HOW IT BUILDS
+  3. SOURCE FILE MAP (module_*.py)
+  4. ENGINE CONCEPTS AND GOTCHAS
+  5. TOOLING
+  6. FEATURE RESEARCH -- COMMON MOD FEATURES AND HOW THEY ARE BUILT
+  7. OPEN QUESTIONS / TODO
+  8. SOURCES
+
+================================================================================
+1. LOCAL ENVIRONMENT (verified on this machine)
+================================================================================
+
+1.1 Warband install -- PRIMARY (the real one)
+    C:\Program Files (x86)\Steam\steamapps\common\MountBlade Warband
+    Contains mb_warband.exe, mbw_workshop_uploader.exe, Modules\, Textures\,
+    TexturesHD\, GLShaders\, warband_compatibility.ini, input.ini.
+    Steam AppID 48700.
+
+1.2 Modules present in the primary install
+    Native                 ~76 MB   base game module
+    Napoleonic Wars        ~1485 MB official multiplayer DLC
+    Viking Conquest        ~1971 MB official singleplayer DLC (Reforged Edition)
+    BannerPage             ~3046 MB third-party Native overhaul compilation
+
+    Engine build: Steam buildid 23983102 (final 1.174). Note that
+    mb_warband.exe's FileVersion field reads "1,0,0,0" and is useless for
+    version detection -- use the Steam appmanifest buildid or the launcher.
+
+1.3 Warband install -- SECONDARY: DELETED 2026-07-29
+    D:\SteamLibrary\steamapps\common\MountBlade Warband no longer exists.
+    It was not an install: no mb_warband.exe, and no appmanifest_48700.acf in
+    D:\SteamLibrary\steamapps, so Steam had nothing registered there. It was an
+    incomplete copy of the BannerPage module dumped at an install root --
+    scripts.txt was byte-identical to the real copy (MD5
+    4632C0613CE8254D1E1E5B7877B56868) and it was 356 files short of it.
+    Steam's libraryfolders.vdf still lists 48700 under the D library; that list
+    is a stale size-tracking record, not proof of an install. If a second
+    install ever appears to exist again, check for the appmanifest first.
+
+1.4 Python -- BOTH VERSIONS INSTALLED
+    Python 3.10.11  C:\Users\Lexer\AppData\Local\Programs\Python\Python310\
+                    Remains the default `python` on PATH. Untouched.
+    Python 2.7.18   C:\Python27\python.exe
+                    Installed 2026-07-29 from python.org via winget (installer
+                    hash verified by winget). Build-time only, for the Module
+                    System. Do NOT put it ahead of 3.10 on PATH.
+    build.bat calls C:\Python27\python.exe by absolute path so the build can
+    never accidentally use Python 3. See 2.3.
+
+1.5 Module System source -- PRESENT
+    C:\Users\Lexer\Warbandmod\ModuleSystem\  -- official TaleWorlds Module
+    System 1.171, 118 files, from the int19h/mb_warband_module_system mirror.
+    export_dir in module_info.py points at C:/Users/Lexer/Warbandmod/Module/.
+    Reference\Module_data_1.171\ holds the companion Module_data drop
+    (flora_kinds, ground_specs, skyboxes) -- only needed if we edit terrain
+    types or skyboxes.
+    BannerPage still ships compiled .txt only, so it remains a black-box
+    reference, not readable source.
+
+1.6 Project directory and layout
+    C:\Users\Lexer\Warbandmod
+        ModuleSystem\   our Python source. THIS is the mod. Tracked in git.
+        Module\         build output + a copy of Native's game data.
+                        Git-ignored (build artefacts + TaleWorlds assets).
+                        Junctioned into the Warband install -- see 1.7.
+        Reference\      third-party material kept for reading, not shipped.
+        build.bat       the build. See 2.2.
+        CREDITS.txt     attribution policy and per-feature credits.
+        Codex.txt       this file.
+        TODO.txt        the work list.
+
+    git: initialised, branch master.
+    Remote: https://github.com/Lexer-Lux/LexersModForWarband (PRIVATE).
+    Commit identity is set per-repo to the GitHub noreply address
+    (89482099+Lexer-Lux@users.noreply.github.com). This is required: the
+    account has email privacy enabled and GitHub REJECTS pushes whose commits
+    carry the real address. If a push ever fails with "push declined due to
+    email privacy restrictions", that is this.
+
+1.7 How the mod is both here and in the game
+    A directory junction, created 2026-07-29 and verified working:
+        "C:\Program Files (x86)\Steam\steamapps\common\MountBlade Warband\Modules\Lexers Mod"
+            --> C:\Users\Lexer\Warbandmod\Module
+    Warband follows it transparently and lists the mod in the launcher. A file
+    written in Module\ appears through the junction immediately.
+    Notes:
+      - Junction, not a symlink, deliberately: junctions need no admin rights
+        and no Developer Mode.
+      - Modules\ turned out to be writable WITHOUT elevation, so the UAC
+        worry noted earlier does not apply. Builds do not need an admin shell.
+      - Recreate with:
+            New-Item -ItemType Junction -Path "<Warband>\Modules\Lexers Mod" `
+                     -Value "C:\Users\Lexer\Warbandmod\Module"
+      - CAUTION: deleting the junction with some tools follows it and deletes
+        the real content. Remove it with `(Get-Item $link).Delete()` or
+        `cmd /c rmdir "<link>"`, never with a recursive delete.
+
+1.8 NATIVE'S GAME DATA IN Module\ -- DONE 2026-07-29. LINK WHAT WE READ, COPY
+    WHAT WE WRITE
+    The deciding question is never disk space, it is: WILL WE EVER WRITE TO IT?
+    A link means our writes land inside Modules\Native and silently modify the
+    vanilla module. Anything we might modify is a real copy; anything strictly
+    read-only is a junction.
+
+    ON STEAM FILE VERIFICATION -- I overstated this, correcting it.
+    I gave two reasons for copying and only the first is solid:
+      - SOLID: writing through a link corrupts your vanilla Native module.
+        That is reason enough on its own, and it has nothing to do with Steam.
+      - WEAK, and I should not have leant on it: "Steam's verify could revert
+        our work". Lexer's pushback is right. Verify only checks files in
+        Steam's own depot manifest, it is not something that runs on its own,
+        and it has never broken his mods in other games. It would only matter
+        if he manually ran it AND we had written into Native's tracked files --
+        which the copy already prevents. Not a real risk.
+    The plan below is unchanged, because the first reason fully justifies it.
+
+    Measured sizes of Modules\Native (total ~76 MB, so this is not about space):
+        SceneObj    59.6 MB   the town/village/castle scenes
+        languages    9.5 MB   translation csv files
+        Data         ~0 MB
+        Resource     ~0 MB    (.brf references; the real .brf bulk lives in the
+                              install's shared CommonRes\, not in the module)
+        Textures     ~0 MB
+        Sounds       ~0 MB
+        Music        ~0 MB
+
+    PLAN:
+        COPY (we will write to these):
+            SceneObj\    We will edit scenes eventually, and in-game edit mode
+                         writes .sco files directly. Linking this would mean
+                         editing Native's scenes in place. Non-negotiable copy.
+            module.ini   Ours differs -- different module_name, our own flags.
+            the .txt files  These are build OUTPUT. Our build overwrites them
+                         every time. Linking them would have build.bat writing
+                         straight into Native. Never link these.
+        JUNCTION (read-only for us, and we WANT them to track Native):
+            Data\, Resource\, Textures\, Sounds\, Music\, languages\
+            If we later need to modify one, break that single junction and
+            replace it with a real copy at that point. Cheap to reverse.
+
+    Net effect: about 60 MB of real copy, the rest linked. Note the same
+    junction caution as 1.7 -- never recursively delete Module\ while these
+    links are in place, or you will delete Native's data through them. Remove
+    the child junctions first with `cmd /c rmdir`.
+
+    Alternative considered and rejected: junction ALL of it and keep only the
+    .txt output real. Rejected because SceneObj is the one folder we are
+    guaranteed to write to, and a mistake there damages your vanilla install.
+
+    AS BUILT (verified):
+        real copies   36 root files (.txt, module.ini, main.bmp) + SceneObj\ (537 files)
+        junctions     Data, Resource, Textures, Sounds, Music, languages
+        module.ini    module_name = Lexer's Mod for Warband
+                      reduce_texture_loader_memory_usage = 1  (was 0)
+                      use_case_insensitive_mesh_searches = 1  (was 0)
+    First full build: all 29 steps, zero warnings, 34 .txt files written.
+
+================================================================================
+2. MODULE SYSTEM -- WHAT IT IS AND HOW IT BUILDS
+================================================================================
+
+2.1 The model
+    Warband mods are not scripted at runtime. You write Python files
+    (module_*.py) that are really just big nested Python lists of tuples. A
+    build script walks those lists and emits the flat, engine-readable .txt
+    files into the module folder. The engine reads only the .txt files.
+
+        module_*.py  --(build_module.bat)-->  *.txt in Modules\<YourMod>\
+
+    Consequences:
+      - Python is a BUILD-TIME dependency only. Players never need Python.
+      - The .txt files are generated output. Never hand-edit them; the next
+        build overwrites your edits. (Exception: item_kinds1.txt / scenes.txt
+        are sometimes edited by tools -- see 4.6.)
+      - A build is all-or-nothing. Compile errors mean no output changes, or
+        worse, half-written .txt files. Always keep a known-good backup.
+
+2.2 Build procedure -- as actually configured here
+    Just run build.bat in the project root. It cd's into ModuleSystem\ and runs
+    the process_*.py steps in the required order using C:\Python27\python.exe.
+
+    Then read the console output TO THE END. "WARNING: Unable to find ..."
+    lines are the single most common cause of a mod that loads but silently
+    misbehaves, and they scroll past fast. build.bat stops on the first hard
+    failure and says so loudly.
+
+    Why build.bat and not the shipped build_module.bat: the shipped one calls
+    bare `python`, which on this machine is 3.10 and cannot run the Module
+    System. The original is left in ModuleSystem\ untouched for reference.
+
+    Order matters. process_init.py must run first (it builds the ID_*.py maps
+    other steps import), and process_scripts / process_dialogs / process_menus
+    must run after the data files that define the ids they reference.
+
+    A failed build can leave Module\ half-written. Do not launch the game off a
+    failed build; fix and rebuild.
+
+2.3 Python version -- RESOLVED
+    The official Module System is Python 2 code (print statements, `has_key`,
+    implicit relative imports) and does NOT run on Python 3.
+
+    Decision (2026-07-29): option (a) -- Python 2.7.18 installed side-by-side
+    at C:\Python27, Python 3.10 left as the default `python`, and build.bat
+    calls 2.7 by absolute path.
+    Rationale: zero porting risk, and it matches every tutorial and every
+    third-party module system source we might want to read. Python is a
+    build-time dependency only, so this costs players nothing.
+
+    Options NOT taken, recorded in case we revisit:
+      (b) a community Python 3 port (iniznet/mbw-wreck-native-py3,
+          LiXiaYu/mb_warband_module_system_1166_python3) -- experimental, and
+          any 2.x-era source we read for reference would need porting too.
+      (c) porting the official source ourselves -- most work, no benefit.
+
+2.4 Versions -- 1.171 module system on a 1.174 engine is CORRECT
+    Installed engine: 1.174 (Steam buildid 23983102).
+    Installed module system: 1.171.
+
+    This mismatch is expected and fine. 1.171 is the LAST official Module
+    System TaleWorlds released; there is no 1.172 or 1.174 module system.
+    Confirmed by searching GitHub repos and code -- every mirror
+    (int19h/mb_warband_module_system, Sea-Monster/WarbandModuleSystem) tops out
+    at 1.171. The 1.172/1.174 engine patches were overwhelmingly multiplayer
+    and stability work; they did not add script operations we would be missing.
+    Do not go hunting for a 1.174 module system. It does not exist.
+
+    module.ini can force an API level:
+        #operation_set_version = 1167
+    BannerPage's module.ini has exactly that line, commented out -- a useful
+    example of the idiom. Its module.ini also demonstrates the worthwhile
+    modern flags: reduce_texture_loader_memory_usage, use_scene_unloading,
+    use_case_insensitive_mesh_searches, far_plane_distance.
+
+--------------------------------------------------------------------------------
+2.8 HOW YOU KNOW WHAT IS MODDABLE (and why Bannerlord is different)
+--------------------------------------------------------------------------------
+
+THE SHORT ANSWER: ModuleSystem\header_operations.py IS the answer. It is the
+complete list of everything the engine will let a mod do -- roughly a thousand
+numbered operations, each with a comment describing its arguments. If a thing
+is not in that file, a vanilla-engine mod cannot do it. That is the whole
+boundary, and it is a hard one.
+
+So the working method, and it is what every Warband modder actually does:
+  1. grep header_operations.py for the concept ("camera", "overlay", "party_").
+     Present with a sane signature -> possible. Absent -> not possible.
+  2. check the header_*.py files for flags: header_triggers.py for what events
+     you can hook, header_mission_templates.py for mission behaviour,
+     header_game_menus.py for menu flags, header_items.py for item properties.
+  3. check module.ini for engine switches (it has a handful of documented keys
+     and an unknown number of undocumented ones; unknown keys are ignored
+     silently, so trying one is free).
+  4. check whether the thing is DATA or HARDCODED. Troops, items, factions and
+     scenes are data and freely changeable. The inventory grid layout, the
+     order-giving UI, the way names render on the map, and the world-map camera
+     are engine behaviour with no operations exposed, so they are not.
+  5. if all that fails, look at whether a mod you respect has done it. If none
+     has, that is strong evidence it cannot be done -- this engine has been
+     picked over for fifteen years.
+  6. experiment. Builds are cheap and the game either does the thing or does not.
+
+WHY BANNERLORD IS GENUINELY DIFFERENT, not just newer:
+  Bannerlord is C# on .NET. Its game logic ships as managed assemblies, so mods
+  can load their own assemblies, subclass the game's own classes, and use
+  Harmony to patch arbitrary methods at runtime. There is no fixed list of
+  permitted actions, because you are editing the game's actual code. That is
+  why "you can mod literally everything" is true there.
+
+  Warband is closed-source C++ with a bytecode interpreter. The .txt files are
+  bytecode for that interpreter, and the interpreter only understands its fixed
+  opcode table. There is no code to edit and no way to add an opcode from a mod.
+  We are writing scripts for a machine we cannot modify.
+
+  ==> No, we cannot do what Bannerlord modders do. The closest equivalent is
+      WSE (2.7), which is exactly the Bannerlord-style move -- someone patched
+      the engine binary to add opcodes -- which is why it unlocks so much and
+      why it costs a hard dependency.
+
+  Practical consequence for us: FEASIBILITY MUST BE CHECKED BEFORE DESIGN, not
+  after. That is why this file records "verified present" or "not verified" for
+  each mechanism rather than assuming. A Bannerlord modder can design first and
+  find a way; here, the engine decides first.
+
+--------------------------------------------------------------------------------
+2.7 WHAT WSE ACTUALLY IS, AND THE STEAM LAUNCH QUESTION
+--------------------------------------------------------------------------------
+WSE = Warband Script Enhancer, by cmpxchg8b. We now have a copy: it ships inside
+the Silverstag download at Reference\Silverstag_v026\WSE v3.2.0\.
+
+WHAT IT DOES -- read from the shipped SDK and logs, not from memory:
+  - header_operations_addon.py adds 340 NEW OPERATIONS on top of the engine's
+    own set. That is the headline: it roughly extends the modding vocabulary by
+    a third again.
+  - FLOATING POINT. Vanilla has only 32-bit ints. WSE adds fp registers and an
+    expression evaluator (muParser) via (feval, "@fp1=fp2+fp3"), including
+    trig, logs, and direct read/write of position-matrix components like
+    pos3fy. Vanilla forces you to fake all maths in fixed point.
+  - RUNTIME FILE ACCESS, which is the thing that would let a settings file be
+    read while the game runs (see 2.6).
+  - a memory optimizer for large mods, a profiler, and multiplayer extensions
+    (max players, corpse limits) via wse_settings.ini.
+
+HOW IT WORKS, and this is what decides the Steam question:
+  WSELoader.exe starts the game and DLL-INJECTS WSELib.dll into it. Confirmed
+  from the shipped wse_loader_log.txt, which shows it locating
+  mb_warband.exe via the REGISTRY, checksumming it, then injecting:
+      "Game executable origin: registry"
+      "Injecting ... LoadLibraryW ... WSELib.dll"
+  It does NOT replace mb_warband.exe. (The mb_warband_old.exe in that folder is
+  somebody's leftover backup, not part of the mechanism.)
+
+  ==> Therefore launching normally through Steam runs mb_warband.exe with NO
+      injection, and WSE simply is not active. The loader has to be what starts
+      the process.
+
+  CAN IT STILL BE LAUNCHED FROM STEAM? Options, best first:
+    (a) Steam launch options with the %command% wrapper, so Steam runs the
+        loader and the loader runs the game. This is the standard trick for
+        injector-based tools and is the thing to try first.
+    (b) Add WSELoader.exe to Steam as a non-Steam game. Reliable, gives overlay
+        and playtime, but appears as a separate library entry.
+    (c) Just run WSELoader.exe directly. For single-player this is fine as long
+        as Steam is running.
+    NOT RECOMMENDED: renaming WSELoader.exe to mb_warband.exe. The loader finds
+    the real exe through the registry, so it would likely find itself.
+  UNVERIFIED: I have not tested (a). It is a reasonable expectation, not a
+  confirmed fact.
+
+  Also worth knowing: it is a 2013/2014 DLL injector, and its own shipped log
+  ends with "Failed to wait for remote load library thread to exit. If you are
+  running an Antivirus or Security Suite, try temporarily disabling it." Expect
+  Defender to take an interest.
+
+--------------------------------------------------------------------------------
+2.7b WSE2 IS A DIFFERENT PROJECT, AND IT IS THE ONE WE SHOULD USE
+--------------------------------------------------------------------------------
+Everything above (2.7) describes WSE 3.2.0 by cmpxchg8b, which is what ships
+inside the Silverstag download. It is NOT the same project as WSE2, and the
+distinction matters a lot. I installed WSE 3.2.0 only because Silverstag is
+built against it and will not run without it. I never compared the two.
+
+WSE2, already installed in the Warband root (Lexer had it before this project):
+    mb_warband_wse2.exe        7.4 MB, built 2026-07-26
+    mb_warband_wse2_x64.exe    6.5 MB, 64-BIT build
+    wse2_launcher.exe          5.5 MB GUI launcher
+    steam_api_wse2.dll         Steam API shim
+    fmodex_wse2.dll, postFX_WSE2.fx, plus .pdb debug symbols
+    Native_WSE2.bat            contents:
+        start mb_warband_wse2.exe --module Native --no-intro
+
+ARCHITECTURAL DIFFERENCE, and this is the whole point:
+  WSE 3.x  injects a DLL into the stock mb_warband.exe from its own loader.
+  WSE2     REPLACES the executable. It is a reimplementation/extension of the
+           engine, shipping its own exe with a proper command line
+           (--module <name>), a 64-bit build, and its own launcher.
+
+*** THE STEAM CLAIM I MADE NEEDS CORRECTING. ***
+I told Lexer that adopting WSE costs him Steam achievements and playtime, and
+recommended against it partly on that basis. That was researched against WSE 3's
+injection model, where Steam never launched the process it is tracking.
+It does not automatically apply to WSE2. Verified by scanning
+mb_warband_wse2.exe: it references steam_api.dll AND steam_api_wse2.dll, calls
+SteamAPI_Init, and contains achievement-related strings. So WSE2 initialises
+the Steam API itself and is clearly built with Steam integration in mind.
+NOT PROVEN: that achievements actually fire and playtime is counted in practice.
+That needs an in-game test. But "WSE means no achievements" was too broad, and
+the cost side of TODO #25 may be much smaller than I said.
+
+WSE2 also has a 64-bit build, which matters for large mods (the 4 GB address
+space limit is a real ceiling in Warband modding), and it is actively maintained
+-- the exe on this machine was built 2026-07-26, versus WSE 3.2.0's 2014.
+
+CONSEQUENCE: they coexist and should both stay installed.
+    WSE 3.2.0  -> required by Silverstag, do not remove
+    WSE2       -> the one Lexer's Mod should target if we use WSE at all
+Lexer has already been launching Lexer's Mod through WSE2, which is why its
+savegames landed in WSE2's separate profile tree (see Worklog #41b).
+
+STILL TO DO before we can actually USE WSE2 operations: the "WSE2 SDK" folder in
+the Warband root is EMPTY. WSE2's module-system additions (its
+header_operations equivalent) are not on disk, so nothing can call its
+operations yet. That download is the first step if #25 goes ahead.
+
+FOR OUR MOD, REVISED: if we use an engine extender it should be WSE2, not
+WSE 3.x. My earlier "no WSE" recommendation rested largely on the achievements
+cost, which was measured against the wrong project. Reassess once we know
+whether achievements survive under WSE2.
+Original WSE-3-based reasoning follows, kept for context: Vanilla-compatible costs us
+nothing today, and the one feature we currently want that WSE might unlock is
+map camera pitch (6.10.2), which is not worth a hard dependency. Running
+Silverstag with WSE to play it is a completely separate matter and is fine.
+
+--------------------------------------------------------------------------------
+2.6 settings.ini -- THE GAMEPLAY KNOBS, AND WHY IT IS BUILD-TIME
+--------------------------------------------------------------------------------
+    settings.ini                      project root. The file Lexer edits.
+    ModuleSystem\module_settings.py   reads it, exposes each value as an int.
+
+    Usage in module source:
+        from module_settings import *
+        (store_mul, ":loot", ":prosperity", RAID_LOOT_PROSPERITY_MULTIPLIER),
+
+    WHY IT CANNOT BE READ AT RUNTIME. Warband gives scripts no file access of
+    any kind -- no read, no write, no ini parsing (see 6.7's engine limits). A
+    settings file the player edits between launches is therefore impossible in
+    vanilla. What we have instead is a build-time file whose values are BAKED
+    INTO the compiled .txt output. Edit it, rerun build.bat. There is no way
+    around this short of WSE, which does add file I/O (ties into the open WSE
+    question in 2.5).
+
+    If we ever want player-facing options, that has to be an in-game options
+    presentation writing to global variables -- a different and much larger
+    job. Silverstag has one ("Source - Game Options") if we want a reference.
+
+    ADDING A KNOB:
+      1. add the key to settings.ini under a section
+      2. add it to DEFAULTS in module_settings.py, and optionally to ALIASES
+         for a nicer constant name
+      3. use the constant in whichever module_*.py needs it, importing
+         module_settings there
+    The generated name is SECTION_KEY uppercased unless ALIASES overrides it.
+
+    DELIBERATE BEHAVIOURS worth knowing:
+      - a missing settings.ini falls back to every default and says so
+      - a missing key falls back and reports it
+      - a non-numeric value falls back and reports it
+      - an unknown section or key is reported as a probable typo rather than
+        silently ignored, which is the failure mode that wastes an afternoon
+      - notes print once per build to stderr, so the build log always records
+        what the module was actually compiled with
+      - trailing "; Native: 5" comments are stripped by hand, because Python 2's
+        ConfigParser only strips ';' comments preceded by whitespace and
+        Python 3's does not strip them at all
+
+    Every value in settings.ini carries a comment recording Native's original,
+    so stock behaviour is always recoverable without digging through git.
+
+--------------------------------------------------------------------------------
+2.5 THIRD-PARTY SOURCE AVAILABILITY, AND THE REVERSE-ENGINEERING QUESTION
+--------------------------------------------------------------------------------
+
+WHAT SOURCE WE ACTUALLY HAVE
+    Silverstag       FULL PYTHON SOURCE. Cloned to
+                     Reference\Silverstag_source\ (20.9 MB, from
+                     github.com/Leifdin/Silverstag, last pushed 2017-07-25).
+                     Neatly segregated into per-feature "Source - <Feature>"
+                     folders with a modmerger, which makes it an unusually good
+                     reference. Its LICENSE explicitly permits pulling features
+                     into another mod with credit.
+    Floris Mod Pack  No source found on GitHub (searched: no results).
+    BannerPage       No source found on GitHub (searched: no results).
+                     Compiled .txt only.
+
+    Silverstag's lineage, confirmed: its module folder is named
+    "Floris Workshop" -- the mod's ORIGINAL name, kept so old saves keep
+    working. Author is Windyplains. So Lexer's recollection is right: it is the
+    Floris-lineage successor, not merely a similar mod.
+
+*** THE WSE CAVEAT -- READ THIS BEFORE USING SILVERSTAG AS REFERENCE ***
+    Silverstag requires the Warband Script Enhancer (WSE 3.1.5), a third-party
+    replacement loader that ADDS operations to the engine. A grep of its source
+    finds 254 WSE references. It is deeply WSE-dependent, and its own licence
+    text says the features are "very interrelated which makes it difficult to
+    pull out an individual one".
+
+    Consequence for us: Silverstag source may use operations that DO NOT EXIST
+    in our vanilla 1.174 engine. When reading it, every operation must be
+    checked against ModuleSystem\header_operations.py before we rely on the
+    pattern. A design that reads beautifully in Silverstag may be impossible
+    for us. Treat it as a source of ideas and decomposition, not of code.
+
+    Open decision: whether Lexer's Mod itself adopts WSE. It would unlock a
+    lot, but it means players must launch through a third-party loader, and it
+    is a hard dependency we cannot walk back later. Default: NO WSE, stay
+    vanilla-compatible, until there is a feature we genuinely cannot do without
+    it. Recorded as an open question in section 7.
+
+IS REVERSE-ENGINEERING THE COMPILED .txt WORTH IT? -- verdict: NO, except
+targeted greps.
+    It is mechanically possible. The .txt files are integer opcode streams and
+    header_operations.py is the opcode table, so a decompiler is a plausible
+    weekend project (community ones exist).
+
+    But it is the wrong tool here, on all three counts Lexer asked about:
+      EASY?  No. scripts.txt alone is 2.3 MB of space-separated integers with
+             no names, no locals, and no structure -- Native's own compiled
+             scripts.txt is 2,328,641 bytes. Recovering intent from that is
+             much harder than reading equivalent Python.
+      FAST?  No. Slower than reading Silverstag's actual source, which we now
+             have for free.
+      TOKEN-EFFICIENT?  Emphatically no. This is the worst part. Pulling
+             megabytes of integer soup into context is the single most
+             expensive thing we could do, and the yield per token is dreadful.
+
+    WHAT IS CHEAP AND WORKS, and is what we should keep doing: targeted
+    grepping of the compiled .txt for a known string or identifier. That is how
+    we found BannerPage's mno_town_merchant / "Speak_with_the_merchant." and
+    its condition block -- a couple of hundred tokens, one useful answer. The
+    compiled files keep identifier names and all display strings, so searching
+    them is genuinely productive even though reading them wholesale is not.
+
+    And the decisive point: we are writing our own implementations anyway. We
+    need to know WHAT a mod does and roughly HOW it is decomposed, not its
+    exact opcodes. Greps plus Silverstag's real source cover that completely.
+
+================================================================================
+3. SOURCE FILE MAP (module_*.py)
+================================================================================
+
+Data definition files -- "what exists":
+    module_items.py             weapons, armour, horses, goods
+    module_troops.py            troops, heroes, the player, companions
+    module_factions.py          factions and their relations
+    module_parties.py           unique map parties (towns, villages, spawns)
+    module_party_templates.py   templates parties are generated from
+    module_scenes.py            scene records (terrain code + mesh + bounds)
+    module_map_icons.py         world-map icons
+    module_skins.py             body/face models, morph ranges
+    module_skills.py            skills
+    module_music.py             tracks and when they play
+    module_sounds.py            sound records and flags
+    module_animations.py        animation records (act_*)
+    module_meshes.py            named meshes usable by presentations/UI
+    module_particle_systems.py  particle effects
+    module_scene_props.py       interactive/static props, incl. their triggers
+    module_tableau_materials.py runtime-rendered textures (banners, faces)
+    module_postfx.py            post-processing
+    module_strings.py           str_* text
+    module_quick_strings.py     usually auto-generated; do not hand-manage
+    module_game_menus.py        world-map menus (camp, town, village...)
+    module_dialogs.py           all conversation
+    module_info_pages.py        the in-game help/notes pages
+    module_quests.py            quest records (the logic lives in scripts)
+
+Logic files -- "what happens":
+    module_scripts.py           the bulk of the mod's logic; call_script targets
+    module_triggers.py          world-map/global timers and events
+    module_simple_triggers.py   world-map timers with no condition/consequence
+                                split (cheaper, use for periodic upkeep)
+    module_mission_templates.py per-mission-type triggers and troop spawning;
+                                this is where battle/scene behaviour lives
+    module_presentations.py     all custom UI (overlays, menus, minimaps)
+
+Constants / plumbing:
+    module_constants.py         our own named constants and slot numbers
+    header_*.py                 operation and flag definitions -- READ ONLY.
+                                header_operations.py is the operation
+                                reference; header_triggers.py has ti_* events;
+                                header_mission_templates.py has mission flags.
+    process_*.py                the compiler itself. Do not edit.
+    module_info.py              export_dir only.
+    ID_*.py                     auto-generated ID maps produced by the build.
+
+Reading order for a newcomer to a feature: module_scripts.py to find the
+script, module_constants.py for its slots, then whichever data file declares
+the things it touches.
+
+================================================================================
+4. ENGINE CONCEPTS AND GOTCHAS
+================================================================================
+
+4.1 There are no variables, only registers and slots
+      - reg0..reg63: temporary signed 32-bit ints, valid for the current
+        operation block only. Assume anything can clobber them; never hold a
+        value in a register across a call_script.
+      - s0..s63 / s1..: string registers, same volatility.
+      - pos0..pos63: position/matrix registers.
+      - Global variables ($name) persist and are SAVED. Declaring one is just
+        using it; the build collects them into variables.txt.
+      - Slots are the real data model: every troop, party, faction, item,
+        scene prop, quest and player has an indexed array of ints attached.
+        troop_set_slot / party_get_slot etc. Slot numbers must be named
+        constants in module_constants.py, and MUST NOT collide -- a colliding
+        slot number is the single most common source of bizarre save-breaking
+        bugs when merging features from two different mods.
+        ==> Maintain a slot registry. See 7.
+
+4.2 Slot ranges -- our policy
+    Reserve a documented block per feature, written down in
+    module_constants.py AND mirrored in section 7 of this file. Never reuse a
+    slot number "because that feature is disabled".
+
+4.3 Triggers
+      - module_triggers.py entries run on the world map at a period, or on
+        ti_* engine events. (check_interval, delay_interval, rearm_interval)
+      - Negative interval values have special meanings (e.g. 0 = every frame,
+        ti_once); check header_triggers.py rather than guessing.
+      - module_mission_templates.py triggers run inside missions and are the
+        only place to react to combat events (ti_on_agent_hit,
+        ti_on_agent_killed_or_wounded, ti_before_mission_start, etc.).
+      - Save compatibility: adding a trigger is usually save-safe; adding a
+        global variable or changing slot meanings is NOT. Assume every content
+        change breaks old saves and say so in the changelog.
+
+4.4 Presentations (UI)
+    Custom UI is built from overlays created in ti_on_presentation_load and
+    updated on ti_on_presentation_run. Overlays are addressed by the reg0
+    value returned at creation, which must be stored in a slot or global.
+    Coordinates are in a fixed virtual space (1000x750-ish, scaled by the
+    engine); always test at 16:9 and 4:3. There is no layout engine -- every
+    position is manual.
+
+4.5 Scripts
+    call_script passes ints only. To pass strings use string registers or
+    (better) pass a troop/party id and look it up. Scripts can return values
+    via reg0 or by convention through a global. Recursion depth is limited;
+    deep recursion silently fails.
+
+4.6 Files that tools own
+    OpenBRF edits .brf resource files, not the module .py source.
+    Thorgrim's/the in-game editor writes scenes into the module's scene .sco
+    files under SceneObj\ and can rewrite scenes.txt -- coordinate this with
+    builds, because a build regenerates scenes.txt from module_scenes.py.
+    Standard practice: edit scenes in-game with edit mode, keep SceneObj\
+    under version control, and never let a build clobber a scene record's
+    terrain code without re-copying it back into module_scenes.py.
+
+4.7 rgl_log.txt
+    The install root has rgl_log.txt. This is the engine's error log -- missing
+    meshes, missing textures, bad scene props all land here. First place to
+    look when the game loads but looks wrong.
+
+4.8 Text and localisation
+    strings.txt uses underscores for spaces. languages\ holds translation
+    csv files. If we add strings, the language files go stale silently; the
+    game falls back to the source string, so this is low-risk but untidy.
+
+================================================================================
+5. TOOLING
+================================================================================
+    Python 2.7            build_module.bat dependency (see 2.3)
+    OpenBRF               view/edit meshes, materials, collision, animations
+    Thorgrim's Map Editor world map editing (map.txt + parties)
+    In-game edit mode     scene editing; enable edit mode in the launcher
+    A text editor with    module_*.py files are large; ripgrep/grep across the
+      project-wide search   source tree is the main navigation tool
+    Version control       STRONGLY recommended before the first build. Track
+                          the .py source and SceneObj\, ignore generated .txt.
+
+================================================================================
+6. FEATURE RESEARCH -- COMMON MOD FEATURES AND HOW THEY ARE BUILT
+================================================================================
+This section is the design library. Each entry: what the player gets, and the
+engine mechanism it needs. Fill in per-feature detail as we implement.
+Attribution for anything we take goes in CREDITS.txt, not here.
+
+6.1 Freelancer -- enlist in a lord's warband as a common soldier
+    Mechanism: a global holding the lord's troop id; a world-map trigger that
+    each tick moves/hides the player's party to the lord's party position and
+    suppresses normal party behaviour; menu overrides so the player gets a
+    soldier's menu instead of a commander's; mission template triggers to spawn
+    the player as one of the lord's troops in his battles; wage payment and
+    promotion on a periodic trigger; gear stored to slots on enlist and
+    restored on discharge.
+    Hard parts: reliably restoring inventory/party on every exit path
+    (discharge, desertion, lord's death, lord captured, faction destroyed).
+    Present in BannerPage (integrated) -- available locally as a black box.
+
+6.2 Diplomacy -- expanded politics
+    Mechanism: mostly scripts + dialogs + presentations. Faction slots for
+    treaty state; periodic triggers to run AI diplomacy; new menu/report
+    presentations. Little engine trickery, lots of bookkeeping.
+
+6.3 Camp / party management overhauls (troop trees, formations, banners)
+    Mechanism: presentations plus mission template triggers. Formations in
+    particular need per-agent position maths in a fast mission trigger and are
+    the most performance-sensitive thing a Warband mod does.
+
+6.4 Custom troop trees / faction overhaul
+    Mechanism: pure data -- module_troops.py, module_factions.py,
+    module_party_templates.py, module_items.py. Cheapest to implement, most
+    expensive to balance.
+
+6.5 Economy / enterprises / caravans
+    Mechanism: party slots on centres for stock and prices, a periodic
+    simple_trigger to simulate, presentations for the ledger.
+    BannerPage's "Trade Ledger" is an example of the presentation-heavy form.
+
+6.6 Persistent / dynamic world features (village growth, prosperity)
+    Mechanism: slots on party records for towns/villages plus a slow periodic
+    trigger. Watch out: iterating every party every tick is a real framerate
+    cost on the world map; stagger work across ticks.
+
+6.7 Combat feel (couched lance behaviour, shield mechanics, morale)
+    Mechanism: mission template triggers on ti_on_agent_hit and friends, plus
+    item flags and animation records. Some things are engine-fixed and cannot
+    be modded -- confirm feasibility BEFORE promising a feature.
+
+    ENGINE HARD LIMITS worth knowing before designing:
+      - No new operations can be added. If header_operations.py does not
+        expose it, it cannot be done in the module system.
+      - No true multithreading, no file I/O, no networking from scripts.
+      - Battle sizes are capped by module.ini and by practical performance.
+      - The world map is a single heightmap; no runtime map generation.
+      - UI has no layout engine and no scrolling primitive -- lists must be
+        paginated by hand.
+
+--------------------------------------------------------------------------------
+6.8 FEATURE #1/#3 -- TALK TO KEY NPCs FROM THE MENU, AND SHOW THEM IN THE
+    ENCYCLOPEDIA, GATED ON HAVING MET THEM
+--------------------------------------------------------------------------------
+
+WHAT NATIVE ACTUALLY DOES -- corrected 2026-07-29
+    An earlier draft of this file said Native's village menu already offers
+    "Speak with the village elder". THAT WAS WRONG. It does not. Verified by
+    listing every option in Native's village menu in module_game_menus.py:
+        village_manage, village_center ("Go to the village center."),
+        village_buy_food, village_attack_bandits, village_wait,
+        village_hostile_action ("Take a hostile action."), village_reports,
+        village_leave
+    plus the hostile sub-options (village_take_food, village_steal_cattle,
+    village_loot) and the bandit/raid confirmations.
+    There is NO elder option anywhere. To talk to the elder in Native you must
+    pick "Go to the village center", load the scene, and find them on foot.
+    The town menu likewise does not offer the guild master or the merchants.
+
+    ==> BOTH halves of feature #1 are new work: villages AND towns. Do not
+        scope it as "just the town side".
+    Lesson for this file: verify against module_game_menus.py before claiming
+    Native does something. Do not infer Native's behaviour from a mod's source.
+
+WHAT THE REFERENCE MODS DO
+    Floris Mod Pack: added menu access to the village elder, gated so it only
+    appears once you know the NPC.
+    BannerPage (installed locally, compiled only): expands this. Confirmed by
+    reading its menus.txt -- it has
+        mno_town_merchant   "Speak_with_the_merchant."
+    on the town menu, wrapped in a five-condition block that includes
+    troop/party slot equality checks (opcode 541 = a slot comparison) and a
+    faction/relation check. So the gating is exactly the pattern we want: a
+    slot on the centre records whether you have met the NPC, and the menu
+    option's condition block hides it otherwise.
+    We are reading this to learn WHICH conditions matter, then writing our own.
+    See CREDITS.txt -- level [REFERENCE].
+
+HOW WARBAND MODELS THESE NPCs -- the important structural fact
+    Village elders and guild masters are NOT ad-hoc scene props. Each centre
+    has a real troop record for its elder/guild master, referenced from the
+    centre's party via a slot (Native uses slot_town_elder /
+    slot_center_... conventions). That means:
+      - they have a persistent troop id we can name and store
+      - they have a real name we can print in the encyclopedia
+      - talking to them from a menu is just start_dialog with that troop id
+    Town shop merchants (arms, armour, goods, horse, tavern keeper) are handled
+    the same way, each hung off the town party on its own slot.
+
+    ==> Both features therefore reduce to the same two problems:
+        (1) knowing WHO the NPC is (already solved by Native's slots), and
+        (2) knowing WHETHER THE PLAYER HAS MET THEM (not tracked by Native --
+            this is the bit we must add).
+
+THE "MET" LAYER (TODO #6) -- BUILT. As implemented:
+
+    slot_center_met_npcs = 600, a bitmask on the centre's party.
+    Bits in module_constants.py: cmet_elder / cmet_tavernkeeper /
+    cmet_weaponsmith / cmet_armorer / cmet_goods_merchant / cmet_horse_merchant.
+    One bit covers elder AND guild master, because Native keeps both in
+    slot_town_elder and a centre is only ever one or the other.
+
+    script_lexer_note_met_npc (no args, reads $g_talk_troop and $current_town)
+        Compares $g_talk_troop against the centre's six NPC slots
+        (slot_town_elder 25, tavernkeeper 20, weaponsmith 21, armorer 22,
+        merchant 23, horse_merchant 24) and ORs in the matching bit.
+        Every slot check is guarded by party_slot_ge >= 1 first, because an
+        absent NPC leaves the slot at 0 or -1 and must not match a 0 troop id.
+        Wrapped entirely in try_begin so it can never fail its caller.
+        Prints a debug line when $cheat_mode is 1.
+
+    script_cf_lexer_has_met_npc (center_no, bit) -> fails if not met
+        The query side. Menus (#1) and the encyclopedia page (#3) should use
+        this rather than reading the slot by hand, so the bit logic lives once.
+
+    HOOK: called from the universal [anyone, "start"] dialog entry at the top of
+    module_dialogs.py, which runs on every conversation in the game. This is why
+    walking in and meeting someone the normal way is what unlocks the shortcut,
+    and why we do not have to find every path to every NPC.
+    Verified compiled: script ids 610 and 611, non-empty bodies, and the
+    call_script to 610 present in the compiled conversation.txt.
+
+    NOT YET VERIFIED IN GAME. In particular: whether $current_town is reliably
+    set for every way of reaching these NPCs. If some path leaves it stale or
+    zero the bit silently will not set, which is the most likely bug here.
+    Test with cheat mode on and watch for the debug line.
+
+ORIGINAL DESIGN NOTES (kept for reasoning)
+    Add one bitmask slot per centre rather than one slot per NPC type. A single
+    int gives 32 flags, which is far more than the handful of NPCs per centre,
+    and it keeps the slot registry small and merge-safe:
+
+        slot_center_met_npcs        (party slot on the centre)
+            bit 0  village elder
+            bit 1  guild master
+            bit 2  goods merchant
+            bit 3  arms merchant
+            bit 4  armour merchant
+            bit 5  horse merchant
+            bit 6  tavern keeper
+
+    Set the bit at the moment the player first actually converses with that
+    NPC. The clean hook is the dialog side, not the menu side: when a dialog
+    with one of these troops begins, resolve which centre and which role, then
+    OR the bit in. Doing it in dialog means walking in and meeting them the
+    normal way is what unlocks the menu shortcut -- which is the intended
+    feel, and it means we do not have to find every possible path to the NPC.
+
+    Bit twiddling in the module system: there is no single-bit operation set, so
+    use val_or / val_and with a literal mask, or store 1 << n as a constant.
+    Test with (store_and, ":r", ":slotval", mask) then (neq, ":r", 0).
+
+    IMPORTANT: reserve these slot numbers in module_constants.py and record
+    them in the slot registry in section 7 BEFORE writing code. A colliding
+    slot number is the classic save-corrupting Warband merge bug (4.1).
+
+MENU SIDE (TODO #1) -- GREY OUT, DO NOT HIDE
+    An earlier draft said to hide the option until met. Lexer corrected this:
+    the reference mods grey it out with an explanation instead, which is better
+    -- a vanished option teaches the player nothing.
+
+    And Warband supports it properly. VERIFIED:
+        disable_menu_option = 2061   # (disable_menu_option)
+    Called from inside a menu option's CONDITION block: the condition still
+    passes so the option is displayed, but the option renders greyed and
+    unclickable. This is the mechanism for all of this.
+
+    Add one menu option per NPC role to the town and village menus in
+    module_game_menus.py. Condition block:
+        - centre has that NPC slot set (the NPC exists here) -- if not, the
+          option genuinely should not appear, e.g. no guild master in a village
+        - if the met bit is NOT set: still show, call disable_menu_option, and
+          set the label to say why
+        - likewise for other unavailability (under siege, hostile faction) --
+          grey with a reason rather than vanish. BannerPage's condition block is
+          worth mirroring in spirit.
+    Consequence block: start_dialog with the stored troop id.
+
+    IMPORTANT CONSEQUENCE OF disable_menu_option: a disabled option CANNOT be
+    clicked, so there is no click to hang a message popup on. The explanation
+    has to be in the option's own text, built with a string register:
+        "Speak with the guild master. (You have not met them.)"
+    Plan the label strings accordingly; do not design around a popup.
+
+    This same mechanism is what TODO #36 uses to fix Native's habit of silently
+    hiding options -- starting with Recruit Volunteers, which Native hides when
+    centre relation is below 0 or the party is full, leaving the player with no
+    idea why it disappeared.
+
+ENCYCLOPEDIA SIDE (TODO #3 -- REJECTED, see below. TODO #79 is the substitute:
+a "People here" page on the settlement menu instead of the encyclopedia.)
+    The centre encyclopedia page is a presentation. For each role:
+        met     -> print the troop's name via str_store_troop_name
+        unmet   -> print "?"
+    Format as agreed:
+        Village Elder: ?
+        Guild Master:  Ex Whyman
+    Remember 4.4: no layout engine. Every line is a manually positioned
+    overlay, and the page must be checked at both 16:9 and 4:3. Budget more
+    time for the layout than for the logic.
+    Only list roles the centre actually has -- do not print "Guild Master: ?"
+    on a village.
+
+--------------------------------------------------------------------------------
+6.9 FEATURE #2 -- WOW-STYLE QUEST MARKERS ON THE WORLD MAP
+--------------------------------------------------------------------------------
+
+TARGET BEHAVIOUR
+    A small marker to the right of a centre's name on the world map:
+        yellow !   quest available here, not taken
+        grey   !   accepted, still need to complete it
+        green   !  completed, return here to hand in
+        red    !   failed, return here to report
+    One marker per centre. Precedence when ambiguous: red > green > yellow >
+    grey (most urgent wins).
+
+THIS SPLITS INTO TWO INDEPENDENT PROBLEMS. The second is the hard one.
+
+PROBLEM A -- DRAWING THE MARKER  ***SOLVED: DRAW IT AS COLOURED TEXT***
+
+    An earlier draft of this file claimed we needed four "!" meshes as map
+    icons. That was wrong. Everything needed to draw a coloured "!" as TEXT
+    over the world map exists in the operation set. Verified in
+    header_operations.py and header_presentations.py:
+
+        position_get_screen_projection = 750
+            (position_get_screen_projection, <dest_pos>, <src_pos>)
+            Converts a world position to a SCREEN position. This is the
+            operation that makes the whole approach possible -- it is what
+            lets us find where on screen a given centre currently is.
+        create_text_overlay = 910      make a text overlay
+        overlay_set_text    = 920      set its string
+        overlay_set_color   = 921      0xRRGGBB -- true per-overlay colour
+        overlay_set_alpha   = 922      0xAA
+        overlay_set_position= 926      place it (uses the position's x,y)
+        overlay_set_size    = 925      scale it
+        set_fixed_point_multiplier = 2124   for the fixed-point coord maths
+        tf_with_outline  = 0x00010000   text flag: outline the glyph, which is
+                                        what makes it readable over any
+                                        terrain colour
+        prsntf_read_only = 0x00000001   a read-only presentation, so input
+                                        still reaches the map underneath
+
+    APPROACH (A1) -- READ-ONLY TEXT-OVERLAY PRESENTATION. This is the plan.
+        Start one presentation on the world map, flagged prsntf_read_only so
+        the player can still click, drag and select normally. On
+        ti_on_presentation_run, for each centre that has a marker state:
+            - get the centre party's map position
+            - position_get_screen_projection to turn it into a screen position
+            - offset slightly right of the name
+            - overlay_set_text "!" , overlay_set_color for the state,
+              overlay_set_position, and show it
+        Colours: yellow 0xFFDD00, grey 0x999999, green 0x33CC33, red 0xCC2222.
+        Use tf_with_outline so it does not vanish over pale terrain.
+
+        Advantages over the mesh plan: no art assets at all, true per-state
+        colour, no extra map parties, and no risk of lords besieging our
+        exclamation marks. Strictly better. The mesh idea is dropped.
+
+        REAL COSTS, to be honest about them:
+          - This is per-frame work. Create the overlays ONCE on
+            ti_on_presentation_load and only reposition/recolour them on run;
+            never create overlays in the run trigger, that leaks.
+          - Cull hard. Only project centres whose marker state is non-zero,
+            and skip any whose projection falls outside the screen. With ~100
+            centres and typically a handful of markers this is cheap, but a
+            naive loop over every centre every frame is not (see 6.6).
+          - Recompute the marker STATES on a slow trigger and cache them in a
+            slot (601). The per-frame job is drawing only, never evaluating.
+          - The presentation must be restarted after anything that changes
+            screen (entering a town, a battle, opening the encyclopedia).
+            Expect this to be the fiddly part in testing, not the maths.
+          - Text overlay position is in the presentation's fixed-point screen
+            space; get set_fixed_point_multiplier right or everything lands in
+            a corner. This is the classic first-attempt bug.
+
+    APPROACH (A2) -- APPEND A CHARACTER TO THE PARTY NAME  -- fallback only
+        party_set_name the centre to "Praven !". Five minutes, zero risk, but
+        map name rendering is a single colour, so the four states would have to
+        become four different glyphs. Also rewrites a name the rest of the game
+        reads, risking cosmetic bugs anywhere a centre name is printed.
+        Keep in the back pocket in case (A1)'s presentation lifecycle fights us.
+
+PROBLEM B -- KNOWING THERE IS A QUEST AVAILABLE  (the actual difficulty)
+    The three "you already have it" states are easy. Native tracks quest state
+    directly, and header_quests / the quest slots give us:
+        accepted & incomplete   -> quest active
+        succeeded, not handed in-> quest succeeded but not concluded
+        failed, not reported    -> quest failed but not concluded
+    Each quest also records its giver, so we can map a quest back to the centre
+    whose NPC gave it. Grey / green / red therefore fall out of a periodic pass
+    over the quest records, cheaply.
+
+    Yellow is the problem. Native does not precompute "this NPC has a quest for
+    you". Availability is decided AT CONVERSATION TIME, inside the dialog: you
+    talk to the elder, and only then does a script roll and pick a quest based
+    on relation, existing quests, centre state, random chance and so on. There
+    is no flag to read.
+
+    So a marker cannot just query a flag -- and this is precisely the point of
+    the feature (not having to visit every elder), so we cannot dodge it.
+
+    VERIFIED IN NATIVE 1.171: the relevant script is script_get_quest, at
+    module_scripts.py line ~17650, whose own comment reads "combines old
+    get_random_quest with new get_dynamic_quest". It picks a quest from the
+    ranges village_elder_quests_begin/end or mayor_quests_begin/end AND sets it
+    up in the same breath. Selection and commitment are fused, and the dialogs
+    are full of store_random_in_range. There is no predicate to query.
+
+    SILVERSTAG ALREADY SOLVED THIS, and it is a direct reference for us.
+    Its source adds exactly the predicate this feature needs:
+        script_cf_common_mayor_quest_available   (troop, quest_no)
+        script_cf_common_village_quest_available (troop, quest_no)
+    called from its dialogs, and it counts available quests into a local
+    :available_quests. Confirmed absent from Native 1.171 and present in
+    Silverstag -- so this is Silverstag's own work, not Native's.
+    The cf_ prefix is the module system convention for "conditional, may fail,
+    no side effects", which is precisely the shape we want.
+    Read Reference\Silverstag_source\Source - Quest Utilities\questutil_scripts.py
+    to see how they decomposed it, then write ours. [REFERENCE], not copied --
+    and note their version may use WSE operations we cannot use (see 2.5).
+
+    The fix is a refactor: extract the availability decision out of the dialogs
+    into a single shared script, e.g.
+        script_center_has_quest_available(centre) -> reg0
+    with NO side effects and NO randomness -- it must be a pure predicate.
+    Then:
+      - the dialogs call it, so what the marker promises and what the NPC
+        actually offers can never disagree
+      - a staggered periodic trigger calls it per centre and caches the result
+        in a party slot, which the marker layer reads
+    Any randomness must be made deterministic per centre -- seed it from the
+    centre id and a slowly-changing value (e.g. a week counter) stored in a
+    slot, so the answer is stable between the marker appearing and the player
+    arriving. A marker that vanishes when you get there is worse than no
+    marker.
+
+    Cost the refactor honestly: this touches every quest-giving dialog path,
+    not just the elder's. Expect this to be the bulk of the work on #2, with
+    the drawing being the easy half. Consider shipping it scoped to village
+    elders and guild masters first, then widening.
+
+    Recommended slot layout (reserve in section 7 with #6's slots):
+        slot_center_quest_marker_state   0 none / 1 yellow / 2 grey / 3 green / 4 red
+        slot_center_quest_avail_cache    cached predicate result
+        slot_center_quest_avail_seed     stable per-centre seed
+
+--------------------------------------------------------------------------------
+6.0 JARGON -- "CENTRE"
+--------------------------------------------------------------------------------
+My word, not the game's UI word, and I should have defined it. "Centre" is
+Native's own internal term for a settlement of any kind -- town, castle or
+village -- taken together. It comes straight from the source:
+    centers_begin = towns_begin ("p_town_1")
+    centers_end   = villages_end
+so "centre" means "anything in that range", which is every town, castle and
+village on the map. That is why the slot is called slot_center_player_relation
+rather than slot_village_reputation: one slot covers all three.
+Where a distinction matters, this file says town / castle / village explicitly.
+
+--------------------------------------------------------------------------------
+6.24 PROSPERITY, CORRECTED -- IT IS A SUPPLY-DRIVEN EQUILIBRIUM (TODO #45)
+--------------------------------------------------------------------------------
+*** THIS CORRECTS 6.13 BELOW, in a way that matters for the #45 rework. ***
+
+6.13 says prosperity is "bought with accumulated elder gold at 3000 denars per
+point". That conversion is real, but it is a SECONDARY input. The dominant
+mechanic is convergence toward a target, and I missed it entirely.
+
+    script_get_center_ideal_prosperity (module_scripts.py ~L34096)
+        ideal  = 65
+        ideal -= 2 * hardship_index          <- derived from goods prices
+        ideal += 5 if the village has a fish pond
+        ideal  = max(ideal, 0)
+
+    A periodic trigger (module_simple_triggers.py ~L579) then nudges actual
+    prosperity toward that ideal: -1 per firing when above, +1 when below, plus
+    a 3% chance of a +/-10 jolt either way.
+
+    script_center_get_goods_availability builds hardship_index from PRICES: for
+    each trade good with consumer demand above 2, it takes how far the local
+    price sits above the 1000 baseline, divides the excess by 200, and caps each
+    good's contribution at demand/4. Expensive scarce goods = hardship = lower
+    ideal prosperity.
+
+==> Native prosperity is not an accumulator, it is an EQUILIBRIUM, and what
+    really sets a settlement's wealth is HOW WELL SUPPLIED IT IS. Cheap
+    plentiful goods drift it up toward 65+; expensive scarce goods drag it down.
+    The elder-gold conversion and the -60 raid hit are perturbations around that
+    attractor -- which is also exactly why a raided village climbs back. Nothing
+    about the raid changed its ideal.
+
+IMPLICATIONS FOR #45:
+  - "Settlements buy prosperity with accumulated money, and each point costs
+    upkeep" REPLACES the equilibrium, it does not sit on top of it. Both cannot
+    run at once or they fight: the convergence trigger will drag prosperity back
+    to ideal regardless of the ledger. Decide explicitly whether to disable it.
+  - If convergence stays, the honest lever for "villages have expenses" is the
+    IDEAL, not the current value -- make expenses raise hardship or lower the
+    base 65, and prosperity follows by itself.
+  - This is also why raid damage never sticks (6.12). To make raiding matter
+    long term it has to damage what sets the ideal -- goods availability, or the
+    capital goods behind production -- not just the current number.
+
+WHAT OTHER MODS DO
+  SILVERSTAG keeps Native's equilibrium and tunes the RECOVERY RATE instead of
+  replacing the model. Enhanced Diplomacy adds a recovery_rate percentage: a
+  reconstruction decree pushes it toward +200%, a war-taxation decree divides
+  it, the whole thing is clamped at 400%, and the per-tick change is capped at
+  +4 rather than Native's +1. Below 100% it becomes a random roll, so recovery
+  stutters. It also ties conscription to prosperity.
+  Same physics, political modifiers on the rate.
+
+  FLORIS calls change_center_prosperity in 28 places against Native's 8 -- far
+  more events move prosperity -- but keeps the same underlying equilibrium.
+
+  BANNERPAGE documents no prosperity formula. Its economy pages describe the
+  supply-and-trade story Native's hardship index already implements, and add two
+  PLAYER-FACING systems instead: town moneylenders (per-town interest from 20%,
+  borrowing capacity scaled by your relation with that town, penalties for
+  defaulting) and land ownership as an investment with per-town prices.
+  It builds player economic agency on top of Native's model rather than
+  changing the model.
+
+--------------------------------------------------------------------------------
+6.13 PROSPERITY -- HOW IT ACTUALLY WORKS
+--------------------------------------------------------------------------------
+slot_town_prosperity = 50, commented in Native as "affects the amount of wealth
+generated". Range 0-100, hard clamped by val_clamp in
+script_change_center_prosperity.
+
+THE LOOP, for a village:
+    The village elder's troop acts as the village's purse and its shop.
+    Trade accumulates gold on that troop. Then, in the periodic village update:
+        if the elder's gold > 3500:
+            prosperity += gold / 3000
+            gold       -= 3000 * (that many points)
+    So prosperity is literally bought with accumulated trade income, at
+    3000 denars per point, and the gold is consumed in the process.
+
+    Prosperity then feeds back into how much the village has to sell:
+        number_of_items_in_village = (prosperity / 15) + 1     # so 1 to 7
+    That count is what stocks the village merchant's inventory, alongside the
+    village's own production and a fifth of its bound town's production.
+
+    ==> Higher prosperity means more goods on sale, which means more trade,
+        which means more gold, which means more prosperity. A slow flywheel.
+
+FOR TOWNS there is a second slot: slot_town_wealth = 49, "total amount of
+accumulated wealth in the center, pays for the garrison". Prosperity drives
+wealth generation; wealth pays the garrison. So sacking a town's economy
+eventually degrades its ability to defend itself.
+
+PRESENTATION: prosperity is bucketed into 5 tiers for display (prosperity / 20)
+and shown as a word, not a number, via script_get_prosperity_text_to_s50. The
+player only sees a tier change, and only for fiefs they own, which is why
+prosperity damage feels invisible.
+
+WHAT MOVES IT:
+    village raided            -60   <- by far the largest single event
+    daily siege effect        negative, per day under siege
+    defeat a party at a centre  -5
+    routine growth             +1 per 3000 denars of accumulated elder gold
+    misc                       -1 in places (e.g. some quest failures)
+
+==> WHY THE RAID PENALTY IS SO HARSH IN CONTEXT: -60 on a 0-100 scale wipes out
+    something like 180,000 denars of accumulated trade income, and drops the
+    village's goods stock from up to 7 items down to 1-2. Recovery is not a
+    timer, it is the flywheel spinning back up from a standing start, which is
+    slow precisely because the village now has almost nothing to sell.
+    That is the real reason villages feel dead after a raid, and the real reason
+    Native cannot afford to make the penalty stick.
+
+--------------------------------------------------------------------------------
+6.14 THE PRODUCTION ECONOMY -- IT ALREADY EXISTS, AND IT IS BETTER THAN THE
+     TRADE SCREEN SUGGESTS (TODO #46)
+--------------------------------------------------------------------------------
+This is the big discovery of this pass. Native already models per-settlement
+productive capacity in detail. Every centre carries "capital goods" slots:
+
+    205 head_cattle      dried meat, cheese, hides, butter
+    206 head_sheep       sausages, wool
+    207 head_horses      tracked but never offered for sale
+    208 acres_pasture    drives cattle/sheep growth rate
+    209 acres_grain      grain
+    210 acres_olives     olives
+    211 acres_vineyard   fruit
+    212 acres_flax       flax
+    213 acres_dates      dates
+    214 fishing_fleet    smoked fish
+    215 salt_pans        salt
+    217 silk_farms       silk
+    219 iron_deposits    iron
+    221 mills            bread
+    222 breweries        ale
+    223 wine_presses     wine
+    226 silk_looms       velvet
+    228 pottery_kilns    pottery
+    229 smithies         tools
+
+To be precise, because it is easy to misread: there are 19 capital-good SLOT
+TYPES, and EVERY settlement carries a value for EVERY one of them. A given
+village has some number of head of cattle, some acres of grain, some number of
+mills, and so on -- usually zero for most of them and non-zero for a few. "What
+this village makes" = which of its 19 values are non-zero.
+
+script_center_get_production(center, good) turns those into a production number,
+e.g. bread = mills * 20, grain = acres_grain / 125, salt = salt_pans * 35,
+dried meat = head_cattle / 2. There is a matching script_center_get_consumption.
+The reverse mapping also already exists: slot_item_production_slot links each
+trade item to the capital good that produces it, e.g.
+    (item_set_slot, "itm_bread",      slot_item_production_slot, slot_center_mills)
+    (item_set_slot, "itm_dried_meat", slot_item_production_slot, slot_center_head_cattle)
+So the item <-> capital-good relationship is wired both directions already.
+
+*** BUT HERE IS THE ANSWER TO "HOW DO WE KNOW WHAT EACH VILLAGE MAKES": WE DO
+NOT, BECAUSE NATIVE DOES NOT DECIDE UNTIL THE CAMPAIGN STARTS. ***
+The values are ROLLED RANDOMLY at game start, in the centre initialisation
+script (module_scripts.py ~L6850-7120). Examples straight from the source:
+    villages: head_cattle   = random, average 50
+              acres_grain   = random, 0 .. ~2x average
+              mills         = random 0..3
+    towns:    mills         = random, average 5, variation 3
+              acres_grain   = random, average 1000, variation 1000
+with a handful of hardcoded exceptions (p_town_7 gets 15 mills; one village is
+pinned to 100 head of cattle).
+
+So a Native village has NO DESIGNED IDENTITY. Nothing in the files says
+"Chalbek makes wine". It is rolled per playthrough and lives only in the save.
+That is why the world feels economically anonymous, and it is why you cannot
+look up what a village produces -- there is nothing to look up.
+
+==> This REFRAMES the trade rework (TODO #46). The feature is not merely "let
+    villages sell what they make". It is "give villages a designed, stable,
+    VISIBLE identity at all", which means:
+      - author the capital-good values per village instead of rolling them, or
+        roll once from a designed template and keep it
+      - surface it in the UI so the player can learn that Chalbek means wine
+      - then let stocking and raid loot follow from it (the existing 1-7 item
+        cap and the bound-town dilution)
+    slot_town_village_product (76), declared and never used, is exactly the hook
+    somebody left for the "designed speciality" half of this.
+    Note this interacts with save compatibility: authored values would need to be
+    applied at campaign start, so it wants a new game.
+
+==> So "each village should sell what it actually produces", the Bannerlord
+    behaviour, is ALREADY IN THE DATA. It is not a missing feature, it is a
+    feature the inventory-stocking code throws away.
+
+WHY IT DOES NOT SHOW UP IN GAME:
+  1. QUANTITY. A village's merchant stock is
+         number_of_items_in_village = (prosperity / 15) + 1     -> 1 to 7 items
+     out of 40 possible merchandise goods. That is the "why are there so few
+     things for sale" complaint, and it is a single formula.
+  2. DILUTION. When stocking, the village's own production is blended with a
+     FIFTH of its bound town's production. So a village's identity gets muddied
+     by whatever the nearby town does.
+  3. THE RAID LOOT IS WORSE -- it weights purely by the BOUND TOWN's production
+     and consumption, ignoring the village entirely. Which is exactly Lexer's
+     "all prosperity calcs should be bound to the village, not the nearest
+     city" point, and he is right that this is backwards.
+  4. slot_town_village_product (slot 76) is DECLARED IN module_constants.py AND
+     NEVER USED ANYWHERE. Vestigial. Somebody intended exactly this feature and
+     did not finish it.
+
+TALEWORLDS AGREED WITH LEXER. There is a developer comment sitting directly
+above script_center_get_production:
+    "Actually, this could be reset somewhat to yield supply and demand as raw
+     numbers ... Supply could be based on capital goods -- head of cattle, head
+     of sheep, fish ponds, fishing fleets, acres of grain fields, olive
+     orchards, olive presses, wine presses, mills, smithies, salt pans,
+     potters' kilns, etc. Prosperity would increase both demand and supply"
+That is the rework, written by the original authors, left undone.
+
+REWORK SHAPE (cheap parts first):
+  a. raise the item-count formula so villages stock more than 1-7 goods
+  b. stop blending the bound town's production into village stock; weight
+     purely by the village's own capital goods
+  c. make the raid loot table use the VILLAGE's production, not the town's
+  d. optionally use slot_town_village_product as a declared speciality that
+     gets a stocking bonus, so each village has a recognisable identity
+  e. let prosperity scale both supply and demand, per the dev comment
+All of this is script and data. None of it needs WSE.
+
+NOTE: trade goods run itm_spice .. itm_siege_supply, with num_merchandise_goods
+= 40 and average_price_factor = 1000.
+
+--------------------------------------------------------------------------------
+6.15 SHOWING NUMBERS ON THE MAP AND ON SETTLEMENT SCREENS (TODO #47)
+--------------------------------------------------------------------------------
+Lexer wants village prosperity, and his reputation with a settlement, visible on
+the settlement screen and under its name on the world map.
+
+THE MAP HALF IS ALREADY SOLVED BY NATIVE, and we found the mechanism earlier
+without realising what it was for:
+    party_set_extra_text
+Native uses it to hang "(Looted)", "(Being Raided)" and "(Under Siege)" next to
+a village's name on the world map -- see script_village_set_state. It is a plain
+string attached to the party, drawn by the engine beneath/beside the name.
+So "prosperity under the village name" is:
+    (str_store_string, s0, <formatted text>), (party_set_extra_text, center, s0)
+refreshed from a slow periodic trigger. Cheap, no presentation needed, no assets.
+
+LIMITS, and they matter for design:
+  - ONE extra_text per party. Prosperity and reputation cannot both have their
+    own slot; they must share one string ("Rich | Liked"), or we alternate, or
+    reputation goes on the settlement screen only.
+  - NO COLOUR. extra_text is drawn in the engine's own colour. This is why the
+    quest markers (6.9) still want the text-overlay presentation approach --
+    that one needs per-state colour, and extra_text cannot give it.
+  - It COLLIDES with Native's own use. If we write prosperity into extra_text we
+    will overwrite "(Looted)"/"(Under Siege)". Any implementation must compose
+    with those states rather than clobbering them -- state text should win, or
+    be concatenated.
+
+THE SETTLEMENT SCREEN HALF is just menu text. Village and town menus already
+build their description text from script output, so prosperity and reputation
+can be appended there with no new UI at all. Native already has
+script_get_prosperity_text_to_s50 producing the word form, and the raw 0-100
+number is a slot read. Showing the number as well as the word is trivial, and is
+the thing Lexer needs in order to see the distribution before tuning (6.16).
+
+IS THERE A NATIVE DEBUG FACILITY? Partly, yes -- see 6.17 on cheat mode. With
+cheats on, Native already prints prosperity changes for fiefs the player owns
+(script_change_center_prosperity does a display_message on tier change). For
+seeing ALL villages at once we would need to build a report, which is a
+presentation or a menu listing -- worth doing as a dev tool before the rework.
+
+--------------------------------------------------------------------------------
+6.16 PROSPERITY REWORK -- FEASIBILITY AND SHAPE (TODO #45)
+--------------------------------------------------------------------------------
+"Can we edit mechanics this deeply?" YES. Prosperity is entirely script-side:
+one slot (slot_town_prosperity = 50), one mutator
+(script_change_center_prosperity), and a handful of callers. There is no engine
+involvement at all. This is the most moddable kind of system in Warband.
+
+IS POPULATION A THING? No. There is no population stat anywhere in
+module_constants.py. Prosperity IS the population/wealth proxy, and the capital
+goods slots (6.14) are the productive-capacity model. If we want population as a
+distinct concept we would be adding it, which is possible but is a new stat with
+new slots rather than an existing one to hook.
+
+LEXER'S DESIGN, and how each part lands against the engine:
+  * villages have expenses; profit/loss drives prosperity
+      Fits Native's existing shape well. Today prosperity already grows from the
+      elder's accumulated gold at 3000 denars per point -- that is revenue with
+      no cost side. Adding an expense term makes it a genuine balance.
+      slot_center_accumulated_rents and slot_center_accumulated_tariffs already
+      exist and are already zeroed on a raid, so there is revenue plumbing to
+      build on.
+  * expenses scale with prosperity, linear vs log
+      Trivial arithmetic, BUT: all module-system maths is 32-bit INTEGER. There
+      is no log and no floating point in vanilla. A log curve has to be faked
+      with a lookup table or piecewise division. Doable, just say it up front.
+      (This is one of the few places WSE's floating point would genuinely help.)
+      Lexer is right to want the in-game distribution of prosperity values
+      before choosing the curve -- which is what TODO #47 is for. Do that first.
+  * prosperity <-> items equivalence function, raid reduces prosperity by the
+    VALUE of what was taken
+      This is the good idea in the whole set. It makes the raid loot and the
+      prosperity hit two views of one quantity instead of two unrelated
+      constants, and it automatically fixes the thing Lexer found absurd: that
+      vanilla raid loot is independent of everything. Implementation: sum the
+      item values actually taken in the loot screen and convert to prosperity
+      via a divisor. Note the loot screen is player-driven -- they may leave
+      goods behind -- so read what was TAKEN, not what was offered, or the
+      equivalence breaks.
+  * raiding always results in battle
+      Fits. The raid already runs through a progress/interception system; making
+      the defenders always engage is a change to the encounter path, not new
+      machinery.
+  * prosperity <-> troop equivalence: more prosperity = more and better men
+      Fits well. Village defender parties are built from party templates, and
+      Native already scales some spawns. A prosperity-driven template selection
+      or troop-count multiplier is straightforward, and it makes rich villages
+      genuinely risky to raid -- which is the mitigation-by-difficulty half of
+      the raiding brief (6.12).
+  * all prosperity calcs bound to the village, not the nearest city
+      Correct and already justified -- see 6.14 points 2 and 3. This is a bug in
+      spirit, not a design choice.
+
+ORDER OF WORK: visibility first (#47), then look at real distributions, then
+curve choice, then the equivalence functions, then the combat changes. Tuning
+before we can see the numbers is guesswork.
+
+--------------------------------------------------------------------------------
+6.20 MORALE -- IT IS PER FACTION-OF-ORIGIN, NOT PER UNIT TYPE
+--------------------------------------------------------------------------------
+Lexer asked whether every unit type has its own morale. Close, and more
+interesting than a flat no.
+
+There is ONE party morale value (party_get_morale on p_main_party). But there is
+also slot_faction_morale_of_player_troops = 99, a slot on each FACTION, and a
+script that does this:
+
+    (store_script_param_1, ":troop_no"),
+    (store_troop_faction, ":faction_no", ":troop_no"),
+    (ge, ":faction_no", npc_kingdoms_begin), (lt, ":faction_no", npc_kingdoms_end),
+    (faction_get_slot, reg0, ":faction_no", slot_faction_morale_of_player_troops),
+    ...
+    (val_div, reg0, 100),
+    (party_get_morale, reg1, "p_main_party"),
+
+So each troop in your party gets a morale modifier based on THE FACTION IT CAME
+FROM, added to the shared party morale. Only troops of the five NPC kingdoms
+qualify; anything outside npc_kingdoms_begin..end gets 0.
+
+What moves it: battle outcomes against or alongside a faction, and raiding --
+script_village_set_state lowers the raided faction's
+slot_faction_morale_of_player_troops. So sacking Vaegir villages makes your
+Vaegir recruits unhappy specifically. That is a genuinely good mechanic that the
+game never explains, and it is a natural hook for the raiding rework (6.12):
+mitigating raid consequences could include not fielding troops from the faction
+you are raiding.
+
+--------------------------------------------------------------------------------
+6.21 ENCUMBRANCE / INVENTORY / PARTY SPEED
+--------------------------------------------------------------------------------
+INVENTORY IS SLOT-BASED, NOT WEIGHT-BASED. The operation is
+troop_get_inventory_capacity, and capacity is a COUNT of slots. Native grows it
+with the Inventory Management skill (and this is why BannerPage's own text
+mentions moving inventory-management points into trading -- the skill is widely
+considered dead weight). There is no "you are carrying too much" weight budget
+on the player's inventory.
+
+ITEM WEIGHT is a real item property, but the engine consumes it internally for
+combat feel -- weapon swing speed, shield handling, armour burden. It is not
+exposed as a script-readable encumbrance stat, so we cannot rebalance "how much
+armour weight slows you" directly from the module system.
+
+PARTY MAP SPEED is computed by the ENGINE from party size, mounts, terrain,
+cargo and prisoners. We do not get the formula. BUT there is a hook, and it is
+sitting commented out in Native:
+
+    ##  ("game_get_party_speed_multiplier",
+    ##   [ (store_script_param, ":party_no", 1), (set_trigger_result, 100), ])
+
+An engine callback that lets a mod multiply any party's speed. Native ships it
+disabled. Uncommenting it gives us a single, clean lever over all map movement --
+which is the right place to implement any real encumbrance rules, e.g. speed
+penalties scaled to how much loot a party is hauling. Worth knowing before
+designing anything movement-related.
+
+--------------------------------------------------------------------------------
+6.22 HOW MUCH UI CAN WE ACTUALLY DO -- AND THE HARD LIMIT ON PER-SOLDIER DATA
+--------------------------------------------------------------------------------
+THE UI ITSELF IS VERY FLEXIBLE. Presentations let us draw arbitrary overlays --
+text, meshes, images, buttons, sliders, per-item hit testing. A card-list party
+screen is entirely drawable. Native's own encyclopedia, reports and banner
+selector are all presentations. So the LOOK of a Bannerlord-style party screen is
+not the problem.
+
+THE DATA IS THE PROBLEM, and this is a genuine hard limit. Regular troops in
+Warband are NOT individuals. A party is a list of STACKS, and the only things
+the engine exposes per stack are:
+
+    party_stack_get_troop_id     which troop type
+    party_stack_get_size         how many
+    party_stack_get_num_wounded  how many wounded
+    party_stack_get_troop_dna    a visual-variation seed
+
+That is the whole READABLE vocabulary. No per-soldier hit points, no per-soldier
+name, no per-soldier anything -- "37 Swadian Infantry, 4 wounded" is the complete
+truth the module system can see. Individuality exists only for HEROES
+(companions, lords), which are real troop records.
+
+CORRECTION ON EXPERIENCE. I first implied there was no per-stack XP at all. That
+was imprecise, and Lexer's question ("then how do they level up?") caught it.
+XP exists, but effectively only as a WRITE:
+    party_add_xp_to_stack   = 1670  (party_id, stack_no, xp_amount)
+    party_add_xp            = 1674  (party_id, xp_amount)
+    party_upgrade_with_xp   = 1673  (party_id, xp_amount, upgrade_path)
+    troop_get_xp            = 1515  -- works on troop records, i.e. heroes
+There is NO party_stack_get_xp. The engine DOES track experience per stack
+internally -- that is what makes the upgrade prompt appear -- and we can ADD to
+it, but the module system cannot READ a stack's current XP.
+
+==> So: they do not level individually. XP accrues to the STACK, the engine
+    holds the number, and upgrading converts N members of the stack into the
+    next troop type. A hundred Recruits share one pool; there is no notion of
+    which individual earned it, because there is no individual.
+==> Consequence for any card UI: we can show type, count and wounded, but we
+    CANNOT draw an XP bar ourselves -- no getter. Native's party-screen XP bar is
+    drawn by the engine, not by script.
+
+==> So per-unit cards with individual hp/xp/name for regular soldiers cannot be
+    read from the game, because the game does not have it. To do what Lexer's
+    Bannerlord mod does, we would have to INVENT and store identity ourselves:
+    one record per soldier, persisted, and kept in sync as stacks merge, split,
+    take casualties and get recruited. Warband gives us fixed numbered slots and
+    global variables, with no arrays and no dynamic allocation, so tracking an
+    arbitrary number of individual soldiers is impractical in vanilla.
+
+    This is THE feature where WSE would be close to required -- and note that
+    Silverstag ships a "Source - Dynamic Arrays" module, which exists precisely
+    because vanilla has no arrays. If Lexer wants this specific feature, it is
+    the strongest argument yet for adopting WSE (TODO #25).
+
+    A vanilla-friendly middle ground worth offering: keep stacks as they are, but
+    build the card list per TROOP TYPE rather than per soldier -- one card per
+    stack showing type, count, wounded, wage, upgrade path and assignment. That
+    gets most of the readability of the Bannerlord screen without inventing a
+    data model the engine cannot hold.
+
+--------------------------------------------------------------------------------
+6.23 WSE AND STEAM ACHIEVEMENTS -- the honest answer is no
+--------------------------------------------------------------------------------
+Lexer's instinct that "someone must have solved this" is reasonable, but the
+community answer is that it is not solved, and the reason is structural.
+
+WSE works by DLL injection from its own loader (2.7). Steam therefore never
+launched the process it is tracking, so it does not count the session. Reported
+consistently: Steam does not recognise WSE as Warband and will not track hours
+played or achievements. WSE also does not require Steam to be running at all.
+
+Things that do NOT fix it:
+  - launch options with %command%: worth one experiment, and it may get Steam to
+    count playtime, but I found no report of achievements working this way.
+    I have not tested it; treat as unverified either way.
+  - adding WSELoader.exe as a non-Steam game: gives overlay and playtime under a
+    separate library entry, not Warband's achievements.
+
+*** THE IMPORTANT CONSEQUENCE FOR US: Warband's achievements are MODULE-DRIVEN.
+Native's own module_constants.py defines ACHIEVEMENT_* ids and the scripts call
+set_achievement_stat / get_achievement_stat -- we saw exactly that in the village
+raid code (ACHIEVEMENT_THE_BANDIT). So a NON-WSE mod launched normally through
+Steam keeps achievements working, and can even award them.
+That is now the strongest practical argument for answering TODO #25 with "no
+WSE": adopting it costs Lexer his achievements and Steam playtime, permanently
+and for every player. Weigh that against the per-soldier UI feature in 6.22,
+because those two are now directly in tension. ***
+
+--------------------------------------------------------------------------------
+6.17 CHEAT MODE (how to turn it on)
+--------------------------------------------------------------------------------
+Native's own comment, above script_game_enable_cheat_menu:
+    "This script is called from the game engine when user enters cheatmenu from
+     command console (ctrl+~)."
+So: enable cheats in the Warband launcher's Configure screen, then press
+Ctrl+~ in game to open the console / cheat menu. That sets $cheat_mode to 1.
+
+$cheat_mode is read all over Native to unlock debug output. Note there is also a
+$cheat_mode == 2 in places, which gates extra verbose logging.
+Our own code follows the same convention -- script_lexer_note_met_npc prints its
+debug line only when $cheat_mode is 1.
+
+--------------------------------------------------------------------------------
+6.18 CUT CONTENT STILL IN THE FILES (TODO #48)
+--------------------------------------------------------------------------------
+Searched Native 1.171's module system. What is actually still there:
+
+  FACTIONS -- all still live, not commented out, in module_factions.py:
+      fac_dark_knights     "Dark Knights"
+      fac_black_khergits   "Black Khergits"
+      fac_undeads          "Undeads", with max_player_rating(-30)
+      fac_slavers          "Slavers"
+  ENGINE SUPPORT still present: the troop flags tf_undead and
+      tf_allways_fall_dead exist in the headers, and undead_face1 / undead_face2
+      face codes are still defined in module_troops.py. So the engine can still
+      render and behave undead -- this is not just leftover names.
+  TROOPS, commented out but COMPLETE with attributes, equipment and levels:
+      undead_walker (lvl 3), undead_horseman (lvl 19), undead_nomad, undead,
+      hell_knight (lvl 23), black_khergit_guard, slave_keeper
+  TROOPS still active: black_khergit_horseman, and the whole slaver line.
+
+  NOT FOUND: "ghoul" and "antler" appear nowhere in the module system. Those are
+  either from an older Mount&Blade build, a mod, or the pre-release material and
+  did not survive into Warband's module system. I did not find them; I am not
+  claiming they never existed.
+
+CAN WE ADD THEM BACK? The commented troops, yes -- uncommenting is nearly free
+because the definitions are intact and the factions still exist. What is NOT
+free is everything around them: party templates to spawn them, spawn points,
+map behaviour, AI, and above all MESHES. A troop definition references armour
+and faces that may no longer have art. Restoring the definitions is an hour;
+making them appear in a playable, non-broken way is the real work, and it needs
+a check that the referenced items and meshes still exist.
+
+--------------------------------------------------------------------------------
+6.19 MANHUNTERS AND SLAVERS (TODO #49)
+--------------------------------------------------------------------------------
+Lexer's theory was that manhunters never upgrade because the higher tiers belong
+to the slaver faction. The upgrade chain is intact and faction is not the
+blocker. From module_troops.py:
+
+    upgrade(troops, "manhunter",     "slave_driver")
+    upgrade(troops, "slave_driver",  "slave_hunter")
+    upgrade(troops, "slave_hunter",  "slave_crusher")
+    upgrade(troops, "slave_crusher", "slaver_chief")
+
+A full four-step chain exists, and troop faction membership has no effect on
+whether an upgrade is allowed. So manhunters the PLAYER owns do upgrade, all the
+way to slaver_chief.
+
+THE ACTUAL ANSWER, and it does confirm the second half of Lexer's point: only
+ONE party template references any of these troops --
+    ("manhunters", ..., fac_manhunters, ..., [(trp_manhunter, 9, 4...
+There is NO slaver party template anywhere. So:
+  - slavers genuinely never spawn as parties, exactly as Lexer suspected
+  - the entire slave_driver -> slaver_chief line exists ONLY as upgrade targets
+    for player-owned manhunters
+  - and NPC manhunter parties never get stronger because AI parties do not use
+    the troop upgrade system at all; upgrading is a player-party mechanic
+So merging the factions would NOT make world manhunter parties upgrade. If we
+want tougher manhunter parties over time, that needs the party template or a
+spawn-scaling script, not a faction change.
+Ramun the slave trader is fac_slavers, which is why the faction still exists.
+slot_center_player_relation. Native WRITES to it in dozens of places (quests,
+dialogs, raiding), but it is READ in only four, which is the whole answer:
+
+  1. VOLUNTEER RECRUITMENT GATE. Hard requirement of relation >= 0 to recruit
+     volunteers at all (module_scripts.py ~L33896). Also blocked if the village
+     is svs_looted, svs_being_raided, or bandit-infested.
+  2. VOLUNTEER QUANTITY. script_update_volunteer_troops_in_village (~L31870)
+     feeds relation into how many volunteers are available.
+  3. TRADE PRICES (~L3838). penalty_multiplier += relation * -3, and if relation
+     is negative the whole multiplier is scaled by (100 - relation)/100. So bad
+     standing makes that centre's prices worse for you.
+  4. DIALOGUE TONE. module_dialogs.py L80 loads it into $g_talk_troop_relation,
+     which gates some lines.
+
+That is it. Centre reputation does NOT affect prosperity, quest availability,
+garrison behaviour, politics, tax income, or anything the owning lord does.
+
+==> It is a nearly-vestigial stat with one real use (recruitment) and one minor
+    one (prices). That makes it the most underused lever in the game and the
+    obvious place to hang consequences -- see 6.12. It is also why raiding
+    stings less than it should: -25 to -35 relation sounds severe but in
+    practice only costs you recruitment and slightly worse prices at ONE
+    village you were never going to use again.
+NOT VERIFIED: whether centre relation drifts back toward 0 over time. Check
+before designing anything that depends on the penalty being permanent.
+
+--------------------------------------------------------------------------------
+6.12 VILLAGE RAIDING REWORK (TODO #0, #34)
+--------------------------------------------------------------------------------
+
+WHAT NATIVE ACTUALLY DOES -- all verified in source, not from memory
+
+  The three hostile actions, under village_hostile_action ("Take a hostile
+  action."), are: village_take_food, village_steal_cattle, village_loot
+  ("Plunder the village, then raze it."). Note: Native has no "force conscript"
+  option -- if you are remembering one, it is from a mod, not Native. Worth
+  knowing, because "add conscription" is then a NEW option rather than a fix to
+  an existing one.
+
+  RAIDING (village_loot), step by step:
+    - sets village state svs_being_raided, marks slot_village_raided_by
+    - rest_for_hours 3-5 while ATTACKABLE, so nearby lords can intercept you.
+      This is the only real cost and it is trivially avoided by raiding where
+      no army is near.
+    - on completion:
+        gold      = 50 + (prosperity * 5)
+        prosperity -60  (script_village_set_state)
+        centre relation  -25 to -35 (random)
+        owning lord relation  -5
+        faction relation  -3, but ONLY if already hostile
+        player party morale +3 + (gold/100)
+        faction morale of player troops drops
+        companion disapproval via objectionable_action tmt_humanitarian
+    - state goes svs_looted, extra text "(Looted)", then recovers through
+      svs_recovering to svs_normal.
+
+  THE DEAD SWITCH. script_village_set_state contains a block, commented
+  "optional - lowers the relationship between a lord and his liege if his fief
+  is looted", that is disabled by the always-false condition (eq, 5, 0).
+  So in Native, raiding a lord's village has ZERO political effect on that
+  lord's standing with his own king. Turning this on is a free, one-line source
+  of political consequence and should be part of any rework.
+
+DIAGNOSIS -- why it feels broken
+
+  Per raid the gold is modest (prosperity ~50-70 gives ~300-400 denars; even a
+  prosperity-100 village is only ~550). The problem is not the size of one raid,
+  it is:
+    (a) THROUGHPUT. 3-5 hours per raid, ~100 villages, and the only cost is
+        interception risk you control by choosing where to raid. Repeatable
+        income with no cap.
+    (b) NO MEANINGFUL COST. The relation hit only blocks recruitment at a
+        village you are burning anyway (6.11). The political penalty is
+        switched off. Morale goes UP. So raiding is nearly pure profit.
+    (c) THE RECOVERY PARADOX Lexer identified. Prosperity -60 is severe, but
+        villages must bounce back fast or the map depopulates. So the punishment
+        lands on a stat that has to be forgiving, and the raider pays nothing.
+    (d) THE OTHER TWO OPTIONS ARE POINTLESS. Take food and steal cattle give
+        trivial returns next to plundering, so there is no decision to make --
+        raid is strictly dominant.
+
+DESIGN DIRECTION -- move the cost off prosperity and onto the player
+
+  The core move: stop trying to punish raiding by hurting the village, and
+  start making raiding cost the PLAYER something that persists. That resolves
+  (c) directly, because the village can then recover at whatever rate keeps the
+  map alive without letting the raider off the hook.
+
+  1. CUT THE LOOT. Immediate, one-line, and TODO #0. Drop the multiplier from
+     prosperity*5 to something like prosperity*1 to *2, and consider making the
+     flat 50 scale with nothing. Do this first, independently of everything
+     else -- it is the highest-value change per unit of effort in this whole
+     rework.
+
+  2. DIMINISHING RETURNS PER VILLAGE. A slot on the village counting recent
+     raids, decaying over months, dividing the payout. Raiding the same village
+     twice in a season should be nearly worthless. Kills the farm loop without
+     touching prosperity recovery.
+
+  3. TURN ON THE POLITICAL CONSEQUENCE. Enable the dead (eq, 5, 0) block so a
+     raided lord loses standing with his liege, and extend it: the owning lord
+     should personally hate you far more than -5, and neighbouring villages of
+     the same faction should lose relation with you too. Raiding one village
+     currently makes exactly one village dislike you, which is absurd.
+
+  4. GIVE CENTRE REPUTATION TEETH so the relation hit means something (6.11).
+     Ideas, in rough order of value: recruitment quality as well as quantity;
+     villagers refusing to trade or sell food; being reported so nearby lords
+     get your location; a "notorious raider" reputation gated on total raids
+     that raises garrison alertness and lowers hire prices for mercenaries who
+     like you and raises them for those who do not.
+
+  5. MAKE THE MILD OPTIONS REAL DECISIONS. The goal is a spectrum from cheap
+     and quiet to lucrative and infamous:
+        Demand tribute   small gold, small relation hit, repeatable, no state
+                         change. The "bleed them slowly" option.
+        Take food        as now but worth taking -- meaningful provisions for a
+                         real relation hit.
+        Steal cattle     as now, tuned so it competes.
+        Conscription     NEW. Force volunteers into your party against their
+                         will: troops now, but a large relation hit, morale
+                         penalty for the conscripts, and desertion risk. Fills
+                         the gap where the player wants bodies not money.
+        Plunder          the big one, now genuinely costly.
+     Each should be the best answer to a different need (gold / food / troops /
+     scorched earth), which is what Native lacks.
+
+  6. LET THE VILLAGE FIGHT BACK OVER TIME. Repeated raiding in a region should
+     raise bandit spawns, or cause villagers to flee to the nearest town
+     (transferring prosperity rather than destroying it). This makes raiding
+     change the map instead of just denting a number.
+
+  IMPLEMENTATION SHAPE: items 1 and 3 are edits to existing blocks and are
+  cheap. Items 2, 4 and 5 need new slots (reserve in section 7 when we start)
+  and new menu options plus scripts. Item 6 is the most speculative and should
+  be last. None of it needs WSE.
+
+  ANSWERED BY LEXER: it should be BOTH. Raiding is viable as a career IF you
+  specialise into blunting the consequences, and it is also available as a
+  desperation move where you simply eat the price.
+  That is a specific and useful brief, and it changes the design:
+    - the penalties must be LARGE by default, so the desperation case genuinely
+      hurts and is a real decision
+    - and they must be MITIGABLE through deliberate investment, so specialising
+      is a build rather than a workaround
+  Which means the rework needs mitigation levers, which the list above did not
+  have. Candidates, all of which fit Native's existing systems:
+      a disguise / unmarked-banner option so raids are not always attributed
+      to you (attribution becomes a mechanic rather than an assumption)
+      a roguery / persuasion skill path that reduces the relation and
+      attribution penalties
+      companions who approve rather than object (Native already has
+      objectionable_action tmt_humanitarian firing on raids -- the inverse
+      exists as a hook)
+      paying off or intimidating the owning lord to suppress the political
+      consequence
+      a bandit-reputation track that unlocks outlaw-side benefits (cheaper
+      mercenaries, bandit non-aggression, black-market fences) as the
+      legitimate side closes off
+  The shape to aim for: raiding does not get cheaper, it gets SURVIVABLE for
+  players who build for it, and the legitimate world closes to them as it does.
+
+  *** WHERE THE MONEY ACTUALLY COMES FROM -- FOUND, and it is not the gold. ***
+  I twice got this wrong before finding it. It is in module_game_menus.py at
+  line ~8486, inside menu village_loot_complete, well below the gold award:
+
+      (troop_add_merchandise, "trp_temp_troop", itp_type_goods, 30),
+      (troop_sort_inventory, "trp_temp_troop"),
+      (change_screen_loot, "trp_temp_troop"),
+
+  A raid hands the player a LOOT SCREEN containing THIRTY stacks of trade goods,
+  and it does so whether or not a single blow was struck. That is the "fuckton
+  of loot". The gold award (50 + prosperity*multiplier) is loose change beside
+  it, which is exactly why the menu can say "your share of 50 denars" and still
+  leave you thousands richer.
+
+  The goods are weighted by the BOUND TOWN's production and consumption, not the
+  village's, via script_center_get_production / _get_consumption divided by
+  price -- so raids near rich towns pay far better. There is also a separate
+  cattle path via slot_village_number_of_cattle.
+
+  ==> THE REAL LEVER IS THAT 30. It is now settings.ini
+      [raiding] loot_goods_count, defaulted to 8.
+      Tuning the gold alone would have accomplished almost nothing, which is
+      what my earlier note wrongly implied.
+
+--------------------------------------------------------------------------------
+6.10 WORLD MAP CAMERA AND CONTROLS (TODO #23, #24)
+--------------------------------------------------------------------------------
+
+6.10.1  TAP MIDDLE MOUSE BUTTON TO CENTRE ON YOUR PARTY  -- FEASIBLE, EASY
+    Both halves exist and are verified:
+        set_camera_follow_party = 1021
+            (set_camera_follow_party, <party_id>)
+            header_operations.py annotates it "#Works on map only." -- exactly
+            our use case.
+        key_middle_mouse_button = 0xe2   (header_triggers.py)
+    Implementation: a world-map trigger polling key_clicked on 0xe2, calling
+    set_camera_follow_party with "p_main_party".
+    Design notes:
+      - "Tap" implies detecting a click, not a hold. key_clicked fires once per
+        press, which is what we want; do not use key_is_down.
+      - MMB is not free on the world map in Native -- confirm nothing else
+        claims it before binding, or we will break an existing control.
+      - Decide the toggle semantics: does a second tap release the follow, or
+        does any manual pan release it? Follow-until-you-pan feels better but
+        needs a way to detect a pan.
+    This one is genuinely small. Good first real feature to build.
+
+6.10.2  WORLD MAP CAMERA PITCH  -- LIKELY NOT POSSIBLE WITHOUT WSE
+    Searched thoroughly and found nothing that sets map camera pitch:
+      - header_operations.py: the only camera operations are
+        set_camera_in_first_person / is_camera_in_first_person (missions only),
+        mission_cam_* (missions only), cur_tableau_set_camera_* (tableaus only),
+        and set_camera_follow_party (map, but position only -- no angle).
+        There is NO map camera pitch/angle operation.
+      - module.ini: Native exposes only
+            disable_zoom = 0
+            can_adjust_camera_distance = 1
+        plus map extents and sea/river cosmetics. DISTANCE is adjustable;
+        PITCH is not exposed.
+      - Cross-checked BannerPage's module.ini, which is a heavily customised
+        one, and it has the same two flags and nothing more. If a hidden pitch
+        flag existed, a mod that thorough would likely be using it.
+    Conclusion: map camera pitch appears to be engine-controlled and not
+    moddable through the module system.
+    Remaining avenues, in order of plausibility:
+      1. WSE may expose camera control the vanilla engine does not. This is the
+         most likely route and ties into the open WSE decision in 2.5.
+      2. An undocumented module.ini flag. Cannot be ruled out -- the engine
+         ignores unknown keys silently, so flags exist that Native never uses.
+         Cheap to test empirically once the mod builds: add a candidate key,
+         launch, see if anything changes. Low probability, near-zero cost.
+      3. Not possible. Most likely answer.
+    Do not promise this feature. It needs an empirical test pass before we know.
+
+================================================================================
+7. OPEN QUESTIONS AND THE SLOT REGISTRY
+================================================================================
+
+The work list lives in TODO.txt, not here. This section is only for unresolved
+technical questions and for the slot registry.
+
+RESOLVED since the first draft of this file:
+    Module System obtained (1.171, and 1.171 is correct -- see 2.4).
+    Python route decided (2.7 side-install -- see 2.3).
+    Engine build confirmed (23983102 / 1.174 -- see 1.2).
+    Program Files / UAC worry -- does not apply, Modules\ is writable (1.7).
+    Mod lives in the project folder, junctioned into the install (1.7).
+    git initialised, private remote created (1.6).
+    Base is Native. BannerPage is compiled-only, so there is no source to fork
+    even if we wanted to.
+
+RESOLVED in the second pass:
+    Feature #2 needs NO art assets. Coloured text overlays do the job -- see
+    6.9 Problem A. The four-mesh plan is dropped.
+    Reverse-engineering compiled .txt: not worth it, targeted greps only (2.5).
+    Silverstag source obtained; Floris and BannerPage have no public source
+    (2.5). Silverstag is the Floris-lineage successor, confirmed.
+    Native data: link the read-only folders, copy SceneObj and module.ini (1.8).
+
+STILL OPEN:
+    [ ] Set up Module\ per 1.8 -- deliberately deferred, TODO #4.
+    [ ] DOES LEXER'S MOD ADOPT WSE? See 2.5. This is the biggest open
+        architectural question and it gates several things, including whether
+        world-map camera pitch (6.10.2) is achievable at all. Default answer is
+        no, stay vanilla-compatible, until a must-have feature forces it.
+        Deciding late is expensive; deciding no and sticking to it is cheap.
+    [ ] Feature #2's quest-availability refactor is still the real cost of that
+        feature (6.9 Problem B), even with Silverstag as a reference. Decide
+        scope: elders + guild masters only, or every quest giver.
+    [ ] Is map camera pitch possible at all (6.10.2)? Needs an empirical
+        module.ini test pass once the mod builds.
+    [ ] Save compatibility policy. Everything below adds global variables and
+        slots, so old saves will break. Agree that dev saves are disposable
+        before we start, or we will be fighting it constantly (4.3).
+
+--------------------------------------------------------------------------------
+SLOT REGISTRY -- fill in as features are added. See 4.1 and 4.2.
+Nothing is written to a slot until it is listed here AND named in
+module_constants.py. Never reuse a number, even for a disabled feature.
+--------------------------------------------------------------------------------
+Native's own party-slot usage, read out of ModuleSystem\module_constants.py
+(1899 lines): highest values observed are 500, 350, 250, and a dense run in the
+180-199 region (slot_center_walker_*, slot_town_trade_route_*).
+==> Our party slots start at 600. That leaves a 100-slot gap above Native's
+    highest, which is cheap insurance against a Native slot we have not spotted.
+
+    entity   number    name / feature                            status
+    -------- --------- ----------------------------------------- ------------
+    party    600       slot_center_met_npcs        (bitmask)     IN USE   #6
+                       bits: cmet_elder 1, cmet_tavernkeeper 2,
+                       cmet_weaponsmith 4, cmet_armorer 8,
+                       cmet_goods_merchant 16, cmet_horse_merchant 32
+    party    601       slot_center_quest_marker_state            RESERVED #2
+    party    602       slot_center_quest_avail_cache             RESERVED #2
+    party    603       slot_center_quest_avail_seed              RESERVED #2
+    party    604-649   (reserved for #1/#2/#3 expansion)         FREE
+    party    650+      (reserved for future features)            FREE
+
+USEFUL NATIVE FACT found while doing this, relevant to features #1 and #3:
+    slot_town_elder = 25
+    Native stores the NPC's troop id on the centre's party in this slot -- and
+    it uses THE SAME SLOT for both roles: on a village it holds the village
+    elder, on a town it holds the guild master. Native's naming is misleading
+    here ("elder" for what the player sees as the guild master). Do not add a
+    second slot for the guild master; read slot_town_elder and decide the label
+    from the centre type. Native's troop id ranges (village_elders_begin,
+    mayors_end, ...) confirm the two sets of troops are distinct records.
+    Shop merchants are stored on their own separate slots.
+
+================================================================================
+8. SOURCES
+================================================================================
+    Official Module System documentation (community mirror)
+        https://mbmodwiki.github.io/Official_Module_System_Documentation:_Part_01
+    Module System setup guide
+        https://earendil_ardamire.gitlab.io/modding-guide/Subpages/New_at_modding_Warband/Setting_up_the_MS.html
+    TaleWorlds forums -- The Module System release thread
+        https://forums.taleworlds.com/index.php?topic=368063.0
+    Module System source mirror (reference for file layout)
+        https://github.com/int19h/mb_warband_module_system
+    Python 3 port experiments
+        https://github.com/iniznet/mbw-wreck-native-py3
+        https://github.com/LiXiaYu/mb_warband_module_system_1166_python3
+    Persistent World module system -- large real-world source to read
+        https://github.com/vornne/pw_module_system
+    Steam guide -- Introduction to ModSys
+        https://steamcommunity.com/sharedfiles/filedetails/?id=158727246

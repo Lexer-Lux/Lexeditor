@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356295621,
+    "number": 149,
+    "title": "Finish wanted-system research after the trace crash repair",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/149"
+  },
+  "sha256": "4e6dfade89742dac20cc95c4f3ca963e4e5415aa3ee792ed9671a47779dd2a8e",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-50.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

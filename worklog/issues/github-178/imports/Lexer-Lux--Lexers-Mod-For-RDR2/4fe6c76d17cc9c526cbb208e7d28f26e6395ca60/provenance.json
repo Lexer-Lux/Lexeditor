@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356301550,
+    "number": 178,
+    "title": "Prepare complete map-marker gate and location tests",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/178"
+  },
+  "sha256": "83b065cc7f080cbd505b9bae2b831909489ed2cda13d9abfd3930631b933ff4f",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-80.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

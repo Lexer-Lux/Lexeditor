@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356310568,
+    "number": 213,
+    "title": "Correct markers displaced outside the map",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/213"
+  },
+  "sha256": "d06f4ea4a45199b5675895fd5d366b78b1b7643a9a22010e670e2471cd728632",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-120.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356285961,
+    "number": 110,
+    "title": "Deliver the accepted minimap zoom help update",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/110"
+  },
+  "sha256": "9a9d89e72787ac5662bfdfeec2532301b0d7dc59ad38c0f8c5bf87f476e22956",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-10.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

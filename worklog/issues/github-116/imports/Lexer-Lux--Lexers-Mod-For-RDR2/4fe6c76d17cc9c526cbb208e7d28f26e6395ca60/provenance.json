@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356287453,
+    "number": 116,
+    "title": "Deliver the repaired visible bullet trails",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/116"
+  },
+  "sha256": "e37d33a638454895fe67a8230fec473d01db1627cbcc442c876c1f05cb11ac4c",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-16.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

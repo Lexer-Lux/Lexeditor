@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356327065,
+    "number": 275,
+    "title": "Fix the carried-mask startup buffer overwrite",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/275"
+  },
+  "sha256": "b8cb11083430a02d8cdd501fecd97f308b9b0c08040621001bf926128f2f1a0b",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-183.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

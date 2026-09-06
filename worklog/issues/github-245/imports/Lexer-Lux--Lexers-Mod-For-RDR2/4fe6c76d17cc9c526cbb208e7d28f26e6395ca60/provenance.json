@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356318270,
+    "number": 245,
+    "title": "Deliver the repaired corpse X and complete map artwork",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/245"
+  },
+  "sha256": "7e008a739ce791abecd82605d0edc9ad9d15dd652fa75a3ed2e9a51d585944c5",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-153.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

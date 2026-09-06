@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356286186,
+    "number": 111,
+    "title": "Improve the replacement inventory icons",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/111"
+  },
+  "sha256": "b1977eb0662f954a135742d98ed00b23f1a4037851647959410e1cb9d1b75174",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-11.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

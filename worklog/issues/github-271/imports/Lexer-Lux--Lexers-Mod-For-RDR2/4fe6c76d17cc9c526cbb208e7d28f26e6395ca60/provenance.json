@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356325916,
+    "number": 271,
+    "title": "Refuse rolls when stamina cannot pay the cost",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/271"
+  },
+  "sha256": "21193ff7a05a0c90d61012cba97a40328f6067b13ac5544d86d99ee7ccc7878c",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-179.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

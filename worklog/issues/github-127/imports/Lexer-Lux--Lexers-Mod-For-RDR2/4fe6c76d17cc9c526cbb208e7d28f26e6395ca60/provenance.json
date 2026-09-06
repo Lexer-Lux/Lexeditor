@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356290266,
+    "number": 127,
+    "title": "Skip RDR2 startup movies and disclaimers",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/127"
+  },
+  "sha256": "9fe43570f525919d6ebe2aeb4015b2dfb10df1730da863f2549df99f5bb1cb10",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-27.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356295226,
+    "number": 147,
+    "title": "Make zero swimming stamina fatal",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/147"
+  },
+  "sha256": "5cd5bc5c81ce453078cb3a7c034a978aeb020553514f819172adb537070da7df",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-48.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

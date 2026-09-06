@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356311726,
+    "number": 218,
+    "title": "Configure Dead Eye consumption in points per second",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/218"
+  },
+  "sha256": "bb65f78144199b4c8543f08cab82241170ab4bd9d2d1a1b1bf4c8152b14eb753",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-125.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

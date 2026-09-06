@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356322222,
+    "number": 258,
+    "title": "Fix the slide-down and snap before mantling",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/258"
+  },
+  "sha256": "a84e8b4d54bf8c55b13f5cae5df253aed2ec3d1e61e95b656ae5ca55857b7228",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-166.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

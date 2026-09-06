@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356293703,
+    "number": 141,
+    "title": "Explain and build additional gunsmiths",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/141"
+  },
+  "sha256": "c4cee91745f054e0909b334beb4dc435c007726e18944c1f942725630c8f950d",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-42.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}
