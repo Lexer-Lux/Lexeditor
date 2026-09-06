@@ -12,7 +12,7 @@ from pathlib import Path
 from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProjectSpec
 from service_session import LocalPluginSession, request_json
 
-from . import paths
+from . import paths, wse2_manager
 from .game_launch import WarbandGameController
 
 
@@ -131,6 +131,11 @@ def installed_modules() -> list[Path]:
 PLUGIN = GamePlugin(
     plugin_id="warband",
     game_process_factory=WarbandGameController,
+    helper_name="WSE2",
+    helper_pinned=wse2_manager.PINNED_RELEASE,
+    helper_status_for_root=wse2_manager.status,
+    helper_install_for_root=wse2_manager.install,
+    helper_upstream=wse2_manager.upstream_release,
     name="Mount & Blade: Warband",
     subtitle="WARBAND",
     description="Edit module data, settings, troops, manuals, and builds.",

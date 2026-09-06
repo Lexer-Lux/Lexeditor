@@ -43,7 +43,7 @@
     .game { position:relative; display:block; aspect-ratio:2/3; min-width:0; box-sizing:border-box; overflow:visible; padding:0; border:3px solid #30353d; border-radius:0; background:#20242a; box-shadow:0 9px 22px #0006; cursor:pointer; isolation:isolate; transition:transform .12s ease,box-shadow .12s ease,border-color .12s ease; }
     .game:hover,.game:focus-visible,.game:focus-within { z-index:5; border-color:var(--state-color); transform:translateY(-3px); box-shadow:0 13px 30px #0009; }
     .state-added { --state-color:#4f9a5a; }
-    .state-warning { --state-color:#d6a936; }
+    .state-warning,.state-broken { --state-color:#d6a936; }
     .state-not-added { --state-color:#b74a42; }
     .game-cover { position:absolute; inset:0; z-index:-3; width:100%; height:100%; object-fit:cover; }
     .cover-fallback { position:absolute; inset:0; z-index:-4; display:grid; place-items:center; padding:18px; color:#727984; background:radial-gradient(circle at 50% 28%,#303641,#171a20 62%,#0e1014); font:900 54px/1 var(--lex-heading-font); text-align:center; }
@@ -117,9 +117,8 @@
     .lexer-helper-name { display:flex; align-items:baseline; justify-content:space-between; gap:8px; font-weight:700; }
     .lexer-helper-state { color:var(--lex-muted); font-size:10px; letter-spacing:.06em; }
     .lexer-helper.behind .lexer-helper-state { color:var(--lex-highlight); }
-    .lexer-helper a { color:inherit; text-decoration:underline; }
-    .lexer-helper time { display:block; margin:.3em 0; }
-    .lexer-helper-versions { color:var(--lex-text); font-size:12px; }
+    .lexer-helper-versions { color:var(--lex-text); font-size:12px; overflow-wrap:anywhere; line-height:1.5; }
+    button.lexer-helper-source { justify-self:start; padding:3px 0; background:none; border:0; text-decoration:underline; cursor:pointer; }
     .lexer-helper-source,.lexer-helper-error { overflow-wrap:anywhere; color:var(--lex-muted); font-size:11px; }
     .lexer-helper-error { color:#e08a80; }
     .lexer-panel-actions { display:flex; gap:8px; }
@@ -161,7 +160,7 @@
       <h2>HELPER VERSIONS</h2>
       <button id="lexer-panel-close" type="button" title="Close" aria-label="Close helper versions">✕</button>
     </div>
-    <p class="lexer-panel-note">Every Lexeditor helper is a pinned fork with self-updating disabled. This panel reports what upstream has published; nothing here installs anything.</p>
+    <p class="lexer-panel-note">Every Lexeditor helper is version-pinned with self-updating disabled. This panel reports what upstream has published; nothing here installs anything.</p>
     <ul id="lexer-panel-list" class="lexer-panel-list"></ul>
     <div class="lexer-panel-actions"><button id="lexer-panel-refresh" type="button">Check again</button></div>
   </aside>
@@ -193,18 +192,32 @@
       const name=document.createElement("div");name.className="lexer-helper-name";
       const label=document.createElement("span");label.textContent=`${helper.helper||helper.runtime||"Helper"} — ${helper.plugin||helper.pluginId||""}`;
       const state=document.createElement("span");state.className="lexer-helper-state";
-      state.textContent=helper.error?"UNAVAILABLE":!helper.latest?"UNKNOWN":helper.behind?"NEWER RELEASE":"UP TO DATE";
+      state.textContent=helper.error?"UNAVAILABLE":helper.behind?"NEWER RELEASE":"UP TO DATE";
       name.append(label,state);row.append(name);
-      if(helper.error){const problem=document.createElement("div");problem.className="lexer-helper-error";problem.textContent=helper.error;row.append(problem);}
       const versions=document.createElement("div");versions.className="lexer-helper-versions";
-      const installed=helper.installedError?"Could not read installation":helper.installed?(helper.installedVersion||"Installed; version unknown"):"Not installed";
-      versions.textContent=`Pinned: ${helper.pinned||"Unknown"} · Installed: ${installed} · Latest: ${helper.latest||"Unavailable"}`;
+      for(const text of [
+        `Pinned: ${helper.pinned||"Unknown"}${helper.packageVersion?` · Package ${helper.packageVersion}`:""}`,
+        `Installed: ${helper.installedVersion||"Not detected"}${helper.installedStatus?` (${helper.installedStatus})`:""}`,
+        `Latest upstream: ${helper.latest||"Unavailable"}`,
+        `Published: ${helper.published||"Unavailable"}`]){
+        const line=document.createElement("div");line.textContent=text;versions.append(line);
+      }
       row.append(versions);
-      if(helper.installedError){const error=document.createElement("p");error.className="lexer-helper-error";error.textContent=helper.installedError;row.append(error);}
-      if(helper.published){const date=document.createElement("time");date.dateTime=helper.published;date.textContent=`Published: ${helper.published.replace("T"," ").replace("Z"," UTC")}`;row.append(date);}
-      const notes=helper.releaseNotes||helper.source;
-      if(notes){try{const url=new URL(notes);if(url.protocol==="https:"){const source=document.createElement("a");source.className="lexer-helper-source";source.href=url.href;source.target="_blank";source.rel="noopener noreferrer";source.textContent=helper.releaseNotes?"Release notes":"Project page";row.append(source);}}catch{}}
-
+      for(const error of [helper.error,helper.installedError]){
+        if(!error)continue;
+        const problem=document.createElement("div");problem.className="lexer-helper-error";problem.textContent=error;row.append(problem);
+      }
+      if(helper.releaseNotes){
+        // Never navigate the privileged desktop WebView to remote content.
+        try{const url=new URL(helper.releaseNotes);
+          if(url.protocol==="https:"&&url.hostname==="github.com"&&/^\/[^/]+\/[^/]+\/releases\/tag\//.test(url.pathname)){
+            const link=document.createElement("button");link.type="button";link.className="lexer-helper-source";link.textContent="Release notes ↗";
+            link.onclick=()=>window.pywebview.api.open_helper_release_notes(helper.pluginId).catch(error=>{
+              const problem=document.createElement("div");problem.className="lexer-helper-error";problem.textContent=String(error);row.append(problem);
+            });row.append(link);
+          }
+        }catch(_ignored){}
+      }
       return row;
     }
     async function loadHelperVersions(refresh=false){
@@ -233,11 +246,12 @@
       controls:windowControls,
       regions:[document.querySelector("#chooser-window-header")],
     });
-    const labels={"added":"Ready","warning":"Broken","not-added":"Absent"};
-    const stateSymbols={"added":"✓","warning":"!","not-added":"✕"};
+    const labels={"added":"Ready","warning":"Broken","broken":"Broken","not-added":"Absent"};
+    const stateSymbols={"added":"✓","warning":"!","broken":"!","not-added":"✕"};
     const actionSymbols={
       added:'<span aria-hidden="true">✍️</span>',
       warning:'<span aria-hidden="true">🛠️</span>',
+      broken:'<span aria-hidden="true">🛠️</span>',
       "not-added":'<span aria-hidden="true">🔍</span>',
     };
     function button(label,action,secondary=false){const control=document.createElement("button");control.textContent=label;control.classList.toggle("secondary",secondary);control.onclick=action;return control;}
@@ -312,12 +326,13 @@
         setDialog(plugin.name,"The game is ready.",[button("OPEN",()=>openGame(plugin)),button("CLOSE",closeDialog,true)]);return;
       }
       const scanning=plugin.scanInProgress;
+      // A project warning must not hide repair of the independently missing helper.
+      const canRepair=!!plugin.root&&plugin.helperInstallable&&!plugin.helperInstalled&&!scanning;
       const message=scanning
         ?"Lexeditor is still scanning automatically. You can wait for it to finish or locate the game now."
-        :(plugin.status==="broken"?"This game cannot open until its runtime helper is installed.":plugin.status==="warning"?"Lexeditor found a problem with this game. Locate the game directory or scan again.":"The scan did not find this game. Locate its directory or scan again.");
-      // A broken game is missing its helper, so offer the fix first.
-      const actions=plugin.status==="broken"&&!scanning
-        ?[button(`INSTALL ${(plugin.helperName||"HELPER").toUpperCase()}`,()=>installHelper(plugin)),button("LOCATE GAME",()=>locate(plugin)),button("CLOSE",closeDialog,true)]
+        :(canRepair?"Install or repair the pinned runtime helper. Any remaining project problems are listed below.":plugin.status==="warning"?"Lexeditor found a problem with this game. Locate the game directory or scan again.":"The scan did not find this game. Locate its directory or scan again.");
+      const actions=canRepair
+        ?[button(`INSTALL / REPAIR ${(plugin.helperName||"HELPER").toUpperCase()}`,()=>installHelper(plugin)),button("LOCATE GAME",()=>locate(plugin)),button("CLOSE",closeDialog,true)]
         :[button("LOCATE GAME",()=>locate(plugin)),button("SCAN AGAIN",()=>scan(plugin)),button(scanning?"WAIT FOR SCAN":"CLOSE",closeDialog,true)];
       setDialog(plugin.name,message,actions,plugin.problems||[],scanning?(plugin.scanLabel||plugin.statusText):plugin.statusText);
     }

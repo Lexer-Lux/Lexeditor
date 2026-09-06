@@ -33,7 +33,11 @@ def installed_module(game_root: Path, project: Path) -> str:
 def launch_command(game_root: Path, project: Path) -> list[str]:
     module = installed_module(game_root, project)
     executable = game_root.resolve() / "mb_warband_wse2.exe"
-    if executable.is_file():
+    if (executable.is_file() or (game_root / "mb_warband_wse2_x64.exe").exists()
+            or (game_root / ".lexeditor/wse2/receipt.json").exists()
+            or (game_root / ".lexeditor/wse2/pending.json").exists()):
+        from .wse2_manager import require_managed
+        require_managed(game_root)
         return [str(executable), "--module", module, "--no-intro"]
     executable = game_root.resolve() / "mb_warband.exe"
     if not executable.is_file():
@@ -259,7 +263,12 @@ class WarbandGameController:
                 return {**self.status(),"alreadyRunning":True}
             command=launch_command(game_root,project)
             module = installed_module(game_root, project)
-            job=self._factory(command,game_root)
+            if len(command) > 1:
+                from .wse2_manager import verified_launch
+                with verified_launch(game_root):
+                    job = self._factory(command, game_root)
+            else:
+                job = self._factory(command, game_root)
             deadline=self._clock()+self._timeout
             stable_pid=None;stable_since=0.0
             try:
