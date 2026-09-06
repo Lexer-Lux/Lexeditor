@@ -142,7 +142,7 @@
         const controller=await createWarbandRenderer(canvas,data,true);
         if(!detail.isConnected||!open||token!==generation){controller.dispose();return;}
         window.__warbandPreview=[controller];message.hidden=true;
-      }catch(error){if(detail.isConnected&&token===generation){message.hidden=false;message.textContent=error.message;action.disabled=true;}}
+      }catch(error){if(detail.isConnected&&token===generation){message.hidden=false;message.textContent=error.message;}}
     }
     if(item.inventoryMesh)requestAnimationFrame(async()=>{
       loadWarbandIcon(item,detail,thumbnail,thumbnailMessage);
