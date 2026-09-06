@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-import hashlib
 import json
 import mimetypes
 import os
@@ -11,7 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import paths
-from .kernel import CATEGORIES, Kernel, category_metadata, resolve_kernel
+from .datasets import CATEGORIES, UNRESOLVED, READ_ERRORS, load_datasets, save_datasets
 from platform_config import load_config, save_config
 from theme_sounds import ensure_theme_sounds, sound_file
 
@@ -30,123 +29,92 @@ PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_FF7_PROJECT", str(paths.PROJECT_RO
 EXECUTABLE = os.environ.get("LEXEDITOR_FF7_EXECUTABLE", "FFVII_LAUNCHER.exe")
 
 
-UNRESOLVED_AREAS = (
-    ("Characters", "Character initialization and growth data"),
-    ("Enemies", "Enemy records, attacks, rewards, names, and scan text"),
-    ("Encounters", "Encounter composition and placement"),
-    ("Shops", "Shop inventories and prices"),
-)
+def editor_data() -> dict:
+    return load_datasets(GAME_ROOT, PROJECT_ROOT)
 
 
-def _kernel_paths() -> tuple[Path, Path, Path]:
-    source, relative = resolve_kernel(GAME_ROOT)
-    return source, relative, PROJECT_ROOT / relative
+def platform_data() -> dict:
+    return load_config(GAME_ROOT / "FFNx.toml", "FFNx", "toml", game="FF7")
 
 
-def _active_kernel() -> tuple[Kernel, Kernel, Path, Path]:
-    source, relative, project = _kernel_paths()
-    vanilla = Kernel(source)
-    current = Kernel(project if project.is_file() else source)
-    return current, vanilla, relative, project
+def save_platform_data(payload: object) -> dict:
+    if not isinstance(payload, dict) or not isinstance(payload.get("changes"), dict):
+        raise ValueError("FFNx save payload must contain a changes object")
+    # Do not accept FF8-only keys through a hand-crafted FF7 request either.
+    allowed = {field["id"] for section in platform_data()["sections"]
+               for field in section["fields"]}
+    if set(payload["changes"]) - allowed:
+        raise ValueError("FFNx change set contains settings unavailable for FF7")
+    result = save_config(GAME_ROOT / "FFNx.toml", "FFNx", "toml",
+        str(payload.get("sha256", "")), payload["changes"],
+        (EXECUTABLE, "FF7_EN.exe", "ff7.exe"))
+    # The shared writer returns all games' fields. Keep its metadata, but filter
+    # its response as well so FF8 settings cannot reappear immediately on save.
+    for section in result["sections"]:
+        section["fields"] = [field for field in section["fields"]
+            if not field.get("onlyFor") or field["onlyFor"] == "FF7"]
+    result["sections"] = [section for section in result["sections"] if section["fields"]]
+    return result
 
 
 def data_map() -> dict:
+    data = editor_data()
     rows = []
-    try:
-        source, relative, project = _kernel_paths()
-        source_label = relative.as_posix()
-        for category in CATEGORIES.values():
-            rows.append({
-                "filename": source_label,
-                "controls": f"{category.label}: {len(category.fields)} bounded numeric fields",
-                "notes": (
-                    f"Integrated KERNEL.BIN section {category.section}. Saves a lossless project copy "
-                    f"to {project}; names and descriptions are read-only."
-                ),
-                "status": "integrated",
-                "openable": True,
-                "sourcePath": str(source),
-            })
-    except FileNotFoundError as error:
-        rows.append({
-            "filename": "English KERNEL.BIN",
-            "controls": "Items, weapons, armor, accessories, and materia",
-            "notes": str(error), "status": "blocked", "openable": False,
-        })
-    rows.extend({
-        "filename": f"Unresolved / {name}", "controls": controls,
-        "notes": "No proved writable format path is connected yet.",
-        "status": "not-integrated", "openable": False,
-    } for name, controls in UNRESOLVED_AREAS)
+    for key, category in CATEGORIES.items():
+        error = data["errors"].get(key)
+        source_label = data["sourceRelativePath"] or "English KERNEL.BIN"
+        notes = error or (
+            f"{len(data['records'][key])} records; {len(category.fields)} bounded numeric fields. "
+            f"Saves a project copy to {data['projectPath']}; installed source is unchanged. "
+            "Names are read-only KERNEL.BIN text, not a kernel2.bin text editor."
+        )
+        if key == "characters" and not error:
+            notes += " Starting stats (section 4) and limit-learning thresholds (section 3) only; growth curves, equipment and AI are preserved."
+        rows.append({"filename": source_label, "controls": category.label,
+            "notes": notes, "status": "blocked" if error else (
+                "partial" if key == "characters" else "integrated"),
+            "openable": not bool(error), "category": key,
+            "sourcePath": str(GAME_ROOT / data["sourceRelativePath"]) if data["sourceRelativePath"] else ""})
+    for key, area in UNRESOLVED.items():
+        rows.append({"filename": area["source"], "controls": area["label"],
+            "notes": area["reason"] + " " + area["unlock"],
+            "status": "not-integrated", "openable": False, "category": key})
     config = GAME_ROOT / "FFNx.toml"
-    rows.append({
-        "filename": "FFNx.toml", "controls": "FFNx display, audio, rendering, mod and runtime settings",
-        "notes": "The Tweaks tab edits typed values in place and preserves comments and file order."
-                 if config.is_file() else "Available after FFNx creates its configuration in the game directory.",
-        "status": "integrated" if config.is_file() else "partial", "openable": config.is_file(),
-    })
+    try:
+        available = platform_data()["available"]
+        note = ("Tweaks edits FF7 and shared runtime settings in place, with backups and stale-write protection."
+                if available else "Available after FFNx creates its configuration in the game directory.")
+        status = "integrated" if available else "partial"
+    except READ_ERRORS as error:
+        available, note, status = False, str(error), "blocked"
+    rows.append({"filename": "FFNx.toml", "controls": "FFNx runtime settings",
+        "notes": note, "status": status, "openable": available,
+        "sourcePath": str(config), "category": "tweaks"})
     return {"contract": "Lexeditor.data-map", "rows": rows}
 
 
 def dashboard() -> dict:
     executable = GAME_ROOT / EXECUTABLE
     problems = [] if executable.is_file() else [f"{EXECUTABLE} is missing from {GAME_ROOT}"]
-    try:
-        source, relative, project = _kernel_paths()
-        parsed = Kernel(source)
-        baseline = {
-            "ready": True, "fileCount": 1, "source": str(source),
-            "relativePath": relative.as_posix(), "projectPath": str(project),
-            "sha256": parsed.sha256,
-            "message": "English KERNEL.BIN is decoded. Five proved record sections are editable.",
-        }
-    except (OSError, ValueError) as error:
-        problems.append(str(error))
-        baseline = {"ready": False, "fileCount": 0, "message": str(error)}
+    data = editor_data()
+    problems.extend(f"{CATEGORIES[key].label}: {error}" for key, error in data["errors"].items())
+    count = len(data["records"])
+    baseline = {"ready": bool(count), "fileCount": int(bool(data["sourceSha256"])),
+        "source": str(GAME_ROOT / data["sourceRelativePath"]) if data["sourceRelativePath"] else None,
+        "relativePath": data["sourceRelativePath"], "projectPath": data["projectPath"],
+        "sha256": data["sourceSha256"],
+        "message": f"{count} of {len(CATEGORIES)} kernel datasets are readable. Saves edit the project copy, not the installed game."}
     sounds = ensure_theme_sounds(GAME_ROOT, DATA_ROOT,
         ("data/sound", "ff7/workingdir/data/sound"), {
             "confirm": 1, "move": 1, "back": 4, "exit": 4,
             "save": 2, "launch": None,
         }, format_kind="ff7")
-    return {
-        "game": {"root": str(GAME_ROOT), "executable": str(executable), "ready": not problems},
-        "baseline": baseline, "problems": problems, "themeSounds": sounds,
-    }
-
-
-def editor_data() -> dict:
-    current, vanilla, relative, project = _active_kernel()
-    return {
-        "contract": "Lexeditor.ff7-kernel", "sourceRelativePath": relative.as_posix(),
-        "projectPath": str(project), "usingProject": project.is_file(),
-        "sourceSha256": vanilla.sha256, "categories": category_metadata(),
-        "records": {key: current.records(key) for key in CATEGORIES},
-        "vanilla": {key: vanilla.records(key) for key in CATEGORIES},
-    }
+    return {"game": {"root": str(GAME_ROOT), "executable": str(executable), "ready": not problems},
+        "baseline": baseline, "problems": problems, "themeSounds": sounds}
 
 
 def save_editor_data(payload: object) -> dict:
-    if not isinstance(payload, dict) or not isinstance(payload.get("records"), dict):
-        raise ValueError("Save payload must contain a records object")
-    records = payload["records"]
-    if set(records) != set(CATEGORIES):
-        raise ValueError("Save payload must contain every integrated FF7 category")
-    source, _relative, project = _kernel_paths()
-    kernel = Kernel(project if project.is_file() else source)
-    for key in CATEGORIES:
-        category_records = records[key]
-        if not isinstance(category_records, list):
-            raise ValueError(f"{CATEGORIES[key].label} records must be a list")
-        kernel.apply(key, category_records)
-    kernel.save(project)
-    verified = Kernel(project)
-    for key in CATEGORIES:
-        verified.records(key)
-    return {
-        "saved": True, "path": str(project),
-        "sha256": hashlib.sha256(project.read_bytes()).hexdigest().upper(),
-        "bytes": project.stat().st_size,
-    }
+    return save_datasets(GAME_ROOT, PROJECT_ROOT, payload)
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -214,7 +182,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/data":
                 self.json_response(editor_data())
             elif path == "/api/platform-config":
-                self.json_response(load_config(GAME_ROOT / "FFNx.toml", "FFNx", "toml"))
+                self.json_response(platform_data())
             else:
                 self.json_response({"error": "Not found"}, 404)
         except Exception as error:
@@ -231,11 +199,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("FF7 save payload has an invalid size")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             if path == "/api/platform-config/save":
-                self.json_response(save_config(
-                    GAME_ROOT / "FFNx.toml", "FFNx", "toml",
-                    str(payload.get("sha256", "")), payload.get("changes", {}),
-                    (EXECUTABLE, "FF7_EN.exe", "ff7.exe"),
-                ))
+                self.json_response(save_platform_data(payload))
             else:
                 self.json_response(save_editor_data(payload))
         except Exception as error:
