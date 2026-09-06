@@ -40,13 +40,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     steps:
+      # checkout's immediate recursive cleanup fails on the unrelated legacy
+      # tools/magic-rdr/source gitlink (no .gitmodules URL). Clear this checkout's
+      # read-only token directly before running tests; do not change the index.
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /*
-            !/tools/magic-rdr/source/
+      - name: Clear temporary checkout credentials
+        run: python -c "import subprocess; r=subprocess.run(['git','config','--local','--unset-all','http.https://github.com/.extraheader']); assert r.returncode in (0,1,5)"
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -71,12 +70,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-          sparse-checkout-cone-mode: false
-          sparse-checkout: |
-            /*
-            !/tools/magic-rdr/source/
+      - name: Clear temporary checkout credentials
+        run: python -c "import subprocess; r=subprocess.run(['git','config','--local','--unset-all','http.https://github.com/.extraheader']); assert r.returncode in (0,1,5)"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
