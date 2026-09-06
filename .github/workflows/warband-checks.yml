@@ -24,13 +24,13 @@ jobs:
       - name: Apply the exact locally reviewed source patch
         id: patch
         run: |
-          if [ ! -f .github/warband-reviewed.patch.xz.b64 ]; then
+          if [ ! -f .github/warband-reviewed.patch.xz.b64.4 ]; then
             echo 'applied=false' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           python - <<'PY'
           import base64, hashlib, lzma, pathlib, subprocess
-          encoded = pathlib.Path('.github/warband-reviewed.patch.xz.b64').read_text().strip()
+          encoded = ''.join(pathlib.Path(f'.github/warband-reviewed.patch.xz.b64.{i}').read_text().strip() for i in range(5))
           patch = lzma.decompress(base64.b64decode(encoded, validate=True))
           assert hashlib.sha256(patch).hexdigest() == '9899f8ae582718560a440b6fdca2d1e20dddec0b9aa9be90b20a2fdf3d49d60c', 'Reviewed patch checksum mismatch'
           subprocess.run(['git', 'apply', '--unidiff-zero', '--index', '--check', '-'], input=patch, check=True)
@@ -50,7 +50,7 @@ jobs:
         id: publish
         run: |
           if [ '${{ steps.patch.outputs.applied }}' = 'true' ]; then
-            git rm .github/warband-reviewed.patch.xz.b64
+            git rm .github/warband-reviewed.patch.xz.b64.*
             git config user.name 'Lexer'
             git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
             git commit -m 'Implement Warband coverage, troop trees, cached icons and guarded WSE2 launch'
