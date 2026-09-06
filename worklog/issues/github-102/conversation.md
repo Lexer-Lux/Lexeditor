@@ -44,6 +44,38 @@ Each full ring represents the configured HP amount; successive colored layers sh
 
 References: [RDR UI](https://github.com/Sarbatore/rdr_uis), [native menu base](https://github.com/Halen84/RDR2-Native-Menu-Base).
 
+## issue 5356284241 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/102
+
+Created: 2026-08-06T01:17:34Z; updated: 2026-09-06T18:37:56Z
+
+Exact metadata: [source record](sources/issue-5356284241-907b8eddec1983916d6cb0cfad8755c2b1ed79447fb16e3b04cb345828f2f749.json).
+
+Each full ring represents the configured HP amount; successive colored layers show additional health. Do not normalize every enemy to its own maximum. The owned horse keeps its separate core behavior.
+
+**Actionable — latest correction is built, not installed.** Known-HP targets and the installed test build still need preparing.
+
+References: [RDR UI](https://github.com/Sarbatore/rdr_uis), [native menu base](https://github.com/Halen84/RDR2-Native-Menu-Base).
+
+## issue 5356284241 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/102
+
+Created: 2026-08-06T01:17:34Z; updated: 2026-09-06T18:37:56Z
+
+Exact metadata: [source record](sources/issue-5356284241-da5d6df036e70a498a8a3cb2f8411006de551104bed256783c2a5a73da5c81c6.json).
+
+Each full ring represents the configured HP amount; successive colored layers show additional health. Do not normalize every enemy to its own maximum. The owned horse keeps its separate core behavior.
+
+**Needs Testing — corrected candidate is built.** Current runtime master had regressed to one ring normalized against each target's own maximum. Runtime PR [Lexer-Lux/Lexers-Mod-For-RDR2#214](https://github.com/Lexer-Lux/Lexers-Mod-For-RDR2/pull/214) restores fixed-value layers using authored `rpg_meter_N` assets and adds `ReconTagging/HealthPerRing` (default 100 HP). Ordinary targets layer red → gold → blue → white; the owned horse remains on its separate white/grey core-capacity path.
+
+Permanent source CI and both Windows release/development builds pass: [source run 34052150625](https://github.com/Lexer-Lux/Lexers-Mod-For-RDR2/actions/runs/34052150625), [Windows run 34052150630](https://github.com/Lexer-Lux/Lexers-Mod-For-RDR2/actions/runs/34052150630).
+
+In-game checklist: test a low-HP target at about one layer; a high-HP animal such as a grizzly should show additional colored layers; damage should reduce only the top active layer before exposing lower complete layers; the owned horse should retain its white/grey/clear capacity behavior; center icon, background, distance text and tag scaling should remain unaffected.
+
+References: [RDR UI](https://github.com/Sarbatore/rdr_uis), [native menu base](https://github.com/Halen84/RDR2-Native-Menu-Base).
+
 ## comment 5550109365 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/102#issuecomment-5550109365
