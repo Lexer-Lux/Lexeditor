@@ -19,7 +19,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python .github/ui-followup.py > /tmp/ui-followup.log 2>&1
+          python .github/ui-followup2.py > /tmp/ui-followup.log 2>&1
           code=$?
           cat /tmp/ui-followup.log
           if [ "$code" -ne 0 ]; then
@@ -41,7 +41,7 @@ jobs:
             node --check ui/framework.js
             python -m compileall -q desktop_host.py github_integration.py settings_manager.py
             python -m unittest discover -s tests -p 'test_*.py'
-            ! git grep -n -E 'Lexer Mode|I am Lexer|lexerMode|lexerAuthorized|lexerLogin' -- ':!worklog/**' ':!.github/workflows/**' ':!.github/ui-followup.py'
+            ! git grep -n -E 'Lexer Mode|I am Lexer|lexerMode|lexerAuthorized|lexerLogin' -- ':!worklog/**' ':!.github/workflows/**' ':!.github/ui-followup.py' ':!.github/ui-followup2.py'
             ! git grep -n 'lex-tab-ordinal' -- ui/framework.js
             git diff --check
           } > /tmp/ui-followup-tests.log 2>&1
@@ -86,7 +86,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           rm -f .github/ui-followup-error.txt .github/ui-batch-error.txt
-          git rm .github/ui-followup.py
+          git rm .github/ui-followup.py .github/ui-followup2.py
           git checkout HEAD -- .github/workflows
           git add -A
           git add -f worklog/reference 2>/dev/null || true
