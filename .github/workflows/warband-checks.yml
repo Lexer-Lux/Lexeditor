@@ -1,0 +1,41 @@
+name: Warband checks
+on:
+  push:
+    branches: [fix/warband-issue-batch]
+  pull_request:
+    paths:
+      - 'games/warband/**'
+      - 'tests/*warband*'
+      - '.github/workflows/warband-checks.yml'
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile Warband Python
+        run: python -m compileall -q games/warband
+      - name: Export review sources
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile, ZIP_DEFLATED
+          with ZipFile('warband-review-sources.zip', 'w', ZIP_DEFLATED) as out:
+              for path in Path('.').rglob('*'):
+                  if not path.is_file() or '.git' in path.parts or '__pycache__' in path.parts:
+                      continue
+                  if path.suffix.lower() in {'.py', '.js', '.css', '.html', '.md', '.json', '.txt', '.toml', '.yml', '.yaml'}:
+                      out.write(path)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: warband-review-sources
+          path: warband-review-sources.zip
+          retention-days: 1
