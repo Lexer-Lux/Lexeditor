@@ -1,0 +1,25 @@
+name: Review native source
+on:
+  push:
+    branches: [fix/ff8-native-battle-batch]
+    paths: [.github/workflows/review-native-source.yml]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Export exact tracked source only
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          git init repo
+          git -C repo remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C repo fetch --depth=1 origin "$REVISION"
+          git -C repo archive --format=zip --output=../native-review.zip FETCH_HEAD .github games/ff8/ffnx_party_switch games/ff8/ffnx_status_bars games/ff8/editor.html ui/framework.js tools/verify_ff8_ui_battle_regressions.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-review
+          path: native-review.zip
+          retention-days: 1
