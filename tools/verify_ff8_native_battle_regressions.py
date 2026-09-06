@@ -51,6 +51,53 @@ def run(executable: Path) -> None:
     for call, target in ((0x4B17D5,0x4B0F10),(0x4B1100,0x4A7210),(0x4B127B,0x4A7210)):
         assert image[call-BASE:call-BASE+5] == b'\xe8'+struct.pack('<i',target-call-5)
 
+    # Execute the actual name resolver, width measurer and text parser. The
+    # old 03/ID control sequence produced a blank row; ordinary saved/kernel
+    # names must emit all glyphs, at the same widths used by menu layout.
+    for character in range(8):
+        u = machine()
+        name = bytes((0x50, 0x51, 0x52, 0))
+        if character in (0, 4):
+            name_address = 0x1CFDC70 if character == 0 else 0x1CFDC7C
+        else:
+            put(u, 0x1CF3EE0, 0x1000)
+            offset = 0x200 + character * 16
+            put(u, 0x1CF75EC + character * 36, offset, 'H')
+            name_address = 0x1CF3E48 + 0x1000 + offset
+        u.mem_write(name_address, name)
+        # Even glyphs use the low nibble; odd glyphs the high nibble.
+        u.mem_write(0x1D2B818 + (0x50 - 0x20) // 2, bytes((0x65, 0x65)))
+        assert invoke(u, 0x47EB50, character) == name_address
+        assert invoke(u, 0x4B1850, name_address) == 16  # 5 + 6 + 5
+        assert invoke(u, 0x4B1850, 0) == 0
+        glyphs = []
+        ordering, primitives, menu = 0x2803000, 0x2804000, 0x2805000
+        def draw_stub(uc, address, size, user):
+            if address not in (0x49B080, 0x403E00, 0x49C8F0):
+                return
+            sp = uc.reg_read(UC_X86_REG_ESP)
+            if address == 0x403E00:
+                uc.reg_write(UC_X86_REG_EAX, menu)
+            elif address == 0x49C8F0:
+                primitive = get(uc, sp + 8)
+                glyphs.append((get(uc, primitive + 12, 'h'),
+                               get(uc, primitive + 14, 'h')))
+                uc.reg_write(UC_X86_REG_EAX, get(uc, sp + 4))
+            uc.reg_write(UC_X86_REG_EIP, get(uc, sp))
+            uc.reg_write(UC_X86_REG_ESP, sp + 4)
+        u.hook_add(UC_HOOK_CODE, draw_stub)
+        result = invoke(u, 0x4A7250, ordering, primitives, 38, 32,
+                        name_address, 7)
+        assert result == primitives + 3 * 24
+        assert glyphs == [(38, 32), (43, 32), (49, 32)]
+        # Keep the failing old representation as a negative control.
+        u.mem_write(name_address, bytes((3, 0x30 + character, 0)))
+        glyphs.clear()
+        assert invoke(u, 0x4B1850, name_address) == 0
+        assert invoke(u, 0x4A7250, ordering, primitives, 38, 32,
+                      name_address, 7) == primitives
+        assert not glyphs
+
     for slot in range(3):
         u = machine()
         calls = []
@@ -137,7 +184,7 @@ def run(executable: Path) -> None:
         assert get(u,stats+0x1C,'B') & 1
         assert get(u,stats+0x1D,'B') == gf+0x40
 
-    print('PASS: 3-slot native soft-lock reproduction, retirement/resource-release sequence, '
+    print('PASS: 8-character native name/glyph/width regression; 3-slot soft-lock reproduction, retirement/resource-release sequence, '
           'new loader completion, isolation of other slots, and GF charge-state ownership.')
     print('Resource I/O was stubbed. No live-game or visual acceptance claimed.')
 
