@@ -4207,17 +4207,17 @@ function settingIsBoolean(section,key){
 // large, unrelated block behind that field's "?".
 function settingPatternHelp(section,key){
   let m;
-  if(key==="Enabled")return `Master switch for ${humanSettingName(section)}. 0 restores vanilla behaviour.`;
+  if(key==="Enabled")return `Enable or disable ${humanSettingName(section)}. This switch does not delete its saved settings.`;
   if(section==="WalletCap"&&(m=/^Rank(\d+)Dollars$/.exec(key)))
     return `Wallet capacity in dollars at Gambler challenge rank ${m[1]}.`;
   if(section==="HonorPrices"&&(m=/^Rank([+-]\d+)Multiplier$/.exec(key)))
     return `Shop purchase-price multiplier at honor rank ${m[1]}. 1.00 is the undiscounted catalog price; above 1 is a surcharge, below 1 a discount.`;
   if(section==="Camera"&&(m=/^(.*)ShoulderOffset$/.exec(key)))
-    return `Horizontal camera offset for the ${humanSettingName(m[1]).toLowerCase()} camera, in metres. Clamped to -2.00..2.00 (modules/gameplay_camera.cpp:84).`;
+    return `Horizontal offset for the ${humanSettingName(m[1]).toLowerCase()} camera. The engine can limit visible movement even when the stored value changes.`;
   if(section==="Camera"&&(m=/^(.*)Distance$/.exec(key)))
-    return `Orbit distance for the ${humanSettingName(m[1]).toLowerCase()} camera, in metres. Clamped to 0.30..8.00 (modules/gameplay_camera.cpp:85).`;
+    return `Orbit distance for the ${humanSettingName(m[1]).toLowerCase()} camera. The engine can limit the visible distance in some camera states.`;
   if(section==="Camera"&&(m=/^(.*)LowCamera$/.exec(key)))
-    return `Use the LOW ground-level framing for the ${humanSettingName(m[1]).toLowerCase()} camera instead of NORMAL. The game exposes no continuous vertical setter, so this real two-state switch is the vertical control.`;
+    return `Choose LOW instead of NORMAL framing for the ${humanSettingName(m[1]).toLowerCase()} camera. This is a two-state setting, not continuous height; some camera states ignore it.`;
   if((m=/^(SpentBar|SpentCore|Live|Zero)([RGBA])$/.exec(key))){
     const channel={R:"Red",G:"Green",B:"Blue",A:"Alpha"}[m[2]];
     return `${channel} channel, 0-255, of the ${humanSettingName(m[1]).toLowerCase()} colour.`;
@@ -4228,13 +4228,21 @@ function settingHelp(section,setting){
   const compound=`${section.name}|${setting.key}`;
   const ordinary=(setting.help||"").trim()||schemaMap("help")[compound]||
     settingPatternHelp(section.name,setting.key)||
-    `Controls ${settingLabel(section.name,setting.key)} in ${humanSettingName(section.name)}.`;
+    `Edits ${setting.key} in the [${section.name}] section of this mod's INI. This installed setting has no field-specific behavior description.`;
   const boundary=settingConstBoundary(section.name,setting.key);
-  return boundary?`${ordinary} Apply requirement: ${boundary}`:ordinary;
+  const range=settingRange(section.name,setting.key);
+  const facts=[];
+  if(range&&range.min!==undefined&&range.max!==undefined)facts.push(`Editor range: ${range.min} to ${range.max}.`);
+  const authoredUnit=schemaMap("units")[compound];
+  if(typeof authoredUnit==="string"&&authoredUnit.trim())facts.push(`Unit: ${authoredUnit}.`);
+  if(boundary)facts.push(`Apply requirement: ${boundary}`);
+  return [ordinary,...facts].join(" ");
 }
 
 function settingUnit(section,key){
   const compound=`${section}|${key}`;
+  const authored=schemaMap("units")[compound];
+  if(typeof authored==="string")return authored;
   if(compound==="Campsites|Key")return "VK code";
   if(/Ms$/.test(key))return "ms";
   if(/Hours$/.test(key))return "hours";

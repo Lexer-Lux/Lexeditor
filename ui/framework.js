@@ -348,10 +348,22 @@
       class: ["lex-info-help", className].filter(Boolean).join(" "),
       "aria-label": ariaLabel, "aria-describedby": popupId,
     }, element("span", {"aria-hidden": "true"}, "?"));
+    let closeTimer = null;
+    const cancelClose = () => { clearTimeout(closeTimer); closeTimer = null; };
+    const scheduleClose = () => {
+      cancelClose();
+      closeTimer = setTimeout(() => {
+        if (activeHelpPopup?.id === popupId &&
+            !marker.matches(":hover,:focus-within") &&
+            !activeHelpPopup.matches(":hover,:focus-within")) closeHelpPopup();
+      }, 150);
+    };
     const open = () => {
+      cancelClose();
+      if (activeHelpPopup?.id === popupId) return;
       closeHelpPopup();
       const popup = element("div", {
-        id: popupId, class: "lex-help-popover", role: "tooltip",
+        id: popupId, class: "lex-help-popover", role: "tooltip", tabindex: "0",
       }, text instanceof Node ? text.cloneNode(true) : String(text ?? title ?? ""));
       document.body.append(popup);
       const position = () => {
@@ -375,21 +387,32 @@
       };
       const escape = event => { if (event.key === "Escape") closeHelpPopup(); };
       const close = () => closeHelpPopup();
+      const onScroll = event => { if (!popup.contains(event.target)) close(); };
+      popup.addEventListener("pointerenter", cancelClose);
+      popup.addEventListener("pointerleave", scheduleClose);
+      popup.addEventListener("focus", cancelClose);
+      popup.addEventListener("blur", scheduleClose);
       window.addEventListener("resize", close, {once: true});
-      window.addEventListener("scroll", close, {once: true, capture: true});
+      window.addEventListener("scroll", onScroll, {capture: true});
       document.addEventListener("keydown", escape);
       popup.cleanup = () => {
+        cancelClose();
         document.removeEventListener("keydown", escape);
         window.removeEventListener("resize", close);
-        window.removeEventListener("scroll", close, true);
+        window.removeEventListener("scroll", onScroll, true);
       };
       activeHelpPopup = popup;
       position();
     };
     marker.addEventListener("pointerenter", open);
-    marker.addEventListener("pointerleave", closeHelpPopup);
+    marker.addEventListener("pointerleave", scheduleClose);
     marker.addEventListener("focus", open);
-    marker.addEventListener("blur", closeHelpPopup);
+    marker.addEventListener("blur", scheduleClose);
+    marker.addEventListener("keydown", event => {
+      if (event.key === "ArrowDown" && activeHelpPopup?.id === popupId) {
+        event.preventDefault(); activeHelpPopup.focus();
+      }
+    });
     return marker;
   };
 
@@ -788,8 +811,40 @@
     const typeName = element("span", {class: "lex-field-type-name"},
       TYPE_CODES[dataType] || dataType);
     const typeRange = rangeText ? element("span", {class: "lex-field-type-range"}, rangeText) : null;
-    const typeRail = element("div", {class: "lex-field-type-rail", "aria-hidden": "true"},
-      typeName, typeRange, options.help || null);
+    // Describe the actual control's contract. Never infer an engine behavior or
+    // restart rule from a raw field name; retain the plugin's authored meaning.
+    const labelText = (options.label instanceof Node ? options.label.textContent : String(options.label || "value")).trim();
+    const suppliedHelp = options.help instanceof Element
+      ? String(options.help.getAttribute("aria-label") || options.help.getAttribute("title") || "").trim()
+      : String(options.description || "").trim();
+    const meaning = suppliedHelp || (readOnly
+      ? `${labelText} is read-only in this view.`
+      : inputType === "checkbox" ? `Enable or disable ${labelText}.`
+      : input?.tagName === "SELECT" ? `Choose ${labelText} from the listed values.`
+      : `Edit the stored ${labelText} value. A gameplay interpretation is not documented for this field.`);
+    const finiteBound = bound => bound !== null && bound !== undefined && bound !== "" && Number.isFinite(Number(bound));
+    const facts = [];
+    if (readOnly && !/read.only/i.test(meaning)) facts.push("Read-only in this view.");
+    if (numericLike) {
+      if (finiteBound(min) && finiteBound(max)) facts.push(`Allowed range: ${min} to ${max}.`);
+      else if (finiteBound(min)) facts.push(`Minimum: ${min}.`);
+      else if (finiteBound(max)) facts.push(`Maximum: ${max}.`);
+      if (dataType === "INT") facts.push("Whole numbers only.");
+      else if (finiteBound(step) && Number(step) > 0) facts.push(`Step: ${step}.`);
+    }
+    const unit = String(options.unit || control?.querySelector?.(".lex-unit")?.textContent || "").trim();
+    if (unit) facts.push(`Unit: ${unit}.`);
+    if (options.applyRequirement) facts.push(`Apply: ${String(options.applyRequirement).trim()}`);
+    const helpText = [meaning, ...facts].join(" ");
+    const helpMarker = options.help || infoHelp(helpText);
+    // Native fallback and assistive text exist on the input itself, not just '?'.
+    if (input) {
+      if (!input.getAttribute("aria-label") && labelText) input.setAttribute("aria-label", labelText);
+      input.setAttribute("aria-description", helpText);
+      if (!input.title) input.title = helpText;
+    }
+    const typeRail = element("div", {class: "lex-field-type-rail"},
+      typeName, typeRange, helpMarker);
     const directCheckboxes = control instanceof Element
       ? (control.matches('input[type="checkbox"]') ? 1 : control.querySelectorAll('input[type="checkbox"]').length)
       : 0;
@@ -1754,6 +1809,11 @@
           return false;
         }
         return true;
+      } catch (error) {
+        // A failed destination must not move the history cursor away from the
+        // page that is still visible. Cancellation already returns false above.
+        this.index = previous;
+        throw error;
       } finally {
         this.applying = false;
         this.changed(this);
@@ -2344,8 +2404,12 @@
     button.onclick = async () => {
       if (busy || button.disabled) return;
       setBusy(true);
+      let failure = null;
       try { await options.save?.(); playThemeSound("save"); }
+      catch (error) { failure = error; }
       finally { setBusy(false); }
+      if (failure) showAlert({title: "Settings save failed",
+        message: String(failure.message || failure)});
     };
     button.oncontextmenu = event => {
       event.preventDefault();
@@ -4415,10 +4479,13 @@
         else return;
         event.preventDefault();
       });
-      divider.addEventListener("contextmenu", event => {
+      const reset = event => {
+        if (event.target.closest?.("button,input,select,textarea,[role=button]")) return;
         event.preventDefault();
         setSizes(defaults, true);
-      });
+      };
+      divider.addEventListener("dblclick", reset);
+      divider.addEventListener("contextmenu", reset);
     });
 
     nodes.forEach((node, index) => {

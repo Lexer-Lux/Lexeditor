@@ -37,8 +37,10 @@ PLUGIN = GamePlugin(plugin_id="example", name="Example", subtitle="Example game"
 
 Register the server module in `runtime_bootstrap.SERVICE_MODULES` as well: frozen
 applications allow only explicitly bundled child services. Add attribution and
-local notices under your plugin ID in `ui/credits.json`. The credits validator
-rejects missing plugin entries. Do not package game assets or unlicensed helpers.
+local notices under your plugin ID in `ui/credits-sources.json`. Run
+`python tools/generate_credits.py` to rebuild the offline bundle;
+`python tools/generate_credits.py --check` checks it without modifying files.
+The credits validator rejects missing plugin entries. Do not package game assets or unlicensed helpers.
 
 ## 2. Describe the installation and editable project
 
