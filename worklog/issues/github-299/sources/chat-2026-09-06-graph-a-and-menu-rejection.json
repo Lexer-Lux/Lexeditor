@@ -1,0 +1,43 @@
+{
+  "schema": 1,
+  "repository": "Lexer-Lux/Lexeditor",
+  "issue": 299,
+  "kind": "verbatim-user-decision",
+  "body_sha256": "3b5b18bb49760c7ae1eb02c4c8ed2e50794792e881dd59027e476f6dc6e5db4a",
+  "record": {
+    "id": "chat-2026-09-06-graph-a-and-menu-rejection",
+    "user": {"login": "Lexer"},
+    "created_at": null,
+    "updated_at": null,
+    "source_note": "Exact user message in the current ChatGPT conversation on September 6, 2026. The id above is an archive identifier, not an exposed original message ID. Exact message timestamp and chat URL are unavailable.",
+    "body": "For the graphs, I like A.\nNeither of the menu bar redesigns are any good."
+  },
+  "reviewed_proposal": {
+    "filename": "lexeditor-layout-review.html",
+    "chat_file_id": "file_00000000da1481fba806b2d99329bf51",
+    "sha256": "c5f172bf712d2494784f2867e8c948485e8ebba28b33e7ee584eeee20f11fc59",
+    "bundle_source_path": "docs/reviews/global-interface.html",
+    "selected_graph_option": "A — natural weight and shadow",
+    "selected_graph_value": "natural",
+    "alternative_not_selected": "B — stronger weight and thin outline",
+    "exact_sample_graph_css": ".sample-curve .lex-curve-path-formula{display:block;font:600 14px/1 var(--lex-font);fill:var(--lex-text);filter:drop-shadow(1px 2px 1px #000);stroke:none}",
+    "comparison_boundary": "The standalone review uses system typography. Actual graphs must retain their game font, transparent background, shadows and curve-following placement. Its stacked fraction is a typography sample, not proof that the curved SVG renderer implements stacked fractions."
+  },
+  "decision_interpretation_not_a_quote": [
+    "Graph option A is approved. Do not ask Lexer to choose A versus B again.",
+    "Apply the approved treatment to formulas and matching minimum/maximum labels; preserve the existing requirements for readable powers and fractions.",
+    "Approval of a proposal does not establish implementation, delivery or installed-game acceptance. Keep issue 299 actionable until that work is ready.",
+    "Both menu-bar proposals for issue 99 were rejected. Graph A approval does not approve menu layout A.",
+    "Do not resume the excluded codex/worklog consolidation issue 86. This record only preserves the new design feedback."
+  ],
+  "issue_before_edit": {
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/299",
+    "number": 299,
+    "title": "Improve formula readability without losing the game style",
+    "body": "Make graph formulas, fractions and powers easier to read while keeping the game font, shadow, transparent background and curve-following placement. Minimum/maximum labels must match.\n\n**Status: Redesign deferred.** The unwanted boxed overlay has been removed and Blank now has editable graph examples. New alternatives still need preparing before a design review.",
+    "state": "open",
+    "labels": ["enhancement", "actionable", "global"],
+    "updated_at": "2026-09-06T14:59:55Z",
+    "comments": 0
+  }
+}
