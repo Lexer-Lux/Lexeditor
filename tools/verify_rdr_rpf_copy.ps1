@@ -48,10 +48,15 @@ try {
     if (-not (Test-Path -LiteralPath $built)) { throw 'build-copy did not create output archive' }
 
     $extract = Join-Path $temp 'extract'
+    # Synthetic "test.xml" is deliberately not in MagicRDR's real filename hash
+    # dictionary, so a reopened RPF names it by hash. Match every file, require the
+    # single fixture entry, and verify its bytes instead of relying on display name.
     Push-Location $appRoot
-    try { & $cli extract $built $extract 'root/test.xml' } finally { Pop-Location }
+    try { & $cli extract $built $extract '**' } finally { Pop-Location }
     if ($LASTEXITCODE -ne 0) { throw 'built archive did not reopen/extract' }
-    $actual = [IO.File]::ReadAllBytes((Join-Path $extract 'test.xml'))
+    $extracted = @(Get-ChildItem -LiteralPath $extract -Recurse -File)
+    if ($extracted.Count -ne 1) { throw "rebuilt fixture extracted $($extracted.Count) files instead of one" }
+    $actual = [IO.File]::ReadAllBytes($extracted[0].FullName)
     $expected = [IO.File]::ReadAllBytes($after)
     if (-not [Linq.Enumerable]::SequenceEqual([byte[]]$actual, [byte[]]$expected)) { throw 'built replacement did not round-trip exactly' }
 
