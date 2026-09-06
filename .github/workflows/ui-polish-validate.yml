@@ -24,16 +24,10 @@ jobs:
       - name: Reassemble and apply reviewed UI patch
         working-directory: editor
         run: |
-          cat > /tmp/chunks.sha256 <<'EOF'
-          18fe33c8ff298f989192504dd8ff9f510191fe3851cbac89f7b62ac280e8b82c  .github/ui-polish.part-00
-          af6ede3da3120aec545f9b42677a8c4dee6ff9cabd6519aebf6ac0502fa9a76d  .github/ui-polish.part-01
-          bbdb7856daa1dfa9db742ea473e3d271243aeba890fe5851f13cab3572ca4e57  .github/ui-polish.part-02
-          64df9fdd1b388064da02db1e78a5ac33695161b0cb903dc7d4741d056e59cbbb  .github/ui-polish.part-03
-          22c620a4519c931317a68594968a315240ec8df95772739ea72a86874f41233b  .github/ui-polish.part-04
-          17668fee606a3da98c5eaaf7e187d0a71c62fcd001f0c7206b574df4d1770129  .github/ui-polish.part-05
-          EOF
-          sha256sum -c /tmp/chunks.sha256
-          cat .github/ui-polish.part-* | base64 -d | gzip -dc > /tmp/ui-polish.patch
+          cat .github/ui-polish.part-* | base64 -d > /tmp/ui-polish.patch.gz
+          echo '99e03e5675e018ebcb0bff2a32ab7413df9859e4760eaa605810e6052b32e4df  /tmp/ui-polish.patch.gz' | sha256sum -c -
+          gzip -t /tmp/ui-polish.patch.gz
+          gzip -dc /tmp/ui-polish.patch.gz > /tmp/ui-polish.patch
           patch -p1 < /tmp/ui-polish.patch
           python - <<'PY'
           import subprocess
