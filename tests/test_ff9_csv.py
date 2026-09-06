@@ -119,7 +119,9 @@ def test_project_cannot_be_installed_baseline(store):
 
 def test_all_datasets_have_pinned_baseline_paths():
     assert len(csv.DATASETS) == 12
-    assert {d.relative_path for d in csv.DATASETS} == set(baseline.FILES)
+    # The central baseline can cover more Memoria files than this editor batch;
+    # every editable dataset still must be pinned.
+    assert {d.relative_path for d in csv.DATASETS} <= set(baseline.FILES)
 
 
 def test_bad_baseline_download_does_not_replace_file(tmp_path, monkeypatch):
