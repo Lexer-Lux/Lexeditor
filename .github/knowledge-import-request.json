@@ -5,34 +5,35 @@
       "repository": "Lexer-Lux/Lexers-Mod-For-RDR2",
       "commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
       "reviewed_for_publication": true,
-      "review": "Technical codex/worklogs reviewed; 11 editor evidence screenshots inspected; no credentials detected. Protected TODO/Design files and game binaries excluded.",
+      "review": "Technical codex/worklogs and 11 editor screenshots reviewed. Protected TODO/Design files, credentials and game binaries excluded.",
       "sha256": "e757256cfa0d0f8b961b672143b3ad6290035d88a68359b98b781c53d03b061c",
-      "transfer_url": "https://sdmntprwestcentralus.oaiusercontent.com/files/00000000-8164-81fb-8968-24d3b88146e6/raw?se=2026-09-06T14%3A11%3A57Z&sp=r&sv=2026-02-06&sr=b&scid=636bd178-79d2-5b2d-99c2-771966eb4b12&skoid=80e81ea6-3c08-46f9-bd84-b87176742bcd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-06T12%3A43%3A33Z&ske=2026-09-07T12%3A43%3A33Z&sks=b&skv=2026-02-06&sig=K5pEFtIJB5N1NRSPYSLOSQdtRtRnARwiPoJFu1Ypcns%3D"
+      "transfer_url": "https://productionresultssa2.blob.core.windows.net/actions-results/af784a62-0b13-4c3e-aa69-d7a9ecdb2f26/workflow-job-run-b2145d70-77ab-57f5-a1e4-fe19764f8b1f/artifacts/7cfebe4f193abb725b4fedb51e690b1a3b7bcf09cfb6aad106cf8e30b6e9bd65.zip?rscd=attachment%3B+filename%3D%22documentation-for-lexeditor.zip%22&rsct=application%2Fzip&se=2026-09-06T14%3A24%3A00Z&sig=xfrJKVJCX%2B0qBjFdF5XLf9BRS8oQyUt87yzqMOGrNME%3D&ske=2026-09-06T17%3A58%3A24Z&skoid=ca7593d4-ee42-46cd-af88-8b886a2f84eb&sks=b&skt=2026-09-06T13%3A58%3A24Z&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skv=2025-11-05&sp=r&spr=https&sr=b&st=2026-09-06T14%3A13%3A55Z&sv=2025-11-05"
     },
     {
       "game": "warband",
       "repository": "Lexer-Lux/Lexers-Mod-For-Warband",
       "commit": "fb57f93c6f1c6efa48df75618baf95d70404a4b2",
       "reviewed_for_publication": true,
-      "review": "Codex.txt and Worklog.txt technical source text reviewed; no credentials detected; no game binaries or unrelated source files included.",
+      "review": "Codex.txt and Worklog.txt reviewed; no credentials detected. No binaries or unrelated files included.",
       "sha256": "b016f80c6143f664ffd1cbda3928c32fa3e5998c177d7734e9290c47824f54cc",
-      "transfer_url": "https://sdmntprwestcentralus.oaiusercontent.com/files/00000000-2efc-81fb-a4aa-ec62cf63ead7/raw?se=2026-09-06T14%3A13%3A01Z&sp=r&sv=2026-02-06&sr=b&scid=9ad7bb0b-4318-596c-a31e-f7cca912c3fd&skoid=80e81ea6-3c08-46f9-bd84-b87176742bcd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-05T22%3A16%3A36Z&ske=2026-09-06T22%3A16%3A36Z&sks=b&skv=2026-02-06&sig=KHYsj1IbVu/XNF2EL8s1Y91aVqVt7vFiWKh3wAzgxdQ%3D"
+      "transfer_url": "https://productionresultssa13.blob.core.windows.net/actions-results/7c710f1a-1906-4096-aacf-c4fc9cc961dc/workflow-job-run-e45c2906-f1f9-59a4-980a-a96bb1591a5f/artifacts/7cfebe4f193abb725b4fedb51e690b1a3b7bcf09cfb6aad106cf8e30b6e9bd65.zip?rscd=attachment%3B+filename%3D%22documentation-for-lexeditor.zip%22&rsct=application%2Fzip&se=2026-09-06T14%3A24%3A09Z&sig=vXzqns6vRlREWyM6gANFVkLWxApd1fD7Dpn7fXaE7Qg%3D&ske=2026-09-06T17%3A57%3A11Z&skoid=ca7593d4-ee42-46cd-af88-8b886a2f84eb&sks=b&skt=2026-09-06T13%3A57%3A11Z&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skv=2025-11-05&sp=r&spr=https&sr=b&st=2026-09-06T14%3A14%3A04Z&sv=2025-11-05"
     },
     {
       "game": "bannerlord",
       "repository": "Lexer-Lux/Lexers-Mod-For-Bannerlord",
       "commit": "d1bb7b3ae25bbe0e676ea2a3f9e0e0ff67222c01",
       "reviewed_for_publication": true,
-      "review": "Complete PROJECT_MEMORY.md read; technical project history and paths only. Design.txt and decompiled game assemblies excluded.",
+      "review": "Complete PROJECT_MEMORY.md read; technical history and paths only. Design.txt and decompiled assemblies excluded.",
       "sha256": "81007888c2fad852c9db542a59afd9c09d94f0c01895269275e18786db99a598",
-      "transfer_url": "https://sdmntprwestcentralus.oaiusercontent.com/files/00000000-22e8-81fb-a2f8-3370b27c7b42/raw?se=2026-09-06T14%3A12%3A47Z&sp=r&sv=2026-02-06&sr=b&scid=fb7809d2-603d-5887-9f2e-5314f3900b92&skoid=80e81ea6-3c08-46f9-bd84-b87176742bcd&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2026-09-05T22%3A10%3A29Z&ske=2026-09-06T22%3A10%3A29Z&sks=b&skv=2026-02-06&sig=F6k4BgXaM%2BGs9my%2BTSTvOPonEgEyklBQf7950KA6PEo%3D"
+      "transfer_url": "https://productionresultssa18.blob.core.windows.net/actions-results/e6efa7fc-4f59-43d7-9055-48e7a9a2656e/workflow-job-run-b6ca7f37-9177-5e0c-9062-eddaac8b7dc3/artifacts/7cfebe4f193abb725b4fedb51e690b1a3b7bcf09cfb6aad106cf8e30b6e9bd65.zip?rscd=attachment%3B+filename%3D%22documentation-for-lexeditor.zip%22&rsct=application%2Fzip&se=2026-09-06T14%3A24%3A20Z&sig=VSZF6ksQi3crkT9nJrZEdr59SUjxlyrP0OoLvZGB5Kg%3D&ske=2026-09-06T17%3A49%3A09Z&skoid=ca7593d4-ee42-46cd-af88-8b886a2f84eb&sks=b&skt=2026-09-06T13%3A49%3A09Z&sktid=398a6654-997b-47e9-b12b-9515b896b4de&skv=2025-11-05&sp=r&spr=https&sr=b&st=2026-09-06T14%3A14%3A15Z&sv=2025-11-05"
     }
   ],
   "gaps": [
-    "Uncommitted local or other-chat source text is not represented by GitHub snapshots; never claim it was never supplied.",
-    "FF8 and RDR1 standalone source repositories require verification; FF7 and FF9 have no separate source repository identified in this inventory.",
-    "Termina has no codex/worklog at repository root; recursive verification remains.",
-    "Three RDR2 source worklog issue identities were unavailable (113, 118, 119); originals remain namespaced, not assigned to guessed Lexeditor issues.",
+    "Uncommitted local and unsaved chat text is not represented by GitHub snapshots; its absence here does not mean it was never supplied.",
+    "GitHub reports the standalone Lexers-Mod-For-FF8 and Lexers-Mod-For-RDR repositories empty. Existing central FF8 topics are retained; local-only codices remain to be imported when accessible.",
+    "No separate FF7 or FF9 repository was identified in the owner repository inventory.",
+    "Termina root and main-tree inspection did not identify a standalone codex. Wiki dumps and game data were not republished as the user's authored codex.",
+    "RDR2 source worklogs 113, 118 and 119 have unavailable transferred identities; their complete originals are archived without guessing central issue numbers.",
     "Parallel branch changes after the recorded source commits require a delta import and reconciliation."
   ]
 }
