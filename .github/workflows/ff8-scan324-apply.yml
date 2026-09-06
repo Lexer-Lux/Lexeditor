@@ -1,0 +1,56 @@
+name: Publish FF8 Scan details candidate
+on:
+  push:
+    branches: [work/ff8-scan-details-324]
+    paths: [.github/workflows/ff8-scan324-apply.yml]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Fetch exact candidate revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init editor
+          git -C editor remote add origin "https://x-access-token:${GH_TOKEN}@github.com/Lexer-Lux/Lexeditor.git"
+          git -C editor fetch --depth=1 origin "$GITHUB_SHA"
+          git -C editor checkout -b work/ff8-scan-details-324 FETCH_HEAD
+          git -C editor config user.name "Lexer-Lux"
+          git -C editor config user.email "89482099+Lexer-Lux@users.noreply.github.com"
+      - name: Verify and apply exact staged patch
+        working-directory: editor
+        run: |
+          echo '58f287d27eb7ab9b933db9b28151e3c48c8522fea14bb8d56d74797635046dc  .agent/ff8-scan324.patch' | sha256sum -c -
+          git apply --check .agent/ff8-scan324.patch
+          git apply .agent/ff8-scan324.patch
+      - name: Run Scan and Enemies regressions
+        working-directory: editor
+        run: |
+          python -m py_compile games/ff8/scan_details.py games/ff8/enemy_tables.py games/ff8/formats.py tools/verify_ff8_scan_details_issue_324.py
+          python tools/verify_ff8_scan_details_issue_324.py
+          python tools/verify_ff8_enemy_compact_ui.py
+          python - <<'PY'
+          from pathlib import Path
+          source=Path('games/ff8/editor.html').read_text(encoding='utf-8')
+          marker='<script src="/cards_ui.js"></script>'
+          start=source.index('<script>',source.index(marker))+len('<script>')
+          end=source.index('</script>',start)
+          Path('/tmp/ff8-editor-inline.js').write_text(source[start:end],encoding='utf-8')
+          PY
+          node --check /tmp/ff8-editor-inline.js
+      - name: Publish reviewed source and remove staging files
+        working-directory: editor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          rm .agent/ff8-scan324.patch .github/workflows/ff8-scan324-apply.yml
+          rmdir .agent 2>/dev/null || true
+          git add games/ff8/editor.html games/ff8/enemy_tables.py games/ff8/formats.py games/ff8/scan_details.py games/ff8/schema/devour.json tools/verify_ff8_scan_details_issue_324.py worklog/issues/github-324.md
+          git add -u .agent .github/workflows/ff8-scan324-apply.yml
+          git diff --cached --check
+          test "$(git diff --cached --name-only | sort | tr '\n' ' ')" = ".agent/ff8-scan324.patch .github/workflows/ff8-scan324-apply.yml games/ff8/editor.html games/ff8/enemy_tables.py games/ff8/formats.py games/ff8/scan_details.py games/ff8/schema/devour.json tools/verify_ff8_scan_details_issue_324.py worklog/issues/github-324.md "
+          git commit -m "Add data-driven FF8 Scan details"
+          git push origin HEAD:work/ff8-scan-details-324
