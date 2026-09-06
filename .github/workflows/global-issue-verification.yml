@@ -1,0 +1,42 @@
+name: Global issue verification
+on:
+  push:
+    branches: [fix/global-issues-20260906]
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: read
+concurrency:
+  group: global-issue-verification-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          submodules: false
+          persist-credentials: false
+      - name: Capture tracked source and current issue evidence without changing either
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p verification
+          git archive --format=zip HEAD > verification/source.zip
+          gh api --paginate --slurp 'repos/Lexer-Lux/Lexeditor/issues?state=all&per_page=100' > verification/issues-pages.json
+          gh api --paginate --slurp 'repos/Lexer-Lux/Lexeditor/issues/comments?per_page=100' > verification/comments-pages.json
+          gh api 'repos/Lexer-Lux/Lexeditor/pulls?state=open&per_page=100' > verification/pulls.json
+          git rev-parse HEAD > verification/commit.txt
+      - name: Verify global regressions when present
+        run: |
+          if [ -f tests/test_global_issues.py ]; then
+            python3 -m pip install -r requirements.txt
+            python3 -m unittest discover -s tests -p 'test_global_issues.py' -v
+          fi
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: global-verification-${{ github.run_id }}
+          path: verification/
+          retention-days: 14
