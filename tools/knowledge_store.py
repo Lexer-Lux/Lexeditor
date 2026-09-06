@@ -79,8 +79,10 @@ def store(number: int, kind: str, record: dict) -> Path:
 class AttachmentRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, url):
         host = urllib.parse.urlparse(url).hostname or ''
-        if not (host == 'github.com' or host.endswith('.githubusercontent.com') or re.fullmatch(r'github-production-user-asset-[a-z0-9-]+[.]s3[.]amazonaws[.]com', host)):
-            raise RuntimeError('Unexpected attachment redirect host: ' + host)
+        parsed = urllib.parse.urlparse(url)
+        github_asset = re.fullmatch(r'github-production-(?:user-asset-[a-z0-9-]+|repository-file-[a-z0-9]+|release-asset-[a-z0-9]+)\.s3(?:[.-][a-z0-9-]+)?\.amazonaws\.com', host)
+        if parsed.scheme != 'https' or not (host == 'github.com' or host.endswith('.githubusercontent.com') or github_asset):
+            raise RuntimeError(f'Unexpected attachment redirect host: {host}')
         return super().redirect_request(req, fp, code, msg, headers, url)
 
 
@@ -139,9 +141,9 @@ def regenerate(number: int, current: dict | None = None) -> None:
         write(handoff, handoff.read_bytes() + ('\n\n## Preserved source records\n\n' + pointer + '\n').encode())
 
 
-def archive(baseline: Path | None) -> dict:
+def archive(baseline: Path | None, excluded: set[int] | None = None) -> dict:
     issues = all_pages(f'repos/{REPO}/issues?state=all&per_page=100&sort=created&direction=asc')
-    current = {i['number']: i for i in issues if 'pull_request' not in i}
+    current = {i['number']: i for i in issues if 'pull_request' not in i and i['number'] not in (excluded or set())}
     comments = all_pages(f'repos/{REPO}/issues/comments?per_page=100&sort=created&direction=asc')
     comments = [c for c in comments if int(c['issue_url'].rsplit('/', 1)[1]) in current]
     old_issues, old_comments = [], []
@@ -186,13 +188,28 @@ def cleanup() -> dict:
     subprocess.run(['git', 'merge-base', '--is-ancestor', 'HEAD', 'origin/master'], check=True)
     snapshot = json.loads((CONTROL / 'snapshot.json').read_text())
     if snapshot['repository'] != REPO: raise RuntimeError('Wrong archive repository')
+    registry = json.loads(subprocess.check_output(['git', 'show', f'HEAD:{ATTACHMENTS / "index.json"}']))
     candidates = snapshot['pending']; deleted=[]; skipped=[]
+    verified_attachments = set()
     try:
         for start in range(0, len(candidates), 10):
             batch = candidates[start:start+10]
             for c in batch:
                 data = subprocess.check_output(['git','show',f'HEAD:{c["archive"]}'])
                 if digest(data) != c['archive_sha256']: raise RuntimeError('Committed archive mismatch')
+                record = json.loads(data)
+                if record.get('repository') != REPO or record.get('issue') != c['issue'] or record['record']['id'] != c['id']:
+                    raise RuntimeError('Archive identity mismatch')
+                for url in set(URL.findall(record['record'].get('body') or '')):
+                    if url in verified_attachments or url in c['missing_attachments']: continue
+                    asset = registry.get(url, {})
+                    if not asset.get('path') or asset.get('error'): raise RuntimeError('Missing committed attachment')
+                    path = Path(asset['path'])
+                    if path.is_absolute() or '..' in path.parts or path.parts[:2] != ('worklog', 'attachments'):
+                        raise RuntimeError('Unsafe archived attachment path')
+                    saved = subprocess.check_output(['git', 'show', f'HEAD:{path.as_posix()}'])
+                    if digest(saved) != asset['sha256']: raise RuntimeError('Committed attachment mismatch')
+                    verified_attachments.add(url)
             query = 'query($ids:[ID!]!){nodes(ids:$ids){... on IssueComment{id body updatedAt}}}'
             fresh = gh('graphql', {'query':query,'variables':{'ids':[c['node_id'] for c in batch]}})
             if fresh.get('errors'): raise RuntimeError('Could not re-read comments; deletion stopped')
@@ -204,14 +221,36 @@ def cleanup() -> dict:
                     skipped.append(c['id']); continue
                 safe.append(c)
             if not safe: continue
-            variables = {f'id{k}':c['node_id'] for k,c in enumerate(safe)}
-            declarations = ','.join(f'${k}:ID!' for k in variables)
-            fields = ' '.join(f'd{k}:deleteIssueComment(input:{{id:$id{k}}}){{clientMutationId}}' for k in range(len(safe)))
-            time.sleep(1.1)
-            result = gh('graphql',{'query':f'mutation({declarations}){{{fields}}}','variables':variables})
-            for k,c in enumerate(safe):
-                if result.get('data',{}).get(f'd{k}') is not None: deleted.append(c['id'])
-            if result.get('errors'): raise RuntimeError('GitHub rejected a deletion; stopped without retrying')
+            # An API timeout does not prove the mutation failed. Before a
+            # bounded retry, identify which exact comments still exist.
+            for attempt in range(3):
+                variables = {f'id{k}':c['node_id'] for k,c in enumerate(safe)}
+                declarations = ','.join(f'${k}:ID!' for k in variables)
+                fields = ' '.join(f'd{k}:deleteIssueComment(input:{{id:$id{k}}}){{clientMutationId}}' for k in range(len(safe)))
+                time.sleep(1.1)
+                try:
+                    result = gh('graphql',{'query':f'mutation({declarations}){{{fields}}}','variables':variables})
+                except RuntimeError as error:
+                    if 'HTTP 504' not in str(error) or attempt == 2:
+                        raise
+                    time.sleep(2 * (attempt + 1))
+                    check = gh('graphql', {'query': query, 'variables': {'ids': [c['node_id'] for c in safe]}})
+                    if check.get('errors'): raise RuntimeError('Timeout readback failed; cleanup stopped')
+                    remaining = {n['id']: n for n in check['data']['nodes'] if n}
+                    retry = []
+                    for c in safe:
+                        node = remaining.get(c['node_id'])
+                        if node is None: deleted.append(c['id'])
+                        elif node['updatedAt'] == c['updated_at'] and digest(node['body'].encode()) == c['body_sha256']:
+                            retry.append(c)
+                        else: skipped.append(c['id'])
+                    safe = retry
+                    if not safe: break
+                    continue
+                for k,c in enumerate(safe):
+                    if (result.get('data') or {}).get(f'd{k}') is not None: deleted.append(c['id'])
+                if result.get('errors'): raise RuntimeError('GitHub rejected a deletion; stopped without retrying')
+                break
             print(f'Archived comments removed: {len(deleted)}; preserved/skipped: {len(skipped)}',flush=True)
             time.sleep(1.1)
     finally:
@@ -243,9 +282,10 @@ def main() -> None:
     parser.add_argument('mode',choices=['archive','cleanup','event'])
     parser.add_argument('--baseline',type=Path)
     parser.add_argument('--event',type=Path)
+    parser.add_argument('--exclude', type=int, action='append', default=[], help='Issue numbers excluded from this bulk archive/cleanup snapshot')
     args=parser.parse_args()
     if os.environ.get('GITHUB_REPOSITORY',REPO)!=REPO:raise RuntimeError('Wrong repository')
-    result=archive(args.baseline) if args.mode=='archive' else cleanup() if args.mode=='cleanup' else event_capture(args.event)
+    result=archive(args.baseline, set(args.exclude)) if args.mode=='archive' else cleanup() if args.mode=='cleanup' else event_capture(args.event)
     print(json.dumps(result,ensure_ascii=False),flush=True)
 
 if __name__=='__main__': main()
