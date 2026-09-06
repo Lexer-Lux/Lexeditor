@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "repository": "Lexer-Lux/Lexeditor",
+  "issue": 99,
+  "kind": "verbatim-user-decision",
+  "body_sha256": "3b5b18bb49760c7ae1eb02c4c8ed2e50794792e881dd59027e476f6dc6e5db4a",
+  "record": {
+    "id": "chat-2026-09-06-graph-a-and-menu-rejection",
+    "user": {"login": "Lexer"},
+    "created_at": null,
+    "updated_at": null,
+    "source_note": "Exact user message in the current ChatGPT conversation on September 6, 2026. The id above is an archive identifier, not an exposed original message ID. Exact message timestamp and chat URL are unavailable.",
+    "body": "For the graphs, I like A.\nNeither of the menu bar redesigns are any good."
+  },
+  "reviewed_proposal": {
+    "filename": "lexeditor-layout-review.html",
+    "chat_file_id": "file_00000000da1481fba806b2d99329bf51",
+    "sha256": "c5f172bf712d2494784f2867e8c948485e8ebba28b33e7ee584eeee20f11fc59",
+    "bundle_source_path": "docs/reviews/global-interface.html",
+    "rejected_menu_options": [
+      "A — project and actions above the tabs",
+      "B — project in title bar, actions below details"
+    ],
+    "independent_graph_decision": "Graph A — natural weight and shadow — approved for issue 299; this is not approval of menu layout A."
+  },
+  "decision_interpretation_not_a_quote": [
+    "Both presented menu-bar layouts are rejected. Neither is approved for application to the editor.",
+    "Keep the existing menu bar unchanged while preparing genuinely different alternatives.",
+    "The redesign remains agent work and stays actionable; Lexer is not waiting to approve these two rejected proposals.",
+    "The user gave no reason for the rejection. Do not invent aesthetic preferences, narrower scope or new requirements.",
+    "Preserve the original scope: menu bar, mod selector, Undo/Redo/Save/Play placement, 3D preview location, circular utilities beside window controls and room for editable details.",
+    "Do not resume excluded codex/worklog consolidation issue 86. This record only preserves the new design feedback."
+  ],
+  "issue_before_edit": {
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/99",
+    "number": 99,
+    "title": "Propose a shared UI redesign",
+    "body": "Review the menu bar, mod selector, Undo/Redo/Save/Play placement and 3D preview location. Keep circular utility buttons grouped beside the window controls and preserve space for editable details.\n\n**Status: Deferred design work.** Concrete alternatives still need preparing before you can choose one; there is no build to test.",
+    "state": "open",
+    "labels": ["actionable", "global"],
+    "updated_at": "2026-09-06T12:38:33Z",
+    "comments": 0
+  }
+}
