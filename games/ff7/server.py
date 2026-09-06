@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import paths
+from .extended import FAMILIES, load_extended, save_extended
 from .datasets import CATEGORIES, UNRESOLVED, READ_ERRORS, load_datasets, save_datasets
 from platform_config import load_config, save_config
 from theme_sounds import ensure_theme_sounds, sound_file
@@ -30,7 +31,15 @@ EXECUTABLE = os.environ.get("LEXEDITOR_FF7_EXECUTABLE", "FFVII_LAUNCHER.exe")
 
 
 def editor_data() -> dict:
-    return load_datasets(GAME_ROOT, PROJECT_ROOT)
+    data = load_datasets(GAME_ROOT, PROJECT_ROOT)
+    extra = load_extended(GAME_ROOT, PROJECT_ROOT)
+    data['kernelCategories'] = list(CATEGORIES)
+    data['categories'].extend(extra['categories'])
+    for key in ('records', 'vanilla', 'errors'):
+        data[key].update(extra[key])
+    data['families'] = extra['families']
+    data['unresolved'] = {}
+    return data
 
 
 def platform_data() -> dict:
@@ -69,16 +78,20 @@ def data_map() -> dict:
             "Names are read-only KERNEL.BIN text, not a kernel2.bin text editor."
         )
         if key == "characters" and not error:
-            notes += " Starting stats (section 4) and limit-learning thresholds (section 3) only; growth curves, equipment and AI are preserved."
+            notes += " Initial stats/equipment/materia and growth/limit fields are editable. Curve coefficients, executable-only character initialization and AI remain preserved."
         rows.append({"filename": source_label, "controls": category.label,
             "notes": notes, "status": "blocked" if error else (
                 "partial" if key == "characters" else "integrated"),
             "openable": not bool(error), "category": key,
             "sourcePath": str(GAME_ROOT / data["sourceRelativePath"]) if data["sourceRelativePath"] else ""})
-    for key, area in UNRESOLVED.items():
-        rows.append({"filename": area["source"], "controls": area["label"],
-            "notes": area["reason"] + " " + area["unlock"],
-            "status": "not-integrated", "openable": False, "category": key})
+    for family, info in FAMILIES.items():
+        report = data['families'][family]
+        for key, metadata in info['categories'].items():
+            error = data['errors'].get(key)
+            rows.append({'filename':report.get('sourceRelativePath') or info['source'],
+                'controls':metadata['label'], 'notes':(error + ' ' if error else '') + info['note'],
+                'status':'not-integrated' if error else 'partial', 'openable':not bool(error),
+                'category':key, 'sourcePath':str(GAME_ROOT / report['sourceRelativePath']) if report.get('sourceRelativePath') else ''})
     config = GAME_ROOT / "FFNx.toml"
     try:
         available = platform_data()["available"]
@@ -96,7 +109,7 @@ def data_map() -> dict:
 def dashboard() -> dict:
     executable = GAME_ROOT / EXECUTABLE
     problems = [] if executable.is_file() else [f"{EXECUTABLE} is missing from {GAME_ROOT}"]
-    data = editor_data()
+    data = load_datasets(GAME_ROOT, PROJECT_ROOT)
     problems.extend(f"{CATEGORIES[key].label}: {error}" for key, error in data["errors"].items())
     count = len(data["records"])
     baseline = {"ready": bool(count), "fileCount": int(bool(data["sourceSha256"])),
@@ -191,14 +204,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
             path = urlparse(self.path).path
-            if path not in {"/api/save", "/api/platform-config/save"}:
+            if path not in {"/api/save", "/api/platform-config/save", "/api/extended/save"}:
                 self.json_response({"error": "Not found"}, 404)
                 return
             length = int(self.headers.get("Content-Length", "0"))
-            if length < 2 or length > 4 * 1024 * 1024:
+            if length < 2 or length > (16 if path == "/api/extended/save" else 4) * 1024 * 1024:
                 raise ValueError("FF7 save payload has an invalid size")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            if path == "/api/platform-config/save":
+            if path == "/api/extended/save":
+                self.json_response(save_extended(GAME_ROOT, PROJECT_ROOT, payload))
+            elif path == "/api/platform-config/save":
                 self.json_response(save_platform_data(payload))
             else:
                 self.json_response(save_editor_data(payload))

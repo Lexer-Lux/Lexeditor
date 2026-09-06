@@ -50,11 +50,42 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
-      - name: Verify binary formats and HTTP behavior
-        run: python tools/verify_ff7_datasets.py
+      - name: Verify binary formats, preservation and HTTP behavior
+        run: |
+          python tools/verify_ff7_datasets.py
+          python tools/verify_ff7_extended.py
+
+  browser-scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - group: kernel-and-tweaks
+            tests: PageTests.test_character_save_invalid_input_and_vanilla_for_both_editions PageTests.test_inflight_config_refresh_cannot_discard_new_edit PageTests.test_kernel_api_failure_keeps_auxiliary_tabs_and_runtime_detection PageTests.test_platform_api_failure_does_not_hide_characters
+          - group: mixed-save
+            tests: PageTests.test_partial_save_keeps_only_failed_family_dirty
+          - group: scenes
+            tests: PageTests.test_scene_fields_save_without_kernel_and_keep_ai
+          - group: text-and-shops
+            tests: PageTests.test_text_and_shop_ui_persistence
+    name: Browser - ${{ matrix.group }}
+    steps:
+      - name: Check out the exact event commit
+        shell: bash
+        run: |
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
       - name: Install browser test dependencies
         run: |
           python -m pip install playwright==1.57.0
           python -m playwright install --with-deps chromium
       - name: Verify page logic with synthetic data and component doubles
-        run: python tools/verify_ff7_ui.py
+        run: python tools/verify_ff7_ui.py ${{ matrix.tests }}
