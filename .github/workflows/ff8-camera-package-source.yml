@@ -6,24 +6,24 @@ on:
 permissions:
   contents: read
 jobs:
-  export:
+  export-ffnx:
     runs-on: ubuntu-24.04
     steps:
-      - name: Fetch exact revision without optional gitlinks
+      - name: Fetch pinned FFNx revision
         run: |
-          git init editor
-          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
-          git -C editor fetch --depth=1 origin "$GITHUB_SHA"
-          git -C editor checkout --detach FETCH_HEAD
-      - name: Archive tracked working tree
+          git init ffnx
+          git -C ffnx remote add origin https://github.com/julianxhokaxhiu/FFNx.git
+          git -C ffnx fetch --depth=1 origin c056db2783f376a340fcefa6a48cc33618998876
+          git -C ffnx checkout --detach FETCH_HEAD
+      - name: Archive pinned tracked source
         run: |
           python - <<'PY'
           from pathlib import Path
-          import os, subprocess, zipfile
-          root=Path('editor')
+          import subprocess, zipfile
+          root=Path('ffnx')
           names=subprocess.check_output(['git','-C',str(root),'ls-files','-z']).decode().split('\0')
-          with zipfile.ZipFile('ff8-camera-package-source.zip','w',zipfile.ZIP_DEFLATED) as z:
-              z.writestr('SNAPSHOT_REVISION.txt', os.environ['GITHUB_SHA'])
+          with zipfile.ZipFile('ffnx-pinned-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              z.writestr('PINNED_REVISION.txt','c056db2783f376a340fcefa6a48cc33618998876')
               for name in names:
                   if not name: continue
                   p=root/name
@@ -31,7 +31,7 @@ jobs:
           PY
       - uses: actions/upload-artifact@v4
         with:
-          name: ff8-camera-package-source
-          path: ff8-camera-package-source.zip
+          name: ffnx-pinned-source
+          path: ffnx-pinned-source.zip
           retention-days: 2
           if-no-files-found: error
