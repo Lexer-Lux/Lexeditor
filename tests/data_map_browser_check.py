@@ -19,13 +19,17 @@ if os.environ.get('DATAMAP_GAMES'):
 ROWS=[{'id':str(i),'filename':f'file-{i:03}.dat','controls':f'Interface {i:03}',
        'coverage':['structured','view','source','unavailable'][i%4],
        'status':'partial' if i%4<3 else 'not-integrated', 'notes':('Long scoped explanation. '*40),
-       'target':'items','dataset':'fixture-data','openable':i%4<3} for i in range(100)]
+       'target':'items','dataset':'fixture-data','datasetKey':'fixture-data','openable':i%4<3} for i in range(100)]
 ROWS[0]['filename']='same-file.dat';ROWS[4]['filename']='same-file.dat'  # IDs must not collapse sections.
 
 def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
     html=(ROOT/'games'/source_game/'editor.html').read_text()
-    stub='''const replace=history.replaceState.bind(history);history.replaceState=(s,u)=>replace(s,u);
+    # Synthetic set_content() documents otherwise use about:blank, which cannot
+    # resolve the shared framework's optional relative assets or push fragment URLs.
+    html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
+    stub='''const replace=history.replaceState.bind(history),push=history.pushState.bind(history);
+    history.replaceState=(s,u)=>replace(s,u);history.pushState=(s,u)=>push(s,u);
     window.fetch=()=>new Promise(()=>{});
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
@@ -45,6 +49,8 @@ with sync_playwright() as p:
                 page=browser.new_page(viewport={'width':width,'height':height})
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 page.set_content(html_for(game),wait_until='domcontentloaded')
+                if page.evaluate('typeof state') == 'undefined' and game != 'blank':
+                    raise AssertionError((game,width,height,'plugin state missing',errors,page.locator('body').inner_text()[:1200]))
                 if game=='blank':
                     page.evaluate('navigate("datamap")')
                 else:

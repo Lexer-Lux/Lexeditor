@@ -2633,7 +2633,11 @@
       const current = rows.find(row => row.current);
       const sources = options.projectSources?.() || [];
       const activeSource = String(options.projectActiveSource?.() || "mine");
-      const selectedSource = sources.find(row => String(row.key) === activeSource);
+      const selectedReference = sources.find(row => String(row.key) === activeSource);
+      const selectedSource = activeSource === "mine" && current ? {
+        key:"mine", label:current.name, path:current.path || "", readOnly:false,
+        enabled:current.enabled !== false,
+      } : selectedReference;
       const canChoose = Boolean(value);
       box.hidden = !current && !selectedSource && !canChoose;
       if (!current && !selectedSource && !canChoose) return;
@@ -2646,7 +2650,7 @@
       status.className = `lex-project-source-status ${selectedSource?.enabled === false ? "disabled" : "enabled"}`;
       status.setAttribute("aria-label", selectedSource?.enabled === false ? "Disabled" : "Enabled");
       path.textContent = selectedSource?.path || (selectedSource
-        ? "Read-only reference"
+        ? (selectedSource.readOnly === false ? "Editable mod" : "Read-only reference")
         : current?.path || "New Mod or Find a Mod");
       box.title = path.textContent;
       const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid)).map(row => {
@@ -2661,8 +2665,11 @@
           });
           else if (!row.current) guarded(() => callWindow("select_mod_project", options.plugin.id, row.path));
         },
-      }, element("span", {class: "lex-project-menu-name"}, row.name),
-      element("span", {class: "lex-project-menu-path"}, row.path));
+      }, element("span", {class: "lex-project-source-mode", "aria-label":"Editable"}, "📝"),
+      element("span", {class: "lex-project-menu-name"}, row.name),
+      element("span", {class: "lex-project-menu-path"}, row.path),
+      element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
+        "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
         const rename = element("button", {class:"lex-project-rename",type:"button",title:`Rename ${row.name}`,"aria-label":`Rename ${row.name}`,onclick:async()=>{closeMenu();const next=await askProjectName(options.plugin.name||options.plugin.id,{rename:true,value:row.name});if(next&&next!==row.name)guarded(()=>callWindow("rename_mod_project",options.plugin.id,row.path,next))}}, "✎");
         const folder = element("button", {
           class: "lex-project-folder", type: "button",
@@ -2788,20 +2795,19 @@
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
         {key:"mainMenuHeightPercent", scope:"user", title:"Menu bar height", description:"Height of the menu bar in the Home screen and every game plugin, as a percentage of the screen.", type:"number", min:3, max:20, step:.25, unit:"%"},
         {key:"soundEnabled", scope:"user", title:"Sound", description:"Play game-themed interface sounds when the active plugin supplies them.", type:"checkbox"},
-        {key:"soundVolumePercent", scope:"lexer", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
-        {key:"developerMode", scope:"developer", title:"Developer Mode", description:"Shows development tools such as the GitHub workspace and plugin Restart control.", type:"checkbox"},
-        {key:"residentHandleWidthPercent", scope:"lexer", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},
-        {key:"absentGameDesaturationPercent", scope:"lexer", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
-        {key:"globalMessageRarity", scope:"lexer", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
-        {key:"loadingTransitionMinimumSeconds", scope:"lexer", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
+        {key:"soundVolumePercent", scope:"packaged", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
+        {key:"residentHandleWidthPercent", scope:"packaged", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},
+        {key:"absentGameDesaturationPercent", scope:"packaged", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
+        {key:"globalMessageRarity", scope:"packaged", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
+        {key:"loadingTransitionMinimumSeconds", scope:"packaged", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
       ];
-      const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "lexer");
+      const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "packaged");
       const supportsCurrent = definition => Object.prototype.hasOwnProperty.call(settings, definition.key);
       const supportsDefault = definition => Object.prototype.hasOwnProperty.call(settings.defaultValues || {}, definition.key);
       const supportedOrdinaryDefinitions = ordinaryDefinitions.filter(supportsCurrent);
       const supportedDefaultDefinitions = definitions.filter(supportsDefault);
       const unsupportedDefinitions = definitions.filter(definition =>
-        (definition.scope !== "lexer" && !supportsCurrent(definition)) || !supportsDefault(definition));
+        (definition.scope !== "packaged" && !supportsCurrent(definition)) || !supportsDefault(definition));
       const initialValue = (definition, defaults = false) => {
         const source = defaults ? settings.defaultValues : settings;
         return source?.[definition.key] ?? settings[definition.key] ??
@@ -2856,31 +2862,25 @@
       const lane = (scope, title) => element("section", {class:`lex-settings-lane lex-settings-lane-${scope}`},
         element("h3", {}, title));
       const userLane = lane("user", "GLOBAL SETTINGS");
-      const developerLane = lane("developer", `${plugin || "PLUGIN"} EDITOR SETTINGS`.toLocaleUpperCase());
-      const lexerLane = lane("lexer", "LEXER");
-      const lexerMode = element("input", {
-        id:"lex-lexer-mode", type:"checkbox", checked:!!settings.lexerMode,
-        disabled:!settings.lexerAuthorized,
-      });
-      const lexerModeCard = element("section", {class:"lex-global-setting lex-lexer-setting lex-lexer-mode-setting"},
-        element("label", {for:"lex-lexer-mode"}, "I am Lexer"),
-        element("p", {}, settings.lexerAuthorized
-          ? `Verified GitHub account: ${settings.lexerLogin}. Enables distributable defaults.`
-          : "Unavailable. Sign in to GitHub as Lexer to enable distributable defaults."), lexerMode);
-      lexerLane.append(lexerModeCard);
+      const developerLane = lane("developer", `${plugin || "PLUGIN"} DEVELOPER SETTINGS`.toLocaleUpperCase());
+      const developerActive = !!settings.developerMode;
+      developerLane.append(element("section", {class:"lex-global-setting lex-developer-identity"},
+        element("strong", {}, developerActive ? "DEVELOPER MODE ACTIVE" : "DEVELOPER MODE UNAVAILABLE"),
+        element("p", {}, developerActive
+          ? `Authenticated GitHub account: ${settings.developerLogin}. Distributable authoring controls are enabled.`
+          : "Sign in to GitHub as the authorized developer to expose authoring controls.")));
       const setDefaultVisibility = () => {
-        const active = lexerMode.checked && !lexerMode.disabled;
         defaultCards.forEach(control => {
-          control.hidden = !active;
+          control.hidden = !developerActive;
           const supported = control.dataset.lexSettingSupported !== "false";
           control.setAttribute("aria-disabled", String(!supported));
-          control.querySelectorAll?.("input,select").forEach(input => { input.disabled = !active || !supported; });
+          control.querySelectorAll?.("input,select").forEach(input => { input.disabled = !developerActive || !supported; });
         });
-        lexerLane.classList.toggle("active", active);
+        developerLane.classList.toggle("active", developerActive);
       };
       const copyToDefault = (definition, defaultControl) => {
-        if (!lexerMode.checked || lexerMode.disabled) {
-          message.textContent = "Enable I am Lexer to change the default for everyone."; return;
+        if (!developerActive) {
+          message.textContent = "Developer Mode requires the authorized GitHub account."; return;
         }
         if (!supportsDefault(definition)) {
           message.textContent = "Restart LEXEDITOR to enable this newly added setting."; return;
@@ -2893,18 +2893,18 @@
         message.textContent = `${definition.title} will become the packaged default when you save.`;
       };
       for (const definition of definitions) {
-        if (definition.scope === "lexer") {
+        if (definition.scope === "packaged") {
           const supported = supportsDefault(definition);
           const wrapped = makeControl(definition, initialValue(definition, true),
             `lex-default-${definition.key}`);
           defaultControls.set(definition.key, wrapped);
           const card = element("section", {
-            class:"lex-global-setting lex-lexer-setting lex-lexer-only-setting", hidden:true,
+            class:"lex-global-setting lex-developer-setting lex-packaged-setting", hidden:true,
           }, element("div", {class:"lex-setting-copy"},
             element("label", {for:`lex-default-${definition.key}`}, definition.title),
             element("p", {}, `${definition.description}${supported ? "" : " Restart LEXEDITOR to enable this newly added setting."}`)), wrapped);
           card.dataset.lexSettingSupported = String(supported);
-          lexerLane.append(card);
+          developerLane.append(card);
           defaultCards.push(card);
           continue;
         }
@@ -2919,7 +2919,7 @@
         const defaultWrapped = makeControl(definition, initialValue(definition, true), `lex-default-${definition.key}`);
         defaultControls.set(definition.key, defaultWrapped);
         const defaultControl = element("label", {
-          class:"lex-setting-default-control lex-lexer-setting", hidden:true,
+          class:"lex-setting-default-control lex-developer-setting", hidden:true,
           for:`lex-default-${definition.key}`, title:"Default for every user",
         }, element("span", {}, "DEFAULT"), defaultWrapped);
         defaultControl.dataset.lexSettingSupported = String(defaultSupported);
@@ -2929,14 +2929,12 @@
         defaultCards.push(defaultControl);
         copy.addEventListener("dblclick", event => { event.preventDefault(); copyToDefault(definition, defaultControl); });
       }
-      lexerMode.addEventListener("change", setDefaultVisibility);
       setDefaultVisibility();
       let savedSettings = clone(settings);
       settingsDirtyCount = () => {
         let dirty = supportedOrdinaryDefinitions.reduce((total, definition) => total + Number(
           readControl(definition, currentControls.get(definition.key)) !== savedSettings[definition.key]), 0);
-        dirty += Number(lexerMode.checked !== !!savedSettings.lexerMode);
-        if (lexerMode.checked && !lexerMode.disabled) {
+        if (developerActive) {
           dirty += supportedDefaultDefinitions.reduce((total, definition) => total + Number(
             readControl(definition, defaultControls.get(definition.key)) !== savedSettings.defaultValues?.[definition.key]), 0);
         }
@@ -2947,9 +2945,7 @@
           currentControls.get(definition.key), savedSettings[definition.key]));
         supportedDefaultDefinitions.forEach(definition => writeControl(definition,
           defaultControls.get(definition.key), savedSettings.defaultValues?.[definition.key]));
-        lexerMode.checked = !!savedSettings.lexerMode;
         setDefaultVisibility();
-        developerSetting.classList.toggle("active-developer-setting", developerMode.checked);
         message.textContent = "Restored the last saved settings.";
       };
       const save = settingsSaveControl({
@@ -2959,11 +2955,11 @@
           try {
             const values = Object.fromEntries(supportedOrdinaryDefinitions.map(definition =>
               [definition.key, readControl(definition, currentControls.get(definition.key))]));
-            settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", {...values, lexerMode: lexerMode.checked}));
-            if (lexerMode.checked) {
+            settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", values));
+            if (developerActive) {
               const defaults = Object.fromEntries(supportedDefaultDefinitions.map(definition =>
                 [definition.key, readControl(definition, defaultControls.get(definition.key))]));
-              settings = rememberSharedSettings(await callWindow("save_lexer_setting_defaults", defaults));
+              settings = rememberSharedSettings(await callWindow("save_developer_setting_defaults", defaults));
             }
             savedSettings = clone(settings);
             window.dispatchEvent(new CustomEvent("lexeditor-settings-changed", {detail: settings}));
@@ -2976,13 +2972,9 @@
         },
         discard: restoreSettings,
       });
-      const developerMode = controlNode(currentControls.get("developerMode"));
-      const developerSetting = developerMode.closest(".lex-global-setting");
-      developerSetting.classList.toggle("active-developer-setting", developerMode.checked);
-      developerMode.addEventListener("change", () => developerSetting.classList.toggle("active-developer-setting", developerMode.checked));
       const dialogChildren = [
         heading,
-        element("div", {class:"lex-settings-columns"}, userLane, developerLane, lexerLane),
+        element("div", {class:"lex-settings-columns"}, userLane, developerLane),
       ];
       dialogChildren.push(message, element("div", {class: "lex-dialog-actions"}, save));
       dialog.replaceChildren(...dialogChildren);
@@ -3447,7 +3439,6 @@
     let githubWorkspace = null;
     let navigationHistory = null;
     let developerMode = false;
-    let lexerMode = false;
     const toast = message => {
       const node = element("div", {class: "lex-toast", role: "status"}, message);
       document.body.append(node);
@@ -3503,7 +3494,7 @@
         // changes still play it, because those really are moves.
         onfocus: event => { if (event.target.matches(":focus-visible")) playThemeSound("move"); },
         onpointerdown: event => {
-          if (event.button !== 2 || !lexerMode) return;
+          if (event.button !== 2 || !developerMode) return;
           savedDefault = false;
           clearTimeout(defaultHoldTimer);
           defaultHoldTimer = setTimeout(() => {
@@ -3640,18 +3631,16 @@
         initializeGitHub();
       }
     };
-    const setLexerMode = enabled => { lexerMode = !!enabled; };
     const initializeDeveloperMode = async () => {
       try {
         const value = rememberSharedSettings(await callWindow("lexeditor_settings"));
-        setDeveloperMode(value?.developerMode); setLexerMode(value?.lexerMode);
+        setDeveloperMode(value?.developerMode);
       }
-      catch (_error) { setDeveloperMode(false); setLexerMode(false); }
+      catch (_error) { setDeveloperMode(false); }
     };
     window.addEventListener("lexeditor-settings-changed", event => {
       rememberSharedSettings(event.detail);
       setDeveloperMode(event.detail?.developerMode);
-      setLexerMode(event.detail?.lexerMode);
     });
     if (window.pywebview?.api) initializeDeveloperMode();
     else window.addEventListener("pywebviewready", initializeDeveloperMode, {once: true});
@@ -3880,7 +3869,7 @@
     // Hovering a tab reveals the number that jumps to it.
     nav.addEventListener("pointerover", event => {
       const button = event.target.closest?.("button[data-tab]");
-      if (!button || button.querySelector(".lex-tab-ordinal")) return;
+      if (!button || button.querySelector(".lex-tab-ordinal,.lex-tab-shortcut")) return;
       const index = [...nav.querySelectorAll("button[data-tab]")].indexOf(button);
       if (index < 0 || index > 8) return;
       button.append(element("span", {class: "lex-tab-ordinal", "aria-hidden": "true"}, String(index + 1)));
@@ -4006,16 +3995,26 @@
       return element("span", {class: "lex-enabled-toggle"}, input);
     },
   });
-  const withEnabledColumn = (declared, rows, change) => {
+  const withEnabledColumn = (declared, rows, change, autoAdd = true) => {
     const columns = declared || [];
-    if (!hasEnabledProperty(rows)) return columns;
-    if (columns.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)) return columns;
-    return [enabledColumn(change), ...columns];
+    const enabledIndex = columns.findIndex(
+      column => String(column.key).toLocaleLowerCase() === ENABLED_KEY);
+    if (!hasEnabledProperty(rows)) {
+      return columns.filter((column, index) =>
+        index !== enabledIndex || !column.generated);
+    }
+    if (enabledIndex >= 0) {
+      return columns.map((column, index) =>
+        index === enabledIndex && column.generated ? enabledColumn(change) : column);
+    }
+    return autoAdd ? [enabledColumn(change), ...columns] : columns;
   };
 
   const columnPreferences = (viewKey, definitions, changed = () => {}) => {
     const key = `lexeditor:columns:${String(viewKey || "view")}`;
-    const source = numberedIdColumns(definitions || [], []);
+    const declared = numberedIdColumns(definitions || [], []);
+    const source = declared.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)
+      ? declared : [enabledColumn(null), ...declared];
     const byKey = new Map(source.map(column => [column.key, column]));
     const defaults = source.filter(column => column.pinned !== false).map(column => column.key);
     let order = [...defaults];
@@ -4027,14 +4026,8 @@
     } catch (_error) {}
     const save = () => {
       try { localStorage.setItem(key, JSON.stringify(order)); } catch (_error) {}
-      // A changed column set changes the table's real minimum width. Discard
-      // the old divider size so the shared layout can fit the new table.
-      for (const layoutKey of [
-        `lexeditor:panel-layout:${viewKey}`,
-        `lexeditor:list-detail:${viewKey}`,
-      ]) {
-        try { localStorage.removeItem(layoutKey); } catch (_error) {}
-      }
+      // Preserve the divider while pinning. Clearing it made the detail pane
+      // flash to the default width on every pin click.
       changed([...order]);
       window.dispatchEvent(new CustomEvent("lexeditor-columns-changed", {
         detail: {viewKey, columns: [...order]},
@@ -4179,7 +4172,7 @@
     // The generic enabled column is not a user-choosable column, so it is
     // added after saved preferences rather than being subject to them.
     const columns = preferredColumns
-      ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange)
+      ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange, false)
       : numberedIdColumns(
           withEnabledColumn(options.columns, options.rows, options.enabledChange),
           options.rows || []);
@@ -5417,9 +5410,10 @@
         rowSelector: fit.rowSelector,
         headerSelector: fit.headerSelector,
         resize: (height, measurement) => {
-          masterNode.style.height = `${height}px`;
+          const fittedHeight = measurement?.full ? `${height}px` : "";
+          masterNode.style.height = fittedHeight;
           root.classList.toggle("lex-full-table-page", !!measurement?.full);
-          detailNode.style.height = measurement?.full ? `${height}px` : "";
+          detailNode.style.height = fittedHeight;
         },
         change: nextSize => {
           if (fitMinimum) tableFitCapacityCache.set(rowPreferenceKey, {capacity: nextSize, requested: requestedPageSize});
@@ -5437,7 +5431,9 @@
 
   const shortReferenceName = source => {
     if (source.shortName) return source.shortName;
-    if (String(source.name || "").toLocaleLowerCase() === "vanilla") return "V";
+    const normalized = String(source.name || "").trim().toLocaleLowerCase();
+    if (normalized === "vanilla") return "V";
+    if (["lexer", "lexer lux", "lexer-lux", "lexer's mod", "lexers mod", "lexers-mod"].includes(normalized)) return "LL";
     const words = String(source.name || "").trim().split(/\s+/).filter(Boolean);
     if (words.length > 1) return words.map(word => word[0]).join("").slice(0, 3).toLocaleUpperCase();
     return String(source.name || "").slice(0, 5).toLocaleUpperCase();
@@ -5482,7 +5478,7 @@
         title: `Use ${source.name}: ${description}`,
         onclick: event => options.apply?.(clone(source.value), event, source),
       },
-      element("span", {class: "lex-reference-tag"}, shortReferenceName(source)),
+      element("span", {class: `lex-reference-tag${shortReferenceName(source) === "LL" ? " lex-reference-ll" : ""}`}, shortReferenceName(source)),
       element("span", {class: "lex-reference-text"}, formatted));
     }));
   };
@@ -5752,4 +5748,166 @@
   };
 
   window.LexeditorUI = {element, el: element, newButton, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+})();
+
+
+/* LEXEDITOR_SHARED_UI_STANDARDIZATION_20260906 */
+(() => {
+  const ui = window.LexeditorUI;
+  if (!ui || ui.__sharedStandardization20260906) return;
+  ui.__sharedStandardization20260906 = true;
+
+  const attachModelPreview = (panel, spec) => {
+    if (!(panel instanceof Element) || !spec) return panel;
+    const heading = panel.querySelector(':scope > .lex-detail-panel-heading');
+    const icon = heading?.querySelector('.lex-detail-panel-icon');
+    if (!heading || !icon) return panel;
+    const getContent = typeof spec === 'function' ? spec : () => spec.content;
+    const onOpen = typeof spec === 'object' ? spec.onOpen : null;
+    const onClose = typeof spec === 'object' ? spec.onClose : null;
+    const drawer = document.createElement('section');
+    drawer.className = 'lex-model-preview-drawer';
+    drawer.hidden = true;
+    drawer.setAttribute('aria-label', typeof spec === 'object' && spec.label ? spec.label : 'Model preview');
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'lex-model-preview-close';
+    close.textContent = '×';
+    close.title = 'Close model preview';
+    close.setAttribute('aria-label', close.title);
+    heading.style.position = 'relative';
+    heading.append(close);
+    heading.after(drawer);
+    const syncCloseSlot = () => {
+      close.style.left = `${icon.offsetLeft}px`;
+      close.style.top = `${icon.offsetTop}px`;
+      close.style.width = `${icon.offsetWidth}px`;
+      close.style.height = `${icon.offsetHeight}px`;
+    };
+    const open = async () => {
+      syncCloseSlot();
+      if (!drawer.childNodes.length) {
+        const content = await getContent?.();
+        if (content instanceof Node) drawer.append(content);
+      }
+      drawer.hidden = false;
+      panel.classList.add('lex-model-preview-open');
+      icon.setAttribute('aria-expanded', 'true');
+      await onOpen?.(drawer);
+    };
+    const shut = async () => {
+      await onClose?.(drawer);
+      panel.classList.remove('lex-model-preview-open');
+      drawer.hidden = true;
+      icon.setAttribute('aria-expanded', 'false');
+    };
+    icon.classList.add('lex-model-preview-trigger');
+    icon.tabIndex = 0;
+    icon.setAttribute('role', 'button');
+    icon.setAttribute('aria-label', typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview');
+    icon.setAttribute('aria-expanded', 'false');
+    icon.addEventListener('click', open);
+    icon.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        open();
+      }
+    });
+    close.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      shut();
+    });
+    panel.lexModelPreview = {open, close: shut, drawer};
+    return panel;
+  };
+  ui.attachModelPreview = attachModelPreview;
+  const originalDetailPanel = ui.detailPanel;
+  ui.detailPanel = options => {
+    const panel = originalDetailPanel(options);
+    return options?.modelPreview ? attachModelPreview(panel, options.modelPreview) : panel;
+  };
+
+  const hoverKey = node => node?.dataset?.lexProperty || node?.dataset?.columnKey || '';
+  document.addEventListener('pointerover', event => {
+    const node = event.target.closest?.('.lex-detail-field,[data-column-key]');
+    if (!node) return;
+    node.classList.add('lex-self-hover');
+    const key = hoverKey(node);
+    if (!key) return;
+    const escaped = CSS.escape(String(key));
+    document.querySelectorAll(`[data-column-key="${escaped}"],[data-lex-property="${escaped}"]`)
+      .forEach(peer => peer.classList.add('lex-column-lit'));
+  });
+  document.addEventListener('pointerout', event => {
+    const node = event.target.closest?.('.lex-detail-field,[data-column-key]');
+    if (!node || node.contains(event.relatedTarget)) return;
+    node.classList.remove('lex-self-hover');
+    const key = hoverKey(node);
+    if (!key) return;
+    const escaped = CSS.escape(String(key));
+    document.querySelectorAll(`[data-column-key="${escaped}"],[data-lex-property="${escaped}"]`)
+      .forEach(peer => peer.classList.remove('lex-column-lit'));
+  });
+
+  document.addEventListener('click', event => {
+    const field = event.target.closest?.('.lex-boolean-field');
+    if (!field || event.target.closest?.('input,button,a,select,textarea,.lex-info-help,.lex-reference-values,.lex-column-pin')) return;
+    const input = field.querySelector('.lex-detail-field-control input[type="checkbox"]');
+    if (!input || input.disabled) return;
+    event.preventDefault();
+    input.click();
+  });
+
+  const syncRange = field => {
+    if (!field) return;
+    const number = field.querySelector('input[type="number"]');
+    const range = field.querySelector('input[type="range"]');
+    if (number && range && range.value !== number.value) {
+      range.value = number.value;
+      range.dispatchEvent(new Event('input', {bubbles: true}));
+    }
+  };
+  document.addEventListener('contextmenu', event => {
+    const field = event.target.closest?.('.lex-detail-field');
+    if (!field) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      syncRange(field);
+      const target = getComputedStyle(field).backgroundColor;
+      const accent = getComputedStyle(document.documentElement).getPropertyValue('--lex-accent').trim() || target;
+      field.animate(
+        [{backgroundColor: accent}, {backgroundColor: target}],
+        {duration: 420, easing: 'cubic-bezier(.2,.75,.2,1)'},
+      );
+    }));
+  }, true);
+
+  const dedupeShortcuts = root => root.querySelectorAll?.('nav button[data-tab]').forEach(button => {
+    if (button.querySelector('.lex-tab-shortcut')) {
+      button.querySelectorAll('.lex-tab-ordinal').forEach(node => node.remove());
+    }
+  });
+  new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (node instanceof Element) dedupeShortcuts(node.closest('header') || node);
+  }))).observe(document.documentElement, {childList: true, subtree: true});
+  dedupeShortcuts(document);
+
+  const fitLabel = label => {
+    if (!(label instanceof HTMLElement)) return;
+    label.style.fontSize = '';
+    let size = parseFloat(getComputedStyle(label).fontSize) || 12;
+    while (size > 8 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth + 1)) {
+      size -= .5;
+      label.style.fontSize = `${size}px`;
+    }
+  };
+  const fitAllLabels = root => root.querySelectorAll?.(
+    '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label',
+  ).forEach(fitLabel);
+  const labelObserver = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (node instanceof Element) fitAllLabels(node);
+  })));
+  labelObserver.observe(document.documentElement, {childList: true, subtree: true});
+  window.addEventListener('resize', () => fitAllLabels(document));
+  requestAnimationFrame(() => fitAllLabels(document));
 })();

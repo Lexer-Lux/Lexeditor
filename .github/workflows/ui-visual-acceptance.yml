@@ -1,0 +1,36 @@
+name: Shared UI visual acceptance
+
+on:
+  push:
+    branches:
+      - fix/ui-standardization-20260906
+
+permissions:
+  contents: read
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ui-standardization-20260906
+      - name: Install browser tools
+        run: |
+          python -m pip install playwright Pillow
+          python -m playwright install --with-deps chromium
+      - name: Shared Blank acceptance
+        run: python .github/scripts/ui_visual_acceptance.py out/ui-visual-acceptance
+      - name: Data Map browser regression
+        run: python tests/data_map_browser_check.py out/data-map-browser
+      - name: Developer helper browser regression
+        run: python tests/wse2_helper_browser_check.py out/wse2-helper-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-visual-acceptance
+          path: |
+            out/ui-visual-acceptance
+            out/data-map-browser
+            out/wse2-helper-browser
+          if-no-files-found: warn

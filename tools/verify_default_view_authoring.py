@@ -16,11 +16,10 @@ from games.ff8.plugin import PLUGIN
 
 
 class Settings:
-    def __init__(self, enabled: bool = True):
-        self.enabled = enabled
-
     def snapshot(self) -> dict:
-        return {"developerMode": self.enabled, "lexerMode": self.enabled}
+        # Developer Mode is intentionally not persisted here. It is derived
+        # from the active authenticated GitHub account by HostApi.
+        return {}
 
 
 class GitHub:
@@ -38,7 +37,7 @@ class Passive:
     pass
 
 
-def api(settings: Settings, github: GitHub) -> HostApi:
+def api(github: GitHub) -> HostApi:
     return HostApi(
         {"ff8": PLUGIN},
         installation_manager=Passive(),
@@ -46,7 +45,7 @@ def api(settings: Settings, github: GitHub) -> HostApi:
         auto_scan=False,
         github=github,
         cover_art=Passive(),
-        settings=settings,
+        settings=Settings(),
         projects=Passive(),
     )
 
@@ -56,22 +55,22 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-default-view-", ignore_cleanu
     desktop_host.DEFAULT_VIEWS = Path(temp_name) / "default_views.json"
     try:
         key = "lexeditor-columns:ff8-items"
-        result = api(Settings(), GitHub()).save_default_view(
+        result = api(GitHub()).save_default_view(
             "ff8", "items", {key: '["name","buyPrice"]', "unrelated": "ignored"},
         )
         assert result["saved"] and result["preferences"] == 1
         stored = json.loads(desktop_host.DEFAULT_VIEWS.read_text(encoding="utf-8"))
         assert stored == {"ff8": {"items": {key: '["name","buyPrice"]'}}}
-        assert api(Settings(), GitHub()).default_views("ff8")["views"] == stored["ff8"]
+        assert api(GitHub()).default_views("ff8")["views"] == stored["ff8"]
 
-        for blocked in (api(Settings(False), GitHub()), api(Settings(), GitHub(False))):
-            try:
-                blocked.save_default_view("ff8", "items", {key: "[]"})
-            except PermissionError:
-                pass
-            else:
-                raise AssertionError("Default authoring bypassed its owner/Lexer Mode gate")
+        blocked = api(GitHub(False))
+        try:
+            blocked.save_default_view("ff8", "items", {key: "[]"})
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError("Default authoring bypassed its Developer Mode owner gate")
     finally:
         desktop_host.DEFAULT_VIEWS = previous
 
-print("Packaged view defaults require Lexer Mode and the authorized Lexeditor owner")
+print("Packaged view defaults require the authorized Lexeditor developer")

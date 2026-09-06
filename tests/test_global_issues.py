@@ -55,7 +55,7 @@ class Helpers(unittest.TestCase):
         b=dataclasses.replace(a,plugin_id='b',name='B',helper_upstream=Mock(side_effect=RuntimeError('offline')))
         c=dataclasses.replace(a,plugin_id='c',name='C',helper_upstream=None)
         h=object.__new__(HostApi);h._plugins={'a':a,'b':b,'c':c};h._lock=threading.RLock();h._helper_versions=None
-        h._settings=Mock();h._settings.snapshot.return_value={'lexerMode':True}
+        h._settings=Mock();h._github=Mock();h._github.visible_repository.return_value={'repository':'Lexer-Lux/Lexeditor','login':'Lexer-Lux'}
         h._installations=Mock()
         h._installations.snapshot.side_effect=lambda plugin_id:{'root':'/game','helper':{'installed':True,'version':'1.1','integrity':'ok'}}
         return h
@@ -70,7 +70,7 @@ class Helpers(unittest.TestCase):
         h.helper_versions(True);self.assertEqual(h._plugins['a'].helper_upstream.call_count,2)
         for p in h._plugins.values():p.helper_install.assert_not_called()
     def test_permissions(self):
-        h=self.host();h._settings.snapshot.return_value={'lexerMode':False}
+        h=self.host();h._github.visible_repository.return_value=None
         with self.assertRaises(PermissionError):h.helper_versions()
 
 

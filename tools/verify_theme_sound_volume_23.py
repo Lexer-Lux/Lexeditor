@@ -31,7 +31,7 @@ window.Audio=class {{
   play(){{return Promise.resolve()}}
   pause(){{this.paused=true}}
 }};
-window.__settings={{developerMode:false,lexerMode:false,soundEnabled:true,soundVolumePercent:1,viewPreferences:{{}}}};
+window.__settings={{developerMode:false,soundEnabled:true,soundVolumePercent:1,viewPreferences:{{}}}};
 window.pywebview={{api:{{lexeditor_settings:async()=>structuredClone(window.__settings),window_state:async()=>({{maximized:false}})}}}};
 </script>
 <script src="{(ROOT / 'ui' / 'framework.js').as_uri()}"></script>

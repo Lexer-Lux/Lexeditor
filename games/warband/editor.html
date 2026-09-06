@@ -131,27 +131,27 @@
     const canvas=el("canvas",{tabindex:"0","aria-label":`${item.name} inventory mesh preview`});
     const stage=el("div",{class:"warband-preview-stage"},canvas,message);
     const facts=el("div",{class:"warband-preview-facts"});
-    let data=null,open=true,generation=0;
-    const action=el("button",{class:"warband-item-preview-action",disabled:true,title:"Checking mesh and texture dependencies…","aria-label":"Close 3D preview"},"×");
-    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,actions:action,
-      body:[el("div",{class:"warband-mesh-list"},el("b",{},"Meshes: "),item.meshes.length?item.meshes.join(" · "):"None"),stage,facts]});
+    let data=null,open=false,generation=0;
+    const previewBody=el("div",{class:"warband-shared-model-preview"},stage,facts);
+    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,
+      body:[el("div",{class:"warband-mesh-list"},el("b",{},"Meshes: "),item.meshes.length?item.meshes.join(" · "):"None")],
+      modelPreview:{content:previewBody,label:`${item.name} 3D model preview`,onOpen:async()=>{open=true;generation++;if(data)await showPreview();},onClose:()=>{open=false;generation++;disposeWarbandPreview();}}});
     async function showPreview(){
       const token=++generation;
       try{
         const controller=await createWarbandRenderer(canvas,data,true);
         if(!detail.isConnected||!open||token!==generation){controller.dispose();return;}
-        window.__warbandPreview=[controller];message.hidden=true;action.disabled=false;action.title="Close 3D preview";
-      }catch(error){if(detail.isConnected&&token===generation){message.hidden=false;message.textContent=error.message;action.disabled=true;}}
+        window.__warbandPreview=[controller];message.hidden=true;
+      }catch(error){if(detail.isConnected&&token===generation){message.hidden=false;message.textContent=error.message;}}
     }
-    action.onclick=()=>{open=!open;generation++;stage.hidden=!open;disposeWarbandPreview();action.textContent=open?"×":"◉";action.setAttribute("aria-label",open?"Close 3D preview":"Open 3D preview");action.title=action.getAttribute("aria-label");if(open){action.disabled=true;showPreview();}};
     if(item.inventoryMesh)requestAnimationFrame(async()=>{
       loadWarbandIcon(item,detail,thumbnail,thumbnailMessage);
       try{
         data=await api(`/api/item-preview?mesh=${encodeURIComponent(item.inventoryMesh)}`);
         if(!detail.isConnected)return;
         facts.replaceChildren(el("span",{},data.resource),el("span",{},data.material),el("span",{},`${data.summary.vertices} vertices · ${data.summary.triangles} triangles`));
-        await showPreview();
-      }catch(error){if(detail.isConnected){message.textContent=error.message;action.title=error.message;}}
+        if(open)await showPreview();
+      }catch(error){if(detail.isConnected){message.textContent=error.message;message.title=error.message;}}
     });
     return detail;
   }

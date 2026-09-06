@@ -148,19 +148,19 @@ def main() -> int:
         }), encoding="utf-8")
         store = SettingsStore(root / "settings.json", defaults)
         store.save("daily", main_menu_height_percent=10.0)
-        store.save_lexer_defaults({"mainMenuHeightPercent": 12.0})
+        store.save_packaged_defaults({"mainMenuHeightPercent": 12.0})
         snapshot = store.snapshot()
         assert snapshot["mainMenuHeightPercent"] == 10.0, snapshot
         assert snapshot["defaultValues"]["mainMenuHeightPercent"] == 12.0, snapshot
-        store.save_lexer_defaults({"absentGameDesaturationPercent": 140.0})
+        store.save_packaged_defaults({"absentGameDesaturationPercent": 140.0})
         snapshot = store.snapshot()
         assert snapshot["absentGameDesaturationPercent"] == 100.0, snapshot
         assert snapshot["defaultValues"]["absentGameDesaturationPercent"] == 100.0, snapshot
-        store.save_lexer_defaults({"globalMessageRarity": 0.25})
+        store.save_packaged_defaults({"globalMessageRarity": 0.25})
         snapshot = store.snapshot()
         assert snapshot["globalMessageRarity"] == 1.0, snapshot
         assert snapshot["defaultValues"]["globalMessageRarity"] == 1.0, snapshot
-        store.save_lexer_defaults({"loadingTransitionMinimumSeconds": 14.0})
+        store.save_packaged_defaults({"loadingTransitionMinimumSeconds": 14.0})
         snapshot = store.snapshot()
         assert snapshot["loadingTransitionMinimumSeconds"] == 10.0, snapshot
         assert snapshot["defaultValues"]["loadingTransitionMinimumSeconds"] == 10.0, snapshot

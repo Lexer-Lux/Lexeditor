@@ -36,7 +36,8 @@ class HelperPanelTests(unittest.TestCase):
         self.manager=GameInstallationManager({'warband':self.plugin},config_path=self.root/'locations.json',auto_scan=False)
         self.manager._states['warband']=self.manager._state('added','Ready',root=str(self.game))
         self.api=HostApi.__new__(HostApi);self.api._plugins={'warband':self.plugin}
-        self.api._settings=SimpleNamespace(snapshot=lambda:{'lexerMode':True,'updateCheckFrequency':'never'})
+        self.api._settings=SimpleNamespace(snapshot=lambda:{'updateCheckFrequency':'never'})
+        self.api._github=Mock();self.api._github.visible_repository.return_value={'repository':'Lexer-Lux/Lexeditor','login':'Lexer-Lux'}
         self.api._installations=self.manager;self.api._lock=threading.RLock();self.api._helper_versions=None
 
     def test_plugin_registers_pin_and_all_root_aware_hooks(self):
@@ -78,11 +79,11 @@ class HelperPanelTests(unittest.TestCase):
         self.assertEqual(row['installedVersion'],'')
         with self.assertRaisesRegex(RuntimeError,'Locate'):self.api.install_helper('warband')
 
-    def test_lexer_permission_and_read_only_checker(self):
+    def test_developer_permission_and_read_only_checker(self):
         self.api._plugins['warband']=replace(self.plugin,helper_install_for_root=Mock(side_effect=AssertionError('installed during check')))
         self.api.helper_versions();self.api.helper_versions(True)
         self.assertFalse((self.game/'.lexeditor').exists())
-        self.api._settings=SimpleNamespace(snapshot=lambda:{'lexerMode':False})
+        self.api._github.visible_repository.return_value=None
         with self.assertRaises(PermissionError):self.api.helper_versions()
         with self.assertRaises(PermissionError):self.api.open_helper_release_notes('warband')
 

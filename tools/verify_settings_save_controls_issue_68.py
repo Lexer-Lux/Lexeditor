@@ -22,7 +22,7 @@ def main() -> int:
         "dirtyCount: settingsDirtyCount",
         "confirmDiscardChanges({",
         "if (event.target === backdrop && !settingsDirtyCount()) close();",
-        'callWindow("save_lexeditor_settings", {...values, lexerMode: lexerMode.checked})',
+        'callWindow("save_lexeditor_settings", {...values, })',
         "const supportsDefault = definition =>",
         "supportedDefaultDefinitions.map(definition =>",
         "Restart LEXEDITOR to enable newly added settings.",

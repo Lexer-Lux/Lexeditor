@@ -51,23 +51,30 @@ def main():
                     model={**MODEL,'texture':'data:image/png;base64,'+base64.b64encode(TEXTURE).decode()}
                     stub='const replaceState=history.replaceState.bind(history);history.replaceState=(state,unused)=>replaceState(state,unused);window.fetch=async function(input){const path=String(input);const fixtures='+json.dumps(fixtures)+';if(path.startsWith("/api/item-preview?")){return new Response(JSON.stringify(path.includes("broken")?{error:"Missing diffuse texture fixture"}:'+json.dumps(model)+'),{status:path.includes("broken")?422:200});}if(path.startsWith("/api/item-icon?")){if(path.includes("broken"))return new Response(JSON.stringify({error:"Missing diffuse texture fixture"}),{status:422});const bytes=Uint8Array.from(atob("'+base64.b64encode(ICON).decode()+'"),c=>c.charCodeAt(0));return new Response(bytes,{headers:{"Content-Type":"image/png"}});}return new Response(JSON.stringify(fixtures[path]||{}));};'
                     html=(ROOT/'games/warband/editor.html').read_text()
+                    # Synthetic set_content pages need a hierarchical base for shared optional asset URLs.
+                    html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
                     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
                     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text()+'</script>')
                     html=html.replace('<script src="/warband/troop_trees.js"></script>','<script>'+(ROOT/'games/warband/troop_trees.js').read_text()+'</script>')
                     page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('!state.booting')
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
-                    page.wait_for_function('window.__warbandPreview?.length===1 || document.querySelector(".warband-preview-message")?.textContent.includes("cannot start the WebGL")')
                     assert page.locator('.warband-item-thumbnail canvas').count()==0
+                    assert page.locator('.warband-preview-stage canvas').count()==0
+                    assert page.locator('.lex-model-preview-drawer').is_hidden()
+                    assert not page.evaluate('window.__warbandPreview?.length')
+                    page.get_by_role('button',name='Open model preview',exact=True).click()
+                    page.wait_for_function('window.__warbandPreview?.length===1 || document.querySelector(".warband-preview-message")?.textContent.includes("cannot start the WebGL")')
                     assert page.locator('.warband-preview-stage canvas').count()==1
                     webgl=page.evaluate('window.__warbandPreview?.length===1')
                     if os.environ.get('WARBAND_REQUIRE_WEBGL')=='1':assert webgl,'WebGL fixture rendering required by CI'
                     if webgl:
-                        page.get_by_role('button',name='Close 3D preview',exact=True).click()
-                        assert page.locator('.warband-preview-stage').is_hidden()
-                        page.get_by_role('button',name='Open 3D preview',exact=True).click()
+                        page.get_by_role('button',name='Close model preview',exact=True).click()
+                        assert page.locator('.lex-model-preview-drawer').is_hidden()
+                        assert not page.evaluate('window.__warbandPreview?.length')
+                        page.get_by_role('button',name='Open model preview',exact=True).click()
                         page.wait_for_function('window.__warbandPreview?.length===1')
                     else:
-                        assert page.locator('.warband-item-preview-action').is_disabled()
+                        assert page.locator('.warband-preview-message').is_visible()
                     page.screenshot(path=str(ARTIFACTS/f'items-{width}.png'),full_page=True)
                     page.evaluate('navigate("datamap")');page.wait_for_timeout(600)
                     assert page.locator('.lex-paged-list-detail').count()==1
@@ -102,8 +109,9 @@ def main():
                     assert page.locator('[data-troop="recruit"]').count()==0
                     # Missing dependencies never enable the preview action.
                     page.evaluate('state.filters.items="Missing texture fixture";navigate("items")')
+                    page.get_by_role('button',name='Open model preview',exact=True).click()
                     page.wait_for_function('document.querySelector(".warband-preview-message")?.textContent.includes("Missing diffuse")')
-                    assert page.locator('.warband-item-preview-action').is_disabled()
+                    assert page.locator('.lex-model-preview-drawer').is_visible()
                     assert page.evaluate('!window.__warbandPreview')
                     results.append({'width':width,'height':height,'dataMap':metrics,'webglAvailable':webgl,'status':'passed'})
                     page.close()

@@ -92,3 +92,14 @@ Preserve the original issue request and record implementation evidence in its
 existing worklog. Keep the human-facing issue short, with a usable acceptance
 checklist only when its test candidate is actually available. Follow `AGENTS.md`;
 the separate codex/worklog consolidation task is not part of adding a plugin.
+
+
+## Shared UI contracts
+
+Do not clone Blank-specific markup into a plugin. Blank exercises the same shared
+framework controls that every plugin receives. Use `detailPanel({modelPreview: …})`
+for model previews; the framework owns the drawer and header-icon open/close slot.
+Every game uses the central Lexeditor issue tracker; the host filters it by the
+plugin id label. Variable editors must expose semantic human controls rather than
+raw storage encodings (checkbox/toggle for booleans, named enums, decomposed
+bitflags).

@@ -1,4 +1,4 @@
-"""Rendered check for the I AM LEXER helper-versions panel (GOAL.md item 35).
+"""Rendered check for the DEV helper-versions panel (GOAL.md item 35).
 
 Lexeditor helpers are pinned forks with self-updating disabled, so this panel
 is the only update path there is: it reports what upstream published and never
@@ -55,7 +55,7 @@ STUB = """
 """
 
 SETTINGS = {
-    "developerMode": False, "lexerMode": True, "lexerAuthorized": True, "lexerLogin": "Lexer-Lux",
+    "developerMode": False, "developerMode": True, "developerAuthorized": True, "developerLogin": "Lexer-Lux",
     "hoverableAltClick": False, "selectionHoldMs": 650, "tableRowsPerPage": 15,
     "panelGapPercent": 1, "residentHandleWidthPercent": 5, "mainMenuHeightPercent": 9,
     "soundEnabled": False, "soundVolumePercent": 50, "absentGameDesaturationPercent": 75,
@@ -136,7 +136,7 @@ def main() -> int:
         time.sleep(.4)
         assert cdp.eval("document.querySelector('#lexer-panel').hidden") is True, "close left the panel open"
         # Without Lexer Mode the button does not exist for anyone else.
-        cdp.eval("""window.__testSettings.lexerMode=false;
+        cdp.eval("""window.__testSettings.developerMode=false;
           window.dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:structuredClone(window.__testSettings)}))""")
         assert cdp.eval("document.querySelector('#chooser-lexer').hidden") is True, \
             "the helper panel button must belong to Lexer Mode alone"
