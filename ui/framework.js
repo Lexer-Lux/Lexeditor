@@ -335,6 +335,65 @@
     activeHelpPopup = null;
   };
 
+  // Every interactive control gets a concise native tooltip even when a plugin
+  // has no richer ?-marker description. We only derive facts visible in the DOM
+  // (label, type, bounds, unit and authored apply requirement); we never guess
+  // undocumented gameplay semantics from a field name.
+  const controlHelp = control => {
+    if (!(control instanceof Element) || !control.matches("button,input,select,textarea,[role='button'],[role='slider'],[role='separator']")) return "";
+    const authored = String(control.getAttribute("aria-description") || "").trim();
+    if (authored) return authored;
+    const explicit = String(control.getAttribute("aria-label") || "").trim();
+    const labelNode = control.labels?.[0] || control.closest?.("label");
+    const fieldLabel = control.closest?.(".lex-detail-field")?.querySelector?.(".lex-detail-field-label");
+    const visible = control.matches("button,[role='button']") ? String(control.textContent || "").trim() : "";
+    const placeholder = String(control.getAttribute("placeholder") || "").trim();
+    const name = (explicit || labelNode?.textContent || fieldLabel?.textContent || visible || placeholder)
+      ?.replace(/\s+/g, " ").trim();
+    if (!name) return "";
+    let text;
+    const type = String(control.getAttribute("type") || "").toLocaleLowerCase();
+    if (control.matches("button,[role='button']")) text = name.endsWith(".") ? name : `${name}.`;
+    else if (type === "checkbox" || type === "radio") text = `Enable or disable ${name}.`;
+    else if (control.tagName === "SELECT") text = `Choose ${name}.`;
+    else if (type === "range" || type === "number" || control.getAttribute("role") === "slider") text = `Set ${name}.`;
+    else if (control.getAttribute("role") === "separator") text = `Resize ${name}.`;
+    else text = `Edit ${name}.`;
+    const facts = [];
+    const min = control.getAttribute("min") ?? control.getAttribute("aria-valuemin");
+    const max = control.getAttribute("max") ?? control.getAttribute("aria-valuemax");
+    const step = control.getAttribute("step");
+    if (min !== null && max !== null && min !== "" && max !== "") facts.push(`Range: ${min} to ${max}.`);
+    else if (min !== null && min !== "") facts.push(`Minimum: ${min}.`);
+    else if (max !== null && max !== "") facts.push(`Maximum: ${max}.`);
+    if (step && step !== "any" && !["checkbox","radio"].includes(type)) facts.push(`Step: ${step}.`);
+    const unit = control.closest?.(".lex-unit-field")?.querySelector?.(".lex-unit")?.textContent?.trim();
+    if (unit) facts.push(`Unit: ${unit}.`);
+    const apply = control.dataset?.lexApplyRequirement || control.closest?.("[data-lex-apply-requirement]")?.dataset?.lexApplyRequirement;
+    if (apply) facts.push(`Apply: ${String(apply).trim()}`);
+    return [text, ...facts].join(" ");
+  };
+
+  const installControlHelp = (root = document.body) => {
+    const annotate = node => {
+      if (!(node instanceof Element)) return;
+      const controls = [node.matches?.("button,input,select,textarea,[role='button'],[role='slider'],[role='separator']") ? node : null,
+        ...node.querySelectorAll?.("button,input,select,textarea,[role='button'],[role='slider'],[role='separator']") || []].filter(Boolean);
+      controls.forEach(control => {
+        if (control.title) return;
+        const text = controlHelp(control);
+        if (!text) return;
+        control.title = text;
+        if (!control.getAttribute("aria-description") && !control.matches("button,[role='button']")) control.setAttribute("aria-description", text);
+      });
+    };
+    annotate(root);
+    if (typeof MutationObserver !== "function") return () => {};
+    const observer = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(annotate)));
+    observer.observe(root, {childList:true, subtree:true});
+    return () => observer.disconnect();
+  };
+
   const infoHelp = (text, attrs = {}) => {
     const {
       class: className = "", title = text, "aria-label": ariaLabel = text,
@@ -3816,6 +3875,9 @@
       }
     });
 
+    const removeControlHelp = installControlHelp(document.body);
+    window.addEventListener("pagehide", removeControlHelp, {once:true});
+
     return {
       header, nav, context, settings, help, info, github, restart, githubWorkspace: () => githubWorkspace,
       save, game, undo, redo, minimize, maximize, close, history, navigationHistory, refresh,
@@ -5668,5 +5730,5 @@
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {element, el: element, newButton, infoHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {element, el: element, newButton, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
