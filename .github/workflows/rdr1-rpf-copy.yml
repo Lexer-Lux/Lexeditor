@@ -1,10 +1,11 @@
 name: RDR1 RPF copy checks
 on:
   push:
-    branches: [fix/rdr1-runtime-repo-link, fix/rdr1-carriage-auto-rest]
+    branches: [fix/rdr1-runtime-repo-link, fix/rdr1-carriage-auto-rest, fix/rdr1-skip-travel-remap]
     paths:
       - 'games/rdr/archive_deployment.py'
       - 'games/rdr/script_features.py'
+      - 'games/rdr/input_remaps.py'
       - 'games/rdr/server.py'
       - 'tools/magic-rdr/cli/**'
       - 'tools/magic-rdr/app/Rpf6ReadCli.exe'
@@ -12,11 +13,13 @@ on:
       - 'tools/verify_rdr_rpf_copy.ps1'
       - 'tools/verify_rdr_type2_resource.ps1'
       - 'tools/verify_rdr_script_features.py'
+      - 'tools/verify_rdr_input_remaps.py'
       - '.github/workflows/rdr1-rpf-copy.yml'
   pull_request:
     paths:
       - 'games/rdr/archive_deployment.py'
       - 'games/rdr/script_features.py'
+      - 'games/rdr/input_remaps.py'
       - 'games/rdr/server.py'
       - 'tools/magic-rdr/cli/**'
       - 'tools/magic-rdr/app/Rpf6ReadCli.exe'
@@ -24,13 +27,14 @@ on:
       - 'tools/verify_rdr_rpf_copy.ps1'
       - 'tools/verify_rdr_type2_resource.ps1'
       - 'tools/verify_rdr_script_features.py'
+      - 'tools/verify_rdr_input_remaps.py'
       - '.github/workflows/rdr1-rpf-copy.yml'
 permissions:
   contents: read
 jobs:
   copy-builder:
     runs-on: windows-2022
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out without optional gitlinks
         shell: pwsh
@@ -44,6 +48,9 @@ jobs:
       - name: Verify passenger coach bytecode patch shape
         shell: pwsh
         run: python tools/verify_rdr_script_features.py
+      - name: Verify camp/cutscene input-action relocation
+        shell: pwsh
+        run: python tools/verify_rdr_input_remaps.py
       - name: Build bridge and exercise a synthetic RPF6 replacement
         shell: powershell
         run: .\tools\verify_rdr_rpf_copy.ps1
