@@ -12,7 +12,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Download analysis wheels (no game data)
-        run: python -m pip download --only-binary=:all: --dest tools-wheels pefile==2024.8.26 capstone==5.0.6 unicorn==2.1.4
+        run: |
+          python -m pip download --only-binary=:all: --dest tools-wheels pefile==2024.8.26 capstone==5.0.6 unicorn==2.1.4
       - name: Read pinned upstream source
         run: |
           git init ffnx
