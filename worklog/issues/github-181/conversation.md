@@ -68,6 +68,30 @@ Exact metadata: [source record](sources/issue-5356302274-3e3f7be80c1769be5dd49a8
 
 Find an effective animation-speed path or remove the misleading control, with correct multiplier units and bounds. Resolve the binocular crash in #357 before another in-game comparison.
 
+## issue 5356302274 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/181
+
+Created: 2026-08-06T03:47:17Z; updated: 2026-09-06T17:33:49Z
+
+Exact metadata: [source record](sources/issue-5356302274-1afb9cd3e89c078a8e102fb0ff7c86ef56ac858dcfbc384a0cf726a1d579dff9.json).
+
+**Resolved by removing the misleading control.** Lexeditor PR #364 and runtime PR Lexer-Lux/Lexers-Mod-For-RDR2#211 are merged.
+
+The ineffective `TransitionAnimRate` setting/setters were retired instead of continuing to expose a number that did not visibly change the binocular transition. Native draw/stow behavior is preserved. The separate binocular crash remains tracked in #357 and is not closed by this change.
+
+## issue 5356302274 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/181
+
+Created: 2026-08-06T03:47:17Z; updated: 2026-09-06T17:33:49Z
+
+Exact metadata: [source record](sources/issue-5356302274-b5ec41d947ef66ce3fbcda2e969bb8e747bdc4b025bb48489299b1888f14201f.json).
+
+**Status: No visible speed improvement is confirmed.** Setting 10 did not help, and the implementation had silently clamped it to 4. A larger displayed number is not a repair.
+
+Find an effective animation-speed path or remove the misleading control, with correct multiplier units and bounds. Resolve the binocular crash in #357 before another in-game comparison.
+
 ## comment 5550130609 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/181#issuecomment-5550130609
