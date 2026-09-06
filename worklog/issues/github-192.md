@@ -4,14 +4,14 @@
 
 ## Requirements and decisions
 
-Recover the complete scope from the linked verbatim sources before implementation or status changes. The short GitHub summary is not the full specification. Do not infer that missing chat text was never supplied.
+Incomplete Study/tag progress must drain gradually after losing the target. Completed tags must remain complete. The rate is configurable; zero pauses decay.
 
-## Current implementation and evidence
+## 2026-09-06 — clean follow-up runtime candidate
 
-Reconcile live code, PRs and existing topic/session worklogs. This archive import makes no build, deployment or gameplay-success claim.
+The prior “source-only” status was stale: current runtime `master` still deleted partial ped dwell after target loss and had no decay setting. Runtime PR [Lexer-Lux/Lexers-Mod-For-RDR2#212](https://github.com/Lexer-Lux/Lexers-Mod-For-RDR2/pull/212) now stores explicit partial progress for peds and plants. Visible targets accumulate progress; after a 150 ms loss grace, incomplete progress decays at `StudyProgressDecayPercentPerSecond` (default 50% of a full bar per real second). Setting 0 pauses decay. Completed tags remain outside this partial-progress state and do not decay.
 
-## Next agent work
+Permanent `verify_recon_scaling_decay.py` guards the retained progress/decay path and rejects the old instant-erasure state. Source CI run 34050295438 passed. Both release and development Windows variants built and packaged successfully in run 34050295402. A production compiler error found during the first build attempt (`observedPlantAt` stale reset) was repaired before these green runs.
 
-Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.
+## Acceptance boundary
 
-- [Original Lexer-Lux/Lexers-Mod-For-RDR2 #96 worklog](github-192/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-96.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+No game installation or visual/gameplay acceptance is claimed. Test a partial ped Study, a partial plant Study, decay at the default rate, `0` decay preserving partial progress, and a completed tag remaining complete. Preserve the user's existing INI when installing the candidate.
