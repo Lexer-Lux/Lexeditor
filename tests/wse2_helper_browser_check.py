@@ -25,6 +25,8 @@ def main():
                 page=browser.new_page(viewport={'width':width,'height':height});errors=[]
                 page.on('pageerror',lambda e:errors.append(str(e)))
                 html=(ROOT/'ui/chooser.html').read_text()
+                # Synthetic set_content pages need a hierarchical base for shared optional asset URLs.
+                html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
                 html=html.replace('<link rel="stylesheet" href="framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
                 for name in ('framework.js','editor-host.js'):
                     html=html.replace(f'<script src="{name}"></script>','<script>'+(ROOT/'ui'/name).read_text()+'</script>')
