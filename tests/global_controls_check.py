@@ -54,6 +54,11 @@ def main() -> None:
           m.append(U.newButton({id:'add',title:'Add record',onclick:()=>__adds++}),__table());
         }''')
         assert page.locator('#add').get_attribute('aria-label') == 'Add record'
+        page.evaluate('LexeditorUI.installControlHelp(document.body)')
+        assert page.locator('#add').get_attribute('title') == 'Add record'
+        page.evaluate("""()=>{const U=LexeditorUI,e=U.el;const wrap=e('label',{},'Opacity',e('input',{id:'auto-help',type:'number',min:0,max:100,step:5}));document.querySelector('#main').append(wrap)}""")
+        page.wait_for_timeout(20)
+        assert page.locator('#auto-help').get_attribute('title') == 'Set Opacity. Range: 0 to 100. Step: 5.'
         page.locator('#add').click()
         assert page.evaluate('__adds') == 1
         head = page.locator('[role=columnheader][data-column-key=name]')
@@ -124,7 +129,7 @@ def main() -> None:
         assert not errors, errors
         results={'new_button':'pass','whole_header_sort':'pass','selection_retained':'pass',
           'divider_keyboard_persistence_doubleclick_contextmenu_stack':'pass','units_integer_bounds':'pass',
-          'settings_save_discard_isolation_and_visible_failure':'pass','history_cancellation_and_failure':'pass',
+          'settings_save_discard_isolation_and_visible_failure':'pass','automatic_control_tooltips':'pass','history_cancellation_and_failure':'pass',
           'page_errors':errors,'storage':'in-memory test double' if server is None else 'browser localStorage',
           'note':'Shared browser fixtures; not physical mouse, native window, sound or installed-game acceptance.'}
         (OUT/'results.json').write_text(json.dumps(results,indent=2)+'\n')
