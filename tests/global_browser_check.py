@@ -14,7 +14,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 
 ROOT=Path(__file__).resolve().parents[1]
 OUT=Path(os.environ.get('LEXEDITOR_TEST_OUTPUT',str(ROOT/'out/global-browser')))
-SETTINGS=json.loads((ROOT/'ui/default_settings.json').read_text())|{'lexerMode':True,'lexerAuthorized':True,'lexerLogin':'Lexer-Lux','viewPreferences':{},'defaultValues':{},'updateCheckChoices':[], 'loadingTransitionMinimumSeconds':0}
+SETTINGS=json.loads((ROOT/'ui/default_settings.json').read_text())|{'developerMode':True,'developerAuthorized':True,'developerLogin':'Lexer-Lux','viewPreferences':{},'defaultValues':{},'updateCheckChoices':[], 'loadingTransitionMinimumSeconds':0}
 HELPERS=[{'pluginId':'ff8','plugin':'Final Fantasy 8','helper':'FFNx','pinned':'1.0','installed':True,'installedVersion':'1.1','latest':'1.2','behind':True,'published':'2026-09-01T00:00:00Z','releaseNotes':'https://github.com/julianxhokaxhiu/FFNx/releases/tag/example'},
 {'pluginId':'ff9','plugin':'Final Fantasy 9','helper':'Memoria','installed':False,'error':'Offline: cannot read the upstream release'}]
 STUB='''

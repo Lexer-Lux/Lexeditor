@@ -422,10 +422,10 @@ class HostApi:
 
     def plugins(self) -> list[dict]:
         rows = []
-        lexer_mode = bool(self._settings.snapshot().get("lexerMode"))
+        developer_mode = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY))
         for managed in self._installations.rows(bypass=not self._enforce_installations):
             plugin = managed["plugin"]
-            if plugin.plugin_id == "blank" and not lexer_mode:
+            if plugin.plugin_id == "blank" and not developer_mode:
                 continue
             installation = managed["installation"]
             problems = installation["problems"]
@@ -483,12 +483,10 @@ class HostApi:
         identity = self._github.visible_repository(LEXEDITOR_REPOSITORY)
         authorized = bool(identity)
         # There is one privileged mode: Developer Mode. It is an identity
-        # fact, not a preference. The legacy lexer field stays internal until
-        # older settings files age out.
+        # fact, not a preference.
         payload["developerMode"] = authorized
-        payload["lexerMode"] = authorized
-        payload["lexerAuthorized"] = authorized
-        payload["lexerLogin"] = (identity or {}).get("login", "")
+        payload["developerAuthorized"] = authorized
+        payload["developerLogin"] = (identity or {}).get("login", "")
         return payload
 
     def save_lexeditor_settings(self, values: dict | str, *legacy_values) -> dict:
@@ -496,15 +494,12 @@ class HostApi:
         if isinstance(values, dict):
             payload = values
         else:
-            names = ("developerMode", "lexerMode", "hoverableAltClick", "selectionHoldMs",
-                     "tableRowsPerPage", "panelGapPercent", "mainMenuHeightPercent",
-                     "soundEnabled", "soundVolumePercent")
+            names = ("hoverableAltClick", "selectionHoldMs", "tableRowsPerPage",
+                     "panelGapPercent", "mainMenuHeightPercent", "soundEnabled",
+                     "soundVolumePercent")
             payload = {"updateCheckFrequency": values, **dict(zip(names, legacy_values))}
-        authorized = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True))
         self._settings.save(
             str(payload.get("updateCheckFrequency", "daily")),
-            authorized,
-            authorized,
             None if "hoverableAltClick" not in payload else bool(payload["hoverableAltClick"]),
             payload.get("selectionHoldMs"),
             payload.get("tableRowsPerPage"),
@@ -515,11 +510,11 @@ class HostApi:
         )
         return self.lexeditor_settings()
 
-    def save_lexer_setting_defaults(self, values: dict) -> dict:
+    def save_developer_setting_defaults(self, values: dict) -> dict:
         """Save distributable setting defaults for the active repository owner."""
         if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
             raise PermissionError("Developer Mode requires Lexer's active GitHub account")
-        self._settings.save_lexer_defaults(values)
+        self._settings.save_packaged_defaults(values)
         return self.lexeditor_settings()
 
     def save_lexeditor_view_preference(self, key: str, value: int) -> dict:

@@ -2795,20 +2795,19 @@
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
         {key:"mainMenuHeightPercent", scope:"user", title:"Menu bar height", description:"Height of the menu bar in the Home screen and every game plugin, as a percentage of the screen.", type:"number", min:3, max:20, step:.25, unit:"%"},
         {key:"soundEnabled", scope:"user", title:"Sound", description:"Play game-themed interface sounds when the active plugin supplies them.", type:"checkbox"},
-        {key:"soundVolumePercent", scope:"lexer", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
-        {key:"developerMode", scope:"developer", title:"Developer Mode", description:"Shows development tools such as the GitHub workspace and plugin Restart control.", type:"checkbox"},
-        {key:"residentHandleWidthPercent", scope:"lexer", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},
-        {key:"absentGameDesaturationPercent", scope:"lexer", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
-        {key:"globalMessageRarity", scope:"lexer", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
-        {key:"loadingTransitionMinimumSeconds", scope:"lexer", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
+        {key:"soundVolumePercent", scope:"packaged", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
+        {key:"residentHandleWidthPercent", scope:"packaged", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},
+        {key:"absentGameDesaturationPercent", scope:"packaged", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
+        {key:"globalMessageRarity", scope:"packaged", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
+        {key:"loadingTransitionMinimumSeconds", scope:"packaged", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
       ];
-      const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "lexer");
+      const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "packaged");
       const supportsCurrent = definition => Object.prototype.hasOwnProperty.call(settings, definition.key);
       const supportsDefault = definition => Object.prototype.hasOwnProperty.call(settings.defaultValues || {}, definition.key);
       const supportedOrdinaryDefinitions = ordinaryDefinitions.filter(supportsCurrent);
       const supportedDefaultDefinitions = definitions.filter(supportsDefault);
       const unsupportedDefinitions = definitions.filter(definition =>
-        (definition.scope !== "lexer" && !supportsCurrent(definition)) || !supportsDefault(definition));
+        (definition.scope !== "packaged" && !supportsCurrent(definition)) || !supportsDefault(definition));
       const initialValue = (definition, defaults = false) => {
         const source = defaults ? settings.defaultValues : settings;
         return source?.[definition.key] ?? settings[definition.key] ??
@@ -2863,31 +2862,25 @@
       const lane = (scope, title) => element("section", {class:`lex-settings-lane lex-settings-lane-${scope}`},
         element("h3", {}, title));
       const userLane = lane("user", "GLOBAL SETTINGS");
-      const developerLane = lane("developer", `${plugin || "PLUGIN"} EDITOR SETTINGS`.toLocaleUpperCase());
-      const lexerLane = lane("lexer", "LEXER");
-      const lexerMode = element("input", {
-        id:"lex-lexer-mode", type:"checkbox", checked:!!settings.lexerMode,
-        disabled:!settings.lexerAuthorized,
-      });
-      const lexerModeCard = element("section", {class:"lex-global-setting lex-lexer-setting lex-lexer-mode-setting"},
-        element("label", {for:"lex-lexer-mode"}, "I am Lexer"),
-        element("p", {}, settings.lexerAuthorized
-          ? `Verified GitHub account: ${settings.lexerLogin}. Enables distributable defaults.`
-          : "Unavailable. Sign in to GitHub as Lexer to enable distributable defaults."), lexerMode);
-      lexerLane.append(lexerModeCard);
+      const developerLane = lane("developer", `${plugin || "PLUGIN"} DEVELOPER SETTINGS`.toLocaleUpperCase());
+      const developerActive = !!settings.developerMode;
+      developerLane.append(element("section", {class:"lex-global-setting lex-developer-identity"},
+        element("strong", {}, developerActive ? "DEVELOPER MODE ACTIVE" : "DEVELOPER MODE UNAVAILABLE"),
+        element("p", {}, developerActive
+          ? `Authenticated GitHub account: ${settings.developerLogin}. Distributable authoring controls are enabled.`
+          : "Sign in to GitHub as the authorized developer to expose authoring controls.")));
       const setDefaultVisibility = () => {
-        const active = lexerMode.checked && !lexerMode.disabled;
         defaultCards.forEach(control => {
-          control.hidden = !active;
+          control.hidden = !developerActive;
           const supported = control.dataset.lexSettingSupported !== "false";
           control.setAttribute("aria-disabled", String(!supported));
-          control.querySelectorAll?.("input,select").forEach(input => { input.disabled = !active || !supported; });
+          control.querySelectorAll?.("input,select").forEach(input => { input.disabled = !developerActive || !supported; });
         });
-        lexerLane.classList.toggle("active", active);
+        developerLane.classList.toggle("active", developerActive);
       };
       const copyToDefault = (definition, defaultControl) => {
-        if (!lexerMode.checked || lexerMode.disabled) {
-          message.textContent = "Enable I am Lexer to change the default for everyone."; return;
+        if (!developerActive) {
+          message.textContent = "Developer Mode requires the authorized GitHub account."; return;
         }
         if (!supportsDefault(definition)) {
           message.textContent = "Restart LEXEDITOR to enable this newly added setting."; return;
@@ -2900,18 +2893,18 @@
         message.textContent = `${definition.title} will become the packaged default when you save.`;
       };
       for (const definition of definitions) {
-        if (definition.scope === "lexer") {
+        if (definition.scope === "packaged") {
           const supported = supportsDefault(definition);
           const wrapped = makeControl(definition, initialValue(definition, true),
             `lex-default-${definition.key}`);
           defaultControls.set(definition.key, wrapped);
           const card = element("section", {
-            class:"lex-global-setting lex-lexer-setting lex-lexer-only-setting", hidden:true,
+            class:"lex-global-setting lex-developer-setting lex-packaged-setting", hidden:true,
           }, element("div", {class:"lex-setting-copy"},
             element("label", {for:`lex-default-${definition.key}`}, definition.title),
             element("p", {}, `${definition.description}${supported ? "" : " Restart LEXEDITOR to enable this newly added setting."}`)), wrapped);
           card.dataset.lexSettingSupported = String(supported);
-          lexerLane.append(card);
+          developerLane.append(card);
           defaultCards.push(card);
           continue;
         }
@@ -2926,7 +2919,7 @@
         const defaultWrapped = makeControl(definition, initialValue(definition, true), `lex-default-${definition.key}`);
         defaultControls.set(definition.key, defaultWrapped);
         const defaultControl = element("label", {
-          class:"lex-setting-default-control lex-lexer-setting", hidden:true,
+          class:"lex-setting-default-control lex-developer-setting", hidden:true,
           for:`lex-default-${definition.key}`, title:"Default for every user",
         }, element("span", {}, "DEFAULT"), defaultWrapped);
         defaultControl.dataset.lexSettingSupported = String(defaultSupported);
@@ -2936,14 +2929,12 @@
         defaultCards.push(defaultControl);
         copy.addEventListener("dblclick", event => { event.preventDefault(); copyToDefault(definition, defaultControl); });
       }
-      lexerMode.addEventListener("change", setDefaultVisibility);
       setDefaultVisibility();
       let savedSettings = clone(settings);
       settingsDirtyCount = () => {
         let dirty = supportedOrdinaryDefinitions.reduce((total, definition) => total + Number(
           readControl(definition, currentControls.get(definition.key)) !== savedSettings[definition.key]), 0);
-        dirty += Number(lexerMode.checked !== !!savedSettings.lexerMode);
-        if (lexerMode.checked && !lexerMode.disabled) {
+        if (developerActive) {
           dirty += supportedDefaultDefinitions.reduce((total, definition) => total + Number(
             readControl(definition, defaultControls.get(definition.key)) !== savedSettings.defaultValues?.[definition.key]), 0);
         }
@@ -2954,9 +2945,7 @@
           currentControls.get(definition.key), savedSettings[definition.key]));
         supportedDefaultDefinitions.forEach(definition => writeControl(definition,
           defaultControls.get(definition.key), savedSettings.defaultValues?.[definition.key]));
-        lexerMode.checked = !!savedSettings.lexerMode;
         setDefaultVisibility();
-        developerSetting.classList.toggle("active-developer-setting", developerMode.checked);
         message.textContent = "Restored the last saved settings.";
       };
       const save = settingsSaveControl({
@@ -2966,11 +2955,11 @@
           try {
             const values = Object.fromEntries(supportedOrdinaryDefinitions.map(definition =>
               [definition.key, readControl(definition, currentControls.get(definition.key))]));
-            settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", {...values, lexerMode: lexerMode.checked}));
-            if (lexerMode.checked) {
+            settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", values));
+            if (developerActive) {
               const defaults = Object.fromEntries(supportedDefaultDefinitions.map(definition =>
                 [definition.key, readControl(definition, defaultControls.get(definition.key))]));
-              settings = rememberSharedSettings(await callWindow("save_lexer_setting_defaults", defaults));
+              settings = rememberSharedSettings(await callWindow("save_developer_setting_defaults", defaults));
             }
             savedSettings = clone(settings);
             window.dispatchEvent(new CustomEvent("lexeditor-settings-changed", {detail: settings}));
@@ -2983,13 +2972,9 @@
         },
         discard: restoreSettings,
       });
-      const developerMode = controlNode(currentControls.get("developerMode"));
-      const developerSetting = developerMode.closest(".lex-global-setting");
-      developerSetting.classList.toggle("active-developer-setting", developerMode.checked);
-      developerMode.addEventListener("change", () => developerSetting.classList.toggle("active-developer-setting", developerMode.checked));
       const dialogChildren = [
         heading,
-        element("div", {class:"lex-settings-columns"}, userLane, developerLane, lexerLane),
+        element("div", {class:"lex-settings-columns"}, userLane, developerLane),
       ];
       dialogChildren.push(message, element("div", {class: "lex-dialog-actions"}, save));
       dialog.replaceChildren(...dialogChildren);
