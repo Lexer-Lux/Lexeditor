@@ -24,6 +24,18 @@ Picking up a casing should show the correct item notification and icon.
 
 **Status: Not ready for a fresh retest.** The earlier icon repair did not settle the pickup path; its later correction in #222 still lacks an installed handoff. Complete that delivery before asking you to repeat this dependent check.
 
+## issue 5356300695 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/174
+
+Created: 2026-08-06T03:26:49Z; updated: 2026-09-06T13:54:43Z
+
+Exact metadata: [source record](sources/issue-5356300695-64c82f44d32eeebb9a26fb30bf991e6e247ad665a0c03fd0ad99d74ab8fdfc07.json).
+
+Picking up a casing should show the correct item notification and icon.
+
+**Status: Not ready for a fresh retest.** The earlier icon repair did not settle the pickup path; its later correction in #222 still lacks an installed handoff. Complete that delivery before asking you to repeat this dependent check.
+
 ## comment 5550128970 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/174#issuecomment-5550128970

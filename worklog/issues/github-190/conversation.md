@@ -25,6 +25,18 @@ When Tagged Only On Minimap is enabled, untagged enemies and animals must stay h
 
 **Status: Still broken.** The latest report found hostile wolves appearing as ordinary red dots immediately after howling. Investigate that concrete case; no newer successful repair is recorded.
 
+## issue 5356304474 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/190
+
+Created: 2026-08-06T04:36:15Z; updated: 2026-09-06T13:57:48Z
+
+Exact metadata: [source record](sources/issue-5356304474-89f035bd1a1eaff621dce7c330ce80c24a327590306da72c33d9a37a94c7b997.json).
+
+When Tagged Only On Minimap is enabled, untagged enemies and animals must stay hidden. Turning it off allows normal vanilla markers alongside tags.
+
+**Status: Still broken.** The latest report found hostile wolves appearing as ordinary red dots immediately after howling. Investigate that concrete case; no newer successful repair is recorded.
+
 ## comment 5550133062 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/190#issuecomment-5550133062

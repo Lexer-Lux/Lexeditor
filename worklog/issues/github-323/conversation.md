@@ -30,6 +30,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/323
 
 Created: 2026-09-04T06:32:42Z; updated: 2026-09-06T14:09:33Z
 
+Exact metadata: [source record](sources/issue-5356485731-531060e297644914e2671f1b1831b11cf872bebc066b8130717d749cb5381320.json).
+
+Add an optional Reptile tweak. While enabled, let enemies be tagged as reptiles in the Enemies editor. Each ice move used on a reptile multiplies its ATB speed by **0.92**; each fire move multiplies it by **1.08**.
+
+**Status: Implementation remains.** These rules are already specified; no replacement design is needed.
+
+## issue 5356485731 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/323
+
+Created: 2026-09-04T06:32:42Z; updated: 2026-09-06T14:09:33Z
+
 Exact metadata: [source record](sources/issue-5356485731-5984909c194361d2da6d321d7e3d59ed0220b55b58a8ec11b5c270c8022d8a8b.json).
 
 Add an optional Reptile tweak. While enabled, let enemies be tagged as reptiles in the Enemies editor. Each ice move used on a reptile multiplies its ATB speed by **0.92**; each fire move multiplies it by **1.08**.

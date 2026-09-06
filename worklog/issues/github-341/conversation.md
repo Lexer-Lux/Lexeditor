@@ -24,6 +24,18 @@ Exact metadata: [source record](sources/issue-5356489261-2a34b64cc0d9051c195bd8d
 
 Prepare one named shop/item, a known test value and the exact deployment/revert steps before asking you to visit it. An editor save/readback alone does not prove the shop changed in game.
 
+## issue 5356489261 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/341
+
+Created: 2026-08-24T16:26:53Z; updated: 2026-09-06T12:39:00Z
+
+Exact metadata: [source record](sources/issue-5356489261-86d60b6c49703524d5632d67af4fdadab00f1178b39802b19c6ea1ad35f72bff.json).
+
+**Status: Shops editing is implemented; in-game delivery remains unverified.** The editor supports stock, purchase quantities and price modifiers for 20 shops.
+
+Prepare one named shop/item, a known test value and the exact deployment/revert steps before asking you to visit it. An editor save/readback alone does not prove the shop changed in game.
+
 ## comment 5550350838 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/341#issuecomment-5550350838

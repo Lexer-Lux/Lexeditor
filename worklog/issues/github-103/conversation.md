@@ -25,6 +25,19 @@ Exact metadata: [source record](sources/issue-5356284426-5a7600b9c1e6ae2f6fe8ce3
 - [ ] Restart Story Mode, take control of a horse-drawn wagon and drive it. Confirm a proper horse-stamina icon appears in the lower-left HUD, not a white square, and stamina decreases during sustained exertion.
 - [ ] Stop and check recovery. Report the wagon, incorrect behavior and a screenshot showing the HUD position.
 
+## issue 5356284426 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/103
+
+Created: 2026-08-06T01:21:14Z; updated: 2026-09-06T13:57:32Z
+
+Exact metadata: [source record](sources/issue-5356284426-d94d825cff604db2555363f2841c81267f865412fd1bbc6da38d231d90fdc18b.json).
+
+**Status: A candidate is installed; the earlier white-square icon failure is not yet accepted as fixed.**
+
+- [ ] Restart Story Mode, take control of a horse-drawn wagon and drive it. Confirm a proper horse-stamina icon appears in the lower-left HUD, not a white square, and stamina decreases during sustained exertion.
+- [ ] Stop and check recovery. Report the wagon, incorrect behavior and a screenshot showing the HUD position.
+
 ## comment 5550109586 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/103#issuecomment-5550109586

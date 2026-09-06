@@ -25,6 +25,18 @@ Casings, hulls, empty bottles and .225 AP ammunition need clear, appropriate art
 
 **Status: The latest report says the icons appear but look poor.** This is now an artwork-quality task, not simply missing images. Prepare replacement previews before asking you to approve a design.
 
+## issue 5356286186 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/111
+
+Created: 2026-08-06T01:39:42Z; updated: 2026-09-06T13:57:38Z
+
+Exact metadata: [source record](sources/issue-5356286186-54843dcad23a475582511f1882ac2bc92427c26bcda8480e9d9a4eaf0baef992.json).
+
+Casings, hulls, empty bottles and .225 AP ammunition need clear, appropriate artwork in the editor and game.
+
+**Status: The latest report says the icons appear but look poor.** This is now an artwork-quality task, not simply missing images. Prepare replacement previews before asking you to approve a design.
+
 ## comment 5550111811 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/111#issuecomment-5550111811

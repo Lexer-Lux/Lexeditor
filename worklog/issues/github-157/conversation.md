@@ -24,6 +24,18 @@ Exact metadata: [source record](sources/issue-5356297223-65ea1f89f34b09958c84786
 
 Audit the reported omissions and prepare a truthful display approach that preserves the real quantities. No new satchel view is ready to test.
 
+## issue 5356297223 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/157
+
+Created: 2026-08-06T02:40:08Z; updated: 2026-09-06T13:54:00Z
+
+Exact metadata: [source record](sources/issue-5356297223-9a0d4d5e3de59c55cac91d522300de7605b6de271df1a05e43d0b9b0f8e8cad1.json).
+
+**Status: Research only.** Ammunition uses weapon-ammo storage rather than ordinary provision stacks; changing a catalog category alone does not guarantee a valid satchel row.
+
+Audit the reported omissions and prepare a truthful display approach that preserves the real quantities. No new satchel view is ready to test.
+
 ## comment 5550125035 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/157#issuecomment-5550125035

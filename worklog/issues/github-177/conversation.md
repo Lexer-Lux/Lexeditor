@@ -44,6 +44,18 @@ Exact metadata: [source record](sources/issue-5356301343-a4ba961b2bd5653c4058c37
 
 The remaining question needs a synchronized core-value trace and video to distinguish artwork stepping from update timing. Prepare the recording tool and exact restoration/drain sequence first. No smoothing change is ready to test.
 
+## issue 5356301343 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/177
+
+Created: 2026-08-06T03:32:27Z; updated: 2026-09-06T13:55:21Z
+
+Exact metadata: [source record](sources/issue-5356301343-17098996ca4746c38181ebb534477c9d47248c4da482cf51780188a2e0749b70.json).
+
+**Status: Static research and HUD extraction are complete.** The core artwork has 16 staged states; repeating the OpenIV inspection is unnecessary.
+
+The remaining question needs a synchronized core-value trace and video to distinguish artwork stepping from update timing. Prepare the recording tool and exact restoration/drain sequence first. No smoothing change is ready to test.
+
 ## comment 5550129676 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/177#issuecomment-5550129676

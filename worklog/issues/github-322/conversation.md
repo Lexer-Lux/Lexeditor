@@ -54,6 +54,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/322
 
 Created: 2026-09-04T06:32:34Z; updated: 2026-09-06T14:09:33Z
 
+Exact metadata: [source record](sources/issue-5356485585-5a5df8f8b5318725481ef18a10a1af49caa11feb05f1d7079d7e60d69a1b7c02.json).
+
+Add an optional tweak so mugged enemies still give their normal item drops on death.
+
+**Actionable.** The requested behavior is specified; implementation and verification remain, not another explanation from you.
+
+## issue 5356485585 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/322
+
+Created: 2026-09-04T06:32:34Z; updated: 2026-09-06T14:09:33Z
+
 Exact metadata: [source record](sources/issue-5356485585-e23ce5a6586b73f082705e2d4a3b794f836a678de4336f25352f187a5b861c0a.json).
 
 Add an optional tweak so mugged enemies still give their normal item drops on death.

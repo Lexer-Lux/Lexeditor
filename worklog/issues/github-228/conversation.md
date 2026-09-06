@@ -26,3 +26,15 @@ Exact metadata: [source record](sources/issue-5356314173-0cabbbfaade7992e469b197
 **Actionable — research remains.** No verified data field or working hook for the maximum bounty has been found. The missing implementation is not proof that every approach is unfeasible.
 
 No functional setting or player test is available yet.
+
+## issue 5356314173 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/228
+
+Created: 2026-08-07T08:48:02Z; updated: 2026-09-06T13:31:38Z
+
+Exact metadata: [source record](sources/issue-5356314173-de23f3626e31722dd718637801248bffedd434935098b3533affe91d598cc58b.json).
+
+**Actionable — research remains.** No verified data field or working hook for the maximum bounty has been found. The missing implementation is not proof that every approach is unfeasible.
+
+No functional setting or player test is available yet.

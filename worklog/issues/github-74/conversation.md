@@ -23,3 +23,15 @@ Exact metadata: [source record](sources/issue-5306527037-26fcb8bebf3d0b04d22f3b1
 Items, effects, equipment, abilities, actions, character stats, shops and synthesis have initial editing support.
 
 **Work remains:** integrate the remaining data, especially enemies/encounters, and prove saved overrides load in game. Data Map must distinguish editable areas from placeholders. Existing tables do not establish complete FF9 support.
+
+## issue 5306527037 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/74
+
+Created: 2026-09-01T01:04:04Z; updated: 2026-09-06T12:45:36Z
+
+Exact metadata: [source record](sources/issue-5306527037-5f4c44fdf546869b5529bc93269cce31ecc4e46925e6556b67e08169fd7b8275.json).
+
+Items, effects, equipment, abilities, actions, character stats, shops and synthesis have initial editing support.
+
+**Work remains:** integrate the remaining data, especially enemies/encounters, and prove saved overrides load in game. Data Map must distinguish editable areas from placeholders. Existing tables do not establish complete FF9 support.

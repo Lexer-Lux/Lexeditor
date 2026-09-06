@@ -39,6 +39,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/14
 
 Created: 2026-08-20T11:38:08Z; updated: 2026-09-06T13:06:24Z
 
+Exact metadata: [source record](sources/issue-5202953146-23bec9b8c3e1154e8c048ee7376001378e38d226c9df3f793611bcc623dd3b36.json).
+
+**Status: Implemented; needs your check.** The owner-only GitHub tab contains the issue list, editable issue and comments, with a ! priority toggle.
+
+- [ ] Restart Lexeditor, open a game’s GitHub tab and switch status subtabs. Confirm issues are readable on one line and the selected issue matches GitHub.
+- [ ] On #357, toggle ! on and back off. Confirm the list updates immediately and the original priority is restored.
+- [ ] Open an issue with comments. Confirm the newest comment is visible, then return to the game tab without losing editor work. Report any mismatch or missing issue.
+
+## issue 5202953146 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/14
+
+Created: 2026-08-20T11:38:08Z; updated: 2026-09-06T13:06:24Z
+
 Exact metadata: [source record](sources/issue-5202953146-269538e98cc21470be8bc3f8c3c3662a4f54813c373b7151602e681734405da7.json).
 
 **Status: Implemented; needs your check.** The owner-only GitHub tab contains the issue list, editable issue and comments, with a ! priority toggle.

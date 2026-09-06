@@ -62,6 +62,20 @@ Exact metadata: [source record](sources/issue-5356305892-f25fbdbbd64257302af8c7a
 - [ ] Retrieve it: confirm the stored money returns once and the hat recovery markers disappear.
 - [ ] Repeat, but die again before recovery. Confirm only the newer recovery remains and the older money is permanently lost. Report the failed step.
 
+## issue 5356305892 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/195
+
+Created: 2026-08-06T05:59:31Z; updated: 2026-09-06T13:57:53Z
+
+Exact metadata: [source record](sources/issue-5356305892-a2e8dc0e2b47cc01e66f9f168b9c1434a58f34e5fb70924b589049f0cef73805.json).
+
+**Status: A hat-based recovery build is installed; confirmation remains.** Respawn placement is a separate issue in #244.
+
+- [ ] On a spare save with cash and a worn/recently worn hat, die. Confirm that hat and a bloodstained-hat marker appear near the death location, with the recovery warning.
+- [ ] Retrieve it: confirm the stored money returns once and the hat recovery markers disappear.
+- [ ] Repeat, but die again before recovery. Confirm only the newer recovery remains and the older money is permanently lost. Report the failed step.
+
 ## comment 5550134513 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/195#issuecomment-5550134513

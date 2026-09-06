@@ -24,6 +24,18 @@ Exact metadata: [source record](sources/issue-5356311501-1a1a3d7bff75e574706d2ae
 
 [Original screenshot](https://github.com/user-attachments/assets/d44d757d-1882-4906-8be9-00012b064019).
 
+## issue 5356311501 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/217
+
+Created: 2026-08-06T11:14:45Z; updated: 2026-09-06T13:57:29Z
+
+Exact metadata: [source record](sources/issue-5356311501-29ab55b5a75998cf9a46a2084b1c7b95fed41130ab4e67734b08242b0d36b7de.json).
+
+**Closed after the editor repair.** Case variants and repeated INI sections/keys merge into one Misc card, rather than showing or saving separate copies.
+
+[Original screenshot](https://github.com/user-attachments/assets/d44d757d-1882-4906-8be9-00012b064019).
+
 ## comment 5550140587 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/217#issuecomment-5550140587

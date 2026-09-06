@@ -31,3 +31,15 @@ Exact metadata: [source record](sources/issue-5356169067-3fa3f8297ffcaa35cec51af
 Warband repair is in PR #361, not yet merged: structured editing, read-only views, source-only access and missing files have distinct labels and links. Data Map uses the shared fitted pager; rendered checks pass at three window sizes.
 
 **Still needs development:** audit and repair the same claims/layouts in the other plugins. They were deliberately left untouched during parallel game work. The full cross-plugin issue remains open; no design decision is needed from you.
+
+## issue 5356169067 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/98
+
+Created: 2026-09-05T06:31:30Z; updated: 2026-09-06T13:02:32Z
+
+Exact metadata: [source record](sources/issue-5356169067-e91b241382f536892fa0d399492489c218fd5478ab0e88e22fe43635e01d2009.json).
+
+Warband repair is in PR #361, not yet merged: structured editing, read-only views, source-only access and missing files have distinct labels and links. Data Map uses the shared fitted pager; rendered checks pass at three window sizes.
+
+**Still needs development:** audit and repair the same claims/layouts in the other plugins. They were deliberately left untouched during parallel game work. The full cross-plugin issue remains open; no design decision is needed from you.

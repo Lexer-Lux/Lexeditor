@@ -79,8 +79,8 @@ def store(number: int, kind: str, record: dict) -> Path:
 class AttachmentRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, url):
         host = urllib.parse.urlparse(url).hostname or ''
-        if not (host == 'github.com' or host.endswith('.githubusercontent.com')):
-            raise RuntimeError('Unexpected attachment redirect host')
+        if not (host == 'github.com' or host.endswith('.githubusercontent.com') or re.fullmatch(r'github-production-user-asset-[a-z0-9-]+[.]s3[.]amazonaws[.]com', host)):
+            raise RuntimeError('Unexpected attachment redirect host: ' + host)
         return super().redirect_request(req, fp, code, msg, headers, url)
 
 

@@ -45,6 +45,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/80
 
 Created: 2026-09-02T00:46:07Z; updated: 2026-09-06T12:45:45Z
 
+Exact metadata: [source record](sources/issue-5318381754-4ef59f8e3cc023f61d1ba53b11a548af624b0b710c0073edabf41189c48acbb7.json).
+
+One optional Improved Interface tweak should add safe text reveal/history/fast-forward, full-width ATB/Trance with HP/MP bars, and a distinct prompt for unbeaten card opponents. Include keyboard equivalents.
+
+**Work remains:** first reuse the capabilities Memoria already provides, then implement the gaps. Dialogue history must not replay scripts or rewards. No completed candidate is ready for your testing.
+
+## issue 5318381754 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/80
+
+Created: 2026-09-02T00:46:07Z; updated: 2026-09-06T12:45:45Z
+
 Exact metadata: [source record](sources/issue-5318381754-f475668744d9a3a2994141bca7547401d7c7ffe94b0e470821930801ca1d072d.json).
 
 One optional Improved Interface tweak should add safe text reveal/history/fast-forward, full-width ATB/Trance with HP/MP bars, and a distinct prompt for unbeaten card opponents. Include keyboard equivalents.

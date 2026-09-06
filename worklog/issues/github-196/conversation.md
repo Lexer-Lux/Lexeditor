@@ -33,6 +33,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/196
 
 Created: 2026-08-06T05:59:32Z; updated: 2026-09-06T12:55:34Z
 
+Exact metadata: [source record](sources/issue-5356306245-0ab9f7cd44d3b262a0dd641a122eccf191d6c6477c2f06d726483390aa1a9c76.json).
+
+Each configured ammunition family should share one capacity across its variants; zero keeps vanilla per-variant limits.
+
+**Status: Dependent test preparation remains.** The ammo-count display in #194 still needs delivery. Then prepare the Revolver=100 mixed-ammo test with reliable before/after totals. Do not treat an unreadable or duplicated counter as proof of the cap.
+
+## issue 5356306245 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/196
+
+Created: 2026-08-06T05:59:32Z; updated: 2026-09-06T12:55:34Z
+
 Exact metadata: [source record](sources/issue-5356306245-aeec9e3f5c88ac9ba81efe020158984816359be37ae03d289d52f8b87927c88a.json).
 
 Each configured ammunition family should share one capacity across its variants; zero keeps vanilla per-variant limits.

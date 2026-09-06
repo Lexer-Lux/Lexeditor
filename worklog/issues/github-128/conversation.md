@@ -33,6 +33,19 @@ Exact metadata: [source record](sources/issue-5356290597-98eb6c6eb4075fdf87ad1a0
 - [ ] Restart Story Mode with room for ammunition. Walk over a defeated enemy without looting: your reserve should not increase merely from proximity.
 - [ ] Loot the corpse deliberately and confirm normal eligible loot still works. Report the weapon/ammo and which action changed its count. Mission-specific behavior remains protected.
 
+## issue 5356290597 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/128
+
+Created: 2026-08-06T02:04:47Z; updated: 2026-09-06T13:53:59Z
+
+Exact metadata: [source record](sources/issue-5356290597-7f57aa26c786731f45959a490fcd60801a06e23cf670f51605d84b3911445545.json).
+
+**Status: The change is now part of the main overhaul, not a separate mod.**
+
+- [ ] Restart Story Mode with room for ammunition. Walk over a defeated enemy without looting: your reserve should not increase merely from proximity.
+- [ ] Loot the corpse deliberately and confirm normal eligible loot still works. Report the weapon/ammo and which action changed its count. Mission-specific behavior remains protected.
+
 ## comment 5550117052 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/128#issuecomment-5550117052

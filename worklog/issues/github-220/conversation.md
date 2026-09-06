@@ -26,6 +26,18 @@ Exact metadata: [source record](sources/issue-5356312308-56a873da272a05f426fcca8
 
 A first/third-person vehicle toggle is described in the latest note, but its installation and usable test handoff are not established. Verify that candidate before requesting another wagon/cart/buggy test; do not repeat accepted foot/horse checks.
 
+## issue 5356312308 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/220
+
+Created: 2026-08-06T18:49:52Z; updated: 2026-09-06T12:56:00Z
+
+Exact metadata: [source record](sources/issue-5356312308-d1757bd2638e5f2c13fcf17f116db4d8b86d3f84ada53055d45a7b5cfc419bc2.json).
+
+**Status: You already confirmed two camera modes work on foot and horseback.** The remaining failure was V doing nothing in vehicles.
+
+A first/third-person vehicle toggle is described in the latest note, but its installation and usable test handoff are not established. Verify that candidate before requesting another wagon/cart/buggy test; do not repeat accepted foot/horse checks.
+
 ## comment 5550141339 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/220#issuecomment-5550141339

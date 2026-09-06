@@ -20,6 +20,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/272
 
 Created: 2026-08-11T04:37:34Z; updated: 2026-09-06T13:31:59Z
 
+Exact metadata: [source record](sources/issue-5356326236-c514ef3bb06b906c1c499d3776264bcf7d8ca380532b1548e59ced1759cba619.json).
+
+Inactive camps need black smoke; active camps need white smoke, with one plume per site and clean removal.
+
+**Actionable — latest timing repair is source-only.** The one-second initialization delay was reduced, but the change is not installed. No new timing test is ready.
+
+[Original screenshot](https://github.com/user-attachments/assets/96d65a03-6274-4478-9b89-4efc0aa4ab19).
+
+## issue 5356326236 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/272
+
+Created: 2026-08-11T04:37:34Z; updated: 2026-09-06T13:31:59Z
+
 Exact metadata: [source record](sources/issue-5356326236-ef31d7cab098ffdf66c9892de8559d61143130dc00034b2b06c7904cce2c364e.json).
 
 Inactive camps need black smoke; active camps need white smoke, with one plume per site and clean removal.

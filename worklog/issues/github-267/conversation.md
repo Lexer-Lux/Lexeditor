@@ -24,6 +24,18 @@ While aiming, X should switch smoothly between comparably offset left and right 
 
 **Status: Latest retest still failed.** Merely crossing the centerline is not success. Fix the settled positions and transition before requesting another shoulder-switch check.
 
+## issue 5356324593 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/267
+
+Created: 2026-08-11T02:12:52Z; updated: 2026-09-06T12:56:56Z
+
+Exact metadata: [source record](sources/issue-5356324593-a6858f0c4ce6c95dbc7b78f157095b5034939ee6605f20b85451c594ce77553b.json).
+
+While aiming, X should switch smoothly between comparably offset left and right shoulders—not far-left and centered.
+
+**Status: Latest retest still failed.** Merely crossing the centerline is not success. Fix the settled positions and transition before requesting another shoulder-switch check.
+
 ## comment 5550156674 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/267#issuecomment-5550156674

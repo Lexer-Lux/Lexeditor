@@ -36,6 +36,20 @@ Exact metadata: [source record](sources/issue-5287107844-1841bf675ddd1036297e71b
 - [ ] Restore the window. Drag the top strip and each edge/corner; all should move or resize normally.
 - [ ] Close and reopen once while restored, then once while maximized. Confirm position, size and maximized state return correctly. Report the transition that fails.
 
+## issue 5287107844 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/49
+
+Created: 2026-08-29T14:28:15Z; updated: 2026-09-06T13:06:50Z
+
+Exact metadata: [source record](sources/issue-5287107844-eb0dd0301834a7f9f67fcf13db17177d97bfb02f9ee74303db5adce80cf6d477.json).
+
+**Status: Repairs and window-state persistence are ready for review.**
+
+- [ ] Restart Lexeditor, maximize it, then drag the top strip. It should remain maximized and respect the taskbar area.
+- [ ] Restore the window. Drag the top strip and each edge/corner; all should move or resize normally.
+- [ ] Close and reopen once while restored, then once while maximized. Confirm position, size and maximized state return correctly. Report the transition that fails.
+
 ## comment 5462995958 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/49#issuecomment-5462995958

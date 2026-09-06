@@ -27,6 +27,16 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/279
 
 Created: 2026-08-12T13:35:53Z; updated: 2026-09-06T13:18:38Z
 
+Exact metadata: [source record](sources/issue-5356328089-a2f945efe29a7c10968f851823e51894f76dfb3f12a90ec577230fa65bcd3285.json).
+
+**Status: Not implemented with the tested movement control.** It supplies a limited relative gait multiplier, not an absolute metres-per-second speed or exact crouch/sprint multiples. Forced velocity/position workarounds were rejected after visible failures; the nonfunctional substitute was removed.
+
+## issue 5356328089 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/279
+
+Created: 2026-08-12T13:35:53Z; updated: 2026-09-06T13:18:38Z
+
 Exact metadata: [source record](sources/issue-5356328089-aca3491aabc8b35c3e108224c5c59791cf8ffc6d307a8ee575526bfb6ae65ddf.json).
 
 **Status: Not implemented with the tested movement control.** It supplies a limited relative gait multiplier, not an absolute metres-per-second speed or exact crouch/sprint multiples. Forced velocity/position workarounds were rejected after visible failures; the nonfunctional substitute was removed.

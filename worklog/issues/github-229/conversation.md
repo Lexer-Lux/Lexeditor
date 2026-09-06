@@ -27,3 +27,15 @@ Exact metadata: [source record](sources/issue-5356314417-3fedd47cf79f1184cce1b26
 **Actionable — replacement approach needed.** Disabling scenario points left visible plants that could not be picked; that failed implementation remains disabled.
 
 A real placement/spawn solution still needs research. There is no new candidate to test, and failure of the scenario-only method does not prove the entire request impossible.
+
+## issue 5356314417 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/229
+
+Created: 2026-08-07T08:48:03Z; updated: 2026-09-06T13:31:40Z
+
+Exact metadata: [source record](sources/issue-5356314417-6f5b1faf56b3275e728c239655f295d568863c953fb61a6ec344fdb13fc6ab14.json).
+
+**Actionable — replacement approach needed.** Disabling scenario points left visible plants that could not be picked; that failed implementation remains disabled.
+
+A real placement/spawn solution still needs research. There is no new candidate to test, and failure of the scenario-only method does not prove the entire request impossible.

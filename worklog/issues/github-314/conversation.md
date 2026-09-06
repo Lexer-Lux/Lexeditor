@@ -40,6 +40,19 @@ Exact metadata: [source record](sources/issue-5356484204-02037d0add882e8e009e295
 - [ ] Enable Draw Once Per Enemy and Streamlined Draw, save and enter a battle with two drawable enemies while below the stock cap. Draw from each in turn: using the first must not disable the second; Draw should disable only when no valid target remains.
 - [ ] Use Irvine’s Shoot: it should consume ammunition and the configured fraction of ATB per shot. Cancel and confirm the next command works. Report the command and failed step.
 
+## issue 5356484204 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/314
+
+Created: 2026-08-29T15:23:56Z; updated: 2026-09-06T12:59:35Z
+
+Exact metadata: [source record](sources/issue-5356484204-6662547e7214161a70c553dcd59d716633d3be4fd5e901185ede500e537dbd0d.json).
+
+**Status: Partial.** Latest Draw tracking and Shoot repairs are installed; GF spellbooks (#93) and remaining custom-command behavior are unfinished.
+
+- [ ] Enable Draw Once Per Enemy and Streamlined Draw, save and enter a battle with two drawable enemies while below the stock cap. Draw from each in turn: using the first must not disable the second; Draw should disable only when no valid target remains.
+- [ ] Use Irvine’s Shoot: it should consume ammunition and the configured fraction of ATB per shot. Cancel and confirm the next command works. Report the command and failed step.
+
 ## comment 5550345126 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/314#issuecomment-5550345126

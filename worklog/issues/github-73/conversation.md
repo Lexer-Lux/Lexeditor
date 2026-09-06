@@ -38,6 +38,18 @@ Exact metadata: [source record](sources/issue-5306402966-4091755405402f907e40f49
 
 FF7/FF8 need separate FFNx settings subtabs with backups and preserved unknown settings. FF9 should instead direct you to Memoria’s existing launcher, as you already decided. Integration and the FF9 Play handoff remain; no further design approval is needed.
 
+## issue 5306402966 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/73
+
+Created: 2026-09-01T00:42:35Z; updated: 2026-09-06T13:30:58Z
+
+Exact metadata: [source record](sources/issue-5306402966-c187b1c9f17d961f0d4c18fc043f423b6c9529ac04d61f2fb59abcc36d745883.json).
+
+**Actionable — partly implemented.** FF8 controls exist. FF7’s subtab and safer refresh handling are in unmerged PR #359.
+
+FF7/FF8 need separate FFNx settings subtabs with backups and preserved unknown settings. FF9 should instead direct you to Memoria’s existing launcher, as you already decided. Integration and the FF9 Play handoff remain; no further design approval is needed.
+
 ## comment 5486891895 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/73#issuecomment-5486891895

@@ -31,6 +31,18 @@ Determine what duration category changes independently of effect behavior and du
 
 **Status: The probe is not shown as built or installed.** Create the contrasting test items, expected timing sheet and safe restore procedure first. Human observation will be needed afterward, but test preparation is not your task.
 
+## issue 5356296027 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/151
+
+Created: 2026-08-06T02:35:29Z; updated: 2026-09-06T13:55:11Z
+
+Exact metadata: [source record](sources/issue-5356296027-9c73aac84f9ad5e0daa953c54647d6d434eb5044232d95e0a851f97b4051ba41.json).
+
+Determine what duration category changes independently of effect behavior and duration.
+
+**Status: The probe is not shown as built or installed.** Create the contrasting test items, expected timing sheet and safe restore procedure first. Human observation will be needed afterward, but test preparation is not your task.
+
 ## comment 5550123622 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/151#issuecomment-5550123622

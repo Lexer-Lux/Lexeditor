@@ -45,6 +45,18 @@ Support prone equipping, aiming, firing, reloading and binocular use without los
 
 **Status: The one-handed test failed.** Reusing unchanged clips did not work. A compatible animation/export workflow and modified or authored upper-body poses are needed. Asset creation is development work, not a reason to leave you with an unspecified test.
 
+## issue 5356299318 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/167
+
+Created: 2026-08-06T02:52:16Z; updated: 2026-09-06T13:56:41Z
+
+Exact metadata: [source record](sources/issue-5356299318-a3c08f293715640463e83f01171f1d51b953a2515fb56030263ef71136f2c991.json).
+
+Support prone equipping, aiming, firing, reloading and binocular use without losing reticle tracking or breaking the pose.
+
+**Status: The one-handed test failed.** Reusing unchanged clips did not work. A compatible animation/export workflow and modified or authored upper-body poses are needed. Asset creation is development work, not a reason to leave you with an unspecified test.
+
 ## comment 5550127477 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/167#issuecomment-5550127477

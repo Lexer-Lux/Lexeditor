@@ -27,6 +27,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/12
 
 Created: 2026-08-20T11:18:29Z; updated: 2026-09-06T12:45:01Z
 
+Exact metadata: [source record](sources/issue-5202798806-3ab3ff87ed4b570f5ec0ccc327f4aa7a811b84644a571e117bad5dcd455d834d.json).
+
+RDR2's active main tab and full subtab row now form one continuous red surface, with a clear underline on the active subtab.
+
+- [ ] Restart Lexeditor. Open RDR2 Effects and switch between Effects and Behavior IDs, then check Crafting.
+- [ ] Confirm the red surface has no seam or separate subtab boxes, and hover/focus remain visible. Send a screenshot of any mismatch.
+
+## issue 5202798806 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/12
+
+Created: 2026-08-20T11:18:29Z; updated: 2026-09-06T12:45:01Z
+
 Exact metadata: [source record](sources/issue-5202798806-b6e25820b9da3dc4324c72c6e00994d6797771a1b937768b7d4b39ce4ec37b0a.json).
 
 RDR2's active main tab and full subtab row now form one continuous red surface, with a clear underline on the active subtab.

@@ -23,3 +23,15 @@ Exact metadata: [source record](sources/issue-5360676717-43dbe36a74731b83a95ef9d
 When enabled, casting spells should not reduce their stock. Disabling it should restore normal consumption.
 
 **Status: Requested, not shown as implemented.** Build the per-mod tweak and verify its interaction with shared magic and stock caps before preparing a player test.
+
+## issue 5360676717 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/354
+
+Created: 2026-09-05T20:19:10Z; updated: 2026-09-06T13:00:08Z
+
+Exact metadata: [source record](sources/issue-5360676717-c100930ceee2e6d1d3a1f956676e720c0def614db4165d44eacb02c41de0bbfe.json).
+
+When enabled, casting spells should not reduce their stock. Disabling it should restore normal consumption.
+
+**Status: Requested, not shown as implemented.** Build the per-mod tweak and verify its interaction with shared magic and stock caps before preparing a player test.

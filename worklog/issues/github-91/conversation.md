@@ -24,6 +24,18 @@ Existing Triple Triad cards now support names, ranks, elements and selection pow
 
 **Incomplete:** creating/deleting card types still needs engine, artwork, deck, reward and save support; existing-card edits also need in-game validation. The current fixed-slot editor does not fulfil the whole request. The artwork/NPC-deck redesign remains #300.
 
+## issue 5349357854 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/91
+
+Created: 2026-09-04T14:33:25Z; updated: 2026-09-06T12:46:05Z
+
+Exact metadata: [source record](sources/issue-5349357854-fea455819da16b7e8661bf18fc72aad720a407f3af81b992857140d9dca10e7b.json).
+
+Existing Triple Triad cards now support names, ranks, elements and selection power.
+
+**Incomplete:** creating/deleting card types still needs engine, artwork, deck, reward and save support; existing-card edits also need in-game validation. The current fixed-slot editor does not fulfil the whole request. The artwork/NPC-deck redesign remains #300.
+
 ## comment 5549858497 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/91#issuecomment-5549858497

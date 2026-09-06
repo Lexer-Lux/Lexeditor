@@ -23,3 +23,15 @@ Exact metadata: [source record](sources/issue-5356485087-5b57c6e45c9401125e5b28d
 Offer optional restoration of verified censored or altered content in the supported release.
 
 **Status: Research remains.** Identify exact version/regional differences and prepare the proposed restorations before asking you to review them. No restoration patch is ready to test.
+
+## issue 5356485087 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/319
+
+Created: 2026-09-04T06:32:30Z; updated: 2026-09-06T12:59:45Z
+
+Exact metadata: [source record](sources/issue-5356485087-695d6c253dfd648b93f97a1690a7fa73084a4589f9ea8fa19aac835e56846ebd.json).
+
+Offer optional restoration of verified censored or altered content in the supported release.
+
+**Status: Research remains.** Identify exact version/regional differences and prepare the proposed restorations before asking you to review them. No restoration patch is ready to test.

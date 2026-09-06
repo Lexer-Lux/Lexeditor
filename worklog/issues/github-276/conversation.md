@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/276
 
 Created: 2026-08-12T11:57:29Z; updated: 2026-09-06T12:57:07Z
 
+Exact metadata: [source record](sources/issue-5356327296-58f45368aea2db222a3d005f3f2b6ebca65124499cf7c9837d9f52ac12d072bf.json).
+
+**Status: Research complete; no implementation yet.** The tonic requirement for late stages can be removed while making stage duration configurable.
+
+- [ ] Choose whether tonic remains an optional 2×/4×/8× accelerator, or the configured stage duration is exact and ignores tonic acceleration. Tonic will not be required for growth under either choice.
+
+## issue 5356327296 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/276
+
+Created: 2026-08-12T11:57:29Z; updated: 2026-09-06T12:57:07Z
+
 Exact metadata: [source record](sources/issue-5356327296-d8a5f33ff3bb828c51150c221fe5e9b95defcd54376d71cd4532ddcc04cb536c.json).
 
 **Status: Research complete; no implementation yet.** The tonic requirement for late stages can be removed while making stage duration configurable.

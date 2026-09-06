@@ -35,6 +35,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/27
 
 Created: 2026-08-29T10:46:25Z; updated: 2026-09-06T13:30:54Z
 
+Exact metadata: [source record](sources/issue-5286083262-80cb6e1f855a1bed086ee522de20d65519b0fa33708f448e392bf0f21cb7806f.json).
+
+**Needs testing.** The latest selector repair is ready for review.
+
+- [ ] Restart Lexeditor. Compare the closed mod selector with its selected dropdown row: name, colored icons and alignment should match.
+- [ ] Open Map and Info, then return. Confirm no duplicate Setup/Project tab or lost selection.
+- [ ] Create a disposable UI-test mod, then Browse back to your original. Confirm selection works and unsaved-change warnings protect edits. Report the failed step.
+
+## issue 5286083262 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/27
+
+Created: 2026-08-29T10:46:25Z; updated: 2026-09-06T13:30:54Z
+
 Exact metadata: [source record](sources/issue-5286083262-b9efb3d5527b183141adfb8069a1547df4a9c516c64104936eedbb039cf84230.json).
 
 **Needs testing.** The latest selector repair is ready for review.

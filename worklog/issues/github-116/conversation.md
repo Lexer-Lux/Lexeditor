@@ -25,6 +25,18 @@ Bullet trails should be visible by day and night, start at the weapon and not du
 
 **Status: Latest correction is source-only, not installed.** Its presentation is an impact-synchronized trail, not proven tracking of a live projectile. Deliver and verify the candidate before another visual test.
 
+## issue 5356287453 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/116
+
+Created: 2026-08-06T01:52:13Z; updated: 2026-09-06T13:57:39Z
+
+Exact metadata: [source record](sources/issue-5356287453-39f8263c87dbd0a62ea6b9a7d8fa5aecaceea6d48320a29dfa26aa96951fe979.json).
+
+Bullet trails should be visible by day and night, start at the weapon and not duplicate a second trail from the player’s eyes.
+
+**Status: Latest correction is source-only, not installed.** Its presentation is an impact-synchronized trail, not proven tracking of a live projectile. Deliver and verify the candidate before another visual test.
+
 ## comment 5550113264 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/116#issuecomment-5550113264

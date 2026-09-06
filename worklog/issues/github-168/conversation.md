@@ -28,6 +28,18 @@ Owned weapons and collectible hats should stop advertising themselves as new pic
 
 **Not working:** the weapon implementation was removed after repeated crash isolation. The hat path is also unfinished. Restore a safe implementation and prepare any necessary identification probe before asking you for a capture.
 
+## issue 5356299528 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/168
+
+Created: 2026-08-06T02:52:40Z; updated: 2026-09-06T13:55:14Z
+
+Exact metadata: [source record](sources/issue-5356299528-7ad272e3009a82e95a865027610cc78299cf288a0dad2ef38f156ccd295bdabf.json).
+
+Owned weapons and collectible hats should stop advertising themselves as new pickups.
+
+**Not working:** the weapon implementation was removed after repeated crash isolation. The hat path is also unfinished. Restore a safe implementation and prepare any necessary identification probe before asking you for a capture.
+
 ## comment 5550127614 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/168#issuecomment-5550127614

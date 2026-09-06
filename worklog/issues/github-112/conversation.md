@@ -22,6 +22,16 @@ Exact metadata: [source record](sources/issue-5356286403-8ecaa12b91742bdc8401ce6
 
 **Status: Closed design record.** You chose the simple campfire icon with its flame blacked out for inactive camps, not the stove variant. The last report here still showed black squares; complete map-artwork repair is tracked in #245. Do not treat that failed image check as acceptance.
 
+## issue 5356286403 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/112
+
+Created: 2026-08-06T01:41:37Z; updated: 2026-09-06T13:56:26Z
+
+Exact metadata: [source record](sources/issue-5356286403-741b2a1001091de81748cd370281ad34f83909ff27bec5b81374da44d9f774c3.json).
+
+**Status: Closed design record.** You chose the simple campfire icon with its flame blacked out for inactive camps, not the stove variant. The last report here still showed black squares; complete map-artwork repair is tracked in #245. Do not treat that failed image check as acceptance.
+
 ## comment 5550112096 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/112#issuecomment-5550112096

@@ -33,6 +33,19 @@ Exact metadata: [source record](sources/issue-5356295411-4ecb8a46281cea229265f5c
 - [ ] Reload Shops, select General Store and choose SELLS → Weapons → Revolvers. Combine the filter with a search, then choose All; confirm the correct rows appear.
 - [ ] Check that the tall Catalogue column is gone and price, availability and Acceptance Report controls remain usable. Report a wrong row, clipped control or inaccurate acceptance result.
 
+## issue 5356295411 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/148
+
+Created: 2026-08-06T02:31:38Z; updated: 2026-09-06T13:54:58Z
+
+Exact metadata: [source record](sources/issue-5356295411-48ca8bf43fad04efb3cacb5d7b00cfd2e40724f66f7d2719360a01f3a1ed3010.json).
+
+**Status: Latest Shops UI is ready for review.** The rejected full-page catalog experiment was completely reverted; it is not still awaiting your approval.
+
+- [ ] Reload Shops, select General Store and choose SELLS → Weapons → Revolvers. Combine the filter with a search, then choose All; confirm the correct rows appear.
+- [ ] Check that the tall Catalogue column is gone and price, availability and Acceptance Report controls remain usable. Report a wrong row, clipped control or inaccurate acceptance result.
+
 ## comment 5550122771 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/148#issuecomment-5550122771

@@ -28,6 +28,18 @@ Exact metadata: [source record](sources/issue-5356296830-f239a5193a7746d6d8c98ed
 
 Trace and explain the actual decision in plain language before proposing settings or a never-kill change. This remains exploratory; no new combat behavior is ready.
 
+## issue 5356296830 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/155
+
+Created: 2026-08-06T02:39:27Z; updated: 2026-09-06T13:54:35Z
+
+Exact metadata: [source record](sources/issue-5356296830-a9edf56224910c129f791f25d6298d95230404f9ba4dcd0cd0261f7fb693e4c5.json).
+
+**Status: The requested explanation is still outstanding.** Knockout exists, but lowering Unarmed damage alone does not guarantee nonlethal punches. Action-specific damage/reactions and shared health/knockout rules both matter.
+
+Trace and explain the actual decision in plain language before proposing settings or a never-kill change. This remains exploratory; no new combat behavior is ready.
+
 ## comment 5550124595 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/155#issuecomment-5550124595

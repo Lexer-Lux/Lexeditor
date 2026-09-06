@@ -27,6 +27,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/137
 
 Created: 2026-08-06T02:14:20Z; updated: 2026-09-06T12:47:11Z
 
+Exact metadata: [source record](sources/issue-5356292759-4438ee30863e625031fd423998603044dad68fee4caabe8e02f511c8fbabb185.json).
+
+Acquiring or discarding cigarettes must not grant a card. Smoking the actual premium cigarette should roll the configured chance, default 20%, preferring unowned cards until all 144 are owned. Existing cards and loose world pickups remain intact.
+
+**Status: The corrected smoking-trigger implementation is not verified installed.** Deliver it and prepare deterministic 0%/100% tests before another player check.
+
+## issue 5356292759 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/137
+
+Created: 2026-08-06T02:14:20Z; updated: 2026-09-06T12:47:11Z
+
 Exact metadata: [source record](sources/issue-5356292759-93291f7a2082b8c238730f1b7c409e4cd6aaccbd9027a6346cdd0fea1407215c.json).
 
 Acquiring or discarding cigarettes must not grant a card. Smoking the actual premium cigarette should roll the configured chance, default 20%, preferring unowned cards until all 144 are owned. Existing cards and loose world pickups remain intact.

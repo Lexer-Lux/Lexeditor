@@ -26,6 +26,18 @@ Exact metadata: [source record](sources/issue-5356298033-7c554347e846d25a354b852
 
 Independent amounts require intercepting the event before its identity is lost. Prove that implementation path and expose meaningful per-action controls; do not send the existing shared tiers back as a finished feature.
 
+## issue 5356298033 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/161
+
+Created: 2026-08-06T02:41:39Z; updated: 2026-09-06T13:55:46Z
+
+Exact metadata: [source record](sources/issue-5356298033-2ff9d702f45562db321933b2f40f18fba49abe265030cfdc23abb7c1cb1c806f.json).
+
+**Status: Incomplete.** The editor has action toggles and a separate shared-tier table, not the requested amount beside each action.
+
+Independent amounts require intercepting the event before its identity is lost. Prove that implementation path and expose meaningful per-action controls; do not send the existing shared tiers back as a finished feature.
+
 ## comment 5550125886 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/161#issuecomment-5550125886

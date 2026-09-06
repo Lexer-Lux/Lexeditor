@@ -56,3 +56,21 @@ Exact metadata: [source record](sources/issue-5347184723-052dfac35aa91d5811c6610
 Each game plugin needs its own technical codex in Lexeditor. New plugins should receive one automatically, with a check for missing documentation. Mod repositories keep distributable mod files, not duplicated research or attempt logs.
 
 **Status: Migration and validation remain unfinished.** No action from you is needed.
+
+## issue 5347184723 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/86
+
+Created: 2026-09-04T10:51:54Z; updated: 2026-09-06T14:03:00Z
+
+Exact metadata: [source record](sources/issue-5347184723-ef760e452a188d5809b7f21ecabd92a5dcd62f4cb475714000f6962ea274109b.json).
+
+**Status: Deferred at your request; consolidation is unfinished.** Keep actionable, not waiting. Do not resume migration or comment cleanup now.
+
+Merge all game/mod codices and legacy worklogs into Lexeditor: one codex per game for settled knowledge, and one worklog per issue for full requirements, decisions, progress and technical evidence. Add codex scaffolding/checks for new plugins.
+
+Preserve your complete original requests and attachments without summarizing away details. Migrate and verify all issue comments before deleting them. Keep GitHub brief, with accurate statuses and final action/test checklists for Waiting and Needs Testing; recover missing context before asking you to repeat it.
+
+After parallel work merges, reconcile new/changed notes without overwriting newer knowledge. Verify every source is accounted for before retiring old stores.
+
+[Full specification and preserved request](https://github.com/Lexer-Lux/Lexeditor/blob/master/worklog/issues/github-86/deferred-consolidation-spec.md).

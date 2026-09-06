@@ -23,6 +23,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/30
 
 Created: 2026-08-29T11:07:47Z; updated: 2026-09-06T13:06:43Z
 
+Exact metadata: [source record](sources/issue-5286177998-a0ecb0a620370988f9fdd0f3e10b16cc7ada4fe11269d0ba1d711ad386d6aaa4.json).
+
+**Status: Implemented; needs a visible Windows check.** Background tools should stay hidden; deliberately opened applications should not.
+
+- [ ] Fully restart Lexeditor, let game discovery finish, then open RDR1, RDR2 and Warband where installed. Confirm no command-prompt window flashes during preparation.
+- [ ] Report which action produced a window, or confirm none appeared. Normal Explorer/game windows are not failures.
+
+## issue 5286177998 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/30
+
+Created: 2026-08-29T11:07:47Z; updated: 2026-09-06T13:06:43Z
+
 Exact metadata: [source record](sources/issue-5286177998-fcca48b43ee339952459e76664fbd11ec1debcc6e42f92e33421795acc2443e0.json).
 
 **Status: Implemented; needs a visible Windows check.** Background tools should stay hidden; deliberately opened applications should not.

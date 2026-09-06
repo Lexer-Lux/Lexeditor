@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/309
 
 Created: 2026-08-30T20:50:32Z; updated: 2026-09-06T12:59:29Z
 
+Exact metadata: [source record](sources/issue-5356483398-f829148f46fcc76c8e8af846fff4b824f8567c288691c3e3f241dbf050de7e58.json).
+
+When a living party member is ready to choose an action, pause other party/enemy ATB filling. Resume only when nobody is ready, without freezing animations or unrelated battle work.
+
+**Status: A current delivered implementation is not established.** Verify the runtime and prepare a battle with clearly different Speed values before requesting acceptance.
+
+## issue 5356483398 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/309
+
+Created: 2026-08-30T20:50:32Z; updated: 2026-09-06T12:59:29Z
+
 Exact metadata: [source record](sources/issue-5356483398-f91f9766179fb19ef38f9376c44e25952704a43e5588cea40b78261abf93aa5e.json).
 
 When a living party member is ready to choose an action, pause other party/enemy ATB filling. Resume only when nobody is ready, without freezing animations or unrelated battle work.

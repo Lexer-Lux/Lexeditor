@@ -27,6 +27,20 @@ Exact metadata: [source record](sources/issue-5356290016-11cfe5a291dc59ebde748ee
 - [ ] At a recognized camp, open F7 Overflow Storage. Deposit One and Withdraw One; confirm carried and stored counts change by exactly one without duplication.
 - [ ] Save, quit and reload. Confirm stored beans persist and closing storage restores normal controls. Report the counts and failed step.
 
+## issue 5356290016 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/126
+
+Created: 2026-08-06T02:03:34Z; updated: 2026-09-06T13:57:30Z
+
+Exact metadata: [source record](sources/issue-5356290016-de740cda505c72af62a58577465c116710af8930e833496e2be489a396f57ac8.json).
+
+**Status: A Baked Beans prototype is installed, not general storage for every item.**
+
+- [ ] On a spare save, buy or collect Baked Beans beyond the carry limit. Confirm only the excess goes to storage and a notice explains it.
+- [ ] At a recognized camp, open F7 Overflow Storage. Deposit One and Withdraw One; confirm carried and stored counts change by exactly one without duplication.
+- [ ] Save, quit and reload. Confirm stored beans persist and closing storage restores normal controls. Report the counts and failed step.
+
 ## comment 5550116464 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/126#issuecomment-5550116464

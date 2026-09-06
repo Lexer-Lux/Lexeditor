@@ -29,3 +29,15 @@ Exact metadata: [source record](sources/issue-5356333185-73c4d31901bfcc912486d1e
 **Status: No reliable leg/coat-clearance solution is proven for the accepted physical prop rig.** Preserve that rig rather than replace it with an unstable workaround.
 
 A verified collision/cloth or custom-model path is needed to remove this limitation. Attachment angles and disappearing lanterns are separate defects in #348, not proof that leg clipping is fixed.
+
+## issue 5356333185 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/295
+
+Created: 2026-08-20T12:34:17Z; updated: 2026-09-06T12:57:21Z
+
+Exact metadata: [source record](sources/issue-5356333185-b09566885721524a3d5a776f17843f02269e86cbf160454cf62319d78b62eb27.json).
+
+**Status: No reliable leg/coat-clearance solution is proven for the accepted physical prop rig.** Preserve that rig rather than replace it with an unstable workaround.
+
+A verified collision/cloth or custom-model path is needed to remove this limitation. Attachment angles and disappearing lanterns are separate defects in #348, not proof that leg clipping is fixed.

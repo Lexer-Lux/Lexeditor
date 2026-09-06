@@ -20,6 +20,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/19
 
 Created: 2026-08-27T05:45:26Z; updated: 2026-09-06T13:06:26Z
 
+Exact metadata: [source record](sources/issue-5264309580-856edc91b399946ab6be09f3f8717cc6ff248cdd5d633805af0dd68627ed4f46.json).
+
+**Status: Layout and row-fitting fixes are ready for review.** Items, Shops and Missions should show complete entries, with details on the right.
+
+- [ ] Restart Lexeditor and open RDR1 Items. Select a record and drag the divider; confirm both panels remain usable without an empty right half.
+- [ ] Check Items, Shops and Missions at 1600×900 and 1280×720. Confirm the bottom list entry is complete and paging works. Report the affected view and screenshot.
+
+## issue 5264309580 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/19
+
+Created: 2026-08-27T05:45:26Z; updated: 2026-09-06T13:06:26Z
+
 Exact metadata: [source record](sources/issue-5264309580-96936019683ceaca2d75ed1081707f94f8d47328c371088167281d27ae5df841.json).
 
 **Status: Layout and row-fitting fixes are ready for review.** Items, Shops and Missions should show complete entries, with details on the right.

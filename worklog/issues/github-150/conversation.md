@@ -59,6 +59,18 @@ Exact metadata: [source record](sources/issue-5356295820-23339a84d6307e1569d4a92
 
 A controlled stationary/walk/sprint comparison is still needed before proposing rebalance values. Asking whether you want more work is not a blocker. Model assignments must not pretend to apply unsupported changes.
 
+## issue 5356295820 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/150
+
+Created: 2026-08-06T02:34:39Z; updated: 2026-09-06T13:55:22Z
+
+Exact metadata: [source record](sources/issue-5356295820-978e9b857779166c878f7237d489cc739b7eeb3af1411cb29a9a9d4274c11c40.json).
+
+**Actionable — validation remains.** Mobs exposes separate combat, accuracy, tactics and health data; there is no universal per-model stat record. The reported walking-target misses match a directional accuracy penalty that does not distinguish walking from sprinting.
+
+A controlled stationary/walk/sprint comparison is still needed before proposing rebalance values. Asking whether you want more work is not a blocker. Model assignments must not pretend to apply unsupported changes.
+
 ## comment 5550123298 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/150#issuecomment-5550123298

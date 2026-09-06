@@ -24,6 +24,18 @@ Newspaper markers should appear only when a newspaper can actually be bought, in
 
 **Status: The latest correction is source-only.** It restores the real newspaper sprite and controls the existing markers rather than creating private replacements. Build/install it before asking you to recheck the blank Index entry.
 
+## issue 5356309932 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/210
+
+Created: 2026-08-06T06:41:16Z; updated: 2026-09-06T13:57:54Z
+
+Exact metadata: [source record](sources/issue-5356309932-5971be690622aa3045c0afd16013da28c736117e42c7194022f952474f2db816.json).
+
+Newspaper markers should appear only when a newspaper can actually be bought, including their map Index entries.
+
+**Status: The latest correction is source-only.** It restores the real newspaper sprite and controls the existing markers rather than creating private replacements. Build/install it before asking you to recheck the blank Index entry.
+
 ## comment 5550138781 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/210#issuecomment-5550138781

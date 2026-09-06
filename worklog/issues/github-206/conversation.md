@@ -32,6 +32,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/206
 
 Created: 2026-08-06T05:59:40Z; updated: 2026-09-06T12:55:46Z
 
+Exact metadata: [source record](sources/issue-5356309059-a228c6790b0cad5bb5f3c37861b1f8c48484d647d0dee8e8b45cda73dbd30faa.json).
+
+Check bread, cheese, corn, cricket tins and worm cans for buying, resale, crafting, carry limits and finite consumption.
+
+**Status: The existing handoff omits the exact prices, outputs, recipe costs and stations.** Prepare that small test table and verify the deployed data first. Those expected results should not be left for you to discover.
+
+## issue 5356309059 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/206
+
+Created: 2026-08-06T05:59:40Z; updated: 2026-09-06T12:55:46Z
+
 Exact metadata: [source record](sources/issue-5356309059-acb6932bba8f61946d5b9da23745a76f5edf2ee44985f56619b7e82e7bfd0d04.json).
 
 Check bread, cheese, corn, cricket tins and worm cans for buying, resale, crafting, carry limits and finite consumption.

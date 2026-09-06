@@ -25,6 +25,19 @@ The optional Flat Stat Abilities tweak now changes percentage bonuses to fixed p
 - [ ] Restart Lexeditor, enable the tweak, save and launch FF8. On a character below the stat cap, equip Str+20; confirm STR rises by exactly 20 and the name no longer says percent.
 - [ ] Unequip it, then disable the tweak and relaunch. Confirm the fixed bonus disappears and normal percentage behavior returns; report before/after values.
 
+## issue 5349358048 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/92
+
+Created: 2026-09-04T14:33:27Z; updated: 2026-09-06T12:46:08Z
+
+Exact metadata: [source record](sources/issue-5349358048-a4bed4d6fe27ce6f4ec48e13c3f05c52b07f0aaae34aad146b5d781478a94128.json).
+
+The optional Flat Stat Abilities tweak now changes percentage bonuses to fixed points and updates matching names. Its gameplay effect needs confirmation.
+
+- [ ] Restart Lexeditor, enable the tweak, save and launch FF8. On a character below the stat cap, equip Str+20; confirm STR rises by exactly 20 and the name no longer says percent.
+- [ ] Unequip it, then disable the tweak and relaunch. Confirm the fixed bonus disappears and normal percentage behavior returns; report before/after values.
+
 ## comment 5543436320 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/92#issuecomment-5543436320

@@ -34,6 +34,18 @@ Expose meaningful search durations/radii and investigate persistent crime zones 
 
 **Status: The unsafe diagnostic crash was repaired and installed, but the requested overhaul remains research work.** Multiple drawn circles alone do not prove persistent law behavior. Prepare the remaining duration/state experiment and a concrete zone prototype before final player acceptance.
 
+## issue 5356295621 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/149
+
+Created: 2026-08-06T02:32:54Z; updated: 2026-09-06T13:57:23Z
+
+Exact metadata: [source record](sources/issue-5356295621-8683046cca790e500da0e32c01951b4950613cc1c6f5ff67995a92db908cf635.json).
+
+Expose meaningful search durations/radii and investigate persistent crime zones with working re-entry consequences.
+
+**Status: The unsafe diagnostic crash was repaired and installed, but the requested overhaul remains research work.** Multiple drawn circles alone do not prove persistent law behavior. Prepare the remaining duration/state experiment and a concrete zone prototype before final player acceptance.
+
 ## comment 5550123041 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/149#issuecomment-5550123041

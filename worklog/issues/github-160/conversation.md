@@ -27,6 +27,18 @@ Exact metadata: [source record](sources/issue-5356297820-09925ea396b66374883f8d4
 
 - [ ] Choose whether to hide those misleading rows or replace them with a mod-owned summary showing the current activity and time until empty. Neither replacement has been implemented yet.
 
+## issue 5356297820 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/160
+
+Created: 2026-08-06T02:41:27Z; updated: 2026-09-06T13:55:25Z
+
+Exact metadata: [source record](sources/issue-5356297820-af5d88b5ff276d2e8f124ea6e2c3186e5cfbda8b74990bb2eabeb274c2b27f71.json).
+
+**Status: Research complete; presentation needs your decision.** The vanilla rows are script-calculated and do not represent the overhaul’s activity-dependent drain.
+
+- [ ] Choose whether to hide those misleading rows or replace them with a mod-owned summary showing the current activity and time until empty. Neither replacement has been implemented yet.
+
 ## comment 5550125689 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/160#issuecomment-5550125689

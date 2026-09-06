@@ -27,6 +27,19 @@ Exact metadata: [source record](sources/issue-5356488907-688ebaa61ccf87c4314705d
 - [ ] Fully close RDR1 and launch it again from Lexeditor. Confirm it reaches the menu without the startup logo movies.
 - [ ] Load Story Mode and confirm normal loading still works. Report any logo that remains or any startup error.
 
+## issue 5356488907 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/339
+
+Created: 2026-08-24T16:26:39Z; updated: 2026-09-06T13:07:48Z
+
+Exact metadata: [source record](sources/issue-5356488907-d4a23adf0442459acf2be9b7ca62353139a1a6d971f23284b383fd1dd397474b.json).
+
+**Status: Startup skipping is enabled with the installed RedHook runtime.** Original movie files are unchanged.
+
+- [ ] Fully close RDR1 and launch it again from Lexeditor. Confirm it reaches the menu without the startup logo movies.
+- [ ] Load Story Mode and confirm normal loading still works. Report any logo that remains or any startup error.
+
 ## comment 5550350424 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/339#issuecomment-5550350424

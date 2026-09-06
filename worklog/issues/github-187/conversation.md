@@ -61,6 +61,18 @@ An idle owned horse should approach safe food/water when needed, restore its cor
 
 **Status: Latest approach and water-marker repairs are source-only.** The previous session found a valid source but issued no approach. Build and install the corrections before another horse test; the flashing-marker repair is also undelivered.
 
+## issue 5356303595 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/187
+
+Created: 2026-08-06T04:04:50Z; updated: 2026-09-06T13:55:17Z
+
+Exact metadata: [source record](sources/issue-5356303595-89152eb71ea4c2403a99b032a1c6110622fba96cecd0cd905e0f83f49bd01011.json).
+
+An idle owned horse should approach safe food/water when needed, restore its cores and stop cleanly for player input or danger.
+
+**Status: Latest approach and water-marker repairs are source-only.** The previous session found a valid source but issued no approach. Build and install the corrections before another horse test; the flashing-marker repair is also undelivered.
+
 ## comment 5550132173 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/187#issuecomment-5550132173

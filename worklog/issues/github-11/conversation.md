@@ -35,6 +35,21 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/11
 
 Created: 2026-08-20T11:04:46Z; updated: 2026-09-06T13:06:20Z
 
+Exact metadata: [source record](sources/issue-5202681341-399f5f64ce582e7c566d4d4296e6486724cee24b8dbfe92595cbcc3a436b04ba.json).
+
+Use sortable record lists with details beside them, including Effects and Behavior IDs.
+
+**Status: Latest sorting repair is ready for review.** Clicking empty space inside a header should now work, not just its small arrow.
+
+- [ ] Restart Lexeditor. In FF8 Items, click the Name header away from its icon twice. Confirm visible rows reverse order each time and the hand indicator stays intact.
+- [ ] Repeat in RDR2 Effects, then select and edit a record in a test mod. Confirm details, paging and selection still work; report the view and header that fail.
+
+## issue 5202681341 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/11
+
+Created: 2026-08-20T11:04:46Z; updated: 2026-09-06T13:06:20Z
+
 Exact metadata: [source record](sources/issue-5202681341-cef7c45b3ac36de65ec4279839a26dfd8861a31c821b5912223b689bdfbc9a7d.json).
 
 Use sortable record lists with details beside them, including Effects and Behavior IDs.

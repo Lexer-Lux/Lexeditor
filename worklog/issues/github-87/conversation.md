@@ -89,6 +89,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/87
 
 Created: 2026-09-04T10:53:51Z; updated: 2026-09-06T12:45:56Z
 
+Exact metadata: [source record](sources/issue-5347203364-871062c7d20454ccb9c71b9a37a0760186d5d93aa01f8d4c85d61e095e7c05ef.json).
+
+Start should open an optional Journal: Main Quest first, active side quests next, locked quests last with start instructions. Cover the requested side quests and show one-time unlock/update/completion notices.
+
+**Not implemented.** Map reliable quest state and preserve editable progression rules, including compatibility with #88. The detailed request already supplies the direction; research and implementation are agent work.
+
+## issue 5347203364 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/87
+
+Created: 2026-09-04T10:53:51Z; updated: 2026-09-06T12:45:56Z
+
 Exact metadata: [source record](sources/issue-5347203364-f773dcade595d2ee5f7317fea5a0ad9c936fe4445ff9790732dd526abb851dea.json).
 
 Start should open an optional Journal: Main Quest first, active side quests next, locked quests last with start instructions. Cover the requested side quests and show one-time unlock/update/completion notices.

@@ -41,6 +41,18 @@ Exact metadata: [source record](sources/issue-5356294803-c533c5201483f9ff8f094e5
 
 Resolve those references and decoding failures before requesting more exports. Do not ask you to repeat the completed OpenIV session.
 
+## issue 5356294803 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/145
+
+Created: 2026-08-06T02:27:53Z; updated: 2026-09-06T13:55:14Z
+
+Exact metadata: [source record](sources/issue-5356294803-488702fe285365a5642232b4e6e4383738cede542315e4894dae8d92c6487fc1.json).
+
+**Status: Partly repaired.** The manual export is already done and supplied 544 local icons. Remaining gaps include 84 unresolved catalog references and two textures the converter cannot decode.
+
+Resolve those references and decoding failures before requesting more exports. Do not ask you to repeat the completed OpenIV session.
+
 ## comment 5550121955 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/145#issuecomment-5550121955

@@ -29,6 +29,18 @@ Show remaining fortified core fill and outer-bar overfill separately. The core�
 
 **Status: Incomplete.** The core overlay and independent value handling are still missing. There is no completed visual implementation to test.
 
+## issue 5356289284 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/123
+
+Created: 2026-08-06T01:58:56Z; updated: 2026-09-06T13:57:41Z
+
+Exact metadata: [source record](sources/issue-5356289284-b885b9f8623cd091cfe114c6296820609b05d677ff640c04a9c56cc515830f44.json).
+
+Show remaining fortified core fill and outer-bar overfill separately. The core’s gold fill should shrink over its normal white fill, not be combined with the outer ring’s timer.
+
+**Status: Incomplete.** The core overlay and independent value handling are still missing. There is no completed visual implementation to test.
+
 ## comment 5550115577 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/123#issuecomment-5550115577

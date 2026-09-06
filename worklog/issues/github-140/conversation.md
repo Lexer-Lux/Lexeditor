@@ -27,6 +27,18 @@ Exact metadata: [source record](sources/issue-5356293475-22a364a2f4d216df12039b6
 
 - [ ] Choose between representative displays—remove discontinued categories and place selected signature items—or a larger custom display system. For representative displays, name the first shop and the few items/categories you want visible.
 
+## issue 5356293475 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/140
+
+Created: 2026-08-06T02:20:16Z; updated: 2026-09-06T13:54:12Z
+
+Exact metadata: [source record](sources/issue-5356293475-d6c7af49a66c3b5d9076331e98f4971c1e38b0236c5cbfcfcc150cbb050b345f.json).
+
+**Status: Design decision needed.** Shops have more menu stock than physical display positions, so automatic one-to-one shelving is not established.
+
+- [ ] Choose between representative displays—remove discontinued categories and place selected signature items—or a larger custom display system. For representative displays, name the first shop and the few items/categories you want visible.
+
 ## comment 5550120506 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/140#issuecomment-5550120506

@@ -29,6 +29,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/316
 
 Created: 2026-08-29T09:38:54Z; updated: 2026-09-06T12:59:39Z
 
+Exact metadata: [source record](sources/issue-5356484601-58f03d66abc033aea11cc6c6cf15863ff564c38d308924afa195250fac6b7532.json).
+
+Flying enemies gain the configured evasion bonus against melee; ranged attacks and Float ignore only that bonus. The patch deliberately routes gunblade hit-rate 255 through ordinary accuracy rather than bypassing the rule.
+
+**Status: A generated patch exists, but patch-load and battle results remain unverified.** Prepare fixed enemy/stat/attack comparisons, including ranged and Float controls, before asking you to judge random hits and misses.
+
+## issue 5356484601 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/316
+
+Created: 2026-08-29T09:38:54Z; updated: 2026-09-06T12:59:39Z
+
 Exact metadata: [source record](sources/issue-5356484601-910d4a00bc495faaa8d5eee91f2ef4626783aee0e4cb25d8e7c7aa61daede5ed.json).
 
 Flying enemies gain the configured evasion bonus against melee; ranged attacks and Float ignore only that bonus. The patch deliberately routes gunblade hit-rate 255 through ordinary accuracy rather than bypassing the rule.

@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/254
 
 Created: 2026-08-10T15:41:15Z; updated: 2026-09-06T12:56:45Z
 
+Exact metadata: [source record](sources/issue-5356320882-090666e41910d411c2b651f1bde5bc407fb5607f0403cae0686eee3dadbe8c4d.json).
+
+Screen Center Tolerance now displays a real percentage, but that alone does not implement your proposed targeting circle with rays across its area.
+
+**Status: Partly implemented.** Establish reliable animal/plant hits, performance and the visible acquisition area. The percentage-label repair is not acceptance of the requested targeting change; binocular testing is also blocked by #357.
+
+## issue 5356320882 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/254
+
+Created: 2026-08-10T15:41:15Z; updated: 2026-09-06T12:56:45Z
+
 Exact metadata: [source record](sources/issue-5356320882-b780bd9013aa1de1d1704a4966c1c55857602fef71d1d71a17d6e56bcbf7f69d.json).
 
 Screen Center Tolerance now displays a real percentage, but that alone does not implement your proposed targeting circle with rays across its area.

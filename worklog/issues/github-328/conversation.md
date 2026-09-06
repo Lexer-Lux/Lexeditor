@@ -27,6 +27,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/328
 
 Created: 2026-09-05T06:51:22Z; updated: 2026-09-06T12:31:37Z
 
+Exact metadata: [source record](sources/issue-5356486650-37a090c55e45cbd2d19dea6c4c89b070010f908a3bcf69d6f1198bd7a4b81f26.json).
+
+HP bars should sit beneath each HP number, fill right-to-left, and scale to maximum HP out of 9,999. XP bars should be yellow, stay inside their panels, and disappear outside the relevant screens.
+
+**Status: Work remains.** XP progress was confirmed, but HP bars are still too low. The height repair is in draft PR #356; its Windows game driver is not yet built and packaged. There is no new HP-bar build for you to test.
+
+## issue 5356486650 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/328
+
+Created: 2026-09-05T06:51:22Z; updated: 2026-09-06T12:31:37Z
+
 Exact metadata: [source record](sources/issue-5356486650-d734cea1644a1952211dbfbdc50a183a2878e4267ea4dbe6102455affadc86ea.json).
 
 HP bars should sit beneath each HP number, fill right-to-left, and scale to maximum HP out of 9,999. XP bars should be yellow, stay inside their panels, and disappear outside the relevant screens.
