@@ -1,0 +1,48 @@
+name: Native battle source regressions
+on:
+  pull_request:
+    paths:
+      - 'games/ff8/**'
+      - 'tools/verify_ff8_native*'
+      - 'tools/verify_ff8_gf_bar_settings.py'
+      - 'tools/fixtures/ff8_native/**'
+      - '.github/workflows/native-regressions.yml'
+  push:
+    branches: [fix/ff8-native-battle-batch]
+    paths:
+      - 'games/ff8/**'
+      - 'tools/verify_ff8_native*'
+      - 'tools/verify_ff8_gf_bar_settings.py'
+      - 'tools/fixtures/ff8_native/**'
+      - '.github/workflows/native-regressions.yml'
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch exact source without unrelated gitlink initialization
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin "$REVISION"
+          git -C editor checkout --detach FETCH_HEAD
+      - name: Install editor import dependencies
+        run: python -m pip install pillow fonttools
+      - name: Execute production C++ policy and settings regressions
+        working-directory: editor
+        run: |
+          python tools/verify_ff8_native_compiled.py
+          python tools/verify_ff8_gf_bar_settings.py
+          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/verify_ff8_native_battle_regressions.py
+          python - <<'PY'
+          import pathlib, re, subprocess
+          text = pathlib.Path('games/ff8/editor.html').read_text(encoding='utf-8')
+          for script in re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', text, re.S | re.I):
+              subprocess.run(['node', '--check'], input=script, text=True, check=True)
+          PY
+      - name: Record native test boundary
+        run: echo 'Native EXE tests run privately with a local FF8_EN.exe. No game executable is downloaded, uploaded, or required by this CI job.'
