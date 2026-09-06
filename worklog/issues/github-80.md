@@ -1,15 +1,18 @@
-# #80: Add dialogue controls and a clearer battle interface
+# #80 — Improved Interface
 
-[Full request and discussion archive](github-80/conversation.md)
+## 2026-09-06 — upstream audit, no fake feature toggle
 
-## Requirements and decisions
+Read the pinned launcher Steam preset and Control/Interface configuration
+structures. Existing features include DialogProgressButtons, TurboDialog,
+PSXBattleMenu, ThickerATBBar, menu/detail layout and text-fade settings.
+Findings and pinned references: `codex/ff9-memoria-integration.md`.
 
-Recover the complete scope from the linked verbatim sources before implementation or status changes. The short GitHub summary is not the full specification. Do not infer that missing chat text was never supplied.
+Important differences: DialogProgressButtons advances messages, so adding Circle
+there is not reveal-only behavior. The documented turbo hold uses Shift+Confirm
+or Right Bumper+Confirm, not the requested Square-only mapping. Layout settings
+are not proof of the requested full-row ATB/Trance and HP/MP bars.
 
-## Current implementation and evidence
-
-Reconcile live code, PRs and existing topic/session worklogs. This archive import makes no build, deployment or gameplay-success claim.
-
-## Next agent work
-
-Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.
+Status: actionable. Full launcher/input behavior audit, new history and HUD
+hooks, action-time drain and durable Tetra Master opponent state remain. No
+runtime implementation or in-game verification is claimed, and no misleading
+all-in-one checkbox was added. Better Eat (#83) remains explicitly parked.
