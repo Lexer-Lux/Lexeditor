@@ -1,0 +1,50 @@
+name: Apply RDR1 carriage Rest integration
+on:
+  push:
+    branches: [fix/rdr1-carriage-auto-rest]
+    paths: ['.github/workflows/rdr1-carriage-apply.yml']
+permissions:
+  contents: write
+concurrency:
+  group: rdr1-carriage-rest-apply
+  cancel-in-progress: false
+jobs:
+  apply:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - name: Check out this branch without optional gitlinks
+        shell: pwsh
+        run: |
+          git init .
+          git -c protocol.version=2 fetch --depth=1 "https://github.com/${env:GITHUB_REPOSITORY}.git" $env:GITHUB_SHA
+          git checkout --detach FETCH_HEAD
+      - name: Apply exact reviewed source edits
+        shell: pwsh
+        run: python .github/rdr1-carriage-edit.py
+      - name: Verify Python script patch contracts
+        shell: pwsh
+        run: |
+          python -m compileall -q games/rdr
+          python tools/verify_rdr_script_features.py
+          python tools/verify_rdr_archive_deployment.py
+      - name: Build bridge and verify ordinary RPF copies
+        shell: powershell
+        run: .\tools\verify_rdr_rpf_copy.ps1
+      - name: Verify encrypted type-2 WSC repacking
+        shell: powershell
+        run: .\tools\verify_rdr_type2_resource.ps1
+      - name: Check diff and publish compiled bridge/source
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git diff --check
+          Remove-Item -LiteralPath .github/rdr1-carriage-edit.py -Force
+          Remove-Item -LiteralPath .github/workflows/rdr1-carriage-apply.yml -Force
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- games/rdr/server.py tools/magic-rdr/cli/Rpf6ReadCli.cs tools/magic-rdr/app/Rpf6ReadCli.exe tools/magic-rdr/app/Rpf6ReadCli.exe.config .github/rdr1-carriage-edit.py .github/workflows/rdr1-carriage-apply.yml
+          git commit -m 'feat(rdr1): generate automatic carriage Rest override'
+          $token = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GH_TOKEN"))
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $token" push "https://github.com/$env:GITHUB_REPOSITORY.git" HEAD:refs/heads/fix/rdr1-carriage-auto-rest
