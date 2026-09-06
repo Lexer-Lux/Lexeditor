@@ -19,7 +19,7 @@ if os.environ.get('DATAMAP_GAMES'):
 ROWS=[{'id':str(i),'filename':f'file-{i:03}.dat','controls':f'Interface {i:03}',
        'coverage':['structured','view','source','unavailable'][i%4],
        'status':'partial' if i%4<3 else 'not-integrated', 'notes':('Long scoped explanation. '*40),
-       'target':'items','dataset':'fixture-data','openable':i%4<3} for i in range(100)]
+       'target':'items','dataset':'fixture-data','datasetKey':'fixture-data','openable':i%4<3} for i in range(100)]
 ROWS[0]['filename']='same-file.dat';ROWS[4]['filename']='same-file.dat'  # IDs must not collapse sections.
 
 def html_for(game):
