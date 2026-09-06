@@ -29,13 +29,25 @@ jobs:
             tools/knowledge_store.py
             worklog
           sparse-checkout-cone-mode: false
-      - name: Apply reviewed archival repair only to its exact baseline
+      - name: Apply reviewed archival repair only to reviewed baselines
         working-directory: repository
         run: |
           set -euo pipefail
-          test "$(git hash-object tools/knowledge_store.py)" = 1c9eb7584c0b5e5c78370205bf58ac46c188eec9
-          git apply --check --recount ../request/maintenance/finish-human-issues.patch
-          git apply --recount ../request/maintenance/finish-human-issues.patch
+          python3 - <<'PY'
+          import pathlib,subprocess
+          actual=subprocess.check_output(['git','hash-object','tools/knowledge_store.py']).decode().strip()
+          assert actual in {'1c9eb7584c0b5e5c78370205bf58ac46c188eec9','ce0924bbbfbca413502a133c7ec98d04f76c4e5a'},'Concurrent unreviewed archive change; stop without overwriting'
+          patch=pathlib.Path('../request/maintenance/finish-human-issues.patch').read_text()
+          if actual=='ce0924bbbfbca413502a133c7ec98d04f76c4e5a':
+              old="-        if not (host == 'github.com' or host.endswith('.githubusercontent.com')):\n-            raise RuntimeError('Unexpected attachment redirect host')"
+              new="-        if not (host == 'github.com' or host.endswith('.githubusercontent.com') or re.fullmatch(r'github-production-user-asset-[a-z0-9-]+[.]s3[.]amazonaws[.]com', host)):\n-            raise RuntimeError('Unexpected attachment redirect host: ' + host)"
+              assert patch.count(old)==1
+              patch=patch.replace(old,new)
+          patch=patch.replace('user-asset-[a-z0-9]+','user-asset-[a-z0-9-]+')
+          pathlib.Path('/tmp/reviewed-archive.patch').write_text(patch)
+          PY
+          git apply --check --recount /tmp/reviewed-archive.patch
+          git apply --recount /tmp/reviewed-archive.patch
           python3 -m py_compile tools/knowledge_store.py
           git config user.name 'Lexeditor Issue Archive'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -133,7 +145,8 @@ jobs:
               if not body:failures.append([i['number'],'empty-body'])
               if labels&{'waiting','untested'} and (not body or not body.splitlines()[-1].startswith('- [ ] ')):failures.append([i['number'],'missing-final-checklist'])
           result={'issues':len(issues),'remaining_comments':len(comments),'remaining_comment_ids':[c['id'] for c in comments],'format_failures':failures,'excluded':[86]}
-          pathlib.Path('issue-cleanup-validation.json').write_text(json.dumps(result,indent=2));print(json.dumps(result))
+          pathlib.Path('issue-cleanup-validation.json').write_text(json.dumps(result,indent=2))
+          print(json.dumps({k:v for k,v in result.items() if k!='remaining_comment_ids'}))
           PY
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
