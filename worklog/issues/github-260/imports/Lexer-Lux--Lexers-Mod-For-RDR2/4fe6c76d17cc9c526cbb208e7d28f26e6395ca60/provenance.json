@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356322646,
+    "number": 260,
+    "title": "Live scaling does not work on the physical lantern",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/260"
+  },
+  "sha256": "89832f01c4353ed5bdf6713b45cf9597285d9928ffc25e678d565ed764e3456f",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-168.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

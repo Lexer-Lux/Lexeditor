@@ -30,3 +30,15 @@ Exact metadata: [source record](sources/issue-5322892743-09b46eaac351f7c4b07c2d6
 Make Eat's target/availability rules avoid unproductive use, and give enemies carrying an unlearned ability a blue glow.
 
 **Not delivered.** Check Memoria's existing eligibility and highlight support before adding code. No implementation result or prepared test justifies a Waiting label.
+
+## issue 5322892743 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/83
+
+Created: 2026-09-02T10:44:53Z; updated: 2026-09-06T12:45:48Z
+
+Exact metadata: [source record](sources/issue-5322892743-9b7b4a21a63b4cfe8200169862e63bce6fd89c51eee63c927e7614d5c42115ea.json).
+
+Make Eat's target/availability rules avoid unproductive use, and give enemies carrying an unlearned ability a blue glow.
+
+**Not delivered.** Check Memoria's existing eligibility and highlight support before adding code. No implementation result or prepared test justifies a Waiting label.

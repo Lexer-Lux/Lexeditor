@@ -43,6 +43,18 @@ Incomplete study/tag progress should drain gradually after losing the target; co
 
 **Status: Latest repair is source-only.** The recorded default is 50% per second, but that build is not installed. Deliver it before another decay-rate comparison.
 
+## issue 5356305099 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/192
+
+Created: 2026-08-06T05:48:36Z; updated: 2026-09-06T13:55:37Z
+
+Exact metadata: [source record](sources/issue-5356305099-32c6a1e6cda5cc9ef86605bd9c4e251533df47cb5b66248f04d544f69fec81b8.json).
+
+Incomplete study/tag progress should drain gradually after losing the target; completed tags must remain. The decay rate should be configurable, including zero to pause it.
+
+**Status: Latest repair is source-only.** The recorded default is 50% per second, but that build is not installed. Deliver it before another decay-rate comparison.
+
 ## comment 5550133681 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/192#issuecomment-5550133681

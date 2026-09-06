@@ -33,6 +33,18 @@ Exact metadata: [source record](sources/issue-5356308837-46162060781487926de1feb
 
 - [ ] Choose which model to use: one physical Flight Feather item, or interchangeable ordinary feathers through a recipe category. Exotic mission plumes remain distinct and excluded from generic substitutions.
 
+## issue 5356308837 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/205
+
+Created: 2026-08-06T05:59:39Z; updated: 2026-09-06T12:55:44Z
+
+Exact metadata: [source record](sources/issue-5356308837-9a65098941c2daf4629ee3f6f731e401757c2eac27ad44d7a8d9b589b55ab104.json).
+
+**Status: A later design proposal changes the original request.** The original converts ordinary yields to Flight Feathers; your later idea keeps species feathers and lets recipes accept the Feathers category.
+
+- [ ] Choose which model to use: one physical Flight Feather item, or interchangeable ordinary feathers through a recipe category. Exotic mission plumes remain distinct and excluded from generic substitutions.
+
 ## comment 5550137495 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/205#issuecomment-5550137495

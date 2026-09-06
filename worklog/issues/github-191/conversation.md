@@ -25,6 +25,19 @@ Exact metadata: [source record](sources/issue-5356304844-4b149cb75d7ebe8588e8f5a
 - [ ] On a spare save, use Rampage’s attribute-overpower command and record which outer bars turn gold. Reload, then use a normal Miracle Tonic that fortifies all three bars.
 - [ ] Compare the Stamina bar in both cases. Report whether only Rampage fails or the tonic also fails, with screenshots. Do not change unrelated settings between the two checks.
 
+## issue 5356304844 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/191
+
+Created: 2026-08-06T05:38:08Z; updated: 2026-09-06T13:55:24Z
+
+Exact metadata: [source record](sources/issue-5356304844-6101be94d1b574205b1de051d8820cc52fec5bfa5c7127de65f5c3246468e5bb.json).
+
+**Status: Cause unconfirmed; no mod fix is established.** Static evidence suggests Rampage’s command may omit the Stamina bar, but that is not a runtime diagnosis.
+
+- [ ] On a spare save, use Rampage’s attribute-overpower command and record which outer bars turn gold. Reload, then use a normal Miracle Tonic that fortifies all three bars.
+- [ ] Compare the Stamina bar in both cases. Report whether only Rampage fails or the tonic also fails, with screenshots. Do not change unrelated settings between the two checks.
+
 ## comment 5550133359 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/191#issuecomment-5550133359

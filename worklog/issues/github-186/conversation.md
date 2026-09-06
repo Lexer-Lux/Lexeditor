@@ -24,6 +24,18 @@ Exact metadata: [source record](sources/issue-5356303310-14d66869fb75c80dd088894
 
 - [ ] Choose the discovery radius in metres and how existing saves should start: all custom markers undiscovered, or a defined set already known. For the latter, name which categories/locations should be imported as known.
 
+## issue 5356303310 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/186
+
+Created: 2026-08-06T03:57:07Z; updated: 2026-09-06T13:57:17Z
+
+Exact metadata: [source record](sources/issue-5356303310-5b6b51d92b8e0f16a80db22b277e1a98094646654ff87ce4c453821d1157ad57.json).
+
+**Status: Research complete; marker discovery is not implemented.** Proposed behavior: show a custom marker only after nearby discovery, retain it afterward, and still respect quest/collection gates.
+
+- [ ] Choose the discovery radius in metres and how existing saves should start: all custom markers undiscovered, or a defined set already known. For the latter, name which categories/locations should be imported as known.
+
 ## comment 5550131890 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/186#issuecomment-5550131890

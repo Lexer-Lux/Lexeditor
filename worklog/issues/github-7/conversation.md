@@ -25,6 +25,19 @@ The colored floppy-disk icon and RDR2 font hierarchy are restored. Text metrics 
 - [ ] Restart Lexeditor and open RDR2. Check Save, main tabs, item names and descriptions: the floppy should be colored, headings use the display font, and smaller text remain readable.
 - [ ] Resize the window and inspect the bottom list row for clipping. Send a screenshot of any wrong font or alignment.
 
+## issue 5202412299 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/7
+
+Created: 2026-08-20T10:31:11Z; updated: 2026-09-06T12:44:55Z
+
+Exact metadata: [source record](sources/issue-5202412299-81936ff43c9cce94234b85d4abe3e9ed24c45a57ddf1da4a400a61889d8f7c19.json).
+
+The colored floppy-disk icon and RDR2 font hierarchy are restored. Text metrics were also adjusted; appearance needs your check.
+
+- [ ] Restart Lexeditor and open RDR2. Check Save, main tabs, item names and descriptions: the floppy should be colored, headings use the display font, and smaller text remain readable.
+- [ ] Resize the window and inspect the bottom list row for clipping. Send a screenshot of any wrong font or alignment.
+
 ## comment 5354718857 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/7#issuecomment-5354718857

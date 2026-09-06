@@ -28,6 +28,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/25
 
 Created: 2026-08-29T10:18:21Z; updated: 2026-09-06T13:06:33Z
 
+Exact metadata: [source record](sources/issue-5285953301-0a9bbc845d62be6c25d99e83a974920ce567e52d9b54aeb8920a8bea1f819dad.json).
+
+**Status: Implemented; needs your visual check.** Normal tabs are alphabetical; Tweaks is last and distinct. Record IDs belong with names, and paged lists show complete rows with one total.
+
+- [ ] Open Blank’s 2 Panels page, then RDR2 Items. Resize the window and page through records: no partial bottom row or vertical list scrollbar should appear.
+- [ ] Check the record heading and bottom range/total; neither identity nor totals should be duplicated. Confirm Tweaks stays last. Report the view and screenshot of any mismatch.
+
+## issue 5285953301 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/25
+
+Created: 2026-08-29T10:18:21Z; updated: 2026-09-06T13:06:33Z
+
 Exact metadata: [source record](sources/issue-5285953301-d4bb523a18ecac054cfe7a8df138e47fa81656b0ace4700ef37b6b83892599a4.json).
 
 **Status: Implemented; needs your visual check.** Normal tabs are alphabetical; Tweaks is last and distinct. Record IDs belong with names, and paged lists show complete rows with one total.

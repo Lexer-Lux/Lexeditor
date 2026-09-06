@@ -24,6 +24,18 @@ Show candidate map icons, revise them from your feedback and replace the existin
 
 **Status: No reviewable variants are supplied in this issue.** Preparing and presenting them is the next development task; you are not being asked to approve unseen artwork.
 
+## issue 5356293006 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/138
+
+Created: 2026-08-06T02:15:54Z; updated: 2026-09-06T13:55:15Z
+
+Exact metadata: [source record](sources/issue-5356293006-51bc5a6fdcaa450b99cec2abdf5df1f302839a66bd05263e3369e37a0683e60d.json).
+
+Show candidate map icons, revise them from your feedback and replace the existing artwork only after approval.
+
+**Status: No reviewable variants are supplied in this issue.** Preparing and presenting them is the next development task; you are not being asked to approve unseen artwork.
+
 ## comment 5550119985 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/138#issuecomment-5550119985

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356288308,
+    "number": 119,
+    "title": "Finish and validate stealth detection indicators",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/119"
+  },
+  "sha256": "8ec9fd5d0e10df3736aaec1db3937c4cb3f8c7228bebd586b192a0c82796aa5e",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-19.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

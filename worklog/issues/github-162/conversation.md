@@ -28,6 +28,18 @@ Exact metadata: [source record](sources/issue-5356298250-8d0e0c5b8f14f437c05d6d4
 
 - [ ] Attach the sound file you want for picking up brass, with its source and permission/credit details. It can then be authored into a playable event and used by the casing pickup paths.
 
+## issue 5356298250 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/162
+
+Created: 2026-08-06T02:43:28Z; updated: 2026-09-06T13:55:29Z
+
+Exact metadata: [source record](sources/issue-5356298250-1e15733d69dfb8c4cafc2dde22894ab9ca26418df3cc30b63a36dc966b4c0278.json).
+
+**Status: The routing approach is established; audio work has not started.** One custom sound event can serve casing pickups, but an item category does not create the audio itself.
+
+- [ ] Attach the sound file you want for picking up brass, with its source and permission/credit details. It can then be authored into a playable event and used by the casing pickup paths.
+
 ## comment 5550126121 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/162#issuecomment-5550126121

@@ -25,6 +25,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/301
 
 Created: 2026-09-02T06:42:31Z; updated: 2026-09-06T13:07:39Z
 
+Exact metadata: [source record](sources/issue-5356482008-777087b52ed6db598b71220b2fc76a3e67df603d9de340c311517167f76e1f14.json).
+
+**Status: The opening movie was already confirmed skipped.** A later repair targets the remaining startup flashes; it still needs your check.
+
+- [ ] Enable Fast Start, save and cold-launch FF8 from Lexeditor. Confirm the main menu appears without Squaresoft/Square Enix, FFNx splashes or the opening movie. Report anything that still appears.
+- [ ] Disable Fast Start and relaunch. Confirm normal startup returns, then restore your preference.
+
+## issue 5356482008 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/301
+
+Created: 2026-09-02T06:42:31Z; updated: 2026-09-06T13:07:39Z
+
 Exact metadata: [source record](sources/issue-5356482008-d5d70a8dfe099fef1465fd77720bf8594be1eb297a43174605aecf7adb80a6e2.json).
 
 **Status: The opening movie was already confirmed skipped.** A later repair targets the remaining startup flashes; it still needs your check.

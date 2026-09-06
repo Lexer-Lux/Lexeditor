@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356298033,
+    "number": 161,
+    "title": "Add real per-action honor amounts",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/161"
+  },
+  "sha256": "19dc181795edb26973aab95ea2d4270b4a2bf6870d75f739d1ac1c8080fcc2ea",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-62.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

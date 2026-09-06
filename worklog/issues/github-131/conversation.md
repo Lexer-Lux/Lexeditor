@@ -34,6 +34,18 @@ Expose each drink’s real alcohol strength separately from its coarse drink-cla
 
 **Status: Reported broken.** The latest report says the numeric strengths all became 1. Restore and validate the real per-drink values before requesting another test.
 
+## issue 5356291314 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/131
+
+Created: 2026-08-06T02:10:38Z; updated: 2026-09-06T13:54:36Z
+
+Exact metadata: [source record](sources/issue-5356291314-a9f9a07ce153ca6ef520fca810d71f9f70c5c786e1b697a5d5885d8823e38714.json).
+
+Expose each drink’s real alcohol strength separately from its coarse drink-class tag. Preserve the requested strong-Moonshine behavior.
+
+**Status: Reported broken.** The latest report says the numeric strengths all became 1. Restore and validate the real per-drink values before requesting another test.
+
 ## comment 5550117968 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/131#issuecomment-5550117968

@@ -22,6 +22,16 @@ Exact metadata: [source record](sources/issue-5356285756-a97ac438dc8ab948a5857ed
 
 **Status: Closed movement-repair report.** The recorded correction ties turning to actual horizontal crawl motion rather than rotating a stationary prone character. Weapon equipping, aiming and animation limitations remain separate in #167; this closure does not mean those work.
 
+## issue 5356285756 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/109
+
+Created: 2026-08-06T01:37:44Z; updated: 2026-09-06T13:57:37Z
+
+Exact metadata: [source record](sources/issue-5356285756-cda18c8f1f5ebbcf986d0166888692eb41c2d7be23f709fdfca9c35b3ec174a2.json).
+
+**Status: Closed movement-repair report.** The recorded correction ties turning to actual horizontal crawl motion rather than rotating a stationary prone character. Weapon equipping, aiming and animation limitations remain separate in #167; this closure does not mean those work.
+
 ## comment 5550111233 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/109#issuecomment-5550111233

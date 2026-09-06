@@ -23,3 +23,15 @@ Exact metadata: [source record](sources/issue-5356485912-04a00a5af11b3922b57acc6
 Expand Scan with target-specific information such as weaknesses and Devour results.
 
 **Status: Work remains.** Establish the real data for each added detail and implement the messages. Corrected Scan invocation in #315 does not mean these expanded descriptions already exist.
+
+## issue 5356485912 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/324
+
+Created: 2026-09-04T06:32:43Z; updated: 2026-09-06T12:59:55Z
+
+Exact metadata: [source record](sources/issue-5356485912-877ae42c5707cefc9c4b33d623c00a993f32ec66c91170d983b0aad536b93ffb.json).
+
+Expand Scan with target-specific information such as weaknesses and Devour results.
+
+**Status: Work remains.** Establish the real data for each added detail and implement the messages. Corrected Scan invocation in #315 does not mean these expanded descriptions already exist.

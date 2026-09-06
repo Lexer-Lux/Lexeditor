@@ -1,0 +1,548 @@
+{
+  "codex_source_sha256": "7abad5d2fadf8a461d60d9573295120542882dcdfc7306674e5fcb5f19cd0b14",
+  "worklog_source_sha256": "87dd4154cac25e21b60bf9e86e3dc400d54ca95c7500eca86601ce2c07dba403",
+  "codex_sections": [
+    {
+      "title": "Project and release policy",
+      "path": "codex/project-release-policy.md",
+      "source_section_sha256": "baa73db5ff52d73c01f3491c877978202864202f69fadf1189db2b31d63b7fef",
+      "body_sha256": "4cec0f3095852695dede709ea160ba2cbdcb387a47cf8fdf6a3a356d6783000a"
+    },
+    {
+      "title": "Build and installation",
+      "path": "codex/build-installation.md",
+      "source_section_sha256": "acfd42f70c561149ef249bf98e89b1a45b1b934d6ce836ee3ccb75c374b825f7",
+      "body_sha256": "149269f42aa3e786133fc25dafadab761ebf31c744e637d90ea234b089f965bc"
+    },
+    {
+      "title": "Data fundamentals",
+      "path": "codex/data-fundamentals.md",
+      "source_section_sha256": "b568b71cfb7c17d0d2d36dd1ba4e2df6c67ce411b9b0c392253ee468ff49c436",
+      "body_sha256": "1e83ecefb3611224be3661570b486eb504afaae61b188873d79be88211d8bda0"
+    },
+    {
+      "title": "Inventory and radial architecture",
+      "path": "codex/inventory-radial.md",
+      "source_section_sha256": "829d85bea438e4bc0020308b74e52eba3975f3571cc7bdd982564b73b869535b",
+      "body_sha256": "7e8eda6c5c0c0f5e530888407e02a2f3d255ff0486492920626c54cb9f4064ec"
+    },
+    {
+      "title": "Stealth and perception",
+      "path": "codex/stealth-perception.md",
+      "source_section_sha256": "9108af302c013f3e76f2a043cc7cb8499a1e954f398b10602abed989a22d4eed",
+      "body_sha256": "d5a89e4d4f9f4a0ac12dcb00669419bc8f06c022de586adb987360364154827f"
+    },
+    {
+      "title": "Enemy accuracy, health and the Mobs tab",
+      "path": "codex/enemy-mobs.md",
+      "source_section_sha256": "b79bcf7366dfc4fa4d3f02bc4db74db6da0e708c835d418243c71f1e40edace3",
+      "body_sha256": "72e25693a24fc5366a43a34e088a88ca83cedf225290b54c00cdcb500229ea25"
+    },
+    {
+      "title": "Item and consumable description style",
+      "path": "codex/item-description-style.md",
+      "source_section_sha256": "e0229e6b4e7874e7576214b3fe89533d1a117616e636bface1f5b51ca43276c3",
+      "body_sha256": "94ea6dabd511304bec4cc029036ff0fea8793a94217ef540233fc2e711ae60b7"
+    },
+    {
+      "title": "LEXEDITOR UI rules",
+      "path": "codex/lexeditor.md",
+      "source_section_sha256": "d3624a7d350ba9a5ac642fedc9e309ad426207b19987f43ec03b7ac0dcfafde0",
+      "body_sha256": "db4d9c1bc7170efcaa909515115cc92bec921f684a8259042465445960bd5f38"
+    },
+    {
+      "title": "Archive extraction tooling",
+      "path": "codex/archive-extraction.md",
+      "source_section_sha256": "0fefe5095bd4a9554dbbc3f856dc2b2b35228aa7138ba0fda7416bde0e54f659",
+      "body_sha256": "b6a16e711e63a68e27100916404334d718054171f83b0022e477b821e6c83ecd"
+    },
+    {
+      "title": "Confirmed runtime behaviour and engine limits",
+      "path": "codex/runtime-engine-limits.md",
+      "source_section_sha256": "31d976e773d9219142610b31a99be52c3aa55e5c987c6bd1e81c356b1687a551",
+      "body_sha256": "d513b557faa0649746be2cf9464ba7e7318b6321a45887268d0dd7a457e1cb7a"
+    }
+  ],
+  "worklog_sections": [
+    {
+      "title": "#169 climbing \u2014 the geometry was wrong at the root 2026-08-05 (second pass)",
+      "path": "worklog/issues/todo-169.md",
+      "source_section_sha256": "0e3bfee5d3a764a6c10532c26b785210b8783fb8516b480830e4fc815426c5cb"
+    },
+    {
+      "title": "#169 free climbing \u2014 seven-defect pass from trace evidence 2026-08-05",
+      "path": "worklog/issues/todo-169.md",
+      "source_section_sha256": "84d62ddec5a8106d74fb91e00988f08d0f197663dc18d6a5da7d539406e7fc0e"
+    },
+    {
+      "title": "#169 \u2014 four of five remaining defects, 2026-08-04",
+      "path": "worklog/issues/todo-169.md",
+      "source_section_sha256": "0c2586a295a6c4f19d8838e440df35f5c02d6182e5ecb2e6a49d4ae78281f4f5"
+    },
+    {
+      "title": "#208 dodge roll \u2014 engine task confirmed, clip DICTIONARY still unknown 2026-08-05",
+      "path": "worklog/issues/todo-208.md",
+      "source_section_sha256": "493ac75ae9710aeac62087c8f63862c9c84ce6c18d8534865f02e6161784bb5d"
+    },
+    {
+      "title": "#59 death-cam coronas + campsite respawn \u2014 one root cause 2026-08-05",
+      "path": "worklog/issues/todo-59.md",
+      "source_section_sha256": "788641255afe40a0e263d5516d9953676259c532472d88b28f3783e804dfa054"
+    },
+    {
+      "title": "#42 carried mask permanently disabled \u2014 my own camp gate 2026-08-05",
+      "path": "worklog/issues/todo-42.md",
+      "source_section_sha256": "c585f0312ac28233c062ee6eadf5fdf34f9e53ab03590e9153e76e29102d53b8"
+    },
+    {
+      "title": "#116 binoculars dead in the 07:5x build \u2014 animated draw, not the trigger 2026-08-05",
+      "path": "worklog/issues/todo-116.md",
+      "source_section_sha256": "d951388e33c5da6f2e6c9bbdcbf928c0e01e8ad8bf5d33406e6658160ce99251"
+    },
+    {
+      "title": "#113(d) plant tagging \u2014 root cause proven, learner replaced 2026-08-05",
+      "path": "worklog/issues/todo-113.md",
+      "source_section_sha256": "b794b5bfa72cd41121897d302881a3149f500d9229295338547ab3eab1314128"
+    },
+    {
+      "title": "#113(d) plants-only filter \u2014 2026-08-05",
+      "path": "worklog/issues/todo-113.md",
+      "source_section_sha256": "43f14be9389d351f84ffb85cf3aa0e2cee99ffdbba04dc6e94ab926f3d7293ed"
+    },
+    {
+      "title": "#113(d) plant tagging \u2014 done 2026-08-05",
+      "path": "worklog/issues/todo-113.md",
+      "source_section_sha256": "6e57e5204b0172bc99786287b75c10a935cbbb1a15f172176e55fb959e641a71"
+    },
+    {
+      "title": "#113 marker anchor \u2014 bone space is not world space, 2026-08-04",
+      "path": "worklog/issues/todo-113.md",
+      "source_section_sha256": "2d3333fd8c20d8657c3f5d01f46850440ff318799e4e895c428e3b60793240a5"
+    },
+    {
+      "title": "#203 core writes \u2014 previous fix DISPROVEN by measurement 2026-08-05",
+      "path": "worklog/issues/todo-203.md",
+      "source_section_sha256": "b3fd28a10b10f930aab63499124ca345cd62f1d8216fe076b14d35db34c210a1"
+    },
+    {
+      "title": "#203 Intermittent fader/haze \u2014 root-caused and fixed 2026-08-05",
+      "path": "worklog/issues/todo-203.md",
+      "source_section_sha256": "b69aeec601083faa265d90404ec19240ebd035dedd158ca2f1d1bbeb43ccc559"
+    },
+    {
+      "title": "#85(b) casing pickup \u2014 REVERTED, my regression",
+      "path": "worklog/issues/todo-85.md",
+      "source_section_sha256": "7eebe592b65391114c170c6696f2a3cf5cf9d813fb22c6e59d848b722b416345"
+    },
+    {
+      "title": "#85 long-gun casings regression \u2014 root cause, 2026-08-04",
+      "path": "worklog/issues/todo-85.md",
+      "source_section_sha256": "9065062f4c7a5275671aada31cc116bbb85027c56e8e67f082b8a238848136e0"
+    },
+    {
+      "title": "#112 tracers \u2014 REVERTED, my regression",
+      "path": "worklog/issues/todo-112.md",
+      "source_section_sha256": "f0829d453fc4efe4fab9904dc49960aefe4adc465ffa70c4adf916878dc88149"
+    },
+    {
+      "title": "#112 engine_tracer is a no-op and caused a regression \u2014 2026-08-04",
+      "path": "worklog/issues/todo-112.md",
+      "source_section_sha256": "477a8f5a678268f029d9556a84de7eca331a85c9a37a3a99b813baf033e743c2"
+    },
+    {
+      "title": "#112 particle-trail choice \u2014 built and installed 2026-08-05",
+      "path": "worklog/issues/todo-112.md",
+      "source_section_sha256": "bde454f6d692154e4b5e9552f5cae1d19420760896f3a86244cec65ba3b02d5b"
+    },
+    {
+      "title": "#170 prone sinking \u2014 fixed, BUILT BUT NOT INSTALLED 2026-08-05",
+      "path": "worklog/issues/todo-170.md",
+      "source_section_sha256": "38e0a765932586a6a68742d4861783c71961204c3f31574047e3b5e105d17eaa"
+    },
+    {
+      "title": "#170 prone \u2014 four defects fixed from live-log evidence, 2026-08-04",
+      "path": "worklog/issues/todo-170.md",
+      "source_section_sha256": "19d0dcc9aa23ac0eda30b58a12c48efb812aa71a234fe9a781686dc547177663"
+    },
+    {
+      "title": "#169 (a)(b)(e)(f) / #85(a) / #113(d) \u2014 2026-08-05",
+      "path": "worklog/legacy/014-169-a-b-e-f-85-a-113-d-2026-08-05.md",
+      "source_section_sha256": "4c4ee4b1dc7cd6b21df001c3c337d11203b56f41369292028a0aa7fa2cd53d69"
+    },
+    {
+      "title": "#85(b) properly / #1 / #169(d) / #113(c) \u2014 2026-08-05",
+      "path": "worklog/legacy/015-85-b-properly-1-169-d-113-c-2026-08-05.md",
+      "source_section_sha256": "78d7c83904ab35eb3e8954e9ce03abdc5d2d444c4a95d60dffe061cb040c6ae7"
+    },
+    {
+      "title": "#7 / #85(b) / #116 / #169(c) / #182 \u2014 fixed 2026-08-05",
+      "path": "worklog/legacy/016-7-85-b-116-169-c-182-fixed-2026-08-05.md",
+      "source_section_sha256": "c2387d6d9fb232358c0aaf1ce7684a5f604e732c540871e091f81b2ea203b8af"
+    },
+    {
+      "title": "#42 / #19 / #113 \u2014 fixed 2026-08-05",
+      "path": "worklog/legacy/017-42-19-113-fixed-2026-08-05.md",
+      "source_section_sha256": "f361ca060ad0b04bc6a5bb2a334c8a4170d260ddbcd2a2fe2e29284f956a3f2c"
+    },
+    {
+      "title": "#98 / #112 / #50 \u2014 invented identifier names, found by audit 2026-08-05",
+      "path": "worklog/legacy/018-98-112-50-invented-identifier-names-found-by-audit-2026-08-05.md",
+      "source_section_sha256": "e2c77120c9513554de2493f852c888c52917c46ec6cead2ae257c0d36147cefb"
+    },
+    {
+      "title": "#8 Black-square blips \u2014 CAUSE FOUND AND FIXED 2026-08-05",
+      "path": "worklog/issues/todo-8.md",
+      "source_section_sha256": "2973cc79e89dc28d8e9628f5859bdbf35c66fd6cf20e8bcb36cd761e2eedd7f6"
+    },
+    {
+      "title": "#8 fainter looted markers \u2014 done WITHOUT OpenIV, 2026-08-04",
+      "path": "worklog/issues/todo-8.md",
+      "source_section_sha256": "e4665961dc1086f04a3a758adfccef517ab215e54760d8b2cdbb33f25f39754a"
+    },
+    {
+      "title": "#204 / #205 / #206 Weapons tab \u2014 fixed 2026-08-05",
+      "path": "worklog/legacy/021-204-205-206-weapons-tab-fixed-2026-08-05.md",
+      "source_section_sha256": "2eb113678fe8acae85587b26ddf600b94f6a79f9181f60a0e32b2ec1a22c7387"
+    },
+    {
+      "title": "#190 MobProbe + per-model view \u2014 built and verified 2026-08-05",
+      "path": "worklog/issues/todo-190.md",
+      "source_section_sha256": "76730c68f86b073201aad9ef83654b78880802fa03150763b3f5ef759f97a819"
+    },
+    {
+      "title": "#190 Mobs tab \u2014 built and verified 2026-08-04",
+      "path": "worklog/issues/todo-190.md",
+      "source_section_sha256": "63327f97e907a23b4b8b7e967d83fbb8ce730ea1f94995473f4a8bda3ba6d1b7"
+    },
+    {
+      "title": "Follow-up candidate build \u2014 2026-08-03",
+      "path": "worklog/legacy/024-follow-up-candidate-build-2026-08-03.md",
+      "source_section_sha256": "37b42e7df8e36dff15d091b08ab8167340cff86fc871b4a81c6709642dc7f74b"
+    },
+    {
+      "title": "#48 / #51 are two different features \u2014 2026-08-04",
+      "path": "worklog/legacy/025-48-51-are-two-different-features-2026-08-04.md",
+      "source_section_sha256": "75617fb0301960c418320a4545b82c76ab4b129b855512453d5c5f1e1b06e5f8"
+    },
+    {
+      "title": "#150 \u2014 no way to move the pause map view, 2026-08-04",
+      "path": "worklog/issues/todo-150.md",
+      "source_section_sha256": "df1aeb6dae6a756383e58831bef8d20de3a2962b89ef3dd44682384faa990b6f"
+    },
+    {
+      "title": "#195 \u2014 the four options, in full, 2026-08-04",
+      "path": "worklog/issues/todo-195.md",
+      "source_section_sha256": "5021d5b2077aa4075c7d004a7d5658dd368dcac94acd966d11a7d24a1f64b16b"
+    },
+    {
+      "title": "#170 + #169 \u2014 2026-08-04",
+      "path": "worklog/legacy/028-170-169-2026-08-04.md",
+      "source_section_sha256": "19b410d5a7a5c794a94f4076c061c9c8e224b16ed0812cde8f747a8209c52fb8"
+    },
+    {
+      "title": "#147 + #193 \u2014 custom textures: TWO stacked registration bugs, 2026-08-04",
+      "path": "worklog/legacy/029-147-193-custom-textures-two-stacked-registration-bugs-2026-08-04.md",
+      "source_section_sha256": "5afe8c265599b336a8482fc093d6f8faff3453ecda21a1057ac52667eeae89e7"
+    },
+    {
+      "title": "#42 carrier no longer rewrites the equipped mask + #195 blocking \u2014 2026-08-04",
+      "path": "worklog/legacy/033-42-carrier-no-longer-rewrites-the-equipped-mask-195-blocking-202.md",
+      "source_section_sha256": "099bcd29eab18e5509904e208a462b8f78a9c2ae491935f8ac0d98999dc071af"
+    },
+    {
+      "title": "#170 split into #170 + #195 \u2014 2026-08-04",
+      "path": "worklog/legacy/034-170-split-into-170-195-2026-08-04.md",
+      "source_section_sha256": "9c0d24a7594b41f6a282f14911306d5b6293bee655c7e22ee80093dec5f95f33"
+    },
+    {
+      "title": "#195 (was #170) prone aiming \u2014 the reference cannot be ported, 2026-08-04",
+      "path": "worklog/legacy/035-195-was-170-prone-aiming-the-reference-cannot-be-ported-2026-08.md",
+      "source_section_sha256": "035ce106484e4ed09a826917d23ff362f3011a6ac79f62c3c8162683dd0c9bdb"
+    },
+    {
+      "title": "#1 visible core dip, #112 nothing rendering, #113 tags \u2014 2026-08-04",
+      "path": "worklog/legacy/036-1-visible-core-dip-112-nothing-rendering-113-tags-2026-08-04.md",
+      "source_section_sha256": "2b186dd8cc01d09bd8eb13fb26f0993457dca64a1f51819feadebded0268062c"
+    },
+    {
+      "title": "#1 player/horse stamina cross-drain + #59 F4 leak \u2014 2026-08-04",
+      "path": "worklog/legacy/037-1-player-horse-stamina-cross-drain-59-f4-leak-2026-08-04.md",
+      "source_section_sha256": "7ea6471bafbf358e1f82e51cf04249347e966f2c76e6a46fa6394387ee9646ab"
+    },
+    {
+      "title": "#87 weapons stack \u2014 partial answer, 2026-08-04",
+      "path": "worklog/issues/todo-87.md",
+      "source_section_sha256": "766a064119feb45b3b76e7064e67f188d797d7028c7cec6bcf4930f4acab1bd6"
+    },
+    {
+      "title": "#87 weapon stack \u2014 complete, but one layer is a third-party file, 2026-08-04",
+      "path": "worklog/issues/todo-87.md",
+      "source_section_sha256": "55f8f052bb12befd026a65c44196badc4e7fb39faefddfc04baed1a4fce12eaa"
+    },
+    {
+      "title": "#87 clean baseline \u2014 CLI exhausted, needs OpenIV, 2026-08-04",
+      "path": "worklog/issues/todo-87.md",
+      "source_section_sha256": "4d71f235fa09cfbc387ead44641adbd711519b286def72a8adf8e9718779ad4e"
+    },
+    {
+      "title": "#87 OpenIV blocked on the access prompt \u2014 2026-08-04",
+      "path": "worklog/issues/todo-87.md",
+      "source_section_sha256": "da397ad30acf1a1b7c10bf720028b9df36a0674c0a7b44a94eba478fe08dc564"
+    },
+    {
+      "title": "#87 \u2014 final analysis before OpenIV, 2026-08-04",
+      "path": "worklog/issues/todo-87.md",
+      "source_section_sha256": "5639b8b948e23722a91d1d27e47ec203dad91e56d6fc74d81402d636bde20b83"
+    },
+    {
+      "title": "#87 weapon stack \u2014 FINAL CORRECTION, no work remains \u2014 2026-08-05",
+      "path": "worklog/issues/todo-87.md",
+      "source_section_sha256": "feb7f557fb7e21742f22d49e27b357483eaa6f3103e794d22ccebc4953574245"
+    },
+    {
+      "title": "File consolidation \u2014 2026-08-04",
+      "path": "worklog/legacy/039-file-consolidation-2026-08-04.md",
+      "source_section_sha256": "cc4cb11b78e93bbdb3e3a4ced75ff590cc1f58c01a30b50b75dbf0bd4f3eb48b"
+    },
+    {
+      "title": "TODO.txt cleanup \u2014 2026-08-04",
+      "path": "worklog/legacy/041-todo-txt-cleanup-2026-08-04.md",
+      "source_section_sha256": "7a051e5dbaaa815b27ce7d7acbc97bf3d956d1f256733afafdc1db3f00b64f64"
+    },
+    {
+      "title": "Current test batch \u2014 2026-08-03",
+      "path": "worklog/legacy/042-current-test-batch-2026-08-03.md",
+      "source_section_sha256": "5e1bde1eb442e225619573c909e52e17092f07c55cf0230bf3cbd55395c6117b"
+    },
+    {
+      "title": "What this project is",
+      "path": "worklog/legacy/043-what-this-project-is.md",
+      "source_section_sha256": "5b57573b726bd2948afb4267da29302264a9bd844c14150c73ab9f35d2df80d9"
+    },
+    {
+      "title": "SOP: crack open existing mods to learn mechanisms (Lexer, 2026-07-09)",
+      "path": "worklog/legacy/044-sop-crack-open-existing-mods-to-learn-mechanisms-lexer-2026-07-0.md",
+      "source_section_sha256": "6af184f9052c6c85b392658cc99e1cccdd4a019c88acc1b56c4de94be6c9088c"
+    },
+    {
+      "title": "Hard rules from Lexer",
+      "path": "worklog/legacy/045-hard-rules-from-lexer.md",
+      "source_section_sha256": "2c0f62070dfa684849a7809d23db4f361090b36ea2a67a2f87a91e3b127446be"
+    },
+    {
+      "title": "Key technical knowledge",
+      "path": "worklog/legacy/046-key-technical-knowledge.md",
+      "source_section_sha256": "3798f88148da8331f32585c7b5462dce70d4de2e13689f9d70be5cbb1bf7187a"
+    },
+    {
+      "title": "GameplayTweaks.asi (TODO #1/#4/#5) \u2014 key natives & findings",
+      "path": "worklog/legacy/047-gameplaytweaks-asi-todo-1-4-5-key-natives-findings.md",
+      "source_section_sha256": "211fc0c75dd6cad18373a170104fe64a4f50f048261605c04a3564f9cb7e2a36"
+    },
+    {
+      "title": "TODO structure & feasibility notes (2026-07-06)",
+      "path": "worklog/legacy/048-todo-structure-feasibility-notes-2026-07-06.md",
+      "source_section_sha256": "c4560e61cd54e4297d301acb3e443dc7c7b6aff26d3fbe283c697f5f22bc2792"
+    },
+    {
+      "title": "CRITICAL INSTALL FACTS (learned the hard way 2026-07-07)",
+      "path": "worklog/legacy/049-critical-install-facts-learned-the-hard-way-2026-07-07.md",
+      "source_section_sha256": "21e2f9653cbc261809f398af300936e479b4ab46c3fde36ba4d41b65a63eed39"
+    },
+    {
+      "title": "Overnight session 2026-07-09 (Lexer asleep, \"do everything\")",
+      "path": "worklog/legacy/050-overnight-session-2026-07-09-lexer-asleep-do-everything.md",
+      "source_section_sha256": "71863a16fa3bde0116051d2921b06d9fd556d1da9431641db86af4b0e75832c4"
+    },
+    {
+      "title": "CORE-EFFECT RAMP \u2014 corrected understanding (2026-07-09)",
+      "path": "worklog/legacy/051-core-effect-ramp-corrected-understanding-2026-07-09.md",
+      "source_section_sha256": "54d611f80800559e6b9e29d96b264ed183a490ef6d7c17b233a8d29fafc283e7"
+    },
+    {
+      "title": "OpenIV RDR2 tooling walls (confirmed 2026-07-09, unlocked-PC session)",
+      "path": "worklog/legacy/052-openiv-rdr2-tooling-walls-confirmed-2026-07-09-unlocked-pc-sessi.md",
+      "source_section_sha256": "0b0ba16cf95f8e5a51b083b42b9a2d277b57c5ac5d7d61c7044a58598db467ea"
+    },
+    {
+      "title": "(NOTE: these walls only mattered for the mistaken sprite approach \u2014 moot now)",
+      "path": "worklog/legacy/053-note-these-walls-only-mattered-for-the-mistaken-sprite-approach.md",
+      "source_section_sha256": "59c45c31b85801072fb6b292c06b0d688ab64d37d0493488f4657823246edea6"
+    },
+    {
+      "title": "State / pending verification",
+      "path": "worklog/legacy/054-state-pending-verification.md",
+      "source_section_sha256": "20d6d54fd5ac98dccf6da23e9ade4ab06ada34cc782ddc0d4fd86d18a8143d6a"
+    },
+    {
+      "title": "Item identity and feather decisions (2026-07-13)",
+      "path": "worklog/legacy/055-item-identity-and-feather-decisions-2026-07-13.md",
+      "source_section_sha256": "ee75b1c54c508355ea7089a882b02ffb2ba2d3e1c83b549655bbdd3adc31fb78"
+    },
+    {
+      "title": "Editor/reference/install update (2026-07-12)",
+      "path": "worklog/legacy/056-editor-reference-install-update-2026-07-12.md",
+      "source_section_sha256": "bafb55791f6263c55ef18593dca9ee3d5d1abd045e50df6382129ed399956afd"
+    },
+    {
+      "title": "Bandit challenge/mask implementation (2026-07-13)",
+      "path": "worklog/legacy/057-bandit-challenge-mask-implementation-2026-07-13.md",
+      "source_section_sha256": "9de507864ea534c007ac9c4128d6d572396c2537a12718c53506dbbf7dc41ac1"
+    },
+    {
+      "title": "Researched game-data map (2026-07-11)",
+      "path": "worklog/legacy/058-researched-game-data-map-2026-07-11.md",
+      "source_section_sha256": "c499464d3d847f6d9fd333aaec07f986ec43e815a7ea162c82b55604ba5e2e01"
+    },
+    {
+      "title": "Editor taxonomy and shop UX (2026-07-12)",
+      "path": "worklog/legacy/059-editor-taxonomy-and-shop-ux-2026-07-12.md",
+      "source_section_sha256": "7048a4af794be227afe3025f32b5f5186597a0c513962b3c30217bcd86094950"
+    },
+    {
+      "title": "#112 streak + #42 worn-state latch \u2014 2026-08-04",
+      "path": "worklog/legacy/060-112-streak-42-worn-state-latch-2026-08-04.md",
+      "source_section_sha256": "9d47c686a7b7b67f6ced4d9d2c45d49275615cb0f773b05e1cd5876be1b7e1b8"
+    },
+    {
+      "title": "#98 always-holster + #50 physical bloodstain marker \u2014 2026-08-04",
+      "path": "worklog/legacy/062-98-always-holster-50-physical-bloodstain-marker-2026-08-04.md",
+      "source_section_sha256": "7ec42fd289f6fdcf0427251ffb9b1dcfc6c723bb363c358d2a2e17a3633b2a59"
+    },
+    {
+      "title": "#131 belt lantern, #42 camp greying \u2014 2026-08-04",
+      "path": "worklog/legacy/064-131-belt-lantern-42-camp-greying-2026-08-04.md",
+      "source_section_sha256": "70f54f254819ebb0fefa4bdf753e8b2b7a1eb14c47e1a723b8d80687522caf0f"
+    },
+    {
+      "title": "#182 recon tags rebuilt on Rockstar's core language \u2014 2026-08-04",
+      "path": "worklog/issues/todo-182.md",
+      "source_section_sha256": "d7c28753540a5af15972a93da67c7926c41e563103b9c95eafaedce68755598a"
+    },
+    {
+      "title": "#189 camera calibration + #103 optional feed \u2014 2026-08-04",
+      "path": "worklog/legacy/068-189-camera-calibration-103-optional-feed-2026-08-04.md",
+      "source_section_sha256": "94b24f3dfb972e9b67e1c34a3cf132a54892d8f39a5cdd78a988f9722ab952f8"
+    },
+    {
+      "title": "#175 probe HUD overlap fixed; #87/#200 confirmed OpenIV-only \u2014 2026-08-04",
+      "path": "worklog/legacy/070-175-probe-hud-overlap-fixed-87-200-confirmed-openiv-only-2026-08.md",
+      "source_section_sha256": "09d2d4e7ff05b7d750664cbd2f9ba5713958b365cfbcb398ba15fa987d1ab0aa"
+    },
+    {
+      "title": "#200 exact missing-icon manifest \u2014 2026-08-04",
+      "path": "worklog/issues/todo-200.md",
+      "source_section_sha256": "e4d45266b26ef868ec181696f7992e1cb595ce9d6e024f3a712e6a8f3b2d6f8e"
+    },
+    {
+      "title": "#200 \u2014 \"femga does not host these dictionaries\" is FALSE, 2026-08-04",
+      "path": "worklog/issues/todo-200.md",
+      "source_section_sha256": "a0a98d70a6e70526802770d013b16e413a4ac71dcd3abad6579c57a69bc07c3b"
+    },
+    {
+      "title": "#200 corrected TWICE \u2014 the real gap is 633 in two dictionaries, 2026-08-04",
+      "path": "worklog/issues/todo-200.md",
+      "source_section_sha256": "b040a59ee8991ed97fb4d7a218905154d5ce5becd9ef3d2368dc4ec8beb14a17"
+    },
+    {
+      "title": "#175 \u2014 the replacement harness already existed, 2026-08-04",
+      "path": "worklog/issues/todo-175.md",
+      "source_section_sha256": "851083edb2237bb89decad4d26070080d03c98587284085becde3f6f30386d2e"
+    },
+    {
+      "title": "Session close \u2014 2026-08-04",
+      "path": "worklog/legacy/076-session-close-2026-08-04.md",
+      "source_section_sha256": "583b638f75f02d3a6a38841bf49d890ac823e77bbe3f9d2e4d525bb43aa3cc33"
+    },
+    {
+      "title": "Priority-0 fixes \u2014 2026-08-04",
+      "path": "worklog/legacy/077-priority-0-fixes-2026-08-04.md",
+      "source_section_sha256": "42d51de5705cd436e94d1d35cef9d72f7daed5baa958947c77c7fddd08707031"
+    },
+    {
+      "title": "Class_A batch: #59, #193, #11, #116, #170, #1, #195 \u2014 2026-08-04",
+      "path": "worklog/legacy/078-class-a-batch-59-193-11-116-170-1-195-2026-08-04.md",
+      "source_section_sha256": "3345bbc88426f4fd8a451acc6ad28a1d75ef72325d09d896951245827150b305"
+    },
+    {
+      "title": "#19 \u2014 wagon stamina cores: the swap could never have fired",
+      "path": "worklog/issues/todo-19.md",
+      "source_section_sha256": "735d2ca2e53162e04c62106007c9ea8a3e38333d4163742a24288318c6299be2"
+    },
+    {
+      "title": "#50 lost-money marker: icon, scale, world marker \u2014 2026-08-05",
+      "path": "worklog/issues/todo-50.md",
+      "source_section_sha256": "7a6b7b0b7a5bd76e85d20f5dff5ed49aa086472cbbc66ab49cb59837cf5024c9"
+    },
+    {
+      "title": "GitHub #48 immediate drowning at zero swimming Stamina \u2014 2026-08-05",
+      "path": "worklog/issues/github-48.md",
+      "source_section_sha256": "7b38784afada63a9ed9a608ae0c7d442206d327f16caccc98c0bb6c736c92b94"
+    },
+    {
+      "title": "GitHub #42 more gunsmiths feasibility \u2014 2026-08-05",
+      "path": "worklog/issues/github-42.md",
+      "source_section_sha256": "b669099561b634da831662850740bfd10610e1d9eedde8d82fec55c5aa6f115e"
+    },
+    {
+      "title": "GitHub #25 core XP gain toggle \u2014 2026-08-05",
+      "path": "worklog/issues/github-25.md",
+      "source_section_sha256": "50f4d3db098615adb4623720d1140365546e9fe4e0fc64f26a57b37df0d05e81"
+    },
+    {
+      "title": "GitHub #15 wallet size cap \u2014 2026-08-05",
+      "path": "worklog/issues/github-15.md",
+      "source_section_sha256": "38a4fdd5e3e5b3a3afcb15569c4ce9806b9950f097877bcdeb8150162734f7ef"
+    },
+    {
+      "title": "#199 projectile flag restoration \u2014 2026-08-05",
+      "path": "worklog/issues/todo-199.md",
+      "source_section_sha256": "7d8da4acbc391d546904228bab79458e3154d6ae773f301129bbd43e3ba1bfb8"
+    },
+    {
+      "title": "#1 horse stamina reserve boundary \u2014 2026-08-05",
+      "path": "worklog/issues/todo-1.md",
+      "source_section_sha256": "022da732d6fa6298f818480147810f150c4c71b612962232c9c29cf69f4270b8"
+    },
+    {
+      "title": "#1 horse Health core reserve \u2014 2026-08-05",
+      "path": "worklog/issues/todo-1.md",
+      "source_section_sha256": "15fdbe15b08d7f4dc38aa397a2c69bcae0245d558cd3d18a9a9020918d5c2050"
+    },
+    {
+      "title": "GitHub #73 campsite respawn on fire \u2014 2026-08-05",
+      "path": "worklog/issues/github-73.md",
+      "source_section_sha256": "18de52ed6ec73e1a4f6e0ffcc9391e54c2820d617461c38e80d6885eae0ce6b4"
+    },
+    {
+      "title": "GitHub #74 recurring exhaustion-like fade \u2014 2026-08-05",
+      "path": "worklog/issues/github-74.md",
+      "source_section_sha256": "e4d61bffc3a2463fad808ff0ae890d1e03f0f679a7403a500d4e7dc313b0ec8b"
+    },
+    {
+      "title": "GitHub #78 zero-bar Dead Eye reactivation \u2014 2026-08-05",
+      "path": "worklog/issues/github-78.md",
+      "source_section_sha256": "76ea822e610b78dd0d6dcc34ab4b4de8d422fda52a777bf59a0082d0d2708caa"
+    },
+    {
+      "title": "Collectible relocation key collision \u2014 2026-08-05",
+      "path": "worklog/legacy/093-collectible-relocation-key-collision-2026-08-05.md",
+      "source_section_sha256": "556d9d6e18f3ecc45773b059f615540b721730ec9f8f84d0588908f47eff34d4"
+    },
+    {
+      "title": "GitHub #80 cigarette-card map coordinates \u2014 2026-08-05",
+      "path": "worklog/issues/github-80.md",
+      "source_section_sha256": "7921c591bdae49bd1be1ef213037761e91afaccdc561f2c76e950471f52f7d42"
+    },
+    {
+      "title": "GitHub exploratory swarm research \u2014 2026-08-05",
+      "path": "worklog/legacy/095-github-exploratory-swarm-research-2026-08-05.md",
+      "source_section_sha256": "3525c3729f1565c90c6f921cc63cf299ea97117c6be47fe0422caf90aa6a9f37"
+    },
+    {
+      "title": "GitHub #92 GameplayTweaks source split \u2014 2026-08-05",
+      "path": "worklog/issues/github-92.md",
+      "source_section_sha256": "023c1db6059fa4900cf4e17147160bab743bf1c5697331808170e5c68bab2729"
+    }
+  ]
+}

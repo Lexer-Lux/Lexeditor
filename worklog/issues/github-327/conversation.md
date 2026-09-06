@@ -20,6 +20,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/327
 
 Created: 2026-09-05T06:34:10Z; updated: 2026-09-06T13:00:01Z
 
+Exact metadata: [source record](sources/issue-5356486474-d2ee5fe3b01d3168a873982a8ac8e210f40d95d0467dd6e34d51d1a2cededdd9.json).
+
+Use Flare to trigger a location-appropriate random encounter and show the remaining count. The shortcut requires Modern Controls. Move vehicle forward/reverse to analog triggers with keyboard equivalents so Square is available.
+
+**Status: You already supplied the design and the missing control constraint.** Implementation and analog-trigger movement remain; do not ask you to define the same feature again.
+
+## issue 5356486474 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/327
+
+Created: 2026-09-05T06:34:10Z; updated: 2026-09-06T13:00:01Z
+
 Exact metadata: [source record](sources/issue-5356486474-d5db7c2db94eb7463325b5e160ed5a29674101d137afb8b67ba12fe79154ca0c.json).
 
 Use Flare to trigger a location-appropriate random encounter and show the remaining count. The shortcut requires Modern Controls. Move vehicle forward/reverse to analog triggers with keyboard equivalents so Square is available.

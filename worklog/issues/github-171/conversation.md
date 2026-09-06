@@ -49,6 +49,18 @@ At zero swimming stamina, death remains inevitable; add a readable struggle/subm
 
 **Status: Research only.** A short engine-owned drowning-time experiment was proposed, but not built. Prepare that controlled prototype and recovery checks before asking you to drown again. The earlier zero-second and trough-animation proposals are rejected.
 
+## issue 5356300100 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/171
+
+Created: 2026-08-06T03:08:31Z; updated: 2026-09-06T13:55:28Z
+
+Exact metadata: [source record](sources/issue-5356300100-ebca9e21bfdba049fc8b23955e5068543f6e6d3c4cd29780f8332bde3521c2ff.json).
+
+At zero swimming stamina, death remains inevitable; add a readable struggle/submerge transition without a rescue window or HUD warning.
+
+**Status: Research only.** A short engine-owned drowning-time experiment was proposed, but not built. Prepare that controlled prototype and recovery checks before asking you to drown again. The earlier zero-second and trough-animation proposals are rejected.
+
 ## comment 5550128281 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/171#issuecomment-5550128281

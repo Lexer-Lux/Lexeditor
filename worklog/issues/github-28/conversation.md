@@ -30,6 +30,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/28
 
 Created: 2026-08-29T10:52:39Z; updated: 2026-09-06T13:30:56Z
 
+Exact metadata: [source record](sources/issue-5286109841-22c113b9ffb2c2bce2560000d92c22c565dbd8674f8276dc85acb774916b030b.json).
+
+**Needs testing.** The field repairs are ready for review.
+
+- [ ] Restart Lexeditor. In FF8 Items, check Buy Price, Sell Multiplier and Sell Price: G/× stay inside borders, only numbers are editable, and Sell Price remains read-only.
+- [ ] In Blank, edit a number and drag a slider. Limits should replace the type while editing, references should stay aligned, and the released value should persist.
+- [ ] Report clipping, incorrect units or jumpy sliders with the field name and screenshot.
+
+## issue 5286109841 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/28
+
+Created: 2026-08-29T10:52:39Z; updated: 2026-09-06T13:30:56Z
+
 Exact metadata: [source record](sources/issue-5286109841-429d9c5ab0b101427592485b69bab9773865cfd9e842ed438d4e0ceaadd04157.json).
 
 **Needs testing.** The field repairs are ready for review.

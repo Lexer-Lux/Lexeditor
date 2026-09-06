@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356285491,
+    "number": 108,
+    "title": "Finish independent camera profiles and vehicle framing",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/108"
+  },
+  "sha256": "ba79564588580dd933f854c53a95068f18b9a010bca5d1317a3ac50ad9e5fddc",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-8.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -34,6 +34,18 @@ Use the correct law/bounty artwork and preserve the map marker’s white, alerte
 
 **Status: Source implementation complete, but unbuilt.** The overhead glyph still remains white because matching its state color is unresolved. Deliver and explain that remaining boundary before final visual acceptance.
 
+## issue 5356333790 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/297
+
+Created: 2026-08-20T19:16:51Z; updated: 2026-09-06T12:57:26Z
+
+Exact metadata: [source record](sources/issue-5356333790-c1e8146a813782c7bb2ebc96cf3d726a22909c8ae3fc3c99a5e14d8374e781b0.json).
+
+Use the correct law/bounty artwork and preserve the map marker’s white, alerted dark-red and hostile red states.
+
+**Status: Source implementation complete, but unbuilt.** The overhead glyph still remains white because matching its state color is unresolved. Deliver and explain that remaining boundary before final visual acceptance.
+
 ## comment 5550167431 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/297#issuecomment-5550167431

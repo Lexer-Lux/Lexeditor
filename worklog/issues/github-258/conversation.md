@@ -24,6 +24,18 @@ Arthur should mantle smoothly at the top rather than slide down, snap upward and
 
 **Status: The actual mantle defect was not repaired in the latest notes.** Earlier handoffs only improved the probes used to reach it, and current wall-grabbing is broken again. Restore reliable climbing and diagnose the mantle transition before another test.
 
+## issue 5356322222 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/258
+
+Created: 2026-08-10T18:25:42Z; updated: 2026-09-06T12:56:47Z
+
+Exact metadata: [source record](sources/issue-5356322222-c318a531b84a3609b937c366ab16eb6fdb09631d3030e1ab33d9d74deaf17586.json).
+
+Arthur should mantle smoothly at the top rather than slide down, snap upward and then animate.
+
+**Status: The actual mantle defect was not repaired in the latest notes.** Earlier handoffs only improved the probes used to reach it, and current wall-grabbing is broken again. Restore reliable climbing and diagnose the mantle transition before another test.
+
 ## comment 5550152803 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/258#issuecomment-5550152803

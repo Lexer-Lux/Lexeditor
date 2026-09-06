@@ -20,6 +20,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/307
 
 Created: 2026-09-05T07:39:22Z; updated: 2026-09-06T13:32:08Z
 
+Exact metadata: [source record](sources/issue-5356482989-078f44299c5ff4ec69e4a897eb2a5fa4c32f34ed5f73274825ec65a9aecdef2d.json).
+
+**Actionable — not implemented.** Add structured Bannerlord editing and a Data Map. Supported data coverage still needs research.
+
+Existing Bannerlord mod issues stay in their current repository until the plugin exists; do not migrate them prematurely.
+
+## issue 5356482989 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/307
+
+Created: 2026-09-05T07:39:22Z; updated: 2026-09-06T13:32:08Z
+
 Exact metadata: [source record](sources/issue-5356482989-bc77c73ffec3b166d46d4420582877dc6d2eab78f7a670e9168309833309f4a2.json).
 
 **Actionable — not implemented.** Add structured Bannerlord editing and a Data Map. Supported data coverage still needs research.

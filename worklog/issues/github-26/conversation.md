@@ -36,6 +36,20 @@ Exact metadata: [source record](sources/issue-5285953371-a57f3193689ee52c754649a
 - [ ] In RDR1, RDR2 and FF8 Data Map, use a file button. It should reveal the file, containing folder or archive, or clearly report it missing.
 - [ ] Confirm source-file banners are absent from ordinary editing pages. Report the failing field or row.
 
+## issue 5285953371 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/26
+
+Created: 2026-08-29T10:18:23Z; updated: 2026-09-06T13:30:52Z
+
+Exact metadata: [source record](sources/issue-5285953371-e26de72d59b57cab2df44c2e6084caefda02a4d9975e6a46fdb33a0d18405302.json).
+
+**Needs testing.** Shared references and Data Map file buttons are implemented. Unavailable references remain explicit; game assets stay in private caches.
+
+- [ ] In a copied RDR1 mod, change an item, shop or mission value, then click Vanilla. Confirm the original value returns as a normal tracked edit.
+- [ ] In RDR1, RDR2 and FF8 Data Map, use a file button. It should reveal the file, containing folder or archive, or clearly report it missing.
+- [ ] Confirm source-file banners are absent from ordinary editing pages. Report the failing field or row.
+
 ## comment 5461867312 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/26#issuecomment-5461867312

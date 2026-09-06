@@ -40,6 +40,18 @@ Return Home and resume the same editor through its right-edge handle without rel
 
 **Status: Mostly implemented.** Resident navigation, pan and header repairs are recorded, but loading-message selection is currently broken in #353. Fix that regression before final acceptance of the complete loading flow.
 
+## issue 5288664916 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/59
+
+Created: 2026-08-29T20:21:06Z; updated: 2026-09-06T12:38:22Z
+
+Exact metadata: [source record](sources/issue-5288664916-d0c028aed1fb8b3889e0b68591343db7c334cfda6e496fe51ca4e85d5eff5e4b.json).
+
+Return Home and resume the same editor through its right-edge handle without reloading. Fresh loads use the quote screen; navigation pans smoothly and the header stays visible.
+
+**Status: Mostly implemented.** Resident navigation, pan and header repairs are recorded, but loading-message selection is currently broken in #353. Fix that regression before final acceptance of the complete loading flow.
+
 ## comment 5464858540 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/59#issuecomment-5464858540

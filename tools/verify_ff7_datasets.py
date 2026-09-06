@@ -313,7 +313,8 @@ class HttpTests(unittest.TestCase):
     def test_map_reports_per_category_proof_and_missing_work(self):
         write_kernel(self.game / PATHS[0])
         rows = self.request("/api/datamap")[1]["rows"]
-        self.assertEqual(sum(row["status"] == "integrated" for row in rows), 5)
+        self.assertEqual(sum(row["coverage"] == "structured" for row in rows), 6)
+        self.assertTrue(all(row["target"] == row["category"] == row["id"] for row in rows))
         for row in rows:
             if row["category"] in ("enemies", "encounters", "shops"):
                 self.assertEqual(row["status"], "not-integrated")

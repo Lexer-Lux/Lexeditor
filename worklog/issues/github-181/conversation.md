@@ -44,6 +44,18 @@ Exact metadata: [source record](sources/issue-5356302274-c1bc314bf1fed28df5a1c1b
 
 Find an effective animation-speed path or remove the misleading control, with correct multiplier units and bounds. Resolve the binocular crash in #357 before another in-game comparison.
 
+## issue 5356302274 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/181
+
+Created: 2026-08-06T03:47:17Z; updated: 2026-09-06T13:57:47Z
+
+Exact metadata: [source record](sources/issue-5356302274-06880a5d2d48d954c1d4c6a2f2585391072a226dcfd1dbf8e6ccc2efe22527ef.json).
+
+**Status: No visible speed improvement is confirmed.** Setting 10 did not help, and the implementation had silently clamped it to 4. A larger displayed number is not a repair.
+
+Find an effective animation-speed path or remove the misleading control, with correct multiplier units and bounds. Resolve the binocular crash in #357 before another in-game comparison.
+
 ## comment 5550130609 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/181#issuecomment-5550130609

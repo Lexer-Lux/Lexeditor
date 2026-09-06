@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356284241,
+    "number": 102,
+    "title": "Show fixed-value health rings on Recon tags",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/102"
+  },
+  "sha256": "9ca3db25a43a7609e7f9a99c3ebf93f59d775619f9ced7e4fc15f0d5c08d4718",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-2.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

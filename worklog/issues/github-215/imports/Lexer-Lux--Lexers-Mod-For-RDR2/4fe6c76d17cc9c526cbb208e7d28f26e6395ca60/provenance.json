@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356311042,
+    "number": 215,
+    "title": "Stop the camera flying around after respawn",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/215"
+  },
+  "sha256": "a60bc90adbd48e037f075327fd8c1ee9d566f5ec4bed5cca3815a05afd7b9b15",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-122.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -21,3 +21,13 @@ Created: 2026-08-10T06:05:18Z; updated: 2026-09-06T13:29:24Z
 Exact metadata: [source record](sources/issue-5356315482-0585b980cb80e7bf9cb34552ba7f9c9b6e24d0a691b79d9977c21762489cea8f.json).
 
 I think the human side is done, I need to understand the horse movement so I can do theirs.
+
+## issue 5356315482 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/234
+
+Created: 2026-08-10T06:05:18Z; updated: 2026-09-06T13:29:24Z
+
+Exact metadata: [source record](sources/issue-5356315482-e0fcb53f0bdb0c0f51b9af65a15644d3d5740010ccb57d2a46ce8ce4fd522638.json).
+
+I think the human side is done, I need to understand the horse movement so I can do theirs.

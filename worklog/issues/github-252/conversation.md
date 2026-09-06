@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/252
 
 Created: 2026-08-10T15:30:11Z; updated: 2026-09-06T12:56:41Z
 
+Exact metadata: [source record](sources/issue-5356320209-159087f87e6d1a5ba827d8240228138427206fbfceb75c9e95406ea98ccba399.json).
+
+Climbing onto an angled roof should produce a real mantle or retain a safe grip, never a fall followed by teleporting back up.
+
+**Status: Unresolved.** A timeout only bounded the stuck state; it did not fix the fall/snap itself. Current climbing-entry failures also block useful testing. Repair the traversal path before another roof test.
+
+## issue 5356320209 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/252
+
+Created: 2026-08-10T15:30:11Z; updated: 2026-09-06T12:56:41Z
+
 Exact metadata: [source record](sources/issue-5356320209-d5cc91be0cc4b09ca8adc224179d1af77ddc5956c34404ccd6958654c9c36970.json).
 
 Climbing onto an angled roof should produce a real mantle or retain a safe grip, never a fall followed by teleporting back up.

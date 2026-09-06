@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/261
 
 Created: 2026-08-11T01:23:13Z; updated: 2026-09-06T12:56:53Z
 
+Exact metadata: [source record](sources/issue-5356323028-04e94c87b48e1e8510d151056cefac7ed357ba4921b73439d55306c3631517e3.json).
+
+Prevent repeated falling/snap-back loops, underground climbing and anchors in empty space. Unsafe surfaces must release safely rather than pretend to fit.
+
+**Status: Latest combined surface/state repair is source-only.** It has not been built or installed. Deliver and verify it before repeating slide-to-climb or angled-surface tests.
+
+## issue 5356323028 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/261
+
+Created: 2026-08-11T01:23:13Z; updated: 2026-09-06T12:56:53Z
+
 Exact metadata: [source record](sources/issue-5356323028-71a1363ae7539e5b6eba8a74e82aeab85fe67b0e74ea3e7aba296b3ed26fb3c7.json).
 
 Prevent repeated falling/snap-back loops, underground climbing and anchors in empty space. Unsafe surfaces must release safely rather than pretend to fit.

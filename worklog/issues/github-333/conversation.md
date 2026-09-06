@@ -22,6 +22,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/333
 
 Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T12:38:42Z
 
+Exact metadata: [source record](sources/issue-5356487639-66a18509ccefed71dae3b95cce35d33c97ae699bd719c69b80e4ddd681fc46eb.json).
+
+The weapon wheel should use configurable slow motion and sit vertically centered.
+
+**Status: Broken and deferred.** Opening it with Tab reproduced an access violation and left game/helper processes hanging. The cause is unconfirmed; neither slow motion nor centering is accepted.
+
+No further game testing is requested until the crash is repaired. The earlier instruction to defer implementation/testing remains in force.
+
+## issue 5356487639 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/333
+
+Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T12:38:42Z
+
 Exact metadata: [source record](sources/issue-5356487639-cbbefb04352197a4d75794f2b1b111734fc4325c50e1f2f33a50ee586a736332.json).
 
 The weapon wheel should use configurable slow motion and sit vertically centered.

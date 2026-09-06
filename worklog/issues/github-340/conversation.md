@@ -26,6 +26,20 @@ Exact metadata: [source record](sources/issue-5356489074-9ab38738443bfa828f6fd91
 - [ ] Make one purchase and fire/reload the equipped gun without opening the wheel. Confirm money and ammunition update and the text stays stable.
 - [ ] Report an incorrect value, flicker or bad placement with a screenshot and your display resolution.
 
+## issue 5356489074 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/340
+
+Created: 2026-08-24T16:26:46Z; updated: 2026-09-06T13:07:50Z
+
+Exact metadata: [source record](sources/issue-5356489074-f569e91316944de0a1ad3d264a82dc401320e371a8a465366b779a8ad559bb74.json).
+
+**Status: A repaired build is installed; needs your check.** Money should show as $X above ammunition, only during normal gameplay—not loading. Avoid the weapon-wheel crash in #333.
+
+- [ ] Restart RDR1 and load Story Mode. Confirm no custom money/ammo text appears during loading, then check the money value against your actual balance.
+- [ ] Make one purchase and fire/reload the equipped gun without opening the wheel. Confirm money and ammunition update and the text stays stable.
+- [ ] Report an incorrect value, flicker or bad placement with a screenshot and your display resolution.
+
 ## comment 5550350599 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/340#issuecomment-5550350599

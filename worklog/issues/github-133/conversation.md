@@ -29,6 +29,18 @@ Explore low incidental animal density with hunting driven by signs and tracks.
 
 **Status: Research incomplete.** Existing evidence does not prove that usable trails persist independently of a live animal. Prepare a controlled trail/streaming experiment before asking you to choose between native trails and custom hunting signs.
 
+## issue 5356291792 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/133
+
+Created: 2026-08-06T02:12:04Z; updated: 2026-09-06T13:55:23Z
+
+Exact metadata: [source record](sources/issue-5356291792-0740d997d997329f2cbe0af4b5ca339e95fcaa8b52905a0dd7aa04d493694a79.json).
+
+Explore low incidental animal density with hunting driven by signs and tracks.
+
+**Status: Research incomplete.** Existing evidence does not prove that usable trails persist independently of a live animal. Prepare a controlled trail/streaming experiment before asking you to choose between native trails and custom hunting signs.
+
 ## comment 5550118558 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/133#issuecomment-5550118558

@@ -34,6 +34,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/31
 
 Created: 2026-08-29T11:13:00Z; updated: 2026-09-06T12:45:19Z
 
+Exact metadata: [source record](sources/issue-5286202785-801a725bace2defe21129078151c8b4d10ff10bed138b066e43e7e78f965cd7a.json).
+
+Provide the requested melee, magic, status, healing and accuracy formulas as one editable, per-mod rework with live previews.
+
+**Incomplete:** healing and accuracy have runtime patches; melee, ordinary magic damage and status infliction do not. The Formulae page also has an unresolved scrolling report. Resolve the remaining rule details and deliver the full feature; a preview is not an applied game change.
+
+## issue 5286202785 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/31
+
+Created: 2026-08-29T11:13:00Z; updated: 2026-09-06T12:45:19Z
+
 Exact metadata: [source record](sources/issue-5286202785-d212d2710da2dd67bce274a84b9f40431a342275892af04ce29e82d0fbc1584e.json).
 
 Provide the requested melee, magic, status, healing and accuracy formulas as one editable, per-mod rework with live previews.

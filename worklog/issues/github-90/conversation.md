@@ -24,3 +24,16 @@ Replace the world-map Back action with a full-screen map menu. The contents and 
 
 - [ ] Specify what it should show: locations, quest markers, unexplored areas and any other information you want included.
 - [ ] Decide what selecting a location should do and how zoom/navigation should work. This is design work, not a test of an existing menu.
+
+## issue 5347826794 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/90
+
+Created: 2026-09-04T12:02:09Z; updated: 2026-09-06T12:46:03Z
+
+Exact metadata: [source record](sources/issue-5347826794-b214e9a999fb31c8136daf74dc80797395a3231bf34f76894729abfb14bd97bb.json).
+
+Replace the world-map Back action with a full-screen map menu. The contents and interactions are not yet defined.
+
+- [ ] Specify what it should show: locations, quest markers, unexplored areas and any other information you want included.
+- [ ] Decide what selecting a location should do and how zoom/navigation should work. This is design work, not a test of an existing menu.

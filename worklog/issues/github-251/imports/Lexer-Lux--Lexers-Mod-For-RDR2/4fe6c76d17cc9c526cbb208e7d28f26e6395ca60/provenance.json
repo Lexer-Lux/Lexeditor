@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356319949,
+    "number": 251,
+    "title": "Restore climbing entry before testing animation stop",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/251"
+  },
+  "sha256": "588bd3f6f268bb284a6b34b24a7f5a30a42bc4fe831447787aa3b366d0eeb9db",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-159.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

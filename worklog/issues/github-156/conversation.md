@@ -26,3 +26,15 @@ Exact metadata: [source record](sources/issue-5356297024-14867170ba0c371d60ce22e
 Keep cigarette cards unsellable until their twelve-card set is mailed to Phineas. Afterward, allow duplicates from that set to be sold without restoring the submitted cards.
 
 **Status: A current implementation and prepared test are not established.** Verify the set-turn-in handling and provide a suitable before/after test state before requesting acceptance.
+
+## issue 5356297024 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/156
+
+Created: 2026-08-06T02:39:39Z; updated: 2026-09-06T12:54:25Z
+
+Exact metadata: [source record](sources/issue-5356297024-e88bbc093b87a689e6af94e12721fda7e182d5f1c267f9b23c5acb15792545eb.json).
+
+Keep cigarette cards unsellable until their twelve-card set is mailed to Phineas. Afterward, allow duplicates from that set to be sold without restoring the submitted cards.
+
+**Status: A current implementation and prepared test are not established.** Verify the set-turn-in handling and provide a suitable before/after test state before requesting acceptance.

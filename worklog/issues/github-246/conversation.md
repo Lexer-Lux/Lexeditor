@@ -22,6 +22,16 @@ Exact metadata: [source record](sources/issue-5356318543-2b10b35c6f0270344455d44
 
 **Status: Not implemented with the resolved camera interfaces.** The tested shoulder control works in aiming context, not with a holstered weapon. A key listener or generic offset does not create the missing shoulder state. This is a technical blocker, not completed functionality.
 
+## issue 5356318543 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/246
+
+Created: 2026-08-10T14:54:53Z; updated: 2026-09-06T13:18:01Z
+
+Exact metadata: [source record](sources/issue-5356318543-c70c64dddcde62016a31afb136a5cc9c259ee90ecbb482ad982fa65ecfcf4959.json).
+
+**Status: Not implemented with the resolved camera interfaces.** The tested shoulder control works in aiming context, not with a holstered weapon. A key listener or generic offset does not create the missing shoulder state. This is a technical blocker, not completed functionality.
+
 ## comment 5550148714 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/246#issuecomment-5550148714

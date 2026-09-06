@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356317206,
+    "number": 241,
+    "title": "Reject activated campsite markers without a physical camp",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/241"
+  },
+  "sha256": "227795e2aa5dbc8568a311d903f2b39801e2d20338ec3e6468c60953c33a5d05",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-149.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

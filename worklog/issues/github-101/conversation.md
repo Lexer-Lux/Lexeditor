@@ -25,6 +25,18 @@ Keep placed campsites usable but not removable by normal players; hide ordinary 
 
 **Status: Latest activation and map-name repair is source-only.** It has not been built or installed. Prepare and deliver the corrected build before another campsite test.
 
+## issue 5356282325 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/101
+
+Created: 2026-08-06T01:11:31Z; updated: 2026-09-06T13:58:00Z
+
+Exact metadata: [source record](sources/issue-5356282325-58cade730ba262c095e5ac4549d80e0f5a262dadcccd88d8e834dbcf03382e23.json).
+
+Keep placed campsites usable but not removable by normal players; hide ordinary camp creation outside missions. Activation must update the fire, map icon and saved state consistently.
+
+**Status: Latest activation and map-name repair is source-only.** It has not been built or installed. Prepare and deliver the corrected build before another campsite test.
+
 ## comment 5550107133 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/101#issuecomment-5550107133

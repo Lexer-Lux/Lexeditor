@@ -25,3 +25,15 @@ Exact metadata: [source record](sources/issue-5356552028-92b6c795c3c00c4abb9ccec
 **Actionable — no fix ready.** Several attachment points tilt the lantern sideways; Melee belt also makes it disappear intermittently. Correct orientation and visibility during movement.
 
 Main lantern behavior is #105; leg clipping is separately tracked in #295. Deferral does not make this waiting on you.
+
+## issue 5356552028 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/348
+
+Created: 2026-09-05T07:55:26Z; updated: 2026-09-06T13:32:12Z
+
+Exact metadata: [source record](sources/issue-5356552028-aefd417ff16d4bc6bc5994c052fac3791204844a0d59c9bfa339c7fc844181d6.json).
+
+**Actionable — no fix ready.** Several attachment points tilt the lantern sideways; Melee belt also makes it disappear intermittently. Correct orientation and visibility during movement.
+
+Main lantern behavior is #105; leg clipping is separately tracked in #295. Deferral does not make this waiting on you.

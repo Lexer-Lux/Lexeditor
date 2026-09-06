@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356320209,
+    "number": 252,
+    "title": "Fix falling and snapping during angled top-outs",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/252"
+  },
+  "sha256": "b160f77faae922fb6f58c8b132373b59a887c6ad73cea4eba18685fd08b1cff3",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-160.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

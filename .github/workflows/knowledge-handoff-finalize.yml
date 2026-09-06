@@ -1,0 +1,97 @@
+name: Finalize knowledge handoff
+on:
+  push:
+    branches: [master]
+    paths: [.github/workflows/knowledge-handoff-finalize.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: lexeditor-knowledge-store
+  cancel-in-progress: false
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: master
+          submodules: false
+          sparse-checkout: |
+            tools/import_knowledge.py
+            .github/knowledge-import-request.json
+            .github/workflows/knowledge-store.yml
+            codex
+            worklog
+            docs
+          sparse-checkout-cone-mode: false
+      - name: Complete provenance routing without issue mutations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import datetime,json,pathlib,subprocess
+          root=pathlib.Path('.')
+          p=root/'tools/import_knowledge.py';text=p.read_text()
+          old='        if canonical:\n            merge_file(canonical,data,key,ledger,conflicts)'
+          new="        if b'KNOWLEDGE HAS MOVED TO LEXEDITOR' in data[:200]:\n            canonical=None  # Forwarding stubs must not replace central knowledge.\n        if canonical:\n            merge_file(canonical,data,key,ledger,conflicts)"
+          assert old in text or new in text
+          if new not in text:text=text.replace(old,new)
+          p.write_text(text);compile(text,str(p),'exec')
+          workflow=root/'.github/workflows/knowledge-store.yml';text=workflow.read_text()
+          old='        run: gh run download 34033219303 --repo Lexer-Lux/Lexeditor --name human-issue-audit-34033219303 --dir /tmp/knowledge-baseline'
+          new='        run: |\n          if [ ! -f worklog/migrations/comment-archive/snapshot.json ]; then\n            gh run download 34033219303 --repo Lexer-Lux/Lexeditor --name human-issue-audit-34033219303 --dir /tmp/knowledge-baseline\n          fi'
+          assert old in text or new in text
+          workflow.write_text(text.replace(old,new))
+          ledger=json.loads((root/'worklog/migrations/game-knowledge.json').read_text())
+          (root/'.github/knowledge-import-request.json').write_text(json.dumps({'imports':[],'gaps':ledger.get('gaps',[]),'state':'Snapshot imported; a future catch-up needs a newly reviewed export.'},indent=2)+'\n')
+          for game in ('ff7','ff8','ff9','rdr1','shared'):
+              directory=root/'codex'/game
+              topics=sorted(p for p in directory.rglob('*') if p.is_file() and p.name!='README.md' and p.suffix in {'.md','.txt'})
+              if topics:
+                  body=f'# {game.upper()} codex\n\nCanonical central topics. Full requests and pending work belong in per-issue worklogs.\n\n'+''.join(f'- [{p.stem}]({p.relative_to(directory).as_posix()})\n' for p in topics)
+                  body+='\nSee worklog/migrations/game-knowledge.json for source-repository coverage and local-only gaps. Existing central topics do not prove that an unavailable local codex was imported.\n'
+                  (directory/'README.md').write_text(body)
+          report_path=root/'worklog/migrations/knowledge-consolidation-2026-09-06/verification.json'
+          report=json.loads(report_path.read_text())
+          result=subprocess.run(['gh','api','repos/Lexer-Lux/Lexeditor/actions/jobs/101497841433/logs','--allow-escape-sequences'],capture_output=True,timeout=90)
+          if result.returncode==0:
+              lines=result.stdout.decode('utf-8-sig',errors='replace').splitlines()
+              report['stopped_cleanup_error']=[line for line in lines if any(word in line for word in ('RuntimeError:','HTTP 403','secondary rate','rate limit','Resource not accessible'))][-8:]
+          else:report['stopped_cleanup_error']=['Log read failed: '+result.stderr.decode(errors='replace')[-500:]]
+          report['handoff_finalized_at']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+          report_path.write_text(json.dumps(report,ensure_ascii=False,sort_keys=True,indent=2)+'\n')
+          documentation=[
+              '# Requests, worklogs and codices','',
+              'GitHub is the concise human-facing view, not the complete specification.','',
+              'Preserve each request verbatim before shortening it: examples, numeric rules, exceptions, rejected alternatives and corrections.','',
+              'Use worklog/issues/github-N.md for the current handoff and acceptance criteria. Immutable originals belong in github-N/sources/; the full readable discussion is in github-N/conversation.md. Settled knowledge belongs in codex/<game>/, not the progress log.','',
+              'Search these originals before asking a question. Missing or unretrieved context is agent recovery work, not evidence that Lexer supplied no details. Delete a comment only after its exact version and attachments are committed and verified; re-read immediately before deletion.','',
+              '## Parallel ownership','',
+              'One owner edits each issue handoff. Other contributors append uniquely named session/source records. One integrator reconciles shared codex indices. Do not let every worker overwrite a global Worklog.txt.','',
+              '## Catch up after parallel branches merge','',
+              '1. Preserve the actual new notes, including uncommitted local files through an explicit local import. A remote snapshot cannot include them.','2. Export documentation from the source repository. Compare file hashes and the source commit with worklog/migrations/game-knowledge.json.','3. Review new documentation before publication. Use a fresh file-scoped link for that reviewed artifact, never an account token, expired prior export, or proprietary game dump.','4. Run the central importer with the reviewed manifest. It preserves original bytes in a repository/commit namespace, keeps diverged central files, and reports conflicts instead of overwriting newer work. Forwarding stubs must never replace actual knowledge.','5. Reconcile conflicts against newer human decisions and actual code. Match transferred issue identities explicitly, never by number alone. Verify source and attachment preservation before comment cleanup.','',
+              'The ledger makes catch-up repeatable; it does not recover chat text that was never captured. GitHub event archival preserves body/comment changes and before-edit text supplied by GitHub. Agents must still save full original chat requests at intake.','']
+          (root/'docs').mkdir(exist_ok=True)
+          (root/'docs/KNOWLEDGE.md').write_text('\n'.join(documentation))
+          print(json.dumps({'cleanup_error':report['stopped_cleanup_error'],'imported_sources':list(ledger['sources']),'note':'No issue comments deleted by finalization.'}))
+          PY
+      - name: Commit and verify the handoff
+        run: |
+          set -euo pipefail
+          git config user.name 'Lexeditor Knowledge Handoff'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f tools/import_knowledge.py .github/knowledge-import-request.json .github/workflows/knowledge-store.yml codex worklog/migrations docs/KNOWLEDGE.md
+          if ! git diff --cached --quiet; then
+            git commit -m 'Finalize lossless knowledge routing and post-merge catch-up safeguards [skip ci]'
+            pushed=0
+            for attempt in 1 2 3; do
+              git -c submodule.recurse=false fetch --no-recurse-submodules origin master
+              git -c submodule.recurse=false rebase origin/master
+              if git push origin HEAD:master; then pushed=1; break; fi
+            done
+            test "$pushed" = 1
+          fi
+          git -c submodule.recurse=false fetch --no-recurse-submodules origin master
+          git merge-base --is-ancestor HEAD origin/master

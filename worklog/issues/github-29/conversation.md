@@ -36,6 +36,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/29
 
 Created: 2026-08-29T11:00:59Z; updated: 2026-09-06T13:06:41Z
 
+Exact metadata: [source record](sources/issue-5286146661-533e3e75875fac18324c272b83603a75b20bcdc412ca0746016a6f49931e4cf7.json).
+
+**Status: Implemented; needs your check.** Plugin Restart restarts the active editor; Home Restart restarts Lexeditor, even with no plugin open. Developer controls stay hidden when Developer Mode is off.
+
+- [ ] Toggle Developer Mode in Settings. Confirm Restart appears/disappears immediately on Home and in a plugin.
+- [ ] With a disposable unsaved edit, choose Restart, then Cancel. Confirm the edit survives. Save or discard deliberately, restart, and confirm only one window remains.
+- [ ] Enable Lexer Mode and confirm Blank: The Game is available without an installation. Report missing controls or the wrong restart behavior.
+
+## issue 5286146661 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/29
+
+Created: 2026-08-29T11:00:59Z; updated: 2026-09-06T13:06:41Z
+
 Exact metadata: [source record](sources/issue-5286146661-f1dcbaaeef87055887949c717d04c390428061ac199308a01be3c146086bd866.json).
 
 **Status: Implemented; needs your check.** Plugin Restart restarts the active editor; Home Restart restarts Lexeditor, even with no plugin open. Developer controls stay hidden when Developer Mode is off.

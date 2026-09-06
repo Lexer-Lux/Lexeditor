@@ -73,3 +73,17 @@ Make rendering smoother without speeding up battle logic, animations, timers or 
 **Status: Research only; initial scope needs your decision.**
 
 - [ ] Choose one first milestone: 60 FPS battles with original 15 Hz logic; display-refresh battles with original logic; or full-game arbitrary-refresh rendering with fixed-step simulation. No implementation is claimed yet.
+
+## issue 5356482365 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/303
+
+Created: 2026-08-30T22:25:53Z; updated: 2026-09-06T12:59:22Z
+
+Exact metadata: [source record](sources/issue-5356482365-c59dd0df97415c9dcd3a9f1145544825e0ebcae8c80e09c9641dabd62a2409f5.json).
+
+Make rendering smoother without speeding up battle logic, animations, timers or input. This needs more than raising an FPS limit.
+
+**Status: Research only; initial scope needs your decision.**
+
+- [ ] Choose one first milestone: 60 FPS battles with original 15 Hz logic; display-refresh battles with original logic; or full-game arbitrary-refresh rendering with fixed-step simulation. No implementation is claimed yet.

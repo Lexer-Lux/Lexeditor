@@ -24,6 +24,18 @@ The FF8 editor exists; this is no longer an unstarted plugin request. Editing, s
 
 **Work remains:** finish the missing runtime/features in #31, #84, #91, #93, #100 and #308–#328, then prepare concrete checks for Draw, Refine recipes and text overrides. Do not mark the whole plugin ready because individual tabs or patches exist.
 
+## issue 5285594217 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/21
+
+Created: 2026-08-29T08:49:48Z; updated: 2026-09-06T12:45:14Z
+
+Exact metadata: [source record](sources/issue-5285594217-e5c47063da304bc9777c6d3437f1d290deaa64b6a9c65572026bc9dfa5829dd3.json).
+
+The FF8 editor exists; this is no longer an unstarted plugin request. Editing, startup and some save-loading paths work, but complete gameplay acceptance remains outstanding.
+
+**Work remains:** finish the missing runtime/features in #31, #84, #91, #93, #100 and #308–#328, then prepare concrete checks for Draw, Refine recipes and text overrides. Do not mark the whole plugin ready because individual tabs or patches exist.
+
 ## comment 5461473582 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/21#issuecomment-5461473582

@@ -24,6 +24,18 @@ Restore the full set of custom/vanilla map icons without missing squares or invi
 
 **Status: Latest corpse-X artwork is rebuilt but not installed.** The previous test found no X on the minimap. Deliver the complete icon package and verify its runtime visibility, not just its file hash.
 
+## issue 5356318270 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/245
+
+Created: 2026-08-10T13:12:15Z; updated: 2026-09-06T12:56:37Z
+
+Exact metadata: [source record](sources/issue-5356318270-ecf3ae6a7dd896e8312b44623b4396147551e1a822d5b23b388b5fdae76b75ba.json).
+
+Restore the full set of custom/vanilla map icons without missing squares or invisible corpse markers.
+
+**Status: Latest corpse-X artwork is rebuilt but not installed.** The previous test found no X on the minimap. Deliver the complete icon package and verify its runtime visibility, not just its file hash.
+
 ## comment 5550148394 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/245#issuecomment-5550148394

@@ -23,3 +23,15 @@ Exact metadata: [source record](sources/issue-5356486830-2430f1369cf2fb8594db53f
 Explore safe up/down camera movement proportional to stick deflection, with a dead zone and no drift. Preserve normal movement and zoom.
 
 **Status: Deferred feasibility work.** Horizontal camera rotation in #305 is already confirmed working; it is no longer the blocker. Vertical support still needs proving before any player test.
+
+## issue 5356486830 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/329
+
+Created: 2026-09-05T06:51:23Z; updated: 2026-09-06T13:00:02Z
+
+Exact metadata: [source record](sources/issue-5356486830-a72d920e8c74255f734c9422f7da80b3234ae51d16b1ea175c229c41da322964.json).
+
+Explore safe up/down camera movement proportional to stick deflection, with a dead zone and no drift. Preserve normal movement and zoom.
+
+**Status: Deferred feasibility work.** Horizontal camera rotation in #305 is already confirmed working; it is no longer the blocker. Vertical support still needs proving before any player test.

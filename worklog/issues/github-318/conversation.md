@@ -23,3 +23,15 @@ Exact metadata: [source record](sources/issue-5356484920-1321f338a08ad167de3190a
 **Status: Design not selected; no replacement acquisition system is implemented.**
 
 - [ ] Choose the alternative to drawing boss-held GFs: automatic awards on victory, items/quests, or another rule. Specify how missed GFs should be recovered and which progression restrictions must remain.
+
+## issue 5356484920 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/318
+
+Created: 2026-09-04T06:32:26Z; updated: 2026-09-06T12:59:43Z
+
+Exact metadata: [source record](sources/issue-5356484920-21fb4fa50005fc9a471409cc9f2447f986e5cb0a7d135991cf90f275aaf5db3b.json).
+
+**Status: Design not selected; no replacement acquisition system is implemented.**
+
+- [ ] Choose the alternative to drawing boss-held GFs: automatic awards on victory, items/quests, or another rule. Specify how missed GFs should be recovered and which progression restrictions must remain.

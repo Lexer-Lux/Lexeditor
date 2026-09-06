@@ -22,6 +22,16 @@ Exact metadata: [source record](sources/issue-5356311042-72a1ae30a07960a2f0a7009
 
 **Status: Closed historical repair.** Repeated per-frame player relocation was replaced with one validated move after normal respawn. This issue’s last delivery note was still queued; current campsite selection and placement work remains in #244 and #172.
 
+## issue 5356311042 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/215
+
+Created: 2026-08-06T10:01:10Z; updated: 2026-09-06T13:56:13Z
+
+Exact metadata: [source record](sources/issue-5356311042-e1a0574220f2167688c627c5feb93fd05829b441583f57b537d7c018eb37e528.json).
+
+**Status: Closed historical repair.** Repeated per-frame player relocation was replaced with one validated move after normal respawn. This issue’s last delivery note was still queued; current campsite selection and placement work remains in #244 and #172.
+
 ## comment 5550140090 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/215#issuecomment-5550140090

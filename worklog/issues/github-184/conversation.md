@@ -48,6 +48,18 @@ The reusable canteen stores five drinks, consumes one charge per use, restores c
 
 **Status: An earlier candidate was installed, but the required custom-crafting flow still has undelivered repairs in #122.** Verify that combined build and its acquisition route before requesting final canteen/refill tests.
 
+## issue 5356302883 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/184
+
+Created: 2026-08-06T03:56:34Z; updated: 2026-09-06T13:57:09Z
+
+Exact metadata: [source record](sources/issue-5356302883-f2fa6e4341344e23279f4f77b9860f0760fab259c5636f4c4d5ca2c7c9f14ab2.json).
+
+The reusable canteen stores five drinks, consumes one charge per use, restores configured Stamina Core and retains its water across reloads. It is crafted from one Empty Bottle at a campfire.
+
+**Status: An earlier candidate was installed, but the required custom-crafting flow still has undelivered repairs in #122.** Verify that combined build and its acquisition route before requesting final canteen/refill tests.
+
 ## comment 5550131378 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/184#issuecomment-5550131378

@@ -24,6 +24,18 @@ Exact metadata: [source record](sources/issue-5356285961-35c428e5a569c9917854701
 
 The remaining help update explains that increasing the displayed distance also thins nearby icons. Its latest generated-menu change was not built or installed. Deliver that documentation update before closing this issue.
 
+## issue 5356285961 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/110
+
+Created: 2026-08-06T01:38:46Z; updated: 2026-09-06T13:58:04Z
+
+Exact metadata: [source record](sources/issue-5356285961-91a2e1b53968781618c5375612fc716bbcd427a481674423a3220824d9133f77.json).
+
+**Status: You already confirmed the zoom works.** Do not repeat that acceptance test.
+
+The remaining help update explains that increasing the displayed distance also thins nearby icons. Its latest generated-menu change was not built or installed. Deliver that documentation update before closing this issue.
+
 ## comment 5550111520 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/110#issuecomment-5550111520

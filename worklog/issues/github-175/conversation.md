@@ -22,6 +22,16 @@ Exact metadata: [source record](sources/issue-5356300897-bf7d7b0b290ac129e2dd07b
 
 **Status: Closed after the installed mask-carrier recovery.** The selected mask can recover after its inventory carrier disappears, without requiring another wardrobe visit. Equipping/removing it should keep its wheel check mark synchronized and preserve shops and horse inventory interactions.
 
+## issue 5356300897 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/175
+
+Created: 2026-08-06T03:27:51Z; updated: 2026-09-06T13:58:03Z
+
+Exact metadata: [source record](sources/issue-5356300897-f5b366067cbe2f0c5ae08b89bd7577f3d47532a8cd5a9acf84fc220a555b7953.json).
+
+**Status: Closed after the installed mask-carrier recovery.** The selected mask can recover after its inventory carrier disappears, without requiring another wardrobe visit. Equipping/removing it should keep its wheel check mark synchronized and preserve shops and horse inventory interactions.
+
 ## comment 5550129211 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/175#issuecomment-5550129211

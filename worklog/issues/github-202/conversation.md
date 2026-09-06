@@ -32,3 +32,15 @@ Exact metadata: [source record](sources/issue-5356308169-29c3a399ab839fecf8fdd0d
 Carrying the Viking Comb should double eligible small positive social Honor gains, excluding missions, losses and gains above 20 points.
 
 **Status: Delivery and a measurable test are not established.** Prepare a known interaction and readable before/after Honor values; asking you to judge an unspecified Honor-bar change is not a valid test.
+
+## issue 5356308169 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/202
+
+Created: 2026-08-06T05:59:36Z; updated: 2026-09-06T12:55:38Z
+
+Exact metadata: [source record](sources/issue-5356308169-4df0510ab050d95e80acd95256d1e20683cb8cdefc695c14411a47e1f0e1e64a.json).
+
+Carrying the Viking Comb should double eligible small positive social Honor gains, excluding missions, losses and gains above 20 points.
+
+**Status: Delivery and a measurable test are not established.** Prepare a known interaction and readable before/after Honor values; asking you to judge an unspecified Honor-bar change is not a valid test.

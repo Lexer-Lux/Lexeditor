@@ -28,6 +28,18 @@ Exact metadata: [source record](sources/issue-5356297414-bdb9d4db4070af671baf356
 
 A different mechanism is needed for separate regular/improved zoom stages. The new crash is tracked independently in #357.
 
+## issue 5356297414 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/158
+
+Created: 2026-08-06T02:40:48Z; updated: 2026-09-06T13:58:01Z
+
+Exact metadata: [source record](sources/issue-5356297414-aa7d517012fb550477b849d877f75fa86345a0b0275c151768ebc7344b021deb.json).
+
+**Status: Blocked with the currently proven camera interfaces.** The native data exposes a base FOV, not independently editable zoom stages. The scripted-camera attempt failed and was removed; normal binocular camera behavior was restored.
+
+A different mechanism is needed for separate regular/improved zoom stages. The new crash is tracked independently in #357.
+
 ## comment 5550125245 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/158#issuecomment-5550125245

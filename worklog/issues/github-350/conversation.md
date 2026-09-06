@@ -22,6 +22,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/350
 
 Created: 2026-09-05T10:42:40Z; updated: 2026-09-06T13:00:07Z
 
+Exact metadata: [source record](sources/issue-5357377096-1e86f263a788636ce761c07117d8281f45d55a01c64962d14d4cc856e04e8c8e.json).
+
+**Status: A direct-launch check is needed, not a confirmed warning-screen patch.** The existing report associates the warning with the separate launcher.
+
+- [ ] Start FF8 using Lexeditor’s Play button. Confirm whether the epilepsy warning appears; if it does, send its exact text or a screenshot.
+
+## issue 5357377096 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/350
+
+Created: 2026-09-05T10:42:40Z; updated: 2026-09-06T13:00:07Z
+
 Exact metadata: [source record](sources/issue-5357377096-a2941d22714add51471fc62e27f3782a5fc332de53d981bfb53f88cb427a730c.json).
 
 **Status: A direct-launch check is needed, not a confirmed warning-screen patch.** The existing report associates the warning with the separate launcher.

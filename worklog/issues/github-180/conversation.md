@@ -35,6 +35,18 @@ Exact metadata: [source record](sources/issue-5356302029-bc4fadabd2fbd377b575463
 
 Remove the custom card-glint code and setting while preserving vanilla flashes, card pickups and the separate casing glints. No new design answer or repeat test is needed from you.
 
+## issue 5356302029 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/180
+
+Created: 2026-08-06T03:45:31Z; updated: 2026-09-06T13:56:06Z
+
+Exact metadata: [source record](sources/issue-5356302029-8e503e6ea47db8f63581ce4c517dbc1e8e8787f7f63957e877cb3b14046f3602.json).
+
+**Actionable — removal remains.** You asked to remove this feature because vanilla cigarette cards already flash. Later implementation notes did not supersede that decision.
+
+Remove the custom card-glint code and setting while preserving vanilla flashes, card pickups and the separate casing glints. No new design answer or repeat test is needed from you.
+
 ## comment 5550130360 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/180#issuecomment-5550130360

@@ -25,3 +25,15 @@ Exact metadata: [source record](sources/issue-5356313741-31612f2312e71e8be333c3b
 **Actionable — engine research remains.** No verified field or safe hook removes these specific modifiers yet. That missing implementation does not prove the request impossible.
 
 Changing unrelated core rates would not meet the requirement. No working switch or player test is available.
+
+## issue 5356313741 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/226
+
+Created: 2026-08-07T08:47:44Z; updated: 2026-09-06T13:31:34Z
+
+Exact metadata: [source record](sources/issue-5356313741-e08ffae17dd03e54ea0a2822c5de8adb3f1cb24768725bdb8ec215c9d57f82f3.json).
+
+**Actionable — engine research remains.** No verified field or safe hook removes these specific modifiers yet. That missing implementation does not prove the request impossible.
+
+Changing unrelated core rates would not meet the requirement. No working switch or player test is available.

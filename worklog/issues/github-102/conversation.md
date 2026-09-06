@@ -30,6 +30,20 @@ Each full ring represents the configured HP amount; successive colored layers sh
 
 References: [RDR UI](https://github.com/Sarbatore/rdr_uis), [native menu base](https://github.com/Halen84/RDR2-Native-Menu-Base).
 
+## issue 5356284241 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/102
+
+Created: 2026-08-06T01:17:34Z; updated: 2026-09-06T13:57:32Z
+
+Exact metadata: [source record](sources/issue-5356284241-95c20e0d987e5d541c7aaa3de64210d3a0a4dd02f90ae0715ad664b744d488d0.json).
+
+Each full ring represents the configured HP amount; successive colored layers show additional health. Do not normalize every enemy to its own maximum. The owned horse keeps its separate core behavior.
+
+**Actionable — latest correction is built, not installed.** Known-HP targets and the installed test build still need preparing.
+
+References: [RDR UI](https://github.com/Sarbatore/rdr_uis), [native menu base](https://github.com/Halen84/RDR2-Native-Menu-Base).
+
 ## comment 5550109365 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/102#issuecomment-5550109365

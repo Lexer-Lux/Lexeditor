@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356310129,
+    "number": 211,
+    "title": "Recognize the full campsite for developer removal",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/211"
+  },
+  "sha256": "77c6652a4231da426d5a66c09260fc28b61caa0c217c399f5037f0db2415f9e1",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-116.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

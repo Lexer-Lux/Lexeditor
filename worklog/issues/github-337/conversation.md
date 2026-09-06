@@ -24,6 +24,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/337
 
 Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T13:26:43Z
 
+Exact metadata: [source record](sources/issue-5356488488-899903f18770b11ae2831fa2bc02d515edc0ae50abefe0d10e729b7f66357055.json).
+
+Provide real Items, Shops, Loot Tables, Missions and Tweaks editing, with honest Data Map coverage and the shared list/detail layout. Do not substitute a raw Files tab or overwrite installed archives.
+
+**Status: Partly implemented.** Items, Shops and Missions have working editor surfaces; remaining data coverage and end-to-end in-game application still need completing. Not ready for overall acceptance.
+
+## issue 5356488488 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/337
+
+Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T13:26:43Z
+
 Exact metadata: [source record](sources/issue-5356488488-e5fe8d358ed94e9a35a7f62cdbd252edbb107506d72b2fcdb334a71ad206c36d.json).
 
 Provide real Items, Shops, Loot Tables, Missions and Tweaks editing, with honest Data Map coverage and the shared list/detail layout. Do not substitute a raw Files tab or overwrite installed archives.

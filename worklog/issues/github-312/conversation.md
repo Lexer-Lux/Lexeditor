@@ -27,6 +27,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/312
 
 Created: 2026-08-29T15:23:54Z; updated: 2026-09-06T12:59:33Z
 
+Exact metadata: [source record](sources/issue-5356483893-49c4e787363bf63ea9332f4eba541529bdd4e32477a855ad351447dffe70c157.json).
+
+Use Attack, Magic, the character command and the learned command from the single junctioned GF. Removing a GF must remove its command.
+
+**Status: Partly repaired.** The Siren/Treatment learning gate is corrected in the latest handoff, but custom commands in #314 and undefined Angelo behavior remain open. Do not label the complete command rework finished from the Treatment repair alone.
+
+## issue 5356483893 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/312
+
+Created: 2026-08-29T15:23:54Z; updated: 2026-09-06T12:59:33Z
+
 Exact metadata: [source record](sources/issue-5356483893-f80093a34ba81fadd73fdf6276248fe0a35ecae9f0115e0a70a6b32f413a609f.json).
 
 Use Attack, Magic, the character command and the learned command from the single junctioned GF. Removing a GF must remove its command.

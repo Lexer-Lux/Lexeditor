@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356304474,
+    "number": 190,
+    "title": "Stop untagged hostiles appearing in tagged-only mode",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/190"
+  },
+  "sha256": "3f2c6b82b25591c17e8a8b3df35ac94aa44168f52e163cd0578fcea5898c1935",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-94.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

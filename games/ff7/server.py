@@ -80,8 +80,7 @@ def data_map() -> dict:
         if key == "characters" and not error:
             notes += " Initial stats/equipment/materia and growth/limit fields are editable. Curve coefficients, executable-only character initialization and AI remain preserved."
         rows.append({"filename": source_label, "controls": category.label,
-            "notes": notes, "status": "blocked" if error else (
-                "partial" if key == "characters" else "integrated"),
+            "notes": notes, "status": "blocked" if error else "partial",
             "openable": not bool(error), "category": key,
             "sourcePath": str(GAME_ROOT / data["sourceRelativePath"]) if data["sourceRelativePath"] else ""})
     for family, info in FAMILIES.items():
@@ -103,6 +102,12 @@ def data_map() -> dict:
     rows.append({"filename": "FFNx.toml", "controls": "FFNx runtime settings",
         "notes": note, "status": status, "openable": available,
         "sourcePath": str(config), "category": "tweaks"})
+    # Preserve the shared coverage/navigation contract merged into master.
+    # A bounded subset of a file is structured editing, not complete coverage.
+    for row in rows:
+        row["coverage"] = "structured" if row["openable"] else "unavailable"
+        row["target"] = row["category"]
+        row["id"] = row["category"]
     return {"contract": "Lexeditor.data-map", "rows": rows}
 
 

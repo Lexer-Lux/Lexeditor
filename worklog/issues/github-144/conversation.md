@@ -26,6 +26,18 @@ Match custom casing position and momentum to vanilla before tuning away the refe
 
 **Status: Test preparation is broken.** The restore control restores only the base weapon file while six patch files remain blank, so several weapons have no valid reference. Correct restore/status coverage across the whole weapon set before any visual comparison.
 
+## issue 5356294452 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/144
+
+Created: 2026-08-06T02:25:40Z; updated: 2026-09-06T13:57:17Z
+
+Exact metadata: [source record](sources/issue-5356294452-87eb5c7244d89bf169e4b002280be51571e7150462e3ff6fd897a05071afc92d.json).
+
+Match custom casing position and momentum to vanilla before tuning away the reference effects.
+
+**Status: Test preparation is broken.** The restore control restores only the base weapon file while six patch files remain blank, so several weapons have no valid reference. Correct restore/status coverage across the whole weapon set before any visual comparison.
+
 ## comment 5550121573 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/144#issuecomment-5550121573

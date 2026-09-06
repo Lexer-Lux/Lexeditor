@@ -31,6 +31,19 @@ Exact metadata: [source record](sources/issue-5356289511-7992bfd7f5ac3e850848c2f
 - [ ] On a spare save in free roam, incur a serious bounty and approach a lawman when the payment interaction is offered. With enough cash, confirm it shows the amount, charges once and ends the pursuit.
 - [ ] Repeat with less cash than the displayed amount: payment must be unavailable with the shortfall shown and no money deducted. Report the crime, amount and failed step.
 
+## issue 5356289511 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/124
+
+Created: 2026-08-06T01:59:28Z; updated: 2026-09-06T13:55:45Z
+
+Exact metadata: [source record](sources/issue-5356289511-881f0477cd977b5c007d89503efdfdcad23f0d73e6e7293c5ab1251053a29286.json).
+
+**Status: The repaired development build is installed.** Serious-crime handling now uses the current crime’s defined severity; no new definition is waiting on you.
+
+- [ ] On a spare save in free roam, incur a serious bounty and approach a lawman when the payment interaction is offered. With enough cash, confirm it shows the amount, charges once and ends the pursuit.
+- [ ] Repeat with less cash than the displayed amount: payment must be unavailable with the shortfall shown and no money deducted. Report the crime, amount and failed step.
+
 ## comment 5550115914 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/124#issuecomment-5550115914

@@ -28,6 +28,20 @@ Exact metadata: [source record](sources/issue-5356309506-753af4d162877143e9d08e6
 - [ ] Disable Auto-Bank: over-cap sales should be blocked; pickups at the cap should warn. Report lost or duplicated money.
 - [ ] Choose the existing native display without greying or a separate custom HUD replacement.
 
+## issue 5356309506 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/208
+
+Created: 2026-08-06T06:38:02Z; updated: 2026-09-06T13:55:15Z
+
+Exact metadata: [source record](sources/issue-5356309506-44d19043758d34bc393c399c03c0fa8e4a1297bb32895858a8d3728eca8aa1d1.json).
+
+**Waiting on your test and display choice.** Auto-Bank and sale blocking are installed; conditional native-HUD greying is unsupported by the checked path.
+
+- [ ] On a spare save near the wallet cap, enable Auto-Bank and collect excess cash. Confirm only the excess reaches the bank and the wallet stays capped.
+- [ ] Disable Auto-Bank: over-cap sales should be blocked; pickups at the cap should warn. Report lost or duplicated money.
+- [ ] Choose the existing native display without greying or a separate custom HUD replacement.
+
 ## comment 5550138250 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/208#issuecomment-5550138250

@@ -30,6 +30,19 @@ Exact metadata: [source record](sources/issue-5356295046-7143df9272dce8b8603092b
 - [ ] Restart with horse-camera centering disabled. While riding, turn the camera sideways and release it; confirm it stays there. Check aim, Look Behind, first person, cinematic camera and dismounting.
 - [ ] Re-enable centering, restart and confirm normal centering returns. Restore your preference and report the exact transition that breaks.
 
+## issue 5356295046 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/146
+
+Created: 2026-08-06T02:28:35Z; updated: 2026-09-06T13:56:17Z
+
+Exact metadata: [source record](sources/issue-5356295046-bcc479b7594babb51df7cfe7f6889c542a12860b0c233db5bf5bee092b45e805.json).
+
+**Status: The startup crash is repaired and basic riding orbit was checked.** Remaining camera transitions need your confirmation.
+
+- [ ] Restart with horse-camera centering disabled. While riding, turn the camera sideways and release it; confirm it stays there. Check aim, Look Behind, first person, cinematic camera and dismounting.
+- [ ] Re-enable centering, restart and confirm normal centering returns. Restore your preference and report the exact transition that breaks.
+
 ## comment 5550122243 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/146#issuecomment-5550122243

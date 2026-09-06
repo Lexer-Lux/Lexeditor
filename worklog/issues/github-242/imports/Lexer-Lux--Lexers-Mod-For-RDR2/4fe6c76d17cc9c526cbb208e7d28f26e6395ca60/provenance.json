@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356317434,
+    "number": 242,
+    "title": "Check known failure patterns before releasing fixes",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/242"
+  },
+  "sha256": "4264ba11a2d8617e7a4e0eaa590437f45c603606b0539eba3677f03b7be12b32",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-150.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

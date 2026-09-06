@@ -24,6 +24,18 @@ Give each GF an ordered, editable spellbook with pages, visible zero-stock spell
 
 **Not delivered:** the draft used an unsafe memory region, was disabled and was not installed. Safe runtime storage and editor integration remain unfinished. There is no spellbook build for you to test yet.
 
+## issue 5349503543 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/93
+
+Created: 2026-09-04T14:46:05Z; updated: 2026-09-06T12:46:10Z
+
+Exact metadata: [source record](sources/issue-5349503543-d9472de4273a17b649bd287d8ad4b06b93e5ae3d0b95e600d2bb85bbf65336a3.json).
+
+Give each GF an ordered, editable spellbook with pages, visible zero-stock spells and optional learned-ability requirements.
+
+**Not delivered:** the draft used an unsafe memory region, was disabled and was not installed. Safe runtime storage and editor integration remain unfinished. There is no spellbook build for you to test yet.
+
 ## comment 5549952649 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/93#issuecomment-5549952649

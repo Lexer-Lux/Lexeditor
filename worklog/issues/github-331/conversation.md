@@ -24,6 +24,18 @@ Exact metadata: [source record](sources/issue-5356487232-d6464d2738e8527ee1df6a9
 
 The old handoff asks you to edit a raw file, but the current goal is structured editing. Prepare a current, specific save/reopen check through the real editor and explain how it reaches the game before marking this ready. Remaining editor coverage is in #337.
 
+## issue 5356487232 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/331
+
+Created: 2026-08-24T15:15:54Z; updated: 2026-09-06T12:38:38Z
+
+Exact metadata: [source record](sources/issue-5356487232-e4d01e76ae8c299284d18e0363d11bfc2755d8682a9c662fd742f66bfc302f53.json).
+
+**Status: The managed plugin and editable workspace exist.** Installed archives are kept separate from mod edits.
+
+The old handoff asks you to edit a raw file, but the current goal is structured editing. Prepare a current, specific save/reopen check through the real editor and explain how it reaches the game before marking this ready. Remaining editor coverage is in #337.
+
 ## comment 5550348480 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/331#issuecomment-5550348480

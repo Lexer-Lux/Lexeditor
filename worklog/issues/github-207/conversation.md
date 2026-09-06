@@ -31,6 +31,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/207
 
 Created: 2026-08-06T05:59:40Z; updated: 2026-09-06T13:07:29Z
 
+Exact metadata: [source record](sources/issue-5356309278-bcd9adae8973582929950a5058a4cb10599a3ce70104425f6644d11933959033.json).
+
+**Status: Current data is loaded, not a confirmed stronger accuracy buff.** Improved Sights still add the vanilla 5 displayed accuracy points; the defined mechanical change is a slightly narrower view, not reduced spread.
+
+- [ ] At a gunsmith, use the Cattleman Revolver: Customize → Components → Sights. Compare Stock Sights with Improved Sights while changing no other component; check the Accuracy bar rises.
+- [ ] Aim from the same position at the same landmarks with each sight. Improved should show a narrower view. Send comparison screenshots or report no difference. Do not use Navy Revolver for this test.
+
+## issue 5356309278 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/207
+
+Created: 2026-08-06T05:59:40Z; updated: 2026-09-06T13:07:29Z
+
 Exact metadata: [source record](sources/issue-5356309278-c74c23572d6cff037821b6657c9d5b65d3af125cc94fbdad74cec6bc7ac7f951.json).
 
 **Status: Current data is loaded, not a confirmed stronger accuracy buff.** Improved Sights still add the vanilla 5 displayed accuracy points; the defined mechanical change is a slightly narrower view, not reduced spread.

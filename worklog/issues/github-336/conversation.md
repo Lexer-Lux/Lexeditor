@@ -24,6 +24,18 @@ Add a development-only camera that restores normal gameplay cleanly on exit.
 
 **Status: Development build installed, test handoff incomplete.** Tilde enables development mode and F4 toggles the camera, but the movement/rotation bindings and a safe repeatable test still need documenting. Do not leave that setup for you to discover.
 
+## issue 5356488255 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/336
+
+Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T12:38:50Z
+
+Exact metadata: [source record](sources/issue-5356488255-6ede0bbc2ef3109acacacb3c78c7cf4719445af09a0fb6ff5113ff1d225769ac.json).
+
+Add a development-only camera that restores normal gameplay cleanly on exit.
+
+**Status: Development build installed, test handoff incomplete.** Tilde enables development mode and F4 toggles the camera, but the movement/rotation bindings and a safe repeatable test still need documenting. Do not leave that setup for you to discover.
+
 ## comment 5550349659 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/336#issuecomment-5550349659

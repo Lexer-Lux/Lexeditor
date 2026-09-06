@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356325322,
+    "number": 269,
+    "title": "Deliver the non-invasive camera transition recorder",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/269"
+  },
+  "sha256": "b4421f278c885304b1668627efd07978b71a52798948dc5b2456951878549639",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-177.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

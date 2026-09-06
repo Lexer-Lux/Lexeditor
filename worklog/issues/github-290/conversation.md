@@ -24,6 +24,18 @@ Brightness and range must visibly change the lantern’s light, including no lig
 
 **Status: Still broken in your latest test.** A settings-cache/readback correction exists in source but was not built or installed. Deliver and verify the actual light result; saved numbers alone are not acceptance.
 
+## issue 5356331532 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/290
+
+Created: 2026-08-20T10:06:43Z; updated: 2026-09-06T12:57:13Z
+
+Exact metadata: [source record](sources/issue-5356331532-e687d6b4ca15db6306f869d0a644d43c66729f32af7b8e7386c5ea40eb2a44f1.json).
+
+Brightness and range must visibly change the lantern’s light, including no light at zero brightness.
+
+**Status: Still broken in your latest test.** A settings-cache/readback correction exists in source but was not built or installed. Deliver and verify the actual light result; saved numbers alone are not acceptance.
+
 ## comment 5550164704 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/290#issuecomment-5550164704
