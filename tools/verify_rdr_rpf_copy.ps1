@@ -8,8 +8,10 @@ if ($LASTEXITCODE -ne 0) { throw "Rpf6ReadCli build failed" }
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
 $fixtureSource = Join-Path $cliRoot 'Rpf6CopyFixture.cs'
 # .NET Framework probes referenced private assemblies beside the executable,
-# not from the process working directory. Build this fixture beside MagicRDR.exe.
+# not from the process working directory. Build this fixture beside MagicRDR.exe
+# and give it the same private-path probing config as the bridge.
 $fixtureExe = Join-Path $appRoot ('Rpf6CopyFixture-test-' + [guid]::NewGuid().ToString('N') + '.exe')
+$fixtureConfig = $fixtureExe + '.config'
 $references = @(
     (Join-Path $appRoot 'MagicRDR.exe'),
     (Join-Path $appRoot 'Assemblies\PikIO.dll'),
@@ -19,6 +21,7 @@ $references = @(
 )
 & $compiler /nologo /target:exe /platform:x86 /optimize+ "/out:$fixtureExe" /reference:System.Core.dll /reference:System.Windows.Forms.dll ($references | ForEach-Object { "/reference:$_" }) $fixtureSource
 if ($LASTEXITCODE -ne 0) { throw "Fixture compiler failed" }
+Copy-Item -LiteralPath (Join-Path $appRoot 'Rpf6ReadCli.exe.config') -Destination $fixtureConfig -Force
 
 $temp = Join-Path $env:TEMP ('lexeditor-rdr-rpf-copy-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force $temp | Out-Null
@@ -68,4 +71,5 @@ try {
 } finally {
     Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $fixtureExe -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $fixtureConfig -Force -ErrorAction SilentlyContinue
 }
