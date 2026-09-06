@@ -97,6 +97,11 @@ def main():
                     assert page.locator('.settings-section').count() == 2
                     page.evaluate('navigate("project")')
                     assert page.get_by_text('Saved files and game delivery', exact=True).count()
+                    assert page.get_by_role('button', name='Deploy Project').count()
+                    assert page.get_by_role('button', name='Revert Deployment').count()
+                    delivery_text = page.locator('#main').inner_text()
+                    assert 'Deploy Project rebuilds verified copies' in delivery_text
+                    assert 'original' in delivery_text and 'never overwritten' in delivery_text
                     assert not errors, errors
                     print('RDR browser: split views, preflight, decimal save, loot validation, discard, optional-file recovery passed')
                 finally:

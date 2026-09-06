@@ -20,6 +20,9 @@ from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
 from . import mission_rewards, paths
+from .archive_deployment import (
+    ArchiveSpec, deploy_archives, deployment_status, revert_archives,
+)
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -35,6 +38,11 @@ CONTENT_OVERRIDE_ROOT = MOD_ROOT / "content"
 GRINGO_PACKED_ROOT = EXTRACT_ROOT / "gringores"
 GRINGO_UNPACKED_ROOT = EXTRACT_ROOT / "gringores-unpacked"
 GRINGO_OVERRIDE_ROOT = MOD_ROOT / "gringores"
+ARCHIVE_SPECS = (
+    ArchiveSpec("tuning", Path("game") / "tune_d11generic.rpf", OVERRIDE_ROOT),
+    ArchiveSpec("content", Path("game") / "content.rpf", CONTENT_OVERRIDE_ROOT),
+    ArchiveSpec("gringores", Path("game") / "gringores.rpf", GRINGO_OVERRIDE_ROOT),
+)
 SETTINGS_FILE = paths.SETTINGS_FILE
 LOOT_FILE = Path(
     os.environ.get("LEXEDITOR_RDR_LOOT", PROJECT / "LexerRDR.loot.json")
@@ -1267,6 +1275,7 @@ def dashboard_payload() -> dict:
         },
         "manifest": manifest,
         "redHook": redhook_payload(),
+        "deployment": deployment_status(GAME_ROOT, ARCHIVE_SPECS),
         "problems": paths.check()
         + ([] if PREPARED_ROOT.is_dir() else [f"Prepared RDR data is missing: {PREPARED_ROOT}"])
         + ([] if CONTENT_PREPARED_ROOT.is_dir() else [
@@ -1351,10 +1360,13 @@ class Handler(BaseHTTPRequestHandler):
                         "prepared-files", "project-overrides", "source-editor",
                         "items", "shops", "missions", "loot-asi-override", "settings",
                         "data-map", "redhook-prerequisite", "github-workspace",
+                        "archive-copy-deployment",
                     ],
                 })
             elif path == "/api/dashboard":
                 self.json_response(dashboard_payload())
+            elif path == "/api/deployment":
+                self.json_response(deployment_status(GAME_ROOT, ARCHIVE_SPECS))
             elif path == "/api/files":
                 self.json_response(files_payload())
             elif path == "/api/file":
@@ -1411,6 +1423,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(open_redhook_page())
             elif path == "/api/redhook/configure":
                 self.json_response(configure_redhook())
+            elif path == "/api/deployment/deploy":
+                self.json_response(deploy_archives(
+                    GAME_ROOT, paths.RPF6_TOOL, ARCHIVE_SPECS))
+            elif path == "/api/deployment/revert":
+                self.json_response(revert_archives(GAME_ROOT, ARCHIVE_SPECS))
             else:
                 self.json_response({"error": "not found"}, 404)
         except Exception as error:
