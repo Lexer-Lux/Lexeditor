@@ -1,0 +1,45 @@
+name: Inspect RDR2 merge conflicts
+on:
+  push:
+    branches: [fix/rdr2-issue-batch]
+    paths: [.github/workflows/rdr2-merge-inspect.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch both public histories without optional gitlinks
+        run: |
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --no-tags --filter=blob:none origin "$GITHUB_SHA" master
+          git checkout --detach "$GITHUB_SHA"
+          git config user.name 'Merge inspection'
+          git config user.email 'inspection@localhost'
+      - name: Attempt a non-committing merge and preserve exact conflict evidence
+        run: |
+          mkdir -p /tmp/rdr2-merge
+          git rev-parse origin/master > /tmp/rdr2-merge/master.txt
+          git merge --no-commit --no-ff origin/master > /tmp/rdr2-merge/merge.log 2>&1 || true
+          cat /tmp/rdr2-merge/merge.log
+          python - <<'PY'
+          import json,pathlib,subprocess
+          def git(*a): return subprocess.check_output(['git',*a])
+          paths=git('diff','--name-only','--diff-filter=U','-z').decode().split('\0')
+          conflicts=[]
+          for path in filter(None,paths):
+              record={'path':path}
+              for stage in (1,2,3):
+                  try: record[str(stage)]=git('show',f':{stage}:{path}').decode()
+                  except subprocess.CalledProcessError: record[str(stage)]=None
+              conflicts.append(record)
+          pathlib.Path('/tmp/rdr2-merge/conflicts.json').write_text(json.dumps(conflicts,indent=2))
+          print('Conflict paths:',[x['path'] for x in conflicts])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rdr2-merge-evidence
+          path: /tmp/rdr2-merge/
+          retention-days: 3
