@@ -8,20 +8,23 @@ on:
       - 'platform_config.py'
       - 'process_probe.py'
       - 'tools/verify_ff7_*.py'
+      - 'tools/ff7_tests/**'
       - '.github/workflows/ff7-data-regressions.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ff7-data-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   synthetic-data-and-page-logic:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      # The public repository includes an unrelated gitlink without a
-      # .gitmodules URL. Fetch the exact event commit without submodule
-      # traversal or stored credentials; FF7 tests need no submodules.
+      # Avoid traversing the unrelated incomplete RDR submodule.
       - name: Check out the exact event commit
         shell: bash
         run: |
@@ -29,6 +32,21 @@ jobs:
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
           git checkout --detach FETCH_HEAD
+      - name: Export source-only component test snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff7-component-sources
+          retention-days: 3
+          path: |
+            *.py
+            games/__init__.py
+            games/ff7/*.py
+            games/ff7/*.html
+            games/ff7_2013/*.py
+            ui/**/*.js
+            ui/**/*.css
+            ui/**/*.json
+            tools/verify_ff7_*.py
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
