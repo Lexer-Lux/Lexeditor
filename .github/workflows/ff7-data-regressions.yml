@@ -19,9 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+      # The public repository includes an unrelated gitlink without a
+      # .gitmodules URL. Fetch the exact event commit without submodule
+      # traversal or stored credentials; FF7 tests need no submodules.
+      - name: Check out the exact event commit
+        shell: bash
+        run: |
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
