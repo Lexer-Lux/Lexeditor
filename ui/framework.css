@@ -4567,3 +4567,50 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-curve-right-axis :is(.lex-curve-axis,.lex-curve-axis-label,.lex-curve-axis-number) {
   writing-mode:vertical-rl; transform:rotate(180deg) !important; text-orientation:mixed;
 }
+
+
+/* LEXEDITOR_SHARED_UI_STANDARDIZATION_FOLLOWUP_20260906 */
+.lex-detail-field[data-lex-sort] .lex-field-type-rail > .lex-info-help {
+  display:inline-grid !important; opacity:1 !important;
+}
+.lex-detail-field[data-lex-sort] .lex-field-type-rail::after {
+  top:auto !important; bottom:2px !important; left:50% !important;
+  transform:translateX(-50%) !important;
+}
+.lex-detail-field[data-lex-sort] > .lex-detail-field-label {
+  display:flex !important; visibility:visible !important; opacity:1 !important;
+}
+.lex-toggle-name,.lex-toggle-label,.lex-flag-label {
+  writing-mode:horizontal-tb !important; text-orientation:mixed !important;
+  transform:none !important; white-space:normal; overflow-wrap:anywhere;
+}
+.lex-model-preview-close { position:absolute !important; z-index:4; margin:0 !important; }
+.lex-curve-editor { position:relative; }
+.lex-curve-heading > h4,.lex-curve-heading-title {
+  margin:0 !important; text-transform:uppercase !important;
+  font-size:clamp(26px,3.2vw,46px) !important; line-height:1 !important;
+  transform:none !important; font-stretch:normal !important; letter-spacing:.04em !important;
+}
+.lex-curve-plot { --lex-curve-margin-right:42px !important; }
+.lex-curve-axis-top,.lex-curve-axis-bottom {
+  left:auto !important; right:7px !important;
+  writing-mode:vertical-rl !important; text-orientation:mixed !important;
+  transform:rotate(180deg) !important;
+}
+.lex-curve-axis-top { top:calc(var(--lex-curve-margin-top) + 2px) !important; }
+.lex-curve-axis-bottom { bottom:calc(var(--lex-curve-margin-bottom) + 2px) !important; }
+.lex-curve-axis-name-y {
+  left:auto !important; right:22px !important; top:50% !important; bottom:auto !important;
+  writing-mode:vertical-rl !important; text-orientation:mixed !important;
+  transform:translateY(-50%) rotate(180deg) !important;
+}
+.lex-curve-axis-start,.lex-curve-axis-end,.lex-curve-axis-name-x {
+  top:auto !important; bottom:4px !important;
+}
+.lex-project-menu-item-select {
+  grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;
+}
+.lex-project-menu-item:has(.lex-project-source-status.disabled),
+.lex-project-reference:has(.lex-project-source-status.disabled) {
+  filter:grayscale(1) !important; opacity:.42 !important;
+}

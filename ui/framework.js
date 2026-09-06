@@ -2633,7 +2633,11 @@
       const current = rows.find(row => row.current);
       const sources = options.projectSources?.() || [];
       const activeSource = String(options.projectActiveSource?.() || "mine");
-      const selectedSource = sources.find(row => String(row.key) === activeSource);
+      const selectedReference = sources.find(row => String(row.key) === activeSource);
+      const selectedSource = activeSource === "mine" && current ? {
+        key:"mine", label:current.name, path:current.path || "", readOnly:false,
+        enabled:current.enabled !== false,
+      } : selectedReference;
       const canChoose = Boolean(value);
       box.hidden = !current && !selectedSource && !canChoose;
       if (!current && !selectedSource && !canChoose) return;
@@ -2646,7 +2650,7 @@
       status.className = `lex-project-source-status ${selectedSource?.enabled === false ? "disabled" : "enabled"}`;
       status.setAttribute("aria-label", selectedSource?.enabled === false ? "Disabled" : "Enabled");
       path.textContent = selectedSource?.path || (selectedSource
-        ? "Read-only reference"
+        ? (selectedSource.readOnly === false ? "Editable mod" : "Read-only reference")
         : current?.path || "New Mod or Find a Mod");
       box.title = path.textContent;
       const projects = (options.sourcesReplaceProjects ? [] : rows.filter(row => row.valid)).map(row => {
@@ -2661,8 +2665,11 @@
           });
           else if (!row.current) guarded(() => callWindow("select_mod_project", options.plugin.id, row.path));
         },
-      }, element("span", {class: "lex-project-menu-name"}, row.name),
-      element("span", {class: "lex-project-menu-path"}, row.path));
+      }, element("span", {class: "lex-project-source-mode", "aria-label":"Editable"}, "📝"),
+      element("span", {class: "lex-project-menu-name"}, row.name),
+      element("span", {class: "lex-project-menu-path"}, row.path),
+      element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
+        "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
         const rename = element("button", {class:"lex-project-rename",type:"button",title:`Rename ${row.name}`,"aria-label":`Rename ${row.name}`,onclick:async()=>{closeMenu();const next=await askProjectName(options.plugin.name||options.plugin.id,{rename:true,value:row.name});if(next&&next!==row.name)guarded(()=>callWindow("rename_mod_project",options.plugin.id,row.path,next))}}, "✎");
         const folder = element("button", {
           class: "lex-project-folder", type: "button",
@@ -4006,16 +4013,26 @@
       return element("span", {class: "lex-enabled-toggle"}, input);
     },
   });
-  const withEnabledColumn = (declared, rows, change) => {
+  const withEnabledColumn = (declared, rows, change, autoAdd = true) => {
     const columns = declared || [];
-    if (!hasEnabledProperty(rows)) return columns;
-    if (columns.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)) return columns;
-    return [enabledColumn(change), ...columns];
+    const enabledIndex = columns.findIndex(
+      column => String(column.key).toLocaleLowerCase() === ENABLED_KEY);
+    if (!hasEnabledProperty(rows)) {
+      return columns.filter((column, index) =>
+        index !== enabledIndex || !column.generated);
+    }
+    if (enabledIndex >= 0) {
+      return columns.map((column, index) =>
+        index === enabledIndex && column.generated ? enabledColumn(change) : column);
+    }
+    return autoAdd ? [enabledColumn(change), ...columns] : columns;
   };
 
   const columnPreferences = (viewKey, definitions, changed = () => {}) => {
     const key = `lexeditor:columns:${String(viewKey || "view")}`;
-    const source = numberedIdColumns(definitions || [], []);
+    const declared = numberedIdColumns(definitions || [], []);
+    const source = declared.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)
+      ? declared : [enabledColumn(null), ...declared];
     const byKey = new Map(source.map(column => [column.key, column]));
     const defaults = source.filter(column => column.pinned !== false).map(column => column.key);
     let order = [...defaults];
@@ -4027,14 +4044,8 @@
     } catch (_error) {}
     const save = () => {
       try { localStorage.setItem(key, JSON.stringify(order)); } catch (_error) {}
-      // A changed column set changes the table's real minimum width. Discard
-      // the old divider size so the shared layout can fit the new table.
-      for (const layoutKey of [
-        `lexeditor:panel-layout:${viewKey}`,
-        `lexeditor:list-detail:${viewKey}`,
-      ]) {
-        try { localStorage.removeItem(layoutKey); } catch (_error) {}
-      }
+      // Preserve the divider while pinning. Clearing it made the detail pane
+      // flash to the default width on every pin click.
       changed([...order]);
       window.dispatchEvent(new CustomEvent("lexeditor-columns-changed", {
         detail: {viewKey, columns: [...order]},
@@ -4179,7 +4190,7 @@
     // The generic enabled column is not a user-choosable column, so it is
     // added after saved preferences rather than being subject to them.
     const columns = preferredColumns
-      ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange)
+      ? withEnabledColumn(preferredColumns, options.rows, options.enabledChange, false)
       : numberedIdColumns(
           withEnabledColumn(options.columns, options.rows, options.enabledChange),
           options.rows || []);
@@ -5485,7 +5496,7 @@
         title: `Use ${source.name}: ${description}`,
         onclick: event => options.apply?.(clone(source.value), event, source),
       },
-      element("span", {class: "lex-reference-tag"}, shortReferenceName(source)),
+      element("span", {class: `lex-reference-tag${shortReferenceName(source) === "LL" ? " lex-reference-ll" : ""}`}, shortReferenceName(source)),
       element("span", {class: "lex-reference-text"}, formatted));
     }));
   };
@@ -5782,9 +5793,17 @@
     close.textContent = '×';
     close.title = 'Close model preview';
     close.setAttribute('aria-label', close.title);
+    heading.style.position = 'relative';
     heading.append(close);
     heading.after(drawer);
+    const syncCloseSlot = () => {
+      close.style.left = `${icon.offsetLeft}px`;
+      close.style.top = `${icon.offsetTop}px`;
+      close.style.width = `${icon.offsetWidth}px`;
+      close.style.height = `${icon.offsetHeight}px`;
+    };
     const open = async () => {
+      syncCloseSlot();
       if (!drawer.childNodes.length) {
         const content = await getContent?.();
         if (content instanceof Node) drawer.append(content);
@@ -5850,9 +5869,9 @@
   });
 
   document.addEventListener('click', event => {
-    const label = event.target.closest?.('.lex-boolean-field > .lex-detail-field-label');
-    if (!label) return;
-    const input = label.parentElement?.querySelector('.lex-detail-field-control input[type="checkbox"]');
+    const field = event.target.closest?.('.lex-boolean-field');
+    if (!field || event.target.closest?.('input,button,a,select,textarea,.lex-info-help,.lex-reference-values,.lex-column-pin')) return;
+    const input = field.querySelector('.lex-detail-field-control input[type="checkbox"]');
     if (!input || input.disabled) return;
     event.preventDefault();
     input.click();
