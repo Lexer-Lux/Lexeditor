@@ -8,6 +8,7 @@ on:
       - 'tests/*warband*'
       - 'tests/*data_map*'
       - 'tests/fixtures/warband_launcher_window.py'
+      - 'tools/Warband-checks.cmd'
       - 'desktop_host.py'
       - 'plugin_api.py'
       - '.github/workflows/warband-checks.yml'
@@ -18,6 +19,7 @@ on:
       - 'tests/*warband*'
       - 'tests/*data_map*'
       - 'tests/fixtures/warband_launcher_window.py'
+      - 'tools/Warband-checks.cmd'
       - 'desktop_host.py'
       - 'plugin_api.py'
       - '.github/workflows/warband-checks.yml'
@@ -48,6 +50,11 @@ jobs:
       - run: python -m unittest discover -s tests -p test_data_map_coverage.py -v
       - run: node --check ui/framework.js
       - run: node tests/test_warband_trees.js
+      - name: Check the one-click Windows diagnostic launcher
+        if: runner.os == 'Windows'
+        run: |
+          $env:LEXEDITOR_CHECK_PYTHON = (Get-Command python).Source
+          cmd /d /c tools\Warband-checks.cmd --checks-only
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 10
