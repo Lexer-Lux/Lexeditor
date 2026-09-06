@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
-from . import camera_features, input_remaps, mission_rewards, paths, script_features
+from . import camera_features, input_remaps, map_icon_features, mission_rewards, paths, script_features
 from .archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives,
 )
@@ -39,6 +39,7 @@ GRINGO_PACKED_ROOT = EXTRACT_ROOT / "gringores"
 GRINGO_UNPACKED_ROOT = EXTRACT_ROOT / "gringores-unpacked"
 GRINGO_OVERRIDE_ROOT = MOD_ROOT / "gringores"
 CAMERA_GENERATED_ROOT = PROJECT / ".lexeditor-generated" / "camera"
+MAP_ICON_GENERATED_ROOT = PROJECT / ".lexeditor-generated" / "map-icons"
 MISSION_TEST_STATE = PROJECT / ".lexeditor-mission-test.json"
 MISSION_TEST_ID = 2
 MISSION_TEST_REWARDS = {"cash": 123, "fame": 321, "honor": 222}
@@ -47,6 +48,7 @@ ARCHIVE_SPECS = (
     ArchiveSpec("content", Path("game") / "content.rpf", CONTENT_OVERRIDE_ROOT),
     ArchiveSpec("gringores", Path("game") / "gringores.rpf", GRINGO_OVERRIDE_ROOT),
     ArchiveSpec("camera", camera_features.CAMERA_ARCHIVE_RELATIVE, CAMERA_GENERATED_ROOT),
+    ArchiveSpec("mapres", map_icon_features.MAPRES_ARCHIVE_RELATIVE, MAP_ICON_GENERATED_ROOT),
 )
 SETTINGS_FILE = paths.SETTINGS_FILE
 LOOT_FILE = Path(
@@ -1689,6 +1691,8 @@ class Handler(BaseHTTPRequestHandler):
                     GAME_ROOT, paths.RPF6_TOOL, CONTENT_OVERRIDE_ROOT, feature_state)
                 input_remaps.prepare_input_remaps(
                     GAME_ROOT, paths.RPF6_TOOL, CONTENT_OVERRIDE_ROOT, feature_state)
+                map_icon_features.ensure_owned_horse_icon_override(
+                    GAME_ROOT, paths.RPF6_TOOL, MAP_ICON_GENERATED_ROOT)
                 cover_problem = _prepare_cover_shoulder_override()
                 if cover_problem:
                     raise RuntimeError(cover_problem)
