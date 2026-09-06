@@ -1,0 +1,29 @@
+name: RDR1 RPF copy checks
+on:
+  push:
+    branches: [fix/rdr1-runtime-repo-link]
+    paths:
+      - 'tools/magic-rdr/cli/**'
+      - 'tools/verify_rdr_rpf_copy.ps1'
+      - '.github/workflows/rdr1-rpf-copy.yml'
+  pull_request:
+    paths:
+      - 'tools/magic-rdr/cli/**'
+      - 'tools/verify_rdr_rpf_copy.ps1'
+      - '.github/workflows/rdr1-rpf-copy.yml'
+permissions:
+  contents: read
+jobs:
+  copy-builder:
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - name: Check out without optional gitlinks
+        shell: pwsh
+        run: |
+          git init .
+          git -c protocol.version=2 fetch --depth=1 "https://github.com/${env:GITHUB_REPOSITORY}.git" $env:GITHUB_SHA
+          git checkout --detach FETCH_HEAD
+      - name: Build bridge and exercise a synthetic RPF6 replacement
+        shell: powershell
+        run: .\tools\verify_rdr_rpf_copy.ps1
