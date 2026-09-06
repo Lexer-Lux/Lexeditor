@@ -143,10 +143,9 @@ PLUGIN = GamePlugin(
         root_env="LEXEDITOR_FF9_ROOT",
         data_env="LEXEDITOR_FF9_DATA_ROOT",
         required_paths=("FF9_Launcher.exe", "x64/FF9.exe", "StreamingAssets/p0data2.bin"),
-        # Start the game itself. FF9_Launcher.exe is Memoria's launcher and
-        # offers its own updates, which would move the helper off the version
-        # this plugin is pinned to.
-        launch_path="x64/FF9.exe",
+        # #73: use Memoria's existing settings UI on every Play, rather than
+        # recreating it in Lexeditor or bypassing it with the game executable.
+        launch_path="FF9_Launcher.exe",
         steam_app_id="377840",
         install_dir_names=("FINAL FANTASY IX",),
         default_roots=(
