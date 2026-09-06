@@ -56,6 +56,8 @@ class Helpers(unittest.TestCase):
         c=dataclasses.replace(a,plugin_id='c',name='C',helper_upstream=None)
         h=object.__new__(HostApi);h._plugins={'a':a,'b':b,'c':c};h._lock=threading.RLock();h._helper_versions=None
         h._settings=Mock();h._settings.snapshot.return_value={'lexerMode':True}
+        h._installations=Mock()
+        h._installations.snapshot.side_effect=lambda plugin_id:{'root':'/game','helper':{'installed':True,'version':'1.1','integrity':'ok'}}
         return h
     def test_versions_independent_errors_retained_cache_and_refresh(self):
         h=self.host();result=h.helper_versions();rows=result['helpers']

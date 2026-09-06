@@ -82,7 +82,7 @@ def choose_loading_quote(payload: dict, plugin_id: str, global_rarity: float,
         source = payload.get(key, []) if isinstance(payload, dict) else []
         if not isinstance(source, list):
             return []
-        return [str(line).strip() for line in source if str(line).strip()]
+        return list(dict.fromkeys(line.strip() for line in source if isinstance(line, str) and line.strip()))
 
     # A plugin can borrow another plugin's section, so a game and its remaster
     # share one pool instead of duplicating every line: "shares" maps a plugin
@@ -101,9 +101,14 @@ def choose_loading_quote(payload: dict, plugin_id: str, global_rarity: float,
                     game_lines.append(line)
     global_lines = clean_lines("global")
     try:
-        rarity = max(1.0, float(global_rarity))
+        rarity = float(global_rarity)
+        if not math.isfinite(rarity):
+            raise ValueError("non-finite rarity")
+        rarity = max(1.0, rarity)
     except (TypeError, ValueError):
         rarity = 3.0
+    if not game_lines and not global_lines:
+        return "Loading editor…"  # Missing/broken configuration is not session exhaustion.
     if used is not None:
         game_lines = [line for line in game_lines if line not in used]
         global_lines = [line for line in global_lines if line not in used]
