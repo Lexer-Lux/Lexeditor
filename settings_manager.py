@@ -103,25 +103,25 @@ class SettingsStore:
             main_menu_height_percent = defaults["mainMenuHeightPercent"]
         try:
             absent_game_desaturation_percent = float(payload.get(
-                "absentGameDesaturationPercent", defaults["absentGameDesaturationPercent"],
+                "absentGameDesaturationPercent", defaults["absentGameDesaturationPercent"]
             ))
         except (TypeError, ValueError):
             absent_game_desaturation_percent = DEFAULTS["absentGameDesaturationPercent"]
         try:
             sound_volume_percent = float(payload.get(
-                "soundVolumePercent", defaults["soundVolumePercent"],
+                "soundVolumePercent", defaults["soundVolumePercent"]
             ))
         except (TypeError, ValueError):
             sound_volume_percent = DEFAULTS["soundVolumePercent"]
         try:
             global_message_rarity = float(payload.get(
-                "globalMessageRarity", defaults["globalMessageRarity"],
+                "globalMessageRarity", defaults["globalMessageRarity"]
             ))
         except (TypeError, ValueError):
             global_message_rarity = DEFAULTS["globalMessageRarity"]
         try:
             loading_transition_minimum_seconds = float(payload.get(
-                "loadingTransitionMinimumSeconds", defaults["loadingTransitionMinimumSeconds"],
+                "loadingTransitionMinimumSeconds", defaults["loadingTransitionMinimumSeconds"]
             ))
         except (TypeError, ValueError):
             loading_transition_minimum_seconds = DEFAULTS["loadingTransitionMinimumSeconds"]
@@ -179,7 +179,7 @@ class SettingsStore:
              main_menu_height_percent: float | None = None,
              sound_enabled: bool | None = None,
              sound_volume_percent: float | None = None) -> dict:
-        """Save the per-user settings. Lexer-scope values stay packaged defaults."""
+        """Save per-user preferences. Authenticated authoring state is never persisted."""
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
         current = self.snapshot()
@@ -231,7 +231,6 @@ class SettingsStore:
             raise ValueError("Choose a listed update-check frequency")
         clean = {
             "updateCheckFrequency": frequency,
-            "developerMode": bool(current["developerMode"]),
             "hoverableAltClick": bool(current["hoverableAltClick"]),
             "selectionHoldMs": max(150, min(2000, int(current["selectionHoldMs"]))),
             "tableRowsPerPage": max(5, min(40, int(current["tableRowsPerPage"]))),
@@ -252,7 +251,7 @@ class SettingsStore:
         }
         with self._lock:
             self.defaults_path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self.defaults_path.with_suffix(self.defaults_path.suffix + ".tmp")
+            temporary = self.defaults_path.with_suffix(".tmp")
             temporary.write_text(json.dumps(clean, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             temporary.replace(self.defaults_path)
         return clean
