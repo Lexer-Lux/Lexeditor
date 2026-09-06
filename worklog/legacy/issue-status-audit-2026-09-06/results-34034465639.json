@@ -1,0 +1,944 @@
+{
+  "baseline_issue_count": 340,
+  "planned_issue_count": 123,
+  "target_count": 165,
+  "counts": {
+    "already_matches": 79,
+    "skipped_concurrent_change": 82,
+    "updated": 4
+  },
+  "results": [
+    {
+      "number": 1,
+      "result": "already_matches"
+    },
+    {
+      "number": 2,
+      "result": "already_matches"
+    },
+    {
+      "number": 3,
+      "result": "already_matches"
+    },
+    {
+      "number": 4,
+      "result": "already_matches"
+    },
+    {
+      "number": 5,
+      "result": "already_matches"
+    },
+    {
+      "number": 6,
+      "result": "already_matches"
+    },
+    {
+      "number": 7,
+      "result": "already_matches"
+    },
+    {
+      "number": 8,
+      "result": "already_matches"
+    },
+    {
+      "number": 9,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:42Z"
+    },
+    {
+      "number": 10,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:44Z"
+    },
+    {
+      "number": 11,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:46Z"
+    },
+    {
+      "number": 12,
+      "result": "already_matches"
+    },
+    {
+      "number": 13,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:48Z"
+    },
+    {
+      "number": 14,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:50Z"
+    },
+    {
+      "number": 15,
+      "result": "already_matches"
+    },
+    {
+      "number": 16,
+      "result": "already_matches"
+    },
+    {
+      "number": 18,
+      "result": "already_matches"
+    },
+    {
+      "number": 19,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:00:40Z",
+      "current_updated_at": "2026-09-06T12:37:52Z"
+    },
+    {
+      "number": 20,
+      "result": "already_matches"
+    },
+    {
+      "number": 21,
+      "result": "already_matches"
+    },
+    {
+      "number": 22,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:55Z"
+    },
+    {
+      "number": 23,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:11Z",
+      "current_updated_at": "2026-09-06T12:37:57Z"
+    },
+    {
+      "number": 25,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:59Z"
+    },
+    {
+      "number": 26,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:16:45Z",
+      "current_updated_at": "2026-09-06T12:38:01Z"
+    },
+    {
+      "number": 27,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T12:55:31Z",
+      "current_updated_at": "2026-09-06T12:38:03Z"
+    },
+    {
+      "number": 28,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T07:26:44Z",
+      "current_updated_at": "2026-09-06T12:38:05Z"
+    },
+    {
+      "number": 29,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:07Z"
+    },
+    {
+      "number": 30,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:09Z"
+    },
+    {
+      "number": 31,
+      "result": "already_matches"
+    },
+    {
+      "number": 32,
+      "result": "already_matches"
+    },
+    {
+      "number": 33,
+      "result": "already_matches"
+    },
+    {
+      "number": 34,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:11Z"
+    },
+    {
+      "number": 39,
+      "result": "already_matches"
+    },
+    {
+      "number": 46,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:27:54Z",
+      "current_updated_at": "2026-09-06T12:38:13Z"
+    },
+    {
+      "number": 49,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:15Z"
+    },
+    {
+      "number": 55,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T12:24:57Z",
+      "current_updated_at": "2026-09-06T12:38:17Z"
+    },
+    {
+      "number": 56,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T07:25:03Z",
+      "current_updated_at": "2026-09-06T12:38:19Z"
+    },
+    {
+      "number": 59,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T08:14:58Z",
+      "current_updated_at": "2026-09-06T12:38:22Z"
+    },
+    {
+      "number": 60,
+      "result": "already_matches"
+    },
+    {
+      "number": 68,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:24Z"
+    },
+    {
+      "number": 72,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:26Z"
+    },
+    {
+      "number": 73,
+      "result": "already_matches"
+    },
+    {
+      "number": 74,
+      "result": "already_matches"
+    },
+    {
+      "number": 77,
+      "result": "already_matches"
+    },
+    {
+      "number": 78,
+      "result": "already_matches"
+    },
+    {
+      "number": 79,
+      "result": "already_matches"
+    },
+    {
+      "number": 80,
+      "result": "already_matches"
+    },
+    {
+      "number": 81,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:53:50Z",
+      "current_updated_at": "2026-09-06T12:38:28Z"
+    },
+    {
+      "number": 83,
+      "result": "already_matches"
+    },
+    {
+      "number": 84,
+      "result": "already_matches"
+    },
+    {
+      "number": 85,
+      "result": "already_matches"
+    },
+    {
+      "number": 86,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T12:25:16Z",
+      "current_updated_at": "2026-09-06T12:38:31Z"
+    },
+    {
+      "number": 87,
+      "result": "already_matches"
+    },
+    {
+      "number": 88,
+      "result": "already_matches"
+    },
+    {
+      "number": 89,
+      "result": "already_matches"
+    },
+    {
+      "number": 90,
+      "result": "already_matches"
+    },
+    {
+      "number": 91,
+      "result": "already_matches"
+    },
+    {
+      "number": 92,
+      "result": "already_matches"
+    },
+    {
+      "number": 93,
+      "result": "already_matches"
+    },
+    {
+      "number": 94,
+      "result": "already_matches"
+    },
+    {
+      "number": 95,
+      "result": "already_matches"
+    },
+    {
+      "number": 96,
+      "result": "already_matches"
+    },
+    {
+      "number": 97,
+      "result": "already_matches"
+    },
+    {
+      "number": 98,
+      "result": "already_matches"
+    },
+    {
+      "number": 99,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:32:12Z",
+      "current_updated_at": "2026-09-06T12:38:33Z"
+    },
+    {
+      "number": 100,
+      "result": "already_matches"
+    },
+    {
+      "number": 101,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:54:48Z",
+      "current_updated_at": "2026-09-06T12:46:02Z"
+    },
+    {
+      "number": 102,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:54:51Z",
+      "current_updated_at": "2026-09-06T12:46:04Z"
+    },
+    {
+      "number": 103,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:54:54Z",
+      "current_updated_at": "2026-09-06T12:46:06Z"
+    },
+    {
+      "number": 104,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:54:57Z",
+      "current_updated_at": "2026-09-06T12:46:08Z"
+    },
+    {
+      "number": 105,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:00Z",
+      "current_updated_at": "2026-09-06T12:46:10Z"
+    },
+    {
+      "number": 106,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:03Z",
+      "current_updated_at": "2026-09-06T12:46:12Z"
+    },
+    {
+      "number": 107,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:06Z",
+      "current_updated_at": "2026-09-06T12:46:15Z"
+    },
+    {
+      "number": 108,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:10Z",
+      "current_updated_at": "2026-09-06T12:46:18Z"
+    },
+    {
+      "number": 109,
+      "result": "already_matches"
+    },
+    {
+      "number": 110,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:16Z",
+      "current_updated_at": "2026-09-06T12:46:20Z"
+    },
+    {
+      "number": 111,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:19Z",
+      "current_updated_at": "2026-09-06T12:46:22Z"
+    },
+    {
+      "number": 112,
+      "result": "already_matches"
+    },
+    {
+      "number": 113,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:26Z",
+      "current_updated_at": "2026-09-06T12:46:25Z"
+    },
+    {
+      "number": 115,
+      "result": "already_matches"
+    },
+    {
+      "number": 116,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:36Z",
+      "current_updated_at": "2026-09-06T12:46:27Z"
+    },
+    {
+      "number": 118,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:45Z",
+      "current_updated_at": "2026-09-06T12:46:29Z"
+    },
+    {
+      "number": 119,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:49Z",
+      "current_updated_at": "2026-09-06T12:46:32Z"
+    },
+    {
+      "number": 120,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:53Z",
+      "current_updated_at": "2026-09-06T12:46:34Z"
+    },
+    {
+      "number": 121,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:55:56Z",
+      "current_updated_at": "2026-09-06T12:46:36Z"
+    },
+    {
+      "number": 122,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:00Z",
+      "current_updated_at": "2026-09-06T12:46:39Z"
+    },
+    {
+      "number": 123,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:03Z",
+      "current_updated_at": "2026-09-06T12:46:41Z"
+    },
+    {
+      "number": 124,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:07Z",
+      "current_updated_at": "2026-09-06T12:46:43Z"
+    },
+    {
+      "number": 125,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:10Z",
+      "current_updated_at": "2026-09-06T12:46:46Z"
+    },
+    {
+      "number": 126,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:14Z",
+      "current_updated_at": "2026-09-06T12:46:48Z"
+    },
+    {
+      "number": 127,
+      "result": "already_matches"
+    },
+    {
+      "number": 128,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:20Z",
+      "current_updated_at": "2026-09-06T12:46:50Z"
+    },
+    {
+      "number": 129,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:24Z",
+      "current_updated_at": "2026-09-06T12:46:52Z"
+    },
+    {
+      "number": 130,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:28Z",
+      "current_updated_at": "2026-09-06T12:46:55Z"
+    },
+    {
+      "number": 131,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:31Z",
+      "current_updated_at": "2026-09-06T12:46:58Z"
+    },
+    {
+      "number": 132,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:35Z",
+      "current_updated_at": "2026-09-06T12:47:00Z"
+    },
+    {
+      "number": 133,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:38Z",
+      "current_updated_at": "2026-09-06T12:47:03Z"
+    },
+    {
+      "number": 134,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:42Z",
+      "current_updated_at": "2026-09-06T12:47:05Z"
+    },
+    {
+      "number": 135,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:45Z",
+      "current_updated_at": "2026-09-06T12:47:07Z"
+    },
+    {
+      "number": 136,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:49Z",
+      "current_updated_at": "2026-09-06T12:47:09Z"
+    },
+    {
+      "number": 137,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:52Z",
+      "current_updated_at": "2026-09-06T12:47:11Z"
+    },
+    {
+      "number": 138,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:56Z",
+      "current_updated_at": "2026-09-06T12:47:13Z"
+    },
+    {
+      "number": 139,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:56:59Z",
+      "current_updated_at": "2026-09-06T12:47:15Z"
+    },
+    {
+      "number": 140,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:02Z",
+      "current_updated_at": "2026-09-06T12:47:17Z"
+    },
+    {
+      "number": 141,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:06Z",
+      "current_updated_at": "2026-09-06T12:47:19Z"
+    },
+    {
+      "number": 143,
+      "result": "already_matches"
+    },
+    {
+      "number": 144,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:17Z",
+      "current_updated_at": "2026-09-06T12:47:21Z"
+    },
+    {
+      "number": 145,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:21Z",
+      "current_updated_at": "2026-09-06T12:47:23Z"
+    },
+    {
+      "number": 146,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:24Z",
+      "current_updated_at": "2026-09-06T12:47:26Z"
+    },
+    {
+      "number": 148,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:30Z",
+      "current_updated_at": "2026-09-06T12:47:28Z"
+    },
+    {
+      "number": 149,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:33Z",
+      "current_updated_at": "2026-09-06T12:47:30Z"
+    },
+    {
+      "number": 150,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:36Z",
+      "current_updated_at": "2026-09-06T12:47:32Z"
+    },
+    {
+      "number": 151,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:39Z",
+      "current_updated_at": "2026-09-06T12:47:34Z"
+    },
+    {
+      "number": 152,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:42Z",
+      "current_updated_at": "2026-09-06T12:47:36Z"
+    },
+    {
+      "number": 153,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:45Z",
+      "current_updated_at": "2026-09-06T12:54:19Z"
+    },
+    {
+      "number": 154,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:48Z",
+      "current_updated_at": "2026-09-06T12:54:21Z"
+    },
+    {
+      "number": 155,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:51Z",
+      "current_updated_at": "2026-09-06T12:54:23Z"
+    },
+    {
+      "number": 156,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:54Z",
+      "current_updated_at": "2026-09-06T12:54:25Z"
+    },
+    {
+      "number": 157,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:57Z",
+      "current_updated_at": "2026-09-06T12:54:27Z"
+    },
+    {
+      "number": 158,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:57:59Z",
+      "current_updated_at": "2026-09-06T12:54:29Z"
+    },
+    {
+      "number": 159,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:58:02Z",
+      "current_updated_at": "2026-09-06T12:54:31Z"
+    },
+    {
+      "number": 160,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:58:05Z",
+      "current_updated_at": "2026-09-06T12:54:33Z"
+    },
+    {
+      "number": 161,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:58:08Z",
+      "current_updated_at": "2026-09-06T12:54:35Z"
+    },
+    {
+      "number": 162,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:58:11Z",
+      "current_updated_at": "2026-09-06T12:54:37Z"
+    },
+    {
+      "number": 163,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:58:14Z",
+      "current_updated_at": "2026-09-06T12:54:39Z"
+    },
+    {
+      "number": 164,
+      "result": "updated",
+      "before": {
+        "number": 164,
+        "title": "Ancient Tomahawk Rework",
+        "body": "ANCIENT TOMAHAWK RETURNS ON IMPACT — throw it and it comes straight back\n     into my inventory the moment it hits the ground or hits somebody. Not after\n     a delay, not out of a locker — immediately, on impact. In vanilla you just\n     lose it, like the other uniques.\n     NOT BUILT. What exists today is a 30-second timer that quietly hands the\n     weapon back once its world pickup has despawned. Different mechanic, wrong\n     one for this weapon. Separate item from Lexer-Lux/Lexeditor#150 — do not merge them again.\n",
+        "state": "open",
+        "state_reason": null,
+        "labels": [
+          "rdr2",
+          "waiting"
+        ],
+        "comments": 27,
+        "updated_at": "2026-09-05T06:58:17Z"
+      },
+      "after": {
+        "number": 164,
+        "title": "Check Ancient Tomahawk returns on every impact",
+        "body": "The installed repair addresses the stale tracking state that allowed only the first throw to return. Return feedback also needs checking.\n\n- [ ] Fully restart RDR2 and equip the Ancient Tomahawk. Throw it at the ground three times consecutively; each impact should immediately return it, not just the first.\n- [ ] Repeat against a wall and a target. Confirm there is one usable copy and note whether the acquisition popup appears. Report which throw fails and attach that session's GameplayTweaks log.",
+        "state": "open",
+        "state_reason": null,
+        "labels": [
+          "rdr2",
+          "untested"
+        ],
+        "comments": 27,
+        "updated_at": "2026-09-06T12:54:41Z"
+      },
+      "plan_file": "worklog/issue-status-audit/2026-09-06/plan-rdr2-a.md"
+    },
+    {
+      "number": 165,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:58:20Z",
+      "current_updated_at": "2026-09-06T12:54:43Z"
+    },
+    {
+      "number": 166,
+      "result": "updated",
+      "before": {
+        "number": 166,
+        "title": "Hunter's Hatchet Rework",
+        "body": "52.  HUNTER'S HATCHET REWORK — make it instantly kill any animal without\n     reducing carcass/pelt quality, matching the description I wrote. Preserve\n     legendary/scripted animal behaviour and don't duplicate loot.",
+        "state": "open",
+        "state_reason": null,
+        "labels": [
+          "rdr2",
+          "waiting"
+        ],
+        "comments": 1,
+        "updated_at": "2026-09-05T06:58:23Z"
+      },
+      "after": {
+        "number": 166,
+        "title": "Deliver the Hunter's Hatchet animal-kill rework",
+        "body": "The Hunter's Hatchet should instantly kill ordinary animals without reducing their original pelt quality. Preserve mission/legendary behavior and avoid duplicate loot.\n\n**Delivery is unconfirmed:** the only build record says installation was queued. Confirm the actual installed candidate and prepare the quality comparison before requesting a test.",
+        "state": "open",
+        "state_reason": null,
+        "labels": [
+          "actionable",
+          "rdr2"
+        ],
+        "comments": 1,
+        "updated_at": "2026-09-06T12:54:43Z"
+      },
+      "plan_file": "worklog/issue-status-audit/2026-09-06/plan-rdr2-a.md"
+    },
+    {
+      "number": 167,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:58:26Z",
+      "current_updated_at": "2026-09-06T12:54:45Z"
+    },
+    {
+      "number": 168,
+      "result": "updated",
+      "before": {
+        "number": 168,
+        "title": "NO SPARKLE ON OWNED GEAR",
+        "body": "NO SPARKLE ON OWNED GEAR — pickups stop glowing when I already own the gun.\n     Working for all 80 weapon models. Hats can't use the same mechanism because\n     they aren't pickup entries and their catalog records have blank model\n     fields. WAITING: one safe Story-mode session near a collectible hat so we\n     can capture its real identity and finish the hat path.",
+        "state": "open",
+        "state_reason": null,
+        "labels": [
+          "rdr2",
+          "waiting"
+        ],
+        "comments": 3,
+        "updated_at": "2026-09-05T06:58:29Z"
+      },
+      "after": {
+        "number": 168,
+        "title": "Rebuild owned-gear sparkle suppression safely",
+        "body": "Owned weapons and collectible hats should stop advertising themselves as new pickups.\n\n**Not working:** the weapon implementation was removed after repeated crash isolation. The hat path is also unfinished. Restore a safe implementation and prepare any necessary identification probe before asking you for a capture.",
+        "state": "open",
+        "state_reason": null,
+        "labels": [
+          "actionable",
+          "rdr2"
+        ],
+        "comments": 3,
+        "updated_at": "2026-09-06T12:54:46Z"
+      },
+      "plan_file": "worklog/issue-status-audit/2026-09-06/plan-rdr2-a.md"
+    },
+    {
+      "number": 169,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:58:32Z",
+      "current_updated_at": "2026-09-06T12:54:47Z"
+    },
+    {
+      "number": 170,
+      "result": "updated",
+      "before": {
+        "number": 170,
+        "title": "Enhanced Roads",
+        "body": "## Desired behavior\nTraveling on an actual road should consume less outer-ring stamina than traveling at the same pace across open terrain, for both the player and the player's current horse.\n\n## Implementation\nExtend GameplayTweaks' existing movement-mode stamina controller rather than introducing a second stamina system.\n\n- Detect whether the player or current mount is genuinely on a road/path. Do not count merely being near a road; roadside terrain must remain off-road.\n- Apply the road benefit only when the selected movement-mode rate is negative (draining stamina).\n- Do not alter standing/walking recovery, core values, maximum stamina, swimming, or unrelated horse behavior.\n- Add independent hot-reloaded settings:\n  - `[HumanStamina] RoadDrainMultiplier`\n  - `[HorseStamina] RoadDrainMultiplier`\n- Use `1.0` for no benefit and lower values for cheaper road travel; default both to `0.5` (half normal drain).\n- Preserve all existing movement-mode rates and exhaustion behavior, multiplying only their negative road-going result.\n\n## Reference\nThe temporarily stored **Hardcore Stamina** mod implements the same design in reverse through `RUNNING_NO_ROAD_DRAIN=500` for both `[PLAYER]` and `[HORSE]`: it adds drain when movement is not on a road. Use it as a behavioral reference, not as code to copy.\n\n## Acceptance test\n1. At a fixed running/sprinting pace, compare player stamina loss over the same duration on a road and immediately beside it; road drain should match the configured multiplier.\n2. Repeat while mounted at canter/gallop.\n3. Verify leaving and re-entering the road changes the rate promptly without flicker at the road edge.\n4. Verify walking/standing recovery and swimming rates are unchanged.\n5. Set each multiplier to `1.0` and confirm current behavior is exactly restored.",
+        "state": "open",
+        "state_reason": "reopened",
+        "labels": [
+          "rdr2",
+          "waiting"
+        ],
+        "comments": 9,
+        "updated_at": "2026-09-05T06:58:35Z"
+      },
+      "after": {
+        "number": 170,
+        "title": "Choose the remaining road-travel benefit",
+        "body": "The stamina benefit can remain. The tested foot-speed method is limited to a 15% increase, which you rejected as too small; a stronger horse-only path remains unverified.\n\n- [ ] Choose stamina savings only, or keep research into an additional horse-only speed benefit.\n- [ ] Confirm whether a large speed boost for both Arthur and the horse is essential; no supported way to deliver that combined speed requirement has been established.",
+        "state": "open",
+        "state_reason": "reopened",
+        "labels": [
+          "rdr2",
+          "waiting"
+        ],
+        "comments": 9,
+        "updated_at": "2026-09-06T12:54:48Z"
+      },
+      "plan_file": "worklog/issue-status-audit/2026-09-06/plan-rdr2-a.md"
+    },
+    {
+      "number": 173,
+      "result": "already_matches"
+    },
+    {
+      "number": 183,
+      "result": "already_matches"
+    },
+    {
+      "number": 188,
+      "result": "already_matches"
+    },
+    {
+      "number": 197,
+      "result": "already_matches"
+    },
+    {
+      "number": 198,
+      "result": "already_matches"
+    },
+    {
+      "number": 199,
+      "result": "already_matches"
+    },
+    {
+      "number": 200,
+      "result": "already_matches"
+    },
+    {
+      "number": 213,
+      "result": "already_matches"
+    },
+    {
+      "number": 215,
+      "result": "already_matches"
+    },
+    {
+      "number": 217,
+      "result": "already_matches"
+    },
+    {
+      "number": 219,
+      "result": "already_matches"
+    },
+    {
+      "number": 221,
+      "result": "already_matches"
+    },
+    {
+      "number": 233,
+      "result": "already_matches"
+    },
+    {
+      "number": 241,
+      "result": "already_matches"
+    },
+    {
+      "number": 248,
+      "result": "already_matches"
+    },
+    {
+      "number": 249,
+      "result": "already_matches"
+    },
+    {
+      "number": 255,
+      "result": "already_matches"
+    },
+    {
+      "number": 257,
+      "result": "already_matches"
+    },
+    {
+      "number": 263,
+      "result": "already_matches"
+    },
+    {
+      "number": 264,
+      "result": "already_matches"
+    },
+    {
+      "number": 265,
+      "result": "already_matches"
+    },
+    {
+      "number": 268,
+      "result": "already_matches"
+    },
+    {
+      "number": 271,
+      "result": "already_matches"
+    },
+    {
+      "number": 273,
+      "result": "already_matches"
+    },
+    {
+      "number": 275,
+      "result": "already_matches"
+    },
+    {
+      "number": 278,
+      "result": "already_matches"
+    },
+    {
+      "number": 280,
+      "result": "already_matches"
+    },
+    {
+      "number": 283,
+      "result": "already_matches"
+    },
+    {
+      "number": 284,
+      "result": "already_matches"
+    },
+    {
+      "number": 285,
+      "result": "already_matches"
+    },
+    {
+      "number": 287,
+      "result": "already_matches"
+    },
+    {
+      "number": 288,
+      "result": "already_matches"
+    },
+    {
+      "number": 289,
+      "result": "already_matches"
+    }
+  ]
+}
