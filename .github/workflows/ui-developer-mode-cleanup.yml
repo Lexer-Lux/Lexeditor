@@ -1,0 +1,144 @@
+name: Developer Mode cleanup
+
+on:
+  push:
+    branches: [fix/ui-standardization-20260906]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ui-standardization-20260906
+          fetch-depth: 0
+      - name: Remove legacy Lexer Mode state
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, json
+
+          def read(path): return Path(path).read_text(encoding='utf-8')
+          def write(path,text): Path(path).write_text(text,encoding='utf-8',newline='\n')
+          def one(path, old, new, label):
+              t=read(path); n=t.count(old)
+              if n != 1: raise SystemExit(f'{label}: expected 1 match, got {n}')
+              write(path,t.replace(old,new,1))
+
+          # Persistent settings contain preferences only. Developer Mode is an
+          # authenticated host fact, never a stored/user-selectable bit.
+          p='settings_manager.py'; t=read(p)
+          t=t.replace('    "developerMode": False,\n    "lexerMode": False,\n','')
+          t=t.replace('LEXER_DEFAULT_KEYS = tuple(key for key in DEFAULTS if key not in {"lexerMode", "viewPreferences"})',
+                      'PACKAGED_DEFAULT_KEYS = tuple(key for key in DEFAULTS if key != "viewPreferences")')
+          t=t.replace('LEXER_DEFAULT_KEYS','PACKAGED_DEFAULT_KEYS')
+          t=t.replace('            "developerMode": payload.get("developerMode", defaults["developerMode"]) is True,\n            "lexerMode": payload.get("lexerMode") is True,\n','')
+          t=t.replace('    def save(self, update_check_frequency: str, developer_mode: bool | None = None,\n             lexer_mode: bool | None = None,\n',
+                      '    def save(self, update_check_frequency: str,\n')
+          t=t.replace('        if developer_mode is None:\n            developer_mode = current["developerMode"]\n        if lexer_mode is None:\n            lexer_mode = current["lexerMode"]\n','')
+          t=t.replace('                "developerMode": bool(developer_mode),\n                "lexerMode": bool(lexer_mode),\n','')
+          t=t.replace('    def save_lexer_defaults(self, values: dict) -> dict:\n        """Save checked-in application defaults after host authorization."""',
+                      '    def save_packaged_defaults(self, values: dict) -> dict:\n        """Save checked-in application defaults after Developer Mode authorization."""')
+          t=t.replace('raise ValueError("Lexer defaults must be an object")','raise ValueError("Packaged defaults must be an object")')
+          write(p,t)
+
+          # The host derives Developer Mode solely from the active GitHub CLI
+          # identity and no longer mirrors it into a legacy second mode.
+          p='desktop_host.py'; t=read(p)
+          t=t.replace('        lexer_mode = bool(self._settings.snapshot().get("lexerMode"))\n',
+                      '        developer_mode = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY))\n')
+          t=t.replace('            if plugin.plugin_id == "blank" and not lexer_mode:\n',
+                      '            if plugin.plugin_id == "blank" and not developer_mode:\n')
+          t=t.replace('''        # There is one privileged mode: Developer Mode. It is an identity\n        # fact, not a preference. The legacy lexer field stays internal until\n        # older settings files age out.\n        payload["developerMode"] = authorized\n        payload["lexerMode"] = authorized\n        payload["lexerAuthorized"] = authorized\n        payload["lexerLogin"] = (identity or {}).get("login", "")\n''', '''        # There is one privileged mode: Developer Mode. It is an identity\n        # fact, not a preference.\n        payload["developerMode"] = authorized\n        payload["developerAuthorized"] = authorized\n        payload["developerLogin"] = (identity or {}).get("login", "")\n''')
+          t=t.replace('''            names = ("developerMode", "lexerMode", "hoverableAltClick", "selectionHoldMs",\n                     "tableRowsPerPage", "panelGapPercent", "mainMenuHeightPercent",\n                     "soundEnabled", "soundVolumePercent")\n''', '''            names = ("hoverableAltClick", "selectionHoldMs", "tableRowsPerPage",\n                     "panelGapPercent", "mainMenuHeightPercent", "soundEnabled",\n                     "soundVolumePercent")\n''')
+          t=t.replace('''        authorized = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True))\n        self._settings.save(\n            str(payload.get("updateCheckFrequency", "daily")),\n            authorized,\n            authorized,\n''', '''        self._settings.save(\n            str(payload.get("updateCheckFrequency", "daily")),\n''')
+          t=t.replace('    def save_lexer_setting_defaults(self, values: dict) -> dict:',
+                      '    def save_developer_setting_defaults(self, values: dict) -> dict:')
+          t=t.replace('        self._settings.save_lexer_defaults(values)','        self._settings.save_packaged_defaults(values)')
+          write(p,t)
+
+          # The distributable defaults file must not contain an on/off value
+          # for an identity-derived mode.
+          p=Path('ui/default_settings.json'); data=json.loads(p.read_text(encoding='utf-8'))
+          data.pop('developerMode',None)
+          p.write_text(json.dumps(data,indent=2,sort_keys=True)+'\n',encoding='utf-8')
+
+          # Settings UI: two scopes only. Ordinary user preferences live in
+          # Global Settings; authenticated Developer Mode exposes checked-in
+          # defaults and developer-only packaged controls.
+          p='ui/framework.js'; t=read(p)
+          t=t.replace('scope:"lexer"','scope:"packaged"')
+          t=t.replace('        {key:"developerMode", scope:"developer", title:"Developer Mode", description:"Shows development tools such as the GitHub workspace and plugin Restart control.", type:"checkbox"},\n','')
+          t=t.replace('definitions.filter(definition => definition.scope !== "lexer")',
+                      'definitions.filter(definition => definition.scope !== "packaged")')
+          t=t.replace('(definition.scope !== "lexer" && !supportsCurrent(definition))',
+                      '(definition.scope !== "packaged" && !supportsCurrent(definition))')
+          old='''      const currentControls = new Map(), defaultControls = new Map(), defaultCards = [];\n      const lane = (scope, title) => element("section", {class:`lex-settings-lane lex-settings-lane-${scope}`},\n        element("h3", {}, title));\n      const userLane = lane("user", "GLOBAL SETTINGS");\n      const developerLane = lane("developer", `${plugin || "PLUGIN"} EDITOR SETTINGS`.toLocaleUpperCase());\n      const lexerLane = lane("lexer", "LEXER");\n      const lexerMode = element("input", {\n        id:"lex-lexer-mode", type:"checkbox", checked:!!settings.lexerMode,\n        disabled:!settings.lexerAuthorized,\n      });\n      const lexerModeCard = element("section", {class:"lex-global-setting lex-lexer-setting lex-lexer-mode-setting"},\n        element("label", {for:"lex-lexer-mode"}, "I am Lexer"),\n        element("p", {}, settings.lexerAuthorized\n          ? `Verified GitHub account: ${settings.lexerLogin}. Enables distributable defaults.`\n          : "Unavailable. Sign in to GitHub as Lexer to enable distributable defaults."), lexerMode);\n      lexerLane.append(lexerModeCard);\n      const setDefaultVisibility = () => {\n        const active = lexerMode.checked && !lexerMode.disabled;\n        defaultCards.forEach(control => {\n          control.hidden = !active;\n          const supported = control.dataset.lexSettingSupported !== "false";\n          control.setAttribute("aria-disabled", String(!supported));\n          control.querySelectorAll?.("input,select").forEach(input => { input.disabled = !active || !supported; });\n        });\n        lexerLane.classList.toggle("active", active);\n      };\n'''
+          new='''      const currentControls = new Map(), defaultControls = new Map(), defaultCards = [];\n      const lane = (scope, title) => element("section", {class:`lex-settings-lane lex-settings-lane-${scope}`},\n        element("h3", {}, title));\n      const userLane = lane("user", "GLOBAL SETTINGS");\n      const developerLane = lane("developer", `${plugin || "PLUGIN"} DEVELOPER SETTINGS`.toLocaleUpperCase());\n      const developerActive = !!settings.developerMode;\n      developerLane.append(element("section", {class:"lex-global-setting lex-developer-identity"},\n        element("strong", {}, developerActive ? "DEVELOPER MODE ACTIVE" : "DEVELOPER MODE UNAVAILABLE"),\n        element("p", {}, developerActive\n          ? `Authenticated GitHub account: ${settings.developerLogin}. Distributable authoring controls are enabled.`\n          : "Sign in to GitHub as the authorized developer to expose authoring controls.")));\n      const setDefaultVisibility = () => {\n        defaultCards.forEach(control => {\n          control.hidden = !developerActive;\n          const supported = control.dataset.lexSettingSupported !== "false";\n          control.setAttribute("aria-disabled", String(!supported));\n          control.querySelectorAll?.("input,select").forEach(input => { input.disabled = !developerActive || !supported; });\n        });\n        developerLane.classList.toggle("active", developerActive);\n      };\n'''
+          if t.count(old)!=1: raise SystemExit(f'settings mode block expected once, got {t.count(old)}')
+          t=t.replace(old,new,1)
+          t=t.replace('''        if (!lexerMode.checked || lexerMode.disabled) {\n          message.textContent = "Enable I am Lexer to change the default for everyone."; return;\n        }\n''','''        if (!developerActive) {\n          message.textContent = "Developer Mode requires the authorized GitHub account."; return;\n        }\n''')
+          t=t.replace('if (definition.scope === "lexer") {','if (definition.scope === "packaged") {')
+          t=t.replace('class:"lex-global-setting lex-lexer-setting lex-lexer-only-setting", hidden:true,',
+                      'class:"lex-global-setting lex-developer-setting lex-packaged-setting", hidden:true,')
+          t=t.replace('          lexerLane.append(card);','          developerLane.append(card);')
+          t=t.replace('class:"lex-setting-default-control lex-lexer-setting", hidden:true,',
+                      'class:"lex-setting-default-control lex-developer-setting", hidden:true,')
+          t=t.replace('      lexerMode.addEventListener("change", setDefaultVisibility);\n','')
+          t=t.replace('''        dirty += Number(lexerMode.checked !== !!savedSettings.lexerMode);\n        if (lexerMode.checked && !lexerMode.disabled) {\n''','''        if (developerActive) {\n''')
+          t=t.replace('''        lexerMode.checked = !!savedSettings.lexerMode;\n        setDefaultVisibility();\n        developerSetting.classList.toggle("active-developer-setting", developerMode.checked);\n''','''        setDefaultVisibility();\n''')
+          t=t.replace('settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", {...values, lexerMode: lexerMode.checked}));',
+                      'settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", values));')
+          t=t.replace('''            if (lexerMode.checked) {\n              const defaults = Object.fromEntries(supportedDefaultDefinitions.map(definition =>\n                [definition.key, readControl(definition, defaultControls.get(definition.key))]));\n              settings = rememberSharedSettings(await callWindow("save_lexer_setting_defaults", defaults));\n            }\n''','''            if (developerActive) {\n              const defaults = Object.fromEntries(supportedDefaultDefinitions.map(definition =>\n                [definition.key, readControl(definition, defaultControls.get(definition.key))]));\n              settings = rememberSharedSettings(await callWindow("save_developer_setting_defaults", defaults));\n            }\n''')
+          old='''      const developerMode = controlNode(currentControls.get("developerMode"));\n      const developerSetting = developerMode.closest(".lex-global-setting");\n      developerSetting.classList.toggle("active-developer-setting", developerMode.checked);\n      developerMode.addEventListener("change", () => developerSetting.classList.toggle("active-developer-setting", developerMode.checked));\n      const dialogChildren = [\n        heading,\n        element("div", {class:"lex-settings-columns"}, userLane, developerLane, lexerLane),\n      ];\n'''
+          new='''      const dialogChildren = [\n        heading,\n        element("div", {class:"lex-settings-columns"}, userLane, developerLane),\n      ];\n'''
+          if t.count(old)!=1: raise SystemExit(f'developer control block expected once, got {t.count(old)}')
+          t=t.replace(old,new,1)
+          write(p,t)
+
+          # Two-column settings layout; no hidden third privileged lane.
+          p='ui/framework.css'; t=read(p)
+          t=t.replace('grid-template-columns:minmax(440px,2fr) minmax(230px,1fr) minmax(440px,1.5fr);',
+                      'grid-template-columns:minmax(440px,2fr) minmax(360px,1.35fr);')
+          t=t.replace('.lex-settings-lane-lexer,.lex-lexer-setting { display:none !important; }','')
+          if 'LEXEDITOR_DEVELOPER_MODE_LAYOUT_20260906' not in t:
+              t += '''\n/* LEXEDITOR_DEVELOPER_MODE_LAYOUT_20260906 */\n.lex-settings-lane-developer { grid-template-columns:repeat(2,minmax(200px,1fr)); }\n.lex-settings-lane-developer>h3,.lex-developer-identity { grid-column:1 / -1; }\n.lex-developer-identity strong { letter-spacing:.06em; }\n@media (max-width:1100px) { .lex-settings-lane-developer { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); } }\n'''
+          write(p,t)
+
+          # Home developer tools use the same authenticated Developer Mode flag.
+          p='ui/chooser.html'; t=read(p)
+          t=t.replace('/* I AM LEXER: the one manual update path.', '/* Developer helper-version reporting path.')
+          t=t.replace('lexerButton.textContent="I AM LEXER";', 'lexerButton.textContent="DEV";')
+          t=t.replace('lexerButton.title="Helper versions across every Lexeditor plugin";',
+                      'lexerButton.title="Developer helper versions across every Lexeditor plugin";')
+          t=t.replace('lexerButton.hidden=!settings?.lexerMode;', 'lexerButton.hidden=!settings?.developerMode;')
+          t=t.replace('lexerButton.hidden=!chooser.settings?.lexerMode;', 'lexerButton.hidden=!chooser.settings?.developerMode;')
+          write(p,t)
+
+          # Browser fixture follows the public settings contract.
+          p='tests/global_browser_check.py'; t=read(p)
+          t=t.replace("|{'lexerMode':True,'lexerAuthorized':True,'lexerLogin':'Lexer-Lux',", "|{'developerMode':True,'developerAuthorized':True,'developerLogin':'Lexer-Lux',")
+          write(p,t)
+          PY
+      - name: Report legacy mode references
+        run: |
+          echo 'Legacy mode references after cleanup:'
+          git grep -n -E 'lexerMode|lex-lexer-mode|I am Lexer|I AM LEXER|save_lexer_setting_defaults|save_lexer_defaults' -- . ':!worklog/**' || true
+      - name: Validate
+        run: |
+          node --check ui/framework.js
+          python -m compileall -q settings_manager.py desktop_host.py tests/global_browser_check.py
+          ! git grep -q -E 'lexerMode|lex-lexer-mode|I am Lexer|I AM LEXER|save_lexer_setting_defaults|save_lexer_defaults' -- . ':!worklog/**'
+          grep -q 'developerActive = !!settings.developerMode' ui/framework.js
+          grep -q 'save_developer_setting_defaults' desktop_host.py ui/framework.js
+      - name: Commit cleanup and remove workflow
+        run: |
+          git rm -f .github/workflows/ui-developer-mode-cleanup.yml
+          git config user.name 'Lexeditor UI maintenance'
+          git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+          git add settings_manager.py desktop_host.py ui/default_settings.json ui/framework.js ui/framework.css ui/chooser.html tests/global_browser_check.py
+          git commit -m 'Make Developer Mode identity-only'
+          git push origin HEAD:fix/ui-standardization-20260906
