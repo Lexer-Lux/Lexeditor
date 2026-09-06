@@ -1,0 +1,3 @@
+[submodule "tools/magic-rdr/source"]
+	path = tools/magic-rdr/source
+	url = https://github.com/Foxxyyy/Magic-RDR.git
