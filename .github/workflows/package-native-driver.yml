@@ -1,0 +1,110 @@
+name: Package verified FF8 native driver
+on:
+  push:
+    branches: [fix/ff8-native-battle-batch]
+    paths: [.github/workflows/package-native-driver.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Fetch exact editor and upstream source revisions
+        env:
+          EDITOR_REVISION: ${{ github.sha }}
+        run: |
+          git config --global core.autocrlf false
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin "$EDITOR_REVISION"
+          git -C editor checkout --detach FETCH_HEAD
+          git init ffnx
+          git -C ffnx remote add origin https://github.com/julianxhokaxhiu/FFNx.git
+          git -C ffnx fetch --depth=1 origin c056db2783f376a340fcefa6a48cc33618998876
+          git -C ffnx checkout --detach FETCH_HEAD
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-build-logs
+          repository: Lexer-Lux/Lexeditor
+          run-id: 34035158902
+          github-token: ${{ github.token }}
+          path: recovered
+      - name: Verify immutable build receipt and recover staging without modifying the DLL
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib,json,os,shutil,urllib.request
+          def get(path):
+              req=urllib.request.Request('https://api.github.com/repos/Lexer-Lux/Lexeditor/'+path,headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})
+              with urllib.request.urlopen(req,timeout=30) as response:return json.load(response)
+          run=get('actions/runs/34035158902')
+          assert run['head_sha']=='9a0155df0cd43609690cd8bde4144786915101c5' and run['head_branch']=='fix/ff8-native-battle-batch'
+          artifact=get('actions/artifacts/9989985366')
+          assert artifact['workflow_run']['id']==34035158902 and artifact['name']=='native-build-logs'
+          assert artifact['digest']=='sha256:fd5a6f65d5318efe0af82ee2184cb232a935bff467e4680d8c655aa1c38214ac'
+          root=Path('recovered/candidate')
+          expected={'AF3DN.P':'cf237e90a3c0a099c5182e58561e6469951bf2a493bc8a346938aceff2ab0e77','FFNx.pdb':'1431c8f6f8393ad77c3b834fdd2b9089c1a93898ad4dc69103b079be72d63e92','ISSUE51_DERIVATIVE_SOURCE.patch':'9516488302f5eb352ec5e4162bffc6f540fac6150645eb6f040597332219cf79'}
+          for name,digest in expected.items():
+              assert hashlib.sha256((root/name).read_bytes()).hexdigest()==digest,name
+          cache=Path('recovered/ffnx/.build/CMakeCache.txt').read_text()
+          for flag in ['FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME:BOOL=ON','FFNX_LEXEDITOR_LIVE_CONDITIONS:BOOL=ON','FFNX_DEPLOY_TO_GAME_DIRS:BOOL=OFF']:
+              assert flag in cache,flag
+          shutil.copyfile('ffnx/COPYING.TXT',root/'LICENSE')
+          (root/'BUILD.txt').write_text('Editor source: 9a0155df0cd43609690cd8bde4144786915101c5\nFFNx source: c056db2783f376a340fcefa6a48cc33618998876\nRecovered from immutable Actions run 34035158902, artifact 9989985366. Compilation and linking completed; original licence staging used a nonexistent LICENSE path. Binary untouched; licence supplied from the exact upstream COPYING.TXT. Original CMake cache confirms both runtime flags ON and game deployment OFF.\n')
+          print('PASS: exact archived DLL/PDB/source, build identity, and both required compile gates')
+          PY
+      - name: Install verification dependencies
+        run: python -m pip install Pillow fonttools pefile==2024.8.26
+      - name: Apply reviewed installer idempotency correction
+        working-directory: editor
+        run: |
+          test "$(git hash-object games/ff8/ffnx_manager.py)" = '97e8ca9789ddc8a906c79aad4a65dfc096af47cc'
+          git apply --check tools/ff8-installer-idempotency.patch
+          git apply tools/ff8-installer-idempotency.patch
+          test "$(git hash-object games/ff8/ffnx_manager.py)" = '5f3ca6618033fe807585c746c83b235edfb0e140'
+      - name: Reconstruct and verify full source before packaging
+        working-directory: editor
+        run: |
+          python tools/package_ff8_native_driver.py --candidate ../recovered/candidate --ffnx-source ../ffnx --driver-sha256 cf237e90a3c0a099c5182e58561e6469951bf2a493bc8a346938aceff2ab0e77 --build-revision 9a0155df0cd43609690cd8bde4144786915101c5 --build-run 34035158902
+      - name: Run shipping, Windows checkout, upgrade and compiled native regressions
+        working-directory: editor
+        run: |
+          python tools/verify_ff8_native_package.py
+          python tools/verify_ff8_native_compiled.py
+          python tools/verify_ff8_gf_bar_settings.py
+          python -m compileall -q games/ff8 tools/package_ff8_native_driver.py tools/verify_ff8_native_package.py tools/verify_ff8_linked_runtime.py
+      - name: Commit only the tested package and installer to its repair branch
+        working-directory: editor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add -- games/ff8/ffnx_issue_51/package/AF3DN.P games/ff8/ffnx_issue_51/package/COPYING.TXT games/ff8/ffnx_issue_51/package/ISSUE51_DERIVATIVE_SOURCE.patch games/ff8/ffnx_issue_51/package/ISSUE51_BUILD_REPORT.md games/ff8/ffnx_issue_51/package/runtime-manifest.json games/ff8/ffnx_issue_51/runtime_package.py games/ff8/ffnx_manager.py
+          git rm -- tools/ff8-installer-idempotency.patch
+          python - <<'PY'
+          import subprocess
+          allowed={'games/ff8/ffnx_issue_51/package/'+p for p in ['AF3DN.P','COPYING.TXT','ISSUE51_DERIVATIVE_SOURCE.patch','ISSUE51_BUILD_REPORT.md','runtime-manifest.json']}
+          allowed.update(['games/ff8/ffnx_issue_51/runtime_package.py','games/ff8/ffnx_manager.py','tools/ff8-installer-idempotency.patch'])
+          changed=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+          assert changed<=allowed and 'games/ff8/ffnx_issue_51/package/AF3DN.P' in changed,changed
+          PY
+          git config user.name 'Lexeditor native repair'
+          git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+          git commit -m 'Ship verified Party Switch, HP alignment and GF HP native driver'
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push origin HEAD:refs/heads/fix/ff8-native-battle-batch
+          unset AUTH
+          git rev-parse HEAD
+          git archive --format=zip --output=../verified-native-package.zip HEAD .gitattributes games/ff8/ffnx_issue_51/package games/ff8/ffnx_issue_51/runtime_package.py games/ff8/ffnx_manager.py tools/package_ff8_native_driver.py tools/prepare_ff8_native_build.py tools/verify_ff8_native_package.py tools/verify_ff8_linked_runtime.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-native-package
+          path: verified-native-package.zip
+          retention-days: 7
+          if-no-files-found: error
