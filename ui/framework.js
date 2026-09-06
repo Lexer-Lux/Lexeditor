@@ -5873,6 +5873,9 @@
     if (!field) return;
     requestAnimationFrame(() => requestAnimationFrame(() => {
       syncRange(field);
+      const numeric = field.querySelector('input[type="number"]');
+      if (numeric) numeric.dispatchEvent(new Event('input', {bubbles: true}));
+      if (!field.isConnected) return;
       const target = getComputedStyle(field).backgroundColor;
       const accent = getComputedStyle(document.documentElement).getPropertyValue('--lex-accent').trim() || target;
       field.animate(
@@ -5901,13 +5904,25 @@
       label.style.fontSize = `${size}px`;
     }
   };
-  const fitAllLabels = root => root.querySelectorAll?.(
-    '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label',
-  ).forEach(fitLabel);
+  const fittedLabelSelector = '.lex-detail-field-label,.lex-toggle-name,.lex-toggle-label,.lex-flag-label';
+  const labelResizeObserver = typeof ResizeObserver === 'function'
+    ? new ResizeObserver(entries => entries.forEach(entry => fitLabel(entry.target)))
+    : null;
+  const fitAllLabels = root => {
+    const labels = [
+      root instanceof Element && root.matches(fittedLabelSelector) ? root : null,
+      ...root.querySelectorAll?.(fittedLabelSelector) || [],
+    ].filter(Boolean);
+    labels.forEach(label => {
+      fitLabel(label);
+      labelResizeObserver?.observe(label);
+    });
+  };
   const labelObserver = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
     if (node instanceof Element) fitAllLabels(node);
   })));
   labelObserver.observe(document.documentElement, {childList: true, subtree: true});
   window.addEventListener('resize', () => fitAllLabels(document));
+  document.fonts?.ready?.then(() => fitAllLabels(document));
   requestAnimationFrame(() => fitAllLabels(document));
 })();

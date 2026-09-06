@@ -913,7 +913,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 
 .lex-detail-panel {
-  --lex-detail-label-width:clamp(125px, 18%, 230px);
+  --lex-detail-label-width:10%;
   display:grid !important;
   /* Every Detail reserves the same top tenth for identity. Plugins may scale
      the contents inside it, but they must not make the heading consume more
@@ -4620,3 +4620,71 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-settings-lane-developer>h3,.lex-developer-identity { grid-column:1 / -1; }
 .lex-developer-identity strong { letter-spacing:.06em; }
 @media (max-width:1100px) { .lex-settings-lane-developer { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); } }
+
+
+/* LEXEDITOR_UI_VISUAL_POLISH_20260906 */
+/* Divider accessories intentionally protrude into the table pane. They must
+   remain above the table cells or the visible +/- controls cannot be clicked. */
+.lex-paged-list-detail > .lex-panel-layout-divider {
+  z-index:40;
+  overflow:visible;
+}
+.lex-paged-list-detail > .lex-barrelled-master {
+  position:relative;
+  z-index:1;
+}
+.lex-barrel-control { z-index:50; }
+
+/* Ref tags are prefixes, not fixed-width columns. A 22px V lane left a huge
+   visual hole before a boolean check/X. Keep every code compact, including LL. */
+.lex-reference-values .lex-reference-tag {
+  flex:0 0 auto;
+  width:auto;
+  min-width:0;
+  max-width:none;
+  margin-right:.22em;
+}
+.lex-source-control:has(input[type="checkbox"]) > .lex-reference-values {
+  top:50%;
+  bottom:auto;
+  align-content:center;
+  padding-block:2px;
+  transform:translateY(-50%);
+}
+.lex-source-control:has(input[type="checkbox"]) .lex-reference-value,
+.lex-source-control:has(input[type="checkbox"]) .lex-boolean-mark {
+  align-items:center;
+  line-height:1;
+}
+.lex-source-control:has(input[type="checkbox"]) .lex-boolean-mark {
+  display:inline-grid;
+  place-items:center;
+}
+
+/* The info bubble and its glyph each use the exact centre of the shared rail. */
+.lex-field-type-rail > .lex-info-help {
+  left:50% !important;
+  top:50% !important;
+  translate:none;
+  transform:translate(-50%,-50%) !important;
+}
+.lex-info-help > span {
+  display:grid;
+  box-sizing:border-box;
+  width:100%;
+  height:100%;
+  place-items:center;
+  line-height:1;
+  text-align:center;
+}
+
+/* Grouped boolean labels remain horizontal and must fit their existing box;
+   content length never gets to grow the property row. */
+.lex-toggle-name {
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  text-align:center;
+}
