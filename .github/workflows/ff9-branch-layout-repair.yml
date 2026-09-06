@@ -20,10 +20,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply deterministic repairs
+      - name: Repair FF9 editor controller
         shell: bash
         run: |
-          python tools/ff9/repair_battle_layout.py
           python - <<'PY'
           from pathlib import Path
           p = Path('games/ff9/editor.html')
@@ -34,15 +33,15 @@ jobs:
           s = s.replace('navigate(row.targeti}}', 'navigate(row.target)}}')
           p.write_text(s, encoding='utf-8')
           PY
-      - name: Commit repaired production files
+      - name: Commit repaired editor
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'Lexeditor FF9 Agent'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add games/ff9/battle_scene.py games/ff9/editor.html
+          git add games/ff9/editor.html
           if ! git diff --cached --quiet; then
-            git commit -m 'Repair FF9 battle layout and editor controller'
+            git commit -m 'Fix FF9 editor controller syntax'
             git push origin HEAD:codex/ff9-complete-20260906
           fi
       - name: Verify repaired FF9 branch
