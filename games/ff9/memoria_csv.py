@@ -6,9 +6,11 @@ import csv
 from dataclasses import dataclass
 import hashlib
 import io
+import math
 import os
 from pathlib import Path
 import re
+import tempfile
 from typing import Any
 
 from . import paths
@@ -34,6 +36,9 @@ DATASETS = (
     Dataset("abilities", "abilities", "Support abilities", "Characters/Abilities/AbilityGems.csv", "Support-ability gem costs and boosted versions"),
     Dataset("actions", "magic", "Battle actions", "Battle/Actions.csv", "Battle action targeting, animation, script, power, status, MP, and type"),
     Dataset("characters", "characters", "Character base stats", "Characters/BaseStats.csv", "Base dexterity, strength, magic, will, and gem capacity"),
+    Dataset("character-parameters", "characters", "Character parameters", "Characters/CharacterParameters.csv", "Starting row, victory pose, category, command and equipment sets, model formula, and name keyword"),
+    Dataset("default-equipment", "characters", "Starting equipment", "Characters/DefaultEquipment.csv", "Initial weapon, headgear, wristwear, armor, and accessory for each equipment set"),
+    Dataset("leveling", "characters", "Level growth", "Characters/Leveling.csv", "Experience thresholds and HP/MP growth for levels 1 through 99"),
     Dataset("shops", "shops", "Shop inventories", "Items/ShopItems.csv", "Shop IDs and ordered item inventories"),
     Dataset("synthesis", "synthesis", "Synthesis recipes", "Items/Synthesis.csv", "Recipe shops, price, result, and ingredients"),
 )
@@ -87,12 +92,13 @@ class MemoriaCsvDocument:
                 self.encoding = "utf-8"
                 text = raw.decode(self.encoding)
             except UnicodeDecodeError:
-                # Memoria's pinned vanilla data includes Windows-1252 punctuation.
-                # Preserve that encoding when Lexeditor writes the project overlay.
+                # Preserve the pinned data's Windows-1252 punctuation.
                 self.encoding = "cp1252"
                 text = raw.decode(self.encoding)
         self.newline = "\r\n" if "\r\n" in text else "\n"
+        # Keep each original terminator, including a missing final newline.
         self.lines = text.splitlines()
+        self.endings = [line[len(line.rstrip("\r\n")):] for line in text.splitlines(keepends=True)]
         self.columns, self.types = self._find_schema()
         self.rows = self._read_rows()
         self.fields = self._describe_fields()
@@ -107,6 +113,8 @@ class MemoriaCsvDocument:
                 continue
             types = _parse_csv_line(type_line[1:].strip())
             if len(columns) >= 2 and len(types) == len(columns):
+                if len(set(columns)) != len(columns) or any(not name for name in columns):
+                    raise ValueError(f"Memoria CSV has duplicate or empty column names: {self.path}")
                 return columns, types
         raise ValueError(f"Memoria CSV schema header was not found: {self.path}")
 
@@ -123,13 +131,8 @@ class MemoriaCsvDocument:
             by_name = dict(zip(self.columns, data))
             identity = by_name.get("Id", by_name.get("id", str(len(rows))))
             name = by_name.get("Comment") or by_name.get("Name") or _comment_text(suffix)
-            rows.append({
-                "line": line_number,
-                "id": identity,
-                "name": name or f"Record {identity}",
-                "raw": by_name,
-                "suffix": suffix,
-            })
+            rows.append({"line": line_number, "id": identity,
+                         "name": name or f"Record {identity}", "raw": by_name, "suffix": suffix})
         return rows
 
     def _describe_fields(self) -> list[dict[str, Any]]:
@@ -138,10 +141,8 @@ class MemoriaCsvDocument:
             normalized = declared.strip().casefold()
             values = [row["raw"][column].strip() for row in self.rows]
             descriptor: dict[str, Any] = {
-                "key": column,
-                "label": column.replace("_", " "),
-                "declaredType": declared or "String",
-                "editable": column.casefold() != "id",
+                "key": column, "label": column.replace("_", " "),
+                "declaredType": declared or "String", "editable": column.casefold() != "id",
             }
             if normalized in _BOOLEAN_TYPES:
                 descriptor["kind"] = "boolean"
@@ -169,10 +170,10 @@ class MemoriaCsvDocument:
         fields = {field["key"]: field for field in self.fields}
         return [{
             "line": row["line"],
-            "id": int(row["id"]) if str(row["id"]).lstrip("-+").isdigit() else row["id"],
+            "id": index + 1 if dataset.key == "leveling" else (int(row["id"]) if str(row["id"]).lstrip("-+").isdigit() else row["id"]),
             "name": row["name"],
             "values": {key: self._public_value(value, fields[key]) for key, value in row["raw"].items()},
-        } for row in rows]
+        } for index, row in enumerate(rows)]
 
     @staticmethod
     def _public_value(raw: str, field: dict[str, Any]) -> Any:
@@ -182,20 +183,27 @@ class MemoriaCsvDocument:
         if kind == "integer" and raw.strip():
             return int(raw)
         if kind == "number" and raw.strip():
-            return float(raw)
+            value = float(raw)
+            if not math.isfinite(value):
+                raise ValueError(f"{field['key']} contains a non-finite number")
+            return value
         return raw
 
     def apply(self, changes: list[dict[str, Any]]) -> None:
         row_by_line = {row["line"]: row for row in self.rows}
         field_by_key = {field["key"]: field for field in self.fields}
         for change in changes:
+            if not isinstance(change, dict):
+                raise ValueError("Each changed record must be an object")
             line = change.get("line")
-            if not isinstance(line, int) or line not in row_by_line:
+            if type(line) is not int or line not in row_by_line:
                 raise ValueError("A changed record does not belong to this CSV")
             row = row_by_line[line]
             supplied = change.get("values")
             if not isinstance(supplied, dict):
                 raise ValueError("Changed values must be an object")
+            if not supplied:
+                continue
             for key, value in supplied.items():
                 field = field_by_key.get(key)
                 if not field or not field["editable"]:
@@ -218,8 +226,8 @@ class MemoriaCsvDocument:
                 raise ValueError(f"{field['key']} must be from {field['min']} through {field['max']}")
             return str(value)
         if kind == "number":
-            if isinstance(value, bool) or not isinstance(value, (int, float)):
-                raise ValueError(f"{field['key']} must be a number")
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+                raise ValueError(f"{field['key']} must be a finite number")
             return format(value, ".15g")
         if kind == "text":
             if not isinstance(value, str) or "\n" in value or "\r" in value:
@@ -229,10 +237,19 @@ class MemoriaCsvDocument:
 
     def write_atomic(self, target: Path) -> str:
         target.parent.mkdir(parents=True, exist_ok=True)
-        data = (self.newline.join(self.lines) + self.newline).encode(self.encoding)
-        temporary = target.with_name(target.name + ".lexeditor.tmp")
-        temporary.write_bytes(data)
-        os.replace(temporary, target)
+        data = "".join(line + ending for line, ending in zip(self.lines, self.endings)).encode(self.encoding)
+        fd, name = tempfile.mkstemp(prefix=target.name + ".", suffix=".lexeditor.tmp", dir=target.parent)
+        temporary = Path(name)
+        try:
+            with os.fdopen(fd, "wb") as output:
+                output.write(data)
+                output.flush()
+                os.fsync(output.fileno())
+            if _sha256(self.path) != self.sha256 or (target != self.path and target.exists()):
+                raise RuntimeError("The FF9 CSV changed before saving. Reload it before saving.")
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
         return _sha256(target)
 
 
@@ -257,11 +274,9 @@ class MemoriaDataStore:
         return {
             "key": dataset.key, "tab": dataset.tab, "label": dataset.label,
             "relativePath": "StreamingAssets/Data/" + dataset.relative_path.replace("\\", "/"),
-            "controls": dataset.controls,
-            "available": source is not None,
+            "controls": dataset.controls, "available": source is not None,
             "source": "project" if project.is_file() else "baseline" if baseline else None,
-            "sourcePath": str(source) if source else None,
-            "projectPath": str(project),
+            "sourcePath": str(source) if source else None, "projectPath": str(project),
         }
 
     def load(self, key: str) -> dict[str, Any]:
@@ -270,16 +285,9 @@ class MemoriaDataStore:
             raise KeyError("Unknown FF9 dataset")
         status = self.status(dataset)
         if not status["available"]:
-            raise FileNotFoundError(
-                f"{status['relativePath']} is not present in the selected project or a Memoria/Hades data export"
-            )
+            raise FileNotFoundError(f"{status['relativePath']} is not present in the selected project or a Memoria/Hades data export")
         document = MemoriaCsvDocument(Path(status["sourcePath"]))
-        return {
-            **status,
-            "sha256": document.sha256,
-            "fields": document.fields,
-            "rows": document.public_rows(dataset),
-        }
+        return {**status, "sha256": document.sha256, "fields": document.fields, "rows": document.public_rows(dataset)}
 
     def save(self, key: str, expected_sha256: str, changes: list[dict[str, Any]]) -> dict[str, Any]:
         dataset = DATASET_BY_KEY.get(key)
@@ -291,13 +299,19 @@ class MemoriaDataStore:
         if not isinstance(changes, list):
             raise ValueError("Changes must be a list")
         source = Path(status["sourcePath"])
-        if _sha256(source) != expected_sha256:
-            raise RuntimeError("The FF9 CSV changed outside Lexeditor. Reload it before saving.")
         document = MemoriaCsvDocument(source)
+        if document.sha256 != expected_sha256:
+            raise RuntimeError("The FF9 CSV changed outside Lexeditor. Reload it before saving.")
+        original_lines = document.lines.copy()
         document.apply(changes)
+        if document.lines == original_lines:
+            return self.load(key)
         target = self.project_data / dataset.relative_path
         if source != target and target.exists():
             raise RuntimeError("The FF9 project CSV appeared after this dataset loaded. Reload it before saving.")
+        resolved_target = target.resolve()
+        if any(root.resolve() in resolved_target.parents for root in self.baseline_roots):
+            raise RuntimeError("Select a mod project separate from the installed or cached baseline before saving")
         document.write_atomic(target)
         return self.load(key)
 
