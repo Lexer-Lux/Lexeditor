@@ -16,9 +16,9 @@ Traceback (most recent call last):
   File "/home/runner/work/Lexeditor/Lexeditor/tests/global_controls_check.py", line 181, in <module>
     if __name__=='__main__':main()
                             ^^^^^^
-  File "/home/runner/work/Lexeditor/Lexeditor/tests/global_controls_check.py", line 143, in main
-    trigger=page.locator('.lex-model-preview-trigger');trigger.click()
-                                                       ^^^^^^^^^^^^^^^
+  File "/home/runner/work/Lexeditor/Lexeditor/tests/global_controls_check.py", line 142, in main
+    page.locator('.lex-detail-field-label').click();assert page.evaluate('__flag') is True
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   File "/home/runner/.local/lib/python3.12/site-packages/playwright/sync_api/_generated.py", line 17876, in click
     self._sync(
   File "/home/runner/.local/lib/python3.12/site-packages/playwright/_impl/_sync_base.py", line 115, in _sync
@@ -36,28 +36,28 @@ Traceback (most recent call last):
     raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
 playwright._impl._errors.TimeoutError: Locator.click: Timeout 5000ms exceeded.
 Call log:
-  - waiting for locator(".lex-model-preview-trigger")
-    - locator resolved to <div tabindex="0" role="button" aria-expanded="false" title="Open Model preview" aria-label="Open Model preview" class="lex-detail-panel-icon lex-model-preview-trigger">…</div>
+  - waiting for locator(".lex-detail-field-label")
+    - locator resolved to <div class="lex-detail-field-label">…</div>
   - attempting click action
     2 × waiting for element to be visible, enabled and stable
       - element is visible, enabled and stable
       - scrolling into view if needed
       - done scrolling
-      - <div class="lex-detail-field-label">…</div> from <div class="lex-detail-panel-body">…</div> subtree intercepts pointer events
+      - <h2 class="lex-detail-panel-title">Fixture</h2> from <div class="lex-detail-panel-heading no-actions">…</div> subtree intercepts pointer events
     - retrying click action
     - waiting 20ms
     2 × waiting for element to be visible, enabled and stable
       - element is visible, enabled and stable
       - scrolling into view if needed
       - done scrolling
-      - <div class="lex-detail-field-label">…</div> from <div class="lex-detail-panel-body">…</div> subtree intercepts pointer events
+      - <h2 class="lex-detail-panel-title">Fixture</h2> from <div class="lex-detail-panel-heading no-actions">…</div> subtree intercepts pointer events
     - retrying click action
       - waiting 100ms
     9 × waiting for element to be visible, enabled and stable
       - element is visible, enabled and stable
       - scrolling into view if needed
       - done scrolling
-      - <div class="lex-detail-field-label">…</div> from <div class="lex-detail-panel-body">…</div> subtree intercepts pointer events
+      - <h2 class="lex-detail-panel-title">Fixture</h2> from <div class="lex-detail-panel-heading no-actions">…</div> subtree intercepts pointer events
     - retrying click action
       - waiting 500ms
     - waiting for element to be visible, enabled and stable
