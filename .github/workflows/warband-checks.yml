@@ -1,12 +1,23 @@
 name: Warband checks
 on:
   push:
-    branches: [fix/warband-issue-batch]
+    branches: [master, fix/warband-issue-batch]
+    paths:
+      - 'games/**'
+      - 'ui/framework.*'
+      - 'tests/*warband*'
+      - 'tests/*data_map*'
+      - 'tests/fixtures/warband_launcher_window.py'
+      - 'desktop_host.py'
+      - 'plugin_api.py'
+      - '.github/workflows/warband-checks.yml'
   pull_request:
     paths:
-      - 'games/warband/**'
+      - 'games/**'
+      - 'ui/framework.*'
       - 'tests/*warband*'
-      - 'tools/*warband*'
+      - 'tests/*data_map*'
+      - 'tests/fixtures/warband_launcher_window.py'
       - 'desktop_host.py'
       - 'plugin_api.py'
       - '.github/workflows/warband-checks.yml'
@@ -32,8 +43,10 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install Pillow 'fonttools>=4.59,<5'
-      - run: python -m compileall -q games/warband desktop_host.py plugin_api.py
-      - run: python -m unittest discover -s tests -p test_warband_batch.py -v
+      - run: python -m compileall -q games/warband games/ff7 games/ff8 games/ff9 games/rdr games/rdr2 desktop_host.py plugin_api.py
+      - run: python -m unittest discover -s tests -p 'test_warband*.py' -v
+      - run: python -m unittest discover -s tests -p test_data_map_coverage.py -v
+      - run: node --check ui/framework.js
       - run: node tests/test_warband_trees.js
   browser:
     runs-on: ubuntu-latest
@@ -48,9 +61,10 @@ jobs:
       - run: python tests/warband_browser_check.py out/warband-browser
         env:
           WARBAND_REQUIRE_WEBGL: '1'
+      - run: python tests/data_map_browser_check.py out/data-map-browser
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: warband-browser-fixtures
-          path: out/warband-browser
+          name: warband-and-data-map-fixtures
+          path: out/
           retention-days: 7
