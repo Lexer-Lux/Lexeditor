@@ -1,0 +1,9 @@
+{
+  "source_url": "https://github.com/Lexer-Lux/Lexeditor/issues/78",
+  "author": "Lexer-Lux",
+  "issue_number": 78,
+  "captured_date": "2026-09-06",
+  "capture_note": "Verbatim live issue body retrieved before completion/delivery update; earlier bodies/comments are retained in the repository legacy issue-status archive.",
+  "body_sha256": "c26eb483c638ef90bf85b77c5e1f8b884591010f32a7aa600fd02118b7852142",
+  "body": "**Actionable — delivery remains.** Draft PR #361 adds fixed-camera PNG icons, background generation and module-separated caches. It is not merged; real-item framing and generation speed remain unverified.\n\nIcons must regenerate when source assets change, fit boots through long polearms, and keep browsing responsive. The larger interactive preview remains. A ready-to-run test copy and disposable asset-change fixture still need preparing."
+}

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356284862,
+    "number": 105,
+    "title": "Finish manual control of the belt lantern",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/105"
+  },
+  "sha256": "b9e6bff0061a2725b726b787b104176853446158b7da1f96abe88fdad42828ca",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-5.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356307929,
+    "number": 201,
+    "title": "Research child vulnerability without breaking other interactions",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/201"
+  },
+  "sha256": "dc60483a2dd36f26174d4ad002bbec97d34e26f3e67163900f090d19585ad18b",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-105.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

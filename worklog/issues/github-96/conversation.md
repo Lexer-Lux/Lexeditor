@@ -28,3 +28,15 @@ Exact metadata: [source record](sources/issue-5356141143-8ab368dcd8db0b451af4259
 **Actionable — delivery remains.** Faction/tree selectors, bottom-up upgrade graphs and linked troop details are in draft PR #361, not the normal installed editor. Fixture checks pass, but your actual module is unverified.
 
 A ready-to-run test copy still needs preparing. Roots must sit below upgrades, branch links must match the module, and selecting any node must show that troop’s details.
+
+## issue 5356141143 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/96
+
+Created: 2026-09-05T06:26:46Z; updated: 2026-09-06T13:31:05Z
+
+Exact metadata: [source record](sources/issue-5356141143-fccdf684292df9ff5ced5c264c984ec5cce7b53de5a0b583a3c2dd302081e2e8.json).
+
+**Actionable — delivery remains.** Faction/tree selectors, bottom-up upgrade graphs and linked troop details are in draft PR #361, not the normal installed editor. Fixture checks pass, but your actual module is unverified.
+
+A ready-to-run test copy still needs preparing. Roots must sit below upgrades, branch links must match the module, and selecting any node must show that troop’s details.

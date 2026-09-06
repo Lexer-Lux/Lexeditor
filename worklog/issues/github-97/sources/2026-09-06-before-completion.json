@@ -1,0 +1,9 @@
+{
+  "source_url": "https://github.com/Lexer-Lux/Lexeditor/issues/97",
+  "author": "Lexer-Lux",
+  "issue_number": 97,
+  "captured_date": "2026-09-06",
+  "capture_note": "Verbatim live issue body retrieved before completion/delivery update; earlier bodies/comments are retained in the repository legacy issue-status archive.",
+  "body_sha256": "a806e2aeb6fe5aaa500ae8eefcddf392c7fc00e68612851a1427528e9dfa2329",
+  "body": "PR #361 adds selected-module WSE2 launching, owned child-process tracking, a visible-window check, failure cleanup and Stop. Windows regression tests pass; no real game session has been tested.\n\n**Still needs development:** stock/native `mb_warband.exe` launching is not implemented. Without WSE2, this branch reports an explicit error rather than pretending Play succeeded. This is not fully fixed and is not blocked on another design answer from you."
+}

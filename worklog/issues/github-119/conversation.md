@@ -24,6 +24,18 @@ Show clear directional detection feedback without inventing a universal awarenes
 
 **Status: A discrete-state prototype was installed, but the supporting stealth audit in #113 is still incomplete.** Finish the remaining evidence and prepare a controlled observer test before calling the requested indicator behavior ready.
 
+## issue 5356288308 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/119
+
+Created: 2026-08-06T01:56:32Z; updated: 2026-09-06T13:57:19Z
+
+Exact metadata: [source record](sources/issue-5356288308-84cf89073c4aeac70b6f0a28fe9da9ba74d6e1f3445e7e19ae4bb1a2f39ae711.json).
+
+Show clear directional detection feedback without inventing a universal awareness percentage.
+
+**Status: A discrete-state prototype was installed, but the supporting stealth audit in #113 is still incomplete.** Finish the remaining evidence and prepare a controlled observer test before calling the requested indicator behavior ready.
+
 ## comment 5550114375 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/119#issuecomment-5550114375

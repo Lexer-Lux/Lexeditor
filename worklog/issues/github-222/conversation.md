@@ -34,6 +34,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/222
 
 Created: 2026-08-07T07:50:30Z; updated: 2026-09-06T12:56:02Z
 
+Exact metadata: [source record](sources/issue-5356312766-5296cbac41b5e61513fc1b9156f404457d499f453e2215123626e3c435c414d2.json).
+
+Casings should use Hold E, a ground-pickup animation and the casing’s acquisition card—not a grey Tab prompt for live ammunition.
+
+**Status: The latest path correction is not confirmed installed.** Deliver it before another pickup test. Picking up brass must never grant live rounds; the separate longarm-held reach animation remains unfinished.
+
+## issue 5356312766 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/222
+
+Created: 2026-08-07T07:50:30Z; updated: 2026-09-06T12:56:02Z
+
 Exact metadata: [source record](sources/issue-5356312766-8fd4864c572fd9d9c15b12da74710227713dab20a3e7ea1f81e9e93d7460e64c.json).
 
 Casings should use Hold E, a ground-pickup animation and the casing’s acquisition card—not a grey Tab prompt for live ammunition.

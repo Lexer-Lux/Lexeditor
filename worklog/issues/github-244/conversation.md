@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/244
 
 Created: 2026-08-10T12:49:56Z; updated: 2026-09-06T12:56:35Z
 
+Exact metadata: [source record](sources/issue-5356317947-40bd5abd3aa7196f33b412ae6d70dbcf32d91c7e732913fa78591745c0357e39.json).
+
+Respawn at a safe point beside the nearest activated campsite. Use vanilla placement only when no valid active campsite destination is available, with one real notification explaining the failure.
+
+**Status: Latest warning repair is not built or installed.** Deliver it and verify the active-camp selection case; replacing the warning alone is not proof that campsite respawn works.
+
+## issue 5356317947 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/244
+
+Created: 2026-08-10T12:49:56Z; updated: 2026-09-06T12:56:35Z
+
 Exact metadata: [source record](sources/issue-5356317947-44191b8e3716a7a6ad57703ab8267ad0f3823ef93a3e0592581d31764756cdf6.json).
 
 Respawn at a safe point beside the nearest activated campsite. Use vanilla placement only when no valid active campsite destination is available, with one real notification explaining the failure.

@@ -23,3 +23,15 @@ Exact metadata: [source record](sources/issue-5356487031-5c0c302494fb70bf480dfb2
 Extend Modern Controls to supported battle-camera axes with proportional stick speed and no drift, without breaking commands or targeting.
 
 **Status: Deferred, not implemented.** Establish the supported camera states and limits first. There is no existing battle-camera feature waiting for you to test.
+
+## issue 5356487031 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/330
+
+Created: 2026-09-05T06:53:51Z; updated: 2026-09-06T13:00:05Z
+
+Exact metadata: [source record](sources/issue-5356487031-7302a7ce82ca7d3a5aad376c66e0976eed7c17e1fe10cc5df7311b975f5803c5.json).
+
+Extend Modern Controls to supported battle-camera axes with proportional stick speed and no drift, without breaking commands or targeting.
+
+**Status: Deferred, not implemented.** Establish the supported camera states and limits first. There is no existing battle-camera feature waiting for you to test.

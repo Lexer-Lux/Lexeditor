@@ -59,6 +59,18 @@ Make imported Online content genuinely usable in Story Mode while preserving exi
 
 **Status: Partial.** Irish Whiskey and Old Tom Gin work in the satchel, but their missing item-wheel mappings are only prepared, not installed. Deliver those mappings before a retest. Catalog entries alone do not establish complete Online-content support.
 
+## issue 5356330248 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/286
+
+Created: 2026-08-16T02:21:04Z; updated: 2026-09-06T12:57:11Z
+
+Exact metadata: [source record](sources/issue-5356330248-a4237d129642a836e20172ff1d4ab9c74f8b5c87ff1d1214784ad9a2dafd6fc2.json).
+
+Make imported Online content genuinely usable in Story Mode while preserving existing custom items and effects.
+
+**Status: Partial.** Irish Whiskey and Old Tom Gin work in the satchel, but their missing item-wheel mappings are only prepared, not installed. Deliver those mappings before a retest. Catalog entries alone do not establish complete Online-content support.
+
 ## comment 5550163508 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/286#issuecomment-5550163508

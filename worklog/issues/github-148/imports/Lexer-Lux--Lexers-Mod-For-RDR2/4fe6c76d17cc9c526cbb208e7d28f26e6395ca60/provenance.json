@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356295411,
+    "number": 148,
+    "title": "Review shop category filters and acceptance information",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/148"
+  },
+  "sha256": "83442e3ffe6f4e6584ef86e2a0b9eb1f3402c0ce4f05d603fb1fe29f2cbb5330",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-49.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

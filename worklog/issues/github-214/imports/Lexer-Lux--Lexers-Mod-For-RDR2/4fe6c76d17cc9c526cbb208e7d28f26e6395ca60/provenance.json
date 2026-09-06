@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356310801,
+    "number": 214,
+    "title": "Check marker-move feedback and hold-to-undo",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/214"
+  },
+  "sha256": "dd00893ee2fac120526b3c8d7cd4c1369d2a538c408b411871571926d29c93ec",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-121.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

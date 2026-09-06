@@ -25,6 +25,13 @@ class PluginSession(Protocol):
     def stop(self) -> None: ...
 
 
+class GameProcessController(Protocol):
+    """Optional game-specific launch/readiness contract; the shell owns its instance."""
+    def launch(self, game_root: Path, project: Path) -> dict: ...
+    def status(self) -> dict: ...
+    def stop(self) -> dict: ...
+
+
 SessionFactory = Callable[..., PluginSession]
 
 
@@ -122,6 +129,7 @@ class GamePlugin:
     # Executable names this game runs as. The shell uses them so a game it did
     # not start itself is still reported as running, and can still be stopped.
     process_names: tuple[str, ...] = ()
+    game_process_factory: Callable[[], GameProcessController] | None = None
 
 
 def validate_plugin(plugin: GamePlugin) -> None:

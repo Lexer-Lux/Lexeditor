@@ -30,6 +30,18 @@ Show markers only for real live trains, with their direction and distinct cargo/
 
 **Status: Still incomplete.** The latest report says train markers are missing. Repair reliable detection and cleanup before delivering new artwork or requesting a visual test.
 
+## issue 5356292236 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/135
+
+Created: 2026-08-06T02:13:21Z; updated: 2026-09-06T13:57:02Z
+
+Exact metadata: [source record](sources/issue-5356292236-63d77c3990053cca25fa73ae5c53840929d28a75b69a9f1425c9668e0626c653.json).
+
+Show markers only for real live trains, with their direction and distinct cargo/passenger/streetcar artwork. Remove markers when trains disappear.
+
+**Status: Still incomplete.** The latest report says train markers are missing. Repair reliable detection and cleanup before delivering new artwork or requesting a visual test.
+
 ## comment 5550119122 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/135#issuecomment-5550119122

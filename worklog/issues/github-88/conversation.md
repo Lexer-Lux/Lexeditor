@@ -34,6 +34,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/88
 
 Created: 2026-09-04T11:50:25Z; updated: 2026-09-06T12:45:59Z
 
+Exact metadata: [source record](sources/issue-5347715431-024b1eeeae620ddabca6d0b2e259726ca43d874d481c66522361abd17efd29db.json).
+
+Make FF8 less linear without breaking required characters, vehicles or story events. No concrete progression design has been selected.
+
+- [ ] Choose the initial scope: earlier free travel, selected missions in a different order, or a substantially open world.
+- [ ] Describe which locations, vehicles and party members should become available earlier, and which story gates must remain. This is a design decision, not a game test.
+
+## issue 5347715431 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/88
+
+Created: 2026-09-04T11:50:25Z; updated: 2026-09-06T12:45:59Z
+
 Exact metadata: [source record](sources/issue-5347715431-987556ea1c158001a219683d30e328094757907437bbb8a8f5d9d903d472a996.json).
 
 Make FF8 less linear without breaking required characters, vehicles or story events. No concrete progression design has been selected.

@@ -35,6 +35,19 @@ Exact metadata: [source record](sources/issue-5202852569-240808471763c41b44c95a8
 - [ ] Restart Lexeditor and open RDR2 Loot Tables. Narrow its list with the divider. Confirm headers align with rows and a value such as ContinuousLinear remains readable.
 - [ ] Check Effects and Data Map at normal and narrow widths. Data Map prose may stay left-aligned. Report clipped text or overflow with the view name and screenshot.
 
+## issue 5202852569 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/13
+
+Created: 2026-08-20T11:25:06Z; updated: 2026-09-06T13:06:22Z
+
+Exact metadata: [source record](sources/issue-5202852569-51d2800dc43c8b8905e157860e814e38617d8e142a1f249ac35128b5f207c892.json).
+
+**Status: Implemented; needs your visual check.** Short columns stay compact; long metadata values should not be cut off.
+
+- [ ] Restart Lexeditor and open RDR2 Loot Tables. Narrow its list with the divider. Confirm headers align with rows and a value such as ContinuousLinear remains readable.
+- [ ] Check Effects and Data Map at normal and narrow widths. Data Map prose may stay left-aligned. Report clipped text or overflow with the view name and screenshot.
+
 ## comment 5355298727 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/13#issuecomment-5355298727

@@ -1,0 +1,204 @@
+# Worklog index (generated)
+
+Attempt evidence lives in issue-owned files under `worklog/issues/`; old
+mixed/session material is preserved under `worklog/legacy/`. Do not edit
+this index directly. The integration agent regenerates it with:
+`python tools/knowledge_files.py rebuild`.
+
+Search all evidence with `rg -n "#NUMBER|TERM" worklog Worklog.txt`.
+
+## Files
+
+- `worklog/issues/github-1.md` — Latest runtime correction; Replacement implementation; Evidence and test boundary; Current actionable pass; Integrated release; 2026-08-10 prompt-registry correction; 2026-08-10 live prompt-registry field correction; 2026-08-10 combined release; fuckups.txt recurrence audit; 2026-08-10 full latest-acceptance repair; 2026-08-10 returned test: Leave Fire was blocked; 2026-08-10 integration regression: free-roam inventory churn; 2026-08-10 returned F3 crash recurrence audit before source repair; 2026-08-11 coupled #1/#164 prompt audit
+- `worklog/issues/github-10.md` — Requirement; Diagnosis; Implementation handed to integration; Static evidence and runtime acceptance; Runtime rejection; Ownership mechanism found — `Global_1911667`; Rewrite (this pass); In-game acceptance for this pass; Current actionable pass; Integrated release; 2026-08-10 actionable correction: expose vanilla expanded radar
+- `worklog/issues/github-101.md` — GitHub #101 — Oleander poisoning
+- `worklog/issues/github-102.md` — 2026-08-06 poisoning presentation follow-up; Ranked outer-bar correction; 2026-08-10 real-time drain correction
+- `worklog/issues/github-105.md` — 2026-08-10 safe mechanism conclusion; Evidence; Implemented; Integration handoff; Validation; Runtime acceptance still required; Crosshair follow-up; Returned test: no child was ever reached; Root cause of the repeated failures (decompiled-script pass); Current pass; Native-surface limit on the crosshair; Static validation after returned test; 2026-08-09 repeated-mutation startup crash repair; 2026-08-09 action-triggered native failure and removal; 2026-08-09 established-mod correction and engine-hook port; 2026-08-10 process-wide hook rollback
+- `worklog/issues/github-11.md` — 2026-08-05 implementation pass; Integration; 2026-08-06 follow-up after in-game report; 2026-08-06 returned-test fix: use an existing loadable dictionary; 2026-08-06 second returned-test fix: use Story's resident dictionary; 2026-08-07 root cause found: uppercase texture names are filed under a hash the game never computes
+- `worklog/issues/github-112.md` — Diagnosis; Implementation handed to integration; Static verification; Integration and runtime boundary; Global wallet-indicator audit
+- `worklog/issues/github-113.md` — Runtime evidence; Defensive fix; Static verification; Runtime acceptance
+- `worklog/issues/github-115.md` — Evidence; Implementation; Integration and acceptance; Honest boundary; Exact interaction-gate correction; 2026-08-12 returned regression and repair
+- `worklog/issues/github-116.md` — 2026-08-10 distant respawn streaming correction
+- `worklog/issues/github-117.md` — Root cause of the four previous failures; What was changed; Static verification; Honest feasibility statement; Runtime acceptance; 2026-08-09 correction from the actual runtime report; Installed handoff; Final runtime verdict; Integrated removal
+- `worklog/issues/github-118.md` — 2026-08-10 actual repair after false implementation record; Symptom; Cause; Fix; Static verification; Runtime acceptance boundary
+- `worklog/issues/github-119.md` — Diagnosis; Fix; Static verification; Runtime acceptance
+- `worklog/issues/github-12.md` — GitHub #12 — separate activated/deactivated campsite icons
+- `worklog/issues/github-120.md` — Diagnosis and correction - 2026-08-06; Static acceptance; Authoritative rebuild replacing outlier edits; Complete coordinate rebuild after failed runtime test
+- `worklog/issues/github-121.md` — Requested; Implementation; Verification remaining
+- `worklog/issues/github-122.md` — Reported; Cause; Implementation; Verification remaining
+- `worklog/issues/github-123.md` — Requested; Reference evidence; Implementation; Verification remaining
+- `worklog/issues/github-124.md` — Player-visible failure; Implementation; Acceptance
+- `worklog/issues/github-125.md` — Rejected implementation; Corrected source; 2026-08-10 clamp truthfulness correction; 2026-08-10 combined release; fuckups.txt recurrence audit; 2026-08-10 returned-test zero-rate correction; 2026-08-10 live zero-value correction
+- `worklog/issues/github-128.md` — Requested behavior; Cause; Native audit; Implementation; New INI keys (`[Camera]`); Not done / open; Integration verification; `fuckups.txt` recurrence audit; Independent pre-build audit; 2026-08-10 returned vehicle/first-person correction; 2026-08-10 returned vehicle-input audit
+- `worklog/issues/github-13.md` — Partial run and corrected follow-up; Failed replacement hostile-detection matrix; Controlled stealth-system audit; Implemented rework
+- `worklog/issues/github-130.md` — What the live log actually showed (checked first); Data side: the pickups are correctly registered — this was never the fault; Root cause: the code destroyed a pickup that had been placed correctly; Changes — `GameplayTweaks/modules/items_casings.cpp` only; Runtime acceptance (unverified — needs a build + install)
+- `worklog/issues/github-14.md` — Map Auto Center & Recenter; Integration; 2026-08-06 — resolved: auto-center ships, on-demand Recenter is unfeasible; Integrated classification; 2026-08-09 periodic-focus startup abort
+- `worklog/issues/github-143.md` — Returned failure; Root cause and repair; 2026-08-10 combined release; fuckups.txt recurrence audit; 2026-08-10 recurrence audit before the missing-mask repair; Returned-test repair: explicit native component-scaleform lifecycle; Returned-test correction: measured two-lens raster
+- `worklog/issues/github-144.md` — Requested player-visible contract; First installed runtime failure and exact cause; Reference and primary evidence; Issue-local implementation; Integration and Stamina reconciliation; Static result and runtime boundary; 2026-08-10 combined release; 2026-08-10 immediate movement failure and FWOC isolation; Recurrence audit before the post-failure repair; Post-failure source repair (not enabled or installed); 2026-08-10 #156/#157 ownership reconciliation; 2026-08-10 recurrence audit for #71 speed reconciliation; #71 composition result; 2026-08-10 recurrence audit for the returned speed-setting failure; Supported-range correction; 2026-08-11 supported-subset repair
+- `worklog/issues/github-145.md` — Requested behavior; Primary-source and settled-mechanics basis; Issue-owned implementation; Integration-owned registration; Static verification and runtime boundary; fuckups.txt recurrence audit
+- `worklog/issues/github-146.md` — Live player-facing contract; Authoritative effect audit; Relevant use paths; Issue-local implementation; Integration handoff; Static result and runtime boundary; 2026-08-10 combined release; fuckups.txt recurrence audit; 2026-08-10 runtime-returned effect-buffer repair; 2026-08-10 actionable recurrence audit: per-frame availability writes; 2026-08-11 startup and active-transaction correction
+- `worklog/issues/github-147.md` — Recurrence audit — bottom-right size-setting return; Live request read; Authoritative item and clock path; Implemented; Integration handoff; Static validation; Runtime acceptance still required; 2026-08-10 returned placement and size repair; 2026-08-10 installed release; 2026-08-10 returned placement control; 2026-08-10 returned test: horizontal position; 2026-08-10 stale X value would have regressed with the fixed conversion
+- `worklog/issues/github-148.md` — Live acceptance read before implementation; Primary-source resolution; Issue-owned implementation; Static evidence; Integration requirements; Remaining in-game acceptance; 2026-08-10 installed release; 2026-08-10 shared placement-control request; 2026-08-10 position correction
+- `worklog/issues/github-149.md` — Live report and preserved evidence; Exact source defect; Primary Story evidence; Narrow repair; Static checks and integration; Runtime boundary; 2026-08-10 installed release
+- `worklog/issues/github-15.md` — GitHub #15 wallet size cap — 2026-08-05
+- `worklog/issues/github-150.md` — Trigger; Process repair
+- `worklog/issues/github-151.md` — Live report and installed evidence; `fuckups.txt` recurrence audit before code; Issue-local repair prepared; 2026-08-10 returned failure recurrence audit before further code; 2026-08-10 returned failure: permission hypothesis disproved; 2026-08-10 recurrence audit before the returned actionable repair; 2026-08-10 live eligibility correction; 2026-08-11 returned repair: remove the shared-inventory mutation
+- `worklog/issues/github-152.md` — Recurrence audit before implementation
+- `worklog/issues/github-153.md` — fuckups.txt recurrence audit; Current repair; Rejected dictionary physically removed
+- `worklog/issues/github-154.md` — Recurrence audit before source edits; Direct answer; Repair and direct answer; 2026-08-10 returned-test snap-back correction; 2026-08-10 live double-edge correction; 2026-08-11 evidence correction
+- `worklog/issues/github-156.md` — 2026-08-10 recurrence audit before source edits; Issue-local shared-gait implementation
+- `worklog/issues/github-157.md` — 2026-08-10 recurrence audit before source edits; Issue-local shared-gait implementation
+- `worklog/issues/github-158.md` — 2026-08-10 recurrence audit before mechanism review; Resolved script-native boundary
+- `worklog/issues/github-159.md` — Recurrence audit before source repair; Implemented repair and static result; 2026-08-10 live release retry
+- `worklog/issues/github-16.md` — Luminous-streak correction; Superseded muzzle-path implementation; Returned-test correction: literal vanilla-only toggle and controls; Current actionable pass; Integrated release
+- `worklog/issues/github-160.md` — Recurrence audit before source repair; Implemented repair and static result; 2026-08-10 live rejected-mantle correction
+- `worklog/issues/github-161.md` — 2026-08-10 corrected asset binding; rejected fallback removed; 2026-08-10 returned horse-leading regression audit before source repair; Recurrence audit before source repair; Implemented repair and static result; 2026-08-10 live pose rejection
+- `worklog/issues/github-162.md` — Live report; fuckups.txt recurrence audit before code; 2026-08-10 issue-local repair
+- `worklog/issues/github-163.md` — Recurrence audit before code; Supplied failure and installed evidence; Repair; Static verification; Runtime boundary; 2026-08-10 returned F3 crash after the name-cleanup repair
+- `worklog/issues/github-164.md` — 2026-08-10 recurrence audit before source edits; 2026-08-10 returned test; 2026-08-11 exact cache-ownership repair
+- `worklog/issues/github-165.md` — Recurrence audit; 2026-08-10 source diagnosis; 2026-08-10 returned test and live trace
+- `worklog/issues/github-166.md` — Recurrence audit; 2026-08-10 source diagnosis
+- `worklog/issues/github-167.md` — Recurrence audit; 2026-08-10 source diagnosis
+- `worklog/issues/github-168.md` — Recurrence audit before source edits; Implementation; Returned-test audit before repair
+- `worklog/issues/github-169.md` — Recurrence audit; Live evidence and cause; Repair; Static and runtime boundary; 2026-08-11 latest returned result
+- `worklog/issues/github-17.md` — Implementation; Static verification; Integration handoff; Visible subsection correction; Subcategory rework, developer tagging, and a shared schema; Left for Lexer; 2026-08-09 correction against Lexer's latest comment; Installed handoff; Current actionable pass; Integrated release; 2026-08-10 field-help correction; 2026-08-10 numeric-width correction; 2026-08-10 actionable pass: setting lifecycle tags; 2026-08-10 integration correction; 2026-08-10 combined release; `fuckups.txt` recurrence audit for the returned CONST styling; 2026-08-10 full-row lifecycle styling and rendered acceptance; Recurrence audit — returned lifecycle colors and category placement; 2026-08-10 corrected lifecycle colors and rendered acceptance; Integration reconciliation after roll-setting removal
+- `worklog/issues/github-171.md` — Failure classes checked before the repair; Exact mismatch; Primary Story evidence; Repair; Verification and runtime boundary
+- `worklog/issues/github-172.md` — 2026-08-10 recurrence audit before implementation; 2026-08-10 issue-owned implementation; Integration cleanup
+- `worklog/issues/github-173.md` — 2026-08-10 recurrence audit before implementation; 2026-08-10 implementation
+- `worklog/issues/github-174.md` — Recurrence audit before source edits; Source repair
+- `worklog/issues/github-175.md` — Recurrence audit before source edits; Source repair; 2026-08-11 discontinuity correction
+- `worklog/issues/github-176.md` — 2026-08-11 recurrence audit before implementation; 2026-08-11 source repair
+- `worklog/issues/github-177.md` — Recurrence audit before source edits; Source result
+- `worklog/issues/github-178.md` — Recurrence audit before source edits; Source result
+- `worklog/issues/github-179.md` — Recurrence audit; Repair
+- `worklog/issues/github-18.md` — Implementation; Integration handoff; Static verification; Vanilla-style renderer correction; 2026-08-10 returned layout correction; `fuckups.txt` recurrence audit for the returned in-game menu; 2026-08-10 returned-test repair; 2026-08-10 returned-test value-column inset
+- `worklog/issues/github-181.md` — Recurrence audit before implementation; Repair
+- `worklog/issues/github-183.md` — Recurrence audit; 2026-08-11 repair
+- `worklog/issues/github-19.md` — Implementation handoff
+- `worklog/issues/github-2.md` — Requested appearance; Evidence and implementation; Static verification and integration; Runtime acceptance boundary; 2026-08-06 returned-test correction: opaque HUD masks removed; 2026-08-06 (second pass) — the "opaque HUD mask" theory was itself wrong; 2026-08-09 returned-test correction: literal markup and white core; Installed handoff; Current actionable pass; Integrated release; 2026-08-10 actionable correction: capacity layers and horse-core source; 2026-08-10 returned-test repair: plants, horse capacity, binocular height; 2026-08-10 recurrence audit before the latest repair; 2026-08-10 returned-test root cause and repair
+- `worklog/issues/github-20.md` — Requirement; Implementation; Integration handoff; Static checks; Runtime toggle follow-up; 2026-08-11 returned-test audit: release lost prone
+- `worklog/issues/github-22.md` — Requirement read from the live issue; Reference evidence; Implemented isolated vertical slice; Static evidence; LEXEDITOR integration; Remaining integration-owned steps; Remaining acceptance boundary; Readability and exit repair; Remaining seamless-vanilla blocker; Swarm re-audit; Campfire softlock correction; Live deployment conflict found during re-audit; 2026-08-10 vanilla-menu misidentification and hidden overlay; Unrequested recipe-order change reverted; Underlying-input safety failure; Recurrence audit before the current repair; 2026-08-10 safe-isolation conclusion; 2026-08-10 sanctioned Story-thread isolation repair; Recurrence audit before the returned vanilla-page repair; Returned vanilla-page cause and repair
+- `worklog/issues/github-23.md` — Requirement; Four rejected attempts; What the reference binary actually says; What the returned screenshots measure; Implementation; Dead assets from attempt 4; Static verification; Integration; Honest open points for the in-game test; Current actionable pass; Integrated release; 2026-08-10 returned calibrator repair; 2026-08-10 returned overlay correction; fuckups.txt recurrence audit; 2026-08-10 returned double-ring root cause
+- `worklog/issues/github-24.md` — Evidence; Implementation; Integration and runtime boundary
+- `worklog/issues/github-25.md` — GitHub #25 core XP gain toggle — 2026-08-05; Regression: CoreClock overwrote saved progression — 2026-08-05
+- `worklog/issues/github-26.md` — Failure classes checked before implementation; Primary evidence; Implemented prototype; Static proof; Integration requirements; Exact boundary and runtime acceptance
+- `worklog/issues/github-27.md` — Implementation; Static verification; Integration and runtime boundary
+- `worklog/issues/github-29.md` — Returned runtime result; Issue-local correction and boundary; fuckups.txt recurrence audit; 2026-08-10 returned 999x result; 2026-08-10 installed observation handoff
+- `worklog/issues/github-3.md` — Requirement; Evidence; Implementation; Integration handoff; Runtime acceptance boundary
+- `worklog/issues/github-30.md` — 2026-08-11 blocked-runtime correction; 2026-08-06 implementation; Integration boundary; Runtime acceptance
+- `worklog/issues/github-31.md` — Authoritative source; Implementation; Integrator-owned wiring; Static verification; Runtime acceptance after integration/build/install; 2026-08-06 editor regression repair
+- `worklog/issues/github-32.md` — Requirement; Trace and editable surface; Implementation; Integration and runtime acceptance
+- `worklog/issues/github-35.md` — Train map markers — entity-backed rewrite, 2026-08-05; Integration
+- `worklog/issues/github-37.md` — Live request readback; Authoritative evidence; Repair written; Integration handoff; Runtime acceptance boundary; Static checks
+- `worklog/issues/github-39.md` — Reference inspection; Current-vanilla extraction attempt; Installed-mod conflict audit; Handoff and acceptance boundary
+- `worklog/issues/github-4.md` — Requirement; Cause; Shipped-script evidence; Implementation; Static verification; In-game acceptance; Remaining boundary; 2026-08-10 returned-test correction — one-frame prompt flash; Returned-test correction: active-view movement and prompt; 2026-08-09 Q hold stopped after recon use; 2026-08-10 extended-session input-gate correction; 2026-08-10 one-frame put-away prompt correction; 2026-08-10 combined release; Recurrence audit before the pre-optics tag repair; Returned-test repair: Rockstar optics-ready gate; 2026-08-10 recurrence audit before the latest Q-input repair; Returned-test repair: bindable Cover restored as the hold source; 2026-08-11 #176 prompt-ownership correction
+- `worklog/issues/github-42.md` — GitHub #42 more gunsmiths feasibility — 2026-08-05
+- `worklog/issues/github-43.md` — 2026-08-06 implementation pass; 2026-08-06 actionable follow-up; 2026-08-06 resumed runtime audit; 2026-08-06 swarm recheck
+- `worklog/issues/github-44.md` — 2026-08-05 implementation; Runtime acceptance; Integration
+- `worklog/issues/github-45.md` — Requirement; Reference boundary; Implementation; Integration; Runtime acceptance
+- `worklog/issues/github-47.md` — Requirement; Evidence and design; Integration handoff; Static acceptance; Runtime acceptance still required; 2026-08-06 correction after installed camera jumping; 2026-08-06 static regression guard; 2026-08-06 vanilla extraction attempt
+- `worklog/issues/github-48.md` — GitHub #48 immediate drowning at zero swimming Stamina — 2026-08-05
+- `worklog/issues/github-49.md` — Completed editor path
+- `worklog/issues/github-5.md` — Current attempt; Primary-source evidence; Integration and acceptance boundary; Combined build; 2026-08-10 returned-test repair: downward pose; 2026-08-10 combined release; Recurrence audit before the returned `+90 X` repair; Returned-test repair: bounded pose calibration and exterior belt anchor; 2026-08-10 recurrence audit before holster/knife/leg clipping repair; Evidence-backed clipping candidate: Rockstar's lantern holster anchor
+- `worklog/issues/github-50.md` — Evidence; Implemented; Validation; Remaining acceptance boundary; Automatic runtime trace prepared
+- `worklog/issues/github-55.md` — Implemented; Evidence and boundaries; 2026-08-10 returned editor usability repair; 2026-08-10 combined release; `fuckups.txt` recurrence audit after the failed editor test; 2026-08-10 version-skew repair and rendered acceptance; Recurrence audit — unexplained Clean and wanted tiers; 2026-08-10 visible wanted-tier explanation and rendered acceptance; Recurrence audit — each wanted tier still lacked its own explanation; Per-tier help repair and live-page render
+- `worklog/issues/github-57.md` — Evidence; Implementation; Integration boundary
+- `worklog/issues/github-59.md` — Requested result; Proven ownership; Implementation prepared; Integration steps (integration agent only); Static validation; Runtime boundary / acceptance; Returned-test correction; 2026-08-06 returned-test fix: real Story inventory path; 2026-08-06 live acquisition failure and Story-table fix; Returned test: imported Online item does not enter the Story binocular script; Returned test: missing mask and unverifiable zoom steps; Returned request: editable restart-applied zoom; Correction: independently editable stages; Returned test: scripted stages rejected
+- `worklog/issues/github-6.md` — Directional dodge roll; Fourth attempt — root cause found: the flag word was fabricated; Reference evidence actually used; Change made; Integrated release; 2026-08-10 working-reference parity correction; 2026-08-10 complete Combat Roll sequence port; 2026-08-10 combined release; Recurrence audit before the reference-grounded repair; Direct reference-binary repair; 2026-08-10 returned direction failure recurrence audit before source edits; 2026-08-10 reference heading-loop correction; 2026-08-10 returned-test request: timing, i-frames and opacity; 2026-08-10 recurrence audit before the rapid-roll repair; 2026-08-10 rapid-roll source repair; Integration cleanup of dead controls; 2026-08-11 direct answer to the latest timing question
+- `worklog/issues/github-62.md` — Audit; Built in this slice; Remaining integration/runtime work; Runtime checks; 2026-08-10 returned editor correction; `fuckups.txt` recurrence audit after the failed editor test; 2026-08-10 amount-first rendered acceptance; Recurrence audit — amount editor absent in the rendered page; 2026-08-10 corrected scroll-retention diagnosis and rendered acceptance; Recurrence audit — verify the actual running LEXEDITOR session; Actual running-server verification
+- `worklog/issues/github-64.md` — Proven scope; Implemented source boundary; Acceptance once the missing mechanism exists; 2026-08-10 returned actionable: deletion raced Story-script respawn
+- `worklog/issues/github-65.md` — Requirement; Failure history and root cause; Current implementation (entity-observed impact); Diagnostics; Static verification; Runtime acceptance boundary; Evidence: the module ran and never armed; Why ownership never drops: a throwable is ammo, not a weapon slot; The projectile native, and how it differs from the one in fuckups.txt; `baselineObjects=0` is not yet proof of anything; Changes (GameplayTweaks/modules/ancient_tomahawk.cpp, rewritten); Diagnostics contract for the next log; Not done in this pass; Integrated release; 2026-08-09 staged startup-crash isolation; 2026-08-10 returned-world-copy correction; 2026-08-10 delayed world-copy/feed repair; 2026-08-10 recurrence audit: owned charge but no hash-level equip; 2026-08-10 combined release; 2026-08-10 exact held-entity detector and installed build; 2026-08-11 returned world-copy root cause
+- `worklog/issues/github-66.md` — Failed locker-field attempt; Root cause; Implemented correction; Evidence and checks; Acceptance boundary; 2026-08-10 returned actionable: restore vanilla locker access first; fuckups.txt recurrence audit
+- `worklog/issues/github-67.md` — Evidence; Implementation; Verification and handoff
+- `worklog/issues/github-68.md` — 2026-08-06 wheel-test unblock; Known limits and runtime acceptance; 2026-08-06 safe wheel/equip ownership follow-up
+- `worklog/issues/github-69.md` — Requested behavior and existing state; 2026-08-09 delayed-abort repair; 2026-08-09 failed first repair and pickup-pool removal; 2026-08-09 conclusive continuation result
+- `worklog/issues/github-71.md` — Requirement; Implementation; Evidence; Integration required; Runtime acceptance still required; 2026-08-10 recurrence audit before road-speed extension; Road-speed implementation and scoped result; Exact integration required for the road-speed extension
+- `worklog/issues/github-73.md` — GitHub #73 campsite respawn on fire — 2026-08-05
+- `worklog/issues/github-74.md` — GitHub #74 recurring exhaustion-like fade — 2026-08-05; Post-quarantine restart verification — 2026-08-05
+- `worklog/issues/github-77.md` — Requirement; Cause; Change; Static verification; Integration and in-game acceptance; Second live failure correction; Horse weapon-wheel crash guard; Third live failure — "the animation plays but the mask never goes on"; Current actionable pass; Integrated release; 2026-08-10 second-selection correction; 2026-08-11 shared-cache safety correction
+- `worklog/issues/github-78.md` — GitHub #78 zero-bar Dead Eye reactivation — 2026-08-05; Active-ability correction; Live zero-bar correction; 2026-08-07 — why every one of the above still failed; 2026-08-09 Eagle Eye input regression
+- `worklog/issues/github-8.md` — Recurrence audit — tilde developer-mode boundary; Requested behavior; Native audit; Implementation; Integration handoff; Static verification; Current actionable pass; Integrated release; 2026-08-10 keypad-ownership correction; 2026-08-10 returned-test correction — release build made editor unreachable; 2026-08-10 release-editor correction; 2026-08-10 combined release; 2026-08-10 shared developer-mode semantics repair; 2026-08-11 actionable swarm audit; 2026-08-10 ignored requirement and returned runtime failure; Recurrence audit — #8/#154 coupled shoulder pass; #8/#154 holstered-input repair
+- `worklog/issues/github-80.md` — GitHub #80 cigarette-card map coordinates — 2026-08-05; Gang-hideout completion layer — 2026-08-06; Point-of-interest repair — 2026-08-06
+- `worklog/issues/github-82.md` — Requirement; Cause; Shipped-script evidence; Implementation; Static verification; In-game acceptance; 2026-08-06 follow-up after failed in-game test; 2026-08-06 correction for repeated presses and hand/back oscillation; Enabled-edge correction; 2026-08-06 returned-test correction: remove asynchronous retry ownership; 2026-08-06 root cause found: banked key edge + collision with the draw's own swap task
+- `worklog/issues/github-83.md` — Implementation; Integration handoff; Static evidence; User-directed removal
+- `worklog/issues/github-84.md` — Failed layer probe; Narrow authored-clip implementation; In-game acceptance; 2026-08-10 returned actionable: live target was a clipset, not an animation dictionary; 2026-08-10 combined release; fuckups.txt recurrence audit; 2026-08-10 recurrence audit before the latest transition-rate repair; Returned-test correction: Rockstar's actual binocular state dictionary
+- `worklog/issues/github-85.md` — Requested behavior; Evidence and diagnosis; Implemented probe; Exact in-game procedure; Evidence boundary; Integration handoff
+- `worklog/issues/github-86.md` — Implemented; Evidence boundary; 2026-08-06 — root cause of "they're black boxes"; Current actionable pass; Integrated release; 2026-08-10 actionable correction: use the proven resident dictionary; 2026-08-10 returned-test repair: attitude colors; 2026-08-10 returned-test repair: vanilla-style outline; 2026-08-10 combined release; fuckups.txt recurrence audit; 2026-08-10 recurrence audit before the latest repair; 2026-08-10 returned-test root cause and repair; 2026-08-11 recurrence audit: animal vision cones; 2026-08-11 evidence result: source-only cone path is not safe yet; 2026-08-11 data-layer recurrence audit before cone repair; 2026-08-11 data-layer cone repair
+- `worklog/issues/github-88.md` — Implemented in the isolated feature handoff; Integration ownership; Deliberate runtime boundary; Static checks; 2026-08-06 acquisition-path correction
+- `worklog/issues/github-89.md` — Requested result; Rockstar evidence; Isolated implementation; Narrow #88 API boundary; Integration ownership; Water-pump map layer; Custom icon asset; Runtime boundary / acceptance; Static validation
+- `worklog/issues/github-9.md` — Diagnosis; Implementation; Static evidence; Integration and acceptance; Follow-up after the failed installed test; Current actionable pass; Integrated release; 2026-08-10 actionable correction: port the working reference entry; 2026-08-10 correction: persistent prone is not the combat-dive handler; 2026-08-10 combined release; fuckups.txt recurrence audit; 2026-08-10 returned-test audit: the reference stopped at entry; 2026-08-10 recurrence audit before the camera-relative and exit repair; 2026-08-10 reference-grounded repair; 2026-08-11 returned camera-relative test
+- `worklog/issues/github-91.md` — Reference behavior and permissions; Rockstar evidence; Implementation; Integration handoff; Static acceptance evidence and remaining runtime checks; Returned runtime test repair; Returned-test clarification and diagnostic contract; 2026-08-10 combined release; fuckups.txt recurrence audit; 2026-08-10 returned-test root cause and reference-binary audit
+- `worklog/issues/github-92.md` — GitHub #92 GameplayTweaks source split — 2026-08-05
+- `worklog/issues/github-93.md` — GitHub #93 conflict-safe agent swarm workflow — 2026-08-05
+- `worklog/issues/github-94.md` — 2026-08-05 implementation; 2026-08-06 camera-direction fix; 2026-08-06 persistent-handle correction; 2026-08-09 freeze correction and resumable isolation; 2026-08-09 mounted-horse completion crash; 2026-08-09 combined Study intent correction; 2026-08-09 automatic acquisition correction; 2026-08-09 plant-scenario stack corruption; 2026-08-09 Saint Denis world-transition failure; 2026-08-09 startup failure after transition containment; 2026-08-09 startup gate runtime failure and owned-mutation correction; 2026-08-09 input-edge map build also failed; 2026-08-09 update-pipeline hard bisect; 2026-08-11 recurrence audit: untagged hostile animals; 2026-08-11 hostile-animal suppression repair
+- `worklog/issues/github-96.md` — 2026-08-10 tag visibility distance; Root cause (evidence first, code second); Changes (recon.cpp only); Not done / open; Second white-square site, reported not fixed (belongs to #2, not #96); Integration correction after runtime crash; 2026-08-10 actionable correction: validated reticle visuals; 2026-08-10 returned tagging feedback; 2026-08-10 combined release
+- `worklog/issues/github-97.md` — Evidence; Implementation; Static verification; Integration and runtime boundary; 2026-08-10 correction; fuckups.txt recurrence audit
+- `worklog/issues/github-98.md` — Requirement; Where it stands; Attempt history; The stock X / Y line: blocked, with evidence; The font face: not reachable, no substitute invented; Ammo rows, re-derived rather than trusted; Changes this pass; Not done; Runtime acceptance remaining; 2026-08-09 returned-test correction: disabled feature, square overlays, font
+- `worklog/issues/github-99.md` — Requested behavior read before implementation; Engine evidence used; Source/data implementation; Integration handoff; Static verification and remaining runtime boundary; 2026-08-10 latest-comment triage; 2026-08-10 reported campsite-respawn failure repaired
+- `worklog/issues/todo-1.md` — #1 horse stamina reserve boundary — 2026-08-05; #1 horse Health core reserve — 2026-08-05
+- `worklog/issues/todo-112.md` — #112 tracers — REVERTED, my regression; #112 engine_tracer is a no-op and caused a regression — 2026-08-04; #112 particle-trail choice — built and installed 2026-08-05
+- `worklog/issues/todo-113.md` — #113(d) plant tagging — root cause proven, learner replaced 2026-08-05; #113(d) plants-only filter — 2026-08-05; #113(d) plant tagging — done 2026-08-05; #113 marker anchor — bone space is not world space, 2026-08-04
+- `worklog/issues/todo-116.md` — #116 binoculars dead in the 07:5x build — animated draw, not the trigger 2026-08-05
+- `worklog/issues/todo-150.md` — #150 — no way to move the pause map view, 2026-08-04
+- `worklog/issues/todo-169.md` — #169 climbing — the geometry was wrong at the root 2026-08-05 (second pass); #169 free climbing — seven-defect pass from trace evidence 2026-08-05; #169 — four of five remaining defects, 2026-08-04
+- `worklog/issues/todo-170.md` — #170 prone sinking — fixed, BUILT BUT NOT INSTALLED 2026-08-05; #170 prone — four defects fixed from live-log evidence, 2026-08-04
+- `worklog/issues/todo-175.md` — #175 — the replacement harness already existed, 2026-08-04
+- `worklog/issues/todo-182.md` — #182 recon tags rebuilt on Rockstar's core language — 2026-08-04
+- `worklog/issues/todo-19.md` — #19 — wagon stamina cores: the swap could never have fired
+- `worklog/issues/todo-190.md` — #190 MobProbe + per-model view — built and verified 2026-08-05; #190 Mobs tab — built and verified 2026-08-04
+- `worklog/issues/todo-195.md` — #195 — the four options, in full, 2026-08-04
+- `worklog/issues/todo-199.md` — #199 projectile flag restoration — 2026-08-05
+- `worklog/issues/todo-200.md` — #200 exact missing-icon manifest — 2026-08-04; #200 — "femga does not host these dictionaries" is FALSE, 2026-08-04; #200 corrected TWICE — the real gap is 633 in two dictionaries, 2026-08-04
+- `worklog/issues/todo-203.md` — #203 core writes — previous fix DISPROVEN by measurement 2026-08-05; #203 Intermittent fader/haze — root-caused and fixed 2026-08-05
+- `worklog/issues/todo-208.md` — #208 dodge roll — engine task confirmed, clip DICTIONARY still unknown 2026-08-05
+- `worklog/issues/todo-42.md` — #42 carried mask permanently disabled — my own camp gate 2026-08-05
+- `worklog/issues/todo-50.md` — #50 lost-money marker: icon, scale, world marker — 2026-08-05
+- `worklog/issues/todo-59.md` — #59 death-cam coronas + campsite respawn — one root cause 2026-08-05
+- `worklog/issues/todo-8.md` — #8 Black-square blips — CAUSE FOUND AND FIXED 2026-08-05; #8 fainter looted markers — done WITHOUT OpenIV, 2026-08-04
+- `worklog/issues/todo-85.md` — #85(b) casing pickup — REVERTED, my regression; #85 long-gun casings regression — root cause, 2026-08-04
+- `worklog/issues/todo-87.md` — #87 weapons stack — partial answer, 2026-08-04; #87 weapon stack — complete, but one layer is a third-party file, 2026-08-04; #87 clean baseline — CLI exhausted, needs OpenIV, 2026-08-04; #87 OpenIV blocked on the access prompt — 2026-08-04; #87 — final analysis before OpenIV, 2026-08-04; #87 weapon stack — FINAL CORRECTION, no work remains — 2026-08-05
+- `worklog/legacy/014-169-a-b-e-f-85-a-113-d-2026-08-05.md` — #169 (a)(b)(e)(f) / #85(a) / #113(d) — 2026-08-05
+- `worklog/legacy/015-85-b-properly-1-169-d-113-c-2026-08-05.md` — #85(b) properly / #1 / #169(d) / #113(c) — 2026-08-05
+- `worklog/legacy/016-7-85-b-116-169-c-182-fixed-2026-08-05.md` — #7 / #85(b) / #116 / #169(c) / #182 — fixed 2026-08-05
+- `worklog/legacy/017-42-19-113-fixed-2026-08-05.md` — #42 / #19 / #113 — fixed 2026-08-05
+- `worklog/legacy/018-98-112-50-invented-identifier-names-found-by-audit-2026-08-05.md` — #98 / #112 / #50 — invented identifier names, found by audit 2026-08-05
+- `worklog/legacy/021-204-205-206-weapons-tab-fixed-2026-08-05.md` — #204 / #205 / #206 Weapons tab — fixed 2026-08-05
+- `worklog/legacy/024-follow-up-candidate-build-2026-08-03.md` — Follow-up candidate build — 2026-08-03
+- `worklog/legacy/025-48-51-are-two-different-features-2026-08-04.md` — #48 / #51 are two different features — 2026-08-04
+- `worklog/legacy/028-170-169-2026-08-04.md` — #170 + #169 — 2026-08-04
+- `worklog/legacy/029-147-193-custom-textures-two-stacked-registration-bugs-2026-08-04.md` — #147 + #193 — custom textures: TWO stacked registration bugs, 2026-08-04
+- `worklog/legacy/033-42-carrier-no-longer-rewrites-the-equipped-mask-195-blocking-202.md` — #42 carrier no longer rewrites the equipped mask + #195 blocking — 2026-08-04
+- `worklog/legacy/034-170-split-into-170-195-2026-08-04.md` — #170 split into #170 + #195 — 2026-08-04
+- `worklog/legacy/035-195-was-170-prone-aiming-the-reference-cannot-be-ported-2026-08.md` — #195 (was #170) prone aiming — the reference cannot be ported, 2026-08-04
+- `worklog/legacy/036-1-visible-core-dip-112-nothing-rendering-113-tags-2026-08-04.md` — #1 visible core dip, #112 nothing rendering, #113 tags — 2026-08-04
+- `worklog/legacy/037-1-player-horse-stamina-cross-drain-59-f4-leak-2026-08-04.md` — #1 player/horse stamina cross-drain + #59 F4 leak — 2026-08-04
+- `worklog/legacy/039-file-consolidation-2026-08-04.md` — File consolidation — 2026-08-04
+- `worklog/legacy/041-todo-txt-cleanup-2026-08-04.md` — TODO.txt cleanup — 2026-08-04
+- `worklog/legacy/042-current-test-batch-2026-08-03.md` — Current test batch — 2026-08-03
+- `worklog/legacy/043-what-this-project-is.md` — What this project is
+- `worklog/legacy/044-sop-crack-open-existing-mods-to-learn-mechanisms-lexer-2026-07-0.md` — SOP: crack open existing mods to learn mechanisms (Lexer, 2026-07-09)
+- `worklog/legacy/045-hard-rules-from-lexer.md` — Hard rules from Lexer
+- `worklog/legacy/046-key-technical-knowledge.md` — Key technical knowledge
+- `worklog/legacy/047-gameplaytweaks-asi-todo-1-4-5-key-natives-findings.md` — GameplayTweaks.asi (TODO #1/#4/#5) — key natives & findings
+- `worklog/legacy/048-todo-structure-feasibility-notes-2026-07-06.md` — TODO structure & feasibility notes (2026-07-06)
+- `worklog/legacy/049-critical-install-facts-learned-the-hard-way-2026-07-07.md` — CRITICAL INSTALL FACTS (learned the hard way 2026-07-07)
+- `worklog/legacy/050-overnight-session-2026-07-09-lexer-asleep-do-everything.md` — Overnight session 2026-07-09 (Lexer asleep, "do everything")
+- `worklog/legacy/051-core-effect-ramp-corrected-understanding-2026-07-09.md` — CORE-EFFECT RAMP — corrected understanding (2026-07-09)
+- `worklog/legacy/052-openiv-rdr2-tooling-walls-confirmed-2026-07-09-unlocked-pc-sessi.md` — OpenIV RDR2 tooling walls (confirmed 2026-07-09, unlocked-PC session)
+- `worklog/legacy/053-note-these-walls-only-mattered-for-the-mistaken-sprite-approach.md` — (NOTE: these walls only mattered for the mistaken sprite approach — moot now)
+- `worklog/legacy/054-state-pending-verification.md` — State / pending verification
+- `worklog/legacy/055-item-identity-and-feather-decisions-2026-07-13.md` — Item identity and feather decisions (2026-07-13)
+- `worklog/legacy/056-editor-reference-install-update-2026-07-12.md` — Editor/reference/install update (2026-07-12)
+- `worklog/legacy/057-bandit-challenge-mask-implementation-2026-07-13.md` — Bandit challenge/mask implementation (2026-07-13)
+- `worklog/legacy/058-researched-game-data-map-2026-07-11.md` — Researched game-data map (2026-07-11)
+- `worklog/legacy/059-editor-taxonomy-and-shop-ux-2026-07-12.md` — Editor taxonomy and shop UX (2026-07-12)
+- `worklog/legacy/060-112-streak-42-worn-state-latch-2026-08-04.md` — #112 streak + #42 worn-state latch — 2026-08-04
+- `worklog/legacy/062-98-always-holster-50-physical-bloodstain-marker-2026-08-04.md` — #98 always-holster + #50 physical bloodstain marker — 2026-08-04
+- `worklog/legacy/064-131-belt-lantern-42-camp-greying-2026-08-04.md` — #131 belt lantern, #42 camp greying — 2026-08-04
+- `worklog/legacy/068-189-camera-calibration-103-optional-feed-2026-08-04.md` — #189 camera calibration + #103 optional feed — 2026-08-04
+- `worklog/legacy/070-175-probe-hud-overlap-fixed-87-200-confirmed-openiv-only-2026-08.md` — #175 probe HUD overlap fixed; #87/#200 confirmed OpenIV-only — 2026-08-04
+- `worklog/legacy/076-session-close-2026-08-04.md` — Session close — 2026-08-04
+- `worklog/legacy/077-priority-0-fixes-2026-08-04.md` — Priority-0 fixes — 2026-08-04
+- `worklog/legacy/078-class-a-batch-59-193-11-116-170-1-195-2026-08-04.md` — Class_A batch: #59, #193, #11, #116, #170, #1, #195 — 2026-08-04
+- `worklog/legacy/093-collectible-relocation-key-collision-2026-08-05.md` — Collectible relocation key collision — 2026-08-05
+- `worklog/legacy/095-github-exploratory-swarm-research-2026-08-05.md` — GitHub exploratory swarm research — 2026-08-05

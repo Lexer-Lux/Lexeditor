@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356319385,
+    "number": 249,
+    "title": "Return directly from sprinting to walking",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/249"
+  },
+  "sha256": "0be5df694e784330b35b25e2bfc8eb4b46e006205aecad5d8111949c2988deb2",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-157.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

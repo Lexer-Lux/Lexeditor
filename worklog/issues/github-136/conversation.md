@@ -29,6 +29,18 @@ Provide a separate trinket view without pretending a new native satchel category
 
 **Status: Research only.** Native category insertion still needs a feasibility test. Prepare a concrete native-tab or separate-page proposal before asking you to choose the presentation.
 
+## issue 5356292519 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/136
+
+Created: 2026-08-06T02:13:45Z; updated: 2026-09-06T13:54:00Z
+
+Exact metadata: [source record](sources/issue-5356292519-05df60c7c4ba5429c4b21646cde65318bb2078879e5ca23f2d15c42d84bfc794.json).
+
+Provide a separate trinket view without pretending a new native satchel category is already supported.
+
+**Status: Research only.** Native category insertion still needs a feasibility test. Prepare a concrete native-tab or separate-page proposal before asking you to choose the presentation.
+
 ## comment 5550119421 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/136#issuecomment-5550119421

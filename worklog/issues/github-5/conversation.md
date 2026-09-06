@@ -46,6 +46,21 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/5
 
 Created: 2026-08-20T08:29:33Z; updated: 2026-09-06T13:32:24Z
 
+Exact metadata: [source record](sources/issue-5201356870-7bfa2f21630bf09a98d3c9e332189261fcefe3c1dbdc2a0ab65897e360449830.json).
+
+**Needs testing.** Per-entry reference matches and separate reference-only rows are implemented.
+
+Original examples: [1](https://github.com/user-attachments/assets/4bed2d8a-d9a9-403d-a3ac-45cb496a4245), [2](https://github.com/user-attachments/assets/17fedf2f-e9cd-470e-b08c-36382e4fa0ff).
+
+- [ ] Restart Lexeditor. In a test RDR2 mod, add/remove an Item Effect or Tag. Reference marks should update; missing entries should appear below the divider. Undo the edit.
+- [ ] Change a Challenge reward. Confirm the same layout works and Add stays below the list. Report a mismatched row or screenshot.
+
+## issue 5201356870 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/5
+
+Created: 2026-08-20T08:29:33Z; updated: 2026-09-06T13:32:24Z
+
 Exact metadata: [source record](sources/issue-5201356870-cf81da9586b2029e56e8233e2f5458e77b7d17b2bea1b8ef740722aa5bf0070c.json).
 
 **Needs testing.** Per-entry reference matches and separate reference-only rows are implemented.

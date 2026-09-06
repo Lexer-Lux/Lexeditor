@@ -1,0 +1,109 @@
+{
+  "body_sha256": "3b9249eaacd238aa07d08b2329da3c9f4ed729225dbc4341a8df3373dfb5f4ae",
+  "issue": 86,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "**Status: Deferred at your request; consolidation is unfinished.** Keep actionable, not waiting. Do not resume migration or comment cleanup now.\n\nMerge all game/mod codices and legacy worklogs into Lexeditor: one codex per game for settled knowledge, and one worklog per issue for full requirements, decisions, progress and technical evidence. Add codex scaffolding/checks for new plugins.\n\nPreserve your complete original requests and attachments without summarizing away details. Migrate and verify all issue comments before deleting them. Keep GitHub brief, with accurate statuses and final action/test checklists for Waiting and Needs Testing; recover missing context before asking you to repeat it.\n\nAfter parallel work merges, reconcile new/changed notes without overwriting newer knowledge. Verify every source is accounted for before retiring old stores.\n\n[Full specification and preserved request](https://github.com/Lexer-Lux/Lexeditor/blob/master/worklog/issues/github-86/deferred-consolidation-spec.md).",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/comments",
+    "created_at": "2026-09-04T10:51:54Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/86",
+    "id": 5347184723,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "0075ca",
+        "default": true,
+        "description": "Improvements or additions to documentation",
+        "id": 11671890137,
+        "name": "documentation",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo2Q",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/documentation"
+      },
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Agent work remains: research, repair, implementation, build, delivery or test preparation.",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPreQUw",
+    "number": 86,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/timeline",
+    "title": "Centralize all game codices and per-issue worklogs",
+    "updated_at": "2026-09-06T14:03:00Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

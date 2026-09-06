@@ -50,6 +50,21 @@ Exact metadata: [source record](sources/issue-5356311288-ba9b4555b39d8cddf83d585
 - [ ] In Story Mode, leave your owned horse outside whistle range and exit cleanly. Restart the same save: the horse should remain there, not appear beside you.
 - [ ] Retrieve it normally and repeat with it hitched. Confirm no duplicate/missing horse or player relocation. Report the failing transition.
 
+## issue 5356311288 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/216
+
+Created: 2026-08-06T10:32:16Z; updated: 2026-09-06T13:56:13Z
+
+Exact metadata: [source record](sources/issue-5356311288-dfcd2b9de9f67806072b67eba3a3857499be24ec1da993806c2c8adcc5e4b2c6.json).
+
+**Needs testing.** The installed persistence feature records a state on its first run.
+
+[Original reference mod](https://www.nexusmods.com/reddeadredemption2/mods/473).
+
+- [ ] In Story Mode, leave your owned horse outside whistle range and exit cleanly. Restart the same save: the horse should remain there, not appear beside you.
+- [ ] Retrieve it normally and repeat with it hitched. Confirm no duplicate/missing horse or player relocation. Report the failing transition.
+
 ## comment 5550140397 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/216#issuecomment-5550140397

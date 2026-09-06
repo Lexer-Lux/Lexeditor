@@ -24,6 +24,18 @@ Exact metadata: [source record](sources/issue-5356322646-efda2d69cbaa1a7255c7b21
 
 The working prop remains normal-sized. Pre-scaled custom models are a possible separate approach, not an existing feature.
 
+## issue 5356322646 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/260
+
+Created: 2026-08-11T01:07:07Z; updated: 2026-09-06T12:56:51Z
+
+Exact metadata: [source record](sources/issue-5356322646-fd7e69b1e0ae188e5c6e3b50118924c38657c3b8175c58df36550fe249b443d1.json).
+
+**Status: The no-op Scale control is removed.** The stored scale changed, but the physically attached lantern’s geometry did not. No supported live-scaling path is established for this rig.
+
+The working prop remains normal-sized. Pre-scaled custom models are a possible separate approach, not an existing feature.
+
 ## comment 5550153422 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/260#issuecomment-5550153422

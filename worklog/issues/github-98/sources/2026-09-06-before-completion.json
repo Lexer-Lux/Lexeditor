@@ -1,0 +1,9 @@
+{
+  "source_url": "https://github.com/Lexer-Lux/Lexeditor/issues/98",
+  "author": "Lexer-Lux",
+  "issue_number": 98,
+  "captured_date": "2026-09-06",
+  "capture_note": "Verbatim live issue body retrieved before completion/delivery update; earlier bodies/comments are retained in the repository legacy issue-status archive.",
+  "body_sha256": "0e88b024c3b0c2b0f2ba04123f5bbbc2cb6f5cf59341dc5b966b262877113410",
+  "body": "Warband repair is in PR #361, not yet merged: structured editing, read-only views, source-only access and missing files have distinct labels and links. Data Map uses the shared fitted pager; rendered checks pass at three window sizes.\n\n**Still needs development:** audit and repair the same claims/layouts in the other plugins. They were deliberately left untouched during parallel game work. The full cross-plugin issue remains open; no design decision is needed from you."
+}

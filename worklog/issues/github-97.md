@@ -1,15 +1,15 @@
 # #97: Make Play actually launch Warband
 
-[Full request and discussion archive](github-97/conversation.md)
+## Sources and requirements
 
-## Requirements and decisions
+[Verbatim request and discussion](github-97/conversation.md), [source records](github-97/sources/), [native/WSE2 implementation](github-97/implementation-2026-09-06.md) and [exit-tracking correction](github-97/exit-tracking-2026-09-06.md) preserve scope and evidence. Play must start the selected built installed module in a usable game window, not merely obtain a process handle. Failed launch restores Play with an error; Stop owns/tracks/closes the actual launched session, including child handoff. Both stock Warband and WSE2 are in scope.
 
-Recover the complete scope from the linked verbatim sources before implementation or status changes. The short GitHub summary is not the full specification. Do not infer that missing chat text was never supplied.
+## Delivered implementation and evidence
 
-## Current implementation and evidence
+PR #361 merged to master as bc6f97ef456b0a20b08358612c26eb400c97d2e7; final repair commit 4bfc39638731eab734674b41387d954646cf0186. Stock uses its owned real launcher controls with exact selection/readback and real Play control 1029; WSE2 uses its documented selected-module command. Job assignment precedes execution. Retained process handles now prevent early Stop completion while Windows still holds files/directories.
 
-Reconcile live code, PRs and existing topic/session worklogs. This archive import makes no build, deployment or gameplay-success claim.
+CI run 34040197660 passed Windows and Linux regressions, real Win32 launcher/child-handoff fixtures, the twelve-cycle directory-release stress test and one-click diagnostic. The two new deterministic exit regressions fail against the old implementation. The full suite is 42 Warband + 7 coverage tests; platform-specific cases skip outside Windows. RDR1 and FF8 companion workflows also passed. This proves fixtures, not a real Warband/Steam/WSE2 session.
 
-## Next agent work
+## Remaining acceptance
 
-Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.
+Use the normal updated master checkout; `tools/Warband-checks.cmd` runs disposable diagnostics and opens Warband. No build is needed. Select a built module installed under this game's Modules directory, press Play, confirm the selected mod's menu and load a save, then Stop. Test stock on an installation without WSE2 and WSE2 where available. Errors must restore Play with an explanation and Stop must affect only the owned session. Report executable/version, module, visible error and relevant rgl_log/WSE2 log. Details are in `docs/warband-acceptance.md`. Actual game acceptance is unverified; implementation and delivery are no longer pending.

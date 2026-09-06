@@ -71,6 +71,16 @@ Exact metadata: [source record](sources/issue-5356287698-a0f3b367b0f90498c5db4f8
 
 **Status: Closed after the settings-editor rework.** Settings use human-readable names, units and suitable controls in responsive categories. DEV marks developer-only options; CONST and its help explain when a restart or rebuild is required. Unspecified settings are preserved.
 
+## issue 5356287698 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/117
+
+Created: 2026-08-06T01:54:43Z; updated: 2026-09-06T13:57:31Z
+
+Exact metadata: [source record](sources/issue-5356287698-5e170e7d99c718dc11e8b649142df78f6704e7265f47319dc49b3b951f827477.json).
+
+**Status: Closed after the settings-editor rework.** Settings use human-readable names, units and suitable controls in responsive categories. DEV marks developer-only options; CONST and its help explain when a restart or rebuild is required. Unspecified settings are preserved.
+
 ## comment 5550113806 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/117#issuecomment-5550113806

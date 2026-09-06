@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356300299,
+    "number": 172,
+    "title": "Verify delivery of safe campsite respawn placement",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/172"
+  },
+  "sha256": "8f884ecad78423d8cc3a786f50bf273942e509f8a861a1e2a240ee95ab838bfc",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-73.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

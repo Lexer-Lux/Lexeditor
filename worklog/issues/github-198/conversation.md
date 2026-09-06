@@ -34,6 +34,16 @@ Exact metadata: [source record](sources/issue-5356307057-ff80a6f60dfebb51b416100
 
 **Status: Recorded closed; final verification is not documented here.** The latest request was configurable real-time HP damage with natural regeneration disabled so it cannot cancel Toxic. The effect targets the Health bar, not its core; earlier reports of negligible damage were not acceptance.
 
+## issue 5356307057 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/198
+
+Created: 2026-08-06T05:59:33Z; updated: 2026-09-06T13:56:19Z
+
+Exact metadata: [source record](sources/issue-5356307057-93cd79bde4328591ba4223f037f9d98c8f9820706e4318e6b4254c741f5173d5.json).
+
+**Status: Recorded closed; final verification is not documented here.** The latest request was configurable real-time HP damage with natural regeneration disabled so it cannot cancel Toxic. The effect targets the Health bar, not its core; earlier reports of negligible damage were not acceptance.
+
 ## comment 5550135433 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/198#issuecomment-5550135433

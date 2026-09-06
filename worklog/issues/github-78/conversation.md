@@ -33,3 +33,15 @@ Exact metadata: [source record](sources/issue-5311959908-1b4ed3326b41d41c4647b28
 **Actionable — delivery remains.** Draft PR #361 adds fixed-camera PNG icons, background generation and module-separated caches. It is not merged; real-item framing and generation speed remain unverified.
 
 Icons must regenerate when source assets change, fit boots through long polearms, and keep browsing responsive. The larger interactive preview remains. A ready-to-run test copy and disposable asset-change fixture still need preparing.
+
+## issue 5311959908 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/78
+
+Created: 2026-09-01T12:42:38Z; updated: 2026-09-06T13:31:00Z
+
+Exact metadata: [source record](sources/issue-5311959908-e99e89c2a3f32581df624ac14f15569bdc94c91c6f8c8f4fae87049aaa409a29.json).
+
+**Actionable — delivery remains.** Draft PR #361 adds fixed-camera PNG icons, background generation and module-separated caches. It is not merged; real-item framing and generation speed remain unverified.
+
+Icons must regenerate when source assets change, fit boots through long polearms, and keep browsing responsive. The larger interactive preview remains. A ready-to-run test copy and disposable asset-change fixture still need preparing.

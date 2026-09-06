@@ -44,6 +44,30 @@ Exact metadata: [source record](sources/issue-5356302274-c1bc314bf1fed28df5a1c1b
 
 Find an effective animation-speed path or remove the misleading control, with correct multiplier units and bounds. Resolve the binocular crash in #357 before another in-game comparison.
 
+## issue 5356302274 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/181
+
+Created: 2026-08-06T03:47:17Z; updated: 2026-09-06T13:57:47Z
+
+Exact metadata: [source record](sources/issue-5356302274-06880a5d2d48d954c1d4c6a2f2585391072a226dcfd1dbf8e6ccc2efe22527ef.json).
+
+**Status: No visible speed improvement is confirmed.** Setting 10 did not help, and the implementation had silently clamped it to 4. A larger displayed number is not a repair.
+
+Find an effective animation-speed path or remove the misleading control, with correct multiplier units and bounds. Resolve the binocular crash in #357 before another in-game comparison.
+
+## issue 5356302274 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/181
+
+Created: 2026-08-06T03:47:17Z; updated: 2026-09-06T15:00:53Z
+
+Exact metadata: [source record](sources/issue-5356302274-3e3f7be80c1769be5dd49a8196ebbb02cb5ce886e22967d061eb4c4eba602bcc.json).
+
+**Status: No visible speed improvement is confirmed.** Setting 10 did not help, and the implementation had silently clamped it to 4. A larger displayed number is not a repair.
+
+Find an effective animation-speed path or remove the misleading control, with correct multiplier units and bounds. Resolve the binocular crash in #357 before another in-game comparison.
+
 ## comment 5550130609 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/181#issuecomment-5550130609
@@ -242,3 +266,17 @@ Created: 2026-08-19T12:42:57Z; updated: 2026-08-19T12:42:57Z
 Exact metadata: [source record](sources/comment-5550130804-0b3aa7dc8373da91562f5268474f019ccfbbffeeff149110c922e26b561aad3d.json).
 
 set it to 10. still no visible change.
+
+## comment 5560078734 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/181#issuecomment-5560078734
+
+Created: 2026-09-06T15:00:53Z; updated: 2026-09-06T15:00:53Z
+
+Exact metadata: [source record](sources/comment-5560078734-a90d0521f909c38a221d5325adc926f17da8665aefd21c2f0722996313ce60c9.json).
+
+Implemented the explicitly permitted removal option rather than another ineffective animation multiplier. Public editor changes are in #364; the actual runtime source removal is in Lexer-Lux/Lexers-Mod-For-RDR2#211 on `fix/lexeditor-rdr2-issue-batch`.
+
+The failed TransitionAnimRate control, observer/state, animation-speed setter calls, INI setting, and generated menu row are removed. Legacy editor keys are hidden. Native draw/stow, timing gates, readiness checks and the early-release latch remain. The menu was regenerated against the private repository's own matching schema, avoiding unrelated menu/layout changes.
+
+Seven focused retirement/preservation checks pass; the runtime PR's GitHub source checks are green. No production ASI build/install or in-game acceptance was performed, and #357 remains unverified. Keep this issue open/actionable until the source candidate is built and accepted; no claim of faster visible animation is made.

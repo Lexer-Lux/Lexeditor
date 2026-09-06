@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356294202,
+    "number": 143,
+    "title": "Reveal all four gunslinger locations when the quest starts",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/143"
+  },
+  "sha256": "227b4c040fd10344a1b206248683551aab5456ca1464ea1af3f6636148d5ba17",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-44.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

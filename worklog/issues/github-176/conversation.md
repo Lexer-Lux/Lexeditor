@@ -45,6 +45,18 @@ Empty outer bars must not use cores as reserve fuel. Dead Eye must stop and stay
 
 **Status: Partly repaired.** The Eagle Eye correction is installed, but the reported horse recovery problem is not resolved in the later notes. Finish that missing behavior before overall acceptance.
 
+## issue 5356301152 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/176
+
+Created: 2026-08-06T03:28:28Z; updated: 2026-09-06T13:58:13Z
+
+Exact metadata: [source record](sources/issue-5356301152-d2908239bb3303796a92c2013516852571e953b0fa95d3ec70ed0d26ec8531c2.json).
+
+Empty outer bars must not use cores as reserve fuel. Dead Eye must stop and stay unavailable while empty; Eagle Eye must still work. Exhausted horses must slow enough to regenerate automatically.
+
+**Status: Partly repaired.** The Eagle Eye correction is installed, but the reported horse recovery problem is not resolved in the later notes. Finish that missing behavior before overall acceptance.
+
 ## comment 5550129472 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/176#issuecomment-5550129472

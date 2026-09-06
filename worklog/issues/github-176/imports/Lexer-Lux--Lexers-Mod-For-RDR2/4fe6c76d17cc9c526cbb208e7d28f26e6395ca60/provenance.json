@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356301152,
+    "number": 176,
+    "title": "Finish exhaustion handling without consuming cores",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/176"
+  },
+  "sha256": "20b3b373c9462fba8959722ce6f485b219f8d3ab941afe421a25945b55f80547",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-78.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

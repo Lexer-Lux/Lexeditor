@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/343
 
 Created: 2026-08-24T17:07:38Z; updated: 2026-09-06T12:39:05Z
 
+Exact metadata: [source record](sources/issue-5356489690-046337d688617b2b4de418de44414e156efa3b6ced14c86fd2fb90d2a164af64.json).
+
+V should switch into first person and back to the previous third-person camera. Movement, aiming, riding, cover, loading and cutscenes must recover safely.
+
+**Status: Research and implementation remain.** Use the downloaded First Person reference to establish a working RDR1 approach; no player test is ready.
+
+## issue 5356489690 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/343
+
+Created: 2026-08-24T17:07:38Z; updated: 2026-09-06T12:39:05Z
+
 Exact metadata: [source record](sources/issue-5356489690-2be516547de0f9998b73ca2d7bd2e62dfcedc44adb785bc82e4262cb57c13380.json).
 
 V should switch into first person and back to the previous third-person camera. Movement, aiming, riding, cover, loading and cutscenes must recover safely.

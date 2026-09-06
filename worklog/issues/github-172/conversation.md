@@ -31,6 +31,18 @@ Respawn beside the nearest activated campfire, never on its flames or inside its
 
 **Status: A safe-placement build was queued, but installation was not confirmed.** Verify the current combined campsite build and prepare a known activated-camp test first. Later respawn work in #244 is also awaiting installation.
 
+## issue 5356300299 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/172
+
+Created: 2026-08-06T03:15:02Z; updated: 2026-09-06T13:53:56Z
+
+Exact metadata: [source record](sources/issue-5356300299-262de9065ffa43279e3c37470a0e9d3637a5b61d039b3da81b62bea393689af4.json).
+
+Respawn beside the nearest activated campfire, never on its flames or inside its props.
+
+**Status: A safe-placement build was queued, but installation was not confirmed.** Verify the current combined campsite build and prepare a known activated-camp test first. Later respawn work in #244 is also awaiting installation.
+
 ## comment 5550128521 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/172#issuecomment-5550128521

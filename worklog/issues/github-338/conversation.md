@@ -23,3 +23,15 @@ Exact metadata: [source record](sources/issue-5356488713-8ce5558ecaeb8a3828a2904
 Begin resting when the carriage’s normal Rest action becomes available, without requiring the extra button press. Leave ineligible states and other carriage controls alone.
 
 **Status: Work remains.** No ready-to-test implementation is recorded.
+
+## issue 5356488713 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/338
+
+Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T12:38:54Z
+
+Exact metadata: [source record](sources/issue-5356488713-95b4609ec0fd047b1b4ebaeba9fd64457c4b745e993be4d8696a65bd8b09ce2c.json).
+
+Begin resting when the carriage’s normal Rest action becomes available, without requiring the extra button press. Leave ineligible states and other carriage controls alone.
+
+**Status: Work remains.** No ready-to-test implementation is recorded.

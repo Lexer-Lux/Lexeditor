@@ -28,6 +28,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/84
 
 Created: 2026-09-04T09:49:11Z; updated: 2026-09-06T12:45:51Z
 
+Exact metadata: [source record](sources/issue-5346645364-b528f56008444c303c956ab79ef8561fb7ffe2e7aa4a61d1a417ca938434649b.json).
+
+Maps now combines Field and World, but Deling/Ifrit-equivalent coverage is incomplete.
+
+**Work remains:** fix misplaced world markers and missing Draw Point map imagery; add the requested textured 3D toggle, 4×4 palette controls and field-local detail tabs; finish verified enemy-AI editing. Preserve unknown data and confirm real save/runtime behavior, not just the presence of tabs.
+
+## issue 5346645364 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/84
+
+Created: 2026-09-04T09:49:11Z; updated: 2026-09-06T12:45:51Z
+
 Exact metadata: [source record](sources/issue-5346645364-f0298291befbbcdba3fb8ea90e870c97b9bf275059287e04d1207ade49b2c77d.json).
 
 Maps now combines Field and World, but Deling/Ifrit-equivalent coverage is incomplete.

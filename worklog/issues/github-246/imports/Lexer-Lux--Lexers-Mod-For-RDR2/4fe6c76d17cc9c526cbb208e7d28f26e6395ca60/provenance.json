@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356318543,
+    "number": 246,
+    "title": "Holstered shoulder switching lacks a supported camera state",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/246"
+  },
+  "sha256": "c8ef2fb970eae4a6d5fdcd0f2d94f7b9c5bb58902ca4955d8746aff702c6bf46",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-154.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

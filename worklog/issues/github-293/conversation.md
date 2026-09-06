@@ -22,6 +22,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/293
 
 Created: 2026-08-20T10:24:01Z; updated: 2026-09-06T13:32:06Z
 
+Exact metadata: [source record](sources/issue-5356332463-1e611ee77d57868017d58bc82de804d82f47fa4970f04df88124a9a7a167de6d.json).
+
+Scale symbols, health rings and distance text together between the configured near/far sizes. Keep a world-distance head gap; 2D tag sizes stay fixed.
+
+**Actionable — latest correction is source-only.** Defaults are 1.50 near and 0.75 far; the updated build is not installed.
+
+[Original screenshot](https://github.com/user-attachments/assets/e2420970-68cf-4a8a-82cf-88eba549fbdd).
+
+## issue 5356332463 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/293
+
+Created: 2026-08-20T10:24:01Z; updated: 2026-09-06T13:32:06Z
+
 Exact metadata: [source record](sources/issue-5356332463-495fff08c1a5af05217c97ba2d3d704871fc76d72176e542cc9d38a3a0d6ed44.json).
 
 Scale symbols, health rings and distance text together between the configured near/far sizes. Keep a world-distance head gap; 2D tag sizes stay fixed.

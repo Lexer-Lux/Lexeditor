@@ -25,3 +25,15 @@ Exact metadata: [source record](sources/issue-5359838900-3cd51ed0460698080290341
 **Actionable — packaging remains.** Provide normal installers and application shortcuts on all three platforms, without requiring shell scripts or a portable-folder workflow.
 
 Installation and launch are not yet verified across those platforms.
+
+## issue 5359838900 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/352
+
+Created: 2026-09-05T17:50:22Z; updated: 2026-09-06T13:32:18Z
+
+Exact metadata: [source record](sources/issue-5359838900-ea402e70bf3e0695f07f124e30a4358906139c73ca1010bdf46ba5d8840ccd05.json).
+
+**Actionable — packaging remains.** Provide normal installers and application shortcuts on all three platforms, without requiring shell scripts or a portable-folder workflow.
+
+Installation and launch are not yet verified across those platforms.

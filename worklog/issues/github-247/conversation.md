@@ -21,3 +21,13 @@ Created: 2026-08-10T14:55:18Z; updated: 2026-09-06T13:18:04Z
 Exact metadata: [source record](sources/issue-5356318829-27f95cbe5746960038f57fbcbab7955902504aaadd2d3657c29acf595f25a127.json).
 
 **Status: No continuous vertical-height control is proven in the available camera path.** The supported LOW/NORMAL framing choice is not an arbitrary Y-coordinate editor. This request is technically blocked, not completed; supported profile editing remains in #108.
+
+## issue 5356318829 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/247
+
+Created: 2026-08-10T14:55:18Z; updated: 2026-09-06T13:18:04Z
+
+Exact metadata: [source record](sources/issue-5356318829-e8b07d930beaf2b5a3aeff48196fa8ea822daf6c06a4433feb1dd0d933213fc1.json).
+
+**Status: No continuous vertical-height control is proven in the available camera path.** The supported LOW/NORMAL framing choice is not an arbitrary Y-coordinate editor. This request is technically blocked, not completed; supported profile editing remains in #108.

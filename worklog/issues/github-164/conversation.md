@@ -32,6 +32,19 @@ The installed repair addresses the stale tracking state that allowed only the fi
 - [ ] Fully restart RDR2 and equip the Ancient Tomahawk. Throw it at the ground three times consecutively; each impact should immediately return it, not just the first.
 - [ ] Repeat against a wall and a target. Confirm there is one usable copy and note whether the acquisition popup appears. Report which throw fails and attach that session's GameplayTweaks log.
 
+## issue 5356298676 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/164
+
+Created: 2026-08-06T02:44:50Z; updated: 2026-09-06T13:58:12Z
+
+Exact metadata: [source record](sources/issue-5356298676-de90eb0ae562c9ec9988c5f7033e5a4adc9acf418aa157cb23da613bfcadb280.json).
+
+The installed repair addresses the stale tracking state that allowed only the first throw to return. Return feedback also needs checking.
+
+- [ ] Fully restart RDR2 and equip the Ancient Tomahawk. Throw it at the ground three times consecutively; each impact should immediately return it, not just the first.
+- [ ] Repeat against a wall and a target. Confirm there is one usable copy and note whether the acquisition popup appears. Report which throw fails and attach that session's GameplayTweaks log.
+
 ## comment 5550126607 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/164#issuecomment-5550126607

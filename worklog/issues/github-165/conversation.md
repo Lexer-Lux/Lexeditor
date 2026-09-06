@@ -40,6 +40,18 @@ Exact metadata: [source record](sources/issue-5356298892-35a384128feac828b23cf28
 
 Lost unique hatchets/tomahawks must return through the camp locker, unequipped and without duplication. The native melee/throwable filter still needs a safe solution. No repeat acceptance request for the smaller workaround is pending.
 
+## issue 5356298892 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/165
+
+Created: 2026-08-06T02:46:40Z; updated: 2026-09-06T13:57:46Z
+
+Exact metadata: [source record](sources/issue-5356298892-564d7421f3e80de8a1f2412b77ec271b7a1cddf4e50a24ea5a5e0ec92e8de3db.json).
+
+**Actionable — requested locker integration is incomplete.** The installed workaround adds a named Recover action; it does not add the ordinary weapon-list entries you explicitly requested.
+
+Lost unique hatchets/tomahawks must return through the camp locker, unequipped and without duplication. The native melee/throwable filter still needs a safe solution. No repeat acceptance request for the smaller workaround is pending.
+
 ## comment 5550126881 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/165#issuecomment-5550126881

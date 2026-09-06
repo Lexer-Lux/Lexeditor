@@ -26,6 +26,30 @@ Match custom casing position and momentum to vanilla before tuning away the refe
 
 **Status: Test preparation is broken.** The restore control restores only the base weapon file while six patch files remain blank, so several weapons have no valid reference. Correct restore/status coverage across the whole weapon set before any visual comparison.
 
+## issue 5356294452 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/144
+
+Created: 2026-08-06T02:25:40Z; updated: 2026-09-06T13:57:17Z
+
+Exact metadata: [source record](sources/issue-5356294452-87eb5c7244d89bf169e4b002280be51571e7150462e3ff6fd897a05071afc92d.json).
+
+Match custom casing position and momentum to vanilla before tuning away the reference effects.
+
+**Status: Test preparation is broken.** The restore control restores only the base weapon file while six patch files remain blank, so several weapons have no valid reference. Correct restore/status coverage across the whole weapon set before any visual comparison.
+
+## issue 5356294452 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/144
+
+Created: 2026-08-06T02:25:40Z; updated: 2026-09-06T14:58:53Z
+
+Exact metadata: [source record](sources/issue-5356294452-ad8610d223671e2bb43470c9aa00b95fc12c1b09d9f0f739a1979fb2ca58cd3d.json).
+
+Match custom casing position and momentum to vanilla before tuning away the reference effects.
+
+**Status: Test preparation is broken.** The restore control restores only the base weapon file while six patch files remain blank, so several weapons have no valid reference. Correct restore/status coverage across the whole weapon set before any visual comparison.
+
 ## comment 5550121573 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/144#issuecomment-5550121573
@@ -96,3 +120,17 @@ The editor calculates status from base `weapons.ymt` only. The restore path chan
 Player impact: a reference build made with this control would show vanilla shell VFX for base weapons but no vanilla reference for those patched weapons. That can make a missing reference look like a correctly calibrated custom casing.
 
 Restore, blank, status, and saved-count checks must cover all 61 fields in all seven YMT files before the comparison build is valid.
+
+## comment 5560067253 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/144#issuecomment-5560067253
+
+Created: 2026-09-06T14:58:53Z; updated: 2026-09-06T14:58:53Z
+
+Exact metadata: [source record](sources/comment-5560067253-86edb984009ccb9c99120bb2f56bce425a45feeb1560f5c73f72b12d54c76200.json).
+
+Partial implementation in #364: the editor's vanilla casing restore/reblank path now covers all seven weapon layers, rather than only weapons.ymt. Status reports the aggregate; the operation preflights the complete eleven-resource stack and vanilla records, honors install.xml mappings, preserves projectile flags, and rolls back files/cache/install.xml on caught write failures.
+
+Validation on temporary copies of project data: all 61 shell fields restored and reblanked across seven files; no other parsed-field changes. Synthetic tests cover missing references, path mapping, partial writes, and install-map rollback. Original project data was not changed.
+
+This does NOT finish custom casing velocity/momentum/ejection calibration or gameplay acceptance. No ASI was built/installed. Keep this broad issue open/actionable; the appended archive handoff distinguishes the implemented editor defect from the remaining runtime work.

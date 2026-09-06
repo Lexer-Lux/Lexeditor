@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356319645,
+    "number": 250,
+    "title": "Exclude the player from lantern shadows only",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/250"
+  },
+  "sha256": "0ed9f5225e728f469f016373b3780f69ab8037e8d17e6a929f663d59fff41055",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-158.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

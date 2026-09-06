@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/304
 
 Created: 2026-08-30T20:50:38Z; updated: 2026-09-06T12:59:23Z
 
+Exact metadata: [source record](sources/issue-5356482581-5b829e8ff044d354bb24936a75609cbab966615a5afa8c512431105924b63343.json).
+
+The optional Vibration Consolidation tweak should open normal pause behavior directly, without FFNx’s extra one-item Vibration screen. Vibration must remain usable in Config.
+
+**Status: Current delivery is not established by the issue.** Identify the working build and verify both field and battle pause paths before requesting a player test; a specification alone is not a delivered fix.
+
+## issue 5356482581 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/304
+
+Created: 2026-08-30T20:50:38Z; updated: 2026-09-06T12:59:23Z
+
 Exact metadata: [source record](sources/issue-5356482581-698504035bca0161a105d4f575ef1ffc6a7e005dcce9f3d8d13dce97255e08b9.json).
 
 The optional Vibration Consolidation tweak should open normal pause behavior directly, without FFNx’s extra one-item Vibration screen. Vibration must remain usable in Config.

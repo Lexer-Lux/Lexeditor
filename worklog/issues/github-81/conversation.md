@@ -44,6 +44,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/81
 
 Created: 2026-09-02T01:05:20Z; updated: 2026-09-06T12:38:28Z
 
+Exact metadata: [source record](sources/issue-5318492637-09eaafb45a4cfc7dcab47e7d106e7c489716629f5f6195890668bd04afaa6689.json).
+
+Add a read-only Lexer Mode overview for every plugin with a managed helper: pinned release, installed version and newest upstream release with date and release notes. Check on opening; Check Again refreshes. One failed lookup must not hide other rows, and nothing installs automatically.
+
+**Status: Work remains.** This is not waiting for your testing.
+
+## issue 5318492637 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/81
+
+Created: 2026-09-02T01:05:20Z; updated: 2026-09-06T12:38:28Z
+
 Exact metadata: [source record](sources/issue-5318492637-9b0cb05c167231a5cbfbc77f37b27bfe0bb5ac433bc32cf8cc21f58f0eb13ce8.json).
 
 Add a read-only Lexer Mode overview for every plugin with a managed helper: pinned release, installed version and newest upstream release with date and release notes. Check on opening; Check Again refreshes. One failed lookup must not hide other rows, and nothing installs automatically.

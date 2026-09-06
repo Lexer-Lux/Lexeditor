@@ -20,6 +20,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/235
 
 Created: 2026-08-10T08:49:06Z; updated: 2026-09-06T13:31:43Z
 
+Exact metadata: [source record](sources/issue-5356315706-9ad6a017fd611730373e13e3fab24bcc800771322ee5423f496b440d6aac5ece.json).
+
+At scale 1 and opacity 1, the mask should match vanilla rather than a pixelated replacement circle.
+
+**Actionable — comparison and repair remain.** The current binocular crash (#357) must be fixed before a safe visual test.
+
+[Reported appearance](https://github.com/user-attachments/assets/2de9f3aa-9dd0-46b0-91d0-5e56911f15b3).
+
+## issue 5356315706 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/235
+
+Created: 2026-08-10T08:49:06Z; updated: 2026-09-06T13:31:43Z
+
 Exact metadata: [source record](sources/issue-5356315706-b6370da05cfa35097b70e64fac6d519b61b5a7825a4e046cc4eb3c117eed532f.json).
 
 At scale 1 and opacity 1, the mask should match vanilla rather than a pixelated replacement circle.

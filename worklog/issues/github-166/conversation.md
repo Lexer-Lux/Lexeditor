@@ -26,6 +26,18 @@ The Hunter's Hatchet should instantly kill ordinary animals without reducing the
 
 **Delivery is unconfirmed:** the only build record says installation was queued. Confirm the actual installed candidate and prepare the quality comparison before requesting a test.
 
+## issue 5356299117 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/166
+
+Created: 2026-08-06T02:46:57Z; updated: 2026-09-06T13:55:45Z
+
+Exact metadata: [source record](sources/issue-5356299117-504c19d126ec1e2376c1ce73eedf6cf7edfe0b4564d3991560572776949205fa.json).
+
+The Hunter's Hatchet should instantly kill ordinary animals without reducing their original pelt quality. Preserve mission/legendary behavior and avoid duplicate loot.
+
+**Delivery is unconfirmed:** the only build record says installation was queued. Confirm the actual installed candidate and prepare the quality comparison before requesting a test.
+
 ## comment 5550127134 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/166#issuecomment-5550127134

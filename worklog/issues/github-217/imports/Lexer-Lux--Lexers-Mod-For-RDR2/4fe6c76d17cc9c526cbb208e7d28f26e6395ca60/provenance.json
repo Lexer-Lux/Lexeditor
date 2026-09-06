@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356311501,
+    "number": 217,
+    "title": "Merge duplicate Misc settings categories",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/217"
+  },
+  "sha256": "d4fd771225975e7f94b5809e3b32f4c93a7d008fca9fc54a834c192778d8aed3",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-124.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

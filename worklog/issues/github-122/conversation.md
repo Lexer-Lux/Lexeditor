@@ -39,6 +39,18 @@ Support custom multi-output recipes, including breaking valuables into metals, t
 
 **Status: Latest cancellation and input-ownership repairs are not built or installed.** Earlier menu work is not final acceptance. Deliver the candidate and prepare a specific craft/cancel/reopen test before asking you to try it.
 
+## issue 5356289083 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/122
+
+Created: 2026-08-06T01:58:26Z; updated: 2026-09-06T13:57:40Z
+
+Exact metadata: [source record](sources/issue-5356289083-327492c33f712d67423c396c28a1a355421f340dd1dd98ae92be746928165fc0.json).
+
+Support custom multi-output recipes, including breaking valuables into metals, through an editable crafting menu. Preserve vanilla recipe data.
+
+**Status: Latest cancellation and input-ownership repairs are not built or installed.** Earlier menu work is not final acceptance. Deliver the candidate and prepare a specific craft/cancel/reopen test before asking you to try it.
+
 ## comment 5550115292 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/122#issuecomment-5550115292

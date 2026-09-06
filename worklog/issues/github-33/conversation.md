@@ -29,6 +29,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/33
 
 Created: 2026-08-29T11:16:06Z; updated: 2026-09-06T12:45:23Z
 
+Exact metadata: [source record](sources/issue-5286217527-acd21b9b612df22eaeea393ec769ba77abd4b07eb93fb9a5d1fd73f7179a7990.json).
+
+The incorrect RDO image path is repaired. Previews now enable only after an image loads; failed icons should not open an empty dialog.
+
+- [ ] Restart Lexeditor. In RDR2 Items, check a Story item and Harrietum: available artwork should load and open normally.
+- [ ] Check an item with missing/no artwork. Its preview should be clearly unavailable rather than blank and clickable; report the item name and screenshot.
+
+## issue 5286217527 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/33
+
+Created: 2026-08-29T11:16:06Z; updated: 2026-09-06T12:45:23Z
+
 Exact metadata: [source record](sources/issue-5286217527-b405a2cdb100448b3ec7f55cece1b2040eee64d348e33ed3e758e04a94405b3b.json).
 
 The incorrect RDO image path is repaired. Previews now enable only after an image loads; failed icons should not open an empty dialog.

@@ -27,6 +27,21 @@ Use the same clear, icon-only + button for new items, effects, tags, recipes and
 - [ ] Restart Lexeditor and open RDR2 Items. Check the + buttons for Effects, Tags and an empty Recipe field: each should be centered, readable and identify its action on hover.
 - [ ] In a copy of your mod, add then remove a tag or quick-select assignment. Confirm the correct row changes; report any broken button or clipping.
 
+## issue 5202503114 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/9
+
+Created: 2026-08-20T10:42:47Z; updated: 2026-09-06T13:06:16Z
+
+Exact metadata: [source record](sources/issue-5202503114-ba85bcf062333ae2de6a195e939798764cff0c251b6df850f47073290e3f95ef.json).
+
+Use the same clear, icon-only + button for new items, effects, tags, recipes and other entries. Hover text names the action.
+
+**Status: Implemented; needs your visual check.**
+
+- [ ] Restart Lexeditor and open RDR2 Items. Check the + buttons for Effects, Tags and an empty Recipe field: each should be centered, readable and identify its action on hover.
+- [ ] In a copy of your mod, add then remove a tag or quick-select assignment. Confirm the correct row changes; report any broken button or clipping.
+
 ## comment 5354871102 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/9#issuecomment-5354871102

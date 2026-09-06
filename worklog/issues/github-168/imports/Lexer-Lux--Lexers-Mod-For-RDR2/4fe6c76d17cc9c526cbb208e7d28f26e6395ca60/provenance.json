@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356299528,
+    "number": 168,
+    "title": "Rebuild owned-gear sparkle suppression safely",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/168"
+  },
+  "sha256": "4e309550c2c26e898eab3c6a6ecefd4daaec405c0a43318c034e4626ffbf7b61",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-69.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -1,0 +1,100 @@
+{
+  "body_sha256": "3956fe127ae6c5d8b4eaa47f6185735d846a5c3bb141118fd4353ea10a4a8f82",
+  "issue": 80,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "One optional Improved Interface tweak should add safe text reveal/history/fast-forward, full-width ATB/Trance with HP/MP bars, and a distinct prompt for unbeaten card opponents. Include keyboard equivalents.\n\n**Work remains:** first reuse the capabilities Memoria already provides, then implement the gaps. Dialogue history must not replay scripts or rewards. No completed candidate is ready for your testing.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/comments",
+    "created_at": "2026-09-02T00:46:07Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/80",
+    "id": 5318381754,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Agent work remains: research, repair, implementation, build, delivery or test preparation.",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "8a6bbe",
+        "default": false,
+        "description": "Final Fantasy IX plugin",
+        "id": 12062139822,
+        "name": "ff9",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlrg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff9"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPQAQug",
+    "number": 80,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80/timeline",
+    "title": "Add dialogue controls and a clearer battle interface",
+    "updated_at": "2026-09-06T12:45:45Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/80",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

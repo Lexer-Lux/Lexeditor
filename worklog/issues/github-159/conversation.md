@@ -28,6 +28,18 @@ Exact metadata: [source record](sources/issue-5356297610-7ebac2bc85a937aaf0a837a
 
 Prepare independently verified, permission-compatible fixes. Clothing/carry physics require separate comparisons; run/walk toggling is a gameplay preference rather than a confirmed bug.
 
+## issue 5356297610 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/159
+
+Created: 2026-08-06T02:41:09Z; updated: 2026-09-06T13:54:15Z
+
+Exact metadata: [source record](sources/issue-5356297610-2276b2efc4780999b5df487c83ae2765323aeba62973965f2b3311ab02f12c2e.json).
+
+**Status: Initial audit complete; fixes are not delivered.** The candidates are separate problems, not one patch. Wickiup map artwork and completed-Dreamcatcher cleanup were proposed as first targets.
+
+Prepare independently verified, permission-compatible fixes. Clothing/carry physics require separate comparisons; run/walk toggling is a gameplay preference rather than a confirmed bug.
+
 ## comment 5550125452 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/159#issuecomment-5550125452

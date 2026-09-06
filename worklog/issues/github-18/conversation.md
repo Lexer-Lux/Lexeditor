@@ -20,6 +20,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/18
 
 Created: 2026-08-27T05:45:26Z; updated: 2026-09-06T12:45:09Z
 
+Exact metadata: [source record](sources/issue-5264309582-2a6ac96610bab650ecc5243f310b7bce036f857355632822f99c0f7f0552baad.json).
+
+Mobs now opens real Combat Profiles and Health archetypes. Unused model-assignment controls were removed; Observed Models is read-only. Typed controls need your check.
+
+- [ ] Restart Lexeditor. Open RDR2 Mobs → Archetypes → Combat Profiles and Health; confirm real values and appropriate number, checkbox and choice controls appear.
+- [ ] In a test mod, change one value, save and reopen it. Confirm the edit survives and no model-assignment control claims to affect the game; report the field that fails.
+
+## issue 5264309582 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/18
+
+Created: 2026-08-27T05:45:26Z; updated: 2026-09-06T12:45:09Z
+
 Exact metadata: [source record](sources/issue-5264309582-775b8da60a9e84057e5908c8bfe39ac2c2667bd570c84bb699b4a5d5a43eb678.json).
 
 Mobs now opens real Combat Profiles and Health archetypes. Unused model-assignment controls were removed; Observed Models is read-only. Typed controls need your check.

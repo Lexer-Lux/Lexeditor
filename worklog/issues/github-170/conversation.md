@@ -47,6 +47,18 @@ Exact metadata: [source record](sources/issue-5356299936-e31a9e960109ed6f340ac36
 
 Provide a useful, verified speed implementation or remove the ineffective speed controls, as requested. Preserve the separate player/horse road-stamina benefits and normal recovery/swimming behavior. No approval of the rejected 15% version is needed.
 
+## issue 5356299936 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/170
+
+Created: 2026-08-06T03:07:52Z; updated: 2026-09-06T13:55:54Z
+
+Exact metadata: [source record](sources/issue-5356299936-ad055ed5886e9b96e4e86b3605a3e981052c58efb681d6a64c9bd7c448af4511.json).
+
+**Actionable — speed work remains.** The current on-foot method stops at 15%, which you rejected as too small. A stronger horse path is only a candidate.
+
+Provide a useful, verified speed implementation or remove the ineffective speed controls, as requested. Preserve the separate player/horse road-stamina benefits and normal recovery/swimming behavior. No approval of the rejected 15% version is needed.
+
 ## comment 5550128033 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/170#issuecomment-5550128033

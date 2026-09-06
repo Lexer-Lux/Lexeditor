@@ -26,6 +26,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/308
 
 Created: 2026-08-30T19:39:40Z; updated: 2026-09-06T12:59:27Z
 
+Exact metadata: [source record](sources/issue-5356483133-2e42ef88a56caf863148fbf242dd69162f13a38e34af196751da199171c00f1c.json).
+
+**Status: Partly repaired.** The generated-name crash and battle-item ordering repairs are recorded as installed; the broader menu work is unfinished.
+
+Remaining scope includes the requested ability presentation, magic grouping and clock/order controls. Keep the crash check separate from full acceptance.
+
+- [ ] For the installed crash repair, open GF → Quezacotl → Learn Abilities and page left, then both ways. Confirm no crash or damaged names. With Auto-sort Inventory on, check the battle Item menu’s order and quantities; report the failing step.
+
+## issue 5356483133 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/308
+
+Created: 2026-08-30T19:39:40Z; updated: 2026-09-06T12:59:27Z
+
 Exact metadata: [source record](sources/issue-5356483133-892d799d212457abb03fc39b74b885bbc147836ba7ace3325f4afc2f9f0f2e08.json).
 
 **Status: Partly repaired.** The generated-name crash and battle-item ordering repairs are recorded as installed; the broader menu work is unfinished.

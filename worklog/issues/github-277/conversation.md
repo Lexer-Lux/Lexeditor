@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/277
 
 Created: 2026-08-12T11:58:45Z; updated: 2026-09-06T12:57:08Z
 
+Exact metadata: [source record](sources/issue-5356327520-9e3fe12621d81f3ea3fd1a807c1d048e82f61d0a0645b43bb0e36302cfa30989.json).
+
+Hide Recon displays and acquisition during actual story cutscenes, then restore existing tags afterward. Cinematic camera mode alone is not a cutscene detector.
+
+**Status: A corrected cutscene-aware implementation is described, but its installed handoff is not confirmed.** Verify that candidate and prepare a real cutscene check before asking you to repeat the failed test.
+
+## issue 5356327520 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/277
+
+Created: 2026-08-12T11:58:45Z; updated: 2026-09-06T12:57:08Z
+
 Exact metadata: [source record](sources/issue-5356327520-f03609575cc4bf285cfc70900963fb588fdba3b1a116a10b1330414e3ed588c2.json).
 
 Hide Recon displays and acquisition during actual story cutscenes, then restore existing tags afterward. Cinematic camera mode alone is not a cutscene detector.

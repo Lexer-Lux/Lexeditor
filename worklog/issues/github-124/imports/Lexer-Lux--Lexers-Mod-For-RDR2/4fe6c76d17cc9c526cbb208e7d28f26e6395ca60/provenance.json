@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356289511,
+    "number": 124,
+    "title": "Check paying a serious bounty instead of surrendering",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/124"
+  },
+  "sha256": "97da41b137b08acdda4c3ec3bd84ccb6b0d883aac9e6b5904966a90458495df6",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-24.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

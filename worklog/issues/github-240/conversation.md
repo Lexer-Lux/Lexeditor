@@ -30,6 +30,21 @@ Exact metadata: [source record](sources/issue-5356316921-acfa4ec2bb739a82db227c9
 - [ ] Buy a Thermometer at a General Store. Its temperature should match the location/info popup; a second thermometer should not be carryable.
 - [ ] Note its position, adjust one Thermometer position percentage, and confirm only temperature moves within about a second—not the clock. Restore it. Report an incorrect reading, position or carry limit.
 
+## issue 5356316921 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/240
+
+Created: 2026-08-10T10:55:17Z; updated: 2026-09-06T13:31:49Z
+
+Exact metadata: [source record](sources/issue-5356316921-e2f6071b18293bc6d00c6efa50f2cbcea72a5eb580cd64de68df5a6068c670a7.json).
+
+**Needs testing.** Thermometer and placement controls are installed; shop artwork currently reuses the watch presentation.
+
+[Display reference](https://github.com/user-attachments/assets/1704ecf8-041c-4e42-b77c-4b2b9cb258eb).
+
+- [ ] Buy a Thermometer at a General Store. Its temperature should match the location/info popup; a second thermometer should not be carryable.
+- [ ] Note its position, adjust one Thermometer position percentage, and confirm only temperature moves within about a second—not the clock. Restore it. Report an incorrect reading, position or carry limit.
+
 ## comment 5550146729 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/240#issuecomment-5550146729

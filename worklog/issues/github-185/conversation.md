@@ -62,6 +62,18 @@ Water pumps should offer Hold E to drink and Hold R to refill the canteen, with 
 
 **Status: Incomplete.** Unvisited-pump coverage and missing scenario evidence still need preparation. The latest icon was rejected: redesign it around the recognizable pump head/handle in the established map style before asking for approval.
 
+## issue 5356303079 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/185
+
+Created: 2026-08-06T03:56:49Z; updated: 2026-09-06T13:57:48Z
+
+Exact metadata: [source record](sources/issue-5356303079-5d6cfdb033667fc9cbeff67167277cc74703e9c1b430dcf7d13b9c7c55ebdb80.json).
+
+Water pumps should offer Hold E to drink and Hold R to refill the canteen, with properly moving pump/player animations. Drinking restores the configured core amount; refilling does not.
+
+**Status: Incomplete.** Unvisited-pump coverage and missing scenario evidence still need preparation. The latest icon was rejected: redesign it around the recognizable pump head/handle in the established map style before asking for approval.
+
 ## comment 5550131633 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/185#issuecomment-5550131633

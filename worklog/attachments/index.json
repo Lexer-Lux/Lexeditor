@@ -1,236 +1,388 @@
 {
   "https://github.com/user-attachments/assets/030813af-38b2-42c8-a5f0-71a6291c0cb8": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 617457,
+    "path": "worklog/attachments/7f429c12e367d20b0cf2fd76b0b6e86c935ae76dc5bf58511b755125c2cfed33.png",
+    "sha256": "7f429c12e367d20b0cf2fd76b0b6e86c935ae76dc5bf58511b755125c2cfed33"
   },
   "https://github.com/user-attachments/assets/0cdef4cc-b45e-471e-b1f9-ff99bdef9f99": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 4499749,
+    "path": "worklog/attachments/1f30795df0aab37db5726917dcafbc06fe918e014e166b7e57d40cda00de06e5.png",
+    "sha256": "1f30795df0aab37db5726917dcafbc06fe918e014e166b7e57d40cda00de06e5"
   },
   "https://github.com/user-attachments/assets/10913fea-2033-4f74-84ff-d10bed86318c": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 91973,
+    "path": "worklog/attachments/d70ea8e4e20db8bc48d30df154f3b9e653241edb89022c337babb4b0a81eb210.png",
+    "sha256": "d70ea8e4e20db8bc48d30df154f3b9e653241edb89022c337babb4b0a81eb210"
   },
   "https://github.com/user-attachments/assets/13bf1c0b-f839-476b-bec8-47ba3d4827b3": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 36945,
+    "path": "worklog/attachments/1e58b51d2eda517225d685cedfd2bfef57818cf7a85db78c26bbd3bb30c7df78.png",
+    "sha256": "1e58b51d2eda517225d685cedfd2bfef57818cf7a85db78c26bbd3bb30c7df78"
   },
   "https://github.com/user-attachments/assets/1568edac-c364-4e8a-af31-a1d35188cae0": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 662152,
+    "path": "worklog/attachments/778fab0e5bd065dbc2c1b05de0b9ed54d208ab5989dc7798decdc1bcef8074bf.png",
+    "sha256": "778fab0e5bd065dbc2c1b05de0b9ed54d208ab5989dc7798decdc1bcef8074bf"
   },
   "https://github.com/user-attachments/assets/1704ecf8-041c-4e42-b77c-4b2b9cb258eb": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 15963,
+    "path": "worklog/attachments/6b292ec883c2ef5568a0c0e2fe493eb15286960945d165841ff77cde03ff4f37.png",
+    "sha256": "6b292ec883c2ef5568a0c0e2fe493eb15286960945d165841ff77cde03ff4f37"
   },
   "https://github.com/user-attachments/assets/1782daea-28c9-4f86-8708-06086065b254": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 4609339,
+    "path": "worklog/attachments/4e3970d454db2ab5856d6b941ee504c81b698e0bea3e2ce750698cb3d6f0dba3.png",
+    "sha256": "4e3970d454db2ab5856d6b941ee504c81b698e0bea3e2ce750698cb3d6f0dba3"
   },
   "https://github.com/user-attachments/assets/17fedf2f-e9cd-470e-b08c-36382e4fa0ff": {
     "error": "HTTP Error 404: Not Found"
   },
   "https://github.com/user-attachments/assets/190e9b5a-aa73-40b2-9086-f982e1f80b68": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 1560105,
+    "path": "worklog/attachments/9bfbdf232e663c82878dcf5ac32d260ff05ae7e28dcf7accc63e069a583c22ea.png",
+    "sha256": "9bfbdf232e663c82878dcf5ac32d260ff05ae7e28dcf7accc63e069a583c22ea"
   },
   "https://github.com/user-attachments/assets/1cdd39a8-beca-4ba2-945a-e943e9b367ef": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 67852,
+    "path": "worklog/attachments/e74439840777ef8c7c7830a8f6fc77ec4162b1767459b150086b4c4d03288c37.png",
+    "sha256": "e74439840777ef8c7c7830a8f6fc77ec4162b1767459b150086b4c4d03288c37"
   },
   "https://github.com/user-attachments/assets/1e54006b-5310-4f97-bf34-d7fd954ddde3": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 680433,
+    "path": "worklog/attachments/a7baadd00c3230b2f68c2c7521702cde28776bddb4929fa985f419571e0654f0.png",
+    "sha256": "a7baadd00c3230b2f68c2c7521702cde28776bddb4929fa985f419571e0654f0"
   },
   "https://github.com/user-attachments/assets/2113c729-ad0e-4c52-b256-6858ef5ac9cc": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 251352,
+    "path": "worklog/attachments/02daa5a0a207154697d4be5073ccc32429c93e54ac92acc9501fb0535a534936.png",
+    "sha256": "02daa5a0a207154697d4be5073ccc32429c93e54ac92acc9501fb0535a534936"
   },
   "https://github.com/user-attachments/assets/2364bde4-05d7-4c76-b294-1c64ee45893a": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 18406,
+    "path": "worklog/attachments/83a79588cb14f28cbddf403ca2562bbcd42670a73e70fb0595ad2db5cfe50991.png",
+    "sha256": "83a79588cb14f28cbddf403ca2562bbcd42670a73e70fb0595ad2db5cfe50991"
   },
   "https://github.com/user-attachments/assets/2cb4c718-13b6-4e27-8cbb-3c8f521e83c3": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 25074,
+    "path": "worklog/attachments/dbf8644aefb1d01ac6250afb54ca8c5d80d638c45f36d408810feb4ae242a575.png",
+    "sha256": "dbf8644aefb1d01ac6250afb54ca8c5d80d638c45f36d408810feb4ae242a575"
   },
   "https://github.com/user-attachments/assets/2de9f3aa-9dd0-46b0-91d0-5e56911f15b3": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 4748445,
+    "path": "worklog/attachments/5d5781dc2e7b4eeb7b409f5ada8e2bc08bcc41c5baefe2764296f4e5f787c1f4.png",
+    "sha256": "5d5781dc2e7b4eeb7b409f5ada8e2bc08bcc41c5baefe2764296f4e5f787c1f4"
   },
   "https://github.com/user-attachments/assets/2e3378bf-e7c8-4570-a84e-0eabf95e102b": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 140797,
+    "path": "worklog/attachments/78756086b4b9dc65d64c6eb1321bb5c95a9b69aa62aeac04a14fa4a7807531b1.png",
+    "sha256": "78756086b4b9dc65d64c6eb1321bb5c95a9b69aa62aeac04a14fa4a7807531b1"
   },
   "https://github.com/user-attachments/assets/2e82b3ff-6ede-42c4-a6f1-9c6f9e8d7e9f": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 2472968,
+    "path": "worklog/attachments/9554793a1eda18b6fa02b763feeccc45b3a45f0b54ed11cd4071c3acc9d3237f.png",
+    "sha256": "9554793a1eda18b6fa02b763feeccc45b3a45f0b54ed11cd4071c3acc9d3237f"
   },
   "https://github.com/user-attachments/assets/3193719f-e214-46f5-a091-edc7923bb59b": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 5716332,
+    "path": "worklog/attachments/44ce205efdfb0a0242c01b88667293e7b3bbc8bf30c50fe192ae19a8ba75adb4.png",
+    "sha256": "44ce205efdfb0a0242c01b88667293e7b3bbc8bf30c50fe192ae19a8ba75adb4"
   },
   "https://github.com/user-attachments/assets/385ed63b-25f8-4a5d-8246-9f8a0eb6ca30": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 11585,
+    "path": "worklog/attachments/0202a38ef8ecc85b24642c62b155013aef3eeb334257f3dad9b3c382976c4204.png",
+    "sha256": "0202a38ef8ecc85b24642c62b155013aef3eeb334257f3dad9b3c382976c4204"
   },
   "https://github.com/user-attachments/assets/3a9f20d0-cd48-4639-8092-e764a9bedff0": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 676004,
+    "path": "worklog/attachments/e6e69a812d2395c70c52cbbdfd89e9c8671f4550be0c10d92a40b919f8dcd3ba.png",
+    "sha256": "e6e69a812d2395c70c52cbbdfd89e9c8671f4550be0c10d92a40b919f8dcd3ba"
   },
   "https://github.com/user-attachments/assets/3ae140a7-da0c-4520-aecd-dfdb23fb2d20": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 50671,
+    "path": "worklog/attachments/039c2a58b6c3630c0768af74353c166407422900d9751d4fd7e010323394e1a9.png",
+    "sha256": "039c2a58b6c3630c0768af74353c166407422900d9751d4fd7e010323394e1a9"
   },
   "https://github.com/user-attachments/assets/3d2413b9-2006-4ef4-8781-00085ea5f585": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 149125,
+    "path": "worklog/attachments/bd7a5e78c06db9c69ad8a703cf6bcd8cfc6cebb821288c6723b04323dfd3074c.png",
+    "sha256": "bd7a5e78c06db9c69ad8a703cf6bcd8cfc6cebb821288c6723b04323dfd3074c"
   },
   "https://github.com/user-attachments/assets/3d2b2799-8016-4f76-8b16-e93e6561aae0": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 34897,
+    "path": "worklog/attachments/bd32f26dd669f389ef360cb6df290b4b718bf0c9c6817f8cc4decb8bf0ee69be.png",
+    "sha256": "bd32f26dd669f389ef360cb6df290b4b718bf0c9c6817f8cc4decb8bf0ee69be"
   },
   "https://github.com/user-attachments/assets/3f0b8782-0cc7-43ce-98b5-1df4a0e1919a": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 3579781,
+    "path": "worklog/attachments/2414b561af19881c5466e15df3578c4bab9b348a09cae6b9735f248978549a8b.png",
+    "sha256": "2414b561af19881c5466e15df3578c4bab9b348a09cae6b9735f248978549a8b"
   },
   "https://github.com/user-attachments/assets/3f4979c9-5140-4c57-9599-65acdb37ffed": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 7563190,
+    "path": "worklog/attachments/eb4f2584bbf2503984fc3c3b720a9260e0757103e5b95e14c19d3e51f6a88132.png",
+    "sha256": "eb4f2584bbf2503984fc3c3b720a9260e0757103e5b95e14c19d3e51f6a88132"
   },
   "https://github.com/user-attachments/assets/3f9dd761-2835-41ed-b842-e678d975f415": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 154141,
+    "path": "worklog/attachments/9b835cbfc52f6504ee8053fc5241cd8a5eeba524fca79ff8107c358ac360062a.png",
+    "sha256": "9b835cbfc52f6504ee8053fc5241cd8a5eeba524fca79ff8107c358ac360062a"
   },
   "https://github.com/user-attachments/assets/43d8c0ce-eaf3-41bd-a1df-0dbde0e5431d": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 599265,
+    "path": "worklog/attachments/72c29b1d5a85c12979381291276c17cadd4a94902459f3654754cc91e6340d7a.png",
+    "sha256": "72c29b1d5a85c12979381291276c17cadd4a94902459f3654754cc91e6340d7a"
   },
   "https://github.com/user-attachments/assets/4ae637fa-160a-4ba7-b647-aea133192a89": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 1743539,
+    "path": "worklog/attachments/4e50334a07561d1906a46f014e80c99b95d02a6bdb6a403fd8fd19ed4d11afac.png",
+    "sha256": "4e50334a07561d1906a46f014e80c99b95d02a6bdb6a403fd8fd19ed4d11afac"
   },
   "https://github.com/user-attachments/assets/4bed2d8a-d9a9-403d-a3ac-45cb496a4245": {
     "error": "HTTP Error 404: Not Found"
   },
   "https://github.com/user-attachments/assets/4d427c16-87ed-41ce-b0c6-0fa6e00310e5": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 11923,
+    "path": "worklog/attachments/2f1ee2efaea070f5e1c98f64c2ae9845270ea9f985f348eb056e574464d1d3f9.png",
+    "sha256": "2f1ee2efaea070f5e1c98f64c2ae9845270ea9f985f348eb056e574464d1d3f9"
   },
   "https://github.com/user-attachments/assets/4f6d70b0-6bfb-4e04-a51a-01f7532290ae": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 183873,
+    "path": "worklog/attachments/6cd99aea52ebf23b2468949b4618c524b0f7ac17e702923e766731aa5ef2a1bc.png",
+    "sha256": "6cd99aea52ebf23b2468949b4618c524b0f7ac17e702923e766731aa5ef2a1bc"
   },
   "https://github.com/user-attachments/assets/4fe5ae3a-825f-4639-8280-70cad18fe8d4": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 369041,
+    "path": "worklog/attachments/86ebdbd690db3134b84e8ce90ee8ee8c0a60c010e56b405a36eb53500dc7cd4d.png",
+    "sha256": "86ebdbd690db3134b84e8ce90ee8ee8c0a60c010e56b405a36eb53500dc7cd4d"
   },
   "https://github.com/user-attachments/assets/5107c16e-79ac-4d21-a986-a7abdc82dcb6": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 328974,
+    "path": "worklog/attachments/a55f420dea4cbc36917ad143d02b8ca27906a78d95d7eb977bdb0b628eee2878.png",
+    "sha256": "a55f420dea4cbc36917ad143d02b8ca27906a78d95d7eb977bdb0b628eee2878"
   },
   "https://github.com/user-attachments/assets/5467b69e-ecf5-41f1-b8d7-7fe05f800d19": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 175540,
+    "path": "worklog/attachments/e3b8a8beadfb5aa13d3ab31ac1f4469e5d91c48e67c2ed050ed50b82ade33b4a.png",
+    "sha256": "e3b8a8beadfb5aa13d3ab31ac1f4469e5d91c48e67c2ed050ed50b82ade33b4a"
   },
   "https://github.com/user-attachments/assets/551d4fbe-fb03-42bb-8ab7-f356c4911dd7": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 2549749,
+    "path": "worklog/attachments/012d221a8c72d0f7a5d7830b12ea0ac1c27f2f5bf2815d8d70df8340d7b67945.png",
+    "sha256": "012d221a8c72d0f7a5d7830b12ea0ac1c27f2f5bf2815d8d70df8340d7b67945"
   },
   "https://github.com/user-attachments/assets/55e6685d-295f-4430-aedf-09719f00cff5": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 22865,
+    "path": "worklog/attachments/8fb4eea3fb784a76c6167a525c98dfa968ac462bcdc976a3178e0db95fb5aab3.png",
+    "sha256": "8fb4eea3fb784a76c6167a525c98dfa968ac462bcdc976a3178e0db95fb5aab3"
   },
   "https://github.com/user-attachments/assets/5b084985-91a6-4055-bc72-3c9825128ba1": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 267001,
+    "path": "worklog/attachments/aad1b0a26fd0ccc1b5a1d35b7c0d5f06042ccbbbeb35d1159793640daa6d6693.png",
+    "sha256": "aad1b0a26fd0ccc1b5a1d35b7c0d5f06042ccbbbeb35d1159793640daa6d6693"
   },
   "https://github.com/user-attachments/assets/5b3e9b34-1d1c-4ffd-8464-679e65235833": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 12918,
+    "path": "worklog/attachments/5dc3383152501fe266100c47730d75bddc86687eea0d5248b95562e7806e9ada.png",
+    "sha256": "5dc3383152501fe266100c47730d75bddc86687eea0d5248b95562e7806e9ada"
   },
   "https://github.com/user-attachments/assets/600935f9-b9f2-487f-905e-d2654107548d": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 1744913,
+    "path": "worklog/attachments/32813f3567b46c86f8f4818b1c9f030af204e3eb1a553dd93c63ef5e1a2ea80e.png",
+    "sha256": "32813f3567b46c86f8f4818b1c9f030af204e3eb1a553dd93c63ef5e1a2ea80e"
   },
   "https://github.com/user-attachments/assets/6260ec20-878e-43ac-9632-857e53485ff3": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 184755,
+    "path": "worklog/attachments/04a56481cc9cac4f4caba00c94d03fa3596a84b28abde2c5fe9666bd8c2ab35f.png",
+    "sha256": "04a56481cc9cac4f4caba00c94d03fa3596a84b28abde2c5fe9666bd8c2ab35f"
   },
   "https://github.com/user-attachments/assets/6cad8b75-99bd-44b9-9662-6ece22dab960": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 2276310,
+    "path": "worklog/attachments/172aa49ad4672ae5c2da456771016d114bf47220ffe58583969d868fb95f1dfd.png",
+    "sha256": "172aa49ad4672ae5c2da456771016d114bf47220ffe58583969d868fb95f1dfd"
   },
   "https://github.com/user-attachments/assets/6eac8c93-ed26-4d14-a668-19afd1622a2f": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 6978560,
+    "path": "worklog/attachments/5a4b36e7edaa8c362b14429431e59b6188f342aafabdc4e51996e88629cb5514.png",
+    "sha256": "5a4b36e7edaa8c362b14429431e59b6188f342aafabdc4e51996e88629cb5514"
   },
   "https://github.com/user-attachments/assets/72722c4e-b454-4ca3-8d6a-2007d8928a1b": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 115039,
+    "path": "worklog/attachments/2b3e7b12913f6d403410f83410bdca161e5a631367e63c2df9c98918bd10e59f.png",
+    "sha256": "2b3e7b12913f6d403410f83410bdca161e5a631367e63c2df9c98918bd10e59f"
   },
   "https://github.com/user-attachments/assets/7348e9db-6026-4427-8b67-daf841b1d857": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 115343,
+    "path": "worklog/attachments/f6b3e077287ba565a681bcd19bc20b0c67786886e582b2c1dd301f41782068de.png",
+    "sha256": "f6b3e077287ba565a681bcd19bc20b0c67786886e582b2c1dd301f41782068de"
   },
   "https://github.com/user-attachments/assets/7624efef-3f60-483d-8f92-996b83ef879b": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 51816,
+    "path": "worklog/attachments/5b3eb099a9db5ad003f8f728bb3bb45aca203ac8af7ccb63c6aa9263a53c4130.png",
+    "sha256": "5b3eb099a9db5ad003f8f728bb3bb45aca203ac8af7ccb63c6aa9263a53c4130"
   },
   "https://github.com/user-attachments/assets/7a37867c-6600-4e1a-9b78-f5fc26357e43": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 530836,
+    "path": "worklog/attachments/dc197845499e0dce06d198eb04f4b4c1cfbdc635a77f7b745c8ae6c855e36294.jpg",
+    "sha256": "dc197845499e0dce06d198eb04f4b4c1cfbdc635a77f7b745c8ae6c855e36294"
   },
   "https://github.com/user-attachments/assets/7a5f2633-654f-4d91-adc9-c9661dfdb509": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 35299,
+    "path": "worklog/attachments/5a334f550ab608e35fb13ae088b99762d36ec1345736df03b722cc90d4a6d011.png",
+    "sha256": "5a334f550ab608e35fb13ae088b99762d36ec1345736df03b722cc90d4a6d011"
   },
   "https://github.com/user-attachments/assets/7c0d2d0f-5cc2-4df6-bd70-575403586afc": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 155580,
+    "path": "worklog/attachments/10ffe396b2e9a741e593cee5d15f7a1d9f6a8a6a0953b8240ccb377999f9bf9d.png",
+    "sha256": "10ffe396b2e9a741e593cee5d15f7a1d9f6a8a6a0953b8240ccb377999f9bf9d"
   },
   "https://github.com/user-attachments/assets/7cc507e3-5fd9-4c9a-a632-c03acac1b4b1": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 910835,
+    "path": "worklog/attachments/fdd915bd4e51bbebfe18e1e6be77eee9a0d7ff6529b37cfddf735e804cea7c80.png",
+    "sha256": "fdd915bd4e51bbebfe18e1e6be77eee9a0d7ff6529b37cfddf735e804cea7c80"
   },
   "https://github.com/user-attachments/assets/81f789df-99c8-4073-ae3c-5b324ac08dda": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 36113,
+    "path": "worklog/attachments/dc47ac7cdb51d89970087e11591d26e9facf80f3f8cfe47efe7a3b1cecfe5351.png",
+    "sha256": "dc47ac7cdb51d89970087e11591d26e9facf80f3f8cfe47efe7a3b1cecfe5351"
   },
   "https://github.com/user-attachments/assets/834e13a4-fa50-4c21-8fa8-a859d4550e32": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 35289,
+    "path": "worklog/attachments/7078e76185e79ae125690d757c4023bcd8e7ca3d9f1c95eef9c51fdd8c39a9c9.png",
+    "sha256": "7078e76185e79ae125690d757c4023bcd8e7ca3d9f1c95eef9c51fdd8c39a9c9"
   },
   "https://github.com/user-attachments/assets/8503fa4d-2522-4417-9c26-46b123b23d8f": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 864,
+    "path": "worklog/attachments/24c04819170352fc113a1f9255ec358f330af2422dcc9812fec6c27f0aa99df4.png",
+    "sha256": "24c04819170352fc113a1f9255ec358f330af2422dcc9812fec6c27f0aa99df4"
   },
   "https://github.com/user-attachments/assets/86fb47e9-f030-4399-aee8-bd7dcd48a368": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 16245,
+    "path": "worklog/attachments/bdba1ee82c26008f72ec036f76efe6c5cf15aba24c1ed89f4fd9101998664b40.png",
+    "sha256": "bdba1ee82c26008f72ec036f76efe6c5cf15aba24c1ed89f4fd9101998664b40"
   },
   "https://github.com/user-attachments/assets/88824de1-4966-4c26-b53e-e55ce2fcb7be": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 18131,
+    "path": "worklog/attachments/ee3d2e45f5fb2a5dfeb498bf6fc4441c4f0cae42fa54679f49a990614763f23b.png",
+    "sha256": "ee3d2e45f5fb2a5dfeb498bf6fc4441c4f0cae42fa54679f49a990614763f23b"
   },
   "https://github.com/user-attachments/assets/8ac99411-5f91-4229-95c4-6a6a16d6a1b4": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 1380940,
+    "path": "worklog/attachments/370147179d663620b5e6e2eff45566a2fe5087cf79280fed3d7f99ff5bbe28ef.png",
+    "sha256": "370147179d663620b5e6e2eff45566a2fe5087cf79280fed3d7f99ff5bbe28ef"
   },
   "https://github.com/user-attachments/assets/96d65a03-6274-4478-9b89-4efc0aa4ab19": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 5397918,
+    "path": "worklog/attachments/67a6429de533a3ebaaf9a7c3a2df14fbba3b3f0e2261485a5d2ac2df4518fdb8.png",
+    "sha256": "67a6429de533a3ebaaf9a7c3a2df14fbba3b3f0e2261485a5d2ac2df4518fdb8"
   },
   "https://github.com/user-attachments/assets/9adf08de-e638-4724-b39f-09efc1bb9023": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 187377,
+    "path": "worklog/attachments/1fb04766e7aa53b66375527b69b44fde74993077eb34333487f6fa27830a4540.png",
+    "sha256": "1fb04766e7aa53b66375527b69b44fde74993077eb34333487f6fa27830a4540"
   },
   "https://github.com/user-attachments/assets/9b587bbb-4bc0-489a-98b7-09f2e7e74e6f": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 2079871,
+    "path": "worklog/attachments/fc19b0246645013f3d42b75b7edf0424afcd97a64b4e079434cd43b69a260bd4.png",
+    "sha256": "fc19b0246645013f3d42b75b7edf0424afcd97a64b4e079434cd43b69a260bd4"
   },
   "https://github.com/user-attachments/assets/9f42b0ab-2c76-4a6a-a870-b2b392dc3cd2": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 4010722,
+    "path": "worklog/attachments/4926330f5ff3dce93abffc02750bb5c012a84dc2e798872dd6ed78ac91a47dea.png",
+    "sha256": "4926330f5ff3dce93abffc02750bb5c012a84dc2e798872dd6ed78ac91a47dea"
   },
   "https://github.com/user-attachments/assets/a04cda10-35be-4909-be3f-21a779712930": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 86073,
+    "path": "worklog/attachments/290ec8a6e5d8b07ff1a9ad0563706c1d95c0a55a84a20983b17d89f5769bbfad.png",
+    "sha256": "290ec8a6e5d8b07ff1a9ad0563706c1d95c0a55a84a20983b17d89f5769bbfad"
   },
   "https://github.com/user-attachments/assets/a93f03f8-1265-4ade-8789-02b69a5804f5": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 92455,
+    "path": "worklog/attachments/8e1311ff90a51ddb841a4c8b2dde7e024a3278bf4e39aa7e31ea9304be98c886.png",
+    "sha256": "8e1311ff90a51ddb841a4c8b2dde7e024a3278bf4e39aa7e31ea9304be98c886"
   },
   "https://github.com/user-attachments/assets/ab08786d-2578-495c-871c-78d68d6f3020": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 112220,
+    "path": "worklog/attachments/50b8c990b8024ff6d1d8034a077d9107fe292dd9e34be279ab3a57fb3c84164d.png",
+    "sha256": "50b8c990b8024ff6d1d8034a077d9107fe292dd9e34be279ab3a57fb3c84164d"
   },
   "https://github.com/user-attachments/assets/ac447b9d-042a-43fd-a463-44f446f3e7af": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 946024,
+    "path": "worklog/attachments/a8396a121e87b33c74ba04bb9fdadfda09d52bcfbfbd51c022a4e8ee53246dcf.png",
+    "sha256": "a8396a121e87b33c74ba04bb9fdadfda09d52bcfbfbd51c022a4e8ee53246dcf"
   },
   "https://github.com/user-attachments/assets/aea11b15-e17e-498b-b2a6-099dc1844950": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 5933069,
+    "path": "worklog/attachments/d0f1f05c7afc5d288a2babec465a6b3de9b1a9bb5e617d1364e13f88d8aa145f.png",
+    "sha256": "d0f1f05c7afc5d288a2babec465a6b3de9b1a9bb5e617d1364e13f88d8aa145f"
   },
   "https://github.com/user-attachments/assets/b4e3aa66-119e-432a-8999-df2fc7edeeb3": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 48140,
+    "path": "worklog/attachments/b9aa9f348cf2b786c0ebb250d2703127425b7715bda1e04f03382aff9097f2b2.png",
+    "sha256": "b9aa9f348cf2b786c0ebb250d2703127425b7715bda1e04f03382aff9097f2b2"
   },
   "https://github.com/user-attachments/assets/c91ff76e-ba1b-4bb3-ba77-92cbbb760ceb": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 119808,
+    "path": "worklog/attachments/108fe32d8ec0079cee2ac8c15c88cb82f52704ef6fb03c7ea09207d6818d1a13.png",
+    "sha256": "108fe32d8ec0079cee2ac8c15c88cb82f52704ef6fb03c7ea09207d6818d1a13"
   },
   "https://github.com/user-attachments/assets/cbdb32d4-8c21-4c2e-a5b6-9558dfe7f5f5": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 5495278,
+    "path": "worklog/attachments/c3f1bc87c774edfd943100fa32aeee667f5f6138d3d9803aea865908e3227277.png",
+    "sha256": "c3f1bc87c774edfd943100fa32aeee667f5f6138d3d9803aea865908e3227277"
   },
   "https://github.com/user-attachments/assets/d0a78ef2-c898-4d0d-9264-132be02fcd75": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 35733,
+    "path": "worklog/attachments/f8ebc1c18b8dd79debd9faf1b1bd60b4d5b73271d4383ee8e7c970a01860cec4.png",
+    "sha256": "f8ebc1c18b8dd79debd9faf1b1bd60b4d5b73271d4383ee8e7c970a01860cec4"
   },
   "https://github.com/user-attachments/assets/d3b24844-bceb-4f4e-8e49-dc75f593fd1e": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 258033,
+    "path": "worklog/attachments/ca9a73fea738c18cf29634c2da92a84a935c790dbd79a50ca0795502d862c602.png",
+    "sha256": "ca9a73fea738c18cf29634c2da92a84a935c790dbd79a50ca0795502d862c602"
   },
   "https://github.com/user-attachments/assets/d44d757d-1882-4906-8be9-00012b064019": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 79733,
+    "path": "worklog/attachments/24624516b46086f4fe104e1b7b219942bf16bb3102623c4e845473db6c7ec9d8.png",
+    "sha256": "24624516b46086f4fe104e1b7b219942bf16bb3102623c4e845473db6c7ec9d8"
   },
   "https://github.com/user-attachments/assets/db67d09e-1b58-4a08-9d79-78ade217dde5": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 71914,
+    "path": "worklog/attachments/3765026e3cc0537808e218afb64329175775d7363a4d56cf16ef13bf26e18458.png",
+    "sha256": "3765026e3cc0537808e218afb64329175775d7363a4d56cf16ef13bf26e18458"
   },
   "https://github.com/user-attachments/assets/e2420970-68cf-4a8a-82cf-88eba549fbdd": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 89774,
+    "path": "worklog/attachments/faf8265bd01ae704bac1526bd6bd5b9227f28d51c4f0f14cafb4416c28644259.png",
+    "sha256": "faf8265bd01ae704bac1526bd6bd5b9227f28d51c4f0f14cafb4416c28644259"
   },
   "https://github.com/user-attachments/assets/e8f35e06-eaa2-4660-8442-3cb36121534d": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 1393079,
+    "path": "worklog/attachments/54f47856e2017be7398483aa1367a42c0cc5f081280662cf2707ad743060803c.png",
+    "sha256": "54f47856e2017be7398483aa1367a42c0cc5f081280662cf2707ad743060803c"
   },
   "https://github.com/user-attachments/assets/ec12ecef-0324-459d-ae86-50d5e51b107f": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 1343408,
+    "path": "worklog/attachments/57d7c4d9f3f5070b6660b07bb41e91e846edb345d7b63b335ecb20775d948b7a.png",
+    "sha256": "57d7c4d9f3f5070b6660b07bb41e91e846edb345d7b63b335ecb20775d948b7a"
   },
   "https://github.com/user-attachments/assets/ec451ffc-34db-4b86-bf70-0bacf862888d": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 26195,
+    "path": "worklog/attachments/6d3ea49f713b97b91d069cbba65a9538bba1e94e5211c20ea6e9de81c8148b1d.png",
+    "sha256": "6d3ea49f713b97b91d069cbba65a9538bba1e94e5211c20ea6e9de81c8148b1d"
   },
   "https://github.com/user-attachments/assets/ef2e1e03-7bf4-474b-9fc9-b0ebc630332d": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 117645,
+    "path": "worklog/attachments/d13bda00e6907d4b365f7b2c23235a41a1f8df8ec4f26e9bc89402bd26459f83.png",
+    "sha256": "d13bda00e6907d4b365f7b2c23235a41a1f8df8ec4f26e9bc89402bd26459f83"
   },
   "https://github.com/user-attachments/assets/f2cc6c9a-0ae1-41cc-a20b-a22a95be708f": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 1430,
+    "path": "worklog/attachments/ac56dd5ed50588c5d1433acf1ea4dc078802a4837f76a949826c657895753369.png",
+    "sha256": "ac56dd5ed50588c5d1433acf1ea4dc078802a4837f76a949826c657895753369"
   },
   "https://github.com/user-attachments/assets/f79d3180-8d9e-4c64-bdd7-aed97cf3afd7": {
-    "error": "Unexpected attachment redirect host"
+    "bytes": 51569,
+    "path": "worklog/attachments/0a1738ad08bced36b2d0fc17e4adb5f0f6d4d131e052128a8fa96606535a5990.png",
+    "sha256": "0a1738ad08bced36b2d0fc17e4adb5f0f6d4d131e052128a8fa96606535a5990"
   }
 }

@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/251
 
 Created: 2026-08-10T15:28:55Z; updated: 2026-09-06T12:56:39Z
 
+Exact metadata: [source record](sources/issue-5356319949-4ca35f1661b712e6806c3068804fdfa7406d40db5d3bd71aeecc62a6f09a1c50.json).
+
+Releasing movement while climbing should stop the climbing cycle and settle into idle. Releasing Sprint while still moving must not count as releasing movement.
+
+**Status: The stop/rebind repair is source-only, and your latest test cannot grab walls at all.** Fix entry in #193 before asking you to test stopping mid-climb.
+
+## issue 5356319949 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/251
+
+Created: 2026-08-10T15:28:55Z; updated: 2026-09-06T12:56:39Z
+
 Exact metadata: [source record](sources/issue-5356319949-ee643618723ae864db6ec981e7fe3601f2b6907c684af172030c119f96a45b2e.json).
 
 Releasing movement while climbing should stop the climbing cycle and settle into idle. Releasing Sprint while still moving must not count as releasing movement.

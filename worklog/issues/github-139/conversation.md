@@ -29,6 +29,18 @@ Remove only Online and Social Club; keep the other pause-menu entries intact.
 
 **Status: The installed replacement emptied the entire menu.** A corrected file is prepared but was not installed because builds/installations were on hold. Deliver that correction before requesting another pause-menu test.
 
+## issue 5356293234 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/139
+
+Created: 2026-08-06T02:17:18Z; updated: 2026-09-06T13:54:31Z
+
+Exact metadata: [source record](sources/issue-5356293234-897fec9d43ca596fc76666083fcbfce461098505c630f69241da1ccf89fe5299.json).
+
+Remove only Online and Social Club; keep the other pause-menu entries intact.
+
+**Status: The installed replacement emptied the entire menu.** A corrected file is prepared but was not installed because builds/installations were on hold. Deliver that correction before requesting another pause-menu test.
+
 ## comment 5550120236 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/139#issuecomment-5550120236

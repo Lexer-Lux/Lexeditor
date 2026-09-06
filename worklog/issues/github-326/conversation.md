@@ -24,6 +24,18 @@ Exact metadata: [source record](sources/issue-5356486282-4676196bfc1928271ad482e
 
 Prepare a known ordinary damage/healing case that exceeds 9,999 and identify the delivered build before requesting a test. Full removal of every limit is not what the current implementation provides.
 
+## issue 5356486282 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/326
+
+Created: 2026-09-04T06:51:17Z; updated: 2026-09-06T12:59:59Z
+
+Exact metadata: [source record](sources/issue-5356486282-77747f0b25531d1d957d4674ae9f46b3a6457572f119b904aaf5f7f6d1a754c1.json).
+
+**Status: Implemented as a higher cap, not unlimited damage.** The current patch raises the normal 9,999 clamp to the game’s existing 60,000 path; it has not been accepted in battle.
+
+Prepare a known ordinary damage/healing case that exceeds 9,999 and identify the delivered build before requesting a test. Full removal of every limit is not what the current implementation provides.
+
 ## comment 5550347325 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/326#issuecomment-5550347325

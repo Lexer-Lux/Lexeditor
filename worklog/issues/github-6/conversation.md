@@ -49,6 +49,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/6
 
 Created: 2026-08-20T08:50:21Z; updated: 2026-09-06T12:44:52Z
 
+Exact metadata: [source record](sources/issue-5201525844-64b84a7d86808ad0d03d342b1f5dc0bb9af0f1b05b7776bed7220df39aabceb5.json).
+
+Items now supports multiple quick-select assignments with valid slot dropdowns, add/remove, undo and saving. Editor checks passed; your check remains.
+
+- [ ] Restart Lexeditor and use a test RDR2 mod. Open an item's Quick-select slots, add a permitted slot, then remove it; duplicate slots must be refused.
+- [ ] Save an assignment change and reopen the item. Confirm every assignment is retained and other items are unchanged; report the item and failed step.
+
+## issue 5201525844 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/6
+
+Created: 2026-08-20T08:50:21Z; updated: 2026-09-06T12:44:52Z
+
 Exact metadata: [source record](sources/issue-5201525844-cafb2bf7ee3768b0202dd5503364b2f8b6a2c91287b418fa2722a732108d77a3.json).
 
 Items now supports multiple quick-select assignments with valid slot dropdowns, add/remove, undo and saving. Editor checks passed; your check remains.

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356292236,
+    "number": 135,
+    "title": "Fix train detection before redesigning its markers",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/135"
+  },
+  "sha256": "b43ffb6a82e0e04fc3868229a23e67502487ac41feb5d57259d2d20d68b87c68",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-35.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

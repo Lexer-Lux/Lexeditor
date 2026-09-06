@@ -24,6 +24,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/230
 
 Created: 2026-08-07T08:48:05Z; updated: 2026-09-06T12:56:17Z
 
+Exact metadata: [source record](sources/issue-5356314646-71e7b99b45421c06361141196c38ac9b6a24501ba2bbae58d1cd97e313ecaed4.json).
+
+**Status: Dropped.** The tried effect controls pulse instead of holding a steady phase, and a generic custom vignette was explicitly rejected as a substitute.
+
+The failed implementation should remain removed. There is no pending player test.
+
+## issue 5356314646 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/230
+
+Created: 2026-08-07T08:48:05Z; updated: 2026-09-06T12:56:17Z
+
 Exact metadata: [source record](sources/issue-5356314646-809cf6dce80801533b0c39fe53397b1f1d7a1450c0efd55094a287438cd0cc30.json).
 
 **Status: Dropped.** The tried effect controls pulse instead of holding a steady phase, and a generic custom vignette was explicitly rejected as a substitute.

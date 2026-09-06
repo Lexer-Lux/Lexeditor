@@ -25,6 +25,19 @@ Items now has separate identity columns, a larger name/icon, centered Add, right
 - [ ] Restart Lexeditor and open RDR2 Items. Check Name/Item, ID, Group and Category columns, the full-width heading, and the lookup button above the preview eye.
 - [ ] Search, filter and select several items, then narrow the window. Confirm names and icons are not clipped and the controls do not overlap; report the affected item or control.
 
+## issue 5202442588 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/8
+
+Created: 2026-08-20T10:35:06Z; updated: 2026-09-06T12:44:57Z
+
+Exact metadata: [source record](sources/issue-5202442588-250df14bbc393d9773f9d63fc23299b17f56c158e0adc0a8e3fd25f43de565e4.json).
+
+Items now has separate identity columns, a larger name/icon, centered Add, right-aligned filters, and stacked lookup/preview buttons. Rendered checks passed.
+
+- [ ] Restart Lexeditor and open RDR2 Items. Check Name/Item, ID, Group and Category columns, the full-width heading, and the lookup button above the preview eye.
+- [ ] Search, filter and select several items, then narrow the window. Confirm names and icons are not clipped and the controls do not overlap; report the affected item or control.
+
 ## comment 5354783857 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/8#issuecomment-5354783857

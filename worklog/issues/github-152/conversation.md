@@ -33,6 +33,19 @@ Exact metadata: [source record](sources/issue-5356296222-32228652a5b725c0c279adc
 - [ ] Open Weapons → Cattleman Revolver. Expand several groups and scroll; confirm the details remain readable and do not trap scrolling in a hidden inner panel.
 - [ ] Type RECOIL into field search one letter at a time, then Backspace. Confirm focus and the caret stay in the search field and matching groups open. Report the failed step or screenshot.
 
+## issue 5356296222 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/152
+
+Created: 2026-08-06T02:37:03Z; updated: 2026-09-06T13:55:23Z
+
+Exact metadata: [source record](sources/issue-5356296222-8bd07e283764fbb6a0e9da146f736c2566792d29028cdd41c3acd995c5b1a9f6.json).
+
+**Status: Latest Weapons layout and search repairs are ready for review.** Unresolved fields remain explicitly unidentified.
+
+- [ ] Open Weapons → Cattleman Revolver. Expand several groups and scroll; confirm the details remain readable and do not trap scrolling in a hidden inner panel.
+- [ ] Type RECOIL into field search one letter at a time, then Backspace. Confirm focus and the caret stay in the search field and matching groups open. Report the failed step or screenshot.
+
 ## comment 5550123806 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/152#issuecomment-5550123806

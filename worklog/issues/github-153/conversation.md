@@ -24,6 +24,18 @@ After the final swig and stowing animation, grant one empty bottle and show its 
 
 **Status: Source cleanup is complete, but not built or installed.** The obsolete Force Acquisition Feed setting was removed from all settings surfaces. Deliver that candidate before another bottle test.
 
+## issue 5356296441 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/153
+
+Created: 2026-08-06T02:37:47Z; updated: 2026-09-06T13:54:51Z
+
+Exact metadata: [source record](sources/issue-5356296441-9764f85eb674a32d0bedc2ae28070c8871c5b486d76022b53324dfc8f5b79bb4.json).
+
+After the final swig and stowing animation, grant one empty bottle and show its real acquisition notification.
+
+**Status: Source cleanup is complete, but not built or installed.** The obsolete Force Acquisition Feed setting was removed from all settings surfaces. Deliver that candidate before another bottle test.
+
 ## comment 5550124046 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/153#issuecomment-5550124046

@@ -30,6 +30,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/317
 
 Created: 2026-08-29T14:44:24Z; updated: 2026-09-06T13:07:43Z
 
+Exact metadata: [source record](sources/issue-5356484756-250b0dd5fc8715e87f5e508639444e2208c221bf966da22a4c67b732ea8b36a1.json).
+
+**Status: Controls and patches are implemented; gameplay checks remain.** Use a copied save: Single GF intentionally clears a character’s existing multiple-GF junctions.
+
+- [ ] Enable Single GF, save and launch the copied save. Enter a field: a character with several GFs should lose those junctions; after adding one, adding a second must be refused. Removal/transfer should still work.
+- [ ] Disable it and relaunch: normal multi-GF junctioning should return.
+- [ ] Enable Auto-sort Inventory, rearrange items and reopen Item: expect normal sorting. Disable it and confirm order is retained. Report the failed check; battle-item ordering is separate in #308.
+
+## issue 5356484756 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/317
+
+Created: 2026-08-29T14:44:24Z; updated: 2026-09-06T13:07:43Z
+
 Exact metadata: [source record](sources/issue-5356484756-c108979f2ae1256c55e0895cbf88b92ef9afc1ec87d7922c14d0eac8ea1d73cb.json).
 
 **Status: Controls and patches are implemented; gameplay checks remain.** Use a copied save: Single GF intentionally clears a character’s existing multiple-GF junctions.

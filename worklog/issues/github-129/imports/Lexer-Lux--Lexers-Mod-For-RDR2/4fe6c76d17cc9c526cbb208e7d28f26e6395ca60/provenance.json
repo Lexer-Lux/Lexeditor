@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356290801,
+    "number": 129,
+    "title": "Compare animal density under controlled conditions",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/129"
+  },
+  "sha256": "8d3c4ba40bd72ce2f5274905dea004be1f65490e72ffe1b9520b4a7b0483c431",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-29.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -40,6 +40,18 @@ Character stat/XP curves, coefficient editing and live redraw are implemented. H
 
 **Work remains:** fix the overlapping graph title/formula and white bar-mode fill; ensure GF graphs share the same layout. The requested larger title must remain clear of the equation. These are implementation fixes, not a request for another design approval.
 
+## issue 5290322475 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/60
+
+Created: 2026-08-30T04:21:29Z; updated: 2026-09-06T12:45:30Z
+
+Exact metadata: [source record](sources/issue-5290322475-3466fa158a75c8eb65e4aad806cc5a16f1c7b5d02d853ac2aec25acff2f287d5.json).
+
+Character stat/XP curves, coefficient editing and live redraw are implemented. HP uses its appropriate larger range, not the original proposed 0–255 axis.
+
+**Work remains:** fix the overlapping graph title/formula and white bar-mode fill; ensure GF graphs share the same layout. The requested larger title must remain clear of the equation. These are implementation fixes, not a request for another design approval.
+
 ## comment 5466857149 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/60#issuecomment-5466857149

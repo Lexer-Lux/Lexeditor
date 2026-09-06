@@ -34,6 +34,19 @@ Exact metadata: [source record](sources/issue-5356291547-8b1a8dc91c39c8567045c56
 - [ ] In Story Mode, fire and reload a revolver, then look at the ejected casings in daylight and darkness. Confirm their glints are visible and staggered rather than synchronized.
 - [ ] Report whether the duration, size and opacity look suitable, with a short clip if timing still looks wrong. The exposed glint controls are for later tuning, not proof that the current look is accepted.
 
+## issue 5356291547 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/132
+
+Created: 2026-08-06T02:11:07Z; updated: 2026-09-06T13:56:02Z
+
+Exact metadata: [source record](sources/issue-5356291547-abe4baca2216a11a0e63c0585ecb6bba1980da58e2ace392d7c54ffd9cffe0c1.json).
+
+**Status: Glint timing and visual controls are installed; needs your check.** Casings should not all flash in lockstep.
+
+- [ ] In Story Mode, fire and reload a revolver, then look at the ejected casings in daylight and darkness. Confirm their glints are visible and staggered rather than synchronized.
+- [ ] Report whether the duration, size and opacity look suitable, with a short clip if timing still looks wrong. The exposed glint controls are for later tuning, not proof that the current look is accepted.
+
 ## comment 5550118231 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/132#issuecomment-5550118231

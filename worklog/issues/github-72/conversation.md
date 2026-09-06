@@ -18,6 +18,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/72
 
 Created: 2026-08-31T00:22:00Z; updated: 2026-09-06T13:06:58Z
 
+Exact metadata: [source record](sources/issue-5295171951-10206ced50c8b5809baafa6654d1db0dccdf1ebb5dbddee0769c5c21d7a07db7.json).
+
+**Status: Sound playback is implemented; the choices need your listening check.** FF8 has all six sound roles. FF7’s Launch sound remains unavailable rather than using a guessed substitute.
+
+- [ ] Restart Lexeditor with Sound on. In FF8 and FF7, move selection, confirm, go back and save a disposable edit. Check the sounds match the actions and are not doubled.
+- [ ] Turn Sound off and repeat: the editor should be silent. Restore your preference.
+- [ ] Report the game/action and any missing, unsuitable or repeated sound; do not count FF7 Launch as a new failure.
+
+## issue 5295171951 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/72
+
+Created: 2026-08-31T00:22:00Z; updated: 2026-09-06T13:06:58Z
+
 Exact metadata: [source record](sources/issue-5295171951-f5cb7bde3815b6be4610bb0502bf53566dbf96146b933ae7d53991492b407149.json).
 
 **Status: Sound playback is implemented; the choices need your listening check.** FF8 has all six sound roles. FF7’s Launch sound remains unavailable rather than using a guessed substitute.

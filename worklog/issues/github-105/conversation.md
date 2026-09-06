@@ -46,6 +46,18 @@ Keep the physical lantern on the belt when unlit. The radial controls its light;
 
 **Status: Latest repair is not built or installed.** Crouched radial availability still needs proper feedback, and brightness/range remain broken in #290. No final retest is ready.
 
+## issue 5356284862 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/105
+
+Created: 2026-08-06T01:29:26Z; updated: 2026-09-06T13:57:16Z
+
+Exact metadata: [source record](sources/issue-5356284862-9ff5af55c06497cb381a29f6c584976095afc4ea7324845f69e3c6ffb946976d.json).
+
+Keep the physical lantern on the belt when unlit. The radial controls its light; crouching uses the agreed dimmed behavior and standing restores the prior state. Mission lanterns remain unaffected.
+
+**Status: Latest repair is not built or installed.** Crouched radial availability still needs proper feedback, and brightness/range remain broken in #290. No final retest is ready.
+
 ## comment 5550110097 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/105#issuecomment-5550110097

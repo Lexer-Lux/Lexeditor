@@ -27,6 +27,18 @@ Give Health, Stamina and Dead Eye tonics upgradeable carried capacities. Store e
 
 **Status: Not ready.** The premature separate implementation was removed. Complete shared overflow storage in #126 before building this on it; there is nothing to retest yet.
 
+## issue 5356291059 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/130
+
+Created: 2026-08-06T02:08:01Z; updated: 2026-09-06T13:55:00Z
+
+Exact metadata: [source record](sources/issue-5356291059-26437108d00a8da4d9e035b8942ce8e75112daedeeda64918ce9bafd5eaf79bd.json).
+
+Give Health, Stamina and Dead Eye tonics upgradeable carried capacities. Store excess persistently and refill from highest-tier stock at camp or after death, warning when stock is insufficient.
+
+**Status: Not ready.** The premature separate implementation was removed. Complete shared overflow storage in #126 before building this on it; there is nothing to retest yet.
+
 ## comment 5550117695 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/130#issuecomment-5550117695

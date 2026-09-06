@@ -26,6 +26,18 @@ Every plugin needs consistent credits explaining contributions, with links and s
 
 **Partly implemented:** FF8 has credits, but link contrast needs repair. The shared presentation, other plugins and completeness checks still need work.
 
+## issue 5347101224 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/85
+
+Created: 2026-09-04T10:42:57Z; updated: 2026-09-06T12:45:53Z
+
+Exact metadata: [source record](sources/issue-5347101224-f377b7fdc45cec5c8c8c4b5fcf4068797c33d81db5222e676871103de00a36ca.json).
+
+Every plugin needs consistent credits explaining contributions, with links and separate license notices available offline.
+
+**Partly implemented:** FF8 has credits, but link contrast needs repair. The shared presentation, other plugins and completeness checks still need work.
+
 ## comment 5549895985 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/85#issuecomment-5549895985

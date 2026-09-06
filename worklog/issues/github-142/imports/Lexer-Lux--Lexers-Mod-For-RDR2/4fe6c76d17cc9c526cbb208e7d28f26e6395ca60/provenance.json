@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356293946,
+    "number": 142,
+    "title": "Per-cartridge projectile speed lacks a working runtime path",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/142"
+  },
+  "sha256": "0f99d1d8dbb5e054a2f6b13c8f5bfca2d46c31278c16b6e70f035a18e5b9708f",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-43.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

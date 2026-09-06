@@ -23,3 +23,15 @@ Exact metadata: [source record](sources/issue-5356489497-39c08258891bdb8dbfb78d9
 The shoulder-swap button should switch camera sides while John stays in cover. It must not depend only on the last movement direction or break aiming and normal camera controls.
 
 **Status: Work remains.** No ready-to-test implementation is recorded.
+
+## issue 5356489497 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/342
+
+Created: 2026-08-24T17:07:36Z; updated: 2026-09-06T12:39:03Z
+
+Exact metadata: [source record](sources/issue-5356489497-89c82e2e3fda5c631ba7604d7e551d0b92ede7d80985e16659c01184bfc852ed.json).
+
+The shoulder-swap button should switch camera sides while John stays in cover. It must not depend only on the last movement direction or break aiming and normal camera controls.
+
+**Status: Work remains.** No ready-to-test implementation is recorded.

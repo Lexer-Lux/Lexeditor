@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356288606,
+    "number": 120,
+    "title": "Check the shared development-mode toggle",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/120"
+  },
+  "sha256": "7fcf2c428c757e8d09a4b8133c387f58afeeca0c23f290cb7eb30d6bc6d6b1ba",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-20.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

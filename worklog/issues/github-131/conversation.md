@@ -34,6 +34,30 @@ Expose each drink’s real alcohol strength separately from its coarse drink-cla
 
 **Status: Reported broken.** The latest report says the numeric strengths all became 1. Restore and validate the real per-drink values before requesting another test.
 
+## issue 5356291314 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/131
+
+Created: 2026-08-06T02:10:38Z; updated: 2026-09-06T13:54:36Z
+
+Exact metadata: [source record](sources/issue-5356291314-a9f9a07ce153ca6ef520fca810d71f9f70c5c786e1b697a5d5885d8823e38714.json).
+
+Expose each drink’s real alcohol strength separately from its coarse drink-class tag. Preserve the requested strong-Moonshine behavior.
+
+**Status: Reported broken.** The latest report says the numeric strengths all became 1. Restore and validate the real per-drink values before requesting another test.
+
+## issue 5356291314 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/131
+
+Created: 2026-08-06T02:10:38Z; updated: 2026-09-06T15:00:37Z
+
+Exact metadata: [source record](sources/issue-5356291314-f97e897e17af3f52d05e48bad4e7727b646d7a2a4300b8a0f86d62774d07ca4c.json).
+
+Expose each drink’s real alcohol strength separately from its coarse drink-class tag. Preserve the requested strong-Moonshine behavior.
+
+**Status: Reported broken.** The latest report says the numeric strengths all became 1. Restore and validate the real per-drink values before requesting another test.
+
 ## comment 5550117968 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/131#issuecomment-5550117968
@@ -54,3 +78,17 @@ Exact metadata: [source record](sources/comment-5550117975-441d19fbefd6c0a62379e
 
 <img width="620" height="79" alt="Image" src="https://github.com/user-attachments/assets/4d427c16-87ed-41ce-b0c6-0fa6e00310e5" />
 wait before this i saw actual numerical values in the editor for booze. now every single one has been replaced with a 1. i don't understand what you did. was this already done and you just broke it?
+
+## comment 5560077142 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/131#issuecomment-5560077142
+
+Created: 2026-09-06T15:00:37Z; updated: 2026-09-06T15:00:37Z
+
+Exact metadata: [source record](sources/comment-5560077142-b56e9871a18c0a06333ceaa6f2a0d9e463ea7a5d242920f8eac8c3deb73d2b3a.json).
+
+Partial repair candidate in #364. Confirmed unsafe save behavior is fixed: the browser sends only edited drinks; the backend merges with current persisted overrides rather than overwriting unrelated newer values. Invalid/non-finite/out-of-range inputs are rejected, unknown saved entries cannot be silently dropped, missing baselines are explicit, and float round-trip precision is retained.
+
+The current source data has distinct per-drink strengths; the deliberate Moonshine=1 value is preserved. I did not reproduce the reported universal-1 display, so this is not a proven diagnosis of that original symptom. Regression tests cover sparse saves, unrelated concurrent changes, precision, invalid input, and unavailable baselines.
+
+The source PR is draft, with no full browser/visual acceptance performed. Keep this issue open/actionable pending comparison of the rendered values against the selected CSV. Existing requests and the new implementation handoff are retained.

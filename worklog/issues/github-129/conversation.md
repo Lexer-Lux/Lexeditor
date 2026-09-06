@@ -18,6 +18,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/129
 
 Created: 2026-08-06T02:05:32Z; updated: 2026-09-06T13:07:15Z
 
+Exact metadata: [source record](sources/issue-5356290801-95eecad0efe7b8ec024d64128096ba4aa5d3670c6345ea1da156b36ef47f7b16.json).
+
+**Status: The multiplier is active, but previous counts used uncontrolled conditions.** A proportional density change is not yet established; the fake population-budget setting stays removed.
+
+- [ ] In the same free-roam location and session, set Animal Density Multiplier to 999, wait two minutes, then set it to 2 and wait two more. Keep movement and observation area the same.
+- [ ] Restore your original value. Report whether density visibly changed and attach GameplayTweaks.log so the two intervals can be compared.
+
+## issue 5356290801 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/129
+
+Created: 2026-08-06T02:05:32Z; updated: 2026-09-06T13:07:15Z
+
 Exact metadata: [source record](sources/issue-5356290801-ed2dcf4de510434ac5a404a71e671d63ce03bfb270f35c1d9d163e66d518c8b0.json).
 
 **Status: The multiplier is active, but previous counts used uncontrolled conditions.** A proportional density change is not yet established; the fake population-budget setting stays removed.

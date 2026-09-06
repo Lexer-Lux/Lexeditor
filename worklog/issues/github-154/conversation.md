@@ -28,6 +28,18 @@ Exact metadata: [source record](sources/issue-5356296624-a9441054b545c1b1ecbcbf3
 
 Establish those meanings and add the missing explanations before asking you to choose spawn-delay values.
 
+## issue 5356296624 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/154
+
+Created: 2026-08-06T02:38:29Z; updated: 2026-09-06T13:55:40Z
+
+Exact metadata: [source record](sources/issue-5356296624-aed93de8e5d0a45f30372da5067500a31f70d2e4f509a30ef2aaed6a59d204fa.json).
+
+**Status: The editor exists, but its explanations are still incomplete.** The latest request is for help beside each wanted tier explaining what that particular tier means, not another generic definition of wanted level.
+
+Establish those meanings and add the missing explanations before asking you to choose spawn-delay values.
+
 ## comment 5550124290 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/154#issuecomment-5550124290
