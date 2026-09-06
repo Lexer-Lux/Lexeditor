@@ -20,6 +20,7 @@
     .ff7-info-grid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px}.ff7-info-grid code{overflow-wrap:anywhere}
     .ff7-map,.ff7-tweaks{display:flex;flex-direction:column;height:100%;min-height:0}.ff7-map-controls{display:flex;gap:8px;padding:0 0 var(--lex-panel-gap)}.ff7-map .lex-data-map-view{flex:1;min-height:0}
     .ff7-config-body{flex:1;min-height:0;overflow:auto}.ff7-config-error{padding:8px;border:1px solid var(--lex-border)}
+    .ff7-tweak-panel{display:flex;flex-direction:column;flex:1;min-height:0}
   </style>
 </head>
 <body>
@@ -125,9 +126,12 @@
       const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);
       if(field){field.value=value;state.platformRevision++;shellRefresh()}
     }});
-    return el("section",{class:"ff7-tweaks"},controls,
-      state.platformError?el("div",{class:"ff7-config-error",role:"alert"},state.platformError):null,
-      el("div",{class:"ff7-config-body"},view));
+    const tabs=el("nav",{class:"ff7-map-controls",role:"tablist","aria-label":"Tweaks sections"},
+      el("button",{type:"button",role:"tab",id:"ff7-ffnx-tab",class:"active","aria-selected":"true","aria-controls":"ff7-ffnx-panel"},"FFNx"));
+    return el("section",{class:"ff7-tweaks"},tabs,
+      el("section",{class:"ff7-tweak-panel",role:"tabpanel",id:"ff7-ffnx-panel","aria-labelledby":"ff7-ffnx-tab"},controls,
+        state.platformError?el("div",{class:"ff7-config-error",role:"alert"},state.platformError):null,
+        el("div",{class:"ff7-config-body"},view)));
   }
   function infoView(){
     const baseline=state.dashboard.baseline,sounds=LexeditorUI.sharedSettings()?.developerMode?LexeditorUI.soundCoverageTable(state.dashboard.themeSounds?.rows||[]):null;
