@@ -78,7 +78,6 @@ jobs:
           cmd /c "call `"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x86 && set > $env:RUNNER_TEMP\vcvars.txt"
           Get-Content "$env:RUNNER_TEMP\vcvars.txt" | ForEach-Object { if ($_ -match '^(.*?)=(.*)$') { Set-Content "env:\$($matches[1])" $matches[2] } }
           cmake -S ffnx -B ffnx/.build -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-D_DLL_VERSION=1.24.3-lexeditor51-runtime' "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/triplets" '-DVCPKG_TARGET_TRIPLET=x86-windows-static' '-DFFNX_DEPLOY_TO_GAME_DIRS=OFF' '-DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON' '-DFFNX_LEXEDITOR_LIVE_CONDITIONS=ON'
-          # Both gates are required by the already-shipped runtime contract.
           foreach ($gate in @('FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME','FFNX_LEXEDITOR_LIVE_CONDITIONS')) {
             if (-not (Select-String -Path ffnx/.build/CMakeCache.txt -Pattern "^${gate}:BOOL=ON$" -Quiet)) { throw "Required compile gate disabled: $gate" }
           }
@@ -100,12 +99,12 @@ jobs:
           cmake --build ffnx/.build --config Release --parallel 4
           Copy-Item ffnx/.build/bin/FFNx.dll candidate/AF3DN.P
           Copy-Item ffnx/.build/bin/FFNx.pdb candidate/FFNx.pdb
-          Copy-Item ffnx/LICENSE candidate/LICENSE
+          Copy-Item ffnx/COPYING.TXT candidate/LICENSE
           "Editor source: $env:GITHUB_SHA" | Set-Content candidate/BUILD.txt
           'FFNx source: c056db2783f376a340fcefa6a48cc33618998876' | Add-Content candidate/BUILD.txt
           'MSVC x86 Release; static Release-only dependencies; Shared Magic and Live Conditions compiled; game deployment disabled.' | Add-Content candidate/BUILD.txt
           Get-FileHash candidate/* -Algorithm SHA256 | Format-Table -AutoSize | Out-String -Width 300 | Add-Content candidate/BUILD.txt
-          python ffnx/tools/verify_issue51_runtime_artifact.py candidate/AF3DN.P
+          python editor/tools/verify_ff8_linked_runtime.py --verifier ffnx/tools/verify_issue51_runtime_artifact.py --driver candidate/AF3DN.P
       - uses: actions/upload-artifact@v4
         if: success()
         with:
