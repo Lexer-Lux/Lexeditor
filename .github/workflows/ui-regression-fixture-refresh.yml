@@ -1,0 +1,66 @@
+name: UI regression fixture refresh
+
+on:
+  push:
+    branches: [fix/ui-standardization-20260906]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ui-standardization-20260906
+          fetch-depth: 0
+      - name: Refresh identity-only settings fixture and Data Map diagnostics
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('tools/verify_main_menu_visual_22.py')
+          t=p.read_text(encoding='utf-8')
+          t=t.replace("window.__testSettings={developerMode:false,lexerMode:true,lexerAuthorized:true,lexerLogin:'Lexer-Lux',", "window.__testSettings={developerMode:true,developerAuthorized:true,developerLogin:'Lexer-Lux',")
+          t=t.replace("defaultValues:{developerMode:false,", "defaultValues:{")
+          t=t.replace('save_lexer_setting_defaults:async defaults=>', 'save_developer_setting_defaults:async defaults=>')
+          t=t.replace("wait_eval(cdp, \"document.querySelectorAll('.lex-settings-lane').length===3\", 10)", "wait_eval(cdp, \"document.querySelectorAll('.lex-settings-lane').length===2\", 10)")
+          start=t.index('        settings_layout = cdp.eval(')
+          end=t.index('        setting_geometry = cdp.eval(', start)
+          replacement='''        settings_layout = cdp.eval("""(()=>{const lanes=[...document.querySelectorAll('.lex-settings-lane')],positions=lanes.map(node=>node.getBoundingClientRect().left),defaults=[...document.querySelectorAll('.lex-setting-default-control:not([hidden])')],user=document.querySelector('.lex-settings-lane-user'),developer=document.querySelector('.lex-settings-lane-developer');const current=document.querySelector('#lex-updateCheckFrequency'),target=document.querySelector('#lex-default-updateCheckFrequency');current.value='weekly';current.closest('.lex-global-setting').querySelector('.lex-setting-copy').dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));const sample=defaults[0],sampleStyle=getComputedStyle(sample),label=sample.querySelector(':scope>span'),checkbox=document.querySelector('.lex-setting-default-control input[type=checkbox]'),number=document.querySelector('.lex-setting-default-control input[type=number]'),identity=document.querySelector('.lex-developer-identity');return{headings:lanes.map(node=>node.querySelector('h3').textContent),positions,defaults:defaults.length,copied:target.value,rarity:document.querySelector('#lex-default-globalMessageRarity')?.value,transitionMinimum:document.querySelector('#lex-default-loadingTransitionMinimumSeconds')?.value,authorized:identity?.textContent.includes('DEVELOPER MODE ACTIVE'),userBg:getComputedStyle(user).backgroundColor,developerBg:getComputedStyle(developer).backgroundColor,paired:defaults.every(node=>node.closest('.lex-global-setting')),defaultLabel:label?.textContent,defaultLabelColor:getComputedStyle(label).color,defaultBorder:sampleStyle.borderTopWidth,defaultBackground:sampleStyle.backgroundColor,checkboxAccent:getComputedStyle(checkbox).accentColor,numberBorder:getComputedStyle(number).borderTopColor}})()""")
+        assert settings_layout["headings"] == ["GLOBAL SETTINGS", "LEXEDITOR DEVELOPER SETTINGS"], settings_layout
+        assert settings_layout["positions"] == sorted(settings_layout["positions"]), settings_layout
+        assert settings_layout["defaults"] >= 8 and settings_layout["copied"] == "weekly" and settings_layout["paired"], settings_layout
+        assert settings_layout["rarity"] == "3", settings_layout
+        assert settings_layout["transitionMinimum"] == "1.5", settings_layout
+        assert cdp.eval("document.querySelector('#lex-absentGameDesaturationPercent')===null&&document.querySelector('#lex-default-absentGameDesaturationPercent').value==='75'"), settings_layout
+        assert settings_layout["authorized"] and settings_layout["userBg"] != settings_layout["developerBg"], settings_layout
+        assert settings_layout["defaultLabel"] == "DEFAULT" and settings_layout["defaultBorder"] == "0px", settings_layout
+        assert settings_layout["defaultBackground"] == "rgba(0, 0, 0, 0)", settings_layout
+        assert settings_layout["checkboxAccent"] == "rgb(157, 93, 204)" and settings_layout["numberBorder"] == "rgb(157, 93, 204)", settings_layout
+'''
+          t=t[:start]+replacement+t[end:]
+          p.write_text(t,encoding='utf-8',newline='\n')
+
+          p=Path('tests/data_map_browser_check.py')
+          t=p.read_text(encoding='utf-8')
+          old="""                page.set_content(html_for(game),wait_until='domcontentloaded')\n                if game=='blank':\n"""
+          new="""                page.set_content(html_for(game),wait_until='domcontentloaded')\n                if page.evaluate('typeof state') == 'undefined' and game != 'blank':\n                    raise AssertionError((game,width,height,'plugin state missing',errors,page.locator('body').inner_text()[:1200]))\n                if game=='blank':\n"""
+          if old not in t: raise SystemExit('data map diagnostic anchor missing')
+          p.write_text(t.replace(old,new,1),encoding='utf-8',newline='\n')
+          PY
+      - name: Validate edits
+        run: |
+          python -m compileall -q tools/verify_main_menu_visual_22.py tests/data_map_browser_check.py
+          grep -q 'LEXEDITOR DEVELOPER SETTINGS' tools/verify_main_menu_visual_22.py
+          ! grep -q 'save_lexer_setting_defaults' tools/verify_main_menu_visual_22.py
+          grep -q 'plugin state missing' tests/data_map_browser_check.py
+      - name: Commit fixture refresh
+        run: |
+          git rm -f .github/workflows/ui-regression-fixture-refresh.yml
+          git config user.name 'Lexeditor UI maintenance'
+          git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+          git add tools/verify_main_menu_visual_22.py tests/data_map_browser_check.py
+          git commit -m 'Refresh UI regressions for identity-only Developer Mode'
+          git push origin HEAD:fix/ui-standardization-20260906
