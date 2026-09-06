@@ -25,7 +25,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p verification
-          git archive --format=zip HEAD > verification/source.zip
+          python3 - <<'PY'
+          import pathlib,subprocess,zipfile,json,hashlib
+          text={'.py','.js','.mjs','.cjs','.css','.html','.json','.jsonl','.txt','.md','.yml','.yaml','.toml','.ini','.spec','.ps1','.cmd','.bat','.sh','.xml','.svg','.csv','.h','.hpp','.cpp','.c','.cs','.csproj','.gitignore','.gitattributes'}
+          images={'.png','.jpg','.jpeg','.ico','.icns','.webp'}
+          manifest=[]
+          with zipfile.ZipFile('verification/source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for name in subprocess.check_output(['git','ls-files','-z']).decode().split('\0'):
+                  p=pathlib.Path(name)
+                  if not name or not p.is_file() or p.is_symlink():continue
+                  data=p.read_bytes(); allowed=p.suffix.lower() in text or p.name in {'LICENSE','NOTICE','.gitignore','.gitattributes'} or p.suffix.lower() in images and len(data)<2000000
+                  manifest.append({'path':name,'bytes':len(data),'sha256':hashlib.sha256(data).hexdigest(),'included':allowed})
+                  if allowed:z.writestr(name,data)
+          pathlib.Path('verification/source-manifest.json').write_text(json.dumps(manifest))
+          PY
           gh api --paginate --slurp 'repos/Lexer-Lux/Lexeditor/issues?state=all&per_page=100' > verification/issues-pages.json
           gh api --paginate --slurp 'repos/Lexer-Lux/Lexeditor/issues/comments?per_page=100' > verification/comments-pages.json
           gh api 'repos/Lexer-Lux/Lexeditor/pulls?state=open&per_page=100' > verification/pulls.json
