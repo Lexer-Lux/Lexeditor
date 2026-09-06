@@ -4,12 +4,14 @@
 
 ## Requirements and decisions
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+This tweak raises the ordinary 9,999 clamp to FF8's existing 60,000 path. It is a higher cap, not unlimited damage, and acceptance needs both a >9,999 case and a >60,000 clamp case.
 
 ## Current implementation and evidence
 
-Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
+The supported Steam-English executable guard/static contract passed privately on 2026-09-06. Enabled and disabled states persist and compose correctly in the activated gameplay-settings patch. Formula/weapon controls provide a deterministic way to prepare ordinary physical damage above both thresholds; automated checks do not establish displayed in-battle damage.
+
+The live issue is now `untested` with an ordinary gunblade damage setup, a 60,000 clamp check, and the disabled-tweak 9,999 control.
 
 ## Next agent work
 
-Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+No implementation work is currently known. Close only after the in-game ordinary-damage checks confirm >9,999 output, the 60,000 ceiling, and restoration of the vanilla clamp when disabled.

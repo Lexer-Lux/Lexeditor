@@ -4,12 +4,14 @@
 
 ## Requirements and decisions
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+When any living party member is command-ready, other party and enemy ATB gauges stop filling. Filling resumes only when nobody is ready. Animations and unrelated battle work must continue.
 
 ## Current implementation and evidence
 
-Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
+The True ATB Wait runtime hook is integrated into FF8 gameplay-settings patch generation. On 2026-09-06 the supported Steam-English executable hook/guard contract passed privately, and the full Save/activation persistence/composition verifier passed with the tweak enabled and disabled. No game executable was published and automated checks do not establish observed battle behavior.
+
+The live issue is now `untested` with a controlled battle setup using visibly different Speed values.
 
 ## Next agent work
 
-Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+No implementation work is currently known. Human acceptance must observe gauge freezing while a living character is command-ready, continued animations, persistence while another character is already ready, and resumption when nobody is ready, with the disabled tweak as control.

@@ -4,12 +4,14 @@
 
 ## Requirements and decisions
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+Vibration Consolidation skips FFNx's extra one-item Vibration pause screen while preserving ordinary pause/resume behavior and the Config menu's Vibration setting. Keep field and battle paths separate in acceptance testing.
 
 ## Current implementation and evidence
 
-Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
+The tweak is integrated into FF8 gameplay-settings Hext generation and activation. On 2026-09-06 the supported Steam-English `FF8_EN.exe` guard and Vibration static contract passed privately, and the full gameplay-settings persistence/composition verifier passed through the real Save/activation path. No executable or game asset was published.
+
+The live issue was moved from `actionable` to `untested`: an implemented candidate and a concrete player checklist now exist, but no in-game acceptance is claimed.
 
 ## Next agent work
 
-Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+No implementation work is currently known. Preserve the issue's field pause, battle pause, stuck-rumble and Config checks; close only after those are observed in game or after a newly reported failure is repaired.
