@@ -100,14 +100,14 @@ COVERAGE = [
      "Weapons edits supported weapon and ammo scalar fields while preserving the required layered stack."),
     ("*weapon_*.ymt", "partial", "weapons",
      "Weapons edits supported override records in the layered weapon stack."),
-    ("*weaponcomponents.meta", "partial", "weapons",
-     "Weapons preserves and writes supported component layers; not every component field has a dedicated control."),
-    ("*patch_weaponcomponents.meta", "partial", "weapons",
-     "Weapons preserves and writes supported component layers; not every component field has a dedicated control."),
-    ("*003_weaponcomponents.meta", "partial", "weapons",
-     "Weapons preserves and writes supported component layers; not every component field has a dedicated control."),
-    ("*004_weaponcomponents.meta", "partial", "weapons",
-     "Weapons preserves and writes supported component layers; not every component field has a dedicated control."),
+    ("*weaponcomponents.meta", "not-integrated", None,
+     "Preserved by the layered resource stack. No dedicated component-record browser or editor is connected."),
+    ("*patch_weaponcomponents.meta", "not-integrated", None,
+     "Preserved by the layered resource stack. No dedicated component-record browser or editor is connected."),
+    ("*003_weaponcomponents.meta", "not-integrated", None,
+     "Preserved by the layered resource stack. No dedicated component-record browser or editor is connected."),
+    ("*004_weaponcomponents.meta", "not-integrated", None,
+     "Preserved by the layered resource stack. No dedicated component-record browser or editor is connected."),
 ]
 
 
@@ -121,7 +121,7 @@ PROJECT_ROWS = [
     ("custom_crafting_recipes.tsv", "Custom crafting recipes, ingredients, outputs, stations, and unlocks.",
      "Editable from Crafting > Custom with validation.", "integrated", "crafting"),
     ("projectile_speed_multipliers.csv", "Per-cartridge projectile-speed multipliers used by the runtime.",
-     "Editable only when the runtime switching contract is available.", "partial", "weapons"),
+     "Weapons > Projectile speed shows the proved mapping read-only; per-cartridge writes are disabled because runtime switching is not implemented.", "partial", "weapons"),
     ("honor_actions.csv", "Honor values for supported player actions.",
      "Editable from Crime & Law.", "integrated", "crime"),
     ("merchant_buy_overrides.csv", "Per-merchant accept, reject, or vanilla item overrides.",
@@ -310,6 +310,7 @@ def _add(rows: OrderedDict[str, dict], filename: str, controls: str, notes: str,
         "controls": controls,
         "notes": context,
         "status": status,
+        "coverage": "structured" if target else "unavailable",
         "target": target,
         "openable": target is not None,
     }
@@ -413,10 +414,12 @@ def build_data_map(path: Path) -> dict:
             "controls": controls,
             "notes": notes,
             "status": status,
+            "coverage": "structured" if target else "unavailable",
             "target": target,
-            "openable": True,
+            "openable": target is not None,
         }
 
+    rows["projectile_speed_multipliers.csv"]["coverage"] = "view"
     values = sorted(rows.values(), key=lambda row: row["filename"].casefold())
     counts = {status: sum(row["status"] == status for row in values)
               for status in ("integrated", "partial", "not-integrated")}

@@ -1,22 +1,24 @@
-# #97 — Play without a game window
+# #97 — Stock and WSE2 Play
 
-Branch: `fix/warband-issue-batch`. Latest request resumes the deferred Warband queue.
+The previous WSE2-only boundary is removed. Stock startup now selects the exact
+installed module in its owned native launcher, not a guessed command-line flag
+or name-only filesystem match. Selection is read back after CBN_SELCHANGE; only
+real Play control 1029 is activated. Job assignment occurs before the suspended
+process runs, so immediate child handoff is contained. Readiness excludes dialogs,
+launcher controls and windows from other executables. Errors/timeouts clean up
+only this job; failed cleanup retains ownership and Stop remains usable.
 
-Implemented a plugin-specific process controller, selected-module resolution,
-direct WSE2 arguments, owned Windows Job Object tracking, stable visible-window
-readiness, early-exit/timeout cleanup, and owned-job Stop. Shared host behavior is
-unchanged for plugins without the optional factory.
+Tests: `python -m unittest discover -s tests -p 'test_warband*.py' -v`.
+`test_warband_native.py` adds stock/WSE routing and real Windows GUI fixtures:
+exact module selection, decoy exclusion, unrelated-window isolation, failure
+cleanup, and immediate child-process handoff. These fixtures are not the game.
 
-Remaining agent work: native/stock Warband launch is not implemented. The branch
-fails explicitly when WSE2 is absent; do not close this issue or call it wholly fixed.
-Window detection is a readiness heuristic, not campaign acceptance.
+The native route has no new dependency or separately built runtime artifact.
+Final cross-platform CI and master integration must be recorded before calling
+this delivered. Actual Warband/Steam/WSE2 acceptance remains a prepared human test.
 
-Validation: fake-job tests cover success, handoff, failure, timeout, stale status,
-spaces in module names and installed aliases. Windows-only tests exercise a real
-owned process and host delegation. Linux cannot validate Win32 APIs or the game.
-
-Prepared owner test (WSE2 path): open this branch in a separate checkout; select
-an installed source mod in Warband, press Play, confirm that mod's menu and load a
-save. Press Stop and check all owned game windows close and Play returns. Repeat
-with a disposable module that fails loading; expect an error, never a latched Stop.
-Report module name, executable/version, visible error and WSE2 log on failure.
+Test after updating master and restarting Lexeditor: select a built installed mod,
+press Play, confirm that mod's menu and a loaded save, then Stop. Repeat for a
+stock installation without WSE2 and for WSE2 when available. A broken disposable
+module must restore Play with an error. Report module name, executable/version,
+visible error and rgl_log.txt/WSE2 log. No live save or game asset is edited by Play.

@@ -277,24 +277,15 @@
   const coverageNames={structured:"Structured editable",view:"Read-only view",source:"Source only",unavailable:"Unavailable"};
   function renderDataMap(){
     document.querySelector(".lex-source-dialog")?.closest(".lex-dialog-backdrop")?.remove();
-    const rows=sorted(search(state.datamap.rows,state.filters.datamap,["filename","controls","notes"]),"datamap")
-      .filter(row=>!state.filters.mapStatus||row.coverage===state.filters.mapStatus);
-    const filter=el("select",{"aria-label":"Editor coverage",onchange:e=>{state.filters.mapStatus=e.target.value;state.pages.datamap=0;state.selectedMap="";renderDataMap();}},
-      el("option",{value:""},"All coverage"),...Object.entries(coverageNames).map(([value,label])=>el("option",{value,selected:value===state.filters.mapStatus},label)));
-    const detail=row=>row?detailPanel({className:"detail",title:row.filename,body:[
-      el("strong",{},coverageNames[row.coverage]),el("p",{},row.controls),el("p",{},row.notes),
-      row.view?el("button",{class:"lex-button",onclick:()=>navigate(row.view)},row.coverage==="structured"?"Open editor":"Open read-only view"):null,
-      row.openable?el("button",{class:"lex-button",onclick:()=>selectCatalog(row)},"Edit source"):null]}):detailPanel({title:"No matching files"});
-    $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({rows,key:row=>row.filename,slots:false,fit:{minRowHeight:36},
-      page:state.pages.datamap,pageSize:state.pageSizes.datamap||20,selected:state.selectedMap,noun:"files",
-      splitKey:"warband-datamap",className:"warband-paged-table",defaultSplit:52,
-      search:{key:"warband-datamap",value:state.filters.datamap,placeholder:"Search data files…",change:value=>{state.filters.datamap=value;state.pages.datamap=0;state.selectedMap="";renderDataMap();}},filters:[filter],
-      master:({rows,selected,select})=>columnList({rows,key:row=>row.filename,selected,select,selectedClass:"selected",class:"warband-record-list",
-        columns:[{key:"filename",label:"File",sortable:true},{key:"coverage",label:"Coverage",render:row=>coverageNames[row.coverage]}],
-        sortState:{key:state.sorts.datamap[0],dir:state.sorts.datamap[1]},sort:key=>sort("datamap",key)}),detail,
-      sync:next=>{state.pages.datamap=next.page;state.pageSizes.datamap=next.pageSize;state.selectedMap=next.selected||"";},
-      change:next=>{state.pages.datamap=next.page;state.pageSizes.datamap=next.pageSize;state.selectedMap=next.selected||"";renderDataMap();}}));
+    const view=LexeditorUI.dataMap({rows:state.datamap.rows,query:state.filters.datamap,
+      status:state.filters.mapStatus,page:state.pages.datamap,sort:state.sorts.datamap,
+      tableClass:"warband-record-list",open:row=>navigate(row.view),openSource:selectCatalog,
+      changeQuery:value=>{state.filters.datamap=value;state.pages.datamap=0;renderDataMap()},
+      changeStatus:value=>{state.filters.mapStatus=value;state.pages.datamap=0;renderDataMap()},
+      changePage:value=>{state.pages.datamap=value;renderDataMap()},
+      changeSort:key=>sort("datamap",key)});
+    state.pages.datamap=view.page;$("#toolbar").replaceChildren(...view.controls);
+    $("#main").replaceChildren(view.content);
     const dialog=sourceDialog();if(dialog)document.body.append(dialog);
   }
 

@@ -1,4 +1,4 @@
-"""Selected-module WSE2 launch with owned-process and visible-window checks.
+"""Selected-module stock/WSE2 launch with owned-process and visible-window checks.
 
 Do not invoke the auto-updating WSE2 launcher, guess stock Warband command-line
 switches, or report a Popen handle as evidence of a game window.
@@ -14,7 +14,7 @@ import threading
 import time
 
 
-def launch_command(game_root: Path, project: Path) -> list[str]:
+def installed_module(game_root: Path, project: Path) -> str:
     game_root, project = game_root.resolve(), project.resolve()
     module = project if (project / "module.ini").is_file() else project / "Module"
     if not (module / "module.ini").is_file():
@@ -27,11 +27,46 @@ def launch_command(game_root: Path, project: Path) -> list[str]:
         raise RuntimeError("The selected module is not installed under this game's Modules folder. Play will not start a different mod.")
     if len(candidates) != 1:
         raise RuntimeError("Several installed module names point to this project. Keep one unambiguous installed module before Play.")
-    executable = game_root / "mb_warband_wse2.exe"
+    return candidates[0].name
+
+
+def launch_command(game_root: Path, project: Path) -> list[str]:
+    module = installed_module(game_root, project)
+    executable = game_root.resolve() / "mb_warband_wse2.exe"
+    if executable.is_file():
+        return [str(executable), "--module", module, "--no-intro"]
+    executable = game_root.resolve() / "mb_warband.exe"
     if not executable.is_file():
-        raise RuntimeError("Direct selected-mod launching currently requires an installed mb_warband_wse2.exe. Stock Warband launching is not yet verified; no game was started.")
-    # WSE2 author-documented syntax. argv keeps module names with spaces intact.
-    return [str(executable), "--module", candidates[0].name, "--no-intro"]
+        raise RuntimeError("Neither mb_warband.exe nor mb_warband_wse2.exe exists in the selected game folder.")
+    # Stock uses its real launcher, not unverified command-line flags.
+    return [str(executable)]
+
+
+class _OwnedProcess:
+    """Small handle wrapper; the primary thread stays suspended until job assignment."""
+    def __init__(self, handle, pid, api):
+        self._handle, self.pid, self._api = handle, pid, api
+        self.returncode = None
+
+    def poll(self):
+        if self.returncode is None and self._api.WaitForSingleObject(self._handle, 0) == 0:
+            self.returncode = self._api.GetExitCodeProcess(self._handle)
+        return self.returncode
+
+    def wait(self, timeout=None):
+        milliseconds = 0xFFFFFFFF if timeout is None else max(0, int(timeout * 1000))
+        if self._api.WaitForSingleObject(self._handle, milliseconds) == 258:
+            raise subprocess.TimeoutExpired("Warband", timeout)
+        return self.poll()
+
+    def terminate(self):
+        if self.poll() is None:
+            self._api.TerminateProcess(self._handle, 1)
+
+    def close(self):
+        if self._handle:
+            self._api.CloseHandle(self._handle)
+            self._handle = None
 
 
 class WindowsGameJob:
@@ -54,20 +89,46 @@ class WindowsGameJob:
         u.GetClientRect.argtypes=[wintypes.HWND,ctypes.POINTER(wintypes.RECT)];u.GetClientRect.restype=wintypes.BOOL
         u.GetClassNameW.argtypes=[wintypes.HWND,wintypes.LPWSTR,ctypes.c_int];u.GetClassNameW.restype=ctypes.c_int
         u.GetWindow.argtypes=[wintypes.HWND,wintypes.UINT];u.GetWindow.restype=wintypes.HWND
+        u.GetDlgItem.argtypes=[wintypes.HWND,ctypes.c_int];u.GetDlgItem.restype=wintypes.HWND
         self.handle=k.CreateJobObjectW(None,None)
         if not self.handle:
             raise ctypes.WinError(ctypes.get_last_error())
         self.process=None
+        self.executable = os.path.normcase(str(Path(command[0]).resolve()))
+        k.ResumeThread.argtypes=[wintypes.HANDLE]; k.ResumeThread.restype=wintypes.DWORD
+        k.OpenProcess.argtypes=[wintypes.DWORD,wintypes.BOOL,wintypes.DWORD];k.OpenProcess.restype=wintypes.HANDLE
+        k.QueryFullProcessImageNameW.argtypes=[wintypes.HANDLE,wintypes.DWORD,wintypes.LPWSTR,ctypes.POINTER(wintypes.DWORD)];k.QueryFullProcessImageNameW.restype=wintypes.BOOL
+        thread = None
         try:
             # This is a user-facing game, not a hidden helper process.
-            self.process=subprocess.Popen(command,cwd=str(cwd))
-            if not k.AssignProcessToJobObject(self.handle,wintypes.HANDLE(int(self.process._handle))):
+            import _winapi
+            process, thread, pid, _tid = _winapi.CreateProcess(
+                command[0], subprocess.list2cmdline(command), None, None, False,
+                4, None, str(cwd), subprocess.STARTUPINFO())  # CREATE_SUSPENDED
+            self.process = _OwnedProcess(process, pid, _winapi)
+            if not k.AssignProcessToJobObject(self.handle, wintypes.HANDLE(process)):
+                raise ctypes.WinError(ctypes.get_last_error())
+            if k.ResumeThread(wintypes.HANDLE(thread)) == 0xFFFFFFFF:
                 raise ctypes.WinError(ctypes.get_last_error())
         except Exception:
             if self.process is not None and self.process.poll() is None:
                 self.process.terminate();self.process.wait(timeout=5)
             self.close()
             raise
+        finally:
+            if thread:
+                k.CloseHandle(wintypes.HANDLE(thread))
+
+    def _same_executable(self, pid: int) -> bool:
+        handle = self.kernel.OpenProcess(0x1000, False, pid)
+        if not handle:
+            return False
+        try:
+            size = wintypes.DWORD(32768)
+            name = ctypes.create_unicode_buffer(size.value)
+            return bool(self.kernel.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(size))) and os.path.normcase(str(Path(name.value).resolve())) == self.executable
+        finally:
+            self.kernel.CloseHandle(handle)
 
     def pids(self) -> list[int]:
         if not self.handle:
@@ -87,14 +148,14 @@ class WindowsGameJob:
         raise RuntimeError("The launched game exceeded the process tracking limit.")
 
     def window_pid(self) -> int | None:
-        members=set(self.pids());found=[]
+        members={pid for pid in self.pids() if self._same_executable(pid)};found=[]
         @self.callback_type
         def callback(hwnd,_parameter):
             pid=wintypes.DWORD();self.user.GetWindowThreadProcessId(hwnd,ctypes.byref(pid))
             if pid.value not in members or not self.user.IsWindowVisible(hwnd) or self.user.GetWindow(hwnd,4):
                 return True
             name=ctypes.create_unicode_buffer(256);self.user.GetClassNameW(hwnd,name,len(name))
-            if name.value=="#32770":  # error/configuration dialog is not a game window
+            if name.value=="#32770" or self.user.GetDlgItem(hwnd,1029):  # error/configuration dialog is not a game window
                 return True
             rect=wintypes.RECT()
             if self.user.GetClientRect(hwnd,ctypes.byref(rect)) and rect.right>=320 and rect.bottom>=240:
@@ -110,6 +171,8 @@ class WindowsGameJob:
     def close(self) -> None:
         if self.handle:
             self.kernel.CloseHandle(self.handle);self.handle=None
+        if getattr(self, "process", None):
+            self.process.close()
 
     def __del__(self):
         # Closing the editor does not itself kill an already-running game.
@@ -118,8 +181,10 @@ class WindowsGameJob:
 
 
 class WarbandGameController:
-    def __init__(self, job_factory=WindowsGameJob, *, timeout=30.0, clock=time.monotonic, sleep=time.sleep):
+    def __init__(self, job_factory=WindowsGameJob, *, timeout=120.0, clock=time.monotonic, sleep=time.sleep, native_factory=None):
         self._factory,self._timeout,self._clock,self._sleep=job_factory,timeout,clock,sleep
+        from .native_launcher import NativeLauncher
+        self._native_factory = native_factory or NativeLauncher
         self._job=None
         self._pid=None
         self._module=""
@@ -138,27 +203,29 @@ class WarbandGameController:
             if self.status()["running"]:
                 return {**self.status(),"alreadyRunning":True}
             command=launch_command(game_root,project)
+            module = installed_module(game_root, project)
             job=self._factory(command,game_root)
             deadline=self._clock()+self._timeout
             stable_pid=None;stable_since=0.0
             try:
+                native = self._native_factory(job, module) if len(command) == 1 else None
                 while self._clock()<deadline:
                     pids=job.pids()
                     if not pids:
-                        raise RuntimeError("Warband exited before a game window appeared. Check the module and WSE2 crash log.")
-                    pid=job.window_pid()
+                        raise RuntimeError("Warband exited before a game window appeared. Check the selected module, Steam session and rgl_log.txt.")
+                    launched = native.advance() if native else True
+                    pid=job.window_pid() if launched else None
                     if pid != stable_pid:
                         stable_pid,stable_since=pid,self._clock()
                     if pid and self._clock()-stable_since>=.5:
-                        self._job,self._pid,self._module=job,pid,command[2]
+                        self._job,self._pid,self._module=job,pid,module
                         return {**self.status(),"windowObserved":True,"alreadyRunning":False}
                     self._sleep(.1)
-                raise RuntimeError("Warband started but no game-sized window appeared. The owned launch was stopped; check its WSE2 log.")
+                raise RuntimeError("Warband started but no game-sized window appeared. The owned launch was stopped; check its launcher, Steam session and rgl_log.txt.")
             except Exception:
-                try:
-                    job.terminate()
-                finally:
-                    job.close()
+                # Keep ownership if cleanup itself fails so Stop remains usable.
+                self._job, self._module = job, module
+                self.stop()
                 raise
 
     def stop(self) -> dict:
