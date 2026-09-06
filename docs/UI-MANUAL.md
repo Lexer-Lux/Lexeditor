@@ -68,12 +68,12 @@ re-fit the Table and panel divider.
 
 ## Vanilla and reference values
 
-A **reference rail** shows only values that differ from the current value.
+A **ref rail** shows only values that differ from the current value.
 `V` means Vanilla. Other short tags name reference mods. Clicking a reference
 restores that displayed value. Booleans display a check or an X, not their raw
 stored number or the words `true` and `false`.
 
-A reference rail is a vertical stack with at most four sources. Vanilla is
+A ref rail is a vertical stack with at most four sources. Vanilla is
 always first and green. At most three reference mods can follow it: the first
 is red, the second is blue, and the third is yellow. A plugin must reject a
 fourth active reference mod instead of clipping, wrapping, or hiding it.
@@ -88,7 +88,7 @@ unit. Multiple reference values become smaller and can stack within the same
 reserved area. FF8 Hit Rate uses two linked internal-ref boxes: percent and
 raw value out of 255.
 
-Reference values always use the same player-facing format as the live value.
+Ref-rail values always use the same player-facing format as the live value.
 An enum shows its name. An item shows its icon and name. A boolean shows a
 check or X. A transformed number shows its transformed unit.
 
@@ -98,9 +98,14 @@ A unit is part of its field. It can be a suffix such as `%`, `/255`, `G`, or
 `×`, or a prefix when the game requires one. Unit placement is shared so game
 fonts cannot create local alignment errors.
 
-A value with only two valid states is a boolean control. A numeric 0/1 input
-must not be used when a checkbox or compact check/X toggle can prevent invalid
-values.
+Every variable uses the most human-friendly semantic control available; its raw
+storage representation is an implementation detail, not UI. Booleans are normally
+checkboxes. A **checkless toggle** is the compact on/off alternative when a checkbox
+would add visual noise. A stored `0/1` is never exposed as a numeric field. Enums
+show named choices. Bitflags are decomposed into a property group of checkboxes,
+checkless toggles and/or enum controls as appropriate; never expose a whole flag
+byte or integer merely because that is how the game stores it. Raw numbers are for
+values that are genuinely numeric to a human.
 
 ## Thing Selectors and Searchers
 
@@ -121,9 +126,10 @@ A **hoverable** looks and behaves like a link to another editable record. The
 same linked record has the same hover behavior in every list, Table, Detail
 panel, and reference display.
 
-Help uses a filled circular `?`. The component shape and interaction are
-shared. Its glyph uses the active game's font when that font contains a usable
-question mark.
+An **info bubble** is the filled circular `?` beside a property. Its circle,
+glyph, placement and interaction are shared. It is centred in the metadata space
+between the panel edge and the property label, and its glyph is centred inside the
+circle.
 
 ## Projects and Vanilla
 
@@ -136,34 +142,25 @@ This workflow needs a game-specific baseline adapter because each game stores
 and builds mods differently. A plugin must not call an editable working folder
 "Vanilla" unless its data is proven unchanged.
 
-## Setting scopes
+## Developer Mode
 
-The settings grid has three ordered scopes from left to right:
+Lexeditor has one privileged mode: **Developer Mode**. It activates automatically
+only when the active GitHub CLI account is the authorized `Lexer-Lux` account and
+is not a user preference. Developer Mode exposes diagnostics, the embedded GitHub
+workspace, helper/version authoring, distributable defaults and shared layout
+authoring. Signing out (or switching GitHub accounts) disables those privileges.
+There is no separate Lexer Mode.
 
-- **User** settings change only the current installation.
-- **Developer** settings expose diagnostics and development tools. They do not
-  authorize GitHub or distributable changes.
-- **Lexer** settings change checked-in defaults that ship to every user.
+Holding right-click on a page tab to save its layout for everyone is therefore a
+Developer Mode authoring action. Ordinary page and setting changes remain local.
 
-The `I am Lexer` control is available only when GitHub reports Lexer's allowed
-account as the active account. Lexer Mode gives each setting a second control
-in the Lexer color. This control sets the packaged default. Double-clicking a
-setting name or description copies its current value into that default control.
-The new default becomes distributable only after the changed default file is
-included in a release.
+## Model preview drawer
 
-`Loading screen minimum` is a Lexer setting. It sets the shortest time that a
-game-loading screen remains visible. It does not cap real loading time: a game
-that needs longer stays on the loading screen until its plugin finishes.
-
-`Volume level` is also a Lexer setting. The live interface uses that packaged
-value directly; an old personal settings file cannot override it. Zero prevents
-new theme sounds and stops sounds already playing. The percentage uses a
-perceptual squared-gain curve, so very low values are genuinely quiet.
-
-Holding right-click on a page tab to save its layout for everyone is a Lexer
-authoring action. Developer Mode alone cannot authorize it. Ordinary page and
-setting changes stay local.
+A Detail panel can declare an optional **model preview drawer**. The standard
+header icon is its open control. Activating that icon slides the preview out from
+the Detail panel; while open, an `×` occupies exactly the same header-icon slot
+and closes it. Plugins provide only the preview content/lifecycle callbacks. They
+must not invent a separate preview-panel type or a different close position.
 
 ## Setting dependencies
 

@@ -91,6 +91,7 @@ class GitHubRepository:
 
     full_name: str
     authorized_logins: tuple[str, ...]
+    issue_label: str = ""
 
 
 HelperStatus = Callable[[], dict]

@@ -478,13 +478,17 @@ class HostApi:
         return rows
 
     def lexeditor_settings(self) -> dict:
-        """Return shared settings and managed-helper state."""
+        """Return shared settings; Developer Mode is owner-authenticated."""
         payload = self._settings.snapshot()
         identity = self._github.visible_repository(LEXEDITOR_REPOSITORY)
-        payload["lexerAuthorized"] = bool(identity)
+        authorized = bool(identity)
+        # There is one privileged mode: Developer Mode. It is an identity
+        # fact, not a preference. The legacy lexer field stays internal until
+        # older settings files age out.
+        payload["developerMode"] = authorized
+        payload["lexerMode"] = authorized
+        payload["lexerAuthorized"] = authorized
         payload["lexerLogin"] = (identity or {}).get("login", "")
-        if not identity:
-            payload["lexerMode"] = False
         return payload
 
     def save_lexeditor_settings(self, values: dict | str, *legacy_values) -> dict:
@@ -496,14 +500,11 @@ class HostApi:
                      "tableRowsPerPage", "panelGapPercent", "mainMenuHeightPercent",
                      "soundEnabled", "soundVolumePercent")
             payload = {"updateCheckFrequency": values, **dict(zip(names, legacy_values))}
-        lexer_mode = bool(payload.get("lexerMode"))
         authorized = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True))
-        if lexer_mode and not authorized:
-            raise PermissionError("Lexer Mode requires Lexer's active GitHub account")
         self._settings.save(
             str(payload.get("updateCheckFrequency", "daily")),
-            None if "developerMode" not in payload else bool(payload["developerMode"]),
-            bool(lexer_mode) if authorized else False,
+            authorized,
+            authorized,
             None if "hoverableAltClick" not in payload else bool(payload["hoverableAltClick"]),
             payload.get("selectionHoldMs"),
             payload.get("tableRowsPerPage"),
@@ -516,10 +517,8 @@ class HostApi:
 
     def save_lexer_setting_defaults(self, values: dict) -> dict:
         """Save distributable setting defaults for the active repository owner."""
-        if not self._settings.snapshot().get("lexerMode"):
-            raise PermissionError("Lexer Mode is not enabled")
         if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
-            raise PermissionError("Lexer's active GitHub account is required")
+            raise PermissionError("Developer Mode requires Lexer's active GitHub account")
         self._settings.save_lexer_defaults(values)
         return self.lexeditor_settings()
 
@@ -541,23 +540,19 @@ class HostApi:
         return self.open_plugin(plugin_id)
 
     def _github_repository(self, plugin_id: str):
-        """Resolve one configured repository before the owner check."""
+        """Use the central Lexeditor tracker, filtered to this game."""
         plugin = self._plugins.get(plugin_id)
         if plugin is None:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if plugin.github is None:
-            raise ValueError(f"{plugin.name} has no configured GitHub repository")
-        return plugin.github
+        return GitHubRepository(
+            full_name=LEXEDITOR_REPOSITORY.full_name,
+            authorized_logins=LEXEDITOR_REPOSITORY.authorized_logins,
+            issue_label=plugin_id,
+        )
 
     def github_repository(self, plugin_id: str) -> dict | None:
-        """Show safe repository metadata only to an allowed active owner."""
-        plugin = self._plugins.get(plugin_id)
-        if plugin is None:
-            raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if plugin.github is None:
-            return None
-        repository = self._github_repository(plugin_id)
-        return self._github.visible_repository(repository)
+        """Show the central game-filtered issue tracker to the owner."""
+        return self._github.visible_repository(self._github_repository(plugin_id))
 
     def default_views(self, plugin_id: str) -> dict:
         """Return packaged view defaults for one plugin."""
@@ -574,10 +569,8 @@ class HostApi:
         plugin = self._plugins.get(plugin_id)
         if plugin is None:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if not self._settings.snapshot().get("lexerMode"):
-            raise PermissionError("Lexer Mode is not enabled")
         if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
-            raise PermissionError("Lexer's active GitHub account is required")
+            raise PermissionError("Developer Mode requires Lexer's active GitHub account")
         tab_id = str(tab_id).strip()
         token = f"{plugin_id}-{tab_id}"
         if not tab_id or not isinstance(preferences, dict):

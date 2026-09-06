@@ -3880,7 +3880,7 @@
     // Hovering a tab reveals the number that jumps to it.
     nav.addEventListener("pointerover", event => {
       const button = event.target.closest?.("button[data-tab]");
-      if (!button || button.querySelector(".lex-tab-ordinal")) return;
+      if (!button || button.querySelector(".lex-tab-ordinal,.lex-tab-shortcut")) return;
       const index = [...nav.querySelectorAll("button[data-tab]")].indexOf(button);
       if (index < 0 || index > 8) return;
       button.append(element("span", {class: "lex-tab-ordinal", "aria-hidden": "true"}, String(index + 1)));
@@ -5417,9 +5417,10 @@
         rowSelector: fit.rowSelector,
         headerSelector: fit.headerSelector,
         resize: (height, measurement) => {
-          masterNode.style.height = `${height}px`;
+          const fittedHeight = measurement?.full ? `${height}px` : "";
+          masterNode.style.height = fittedHeight;
           root.classList.toggle("lex-full-table-page", !!measurement?.full);
-          detailNode.style.height = measurement?.full ? `${height}px` : "";
+          detailNode.style.height = fittedHeight;
         },
         change: nextSize => {
           if (fitMinimum) tableFitCapacityCache.set(rowPreferenceKey, {capacity: nextSize, requested: requestedPageSize});
@@ -5437,7 +5438,9 @@
 
   const shortReferenceName = source => {
     if (source.shortName) return source.shortName;
-    if (String(source.name || "").toLocaleLowerCase() === "vanilla") return "V";
+    const normalized = String(source.name || "").trim().toLocaleLowerCase();
+    if (normalized === "vanilla") return "V";
+    if (["lexer", "lexer lux", "lexer-lux", "lexer's mod", "lexers mod", "lexers-mod"].includes(normalized)) return "LL";
     const words = String(source.name || "").trim().split(/\s+/).filter(Boolean);
     if (words.length > 1) return words.map(word => word[0]).join("").slice(0, 3).toLocaleUpperCase();
     return String(source.name || "").slice(0, 5).toLocaleUpperCase();
@@ -5752,4 +5755,158 @@
   };
 
   window.LexeditorUI = {element, el: element, newButton, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+})();
+
+
+/* LEXEDITOR_SHARED_UI_STANDARDIZATION_20260906 */
+(() => {
+  const ui = window.LexeditorUI;
+  if (!ui || ui.__sharedStandardization20260906) return;
+  ui.__sharedStandardization20260906 = true;
+
+  const attachModelPreview = (panel, spec) => {
+    if (!(panel instanceof Element) || !spec) return panel;
+    const heading = panel.querySelector(':scope > .lex-detail-panel-heading');
+    const icon = heading?.querySelector('.lex-detail-panel-icon');
+    if (!heading || !icon) return panel;
+    const getContent = typeof spec === 'function' ? spec : () => spec.content;
+    const onOpen = typeof spec === 'object' ? spec.onOpen : null;
+    const onClose = typeof spec === 'object' ? spec.onClose : null;
+    const drawer = document.createElement('section');
+    drawer.className = 'lex-model-preview-drawer';
+    drawer.hidden = true;
+    drawer.setAttribute('aria-label', typeof spec === 'object' && spec.label ? spec.label : 'Model preview');
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'lex-model-preview-close';
+    close.textContent = '×';
+    close.title = 'Close model preview';
+    close.setAttribute('aria-label', close.title);
+    heading.append(close);
+    heading.after(drawer);
+    const open = async () => {
+      if (!drawer.childNodes.length) {
+        const content = await getContent?.();
+        if (content instanceof Node) drawer.append(content);
+      }
+      drawer.hidden = false;
+      panel.classList.add('lex-model-preview-open');
+      icon.setAttribute('aria-expanded', 'true');
+      await onOpen?.(drawer);
+    };
+    const shut = async () => {
+      await onClose?.(drawer);
+      panel.classList.remove('lex-model-preview-open');
+      drawer.hidden = true;
+      icon.setAttribute('aria-expanded', 'false');
+    };
+    icon.classList.add('lex-model-preview-trigger');
+    icon.tabIndex = 0;
+    icon.setAttribute('role', 'button');
+    icon.setAttribute('aria-label', typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview');
+    icon.setAttribute('aria-expanded', 'false');
+    icon.addEventListener('click', open);
+    icon.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        open();
+      }
+    });
+    close.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      shut();
+    });
+    panel.lexModelPreview = {open, close: shut, drawer};
+    return panel;
+  };
+  ui.attachModelPreview = attachModelPreview;
+  const originalDetailPanel = ui.detailPanel;
+  ui.detailPanel = options => {
+    const panel = originalDetailPanel(options);
+    return options?.modelPreview ? attachModelPreview(panel, options.modelPreview) : panel;
+  };
+
+  const hoverKey = node => node?.dataset?.lexProperty || node?.dataset?.columnKey || '';
+  document.addEventListener('pointerover', event => {
+    const node = event.target.closest?.('.lex-detail-field,[data-column-key]');
+    if (!node) return;
+    node.classList.add('lex-self-hover');
+    const key = hoverKey(node);
+    if (!key) return;
+    const escaped = CSS.escape(String(key));
+    document.querySelectorAll(`[data-column-key="${escaped}"],[data-lex-property="${escaped}"]`)
+      .forEach(peer => peer.classList.add('lex-column-lit'));
+  });
+  document.addEventListener('pointerout', event => {
+    const node = event.target.closest?.('.lex-detail-field,[data-column-key]');
+    if (!node || node.contains(event.relatedTarget)) return;
+    node.classList.remove('lex-self-hover');
+    const key = hoverKey(node);
+    if (!key) return;
+    const escaped = CSS.escape(String(key));
+    document.querySelectorAll(`[data-column-key="${escaped}"],[data-lex-property="${escaped}"]`)
+      .forEach(peer => peer.classList.remove('lex-column-lit'));
+  });
+
+  document.addEventListener('click', event => {
+    const label = event.target.closest?.('.lex-boolean-field > .lex-detail-field-label');
+    if (!label) return;
+    const input = label.parentElement?.querySelector('.lex-detail-field-control input[type="checkbox"]');
+    if (!input || input.disabled) return;
+    event.preventDefault();
+    input.click();
+  });
+
+  const syncRange = field => {
+    if (!field) return;
+    const number = field.querySelector('input[type="number"]');
+    const range = field.querySelector('input[type="range"]');
+    if (number && range && range.value !== number.value) {
+      range.value = number.value;
+      range.dispatchEvent(new Event('input', {bubbles: true}));
+    }
+  };
+  document.addEventListener('contextmenu', event => {
+    const field = event.target.closest?.('.lex-detail-field');
+    if (!field) return;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      syncRange(field);
+      const target = getComputedStyle(field).backgroundColor;
+      const accent = getComputedStyle(document.documentElement).getPropertyValue('--lex-accent').trim() || target;
+      field.animate(
+        [{backgroundColor: accent}, {backgroundColor: target}],
+        {duration: 420, easing: 'cubic-bezier(.2,.75,.2,1)'},
+      );
+    }));
+  }, true);
+
+  const dedupeShortcuts = root => root.querySelectorAll?.('nav button[data-tab]').forEach(button => {
+    if (button.querySelector('.lex-tab-shortcut')) {
+      button.querySelectorAll('.lex-tab-ordinal').forEach(node => node.remove());
+    }
+  });
+  new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (node instanceof Element) dedupeShortcuts(node.closest('header') || node);
+  }))).observe(document.documentElement, {childList: true, subtree: true});
+  dedupeShortcuts(document);
+
+  const fitLabel = label => {
+    if (!(label instanceof HTMLElement)) return;
+    label.style.fontSize = '';
+    let size = parseFloat(getComputedStyle(label).fontSize) || 12;
+    while (size > 8 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth + 1)) {
+      size -= .5;
+      label.style.fontSize = `${size}px`;
+    }
+  };
+  const fitAllLabels = root => root.querySelectorAll?.(
+    '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label',
+  ).forEach(fitLabel);
+  const labelObserver = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (node instanceof Element) fitAllLabels(node);
+  })));
+  labelObserver.observe(document.documentElement, {childList: true, subtree: true});
+  window.addEventListener('resize', () => fitAllLabels(document));
+  requestAnimationFrame(() => fitAllLabels(document));
 })();

@@ -156,6 +156,7 @@ class GitHubIntegration:
         return {
             "repository": repository.full_name,
             "login": str(login),
+            "issueLabel": repository.issue_label,
         }
 
     def list_issues(self, repository: GitHubRepository,
@@ -166,11 +167,14 @@ class GitHubIntegration:
         if normalized_state not in {"open", "closed", "all"}:
             raise ValueError("GitHub issue state must be open, closed, or all")
         normalized_limit = max(1, min(int(limit), 500))
-        payload = self._json([
+        arguments = [
             "issue", "list", "--repo", repository.full_name,
             "--state", normalized_state, "--limit", str(normalized_limit),
-            "--json", "number,title,state,labels,updatedAt,author",
-        ])
+        ]
+        if repository.issue_label:
+            arguments.extend(["--label", repository.issue_label])
+        arguments.extend(["--json", "number,title,state,labels,updatedAt,author"])
+        payload = self._json(arguments)
         if not isinstance(payload, list):
             raise RuntimeError("GitHub CLI returned an invalid issue list")
         return {
