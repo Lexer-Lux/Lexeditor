@@ -1,0 +1,52 @@
+name: One-shot FF9 branch repair
+on:
+  push:
+    branches: [codex/ff9-complete-20260906]
+    paths: ['.github/workflows/ff9-branch-layout-repair.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/ff9-complete-20260906
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Repair FF9 editor controller
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('games/ff9/editor.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('const layout=pagedListDetail{rows,', 'const layout=pagedListDetail({rows,')
+          s = s.replace('master:view=>tablePanel(data,key,view.rows,view.selected,view.select)),detail:row=>detail(data,row)})',
+                        'master:view=>tablePanel(data,key,view.rows,view.selected,view.select),detail:row=>detail(data,row)})')
+          s = s.replace('navigate(row.targeti}}', 'navigate(row.target)}}')
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit repaired editor
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Lexeditor FF9 Agent'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add games/ff9/editor.html
+          if ! git diff --cached --quiet; then
+            git commit -m 'Fix FF9 editor controller syntax'
+            git push origin HEAD:codex/ff9-complete-20260906
+          fi
+      - name: Verify repaired FF9 branch
+        run: |
+          python -m pip install pytest
+          python -m compileall -q games/ff9
+          python -m pytest -q tests/test_ff9*.py
+          node --test tests/ff9_editor.test.cjs

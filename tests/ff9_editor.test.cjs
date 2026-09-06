@@ -113,9 +113,11 @@ test('information help describes launcher-first Play', async () => {
   assert.doesNotMatch(description, /Play starts FF9 directly/);
 });
 
-test('new character data views remain registered', async () => {
+test('catalog-driven views expose every character dataset', async () => {
   const e = await editor();
+  e.run('state.catalog=[{key:"characters",tab:"characters"},{key:"character-parameters",tab:"characters"},{key:"default-equipment",tab:"characters"},{key:"leveling",tab:"characters"},{key:"world-weather",tab:"world"}]');
   assert.deepEqual(Array.from(e.run('choices("characters")')), ['characters','character-parameters','default-equipment','leveling']);
+  assert.deepEqual(Array.from(e.run('choices("world")')), ['world-weather']);
 });
 
 test('controller does not truncate fractional edits to an integer', async () => {

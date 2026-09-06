@@ -28,6 +28,10 @@ def service(tmp_path, monkeypatch):
                        game_problems=lambda: [])
     paths.GAME_ROOT.mkdir()
     dependency("memoria_csv", DATASETS=(), MemoriaDataStore=lambda: None, catalog=lambda: [])
+    class FakeBattleSceneStore:
+        def status_rows(self):
+            return []
+    dependency("battle_scene", BattleSceneStore=FakeBattleSceneStore)
     dependency("memoria_baseline", ensure=lambda: {"release": "fixture", "source": "fixture", "problems": []})
     runtime = dependency("memoria_manager", status=lambda root: {"installed": False},
                          available=lambda: {"available": False})
