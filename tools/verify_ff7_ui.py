@@ -155,6 +155,11 @@ class PageTests(unittest.TestCase):
                 write_kernel(self.backend.game / relative)
                 with patch.object(server, "PLUGIN_ID", "ff7-2013" if index == 0 else "ff7"):
                     self.open()
+                self.click("Tweaks")
+                tab = self.page.get_by_role("tab", name="FFNx", exact=True)
+                self.assertTrue(tab.is_visible())
+                self.assertEqual(tab.get_attribute("aria-selected"), "true")
+                self.assertTrue(self.page.get_by_role("tabpanel", name="FFNx", exact=True).is_visible())
                 self.click("Characters")
                 self.assertEqual(self.page.locator("main button[data-row]").count(), 9)
                 strength = self.page.get_by_label("Strength for Slot0", exact=True)
