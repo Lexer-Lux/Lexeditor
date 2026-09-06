@@ -241,6 +241,20 @@
     const deploymentRows=(deployment.rows||[]).filter(row=>row.overrideCount||row.targetExists).map(row=>
       el("div",{class:"path-row"},el("b",{},`${row.name}: ${row.overrideCount} override${row.overrideCount===1?"":"s"}`),
         el("code",{title:row.target},row.changedSinceDeploy?"changed outside Lexeditor — deployment locked":row.deployed?"deployed and current":row.overrideCount?"saved; deployment needed":"not deployed")));
+    const shopTest=state.dashboard.shopTest||{available:false,reason:"No shop test candidate is available."};
+    const shopTestCard=el("section",{class:"card"},el("h2",{},"Shop edit test"),
+      !shopTest.available?el("div",{class:"error"},shopTest.reason):[
+        el("p",{},"Lexeditor selected one stable prepared record so the in-game check does not require you to invent a shop, item, or value."),
+        el("div",{class:"path-row"},el("b",{},"Shop"),el("code",{},shopTest.shop)),
+        el("div",{class:"path-row"},el("b",{},"Item"),el("code",{},shopTest.item)),
+        el("div",{class:"path-row"},el("b",{},"Price multiplier"),el("code",{},`vanilla ${shopTest.baselinePriceModifier} · current ${shopTest.currentPriceModifier} · test ${shopTest.testPriceModifier}`)),
+        el("div",{class:shopTest.status==="staged"?"ok":shopTest.status==="custom"?"error":"source-note"},shopTest.status==="staged"?"Test value is staged. Deploy Project before launching RDR1.":shopTest.status==="custom"?"This candidate already has a different custom price; the test helper will not overwrite it.":"Candidate is at its vanilla price and ready to stage."),
+        el("p",{},shopTest.instruction),
+        el("div",{class:"redhook-actions"},
+          el("button",{type:"button",onclick:()=>stageShopTest(),disabled:!shopTest.stageAllowed||shopTest.status==="staged"},"Stage Shop Test"),
+          el("button",{type:"button",class:"secondary",onclick:()=>restoreShopTest(),disabled:!shopTest.restoreAllowed||shopTest.status!=="staged"},"Restore Shop Test"),
+          el("button",{type:"button",class:"secondary",onclick:()=>openShopTest(),disabled:!shopTest.available},"Open in Shops"))
+      ]);
     const deliveryCard=el("section",{class:"card"},el("h2",{},"Saved files and game delivery"),
       el("p",{},"Save writes the project workspace. Deploy Project rebuilds verified copies of only the affected RPF archives and installs those copies under the loader's update\game folder. The original game\*.rpf archives are never overwritten."),
       el("p",{},"LexerRDR.ini, loot JSON and mission JSON are consumed by the native runtime from this workspace; archive-backed XML/WGD edits use the update-folder copies below."),
@@ -251,11 +265,20 @@
       el("div",{class:"path-row"},el("b",{},"Update-folder target"),el("code",{title:deployment.updateRoot||""},deployment.updateRoot||"Unavailable")),
       ...deploymentRows,
       ...Object.entries(state.dashboard.paths).filter(([name])=>["Editable overrides","Inventory overrides","Shop overrides","Settings","Loot ASI override","Mission ASI override"].includes(name)).map(([name,path])=>el("div",{class:"path-row"},el("b",{},name),el("code",{title:path},path))));
-    $("#main").replaceChildren(el("div",{class:"cards"},statusCard,redHookCard,deliveryCard));shell.refresh();
+    $("#main").replaceChildren(el("div",{class:"cards"},statusCard,redHookCard,shopTestCard,deliveryCard));shell.refresh();
   }
 
   async function openRedHook(){try{await api("/api/redhook/open",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});setStatus("Opened the official RedHook page");}catch(error){setStatus(`Could not open RedHook: ${error.message}`);alert(state.status);}}
   async function configureRedHook(){await api("/api/redhook/configure",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.dashboard=await api("/api/dashboard");}
+  async function stageShopTest(){
+    try{setStatus("Staging deterministic shop price test…");const result=await api("/api/shop-test/stage",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.shops=await api("/api/shops");state.dashboard=await api("/api/dashboard");setStatus(result.message||"Shop test staged");renderProject();}
+    catch(error){setStatus("Shop test staging failed");showAlert({title:"Shop test staging failed",items:[{item:"Price test",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
+  }
+  async function restoreShopTest(){
+    try{setStatus("Restoring deterministic shop test price…");const result=await api("/api/shop-test/restore",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.shops=await api("/api/shops");state.dashboard=await api("/api/dashboard");setStatus(result.message||"Shop test restored");renderProject();}
+    catch(error){setStatus("Shop test restore failed");showAlert({title:"Shop test restore failed",items:[{item:"Price test",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
+  }
+  function openShopTest(){const test=state.dashboard.shopTest;if(!test?.available)return;state.shopQuery=test.item;state.shopName=test.shop;state.shopCategory="";state.shopSelected=test.id;navigate("shops");}
   async function deployProject(){
     try{setStatus("Building verified RPF copies…");const result=await api("/api/deployment/deploy",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.dashboard=await api("/api/dashboard");setStatus(result.message||"Project archive copies deployed");renderProject();}
     catch(error){setStatus("Deployment failed");showAlert({title:"Deployment failed",items:[{item:"Archive copies",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}

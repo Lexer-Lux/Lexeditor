@@ -99,6 +99,17 @@ def main():
                     assert page.get_by_text('Saved files and game delivery', exact=True).count()
                     assert page.get_by_role('button', name='Deploy Project').count()
                     assert page.get_by_role('button', name='Revert Deployment').count()
+                    assert page.get_by_text('Shop edit test', exact=True).count()
+                    assert page.get_by_role('button', name='Stage Shop Test').count()
+                    plan = server.shop_test_plan()
+                    assert plan['available'] and plan['status'] == 'baseline'
+                    page.get_by_role('button', name='Stage Shop Test').click()
+                    page.wait_for_function('state.dashboard.shopTest.status === "staged"')
+                    assert server.shop_test_plan()['id'] == plan['id']
+                    assert server.shop_test_plan()['currentPriceModifier'] == plan['testPriceModifier']
+                    page.get_by_role('button', name='Restore Shop Test').click()
+                    page.wait_for_function('state.dashboard.shopTest.status === "baseline"')
+                    assert server.shop_test_plan()['currentPriceModifier'] == plan['baselinePriceModifier']
                     delivery_text = page.locator('#main').inner_text()
                     assert 'Deploy Project rebuilds verified copies' in delivery_text
                     assert 'original' in delivery_text and 'never overwritten' in delivery_text
