@@ -1,0 +1,41 @@
+name: FF8 Enemies UI regressions
+on:
+  pull_request:
+    paths:
+      - 'games/ff8/**'
+      - 'ui/framework.*'
+      - 'tools/verify_ff8_enemies_layout.py'
+      - 'tools/verify_ff8_card_art.py'
+      - '.github/workflows/enemies-layout.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'games/ff8/**'
+      - 'ui/framework.*'
+      - 'tools/verify_ff8_enemies_layout.py'
+      - 'tools/verify_ff8_card_art.py'
+      - '.github/workflows/enemies-layout.yml'
+permissions:
+  contents: read
+jobs:
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Read exact source without initializing unrelated gitlinks
+        env:
+          REVISION: ${{ github.sha }}
+        run: |
+          git init .
+          git remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git fetch --depth=1 origin "$REVISION"
+          git checkout --detach FETCH_HEAD
+      - name: Test dependencies
+        run: |
+          python -m pip install pillow fonttools playwright
+          python -m playwright install --with-deps chromium
+      - name: Full page, binary round trip, atlas and HTTP checks
+        run: |
+          python tools/verify_ff8_enemies_layout.py
+          python tools/verify_ff8_card_art.py
+          python tools/verify_ff8_ui_battle_regressions.py
