@@ -67,9 +67,10 @@ def workspace(root: Path, count=1):
         "CONTENT_PREPARED_ROOT": data / "content", "CONTENT_OVERRIDE_ROOT": mod / "content",
         "GRINGO_PACKED_ROOT": data / "gringores", "GRINGO_UNPACKED_ROOT": data / "gringores-unpacked",
         "GRINGO_OVERRIDE_ROOT": mod / "gringores", "SETTINGS_FILE": project / "LexerRDR.ini",
-        "LOOT_FILE": project / "LexerRDR.loot.json"}
+        "LOOT_FILE": project / "LexerRDR.loot.json",
+        "MISSION_TEST_STATE": project / ".lexeditor-mission-test.json"}
     for key, path in mapping.items():
-        if key.endswith("FILE"):
+        if key.endswith("FILE") or key.endswith("STATE"):
             path.parent.mkdir(parents=True, exist_ok=True)
         else:
             path.mkdir(parents=True, exist_ok=True)

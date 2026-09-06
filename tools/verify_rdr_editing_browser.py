@@ -120,6 +120,16 @@ def main():
                     page.get_by_role('button', name='Restore Shop Test').click()
                     page.wait_for_function('state.dashboard.shopTest.status === "baseline"')
                     assert server.shop_test_plan()['currentPriceModifier'] == plan['baselinePriceModifier']
+                    assert page.get_by_text('Mission reward test', exact=True).count()
+                    mission_plan = server.mission_test_plan()
+                    assert mission_plan['missionId'] == 2 and mission_plan['status'] == 'baseline'
+                    page.get_by_role('button', name='Stage Mission Test').click()
+                    page.wait_for_function('state.dashboard.missionTest.status === "staged"')
+                    staged_mission = server.mission_test_plan()
+                    assert staged_mission['testRewards'] == {'cash': 123, 'fame': 321, 'honor': 222}
+                    page.get_by_role('button', name='Restore Mission Test').click()
+                    page.wait_for_function('state.dashboard.missionTest.status === "baseline"')
+                    assert server._mission_row(server._mission_override_document(), 2) is None
                     delivery_text = page.locator('#main').inner_text()
                     assert 'Deploy Project rebuilds verified copies' in delivery_text
                     assert 'original' in delivery_text and 'never overwritten' in delivery_text

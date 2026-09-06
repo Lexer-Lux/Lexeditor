@@ -39,6 +39,9 @@ GRINGO_PACKED_ROOT = EXTRACT_ROOT / "gringores"
 GRINGO_UNPACKED_ROOT = EXTRACT_ROOT / "gringores-unpacked"
 GRINGO_OVERRIDE_ROOT = MOD_ROOT / "gringores"
 CAMERA_GENERATED_ROOT = PROJECT / ".lexeditor-generated" / "camera"
+MISSION_TEST_STATE = PROJECT / ".lexeditor-mission-test.json"
+MISSION_TEST_ID = 2
+MISSION_TEST_REWARDS = {"cash": 123, "fame": 321, "honor": 222}
 ARCHIVE_SPECS = (
     ArchiveSpec("tuning", Path("game") / "tune_d11generic.rpf", OVERRIDE_ROOT),
     ArchiveSpec("content", Path("game") / "content.rpf", CONTENT_OVERRIDE_ROOT),
@@ -1157,6 +1160,135 @@ def save_missions(document: dict) -> dict:
     }
 
 
+def _mission_override_document() -> dict:
+    base = mission_rewards.load_generated()
+    if mission_rewards.OVERRIDE_FILE.is_file():
+        return mission_rewards.validate_override(json.loads(
+            mission_rewards.OVERRIDE_FILE.read_text(encoding="utf-8-sig")), base)
+    return {"schemaVersion": 1, "contract": "LexerRDR.mission-rewards", "overrides": []}
+
+
+def _mission_row(document: dict, mission_id: int) -> dict | None:
+    return next((row for row in document.get("overrides", []) if row.get("id") == mission_id), None)
+
+
+def _mission_test_manifest() -> dict | None:
+    if not MISSION_TEST_STATE.is_file():
+        return None
+    try:
+        document = json.loads(MISSION_TEST_STATE.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError(f"Mission test state is unreadable: {error}") from error
+    if (not isinstance(document, dict) or document.get("version") != 1 or
+            document.get("missionId") != MISSION_TEST_ID or
+            document.get("testOverride") != {"id": MISSION_TEST_ID, "rewards": MISSION_TEST_REWARDS}):
+        raise ValueError("Mission test state does not match the current deterministic test")
+    previous = document.get("previousOverride")
+    if previous is not None:
+        mission_rewards.validate_override({
+            "schemaVersion": 1, "contract": "LexerRDR.mission-rewards", "overrides": [previous]
+        })
+    return document
+
+
+def mission_test_plan() -> dict:
+    base = mission_rewards.load_generated()
+    mission = next(row for row in base["missions"] if row["id"] == MISSION_TEST_ID)
+    current_document = _mission_override_document()
+    current = _mission_row(current_document, MISSION_TEST_ID)
+    test_row = {"id": MISSION_TEST_ID, "rewards": dict(MISSION_TEST_REWARDS)}
+    try:
+        manifest = _mission_test_manifest()
+        problem = ""
+    except ValueError as error:
+        manifest = None
+        problem = str(error)
+    if problem:
+        status = "conflict"
+    elif manifest is not None:
+        status = "staged" if current == test_row else "conflict"
+        if status == "conflict":
+            problem = "Mission 2 changed after the deterministic test was staged; restore is locked to avoid overwriting it."
+    else:
+        status = "custom" if current else "baseline"
+    return {
+        "available": not bool(problem),
+        "missionId": MISSION_TEST_ID,
+        "mission": mission["name"],
+        "storyTitle": "New Friends, Old Problems",
+        "scriptName": mission["scriptName"],
+        "vanillaRewards": dict(mission["rewards"]),
+        "testRewards": dict(MISSION_TEST_REWARDS),
+        "currentOverride": current,
+        "status": status,
+        "problem": problem,
+        "stageAllowed": not bool(problem) and manifest is None,
+        "restoreAllowed": not bool(problem) and manifest is not None and current == test_row,
+        "stateFile": str(MISSION_TEST_STATE),
+        "overrideFile": str(mission_rewards.OVERRIDE_FILE),
+        "route": "Use a normal-difficulty New Game: complete Intro 01, then complete Ranch 01. Mission Replay is intentionally rejected by the runtime.",
+        "expected": "At Ranch 01 completion the configured reward deltas are +$123 cash, +321 fame, and +222 honor instead of the vanilla 0/0/+50.",
+        "instruction": "Stage this test before starting the New Game route. The native runtime reloads LexerRDR.missions.json from the workspace; Deploy Project is not required for this JSON override.",
+    }
+
+
+def stage_mission_test() -> dict:
+    plan = mission_test_plan()
+    if not plan.get("available"):
+        raise RuntimeError(plan.get("problem") or "Mission test is unavailable")
+    if not plan.get("stageAllowed"):
+        raise ValueError("Mission reward test is already staged")
+    current = _mission_override_document()
+    previous = _mission_row(current, MISSION_TEST_ID)
+    rows = [row for row in current["overrides"] if row["id"] != MISSION_TEST_ID]
+    rows.append({"id": MISSION_TEST_ID, "rewards": dict(MISSION_TEST_REWARDS)})
+    candidate = {"schemaVersion": 1, "contract": "LexerRDR.mission-rewards", "overrides": rows}
+    save_missions(candidate)
+    try:
+        manifest = {
+            "version": 1,
+            "missionId": MISSION_TEST_ID,
+            "previousOverride": previous,
+            "testOverride": {"id": MISSION_TEST_ID, "rewards": dict(MISSION_TEST_REWARDS)},
+        }
+        atomic_bytes(MISSION_TEST_STATE, (json.dumps(manifest, indent=2) + "\n").encode("utf-8"))
+    except Exception:
+        rollback_rows = [row for row in _mission_override_document()["overrides"] if row["id"] != MISSION_TEST_ID]
+        if previous is not None:
+            rollback_rows.append(previous)
+        save_missions({"schemaVersion": 1, "contract": "LexerRDR.mission-rewards", "overrides": rollback_rows})
+        raise
+    refreshed = mission_test_plan()
+    if refreshed["status"] != "staged":
+        raise RuntimeError("Mission reward test did not read back as staged")
+    return {"saved": 1, "test": refreshed,
+            "message": "Mission 2 reward test staged. Install/run the current LexerRDR native candidate; no RPF deployment is needed for mission JSON."}
+
+
+def restore_mission_test() -> dict:
+    plan = mission_test_plan()
+    if not plan.get("available"):
+        raise RuntimeError(plan.get("problem") or "Mission test is unavailable")
+    if not plan.get("restoreAllowed"):
+        raise ValueError("Mission reward test is not safely restorable")
+    manifest = _mission_test_manifest()
+    current = _mission_override_document()
+    test_row = manifest["testOverride"]
+    if _mission_row(current, MISSION_TEST_ID) != test_row:
+        raise ValueError("Mission 2 changed after staging; refusing to overwrite it")
+    rows = [row for row in current["overrides"] if row["id"] != MISSION_TEST_ID]
+    if manifest.get("previousOverride") is not None:
+        rows.append(manifest["previousOverride"])
+    save_missions({"schemaVersion": 1, "contract": "LexerRDR.mission-rewards", "overrides": rows})
+    MISSION_TEST_STATE.unlink(missing_ok=True)
+    refreshed = mission_test_plan()
+    expected_status = "custom" if manifest.get("previousOverride") is not None else "baseline"
+    if refreshed["status"] != expected_status:
+        raise RuntimeError("Mission reward test did not restore the previous mission 2 state")
+    return {"saved": 1, "test": refreshed,
+            "message": "Mission 2 reward test restored to the exact pre-test override state."}
+
+
 def redhook_payload() -> dict:
     missing = [name for name in REDHOOK_FILES if not (GAME_ROOT / name).is_file()]
     ini = GAME_ROOT / "RedHook.ini"
@@ -1403,6 +1535,7 @@ def dashboard_payload() -> dict:
         "redHook": redhook_payload(),
         "deployment": _deployment_payload(),
         "shopTest": shop_test_plan(),
+        "missionTest": mission_test_plan(),
         "problems": paths.check()
         + ([] if PREPARED_ROOT.is_dir() else [f"Prepared RDR data is missing: {PREPARED_ROOT}"])
         + ([] if CONTENT_PREPARED_ROOT.is_dir() else [
@@ -1562,6 +1695,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(stage_shop_test())
             elif path == "/api/shop-test/restore":
                 self.json_response(restore_shop_test())
+            elif path == "/api/mission-test/stage":
+                self.json_response(stage_mission_test())
+            elif path == "/api/mission-test/restore":
+                self.json_response(restore_mission_test())
             else:
                 self.json_response({"error": "not found"}, 404)
         except Exception as error:
