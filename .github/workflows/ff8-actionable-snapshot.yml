@@ -16,6 +16,11 @@ jobs:
           git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
           git -C editor fetch --depth=1 origin "$GITHUB_SHA"
           git -C editor checkout --detach FETCH_HEAD
+      - name: Run FF8 mod-order regressions
+        working-directory: editor
+        run: |
+          python tools/verify_ff8_mod_order_selector.py
+          python tools/verify_ff8_mod_combining_issue_100.py
       - name: Build source snapshot
         working-directory: editor
         run: |
