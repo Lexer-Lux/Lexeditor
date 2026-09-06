@@ -314,7 +314,7 @@ PLUGIN = GamePlugin(
     smoke=smoke,
     session_factory=RdrSession,
     github=GitHubRepository(
-        full_name="Lexer-Lux/rdr-overhaul",
+        full_name="Lexer-Lux/Lexers-Mod-For-RDR",
         authorized_logins=("Lexer-Lux",),
     ),
     projects=ModProjectSpec(
