@@ -57,8 +57,16 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             if text.count(old)!=1:raise RuntimeError(f'Integration anchor changed: {relative}: {old}')
             text=text.replace(old,new,1)
         path.write_bytes(text.replace('\n',newline).encode('utf-8'))
-    # Include the source files newly introduced by the packaged derivative.
-    subprocess.run(['git','add','--intent-to-add','--','src'],cwd=source,check=True)
+    # git apply leaves new files untracked. Include EVERY file introduced by
+    # the derivative, not just src/: otherwise the published patch silently
+    # loses its tests, artifact verifier and reproducible-build entry point.
+    patch_paths = [line[6:] for line in patch.read_text(encoding="utf-8").splitlines()
+                   if line.startswith("+++ b/")]
+    for name in patch_paths:
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts or not (source / relative).is_file():
+            raise RuntimeError(f"Invalid derivative patch path: {name}")
+    subprocess.run(['git','add','--intent-to-add','--',*patch_paths],cwd=source,check=True)
     patch_output.parent.mkdir(parents=True,exist_ok=True)
     with patch_output.open('wb') as output:
         subprocess.run(['git','-c','core.autocrlf=false','diff','--binary','HEAD','--','.'],cwd=source,stdout=output,check=True)
