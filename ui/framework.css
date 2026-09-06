@@ -1133,23 +1133,24 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-boolean-field .lex-detail-field-label { min-width:0; }
 .lex-field-boolean-arrow {
   position:relative;
-  flex:1 1 auto;
-  min-width:24px;
+  flex:0 1 48px;
+  min-width:12px;
+  max-width:48px;
   height:1px;
-  margin-left:3px;
-  margin-right:-22px;
+  margin-left:4px;
+  margin-right:-6px;
   background:color-mix(in srgb,var(--lex-border) 72%,transparent);
 }
 .lex-field-boolean-arrow::after {
   position:absolute;
-  right:0;
-  top:-3px;
-  width:6px;
-  height:6px;
+  right:-1px;
+  top:-4px;
+  width:0;
+  height:0;
   content:"";
-  border-top:1px solid var(--lex-border);
-  border-right:1px solid var(--lex-border);
-  transform:rotate(45deg);
+  border-top:4px solid transparent;
+  border-bottom:4px solid transparent;
+  border-left:6px solid var(--lex-border);
 }
 .lex-boolean-field .lex-detail-field-control {
   display:flex;
@@ -1157,6 +1158,12 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   justify-content:flex-end;
 }
 .lex-boolean-field .lex-detail-field-control > .lex-source-control { width:auto; }
+/* A normal provenance field ends its live input before the five-em reference
+   rail. Put boolean checkboxes on that same vertical edge instead of at the
+   far edge of the whole row. */
+.lex-boolean-field:has(.lex-source-control:not(.no-reference)) > .lex-detail-field-control {
+  padding-right:calc(var(--lex-panel-reference-rail-width,5em) + 18px);
+}
 input[type="checkbox"] { accent-color:var(--lex-accent); }
 
 .lex-boolean-mark { font:800 1.08em/1 "Lexend", "Segoe UI Symbol", sans-serif; }
@@ -1211,6 +1218,7 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   grid-template-columns:minmax(0,1fr);
   grid-template-areas:
     "heading"
+    "variables"
     "plot"
     "formula"
     "status";
@@ -1230,7 +1238,7 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   min-width:0;
 }
 
-.lex-curve-heading h4 { margin:0;font:700 1.1em/1 var(--lex-heading-font); }
+.lex-curve-heading h4 { margin:0;font:800 1.55em/1 var(--lex-heading-font);letter-spacing:.06em;text-transform:uppercase; }
 .lex-curve-heading-formula { margin-left:.55em;color:var(--lex-muted);font-size:.72em;font-weight:400; }
 .lex-curve-extrema { display:flex;gap:12px;color:var(--lex-muted);white-space:nowrap; }
 .lex-curve-extrema output { color:var(--lex-text);font-variant-numeric:tabular-nums; }
@@ -1282,21 +1290,21 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   pointer-events:none;
   user-select:none;
 }
-/* Every graph needs its own edge, or the plot backgrounds of neighbouring
-   graphs run together into one unreadable grey field. */
+/* The curve card is the outer box and the SVG is the graph box. The plot is
+   only the margin between them; a third border here produced concentric boxes. */
 .lex-curve-plot {
   position:relative;
   isolation:isolate;
-  border:1px solid color-mix(in srgb,var(--lex-border) 70%,transparent);
+  border:0;
 }
 .lex-curve-svg, .lex-curve-axis, .lex-curve-axis-name { position:relative;z-index:1; }
 /* The stat name IS the title now, so the small heading label is redundant. */
-.ff8-character-curve .lex-curve-heading-title { display:none; }
+.ff8-character-curve .lex-curve-heading-title { display:inline; }
 
 .lex-curve-plot { container-type:size; }
 .lex-curve-plot > .lex-curve-svg { position:relative; z-index:1; }
 
-.lex-curve-plot { position:relative;grid-area:plot;min-width:0;aspect-ratio:2/1;padding:14px 20px 20px 31px; }
+.lex-curve-plot { position:relative;grid-area:plot;min-width:0;aspect-ratio:2/1;padding:28px 22px 30px 46px; }
 .lex-curve-svg { display:block;width:100%;height:100%;overflow:visible;border:1px solid var(--lex-border);background:color-mix(in srgb,var(--lex-bg) 58%,var(--lex-panel)); }
 .lex-curve-grid-lines { fill:none;stroke:color-mix(in srgb,var(--lex-border) 42%,transparent);stroke-width:1;vector-effect:non-scaling-stroke; }
 .lex-curve-fill { fill:var(--lex-curve-fill,color-mix(in srgb,var(--lex-accent) 22%,transparent));stroke:none; }
@@ -1306,36 +1314,27 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
 .lex-curve-guide:not([x1]) { display:none; }
 .lex-curve-point-marker { fill:none;stroke:var(--lex-accent);stroke-width:2;vector-effect:non-scaling-stroke;pointer-events:none; }
 .lex-curve-point-marker:not([d]) { display:none; }
-/* The plot reserves a margin on every side so the scale numbers and the axis
-   names sit outside the drawing instead of over the curve. */
-/* The margin used to be one value on all four sides, so the top and right
-   reserved as much room as the left needs for "4,080" - pure waste that made
-   the plot look adrift in its box. Only the left carries the Y numbers and
-   only the bottom carries the X numbers and the axis name, so those two keep
-   their room and the other two are cut to a hairline. --lex-curve-margin is
-   kept as the left value because existing rules position labels against it. */
+/* Axis labels live in the plot margin, outside the SVG drawing. The graph is
+   the inner bordered rectangle; the surrounding plot padding is its margin. */
 .lex-curve-plot {
-  /* One margin on all four sides. It used to be four different values -
-     fat on the left for "4,080", fat at the bottom for LEVEL, hairlines
-     elsewhere - which read as a lopsided frame. The scale numbers and the
-     axis names now sit INSIDE the drawing, inset from its border, so the
-     frame can be even the whole way round at the right-hand value. */
-  --lex-curve-margin:.75em;
-  --lex-curve-margin-bottom:.75em;
-  --lex-curve-margin-top:.75em;
-  --lex-curve-margin-right:.75em;
-  /* Labels sat 2px from the border, reading as touching it. */
-  --lex-curve-label-inset:7px;
+  --lex-curve-margin-left:46px;
+  --lex-curve-margin-bottom:30px;
+  --lex-curve-margin-top:28px;
+  --lex-curve-margin-right:22px;
 }
-.lex-curve-axis { position:absolute;color:var(--lex-muted);font-size:.72em;line-height:1; }
-/* The vertical extremes belong in the left margin, level with the ends of
-   the drawing they describe. */
-.lex-curve-axis-top { display:block;top:calc(var(--lex-curve-margin-top) + 3px);left:calc(var(--lex-curve-margin) + var(--lex-curve-label-inset)); }
-.lex-curve-axis-bottom { display:block;bottom:calc(var(--lex-curve-margin-bottom) + 3px);left:calc(var(--lex-curve-margin) + var(--lex-curve-label-inset)); }
-/* The domain's first value sits beside the range's, not on top of it: the
-   bottom-left corner carries both "0" (the Y minimum) and "1" (level one). */
-.lex-curve-axis-start { bottom:calc(var(--lex-curve-margin-bottom) + 3px);left:calc(var(--lex-curve-margin) + var(--lex-curve-label-inset) + 2.4em); }
-.lex-curve-axis-end { right:calc(var(--lex-curve-margin-right) + var(--lex-curve-label-inset));bottom:calc(var(--lex-curve-margin-bottom) + 3px); }
+.lex-curve-axis { position:absolute;color:var(--lex-muted);font-size:.72em;line-height:1;white-space:nowrap; }
+.lex-curve-axis-top {
+  top:var(--lex-curve-margin-top);left:7px;transform:translateY(-50%);
+}
+.lex-curve-axis-bottom {
+  bottom:var(--lex-curve-margin-bottom);left:7px;transform:translateY(50%);
+}
+.lex-curve-axis-start {
+  bottom:7px;left:var(--lex-curve-margin-left);
+}
+.lex-curve-axis-end {
+  right:var(--lex-curve-margin-right);bottom:7px;
+}
 .lex-curve-axis-name {
   position:absolute;
   color:var(--lex-muted);
@@ -1343,28 +1342,37 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   letter-spacing:.08em;
   line-height:1;
   pointer-events:none;
+  text-transform:uppercase;
 }
-/* LEVEL sat 1px off the bottom border and HP 1px off the left, which reads
-   as the labels touching the edge of the box. Both now share the label
-   inset the scale numbers use. */
-/* The names ride inside the drawing too, so no side of the frame has to be
-   fattened to hold them. */
 .lex-curve-axis-name-x {
-  bottom:calc(var(--lex-curve-margin-bottom) + 3px);
+  bottom:7px;
   left:50%;
   transform:translateX(-50%);
 }
 .lex-curve-axis-name-y {
   top:50%;
-  left:calc(var(--lex-curve-margin) + 3px);
+  left:7px;
   transform:translateY(-50%) rotate(180deg);
   writing-mode:vertical-rl;
 }
 .lex-curve-hover-extrema { display:none;position:absolute;z-index:3;right:0;bottom:0;left:0;justify-content:space-between;color:var(--lex-muted);font-size:.75em;line-height:1;pointer-events:none; }
-.lex-curve-variables { display:grid;grid-template-columns:minmax(0,1fr);align-content:space-between;gap:4px;min-width:0; }
-.lex-curve-variable-overlay { position:absolute;z-index:4;top:14px;right:20px;bottom:20px;width:clamp(92px,28%,142px);padding:6px;background:color-mix(in srgb,var(--lex-bg) 78%,transparent);opacity:0;pointer-events:none;transition:opacity .12s ease; }
-.lex-curve-plot:hover .lex-curve-variable-overlay,.lex-curve-plot:focus-within .lex-curve-variable-overlay { opacity:1;pointer-events:auto; }
-.lex-curve-variable { display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:6px;min-width:0; }
+.lex-curve-variables {
+  grid-area:variables;
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(105px,1fr));
+  align-items:center;
+  gap:6px 10px;
+  min-width:0;
+}
+.lex-curve-variable-strip {
+  position:static;
+  width:100%;
+  padding:0;
+  background:transparent;
+  opacity:1;
+  pointer-events:auto;
+}
+.lex-curve-variable { display:grid;grid-template-columns:max-content minmax(0,1fr);align-items:center;gap:4px;min-width:0; }
 .lex-curve-variable > span { color:var(--lex-muted);font-size:.85em; }
 .lex-curve-variable-a { color:#f05b5b !important; fill:#f05b5b !important; }
 .lex-curve-variable-b { color:#63a8ff !important; fill:#63a8ff !important; }
@@ -1378,7 +1386,7 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
 .lex-curve-status { grid-area:status;min-height:1em;color:#d96c65; }
 .lex-curve-status:empty { display:none; }
 
-@media (max-width:760px) { .lex-curve-variable-overlay { width:clamp(84px,31%,120px); } }
+@media (max-width:760px) { .lex-curve-variables { grid-template-columns:repeat(auto-fit,minmax(90px,1fr)); } }
 
 .lex-unit-field > input,
 .lex-unit-field > select { min-width: 0; }
@@ -3024,7 +3032,7 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
   text-decoration:underline;
 }
 .lex-reference-tag {
-  margin-right:.28em;
+  margin-right:.12em;
   /* V, R1, R2 are control markers, not words, so they use the shared symbol
      font like every other marker. In the FF8 pixel font the V is drawn with a
      clipped-looking top-left arm, which read as a rendering bug on every
@@ -3870,7 +3878,7 @@ body:has(.lex-data-map-table) #main {
 
 .lex-detail-field:hover .lex-value-fill,
 .lex-detail-field:focus-within .lex-value-fill,
-.lex-value-dragging .lex-value-fill { height:calc(100% + 5px);bottom:-4px;z-index:3; }
+.lex-value-dragging .lex-value-fill { height:calc(100% - 2px);bottom:1px;z-index:3; }
 .lex-detail-field:hover .lex-value-handle,
 .lex-detail-field:focus-within .lex-value-handle,
 .lex-value-dragging .lex-value-handle { opacity:.38;pointer-events:auto; }
@@ -4007,11 +4015,14 @@ body:has(.lex-data-map-table) #main {
 .lex-column-list-head-cell .header-label {
   display:inline-flex;
   align-items:center;
+  justify-content:center;
   max-width:100%;
   min-width:0;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  overflow:visible;
+  text-overflow:clip;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  line-height:1.12;
 }
 .lex-column-list-head-cell .lex-column-sort { min-width:0;max-width:100%; }
 

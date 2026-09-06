@@ -730,6 +730,7 @@
         .filter(control => !control.classList.contains("lex-source-control-internal"));
       if (!controls.length) continue;
       const widest = Math.max(...controls.map(control => Number(control.dataset.lexRailWidth) || 0));
+      panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}em`);
       for (const control of controls) {
         control.style.setProperty("--lex-reference-rail-width", `${widest}em`);
       }
@@ -1174,10 +1175,10 @@
     const svg = document.createElementNS(svgNamespace, "svg");
     svg.setAttribute("class", "lex-curve-svg");
     svg.setAttribute("viewBox", "0 0 320 160");
-    // "meet" letterboxed the 2:1 drawing space inside a taller box, which
-    // left a third of every graph empty. The space stretches to fill instead,
-    // and stroked paths keep their weight through vector-effect below.
-    svg.setAttribute("preserveAspectRatio", "none");
+    // Formula glyphs and labels must never be non-uniformly stretched. The
+    // graph owns a 2:1 user-space viewport; letterbox if a caller gives the
+    // drawing a differently shaped box instead of distorting that viewport.
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", options.graphLabel || `${options.title || "Value"} curve`);
     const grid = document.createElementNS(svgNamespace, "path");
@@ -1213,6 +1214,28 @@
     formulaPath.setAttribute("href", `#${formulaGuideId}`);
     formulaPath.setAttribute("startOffset", "50%");
     formulaPath.setAttribute("text-anchor", "middle");
+    const curveVariableKeys = (options.variables || []).map(variable =>
+      String(variable.label || "").trim()).filter(Boolean);
+    const curveVariableSet = new Set(curveVariableKeys.map(key => key.toLocaleLowerCase()));
+    const formulaContent = source => {
+      if (source?.cloneNode) return source.cloneNode(true);
+      const text = String(source ?? "");
+      if (!curveVariableKeys.length) return text;
+      const escaped = curveVariableKeys
+        .sort((left, right) => right.length - left.length)
+        .map(key => key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      const matcher = new RegExp(`\\b(${escaped.join("|")})\\b`, "gi");
+      const fragment = document.createDocumentFragment();
+      let offset = 0;
+      for (const match of text.matchAll(matcher)) {
+        if (match.index > offset) fragment.append(text.slice(offset, match.index));
+        const key = match[0].toLocaleLowerCase();
+        fragment.append(element("span", {class: `lex-curve-variable-${key}`}, match[0]));
+        offset = match.index + match[0].length;
+      }
+      if (offset < text.length) fragment.append(text.slice(offset));
+      return fragment;
+    };
     const appendFormulaTokens = (target, source) => {
       if (source == null) return;
       if (source.nodeType === Node.TEXT_NODE) {
@@ -1232,7 +1255,7 @@
       }
       target.append(document.createTextNode(String(source)));
     };
-    appendFormulaTokens(formulaPath, options.formula?.cloneNode?.(true) || options.formula || "");
+    appendFormulaTokens(formulaPath, formulaContent(options.formula));
     formulaText.append(formulaPath);
     const guide = document.createElementNS(svgNamespace, "line");
     guide.setAttribute("class", "lex-curve-guide");
@@ -1249,7 +1272,7 @@
     const status = element("span", {class: "lex-curve-status", "aria-live": "polite"});
     const axisTop = element("span", {class: "lex-curve-axis lex-curve-axis-top"}, formatNumber(initialRange.max));
     const axisBottom = element("span", {class: "lex-curve-axis lex-curve-axis-bottom"}, formatNumber(initialRange.min));
-    const variables = element("div", {class: "lex-curve-variables lex-curve-variable-overlay"},
+    const variables = element("div", {class: "lex-curve-variables lex-curve-variable-strip"},
       ...(options.variables || []).map(variable => {
         const key = String(variable.label || "").trim().toLocaleLowerCase();
         return element("label", {class: "lex-curve-variable", "data-curve-variable": key},
@@ -1259,10 +1282,6 @@
     const hoverExtrema = element("div", {class:"lex-curve-hover-extrema", "aria-hidden":"true"},
       element("output", {class:"lex-curve-hover-minimum", title:"Curve minimum"}, "—"),
       element("output", {class:"lex-curve-hover-maximum", title:"Curve maximum"}, "—"));
-    // The stat name sits behind the plot like a watermark: large, centred on
-    // both axes, heavy, and faint enough to read the curve through.
-    const watermark = element("div", {class: "lex-curve-watermark", "aria-hidden": "true"},
-      options.title || "CURVE");
     // Bottom-right switch between the smooth line and a bar reading of the
     // same samples. The mode is a class on the plot, so nothing is redrawn.
     const modeToggle = element("button", {
@@ -1279,7 +1298,6 @@
       },
     }, "BARS");
     const plot = element("div", {class: "lex-curve-plot"},
-      watermark,
       svg,
       axisTop,
       axisBottom,
@@ -1292,10 +1310,9 @@
         options.yLabel || options.title || "VALUE"),
       options.overlayExtrema ? hoverExtrema : null,
       modeToggle,
-      variables,
       tooltip);
     const title = element("h4", {},
-      element("span", {class: "lex-curve-heading-title"}, options.title || "CURVE"));
+      element("span", {class: "lex-curve-heading-title"}, String(options.title || "CURVE").toLocaleUpperCase()));
     if (options.extremaInTitle) title.append(
       " ", element("span", {class: "lex-curve-heading-extrema"}, "[", minimum, " TO ", maximum, "]"));
     if (options.formulaInTitle && options.formula) title.append(
@@ -1310,12 +1327,12 @@
         options.extremaInTitle || options.overlayExtrema ? null : element("div", {class: "lex-curve-extrema"},
           element("span", {}, "MIN ", minimum),
           element("span", {}, "MAX ", maximum))),
+      curveVariableKeys.length ? variables : null,
       plot,
-      element("div", {class: "lex-curve-formula"}, options.formula || ""),
+      element("div", {class: "lex-curve-formula"}, formulaContent(options.formula)),
       status);
 
-    const variableKeys = new Set((options.variables || []).map(variable =>
-      String(variable.label || "").trim().toLocaleLowerCase()).filter(Boolean));
+    const variableKeys = curveVariableSet;
     const formulaTokens = [...root.querySelectorAll(".lex-curve-path-formula [class]")];
     formulaTokens.forEach(token => {
       const match = [...token.classList].find(name => {
@@ -1426,11 +1443,11 @@
     // Real hitboxes, not an estimate: every rendered glyph is asked for its
     // own start point, rotation and extent, turned into the quad it actually
     // occupies, and tested against its neighbours with a separating axis.
-    // The plot is 320x160 of user space stretched into whatever box the card
-    // gives it, with preserveAspectRatio="none". Angles and overlaps therefore
-    // mean nothing in user space - a 20 degree user-space slope can display at
-    // 40 - so every angle below is a SCREEN angle and every box is measured
-    // after the same stretch the eye sees.
+    // The plot is 320x160 of user space fitted uniformly into whatever box the
+    // card gives it. Angles and overlaps are still measured in SCREEN space so
+    // letterboxing, browser zoom and responsive sizing cannot invalidate the
+    // collision test. preserveAspectRatio keeps glyph geometry uniform, and
+    // measuring after that transform keeps the placement faithful to display.
     const plotScale = () => {
       const box = svg.getBoundingClientRect();
       return {x: (box.width || 320) / 320, y: (box.height || 160) / 160};
@@ -4637,7 +4654,14 @@
       const listStyle = getComputedStyle(listNode);
       const borderHeight = (parseFloat(listStyle.borderTopWidth) || 0) +
         (parseFloat(listStyle.borderBottomWidth) || 0);
-      const available = Math.max(0, availableNode.clientHeight - borderHeight - headerHeight);
+      // availableNode is the complete paged view. Its bottom pager occupies
+      // real height in the second grid row; counting it as list space is what
+      // produced one clipped row plus a vertical scrollbar on Tweaks/tables.
+      const pagerNode = availableNode.querySelector?.(":scope > .lex-pager");
+      const pagerHeight = pagerNode?.getBoundingClientRect().height ||
+        parseFloat(getComputedStyle(availableNode).getPropertyValue("--lex-pager-height")) || 0;
+      const availableHeight = Math.max(0, availableNode.clientHeight - pagerHeight);
+      const available = Math.max(0, availableHeight - borderHeight - headerHeight);
       const minimumRowHeight = Math.max(0, Number(options.minRowHeight) || 0);
       const capacity = minimumRowHeight > 0 ? Math.max(1, Math.floor((available - 0.5) / minimumRowHeight)) : Infinity;
       const pageSize = Math.min(fixedRows || Math.max(1, Math.floor((available - 0.5) / naturalRowHeight)), capacity);
@@ -4653,7 +4677,7 @@
       const visibleRows = Math.max(1, Math.min(pageSize,
         Number(requestedVisibleRows) || pageSize));
       const full = visibleRows >= pageSize;
-      const fittedHeight = full ? availableNode.clientHeight :
+      const fittedHeight = full ? availableHeight :
         Math.ceil(borderHeight + headerHeight + visibleRows * rowHeight);
       options.resize?.(fittedHeight, {full, pageSize, visibleRows, rowHeight});
       if ((!fixedRows || minimumRowHeight > 0) && pageSize !== lastSize) {
@@ -4661,25 +4685,18 @@
         options.change?.(pageSize);
       }
     };
-    let fontsReady = !document.fonts;
     const schedule = () => {
-      if (!fontsReady) return;
-      // The fixed pager changes #main through :has(). Wait for two quiet
-      // layout frames so a first measurement cannot use the pre-pager height
-      // and then strand one clipped row after the content area contracts.
+      // The pager is already in the DOM when fitListPage is called. Measure on
+      // the next quiet pair of frames immediately, then measure once more when
+      // web fonts settle. Waiting for fonts before the FIRST fit left some
+      // pages scrollable or at the wrong row count during normal startup.
       if (frame) cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() => {
         frame = requestAnimationFrame(measure);
       });
     };
-    if (document.fonts) {
-      document.fonts.ready.then(() => {
-        fontsReady = true;
-        schedule();
-      });
-    } else {
-      schedule();
-    }
+    schedule();
+    document.fonts?.ready?.then(schedule).catch(() => {});
     if (typeof ResizeObserver !== "undefined") {
       const observer = new ResizeObserver(schedule);
       observer.observe(availableNode);
@@ -5486,7 +5503,11 @@
       return shortReferenceName(source).length + value.length + 1;
     }));
     if (options.internal) {
-      const reserve = Math.max(2.15, Math.min(6.25, referenceCharacters * .38 + .35));
+      // Internal references share the live control's box. Size the reserved
+      // lane from the actual tag+value character count with enough average
+      // glyph width for game fonts; the old .38em estimate clipped values such
+      // as "V DEFAULT" and two-digit numbers against native select chrome.
+      const reserve = Math.max(2.75, Math.min(8.5, referenceCharacters * .58 + .65));
       root.style.setProperty("--lex-internal-reference-width", `${reserve}em`);
     } else {
       const reserve = Math.max(2.35, Math.min(6.25, referenceCharacters * .44 + .45));
