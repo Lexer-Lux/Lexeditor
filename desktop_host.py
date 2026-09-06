@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import subprocess
@@ -737,7 +738,7 @@ class HostApi:
                        "helper": plugin.helper_name, "pinned": plugin.helper_pinned}
                 try:
                     if plugin.helper_upstream is None:
-                        raise RuntimeError("No upstream release check is registered.")
+                        raise RuntimeError("No upstream release provider is registered.")
                     row.update(plugin.helper_upstream() or {})
                 except Exception as error:
                     row["error"] = str(error)
