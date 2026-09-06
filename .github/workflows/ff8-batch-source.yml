@@ -1,0 +1,38 @@
+name: FF8 backlog batch source
+on:
+  push:
+    branches: [work/ff8-remaining-batch-1]
+    paths: [.github/workflows/ff8-batch-source.yml]
+permissions:
+  contents: read
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch exact revision
+        run: |
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin "$GITHUB_SHA"
+          git -C editor checkout --detach FETCH_HEAD
+      - name: Archive source
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import os, subprocess, zipfile
+          root=Path('editor')
+          names=subprocess.check_output(['git','-C',str(root),'ls-files','-z']).decode().split('\0')
+          with zipfile.ZipFile('ff8-batch-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              z.writestr('SNAPSHOT_REVISION.txt', os.environ['GITHUB_SHA'])
+              for name in names:
+                  if not name: continue
+                  p=root/name
+                  if p.is_file(): z.write(p,name)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ff8-batch-source
+          path: ff8-batch-source.zip
+          retention-days: 2
+          if-no-files-found: error
