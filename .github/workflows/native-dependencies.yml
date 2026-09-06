@@ -42,7 +42,7 @@ jobs:
           with zipfile.ZipFile('native-canonical-source.zip','w',zipfile.ZIP_DEFLATED) as z:
               for name in names:
                   p=root/name
-                  if p.is_file() and p.suffix.lower() in {'.py','.cpp','.h','.hpp','.html','.js','.json','.md','.patch','.yml','.txt'}:
+                  if p.is_file() and (p.suffix.lower() in {'.py','.cpp','.h','.hpp','.html','.js','.json','.md','.patch','.yml','.txt'} or name=='.gitattributes'):
                       z.write(p,name)
           '@ | python -
       - uses: actions/upload-artifact@v4
@@ -77,7 +77,11 @@ jobs:
           $vs = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -prerelease -latest -property InstallationPath
           cmd /c "call `"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x86 && set > $env:RUNNER_TEMP\vcvars.txt"
           Get-Content "$env:RUNNER_TEMP\vcvars.txt" | ForEach-Object { if ($_ -match '^(.*?)=(.*)$') { Set-Content "env:\$($matches[1])" $matches[2] } }
-          cmake -S ffnx -B ffnx/.build -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-D_DLL_VERSION=1.24.3-lexeditor51-runtime' "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/triplets" '-DVCPKG_TARGET_TRIPLET=x86-windows-static' '-DFFNX_DEPLOY_TO_GAME_DIRS=OFF' '-DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON'
+          cmake -S ffnx -B ffnx/.build -G Ninja '-DCMAKE_BUILD_TYPE=Release' '-D_DLL_VERSION=1.24.3-lexeditor51-runtime' "-DCMAKE_TOOLCHAIN_FILE=$env:GITHUB_WORKSPACE/ffnx/vcpkg/scripts/buildsystems/vcpkg.cmake" "-DVCPKG_OVERLAY_TRIPLETS=$env:GITHUB_WORKSPACE/triplets" '-DVCPKG_TARGET_TRIPLET=x86-windows-static' '-DFFNX_DEPLOY_TO_GAME_DIRS=OFF' '-DFFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON' '-DFFNX_LEXEDITOR_LIVE_CONDITIONS=ON'
+          # Both gates are required by the already-shipped runtime contract.
+          foreach ($gate in @('FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME','FFNX_LEXEDITOR_LIVE_CONDITIONS')) {
+            if (-not (Select-String -Path ffnx/.build/CMakeCache.txt -Pattern "^${gate}:BOOL=ON$" -Quiet)) { throw "Required compile gate disabled: $gate" }
+          }
       - uses: actions/cache/save@v4
         if: always()
         with:
@@ -94,14 +98,14 @@ jobs:
           cmd /c "call `"$vs\VC\Auxiliary\Build\vcvarsall.bat`" x86 && set > $env:RUNNER_TEMP\vcvars-build.txt"
           Get-Content "$env:RUNNER_TEMP\vcvars-build.txt" | ForEach-Object { if ($_ -match '^(.*?)=(.*)$') { Set-Content "env:\$($matches[1])" $matches[2] } }
           cmake --build ffnx/.build --config Release --parallel 4
-          python ffnx/tools/verify_issue51_runtime_artifact.py ffnx/.build/bin/FFNx.dll
           Copy-Item ffnx/.build/bin/FFNx.dll candidate/AF3DN.P
           Copy-Item ffnx/.build/bin/FFNx.pdb candidate/FFNx.pdb
           Copy-Item ffnx/LICENSE candidate/LICENSE
           "Editor source: $env:GITHUB_SHA" | Set-Content candidate/BUILD.txt
           'FFNx source: c056db2783f376a340fcefa6a48cc33618998876' | Add-Content candidate/BUILD.txt
-          'MSVC x86 Release; static Release-only dependencies; game deployment disabled.' | Add-Content candidate/BUILD.txt
+          'MSVC x86 Release; static Release-only dependencies; Shared Magic and Live Conditions compiled; game deployment disabled.' | Add-Content candidate/BUILD.txt
           Get-FileHash candidate/* -Algorithm SHA256 | Format-Table -AutoSize | Out-String -Width 300 | Add-Content candidate/BUILD.txt
+          python ffnx/tools/verify_issue51_runtime_artifact.py candidate/AF3DN.P
       - uses: actions/upload-artifact@v4
         if: success()
         with:
@@ -117,4 +121,6 @@ jobs:
           path: |
             ffnx/vcpkg/buildtrees/**/*.log
             ffnx/.build/**/*.log
+            ffnx/.build/CMakeCache.txt
+            candidate/
           retention-days: 2
