@@ -21,7 +21,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p ff9-toolchain/dotnet ff9-toolchain/packages ff9-toolchain/wheels
-          for spec in microsoft.netframework.referenceassemblies.net35:1.0.3 microsoft.netframework.referenceassemblies.net472:1.0.3 mono.cecil:0.11.6; do
+          for spec in microsoft.netframework.referenceassemblies.net35:1.0.3 microsoft.netframework.referenceassemblies.net472:1.0.3 mono.cecil:0.11.6 unityengine5:5.5.0; do
             name=${spec%:*}; version=${spec#*:}
             curl --fail --location --retry 2 "https://api.nuget.org/v3-flatcontainer/$name/$version/$name.$version.nupkg" -o "ff9-toolchain/packages/$name.$version.nupkg"
             unzip -q "ff9-toolchain/packages/$name.$version.nupkg" -d "ff9-toolchain/packages/$name"
