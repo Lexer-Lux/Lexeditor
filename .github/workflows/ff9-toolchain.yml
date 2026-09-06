@@ -1,0 +1,41 @@
+name: FF9 development toolchain
+on:
+  push:
+    branches: [codex/ff9-issues-20260906]
+    paths: ['.github/workflows/ff9-toolchain.yml']
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Collect public reference assemblies and compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ff9-toolchain/References ff9-toolchain/dotnet
+          curl --fail --location --retry 2 https://raw.githubusercontent.com/Albeoris/Memoria/d8df6e69ddb618adc753a27d9424409d66216a35/References/Dependencies.7z -o ff9-toolchain/Dependencies.7z
+          test "$(git hash-object ff9-toolchain/Dependencies.7z)" = c460af533dd009b55951ab8ea25fac168fde7bad
+          7z x ff9-toolchain/Dependencies.7z -off9-toolchain/References -y
+          root=$(dirname "$(readlink -f "$(command -v dotnet)")")
+          cp "$root/dotnet" ff9-toolchain/dotnet/
+          cp -r "$root/host" ff9-toolchain/dotnet/
+          runtime=$(dotnet --list-runtimes | grep '^Microsoft.NETCore.App 8\.' | tail -1 | awk '{print $2}')
+          mkdir -p ff9-toolchain/dotnet/shared/Microsoft.NETCore.App
+          cp -r "$root/shared/Microsoft.NETCore.App/$runtime" ff9-toolchain/dotnet/shared/Microsoft.NETCore.App/
+          sdk=$(dotnet --list-sdks | grep '^8\.' | tail -1 | awk '{print $1}')
+          cp -r "$root/sdk/$sdk/Roslyn/bincore" ff9-toolchain/compiler
+          cp -r "$root/packs/Microsoft.NETCore.App.Ref" ff9-toolchain/netcore-ref
+          printf '%s\n' "$runtime" > ff9-toolchain/runtime-version.txt
+          printf '%s\n' "$sdk" > ff9-toolchain/sdk-version.txt
+          find ff9-toolchain -type f \( -iname '*.ttf' -o -iname '*.otf' -o -iname '*.woff*' \) -delete
+          tar -czf ff9-toolchain.tar.gz ff9-toolchain
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ff9-development-toolchain
+          path: ff9-toolchain.tar.gz
+          retention-days: 1
