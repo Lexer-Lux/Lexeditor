@@ -47,6 +47,18 @@ Exact metadata: [source record](sources/issue-5356302029-8e503e6ea47db8f63581ce4
 
 Remove the custom card-glint code and setting while preserving vanilla flashes, card pickups and the separate casing glints. No new design answer or repeat test is needed from you.
 
+## issue 5356302029 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/180
+
+Created: 2026-08-06T03:45:31Z; updated: 2026-09-06T17:14:39Z
+
+Exact metadata: [source record](sources/issue-5356302029-c4f3db52ef49adebefcf96ccc2e514f6e443af614a16baa6e80a375f2fc2d0bd.json).
+
+**Actionable — removal remains.** You asked to remove this feature because vanilla cigarette cards already flash. Later implementation notes did not supersede that decision.
+
+Remove the custom card-glint code and setting while preserving vanilla flashes, card pickups and the separate casing glints. No new design answer or repeat test is needed from you.
+
 ## comment 5550130360 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/180#issuecomment-5550130360
@@ -96,3 +108,13 @@ Created: 2026-08-20T19:43:00Z; updated: 2026-08-20T19:43:00Z
 Exact metadata: [source record](sources/comment-5550130414-c55a0477e1a168c4e09a877b793efa11c74c3b72d948f734d34bbfec1a3122db.json).
 
 Source repair is complete but unbuilt. The casing glint is now attached to the real streamed cigarette-card object for all 144 card models. Discovery is limited to nearby authored placements, and the effect is removed when the card is collected, hidden, or streamed out. The code does not create, move, replace, or collect cards. After the next install, confirm that an uncollected card glints and remains normally inspectable and collectible.
+
+## comment 5560839232 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/180#issuecomment-5560839232
+
+Created: 2026-09-06T17:14:39Z; updated: 2026-09-06T17:14:39Z
+
+Exact metadata: [source record](sources/comment-5560839232-88610c85c0fb8d471ed364d22b47834aa6303cd09643ab34159eae70bc8f2f71.json).
+
+Verified the custom cigarette-card glint implementation is absent and kept that retirement under permanent CI. The regression also confirms unrelated spent-casing glints remain. No replacement card-glint code was added and I am not asking you to repeat the previously rejected visual test. Current Windows candidates build successfully in runtime PR #211; merge/delivery remains separate from source verification.
