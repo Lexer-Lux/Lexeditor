@@ -160,9 +160,10 @@ def test_rollback_restores_previous_files(setup, failure):
         manager.install(root, **kwargs)
     actual = {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
     assert actual == original
+    assert not manager.status(root, kwargs["state_path"])["recoveryRequired"]
 
 
- def test_failed_download_cleans_partial_file(setup):
+def test_failed_download_cleans_partial_file(setup):
     root, kwargs, _, _ = setup
     def fail(_url, target, _progress):
         target.write_bytes(b"truncated")
@@ -191,8 +192,99 @@ def test_game_started_during_download_is_refused(setup, monkeypatch):
     assert (root / "FF9_Launcher.exe").read_bytes() == b"vanilla launcher"
 
 
-@pytest.mark.parametrize("status", ["enabled", "recovery-required"])
-def test_configuration_write_is_serialized(setup, status):
+def test_same_root_concurrent_operation_is_refused(setup):
     root, kwargs, _, _ = setup
-    with manager.configuration_write(root, kwargs["state_path"]):
+    with install_lock(root, manager._control_root(kwargs["state_path"])):
+        with pytest.raises(RuntimeError, match="Another Memoria operation"):
+            manager.install(root, **kwargs)
+
+
+def test_legacy_record_never_leaks_version(setup, tmp_path):
+    root, kwargs, _, _ = setup
+    manager._save_state({"gameRoot": str(tmp_path / "unrelated"), "version": "v9999"}, kwargs["state_path"])
+    result = manager.status(root, kwargs["state_path"])
+    assert result["version"] == "" and result["lastInstalled"] == ""
+
+
+def test_linked_destination_refused_before_patching(setup, tmp_path):
+    root, kwargs, _, _ = setup
+    outside = tmp_path / "outside.ini"
+    outside.write_text("private", encoding="utf-8")
+    (root / "Memoria.ini").symlink_to(outside)
+    kwargs["runner"] = lambda *_: pytest.fail("must not patch symlink")
+    with pytest.raises(RuntimeError, match="linked path"):
+        manager.install(root, **kwargs)
+    assert outside.read_text() == "private"
+
+
+def test_no_rollback_while_game_open_and_explicit_recovery(setup, monkeypatch):
+    root, kwargs, _, _ = setup
+    original = (root / "FF9_Launcher.exe").read_bytes()
+    success = kwargs["runner"]
+    running = False
+    monkeypatch.setattr(manager, "_game_running", lambda _: running)
+    def fail(argv, cwd):
+        nonlocal running
+        success(argv, cwd)
+        running = True
+        return 9
+    kwargs["runner"] = fail
+    with pytest.raises(RuntimeError, match="Recovery is required"):
+        manager.install(root, **kwargs)
+    assert manager.status(root, kwargs["state_path"])["recoveryRequired"]
+    running = False
+    result = manager.recover(root, kwargs["state_path"])
+    assert not result["recoveryRequired"]
+    assert (root / "FF9_Launcher.exe").read_bytes() == original
+
+
+def test_damaged_backup_is_not_restored(setup):
+    root, kwargs, _, _ = setup
+    patcher, _ = manager.stage(fetch_json=kwargs["fetch_json"], fetch_file=kwargs["fetch_file"], cache_root=kwargs["cache_root"])
+    recovery = Recovery.prepare(root, installation_files(inspect_payload(patcher), root), kwargs["cache_root"] / "backups")
+    (recovery.folder / "files/FF9_Launcher.exe").write_bytes(b"damaged")
+    (root / "FF9_Launcher.exe").write_bytes(b"new")
+    with pytest.raises(RuntimeError, match="damaged"):
+        recovery.rollback()
+    assert (root / "FF9_Launcher.exe").read_bytes() == b"new"
+
+
+def test_recovery_can_acquire_lock_after_owner_crashes(setup):
+    root, kwargs, _, _ = setup
+    control = manager._control_root(kwargs["state_path"])
+    script = """import os,sys
+from pathlib import Path
+from games.ff9.memoria_recovery import install_lock
+with install_lock(Path(sys.argv[1]), Path(sys.argv[2])):
+    os._exit(17)
+"""
+    result = subprocess.run([sys.executable, "-c", script, str(root), str(control)],
+                            cwd=Path(__file__).parents[1], timeout=10)
+    assert result.returncode == 17
+    with install_lock(root, control, recover_stale=True):
+        assert (control / (root_key(root) + ".lock")).is_file()
+
+
+def test_recovery_does_not_clear_live_process_lock(setup):
+    root, kwargs, _, _ = setup
+    control = manager._control_root(kwargs["state_path"])
+    script = """import sys
+from pathlib import Path
+from games.ff9.memoria_recovery import install_lock
+with install_lock(Path(sys.argv[1]), Path(sys.argv[2])):
+    print('locked', flush=True)
+    sys.stdin.readline()
+"""
+    process = subprocess.Popen([sys.executable, "-c", script, str(root), str(control)],
+                               cwd=Path(__file__).parents[1], stdin=subprocess.PIPE,
+                               stdout=subprocess.PIPE, text=True)
+    try:
+        assert process.stdout.readline().strip() == "locked"
+        with pytest.raises(RuntimeError, match="Another Memoria operation"):
+            with install_lock(root, control, recover_stale=True):
+                pass
+    finally:
+        process.communicate("done\n", timeout=10)
+    assert process.returncode == 0
+    with install_lock(root, control):
         pass
