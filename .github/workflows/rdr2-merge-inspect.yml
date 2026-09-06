@@ -41,7 +41,7 @@ jobs:
               assert b'RDR2 isolated batch / session rdr2-issue-batch' in ours_append
               assert b'verified transferred issue identity' in theirs_append
               pathlib.Path(path).write_bytes(theirs+ours_append)
-              subprocess.run(['git','add','--',path],check=True)
+              subprocess.run(['git','add','-f','--',path],check=True)
               print('Preserved historical link and new session:',path)
           assert not git('diff','--name-only','--diff-filter=U')
           allowed={'games/rdr2/alcohol_strengths.py','games/rdr2/editor.html','games/rdr2/server.py','games/rdr2/settings_schema.json','tests/test_rdr2_issue_repairs.py','tests/test_rdr2_boot.js','.github/workflows/rdr2-checks.yml','.github/workflows/rdr2-merge-inspect.yml'} | {f'worklog/issues/github-{n}.md' for n in (131,144,181,347,357)}
