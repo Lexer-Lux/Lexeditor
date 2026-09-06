@@ -77,3 +77,8 @@ Actual installation on Lexer's PC and a real Warband/Steam session remain
 unverified. A pin or passing CI must never be treated as evidence of an achievement
 award. Keep the issue open for the prepared installed acceptance; a failure returns
 to implementation with its runtime/module/log evidence.
+
+
+## Preserved source records
+
+[Full request and discussion archive](github-365/conversation.md)
