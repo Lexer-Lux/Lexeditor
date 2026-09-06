@@ -27,6 +27,16 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin master
           git merge --no-edit origin/master
+      - name: Apply final shared-control help coverage
+        run: |
+          if [ -f maintenance/global-resume/apply_followup.py ]; then
+            python maintenance/global-resume/apply_followup.py
+            node --check ui/framework.js
+            python -m py_compile tests/global_controls_check.py
+            git add ui/framework.js tests/global_controls_check.py
+            git rm maintenance/global-resume/apply_followup.py
+            git commit -m 'Explain unlabeled shared controls without inventing gameplay semantics'
+          fi
       - name: Regenerate reviewed offline credits
         run: |
           python tools/generate_credits.py
