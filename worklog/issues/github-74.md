@@ -1,15 +1,26 @@
-# #74: Finish FF9 data editing beyond the initial tables
+# #74 — FF9 CSV editor coverage
 
-[Full request and discussion archive](github-74/conversation.md)
+## 2026-09-06 — character-data increment
 
-## Requirements and decisions
+Added Character parameters, Starting equipment and Level growth under Characters,
+using three SHA-256-pinned official v2025.07.04 CSVs. Catalog/Data Map registration
+now includes all 12 implemented files; Data Map links carry the exact dataset key.
 
-Recover the complete scope from the linked verbatim sources before implementation or status changes. The short GitHub summary is not the full specification. Do not infer that missing chat text was never supplied.
+Verified official raw-byte Git blob/SHA-256 hashes and read/edit/reload of all three
+schemas (12, 16 and 99 rows). Unit fixtures exercise typed booleans/numbers, bounds,
+empty equipment slots, UTF-8 BOM, Windows-1252 punctuation, mixed line endings and
+missing final newlines. Stale source changes and selecting a baseline as the
+project are refused. Empty saves do not create overlays. Non-finite floats cannot
+be serialized; fractional integer edits are no longer silently truncated by JS.
 
-## Current implementation and evidence
+Status: partial/actionable. No enemy/encounter editor or p0data writer was added.
+The remaining Memoria data formats, full real-shell render matrix and game
+readback/deployment acceptance are still agent work; do not close this issue or
+call placeholder tabs complete. Full repository smoke was not run in this
+connector-backed, partial local checkout.
 
-Reconcile live code, PRs and existing topic/session worklogs. This archive import makes no build, deployment or gameplay-success claim.
-
-## Next agent work
-
-Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.
+Prepared acceptance checklist after review:
+- [ ] In Characters, open all four subtabs; check search, sorting and record selection in the real editor.
+- [ ] Save one row/pose checkbox, one starting equipment field and one level-growth field; restart the editor and confirm them.
+- [ ] Compare the installed baseline with its original; only the selected mod-project overlay should have changed.
+- [ ] Verify deployed character equipment/growth changes in a disposable in-game test.

@@ -20,7 +20,7 @@ VISIBLE = frozenset({
     "streamlinedDraw", "betterCard", "fixedCommandMenu", "trueAtbWait",
     "modernControls", "vibrationConsolidation", "betterTargeting",
     "damageLimitRemoval", "fastStart", "xpBars", "hpBars",
-    "flatStatAbilities", "maxSpellEnabled",
+    "flatStatAbilities", "maxSpellEnabled", "gfHpBars", "noMagicConsumption", "dropsAfterMug",
 })
 
 
@@ -53,6 +53,7 @@ def main() -> None:
             "hpBars": True,
             "flatStatAbilities": True,
             "maxSpellEnabled": True,
+            "gfHpBars": True, "noMagicConsumption": True, "dropsAfterMug": True,
         }
         gameplay_settings.settings_path(project).write_text(
             json.dumps(configured), encoding="utf-8",

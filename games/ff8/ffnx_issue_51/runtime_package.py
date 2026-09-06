@@ -18,10 +18,10 @@ EXPECTED_HOOK_COUNT = 28
 # The integration lane fills these from the final reviewed runtime-on package.
 # Empty values keep the package unavailable; a manifest cannot authorize itself.
 PINNED_ARTIFACT_SHA256 = {
-    "driver": "cf237e90a3c0a099c5182e58561e6469951bf2a493bc8a346938aceff2ab0e77",
+    "driver": "b44009f4421f278ea10afc6f53e3f9e21cfdffbdcfd7332da89d01a61c41b250",
     "license": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
-    "sourcePatch": "9516488302f5eb352ec5e4162bffc6f540fac6150645eb6f040597332219cf79",
-    "buildReport": "71130241329dfa8a74bdb67e126e0fac8da8060d316495a5034f1ea0cb1fbb4a",
+    "sourcePatch": "6d733cd2f9d92996c4a5d698282ac58df757535195b69348490afdd93a64cc74",
+    "buildReport": "95b21d38518929a74107e25d8c073c328ef294162e0008bebbddccf71f1350ff",
     # Steamworks redistributable, shipped verbatim under the name FFNx loads
     # it by. FFNx refuses to run unless this file is signed or matches its
     # own pinned SHA-1 03bd9f3e352553a0af41f5fe006f6249a168c243.
@@ -45,6 +45,9 @@ MACHINE_I386 = 0x014C
 OPTIONAL_MAGIC_PE32 = 0x010B
 REQUIRED_EXPORTS = frozenset({
     "new_dll_graphics_driver",
+    "lexeditor_ff8_shared_party_contract_version",
+    "lexeditor_ff8_stock_tweaks_contract_version",
+    "lexeditor_ff8_no_consume_battle_debit",
     "lexeditor_issue_51_identity",
     "lexeditor_issue_51_hook_count",
     "lexeditor_issue_51_runtime_requested",
@@ -441,6 +444,9 @@ def verify(package_root: Path = PACKAGE_ROOT) -> dict:
         raise RuntimePackageError(
             "The packaged Lexeditor FFNx driver is missing exports: " + ", ".join(missing_exports)
         )
+    for contract in ("lexeditor_ff8_shared_party_contract_version", "lexeditor_ff8_stock_tweaks_contract_version"):
+        if _constant_export(driver_data, actual_exports[contract]) != 1:
+            raise RuntimePackageError(f"The packaged FF8 {contract} is not supported")
     if not _pointer_export_string(
         driver_data, actual_exports["lexeditor_issue_51_identity"], identity,
     ):
