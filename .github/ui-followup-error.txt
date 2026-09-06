@@ -1,0 +1,64 @@
++ python -m pip install -q playwright
++ python -m playwright install --with-deps chromium
+
+Running kernel seems to be up-to-date.
+
+No services need to be restarted.
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
++ LEXEDITOR_BROWSER_OFFLINE=1
++ python tests/global_controls_check.py
+Traceback (most recent call last):
+  File "/home/runner/work/Lexeditor/Lexeditor/tests/global_controls_check.py", line 181, in <module>
+    if __name__=='__main__':main()
+                            ^^^^^^
+  File "/home/runner/work/Lexeditor/Lexeditor/tests/global_controls_check.py", line 143, in main
+    trigger=page.locator('.lex-model-preview-trigger');trigger.click()
+                                                       ^^^^^^^^^^^^^^^
+  File "/home/runner/.local/lib/python3.12/site-packages/playwright/sync_api/_generated.py", line 17876, in click
+    self._sync(
+  File "/home/runner/.local/lib/python3.12/site-packages/playwright/_impl/_sync_base.py", line 115, in _sync
+    return task.result()
+           ^^^^^^^^^^^^^
+  File "/home/runner/.local/lib/python3.12/site-packages/playwright/_impl/_locator.py", line 165, in click
+    return await self._frame._click(self._selector, strict=True, **params)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/.local/lib/python3.12/site-packages/playwright/_impl/_frame.py", line 593, in _click
+    await self._channel.send("click", self._timeout, locals_to_params(locals()))
+  File "/home/runner/.local/lib/python3.12/site-packages/playwright/_impl/_connection.py", line 76, in send
+    return await self._connection.wrap_api_call(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/.local/lib/python3.12/site-packages/playwright/_impl/_connection.py", line 632, in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+playwright._impl._errors.TimeoutError: Locator.click: Timeout 5000ms exceeded.
+Call log:
+  - waiting for locator(".lex-model-preview-trigger")
+    - locator resolved to <div tabindex="0" role="button" aria-expanded="false" title="Open Model preview" aria-label="Open Model preview" class="lex-detail-panel-icon lex-model-preview-trigger">…</div>
+  - attempting click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div class="lex-detail-field-label">…</div> from <div class="lex-detail-panel-body">…</div> subtree intercepts pointer events
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div class="lex-detail-field-label">…</div> from <div class="lex-detail-panel-body">…</div> subtree intercepts pointer events
+    - retrying click action
+      - waiting 100ms
+    9 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <div class="lex-detail-field-label">…</div> from <div class="lex-detail-panel-body">…</div> subtree intercepts pointer events
+    - retrying click action
+      - waiting 500ms
+    - waiting for element to be visible, enabled and stable
+
