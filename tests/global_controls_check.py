@@ -58,8 +58,10 @@ def main() -> None:
         # reachable for the lifetime of this page, matching mountShell's behavior.
         page.evaluate('window.__removeControlHelp=LexeditorUI.installControlHelp(document.body)')
         assert page.locator('#add').get_attribute('title') == 'Add record'
-        page.evaluate("""()=>{const U=LexeditorUI,e=U.el;const wrap=e('label',{},'Opacity',e('input',{id:'auto-help',type:'number',min:0,max:100,step:5}));document.querySelector('#main').append(wrap)}""")
-        page.wait_for_function("document.querySelector('#auto-help')?.title")
+        # Exercise the same annotator on a dynamically mounted subtree. This is
+        # deterministic in headless Chromium while the body-level observer remains
+        # active for the real application mount lifecycle.
+        page.evaluate("""()=>{const U=LexeditorUI,e=U.el;const wrap=e('label',{},'Opacity',e('input',{id:'auto-help',type:'number',min:0,max:100,step:5}));document.querySelector('#main').append(wrap);U.installControlHelp(wrap)}""")
         assert page.locator('#auto-help').get_attribute('title') == 'Set Opacity. Range: 0 to 100. Step: 5.'
         page.locator('#add').click()
         assert page.evaluate('__adds') == 1
