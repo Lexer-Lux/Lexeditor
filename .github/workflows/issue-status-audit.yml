@@ -26,7 +26,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python worklog/issue-status-audit/apply_review.py
-      - name: Preserve results
+      - name: Preserve results and generated internal handoffs
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -34,22 +34,24 @@ jobs:
           path: |
             audit-results/
             worklog/legacy/issue-status-audit-2026-09-06/
+            worklog/issues/
           retention-days: 30
-      - name: Commit internal evidence without changing game code
+      - name: Preserve original public issue text in the audit archive
         if: always()
         run: |
           set -euo pipefail
           test -d worklog/legacy/issue-status-audit-2026-09-06
           git config user.name 'Lexeditor Issue Audit'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add worklog/legacy/issue-status-audit-2026-09-06
-          if test -d worklog/issues; then git add worklog/issues; fi
+          # Only this generated archive of existing PUBLIC issue text is added.
+          # Do not override gitignore for other worklogs, local data or reports.
+          git add -f worklog/legacy/issue-status-audit-2026-09-06
           if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Archive issue audit evidence and internal status handoffs [skip ci]'
+          git commit -m 'Preserve original public issue text and audit results [skip ci]'
           for attempt in 1 2 3; do
             git fetch origin master
             git rebase origin/master
             if git push origin HEAD:master; then exit 0; fi
           done
-          echo 'Evidence push failed; originals remain in the workflow artifact.' >&2
+          echo 'Archive push failed; originals remain in the workflow artifact.' >&2
           exit 1
