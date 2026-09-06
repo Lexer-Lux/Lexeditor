@@ -15,6 +15,8 @@ jobs:
         with:
           ref: fix/ui-standardization-20260906
           fetch-depth: 0
+      - name: Install verifier dependencies
+        run: python -m pip install Pillow 'fonttools>=4.59,<5' 'tomli>=2,<3'
       - name: Clean runtime and active regressions
         run: |
           python - <<'PY'
@@ -22,12 +24,7 @@ jobs:
 
           def read(path): return Path(path).read_text(encoding='utf-8')
           def write(path,text): Path(path).write_text(text,encoding='utf-8',newline='\n')
-          def once(path,old,new,label):
-              t=read(path); n=t.count(old)
-              if n != 1: raise SystemExit(f'{label}: expected one match, found {n}')
-              write(path,t.replace(old,new,1))
 
-          # Shell authorization has one state: authenticated Developer Mode.
           p='ui/framework.js'; t=read(p)
           t=t.replace('    let developerMode = false;\n    let lexerMode = false;\n','    let developerMode = false;\n')
           t=t.replace('if (event.button !== 2 || !lexerMode) return;','if (event.button !== 2 || !developerMode) return;')
@@ -37,7 +34,6 @@ jobs:
           t=t.replace('      setDeveloperMode(event.detail?.developerMode);\n      setLexerMode(event.detail?.lexerMode);','      setDeveloperMode(event.detail?.developerMode);')
           write(p,t)
 
-          # Helper-version tools are privileged by the same GitHub identity.
           p='desktop_host.py'; t=read(p)
           old='''        if not self._settings.snapshot().get("lexerMode"):\n            raise PermissionError("Lexer Mode is not enabled")\n'''
           new='''        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):\n            raise PermissionError("Developer Mode requires Lexer's active GitHub account")\n'''
@@ -50,7 +46,6 @@ jobs:
                       '"""Save per-user preferences. Authenticated authoring state is never persisted."""')
           write(p,t)
 
-          # Unit tests now mock the authorization source, not deleted settings bits.
           p='tests/test_global_issues.py'; t=read(p)
           t=t.replace("        h._settings=Mock();h._settings.snapshot.return_value={'lexerMode':True}\n",
                       "        h._settings=Mock();h._github=Mock();h._github.visible_repository.return_value={'repository':'Lexer-Lux/Lexeditor','login':'Lexer-Lux'}\n")
@@ -73,7 +68,6 @@ jobs:
           t=t.replace("{detail:{lexerMode:false}}","{detail:{developerMode:false}}")
           write(p,t)
 
-          # Lightweight fixture/verifier migrations to the renamed public contract.
           migrations={
             'tools/shot.py': [('save_lexer_setting_defaults','save_developer_setting_defaults'),('lexerMode:false','developerMode:true')],
             'tools/verify_ffnx_settings_issue_23.py': [('save_lexer_defaults','save_packaged_defaults')],
