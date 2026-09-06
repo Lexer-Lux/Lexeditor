@@ -237,15 +237,33 @@
     const redHook=state.dashboard.redHook;
     const intro=redHook.skipIntroLogos;
     const redHookCard=el("section",{class:"card"},el("h2",{},"RedHook"),redHook.installed?el("div",{class:"ok"},"RedHook is installed."):el("div",{class:"error"},`RedHook is required. Missing: ${redHook.missing.join(", ")}.`),redHook.installed?(intro.enabled?el("div",{class:"ok"},"Startup logo movies are disabled."):el("div",{class:"error"},intro.problem||"Startup logo skipping is not enabled.")):null,el("div",{class:"path-row"},el("b",{},"Game root"),el("code",{title:redHook.gameRoot},redHook.gameRoot)),!redHook.installed?el("button",{type:"button",onclick:()=>openRedHook()},"Open official RedHook page"):null);
+    const deployment=state.dashboard.deployment||{rows:[],pending:false,active:false};
+    const deploymentRows=(deployment.rows||[]).filter(row=>row.overrideCount||row.targetExists).map(row=>
+      el("div",{class:"path-row"},el("b",{},`${row.name}: ${row.overrideCount} override${row.overrideCount===1?"":"s"}`),
+        el("code",{title:row.target},row.changedSinceDeploy?"changed outside Lexeditor — deployment locked":row.deployed?"deployed and current":row.overrideCount?"saved; deployment needed":"not deployed")));
     const deliveryCard=el("section",{class:"card"},el("h2",{},"Saved files and game delivery"),
-      el("p",{},"Save updates the workspace only. It does not install XML/WGD overrides or prove that LexerRDR.asi loaded a changed INI/JSON file."),
-      el("p",{},"Game deployment is not verified. Do not overwrite installed archives. The native runtime and its loader must be checked before an in-game test."),
+      el("p",{},"Save writes the project workspace. Deploy Project rebuilds verified copies of only the affected RPF archives and installs those copies under the loader's update\game folder. The original game\*.rpf archives are never overwritten."),
+      el("p",{},"LexerRDR.ini, loot JSON and mission JSON are consumed by the native runtime from this workspace; archive-backed XML/WGD edits use the update-folder copies below."),
+      el("div",{class:deployment.pending?"error":deployment.active?"ok":"source-note"},deployment.pending?"Saved archive edits are newer than the current deployment.":deployment.active?"Archive deployment matches the saved project.":"No Lexeditor archive-copy deployment is active."),
+      el("div",{class:"redhook-actions"},
+        el("button",{type:"button",onclick:()=>deployProject(),disabled:!deployment.pending},deployment.active?"Redeploy Project":"Deploy Project"),
+        el("button",{type:"button",class:"secondary",onclick:()=>revertProject(),disabled:!deployment.active},"Revert Deployment")),
+      el("div",{class:"path-row"},el("b",{},"Update-folder target"),el("code",{title:deployment.updateRoot||""},deployment.updateRoot||"Unavailable")),
+      ...deploymentRows,
       ...Object.entries(state.dashboard.paths).filter(([name])=>["Editable overrides","Inventory overrides","Shop overrides","Settings","Loot ASI override","Mission ASI override"].includes(name)).map(([name,path])=>el("div",{class:"path-row"},el("b",{},name),el("code",{title:path},path))));
     $("#main").replaceChildren(el("div",{class:"cards"},statusCard,redHookCard,deliveryCard));shell.refresh();
   }
 
   async function openRedHook(){try{await api("/api/redhook/open",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});setStatus("Opened the official RedHook page");}catch(error){setStatus(`Could not open RedHook: ${error.message}`);alert(state.status);}}
   async function configureRedHook(){await api("/api/redhook/configure",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.dashboard=await api("/api/dashboard");}
+  async function deployProject(){
+    try{setStatus("Building verified RPF copies…");const result=await api("/api/deployment/deploy",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.dashboard=await api("/api/dashboard");setStatus(result.message||"Project archive copies deployed");renderProject();}
+    catch(error){setStatus("Deployment failed");showAlert({title:"Deployment failed",items:[{item:"Archive copies",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
+  }
+  async function revertProject(){
+    try{setStatus("Reverting Lexeditor archive copies…");const result=await api("/api/deployment/revert",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.dashboard=await api("/api/dashboard");setStatus(result.message||"Archive deployment reverted");renderProject();}
+    catch(error){setStatus("Revert failed");showAlert({title:"Revert failed",items:[{item:"Archive copies",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
+  }
   function renderRedHookNotice(){
     document.querySelector(".redhook-modal")?.remove();
     const redHook=state.dashboard?.redHook;
@@ -330,8 +348,8 @@
         await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});saved.push("LexerRDR.ini");
       }
       if(state.lootDirty){await api("/api/loot/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({document:state.lootDocument})});saved.push("LexerRDR.loot.json");}
-      [state.files,state.items,state.shops,state.missions,state.settings,state.loot]=await Promise.all([api("/api/files"),api("/api/items"),api("/api/shops"),api("/api/missions"),optionalRuntime("/api/settings"),optionalRuntime("/api/loot")]);
-      state.itemEdits={};state.shopEdits={};state.missionEdits={};state.settingEdits={};state.lootDocument=clone(state.loot.document);state.lootDirty=false;shell.history.clear();setStatus(`Saved to workspace: ${saved.join(", ")}. In-game deployment is not verified.`);render();
+      [state.files,state.items,state.shops,state.missions,state.settings,state.loot,state.dashboard]=await Promise.all([api("/api/files"),api("/api/items"),api("/api/shops"),api("/api/missions"),optionalRuntime("/api/settings"),optionalRuntime("/api/loot"),api("/api/dashboard")]);
+      state.itemEdits={};state.shopEdits={};state.missionEdits={};state.settingEdits={};state.lootDocument=clone(state.loot.document);state.lootDirty=false;shell.history.clear();setStatus(`Saved to workspace: ${saved.join(", ")}. ${state.dashboard.deployment?.pending?"Deploy Project to rebuild the archive copies.":"Runtime-backed files are ready from the workspace."}`);render();
     }catch(error){setStatus("Save failed");showAlert({title:"Save failed",items:[{item:"Save",issue:error.message||String(error)}],closeLabel:"Confirm and Close"});}
   }
 

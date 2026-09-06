@@ -97,6 +97,9 @@ def main():
                     assert page.locator('.settings-section').count() == 2
                     page.evaluate('navigate("project")')
                     assert page.get_by_text('Saved files and game delivery', exact=True).count()
+                    assert page.get_by_role('button', name='Deploy Project').count()
+                    assert page.get_by_role('button', name='Revert Deployment').count()
+                    assert page.get_by_text('original game\\*.rpf archives are never overwritten', exact=False).count()
                     assert not errors, errors
                     print('RDR browser: split views, preflight, decimal save, loot validation, discard, optional-file recovery passed')
                 finally:
