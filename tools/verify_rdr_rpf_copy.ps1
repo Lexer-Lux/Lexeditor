@@ -7,7 +7,9 @@ if ($LASTEXITCODE -ne 0) { throw "Rpf6ReadCli build failed" }
 
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
 $fixtureSource = Join-Path $cliRoot 'Rpf6CopyFixture.cs'
-$fixtureExe = Join-Path $env:TEMP ('Rpf6CopyFixture-' + [guid]::NewGuid().ToString('N') + '.exe')
+# .NET Framework probes referenced private assemblies beside the executable,
+# not from the process working directory. Build this fixture beside MagicRDR.exe.
+$fixtureExe = Join-Path $appRoot ('Rpf6CopyFixture-test-' + [guid]::NewGuid().ToString('N') + '.exe')
 $references = @(
     (Join-Path $appRoot 'MagicRDR.exe'),
     (Join-Path $appRoot 'Assemblies\PikIO.dll'),
