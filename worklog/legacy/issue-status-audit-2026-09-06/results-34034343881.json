@@ -1,0 +1,477 @@
+{
+  "baseline_issue_count": 340,
+  "planned_issue_count": 62,
+  "target_count": 104,
+  "counts": {
+    "already_matches": 79,
+    "skipped_concurrent_change": 25
+  },
+  "results": [
+    {
+      "number": 1,
+      "result": "already_matches"
+    },
+    {
+      "number": 2,
+      "result": "already_matches"
+    },
+    {
+      "number": 3,
+      "result": "already_matches"
+    },
+    {
+      "number": 4,
+      "result": "already_matches"
+    },
+    {
+      "number": 5,
+      "result": "already_matches"
+    },
+    {
+      "number": 6,
+      "result": "already_matches"
+    },
+    {
+      "number": 7,
+      "result": "already_matches"
+    },
+    {
+      "number": 8,
+      "result": "already_matches"
+    },
+    {
+      "number": 9,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:42Z"
+    },
+    {
+      "number": 10,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:44Z"
+    },
+    {
+      "number": 11,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:46Z"
+    },
+    {
+      "number": 12,
+      "result": "already_matches"
+    },
+    {
+      "number": 13,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:48Z"
+    },
+    {
+      "number": 14,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:50Z"
+    },
+    {
+      "number": 15,
+      "result": "already_matches"
+    },
+    {
+      "number": 16,
+      "result": "already_matches"
+    },
+    {
+      "number": 18,
+      "result": "already_matches"
+    },
+    {
+      "number": 19,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:00:40Z",
+      "current_updated_at": "2026-09-06T12:37:52Z"
+    },
+    {
+      "number": 20,
+      "result": "already_matches"
+    },
+    {
+      "number": 21,
+      "result": "already_matches"
+    },
+    {
+      "number": 22,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:55Z"
+    },
+    {
+      "number": 23,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:11Z",
+      "current_updated_at": "2026-09-06T12:37:57Z"
+    },
+    {
+      "number": 25,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:37:59Z"
+    },
+    {
+      "number": 26,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:16:45Z",
+      "current_updated_at": "2026-09-06T12:38:01Z"
+    },
+    {
+      "number": 27,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T12:55:31Z",
+      "current_updated_at": "2026-09-06T12:38:03Z"
+    },
+    {
+      "number": 28,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T07:26:44Z",
+      "current_updated_at": "2026-09-06T12:38:05Z"
+    },
+    {
+      "number": 29,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:07Z"
+    },
+    {
+      "number": 30,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:09Z"
+    },
+    {
+      "number": 31,
+      "result": "already_matches"
+    },
+    {
+      "number": 32,
+      "result": "already_matches"
+    },
+    {
+      "number": 33,
+      "result": "already_matches"
+    },
+    {
+      "number": 34,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:11Z"
+    },
+    {
+      "number": 39,
+      "result": "already_matches"
+    },
+    {
+      "number": 46,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:27:54Z",
+      "current_updated_at": "2026-09-06T12:38:13Z"
+    },
+    {
+      "number": 49,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:15Z"
+    },
+    {
+      "number": 55,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T12:24:57Z",
+      "current_updated_at": "2026-09-06T12:38:17Z"
+    },
+    {
+      "number": 56,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T07:25:03Z",
+      "current_updated_at": "2026-09-06T12:38:19Z"
+    },
+    {
+      "number": 59,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T08:14:58Z",
+      "current_updated_at": "2026-09-06T12:38:22Z"
+    },
+    {
+      "number": 60,
+      "result": "already_matches"
+    },
+    {
+      "number": 68,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:24Z"
+    },
+    {
+      "number": 72,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:42:05Z",
+      "current_updated_at": "2026-09-06T12:38:26Z"
+    },
+    {
+      "number": 73,
+      "result": "already_matches"
+    },
+    {
+      "number": 74,
+      "result": "already_matches"
+    },
+    {
+      "number": 77,
+      "result": "already_matches"
+    },
+    {
+      "number": 78,
+      "result": "already_matches"
+    },
+    {
+      "number": 79,
+      "result": "already_matches"
+    },
+    {
+      "number": 80,
+      "result": "already_matches"
+    },
+    {
+      "number": 81,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T10:53:50Z",
+      "current_updated_at": "2026-09-06T12:38:28Z"
+    },
+    {
+      "number": 83,
+      "result": "already_matches"
+    },
+    {
+      "number": 84,
+      "result": "already_matches"
+    },
+    {
+      "number": 85,
+      "result": "already_matches"
+    },
+    {
+      "number": 86,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-04T12:25:16Z",
+      "current_updated_at": "2026-09-06T12:38:31Z"
+    },
+    {
+      "number": 87,
+      "result": "already_matches"
+    },
+    {
+      "number": 88,
+      "result": "already_matches"
+    },
+    {
+      "number": 89,
+      "result": "already_matches"
+    },
+    {
+      "number": 90,
+      "result": "already_matches"
+    },
+    {
+      "number": 91,
+      "result": "already_matches"
+    },
+    {
+      "number": 92,
+      "result": "already_matches"
+    },
+    {
+      "number": 93,
+      "result": "already_matches"
+    },
+    {
+      "number": 94,
+      "result": "already_matches"
+    },
+    {
+      "number": 95,
+      "result": "already_matches"
+    },
+    {
+      "number": 96,
+      "result": "already_matches"
+    },
+    {
+      "number": 97,
+      "result": "already_matches"
+    },
+    {
+      "number": 98,
+      "result": "already_matches"
+    },
+    {
+      "number": 99,
+      "result": "skipped_concurrent_change",
+      "reviewed_updated_at": "2026-09-05T06:32:12Z",
+      "current_updated_at": "2026-09-06T12:38:33Z"
+    },
+    {
+      "number": 100,
+      "result": "already_matches"
+    },
+    {
+      "number": 109,
+      "result": "already_matches"
+    },
+    {
+      "number": 112,
+      "result": "already_matches"
+    },
+    {
+      "number": 115,
+      "result": "already_matches"
+    },
+    {
+      "number": 127,
+      "result": "already_matches"
+    },
+    {
+      "number": 143,
+      "result": "already_matches"
+    },
+    {
+      "number": 173,
+      "result": "already_matches"
+    },
+    {
+      "number": 183,
+      "result": "already_matches"
+    },
+    {
+      "number": 188,
+      "result": "already_matches"
+    },
+    {
+      "number": 197,
+      "result": "already_matches"
+    },
+    {
+      "number": 198,
+      "result": "already_matches"
+    },
+    {
+      "number": 199,
+      "result": "already_matches"
+    },
+    {
+      "number": 200,
+      "result": "already_matches"
+    },
+    {
+      "number": 213,
+      "result": "already_matches"
+    },
+    {
+      "number": 215,
+      "result": "already_matches"
+    },
+    {
+      "number": 217,
+      "result": "already_matches"
+    },
+    {
+      "number": 219,
+      "result": "already_matches"
+    },
+    {
+      "number": 221,
+      "result": "already_matches"
+    },
+    {
+      "number": 233,
+      "result": "already_matches"
+    },
+    {
+      "number": 241,
+      "result": "already_matches"
+    },
+    {
+      "number": 248,
+      "result": "already_matches"
+    },
+    {
+      "number": 249,
+      "result": "already_matches"
+    },
+    {
+      "number": 255,
+      "result": "already_matches"
+    },
+    {
+      "number": 257,
+      "result": "already_matches"
+    },
+    {
+      "number": 263,
+      "result": "already_matches"
+    },
+    {
+      "number": 264,
+      "result": "already_matches"
+    },
+    {
+      "number": 265,
+      "result": "already_matches"
+    },
+    {
+      "number": 268,
+      "result": "already_matches"
+    },
+    {
+      "number": 271,
+      "result": "already_matches"
+    },
+    {
+      "number": 273,
+      "result": "already_matches"
+    },
+    {
+      "number": 275,
+      "result": "already_matches"
+    },
+    {
+      "number": 278,
+      "result": "already_matches"
+    },
+    {
+      "number": 280,
+      "result": "already_matches"
+    },
+    {
+      "number": 283,
+      "result": "already_matches"
+    },
+    {
+      "number": 284,
+      "result": "already_matches"
+    },
+    {
+      "number": 285,
+      "result": "already_matches"
+    },
+    {
+      "number": 287,
+      "result": "already_matches"
+    },
+    {
+      "number": 288,
+      "result": "already_matches"
+    },
+    {
+      "number": 289,
+      "result": "already_matches"
+    }
+  ]
+}
