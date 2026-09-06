@@ -48,6 +48,30 @@ Add a tweak so successfully Mugging an enemy does not prevent its normal item dr
 
 **Status: Implementation remains.** Your requested behavior is already specified; no further explanation is needed.
 
+## issue 5356485585 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/322
+
+Created: 2026-09-04T06:32:34Z; updated: 2026-09-06T14:09:33Z
+
+Exact metadata: [source record](sources/issue-5356485585-e23ce5a6586b73f082705e2d4a3b794f836a678de4336f25352f187a5b861c0a.json).
+
+Add an optional tweak so mugged enemies still give their normal item drops on death.
+
+**Actionable.** The requested behavior is specified; implementation and verification remain, not another explanation from you.
+
+## issue 5356485585 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/322
+
+Created: 2026-09-04T06:32:34Z; updated: 2026-09-06T14:09:33Z
+
+Exact metadata: [source record](sources/issue-5356485585-f423a6f54b17980943cccdfac741778de578a3b9154c4c4155ac5ef73a3dee8e.json).
+
+Add a tweak so successfully Mugging an enemy does not prevent its normal item drops when it dies.
+
+**Status: Implementation remains.** Your requested behavior is already specified; no further explanation is needed.
+
 ## comment 5559513402 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/322#issuecomment-5559513402
