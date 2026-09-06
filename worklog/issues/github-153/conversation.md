@@ -48,6 +48,36 @@ After the final swig and stowing animation, grant one empty bottle and show its 
 
 **Status: Source cleanup is complete, but not built or installed.** The obsolete Force Acquisition Feed setting was removed from all settings surfaces. Deliver that candidate before another bottle test.
 
+## issue 5356296441 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/153
+
+Created: 2026-08-06T02:37:47Z; updated: 2026-09-06T17:34:10Z
+
+Exact metadata: [source record](sources/issue-5356296441-97a73811c3fdfb04a411b0c1abf1577d8b0a92ad31e3ef26294d7100cdba88ef.json).
+
+After the final swig and stowing animation, grant one empty bottle and show its real acquisition notification.
+
+**Merged candidate — needs gameplay acceptance.** Runtime PR Lexer-Lux/Lexers-Mod-For-RDR2#211 is merged into `master`. The obsolete synthetic Force Acquisition Feed fallback and setting were removed completely from implementation, state/config handling, schema metadata and the generated menu.
+
+The source/build checks passed, but no actual bottle-drinking session was run after this merge.
+
+- [ ] Install the current runtime build and drink a bottled item through the full final-swig/stow sequence.
+- [ ] Confirm exactly one empty bottle is granted with the game's real acquisition notification and no synthetic fallback setting remains.
+- [ ] Report missing/duplicate bottles or notification problems.
+
+## issue 5356296441 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/153
+
+Created: 2026-08-06T02:37:47Z; updated: 2026-09-06T17:34:10Z
+
+Exact metadata: [source record](sources/issue-5356296441-a826397bfe7f887c0b1debff238abde5f56126a1b74d42cc7a1e185d4e61ec45.json).
+
+After the final swig and stowing animation, grant one empty bottle and show its real acquisition notification.
+
+**Status: Source cleanup is complete, but not built or installed.** The obsolete Force Acquisition Feed setting was removed from all settings surfaces. Deliver that candidate before another bottle test.
+
 ## comment 5550124046 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/153#issuecomment-5550124046
