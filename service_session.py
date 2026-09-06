@@ -94,14 +94,19 @@ class LocalPluginSession:
         raise RuntimeError(f"{self.plugin_id} service did not become ready: {last_error}")
 
     def stop(self) -> None:
-        if not self.process or self.process.poll() is not None:
+        if not self.process:
             return
-        self.process.terminate()
         try:
-            self.process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait(timeout=5)
+            if self.process.poll() is None:
+                self.process.terminate()
+                try:
+                    self.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+                    self.process.wait(timeout=5)
+        finally:
+            if self.process.stdout is not None:
+                self.process.stdout.close()
 
     def wait_closed(self, timeout: float = 2.0) -> bool:
         deadline = time.monotonic() + timeout

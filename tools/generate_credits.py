@@ -1,5 +1,6 @@
 """Build offline credits from reviewed attributions and unchanged original notices."""
 from __future__ import annotations
+import argparse
 import copy
 import json
 from pathlib import Path
@@ -28,5 +29,18 @@ def generate() -> dict:
         for notice in section.get('licenses',[]):notice['text']=read(notice['sourcePath'])
     return result
 
-if __name__=='__main__':
-    (ROOT/'ui/credits.json').write_text(json.dumps(generate(),ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--check', action='store_true', help='Check generated credits without writing files.')
+    args = parser.parse_args(argv)
+    expected = json.dumps(generate(), ensure_ascii=False, indent=2) + '\n'
+    destination = ROOT / 'ui/credits.json'
+    if args.check:
+        if not destination.is_file() or destination.read_text('utf-8') != expected:
+            parser.exit(1, 'Offline credits are stale. Run python tools/generate_credits.py.\n')
+        return 0
+    destination.write_text(expected, encoding='utf-8')
+    return 0
+
+if __name__ == '__main__':
+    raise SystemExit(main())
