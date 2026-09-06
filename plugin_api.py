@@ -129,6 +129,12 @@ class GamePlugin:
     # not start itself is still reported as running, and can still be stopped.
     process_names: tuple[str, ...] = ()
     game_process_factory: Callable[[], GameProcessController] | None = None
+    # Root-aware helper hooks prevent installing into an import-time default
+    # after the user locates a different game folder. Legacy hooks remain valid.
+    helper_status_for_root: Callable[[Path | None], dict] | None = None
+    helper_install_for_root: Callable[[Path], dict] | None = None
+    helper_pinned: str = ""
+
 
 
 def validate_plugin(plugin: GamePlugin) -> None:

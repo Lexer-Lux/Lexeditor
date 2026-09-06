@@ -104,10 +104,11 @@ class GameInstallationManager:
     def _apply_helper(self, plugin_id: str, state: dict) -> dict:
         """Refuse to report a game as ready when its helper is missing."""
         plugin = self._plugins.get(plugin_id)
-        if plugin is None or not plugin.helper_status or state["status"] == "not-added":
+        if plugin is None or not (plugin.helper_status or plugin.helper_status_for_root) or state["status"] == "not-added":
             return state
         try:
-            helper = plugin.helper_status() or {}
+            helper = (plugin.helper_status_for_root(Path(state["root"]) if state.get("root") else None)
+                      if plugin.helper_status_for_root else plugin.helper_status()) or {}
         except Exception as error:
             state["problems"] = list(state["problems"]) + [
                 f"{plugin.helper_name or 'The runtime helper'} could not be checked: {error}"]
@@ -119,7 +120,7 @@ class GameInstallationManager:
             return state
         name = plugin.helper_name or helper.get("runtime") or "The runtime helper"
         state["problems"] = list(state["problems"]) + [
-            f"{name} is not installed. {plugin.name} cannot load edited data without it."]
+            helper.get("message") or f"{name} is not installed. {plugin.name} cannot load edited data without it."]
         state["status"] = "broken"
         state["statusText"] = "Broken"
         return state

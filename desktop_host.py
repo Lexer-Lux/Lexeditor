@@ -437,7 +437,7 @@ class HostApi:
             row_extra = {
                 "helperName": plugin.helper_name or helper.get("runtime") or "",
                 "helperInstalled": bool(helper.get("installed")),
-                "helperInstallable": plugin.helper_install is not None,
+                "helperInstallable": plugin.helper_install is not None or plugin.helper_install_for_root is not None,
             }
             if plugin.session_factory is None:
                 problems = problems + ["Shared UI session is not implemented"]
@@ -690,9 +690,15 @@ class HostApi:
         plugin = self._plugins.get(plugin_id)
         if plugin is None:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if plugin.helper_install is None:
+        if plugin.helper_install_for_root is not None:
+            current = self._installations.snapshot(plugin_id)
+            if not current.get("root") or current.get("scanInProgress"):
+                raise RuntimeError("Locate the game and finish its scan before installing its helper.")
+            result = plugin.helper_install_for_root(Path(current["root"])) or {}
+        elif plugin.helper_install is not None:
+            result = plugin.helper_install() or {}
+        else:
             raise RuntimeError(f"{plugin.name} has no installable helper")
-        result = plugin.helper_install() or {}
         snapshot = self._installations.snapshot(plugin_id)
         return {
             "helper": result,
@@ -714,23 +720,68 @@ class HostApi:
             raise PermissionError("Lexer Mode is not enabled")
         with self._lock:
             cached = self._helper_versions
-        if cached is not None and not refresh:
-            return {"helpers": cached, "cached": True}
-        rows = []
-        for plugin_id, plugin in sorted(self._plugins.items()):
-            if plugin.helper_upstream is None:
-                continue
-            row = {"pluginId": plugin_id, "plugin": plugin.name,
-                   "helper": plugin.helper_name or "Helper"}
+        reused = cached is not None and not refresh
+        if reused:
+            rows = [dict(row) for row in cached]
+        else:
+            rows = []
+            for plugin_id, plugin in sorted(self._plugins.items()):
+                if not (plugin.helper_name and (plugin.helper_upstream or plugin.helper_status or plugin.helper_status_for_root)):
+                    continue
+                row = {"pluginId": plugin_id, "plugin": plugin.name,
+                       "helper": plugin.helper_name, "pinned": plugin.helper_pinned}
+                try:
+                    if plugin.helper_upstream is None:
+                        raise RuntimeError("No upstream release check is registered.")
+                    row.update(plugin.helper_upstream() or {})
+                except Exception as error:
+                    row["error"] = str(error)
+                row["behind"] = bool(row.get("behind"))
+                # Existing managers report a repository rather than a release URL.
+                source, latest = str(row.get("source", "")), str(row.get("latest", ""))
+                if not row.get("releaseNotes") and source.startswith("https://github.com/") and latest:
+                    from urllib.parse import quote
+                    row["releaseNotes"] = source.rstrip("/") + "/releases/tag/" + quote(latest, safe="")
+                rows.append(row)
+            with self._lock:
+                self._helper_versions = [dict(row) for row in rows]
+        # Installed state is always fresh even when upstream metadata is cached.
+        # A failed remote lookup must never hide the pin or local install state.
+        for row in rows:
+            plugin = self._plugins[row["pluginId"]]
             try:
-                row.update(plugin.helper_upstream() or {})
-            except Exception as error:  # a helper check must never break Home
-                row["error"] = str(error)
-            row["behind"] = bool(row.get("behind"))
-            rows.append(row)
+                snapshot = self._installations.snapshot(row["pluginId"])
+                helper = snapshot.get("helper") or {}
+                if not snapshot.get("root"):
+                    helper = {}
+                row["installedVersion"] = str(helper.get("version", ""))
+                row["installed"] = bool(helper.get("installed"))
+                row["installedStatus"] = helper.get("integrity") or ("installed" if helper.get("installed") else "not installed")
+                row["installedMessage"] = str(helper.get("message", ""))
+                row["packageVersion"] = row.get("packageVersion") or helper.get("packageVersion", "")
+                if helper.get("error"):
+                    row["installedError"] = str(helper["error"])
+            except Exception as error:
+                row["installedVersion"] = ""
+                row["installedError"] = str(error)
+        return {"helpers": rows, "cached": reused}
+
+    def open_helper_release_notes(self, plugin_id: str) -> dict:
+        """Open a known cached release in the external browser, never arbitrary URLs."""
+        if not self._settings.snapshot().get("lexerMode"):
+            raise PermissionError("Lexer Mode is not enabled")
+        from urllib.parse import urlsplit
         with self._lock:
-            self._helper_versions = rows
-        return {"helpers": rows, "cached": False}
+            row = next((r for r in (self._helper_versions or []) if r["pluginId"] == plugin_id), None)
+        if row is None:
+            raise ValueError("Check helper versions before opening release notes.")
+        url = str(row.get("releaseNotes", ""))
+        parsed = urlsplit(url)
+        parts = parsed.path.strip("/").split("/")
+        if (parsed.scheme != "https" or parsed.netloc != "github.com" or len(parts) < 5
+                or parts[2:4] != ["releases", "tag"] or parsed.query or parsed.fragment):
+            raise ValueError("No valid GitHub release-notes URL is available.")
+        return {"opened": bool(webbrowser.open(url, new=2)), "url": url}
 
     def open_mod_folder(self, plugin_id: str, path: str) -> dict:
         """Open one of this plugin's own mod folders.
