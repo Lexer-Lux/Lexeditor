@@ -1,0 +1,35 @@
+name: FF7 data regressions
+
+on:
+  pull_request:
+    paths:
+      - 'games/ff7/**'
+      - 'games/ff7_2013/**'
+      - 'platform_config.py'
+      - 'process_probe.py'
+      - 'tools/verify_ff7_*.py'
+      - '.github/workflows/ff7-data-regressions.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  synthetic-data-and-page-logic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Verify binary formats and HTTP behavior
+        run: python tools/verify_ff7_datasets.py
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Verify page logic with synthetic data and component doubles
+        run: python tools/verify_ff7_ui.py
