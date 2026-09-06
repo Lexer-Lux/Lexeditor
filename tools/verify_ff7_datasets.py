@@ -79,7 +79,9 @@ def fixture_sections():
             base._write_field(data, field, (slot + index + 1) * field.scale)
             sections[3][slot * 132:(slot + 1) * 132] = data
         for index, field in enumerate(LIMIT_FIELDS):
-            struct.pack_into("<H", sections[2], slot * 56 + field.offset, 100 + slot * 10 + index)
+            data = sections[2][slot * 56:(slot + 1) * 56]
+            base._write_field(data, field, min(field.maximum, 20 + slot + index))
+            sections[2][slot * 56:(slot + 1) * 56] = data
         name = game_text(f"Slot{slot}").ljust(12, b"\xff")
         sections[3][slot * 132 + 0x10:slot * 132 + 0x1C] = name
     for key, category in base.CATEGORIES.items():
@@ -133,7 +135,9 @@ class DatasetTests(unittest.TestCase):
                     kernel.apply("characters", rows)
                     expected = deepcopy(original.sections)
                     section, stride = (3, 132) if field in INITIAL_FIELDS else (2, 56)
-                    struct.pack_into("<" + field.kind, expected[section], slot * stride + field.offset, value)
+                    record = expected[section][slot * stride:(slot + 1) * stride]
+                    base._write_field(record, field, value)
+                    expected[section][slot * stride:(slot + 1) * stride] = record
                     self.assertEqual(kernel.sections, expected)
                     target = self.root / "roundtrip.bin"
                     kernel.save(target)

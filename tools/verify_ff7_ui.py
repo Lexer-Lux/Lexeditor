@@ -41,7 +41,7 @@ window.LexeditorUI={el,clone:structuredClone,columnPreferences:()=>({}),recordId
   pagedListDetail:o=>{
     const selected=o.rows.find(row=>row.id===o.selected)||o.rows[0];
     return el("div",{},el("input",{"aria-label":o.search.label,value:o.search.value,oninput:e=>o.search.change(e.target.value)}),
-      o.master({rows:o.rows,selected:selected?.id,select:id=>o.change({page:0,pageSize:16,selected:id})}),selected?o.detail(selected):null);
+      o.master({rows:o.rows.slice(0,o.pageSize||16),selected:selected?.id,select:id=>o.change({page:0,pageSize:16,selected:id})}),selected?o.detail(selected):null);
   },
   platformConfigView:o=>{
     if(!o.config?.available)return el("div",{},o.config?.message,o.config?.path);
@@ -77,15 +77,15 @@ class PageTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.playwright = sync_playwright().start()
-        cls.browser = cls.playwright.chromium.launch(headless=True,
-            executable_path=os.environ.get("CHROMIUM") or shutil.which("chromium") or None)
 
     @classmethod
     def tearDownClass(cls):
-        cls.browser.close()
         cls.playwright.stop()
 
     def setUp(self):
+        self.browser = self.playwright.chromium.launch(headless=True,
+            executable_path=os.environ.get("CHROMIUM") or shutil.which("chromium") or None)
+        self.addCleanup(self.browser.close)
         self.backend = HttpTests("test_missing_kernel_still_exposes_dashboard_map_and_tweaks")
         self.backend.setUp()
         self.addCleanup(self.backend.doCleanups)
@@ -100,16 +100,16 @@ class PageTests(unittest.TestCase):
 
     def bridge_request(self, path, options):
         if path in self.failures:
-            return {"status": 400, "body": {"error": self.failures[path]}}
+            return {"status": 400, "body": json.dumps({"error": self.failures[path]})}
         payload = json.loads(options["body"]) if options.get("body") else None
         status, body = self.backend.request(path, payload)
-        return {"status": status, "body": body}
+        return {"status": status, "body": json.dumps(body, ensure_ascii=False)}
 
     def open(self):
         # Offline page harness: no browser network access or policy changes.
         self.page.goto("about:blank")
         html = (server.PLUGIN_ROOT / "editor.html").read_text()
-        bridge = "window.fetch=async(path,options={})=>{const r=await window.testRequest(path,options);return new Response(JSON.stringify(r.body),{status:r.status})};"
+        bridge = "window.fetch=async(path,options={})=>{const r=await window.testRequest(path,options);return new Response(r.body,{status:r.status})};"
         identity = {"id": server.PLUGIN_ID, "name": server.PLUGIN_NAME, "edition": server.PLUGIN_EDITION}
         html = html.replace('<script src="/shared/framework.js"></script>', '<script>' + FRAMEWORK + bridge + 'window.__lexeditorPlugin=' + json.dumps(identity) + ';</script>')
         html = html.replace('<link rel="stylesheet" href="/shared/framework.css">', '')
@@ -214,6 +214,72 @@ class PageTests(unittest.TestCase):
         self.assertFalse(self.page.get_by_label("windowed", exact=True).is_checked())
         self.assertEqual(self.page.evaluate("platformChanges().windowed"), False)
         self.assertEqual(self.errors, [])
+
+    def install_extra(self, family):
+        from verify_ff7_extended import scene_fixture, text_fixture, exe_fixture
+        from games.ff7 import extended as ex
+        import hashlib
+        paths = {"scene":"data/battle/scene.bin", "text":"data/lang-en/kernel/kernel2.bin", "shop":"ff7_en.exe"}
+        value = {"scene":scene_fixture,"text":text_fixture,"shop":exe_fixture}[family]()
+        path = self.backend.game / paths[family]
+        path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(value)
+        if family == "shop":
+            patched=patch.dict(ex.EXE_PROFILES,{hashlib.sha1(value).hexdigest().upper():0x400})
+            patched.start();self.addCleanup(patched.stop)
+        return path
+
+    def save_wait(self):
+        self.click("Save")
+        self.page.wait_for_function("!state.saving")
+        self.assertEqual(self.page.locator("#test-error").inner_text(),"")
+
+    def test_scene_fields_save_without_kernel_and_keep_ai(self):
+        from games.ff7.battle import SceneArchive
+        source=self.install_extra("scene");before=source.read_bytes()
+        self.open();self.click("Enemies")
+        self.page.get_by_label("HP for Enemy0",exact=True).fill("12345")
+        self.save_wait()
+        self.assertEqual(SceneArchive((self.backend.project/"data/battle/scene.bin").read_bytes()).records("enemies")[0]["values"]["hp"],12345)
+        self.click("Encounters")
+        self.page.get_by_label("X for Battle 0",exact=True).first.fill("-123")
+        self.save_wait()
+        self.open();self.click("Enemies")
+        self.assertEqual(self.page.get_by_label("HP for Enemy0",exact=True).input_value(),"12345")
+        self.assertEqual(source.read_bytes(),before);self.assertEqual(self.errors,[])
+
+    def test_text_and_shop_ui_persistence(self):
+        from games.ff7 import extended as ex
+        text=self.install_extra("text");shop=self.install_extra("shop")
+        text_before,shop_before=text.read_bytes(),shop.read_bytes()
+        self.open();self.click("Text")
+        self.page.get_by_label("Text for Command help 0",exact=True).fill("Edited help")
+        self.save_wait()
+        self.click("Shops")
+        self.page.get_by_label("Item ID for Shop 0",exact=True).first.fill("17")
+        self.save_wait()
+        self.click("Prices")
+        self.page.get_by_label("Purchase price (gil) for Items 0",exact=True).fill("777")
+        self.save_wait()
+        self.open();self.click("Text")
+        self.assertEqual(self.page.get_by_label("Text for Command help 0",exact=True).input_value(),"Edited help")
+        self.assertEqual(ex.ShopExecutable((self.backend.project/"ff7_en.exe").read_bytes(),shop_before).records('shops')[0]['values']['item0'],17)
+        self.assertEqual(text.read_bytes(),text_before);self.assertEqual(shop.read_bytes(),shop_before)
+        self.assertEqual(self.errors,[])
+
+    def test_partial_save_keeps_only_failed_family_dirty(self):
+        write_kernel(self.backend.game/PATHS[0]);self.install_extra("text")
+        self.open();self.click("Characters")
+        self.page.get_by_label("Strength for Slot0",exact=True).fill("88")
+        self.click("Text");self.page.get_by_label("Text for Command help 0",exact=True).fill("Pending")
+        self.failures["/api/extended/save"]="Injected text write failure"
+        self.click("Save");self.page.wait_for_function("!state.saving")
+        self.assertIn("Injected",self.page.locator("#test-error").inner_text())
+        self.assertEqual(self.page.evaluate("state.saved.characters[0].values.strength"),88)
+        self.assertNotEqual(self.page.evaluate("state.saved.texts[0].values.text"),"Pending")
+        self.assertGreater(self.page.evaluate("dirtyCount()"),0)
+        del self.failures["/api/extended/save"]
+        self.save_wait();self.assertEqual(self.page.evaluate("dirtyCount()"),0)
+
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 
 Character layout: Shojy/Elena d85e026, Sections/CharacterData.cs and
 KernelSection.cs. Initial records are nine 132-byte slots in section 4;
-limit-learning thresholds are in nine 56-byte slots in section 3.
+growth and limit fields are in nine 56-byte slots in section 3.
 """
 from __future__ import annotations
 
@@ -43,33 +43,46 @@ LIMIT_FIELDS = tuple(base.Field(key, label, offset, "H", maximum=65535)
         (0x20, "usesForLimit22", "Uses to learn limit 2-2"),
         (0x24, "usesForLimit32", "Uses to learn limit 3-2"),
     ))
+INITIAL_FIELDS += tuple(base.Field(key, label, offset, kind, maximum=maximum)
+    for key, label, offset, kind, maximum in (
+        ("storedId", "Stored character ID (slot identity is unchanged)", 0, "B", 255),
+        ("limitLevel", "Starting limit level", 0x0E, "B", 255),
+        ("limitBar", "Starting limit gauge", 0x0F, "B", 255),
+        ("weaponId", "Starting weapon ID", 0x1C, "B", 255),
+        ("armorId", "Starting armor ID", 0x1D, "B", 255),
+        ("accessoryId", "Starting accessory ID (255: none)", 0x1E, "B", 255),
+        ("characterFlags", "Starting character flags", 0x1F, "B", 255),
+        ("rowByte", "Starting row (254: back)", 0x20, "B", 255),
+        ("levelProgress", "Level progress gauge", 0x21, "B", 255),
+        ("learnedLimits", "Learned limit flags", 0x22, "H", 65535),
+        ("killCount", "Starting kill count", 0x24, "H", 65535),
+        ("limit1Uses", "Starting level 1 limit uses", 0x26, "H", 65535),
+        ("limit2Uses", "Starting level 2 limit uses", 0x28, "H", 65535),
+        ("limit3Uses", "Starting level 3 limit uses", 0x2A, "H", 65535),
+    ))
+for equipment, offset in (("weapon", 0x40), ("armor", 0x60)):
+    for slot in range(8):
+        INITIAL_FIELDS += (
+            base.Field(f"{equipment}Materia{slot}", f"{equipment.title()} materia {slot + 1} ID (255: empty)", offset + slot * 4),
+            base.Field(f"{equipment}MateriaAp{slot}", f"{equipment.title()} materia {slot + 1} AP", offset + slot * 4 + 1, "3", maximum=0xFFFFFF),
+        )
+LIMIT_FIELDS += tuple(base.Field(f"{name}Curve", f"{name.title()} growth curve index", offset)
+    for offset, name in enumerate(("strength", "vitality", "magic", "spirit", "dexterity", "luck", "hp", "mp", "experience")))
+LIMIT_FIELDS += (base.Field("recruitOffsetRaw", "Recruitment level offset (signed raw byte, half-level units)", 0x0A, "b", minimum=-128, maximum=127),)
+LIMIT_FIELDS += tuple(base.Field(f"limitAttack{level}", f"Limit {level} attack ID", offset)
+    for level, offset in (("11", 0x0C), ("12", 0x0D), ("21", 0x0F), ("22", 0x10), ("31", 0x12), ("32", 0x13), ("4", 0x15)))
+LIMIT_FIELDS += tuple(base.Field(f"limitHpDivisor{i + 1}", f"Limit level {i + 1} HP divisor", 0x28 + i * 4, "I", maximum=0xFFFFFFFF) for i in range(4))
 CHARACTER_NOTE = (
-    "Starting stats and limit-learning thresholds only. Starting stats do not rewrite "
-    "existing saves; recruitment scripts can override them. Equipment, learned limits, "
-    "growth curves and character AI are preserved, not edited. Slots 6 and 7 are also "
-    "used for Young Cloud and Sephiroth. Numeric bounds are storage bounds, not a "
-    "promise that every value is sensible in game."
+    "Initial stats, equipment, materia/AP, limit learning and growth-curve selection. "
+    "These do not rewrite existing saves; recruitment scripts can override them. "
+    "Curve coefficients, inline names and character AI remain preserved. Slots 6/7 "
+    "also hold Young Cloud/Sephiroth; Cait Sith/Vincent initialization in the executable "
+    "is a separate source. Numeric bounds describe storage, not sensible gameplay."
 )
 CATEGORIES = dict(base.CATEGORIES)
 CATEGORIES["characters"] = base.Category(
     "characters", "Characters", 4, 0, 0, 132, INITIAL_FIELDS + LIMIT_FIELDS)
-UNRESOLVED = {
-    "enemies": {
-        "label": "Enemies", "source": "Battle scene data (scene.bin)",
-        "reason": "The plugin has no scene archive reader/writer connected for enemies, attacks or rewards.",
-        "unlock": "Implement scene parsing, record schemas and safe archive repacking; verify the installed product's deployment path and text sources.",
-    },
-    "encounters": {
-        "label": "Encounters", "source": "Battle formations and field/world encounter placement",
-        "reason": "Formation composition and where encounters occur are separate datasets; neither is connected here.",
-        "unlock": "Connect formation and placement readers/writers, preserve their cross-references, and verify deployment for each product.",
-    },
-    "shops": {
-        "label": "Shops", "source": "Shop inventories, prices and shop-opening scripts",
-        "reason": "No product-specific shop source and writable deployment path has been verified by this plugin.",
-        "unlock": "Identify the installed product's shop tables and script references, then implement bounded editing and write/readback tests.",
-    },
-}
+UNRESOLVED = {}  # Non-kernel source families are handled by extended.py.
 READ_ERRORS = (OSError, ValueError, EOFError, struct.error, zlib.error)
 _SAVE_LOCK = RLock()
 
@@ -133,7 +146,7 @@ def category_metadata():
     result.append({"id": "characters", "label": "Characters", "note": CHARACTER_NOTE,
         "fields": [{"key": f.key, "label": f.label, "dataType": "int",
             "minimum": f.minimum, "maximum": f.maximum, "step": f.scale,
-            "group": "Starting stats" if f in INITIAL_FIELDS else "Limit learning"}
+            "group": "Starting stats" if f in INITIAL_FIELDS else "Growth and limits"}
             for f in INITIAL_FIELDS + LIMIT_FIELDS]})
     return result
 

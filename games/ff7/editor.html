@@ -12,8 +12,8 @@
     main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
     .ff7-layout,.lex-paged-list-detail{height:100%}.ff7-table,.ff7-detail{height:100%;min-height:0}
     .ff7-detail .lex-detail-panel-heading,.ff7-table,.ff7-table .lex-column-list-header,.ff7-message{background:var(--lex-panel);box-shadow:none}
-    .ff7-detail .lex-detail-panel-body{padding:10px;gap:9px}.ff7-detail .lex-detail-section{flex:1 1 auto}
-    .ff7-field input[type=number]{width:100%;min-width:0}.ff7-description{white-space:pre-wrap}
+    .ff7-detail .lex-detail-panel-body{padding:10px;gap:9px;display:block;overflow:auto}.ff7-detail .lex-detail-section{flex:none;margin-bottom:12px}
+    .ff7-field input,.ff7-field textarea{width:100%;min-width:0}.ff7-description{white-space:pre-wrap}
     .ff7-message{height:100%;overflow:auto;padding:24px;border:2px solid var(--lex-border)}
     .ff7-message h2{margin:0 0 14px;font:30px/1.15 var(--lex-heading-font)}.ff7-message p{max-width:850px}
     .ff7-status{display:inline-block;padding:5px 9px;border:1px solid var(--lex-border);font-weight:700}
@@ -31,9 +31,9 @@
   "use strict";
   const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,recordId,infoHelp,pagedListDetail,provenanceControl,platformConfigView,clone,EditHistory}=LexeditorUI;
   const identity=window.__lexeditorPlugin||{id:"ff7",name:"Final Fantasy 7 (Original)",edition:"Steam"};
-  const integrated=["accessories","armor","characters","items","materia","weapons"];
-  const unresolved=["enemies","encounters","shops","tweaks"];
-  const labels={accessories:"Accessories",armor:"Armor",characters:"Characters",items:"Items",materia:"Materia",weapons:"Weapons",enemies:"Enemies",encounters:"Encounters",shops:"Shops",tweaks:"Tweaks"};
+  const integrated=["accessories","armor","characters","items","materia","weapons","enemies","encounters","enemyAttacks","shops","prices","texts"];
+  const unresolved=["tweaks"];
+  const labels={accessories:"Accessories",armor:"Armor",characters:"Characters",items:"Items",materia:"Materia",weapons:"Weapons",enemies:"Enemies",encounters:"Encounters",shops:"Shops",prices:"Prices",texts:"Text",enemyAttacks:"Enemy attacks",tweaks:"Tweaks"};
   const tabs=[...integrated,...unresolved].map(id=>({id,label:labels[id]}));
   const api=async(path,options={})=>{const response=await fetch(path,options),body=await response.json();if(!response.ok)throw new Error(body.error||response.statusText);return body};
   const state={loaded:false,tab:"items",dashboard:null,dataMap:null,data:null,records:{},saved:{},invalid:{},platformConfig:null,savedPlatformConfig:null,platformQuery:"",platformError:"",platformRevision:0,platformLoading:false,activeSource:"mine",selected:{},page:{},pageSize:{},query:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],saving:false};
@@ -62,15 +62,25 @@
     return provenanceControl({control:input,current:()=>row.values[field.key],vanilla,internal:true,
       apply:value=>{if(readonly())return;delete state.invalid[key];row.values[field.key]=Number(value);input.value=String(value);shellRefresh()}});
   }
+  function textControl(row,field){
+    const input=el("textarea",{rows:3,value:row.values[field.key],disabled:readonly(),
+      "aria-label":`${field.label} for ${row.name}`,oninput:event=>{
+        if(readonly())return;
+        row.values[field.key]=event.target.value;shellRefresh();
+      }});
+    const vanilla=rowById(state.tab,row.id,state.data.vanilla).values[field.key];
+    return provenanceControl({control:input,current:()=>row.values[field.key],vanilla,internal:true,
+      apply:value=>{if(readonly())return;row.values[field.key]=String(value);input.value=String(value);shellRefresh()}});
+  }
   function recordDetail(row){
     const metadata=category(),groups=[...new Set(metadata.fields.map(field=>field.group||"Kernel data"))];
-    return detailPanel({className:"ff7-detail",title:row.name,identity:recordId(row.id),meta:identity.edition,body:[
+    return detailPanel({className:"ff7-detail",title:row.values.name||row.name,identity:recordId(row.id),meta:identity.edition,body:[
       detailSection({title:"DESCRIPTION",body:detailField({label:"HELP TEXT",control:el("div",{class:"ff7-description"},row.description||"No description stored.")})}),
-      ...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>detailField({className:"ff7-field",label:field.label,help:infoHelp(`Stored as a bounded ${field.dataType}. Storage range: ${field.minimum} to ${field.maximum}${field.step>1?`; step ${field.step}`:""}.`),control:numberControl(row,field),dataType:"INT",min:field.minimum,max:field.maximum}))})),
+      ...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>detailField({className:"ff7-field",label:field.label,help:infoHelp(field.dataType==="text"?"English game text. Use byte escapes for control codes; unsupported characters and oversized text are refused on save.":`Stored as a bounded ${field.dataType}. Storage range: ${field.minimum} to ${field.maximum}${field.step>1?`; step ${field.step}`:""}.`),control:field.dataType==="text"?textControl(row,field):numberControl(row,field),dataType:field.dataType==="text"?"TEXT":"INT",min:field.minimum,max:field.maximum}))})),
     ]});
   }
   function listTable(rows,selected,select){
-    const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true},{key:"description",label:"Description",sortable:true}];
+    const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,render:row=>row.values.name||row.name},{key:"description",label:"Description",sortable:true}];
     const prefs=columnPreferences(`ff7-${state.tab}`,columns,()=>render());
     const sort=state.sort[state.tab]||{key:"name",dir:1};
     return columnList({rows,key:row=>row.id,selected,select,sortState:sort,sort:key=>{state.sort[state.tab]=sort.key===key?{key,dir:-sort.dir}:{key,dir:1};render()},columnPreferences:prefs,columns,class:"ff7-table","aria-label":`${labels[state.tab]} records`});
@@ -79,7 +89,7 @@
     const error=state.data.errors?.[state.tab];
     return el("section",{class:"ff7-message"},el("h2",{},labels[state.tab]),
       el("p",{},error||"No readable records are available for this dataset."),
-      el("p",{},`Source: ${state.data.sourceRelativePath||"English KERNEL.BIN in the selected installation"}`),
+      el("p",{},`Source: ${state.data.families?.[category()?.family]?.sourceRelativePath||category()?.family||state.data.sourceRelativePath||"English KERNEL.BIN in the selected installation"}`),
       el("p",{},"Repair the reported source or project data, then reopen the editor. Other readable tabs and Tweaks remain available. No replacement records are generated."),
       el("span",{class:"ff7-status"},"DATA UNAVAILABLE"),
       el("p",{},el("button",{type:"button",onclick:()=>navigate("datamap")},"Open Data Map")));
@@ -87,7 +97,7 @@
   function integratedView(){
     const group=state.tab,query=state.query[group]||"",sort=state.sort[group]||{key:"name",dir:1};
     if(!state.records[group]?.length)return unavailableView();
-    const rows=[...state.records[group]].filter(row=>!query||`${row.id} ${row.name} ${row.description}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).sort((a,b)=>{const left=a[sort.key],right=b[sort.key];return(typeof left==="string"?left.localeCompare(right):Number(left)-Number(right))*sort.dir});
+    const rows=[...state.records[group]].filter(row=>!query||`${row.id} ${row.values.name||row.name} ${row.description} ${row.values.text||""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).sort((a,b)=>{const left=a[sort.key],right=b[sort.key];return(typeof left==="string"?left.localeCompare(right):Number(left)-Number(right))*sort.dir});
     if(!rows.some(row=>row.id===state.selected[group]))state.selected[group]=rows[0]?.id??null;
     return pagedListDetail({rows,key:row=>row.id,slots:true,selected:state.selected[group],page:state.page[group]||0,pageSize:state.pageSize[group]||16,noun:labels[group],className:"ff7-layout",splitKey:`ff7-${group}`,rowsKey:`ff7-${group}`,defaultSplit:42,minLeft:340,minRight:440,search:{key:`ff7-${group}`,value:query,label:`Search ${labels[group]}`,change:value=>{state.query[group]=value;state.page[group]=0;render()}},sync:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected},change:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected;render()},master:view=>listTable(view.rows,view.selected,view.select),detail:row=>recordDetail(row)});
   }
@@ -137,7 +147,7 @@
     const baseline=state.dashboard.baseline,sounds=LexeditorUI.sharedSettings()?.developerMode?LexeditorUI.soundCoverageTable(state.dashboard.themeSounds?.rows||[]):null;
     return el("section",{class:"ff7-message"},el("h2",{},identity.name),el("div",{class:"ff7-info-grid"},el("b",{},"Edition"),el("span",{},identity.edition),el("b",{},"Game root"),el("code",{},state.dashboard.game.root||"Unavailable"),el("b",{},"Source"),el("code",{},baseline.source||"Unavailable"),el("b",{},"Project output"),el("code",{},baseline.projectPath||"Unavailable"),el("b",{},"Vanilla SHA-256"),el("code",{},baseline.sha256||"Unavailable")),el("p",{},baseline.message),...(state.dashboard.problems||[]).map(problem=>el("p",{},problem)),sounds);
   }
-  function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return el("section",{class:"ff7-map"},el("div",{class:"ff7-map-controls"},...view.controls),view.content)}
+  function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,open:row=>navigate(row.category),query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return el("section",{class:"ff7-map"},el("div",{class:"ff7-map-controls"},...view.controls),view.content)}
   function render(){if(!state.loaded)return;let content;if(state.tab==="info")content=infoView();else if(state.tab==="datamap")content=mapView();else if(state.tab==="tweaks")content=tweakView();else if(integrated.includes(state.tab))content=integratedView();else content=unresolvedView();main.replaceChildren(content);shellRefresh()}
   function navigate(tab){state.tab=tab;render();if(tab==="tweaks")void refreshPlatformConfig()}
   async function save(){
@@ -145,9 +155,21 @@
     if(Object.keys(state.invalid).length)throw new Error("Correct the empty or out-of-range numeric fields before saving.");
     state.saving=true;state.platformRevision++;render();
     try{
-      if(kernelDirty()){
-        const result=await api("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({records:state.records,sourceSha256:state.data.sourceSha256,activeSha256:state.data.activeSha256})});
-        state.saved=clone(state.records);state.data.activeSha256=result.sha256;state.data.usingProject=true;state.dashboard.baseline.projectPath=result.path;
+      const kernelKeys=state.data.kernelCategories||["items","weapons","armor","accessories","materia","characters"];
+      const subset=(keys,source)=>Object.fromEntries(keys.filter(key=>Object.hasOwn(source,key)).map(key=>[key,source[key]]));
+      const kernelRecords=subset(kernelKeys,state.records);
+      if(JSON.stringify(kernelRecords)!==JSON.stringify(subset(kernelKeys,state.saved))){
+        const result=await api("/api/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({records:kernelRecords,sourceSha256:state.data.sourceSha256,activeSha256:state.data.activeSha256})});
+        Object.assign(state.saved,clone(kernelRecords));state.data.activeSha256=result.sha256;state.data.usingProject=true;state.dashboard.baseline.projectPath=result.path;
+        editHistory.clear();
+      }
+      // Each source has its own verified atomic replacement and saved snapshot.
+      // A later failure must not pretend an earlier file was rolled back.
+      for(const [family,report] of Object.entries(state.data.families||{})){
+        const records=subset(report.categories,state.records);
+        if(JSON.stringify(records)===JSON.stringify(subset(report.categories,state.saved)))continue;
+        const result=await api("/api/extended/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({family,records,sourceSha256:report.sourceSha256,activeSha256:report.activeSha256,usingProject:report.usingProject})});
+        Object.assign(state.saved,clone(records));Object.assign(report,result);editHistory.clear();
       }
       const changes=platformChanges();
       if(Object.keys(changes).length){state.platformConfig=await api("/api/platform-config/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sha256:state.savedPlatformConfig.sha256,changes})});state.savedPlatformConfig=clone(state.platformConfig);state.platformError="";syncConfigMap(state.platformConfig)}
