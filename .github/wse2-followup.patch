@@ -1,0 +1,75 @@
+--- a/tests/test_wse2_manager.py
++++ b/tests/test_wse2_manager.py
+@@ -17,7 +17,8 @@
+ class ManagedPackageTests(unittest.TestCase):
+     def setUp(self):
+         self.temp = tempfile.TemporaryDirectory(); self.addCleanup(self.temp.cleanup)
+-        self.root = Path(self.temp.name) / 'game'; self.root.mkdir()
++        # Expand Windows short TEMP paths before matching injected write failures.
++        self.root = Path(self.temp.name).resolve() / 'game'; self.root.mkdir()
+         self.mod = self.root / 'Modules' / 'Selected mod'; self.mod.mkdir(parents=True)
+         (self.mod/'module.ini').write_text('module_name = Chosen')
+         (self.root/'mb_warband.exe').write_bytes(b'original stock game')
+@@ -132,6 +133,7 @@
+             return original(path,data)
+         with patch.object(m,'_atomic',side_effect=fail):
+             with self.assertRaisesRegex(RuntimeError,'previous files restored'):self.install()
++        self.assertEqual(hit, [True], 'The disk-failure fixture must actually fire')
+         self.assertEqual((self.root/'postFX.fx').read_bytes(),b'old shader')
+         self.assertFalse((self.root/'mb_warband_wse2.exe').exists())
+         self.assertFalse((self.root/'.lexeditor/wse2/pending.json').exists())
+--- a/ui/chooser.html
++++ b/ui/chooser.html
+@@ -326,11 +326,12 @@
+         setDialog(plugin.name,"The game is ready.",[button("OPEN",()=>openGame(plugin)),button("CLOSE",closeDialog,true)]);return;
+       }
+       const scanning=plugin.scanInProgress;
++      // A project warning must not hide repair of the independently missing helper.
++      const canRepair=!!plugin.root&&plugin.helperInstallable&&!plugin.helperInstalled&&!scanning;
+       const message=scanning
+         ?"Lexeditor is still scanning automatically. You can wait for it to finish or locate the game now."
+-        :(plugin.status==="broken"?"This game cannot open until its runtime helper is installed.":plugin.status==="warning"?"Lexeditor found a problem with this game. Locate the game directory or scan again.":"The scan did not find this game. Locate its directory or scan again.");
+-      // A broken game is missing its helper, so offer the fix first.
+-      const actions=plugin.status==="broken"&&!scanning
++        :(canRepair?"Install or repair the pinned runtime helper. Any remaining project problems are listed below.":plugin.status==="warning"?"Lexeditor found a problem with this game. Locate the game directory or scan again.":"The scan did not find this game. Locate its directory or scan again.");
++      const actions=canRepair
+         ?[button(`INSTALL / REPAIR ${(plugin.helperName||"HELPER").toUpperCase()}`,()=>installHelper(plugin)),button("LOCATE GAME",()=>locate(plugin)),button("CLOSE",closeDialog,true)]
+         :[button("LOCATE GAME",()=>locate(plugin)),button("SCAN AGAIN",()=>scan(plugin)),button(scanning?"WAIT FOR SCAN":"CLOSE",closeDialog,true)];
+       setDialog(plugin.name,message,actions,plugin.problems||[],scanning?(plugin.scanLabel||plugin.statusText):plugin.statusText);
+--- a/tests/wse2_helper_browser_check.py
++++ b/tests/wse2_helper_browser_check.py
+@@ -30,7 +30,7 @@
+                     html=html.replace(f'<script src="{name}"></script>','<script>'+(ROOT/'ui'/name).read_text()+'</script>')
+                 page.set_content(html,wait_until='domcontentloaded')
+                 page.evaluate('''({settings,helpers,plugin})=>{
+-                    window.__testSettings=settings;window.__helperCalls=[];window.__installs=[];window.__notes=[];
++                    window.__testSettings=settings;window.__testPlugin=plugin;window.__helperCalls=[];window.__installs=[];window.__notes=[];
+                     window.pywebview={api:{
+                         plugins:async()=>[plugin],window_state:async()=>({maximized:false}),
+                         lexeditor_settings:async()=>settings,loading_quote:async()=>({quote:''}),
+@@ -69,6 +69,20 @@
+                 page.get_by_role('button',name='INSTALL / REPAIR WSE2').click()
+                 page.wait_for_function('window.__installs.length===1')
+                 assert page.evaluate('window.__installs')==['warband']
++                # The same repair remains reachable if a mod/project warning masks
++                # the Home card's broken status. Missing games cannot offer install.
++                page.wait_for_function('document.querySelector("#modal").hidden')
++                page.evaluate('window.__testPlugin.status="warning"; window.__testPlugin.statusText="Project warning"; window.dispatchEvent(new Event("focus"))')
++                page.wait_for_function('document.querySelector("[data-plugin=warband]")._plugin.status==="warning"')
++                page.locator('[data-plugin="warband"]').click()
++                page.get_by_role('button',name='INSTALL / REPAIR WSE2').wait_for()
++                page.screenshot(path=str(OUTPUT/f'install-warning-{width}.png'))
++                page.locator('#modal').get_by_role('button',name='CLOSE',exact=True).click()
++                page.evaluate('window.__testPlugin.root=null; window.dispatchEvent(new Event("focus"))')
++                page.wait_for_function('document.querySelector("[data-plugin=warband]")._plugin.root===null')
++                page.locator('[data-plugin="warband"]').click()
++                assert page.get_by_role('button',name='INSTALL / REPAIR WSE2').count()==0
++                assert page.evaluate('window.__installs')==['warband']
+                 page.evaluate('window.dispatchEvent(new CustomEvent("lexeditor-settings-changed",{detail:{lexerMode:false}}))')
+                 assert page.locator('#chooser-lexer').is_hidden()
+                 assert errors==[],errors
+--- a/.github/workflows/wse2-checks.yml
++++ b/.github/workflows/wse2-checks.yml
+@@ -54,1 +54,1 @@
+-      - run: python -m pip install Pillow 'fonttools>=4.59,<5'
++      - run: python -m pip install Pillow 'fonttools>=4.59,<5' 'tomli>=2,<3'
