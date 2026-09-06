@@ -2,7 +2,6 @@ name: Global recovery verification
 on:
   push:
     branches: [fix/global-resume-20260906]
-    paths: [.github/workflows/global-resume-verification.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -22,11 +21,12 @@ jobs:
         with:
           fetch-depth: 0
           submodules: false
-      - name: Preserve master decisions without migrating issue stores
+      - name: Merge current master without migrating deferred issue stores
         run: |
           git config user.name 'Lexeditor Global Recovery'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git merge --no-edit 292500459a0b47784925d7c781408f75ff9c0e5f
+          git fetch origin master
+          git merge --no-edit origin/master
           git push origin HEAD:fix/global-resume-20260906
       - name: Export auditable source snapshot for offline development
         id: source
