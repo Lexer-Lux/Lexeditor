@@ -14,23 +14,23 @@ def run():
         project.mkdir();game.mkdir()
         path=settings.settings_path(project);path.parent.mkdir(parents=True,exist_ok=True)
         for value,expected in ((None,False),(False,False),(True,True),('true',False),(1,False)):
-            path.write_text(json.dumps({} if value is None else {'gfHpBars':value}))
+            path.write_text(json.dumps({} if value is None else {'gfHpBars':value}),encoding='utf-8')
             assert settings.load(project,game)['gfHpBars'] is expected
-        config=game/'FFNx.toml';config.write_text('fullscreen = true\nenable_ff8_hp_bars = true\n')
+        config=game/'FFNx.toml';config.write_text('fullscreen = true\nenable_ff8_hp_bars = true\n',encoding='utf-8')
         settings._set_ffnx_runtime_tweaks(config,xp_bars=False,hp_bars=False,better_targeting=False,gf_hp_bars=True)
-        text=config.read_text();assert 'enable_ff8_gf_hp_bars = true' in text
+        text=config.read_text(encoding='utf-8');assert 'enable_ff8_gf_hp_bars = true' in text
         assert 'enable_ff8_hp_bars = false' in text and 'fullscreen = true' in text
         settings._set_ffnx_runtime_tweaks(config,xp_bars=True,hp_bars=True,better_targeting=False)
-        assert config.read_text().count('enable_ff8_gf_hp_bars = false')==1
-        assert 'enable_ff8_gf_hp_bars = true' not in config.read_text()
+        assert config.read_text(encoding='utf-8').count('enable_ff8_gf_hp_bars = false')==1
+        assert 'enable_ff8_gf_hp_bars = true' not in config.read_text(encoding='utf-8')
         settings.initialize_project(project)
-        assert json.loads(path.read_text())['gfHpBars'] is False
+        assert json.loads(path.read_text(encoding='utf-8'))['gfHpBars'] is False
         for bad in ('true',1,[],{}):
             try: settings.save({**settings.load(project,game),'gfHpBars':bad},game_root=game,project_root=project)
             except ValueError as error: assert 'GF HP Bars' in str(error)
             else: raise AssertionError('Invalid GF bar value was accepted')
         assert 'gfHpBars' in settings.ACCEPTED_TWEAKS
-    ui=(ROOT/'games/ff8/editor.html').read_text()
+    ui=(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8')
     assert 'gfHpBars:state.data.settings.gfHpBars' in ui
     assert '"aria-label":"GF HP Bars"' in ui
     assert 'platformConfigView({config:state.platformConfig,showHeader:false,' in ui
