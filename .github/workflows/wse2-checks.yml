@@ -1,0 +1,86 @@
+name: Managed WSE2 checks
+on:
+  push:
+    branches: [master, fix/warband-managed-wse2]
+    paths:
+      - 'games/warband/**'
+      - 'desktop_host.py'
+      - 'game_installation.py'
+      - 'plugin_api.py'
+      - 'ui/chooser.html'
+      - 'tests/*wse2*'
+      - 'tests/*warband*'
+      - 'tools/build_wse2_bundle.py'
+      - 'tools/Warband-checks.cmd'
+      - '.github/workflows/wse2-checks.yml'
+  pull_request:
+    paths:
+      - 'games/warband/**'
+      - 'desktop_host.py'
+      - 'game_installation.py'
+      - 'plugin_api.py'
+      - 'ui/chooser.html'
+      - 'tests/*wse2*'
+      - 'tests/*warband*'
+      - 'tools/build_wse2_bundle.py'
+      - 'tools/Warband-checks.cmd'
+      - '.github/workflows/wse2-checks.yml'
+permissions:
+  contents: read
+concurrency:
+  group: managed-wse2-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.10', '3.11']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install Pillow 'fonttools>=4.59,<5'
+      - run: python -m compileall -q games/warband desktop_host.py plugin_api.py game_installation.py
+      - run: python -m unittest discover -s tests -p 'test_wse2*.py' -v
+      - run: python -m unittest discover -s tests -p 'test_warband*.py' -v
+      - run: python -m unittest discover -s tests -p test_data_map_coverage.py -v
+      - run: node tests/test_warband_trees.js
+      - name: Check one-click Windows diagnostic
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:LEXEDITOR_CHECK_PYTHON=(Get-Command python).Source
+          cmd /c tools\Warband-checks.cmd --checks-only
+          exit $LASTEXITCODE
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install Pillow playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/wse2_helper_browser_check.py out/wse2-home
+      - run: python tests/warband_browser_check.py out/warband-browser
+        env:
+          WARBAND_REQUIRE_WEBGL: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: managed-wse2-browser-checks
+          path: out
+          retention-days: 7
