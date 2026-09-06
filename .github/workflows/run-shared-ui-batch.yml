@@ -15,9 +15,11 @@ jobs:
         with:
           fetch-depth: 0
       - name: Apply fixes
+        id: apply
         shell: bash
         run: |
-          python - <<'PY'
+          set +e
+          python - <<'PY' > /tmp/ui-batch.log 2>&1
           from pathlib import Path
           source = Path('.github/workflows/apply-shared-ui-batch.yml').read_text(encoding='utf-8')
           start = "          python - <<'PY'\n"
@@ -26,6 +28,17 @@ jobs:
           body = '\n'.join(line[10:] if line.startswith('          ') else line for line in body.splitlines())
           exec(compile(body, 'apply-shared-ui-batch', 'exec'))
           PY
+          code=$?
+          cat /tmp/ui-batch.log
+          if [ "$code" -ne 0 ]; then
+            cp /tmp/ui-batch.log .github/ui-batch-error.txt
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .github/ui-batch-error.txt
+            git commit -m "Record shared UI batch failure"
+            git push origin HEAD:fix/shared-ui-batch-20260906
+            exit "$code"
+          fi
       - name: Static and syntax checks
         shell: bash
         run: |
@@ -51,6 +64,7 @@ jobs:
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/ui-batch-error.txt
           git add -A
           git commit -m "Fix shared editor UI behaviors"
           git push origin HEAD:fix/shared-ui-batch-20260906
