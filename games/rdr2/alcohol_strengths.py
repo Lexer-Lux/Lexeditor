@@ -42,6 +42,12 @@ def get_alcohol_strengths(
     vanilla_file: Path = VANILLA_FILE,
     override_file: Path = OVERRIDE_FILE,
 ) -> dict[str, object]:
+    if not vanilla_file.is_file():
+        return {
+            "available": False, "file": str(override_file), "source": str(vanilla_file),
+            "entries": {}, "vanilla": {}, "overrides": {},
+            "reason": "The per-drink vanilla strength data is unavailable.",
+        }
     vanilla = _read_rows(vanilla_file)
     overrides = _read_rows(override_file) if override_file.exists() else {}
     unknown = sorted(set(overrides) - set(vanilla))
@@ -64,18 +70,25 @@ def save_alcohol_strengths(
     vanilla_file: Path = VANILLA_FILE,
     override_file: Path = OVERRIDE_FILE,
 ) -> int:
+    if not isinstance(entries, Mapping):
+        raise ValueError("alcohol edits must be an item-to-strength mapping")
     if not override_file.parent.exists():
         raise ValueError("the optional GameplayTweaks runtime extension is not installed")
     vanilla = _read_rows(vanilla_file)
     effective = dict(vanilla)
     if override_file.exists():
         current = _read_rows(override_file)
-        effective.update({key: value for key, value in current.items() if key in vanilla})
+        unknown = sorted(set(current) - set(vanilla))
+        if unknown:
+            raise ValueError("alcohol override has no vanilla item: " + ", ".join(unknown))
+        effective.update(current)
 
     for raw_key, raw_value in entries.items():
         key = str(raw_key).strip()
         if key not in vanilla:
             raise ValueError(f"unknown alcohol item: {key}")
+        if isinstance(raw_value, bool):
+            raise ValueError(f"alcohol strength for {key} must be numeric, not a boolean")
         try:
             value = float(raw_value)
         except (TypeError, ValueError) as exc:
@@ -94,7 +107,7 @@ def save_alcohol_strengths(
         "# item,target_strength_per_drink,vanilla_strength_per_drink,swigs",
     ]
     lines.extend(
-        f"{key},{overrides[key]:g},{vanilla[key]:g},{_swigs_for(key, vanilla_file)}"
+        f"{key},{overrides[key]},{vanilla[key]},{_swigs_for(key, vanilla_file)}"
         for key in vanilla
         if key in overrides
     )

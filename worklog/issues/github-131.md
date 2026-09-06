@@ -13,3 +13,27 @@ Reconcile live code, PRs and existing topic/session worklogs. This archive impor
 ## Next agent work
 
 Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.
+
+
+## 2026-09-06 — RDR2 isolated batch / session rdr2-issue-batch
+
+### Implemented
+
+Save only explicit per-drink edits, merging with the latest persisted overrides
+instead of resending a stale browser's entire effective table. Re-read persisted
+values after saving. Reject booleans, non-finite and out-of-range values; do not
+silently clamp bad input to zero/one. Preserve unknown existing rows by refusing
+the save rather than deleting them. Preserve float round-trip precision rather
+than six-significant-digit formatting. Missing baseline data produces explicit
+unavailability, and an unknown drink has no fabricated zero-valued editor.
+
+### Agent checks and limits
+
+Regression cases cover distinct values, intentional strength 1, sparse edits,
+concurrent unrelated changes, baseline resets, precision, invalid inputs and
+missing/duplicate data. The current private source data already contains 14
+distinctly authored drink records; the deliberate Moonshine=1 override is kept.
+The reported all-ones UI state was not reproduced against this source revision.
+These repairs prevent confirmed save/data-loss defects; they are not proof the
+original screenshot's root cause is fixed. Compare the delivered editor's
+rendered rows with the selected runtime CSV before closing #131.
