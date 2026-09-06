@@ -3,12 +3,15 @@
   "distribution": "lexeditor-ffnx-derivative",
   "sourceCommit": "c056db2783f376a340fcefa6a48cc33618998876",
   "driver": "AF3DN.P",
-  "driverSha256": "cf237e90a3c0a099c5182e58561e6469951bf2a493bc8a346938aceff2ab0e77",
+  "driverSha256": "b44009f4421f278ea10afc6f53e3f9e21cfdffbdcfd7332da89d01a61c41b250",
   "architecture": "x86",
   "runtimeEnabled": true,
   "hookCount": 28,
   "identity": "Lexeditor issue 51 shared magic core; base=c056db2783f376a340fcefa6a48cc33618998876; runtime=on; hooks=28",
   "exports": [
+    "lexeditor_ff8_no_consume_battle_debit",
+    "lexeditor_ff8_shared_party_contract_version",
+    "lexeditor_ff8_stock_tweaks_contract_version",
     "lexeditor_issue_51_compile_gate_enabled",
     "lexeditor_issue_51_config_contract",
     "lexeditor_issue_51_config_version",
@@ -22,8 +25,8 @@
     "license": "COPYING.TXT",
     "licenseSha256": "230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809",
     "sourcePatch": "ISSUE51_DERIVATIVE_SOURCE.patch",
-    "sourcePatchSha256": "9516488302f5eb352ec5e4162bffc6f540fac6150645eb6f040597332219cf79",
+    "sourcePatchSha256": "6d733cd2f9d92996c4a5d698282ac58df757535195b69348490afdd93a64cc74",
     "buildReport": "ISSUE51_BUILD_REPORT.md",
-    "buildReportSha256": "71130241329dfa8a74bdb67e126e0fac8da8060d316495a5034f1ea0cb1fbb4a"
+    "buildReportSha256": "95b21d38518929a74107e25d8c073c328ef294162e0008bebbddccf71f1350ff"
   }
 }

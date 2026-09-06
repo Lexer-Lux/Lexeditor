@@ -49,7 +49,7 @@ def check() -> list[str]:
     problems: list[str] = []
     for relative in (
         "editor.html", "server.py", "formats.py", "extractor.py", "game_font.py",
-        "gameplay_settings.py", "flat_stat_abilities.py", "max_spell.py",
+        "gameplay_settings.py", "flat_stat_abilities.py", "max_spell.py", "mug_drops.py",
         "single_gf.py", "game_icons.py",
         "ffnx_issue_51/runtime_config.py", "ffnx_issue_51/runtime_package.py",
         "runtime_layout.py", "iroj_archive.py", "mod_folders.py", "mngrp_merge.py",

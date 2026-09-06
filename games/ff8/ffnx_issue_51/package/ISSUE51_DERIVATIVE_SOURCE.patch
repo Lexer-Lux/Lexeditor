@@ -100,15 +100,18 @@ index 8eb43c8..fff731e 100644
 +
 +endif()
 diff --git a/misc/FFNx.toml b/misc/FFNx.toml
-index d0b1566..02ec4db 100644
+index d0b1566..ff7b2dc 100644
 --- a/misc/FFNx.toml
 +++ b/misc/FFNx.toml
-@@ -568,6 +568,27 @@ disable_animated_textures_on_field = ""
+@@ -568,6 +568,30 @@ disable_animated_textures_on_field = ""
  #~~~~~~~~~~~~~~~~~~~~~~~~~~~
  enable_devtools = false
  
 +# Look Left opens the reserve party selector during an active battle turn.
 +enable_ff8_party_switch = false
++
++# Keep spell stock on successful field/battle casts; items still consume.
++enable_ff8_no_magic_consumption = false
 +
 +# Manual analog world-map camera. Battle inputs are unchanged.
 +enable_ff8_modern_controls = false
@@ -236,14 +239,15 @@ index 0000000..d0fb20f
 +};
 +}
 diff --git a/src/cfg.cpp b/src/cfg.cpp
-index c313df7..aa2a454 100644
+index c313df7..3caaa6a 100644
 --- a/src/cfg.cpp
 +++ b/src/cfg.cpp
-@@ -119,6 +119,13 @@ std::string override_mod_path;
+@@ -119,6 +119,14 @@ std::string override_mod_path;
  std::string direct_mode_path;
  std::string save_path;
  bool enable_devtools;
 +bool enable_ff8_party_switch;
++bool enable_ff8_no_magic_consumption;
 +bool enable_ff8_modern_controls;
 +bool enable_ff8_fast_start;
 +bool enable_ff8_better_targeting;
@@ -253,11 +257,12 @@ index c313df7..aa2a454 100644
  long devtools_hotkey;
  double speedhack_step;
  double speedhack_max;
-@@ -290,6 +297,13 @@ void read_cfg()
+@@ -290,6 +298,14 @@ void read_cfg()
  	direct_mode_path = config["direct_mode_path"].value_or("");
  	save_path = config["save_path"].value_or("");
  	enable_devtools = config["enable_devtools"].value_or(false);
 +	enable_ff8_party_switch = config["enable_ff8_party_switch"].value_or(false);
++	enable_ff8_no_magic_consumption = config["enable_ff8_no_magic_consumption"].value_or(false);
 +	enable_ff8_modern_controls = config["enable_ff8_modern_controls"].value_or(false);
 +	enable_ff8_fast_start = config["enable_ff8_fast_start"].value_or(false);
 +	enable_ff8_better_targeting = config["enable_ff8_better_targeting"].value_or(false);
@@ -268,14 +273,15 @@ index c313df7..aa2a454 100644
  	speedhack_step = config["speedhack_step"].value_or(0.5);
  	speedhack_max = config["speedhack_max"].value_or(8.0);
 diff --git a/src/cfg.h b/src/cfg.h
-index 056c681..a1bd918 100644
+index 056c681..2609f1f 100644
 --- a/src/cfg.h
 +++ b/src/cfg.h
-@@ -141,6 +141,13 @@ extern std::string override_mod_path;
+@@ -141,6 +141,14 @@ extern std::string override_mod_path;
  extern std::string direct_mode_path;
  extern std::string save_path;
  extern bool enable_devtools;
 +extern bool enable_ff8_party_switch;
++extern bool enable_ff8_no_magic_consumption;
 +extern bool enable_ff8_modern_controls;
 +extern bool enable_ff8_fast_start;
 +extern bool enable_ff8_better_targeting;
@@ -548,6 +554,109 @@ index 9d259e1..d87d8f3 100644
  	// Try with the lang prefix
  	_snprintf(output, output_size, "%s/%s/%s", basedir, direct_mode_path.c_str(), fullpath_copy + get_fl_prefix_size(false));
  
+diff --git a/src/ff8/lexeditor_ff8_shared_party.inc b/src/ff8/lexeditor_ff8_shared_party.inc
+new file mode 100644
+index 0000000..819d3e7
+--- /dev/null
++++ b/src/ff8/lexeditor_ff8_shared_party.inc
+@@ -0,0 +1,97 @@
++// Included by shared_magic_runtime.cpp, after its stock-reconciliation code.
++// This deliberately uses the existing canonical pool, not a second inventory
++// or a snapshot which could overwrite a Draw/cast during model retirement.
++#include "../lexeditor_ff8_shared_party.h"
++
++namespace {
++int g_shared_party_retiring_slot = -1;
++bool g_shared_party_was_ready = false;
++
++bool shared_party_pool_owned()
++{
++    return g_state.shared_pool_active &&
++        g_state.phase == RuntimePhase::shared_mirror &&
++        ff8_externals.savemap != nullptr &&
++        ff8_externals.shared_magic_battle_actor_base != nullptr;
++}
++
++bool shared_party_in_battle()
++{
++    const auto *mode = getmode_cached();
++    return mode != nullptr && mode->driver_mode == MODE_BATTLE;
++}
++}
++
++SharedPartyStockOwnership lexeditor_ff8_shared_party_begin(int slot)
++{
++    if (slot < 0 || slot >= static_cast<int>(kActorCount) ||
++        !shared_party_in_battle() || g_shared_party_retiring_slot != -1) {
++        return SharedPartyStockOwnership::blocked;
++    }
++    if (!g_state.shared_pool_active) {
++        return SharedPartyStockOwnership::private_stocks;
++    }
++    // Never start a replacement inside a serializer, inventory transfer,
++    // reconciliation owner, or one of its native nested writers.
++    if (!shared_party_pool_owned() || g_frame_depth != 0 ||
++        g_internal_depth != 0 || g_private_transaction_depth != 0 ||
++        g_reconciliation_owner_depth != 0 || !g_actor_ready[slot]) {
++        return SharedPartyStockOwnership::blocked;
++    }
++    preserve_canonical();
++    if (!shared_party_pool_owned()) {
++        return SharedPartyStockOwnership::blocked;
++    }
++    g_shared_party_retiring_slot = slot;
++    g_shared_party_was_ready = g_actor_ready[slot];
++    g_actor_ready[slot] = false;
++    return SharedPartyStockOwnership::shared_pool;
++}
++
++void lexeditor_ff8_shared_party_materialized(int slot)
++{
++    if (slot != g_shared_party_retiring_slot || slot < 0 ||
++        slot >= static_cast<int>(kActorCount)) {
++        return;
++    }
++    g_shared_party_retiring_slot = -1;
++    g_shared_party_was_ready = false;
++    if (!shared_party_in_battle() || !shared_party_pool_owned()) {
++        return; // A native load/fallback may have relinquished pool ownership.
++    }
++    // The game's initializer has already filled this record's non-stock
++    // metadata. Publish the CURRENT pool and recompute junction quantities;
++    // other ready actors may have changed the pool while this slot retired.
++    g_actor_ready[slot] = true;
++    preserve_canonical();
++}
++
++void lexeditor_ff8_shared_party_cancel(int slot)
++{
++    if (slot != g_shared_party_retiring_slot || slot < 0 ||
++        slot >= static_cast<int>(kActorCount)) {
++        return;
++    }
++    const bool was_ready = g_shared_party_was_ready;
++    g_shared_party_retiring_slot = -1;
++    g_shared_party_was_ready = false;
++    // Called only BEFORE successful retirement, when the original record
++    // remains materialized. After retirement Party Switch rebuilds the old
++    // actor and calls materialized instead of this cancellation path.
++    if (shared_party_in_battle() && shared_party_pool_owned()) {
++        g_actor_ready[slot] = was_ready;
++        preserve_canonical();
++    }
++}
++
++void lexeditor_ff8_shared_party_reset()
++{
++    // Battle exit/save loading must not write through stale actor pointers.
++    g_shared_party_retiring_slot = -1;
++    g_shared_party_was_ready = false;
++}
++
++extern "C" __declspec(dllexport) unsigned int lexeditor_ff8_shared_party_contract_version()
++{
++    return 1;
++}
 diff --git a/src/ff8/lexeditor_live_conditions.cpp b/src/ff8/lexeditor_live_conditions.cpp
 new file mode 100644
 index 0000000..96fcff6
@@ -2033,16 +2142,17 @@ index 0000000..468b241
 +}
 diff --git a/src/ff8/shared_magic_runtime.cpp b/src/ff8/shared_magic_runtime.cpp
 new file mode 100644
-index 0000000..cf5d586
+index 0000000..67b49a6
 --- /dev/null
 +++ b/src/ff8/shared_magic_runtime.cpp
-@@ -0,0 +1,1675 @@
+@@ -0,0 +1,1680 @@
 +/****************************************************************************/
 +// Lexeditor shared party Magic for FF8 1.2 US-English Nvidia.
 +// This file is part of the GPL-3.0-or-later FFNx derivative.
 +/****************************************************************************/
 +
 +#include "shared_magic_runtime.h"
++#include "../lexeditor_ff8_shared_party.h"
 +
 +#include "lexeditor_shared_magic_core.h"
 +
@@ -2330,6 +2440,7 @@ index 0000000..cf5d586
 +
 +void fail_closed_to_canonical(const char *reason)
 +{
++    lexeditor_ff8_shared_party_reset();
 +    const bool fallback_written =
 +        g_canonical_snapshot_valid && ff8_externals.savemap != nullptr;
 +    if (fallback_written) {
@@ -2502,6 +2613,7 @@ index 0000000..cf5d586
 +
 +void request_activation()
 +{
++    lexeditor_ff8_shared_party_reset();
 +    if (!g_requested || !ff8_externals.savemap) {
 +        return;
 +    }
@@ -3712,6 +3824,8 @@ index 0000000..cf5d586
 +{
 +    return 1U;
 +}
++
++#include "lexeditor_ff8_shared_party.inc"
 diff --git a/src/ff8/shared_magic_runtime.h b/src/ff8/shared_magic_runtime.h
 new file mode 100644
 index 0000000..fc9b943
@@ -3834,7 +3948,7 @@ index 2452d5f..133a8e4 100644
  
  	text_colors[TEXTCOLOR_GRAY] = 0x08;
 diff --git a/src/ff8_opengl.cpp b/src/ff8_opengl.cpp
-index a678015..5740e3c 100644
+index a678015..136f95c 100644
 --- a/src/ff8_opengl.cpp
 +++ b/src/ff8_opengl.cpp
 @@ -22,6 +22,7 @@
@@ -3845,11 +3959,12 @@ index a678015..5740e3c 100644
  #include "fake_dd.h"
  #include "patch.h"
  #include "log.h"
-@@ -37,8 +38,16 @@
+@@ -37,8 +38,17 @@
  #include "ff8/file.h"
  #include "ff8/vram.h"
  #include "ff8/save_data.h"
 +#include "lexeditor_ff8_party_switch.h"
++#include "lexeditor_ff8_stock_tweaks.h"
 +#include "lexeditor_ff8_bars.h"
  #include "ff8/battle/monsters.h"
  #include "ff8/remaster.h"
@@ -3862,7 +3977,7 @@ index a678015..5740e3c 100644
  #include "metadata.h"
  #include "achievement.h"
  #include "widescreen.h"
-@@ -628,6 +637,8 @@ int ff8_get_analog_value_wm(int8_t port, int type, int8_t offset)
+@@ -628,6 +638,8 @@ int ff8_get_analog_value_wm(int8_t port, int type, int8_t offset)
  
  LPDIJOYSTATE2 ff8_update_gamepad_status()
  {
@@ -3871,7 +3986,7 @@ index a678015..5740e3c 100644
  	ff8_externals.dinput_gamepad_state->rgdwPOV[0] = -1;
  	ff8_externals.dinput_gamepad_state->lX = 0;
  	ff8_externals.dinput_gamepad_state->lY = 0;
-@@ -854,6 +865,11 @@ LPDIJOYSTATE2 ff8_update_gamepad_status()
+@@ -854,6 +866,11 @@ LPDIJOYSTATE2 ff8_update_gamepad_status()
  		right_stick_x = 0x80;
  	}
  
@@ -3883,7 +3998,7 @@ index a678015..5740e3c 100644
  	return ff8_externals.dinput_gamepad_state;
  }
  
-@@ -933,7 +949,7 @@ ff8_draw_menu_sprite_texture_infos *ff8_draw_icon_or_key(
+@@ -933,7 +950,7 @@ ff8_draw_menu_sprite_texture_infos *ff8_draw_icon_or_key(
  	int icon_id, uint16_t x, uint16_t y, int a6, int field10_modifier = 0,
  	bool no_a6_mask = false,
  	bool override_field4_8_with_a6 = false,
@@ -3892,7 +4007,7 @@ index a678015..5740e3c 100644
  ) {
  	icon_id = ff8_draw_gamepad_icon_or_keyboard_key(a1, draw_infos, icon_id, x, y);
  	if (icon_id < 0)
-@@ -960,7 +976,8 @@ ff8_draw_menu_sprite_texture_infos *ff8_draw_icon_or_key(
+@@ -960,7 +977,8 @@ ff8_draw_menu_sprite_texture_infos *ff8_draw_icon_or_key(
  		}
  		else
  		{
@@ -3902,7 +4017,7 @@ index a678015..5740e3c 100644
  			draw_infos->field_4 = (sp1_section_data[0] >> 25) & 0x60 | 0xE100041E;
  		}
  		draw_infos->field_14 = sp1_section_data[1] & 0xFF00FF;
-@@ -991,7 +1008,11 @@ ff8_draw_menu_sprite_texture_infos *ff8_draw_icon_or_key2(int a1, ff8_draw_menu_
+@@ -991,7 +1009,11 @@ ff8_draw_menu_sprite_texture_infos *ff8_draw_icon_or_key2(int a1, ff8_draw_menu_
  
  ff8_draw_menu_sprite_texture_infos *ff8_draw_icon_or_key3(int a1, ff8_draw_menu_sprite_texture_infos *draw_infos, int *icon_sp1_data, int icon_id, uint16_t x, uint16_t y, int a6)
  {
@@ -3915,7 +4030,7 @@ index a678015..5740e3c 100644
  }
  
  ff8_draw_menu_sprite_texture_infos *ff8_draw_icon_or_key4(int a1, ff8_draw_menu_sprite_texture_infos *draw_infos, int *icon_sp1_data, int icon_id, uint16_t x, uint16_t y, int a6, int a7)
-@@ -1221,8 +1242,31 @@ uint32_t ff8_retry_configured_drive(char* filename, uint8_t* data)
+@@ -1221,8 +1243,31 @@ uint32_t ff8_retry_configured_drive(char* filename, uint8_t* data)
  	return res;
  }
  
@@ -3947,11 +4062,12 @@ index a678015..5740e3c 100644
  	if (drawFFNxLogoFrame(game_object)) {
  		ff8_externals.input_fill_keystate();
  
-@@ -1848,7 +1892,13 @@ void ff8_field_calc_triangle_condition()
+@@ -1848,7 +1893,14 @@ void ff8_field_calc_triangle_condition()
  
  void ff8_init_hooks(struct game_obj *_game_object)
  {
 +	lexeditor_ff8_party_switch_install();
++	lexeditor_ff8_stock_tweaks_install();
 +	lexeditor_ff8_modern_controls_install();
 +	lexeditor_ff8_bars_install();
  	struct ff8_game_obj *game_object = (struct ff8_game_obj *)_game_object;
@@ -3961,7 +4077,7 @@ index a678015..5740e3c 100644
  
  	game_object->dddevice = &_fake_dddevice;
  	game_object->front_surface[0] = &_fake_dd_front_surface;
-@@ -2048,8 +2098,8 @@ void ff8_init_hooks(struct game_obj *_game_object)
+@@ -2048,8 +2100,8 @@ void ff8_init_hooks(struct game_obj *_game_object)
  	// Worldmap
  	replace_call(ff8_externals.worldmap_input_update_sub_559240 + (FF8_US_VERSION ? 0xC2 : 0xBF), ff8_get_analog_value_wm); // lX
  	replace_call(ff8_externals.worldmap_input_update_sub_559240 + (FF8_US_VERSION ? 0xD2 : 0xCF), ff8_get_analog_value); // lY
@@ -4640,11 +4756,12 @@ index 0000000..e77ad85
 +int lexeditor_ff8_modern_world_axis(std::int8_t port, int type, std::int8_t offset);
 diff --git a/src/lexeditor_ff8_party_switch.cpp b/src/lexeditor_ff8_party_switch.cpp
 new file mode 100644
-index 0000000..619a34e
+index 0000000..b4e772b
 --- /dev/null
 +++ b/src/lexeditor_ff8_party_switch.cpp
-@@ -0,0 +1,305 @@
+@@ -0,0 +1,315 @@
 +#include "lexeditor_ff8_party_switch.h"
++#include "lexeditor_ff8_shared_party.h"
 +#include <windows.h>
 +#include <array>
 +#include <algorithm>
@@ -4746,6 +4863,7 @@ index 0000000..619a34e
 +    return primitives;
 +}
 +void abort_swap() {
++    lexeditor_ff8_shared_party_cancel(slot);
 +    // Event11 inserts the ready actor removed by event12.
 +    if(slot>=0 && slot<3) native<void>(0x4AD620,slot,0x11,0x80,0);
 +    mem<std::uint8_t>(0x1D280C2)=pause1;
@@ -4761,12 +4879,18 @@ index 0000000..619a34e
 +       ((mem<std::uint16_t>(kModels+slot*0x9C)&3)==1)) {
 +        abort_swap(); return;
 +    }
++    const auto stock_ownership=lexeditor_ff8_shared_party_begin(slot);
++    if(stock_ownership==SharedPartyStockOwnership::blocked) {
++        abort_swap(); return;
++    }
 +    const auto actor=kActor+slot*0xD0, stats=kStats+slot*0x1D0;
 +    const auto saved=kSaved+outgoing*0x98;
 +    // Native saveback 0048B8C1..0048B8D2 persists this participant's current HP.
 +    mem<std::uint16_t>(saved)=static_cast<std::uint16_t>(mem<std::uint32_t>(actor+0x18));
 +    // Native 00486D1C..00486D2E copies each live ID/stock pair to its owner.
-+    for(int i=0;i<32;++i) {
++    // Shared Magic owns these stocks and saved mirrors. Copying a retiring
++    // actor's private record would overwrite or duplicate the shared pool.
++    for(int i=0;stock_ownership==SharedPartyStockOwnership::private_stocks && i<32;++i) {
 +        mem<std::uint8_t>(saved+0x10+i*2)=mem<std::uint8_t>(stats+0x82+i*5);
 +        mem<std::uint8_t>(saved+0x11+i*2)=mem<std::uint8_t>(stats+0x83+i*5);
 +    }
@@ -4803,6 +4927,7 @@ index 0000000..619a34e
 +    mem<std::uint8_t>(kParty+slot)=static_cast<std::uint8_t>(target);
 +    native<void>(0x495530,target,slot);
 +    native<void>(0x495960,target,slot);
++    lexeditor_ff8_shared_party_materialized(slot);
 +    native<void>(0x495EC0);
 +    native<void>(0x48B5F0,slot);
 +    native<void>(0x48B310,slot);
@@ -4934,6 +5059,7 @@ index 0000000..619a34e
 +        if(pending || opened) ++generation;
 +        opened=false; pending=false; phase=Phase::idle; slot=-1; count=0; previous=0;
 +        reserve={};
++        lexeditor_ff8_shared_party_reset();
 +        return;
 +    }
 +    if(pending) {
@@ -4958,6 +5084,108 @@ index 0000000..24bd147
 +#pragma once
 +void lexeditor_ff8_party_switch_install();
 +void lexeditor_ff8_party_switch_tick();
+diff --git a/src/lexeditor_ff8_shared_party.h b/src/lexeditor_ff8_shared_party.h
+new file mode 100644
+index 0000000..3aee2be
+--- /dev/null
++++ b/src/lexeditor_ff8_shared_party.h
+@@ -0,0 +1,14 @@
++#pragma once
++
++// The event-driven Party Switch module must explicitly retire and re-register
++// a shared-stock mirror. Its call to the native actor initializer originates
++// in FFNx, not one of the game's previously reviewed return addresses.
++enum class SharedPartyStockOwnership {
++    blocked,
++    private_stocks,
++    shared_pool,
++};
++SharedPartyStockOwnership lexeditor_ff8_shared_party_begin(int slot);
++void lexeditor_ff8_shared_party_materialized(int slot);
++void lexeditor_ff8_shared_party_cancel(int slot);
++void lexeditor_ff8_shared_party_reset();
+diff --git a/src/lexeditor_ff8_stock_tweaks.cpp b/src/lexeditor_ff8_stock_tweaks.cpp
+new file mode 100644
+index 0000000..8f90059
+--- /dev/null
++++ b/src/lexeditor_ff8_stock_tweaks.cpp
+@@ -0,0 +1,68 @@
++// GPL-3.0-or-later. Narrow, guarded FF8_EN spell-cast debit hooks.
++#include "lexeditor_ff8_stock_tweaks.h"
++#include <cstdint>
++#include <cstring>
++#include "cfg.h"
++#include "common.h"
++#include "globals.h"
++#include "patch.h"
++#include "log.h"
++
++namespace {
++constexpr std::uintptr_t kBattleDebit = 0x004FE709;
++constexpr std::uintptr_t kFieldDebit = 0x004F3027;
++std::uintptr_t g_nonnegative = 0x004FE711;
++std::uintptr_t g_underflow = 0x004FE70F;
++bool g_installed = false;
++
++// The same battle list controller handles BOTH Magic and Item. Never suppress
++// the debit merely because this controller is running. The native list
++// callback 004C8820 identifies the Magic inventory; Item keeps its debit.
++// Hook AFTER the stock load so Max Spell's independent signed-byte repair at
++// 004FE706 remains intact. Resume BEFORE the zero-ID cleanup and at the native
++// branch destination so reserved-charge cleanup and command state are retained.
++}
++
++// Exported only for executable-backed verification of the linked register ABI.
++extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_no_consume_battle_debit()
++{
++    __asm {
++        cmp dword ptr ds:[01D768D0h], 004C8820h
++        jne debit
++        movzx eax, byte ptr [ecx]
++        jmp dword ptr [g_nonnegative]
++    debit:
++        sub eax, edi
++        jns positive
++        xor eax, eax
++        jmp dword ptr [g_underflow]
++    positive:
++        jmp dword ptr [g_nonnegative]
++    }
++}
++
++void lexeditor_ff8_stock_tweaks_install()
++{
++    if (!ff8 || !FF8_US_VERSION || g_installed ||
++        !enable_ff8_no_magic_consumption) return;
++    const unsigned char battle[] = {0x2B,0xC7,0x79,0x04,0x33,0xC0};
++    // Field-menu spell effects have already succeeded before this decrement.
++    // Discard, transfer, Refine and stock-removal APIs use other paths.
++    const unsigned char field[] = {0xFE,0xCB,0x88,0x1C,0x45,0xF9,0xE0,0xCF,0x01};
++    if (std::memcmp(reinterpret_cast<void *>(kBattleDebit),battle,sizeof(battle)) ||
++        std::memcmp(reinterpret_cast<void *>(kFieldDebit),field,sizeof(field))) {
++        ffnx_warning("No Magic Consumption: unsupported cast-debit bytes; no hook installed.\n");
++        return;
++    }
++    replace_function(static_cast<std::uint32_t>(kBattleDebit),
++        reinterpret_cast<void *>(&lexeditor_ff8_no_consume_battle_debit));
++    patch_code_byte(static_cast<std::uint32_t>(kBattleDebit + 5),0x90);
++    patch_code_word(static_cast<std::uint32_t>(kFieldDebit),0x9090);
++    g_installed = true;
++    ffnx_trace("No Magic Consumption: field and battle cast debits guarded; Item consumption retained.\n");
++}
++
++extern "C" __declspec(dllexport) unsigned int lexeditor_ff8_stock_tweaks_contract_version()
++{
++    return 1;
++}
+diff --git a/src/lexeditor_ff8_stock_tweaks.h b/src/lexeditor_ff8_stock_tweaks.h
+new file mode 100644
+index 0000000..a12ef0a
+--- /dev/null
++++ b/src/lexeditor_ff8_stock_tweaks.h
+@@ -0,0 +1,2 @@
++#pragma once
++void lexeditor_ff8_stock_tweaks_install();
 diff --git a/src/overlay.cpp b/src/overlay.cpp
 index b2cc508..b922155 100644
 --- a/src/overlay.cpp
