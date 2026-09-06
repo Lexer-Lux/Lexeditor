@@ -422,10 +422,10 @@ class HostApi:
 
     def plugins(self) -> list[dict]:
         rows = []
-        lexer_mode = bool(self._settings.snapshot().get("lexerMode"))
+        developer_mode = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY))
         for managed in self._installations.rows(bypass=not self._enforce_installations):
             plugin = managed["plugin"]
-            if plugin.plugin_id == "blank" and not lexer_mode:
+            if plugin.plugin_id == "blank" and not developer_mode:
                 continue
             installation = managed["installation"]
             problems = installation["problems"]
@@ -478,49 +478,40 @@ class HostApi:
         return rows
 
     def lexeditor_settings(self) -> dict:
-        """Return shared settings and managed-helper state."""
+        """Return shared settings; Developer Mode follows the active GitHub identity."""
         payload = self._settings.snapshot()
         identity = self._github.visible_repository(LEXEDITOR_REPOSITORY)
-        payload["lexerAuthorized"] = bool(identity)
-        payload["lexerLogin"] = (identity or {}).get("login", "")
-        if not identity:
-            payload["lexerMode"] = False
+        payload["developerAuthorized"] = bool(identity)
+        payload["developerLogin"] = (identity or {}).get("login", "")
+        payload["developerMode"] = bool(identity)
         return payload
 
     def save_lexeditor_settings(self, values: dict | str, *legacy_values) -> dict:
-        """Save bounded global application settings."""
+        """Save bounded user settings. Developer Mode is never a stored toggle."""
         if isinstance(values, dict):
             payload = values
         else:
-            names = ("developerMode", "lexerMode", "hoverableAltClick", "selectionHoldMs",
+            names = ("hoverableAltClick", "selectionHoldMs",
                      "tableRowsPerPage", "panelGapPercent", "mainMenuHeightPercent",
                      "soundEnabled", "soundVolumePercent")
             payload = {"updateCheckFrequency": values, **dict(zip(names, legacy_values))}
-        lexer_mode = bool(payload.get("lexerMode"))
-        authorized = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True))
-        if lexer_mode and not authorized:
-            raise PermissionError("Lexer Mode requires Lexer's active GitHub account")
         self._settings.save(
             str(payload.get("updateCheckFrequency", "daily")),
-            None if "developerMode" not in payload else bool(payload["developerMode"]),
-            bool(lexer_mode) if authorized else False,
-            None if "hoverableAltClick" not in payload else bool(payload["hoverableAltClick"]),
-            payload.get("selectionHoldMs"),
-            payload.get("tableRowsPerPage"),
-            payload.get("panelGapPercent"),
-            payload.get("mainMenuHeightPercent"),
-            None if "soundEnabled" not in payload else bool(payload["soundEnabled"]),
-            payload.get("soundVolumePercent"),
+            hoverable_alt_click=None if "hoverableAltClick" not in payload else bool(payload["hoverableAltClick"]),
+            selection_hold_ms=payload.get("selectionHoldMs"),
+            table_rows_per_page=payload.get("tableRowsPerPage"),
+            panel_gap_percent=payload.get("panelGapPercent"),
+            main_menu_height_percent=payload.get("mainMenuHeightPercent"),
+            sound_enabled=None if "soundEnabled" not in payload else bool(payload["soundEnabled"]),
+            sound_volume_percent=payload.get("soundVolumePercent"),
         )
         return self.lexeditor_settings()
 
-    def save_lexer_setting_defaults(self, values: dict) -> dict:
-        """Save distributable setting defaults for the active repository owner."""
-        if not self._settings.snapshot().get("lexerMode"):
-            raise PermissionError("Lexer Mode is not enabled")
+    def save_developer_setting_defaults(self, values: dict) -> dict:
+        """Save distributable defaults only for the authorized repository owner."""
         if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
-            raise PermissionError("Lexer's active GitHub account is required")
-        self._settings.save_lexer_defaults(values)
+            raise PermissionError("Developer Mode requires the authorized GitHub account")
+        self._settings.save_developer_defaults(values)
         return self.lexeditor_settings()
 
     def save_lexeditor_view_preference(self, key: str, value: int) -> dict:
@@ -540,24 +531,24 @@ class HostApi:
                 raise ValueError("Restart is available only for the active plugin")
         return self.open_plugin(plugin_id)
 
+    @staticmethod
+    def _github_issue_label(plugin_id: str) -> str:
+        """Map editor plugin IDs to the labels used by the central issue tracker."""
+        return {"rdr": "rdr1", "ff7_2013": "ff7"}.get(plugin_id, plugin_id)
+
     def _github_repository(self, plugin_id: str):
-        """Resolve one configured repository before the owner check."""
-        plugin = self._plugins.get(plugin_id)
-        if plugin is None:
+        """Every game edits the one canonical Lexeditor issue tracker."""
+        if plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if plugin.github is None:
-            raise ValueError(f"{plugin.name} has no configured GitHub repository")
-        return plugin.github
+        return LEXEDITOR_REPOSITORY
 
     def github_repository(self, plugin_id: str) -> dict | None:
-        """Show safe repository metadata only to an allowed active owner."""
-        plugin = self._plugins.get(plugin_id)
-        if plugin is None:
-            raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if plugin.github is None:
-            return None
+        """Show the central issue repository and this game's issue-label filter."""
         repository = self._github_repository(plugin_id)
-        return self._github.visible_repository(repository)
+        visible = self._github.visible_repository(repository)
+        if not visible:
+            return None
+        return {**visible, "issueLabel": self._github_issue_label(plugin_id)}
 
     def default_views(self, plugin_id: str) -> dict:
         """Return packaged view defaults for one plugin."""
@@ -574,8 +565,8 @@ class HostApi:
         plugin = self._plugins.get(plugin_id)
         if plugin is None:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
-        if not self._settings.snapshot().get("lexerMode"):
-            raise PermissionError("Lexer Mode is not enabled")
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Developer Mode requires the authorized GitHub account")
         if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
             raise PermissionError("Lexer's active GitHub account is required")
         tab_id = str(tab_id).strip()
@@ -603,8 +594,11 @@ class HostApi:
         return {"saved": True, "plugin": plugin_id, "tab": tab_id, "preferences": len(clean)}
 
     def github_issues(self, plugin_id: str, state: str = "open") -> dict:
-        """List issues for the active game's embedded owner workspace."""
-        return self._github.list_issues(self._github_repository(plugin_id), state)
+        """List only this game's issues from the central Lexeditor tracker."""
+        return self._github.list_issues(
+            self._github_repository(plugin_id), state,
+            label=self._github_issue_label(plugin_id),
+        )
 
     def github_issue(self, plugin_id: str, number: int) -> dict:
         """Read one issue for the embedded detail pane."""
@@ -722,8 +716,8 @@ class HostApi:
         therefore the only update path, and it only ever reports: nothing here
         installs anything.
         """
-        if not self._settings.snapshot().get("lexerMode"):
-            raise PermissionError("Lexer Mode is not enabled")
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Developer Mode requires the authorized GitHub account")
         with self._lock:
             cached = self._helper_versions
         reused = cached is not None and not refresh
@@ -774,8 +768,8 @@ class HostApi:
 
     def open_helper_release_notes(self, plugin_id: str) -> dict:
         """Open a known cached release in the external browser, never arbitrary URLs."""
-        if not self._settings.snapshot().get("lexerMode"):
-            raise PermissionError("Lexer Mode is not enabled")
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Developer Mode requires the authorized GitHub account")
         from urllib.parse import urlsplit
         with self._lock:
             row = next((r for r in (self._helper_versions or []) if r["pluginId"] == plugin_id), None)

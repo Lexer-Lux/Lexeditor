@@ -159,18 +159,23 @@ class GitHubIntegration:
         }
 
     def list_issues(self, repository: GitHubRepository,
-                    state: str = "open", limit: int = 500) -> dict:
-        """List repository issues for the embedded workspace."""
+                    state: str = "open", limit: int = 500,
+                    label: str | None = None) -> dict:
+        """List repository issues for the embedded workspace, optionally by game label."""
         self._require_authorized(repository, refresh=True)
         normalized_state = str(state).casefold()
         if normalized_state not in {"open", "closed", "all"}:
             raise ValueError("GitHub issue state must be open, closed, or all")
         normalized_limit = max(1, min(int(limit), 500))
-        payload = self._json([
+        arguments = [
             "issue", "list", "--repo", repository.full_name,
             "--state", normalized_state, "--limit", str(normalized_limit),
             "--json", "number,title,state,labels,updatedAt,author",
-        ])
+        ]
+        clean_label = str(label or "").strip()
+        if clean_label:
+            arguments.extend(["--label", clean_label])
+        payload = self._json(arguments)
         if not isinstance(payload, list):
             raise RuntimeError("GitHub CLI returned an invalid issue list")
         return {

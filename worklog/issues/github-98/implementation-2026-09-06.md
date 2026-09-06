@@ -27,6 +27,6 @@ request is in `github-97/sources/2026-09-06-chat-request.txt`.
 
 The shared component, per-plugin adapters and coverage tests address the requested
 cross-plugin scope, not just Warband. Prepared installed-editor checks are in
-`docs/warband-acceptance.md`; `tools/Warband-checks.cmd` runs all disposable Python
+`worklog/reference/warband-acceptance.md`; `tools/Warband-checks.cmd` runs all disposable Python
 fixtures without editing game assets, then opens Warband. Final merge evidence
 is PR #361. Neither this handoff nor CI claims installation on Lexer's PC.

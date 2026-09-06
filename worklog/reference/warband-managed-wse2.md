@@ -26,7 +26,7 @@ never silently repair or install a helper.
 
 ## Main-menu checker
 
-In Lexer Mode, open **I AM LEXER → HELPER VERSIONS**. WSE2 appears even when
+In Developer Mode, open **I AM LEXER → HELPER VERSIONS**. WSE2 appears even when
 Warband is not installed. Each helper shows pinned, installed, latest upstream,
 publication date and release notes. A failed GitHub lookup keeps the pin and
 local installed state visible. Opening checks upstream once per session;

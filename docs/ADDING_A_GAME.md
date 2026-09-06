@@ -92,3 +92,8 @@ Preserve the original issue request and record implementation evidence in its
 existing worklog. Keep the human-facing issue short, with a usable acceptance
 checklist only when its test candidate is actually available. Follow `AGENTS.md`;
 the separate codex/worklog consolidation task is not part of adding a plugin.
+
+
+## Shared UI primitives are mandatory
+
+Blank is the reference gallery for shared behavior, not a separate implementation. New plugins must compose Tables, Detail panels/fields, ref rails, info bubbles, model-preview drawers, graph editors, paging/barrels, and project controls from `ui/framework.js`/`ui/framework.css`. Do not copy those components into a game editor. If a shared behavior is missing, extend the framework first so Blank, Warband, and every other plugin inherit the same fix.

@@ -624,8 +624,8 @@
     }, element("span", {class: "lex-record-id-prefix", "aria-hidden": "true"}, "#"), content);
   };
 
-  // One shared Detail heading owns the optional icon or live-preview slot,
-  // record identity, metadata, and actions. Games supply themed content.
+  // One shared Detail heading owns the optional icon/live-preview slot,
+  // record identity, metadata, actions, and the standard slide-out model drawer.
   const detailPanel = (options = {}) => {
     const title = options.title instanceof Node
       ? options.title
@@ -634,16 +634,52 @@
       title,
       options.identity ? element("div", {class: "lex-detail-panel-id"}, options.identity) : null,
       options.meta ? element("div", {class: "lex-detail-panel-meta"}, options.meta) : null);
+    const previewContent = typeof options.modelPreview === "function" ? options.modelPreview() : options.modelPreview;
+    const iconSlot = options.icon ? element("div", {
+      class: ["lex-detail-panel-icon", previewContent ? "lex-model-preview-trigger" : ""].filter(Boolean).join(" "),
+    }, element("span", {class: "lex-detail-panel-icon-content"}, options.icon)) : null;
+    const closeMark = previewContent ? element("span", {class: "lex-model-preview-close", "aria-hidden": "true"}, "×") : null;
+    if (iconSlot && closeMark) iconSlot.append(closeMark);
     const heading = options.heading === false ? null : element("div", {
       class: ["lex-detail-panel-heading", options.icon ? "" : "no-icon", options.actions ? "" : "no-actions"].filter(Boolean).join(" "),
     },
-      options.icon ? element("div", {class: "lex-detail-panel-icon"}, options.icon) : null,
+      iconSlot,
       identity,
       options.actions ? element("div", {class: "lex-detail-panel-actions"}, options.actions) : null);
-    return element("section", {
+    const drawer = previewContent ? element("div", {
+      class: "lex-model-preview-drawer", "aria-hidden": "true",
+    }, previewContent) : null;
+    const root = element("section", {
       ...(options.attrs || {}),
-      class: ["lex-detail-panel", "lex-detail", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
-    }, heading, element("div", {class: "lex-detail-panel-body"}, options.body || []));
+      class: ["lex-detail-panel", "lex-detail", heading ? "" : "no-heading", previewContent ? "lex-has-model-preview" : "", options.className || ""].filter(Boolean).join(" "),
+    }, heading, drawer, element("div", {class: "lex-detail-panel-body"}, options.body || []));
+    if (iconSlot && drawer) {
+      iconSlot.tabIndex = 0;
+      iconSlot.setAttribute("role", "button");
+      const label = options.modelPreviewLabel || "Model preview";
+      const setOpen = open => {
+        const next = !!open;
+        if (root.classList.contains("lex-model-preview-open") === next) return;
+        root.classList.toggle("lex-model-preview-open", next);
+        drawer.setAttribute("aria-hidden", String(!next));
+        iconSlot.setAttribute("aria-expanded", String(next));
+        iconSlot.setAttribute("aria-label", next ? `Close ${label}` : `Open ${label}`);
+        iconSlot.title = next ? `Close ${label}` : `Open ${label}`;
+        root.dispatchEvent(new CustomEvent(next ? "lex-model-preview-open" : "lex-model-preview-close", {bubbles:false}));
+      };
+      iconSlot.setAttribute("aria-expanded", "false");
+      iconSlot.setAttribute("aria-label", `Open ${label}`);
+      iconSlot.title = `Open ${label}`;
+      iconSlot.addEventListener("click", event => { event.preventDefault(); setOpen(!root.classList.contains("lex-model-preview-open")); });
+      iconSlot.addEventListener("keydown", event => {
+        if (!["Enter", " "].includes(event.key)) return;
+        event.preventDefault();
+        setOpen(!root.classList.contains("lex-model-preview-open"));
+      });
+      root.lexModelPreviewOpen = () => setOpen(true);
+      root.lexModelPreviewClose = () => setOpen(false);
+    }
+    return root;
   };
 
   // A panel can own local navigation without turning those choices into
@@ -715,6 +751,35 @@
     document.fonts?.ready?.then(update);
     requestAnimationFrame(update);
     return control;
+  };
+
+  // Labels stay inside their existing box: wrap first, then reduce the font
+  // only as far as needed. A long name never makes a Detail row taller.
+  const autoFitBoxText = (node, options = {}) => {
+    if (!(node instanceof Element)) return node;
+    if (node.__lexAutoFitBoxUpdate) { node.__lexAutoFitBoxUpdate(); return node; }
+    const minimum = Math.max(7, Number(options.minimum) || 8);
+    const update = () => {
+      if (!node.isConnected) return;
+      node.style.fontSize = "";
+      const maximum = parseFloat(getComputedStyle(node).fontSize) || 14;
+      let low = minimum, high = maximum, best = minimum;
+      for (let pass = 0; pass < 8; pass++) {
+        const size = (low + high) / 2;
+        node.style.fontSize = `${size}px`;
+        const fits = node.scrollWidth <= node.clientWidth + 1 && node.scrollHeight <= node.clientHeight + 1;
+        if (fits) { best = size; low = size; } else high = size;
+      }
+      node.style.fontSize = `${Math.min(maximum, best)}px`;
+    };
+    node.__lexAutoFitBoxUpdate = update;
+    if (typeof ResizeObserver === "function") {
+      node.__lexAutoFitBoxObserver = new ResizeObserver(update);
+      node.__lexAutoFitBoxObserver.observe(node);
+    }
+    document.fonts?.ready?.then(update);
+    requestAnimationFrame(update);
+    return node;
   };
 
   // Every value box on a panel should end at the same edge, so the reference
@@ -903,13 +968,14 @@
       input.setAttribute("aria-description", helpText);
       if (!input.title) input.title = helpText;
     }
-    const typeRail = element("div", {class: "lex-field-type-rail"},
-      typeName, typeRange, helpMarker);
+    const typeRail = element("div", {class: "lex-field-type-rail"}, typeName, typeRange);
     const directCheckboxes = control instanceof Element
       ? (control.matches('input[type="checkbox"]') ? 1 : control.querySelectorAll('input[type="checkbox"]').length)
       : 0;
     const booleanField = dataType === "BOOL" && directCheckboxes === 1;
     const arrow = booleanField ? element("span", {class: "lex-field-boolean-arrow", "aria-hidden": "true"}) : null;
+    const labelTextNode = element("span", {class: "lex-detail-field-label-text"}, options.label);
+    const labelNode = element("div", {class: "lex-detail-field-label"}, helpMarker, labelTextNode, arrow);
     const node = element("div", {
       ...(options.attrs || {}),
       class: ["lex-detail-field", "lex-pinnable-property", booleanField ? "lex-boolean-field" : "", options.className || ""].filter(Boolean).join(" "),
@@ -917,10 +983,11 @@
       "data-lex-property": options.property
         || pin?.getAttribute?.("data-lex-pin-column") || null,
       "data-lex-readonly": String(readOnly),
-    }, element("div", {class: "lex-detail-field-label"},
-      options.label, arrow),
+    }, labelNode,
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null), typeRail);
+    autoFitBoxText(labelTextNode, {minimum:7});
+    if (node.dataset.lexProperty) bindColumnHighlight(node, node.dataset.lexProperty);
     // The rail runs down the side of one row, so its type name has to fit that
     // row's height. A long name (or a range shown on focus) is set smaller
     // rather than being allowed to run into the rows above and below.
@@ -969,6 +1036,7 @@
         return Math.max(0, Math.min(1, (value - lowBound) / (highBound - lowBound)));
       };
       const paint = () => fill.style.setProperty("--lex-value-ratio", String(ratio()));
+      input.__lexValueSliderPaint = paint;
       input.addEventListener("input", paint);
       input.addEventListener("change", paint);
       const box = () => (control instanceof Element && control.matches(".lex-unit-field")
@@ -1031,8 +1099,14 @@
         handle.addEventListener("pointercancel", stop);
       });
       node.classList.add("lex-has-value-fill");
-      (control instanceof Element && control.matches(".lex-unit-field") ? control : input.parentElement)
-        ?.prepend(fill);
+      let valueHost = control instanceof Element && control.matches(".lex-unit-field") ? control : input.parentElement;
+      if (valueHost?.classList?.contains("lex-detail-field-control")) {
+        const wrapper = element("span", {class: "lex-value-box"});
+        input.before(wrapper);
+        wrapper.append(input);
+        valueHost = wrapper;
+      }
+      valueHost?.prepend(fill);
       requestAnimationFrame(paint);
     }
 
@@ -1059,6 +1133,11 @@
       if (!source?.lexRevert) return;
       event.preventDefault();
       source.lexRevert(event);
+      input?.__lexValueSliderPaint?.();
+      node.classList.remove("lex-reset-flash");
+      void node.offsetWidth;
+      node.classList.add("lex-reset-flash");
+      setTimeout(() => node.classList.remove("lex-reset-flash"), 560);
       showToast("Restored the vanilla value");
     });
 
@@ -1097,15 +1176,12 @@
         "aria-label": toggle.label,
         onchange: event => toggle.change?.(event.target.checked, event),
       });
-      // Each switch carries its own type rail, matching every other property:
-      // BOOL until pointed at, then the help marker for that flag.
-      const rail = element("span", {class: "lex-toggle-rail", "aria-hidden": "true"},
-        element("span", {class: "lex-toggle-type"}, "BOOL"));
+      const name = element("span", {class: "lex-toggle-name"}, toggle.label);
       const label = element("label", {
         class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),
         "data-lex-toggle": toggle.key || toggle.label || "",
-      }, rail, input, element("span", {class: "lex-toggle-name"}, toggle.label));
-      if (toggle.help) rail.append(infoHelp(toggle.help));
+      }, input, name, toggle.help ? infoHelp(toggle.help) : null);
+      autoFitBoxText(name, {minimum:7});
       return label;
     });
     const root = element("div", {
@@ -1317,6 +1393,14 @@
       " ", element("span", {class: "lex-curve-heading-extrema"}, "[", minimum, " TO ", maximum, "]"));
     if (options.formulaInTitle && options.formula) title.append(
       " ", element("span", {class: "lex-curve-heading-formula"}, options.formula));
+    const variableToggle = curveVariableKeys.length ? element("button", {
+      type:"button", class:"lex-curve-variable-toggle", "aria-expanded":"false",
+      onclick:event=>{
+        event.preventDefault(); event.stopPropagation();
+        const open = root.classList.toggle("lex-curve-variables-open");
+        variableToggle.setAttribute("aria-expanded", String(open));
+      },
+    }, "VARIABLES") : null;
     const root = element("article", {
       class: ["lex-curve-editor", options.className || ""].filter(Boolean).join(" "),
       "data-curve-title": options.title || "CURVE",
@@ -1324,6 +1408,7 @@
     },
       element("header", {class: "lex-curve-heading"},
         title,
+        variableToggle,
         options.extremaInTitle || options.overlayExtrema ? null : element("div", {class: "lex-curve-extrema"},
           element("span", {}, "MIN ", minimum),
           element("span", {}, "MAX ", maximum))),
@@ -2637,14 +2722,16 @@
       const canChoose = Boolean(value);
       box.hidden = !current && !selectedSource && !canChoose;
       if (!current && !selectedSource && !canChoose) return;
-      mode.hidden = !selectedSource;
-      mode.textContent = selectedSource?.readOnly === false ? "📝" : "🔒";
-      mode.setAttribute("aria-label", selectedSource?.readOnly === false ? "Editable" : "Read only");
+      const activeEditable = selectedSource ? selectedSource.readOnly === false : !!current;
+      const activeEnabled = selectedSource ? selectedSource.enabled !== false : current?.enabled !== false;
+      mode.hidden = !selectedSource && !current;
+      mode.textContent = activeEditable ? "📝" : "🔒";
+      mode.setAttribute("aria-label", activeEditable ? "Editable" : "Read only");
       name.textContent = selectedSource?.label || current?.name || "Select a mod";
-      status.hidden = !selectedSource;
-      status.textContent = selectedSource?.enabled === false ? "×" : "✓";
-      status.className = `lex-project-source-status ${selectedSource?.enabled === false ? "disabled" : "enabled"}`;
-      status.setAttribute("aria-label", selectedSource?.enabled === false ? "Disabled" : "Enabled");
+      status.hidden = !selectedSource && !current;
+      status.textContent = activeEnabled ? "✓" : "×";
+      status.className = `lex-project-source-status ${activeEnabled ? "enabled" : "disabled"}`;
+      status.setAttribute("aria-label", activeEnabled ? "Enabled" : "Disabled");
       path.textContent = selectedSource?.path || (selectedSource
         ? "Read-only reference"
         : current?.path || "New Mod or Find a Mod");
@@ -2675,10 +2762,11 @@
             catch (error) { showAlert({title: "Could not open the mod folder", message: error.message || String(error)}); }
           },
         }, folderIcon());
-        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`}, select, rename, folder);
+        select.prepend(element("span", {class:"lex-project-source-mode", "aria-label":"Editable"}, "📝"), element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`, "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
+        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}${row.enabled===false?" disabled":""}`}, select, rename, folder);
       });
       const sourceRows = sources.map(row => element("button", {
-        class: `lex-project-menu-item-select lex-project-menu-item lex-project-reference${String(row.key) === activeSource ? " active" : ""}`,
+        class: `lex-project-menu-item-select lex-project-menu-item lex-project-reference${String(row.key) === activeSource ? " active" : ""}${row.enabled === false ? " disabled" : ""}`,
         type: "button", role: "menuitem", title: row.path || "Read-only reference",
         onclick: () => {
           closeMenu();
@@ -2788,20 +2876,19 @@
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
         {key:"mainMenuHeightPercent", scope:"user", title:"Menu bar height", description:"Height of the menu bar in the Home screen and every game plugin, as a percentage of the screen.", type:"number", min:3, max:20, step:.25, unit:"%"},
         {key:"soundEnabled", scope:"user", title:"Sound", description:"Play game-themed interface sounds when the active plugin supplies them.", type:"checkbox"},
-        {key:"soundVolumePercent", scope:"lexer", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
-        {key:"developerMode", scope:"developer", title:"Developer Mode", description:"Shows development tools such as the GitHub workspace and plugin Restart control.", type:"checkbox"},
-        {key:"residentHandleWidthPercent", scope:"lexer", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},
-        {key:"absentGameDesaturationPercent", scope:"lexer", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
-        {key:"globalMessageRarity", scope:"lexer", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
-        {key:"loadingTransitionMinimumSeconds", scope:"lexer", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
+        {key:"soundVolumePercent", scope:"default", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
+        {key:"residentHandleWidthPercent", scope:"default", title:"Home editor handle width", description:"Width of the Back to Editor handle as a percentage of the main-menu window.", type:"number", min:2.5, max:12, step:.25, unit:"%"},
+        {key:"absentGameDesaturationPercent", scope:"default", title:"Absent game desaturation", description:"Amount of color removed from Absent game cover art on the Home screen.", type:"number", min:0, max:100, step:5, unit:"%"},
+        {key:"globalMessageRarity", scope:"default", title:"Global message rarity", description:"Makes each global loading message this many times less likely than each game-specific message.", type:"number", min:1, max:100, step:1, unit:"× rarer"},
+        {key:"loadingTransitionMinimumSeconds", scope:"default", title:"Loading screen minimum", description:"Keeps the loading screen visible for at least this long. Actual loading can take longer.", type:"number", min:0, max:10, step:.25, unit:"s", fallback:1.5},
       ];
-      const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "lexer");
+      const ordinaryDefinitions = definitions.filter(definition => definition.scope !== "default");
       const supportsCurrent = definition => Object.prototype.hasOwnProperty.call(settings, definition.key);
       const supportsDefault = definition => Object.prototype.hasOwnProperty.call(settings.defaultValues || {}, definition.key);
       const supportedOrdinaryDefinitions = ordinaryDefinitions.filter(supportsCurrent);
       const supportedDefaultDefinitions = definitions.filter(supportsDefault);
       const unsupportedDefinitions = definitions.filter(definition =>
-        (definition.scope !== "lexer" && !supportsCurrent(definition)) || !supportsDefault(definition));
+        (definition.scope !== "default" && !supportsCurrent(definition)) || !supportsDefault(definition));
       const initialValue = (definition, defaults = false) => {
         const source = defaults ? settings.defaultValues : settings;
         return source?.[definition.key] ?? settings[definition.key] ??
@@ -2856,31 +2943,23 @@
       const lane = (scope, title) => element("section", {class:`lex-settings-lane lex-settings-lane-${scope}`},
         element("h3", {}, title));
       const userLane = lane("user", "GLOBAL SETTINGS");
-      const developerLane = lane("developer", `${plugin || "PLUGIN"} EDITOR SETTINGS`.toLocaleUpperCase());
-      const lexerLane = lane("lexer", "LEXER");
-      const lexerMode = element("input", {
-        id:"lex-lexer-mode", type:"checkbox", checked:!!settings.lexerMode,
-        disabled:!settings.lexerAuthorized,
-      });
-      const lexerModeCard = element("section", {class:"lex-global-setting lex-lexer-setting lex-lexer-mode-setting"},
-        element("label", {for:"lex-lexer-mode"}, "I am Lexer"),
-        element("p", {}, settings.lexerAuthorized
-          ? `Verified GitHub account: ${settings.lexerLogin}. Enables distributable defaults.`
-          : "Unavailable. Sign in to GitHub as Lexer to enable distributable defaults."), lexerMode);
-      lexerLane.append(lexerModeCard);
+      const defaultsLane = lane("defaults", "DEVELOPER DEFAULTS");
+      const defaultsEnabled = !!settings.developerMode && !!settings.developerAuthorized;
+      defaultsLane.append(element("p", {class:"lex-settings-auth-status"}, defaultsEnabled
+        ? `Developer Mode active: ${settings.developerLogin}.`
+        : "Developer Mode activates automatically when the authorized GitHub account is signed in."));
       const setDefaultVisibility = () => {
-        const active = lexerMode.checked && !lexerMode.disabled;
         defaultCards.forEach(control => {
-          control.hidden = !active;
+          control.hidden = !defaultsEnabled;
           const supported = control.dataset.lexSettingSupported !== "false";
-          control.setAttribute("aria-disabled", String(!supported));
-          control.querySelectorAll?.("input,select").forEach(input => { input.disabled = !active || !supported; });
+          control.setAttribute("aria-disabled", String(!supported || !defaultsEnabled));
+          control.querySelectorAll?.("input,select").forEach(input => { input.disabled = !defaultsEnabled || !supported; });
         });
-        lexerLane.classList.toggle("active", active);
+        defaultsLane.classList.toggle("active", defaultsEnabled);
       };
       const copyToDefault = (definition, defaultControl) => {
-        if (!lexerMode.checked || lexerMode.disabled) {
-          message.textContent = "Enable I am Lexer to change the default for everyone."; return;
+        if (!defaultsEnabled) {
+          message.textContent = "Sign in to GitHub with the authorized account to change packaged defaults."; return;
         }
         if (!supportsDefault(definition)) {
           message.textContent = "Restart LEXEDITOR to enable this newly added setting."; return;
@@ -2893,7 +2972,7 @@
         message.textContent = `${definition.title} will become the packaged default when you save.`;
       };
       for (const definition of definitions) {
-        if (definition.scope === "lexer") {
+        if (definition.scope === "default") {
           const supported = supportsDefault(definition);
           const wrapped = makeControl(definition, initialValue(definition, true),
             `lex-default-${definition.key}`);
@@ -2904,7 +2983,7 @@
             element("label", {for:`lex-default-${definition.key}`}, definition.title),
             element("p", {}, `${definition.description}${supported ? "" : " Restart LEXEDITOR to enable this newly added setting."}`)), wrapped);
           card.dataset.lexSettingSupported = String(supported);
-          lexerLane.append(card);
+          defaultsLane.append(card);
           defaultCards.push(card);
           continue;
         }
@@ -2925,18 +3004,16 @@
         defaultControl.dataset.lexSettingSupported = String(defaultSupported);
         const controls = element("div", {class:"lex-setting-control-pair"}, wrapped, defaultControl);
         const card = element("section", {class:`lex-global-setting lex-${definition.scope}-setting`}, copy, controls);
-        (definition.scope === "developer" ? developerLane : userLane).append(card);
+        userLane.append(card);
         defaultCards.push(defaultControl);
         copy.addEventListener("dblclick", event => { event.preventDefault(); copyToDefault(definition, defaultControl); });
       }
-      lexerMode.addEventListener("change", setDefaultVisibility);
       setDefaultVisibility();
       let savedSettings = clone(settings);
       settingsDirtyCount = () => {
         let dirty = supportedOrdinaryDefinitions.reduce((total, definition) => total + Number(
           readControl(definition, currentControls.get(definition.key)) !== savedSettings[definition.key]), 0);
-        dirty += Number(lexerMode.checked !== !!savedSettings.lexerMode);
-        if (lexerMode.checked && !lexerMode.disabled) {
+        if (defaultsEnabled) {
           dirty += supportedDefaultDefinitions.reduce((total, definition) => total + Number(
             readControl(definition, defaultControls.get(definition.key)) !== savedSettings.defaultValues?.[definition.key]), 0);
         }
@@ -2947,9 +3024,7 @@
           currentControls.get(definition.key), savedSettings[definition.key]));
         supportedDefaultDefinitions.forEach(definition => writeControl(definition,
           defaultControls.get(definition.key), savedSettings.defaultValues?.[definition.key]));
-        lexerMode.checked = !!savedSettings.lexerMode;
         setDefaultVisibility();
-        developerSetting.classList.toggle("active-developer-setting", developerMode.checked);
         message.textContent = "Restored the last saved settings.";
       };
       const save = settingsSaveControl({
@@ -2959,11 +3034,11 @@
           try {
             const values = Object.fromEntries(supportedOrdinaryDefinitions.map(definition =>
               [definition.key, readControl(definition, currentControls.get(definition.key))]));
-            settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", {...values, lexerMode: lexerMode.checked}));
-            if (lexerMode.checked) {
+            settings = rememberSharedSettings(await callWindow("save_lexeditor_settings", values));
+            if (defaultsEnabled) {
               const defaults = Object.fromEntries(supportedDefaultDefinitions.map(definition =>
                 [definition.key, readControl(definition, defaultControls.get(definition.key))]));
-              settings = rememberSharedSettings(await callWindow("save_lexer_setting_defaults", defaults));
+              settings = rememberSharedSettings(await callWindow("save_developer_setting_defaults", defaults));
             }
             savedSettings = clone(settings);
             window.dispatchEvent(new CustomEvent("lexeditor-settings-changed", {detail: settings}));
@@ -2976,13 +3051,9 @@
         },
         discard: restoreSettings,
       });
-      const developerMode = controlNode(currentControls.get("developerMode"));
-      const developerSetting = developerMode.closest(".lex-global-setting");
-      developerSetting.classList.toggle("active-developer-setting", developerMode.checked);
-      developerMode.addEventListener("change", () => developerSetting.classList.toggle("active-developer-setting", developerMode.checked));
       const dialogChildren = [
         heading,
-        element("div", {class:"lex-settings-columns"}, userLane, developerLane, lexerLane),
+        element("div", {class:"lex-settings-columns"}, userLane, defaultsLane),
       ];
       dialogChildren.push(message, element("div", {class: "lex-dialog-actions"}, save));
       dialog.replaceChildren(...dialogChildren);
@@ -3447,7 +3518,6 @@
     let githubWorkspace = null;
     let navigationHistory = null;
     let developerMode = false;
-    let lexerMode = false;
     const toast = message => {
       const node = element("div", {class: "lex-toast", role: "status"}, message);
       document.body.append(node);
@@ -3503,7 +3573,7 @@
         // changes still play it, because those really are moves.
         onfocus: event => { if (event.target.matches(":focus-visible")) playThemeSound("move"); },
         onpointerdown: event => {
-          if (event.button !== 2 || !lexerMode) return;
+          if (event.button !== 2 || !developerMode) return;
           savedDefault = false;
           clearTimeout(defaultHoldTimer);
           defaultHoldTimer = setTimeout(() => {
@@ -3640,18 +3710,16 @@
         initializeGitHub();
       }
     };
-    const setLexerMode = enabled => { lexerMode = !!enabled; };
     const initializeDeveloperMode = async () => {
       try {
         const value = rememberSharedSettings(await callWindow("lexeditor_settings"));
-        setDeveloperMode(value?.developerMode); setLexerMode(value?.lexerMode);
+        setDeveloperMode(value?.developerMode);
       }
-      catch (_error) { setDeveloperMode(false); setLexerMode(false); }
+      catch (_error) { setDeveloperMode(false); }
     };
     window.addEventListener("lexeditor-settings-changed", event => {
       rememberSharedSettings(event.detail);
       setDeveloperMode(event.detail?.developerMode);
-      setLexerMode(event.detail?.lexerMode);
     });
     if (window.pywebview?.api) initializeDeveloperMode();
     else window.addEventListener("pywebviewready", initializeDeveloperMode, {once: true});
@@ -4008,14 +4076,21 @@
   });
   const withEnabledColumn = (declared, rows, change) => {
     const columns = declared || [];
-    if (!hasEnabledProperty(rows)) return columns;
-    if (columns.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)) return columns;
-    return [enabledColumn(change), ...columns];
+    const withoutEnabled = columns.filter(column => String(column.key).toLocaleLowerCase() !== ENABLED_KEY);
+    if (!hasEnabledProperty(rows)) return withoutEnabled;
+    if (!columns.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)) {
+      return [enabledColumn(change), ...withoutEnabled];
+    }
+    return [enabledColumn(change), ...withoutEnabled];
   };
 
   const columnPreferences = (viewKey, definitions, changed = () => {}) => {
     const key = `lexeditor:columns:${String(viewKey || "view")}`;
-    const source = numberedIdColumns(definitions || [], []);
+    const declared = definitions || [];
+    const preferenceColumns = declared.some(column => String(column.key).toLocaleLowerCase() === ENABLED_KEY)
+      ? declared
+      : [{key: ENABLED_KEY, label: "Enabled", generated: true, pinned: true}, ...declared];
+    const source = numberedIdColumns(preferenceColumns, []);
     const byKey = new Map(source.map(column => [column.key, column]));
     const defaults = source.filter(column => column.pinned !== false).map(column => column.key);
     let order = [...defaults];
@@ -4027,14 +4102,7 @@
     } catch (_error) {}
     const save = () => {
       try { localStorage.setItem(key, JSON.stringify(order)); } catch (_error) {}
-      // A changed column set changes the table's real minimum width. Discard
-      // the old divider size so the shared layout can fit the new table.
-      for (const layoutKey of [
-        `lexeditor:panel-layout:${viewKey}`,
-        `lexeditor:list-detail:${viewKey}`,
-      ]) {
-        try { localStorage.removeItem(layoutKey); } catch (_error) {}
-      }
+      // Pinning changes columns, not the user's panel proportions.
       changed([...order]);
       window.dispatchEvent(new CustomEvent("lexeditor-columns-changed", {
         detail: {viewKey, columns: [...order]},
@@ -5163,6 +5231,7 @@
       ? options.detail(picked)
       : (typeof options.emptyDetail === "function" ? options.emptyDetail() : options.emptyDetail || element("div", {class: "lex-detail"}));
     let leadingNode = typeof options.leadingPanel === "function" && picked ? options.leadingPanel(picked) : null;
+    let trailingNode = typeof options.trailingPanel === "function" && picked ? options.trailingPanel(picked) : null;
     let masterNodes = [];
     const select = record => {
       const nextSelected = keyOf(record);
@@ -5189,6 +5258,13 @@
         leadingNode.replaceWith(nextLeading);
         leadingNode = nextLeading;
         refreshReferences(nextLeading);
+      }
+      if (trailingNode) {
+        const nextTrailing = options.trailingPanel(record);
+        nextTrailing.classList.add("lex-panel-layout-pane");
+        trailingNode.replaceWith(nextTrailing);
+        trailingNode = nextTrailing;
+        refreshReferences(nextTrailing);
       }
       refreshReferences(replacement);
       return true;
@@ -5263,23 +5339,39 @@
     }, {passive:false});
     const barrelPanelMinimum = Math.max(160, Number(options.minLeft) || 280) * barrels +
       7 * (barrels - 1);
-    const root = leadingNode ? panelLayout([leadingNode, masterNode, detailNode],
-      `lex-list-detail lex-master-detail lex-list-detail-resizable lex-leading-list-detail ${options.className || ""}`, {
-        defaultSizes: [options.defaultLeadingWidth || 25, 30, 45],
-        minSizes: [Math.max(220, Number(options.minLeading) || 300), barrelPanelMinimum, Math.max(240, Number(options.minRight) || 360)],
-        storageKey: options.splitKey ? `lexeditor:leading-list-detail:${options.splitKey}` : "",
-        dividerClass: "lex-list-detail-divider",
-        dividerAccessories: [null, barrelControl],
-        dividerLabels: ["Resize secondary panel and list", "Resize list and detail panels"],
-        eventName: "lex-list-detail-resize",
-      }) : listDetail(masterNode, detailNode, options.className || "", {
-      splitKey: options.splitKey,
-      defaultSplit: options.defaultSplit,
-      minLeft: barrelPanelMinimum,
-      minRight: options.minRight,
-      minimumSplit: Math.min(78, 22 * barrels),
-      dividerAccessories: [barrelControl],
-    });
+    let root;
+    if (leadingNode) {
+      root = panelLayout([leadingNode, masterNode, detailNode],
+        `lex-list-detail lex-master-detail lex-list-detail-resizable lex-leading-list-detail ${options.className || ""}`, {
+          defaultSizes: [options.defaultLeadingWidth || 25, 30, 45],
+          minSizes: [Math.max(220, Number(options.minLeading) || 300), barrelPanelMinimum, Math.max(240, Number(options.minRight) || 360)],
+          storageKey: options.splitKey ? `lexeditor:leading-list-detail:${options.splitKey}` : "",
+          dividerClass: "lex-list-detail-divider",
+          dividerAccessories: [null, barrelControl],
+          dividerLabels: ["Resize secondary panel and list", "Resize list and detail panels"],
+          eventName: "lex-list-detail-resize",
+        });
+    } else if (trailingNode) {
+      root = panelLayout([masterNode, detailNode, trailingNode],
+        `lex-list-detail lex-master-detail lex-list-detail-resizable lex-trailing-list-detail ${options.className || ""}`, {
+          defaultSizes: options.defaultSizes || [34, 38, 28],
+          minSizes: [barrelPanelMinimum, Math.max(240, Number(options.minRight) || 340), Math.max(220, Number(options.minTrailing) || 260)],
+          storageKey: options.splitKey ? `lexeditor:trailing-list-detail:${options.splitKey}` : "",
+          dividerClass: "lex-list-detail-divider",
+          dividerAccessories: [barrelControl, null],
+          dividerLabels: ["Resize list and detail panels", "Resize detail and trailing panels"],
+          eventName: "lex-list-detail-resize",
+        });
+    } else {
+      root = listDetail(masterNode, detailNode, options.className || "", {
+        splitKey: options.splitKey,
+        defaultSplit: options.defaultSplit,
+        minLeft: barrelPanelMinimum,
+        minRight: options.minRight,
+        minimumSplit: Math.min(78, 22 * barrels),
+        dividerAccessories: [barrelControl],
+      });
+    }
     root.classList.add("lex-paged-list-detail");
     root.dataset.lexPage = String(page);
     root.dataset.lexPageSize = String(pageSize);
@@ -5417,9 +5509,17 @@
         rowSelector: fit.rowSelector,
         headerSelector: fit.headerSelector,
         resize: (height, measurement) => {
+          if (!slotBased) {
+            masterNode.style.height = "100%";
+            detailNode.style.height = "100%";
+            trailingNode && (trailingNode.style.height = "100%");
+            root.classList.add("lex-full-table-page");
+            return;
+          }
           masterNode.style.height = `${height}px`;
           root.classList.toggle("lex-full-table-page", !!measurement?.full);
           detailNode.style.height = measurement?.full ? `${height}px` : "";
+          if (trailingNode) trailingNode.style.height = measurement?.full ? `${height}px` : "";
         },
         change: nextSize => {
           if (fitMinimum) tableFitCapacityCache.set(rowPreferenceKey, {capacity: nextSize, requested: requestedPageSize});
@@ -5436,8 +5536,10 @@
   };
 
   const shortReferenceName = source => {
+    const named = String(source.name || "").trim();
     if (source.shortName) return source.shortName;
-    if (String(source.name || "").toLocaleLowerCase() === "vanilla") return "V";
+    if (/^(?:lexer(?:'s)?(?: mod)?|lexer-lux)$/i.test(named)) return "LL";
+    if (named.toLocaleLowerCase() === "vanilla") return "V";
     const words = String(source.name || "").trim().split(/\s+/).filter(Boolean);
     if (words.length > 1) return words.map(word => word[0]).join("").slice(0, 3).toLocaleUpperCase();
     return String(source.name || "").slice(0, 5).toLocaleUpperCase();
@@ -5475,14 +5577,15 @@
     }, ...sources.map(source => {
       const formatted = format(source.value, source);
       const description = formatted instanceof Node ? formatted.textContent : String(formatted);
+      const shortName = shortReferenceName(source);
       return element("button", {
         type: "button",
-        class: ["lex-reference-value", `lex-reference-slot-${source.referenceIndex}`, source.className || ""].filter(Boolean).join(" "),
+        class: ["lex-reference-value", `lex-reference-slot-${source.referenceIndex}`, shortName === "LL" ? "lex-reference-ll" : "", source.className || ""].filter(Boolean).join(" "),
         "data-reference-index": String(source.referenceIndex),
         title: `Use ${source.name}: ${description}`,
         onclick: event => options.apply?.(clone(source.value), event, source),
       },
-      element("span", {class: "lex-reference-tag"}, shortReferenceName(source)),
+      element("span", {class: "lex-reference-tag"}, shortName),
       element("span", {class: "lex-reference-text"}, formatted));
     }));
   };

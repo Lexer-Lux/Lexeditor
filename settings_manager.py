@@ -22,7 +22,6 @@ UPDATE_FREQUENCIES = {
 DEFAULTS = {
     "updateCheckFrequency": "daily",
     "developerMode": False,
-    "lexerMode": False,
     "hoverableAltClick": False,
     "selectionHoldMs": 650,
     "tableRowsPerPage": 15,
@@ -36,7 +35,7 @@ DEFAULTS = {
     "loadingTransitionMinimumSeconds": 1.5,
     "viewPreferences": {},
 }
-LEXER_DEFAULT_KEYS = tuple(key for key in DEFAULTS if key not in {"lexerMode", "viewPreferences"})
+PACKAGED_DEFAULT_KEYS = tuple(key for key in DEFAULTS if key not in {"developerMode", "viewPreferences"})
 
 
 def utc_now() -> datetime:
@@ -64,7 +63,7 @@ class SettingsStore:
         except (OSError, ValueError, TypeError):
             payload = {}
         return {**DEFAULTS, **{
-            key: payload[key] for key in LEXER_DEFAULT_KEYS if key in payload
+            key: payload[key] for key in PACKAGED_DEFAULT_KEYS if key in payload
         }}
 
     def _read(self) -> dict:
@@ -137,8 +136,7 @@ class SettingsStore:
         } if isinstance(raw_preferences, dict) else {}
         return {
             "updateCheckFrequency": frequency,
-            "developerMode": payload.get("developerMode", defaults["developerMode"]) is True,
-            "lexerMode": payload.get("lexerMode") is True,
+            "developerMode": False,
             "hoverableAltClick": payload.get("hoverableAltClick", defaults["hoverableAltClick"]) is True,
             "selectionHoldMs": max(150, min(2000, selection_hold_ms)),
             "tableRowsPerPage": max(5, min(40, table_rows_per_page)),
@@ -175,8 +173,7 @@ class SettingsStore:
             ],
         }
 
-    def save(self, update_check_frequency: str, developer_mode: bool | None = None,
-             lexer_mode: bool | None = None,
+    def save(self, update_check_frequency: str,
              hoverable_alt_click: bool | None = None,
              selection_hold_ms: int | None = None,
              table_rows_per_page: int | None = None,
@@ -188,10 +185,6 @@ class SettingsStore:
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
         current = self.snapshot()
-        if developer_mode is None:
-            developer_mode = current["developerMode"]
-        if lexer_mode is None:
-            lexer_mode = current["lexerMode"]
         if hoverable_alt_click is None:
             hoverable_alt_click = current["hoverableAltClick"]
         if selection_hold_ms is None:
@@ -211,10 +204,8 @@ class SettingsStore:
         with self._lock:
             stored = self._read()
             payload = {
-                "version": 8,
+                "version": 9,
                 "updateCheckFrequency": update_check_frequency,
-                "developerMode": bool(developer_mode),
-                "lexerMode": bool(lexer_mode),
                 "hoverableAltClick": bool(hoverable_alt_click),
                 "selectionHoldMs": selection_hold_ms,
                 "tableRowsPerPage": table_rows_per_page,
@@ -228,13 +219,13 @@ class SettingsStore:
             self._write(payload)
         return self.snapshot()
 
-    def save_lexer_defaults(self, values: dict) -> dict:
+    def save_developer_defaults(self, values: dict) -> dict:
         """Save checked-in application defaults after host authorization."""
         if not isinstance(values, dict):
             raise ValueError("Lexer defaults must be an object")
         current = self._packaged_defaults()
         for key, value in values.items():
-            if key not in LEXER_DEFAULT_KEYS:
+            if key not in PACKAGED_DEFAULT_KEYS:
                 raise ValueError(f"Setting cannot be a packaged default: {key}")
             current[key] = value
         frequency = str(current["updateCheckFrequency"])
@@ -282,7 +273,7 @@ class SettingsStore:
         with self._lock:
             current = self._read()
             current["viewPreferences"][key] = value
-            self._write({"version": 8, **current})
+            self._write({"version": 9, **current})
         return self.snapshot()
 
     def clear_view_preference(self, key: str) -> dict:
@@ -295,7 +286,7 @@ class SettingsStore:
         with self._lock:
             current = self._read()
             current["viewPreferences"].pop(key, None)
-            self._write({"version": 8, **current})
+            self._write({"version": 9, **current})
         return self.snapshot()
 
     def update_due(self, last_check: str, now: datetime | None = None) -> bool:

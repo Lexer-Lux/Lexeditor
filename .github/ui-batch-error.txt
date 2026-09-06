@@ -1,1 +1,0 @@
-desktop_host.py: expected one replacement, got 2: '        if not self._settings.snapshot().get("lexerMode"):\n            raise PermissionError("Lexer '

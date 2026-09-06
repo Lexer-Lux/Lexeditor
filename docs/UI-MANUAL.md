@@ -68,12 +68,12 @@ re-fit the Table and panel divider.
 
 ## Vanilla and reference values
 
-A **reference rail** shows only values that differ from the current value.
+A **ref rail** shows only values that differ from the current value.
 `V` means Vanilla. Other short tags name reference mods. Clicking a reference
 restores that displayed value. Booleans display a check or an X, not their raw
 stored number or the words `true` and `false`.
 
-A reference rail is a vertical stack with at most four sources. Vanilla is
+A ref rail is a vertical stack with at most four sources. Vanilla is
 always first and green. At most three reference mods can follow it: the first
 is red, the second is blue, and the third is yellow. A plugin must reject a
 fourth active reference mod instead of clipping, wrapping, or hiding it.
@@ -98,9 +98,7 @@ A unit is part of its field. It can be a suffix such as `%`, `/255`, `G`, or
 `×`, or a prefix when the game requires one. Unit placement is shared so game
 fonts cannot create local alignment errors.
 
-A value with only two valid states is a boolean control. A numeric 0/1 input
-must not be used when a checkbox or compact check/X toggle can prevent invalid
-values.
+Every stored variable must be presented in the most human-friendly control available, not in its raw storage encoding. Booleans are normally checkboxes or compact checkless toggles, never numeric 0/1 fields. Bitfields and flag bytes are decomposed into one property made from named checkboxes, enums, and other meaningful controls; raw bytes or integers are only acceptable when no more legible representation exists.
 
 ## Thing Selectors and Searchers
 
@@ -121,7 +119,7 @@ A **hoverable** looks and behaves like a link to another editable record. The
 same linked record has the same hover behavior in every list, Table, Detail
 panel, and reference display.
 
-Help uses a filled circular `?`. The component shape and interaction are
+Help uses a filled circular **info bubble** (`?`). The component shape and interaction are
 shared. Its glyph uses the active game's font when that font contains a usable
 question mark.
 
@@ -145,8 +143,8 @@ The settings grid has three ordered scopes from left to right:
   authorize GitHub or distributable changes.
 - **Lexer** settings change checked-in defaults that ship to every user.
 
-The `I am Lexer` control is available only when GitHub reports Lexer's allowed
-account as the active account. Lexer Mode gives each setting a second control
+The `authorized GitHub identity` control is available only when GitHub reports Lexer's allowed
+account as the active account. Developer Mode gives each setting a second control
 in the Lexer color. This control sets the packaged default. Double-clicking a
 setting name or description copies its current value into that default control.
 The new default becomes distributable only after the changed default file is
@@ -175,3 +173,30 @@ A dependent that the user turned off manually stays off.
 Hovering either related setting draws a semi-transparent flowing arrow from the
 requirement control to its dependent control. This shows both what the setting
 controls and what it requires without permanent connector clutter.
+
+
+## Shared interaction standards
+
+### Human-friendly variable controls
+
+The editor displays the *meaning* of a value rather than its serialization. Use checkboxes for ordinary booleans and **checkless toggles** when the surrounding control already supplies an unambiguous on/off state. Split bitflags into named checkbox/enum controls inside one property. Do not expose 0/1, bit masks, bytes, or packed integers when a safer semantic control can represent them.
+
+### Info bubbles and ref rails
+
+The circular `?` is the **info bubble**. It is geometrically centered in its circle and occupies the shared label/ref area without displacing the property name. The **ref rail** is the stable comparison lane for Vanilla and reference mods. Vanilla is `V`; Lexer's mod is always `LL` and lime green. Ref rails reserve their space even when the current value matches, so editing cannot move the live control.
+
+### Model preview drawer
+
+A model-capable Detail uses the shared `modelPreview` slot. The header icon is the preview button. Clicking it slides the preview drawer out over the Detail body; while open, an `×` occupies exactly the same icon slot and closes the drawer. Plugins provide model data/rendering only. They do not create a second preview-panel interaction.
+
+### Table editing and property linking
+
+There is one Table type. Any cell whose column declares an editor is editable by double-click in place; entering edit mode must not change the cell font, row height, column width, padding, or overall geometry. A separate “Editable Table” type is forbidden. Hovering a column highlights its matching Detail property and hovering the property highlights the column. A hovered column/property also highlights itself when no counterpart exists.
+
+### Detail labels
+
+The Detail property-name region is 10% of the panel. Property names and labels inside grouped boolean boxes may wrap and automatically reduce type size to fit their existing box, but they must not increase the row height. Sorting indicators never replace or hide the property name or info bubble.
+
+### Graphs
+
+Graph titles are large and uppercase. There is one title only. Axis names and numeric range labels live in the graph margins; every right-axis text element, including range numbers, is rotated 90° counter-clockwise. Formula text uses natural glyph proportions and is never stretched or squashed to follow the curve. Variable controls live in a drawer that slides in from the top.

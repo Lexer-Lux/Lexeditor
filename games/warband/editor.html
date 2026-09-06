@@ -47,7 +47,7 @@
   <script src="/warband/troop_trees.js"></script>
   <script>
   "use strict";
-  const {el,columnList,list,masterDetail,pagedListDetail,pager,clone,showAlert,hoverable,detailPanel}=LexeditorUI;
+  const {el,columnList,list,masterDetail,pagedListDetail,pager,clone,showAlert,hoverable,detailPanel,detailSection,detailField,readonlyField}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
   const state={
     booting:true,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
@@ -84,8 +84,7 @@
     const query=state.filters[view]||"",filtered=sorted(search(rows,query,columns.map(column=>column.key)),view);
     const keyOf=options.key||((row)=>columns.map(column=>String(row[column.key]??"")).join("|"));
     const selected=options.selected?.()||"",setSelected=options.setSelected||(()=>{});
-    const detail=row=>row?el("div",{class:"lex-detail detail"},el("h2",{},row.name||(row.from&&row.to?`${row.from} → ${row.to}`:String(keyOf(row)))),
-      el("div",{class:"detail-grid"},...columns.flatMap(column=>[el("div",{class:"label"},typeof column.label==="string"?column.label:column.key),el("div",{},String(row[column.key]??"—"))]))):el("div",{class:"lex-detail detail"},"No matching records.");
+    const detail=row=>row?detailPanel({className:"warband-shared-detail",title:row.name||(row.from&&row.to?`${row.from} → ${row.to}`:String(keyOf(row))),body:[detailSection({title:"PROPERTIES",body:columns.map(column=>{const value=row[column.key];return detailField({label:typeof column.label==="string"?column.label:column.key,property:column.key,control:readonlyField(value??"—",{format:typeof value==="number"}),dataType:typeof value==="number"?"INT":"STRING"})})})]}):detailPanel({className:"warband-shared-detail",title:"No matching records"});
     $("#toolbar").replaceChildren();
     $("#main").replaceChildren(pagedListDetail({rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
       search:{key:`warband-${view}`,value:query,placeholder:`Search ${view}…`,change:value=>{state.filters[view]=value;state.pages[view]=0;render();}},filters:options.filters||[],
@@ -131,27 +130,29 @@
     const canvas=el("canvas",{tabindex:"0","aria-label":`${item.name} inventory mesh preview`});
     const stage=el("div",{class:"warband-preview-stage"},canvas,message);
     const facts=el("div",{class:"warband-preview-facts"});
-    let data=null,open=true,generation=0;
-    const action=el("button",{class:"warband-item-preview-action",disabled:true,title:"Checking mesh and texture dependencies…","aria-label":"Close 3D preview"},"×");
-    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,actions:action,
-      body:[el("div",{class:"warband-mesh-list"},el("b",{},"Meshes: "),item.meshes.length?item.meshes.join(" · "):"None"),stage,facts]});
+    const preview=el("div",{class:"warband-model-preview"},stage,facts);
+    let data=null,generation=0,open=false;
+    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,modelPreview:preview,modelPreviewLabel:`${item.name} model preview`,
+      body:[el("div",{class:"warband-mesh-list"},el("b",{},"Meshes: "),item.meshes.length?item.meshes.join(" · "):"None")]});
     async function showPreview(){
+      if(!open||!data)return;
       const token=++generation;
       try{
         const controller=await createWarbandRenderer(canvas,data,true);
         if(!detail.isConnected||!open||token!==generation){controller.dispose();return;}
-        window.__warbandPreview=[controller];message.hidden=true;action.disabled=false;action.title="Close 3D preview";
-      }catch(error){if(detail.isConnected&&token===generation){message.hidden=false;message.textContent=error.message;action.disabled=true;}}
+        window.__warbandPreview=[controller];message.hidden=true;
+      }catch(error){if(detail.isConnected&&open&&token===generation){message.hidden=false;message.textContent=error.message;}}
     }
-    action.onclick=()=>{open=!open;generation++;stage.hidden=!open;disposeWarbandPreview();action.textContent=open?"×":"◉";action.setAttribute("aria-label",open?"Close 3D preview":"Open 3D preview");action.title=action.getAttribute("aria-label");if(open){action.disabled=true;showPreview();}};
+    detail.addEventListener("lex-model-preview-open",()=>{open=true;showPreview();});
+    detail.addEventListener("lex-model-preview-close",()=>{open=false;generation++;disposeWarbandPreview();});
     if(item.inventoryMesh)requestAnimationFrame(async()=>{
       loadWarbandIcon(item,detail,thumbnail,thumbnailMessage);
       try{
         data=await api(`/api/item-preview?mesh=${encodeURIComponent(item.inventoryMesh)}`);
         if(!detail.isConnected)return;
         facts.replaceChildren(el("span",{},data.resource),el("span",{},data.material),el("span",{},`${data.summary.vertices} vertices · ${data.summary.triangles} triangles`));
-        await showPreview();
-      }catch(error){if(detail.isConnected){message.textContent=error.message;action.title=error.message;}}
+        if(open)await showPreview();
+      }catch(error){if(detail.isConnected){message.textContent=error.message;}}
     });
     return detail;
   }

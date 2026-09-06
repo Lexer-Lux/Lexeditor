@@ -68,7 +68,7 @@ were removed; only read-only validation remains in the final diff.
 
 Update master, restart Home, close Warband/updater processes and select Warband →
 Install / Repair WSE2. Prepared diagnostics: `tools/Warband-checks.cmd`. Full steps:
-`docs/warband-managed-wse2.md`. Confirm installed package/version, then separately
+`worklog/reference/warband-managed-wse2.md`. Confirm installed package/version, then separately
 check the real selected module, Steam overlay, playtime, used Steam features and
 one normally earned eligible achievement. No forced unlock/reset is performed.
 

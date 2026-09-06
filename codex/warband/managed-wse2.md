@@ -30,7 +30,7 @@ is checked server-side and opens outside the privileged WebView.
 Steam and achievement initialization strings occur in the pinned publisher
 engine; the package carries the matching 32/64-bit Steam DLLs and AppID 48700.
 This proves component retention, not actual Steam login/overlay/playtime/unlock
-success. See `docs/warband-managed-wse2.md` for separate acceptance checks.
+success. See `worklog/reference/warband-managed-wse2.md` for separate acceptance checks.
 
 Upstream: https://github.com/Ruslan-700/WSE2-Releases/releases/tag/v1.1.5.1
 Steam initialization requirements: https://partner.steamgames.com/doc/api/steam_api

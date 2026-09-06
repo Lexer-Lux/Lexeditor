@@ -4466,3 +4466,108 @@ body:has(.lex-data-map-view)>#main{flex:1 1 auto;min-height:0;height:auto;overfl
 body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-data-map-detail .lex-detail-panel-body{padding:12px;min-height:0}
 .lex-data-map-detail .lex-data-map-actions{padding-bottom:8px}
+
+
+/* ---- 2026-09-06 shared UI follow-up ------------------------------ */
+/* Detail labels are exactly one tenth of the pane. Their text wraps and is
+   auto-fitted by framework.js; rows never grow just because a name is long. */
+.lex-detail-panel { --lex-detail-label-width:10% !important; position:relative; overflow:hidden; }
+.lex-detail-field { grid-template-columns:minmax(0,var(--lex-detail-label-width)) minmax(0,1fr) !important; }
+.lex-detail-field-label { display:grid !important; grid-template-columns:minmax(18px,.34fr) minmax(0,.66fr); align-items:center; min-width:0; height:100%; overflow:hidden; padding:0 3px; }
+.lex-detail-field-label > .lex-info-help { grid-column:1; grid-row:1; justify-self:center; align-self:center; }
+.lex-detail-field-label-text { grid-column:2; grid-row:1; display:grid; width:100%; height:100%; min-width:0; place-items:center; overflow:hidden; white-space:normal; overflow-wrap:anywhere; text-align:center; line-height:1.02; }
+.lex-field-boolean-arrow { grid-column:2; grid-row:1; justify-self:end; align-self:center; position:static !important; transform:none !important; }
+.lex-detail-field[data-lex-sort] .lex-detail-field-label,
+.lex-detail-field[data-lex-sort] .lex-detail-field-label-text,
+.lex-detail-field[data-lex-sort] .lex-info-help { visibility:visible !important; opacity:1 !important; display:grid !important; }
+.lex-detail-field[data-lex-sort] .lex-field-type-rail > :is(.lex-field-type-name,.lex-field-type-range) { opacity:0 !important; }
+
+/* Info bubble: both the circle and ? glyph use true geometric centring. */
+.lex-info-help { display:grid !important; place-items:center !important; padding:0 !important; line-height:1 !important; text-align:center !important; }
+.lex-info-help > span { display:grid; width:100%; height:100%; place-items:center; line-height:1; transform:translateY(-.015em); }
+
+/* Grouped booleans are ordinary horizontal tiles. The parent property is the
+   FLAGS type; individual flags do not grow their own sideways type rails. */
+.lex-toggle-rail,.lex-toggle-type { display:none !important; }
+.lex-toggle-row { grid-auto-rows:minmax(30px,1fr); }
+.lex-toggle { position:relative; min-height:30px; overflow:hidden; }
+.lex-toggle-name { display:grid; align-items:center; min-width:0; height:100%; overflow:hidden; white-space:normal; overflow-wrap:anywhere; text-overflow:clip; line-height:1.02; }
+.lex-toggle > .lex-info-help { margin-left:auto; }
+
+/* A boolean's ref rail lives immediately beneath the checkbox but still has a
+   little bottom breathing room. It does not hover six pixels away from it. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control { grid-template-rows:minmax(18px,1fr) auto; align-items:center; height:100%; padding:2px 0 3px; }
+.lex-boolean-field .lex-source-control > :not(.lex-reference-values):not(.lex-reference-placeholder) { grid-row:1; }
+.lex-boolean-field .lex-source-control > .lex-reference-values,
+.lex-boolean-field .lex-source-control > .lex-reference-placeholder { position:static !important; grid-row:2; top:auto !important; left:auto !important; right:auto !important; bottom:auto !important; translate:none !important; margin:1px 0 2px; padding:0; line-height:1; }
+.lex-reference-value.lex-reference-ll,.lex-reference-value.lex-reference-ll .lex-reference-tag { color:#7CFC00 !important; }
+.lex-reference-value.lex-reference-ll { border-color:color-mix(in srgb,#7CFC00 60%,var(--lex-border)); }
+
+/* Property/column highlighting is bidirectional and still visible when there
+   is no counterpart on the other pane. */
+.lex-detail-field:hover,.lex-detail-field.lex-column-lit { background:color-mix(in srgb,var(--lex-highlight) 14%,transparent) !important; }
+.lex-column-list-head-cell:hover,.lex-column-list-cell:hover,
+.lex-column-list-head-cell.lex-column-lit,.lex-column-list-cell.lex-column-lit { background:color-mix(in srgb,var(--lex-highlight) 16%,transparent) !important; }
+
+/* Inline edit preserves the table's exact geometry and typography. */
+.lex-column-list-cell.lex-cell-editing { box-shadow:none !important; overflow:hidden; }
+.lex-column-list-cell.lex-cell-editing .lex-column-cell-content { display:block; width:100%; height:100%; min-width:0; }
+.lex-column-list-cell.lex-cell-editing .lex-column-cell-content > :is(input,select,textarea) { box-sizing:border-box; width:100% !important; height:100% !important; min-width:0 !important; margin:0 !important; padding:inherit !important; color:inherit !important; border:0 !important; border-radius:0 !important; outline:0 !important; background:transparent !important; box-shadow:none !important; font:inherit !important; line-height:inherit !important; text-align:inherit !important; }
+
+/* Bounded-value fill is clipped to the actual input box, never the whole
+   property control. */
+.lex-value-box { position:relative; display:block; box-sizing:border-box; width:100%; min-width:0; height:100%; overflow:hidden; }
+.lex-value-box > input { position:relative; z-index:1; box-sizing:border-box; width:100%; height:100%; background:transparent !important; }
+.lex-value-box > .lex-value-fill { position:absolute; inset:0; overflow:hidden; border-radius:inherit; }
+.lex-detail-field-control { overflow:visible; }
+.lex-has-value-fill > .lex-detail-field-control { overflow:hidden; }
+
+/* Reset feedback is an overlay. It fades to transparency, revealing whatever
+   background is correct at that instant (hovered, highlighted, or normal). */
+.lex-detail-field::after { content:""; position:absolute; inset:0; z-index:12; background:var(--lex-accent); opacity:0; pointer-events:none; }
+.lex-detail-field.lex-reset-flash::after { animation:lex-reset-flash .55s ease-out; }
+@keyframes lex-reset-flash { from { opacity:.9; } to { opacity:0; } }
+
+/* Standard model-preview drawer. The header icon is the open control and the
+   close X occupies exactly that same icon slot. */
+.lex-detail-panel-icon.lex-model-preview-trigger { position:relative; cursor:pointer; user-select:none; }
+.lex-detail-panel-icon.lex-model-preview-trigger:focus-visible { outline:2px solid var(--lex-highlight); outline-offset:-2px; }
+.lex-detail-panel-icon-content { display:grid; width:100%; height:100%; place-items:center; }
+.lex-model-preview-close { position:absolute; inset:0; display:grid; place-items:center; opacity:0; font:700 clamp(20px,2em,34px)/1 var(--lex-symbol-font); pointer-events:none; }
+.lex-model-preview-open .lex-detail-panel-icon-content { opacity:0; }
+.lex-model-preview-open .lex-model-preview-close { opacity:1; }
+.lex-model-preview-drawer { position:absolute; z-index:20; top:10%; right:0; bottom:0; left:0; min-width:0; min-height:0; padding:var(--lex-panel-gap); overflow:auto; border-top:1px solid var(--lex-border); background:var(--lex-panel); transform:translateX(-102%); opacity:0; pointer-events:none; transition:transform .22s ease,opacity .18s ease; }
+.lex-model-preview-open .lex-model-preview-drawer { transform:translateX(0); opacity:1; pointer-events:auto; }
+.warband-model-preview { display:flex; flex-direction:column; width:100%; height:100%; min-height:0; }
+
+/* Project states use an explicit mark and a desaturation veil. */
+.lex-project-menu-item.disabled,.lex-project-reference.disabled { position:relative; filter:grayscale(1); opacity:.62; }
+.lex-project-menu-item.disabled::after,.lex-project-reference.disabled::after { content:""; position:absolute; inset:0; z-index:5; background:color-mix(in srgb,var(--lex-panel) 40%,transparent); pointer-events:none; }
+.lex-project-menu-item-select > .lex-project-source-mode,
+.lex-project-menu-item-select > .lex-project-source-status { flex:0 0 auto; }
+
+/* Graph standard: natural text, large title, real margins and a top drawer. */
+.lex-curve-editor { position:relative; overflow:hidden; grid-template-areas:"heading" "plot" "formula" "status" !important; grid-template-rows:auto auto auto auto !important; }
+.lex-curve-heading { min-height:42px; }
+.lex-curve-heading-title { font-size:clamp(24px,2.1vw,36px) !important; line-height:1 !important; text-transform:uppercase !important; }
+.lex-curve-path-formula { display:none !important; }
+.lex-curve-formula { display:block !important; min-height:2.2em; padding:6px 8px; white-space:normal; overflow-wrap:anywhere; }
+.lex-curve-variable-toggle { margin-left:auto; padding:4px 8px; color:var(--lex-text); border:1px solid var(--lex-border); border-radius:var(--lex-radius); background:var(--lex-panel-2); font:700 .72em/1 var(--lex-font); cursor:pointer; }
+.lex-curve-variables { position:absolute !important; z-index:15; top:42px; right:0; left:0; width:auto !important; padding:9px 10px !important; border-block:1px solid var(--lex-border); background:var(--lex-panel-2) !important; box-shadow:0 5px 14px #0004; transform:translateY(calc(-100% - 44px)); opacity:0 !important; pointer-events:none !important; transition:transform .2s ease,opacity .16s ease; }
+.lex-curve-editor.lex-curve-variables-open .lex-curve-variables { transform:translateY(0); opacity:1 !important; pointer-events:auto !important; }
+.lex-curve-plot { --lex-curve-margin:42px; --lex-curve-margin-left:42px; --lex-curve-margin-right:54px; --lex-curve-margin-top:18px; --lex-curve-margin-bottom:40px; padding:0 !important; aspect-ratio:2/1 !important; }
+.lex-curve-plot > .lex-curve-svg { top:var(--lex-curve-margin-top) !important; left:var(--lex-curve-margin-left) !important; width:calc(100% - var(--lex-curve-margin-left) - var(--lex-curve-margin-right)) !important; height:calc(100% - var(--lex-curve-margin-top) - var(--lex-curve-margin-bottom)) !important; }
+.lex-curve-axis-start { bottom:10px !important; left:var(--lex-curve-margin-left) !important; transform:translateX(-50%) !important; }
+.lex-curve-axis-end { bottom:10px !important; right:var(--lex-curve-margin-right) !important; left:auto !important; transform:translateX(50%) !important; }
+.lex-curve-axis-name-x { bottom:7px !important; left:50% !important; transform:translateX(-50%) !important; }
+.lex-curve-axis-name-y { top:50% !important; right:7px !important; left:auto !important; writing-mode:horizontal-tb !important; transform:translateY(-50%) rotate(-90deg) !important; transform-origin:center; }
+.lex-curve-axis-top { top:var(--lex-curve-margin-top) !important; right:15px !important; left:auto !important; transform:translate(50%,-50%) rotate(-90deg) !important; transform-origin:center; }
+.lex-curve-axis-bottom { bottom:var(--lex-curve-margin-bottom) !important; right:15px !important; left:auto !important; transform:translate(50%,50%) rotate(-90deg) !important; transform-origin:center; }
+.lex-curve-plot::before,.lex-curve-plot::after { content:none !important; display:none !important; }
+
+/* A growable paged view owns the pane height even on a short last page. */
+.lex-paged-list-detail,.lex-barrelled-master,.lex-barrel-grid { min-height:0; height:100%; }
+.lex-full-table-page > .lex-panel-layout-pane { min-height:0; }
+
+/* There is one shortcut badge implementation. */
+.lex-tab-ordinal { display:none !important; }

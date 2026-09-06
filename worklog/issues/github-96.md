@@ -10,4 +10,4 @@ PR #361 merged to master as bc6f97ef456b0a20b08358612c26eb400c97d2e7. The normal
 
 ## Remaining acceptance
 
-Update the normal master checkout, restart or run `tools/Warband-checks.cmd`, and select the Warband source mod. In Troop Trees switch faction and tree; click root, both branches and an end troop. Roots must be below upgrades and right-side details must match. Resize/scroll a wide tree. Report faction/troop IDs and screenshot for missing or incorrect links. `docs/warband-acceptance.md` contains the prepared test. No driver/mod rebuild or new design answer is required; only mod-specific acceptance remains.
+Update the normal master checkout, restart or run `tools/Warband-checks.cmd`, and select the Warband source mod. In Troop Trees switch faction and tree; click root, both branches and an end troop. Roots must be below upgrades and right-side details must match. Resize/scroll a wide tree. Report faction/troop IDs and screenshot for missing or incorrect links. `worklog/reference/warband-acceptance.md` contains the prepared test. No driver/mod rebuild or new design answer is required; only mod-specific acceptance remains.

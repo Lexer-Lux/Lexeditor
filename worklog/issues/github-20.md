@@ -10,4 +10,4 @@ PR #361 merged to master as bc6f97ef456b0a20b08358612c26eb400c97d2e7. Cached hea
 
 ## Remaining acceptance
 
-Update the normal checkout from master, restart, then run `tools/Warband-checks.cmd`. No driver or mod rebuild is needed. Follow Items in `docs/warband-acceptance.md`: boots/helmet/sword/polearm icons, preview rotate/zoom/close/reopen, rapid item/tab changes, tab lettering, badges and manuals. Report item/mesh IDs, screenshot and any visible error. Only installed-asset acceptance remains; failed acceptance returns this issue to actionable. Do not close solely from CI.
+Update the normal checkout from master, restart, then run `tools/Warband-checks.cmd`. No driver or mod rebuild is needed. Follow Items in `worklog/reference/warband-acceptance.md`: boots/helmet/sword/polearm icons, preview rotate/zoom/close/reopen, rapid item/tab changes, tab lettering, badges and manuals. Report item/mesh IDs, screenshot and any visible error. Only installed-asset acceptance remains; failed acceptance returns this issue to actionable. Do not close solely from CI.
