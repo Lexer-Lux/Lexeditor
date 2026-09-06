@@ -1,0 +1,84 @@
+name: Apply tested native battle changes
+on:
+  push:
+    branches: [fix/ff8-native-battle-batch]
+    paths: [.github/workflows/apply-native-batch.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Read exact source revision without unrelated gitlinks
+        run: |
+          git init .
+          git remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Apply only hash-verified changes
+        run: |
+          python - <<'PY'
+          import hashlib, json, pathlib
+          plan=json.loads(pathlib.Path('tools/_native_batch_edits.json').read_text())
+          expected={
+            'games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_battle_meters.h':'7f22909c3882fcc8380659cc4c7ddc0a22bf9d01be7d782625ef3bbd80f0d183',
+            'tools/prepare_ff8_native_battle_build.py':'a9367f85b4607554133938080d3e7463f04508bd81777783f3ee33952daa8120',
+            'tools/verify_ff8_battle_meters.cpp':'e6cdbfafb3769357f5802f44209712762138b6c55bb57530c006f23299a91513',
+            'tools/verify_ff8_gf_hp_settings.py':'cf23447b2f6e095b8af12bcf4a16a2c71226e3e0b0c680d23e96481d6ba0c36a',
+            'tools/verify_ff8_native_battle_batch.py':'52fc27c2ba7e6568dfd6f1ba3353ad351fc70f17b13e951baf01536536639064',
+          }
+          for name, digest in expected.items():
+              assert hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()==digest,name
+          changes={}
+          for name,item in plan.items():
+              path=pathlib.Path(name)
+              assert not path.is_absolute() and '..' not in path.parts
+              raw=path.read_bytes()
+              assert hashlib.sha256(raw).hexdigest()==item['before'],name+' before hash'
+              text=raw.decode('utf-8')
+              for start,end,replacement in reversed(item['edits']):
+                  assert 0<=start<=end<=len(text)
+                  text=text[:start]+replacement+text[end:]
+              result=text.encode('utf-8')
+              assert hashlib.sha256(result).hexdigest()==item['after'],name+' after hash'
+              changes[path]=result
+          for path,result in changes.items():
+              path.write_bytes(result)
+              print('Verified and applied:',path)
+          pathlib.Path('/tmp/native-changed-paths').write_text('\n'.join(plan)+'\n')
+          PY
+      - name: Run executable-independent regressions
+        run: |
+          python tools/verify_ff8_gf_hp_settings.py
+          python tools/verify_ff8_gameplay_quarantine_issue_21.py
+          python -m compileall -q games/ff8 tools/prepare_ff8_native_battle_build.py tools/verify_ff8_native_battle_batch.py
+          g++ -std=c++17 -Wall -Wextra -Werror tools/verify_ff8_battle_meters.cpp -o /tmp/test-battle-meters
+          /tmp/test-battle-meters
+          python - <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          class Scripts(HTMLParser):
+              def __init__(self):
+                  super().__init__(); self.inline=False; self.js=[]
+              def handle_starttag(self,tag,attrs):
+                  if tag=='script': self.inline='src' not in dict(attrs)
+              def handle_endtag(self,tag):
+                  if tag=='script': self.inline=False
+              def handle_data(self,data):
+                  if self.inline:self.js.append(data)
+          p=Scripts();p.feed(Path('games/ff8/editor.html').read_text())
+          Path('/tmp/ff8-editor.js').write_text('\n'.join(p.js))
+          PY
+          node --check /tmp/ff8-editor.js
+      - name: Commit tested source and remove one-time transport
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh auth setup-git
+          git config user.name 'Lexeditor build automation'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          while IFS= read -r path; do git add -- "$path"; done < /tmp/native-changed-paths
+          git rm tools/_native_batch_edits.json .github/workflows/apply-native-batch.yml
+          git commit -m 'Fix native Party Switch retirement, HP row alignment and blue GF HP integration'
+          git push origin HEAD:refs/heads/fix/ff8-native-battle-batch
