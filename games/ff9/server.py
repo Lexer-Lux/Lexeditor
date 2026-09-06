@@ -15,7 +15,6 @@ from . import paths
 from .memoria_csv import DATASETS, MemoriaDataStore, catalog
 from .memoria_baseline import ensure as ensure_baseline
 from . import memoria_manager
-from platform_config import load_config, save_config
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
@@ -24,7 +23,7 @@ PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
-POST_ROUTES = {"/api/save", "/api/platform-config/save", "/api/runtime/install",
+POST_ROUTES = {"/api/save", "/api/runtime/install",
                "/api/runtime/recover", "/api/runtime/settings"}
 
 
@@ -62,14 +61,13 @@ def data_map() -> dict:
             "status": "integrated" if row["available"] else "partial",
             "openable": row["available"], "target": row["tab"], "datasetKey": row["key"],
         })
-    config = paths.GAME_ROOT / "Memoria.ini"
+    launcher = paths.GAME_ROOT / "FF9_Launcher.exe"
     return {
         "contract": "Lexeditor.data-map",
         "rows": integrated + [{
-            "filename": "Memoria.ini", "controls": "Memoria engine, graphics, audio, battle and mod settings",
-            "notes": "The Tweaks tab edits typed values in place and preserves comments and file order."
-                     if config.is_file() else "Available after Memoria creates its configuration beside FF9_Launcher.exe.",
-            "status": "integrated" if config.is_file() else "partial", "openable": config.is_file(),
+            "filename": "FF9_Launcher.exe", "controls": "Memoria settings in its own launcher",
+            "notes": "Play opens the launcher. Lexeditor does not edit Memoria.ini; Tweaks explains this handoff.",
+            "status": "integrated" if launcher.is_file() else "partial", "openable": True,
             "target": "tweaks",
         }] + [{
             "filename": filename, "controls": controls, "notes": notes,
@@ -87,7 +85,7 @@ def dashboard() -> dict:
     assembly = paths.GAME_ROOT / "x64" / "FF9_Data" / "Managed" / "Assembly-CSharp.dll"
     return {
         "game": {
-            "root": str(paths.GAME_ROOT), "executable": str(player),
+            "root": str(paths.GAME_ROOT), "executable": str(launcher),
             "settingsExecutable": str(launcher), "ready": not problems,
             "steamAppId": "377840", "steamBuildId": _steam_build(),
             "launcherSha256": _hash(launcher), "playerSha256": _hash(player),
@@ -162,8 +160,6 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(memoria_manager.status(paths.GAME_ROOT))
             elif path == "/api/runtime/available":
                 self.json_response(memoria_manager.available())
-            elif path == "/api/platform-config":
-                self.json_response(load_config(paths.GAME_ROOT / "Memoria.ini", "Memoria", "ini"))
             else:
                 self.json_response({"error": "Not found"}, 404)
         except Exception as error:
@@ -203,13 +199,6 @@ class Handler(BaseHTTPRequestHandler):
                 result = memoria_manager.recover(paths.GAME_ROOT)
             elif path == "/api/runtime/settings":
                 result = memoria_manager.open_settings(paths.GAME_ROOT)
-            elif path == "/api/platform-config/save":
-                with memoria_manager.configuration_write(paths.GAME_ROOT):
-                    result = save_config(
-                        paths.GAME_ROOT / "Memoria.ini", "Memoria", "ini",
-                        str(payload.get("sha256", "")), payload.get("changes", {}),
-                        ("FF9.exe", "FF9_Launcher.exe"),
-                    )
             else:
                 result = MemoriaDataStore().save(str(payload.get("key", "")),
                                                 str(payload.get("sha256", "")), payload.get("changes", []))
