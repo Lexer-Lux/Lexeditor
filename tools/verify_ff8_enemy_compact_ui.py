@@ -111,6 +111,9 @@ def run(browser_path: str | None, exe: Path | None, output: Path | None) -> None
             scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',html,re.S)
             markup=re.sub(r'<script(?:\s[^>]*)?>.*?</script>','',html,flags=re.S)
             markup=re.sub(r'<link[^>]+>','',markup)
+            # framework.js resolves shared assets relative to document.baseURI;
+            # about:blank is not a valid URL base in current Chromium.
+            markup=markup.replace('<head>','<head><base href="http://localhost/">',1)
             page.set_content(markup)
             page.add_style_tag(content=(ROOT/'ui/framework.css').read_text())
             # Plugin overrides come after the shared stylesheet, as in production.
