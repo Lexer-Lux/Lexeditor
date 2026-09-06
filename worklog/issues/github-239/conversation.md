@@ -75,6 +75,43 @@ Owning a pocketwatch shows game time. Offer Classic Serif, Watch Numerals, Catal
 
 [Original display reference](https://github.com/user-attachments/assets/1704ecf8-041c-4e42-b77c-4b2b9cb258eb).
 
+## issue 5356316602 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/239
+
+Created: 2026-08-10T10:53:50Z; updated: 2026-09-06T17:34:36Z
+
+Exact metadata: [source record](sources/issue-5356316602-948105738180b6607479a8d5c01120eed96b6cf94e35eb8c2dc199fe3a2bcc5e.json).
+
+Owning a pocketwatch shows game time. Offer Classic Serif, Watch Numerals, Catalogue Numerals, Redemption and RDR Lino, with Classic Serif as the chosen default.
+
+**Status: Built candidate ready for visual check.** Runtime PR #211 now implements all five validated built-in font faces, defaults to Classic Serif (`body1`), and hot-reloads the selection. Both release and development Windows builds passed.
+
+- [ ] Back up the current ASI/INI, then use the current candidate from runtime build run 34047794918.
+- [ ] In the settings menu, verify the five choices are Classic Serif, Watch Numerals, Catalogue Numerals, Redemption and RDR Lino.
+- [ ] Confirm Classic Serif is the default and changing the font updates the pocketwatch clock within about two seconds.
+- [ ] Report any missing/wrong face or visual regression; no rebuild is required for a font change.
+
+[Original display reference](https://github.com/user-attachments/assets/1704ecf8-041c-4e42-b77c-4b2b9cb258eb).
+
+## issue 5356316602 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/239
+
+Created: 2026-08-10T10:53:50Z; updated: 2026-09-06T17:34:36Z
+
+Exact metadata: [source record](sources/issue-5356316602-c2fe91251f643f15558ad836e41721539a8ff52031a8fb6d140345fe487cd2cc.json).
+
+Owning a pocketwatch shows game time. Offer Classic Serif, Watch Numerals, Catalogue Numerals, Redemption and RDR Lino, with Classic Serif as the chosen default.
+
+**Merged candidate ready for visual check.** Runtime PR Lexer-Lux/Lexers-Mod-For-RDR2#211 is merged into `master` as `024bc06644b648dbcf6bf84c5e280f7bef59a811`. It implements all five validated built-in font faces, defaults to Classic Serif (`body1`), and hot-reloads the selection. Both release and development Windows builds passed before merge.
+
+- [ ] Install the current merged runtime and verify the five choices are Classic Serif, Watch Numerals, Catalogue Numerals, Redemption and RDR Lino.
+- [ ] Confirm Classic Serif is the default and changing the font updates the pocketwatch clock within about two seconds.
+- [ ] Report any missing/wrong face or visual regression; no rebuild is required for a font change.
+
+[Original display reference](https://github.com/user-attachments/assets/1704ecf8-041c-4e42-b77c-4b2b9cb258eb).
+
 ## comment 5550146435 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/239#issuecomment-5550146435
