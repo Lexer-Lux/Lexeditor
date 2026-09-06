@@ -26,7 +26,17 @@ jobs:
           git config user.name 'Lexeditor Global Recovery'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git fetch origin master
+          set +e
           git merge --no-edit origin/master
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo '--- desktop_host.py conflict ---'
+            git diff --cc -- desktop_host.py || true
+            echo '--- ui/chooser.html conflict ---'
+            git diff --cc -- ui/chooser.html || true
+            exit "$status"
+          fi
       - name: Apply final shared-control help coverage if still staged
         run: |
           if [ -f maintenance/global-resume/apply_followup.py ]; then
