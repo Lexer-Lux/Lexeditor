@@ -1,0 +1,99 @@
+{
+  "body_sha256": "f28a75abab2a6371d84d7109eecf25e5face89e1fbab32819b2dfae05f2a7336",
+  "issue": 79,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "**Implemented and merged — needs installed-game acceptance.** PR #359 was merged into `master` as `3e2d2b924ac299f085b7f568c2394419ea0b3b63`, including completion commit `613d2b73c51956d921a032341317d0d37a815feb`.\n\nThe previously missing editors are now connected: character/enemy/formation AI; character growth curves and bonuses; inline/default names; separate Cait Sith/Vincent recruitment data; field and world encounter tables, Yuffie thresholds and Chocobo ratings; enemy/attack/formation records; shops/prices; and all 18 English kernel2 text sections. Existing equipment/materia editors remain available. The page has 24 dataset categories plus FFNx, grouped into subtabs, with independent availability and verified project saves.\n\n**Verification:** all current-head FF7 and shared CI jobs passed. FF7 runs 57 binary/HTTP tests on Windows and Linux plus ten Chromium scenarios, including actual shared controls, save/reopen, layout, sound dispatch and muting. The source artifact was downloaded and its 19 changed/new source/test files matched the locally tested versions by SHA-256. These are synthetic-data checks, not installed-game proof.\n\n**Installed acceptance checklist:**\n- [ ] Update the normal Lexeditor checkout to the merged master and run `tools\\FF7-checks.cmd` for both installed editions. This reads installed data, writes only disposable temporary project copies, verifies readback/source hashes and emits a JSON report. Missing or unreadable datasets remain failures, not a full-success result.\n- [ ] In a disposable mod, edit/save/reopen representative character, AI, enemy, formation, field/world encounter, shop, price and text values. Confirm original installed files remain unchanged.\n- [ ] Validate deployed outputs and native editor behavior in the actual games. This environment did not perform deployment or gameplay acceptance.\n\nFormat limits remain explicit: initial values do not rewrite existing saves; unknown executable builds are refused; fixed AI pools and scene blocks reject overflow rather than corrupting data. This is encounter-table editing, not arbitrary field scripting, world geometry or terrain reassignment. Saving a project is not automatic deployment.\n\nCurrent documentation and primary format references: `codex/ff7-data.md`. Earlier recovery comments are historical: their missing-editor lists have been implemented by the completion pass. This issue remains open for the acceptance checks above, not because those editors are still absent.",
+    "closed_at": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/79/comments",
+    "created_at": "2026-09-01T12:44:24Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/79/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/79",
+    "id": 5311976419,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "c5def5",
+        "default": false,
+        "description": "Final Fantasy VII plugins",
+        "id": 12062139503,
+        "name": "ff7",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWkbw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff7"
+      },
+      {
+        "color": "fbca04",
+        "default": false,
+        "description": "Needs Testing: an implemented candidate is available and the human test checklist is ready.",
+        "id": 12074236871,
+        "name": "untested",
+        "node_id": "LA_kwDOTn28Ks8AAAACz647xw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/untested"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/79/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPJ5T4w",
+    "number": 79,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/79/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/79/timeline",
+    "title": "Complete FF7’s data editors",
+    "updated_at": "2026-09-06T16:45:17Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/79",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}
