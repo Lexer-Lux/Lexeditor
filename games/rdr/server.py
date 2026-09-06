@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
-from . import camera_features, mission_rewards, paths, script_features
+from . import camera_features, input_remaps, mission_rewards, paths, script_features
 from .archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives,
 )
@@ -1684,9 +1684,11 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/redhook/configure":
                 self.json_response(configure_redhook())
             elif path == "/api/deployment/deploy":
+                feature_state = PROJECT / ".lexeditor-generated" / "rdr-script-features.json"
                 script_features.prepare_auto_carriage_rest(
-                    GAME_ROOT, paths.RPF6_TOOL, CONTENT_OVERRIDE_ROOT,
-                    PROJECT / ".lexeditor-generated" / "rdr-script-features.json")
+                    GAME_ROOT, paths.RPF6_TOOL, CONTENT_OVERRIDE_ROOT, feature_state)
+                input_remaps.prepare_input_remaps(
+                    GAME_ROOT, paths.RPF6_TOOL, CONTENT_OVERRIDE_ROOT, feature_state)
                 cover_problem = _prepare_cover_shoulder_override()
                 if cover_problem:
                     raise RuntimeError(cover_problem)

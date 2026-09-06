@@ -125,7 +125,7 @@ def _script_layout(raw: bytes, object_start: int) -> dict:
     code_length = _u32(raw, object_start + 12)
     native_count = _pointer(raw, object_start + 32)
     native_table = _pointer(raw, object_start + 36)
-    if code_length <= COACH_FUNCTION_OFFSET or code_length > len(raw):
+    if code_length <= 0 or code_length > len(raw):
         raise ValueError(f"Unexpected WSC code length: {code_length}")
     if native_count <= 0 or native_count > 4096:
         raise ValueError(f"Unexpected WSC native count: {native_count}")
@@ -211,6 +211,8 @@ def patch_auto_carriage_rest(raw: bytes, object_start: int) -> tuple[bytes, dict
     layout = _script_layout(raw, object_start)
     code = layout["code"]
     start = COACH_FUNCTION_OFFSET
+    if start >= len(code):
+        raise ValueError(f"Passenger coach WSC is shorter than audited Function_41 offset 0x{start:X}")
     if code[start] != 45:
         raise ValueError(f"Expected Function_41 Enter at 0x{start:X}")
     cursor = start + _instruction_length(code, start)
