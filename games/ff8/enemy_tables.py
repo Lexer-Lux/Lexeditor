@@ -37,6 +37,7 @@ def choices(schema_root: Path, magic: list[dict], items: list[dict]) -> dict:
         "magic": magic,
         "items": items,
         "cards": cards,
+        "devour": _json(schema_root, "devour.json")["devour"],
         # The 20 status-defence bytes are one per status, in this order, so the
         # editor can name the slots instead of numbering them.
         "statuses": _json(schema_root, "status.json")["status"],

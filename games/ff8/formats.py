@@ -21,6 +21,7 @@ from . import menu_items as menu_item_format
 from . import mngrp_text
 from . import refine_tables
 from . import scan_text
+from . import scan_details
 from .game_icons import item_icon_id, ability_identity
 
 
@@ -815,12 +816,15 @@ def enemy_table_rows(dataset: str = "current", enemy_id: int | None = None) -> d
         if not target.is_file():
             continue
         raw = target.read_bytes()
+        tables = enemy_table_format.read_tables(raw, _enemy_info_start(raw))
+        table_choices = enemy_table_format.choices(SCHEMA_ROOT, MAGIC, ITEMS)
         rows.append({
             "id": monster_id,
             "name": monster.get("name") or f"Enemy {monster_id}",
             "role": monster.get("role", "enemy"),
             "filename": filename,
-            "tables": enemy_table_format.read_tables(raw, _enemy_info_start(raw)),
+            "tables": tables,
+            "scanDetails": scan_details.build_page(tables, table_choices["devour"]),
         })
     return {
         "rows": rows,
