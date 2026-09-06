@@ -32,12 +32,12 @@ require('rgba.getchannel("A")' in FONT and "luminance.point" not in FONT,
         "Warband glyph opacity must preserve the installed DDS alpha")
 require(".ttf" not in FONT.casefold() and ".otf" not in FONT.casefold(),
         "Warband typography must not invent a desktop font substitute")
-require("loadWarbandPreview" in EDITOR and "createWarbandRenderer" in EDITOR,
+require("loadWarbandIcon" in EDITOR and "createWarbandRenderer" in EDITOR,
         "the Items detail panel must render the extracted model in-window")
 require("detailPanel({className:\"warband-item-detail\",icon:thumbnail" in EDITOR,
         "Warband Items must use the shared Detail heading icon slot")
-require("thumbnailCanvas" in EDITOR and "Promise.all([createWarbandRenderer" in EDITOR,
-        "the real inventory mesh must render in both icon and full-preview spaces")
+require("/api/item-icon" in EDITOR and "thumbnailCanvas" not in EDITOR,
+        "the icon must be a cached PNG, not a second live model canvas")
 require("warband-bitmap-text" in EDITOR,
         "prominent Warband labels must use the native game font atlas")
 require('filename in {"Resource/*.brf", "Textures/*.dds"}' in SERVER,
