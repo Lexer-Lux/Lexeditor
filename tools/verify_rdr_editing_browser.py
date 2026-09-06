@@ -70,6 +70,16 @@ def main():
                     assert page.evaluate('dirtyCount()') == 0
                     assert page.locator('.shop-detail input[type=number]').first.input_value() == '1.1'
                     assert server.shops_payload()['rows'][0]['project']
+                    # That decimal-save regression deliberately changed the same
+                    # first deterministic fixture candidate. Restore only that
+                    # deliberate test field before exercising the handoff helper;
+                    # in a real project a custom candidate must remain blocked.
+                    handoff = server.shop_test_plan()
+                    if handoff['status'] == 'custom':
+                        server.save_shop(
+                            handoff['source'], handoff['rootHash'], handoff['itemIndex'], handoff['item'],
+                            [{'field': 'PriceModifier', 'value': handoff['baselinePriceModifier']}])
+                    assert server.shop_test_plan()['status'] == 'baseline'
                     page.evaluate('navigate("loot")')
                     page.locator('.loot-table input').first.fill('1.5')
                     assert page.evaluate('state.lootDocument.corpseBonusItem.entries[0].quantity') == 1.5
