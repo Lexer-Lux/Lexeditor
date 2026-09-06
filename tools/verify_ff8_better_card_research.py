@@ -63,7 +63,8 @@ for patch in (card_patch, combined):
     assert patch.count(f"{better_card.COMMAND_RENDER_HOOK:X} = ") == 1
     assert "both FF" in patch
 assert f"{battle_issue_54.DRAW_STATE:X}:4" not in card_patch
-assert f"{battle_issue_54.DRAW_STATE:X}:4" in combined
+assert f"{battle_issue_54.DRAW_STATE:X}:8" in combined
+assert battle_issue_54.DRAW_CAPTURED_TARGET == battle_issue_54.DRAW_STATE + 4
 assert f"{battle_issue_54.CARD_FILTER_CAVE:X}:" in card_patch
 assert battle_issue_54.DRAW_STATE.to_bytes(4, "little").hex(" ").upper() not in card_patch
 
