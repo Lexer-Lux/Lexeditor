@@ -1,37 +1,49 @@
 name: RDR1 checks
 on:
   push:
-    branches: [fix/rdr1-editor-runtime-handoff]
+    branches: [master, fix/rdr1-editor-runtime-handoff]
+    paths:
+      - 'games/rdr/**'
+      - 'tools/*rdr*.py'
+      - '.github/workflows/rdr1-checks.yml'
   pull_request:
     paths:
       - 'games/rdr/**'
-      - 'tools/*rdr*'
+      - 'tools/*rdr*.py'
       - '.github/workflows/rdr1-checks.yml'
 permissions:
   contents: read
 jobs:
-  source:
+  editor:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Check out public source without initializing optional gitlinks
+      - name: Check out source without initializing optional gitlinks
         run: |
           git init .
           git -c protocol.version=2 fetch --depth=1 "https://github.com/${GITHUB_REPOSITORY}.git" "$GITHUB_SHA"
           git checkout --detach FETCH_HEAD
-      - name: Collect tracked source for isolated regression checks
-        shell: python
-        run: |
-          import pathlib, subprocess, tarfile
-          paths = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
-          pathlib.Path('tracked-files.txt').write_bytes(subprocess.check_output(['git', 'ls-files', '--stage']))
-          extensions = {'.py', '.html', '.js', '.css', '.json', '.md', '.txt', '.ini', '.yml', '.yaml', '.cpp', '.h', '.hpp', '.cs', '.csproj', '.ps1', '.cmd'}
-          with tarfile.open('rdr1-source.tar.gz', 'w:gz') as archive:
-              for name in paths + ['tracked-files.txt']:
-                  path = pathlib.Path(name)
-                  if path.is_file() and (path.suffix.lower() in extensions or path.name == '.gitignore'):
-                      archive.add(path, arcname=name, recursive=False)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/setup-python@v5
         with:
-          name: rdr1-source
-          path: rdr1-source.tar.gz
-          retention-days: 3
+          python-version: '3.12'
+      - name: Unit and existing cache/layout contracts
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          python -m compileall -q games/rdr
+          python tools/verify_rdr_editing.py 2>&1 | tee artifacts/rdr1-unit.log
+          python tools/verify_rdr_cache_reuse_71.py | tee artifacts/rdr1-cache.log
+          python tools/verify_rdr_items_split_issue_19.py | tee artifacts/rdr1-split.log
+      - name: Install headless browser test dependency
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Browser interactions and complete-row checks
+        shell: bash
+        run: python tools/verify_rdr_editing_browser.py --screenshots artifacts/screenshots 2>&1 | tee artifacts/rdr1-browser.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rdr1-editor-checks
+          path: artifacts/
+          retention-days: 7
