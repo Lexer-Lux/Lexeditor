@@ -9,3 +9,8 @@ Browser checks also pass multi-tab save preflight, decimal shop save/readback, f
 Fixtures are synthetic and Chromium runs on Linux CI. This does not verify the user's installed WebView2 build, divider persistence/paging interactions beyond these assertions, or player acceptance. No issue closure or installed-game claim.
 
 PR: #362. Branch: `fix/rdr1-editor-runtime-handoff`.
+
+
+## Preserved source records
+
+[Full request and discussion archive](github-19/conversation.md)
