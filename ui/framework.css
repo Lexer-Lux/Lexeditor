@@ -4426,3 +4426,17 @@ nav button.active:focus-visible .lex-tab-shortcut,
 .lex-data-map-file{display:flex;align-items:center;gap:.5em;min-width:0;width:100%}.lex-data-map-location{display:grid;place-items:center;flex:0 0 1.6em;width:1.6em;height:1.6em;padding:.2em;border:0;background:transparent;color:inherit;cursor:pointer}.lex-data-map-location svg{width:100%;height:100%}.lex-data-map-file>code,.lex-data-map-file>.lex-data-map-link{min-width:0;overflow-wrap:anywhere}
 
 .lex-leading-list-detail > .lex-panel-layout-pane { min-height:0; max-height:100%; overflow:auto; }
+
+/* Shared credits retain the active game's typeface and readable link contrast. */
+#main.lex-showing-info { overflow-y:auto; min-height:0; }
+.lex-plugin-credits { box-sizing:border-box; min-width:0; width:100%; padding:1rem; text-align:left; color:var(--lex-text); }
+.lex-plugin-credits h2 { margin:.4rem 0 1rem; }
+.lex-plugin-credits h3 { margin:1.2rem 0 .6rem; }
+.lex-plugin-credits a { color:inherit; text-decoration:underline; text-underline-offset:.18em; font-weight:700; overflow-wrap:anywhere; }
+.lex-plugin-credits a:focus-visible,.lex-plugin-credits summary:focus-visible { outline:2px solid currentColor; outline-offset:3px; }
+.lex-credit-entry { margin:.7rem 0; }
+.lex-credit-entry p,.lex-plugin-credits>p { margin:.3rem 0; line-height:1.45; overflow-wrap:anywhere; }
+.lex-plugin-credits details { margin:.5rem 0; }
+.lex-plugin-credits summary { cursor:pointer; padding:.4rem 0; }
+.lex-plugin-credits pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:22rem; overflow:auto; line-height:1.4; font-family:inherit; padding:.75rem; border:1px solid currentColor; }
+.lex-help-popover { max-width:calc(100vw - 24px); max-height:calc(100vh - 24px); overflow:auto; overflow-wrap:anywhere; }

@@ -9,6 +9,9 @@ import importlib
 import sys
 from pathlib import Path
 
+from runtime_bootstrap import bootstrap_environment, dispatch_service
+bootstrap_environment()
+
 from desktop_host import run_host, smoke_host_switch
 from plugin_api import GamePlugin, validate_plugin
 
@@ -49,14 +52,31 @@ def _print_health(plugins: dict[str, GamePlugin]) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if dispatch_service(argv):
+        return 0
     parser = argparse.ArgumentParser(description="Lexeditor game-plugin shell")
     parser.add_argument("--game", help="open or inspect one plugin")
     parser.add_argument("--list", action="store_true", help="list discovered plugins")
     parser.add_argument("--check", action="store_true", help="check plugin paths")
     parser.add_argument("--smoke", action="store_true", help="run the selected plugin's safe smoke test")
     parser.add_argument("--smoke-host", action="store_true", help="test two editable plugins in one hidden WebView2 window")
+    parser.add_argument("--smoke-service", metavar="RESULT", help="test the bundled Blank child service without game files")
     args = parser.parse_args(argv)
     plugins = discover_plugins()
+    if args.smoke_service:
+        import json
+        session = plugins["blank"].session_factory()
+        try:
+            identity = session.start()
+            if identity.get("pluginId") != "blank":
+                raise RuntimeError("Wrong bundled service identity")
+        finally:
+            session.stop()
+        if not session.wait_closed():
+            raise RuntimeError("Bundled child service did not stop")
+        Path(args.smoke_service).write_text(json.dumps({"passed": True, "plugins": list(plugins), "identity": identity, "childStopped": True}), encoding="utf-8")
+        return 0
     selected = {args.game: plugins[args.game]} if args.game in plugins else plugins
     if args.game and args.game not in plugins:
         parser.error(f"unknown game plugin: {args.game}")

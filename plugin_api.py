@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
+import os
 from typing import Callable, Protocol
 
 
@@ -144,7 +145,7 @@ def validate_plugin(plugin: GamePlugin) -> None:
             path = Path(relative)
             if path.is_absolute() or ".." in path.parts:
                 raise ValueError(f"{plugin.plugin_id} has an unsafe required path: {relative}")
-        if any(not path.is_absolute() for path in spec.default_roots):
+        if any(not path.is_absolute() and not (os.name != "nt" and PureWindowsPath(str(path)).is_absolute()) for path in spec.default_roots):
             raise ValueError(f"{plugin.plugin_id} has a relative default game path")
     font_ids: set[str] = set()
     destinations: set[Path] = set()

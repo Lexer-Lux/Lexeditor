@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import random
 import subprocess
@@ -31,8 +32,10 @@ from windows_host import (
 ROOT = Path(__file__).resolve().parent
 CHOOSER = ROOT / "ui" / "chooser.html"
 ICON = ROOT / "assets" / "lexeditor.ico"
-STORAGE = ROOT / "out" / "webview2"
-WINDOW_STATE_PATH = Path(os.environ.get("LOCALAPPDATA", ROOT / "out")) / "Lexeditor" / "window-state.json"
+from runtime_bootstrap import user_data_dir, open_path
+
+STORAGE = user_data_dir() / "webview-cache"
+WINDOW_STATE_PATH = user_data_dir() / "window-state.json"
 DEFAULT_WINDOW_BOUNDS = [80, 80, 1440, 900]
 LOADING_QUOTES = ROOT / "ui" / "loading_quotes.json"
 DEFAULT_VIEWS = ROOT / "ui" / "default_views.json"
@@ -82,7 +85,7 @@ def choose_loading_quote(payload: dict, plugin_id: str, global_rarity: float,
         source = payload.get(key, []) if isinstance(payload, dict) else []
         if not isinstance(source, list):
             return []
-        return [str(line).strip() for line in source if str(line).strip()]
+        return list(dict.fromkeys(line.strip() for line in source if isinstance(line, str) and line.strip()))
 
     # A plugin can borrow another plugin's section, so a game and its remaster
     # share one pool instead of duplicating every line: "shares" maps a plugin
@@ -101,9 +104,14 @@ def choose_loading_quote(payload: dict, plugin_id: str, global_rarity: float,
                     game_lines.append(line)
     global_lines = clean_lines("global")
     try:
-        rarity = max(1.0, float(global_rarity))
+        rarity = float(global_rarity)
+        if not math.isfinite(rarity):
+            raise ValueError("non-finite rarity")
+        rarity = max(1.0, rarity)
     except (TypeError, ValueError):
         rarity = 3.0
+    if not game_lines and not global_lines:
+        return "Loading editor…"  # Missing/broken configuration is not session exhaustion.
     if used is not None:
         game_lines = [line for line in game_lines if line not in used]
         global_lines = [line for line in global_lines if line not in used]
@@ -343,7 +351,7 @@ class HostApi:
         if plugin_id != "__home__" and plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
         try:
-            payload = json.loads(LOADING_QUOTES.read_text(encoding="utf-8"))
+            payload = json.loads(LOADING_QUOTES.read_text(encoding="utf-8-sig"))
         except (OSError, ValueError, TypeError):
             payload = {}
         rarity = self._settings.snapshot().get("globalMessageRarity", 3.0)
@@ -385,6 +393,8 @@ class HostApi:
         """Give window move and resize to Windows after an HTML pointer press."""
         import ctypes
 
+        if os.name != "nt":
+            return {"started": False, "reason": "Use the native window frame"}
         window = self._bound_window()
         native = getattr(window, "native", None)
         if native is None:
@@ -678,7 +688,7 @@ class HostApi:
         root = Path(configured).resolve()
         if not root.is_dir():
             raise RuntimeError(f"The configured game folder is unavailable: {root}")
-        os.startfile(str(root))
+        open_path(root)
         return {"opened": True, "path": str(root)}
 
     def install_helper(self, plugin_id: str) -> dict:
@@ -718,13 +728,23 @@ class HostApi:
             return {"helpers": cached, "cached": True}
         rows = []
         for plugin_id, plugin in sorted(self._plugins.items()):
-            if plugin.helper_upstream is None:
+            if not (plugin.helper_name or plugin.helper_status or plugin.helper_upstream):
                 continue
             row = {"pluginId": plugin_id, "plugin": plugin.name,
-                   "helper": plugin.helper_name or "Helper"}
+                   "helper": plugin.helper_name or "Helper", "installed": False,
+                   "installedVersion": "", "pinned": "", "latest": ""}
             try:
-                row.update(plugin.helper_upstream() or {})
-            except Exception as error:  # a helper check must never break Home
+                installed = plugin.helper_status() if plugin.helper_status else {}
+                row["installed"] = bool(installed.get("installed"))
+                row["installedVersion"] = str(installed.get("version") or "")
+            except Exception as error:
+                row["installedError"] = str(error)
+            try:
+                if plugin.helper_upstream:
+                    row.update(plugin.helper_upstream() or {})
+                else:
+                    row["error"] = "This helper has no upstream version provider."
+            except Exception as error:  # One failed lookup must not hide other rows.
                 row["error"] = str(error)
             row["behind"] = bool(row.get("behind"))
             rows.append(row)
@@ -750,7 +770,7 @@ class HostApi:
             raise ValueError("That folder is not one of this plugin's mods")
         if not wanted.is_dir():
             raise RuntimeError(f"The mod folder is unavailable: {wanted}")
-        os.startfile(str(wanted))
+        open_path(wanted)
         return {"opened": True, "path": str(wanted)}
 
     def open_home_link(self, target: str) -> dict:
@@ -993,7 +1013,7 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
         import webview
     except ImportError as error:
         raise RuntimeError(
-            "Lexeditor's embedded runtime is missing. Run install.ps1."
+            "Lexeditor’s embedded runtime is missing. Reinstall the application or its development dependencies."
         ) from error
 
     geometry = load_window_geometry()
@@ -1017,7 +1037,7 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
         min_size=(900, 620),
         hidden=hidden,
         maximized=False,
-        frameless=True,
+        frameless=os.name == "nt",
         easy_drag=False,
         background_color="#171a1f",
         text_select=True,
@@ -1038,7 +1058,7 @@ def run_host(plugins: dict[str, GamePlugin], initial_plugin: str | None = None,
     window.events.closing += api.window_closing
     window.events.closed += lambda *_args: api.dispose()
     webview.start(
-        gui="edgechromium",
+        gui="edgechromium" if os.name == "nt" else None,
         private_mode=False,
         storage_path=str(STORAGE),
         icon=str(ICON),

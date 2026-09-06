@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "shared": {
+    "contributions": [
+      {
+        "name": "Lexer",
+        "role": "Lexeditor application, integration and mod design.",
+        "url": "https://github.com/Lexer-Lux/Lexeditor"
+      },
+      {
+        "name": "pywebview contributors",
+        "role": "Native desktop window and the JavaScript/Python bridge.",
+        "url": "https://github.com/r0x0r/pywebview"
+      },
+      {
+        "name": "Pillow contributors",
+        "role": "Image decoding and conversion.",
+        "url": "https://github.com/python-pillow/Pillow"
+      },
+      {
+        "name": "fontTools contributors",
+        "role": "Font metadata and conversion.",
+        "url": "https://github.com/fonttools/fonttools"
+      }
+    ],
+    "licenses": []
+  },
+  "plugins": {
+    "blank": {
+      "contributions": [
+        {
+          "name": "Lexeditor contributors",
+          "role": "Shared-control examples and test fixtures.",
+          "url": "https://github.com/Lexer-Lux/Lexeditor"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
+    "ff7": {
+      "contributions": [
+        {
+          "name": "Joshua Moon / Elena",
+          "role": "Reference for FF7 KERNEL records and data structures.",
+          "url": "https://github.com/Shojy/Elena"
+        },
+        {
+          "name": "Christian Bauer / ff7tools",
+          "role": "Reference for FF7 archive and kernel formats.",
+          "url": "https://github.com/cebix/ff7tools"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Elena and ff7tools — original notices",
+          "sourcePath": "games/ff7/THIRD_PARTY.md"
+        }
+      ]
+    },
+    "ff7-2013": {
+      "sameAs": "ff7"
+    },
+    "ff8": {
+      "source": "games/ff8/credits.json",
+      "licenseRoot": "games/ff8"
+    },
+    "ff9": {
+      "contributions": [
+        {
+          "name": "Memoria contributors",
+          "role": "FF9 runtime integration and documented gameplay data formats.",
+          "url": "https://github.com/Albeoris/Memoria"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
+    "warband": {
+      "contributions": [
+        {
+          "name": "BRF Sync contributors",
+          "role": "Separate read-only tool for converting Warband model resources.",
+          "url": "https://github.com/markpryk/brf_sync_tools"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "BRF Sync — source and distribution notice",
+          "sourcePath": "tools/brf-sync/SOURCE.md"
+        },
+        {
+          "name": "BRF Sync — GNU GPL v2",
+          "sourcePath": "tools/brf-sync/LICENSE"
+        }
+      ]
+    },
+    "rdr": {
+      "contributions": [
+        {
+          "name": "MagicRDR contributors",
+          "role": "Reference and separately installed tool for Red Dead Redemption archives.",
+          "url": "https://github.com/Foxxyyy/Magic-RDR"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "MagicRDR — usage and redistribution limits",
+          "sourcePath": "tools/magic-rdr/README.md"
+        }
+      ]
+    },
+    "rdr2": {
+      "contributions": [
+        {
+          "name": "Sage of Mirrors",
+          "role": "PyLibDrawable/libdrawable model geometry and texture-reference decoding.",
+          "url": "https://github.com/Sage-of-Mirrors/PyLibDrawable"
+        },
+        {
+          "name": "RDR2 RPF Tool contributors",
+          "role": "Read-only resource archive extraction.",
+          "url": "https://github.com/amrshaheen61/RDR2-RPF-Tool"
+        },
+        {
+          "name": "RageLib contributors",
+          "role": "Resource format support used by the archive tool.",
+          "url": "https://github.com/WesternSpace/gta-toolkit"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "PyLibDrawable — source notice",
+          "sourcePath": "games/rdr2/vendor/reddead2blend/NOTICE.md"
+        },
+        {
+          "name": "PyLibDrawable — MIT",
+          "sourcePath": "games/rdr2/vendor/reddead2blend/LICENSE"
+        },
+        {
+          "name": "RPF tool — source notice",
+          "sourcePath": "tools/rpf-cli/NOTICE.md"
+        },
+        {
+          "name": "RPF tool — AGPL v3",
+          "sourcePath": "tools/rpf-cli/LICENSE.txt"
+        },
+        {
+          "name": "RageLib — MIT",
+          "sourcePath": "tools/rpf-cli/RAGELIB-LICENSE.txt"
+        }
+      ]
+    }
+  }
+}
