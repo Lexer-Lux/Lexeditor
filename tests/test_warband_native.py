@@ -14,7 +14,7 @@ class NativeRoutingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);mod=root/'Modules'/'A mod with spaces';mod.mkdir(parents=True)
             (mod/'module.ini').touch();(root/'mb_warband.exe').touch()
-            self.assertEqual(launch_command(root,mod),[str(root/'mb_warband.exe')])
+            self.assertEqual(launch_command(root,mod),[str((root/'mb_warband.exe').resolve())])
             (root/'mb_warband_wse2.exe').touch()
             self.assertEqual(launch_command(root,mod)[1:],['--module',mod.name,'--no-intro'])
 
