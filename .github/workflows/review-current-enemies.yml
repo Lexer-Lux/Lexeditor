@@ -1,0 +1,23 @@
+name: Review current Enemies source
+on:
+  push:
+    branches: [fix/ff8-enemies-layout]
+    paths: [.github/workflows/review-current-enemies.yml]
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Export exact public source revision for comparison
+        run: |
+          git init repo
+          git -C repo remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C repo fetch --depth=1 origin e2ec64406cbce153b144221aea352e4ca0bd7ed9
+          git -C repo archive --format=zip --output=../current-enemies.zip FETCH_HEAD AGENTS.md codex/ff8-enemies-ui.md games/ff8/card_art.py games/ff8/editor.html games/ff8/paths.py games/ff8/server.py tools/verify_ff8_card_art.py tools/verify_ff8_enemies_editor_visual_39.py tools/verify_ff8_enemy_compact_ui.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: current-enemies-source
+          path: current-enemies.zip
+          retention-days: 1
