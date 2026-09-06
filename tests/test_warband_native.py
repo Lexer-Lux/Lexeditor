@@ -7,6 +7,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 from games.warband.game_launch import launch_command, WarbandGameController, WindowsGameJob
 
 class NativeRoutingTests(unittest.TestCase):
@@ -16,7 +17,8 @@ class NativeRoutingTests(unittest.TestCase):
             (mod/'module.ini').touch();(root/'mb_warband.exe').touch()
             self.assertEqual(launch_command(root,mod),[str((root/'mb_warband.exe').resolve())])
             (root/'mb_warband_wse2.exe').touch()
-            self.assertEqual(launch_command(root,mod)[1:],['--module',mod.name,'--no-intro'])
+            with patch('games.warband.wse2_manager.require_managed'):
+                self.assertEqual(launch_command(root,mod)[1:],['--module',mod.name,'--no-intro'])
 
     def test_native_must_complete_selection_before_readiness(self):
         with tempfile.TemporaryDirectory() as name:
