@@ -28,16 +28,22 @@ jobs:
           new_evidence='Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.'
           old_next='Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.'
           new_next='Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.'
+          def live(number):
+              return f'https://github.com/Lexer-Lux/Lexeditor/issues/{number}'
           for p in root.glob('github-*.md'):
               text=p.read_text('utf-8')
               original=text
               m=re.match(r'github-(\d+)[.]md$',p.name)
               if not m: continue
               n=m.group(1)
-              text=text.replace(f'[Full request and discussion archive](github-{n}/conversation.md)',f'[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/{n})')
+              text=re.sub(r'\[Full request and discussion archive\]\(github-(\d+)/conversation[.]md\)',lambda x:f'[Live GitHub issue and comments]({live(x.group(1))})',text)
+              text=re.sub(r'\[Verbatim request and discussion\]\(github-(\d+)/conversation[.]md\)',lambda x:f'[Live GitHub issue and comments]({live(x.group(1))})',text)
+              text=re.sub(r'\[#(\d+) archive\]\(github-\1/conversation[.]md\)',lambda x:f'[#{x.group(1)} live issue]({live(x.group(1))})',text)
+              text=re.sub(r'\[issue archive\]\(github-(\d+)/conversation[.]md\)',lambda x:f'[live GitHub issue]({live(x.group(1))})',text)
+              text=re.sub(r'\[source records\]\(github-\d+/sources/\),?\s*(?:and\s+)?','',text)
               text=text.replace(old_req,new_req).replace(old_evidence,new_evidence).replace(old_next,new_next)
-              # Remove empty duplicate archive-pointer sections left by the old generator.
-              text=re.sub(r'\n## Preserved source records\n\n\[Live GitHub issue and comments\]\(https://github[.]com/Lexer-Lux/Lexeditor/issues/'+re.escape(n)+r'\)\n?', '\n', text)
+              text=re.sub(r'The parallel \[live GitHub issue\]\([^)]+\) and its exact sources are\s+preserved from master [0-9a-f]+[.] Its initial placeholder', 'The live GitHub issue is the canonical request record. Its initial placeholder', text)
+              text=re.sub(r'\n## Preserved source records\n\n\[Live GitHub issue and comments\]\(https://github[.]com/Lexer-Lux/Lexeditor/issues/\d+\)\n?', '\n', text)
               if text!=original:
                   p.write_text(text,'utf-8'); changed+=1
           bad=[]
