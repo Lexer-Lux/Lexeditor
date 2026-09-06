@@ -1,0 +1,60 @@
+name: Validate and publish FF8 vertical camera source
+on:
+  push:
+    branches: [fix/ff8-world-camera-pitch]
+    paths: [.github/workflows/ff8-camera-pitch-publish.yml]
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Fetch exact branch
+        run: |
+          git config --global core.autocrlf false
+          git init editor
+          git -C editor remote add origin https://x-access-token:${{ github.token }}@github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin fix/ff8-world-camera-pitch
+          git -C editor checkout -B fix/ff8-world-camera-pitch FETCH_HEAD
+      - name: Extract, verify and apply reviewed payload
+        working-directory: editor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import gzip, hashlib, re
+          workflow=Path('.github/workflows/ff8-camera-pitch-stage.yml').read_text()
+          m=re.search(r"PATCH_HEX: '([0-9a-f]+)'", workflow)
+          assert m, 'reviewed PATCH_HEX payload missing'
+          raw=bytes.fromhex(m.group(1))
+          assert hashlib.sha256(raw).hexdigest() == 'fcc03b0bc54956008d5ac9308df0b8519c0140f39ca1e105c1028af1a0706e7c'
+          patch=gzip.decompress(raw)
+          assert hashlib.sha256(patch).hexdigest() == '1f67cbe670e1014b8b81baa8523f6532eee936ff787209f1c5aff6a899b25b33'
+          Path('/tmp/ff8-pitch.patch').write_bytes(patch)
+          PY
+          git apply --check /tmp/ff8-pitch.patch
+          git apply /tmp/ff8-pitch.patch
+      - name: Run source and policy regressions
+        working-directory: editor
+        run: |
+          python -m pip install pillow pefile==2024.8.26 unicorn==2.1.4
+          python -m py_compile games/ff8/ffnx_modern_controls/apply_to_ffnx.py tools/prepare_ff8_native_build.py tools/verify_ff8_modern_controls_compiled_core.py tools/verify_ff8_world_camera_native_seam.py
+          python tools/verify_ff8_gameplay_settings_issue_50.py
+          cat >/tmp/camera_policy.cpp <<'CPP'
+          #include "games/ff8/ffnx_modern_controls/camera_axis.h"
+          #include <cassert>
+          #include <algorithm>
+          int main(){ for(int raw=0;raw<=255;++raw){ int r=0,s=0,p=0,q=0; for(int i=0;i<87;++i){s+=lexeditor_camera::yaw_step(raw,r);q+=lexeditor_camera::pitch_step(raw,p);} const int a=std::clamp(raw-128,-127,127),m=a<0?-a:a,e=m<=40?0:(a<0?-1:1)*(m-40)*16; assert(s==e&&q==e);} lexeditor_camera::ManualPitch p; int v=-112; for(int i=0;i<64;++i)v=p.update(v,v,0,false,false); assert(v==-512); for(int i=0;i<64;++i)v=p.update(v,-112,128,false,false); assert(v==-512); v=p.update(v,-112,128,true,false); assert(v==-112); v=p.update(v,-256,128,false,true); assert(v==-256&&!p.engaged); for(int i=0;i<64;++i)v=p.update(v,v,255,false,false); assert(v==0); }
+          CPP
+          g++ -std=c++17 -O0 -I. /tmp/camera_policy.cpp -o /tmp/camera_policy
+          /tmp/camera_policy
+      - name: Publish reviewed source only
+        working-directory: editor
+        run: |
+          git add games/ff8/ffnx_modern_controls/camera_axis.h games/ff8/ffnx_modern_controls/lexeditor_ff8_modern_controls.cpp games/ff8/ffnx_modern_controls/apply_to_ffnx.py tools/prepare_ff8_native_build.py tools/verify_ff8_modern_controls_compiled_core.py tools/verify_ff8_world_camera_native_seam.py
+          git diff --cached --quiet && { echo 'No source changes staged'; exit 1; } || true
+          test "$(git diff --cached --name-only | wc -l)" -eq 6
+          git config user.name Lexer
+          git config user.email 89482099+Lexer-Lux@users.noreply.github.com
+          git commit -m 'feat(ff8): add vertical analog world camera control'
+          git push origin HEAD:fix/ff8-world-camera-pitch
