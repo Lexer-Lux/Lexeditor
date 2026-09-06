@@ -1,24 +1,15 @@
-# #97 — Stock and WSE2 Play
+# #97: Make Play actually launch Warband
 
-The previous WSE2-only boundary is removed. Stock startup now selects the exact
-installed module in its owned native launcher, not a guessed command-line flag
-or name-only filesystem match. Selection is read back after CBN_SELCHANGE; only
-real Play control 1029 is activated. Job assignment occurs before the suspended
-process runs, so immediate child handoff is contained. Readiness excludes dialogs,
-launcher controls and windows from other executables. Errors/timeouts clean up
-only this job; failed cleanup retains ownership and Stop remains usable.
+[Full request and discussion archive](github-97/conversation.md)
 
-Tests: `python -m unittest discover -s tests -p 'test_warband*.py' -v`.
-`test_warband_native.py` adds stock/WSE routing and real Windows GUI fixtures:
-exact module selection, decoy exclusion, unrelated-window isolation, failure
-cleanup, and immediate child-process handoff. These fixtures are not the game.
+## Requirements and decisions
 
-The native route has no new dependency or separately built runtime artifact.
-Final cross-platform CI and master integration must be recorded before calling
-this delivered. Actual Warband/Steam/WSE2 acceptance remains a prepared human test.
+Recover the complete scope from the linked verbatim sources before implementation or status changes. The short GitHub summary is not the full specification. Do not infer that missing chat text was never supplied.
 
-Test after updating master and restarting Lexeditor: select a built installed mod,
-press Play, confirm that mod's menu and a loaded save, then Stop. Repeat for a
-stock installation without WSE2 and for WSE2 when available. A broken disposable
-module must restore Play with an error. Report module name, executable/version,
-visible error and rgl_log.txt/WSE2 log. No live save or game asset is edited by Play.
+## Current implementation and evidence
+
+Reconcile live code, PRs and existing topic/session worklogs. This archive import makes no build, deployment or gameplay-success claim.
+
+## Next agent work
+
+Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.
