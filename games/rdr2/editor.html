@@ -1482,7 +1482,9 @@ function applyToControl(control, newVal) {
   control.dispatchEvent(new Event("change", {bubbles:true}));
 }
 
+let datasetLoadVersion = 0;
 async function switchDataset(ds) {
+  const loadVersion = ++datasetLoadVersion;
   state.ds = ds;
   if($("#datasetname")) $("#datasetname").textContent = (dsInfo().readonly ? "🔒 " : "✏️ ") + dsInfo().label;
   if($("#modpath")) $("#modpath").textContent = dsInfo().dir;
@@ -1490,14 +1492,18 @@ async function switchDataset(ds) {
   if (!state.store[ds]) state.store[ds] = { catalog: null, quickSelect:null, effectByKey: {}, loot: {}, matrix: null, shops:null };
   const st = state.store[ds];
   if (!st.catalog && dsInfo().catalog) {
-    $("#main").innerHTML = "";
-    $("#main").append(el("div", { class: "loading" }, "Loading dataset…"));
-    st.catalog = await api("/api/catalog");
-    for (const e of st.catalog.effects) st.effectByKey[e.key] = e;
+    $("#main").replaceChildren(el("div", { class: "loading" }, "Loading dataset…"));
   }
-  if (!st.quickSelect) {
-    st.quickSelect = await api("/api/quick-select").catch(error=>({available:false,items:{},slotsByGroup:{},reason:error.message,activeFile:"quickselectitems.ymt"}));
-  }
+  // Request independent data together, but publish it only after both complete.
+  // Explicit dataset ids prevent a later UI selection from redirecting a request.
+  const [catalog, quickSelect] = await Promise.all([
+    st.catalog || (dsInfo().catalog ? api("/api/catalog", undefined, ds) : null),
+    st.quickSelect || api("/api/quick-select", undefined, ds).catch(error=>({available:false,items:{},slotsByGroup:{},reason:error.message,activeFile:"quickselectitems.ymt"})),
+  ]);
+  st.catalog = catalog;
+  st.quickSelect = quickSelect;
+  if(catalog)for(const effect of catalog.effects)st.effectByKey[effect.key]=effect;
+  if(loadVersion!==datasetLoadVersion)return;
   state.catalog = st.catalog;
   state.quickSelect = st.quickSelect;
   state.effectByKey = st.effectByKey;
@@ -1510,17 +1516,22 @@ async function switchDataset(ds) {
     for (const it of [...st.catalog.items].sort((a, b) => a.key.localeCompare(b.key)))
       dlI.append(el("option", { value: it.key }));
   }
-  render();
-  LexeditorUI.finishPluginLoading();
+  if(!state.booting){
+    await render();
+    LexeditorUI.finishPluginLoading();
+  }
 }
 
 async function boot() {
   try {
-    state.config = await api("/api/config");
-    state.labels = await api("/api/labels");
-    state.localization = await api("/api/localization");
-    state.alcohol = await api("/api/alcohol-strengths").catch(()=>({available:false,file:null,entries:{}}));
-    state.customCrafting = await api("/api/custom-crafting").catch(()=>({available:false,customFile:null,vanillaFile:null,vanilla:[],custom:[],errors:["Custom crafting API unavailable"]}));
+    const [config, labels, localization, alcohol, customCrafting] = await Promise.all([
+      api("/api/config", undefined, "mine"),
+      api("/api/labels", undefined, "mine"),
+      api("/api/localization", undefined, "mine"),
+      api("/api/alcohol-strengths", undefined, "mine").catch(error=>({available:false,file:null,entries:{},vanilla:{},overrides:{},reason:error.message})),
+      api("/api/custom-crafting", undefined, "mine").catch(()=>({available:false,customFile:null,vanillaFile:null,vanilla:[],custom:[],errors:["Custom crafting API unavailable"]})),
+    ]);
+    Object.assign(state, {config, labels, localization, alcohol, customCrafting});
     state.customCraftingDraft = JSON.parse(JSON.stringify(state.customCrafting.custom||[]));
     const sel = $("#dsselect");
     if(sel) for (const [key, info] of Object.entries(state.config.datasets)) {
@@ -1536,7 +1547,8 @@ async function boot() {
   } finally {
     state.booting = false;
   }
-  render();
+  await render();
+  LexeditorUI.finishPluginLoading();
 }
 
 function noData(msg) {
@@ -1793,7 +1805,7 @@ async function saveAllChanges() {
     if(state.shopDirty.size)await saveShops();
     if(Object.keys(state.shopBuyerDirty).length)await saveShopBuyerOverrides();
     const catalogStores=["priceEdits","buyabilityEdits","sellabilityEdits","yieldEdits","bundleEdits",
-      "itemEffectEdits","itemTagEdits","quickSelectEdits","descriptionKeyEdits","carryEdits","craftEdits","effectEdits","localizationEdits"];
+      "itemEffectEdits","itemTagEdits","quickSelectEdits","descriptionKeyEdits","carryEdits","craftEdits","effectEdits","localizationEdits","alcoholEdits"];
     if(catalogStores.some(key=>Object.keys(state[key]).length))await saveCatalog();
     await saveLoot();   // saves every dirty loot file itself
     state.lootFile=originalLootFile;
@@ -3957,11 +3969,18 @@ function itemTagsCell(it){
         // Build the displayed value from the immutable imported baseline plus the
         // sparse override map. Do not trust a flattened `entries` response here.
         const vanilla=state.alcohol.vanilla?.[it.key],savedOverride=state.alcohol.overrides?.[it.key];
-        const runtime=state.alcoholEdits[it.key]??savedOverride??vanilla??0;
-        const input=el("input",{type:"number",min:"0",max:"1",step:"any",value:fmtCompactNumber(runtime),
-          class:it.key in state.alcoholEdits?"edited":"",disabled:!state.alcohol.available,
-          title:state.alcohol.available?"Actual drunkenness added when consumed. 1.0 causes immediate blackout. This runtime value is separate from Rockstar's coarse drink-class tag.":"Optional Lexer's Mod runtime is unavailable.",
-          onchange:event=>{state.alcoholEdits[it.key]=Math.min(1,Math.max(0,+event.target.value||0));renderToolbarOnly();}});
+        const runtime=state.alcoholEdits[it.key]??savedOverride??vanilla;
+        const available=state.alcohol.available&&vanilla!==undefined;
+        const input=el("input",{type:"number",min:"0",max:"1",step:"any",value:runtime===undefined?"":fmtCompactNumber(runtime),placeholder:"Unavailable",
+          class:it.key in state.alcoholEdits?"edited":"",disabled:!available,
+          title:available?"Actual drunkenness added when consumed. 1.0 causes immediate blackout. This runtime value is separate from Rockstar's coarse drink-class tag.":(state.alcohol.reason||"No verified per-drink strength is available for this item."),
+          onchange:event=>{
+            const value=event.target.valueAsNumber;
+            if(!Number.isFinite(value)||value<0||value>1){
+              event.target.value=runtime===undefined?"":fmtCompactNumber(runtime);
+              toast("Drunkenness must be a number from 0 to 1.",true);return;
+            }
+            state.alcoholEdits[it.key]=value;renderToolbarOnly();}});
         wrap.append(el("label",{class:"alcohol-strength"},"Drunkenness",input,
           ...(vanilla===undefined?[]:[el("span",{class:"ref"},`V ${fmtCompactNumber(vanilla)}`)]),
           fieldHelp("Actual per-drink drunkenness: 0 adds no drunkenness; 1.0 triggers the game's normal blackout path. Enter the displayed vanilla value to remove an override. Drink class remains a separate coarse tag.")));
@@ -4103,14 +4122,11 @@ async function saveCatalog() {
   const descriptions=Object.entries(state.descriptionKeyEdits).map(([item,key])=>({item,key}));
   try {
     if(Object.keys(state.alcoholEdits).length){
-      // Send a complete effective table reconstructed from authoritative
-      // vanilla values and sparse overrides.  This also repairs a browser
-      // session that booted against the old flattened-all-ones response.
-      const entries={...(state.alcohol.vanilla||{}),...(state.alcohol.overrides||{}),...state.alcoholEdits};
+      // Save only explicit edits. The backend merges them into the latest file;
+      // a stale browser must not reset an unrelated drink (including Moonshine).
+      const entries={...state.alcoholEdits};
       await api("/api/alcohol-strengths/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({entries})});
-      state.alcohol.entries=entries;
-      state.alcohol.overrides=Object.fromEntries(Object.entries(entries).filter(([key,value])=>
-        state.alcohol.vanilla?.[key]!==undefined&&Math.abs(+value-+state.alcohol.vanilla[key])>1e-9));
+      state.alcohol=await api("/api/alcohol-strengths",undefined,"mine");
       state.alcoholEdits={};
     }
     const localizedSaved=await saveLocalization();
@@ -5511,10 +5527,10 @@ async function renderWeapons() {
   const records=d[section],names=records.map(x=>x.name).sort();if(!f.weapon||!names.includes(f.weapon))f.weapon=names[0];
   const sv=d.shellVfx;
   const shellBox=sv&&sv.available?el("label",{style:"display:flex;align-items:center;gap:6px;margin:4px 0;cursor:pointer",
-    title:`Blank every weapon's shell-eject VFX so vanilla shells stop duplicating the physical collectible casings. Currently ${sv.blank}/${sv.total} blank${sv.mixed?" (mixed)":""}.`},
+    title:`Blank every weapon's shell-eject VFX so vanilla shells stop duplicating the physical collectible casings. Currently ${sv.blank}/${sv.total} fields blank across ${(sv.files||[]).length} weapon files${sv.mixed?" (mixed)":""}.`},
     el("input",{type:"checkbox",checked:(state.weaponShellVfxEdit??sv.blanked)===true,
       onchange:ev=>{state.weaponShellVfxEdit=ev.target.checked;renderToolbarOnly();}}),
-    "Blank vanilla shell VFX (collectible casings)"):null;
+    "Blank vanilla shell VFX (collectible casings)"):sv?el("span",{class:"hint"},"Shell comparison unavailable: a weapon layer or its vanilla reference is missing."):null;
   tb.append(sectionTabs);
   const weaponFilters=[...(shellBox?[shellBox]:[]),savebar(saveWeapons)];
   const m=$("#main");m.innerHTML="";
