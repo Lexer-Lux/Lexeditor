@@ -76,7 +76,7 @@ def _parse_registry(text: str) -> dict[int, dict]:
             "assetPath": asset_path,
             "archive": "game/content.rpf",
             "archivePath": _archive_path(asset_path),
-            "region": asset_path.split("/")[3],
+            "region": asset_path.split("/")[2],
             "registryLine": _source_line(MISSION_REGISTRY_SOURCE, match.start()),
         }
     expected = set(range(1, 58))
@@ -172,7 +172,8 @@ def generate_document() -> dict:
 
 
 def validate_override(document: dict, base: dict | None = None) -> dict:
-    if document.get("schemaVersion") != 1:
+    if (not isinstance(document, dict) or type(document.get("schemaVersion")) is not int
+            or document["schemaVersion"] != 1):
         raise ValueError("Unsupported mission reward schema version")
     if document.get("contract") != "LexerRDR.mission-rewards":
         raise ValueError("Invalid mission reward contract")
@@ -180,11 +181,14 @@ def validate_override(document: dict, base: dict | None = None) -> dict:
     valid_ids = {row["id"] for row in base["missions"]}
     normalized = []
     seen = set()
-    for row in document.get("overrides", []):
+    overrides = document.get("overrides", [])
+    if not isinstance(overrides, list):
+        raise ValueError("Mission overrides must be a list")
+    for row in overrides:
         if not isinstance(row, dict):
             raise ValueError("Each mission override must be an object")
         mission_id = row.get("id")
-        if not isinstance(mission_id, int) or mission_id not in valid_ids:
+        if type(mission_id) is not int or mission_id not in valid_ids:
             raise ValueError(f"Unknown mission ID: {mission_id}")
         if mission_id in seen:
             raise ValueError(f"Duplicate mission ID: {mission_id}")
