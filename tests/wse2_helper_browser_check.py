@@ -7,7 +7,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
 OUTPUT=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'out/wse2-helper-browser'
-SETTINGS={'lexerMode':True,'developerMode':False,'lexerAuthorized':True,'lexerLogin':'Lexer-Lux','loadingTransitionMinimumSeconds':0,'soundEnabled':False,'viewPreferences':{}}
+SETTINGS={'developerMode':True,'developerAuthorized':True,'developerLogin':'Lexer-Lux','loadingTransitionMinimumSeconds':0,'soundEnabled':False,'viewPreferences':{}}
 HELPERS=[
  {'pluginId':'ff8','plugin':'Final Fantasy 8','helper':'FFNx','pinned':'1.24.3','installedVersion':'1.24.3','installedStatus':'installed','latest':'1.25.0','published':'2026-09-01T00:00:00Z','behind':True,'releaseNotes':'https://github.com/julianxhokaxhiu/FFNx/releases/tag/1.25.0'},
  {'pluginId':'ff9','plugin':'Final Fantasy 9','helper':'Memoria','pinned':'v2025.07.04','installedVersion':'v2025.07.04','error':'Fixture GitHub outage: this must not hide other helpers'},
@@ -85,7 +85,7 @@ def main():
                 page.locator('[data-plugin="warband"]').click()
                 assert page.get_by_role('button',name='INSTALL / REPAIR WSE2').count()==0
                 assert page.evaluate('window.__installs')==['warband']
-                page.evaluate('window.dispatchEvent(new CustomEvent("lexeditor-settings-changed",{detail:{lexerMode:false}}))')
+                page.evaluate('window.dispatchEvent(new CustomEvent("lexeditor-settings-changed",{detail:{developerMode:false}}))')
                 assert page.locator('#chooser-lexer').is_hidden()
                 assert errors==[],errors
                 results.append({'width':width,'height':height,'passed':True,'bridge':'fixture responses, real HTML/CSS/JS'})
