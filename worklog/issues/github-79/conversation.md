@@ -43,6 +43,18 @@ Exact metadata: [source record](sources/issue-5311976419-f79c08e013292959dca2b59
 
 Enemies, encounters, shops and wider character/text editing remain unfinished. Integration and in-game validation are still needed; the Characters work alone is not complete FF7 support.
 
+## issue 5311976419 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/79
+
+Created: 2026-09-01T12:44:24Z; updated: 2026-09-06T15:01:17Z
+
+Exact metadata: [source record](sources/issue-5311976419-4768021fee44e84a86e97690dfab70cfdd1308e313987d109176cc93c7ad27c4.json).
+
+**Actionable — partly implemented.** Unmerged PR #359 adds starting-character stats, limit-learning fields and safer project saves for both editions. Starting stats do not rewrite existing saves.
+
+Enemies, encounters, shops and wider character/text editing remain unfinished. Integration and in-game validation are still needed; the Characters work alone is not complete FF7 support.
+
 ## comment 5559373025 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/79#issuecomment-5559373025
@@ -57,3 +69,21 @@ After checking out the PR separately from the FF8 work:
 - [ ] Open each FF7 edition; confirm nine named Characters slots and working equipment/materia tabs.
 - [ ] In a disposable mod project, change Strength by 1, save/reopen, confirm persistence, then restore it. Vanilla and the installed kernel must stay unchanged.
 - [ ] Check Enemies, Encounters, Shops and Data Map for specific status explanations. Report the edition and a screenshot for blank tabs, incorrect names or save errors.
+
+## comment 5560080934 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/79#issuecomment-5560080934
+
+Created: 2026-09-06T15:01:17Z; updated: 2026-09-06T15:01:17Z
+
+Exact metadata: [source record](sources/comment-5560080934-f8e25faedacf902f99125a7199a7e5ed74d3593511331b6650bb784d3f5bb363.json).
+
+Recovered and continued the interrupted work in #359. Current head: `4f028b6d4addd89b4f9684fdafb5f15dbaa2e6da` (implementation `9d34c9e`), synchronized with master without dropping parallel changes.
+
+The PR now connects enemies, enemy attacks, all 1,024 battle formations, supported-executable shop inventories/global prices, all 18 English kernel2 text sections, and expanded character equipment/materia/AP/growth/limit fields. These have actual UI controls and project save/readback paths, not placeholder tabs. Independent source failures and partial multi-file saves are handled without losing other pending edits.
+
+19 kernel/HTTP and 15 extended binary/safety tests pass locally; seven browser interaction scenarios are included in the FF7 workflow, now running on the synchronized head. Synthetic fixtures/component doubles are not installed-game acceptance.
+
+This issue remains actionable: scene/character AI, field/world placement, growth-curve coefficients and the remaining executable-only character data are not edited, and real installed-edition/deployment/in-game acceptance is still outstanding. Scene block overflow is deliberately refused rather than breaking KERNEL's lookup. Source games are unchanged by binary saves.
+
+Current scope, format references and safeguards are recorded in `codex/ff7-recovery-20260906.md`; that continuation note supersedes the earlier note that scene/shop/kernel2 editors were wholly absent.
