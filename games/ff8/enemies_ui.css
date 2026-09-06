@@ -1,0 +1,76 @@
+/* Enemy-only composition: shared field, Searcher and provenance controls remain. */
+.enemy-properties-section .enemy-properties-row{
+  grid-template-columns:repeat(var(--enemy-property-count),minmax(0,1fr))!important;
+  gap:6px!important;padding:5px!important;min-width:0;
+}
+.enemy-properties-section .enemy-properties-numbers{min-width:490px}
+.enemy-properties-section .enemy-properties-bools{min-width:380px}
+.enemy-properties-section>.lex-detail-section-content{overflow-x:auto!important}
+.enemy-properties-numbers .enemy-property{grid-template-rows:minmax(2.4em,auto) 32px}
+.enemy-properties-bools .enemy-property{grid-template-rows:1fr;grid-template-columns:minmax(0,1fr) auto;gap:3px;min-height:32px}
+.enemy-properties-bools .enemy-property-name{font-size:13px}
+.enemy-properties-bools .enemy-property>.lex-source-control{width:auto}
+.enemy-properties-bools .lex-info-help{display:none}
+.enemy-properties-bools .enemy-property-name{padding-right:8px}
+.enemy-tier-scroll{min-width:0;width:100%;overflow-x:auto}
+.enemy-tier-scroll>.enemy-pair-table{min-width:570px;display:grid!important;height:max-content!important}
+.enemy-tier-entry{display:grid;grid-template-columns:minmax(0,1fr) 35px;align-items:center;gap:3px;min-width:0;width:100%}
+.enemy-tier-entry .lex-source-control{min-width:0;--lex-reference-rail-width:1em;gap:1px}
+.enemy-tier-entry .lex-reference-values{font-size:10px}
+.enemy-tier-entry :is(.ff8-item-search,.ff8-entity-search){gap:2px!important;min-width:0;padding:0!important}
+.enemy-tier-entry :is(.ff8-item-link,.ff8-entity-search-name){overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:14px}
+.enemy-tier-entry :is(.ff8-item-icon-slot,.ff8-magic-icon){display:none}
+.enemy-tier-quantity{min-width:0}
+.enemy-tier-quantity input{width:100%;min-width:0;padding:1px 2px!important;text-align:center;font-size:14px}
+.enemy-pair-table .lex-column-list-cell{padding:3px 2px!important;min-width:0}
+.enemy-pair-table .lex-column-cell-content{width:100%;min-width:0}
+.enemy-pair-table .lex-column-list-head-cell{font-size:11px;padding:3px 2px!important}
+.enemy-pair-draw>.lex-column-list-header{display:none}
+.enemy-defence-grid{display:grid;gap:6px;min-width:0;width:100%;align-items:start}
+.enemy-element-defence{grid-template-columns:repeat(8,minmax(0,1fr))}
+.enemy-status-defence{grid-template-columns:repeat(auto-fit,minmax(70px,1fr))}
+.enemy-defence-grid>.lex-source-control{display:flex;flex-direction:column;min-width:0;gap:2px}
+.enemy-defence-grid .lex-source-strip{align-self:center;min-height:0}
+.enemy-defence-tile{display:grid;grid-template-rows:42px 30px;gap:3px;min-width:0;width:100%}
+.enemy-defence-toggle{position:relative;display:grid;place-items:center;width:100%;height:42px;min-width:0;padding:3px;border:1px solid #aaa;background:#454545;color:inherit;cursor:pointer}
+.enemy-defence-toggle .ff8-concept-icon{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+.enemy-defence-toggle:focus-visible{outline:2px solid white;outline-offset:2px}
+.enemy-defence-toggle:hover{background:#555}
+.enemy-defence-toggle[aria-pressed="true"]{border-color:#fff;background:#292929}
+.enemy-defence-immune{display:none;position:absolute;inset:0;place-items:center;background:#222b;color:white;font:12px/1.1 var(--lex-font);text-shadow:1px 1px 1px black}
+.is-immune .enemy-defence-immune{display:grid}
+.enemy-defence-fallback{font-size:12px;text-align:center;overflow-wrap:anywhere;line-height:1.05}
+.enemy-defence-tile>.lex-unit-field{width:100%;min-width:0;height:30px;--lex-unit-reserve:1em}
+.enemy-defence-tile input{width:100%;height:30px;min-width:0;text-align:center;padding:2px 1em 2px 2px!important;font-size:12px}
+.enemy-defence-tile input:disabled{opacity:.45;color:#bbb;background:#333;cursor:not-allowed}
+.enemy-card-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;align-items:start;width:100%}
+.enemy-card-grid>.lex-source-control{display:flex;flex-direction:column;gap:3px;min-width:0}
+.enemy-card-choice{position:relative;display:grid;grid-template-rows:auto auto;gap:5px;width:100%;min-width:0}
+.enemy-card-art{display:grid;place-items:center;justify-self:center;width:min(100%,112px);aspect-ratio:62/88;padding:0;border:1px solid #aaa;background:#333;color:#ddd;cursor:pointer}
+.enemy-card-art img{display:block;width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+.enemy-card-art img[hidden],.enemy-card-fallback[hidden]{display:none}
+.enemy-card-fallback{font-size:12px;padding:4px;text-align:center}
+.enemy-card-caption{display:flex;align-items:center;justify-content:center;gap:3px;min-width:0}
+.enemy-card-name{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.enemy-card-clear{position:absolute;right:0;top:0;width:20px;height:20px;padding:0;border:0;background:#333;color:#ccc;cursor:pointer}
+.enemy-card-choice:not(:hover):not(:focus-within) .enemy-card-clear{opacity:0}
+.enemy-battle-text-content>.enemy-scan-section{margin:16px 0 24px!important}
+.enemy-battle-text-content .enemy-scan-section textarea{width:100%;min-width:0}
+
+.enemy-defence-toggle:disabled,.enemy-card-art:disabled{cursor:default}
+/* Compact tiles keep the shared reference rail beneath, not over the icon.
+   The regular detail-field rail is positioned at the right of an input. */
+:is(.enemy-defence-grid,.enemy-card-grid)>.lex-source-control>.lex-source-strip,
+.enemy-tier-entry .lex-source-control>.lex-source-strip,
+.enemy-battle-text-content .enemy-scan-section .lex-source-control>.lex-source-strip{
+  position:static!important;inset:auto!important;transform:none!important;
+  width:100%!important;min-width:0!important;height:auto;justify-items:center;
+}
+.enemy-defence-grid>.lex-source-control{display:grid;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:75px minmax(13px,auto)}
+.enemy-defence-grid>.lex-source-control.no-reference>.lex-reference-placeholder{display:block;height:13px}
+.enemy-tier-entry .lex-source-control{display:flex;flex-direction:column;align-items:stretch}
+.enemy-tier-entry .lex-source-control>.lex-reference-values{min-height:11px}
+.enemy-battle-text-content .enemy-scan-section .lex-source-control{display:flex;flex-direction:column;align-items:stretch}
+.enemy-battle-text-content .enemy-scan-section .lex-reference-values{justify-items:start}
+.enemy-defence-toggle{overflow:hidden}
+.enemy-defence-toggle .ff8-concept-icon{min-width:0;min-height:0;max-width:100%;max-height:34px}

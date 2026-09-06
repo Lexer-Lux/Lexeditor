@@ -60,6 +60,7 @@ def main() -> int:
               groups:document.querySelectorAll('.enemy-properties-section,.enemy-table-section').length,
               properties:document.querySelectorAll('.enemy-properties-row>.enemy-property').length,
               controls:document.querySelectorAll('.lex-detail input,.lex-detail select,.lex-detail textarea').length,
+              immunityToggles:document.querySelectorAll(".enemy-defence-toggle").length,
               booleans:document.querySelectorAll('.lex-detail input[type="checkbox"]').length,
               sourceControls:document.querySelectorAll('.lex-detail .lex-source-strip').length,
               curves:document.querySelectorAll('.ff8-enemy-curve').length,
@@ -75,12 +76,12 @@ def main() -> int:
             }))()""")
             assert result["rows"] > 0, result
             assert result["groups"] >= 3 and result["properties"] > 0, result
-            # Nine enemy property flags, plus one immunity toggle per element
-            # (8) and per status (20) - those replace typing 155 by hand.
-            assert result["controls"] >= 44 and result["booleans"] == 37, result
+            # Nine checkbox properties; defenses now use checkless icon buttons.
+            assert result["controls"] >= 44 and result["booleans"] == 9, result
+            assert result["immunityToggles"] == 28, result
             assert result["sourceControls"] > 0, result
             assert result["curves"] == 7, result
-            assert result["scan"]["text"] and result["scan"]["pin"] == "false", result
+            assert not result["scan"]["text"], result  # Scan belongs to Battle Text, not Stats.
             assert all(labels == ["A", "B", "C", "D"] for labels in result["curveVariables"]), result
             assert not result["oldPlaceholder"] and not result["filename"], result
             assert result["sectionGeometry"]["bounds"] and not result["sectionGeometry"]["overlaps"] and not result["sectionGeometry"]["escaped"] and not result["sectionGeometry"]["titleCollisions"], result["sectionGeometry"]
@@ -92,6 +93,9 @@ def main() -> int:
             assert not result["errors"], result
             assert result["statHelp"]["color"] == "rgb(5, 5, 5)" and result["statHelp"]["background"] == "rgb(255, 255, 255)", result
             assert result["statHelp"]["textStrokeWidth"] == "0px" and result["statHelp"]["opacity"] == "1", result
+            cdp.eval("state.enemyPanelTab='battleText';renderEnemies()")
+            wait_eval(cdp, "!!document.querySelector('.enemy-scan-section textarea')", 5)
+            assert cdp.eval("document.querySelector('.enemy-scan-section textarea').value"), result
             cdp.eval("""(()=>{const input=document.querySelector('.enemy-scan-section textarea');
               input.value+=' TEST';input.dispatchEvent(new Event('input',{bubbles:true}))})()""")
             wait_eval(cdp, "!!document.querySelector('.enemy-scan-section .lex-reference-values')", 5)
@@ -104,6 +108,7 @@ def main() -> int:
               setTimeout(()=>resolve({before,after:document.querySelector('.lex-detail').scrollTop}),1000);
             })""", True)
             assert abs(scroll_restore["after"] - scroll_restore["before"]) <= 1, scroll_restore
+            cdp.eval("state.enemyPanelTab='stats';renderEnemies()")
             before_path = cdp.eval("document.querySelector('.ff8-enemy-curve .lex-curve-line').getAttribute('d')")
             cdp.eval("""(()=>{const input=document.querySelector('.ff8-enemy-curve input:not(:disabled)');
               input.value=String(Number(input.value)+1);input.dispatchEvent(new Event('input',{bubbles:true}))})()""")

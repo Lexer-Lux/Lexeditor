@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from . import cards, field_data, featured_mods, formats, gameplay_settings, paths, runtime_layout, world_geometry, world_map, world_textures
 from .game_icons import icon_path, portrait_path
+from .card_art import card_png
 from .extractor import baseline_ready, manifest_path
 from .ffnx_manager import status as ffnx_status
 from .game_font import ensure_font
@@ -122,8 +123,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
-            elif path == "/cards_ui.js":
-                self.file_response(PLUGIN_ROOT / "cards_ui.js")
+            elif path in ("/cards_ui.js", "/enemies_ui.js", "/enemies_ui.css"):
+                self.file_response(PLUGIN_ROOT / path.lstrip("/"))
             elif path in ("/assets/licenses/FF8UltimateEditor-GPL-3.0.txt", "/assets/licenses/FFNx-GPL-3.0.txt", "/assets/licenses/Deling-GPL-3.0.txt", "/assets/licenses/OpenVIII-MIT.txt"):
                 self.file_response(PLUGIN_ROOT / path.lstrip("/"))
             elif path == "/assets/ff8-menu.ttf":
@@ -135,6 +136,8 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_response({"error": "Game icon not found"}, 404)
                 else:
                     self.file_response(target)
+            elif path.startswith("/assets/cards/") and path.endswith(".png"):
+                self.binary_response(card_png(int(Path(path).stem)), "image/png")
             elif path.startswith("/assets/portraits/") and path.endswith(".png"):
                 parts = Path(path).parts
                 if len(parts) != 5:

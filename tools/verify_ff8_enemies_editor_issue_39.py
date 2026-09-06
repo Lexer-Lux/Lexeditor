@@ -32,9 +32,9 @@ def main() -> None:
     require('sharedDetail({...row,name:enemyDisplayName(row.name)}' in editor,
             "The Enemies detail heading still sends raw braces to the game font")
     require('className:"enemy-scan-section"' in editor and 'field:"scan_description"' in editor,
-            "The Enemies detail panel does not expose and save Scan descriptions")
-    require('className:"enemy-properties-section"' in editor and 'class:"enemy-properties-row"' in editor,
-            "enemy properties must use one compact shared row")
+            "The Enemies editor does not expose and save Scan descriptions")
+    require('className:"enemy-properties-section"' in editor and 'enemy-properties-numbers' in editor and 'enemy-properties-bools' in editor,
+            "enemy properties must use a compact numeric row and two boolean rows")
 
     from games.ff8 import formats, paths, scan_text
 

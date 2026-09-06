@@ -55,7 +55,7 @@ def check() -> list[str]:
         "runtime_layout.py", "iroj_archive.py", "mod_folders.py", "mngrp_merge.py",
         "featured_mods.py", "featured_mods.json",
         "world_map.py", "world_geometry.py", "world_textures.py", "world_data_merge.py", "field_data.py", "field_background.py", "field_dialogue.py", "field_encounters.py", "field_scripts.py", "field_walkmesh.py", "kernel_text.py", "mngrp_text.py", "refine_tables.py",
-        "executable_text.py", "cards.py", "cards_ui.js",
+        "executable_text.py", "cards.py", "cards_ui.js", "card_art.py", "enemies_ui.js", "enemies_ui.css",
         "menu_items.py", "enemy_tables.py", "enemy_ai.py", "enemy_battle_text.py", "encounters.py", "scan_text.py", "init_data.py",
         "schema/item.json", "schema/kernel_bin_data.json", "schema/jsm_opcodes.json",
         "schema/kernel_section_fields.json", "schema/kernel_lookups.json",
