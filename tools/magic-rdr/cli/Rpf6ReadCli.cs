@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using Magic_RDR;
 using Magic_RDR.Application;
@@ -40,6 +41,18 @@ internal static class Rpf6ReadCli
                     return 2;
                 }
                 return PackResourceFile(
+                    Path.GetFullPath(args[1]),
+                    Path.GetFullPath(args[2]),
+                    Path.GetFullPath(args[3]));
+            }
+            if (command == "build-copy")
+            {
+                if (args.Length != 4)
+                {
+                    PrintUsage();
+                    return 2;
+                }
+                return BuildArchiveCopy(
                     Path.GetFullPath(args[1]),
                     Path.GetFullPath(args[2]),
                     Path.GetFullPath(args[3]));
@@ -128,6 +141,8 @@ internal static class Rpf6ReadCli
         Console.Error.WriteLine("Rpf6ReadCli textures <archive.rpf> <output-directory> [wildcard]");
         Console.Error.WriteLine("Rpf6ReadCli resource-unpack <resource-file> <output-file>");
         Console.Error.WriteLine("Rpf6ReadCli resource-pack <template-resource> <unpacked-file> <output-file>");
+        Console.Error.WriteLine("Rpf6ReadCli build-copy <source.rpf> <output.rpf> <replacements.tsv>");
+        Console.Error.WriteLine("  replacements.tsv: archive/path<TAB>replacement-file, one existing entry per line");
     }
 
     private static void AtomicWrite(string target, byte[] payload)
@@ -186,6 +201,228 @@ internal static class Rpf6ReadCli
         Console.WriteLine(template + "\t" + target + "\tpackedBytes="
             + result.Length.ToString(CultureInfo.InvariantCulture));
         return 0;
+    }
+
+    private sealed class ArchiveReplacement
+    {
+        public string ArchivePath;
+        public string SourcePath;
+        public byte[] ExpectedBytes;
+    }
+
+    private static int BuildArchiveCopy(string source, string target, string manifest)
+    {
+        if (!File.Exists(source))
+            throw new FileNotFoundException("Source RPF was not found.", source);
+        if (!File.Exists(manifest))
+            throw new FileNotFoundException("Replacement manifest was not found.", manifest);
+
+        string sourcePath = Path.GetFullPath(source);
+        string targetPath = Path.GetFullPath(target);
+        if (string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("build-copy never writes over the source archive.");
+
+        List<ArchiveReplacement> replacements = ReadReplacementManifest(manifest);
+        if (replacements.Count == 0)
+            throw new InvalidDataException("Replacement manifest contains no entries.");
+
+        string sourceHashBefore = Sha256File(sourcePath);
+        string parent = Path.GetDirectoryName(targetPath);
+        if (!string.IsNullOrEmpty(parent))
+            Directory.CreateDirectory(parent);
+        string temporary = targetPath + ".lexeditor." + Guid.NewGuid().ToString("N") + ".tmp";
+
+        LoadFileNames();
+        SetPlatform(sourcePath);
+        try
+        {
+            using (FileStream input = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                RPF6 archive = new RPF6(input);
+                try
+                {
+                    ApplyArchiveReplacements(archive, replacements);
+                    using (FileStream output = new FileStream(
+                        temporary, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None))
+                    {
+                        archive.Write(output);
+                        output.Flush(true);
+                    }
+                }
+                finally
+                {
+                    archive.CloseAllStreams();
+                }
+            }
+
+            string sourceHashAfterBuild = Sha256File(sourcePath);
+            if (!string.Equals(sourceHashBefore, sourceHashAfterBuild, StringComparison.OrdinalIgnoreCase))
+                throw new IOException("Source archive changed while building the copy; output was not published.");
+
+            VerifyArchiveCopy(temporary, replacements);
+
+            string sourceHashAfterVerify = Sha256File(sourcePath);
+            if (!string.Equals(sourceHashBefore, sourceHashAfterVerify, StringComparison.OrdinalIgnoreCase))
+                throw new IOException("Source archive changed during verification; output was not published.");
+
+            AtomicMoveFile(temporary, targetPath);
+            Console.Error.WriteLine("BUILT_COPY\t" + replacements.Count.ToString(CultureInfo.InvariantCulture));
+            Console.WriteLine(string.Join("\t", new string[] {
+                sourcePath,
+                targetPath,
+                "sourceSha256=" + sourceHashBefore,
+                "outputSha256=" + Sha256File(targetPath)
+            }));
+            return 0;
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+                File.Delete(temporary);
+        }
+    }
+
+    private static List<ArchiveReplacement> ReadReplacementManifest(string manifest)
+    {
+        List<ArchiveReplacement> result = new List<ArchiveReplacement>();
+        HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int lineNumber = 0;
+        foreach (string raw in File.ReadAllLines(manifest))
+        {
+            lineNumber++;
+            string line = raw.Trim();
+            if (line.Length == 0 || line.StartsWith("#", StringComparison.Ordinal))
+                continue;
+            int tab = raw.IndexOf('\t');
+            if (tab <= 0 || tab == raw.Length - 1)
+                throw new InvalidDataException("Replacement line " + lineNumber.ToString(CultureInfo.InvariantCulture)
+                    + " must be archive/path<TAB>replacement-file.");
+            string archivePath = NormalizePath(raw.Substring(0, tab).Trim());
+            if (!archivePath.StartsWith("root/", StringComparison.OrdinalIgnoreCase) ||
+                archivePath.IndexOf("../", StringComparison.Ordinal) >= 0 ||
+                archivePath.EndsWith("/", StringComparison.Ordinal))
+                throw new InvalidDataException("Invalid archive path on replacement line "
+                    + lineNumber.ToString(CultureInfo.InvariantCulture) + ": " + archivePath);
+            if (!seen.Add(archivePath))
+                throw new InvalidDataException("Duplicate archive replacement: " + archivePath);
+            string sourcePath = Path.GetFullPath(raw.Substring(tab + 1).Trim().Trim('"'));
+            if (!File.Exists(sourcePath))
+                throw new FileNotFoundException("Replacement file was not found for " + archivePath, sourcePath);
+            result.Add(new ArchiveReplacement {
+                ArchivePath = archivePath,
+                SourcePath = sourcePath,
+                ExpectedBytes = File.ReadAllBytes(sourcePath)
+            });
+        }
+        return result;
+    }
+
+    private static void ApplyArchiveReplacements(RPF6 archive, List<ArchiveReplacement> replacements)
+    {
+        RPF6.RPF6TOC.TOCSuperEntry root = archive.TOC.SuperEntries.FirstOrDefault(
+            delegate(RPF6.RPF6TOC.TOCSuperEntry entry) { return entry.SuperParent == null && entry.IsDir; });
+        if (root == null)
+            throw new InvalidDataException("RPF6 root directory was not found.");
+
+        foreach (ArchiveReplacement replacement in replacements)
+        {
+            RPF6.RPF6TOC.TOCSuperEntry original = RPF6.RPF6TOC.GetEntryByPath(
+                replacement.ArchivePath, root);
+            if (original == null || original.IsDir)
+                throw new InvalidDataException("Replacement target is not an existing file: " + replacement.ArchivePath);
+
+            RPF6.RPF6TOC.FileEntry oldFile = original.Entry.AsFile;
+            MemoryStream payload = new MemoryStream(replacement.ExpectedBytes, false);
+            RPF6.RPF6TOC.FileEntry newFile = new RPF6.RPF6TOC.FileEntry();
+            newFile.NameOffset = oldFile.NameOffset;
+            newFile.Parent = oldFile.Parent;
+            newFile.FlagInfo = new ResourceUtils.FlagInfo {
+                Flag1 = oldFile.FlagInfo.Flag1,
+                Flag2 = oldFile.FlagInfo.Flag2
+            };
+            newFile.ResourceType = oldFile.ResourceType;
+            if (!newFile.FlagInfo.IsResource)
+                newFile.FlagInfo.SetTotalSize(replacement.ExpectedBytes.Length, 0);
+            newFile.SizeInArchive = replacement.ExpectedBytes.Length;
+            newFile.KeepOffset = oldFile.GetOffset();
+
+            RPF6.RPF6TOC.TOCSuperEntry changed = new RPF6.RPF6TOC.TOCSuperEntry();
+            changed.Entry = newFile;
+            newFile.SuperOwner = changed;
+            changed.OldEntry = original.Entry;
+            changed.CustomDataStream = payload;
+            changed.ReadBackFromRPF = false;
+            changed.IsFileFromRPF = false;
+            changed.SuperParent = original.SuperParent;
+            RPF6.RPF6TOC.ReplaceEntry(original, changed);
+            Console.WriteLine("REPLACE\t" + replacement.ArchivePath + "\t" + replacement.SourcePath);
+        }
+    }
+
+    private static void VerifyArchiveCopy(string archivePath, List<ArchiveReplacement> replacements)
+    {
+        SetPlatform(archivePath);
+        using (FileStream input = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            RPF6 archive = new RPF6(input);
+            try
+            {
+                RPF6.RPF6TOC.TOCSuperEntry root = archive.TOC.SuperEntries.FirstOrDefault(
+                    delegate(RPF6.RPF6TOC.TOCSuperEntry entry) { return entry.SuperParent == null && entry.IsDir; });
+                if (root == null)
+                    throw new InvalidDataException("Built RPF6 root directory was not found.");
+                foreach (ArchiveReplacement replacement in replacements)
+                {
+                    RPF6.RPF6TOC.TOCSuperEntry entry = RPF6.RPF6TOC.GetEntryByPath(
+                        replacement.ArchivePath, root);
+                    if (entry == null || entry.IsDir)
+                        throw new InvalidDataException("Built archive lost replacement target: " + replacement.ArchivePath);
+                    using (MemoryStream output = new MemoryStream())
+                    {
+                        archive.TOC.ExtractFile(entry, output);
+                        byte[] actual = output.ToArray();
+                        if (!actual.SequenceEqual(replacement.ExpectedBytes))
+                            throw new InvalidDataException("Replacement did not round-trip exactly: " + replacement.ArchivePath);
+                    }
+                }
+            }
+            finally
+            {
+                archive.CloseAllStreams();
+            }
+        }
+    }
+
+    private static string Sha256File(string path)
+    {
+        using (SHA256 algorithm = SHA256.Create())
+        using (FileStream input = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            return BitConverter.ToString(algorithm.ComputeHash(input)).Replace("-", "").ToLowerInvariant();
+        }
+    }
+
+    private static void AtomicMoveFile(string temporary, string target)
+    {
+        if (File.Exists(target))
+        {
+            string backup = target + ".lexeditor.previous";
+            if (File.Exists(backup)) File.Delete(backup);
+            try
+            {
+                File.Replace(temporary, target, backup);
+                File.Delete(backup);
+            }
+            finally
+            {
+                if (File.Exists(temporary) && File.Exists(backup) && !File.Exists(target))
+                    File.Move(backup, target);
+            }
+        }
+        else
+        {
+            File.Move(temporary, target);
+        }
     }
 
     private static void LoadFileNames()
@@ -429,94 +666,68 @@ internal static class Rpf6ReadCli
                     : IOReader.Endian.Big;
                 IOReader reader = new IOReader(stream, endian);
                 reader.BaseStream.Seek(file.FlagInfo.RSC85_ObjectStart, SeekOrigin.Begin);
-                TextureViewerForm.XTD_TextureDictionary dictionary =
-                    new TextureViewerForm.XTD_TextureDictionary(reader, file);
-                Magic_RDR.RPF.Texture.TextureInfo[] infos =
-                    TextureViewerForm.XTD_TextureDictionary.TexInfos;
-                Console.Error.WriteLine(string.Join("\t", new string[] {
-                    "DICTIONARY",
-                    archivePath,
-                    "objectStart=" + file.FlagInfo.RSC85_ObjectStart.ToString(CultureInfo.InvariantCulture),
-                    "resourceBytes=" + resource.Length.ToString(CultureInfo.InvariantCulture),
-                    "declared=" + dictionary.TextureCount.ToString(CultureInfo.InvariantCulture),
-                    "decoded=" + infos.Length.ToString(CultureInfo.InvariantCulture)
-                }));
-                bool useMetadataFallback = infos.Length == 0 &&
-                    dictionary.TexturesPointers != null;
-                int count = useMetadataFallback
-                    ? dictionary.TexturesPointers.Length
-                    : infos.Length;
-                for (int index = 0; index < count; index++)
+                string extension = ".dds";
+                IEnumerable<Magic_RDR.RPF.Texture.TextureInfo> entries =
+                    ReadTextureDictionary(reader, file);
+                foreach (Magic_RDR.RPF.Texture.TextureInfo texture in entries)
                 {
-                    Magic_RDR.RPF.Texture.TextureInfo info;
-                    try
-                    {
-                        info = useMetadataFallback
-                            ? ReadTextureInfo(reader, file, dictionary.TexturesPointers[index])
-                            : infos[index];
-                    }
-                    catch (Exception error)
-                    {
-                        Console.Error.WriteLine("TEXTURE_ERROR\t" + archivePath + "\t"
-                            + index.ToString(CultureInfo.InvariantCulture) + "\t"
-                            + error.GetType().Name + "\t" + error.Message);
+                    if (texture.Width <= 0 || texture.Height <= 0 ||
+                        texture.TextureDataPointer < 0 || texture.TextureSize <= 0)
                         continue;
-                    }
-                    if (info == null)
+                    long end = (long)texture.TextureDataPointer + texture.TextureSize;
+                    if (end > resource.LongLength)
                         continue;
-                    string sourceFormat = AppGlobals.Platform == AppGlobals.PlatformEnum.Switch &&
-                        dictionary.TexturesPointers != null &&
-                        index < dictionary.TexturesPointers.Length
-                            ? ReadSwitchTextureFormat(reader, dictionary.TexturesPointers[index])
-                            : info.PixelFormat.ToString();
-                    string safeName = SafeFileName(info.TextureName);
-                    if (sourceFormat == "CRND" &&
-                        safeName.EndsWith(".crn", StringComparison.OrdinalIgnoreCase))
+                    byte[] pixels = new byte[texture.TextureSize];
+                    Buffer.BlockCopy(resource, texture.TextureDataPointer, pixels, 0, pixels.Length);
+                    string fileName = SafeFileName(texture.TextureName) + extension;
+                    string target = Path.Combine(dictionaryRoot, fileName);
+                    using (FileStream output = new FileStream(
+                        target, FileMode.Create, FileAccess.Write, FileShare.None))
                     {
-                        safeName = safeName.Substring(0, safeName.Length - 4);
+                        DdsWriter.Write(output, texture, pixels);
                     }
-                    string target = Path.Combine(dictionaryRoot,
-                        index.ToString("D4", CultureInfo.InvariantCulture) + "_" + safeName +
-                        (sourceFormat == "CRND" ? ".crn" : ".dds"));
-                    if (sourceFormat == "CRND")
-                    {
-                        reader.BaseStream.Position = info.TextureDataPointer;
-                        File.WriteAllBytes(target, reader.ReadBytes(checked((int)info.TextureSize)));
-                    }
-                    else
-                    {
-                        Magic_RDR.RPF.Texture.SaveDDS(reader, target, info);
-                    }
-                    Console.WriteLine(string.Join("\t", new string[] {
-                        archivePath,
-                        index.ToString(CultureInfo.InvariantCulture),
-                        info.TextureName,
-                        info.Width.ToString(CultureInfo.InvariantCulture),
-                        info.Height.ToString(CultureInfo.InvariantCulture),
-                        info.MipMaps.ToString(CultureInfo.InvariantCulture),
-                        sourceFormat,
-                        target
-                    }));
+                    Console.WriteLine(archivePath + "\t" + target + "\t" + texture.Width + "x" + texture.Height);
                     textures++;
                 }
             }
             dictionaries++;
         }
-        Console.Error.WriteLine("TEXTURES\t" + textures.ToString(CultureInfo.InvariantCulture)
-            + "\tDICTIONARIES\t" + dictionaries.ToString(CultureInfo.InvariantCulture));
+        Console.Error.WriteLine("TEXTURE_DICTIONARIES\t" + dictionaries.ToString(CultureInfo.InvariantCulture));
+        Console.Error.WriteLine("TEXTURES\t" + textures.ToString(CultureInfo.InvariantCulture));
         return dictionaries == 0 ? 3 : 0;
     }
 
-    private static string ReadSwitchTextureFormat(IOReader reader, uint pointer)
+    private static IEnumerable<Magic_RDR.RPF.Texture.TextureInfo> ReadTextureDictionary(
+        IOReader reader, RPF6.RPF6TOC.FileEntry file)
     {
-        reader.BaseStream.Seek(pointer + 0x24, SeekOrigin.Begin);
-        return reader.ReadString(IOReader.StringType.ASCII, 4);
+        long baseOffset = reader.BaseStream.Position;
+        reader.BaseStream.Seek(baseOffset + 0x18, SeekOrigin.Begin);
+        int dictionaryPointer = reader.ReadOffset(reader.ReadInt32());
+        if (dictionaryPointer <= 0 || dictionaryPointer >= reader.BaseStream.Length)
+            yield break;
+        reader.BaseStream.Seek(dictionaryPointer, SeekOrigin.Begin);
+        uint count = reader.ReadUInt32();
+        int entriesPointer = reader.ReadOffset(reader.ReadInt32());
+        if (entriesPointer <= 0 || entriesPointer >= reader.BaseStream.Length)
+            yield break;
+        int safeCount = (int)Math.Min(count, 10000U);
+        for (int index = 0; index < safeCount; index++)
+        {
+            long pointerPosition = entriesPointer + index * 4L;
+            if (pointerPosition + 4 > reader.BaseStream.Length)
+                yield break;
+            reader.BaseStream.Seek(pointerPosition, SeekOrigin.Begin);
+            int texturePointer = reader.ReadOffset(reader.ReadInt32());
+            if (texturePointer <= 0 || texturePointer >= reader.BaseStream.Length)
+                continue;
+            Magic_RDR.RPF.Texture.TextureInfo texture = ReadTexture(reader, file, texturePointer);
+            if (texture != null)
+                yield return texture;
+        }
     }
 
-    private static Magic_RDR.RPF.Texture.TextureInfo ReadTextureInfo(
-        IOReader reader,
-        RPF6.RPF6TOC.FileEntry file,
-        uint pointer)
+    private static Magic_RDR.RPF.Texture.TextureInfo ReadTexture(
+        IOReader reader, RPF6.RPF6TOC.FileEntry file, int pointer)
     {
         reader.BaseStream.Seek(pointer + 0x14, SeekOrigin.Begin);
         uint textureSize = reader.ReadUInt32();
