@@ -25,9 +25,9 @@ jobs:
         working-directory: editor
         run: |
           cat .github/ui-polish.part-* | base64 -d > /tmp/ui-polish.patch.gz
-          echo '99e03e5675e018ebcb0bff2a32ab7413df9859e4760eaa605810e6052b32e4df  /tmp/ui-polish.patch.gz' | sha256sum -c -
           gzip -t /tmp/ui-polish.patch.gz
           gzip -dc /tmp/ui-polish.patch.gz > /tmp/ui-polish.patch
+          echo 'decfecc43c41bdebcdb45200df261795e8def3f83f329b5f2182ee3686c17e5a  /tmp/ui-polish.patch' | sha256sum -c -
           patch -p1 < /tmp/ui-polish.patch
           python - <<'PY'
           import subprocess
