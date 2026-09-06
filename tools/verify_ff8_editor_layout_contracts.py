@@ -35,11 +35,13 @@ require(EDITOR, 'row.available?enemyStatGrowth(row.fields.filter(field=>field.gr
 require(EDITOR, 'showPaged("enemies",rows,columns,enemyDetail,"74px minmax(180px,1fr)",{leadingPanel:enemyLeadingPanel,minLeading:340,defaultLeadingWidth:30,minLeft:260,minRight:430})', "Enemy paged layout attachment")
 
 # #60 — no white prototype fill; heading, variables, plot and formula are
-# separate grid rows; the title remains pointer-safe; shared hover re-evaluates
-# the current curve rather than a stale preview.
+# separate grid rows; the title is centered and pointer-safe; shared hover
+# re-evaluates the current curve rather than a stale preview.
 require(EDITOR, '--lex-curve-fill:#aa243266;', "FF8 game-coloured curve fill")
 require(STYLES, 'grid-template-areas:\n    "heading"\n    "variables"\n    "plot"\n    "formula"\n    "status";', "curve heading/formula separated into distinct rows")
-require(EDITOR, '.level-curve-panel .detail-subtitle{position:relative;z-index:2;margin:0 auto;text-align:center;pointer-events:none;', "centered pointer-safe curve title")
+require(EDITOR, '.ff8-character-curve .lex-curve-heading{', "FF8 curve heading override")
+require(EDITOR, 'display:flex;justify-content:center;', "centered FF8 curve heading")
+require(EDITOR, 'pointer-events:none;', "pointer-safe FF8 curve presentation")
 require(FRAMEWORK, 'const curveEditor = (options = {}) => {', "shared live curve editor")
 require(FRAMEWORK, 'root.addEventListener("pointermove", event => {', "shared curve hover")
 require(FRAMEWORK, 'const y = Number(options.evaluate?.(x));', "live curve evaluation")
