@@ -102,3 +102,4 @@ jobs:
           test "$(git rev-parse origin/fix/global-resume-20260906)" = "${{ needs.prepare.outputs.sha }}"
           git merge --ff-only origin/fix/global-resume-20260906
           git push origin HEAD:master
+# rerun after deterministic control-help fixture fix
