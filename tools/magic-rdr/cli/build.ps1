@@ -7,6 +7,7 @@ $sources = @(
     (Join-Path $PSScriptRoot "DdsWriter.cs")
 )
 $output = Join-Path $appRoot "Rpf6ReadCli.exe"
+$config = $output + '.config'
 $compiler = Join-Path $env:WINDIR "Microsoft.NET\Framework\v4.0.30319\csc.exe"
 $references = @(
     (Join-Path $appRoot "MagicRDR.exe"),
@@ -36,5 +37,18 @@ $compilerArguments = @(
 if ($LASTEXITCODE -ne 0) {
     throw "Rpf6ReadCli compilation failed with exit code $LASTEXITCODE"
 }
+
+# MagicRDR keeps private dependencies such as PikIO in app\Assemblies. The CLI
+# is a separate .NET executable, so it needs its own probing configuration.
+@'
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <runtime>
+    <assemblyBinding xmlns="urn:schemas-microsoft-com:asm.v1">
+      <probing privatePath="Assemblies" />
+    </assemblyBinding>
+  </runtime>
+</configuration>
+'@ | Set-Content -LiteralPath $config -Encoding UTF8
 
 Get-FileHash -LiteralPath $output -Algorithm SHA256
