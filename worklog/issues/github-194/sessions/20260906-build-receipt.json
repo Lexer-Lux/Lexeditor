@@ -1,0 +1,26 @@
+{
+  "repository": "Lexer-Lux/Lexers-Mod-For-RDR2",
+  "branch": "fix/lexeditor-rdr2-issue-batch",
+  "source_commit": "ca2cfb6229e06f4cfd316614d95f5b84077cde90",
+  "built_pr_merge_commit": "c2229994966557ed08320b82c65949cfa3522064",
+  "workflow_run": 34044885479,
+  "status": "Downloaded candidates; archive, ASI manifest and packaged resource hashes verified. Not installed or gameplay-validated.",
+  "variants": [
+    {
+      "mode": "release",
+      "artifact_id": 9992802426,
+      "zip_sha256": "a21d7fc603a4f44ba06bfcabdee7ea7e902af3b942ee1ce4cf28d0bfce03c6a8",
+      "asi_sha256": "3ECF160DD3AD56093C64992B577ADD0B78BD552734BACEBA0582462B83F8E108",
+      "asi_bytes": 1376256
+    },
+    {
+      "mode": "development",
+      "artifact_id": 9992799269,
+      "zip_sha256": "eb5b46686bc1e53e2078aa88b3f07ed19cc3a1c8d2b709e80988aba98b7c7f05",
+      "asi_sha256": "B6DB08C64417FD0E7CD97780E98499F2227E38BE05EA7F53C5563346A4A9762A",
+      "asi_bytes": 1376768
+    }
+  ],
+  "contents": "GameplayTweaks.asi, map, manifest, build metadata, READ-ME-FIRST.md and matching lml/RadialAmmoCounts resources. No replacement GameplayTweaks.ini, SDK or font binaries.",
+  "human_acceptance": "Preserve existing settings; follow backup and rollback notes. Verify actual VFS replacement lines and rendered wheel behavior. Native icon dimming and the reported binocular crash remain unconfirmed/unresolved."
+}
