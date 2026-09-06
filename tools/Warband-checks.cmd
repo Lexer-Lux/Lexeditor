@@ -17,6 +17,8 @@ if errorlevel 1 goto failed
 if errorlevel 1 goto failed
 "%CHECK_PYTHON%" -m unittest discover -s tests -p "test_data_map_coverage.py" -v >> "%CHECK_REPORT%" 2>&1
 if errorlevel 1 goto failed
+"%CHECK_PYTHON%" -m unittest discover -s tests -p "test_wse2*.py" -v >> "%CHECK_REPORT%" 2>&1
+if errorlevel 1 goto failed
 type "%CHECK_REPORT%"
 echo Report: %CHECK_REPORT%
 if /i "%~1"=="--checks-only" goto passed

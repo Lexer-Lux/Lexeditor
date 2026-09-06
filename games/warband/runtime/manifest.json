@@ -1,0 +1,247 @@
+{
+  "archive": "wse2-1.1.5.1-lex1.zip",
+  "files": {
+    "CommonRes/core_physics_materials.brf": {
+      "sha256": "d08dfb9db2f5b7321625ea55eeb38a5efe117bf84ea6af1e812c3192422d4276",
+      "size": 64
+    },
+    "CommonRes/wse2_shaders.brf": {
+      "sha256": "8609ccf98c3f1ea6488a0f82f771914f1cbbf5bf258beb4ce98d66942af9748c",
+      "size": 563
+    },
+    "Fxaa3_11.h": {
+      "sha256": "3326f31801eabf059febd6f4523863b6bebcd37676aff6e9022d58f552f13988",
+      "size": 87927
+    },
+    "WSE2 SDK/EVAL_README.txt": {
+      "sha256": "04b58f93b247de31e4061c21825d549769a16fd470e5be03b21477c54cde762a",
+      "size": 4192
+    },
+    "WSE2 SDK/PhysicsMaterials/core_physics_materials.brf": {
+      "sha256": "d08dfb9db2f5b7321625ea55eeb38a5efe117bf84ea6af1e812c3192422d4276",
+      "size": 64
+    },
+    "WSE2 SDK/PhysicsMaterials/header_physics_materials.py": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "WSE2 SDK/PhysicsMaterials/process_physics_materials.py": {
+      "sha256": "b37dd55b7148d48c08779e854e894c4ad97b476c4c8ba6628af8ad00001a4bf3",
+      "size": 821
+    },
+    "WSE2 SDK/PhysicsMaterials/resource_physics_materials.py": {
+      "sha256": "318a78cc09e0ed61d6383f9ae2d5374e2007cd3a91e8917fcb24beca84d95e96",
+      "size": 91
+    },
+    "WSE2 SDK/README.txt": {
+      "sha256": "a3264aa639e60d9f47840c5dbc25fcbfb56b31989993d4fa57247bca1d9c6485",
+      "size": 594
+    },
+    "WSE2 SDK/Resource/user_interface_wse2.brf": {
+      "sha256": "f6e49008eb362894475adf39e226ac5b304721957c859f0f6c3c53607798e305",
+      "size": 3734
+    },
+    "WSE2 SDK/Shaders/Modules/Napoleonic Wars/wse2_shaders.ini": {
+      "sha256": "ff0c2d3e2abb77b5e3f64163956bf230a5475c47429b24b8ca2758d88df124d1",
+      "size": 11303
+    },
+    "WSE2 SDK/Shaders/postFX.fx": {
+      "sha256": "b5b1cfc7d442ab1be9babcf8699ecaebf60bdb6c51528b5d85d10ffc13ee255c",
+      "size": 22237
+    },
+    "WSE2 SDK/Shaders/postFX_WSE2.fx": {
+      "sha256": "6b8ddfbde817677c005ae17bf2db94474f141a398eb2a642ffc575e87b08d946",
+      "size": 6142
+    },
+    "WSE2 SDK/Shaders/wse2_shaders.brf": {
+      "sha256": "8609ccf98c3f1ea6488a0f82f771914f1cbbf5bf258beb4ce98d66942af9748c",
+      "size": 563
+    },
+    "WSE2 SDK/Shaders/wse2_shaders.ini": {
+      "sha256": "7535661b1b89eb90480f05c3c69301e1448a928dfae45113cc851c725757f0bf",
+      "size": 8308
+    },
+    "WSE2 SDK/Shaders/wse2_shaders.py": {
+      "sha256": "8a822f70e6ae3b2685102f95684011d153c06f88271084249b22c4b8f70f915a",
+      "size": 3261
+    },
+    "WSE2 SDK/game_variables.txt_addon.txt": {
+      "sha256": "a1a0fb0de877a258d3e1f728b253d71de6017eb7437aa60776d8714ad2ec6aae",
+      "size": 559
+    },
+    "WSE2 SDK/header_animations_addon.py": {
+      "sha256": "3560d6f1ff64ed23334fe5ac8773b35c8b745ce57887636eb50d542f61e0389c",
+      "size": 172
+    },
+    "WSE2 SDK/header_common_addon.py": {
+      "sha256": "e8209dfe70c161e6fe546b5e4f9580fe6c64afb782ca6bed80b8b882e1c68b7f",
+      "size": 4339
+    },
+    "WSE2 SDK/header_items_addon.py": {
+      "sha256": "c405529402c7e3e9c52dbaadacf48ae0e1e87f4455c9b77d651925a3d653eca8",
+      "size": 451
+    },
+    "WSE2 SDK/header_operations_addon.py": {
+      "sha256": "1fde8395ca565b67dfd959ca2a5fd3b42691f1c2562e7676ddff78b05bbb750b",
+      "size": 99850
+    },
+    "WSE2 SDK/header_particle_systems_addon.py": {
+      "sha256": "b18ecd37e72e3db0d89e3ee8b8ec56325dd095889bc7b9585b9e318f685f9f85",
+      "size": 184
+    },
+    "WSE2 SDK/header_parties_addon.py": {
+      "sha256": "5bc1a2af9a6f8e55d49ed9a079ccfc32c105df2e90fe4d365123ae8931d39b1a",
+      "size": 116
+    },
+    "WSE2 SDK/header_presentations_addon.py": {
+      "sha256": "da711b9d9b3e0bf93ac8d72fb2c404a067138ede8b138d18016ae2b96d53bf59",
+      "size": 94
+    },
+    "WSE2 SDK/header_scene_props_addon.py": {
+      "sha256": "b02b6c28c866e2a77bd89c7e2514b2eb3c57ec74770e9c6be38e293251fd6c31",
+      "size": 104
+    },
+    "WSE2 SDK/header_sounds_addon.py": {
+      "sha256": "823259c6904c43569e2f4a884b16bc8d707c61dce3dc82c79b7154178b34ed8b",
+      "size": 34
+    },
+    "WSE2 SDK/header_triggers_addon.py": {
+      "sha256": "ec8e8fff6b8ea0b2293c910790283db28f1efba4465c74deb8d38b05cf2fc54c",
+      "size": 6454
+    },
+    "WSE2 SDK/luaGuide.html": {
+      "sha256": "468d69c88345a057e7999d2e1097bbabd8bf55ddfeea0b0ade9569b1d83ad437",
+      "size": 126563
+    },
+    "WSE2 SDK/module_config_template.ini": {
+      "sha256": "505fe9dee9764efa5525dd5bc08d21c74a2defa3c1cea6894c54bc3fb568afdf",
+      "size": 630
+    },
+    "WSE2 SDK/module_controls_template.ini": {
+      "sha256": "5fc930538dfd938f59a11d5d7cd8e221ae61dc0974f6ba56eae05be85eb150e6",
+      "size": 2106
+    },
+    "WSE2 SDK/module_presentations_addon.py": {
+      "sha256": "78880f5c91329ee4dc14379087b7e0db44782fde2614e2579ea3b6201bc114bc",
+      "size": 599
+    },
+    "WSE2 SDK/module_scripts_addon.py": {
+      "sha256": "7fca75a7e1c31d78cbaf6e26b094d2a8e432778d3b7fac63bc863cc8189b459d",
+      "size": 3925
+    },
+    "WSE2 SDK/process_operations_patch.py": {
+      "sha256": "bb5d8561363646c76c860c1445254bbb32ff457f2884ec1835d6fea79ca1c081",
+      "size": 740
+    },
+    "WSE2 SDK/process_skins_patch.py": {
+      "sha256": "dde506188d40dbfe8e1fd2c7aa8b87689f84054a5b0e0091b6c07cc53c231bb5",
+      "size": 175
+    },
+    "fmodex64.dll": {
+      "sha256": "da233648ed16dfc0c109447784e55995f8a11156d9c9e7c0f1feb8e6b523473c",
+      "size": 1503232
+    },
+    "fmodex_wse2.dll": {
+      "sha256": "67b9212131982e4f1e4cb7edc044a0e207702d753e241491c40418e64aeff311",
+      "size": 1266688
+    },
+    "languages/cns/wse2.csv": {
+      "sha256": "05c088dd88b9caa18a90e6d5a3d34d8fe68a12186c3307496a11b9f0c30a04e8",
+      "size": 7528
+    },
+    "languages/cnt/wse2.csv": {
+      "sha256": "d4220afedc59b840b745531db4cb061a090989c158232f7060d6f35b8ee72b4a",
+      "size": 6560
+    },
+    "languages/cz/wse2.csv": {
+      "sha256": "d1ef090a4605e8e0252eb0788b779477ab1f676732870e2d39f61e67f97cf7e8",
+      "size": 7417
+    },
+    "languages/de/wse2.csv": {
+      "sha256": "0ff492ae63084b4d063a1106a44e683196ef19af993df7a0c71a353fc0479ec9",
+      "size": 7430
+    },
+    "languages/en/wse2.csv": {
+      "sha256": "012074562a1f1bfbe53576cd9dfa0f6cb3eb1a91acb560f40b5a5b7ba57a8b06",
+      "size": 6887
+    },
+    "languages/es/wse2.csv": {
+      "sha256": "bd07ef6c64c8b80c66f493fe5ab7cb31152e783a15c83c9d7006968e18e93619",
+      "size": 7633
+    },
+    "languages/fr/wse2.csv": {
+      "sha256": "795e4dc2dcf3a4428a6ee21be037874b191a6014eee5e623cfeadef13564b20f",
+      "size": 7773
+    },
+    "languages/hu/wse2.csv": {
+      "sha256": "a5e3c44b9ca522d4bcf1177d0d949e9bb2595b4b13b0d705d8b652b4ce9f9c5d",
+      "size": 7871
+    },
+    "languages/pl/wse2.csv": {
+      "sha256": "f05ac33bd839dc5d5ae6dc5c26bd71c74f7758ab96658175a2767fb6697ddda4",
+      "size": 7443
+    },
+    "languages/ru/wse2.csv": {
+      "sha256": "061c00c5667b8ff3d6b5a2db30a1a4e245a4fa9396edfe0926603a1147eb6ade",
+      "size": 10742
+    },
+    "languages/tr/wse2.csv": {
+      "sha256": "6582834d8ea20da7abc59bed8b25a4575f7522e6b8ab232d8eb8474a7795e073",
+      "size": 7735
+    },
+    "lua51.dll": {
+      "sha256": "9c7c3fc725b9ac78bb2c3b9287cbbb1edb671029764c9840a7384901b6dbe537",
+      "size": 556032
+    },
+    "lua5164.dll": {
+      "sha256": "5de855d3518bbd78e83728c280ec63fecdefdc9c60762b460ad34c5a073c7a61",
+      "size": 697344
+    },
+    "mb_warband_wse2.exe": {
+      "sha256": "ed0489873847c576f86aa66963cc2ce132d4b180e6dd3af4318c0cda2008c53f",
+      "size": 7463936
+    },
+    "mb_warband_wse2_x64.exe": {
+      "sha256": "1365cc268b16ee41fff4d936a10631ea2e67808fbe5e2bb5ecc92641d6b0320f",
+      "size": 6625792
+    },
+    "msvcr120.dll": {
+      "sha256": "86e39b5995af0e042fcdaa85fe2aefd7c9ddc7ad65e6327bd5e7058bc3ab615f",
+      "size": 970912
+    },
+    "postFX.fx": {
+      "sha256": "b5b1cfc7d442ab1be9babcf8699ecaebf60bdb6c51528b5d85d10ffc13ee255c",
+      "size": 22237
+    },
+    "postFX_WSE2.fx": {
+      "sha256": "6b8ddfbde817677c005ae17bf2db94474f141a398eb2a642ffc575e87b08d946",
+      "size": 6142
+    },
+    "steam_api64.dll": {
+      "sha256": "a44e5537939ae4eebc69000589aa9b2437a667813a1657cc779198bae9b815a9",
+      "size": 298856
+    },
+    "steam_api_wse2.dll": {
+      "sha256": "df431862608823f54df423428296273e1ca65c9928fa93633b882fe1c3d7d153",
+      "size": 266600
+    },
+    "steam_appid.txt": {
+      "sha256": "7fb91f4744c150030d55d015f765c6c9ea3043ef9cefa403db53db02e6cdbe7f",
+      "size": 5
+    },
+    "wse2_shaders.ini": {
+      "sha256": "7535661b1b89eb90480f05c3c69301e1448a928dfae45113cc851c725757f0bf",
+      "size": 8308
+    }
+  },
+  "packageVersion": "1.1.5.1-lex1",
+  "published": "2026-08-28T20:12:29Z",
+  "runtime": "WSE2",
+  "schema": 1,
+  "sha256": "43dc883e0f78cd1fad49dea696080154be0b498000980f63d91e96712707cd31",
+  "steamAppId": "48700",
+  "upstream": "https://github.com/Ruslan-700/WSE2-Releases",
+  "upstreamAsset": "https://github.com/Ruslan-700/WSE2-Releases/releases/download/v1.1.5.1/WSE2.zip",
+  "upstreamSha256": "755cbe31bd757595a1e83aea120029d5b35e0c41bd377413eb39d395b3cff503",
+  "version": "v1.1.5.1"
+}
