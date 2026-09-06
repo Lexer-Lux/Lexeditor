@@ -52,7 +52,8 @@ jobs:
         run: |
           rm .agent/ff8-scan324.patch .github/workflows/ff8-scan324-apply.yml
           rmdir .agent 2>/dev/null || true
-          git add games/ff8/editor.html games/ff8/enemy_tables.py games/ff8/formats.py games/ff8/scan_details.py games/ff8/schema/devour.json tools/verify_ff8_scan_details_issue_324.py worklog/issues/github-324.md
+          git add games/ff8/editor.html games/ff8/enemy_tables.py games/ff8/formats.py games/ff8/scan_details.py games/ff8/schema/devour.json tools/verify_ff8_scan_details_issue_324.py
+          git add -f worklog/issues/github-324.md
           git add -u .agent .github/workflows/ff8-scan324-apply.yml
           git diff --cached --check
           test "$(git diff --cached --name-only | sort | tr '\n' ' ')" = ".agent/ff8-scan324.patch .github/workflows/ff8-scan324-apply.yml games/ff8/editor.html games/ff8/enemy_tables.py games/ff8/formats.py games/ff8/scan_details.py games/ff8/schema/devour.json tools/verify_ff8_scan_details_issue_324.py worklog/issues/github-324.md "
