@@ -7,6 +7,7 @@ static void underlying() {
 static void reset(int actor_slot) {
     std::memset(reinterpret_cast<void *>(0x1CF0000),0,0x500000);
     queued.clear();calls.clear();allocation_fails=false;original_calls=0;
+    shared_ownership=SharedPartyStockOwnership::private_stocks;shared_events.clear();
     opened=pending=false;slot=-1;chosen=0;incoming=outgoing=-1;
     phase=Phase::idle;reserve={};previous=0;mode.driver_mode=MODE_BATTLE;original=&underlying;
     mem<std::uint32_t>(0x1D6D490)=CTX;
@@ -104,5 +105,21 @@ int main() {
     begin_swap(old_ticket);assert(!pending && phase==Phase::idle);
     reset(0);press(4);press(0x40);mem<std::uint16_t>(kModels)=1;
     execute_callback();assert(!pending && mem<std::uint8_t>(0x1D280C2)==1);
+    for(int i=0;i<3;++i) {
+        reset(i);shared_ownership=SharedPartyStockOwnership::shared_pool;
+        press(4);press(0x40);execute_callback();
+        assert(shared_events.front()==(std::array<int,2>{1,i}));
+        // A canonical saved pool is never overwritten from the retiring actor.
+        for(int m=0;m<32;++m) assert(mem<std::uint8_t>(kSaved+i*0x98+0x11+m*2)==0);
+        retire_model(i);lexeditor_ff8_party_switch_tick();execute_callback();
+        assert(shared_events.back()==(std::array<int,2>{2,i}));complete_model_load();
+        reset(i);shared_ownership=SharedPartyStockOwnership::blocked;
+        press(4);press(0x40);execute_callback();assert(!pending && phase==Phase::idle);
+        assert(shared_events.back()==(std::array<int,2>{3,i}));
+        assert(mem<std::uint16_t>(kModels+i*0x9C)==3);
+        reset(i);shared_ownership=SharedPartyStockOwnership::shared_pool;
+        press(4);press(0x40);allocation_fails=true;execute_callback();
+        assert(!pending && shared_events.back()==(std::array<int,2>{3,i}));
+    }
     std::puts("PASS: compiled production Party Switch policy: 3 slots, cancellation, allocation failure, full queue, invalidated reserve rollback, HUD refresh, input suppression, stale callbacks.");
 }

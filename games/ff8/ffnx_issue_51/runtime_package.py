@@ -45,6 +45,9 @@ MACHINE_I386 = 0x014C
 OPTIONAL_MAGIC_PE32 = 0x010B
 REQUIRED_EXPORTS = frozenset({
     "new_dll_graphics_driver",
+    "lexeditor_ff8_shared_party_contract_version",
+    "lexeditor_ff8_stock_tweaks_contract_version",
+    "lexeditor_ff8_no_consume_battle_debit",
     "lexeditor_issue_51_identity",
     "lexeditor_issue_51_hook_count",
     "lexeditor_issue_51_runtime_requested",
@@ -441,6 +444,9 @@ def verify(package_root: Path = PACKAGE_ROOT) -> dict:
         raise RuntimePackageError(
             "The packaged Lexeditor FFNx driver is missing exports: " + ", ".join(missing_exports)
         )
+    for contract in ("lexeditor_ff8_shared_party_contract_version", "lexeditor_ff8_stock_tweaks_contract_version"):
+        if _constant_export(driver_data, actual_exports[contract]) != 1:
+            raise RuntimePackageError(f"The packaged FF8 {contract} is not supported")
     if not _pointer_export_string(
         driver_data, actual_exports["lexeditor_issue_51_identity"], identity,
     ):
