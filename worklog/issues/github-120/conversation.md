@@ -38,6 +38,19 @@ Exact metadata: [source record](sources/issue-5356288606-ca9e379f51ac9b20dace983
 - [ ] Start the development build in Story Mode. Press tilde once: all development readouts should hide; press again and they should return together.
 - [ ] Check that Stamina no longer exposes a separate ShowMode setting. Report a readout that ignores the toggle or an obsolete control that remains.
 
+## issue 5356288606 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/120
+
+Created: 2026-08-06T01:57:12Z; updated: 2026-09-06T15:24:22Z
+
+Exact metadata: [source record](sources/issue-5356288606-9686ab863cfbbf05499b56831a471a16832ddf955568f99d9ae51d33f4ee8f89.json).
+
+**Status: Installed; needs your check.** Development readouts share one tilde toggle. The obsolete separate ShowMode setting is removed.
+
+- [ ] Start the development build in Story Mode. Press tilde once: all development readouts should hide; press again and they should return together.
+- [ ] Check that Stamina no longer exposes a separate ShowMode setting. Report a readout that ignores the toggle or an obsolete control that remains.
+
 ## comment 5550114750 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/120#issuecomment-5550114750
@@ -109,3 +122,17 @@ Created: 2026-08-20T10:36:20Z; updated: 2026-08-20T10:36:20Z
 Exact metadata: [source record](sources/comment-5550114816-d81e904cd17f6c23c7fca68de625d66dbb4527bc14cff261aa0621c7f5e6b30b.json).
 
 Installed. Stamina / Show Mode is gone from the INI, LEXEDITOR, and the in-game settings menu. The player/horse stamina mode readout now follows the shared development-mode latch directly. In this development build it should be visible at startup; press Tilde once and it must disappear, then press Tilde again and it must return. There is no separate saved toggle.
+
+## comment 5560213781 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/120#issuecomment-5560213781
+
+Created: 2026-09-06T15:24:22Z; updated: 2026-09-06T15:24:22Z
+
+Exact metadata: [source record](sources/comment-5560213781-9bc89efe5236dd2be1f3d4dee62f4f414b0f3111b69da52a3e4f1a23d90e8344.json).
+
+Found a source regression while checking the complete RDR2 backlog: `g_runtimeDevelopmentMode` was initialized to `false` for both build modes, contrary to the preserved requirement that development builds start with the shared readouts enabled.
+
+The candidate in Lexer-Lux/Lexers-Mod-For-RDR2#211 now initializes it from `GameplayTweaksBuild::Development`. The existing Tilde toggle remains; no ShowMode control or development-only gameplay gate was added. The actual production initializer was extracted and compiled/executed in both release and development modes, including two toggle transitions. The existing authoring/diagnostic-only static contract passes too.
+
+Windows build checks are being run in this session. This comment does not claim installation, visual readout acceptance, or release/development gameplay parity; keep the existing in-game checklist actionable.
