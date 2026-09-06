@@ -1,0 +1,101 @@
+name: One-shot FF9 battle layout repair
+on:
+  push:
+    branches: [codex/ff9-complete-20260906]
+    paths: ['.github/workflows/ff9-branch-layout-repair.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/ff9-complete-20260906
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Repair serialized battle layout from pinned Memoria reader
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('games/ff9/battle_scene.py')
+          s = p.read_text(encoding='utf-8')
+          start = s.index('# Memoria v2025.07.04, Assembly-CSharp/Global/BTL_SCENE.cs:')
+          end = s.index('\n\nclass BattleScene:', start)
+          block = r'''# Memoria v2025.07.04, Assembly-CSharp/Global/BTL_SCENE.cs.
+          # Offsets mirror BinaryReader calls in ReadBattleScene exactly.
+          ENEMY_FIELDS = (
+              _field("ResistStatus", "Resist status", 0, "<I"),
+              _field("AutoStatus", "Auto status", 4, "<I"),
+              _field("InitialStatus", "Initial status", 8, "<I"),
+              _field("MaxHP", "Max HP", 12, "<H"), _field("MaxMP", "Max MP", 14, "<H"),
+              _field("WinGil", "Gil", 16, "<H"), _field("WinExp", "Experience", 18, "<H"),
+              *tuple(_field(f"WinItem{i+1}", f"Drop {i+1}", 20+i, "<B") for i in range(4)),
+              *tuple(_field(f"StealItem{i+1}", f"Steal {i+1}", 24+i, "<B") for i in range(4)),
+              _field("Radius", "Radius", 28, "<H"), _field("Geo", "Geometry", 30, "<h"),
+              *tuple(_field(f"Motion{i+1}", f"Motion {i+1}", 32+i*2, "<H") for i in range(6)),
+              _field("Mesh1", "Mesh 1", 44, "<H"), _field("Mesh2", "Mesh 2", 46, "<H"),
+              _field("Flags", "Enemy flags", 48, "<H"), _field("AP", "AP", 50, "<H"),
+              _field("Speed", "Speed", 52, "<B"), _field("Strength", "Strength", 53, "<B"),
+              _field("Magic", "Magic", 54, "<B"), _field("Spirit", "Spirit", 55, "<B"),
+              _field("ElementPad", "Element pad", 56, "<B"), _field("ElementTrans", "Element trans", 57, "<B"),
+              _field("CurrentCapacity", "Current capacity", 58, "<B"), _field("MaxCapacity", "Max capacity", 59, "<B"),
+              _field("GuardElement", "Guard element", 60, "<B"), _field("AbsorbElement", "Absorb element", 61, "<B"),
+              _field("HalfElement", "Half element", 62, "<B"), _field("WeakElement", "Weak element", 63, "<B"),
+              _field("Level", "Level", 64, "<B"), _field("Category", "Category", 65, "<B"),
+              _field("HitRate", "Hit rate", 66, "<B"), _field("PhysicalDefence", "Physical defence", 67, "<B"),
+              _field("PhysicalEvade", "Physical evade", 68, "<B"), _field("MagicalDefence", "Magical defence", 69, "<B"),
+              _field("MagicalEvade", "Magical evade", 70, "<B"), _field("BlueMagic", "Blue Magic", 71, "<B"),
+              *tuple(_field(f"Bone{i+1}", f"Bone {i+1}", 72+i, "<B") for i in range(4)),
+              _field("DieSfx", "Death SFX", 76, "<H"), _field("Konran", "Confuse motion", 78, "<B"),
+              _field("MessageCount", "Message count", 79, "<B"),
+              *tuple(_field(f"IconBone{i+1}", f"Icon bone {i+1}", 80+i, "<B") for i in range(6)),
+              *tuple(_field(f"IconY{i+1}", f"Icon Y {i+1}", 86+i, "<b") for i in range(6)),
+              *tuple(_field(f"IconZ{i+1}", f"Icon Z {i+1}", 92+i, "<b") for i in range(6)),
+              _field("StartSfx", "Start SFX", 98, "<H"), _field("ShadowX", "Shadow X", 100, "<H"),
+              _field("ShadowZ", "Shadow Z", 102, "<H"), _field("ShadowBone", "Shadow bone", 104, "<B"),
+              _field("WinCard", "Card reward", 105, "<B"), _field("ShadowOffsetX", "Shadow offset X", 106, "<h"),
+              _field("ShadowOffsetZ", "Shadow offset Z", 108, "<h"), _field("ShadowBone2", "Shadow bone 2", 110, "<B"),
+          )
+          PATTERN_FIELDS = (
+              _field("Rate", "Rate", 0, "<B"), _field("MonsterCount", "Monster count", 1, "<B"),
+              _field("Camera", "Camera", 2, "<B"), _field("AP", "AP", 4, "<I"),
+              *tuple(field for slot in range(4) for field in (
+                  _field(f"Slot{slot+1}Type", f"Enemy {slot+1} type", 8+slot*12, "<B"),
+                  _field(f"Slot{slot+1}Flags", f"Enemy {slot+1} flags", 9+slot*12, "<B"),
+                  _field(f"Slot{slot+1}Pease", f"Enemy {slot+1} pease", 10+slot*12, "<B"),
+                  _field(f"Slot{slot+1}X", f"Enemy {slot+1} X", 12+slot*12, "<h"),
+                  _field(f"Slot{slot+1}Y", f"Enemy {slot+1} Y", 14+slot*12, "<h"),
+                  _field(f"Slot{slot+1}Z", f"Enemy {slot+1} Z", 16+slot*12, "<h"),
+                  _field(f"Slot{slot+1}Rotation", f"Enemy {slot+1} rotation", 18+slot*12, "<h"),
+              )),
+          )
+          '''
+          s = s[:start] + block + s[end:]
+          s = s.replace('dbfile0000.raw,u6', 'dbfile0000.raw16')
+          old = '''    def write(self, base: int, field: Field, value: Any) -> None:\n        if isinstance(value, bool) or not isinstance(value, int) or not field.min <= value <= field.max:\n            raise ValueError(f"{field.label} must be a whole number from {field.min} through {field.max}")\n        struct.pack_into(field.fmt, self.data, base + field.offset, value)\n'''
+          new = '''    def write(self, base: int, field: Field, value: Any) -> None:\n        if isinstance(value, bool) or not isinstance(value, int) or not field.min <= value <= field.max:\n            raise ValueError(f"{field.label} must be a whole number from {field.min} through {field.max}")\n        if field.key == "MonsterCount" and value > 4:\n            raise ValueError("Monster count must be from 0 through 4")\n        if field.key.startswith("Slot") and field.key.endswith("Type") and value >= self.type_count:\n            raise ValueError(f"{field.label} must refer to an enemy type in this scene (0 through {max(0, self.type_count - 1)})")\n        struct.pack_into(field.fmt, self.data, base + field.offset, value)\n'''
+          if old in s:
+              s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Verify the repaired FF9 branch
+        run: |
+          python -m pip install pytest
+          python -m compileall -q games/ff9
+          python -m pytest -q tests/test_ff9*.py
+          node --test tests/ff9_editor.test.cjs
+      - name: Commit repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Lexeditor FF9 Agent'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add games/ff9/battle_scene.py
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Fix FF9 battle scene serialized layout'
+          git push origin HEAD:codex/ff9-complete-20260906
