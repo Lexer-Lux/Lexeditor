@@ -60,7 +60,7 @@ class CoverageTests(unittest.TestCase):
         from games.rdr2.data_map import build_data_map
         with tempfile.TemporaryDirectory() as name:
             source=Path(name)/'map.md'
-            source.write_text('## Files\n- `weaponcomponents.meta` - Components\n- `catalog_sp.ymt` - Catalog\n- `unknown.bin` - Unknown\n')
+            source.write_text('## Files\n- `weaponcomponents.meta` - Components\n- `catalog_sp.ymt` - Catalog\n- `unknown.bin` - Unknown\n',encoding='utf-8')
             rows={row['filename']:row for row in build_data_map(source)['rows']}
             self.assertEqual(rows['weaponcomponents.meta']['coverage'],'unavailable')
             self.assertFalse(rows['weaponcomponents.meta']['openable'])
@@ -72,8 +72,8 @@ class CoverageTests(unittest.TestCase):
     def test_all_plugins_use_shared_data_map(self):
         root=Path(__file__).resolve().parents[1]
         for game in ('blank','warband','ff7','ff8','ff9','rdr','rdr2'):
-            text=(root/'games'/game/'editor.html').read_text()
+            text=(root/'games'/game/'editor.html').read_text(encoding='utf-8')
             self.assertIn('LexeditorUI.dataMap(',text,game)
-        self.assertIn('games.ff7.server',(root/'games/ff7_2013/plugin.py').read_text())
+        self.assertIn('games.ff7.server',(root/'games/ff7_2013/plugin.py').read_text(encoding='utf-8'))
 
 if __name__=='__main__':unittest.main()
