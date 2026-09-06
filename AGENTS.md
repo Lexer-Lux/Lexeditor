@@ -11,36 +11,27 @@
   record's detail pane.
 - Do not claim visual acceptance from source, API, or smoke checks.
 
-## GitHub issues are for humans
+## GitHub issues are the source of truth
 
-GitHub issues are for Lexer and other humans, not an agent's internal progress
-tracker. Keep titles, bodies, and new comments brief. State the requested result,
-the current status, and only the information needed to act. Game labels replace
-game-name prefixes in titles. Brevity applies to the public summary, NEVER to
-preservation of the specification. Do not replace an unresolved request with a
-smaller feature merely to declare it finished.
+GitHub issues and their comments are the canonical record of requests and public
+project discussion. Agents may summarize implementation state in an internal
+handoff, but must not mirror or archive complete issue bodies, comments, attachment
+files, screenshots, or GitHub API metadata into this repository.
 
-### Lossless capture comes before summarization
-
-- When Lexer supplies a request, preserve their complete wording, examples,
-  numbers, exceptions, rejected alternatives, attachments, and later corrections
-  before creating or shortening its GitHub summary. Save verbatim text, not
-  another paraphrase. Never label reconstructed text as an original quotation.
-- Each issue has one internal handoff: `worklog/issues/github-<number>.md`.
-  Its immutable source records live beside it in
-  `worklog/issues/github-<number>/sources/`. Use a temporary request identifier
-  before an issue number exists, then link it when the issue is created.
-- Keep an explicit requirements/acceptance section in the handoff, traceable to
-  the source records. A short current summary does not cancel archived scope.
-  Resolve contradictions using the latest explicit human decision; preserve the
-  superseded instruction as history instead of silently erasing it.
-- Before saying context is missing, search the issue's source records and
-  comments, transferred issue IDs, legacy Worklog/TODO/GOAL files, relevant game
-  codex, and available original chat/file sources. Record what was searched.
-  A short or blank GitHub body is NOT evidence that Lexer supplied no details.
-- If the original request was lost or has not been retrieved, own that as
-  retrieval/recovery work (`actionable`), not as a failure by Lexer to explain.
-  Ask only about a genuinely unresolved point after recovering existing context.
+- Keep one current implementation handoff at `worklog/issues/github-<number>.md`
+  when an issue needs internal continuity. It should contain current requirements,
+  implementation state, evidence, and next work; it is not a verbatim issue archive.
+- Read the live GitHub issue and comments before changing scope or status. Use
+  available chat/file context and relevant codex topics when needed.
+- Never create `worklog/attachments/`, `worklog/issues/github-*/sources/`,
+  `worklog/issues/github-*/conversation.md`, or `worklog/migrations/comment-archive/`.
+- Never download GitHub issue attachments into the repository merely for archival
+  or provenance purposes. Project assets intentionally used by Lexeditor are a
+  separate category and belong in their normal project asset paths.
+- Never delete issue comments as part of cleanup, summarization, handoff, or
+  archival. Comments remain on GitHub unless Lexer explicitly asks to remove a
+  particular comment.
+- Never delete whole issues as a substitute for tidying worklogs or project history.
 
 ### Workflow labels
 
@@ -79,51 +70,30 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
   any testable slice separately. Do not hide unfinished scope behind a test label.
 - Unsuccessful attempts or lack of investigation do not prove `unfeasible`.
   Rejected designs and cancelled requests are not technical impossibilities.
-- Re-read live source records, comments, relevant code/PRs and worklogs before
-  changing status. Never infer delivery, in-game success or approval from CI.
+- Re-read the live issue, relevant code/PRs, worklogs, and codex before changing
+  status. Never infer delivery, in-game success, or approval from CI.
 - Close as completed only when the requested scope is confirmed done. Remove
   active workflow labels on closure and use truthful duplicate/cancellation reasons.
-
-### Archive first; clean the visible discussion second
-
-Lexer authorizes moving issue discussion into the internal records and deleting
-archived comments to keep GitHub concise. This supersedes the earlier instruction
-to keep all historical comments visible. It does NOT authorize losing their content.
-
-- Archive every original body/comment version verbatim, including source URL,
-  author, ID, timestamps, attachments and a content hash. Preserve before-edit
-  text from webhook events and earlier snapshots when available.
-- Commit and verify the archive in the canonical repository BEFORE deleting any
-  comment. A local scratch file or expiring Actions artifact alone is insufficient.
-- Re-read each comment before deletion. Skip new or changed records that are not
-  the exact archived version. Skip records whose required attachments cannot be
-  preserved. Never delete whole issues, PR reviews or unrelated repository data
-  as a substitute for cleaning issue comments.
-- Technical attempts, stack traces, hashes and discussion history belong in the
-  internal worklog/source records, not in repeated GitHub comments. Keep the live
-  issue's current result, real status, and required human checklist concise.
-- Completion may retire the active handoff, but never delete the original request,
-  decisions or evidence archive. Retain them under `worklog/legacy/` if moved.
 
 ## Central knowledge and parallel work
 
 - Lexeditor owns the canonical game knowledge: `codex/<game>/README.md` plus
   topic files under `codex/<game>/`. Shared editor knowledge uses `codex/shared/`.
-  Mod repositories may link here; they must not become independent competing
-  sources of truth. Existing paths remain readable during migration.
+- Lexeditor also owns the canonical implementation worklogs under `worklog/`.
+  Standalone `Lexers-Mod-*` repositories are storage/distribution repositories;
+  they must not recreate independent Codex, Worklog, project-memory, or issue-history
+  stores. Their `AGENTS.md` files should direct development back here.
 - Codex contains settled mechanics, schemas, paths and demonstrated limits.
-  Attempts, guesses, current progress and pending work stay in per-issue worklogs.
-  Imported historical notes are provenance, not automatically current fact.
-- One issue owner edits its handoff. Parallel contributors append uniquely named
-  source/session records; one integrator reconciles the handoff. Do not have every
-  agent rewrite a global Worklog.txt or shared codex index.
-- Record source repository, branch/commit, original path and content hash on
-  import. Snapshot now; after parallel branches merge, import only new/changed
-  records and reconcile conflicting facts. Never overwrite central newer work
-  with an older source copy, force-push, or delete another worker's notes.
-- Before retiring a legacy store, verify every source file is accounted for and
-  leave a forwarding pointer. Do not claim uncommitted local work was migrated
-  through GitHub; preserve it through an explicit local import when accessible.
+  Attempts, guesses, current progress and pending work stay in concise per-issue
+  worklogs. The live GitHub issue remains the canonical request/discussion record.
+- One issue owner edits its handoff. Parallel contributors should avoid competing
+  global Worklog files; one integrator reconciles shared codex indices and handoffs.
+- On imports from standalone mod repositories, import only actual game-development
+  notes that are not already centralized here. Do not import GitHub issue mirrors,
+  attachment caches, generated API snapshots, or forwarding stubs as knowledge.
+- Before retiring a legacy Codex/Worklog store in a standalone mod repository,
+  verify useful development knowledge is accounted for centrally, then remove the
+  old store and keep only the repository's storage-only `AGENTS.md` guidance.
 - Review private-source documentation before publishing into this public repo.
   Never include credentials, private binaries, proprietary game dumps or unrelated
   personal data. A public repository is not private merely because agents use it.
