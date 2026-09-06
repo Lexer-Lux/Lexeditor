@@ -24,6 +24,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/300
 
 Created: 2026-09-05T07:18:40Z; updated: 2026-09-06T12:59:16Z
 
+Exact metadata: [source record](sources/issue-5356398026-0a10ded895910fa72f37ea8b6421eb67087f2b5aa1f5d04aca3524862b537e43.json).
+
+Show card artwork with editable directional ranks and element icons, plus a Players subtab for NPC decks. Use the requested CCGroup-style layout.
+
+**Status: Deferred redesign, not a test-ready feature.** The desired layout is already specified; development and verified deck editing remain. Extra card slots are separate from this redesign and remain part of #91.
+
+## issue 5356398026 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/300
+
+Created: 2026-09-05T07:18:40Z; updated: 2026-09-06T12:59:16Z
+
 Exact metadata: [source record](sources/issue-5356398026-b31a5c10888141d864dbc37a6d45bb5bd487f4b1b577915e3ee33407b95bd0e8.json).
 
 Show card artwork with editable directional ranks and element icons, plus a Players subtab for NPC decks. Use the requested CCGroup-style layout.

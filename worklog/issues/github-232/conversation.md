@@ -24,6 +24,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/232
 
 Created: 2026-08-07T08:48:08Z; updated: 2026-09-06T12:56:21Z
 
+Exact metadata: [source record](sources/issue-5356315062-865f7f0055d6b2a80ffc0b1cb378d5bffe68cc5da9fac0bac59611293d382eeb.json).
+
+Allow serial or parallel ranks while keeping one visible strand and correct progress.
+
+**Status: No acceptable implementation exists yet.** Splitting ranks into separate roots produced duplicate menu entries and progress/script problems. Investigate a runtime solution that preserves the original strand; do not call the rejected split-root version ready.
+
+## issue 5356315062 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/232
+
+Created: 2026-08-07T08:48:08Z; updated: 2026-09-06T12:56:21Z
+
 Exact metadata: [source record](sources/issue-5356315062-f7ba5954e2b46159b35f8dee141eb183812275a46cc09036f58280e9e67c6c56.json).
 
 Allow serial or parallel ranks while keeping one visible strand and correct progress.

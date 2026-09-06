@@ -19,6 +19,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/259
 
 Created: 2026-08-10T18:29:30Z; updated: 2026-09-06T12:56:49Z
 
+Exact metadata: [source record](sources/issue-5356322453-88d9e29bbc646b78513f549dda04c6024e5164ce486bff658858cf87fd5dcc42.json).
+
+Walking or sneaking off a climbable ledge should reverse-mantle into a safe grip; sprinting should retain its separate behavior.
+
+**Status: An earlier correction was installed, but later shared climbing/surface failures remain unresolved.** Verify the combined entry and contact handling before requesting another ledge test; do not assume the older candidate remains accepted.
+
+## issue 5356322453 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/259
+
+Created: 2026-08-10T18:29:30Z; updated: 2026-09-06T12:56:49Z
+
 Exact metadata: [source record](sources/issue-5356322453-f6e785531b65f6641c75d7aca944ca81330f3b5c4139ba582d24a258df89ce8a.json).
 
 Walking or sneaking off a climbable ledge should reverse-mantle into a safe grip; sprinting should retain its separate behavior.

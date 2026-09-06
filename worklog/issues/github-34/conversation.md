@@ -35,6 +35,20 @@ Exact metadata: [source record](sources/issue-5286258145-7f737b9d890233c1bd74683
 - [ ] Make a disposable unsaved edit and click LEXEDITOR. Confirm the unsaved-change guard works; cancel and check the edit remains.
 - [ ] Report which mouse button or navigation step fails.
 
+## issue 5286258145 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/34
+
+Created: 2026-08-29T11:24:28Z; updated: 2026-09-06T13:06:45Z
+
+Exact metadata: [source record](sources/issue-5286258145-a59c6888ef3790e093d0e598fc09380a1d966847371b2d101719701823fd5a87.json).
+
+**Status: Implemented; physical mouse-button confirmation remains.** Back/Forward traverse editor history. The LEXEDITOR wordmark goes Home; the resident plugin behavior belongs to #59.
+
+- [ ] Restart Lexeditor. Browse Items → another tab → Info, then use the mouse’s Back and Forward buttons. Confirm each returns to the correct page rather than Home.
+- [ ] Make a disposable unsaved edit and click LEXEDITOR. Confirm the unsaved-change guard works; cancel and check the edit remains.
+- [ ] Report which mouse button or navigation step fails.
+
 ## comment 5462256525 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/34#issuecomment-5462256525

@@ -25,6 +25,19 @@ Exact metadata: [source record](sources/issue-5356326844-8c5b477b8b865c203fe2de4
 - [ ] On the current audit save with the navigator loaded, use F7 for next and F5 for previous. Resume the named card; confirm the normal marker points to the physical collectible.
 - [ ] At a corrected position, tap F2 to save XYZ; hold F2 to undo a mistaken move. Report missing markers/cards and the last completed entry so the next session resumes correctly.
 
+## issue 5356326844 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/274
+
+Created: 2026-08-11T06:20:14Z; updated: 2026-09-06T12:57:05Z
+
+Exact metadata: [source record](sources/issue-5356326844-9dc4104e9ada8ed95c4016e017957930869ba70deb967d7dfdfb3743beab80c9.json).
+
+**Status: The repaired navigator is installed.** Resume at Famous Gunslingers Card 1. Amazing Inventions Card 7’s missing marker and Artists, Writers & Poets Card 4’s missing physical card remain recorded problems.
+
+- [ ] On the current audit save with the navigator loaded, use F7 for next and F5 for previous. Resume the named card; confirm the normal marker points to the physical collectible.
+- [ ] At a corrected position, tap F2 to save XYZ; hold F2 to undo a mistaken move. Report missing markers/cards and the last completed entry so the next session resumes correctly.
+
 ## comment 5550159808 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/274#issuecomment-5550159808

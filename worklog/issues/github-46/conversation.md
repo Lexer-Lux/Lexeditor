@@ -49,6 +49,22 @@ Use consistent resizable panels rather than different layouts rebuilt by each pl
 - [ ] In Blank’s panel examples, drag a dotted divider and resize it with the keyboard. Confirm selection and panel contents remain intact.
 - [ ] Report the view, window size and screenshot of any layout mismatch.
 
+## issue 5286931791 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/46
+
+Created: 2026-08-29T13:54:29Z; updated: 2026-09-06T13:06:48Z
+
+Exact metadata: [source record](sources/issue-5286931791-ec2fbcc0531e00c14205a2a525413eb95e6d3892abc316027b6502c3fc1981d1.json).
+
+Use consistent resizable panels rather than different layouts rebuilt by each plugin.
+
+**Status: Latest divider and text-fitting repairs are ready for review.**
+
+- [ ] Restart Lexeditor. In RDR2, inspect Effects and Behavior IDs at 1600×900 and 1280×720. Confirm complete names/IDs, usable details and no clipped bottom row.
+- [ ] In Blank’s panel examples, drag a dotted divider and resize it with the keyboard. Confirm selection and panel contents remain intact.
+- [ ] Report the view, window size and screenshot of any layout mismatch.
+
 ## comment 5463009793 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/46#issuecomment-5463009793

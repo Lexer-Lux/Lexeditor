@@ -31,6 +31,18 @@ Tagged generic enemies should get the same facing/FOV presentation as tagged ani
 
 **Status: Source implementation complete, but unbuilt.** Deliver the combined marker build before asking you to compare generic enemies, lawmen and bounty hunters.
 
+## issue 5356333396 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/296
+
+Created: 2026-08-20T19:16:49Z; updated: 2026-09-06T12:57:23Z
+
+Exact metadata: [source record](sources/issue-5356333396-ff9a5ae7bac7a622f25e4e788721c816ef8fa269dc64738d779cff57e83ebb3f.json).
+
+Tagged generic enemies should get the same facing/FOV presentation as tagged animals, without revealing untagged targets or duplicating law/bounty cones.
+
+**Status: Source implementation complete, but unbuilt.** Deliver the combined marker build before asking you to compare generic enemies, lawmen and bounty hunters.
+
 ## comment 5550166702 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/296#issuecomment-5550166702

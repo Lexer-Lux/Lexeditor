@@ -22,6 +22,16 @@ Exact metadata: [source record](sources/issue-5356287172-2a6bc2471c5c2919ca5620a
 
 **Status: Closed after the wallet-cap implementation.** Gambler ranks 0–10 select independently configurable limits. Auto-Bank, over-cap sale behavior and wallet feedback remain tracked in #208 rather than being implied complete here.
 
+## issue 5356287172 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/115
+
+Created: 2026-08-06T01:51:00Z; updated: 2026-09-06T13:53:55Z
+
+Exact metadata: [source record](sources/issue-5356287172-dd42c549083ffd0d488b0d5072c8565616483557beafc780276c422b444b0c7c.json).
+
+**Status: Closed after the wallet-cap implementation.** Gambler ranks 0–10 select independently configurable limits. Auto-Bank, over-cap sale behavior and wallet feedback remain tracked in #208 rather than being implied complete here.
+
 ## comment 5550112958 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/115#issuecomment-5550112958

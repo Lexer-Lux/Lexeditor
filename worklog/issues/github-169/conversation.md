@@ -43,3 +43,16 @@ Exact metadata: [source record](sources/issue-5356299705-38d192b3367dc3f791c56b8
 
 - [ ] Fully restart Story Mode. Fire ordinary and special arrows; check their impact and special effects.
 - [ ] Throw a knife, tomahawk and hatchet, then retrieve each where normally possible. Confirm sticking and recovery still work. Report the exact weapon and failure; unique locker recovery is separate in #165.
+
+## issue 5356299705 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/169
+
+Created: 2026-08-06T03:01:40Z; updated: 2026-09-06T13:07:25Z
+
+Exact metadata: [source record](sources/issue-5356299705-50d1893504b25a262d03df78bfb06f30aff6eb4f4cdd48260ff974becf26e073.json).
+
+**Status: Restored projectile flags are installed.** No intentional new weapon behavior is part of this repair.
+
+- [ ] Fully restart Story Mode. Fire ordinary and special arrows; check their impact and special effects.
+- [ ] Throw a knife, tomahawk and hatchet, then retrieve each where normally possible. Confirm sticking and recovery still work. Report the exact weapon and failure; unique locker recovery is separate in #165.

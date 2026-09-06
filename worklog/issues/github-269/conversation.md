@@ -25,6 +25,18 @@ Drawing a weapon should not introduce an unexplained camera movement or mismatch
 
 **Status: The latest automatic recorder is source-only; the final curve repair is unfinished.** It now preserves a true pre-change frame and needs no Numpad 9 input. Install it before requesting one normal transition recording; do not repeat the old recorder that changed the camera itself.
 
+## issue 5356325322 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/269
+
+Created: 2026-08-11T04:18:50Z; updated: 2026-09-06T12:56:58Z
+
+Exact metadata: [source record](sources/issue-5356325322-efd0ac74a185a3f44815d65e0ea9163ac56822ec568c515933439b41912c81ef.json).
+
+Drawing a weapon should not introduce an unexplained camera movement or mismatched transition.
+
+**Status: The latest automatic recorder is source-only; the final curve repair is unfinished.** It now preserves a true pre-change frame and needs no Numpad 9 input. Install it before requesting one normal transition recording; do not repeat the old recorder that changed the camera itself.
+
 ## comment 5550157354 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/269#issuecomment-5550157354

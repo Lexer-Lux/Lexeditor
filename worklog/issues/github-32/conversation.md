@@ -34,6 +34,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/32
 
 Created: 2026-08-29T11:13:59Z; updated: 2026-09-06T12:45:21Z
 
+Exact metadata: [source record](sources/issue-5286207398-24453d374797f5064eaf87721316c97a2609dee5be25bc84c4df14ca7c3c77ad.json).
+
+The GF selector, signed Compatibility values and three-panel layout are implemented.
+
+**Work remains:** the latest report says GF graphs still use the old layout. Bring them onto the current shared curve controls, keeping Compatibility left, General center and Abilities right. Preserve all 16 GFs, unsaved edits and save/readback behavior.
+
+## issue 5286207398 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/32
+
+Created: 2026-08-29T11:13:59Z; updated: 2026-09-06T12:45:21Z
+
 Exact metadata: [source record](sources/issue-5286207398-a7051c49998441086ebacdf8095b2c3b0e00c0654c28000f33d071de7b588b7e.json).
 
 The GF selector, signed Compatibility values and three-panel layout are implemented.

@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/253
 
 Created: 2026-08-10T15:31:01Z; updated: 2026-09-06T12:56:43Z
 
+Exact metadata: [source record](sources/issue-5356320613-34d938d06052f4f52ebf35097bd654ff99fb180220ac695e0437c5461adf2849.json).
+
+**Status: Sideways movement uses a static grip pose, not a completed hanging-traverse animation.** The rejected vertical ladder cycle is removed; a suitable animated solution remains unproven.
+
+Your latest climbing-entry failure prevents a useful visual comparison. Restore reliable grabbing first, then present the actual pose/animation choice. Do not mark static sliding as the requested animation being finished.
+
+## issue 5356320613 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/253
+
+Created: 2026-08-10T15:31:01Z; updated: 2026-09-06T12:56:43Z
+
 Exact metadata: [source record](sources/issue-5356320613-9085f1975ab2bff92a2e5f49af8c4a326f8ff2fad6d9b3ad663e2d259395468e.json).
 
 **Status: Sideways movement uses a static grip pose, not a completed hanging-traverse animation.** The rejected vertical ladder cycle is removed; a suitable animated solution remains unproven.

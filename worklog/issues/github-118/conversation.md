@@ -44,6 +44,19 @@ Exact metadata: [source record](sources/issue-5356288011-6c0c9762e3f5cb80bea28de
 - [ ] Restart Story Mode and open F8 → Cores → CoreClock. Confirm the displayed durations match your saved values rather than being forced to 0.01.
 - [ ] Note one duration, change it slightly, save and reopen the menu. Confirm it persists, then restore it. Close the menu and confirm normal controls return; report the setting or step that fails.
 
+## issue 5356288011 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/118
+
+Created: 2026-08-06T01:55:27Z; updated: 2026-09-06T13:57:39Z
+
+Exact metadata: [source record](sources/issue-5356288011-e24ba7401d2a9af572d351badfaac9455e37f5bbfa607b6ad0bff16d4fe0c27e.json).
+
+**Status: The F8 settings menu and duration-limit repair are installed.** Changes should persist; settings requiring restart must say so.
+
+- [ ] Restart Story Mode and open F8 → Cores → CoreClock. Confirm the displayed durations match your saved values rather than being forced to 0.01.
+- [ ] Note one duration, change it slightly, save and reopen the menu. Confirm it persists, then restore it. Close the menu and confirm normal controls return; report the setting or step that fails.
+
 ## comment 5550114098 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/118#issuecomment-5550114098

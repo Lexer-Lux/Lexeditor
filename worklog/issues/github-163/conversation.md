@@ -29,6 +29,18 @@ Remove only the fixed world pickups for masks now awarded by Bandit challenges. 
 
 **Status: Still broken.** The latest check found the Cat Mask still present. Verify the actual pickup is removed before asking you to revisit it again; no successful replacement test is recorded.
 
+## issue 5356298462 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/163
+
+Created: 2026-08-06T02:44:26Z; updated: 2026-09-06T13:55:30Z
+
+Exact metadata: [source record](sources/issue-5356298462-7093b1fe519ea0e75646427a125806401551e8f460bb24454678935316b9c492.json).
+
+Remove only the fixed world pickups for masks now awarded by Bandit challenges. Preserve already-owned and unaffected masks.
+
+**Status: Still broken.** The latest check found the Cat Mask still present. Verify the actual pickup is removed before asking you to revisit it again; no successful replacement test is recorded.
+
 ## comment 5550126366 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/163#issuecomment-5550126366

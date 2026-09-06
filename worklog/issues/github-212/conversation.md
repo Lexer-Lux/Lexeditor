@@ -24,6 +24,18 @@ Exact metadata: [source record](sources/issue-5356310350-8d62f42f956c0328e88da89
 
 This is separate from the already accepted map-centering behavior. No zoom-speed setting or ready test remains.
 
+## issue 5356310350 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/212
+
+Created: 2026-08-06T07:43:05Z; updated: 2026-09-06T13:58:14Z
+
+Exact metadata: [source record](sources/issue-5356310350-db18c445beef473cf82d8520e93ab84e791018b22a37f9b707763d446af1de7d.json).
+
+**Status: The tested input-queue approach failed and was removed.** It added delayed equal-sized zoom steps, stalls and beeps instead of increasing zoom strength. No supported script setter for that strength is established.
+
+This is separate from the already accepted map-centering behavior. No zoom-speed setting or ready test remains.
+
 ## comment 5550139286 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/212#issuecomment-5550139286

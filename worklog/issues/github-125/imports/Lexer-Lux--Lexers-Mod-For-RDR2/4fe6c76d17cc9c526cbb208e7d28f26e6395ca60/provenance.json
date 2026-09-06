@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356289791,
+    "number": 125,
+    "title": "Check that disabling core XP preserves progress",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/125"
+  },
+  "sha256": "b21a7252ae0f2c3e450c8963a1a823b9657bbe5811122182ee49b2b517fbff0b",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-25.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

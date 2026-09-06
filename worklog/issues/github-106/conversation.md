@@ -24,6 +24,18 @@ Use Space/controller X for combat dodge rolls, including fists and melee weapons
 
 **Status: The latest input repair lacks a verified installed handoff.** Reconcile the remaining stamina requirements and prepare the build before another test.
 
+## issue 5356285057 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/106
+
+Created: 2026-08-06T01:32:59Z; updated: 2026-09-06T13:58:04Z
+
+Exact metadata: [source record](sources/issue-5356285057-dafb0c73f77d5c306f54c55d4e53c4ecb6c6639012effbdc135ab5c81608b5cd.json).
+
+Use Space/controller X for combat dodge rolls, including fists and melee weapons, while preserving normal traversal. Every roll must charge stamina; insufficient stamina must not produce a dive. First-person rolling stays disabled.
+
+**Status: The latest input repair lacks a verified installed handoff.** Reconcile the remaining stamina requirements and prepare the build before another test.
+
 ## comment 5550110376 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/106#issuecomment-5550110376

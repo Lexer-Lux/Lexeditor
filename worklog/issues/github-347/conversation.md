@@ -25,3 +25,15 @@ Exact metadata: [source record](sources/issue-5356538763-61e209d883c7efdf84a9745
 **Actionable — investigation deferred.** Opening the plugin is too slow. Reduce the delay without removing the loading screen or displaying incomplete data.
 
 No startup-speed repair is ready to test; no action from you is blocking it.
+
+## issue 5356538763 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/347
+
+Created: 2026-09-05T07:52:17Z; updated: 2026-09-06T13:32:10Z
+
+Exact metadata: [source record](sources/issue-5356538763-e6ff67a571da0fbd84099e75d53dbc9f29afa0170700e0da7040181511dd8237.json).
+
+**Actionable — investigation deferred.** Opening the plugin is too slow. Reduce the delay without removing the loading screen or displaying incomplete data.
+
+No startup-speed repair is ready to test; no action from you is blocking it.

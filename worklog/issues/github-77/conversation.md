@@ -39,6 +39,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/77
 
 Created: 2026-09-01T12:23:35Z; updated: 2026-09-06T12:45:38Z
 
+Exact metadata: [source record](sources/issue-5311779665-09f71786860c59b65a8edf82fb72b0085f39af8eb398925b252453372dff6fb7.json).
+
+The detection/download/install backend exists, but installation has not been exercised and the install/update controls and update-frequency behavior remain unfinished.
+
+Finish those paths without losing user settings. Follow your later decision in #73: use Memoria's own launcher for FF9 settings rather than recreating its interface. No installation test is ready for you yet.
+
+## issue 5311779665 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/77
+
+Created: 2026-09-01T12:23:35Z; updated: 2026-09-06T12:45:38Z
+
 Exact metadata: [source record](sources/issue-5311779665-e3d97d37dd4040e8981891fe5db6b830d58cf2aabc3d10d4094eb43a0d2323ff.json).
 
 The detection/download/install backend exists, but installation has not been exercised and the install/update controls and update-frequency behavior remain unfinished.

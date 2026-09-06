@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356311288,
+    "number": 216,
+    "title": "Keep the horse’s location across restarts",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/216"
+  },
+  "sha256": "ad16a01d307c511efb7fe33d47296b141fe0bdc5626467ebadc8266457c88b4b",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-123.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

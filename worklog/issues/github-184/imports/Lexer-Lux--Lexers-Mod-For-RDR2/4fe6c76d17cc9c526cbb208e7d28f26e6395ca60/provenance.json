@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356302883,
+    "number": 184,
+    "title": "Prepare the canteen test on the repaired crafting build",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/184"
+  },
+  "sha256": "b7116cee35abfdb20d7c56d833c95cfe6ca5a07e0c5e52d0b0c1a697b84e5db4",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-88.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -25,6 +25,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/79
 
 Created: 2026-09-01T12:44:24Z; updated: 2026-09-06T13:31:03Z
 
+Exact metadata: [source record](sources/issue-5311976419-1b6504217dc201c4136d04e0f514f4b46fe5f6678c10a202197214464ebcaeab.json).
+
+**Actionable — partly implemented.** Unmerged PR #359 adds starting-character stats, limit-learning fields and safer project saves for both editions. Starting stats do not rewrite existing saves.
+
+Enemies, encounters, shops and wider character/text editing remain unfinished. Integration and in-game validation are still needed; the Characters work alone is not complete FF7 support.
+
+## issue 5311976419 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/79
+
+Created: 2026-09-01T12:44:24Z; updated: 2026-09-06T13:31:03Z
+
 Exact metadata: [source record](sources/issue-5311976419-f79c08e013292959dca2b590017e80f2479288d3828f71c6178c0cdbea8aae29.json).
 
 **Actionable — partly implemented.** Unmerged PR #359 adds starting-character stats, limit-learning fields and safer project saves for both editions. Starting stats do not rewrite existing saves.

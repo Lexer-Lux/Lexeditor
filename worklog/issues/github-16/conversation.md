@@ -41,6 +41,19 @@ First-start preparation now uses the bundled converter. Clean-cache checks passe
 - [ ] Restart Lexeditor and rescan RDR2. Confirm preparation finishes at Ready without requesting OpenIV or a developer checkout.
 - [ ] Open Items, Quick Select, Loot, Challenges, Crime, Dispatch, Weapons and Mobs. Confirm Vanilla data loads; report the first failing page and its error text.
 
+## issue 5234852285 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/16
+
+Created: 2026-08-24T12:45:06Z; updated: 2026-09-06T12:45:06Z
+
+Exact metadata: [source record](sources/issue-5234852285-97798cb8c6d9921a7de1e3fd491a3756e097a22b6a38143272bcf096cd4f846a.json).
+
+First-start preparation now uses the bundled converter. Clean-cache checks passed for the required data; your normal-install check remains.
+
+- [ ] Restart Lexeditor and rescan RDR2. Confirm preparation finishes at Ready without requesting OpenIV or a developer checkout.
+- [ ] Open Items, Quick Select, Loot, Challenges, Crime, Dispatch, Weapons and Mobs. Confirm Vanilla data loads; report the first failing page and its error text.
+
 ## comment 5473713407 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/16#issuecomment-5473713407

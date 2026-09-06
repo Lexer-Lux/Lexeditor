@@ -48,7 +48,7 @@ def main() -> int:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval("state.selectedItem='ankle_boots';renderItems()")
-            wait_eval(cdp, "document.querySelectorAll('.warband-item-detail canvas').length===2&&!document.querySelector('.warband-preview-message')", 90)
+            wait_eval(cdp, "document.querySelectorAll('.warband-item-detail canvas').length===1&&document.querySelector('.warband-item-thumbnail img')?.naturalWidth>0&&window.__warbandPreview?.length===1", 90)
             result = cdp.eval("""(()=>{
               const heading=document.querySelector('.warband-item-detail>.lex-detail-panel-heading');
               const icon=document.querySelector('.lex-detail-panel-icon');
@@ -67,7 +67,7 @@ def main() -> int:
                 raise AssertionError(result)
             if result["icon"]["width"] < 24 or result["icon"]["height"] < 24:
                 raise AssertionError(result)
-            if len(result["canvases"]) != 2 or any(row["width"] < 24 or row["height"] < 24
+            if len(result["canvases"]) != 1 or any(row["width"] < 24 or row["height"] < 24
                                                    for row in result["canvases"]):
                 raise AssertionError(result)
             if not all(row["bitmap"] and row["glyphs"] > 0 for row in result["labels"]):

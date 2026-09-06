@@ -18,6 +18,16 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/250
 
 Created: 2026-08-10T15:25:40Z; updated: 2026-09-06T13:18:11Z
 
+Exact metadata: [source record](sources/issue-5356319645-6def713cff3d61e75a774463e53d35507f58413a5bcc575b22508fb4af4490ff.json).
+
+**Status: Not supported by the checked light interfaces.** They provide no per-light exclusion for Arthur while retaining everyone else’s shadows. Global shadow changes would not satisfy this request. A different engine-level light mask would be needed; no fake workaround was installed.
+
+## issue 5356319645 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/250
+
+Created: 2026-08-10T15:25:40Z; updated: 2026-09-06T13:18:11Z
+
 Exact metadata: [source record](sources/issue-5356319645-a18fbced2aa89022602509aa3ff2a599bb4da60ddc03a574ea84bee0001fc040.json).
 
 **Status: Not supported by the checked light interfaces.** They provide no per-light exclusion for Arthur while retaining everyone else’s shadows. Global shadow changes would not satisfy this request. A different engine-level light mask would be needed; no fake workaround was installed.

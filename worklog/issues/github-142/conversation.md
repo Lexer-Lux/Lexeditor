@@ -30,6 +30,16 @@ Exact metadata: [source record](sources/issue-5356293946-e00bb4cab02909fa39189df
 
 **Status: Not implemented with the currently proven approach.** Static weapon/ammunition mappings do not provide independent live projectile speed for every cartridge. The later mapping audit also found omitted patch weapons. Closing records the technical blocker, not a completed velocity feature.
 
+## issue 5356293946 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/142
+
+Created: 2026-08-06T02:24:14Z; updated: 2026-09-06T13:57:23Z
+
+Exact metadata: [source record](sources/issue-5356293946-fedbf5c3683504e1e578eebb724514f63f67f86acb756202130358e44624f98e.json).
+
+**Status: Not implemented with the currently proven approach.** Static weapon/ammunition mappings do not provide independent live projectile speed for every cartridge. The later mapping audit also found omitted patch weapons. Closing records the technical blocker, not a completed velocity feature.
+
 ## comment 5550121053 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/142#issuecomment-5550121053

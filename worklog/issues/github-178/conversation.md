@@ -57,6 +57,18 @@ Ten marker categories are installed: cards, bones, carvings, dreamcatchers, grav
 
 **Status: Overall acceptance remains incomplete.** Location auditing continues in #274. Prepare representative before/after quest saves and expected markers for the gate checks. POIs must disappear after their journal sketch, not merely on approach.
 
+## issue 5356301550 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/178
+
+Created: 2026-08-06T03:38:20Z; updated: 2026-09-06T13:57:46Z
+
+Exact metadata: [source record](sources/issue-5356301550-3d47212b74f8de1ec2a13456315d3b311b36c9a0368350bb6b5f13891a9abd8c.json).
+
+Ten marker categories are installed: cards, bones, carvings, dreamcatchers, graves, exotics, legendary fish, shacks, treasure clues and points of interest. Actual treasure caches stay unmarked.
+
+**Status: Overall acceptance remains incomplete.** Location auditing continues in #274. Prepare representative before/after quest saves and expected markers for the gate checks. POIs must disappear after their journal sketch, not merely on approach.
+
 ## comment 5550129878 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/178#issuecomment-5550129878

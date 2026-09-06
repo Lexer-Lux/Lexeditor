@@ -25,6 +25,18 @@ Hide the rider’s belt lantern while mounted and attach the purchased horse lan
 
 **Status: An implementation is reported installed, but the purchase/equip handoff is incomplete.** Specify the exact shop/item and equipment route, and resolve relevant light-control failures before asking you to buy and test it.
 
+## issue 5356331805 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/291
+
+Created: 2026-08-20T10:07:20Z; updated: 2026-09-06T12:57:15Z
+
+Exact metadata: [source record](sources/issue-5356331805-df299ea55a055211c6ea67d7baad925cd4351c7a5f1e5ff2ae76d1af5172e80c.json).
+
+Hide the rider’s belt lantern while mounted and attach the purchased horse lantern to the player’s saddle horse, controlled through the radial.
+
+**Status: An implementation is reported installed, but the purchase/equip handoff is incomplete.** Specify the exact shop/item and equipment route, and resolve relevant light-control failures before asking you to buy and test it.
+
 ## comment 5550165066 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/291#issuecomment-5550165066

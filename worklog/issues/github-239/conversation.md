@@ -20,6 +20,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/239
 
 Created: 2026-08-10T10:53:50Z; updated: 2026-09-06T13:31:47Z
 
+Exact metadata: [source record](sources/issue-5356316602-53a97b19d1a4e02d7d01324d0bc0d2203316bf1b0a15f20f83fcab6097f56ddc.json).
+
+Owning a pocketwatch shows game time. Offer Classic Serif, Watch Numerals, Catalogue Numerals, Redemption and RDR Lino, with Classic Serif as the chosen default.
+
+**Actionable — code only.** The font control exists in source and both settings menus, but is not built or installed.
+
+[Original display reference](https://github.com/user-attachments/assets/1704ecf8-041c-4e42-b77c-4b2b9cb258eb).
+
+## issue 5356316602 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/239
+
+Created: 2026-08-10T10:53:50Z; updated: 2026-09-06T13:31:47Z
+
 Exact metadata: [source record](sources/issue-5356316602-c25c6039edd5aaef16dba09d8eff6faf396e62100f518f424365dd563aea5d79.json).
 
 Owning a pocketwatch shows game time. Offer Classic Serif, Watch Numerals, Catalogue Numerals, Redemption and RDR Lino, with Classic Serif as the chosen default.

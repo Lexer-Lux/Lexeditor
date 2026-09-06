@@ -25,6 +25,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/236
 
 Created: 2026-08-10T09:33:15Z; updated: 2026-09-06T13:31:45Z
 
+Exact metadata: [source record](sources/issue-5356315952-0710bb99eea20317b86600ecc61ee1b6181b4d33382504b0c9c9b1e78e0e976f.json).
+
+Use walk/hold-to-sprint instead of walk/run/sprint. Remove crouch-running and allow sprint except where a real gameplay state prevents it.
+
+**Actionable — latest location-restriction repair is source-only.** Earlier tests still found places where sprint refused to start. No installed retest is ready.
+
+Original references: [mod 8957](https://www.nexusmods.com/reddeadredemption2/mods/8957), [mod 1173](https://www.nexusmods.com/reddeadredemption2/mods/1173).
+
+## issue 5356315952 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/236
+
+Created: 2026-08-10T09:33:15Z; updated: 2026-09-06T13:31:45Z
+
 Exact metadata: [source record](sources/issue-5356315952-8b99677fa3124e082e5642024da2c9e1e2d7cd400cd1fd76bf6272a23f982a4e.json).
 
 Use walk/hold-to-sprint instead of walk/run/sprint. Remove crouch-running and allow sprint except where a real gameplay state prevents it.

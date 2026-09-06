@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/94
 
 Created: 2026-09-04T14:46:06Z; updated: 2026-09-06T12:46:13Z
 
+Exact metadata: [source record](sources/issue-5349503760-a6c8abbb7245383913b3f99e2b7092a02c0e7610c6e284f77ffd4e6df73ff843.json).
+
+A 1–255 cap and the above-127 stock repair are implemented. Full stacks should retain vanilla maximum junction strength at any chosen cap.
+
+**Work remains:** Shared Magic is blocked with non-100 caps pending safe migration, and high-stock casting still needs a prepared game check. The original request includes that combination; the standalone cap is only a partial delivery.
+
+## issue 5349503760 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/94
+
+Created: 2026-09-04T14:46:06Z; updated: 2026-09-06T12:46:13Z
+
 Exact metadata: [source record](sources/issue-5349503760-fc619157f62984517eca65f3a438af80a31814255f8fb467d8c19d7949100a00.json).
 
 A 1–255 cap and the above-127 stock repair are implemented. Full stacks should retain vanilla maximum junction strength at any chosen cap.

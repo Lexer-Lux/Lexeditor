@@ -33,6 +33,18 @@ Exact metadata: [source record](sources/issue-5356285491-cf7250dbf0453e52a7904b9
 
 Vehicle-height research and reported shoulder/transition defects remain (#267, #269, #270). Asking you to accept an unsupported control is not a development blocker. Developer mode must gate editing only, not application of saved presets.
 
+## issue 5356285491 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/108
+
+Created: 2026-08-06T01:36:51Z; updated: 2026-09-06T13:57:37Z
+
+Exact metadata: [source record](sources/issue-5356285491-e1700441156868588c49b872860976721049d5f8fcef6e63993eee36c58fc796.json).
+
+**Actionable — partly implemented.** Standing, crouched, aiming, horseback, vehicle and prone profiles exist. Continuous Y is unsupported by the current camera path; LOW/NORMAL works on foot/horse but is ignored in vehicles.
+
+Vehicle-height research and reported shoulder/transition defects remain (#267, #269, #270). Asking you to accept an unsupported control is not a development blocker. Developer mode must gate editing only, not application of saved presets.
+
 ## comment 5550110941 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/108#issuecomment-5550110941

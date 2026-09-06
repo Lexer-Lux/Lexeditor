@@ -13,6 +13,7 @@ from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProject
 from service_session import LocalPluginSession, request_json
 
 from . import paths
+from .game_launch import WarbandGameController
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
@@ -129,6 +130,7 @@ def installed_modules() -> list[Path]:
 
 PLUGIN = GamePlugin(
     plugin_id="warband",
+    game_process_factory=WarbandGameController,
     name="Mount & Blade: Warband",
     subtitle="WARBAND",
     description="Edit module data, settings, troops, manuals, and builds.",

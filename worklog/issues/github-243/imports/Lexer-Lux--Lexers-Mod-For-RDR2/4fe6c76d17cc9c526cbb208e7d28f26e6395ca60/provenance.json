@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356317698,
+    "number": 243,
+    "title": "Restore the second holster and dual-wield slots",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/243"
+  },
+  "sha256": "5d9e90d2339458e5fcc24b0cfb46d0d3559241e160ff065ba54a34f9839d6eb7",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-151.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356324138,
+    "number": 265,
+    "title": "Charge stamina for every rapid dodge roll",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/265"
+  },
+  "sha256": "e7e3fc014ac0be7578b9ccf06bf9091013515a42f579a694d5bc389fa001c2d5",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-173.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

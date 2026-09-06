@@ -1,0 +1,533 @@
+================================================================================
+WORKLOG -- my working notes, per TODO item
+================================================================================
+Lexer: you do not need to read this. It exists so that whichever agent picks
+this project up next knows exactly where things stand without re-deriving it.
+
+TODO.txt = what and why, in your terms.
+Codex.txt = game mechanics research and how the engine works.
+Worklog.txt = this. Implementation state, verification evidence, gotchas,
+              and the things I got wrong so nobody repeats them.
+
+================================================================================
+SETUP AND HOUSEKEEPING ALREADY DONE (moved out of TODO.txt -- Lexer wants that
+file to be his mod's features, not a log of my admin)
+================================================================================
+Warband install found and modules catalogued. Junk D:\ Warband folder deleted.
+Python 2.7 installed beside 3.10. Module System 1.171 obtained and configured.
+Junction set up so the mod lives here but shows in the launcher. build.bat
+written. Private GitHub repo created (Lexer-Lux/LexersModForWarband). Module\
+populated from Native. module.ini written, mod named "Lexer's Mod". Save copied
+in and confirmed working. Silverstag + WSE 3.2.0 installed. Floris 2.55 source
+kit and Silverstag source obtained. Confirmed menu options can be greyed out
+(op 2061). Confirmed quest markers need no art. Decided against decompiling
+compiled .txt files.
+Raid loot cut (30 goods -> 8, gold *5 -> *2) -- Lexer removed this from TODO
+because he is reworking loot wholesale; the change is still in settings.ini.
+
+================================================================================
+STANDING PROJECT FACTS
+================================================================================
+Build:        run build.bat (project root). Set LEXERMOD_NOPAUSE=1 for
+              unattended runs. Uses C:\Python27\python.exe explicitly.
+Source:       ModuleSystem\  (official MS 1.171)
+Output:       Module\        (git-ignored)
+Game sees it: <Warband>\Modules\Lexer's Mod  -> junction -> Module\
+Saves:        D:\Documents\Mount&Blade Warband Savegames\Lexer's Mod\
+              Documents is on D:, NOT C:. This cost me a wrong answer once.
+Repo:         github.com/Lexer-Lux/LexersModForWarband (private)
+              Commit email MUST be the GitHub noreply address; the account has
+              email privacy on and rejects pushes otherwise.
+
+REMOVING THE JUNCTION SAFELY: (Get-Item $link -Force).Delete()
+  Do NOT use Remove-Item -Recurse on Module\ or the junction -- it follows
+  links and would delete Native's game data. Also note PowerShell aliases
+  rmdir to Remove-Item, so `cmd /c rmdir` gets intercepted by the harness.
+
+================================================================================
+VERIFICATION TECHNIQUE THAT WORKS
+================================================================================
+To prove a source change actually reached the game, diff our compiled .txt
+against Native's and look at which integer tokens moved:
+
+  $o=Get-Content 'Module\menus.txt'; $n=Get-Content '<Native>\menus.txt'
+  compare line by line, token by token
+
+CAVEAT, learned the hard way: adding any inline @"..." string anywhere in the
+source shifts the shared quick_string id table, so EVERY later reference shifts
+by one and the diff looks enormous. Those 1585267068834414947 -> ...948 diffs
+are benign id renumbering, not damage. Look for small integer changes.
+
+================================================================================
+PER-ITEM STATE
+================================================================================
+
+#0 RAID LOOT -- built, untested in game
+   Two edits in module_game_menus.py, menu village_loot_complete:
+     gold:  (assign, ":money_gained", RAID_LOOT_BASE) and
+            (store_mul, ":prosperity_share", ":prosperity",
+             RAID_LOOT_PROSPERITY_MULTIPLIER)     was a literal 50 and *5
+     goods: (troop_add_merchandise,"trp_temp_troop",itp_type_goods,
+             RAID_LOOT_GOODS_COUNT)               was a literal 30
+   Verified compiled: menus.txt line 211 token 102 5->2, line 212 token 213
+   30->8.
+
+   *** MY MISTAKE, RECORDED SO IT IS NOT REPEATED ***
+   I first concluded that no raid code path awards items, and told Lexer the
+   goods must be ordinary post-battle loot. That was wrong. I had read only
+   ~55 lines after the menu started and stopped before the loot block, which
+   sits ~100 lines further down at module_game_menus.py:8486. Lexer corrected
+   me ("you get that loot even when not fighting anyone") and he was right.
+   Lesson: read the WHOLE menu/script body before concluding something is
+   absent. A grep that finds nothing is not proof when the block is long.
+
+   Also note: the raid loot screen weights goods by the BOUND TOWN's production
+   and consumption, not the village's, and there is a separate cattle path via
+   slot_village_number_of_cattle. Cattle is not yet exposed as a setting.
+
+#6 MET-NPC TRACKING -- built, untested in game
+   module_constants.py: slot_center_met_npcs = 600, plus cmet_* bit constants
+   (elder 1, tavernkeeper 2, weaponsmith 4, armorer 8, goods_merchant 16,
+   horse_merchant 32). Party slots for this mod start at 600; Native's highest
+   observed is 500.
+   module_scripts.py: script_lexer_note_met_npc (id 610),
+                      script_cf_lexer_has_met_npc (id 611)
+   module_dialogs.py: called from the universal [anyone,"start"] entry at
+                      line ~47, so it fires on every conversation in the game.
+   Verified: both script bodies non-empty in compiled scripts.txt (1202 and 209
+   chars of opcodes), and the call to script id 610 is present in the compiled
+   conversation.txt.
+   Native slots this reads: slot_town_elder 25 (village elder OR town guild
+   master -- same slot, role depends on centre type), tavernkeeper 20,
+   weaponsmith 21, armorer 22, merchant 23, horse_merchant 24.
+   Each comparison is guarded by party_slot_ge >= 1 first, because an absent
+   NPC leaves the slot at 0/-1 and must not match a zero troop id.
+   MOST LIKELY BUG WHEN TESTED: $current_town not set on some path to an NPC,
+   which would silently fail to set the bit. The $cheat_mode debug line is the
+   detector.
+   Fixed during development: reg0 was assigned after the display_message that
+   read it. Ordering corrected.
+
+#1 / #3 TALK FROM MENU + ENCYCLOPEDIA -- not started
+   Both consume #6 via script_cf_lexer_has_met_npc -- use that, do not re-read
+   the slot by hand.
+   Mechanism for greying: disable_menu_option, operation 2061, called from
+   inside the option's CONDITION block. Condition still passes so the option
+   displays, but it renders greyed and unclickable.
+   Consequence: a disabled option cannot be clicked, so the explanation must be
+   in the option's own text via a string register, not a popup.
+   Native offers NEITHER the elder nor the guild master on any menu -- I claimed
+   otherwise once and was wrong. Both sides are new work.
+
+#61 QUEST OFFER SELECTION -- built, not yet tested in game
+   Replaced Native's 20 random draws with replacement in script_get_quest with
+   a randomized exhaustive pass over the giver's complete quest ranges. Every
+   candidate is now tested once, so an eligible quest cannot be missed merely
+   because the random roll repeatedly landed on ineligible quests. This shared
+   path covers village elders, guild masters, lords, enemy lords and ladies.
+
+#62 WSE2 1080P WINDOW -- actionable
+   rgl_config.ini correctly persisted 1920x1080, but direct inspection measured
+   the live WSE2 window at 1282x1025 logical pixels. The earlier DPI diagnosis
+   was wrong: uniform DPI scaling cannot change 16:9 into that aspect ratio.
+   Inspect WSE2 client/window sizing without launching or controlling Lexer's
+   live game; Lexer retains runtime control.
+
+#18 / #2 QUEST MARKERS -- actionable; runtime disproved both renderers
+   Native's script_get_quest (module_scripts.py ~17650) selects AND sets up a
+   quest in one step, with store_random_in_range throughout. No predicate to
+   query. Silverstag added exactly the predicate we need:
+   script_cf_common_mayor_quest_available / _village_quest_available. Read
+   Reference\Silverstag_source\Source - Quest Utilities\questutil_scripts.py,
+   but check every operation against header_operations.py because Silverstag
+   requires WSE.
+   The supposed colored presentation had been deleted, leaving only its comment.
+   Restored it with overlays created once and projection work batched across
+   frames. It now reads cached states only: yellow available, grey active,
+   green ready, red failed. Dynamic guild-master quests are included via a
+   silent availability probe. Runtime correctness and smoothness still require
+   confirmation after restarting the game with the rebuilt module.
+   Runtime later proved the separate map-label renderer visible but detached
+   from Native settlement-name text and slow to update. The original design is
+   one plain ! in four colors, never brackets or alternate symbols. Full-map
+   batching increased from 8 to 24 centers per 0.25-second tick (~1 second per
+   sweep); $current_town is only a supplemental fast path.
+
+#63-#65 WORLD-MAP READABILITY / CAMERA
+   #63 dynamically scale party icons across zoom and #64 friend/foe ground
+   circles remain actionable. #65 is built and recorded below.
+
+#66 FREELANCER -- waiting
+   Consider adding the system that lets the player enlist in a lord's army.
+
+#67 ADDITIONAL QUEST TYPES -- actionable
+   Installed compiled counts: Native 91, BannerPage 112, Silverstag 160,
+   Viking Conquest 132. Counts include story/support/reserved records, not just
+   repeatable jobs. BannerPage has 15 distinct non-Native gameplay quest records
+   plus Freelancer state records. Silverstag ships full source for modular Quest
+   Packs 2-7: trade, nobility, companions, villages, tutorials and miscellaneous.
+
+#68 TOURNAMENT MAP MARKERS -- built, awaiting visual acceptance
+   Active tournament towns now receive a gold `T` anchor-party label from the
+   same update used by quest markers. Native's slot_town_has_tournament is
+   authoritative, and all towns receive a cheap fast pass each firing rather
+   than waiting for the batched quest scan. The `T` is northwest of the town;
+   the quest marker remains northeast, so both can render simultaneously.
+   Full Module System build verified with 614 scripts and consistent IDs.
+
+#69 ORIGINAL QUEST SET -- actionable
+   Seven approved concepts: Recover Shipment, Emergency Contract, Find Missing
+   Caravan, Missing Villagers, Find a New Home, Recruit Specialists, and Ransom
+   Negotiation. Implement using Native-compatible parties/scenes and append all
+   records/slots for save compatibility. A quest is not complete merely because
+   its record exists: offer dialogue, progression, conclusion, failure, reward,
+   marker state and an in-game acceptance test are all required.
+
+#70 CLICKED DESTINATION MARKER -- actionable
+   Draw an `X` on the world map at the player's current clicked movement
+   destination. It must follow replacement orders and disappear on arrival or
+   cancellation; it is not a settlement or quest marker.
+
+#65 MAP CAMERA RECENTER -- built, testing
+   WSE2 extends set_camera_follow_party with one optional `instant` operand; it
+   does not expose a numeric pan speed. Added [camera] instant_recenter (0/1,
+   default 1), applied it to MMB, and added a settlement right-click
+   `Center camera` action using the same setting. The engine-owned settlement
+   popup pan button cannot be intercepted or sped up independently.
+   This is the first shipped WSE2-dependent feature; CREDITS now records WSE2
+   as required rather than incorrectly saying nothing depends on it.
+
+#71 TOWN REST COST -- built, testing
+   Added [rest] cost_per_person (whole denars, default 1). Both the menu preview
+   and daily charge now calculate
+   (main-party companions + main-party prisoners) * REST_COST_PER_PERSON.
+   Restricted the accommodation charge to walled centers so village/manor rest
+   is not accidentally billed as city lodging.
+
+#36 RECRUIT VOLUNTEERS VISIBILITY -- built, testing
+   Replaced the failing conditional-script menu gate with an always-present
+   option that reproduces Native's eligibility checks. It disables itself with
+   a distinct explanation for looted, raided, bandit-occupied, negative local
+   standing, or insufficient local/faction access. Successful behavior still
+   enters Native's existing recruitment menu unchanged.
+
+#72 ILLUSTRATED SPATIAL SETTLEMENT SCREENS -- waiting
+   Replace the bottom-aligned settlement text menus with illustrated screens
+   whose actions occupy the corresponding physical locations. Research each
+   town/village's map, scene layout, culture and relevant details, then generate
+   a distinct culturally appropriate background while preserving recognizable
+   spatial relationships. Before scaling to every center, prototype presentation
+   rendering, clickable overlays, coordinate authoring, resolution/aspect-ratio
+   behavior, image-generation consistency and one representative center from
+   each culture. Do not begin the full asset rollout until those technique and
+   feasibility tests establish a repeatable workflow.
+
+#73 TOWN SCREEN INFORMATION REDESIGN -- waiting; requires #72
+   Have ChatGPT propose multiple town-screen compositions using #72's
+   illustrated spatial interface. At minimum, expose the resident lord's
+   portrait and name plus kingdom identity; investigate which additional
+   at-a-glance town facts are useful without overwhelming or covering spatial
+   actions. Compare proposals only after #72 establishes the actual presentation
+   canvas, scaling rules and safe clickable regions.
+
+#74 RECRUITMENT REWORK -- waiting
+   Desired direction: troops are rarer, significantly more expensive, and both
+   quantity and quality scale predictably and linearly with settlement standing;
+   investigate renown as a secondary term and make price rise steeply with the
+   resulting quantity/quality. BannerPage's own manual corrects the initial
+   royal-rank recollection: regular village troops require village standing >=0
+   plus lord relation >=4, faction membership, supported-pretender status, or
+   village standing >=8. Its elite town troops use stricter town/lord/faction
+   gates. Treat these as design references, not a decision already made.
+
+#75 TWO-COLUMN MAP TOOLTIP ROSTERS -- rejected
+   Checked Native and the installed WSE2 SDK. Party stack read operations exist,
+   but the hover tooltip's garrison/prisoner roster is engine-owned and has no
+   script callback, layout/column operation or suppress-and-replace hook.
+   party_set_extra_text controls only one secondary label line, not the roster.
+
+#76 DIM LOOTED-VILLAGE MAP NAMES -- rejected
+   Checked Native header_parties/header_operations and the installed WSE2
+   operation set. A party label can be small/medium/large or completely hidden,
+   but cannot receive per-party RGB or alpha. Labels inherit faction color.
+   Reassigning a looted village to a display faction would corrupt gameplay
+   semantics, so it is not an acceptable visual workaround.
+
+#1 VISITABLE SETTLEMENT PEOPLE -- revised
+   Removed the tavern-keeper shortcut at Lexer's request: entering the tavern
+   already provides direct access. The met-NPC bit remains reserved for save
+   compatibility, but no tavern-keeper option is rendered.
+   Removed the four merchant conversation shortcuts from the main town page.
+   Their existing marketplace trade buttons now retain exact Native text and
+   behavior after the player has met that merchant; beforehand each remains in
+   place but is disabled and reads "You haven't found the [merchant] yet."
+   Guild-master and village-elder unmet states now use the identical
+   "You haven't found the [person] yet." construction as well.
+
+#47 SETTLEMENT PROSPERITY / STANDING -- revised, testing
+   The earlier implementation did not display either value on the world map,
+   and town prosperity remained numeric only in cheat mode. Corrected both.
+   Every settlement now receives map-only extra text:
+   `Prosperity: N | Standing: N`. This uses party_set_extra_text, never the
+   settlement name, so it cannot contaminate dialogue. Being Raided, Looted and
+   Under Siege are composed into the same line rather than lost. Town and
+   village menu prose now also contains both numeric values directly.
+
+#2 SECONDARY-LINE COLOR TEST -- rejected
+   Native and WSE2 expose party_set_extra_text but no text-color argument.
+   Jelkala's contained `<font color="#FFFF00">!</font>` probe printed the tag
+   literally in hover text and produced no attached exclamation mark. Inline
+   markup is unsupported. The probe has been removed; attached map icons are
+   the remaining map-label-relative renderer to test.
+
+#50 / #37 LEXEDITOR -- v0.1 installed, testing
+   Existing C:\Lexeditor contained only two Python 3 report scripts. Added a
+   Tkinter desktop shell with project health, safe settings.ini editing and
+   automatic backup, troop/cut-content browser, installed-mod manual browser,
+   Warband data catalog and one-click verified build. Installed Desktop and
+   Start Menu shortcuts. The data catalog now has an inline text editor with
+   reload, encoding preservation, automatic .lexeditor.bak files and Python 2
+   syntax validation. Replaced native notebook tabs with a full-width top row.
+   Header now stacks smaller WARBAND text beneath LEXEDITOR and uses the same
+   compact 18px floppy glyph treatment as RDR2 Lexeditor. Every Treeview table
+   now supports dragging data-column headings to reorder them; the structural
+   tree column (#0, used by Data Catalog's Area hierarchy) remains fixed because
+   Tk requires it to anchor the hierarchy.
+
+#24 MMB CENTRE MAP -- not started
+   set_camera_follow_party (1021, annotated "works on map only") plus
+   key_middle_mouse_button (0xe2). Check MMB is not already bound on the map.
+
+#23 MAP CAMERA PITCH -- rejected
+   No camera pitch operation exists. module.ini exposes only disable_zoom and
+   can_adjust_camera_distance. BannerPage's heavily customised module.ini has
+   the same two and nothing more. The installed WSE2 SDK was checked too: it
+   adds get_camera_position and an instant option to set_camera_follow_party,
+   but no world-map camera rotation/pitch setter. There is no executable path.
+
+#37 settings.ini -- built
+   Loader: ModuleSystem\module_settings.py. DEFAULTS table is the source of
+   truth; ALIASES maps to friendlier constant names. Reports missing keys,
+   non-numeric values, and unknown keys/sections as warnings on stderr, once
+   per build. Strips trailing "; Native: 5" comments by hand because Python 2
+   ConfigParser only strips ';' after whitespace and Python 3 not at all.
+   Consumers must `from module_settings import *` -- currently only
+   module_game_menus.py does.
+
+#41b SAVEGAMES UNDER WSE2 -- A SECOND, SEPARATE ROOT
+   WSE2 does NOT use Warband's savegame folder. It keeps its own profile tree:
+       D:\Documents\Mount&Blade Warband WSE2\<Module Folder>\Savegames\
+       D:\Documents\Mount&Blade Warband WSE2\<Module Folder>\module_config.ini
+   It had already created "Lexer's Mod\Savegames" (empty) on first launch, which
+   is why Lexer saw no saves -- his save was in the vanilla root.
+   Copied into both. THEY ARE NOW SEPARATE COPIES: playing under WSE2 saves to
+   the WSE2 root and playing under the normal launcher saves to the vanilla one,
+   and they will diverge. If he switches launcher mid-playthrough, the save has
+   to be copied across.
+   Note also: WSE2 is a different project from the WSE 3.2.0 we installed for
+   Silverstag, with its own config format (rgl_config.ini, 16 KB of gameplay
+   toggles) and its own per-module module_config.ini.
+
+#60 WSE2 SDK -- installed 2026-07-30
+   Installed the Warband SDK from the official Ruslan-700/WSE2-Releases
+   repository into <Warband root>\WSE2 SDK. The installed WSE2 executables,
+   launcher and Steam shim matched that repository byte-for-byte before the
+   copy. Verified 27 SDK files installed with zero hash mismatches.
+
+#41 SAVEGAMES -- NOW PROVEN
+   Warband names the savegame folder after the MODULE FOLDER name, NOT
+   module_name. Proof, found when installing Silverstag: its module.ini says
+       module_name = Workshop_v026c
+   but its folder is "Silverstag (Cinematic)" and its savegame folder is also
+   "Silverstag (Cinematic)". module_name is not involved.
+   So the save folder is the junction name: ...Savegames\Lexer's Mod\.
+   Stale folder "Lexer's Mod for Warband" can be deleted once Lexer confirms.
+   Consequence to remember: renaming the junction orphans the saves. If the
+   folder name ever changes again, move the savegame folder to match.
+   Also: this means the LAUNCHER shows module_name while the SAVE folder uses
+   the directory name, so the two can legitimately disagree.
+
+#44 REFERENCE MATERIAL -- extracted, not installed
+   Reference\Floris_source\Floris Dev Suite 2.55\  (6068 files, 2.6 GB)
+       Source\ contains: Source - Floris Basic / Expanded / Gameplay Mod Pack,
+       Source - Native Warband, Modmerger, Source Kits.
+       This is the Floris source we previously could not find. Not WSE-based as
+       far as I have checked, which makes it a SAFER reference than Silverstag.
+   Reference\Silverstag_v026\  (3953 files, 1.2 GB)
+       "Silverstag (Cinematic)\" playable module incl. its own Source Files\,
+       plus "WSE v3.2.0\".
+   Reference\Silverstag_source\  earlier GitHub clone, now redundant with the
+       archive's Source Files. Git-ignored.
+
+#45/#46/#47 PROSPERITY AND TRADE GOODS -- researched, not started
+   Full findings in Codex.txt 6.14 (production economy), 6.15 (displaying
+   numbers), 6.16 (prosperity rework feasibility).
+   Key facts for whoever builds this:
+     - prosperity is 100% script-side: slot_town_prosperity = 50, mutator
+       script_change_center_prosperity, clamped 0-100. No engine involvement.
+     - NO population stat exists anywhere. Prosperity is the proxy.
+     - 19 capital-goods slots per centre (205-229) already model production;
+       script_center_get_production converts them to per-good output. The
+       Bannerlord "villages sell what they make" behaviour is already in the
+       data and is discarded by the stocking code.
+     - village stock = (prosperity/15)+1 items out of num_merchandise_goods=40,
+       diluted with 1/5 of the bound town's production.
+     - raid loot weights by the BOUND TOWN only, ignoring the village.
+     - slot_town_village_product (76) is declared and never used. Free hook.
+     - ALL MATHS IS 32-BIT INTEGER. No log, no float. A log expense curve needs
+       a lookup table or piecewise division. This is the one place WSE's
+       floating point would genuinely earn its keep.
+   ORDER: build #47 (visibility + a whole-map prosperity report) BEFORE tuning
+   anything. Lexer explicitly wants to see the real distribution first and he is
+   right; curve choice without data is guesswork.
+
+#47 MAP TEXT MECHANISM -- party_set_extra_text
+   This is how Native hangs "(Looted)" / "(Being Raided)" / "(Under Siege)" next
+   to a village name on the world map, in script_village_set_state.
+   Constraints: ONE extra_text per party, and no colour control. So prosperity
+   and reputation must share the line, and any implementation must compose with
+   Native's state strings rather than overwrite them.
+   This does NOT replace the quest-marker plan in 6.9, which needs per-state
+   colour and therefore still wants the text-overlay presentation.
+
+#48/#49 CUT CONTENT AND MANHUNTERS -- researched, not started
+   Codex.txt 6.18 and 6.19.
+   Short version: undead/dark knight/black khergit/slaver FACTIONS are all still
+   live; the undead troop definitions are commented out but complete; tf_undead
+   and the undead face codes still exist. No trace of "ghoul" or "antler".
+   Manhunter upgrade chain is fully intact (manhunter -> slave_driver ->
+   slave_hunter -> slave_crusher -> slaver_chief) and faction does not gate
+   upgrades. World manhunter parties do not upgrade because AI parties never use
+   the upgrade system -- so merging factions would change nothing. There is no
+   slaver party template, which is why slavers never appear.
+
+#44 WSE / SILVERSTAG INSTALL -- done
+   Modules\Silverstag (Cinematic)\   3929 files. module_name = Workshop_v026c.
+   <Warband root>\WSE v3.2.0\        15 files incl. WSELoader.exe.
+   WSE placed in the install root rather than Modules\; its loader locates
+   mb_warband.exe via the registry, so its own location is flexible (the shipped
+   log shows it having run from Modules\ on someone else's machine).
+   Nothing in Lexer's Mod uses WSE. Adopting it is still open (#25).
+   NOTE: I earlier said Silverstag shows as "Floris Workshop" in the launcher,
+   from a web source about an older version. The installed file says
+   Workshop_v026c. Corrected.
+
+#55 WSE rgl_config.ini -- UNEXPLAINED, do not claim it is understood
+   Lexer hit "could not open rgl_config.ini" from WSE's startup options screen.
+   I created rgl_config.ini as a copy of rgl_config.txt in
+   D:\Documents\Mount&Blade Warband\ and he reports it worked.
+   BUT I then searched for the string and could not justify the fix:
+     - mb_warband.exe contains "rgl_config.txt" and nothing else
+     - WSELoader.exe and WSELib.dll contain NO rgl_config string at all,
+       in either ASCII or UTF-16
+   So nothing I can find asks for a .ini. The fix may have been coincidental,
+   or the string is built at runtime, or the message came from somewhere I have
+   not looked (the launcher shell, or Silverstag itself). Recorded as unknown.
+   Do not repeat "WSE expects .ini because it is old" as if it were established.
+
+#56 MOD FEATURE LISTS -- solved via self-documentation, not diffing
+   Lexer pushed back on the diff plan ("won't that just give me a list of every
+   stat and line they changed?"). He was right.
+   Big mods ship an in-game manual in info_pages.txt, author-written, and it is
+   trivially extractable. Lexeditor\dump_infopages.py does it. BannerPage yields
+   38 pages that read as a feature list. Native, Silverstag, Napoleonic Wars and
+   Viking Conquest all have manuals too; Silverstag additionally ships a
+   Documentation folder with per-feature subfolders.
+   Keep diffing as a fallback for mods with no manual, not as the primary tool.
+
+MOD LINEAGE, since it keeps coming up:
+   BannerPage is not Silverstag's successor. It is a compilation that credits
+   BOTH "The Floris Team" AND "Windyplains" (Silverstag's author) in its own
+   in-game credits, and its manual documents Diplomacy 4.3, PBOD, Freelancer,
+   Custom Commander and a tournament overhaul that is clearly Silverstag's
+   Tournament Play Enhancements. So Silverstag and BannerPage are siblings
+   drawing on the same community pool, with BannerPage incorporating Silverstag
+   work rather than succeeding it.
+
+================================================================================
+HOW TO USE TODO.txt -- I got this wrong repeatedly; do not repeat it
+================================================================================
+TODO.txt is a STATUS LIST, not a place to talk to Lexer. One line per item.
+The bucket is decided by ONE question: who has the ball?
+    I can act with no input from him            -> ACTIONABLE
+    I need anything at all from him             -> WAITING
+    I built it, he has not confirmed it         -> TESTING
+    He confirmed it                             -> COMPLETE
+Consequences I kept violating:
+  - Never ask him a question inside an ACTIONABLE entry. If I need an answer,
+    the whole item moves to WAITING.
+  - Never put "I did X, please test it" in ACTIONABLE. That is TESTING.
+  - Never write findings, caveats, corrections or reasoning into an entry.
+    Mechanics go in Codex.txt, my working state goes here, and answers to his
+    questions go in the chat reply.
+  - One entry per feature. Internal groundwork does not get its own number.
+  - COMPLETE is his mod's confirmed features only, not my setup work.
+
+================================================================================
+PENDING DECISION DETAIL (kept out of TODO.txt on purpose)
+================================================================================
+#50 Lexeditor framework. C:\RDR2Mod\editor is a Python HTTP server (server.py
+    146 KB) serving one editor.html (274 KB), plus assets and localisation JSON.
+    That is the browser/server setup Lexer wants away from, but it is also a lot
+    of working UI.
+      (a) wrap the existing HTML in pywebview or Tauri -- standalone, no server,
+          keeps the UI investment, per-game plugins stay web pages, least work
+      (b) PySide6/Qt rewrite -- native, QUndoStack gives undo/redo free, but
+          the RDR2 UI is rebuilt from scratch
+    There is no game-file-editor framework in existence; format handling is
+    always bespoke. Undo/redo, tabs, save and dirty-tracking are standard in Qt,
+    or an off-the-shelf JS undo library in a webview.
+    Lexer's #7 idea is folded in: Save compiles settings.ini and runs the build.
+
+#46 Village goods options: hand-authored table; or procedural from terrain and
+    region (steppe -> horses/cattle, snow -> furs/fish, desert -> dates/salt,
+    valleys -> grain/mills, mountains -> iron) plus one speciality per village;
+    or keep Native's random roll and only fix the stocking bugs (the 1-7 item
+    cap, the bound-town dilution, and raid loot using the town not the village).
+    Authored or themed values apply at campaign start, so they need a new game.
+
+#53 Party cards: (a) per troop type is buildable now; (b) per soldier needs an
+    invented, persisted identity system -- possible now WSE is approved, but it
+    is a large system, not a UI change. Neither can draw an XP bar: stack
+    experience is engine-held with no read operation.
+
+================================================================================
+CORRECTIONS I HAVE HAD TO MAKE -- read before asserting anything about Native
+================================================================================
+1. Claimed Native's village menu offers "Speak with the village elder".
+   FALSE. Native's village menu has no elder option. I had inferred it from
+   Silverstag's source. Verify against module_game_menus.py, never infer
+   Native's behaviour from a mod.
+2. Claimed no raid code path awards items. FALSE, see #0. I stopped reading the
+   menu body too early.
+3. Claimed Steam file verification could revert our work. Overstated. The real
+   reason to copy rather than link is that writes through a link land in
+   Native and corrupt vanilla.
+4. Put the savegame folder under module_name rather than the module folder name.
+5. Said Silverstag would appear as "Workshop_v026c" in the launcher, because
+   that is its module_name. WRONG -- Lexer says it shows as "Silverstag
+   Cinematic", i.e. the FOLDER name. Confirmed by the decisive case: Native's
+   module.ini says "module_name = Calradia" and the launcher shows "Native".
+   ==> THE LAUNCHER SHOWS THE FOLDER NAME. So does the savegame folder.
+   module_name appears to be essentially cosmetic/unused for both. Our folder is
+   "Lexer's Mod", which is why it displays correctly.
+   I made this claim twice from two different bad sources (a web page, then the
+   file) without checking the one case that would have settled it immediately.
+6. Turned on reduce_texture_loader_memory_usage and
+   use_case_insensitive_mesh_searches in module.ini for no pressing reason, and
+   Lexer then reported partially-invisible troop models in the party screen.
+   Reverted both to Native's values. Not confirmed as the cause, but they were
+   the ONLY graphical difference from vanilla, so they were the obvious suspect
+   and I should not have changed them speculatively in the first place.
+   LESSON: do not flip engine flags without a reason and a test.
+7. Lexeditor's first troop parser used cross-line bracket balance to find the end
+   of each entry. One unbalanced bracket made it silently swallow following
+   entries -- it reported 373 troops when there are 1072, and dropped
+   black_khergit_guard. Rewrote it to split on entry starts instead, and
+   validated the count against ID_troops.py and the compiled troops.txt.
+   LESSON: any extraction tool must be validated against an authoritative count
+   before its output is trusted. Silent under-reporting looks like success.
+
+Pattern in all four: I asserted from partial reading or inference instead of
+checking the primary source. Read the whole block. Verify in the compiled
+output. Say "not verified" when it is not.

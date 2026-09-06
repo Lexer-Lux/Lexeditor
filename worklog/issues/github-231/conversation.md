@@ -22,6 +22,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/231
 
 Created: 2026-08-07T08:48:06Z; updated: 2026-09-06T12:56:19Z
 
+Exact metadata: [source record](sources/issue-5356314850-20e0bf8d49b79277cdd1893d3b3a6935e2cd82d62eaf7dbfc029b4a9c9895fd1.json).
+
+Adding challenge strands through data alone does not extend the vanilla menu’s nine links.
+
+**Status: A replacement interface/runtime needs investigation.** The menu limit does not prove all custom challenge implementations impossible. Prepare a concrete working approach and its save/progress behavior before requesting a design decision.
+
+## issue 5356314850 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/231
+
+Created: 2026-08-07T08:48:06Z; updated: 2026-09-06T12:56:19Z
+
 Exact metadata: [source record](sources/issue-5356314850-280340aa400d6b7a8e452e2171ddc0f2993752d601313ca719cf074cd0bb82f9.json).
 
 Adding challenge strands through data alone does not extend the vanilla menu’s nine links.

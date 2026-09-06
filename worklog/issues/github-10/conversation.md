@@ -38,6 +38,20 @@ Exact metadata: [source record](sources/issue-5202578748-628b8da9ba87bcf1f5cacec
 - [ ] Double-click the divider to reset it. Focus it and use the arrow keys; confirm resizing works without clipped rows or a list scrollbar.
 - [ ] Narrow the window until panels stack. Confirm the divider disappears; report any overlap or paging jump.
 
+## issue 5202578748 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/10
+
+Created: 2026-08-20T10:51:37Z; updated: 2026-09-06T13:06:18Z
+
+Exact metadata: [source record](sources/issue-5202578748-6e89f622caf833b0eb9350661eeba69f45d28a9c760ed0b04e10e663348e7684.json).
+
+**Status: Implemented; needs your check.** Panel widths are saved separately for each view.
+
+- [ ] Open RDR2 Items, drag the divider, switch to Crafting and back. Confirm Items remembers its width and selection.
+- [ ] Double-click the divider to reset it. Focus it and use the arrow keys; confirm resizing works without clipped rows or a list scrollbar.
+- [ ] Narrow the window until panels stack. Confirm the divider disappears; report any overlap or paging jump.
+
 ## comment 5354941383 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/10#issuecomment-5354941383

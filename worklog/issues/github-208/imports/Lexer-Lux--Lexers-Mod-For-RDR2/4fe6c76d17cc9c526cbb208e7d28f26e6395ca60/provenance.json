@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356309506,
+    "number": 208,
+    "title": "Check Auto-Bank and choose the wallet display",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/208"
+  },
+  "sha256": "cd36a6125ac4cad5953f99dd55d198a4035cd1cfe647ece9d47f51aaffef7f94",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-112.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

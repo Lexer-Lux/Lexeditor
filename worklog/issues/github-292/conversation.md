@@ -23,6 +23,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/292
 
 Created: 2026-08-20T10:12:17Z; updated: 2026-09-06T13:32:04Z
 
+Exact metadata: [source record](sources/issue-5356332213-28a5e9e5c92c17c0ca05b9b8b6ba031dcfd4a0b40d12a8ac5ad39fa404c80080.json).
+
+Use the animal already selected for Study without imposing Recon’s ordinary screen-center or distance gates.
+
+**Actionable — still failed in your latest test.** The source correction is not installed, and native-prompt/progress handling remains incomplete. No repeat test is ready.
+
+[Original screenshot](https://github.com/user-attachments/assets/6eac8c93-ed26-4d14-a668-19afd1622a2f).
+
+## issue 5356332213 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/292
+
+Created: 2026-08-20T10:12:17Z; updated: 2026-09-06T13:32:04Z
+
 Exact metadata: [source record](sources/issue-5356332213-b271981ab8c57fc8837df3f48567e1a03b621c3d3a0156e752f63f8058bbd68f.json).
 
 Use the animal already selected for Study without imposing Recon’s ordinary screen-center or distance gates.

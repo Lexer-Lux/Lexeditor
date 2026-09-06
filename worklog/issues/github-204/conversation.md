@@ -33,6 +33,18 @@ Fences should reward low Honor with better prices and penalize high Honor, while
 
 **Status: Latest repair is not built or installed.** The previous low-Honor test still showed baseline prices. Deliver the independent shop-modifier correction before another purchase comparison.
 
+## issue 5356308631 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/204
+
+Created: 2026-08-06T05:59:38Z; updated: 2026-09-06T12:55:42Z
+
+Exact metadata: [source record](sources/issue-5356308631-b672c26189a789e34f29d8e8352a2d230833063e612620d86fe46b767c486601.json).
+
+Fences should reward low Honor with better prices and penalize high Honor, while normal stores retain their usual Honor curve.
+
+**Status: Latest repair is not built or installed.** The previous low-Honor test still showed baseline prices. Deliver the independent shop-modifier correction before another purchase comparison.
+
 ## comment 5550137245 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/204#issuecomment-5550137245

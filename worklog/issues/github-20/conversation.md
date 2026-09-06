@@ -36,6 +36,18 @@ Exact metadata: [source record](sources/issue-5264309604-2a6b0f62040f0423e49442c
 
 The full model must fit its heading icon; the larger preview must rotate, zoom and reopen without stale assets. Missing textures need an explicit error, not a gray substitute. Game-font text and manuals must remain readable. A ready-to-run test copy still needs preparing.
 
+## issue 5264309604 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/20
+
+Created: 2026-08-27T05:45:26Z; updated: 2026-09-06T13:30:48Z
+
+Exact metadata: [source record](sources/issue-5264309604-d09aa7cf9344544915f7bf4647e3d553dd78c48d14fe2566900f2ba0bfb4c590.json).
+
+**Actionable — delivery remains.** Preview cleanup, cached heading icons and font checks are in draft PR #361, not the normal installed editor. Real BRF/DDS appearance is unverified.
+
+The full model must fit its heading icon; the larger preview must rotate, zoom and reopen without stale assets. Missing textures need an explicit error, not a gray substitute. Game-font text and manuals must remain readable. A ready-to-run test copy still needs preparing.
+
 ## comment 5435213790 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/20#issuecomment-5435213790

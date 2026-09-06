@@ -25,6 +25,19 @@ Exact metadata: [source record](sources/issue-5356325612-4a0e48f7f6a589bb3df244b
 - [ ] On flat ground, crouch and stand still. Record the bob, then set [Camera] Enabled=0 in GameplayTweaks.ini, restart and repeat at the same place and pose.
 - [ ] Restore Camera, disable Belt Lantern for one restart and repeat. Report which change removes the bob, with short clips; restore your original settings afterward.
 
+## issue 5356325612 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/270
+
+Created: 2026-08-11T04:23:41Z; updated: 2026-09-06T12:57:01Z
+
+Exact metadata: [source record](sources/issue-5356325612-7df59df193c982459ae1013f9c457a9f1f9e126d30c85baf376e9c463bb720b5.json).
+
+**Status: The bob is measured; its cause is not confirmed.** Both the camera feature and the physical belt lantern need an isolated comparison.
+
+- [ ] On flat ground, crouch and stand still. Record the bob, then set [Camera] Enabled=0 in GameplayTweaks.ini, restart and repeat at the same place and pose.
+- [ ] Restore Camera, disable Belt Lantern for one restart and repeat. Report which change removes the bob, with short clips; restore your original settings afterward.
+
 ## comment 5550158229 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/270#issuecomment-5550158229

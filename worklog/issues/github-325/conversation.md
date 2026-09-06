@@ -24,6 +24,18 @@ Better Card should exclude enemies that cannot become cards and disable the comm
 
 **Status: The implementation passes code checks, but its player-test setup is incomplete.** Supply a specific mixed-validity encounter and an all-invalid encounter with the correct build/settings before asking you to find or invent those tests.
 
+## issue 5356486095 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/325
+
+Created: 2026-09-04T06:51:15Z; updated: 2026-09-06T12:59:57Z
+
+Exact metadata: [source record](sources/issue-5356486095-eb6145a3b5ae3aff8816ac9d683a0e32137a15810aba2f35f436e8dbbe335f0f.json).
+
+Better Card should exclude enemies that cannot become cards and disable the command when none are valid, without conflicting with Draw Once.
+
+**Status: The implementation passes code checks, but its player-test setup is incomplete.** Supply a specific mixed-validity encounter and an all-invalid encounter with the correct build/settings before asking you to find or invent those tests.
+
 ## comment 5550347141 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/325#issuecomment-5550347141

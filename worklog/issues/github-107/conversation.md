@@ -30,6 +30,18 @@ Make unique-gun features unlockable parts that can be mixed with normal gunsmith
 
 **Status: Research only.** A Calloway’s Schofield prototype was proposed, but component and engraved-mesh compatibility remain unproven. Prepare a working example before requesting a design or gameplay review.
 
+## issue 5356285266 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/107
+
+Created: 2026-08-06T01:36:02Z; updated: 2026-09-06T13:54:05Z
+
+Exact metadata: [source record](sources/issue-5356285266-b9e2bd2fc4c1900e0416a1fbe883a0c9f542ddcc737ac676aab7604546a16cab.json).
+
+Make unique-gun features unlockable parts that can be mixed with normal gunsmith customization, rather than permanently separate, unmodifiable weapons.
+
+**Status: Research only.** A Calloway’s Schofield prototype was proposed, but component and engraved-mesh compatibility remain unproven. Prepare a working example before requesting a design or gameplay review.
+
 ## comment 5550110671 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/107#issuecomment-5550110671

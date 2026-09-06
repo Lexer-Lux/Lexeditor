@@ -65,6 +65,18 @@ Show a live count beneath each ammo-type icon, dim zero-stock entries and remove
 
 **Status: Latest package-path correction is not installed.** The previous test still showed the vanilla text. Deliver the corrected replacements and verify they load before another layout check.
 
+## issue 5356305701 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/194
+
+Created: 2026-08-06T05:57:20Z; updated: 2026-09-06T13:57:52Z
+
+Exact metadata: [source record](sources/issue-5356305701-84885ddbd31749a0185035b0032efa54bdf89f05125ebbbb4c3f38a44e460be9.json).
+
+Show a live count beneath each ammo-type icon, dim zero-stock entries and remove the duplicate vanilla X/Y counter.
+
+**Status: Latest package-path correction is not installed.** The previous test still showed the vanilla text. Deliver the corrected replacements and verify they load before another layout check.
+
 ## comment 5550134225 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/194#issuecomment-5550134225

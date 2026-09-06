@@ -25,6 +25,19 @@ Exact metadata: [source record](sources/issue-5356289791-dc8a9bc78c07d3e25dd7523
 - [ ] On a spare save, leave Core XP Gain disabled and note your current Health, Stamina and Dead Eye progress. Do ordinary combat/hunting and sustained movement, then compare the same progress displays.
 - [ ] Confirm no new progression was earned and existing ranks or maximums were not reduced. Report what changed and attach GameplayTweaks.log from that session.
 
+## issue 5356289791 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/125
+
+Created: 2026-08-06T02:01:32Z; updated: 2026-09-06T13:53:55Z
+
+Exact metadata: [source record](sources/issue-5356289791-18da3e9cefb2a73176cacf66a46ac90a317cf4449ca455bf852e18938723c023.json).
+
+**Status: Idle logging shows no unwanted XP changes; active play still needs checking.** The previously unsafe progress-reset approach must not return.
+
+- [ ] On a spare save, leave Core XP Gain disabled and note your current Health, Stamina and Dead Eye progress. Do ordinary combat/hunting and sustained movement, then compare the same progress displays.
+- [ ] Confirm no new progression was earned and existing ranks or maximums were not reduced. Report what changed and attach GameplayTweaks.log from that session.
+
 ## comment 5550116204 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/125#issuecomment-5550116204

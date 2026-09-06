@@ -28,3 +28,15 @@ Exact metadata: [source record](sources/issue-5356313013-05131f8bb41e58ca83d89e2
 **Status: The tried control-injection approach cannot select the item page.** It can open the weapon wheel, but the wheel ignores the injected page-switch input.
 
 That implementation was dropped. A different, proven wheel-control mechanism is needed; there is no functioning item-page shortcut to test.
+
+## issue 5356313013 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/223
+
+Created: 2026-08-07T08:47:39Z; updated: 2026-09-06T12:56:04Z
+
+Exact metadata: [source record](sources/issue-5356313013-07200c736818a34d304271229f880e8deb3fabf94aa6579d139513135d96ca5e.json).
+
+**Status: The tried control-injection approach cannot select the item page.** It can open the weapon wheel, but the wheel ignores the injected page-switch input.
+
+That implementation was dropped. A different, proven wheel-control mechanism is needed; there is no functioning item-page shortcut to test.

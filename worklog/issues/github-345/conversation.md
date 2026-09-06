@@ -24,6 +24,18 @@ Change the actual actions and displayed prompts: E for cutscene Skip, T for camp
 
 **Status: Incomplete.** The camp test still used Return. A prompt-only change was correctly rejected; the real camp action still needs a safe script-level repair. No new retest is ready.
 
+## issue 5356490118 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/345
+
+Created: 2026-08-24T17:07:41Z; updated: 2026-09-06T12:39:10Z
+
+Exact metadata: [source record](sources/issue-5356490118-df302d1dfb407fecaeeb722034433123b3ea5b6a68b740b6bfaa3da9d92f63a3.json).
+
+Change the actual actions and displayed prompts: E for cutscene Skip, T for campsite Travel. Leave unrelated confirmation controls alone.
+
+**Status: Incomplete.** The camp test still used Return. A prompt-only change was correctly rejected; the real camp action still needs a safe script-level repair. No new retest is ready.
+
 ## comment 5550351844 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/345#issuecomment-5550351844

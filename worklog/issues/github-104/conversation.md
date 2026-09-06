@@ -24,6 +24,18 @@ Holding Cover should draw and stow binoculars with the normal animations, withou
 
 **Status: Further testing is blocked by the binocular crash in #357.** The earlier shortcut repair is not proof that the current transition is safe. Repair that crash before requesting another binocular test.
 
+## issue 5356284652 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/104
+
+Created: 2026-08-06T01:25:58Z; updated: 2026-09-06T13:57:32Z
+
+Exact metadata: [source record](sources/issue-5356284652-65e15e1a879fbcbbf55017dcccb923ee1a6c4b8b75a5b2472c33f6dc13bb7b41.json).
+
+Holding Cover should draw and stow binoculars with the normal animations, without taking cover or making them appear instantly. A short tap should retain normal cover behavior.
+
+**Status: Further testing is blocked by the binocular crash in #357.** The earlier shortcut repair is not proof that the current transition is safe. Repair that crash before requesting another binocular test.
+
 ## comment 5550109850 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/104#issuecomment-5550109850

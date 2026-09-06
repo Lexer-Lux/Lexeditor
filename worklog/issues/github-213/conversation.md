@@ -27,6 +27,18 @@ Exact metadata: [source record](sources/issue-5356310568-6fe70abfb80f5b594395069
 
 [Original screenshot](https://github.com/user-attachments/assets/2e82b3ff-6ede-42c4-a6f1-9c6f9e8d7e9f).
 
+## issue 5356310568 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/213
+
+Created: 2026-08-06T08:36:23Z; updated: 2026-09-06T13:57:23Z
+
+Exact metadata: [source record](sources/issue-5356310568-2c82a3cb4204827fa63cb91ca91e0a5220ac1b0befd2229062f6277c141750f4.json).
+
+**Closed after the coordinate correction.** Exact source coordinates and calibrated placements replaced the erroneous southwest conversion. Individual location checks continue in #274; this does not certify every collectible.
+
+[Original screenshot](https://github.com/user-attachments/assets/2e82b3ff-6ede-42c4-a6f1-9c6f9e8d7e9f).
+
 ## comment 5550139582 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/213#issuecomment-5550139582

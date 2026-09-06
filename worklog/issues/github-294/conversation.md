@@ -37,6 +37,19 @@ You selected the broad-brim hat/person icon. It is implemented; there is no outs
 - [ ] Restart RDR2. Tag a neutral person without binoculars while #357 remains open; confirm the chosen person glyph appears, not the old plain circle.
 - [ ] Change distance and available tag size/fade settings. Confirm the hat and shoulders stay centered inside the health ring; send a screenshot of any mismatch.
 
+## issue 5356332913 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/294
+
+Created: 2026-08-20T11:47:22Z; updated: 2026-09-06T13:02:57Z
+
+Exact metadata: [source record](sources/issue-5356332913-e780d6d4843a46ab90d130cfc838bbcd0baf2199605d72b12e33a4b96b1b846a.json).
+
+You selected the broad-brim hat/person icon. It is implemented; there is no outstanding icon-design question.
+
+- [ ] Restart RDR2. Tag a neutral person without binoculars while #357 remains open; confirm the chosen person glyph appears, not the old plain circle.
+- [ ] Change distance and available tag size/fade settings. Confirm the hat and shoulders stay centered inside the health ring; send a screenshot of any mismatch.
+
 ## comment 5551264293 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/294#issuecomment-5551264293

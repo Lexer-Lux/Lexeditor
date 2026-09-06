@@ -31,6 +31,18 @@ Exact metadata: [source record](sources/issue-5356307929-d733dec1cd72f118f60e9a7
 
 A safe entity-local mechanism still needs research. Failed attempts do not establish that every approach is unfeasible. Nothing is ready for a player test.
 
+## issue 5356307929 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/201
+
+Created: 2026-08-06T05:59:36Z; updated: 2026-09-06T13:58:10Z
+
+Exact metadata: [source record](sources/issue-5356307929-79030736888df5456342bcc7fb0bb0ac48bb6d7fbb9e439dfc82c4c697ee195d.json).
+
+**Actionable — no safe implementation yet.** Earlier hooks crashed or damaged shared shop/interaction behavior and were removed. Diagnostic logging is not the gameplay feature.
+
+A safe entity-local mechanism still needs research. Failed attempts do not establish that every approach is unfeasible. Nothing is ready for a player test.
+
 ## comment 5550136472 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/201#issuecomment-5550136472

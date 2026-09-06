@@ -22,6 +22,16 @@ Exact metadata: [source record](sources/issue-5356309718-beb9080fbaa87165b0282f7
 
 **Status: Confirmed fixed in game and closed.** Newspaper-marker updates were overwriting shared shop state. Replacing that write with a read-only local count restored shop volumes, markers and interactions.
 
+## issue 5356309718 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/209
+
+Created: 2026-08-06T06:40:35Z; updated: 2026-09-06T13:57:54Z
+
+Exact metadata: [source record](sources/issue-5356309718-7b470d0169fe4a25848cfd752069e9ca52b2b25262594ef1a24647cbf23eb6e0.json).
+
+**Status: Confirmed fixed in game and closed.** Newspaper-marker updates were overwriting shared shop state. Replacing that write with a read-only local count restored shop volumes, markers and interactions.
+
 ## comment 5550138508 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/209#issuecomment-5550138508

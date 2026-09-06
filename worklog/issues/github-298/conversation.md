@@ -36,6 +36,19 @@ Exact metadata: [source record](sources/issue-5356334016-66a5198612060d103175f9a
 - [ ] In Story Mode, aim a weapon at a crow near a corpse without shooting. Confirm the lower-right animal information/Study interaction appears for the crow rather than a nearby target. Avoid binoculars while #357 is unresolved.
 - [ ] If it still fails, press F10 once while aimed with the already-prepared compendium probe enabled. Report the result and attach the probe output and GameplayTweaks.log.
 
+## issue 5356334016 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/298
+
+Created: 2026-08-23T06:07:15Z; updated: 2026-09-06T13:07:38Z
+
+Exact metadata: [source record](sources/issue-5356334016-a686af71875ff7cd75f7e199093a5caaf00043137bee18bc19bf9ac0b261e469.json).
+
+**Status: The aimed-crow selection repair is installed.** The old claim that crows could not be resolved was incorrect.
+
+- [ ] In Story Mode, aim a weapon at a crow near a corpse without shooting. Confirm the lower-right animal information/Study interaction appears for the crow rather than a nearby target. Avoid binoculars while #357 is unresolved.
+- [ ] If it still fails, press F10 once while aimed with the already-prepared compendium probe enabled. Report the result and attach the probe output and GameplayTweaks.log.
+
 ## comment 5550167249 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/298#issuecomment-5550167249

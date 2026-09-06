@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356299936,
+    "number": 170,
+    "title": "Provide useful road bonuses or remove ineffective speed controls",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/170"
+  },
+  "sha256": "068f4e7b1fa67df85370f65277a98ae20de47e659d90b92bc76abb7f18c7c113",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-71.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -18,6 +18,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/15
 
 Created: 2026-08-24T10:40:44Z; updated: 2026-09-06T12:45:04Z
 
+Exact metadata: [source record](sources/issue-5233797716-5ead9290503f9f5b61252798455520e2216ba6c1fdfd36b16d79d86dd711d4d9.json).
+
+Shop names/counts are centered and more readable. Stock-category rows now share the available width instead of scrolling sideways.
+
+- [ ] Restart Lexeditor and open RDR2 Shops. Check the center list's name/count alignment and “X+ buys · Y sells” summaries.
+- [ ] Switch shops and stock categories at wide and narrow sizes. Confirm the two SELLS tab rows remain evenly spaced and readable; send a screenshot of a mismatch.
+
+## issue 5233797716 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/15
+
+Created: 2026-08-24T10:40:44Z; updated: 2026-09-06T12:45:04Z
+
 Exact metadata: [source record](sources/issue-5233797716-d2811836c82a6938bfaed3115f9004fb62009c6071aa0c91e340e72ac729071c.json).
 
 Shop names/counts are centered and more readable. Stock-category rows now share the available width instead of scrolling sideways.

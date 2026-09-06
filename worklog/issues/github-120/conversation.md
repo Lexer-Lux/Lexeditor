@@ -25,6 +25,19 @@ Exact metadata: [source record](sources/issue-5356288606-f9c2f1e57982f77a0cdc7d9
 - [ ] Start the development build in Story Mode. Press tilde once: all development readouts should hide; press again and they should return together.
 - [ ] Check that Stamina no longer exposes a separate ShowMode setting. Report a readout that ignores the toggle or an obsolete control that remains.
 
+## issue 5356288606 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/120
+
+Created: 2026-08-06T01:57:12Z; updated: 2026-09-06T13:57:19Z
+
+Exact metadata: [source record](sources/issue-5356288606-ca9e379f51ac9b20dace98334d903e7a76ba1d292fe1e85d4701f1da83569db2.json).
+
+**Status: Installed; needs your check.** Development readouts share one tilde toggle. The obsolete separate ShowMode setting is removed.
+
+- [ ] Start the development build in Story Mode. Press tilde once: all development readouts should hide; press again and they should return together.
+- [ ] Check that Stamina no longer exposes a separate ShowMode setting. Report a readout that ignores the toggle or an obsolete control that remains.
+
 ## comment 5550114750 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/120#issuecomment-5550114750

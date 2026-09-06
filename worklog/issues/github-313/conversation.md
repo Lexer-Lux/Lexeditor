@@ -33,6 +33,18 @@ L1 / Look Left should open the living reserve list during a turn. Confirm swaps 
 
 **Status: Broken; repair not delivered.** The latest player test opened an empty panel and selecting a reserve soft-locked the game. Draft PR #356 repairs the replacement path, but its Windows driver still needs building and packaging. Do not repeat the old test yet. Shared Magic compatibility also remains unfinished.
 
+## issue 5356484028 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/313
+
+Created: 2026-08-30T19:39:43Z; updated: 2026-09-06T12:33:03Z
+
+Exact metadata: [source record](sources/issue-5356484028-a1f73ea7bd7183ef27ce1671a7b37bfa1b01ad0559234515ed63562dcab29284.json).
+
+L1 / Look Left should open the living reserve list during a turn. Confirm swaps only the acting character and spends their turn; cancel keeps it.
+
+**Status: Broken; repair not delivered.** The latest player test opened an empty panel and selecting a reserve soft-locked the game. Draft PR #356 repairs the replacement path, but its Windows driver still needs building and packaging. Do not repeat the old test yet. Shared Magic compatibility also remains unfinished.
+
 ## comment 5550344895 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/313#issuecomment-5550344895

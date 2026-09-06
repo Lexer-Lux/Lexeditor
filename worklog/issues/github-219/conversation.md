@@ -32,6 +32,16 @@ Exact metadata: [source record](sources/issue-5356311961-dec05bb5f223b56da80d6e7
 
 **Status: Closed after installation.** GameplayTweaks.log combines timestamped subsystem events, resets per session and rotates at a bounded size. Verbose tracing is off by default. Dedicated one-shot developer data exports remain separate; routine troubleshooting should not require dozens of logs.
 
+## issue 5356311961 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/219
+
+Created: 2026-08-06T18:10:34Z; updated: 2026-09-06T13:58:13Z
+
+Exact metadata: [source record](sources/issue-5356311961-735dbcc8496314c9c088e6966cd37a27db7bfc1b750474a3fd77bef8a7935b72.json).
+
+**Status: Closed after installation.** GameplayTweaks.log combines timestamped subsystem events, resets per session and rotates at a bounded size. Verbose tracing is off by default. Dedicated one-shot developer data exports remain separate; routine troubleshooting should not require dozens of logs.
+
 ## comment 5550141080 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/219#issuecomment-5550141080

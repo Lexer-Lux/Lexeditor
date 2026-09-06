@@ -37,6 +37,19 @@ Exact metadata: [source record](sources/issue-5356310801-502378a9495c3bcca908f6c
 - [ ] With tilde development mode on, move a marker you are auditing using F2, then hold F2 for at least 800 ms. Confirm success/undo notices and the exact original position returns.
 - [ ] Try F2 where no marker is in range: expect a clear notice and no move. Turn development mode off and confirm F2 does nothing. Report the incorrect result.
 
+## issue 5356310801 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/214
+
+Created: 2026-08-06T09:58:10Z; updated: 2026-09-06T13:56:12Z
+
+Exact metadata: [source record](sources/issue-5356310801-fa1d47caf9ce7eacc05cb6f6f1786fd9d782521f1e793b20c1b2f6213d23f651.json).
+
+**Status: The repaired F2 authoring tool is installed.** A tap acts on release; holding for 800 ms restores the previous marker coordinates and saved state.
+
+- [ ] With tilde development mode on, move a marker you are auditing using F2, then hold F2 for at least 800 ms. Confirm success/undo notices and the exact original position returns.
+- [ ] Try F2 where no marker is in range: expect a clear notice and no move. Turn development mode off and confirm F2 does nothing. Report the incorrect result.
+
 ## comment 5550139845 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/214#issuecomment-5550139845

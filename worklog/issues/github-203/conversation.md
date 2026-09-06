@@ -34,3 +34,15 @@ Exact metadata: [source record](sources/issue-5356308413-d6514f30b6b1ca8b6b88534
 Looting an ordinary victim killed with the Viking Hatchet should award four times the cash actually rolled, without changing item loot or mission payouts.
 
 **Status: Delivery and a controlled test are not established.** Prepare a known cash result and comparison before asking you to verify 4×; unrelated random corpse payouts cannot prove it.
+
+## issue 5356308413 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/203
+
+Created: 2026-08-06T05:59:37Z; updated: 2026-09-06T12:55:40Z
+
+Exact metadata: [source record](sources/issue-5356308413-efa39b44afa7fda46dbc3d40eb2f1b335a25ea899e0910c993e06b9640b98d14.json).
+
+Looting an ordinary victim killed with the Viking Hatchet should award four times the cash actually rolled, without changing item loot or mission payouts.
+
+**Status: Delivery and a controlled test are not established.** Prepare a known cash result and comparison before asking you to verify 4×; unrelated random corpse payouts cannot prove it.

@@ -29,6 +29,18 @@ Allow chosen items to feed horses and grant a configured bond amount.
 
 **Actionable — runtime mapping remains.** Native feeding uses a scripted allowlist and shared bond award, not a catalog bond field. A configurable mapping must integrate with actual feeding; the rejected after-consumption watcher must not return or double-award bonding. No new permission is needed merely to investigate that non-watcher approach.
 
+## issue 5356292019 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/134
+
+Created: 2026-08-06T02:12:28Z; updated: 2026-09-06T13:55:24Z
+
+Exact metadata: [source record](sources/issue-5356292019-956c9ad257fb71522c2fc506685a1de9ffbbc6baaa58489e16a287fa8dc5bfc9.json).
+
+Allow chosen items to feed horses and grant a configured bond amount.
+
+**Actionable — runtime mapping remains.** Native feeding uses a scripted allowlist and shared bond award, not a catalog bond field. A configurable mapping must integrate with actual feeding; the rejected after-consumption watcher must not return or double-award bonding. No new permission is needed merely to investigate that non-watcher approach.
+
 ## comment 5550118839 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/134#issuecomment-5550118839

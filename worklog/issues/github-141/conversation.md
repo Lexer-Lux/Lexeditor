@@ -25,6 +25,18 @@ Exact metadata: [source record](sources/issue-5356293703-2921996484c9879ef7d93a7
 
 The concrete interior, merchant, stock, interaction and persistence setup still needs documenting and proving. No prototype or prepared test is available; another request to approve research is unnecessary.
 
+## issue 5356293703 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/141
+
+Created: 2026-08-06T02:21:37Z; updated: 2026-09-06T13:53:54Z
+
+Exact metadata: [source record](sources/issue-5356293703-139d6d3adf1f0d62449246a66c0b483d355bf9196688f7f26f1765717f50fa22.json).
+
+**Actionable — practical setup remains.** Your question was how to create the shop, not whether interiors are needed. Blackwater has a recognized shop ID and is the proposed first example.
+
+The concrete interior, merchant, stock, interaction and persistence setup still needs documenting and proving. No prototype or prepared test is available; another request to approve research is unnecessary.
+
 ## comment 5550120751 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/141#issuecomment-5550120751

@@ -38,6 +38,20 @@ Exact metadata: [source record](sources/issue-5285785637-14a6844b42aade3072be06f
 - [ ] In Lexer Mode, note Volume, then try 50%, 1% and 0% while using menu controls. Sound should change immediately; 0% should be silent. Restore your value.
 - [ ] Report any save, version-status or sound failure. Gameplay effects have separate checks.
 
+## issue 5285785637 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/23
+
+Created: 2026-08-29T09:38:53Z; updated: 2026-09-06T13:30:50Z
+
+Exact metadata: [source record](sources/issue-5285785637-87f37545cbf85c7c560c7b50f20a805168b71c3cc4eef47501f07b3a59c717b2.json).
+
+**Needs testing.** FFNx installation and patch loading are recorded working. Helper versions remain pinned; checking for updates must not silently replace them.
+
+- [ ] Restart Lexeditor. Change update frequency, save and reopen Settings; confirm persistence. Check FF8 Info shows the installed helper version.
+- [ ] In Lexer Mode, note Volume, then try 50%, 1% and 0% while using menu controls. Sound should change immediately; 0% should be silent. Restore your value.
+- [ ] Report any save, version-status or sound failure. Gameplay effects have separate checks.
+
 ## comment 5461642207 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/23#issuecomment-5461642207

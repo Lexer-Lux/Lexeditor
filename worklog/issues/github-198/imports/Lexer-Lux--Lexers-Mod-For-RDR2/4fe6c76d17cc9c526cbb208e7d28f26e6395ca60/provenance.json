@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356307057,
+    "number": 198,
+    "title": "Apply Toxic damage to the outer Health bar",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/198"
+  },
+  "sha256": "ad2b70763eb32f7994036d5c974b8a36f44266bb5fcf91bfd7ee4ce395e93e40",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-102.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

@@ -25,6 +25,19 @@ Exact metadata: [source record](sources/issue-5288477560-1af7c4102536f574eacc382
 - [ ] Restart Lexeditor. In Blank, hover a field’s metadata area: the help marker should replace the type text and reveal useful help.
 - [ ] Check a narrow window, then FF8 and RDR2 fields. Confirm markers remain centered and readable and keyboard focus exposes help. Report the field and screenshot of any failure.
 
+## issue 5288477560 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/56
+
+Created: 2026-08-29T19:38:32Z; updated: 2026-09-06T13:06:54Z
+
+Exact metadata: [source record](sources/issue-5288477560-459ce98751b8ff103ff3c05589ea7af88bf52219e99462d89f5d3b7b7e1ca10f.json).
+
+**Status: Latest Blank regression is repaired; needs your visual check.** Help uses a filled-circle question mark, centered in the field’s metadata slot, without an oversized cursor covering it.
+
+- [ ] Restart Lexeditor. In Blank, hover a field’s metadata area: the help marker should replace the type text and reveal useful help.
+- [ ] Check a narrow window, then FF8 and RDR2 fields. Confirm markers remain centered and readable and keyboard focus exposes help. Report the field and screenshot of any failure.
+
 ## comment 5464560681 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/56#issuecomment-5464560681

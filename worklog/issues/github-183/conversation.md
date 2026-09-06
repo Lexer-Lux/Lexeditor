@@ -46,6 +46,16 @@ Exact metadata: [source record](sources/issue-5356302676-0252d6c2ff2983e2cfaf2ff
 
 **Status: Closed for the animal-marker redesign.** Animals use the distinct marker treatment, stable hostility colors and the game’s discoverable name. The last comment reported a missing vision cone, so this record alone does not prove cone coverage; facing-indicator work is tracked separately in #296.
 
+## issue 5356302676 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/183
+
+Created: 2026-08-06T03:52:24Z; updated: 2026-09-06T13:58:11Z
+
+Exact metadata: [source record](sources/issue-5356302676-5b43c16dd3a7bf64b82c441eaf6c94ea48222befe0a5d1d996a66bf4fc6962cc.json).
+
+**Status: Closed for the animal-marker redesign.** Animals use the distinct marker treatment, stable hostility colors and the game’s discoverable name. The last comment reported a missing vision cone, so this record alone does not prove cone coverage; facing-indicator work is tracked separately in #296.
+
 ## comment 5550131124 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/183#issuecomment-5550131124

@@ -27,6 +27,18 @@ Climbing must attach to a real surface, survive cluttered geometry and never hol
 
 **Status: Still blocked in the current game.** The latest user report in #251 says jumping at walls no longer grabs them. A later surface-fit build was not installed. Restore and verify entry before asking you to test climbing animations or mantling.
 
+## issue 5356305471 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/193
+
+Created: 2026-08-06T05:51:27Z; updated: 2026-09-06T13:54:54Z
+
+Exact metadata: [source record](sources/issue-5356305471-2959cf3453591c3abe9ee3d2c0d11cf6161ac1483a815b9641d0f614ba869cb8.json).
+
+Climbing must attach to a real surface, survive cluttered geometry and never hold the player in empty space.
+
+**Status: Still blocked in the current game.** The latest user report in #251 says jumping at walls no longer grabs them. A later surface-fit build was not installed. Restore and verify entry before asking you to test climbing animations or mantling.
+
 ## comment 5550133961 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/193#issuecomment-5550133961

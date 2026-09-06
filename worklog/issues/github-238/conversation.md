@@ -47,6 +47,18 @@ An item must be visibly unavailable before use when its configured negative effe
 
 **Status: Partly working, still defective.** You confirmed use is blocked, but the radial does not grey the item out, so it appears selectable and silently does nothing. Fix that visible availability mismatch before another acceptance test.
 
+## issue 5356316373 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/238
+
+Created: 2026-08-10T10:22:31Z; updated: 2026-09-06T12:56:29Z
+
+Exact metadata: [source record](sources/issue-5356316373-dadff916def9f18855d290a7b6365a2265a3871bf6820db3f379f3fe81446019.json).
+
+An item must be visibly unavailable before use when its configured negative effect would reduce any core below zero. Exactly zero remains allowed.
+
+**Status: Partly working, still defective.** You confirmed use is blocked, but the radial does not grey the item out, so it appears selectable and silently does nothing. Fix that visible availability mismatch before another acceptance test.
+
 ## comment 5550146110 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/238#issuecomment-5550146110

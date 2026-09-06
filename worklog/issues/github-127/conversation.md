@@ -22,6 +22,16 @@ Exact metadata: [source record](sources/issue-5356290266-e7555dedfcdcd1642258fbd
 
 **Status: Closed after the startup-skip installation.** The two logo movies are skipped through the installed loader data. Existing interface timing adjustments remain separate and are preserved; no repeat startup test is requested here.
 
+## issue 5356290266 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/127
+
+Created: 2026-08-06T02:04:07Z; updated: 2026-09-06T13:54:29Z
+
+Exact metadata: [source record](sources/issue-5356290266-cdcf525727928bf63893bf64e288c1b959bc47f22db7fd313354456f9f94607b.json).
+
+**Status: Closed after the startup-skip installation.** The two logo movies are skipped through the installed loader data. Existing interface timing adjustments remain separate and are preserved; no repeat startup test is requested here.
+
 ## comment 5550116751 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/127#issuecomment-5550116751

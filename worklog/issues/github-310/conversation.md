@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/310
 
 Created: 2026-08-29T15:07:03Z; updated: 2026-09-06T12:59:31Z
 
+Exact metadata: [source record](sources/issue-5356483581-c587cdd4133608cec4437aa5b9de63b16a28fa105448b4559dea312e52d16d72.json).
+
+Use one saved spell pool for menus, Draw, casting and junction quantities, without loss or duplication. Reject migration cleanly when existing stocks cannot fit.
+
+**Status: The runtime is packaged, but a completed in-game handoff is not recorded.** Prepare copied-save migration/overflow tests and verify the installed driver. Party Switch (#313) and non-100 stock caps (#94) remain unfinished combinations.
+
+## issue 5356483581 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/310
+
+Created: 2026-08-29T15:07:03Z; updated: 2026-09-06T12:59:31Z
+
 Exact metadata: [source record](sources/issue-5356483581-e05442183db02bfaa0f2842e0626771cdba46ec8ffc113e27f468421c1cf0849.json).
 
 Use one saved spell pool for menus, Draw, casting and junction quantities, without loss or duplication. Reject migration cleanly when existing stocks cannot fit.

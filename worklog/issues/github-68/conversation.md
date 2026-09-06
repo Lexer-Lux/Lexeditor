@@ -42,6 +42,20 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/68
 
 Created: 2026-08-30T22:32:47Z; updated: 2026-09-06T13:06:56Z
 
+Exact metadata: [source record](sources/issue-5294730280-9f0635c9ef523dba39896b4e6dd61700951b8e856100fe549be6263035a38188.json).
+
+**Status: Implemented; latest save-dialog repairs need your check.** The settings floppy tracks only settings changes. Successful saves close the dialog; dirty dismissal must not silently discard work.
+
+- [ ] Restart Lexeditor. Change one setting: confirm badge 1. Save, reopen and confirm the value persisted and the badge cleared.
+- [ ] Change it again, right-click the floppy and confirm discard: the saved value should return.
+- [ ] Leave a disposable item edit unsaved, then save/discard a setting. Confirm the item edit remains unsaved. Check that cancelling a dirty dialog close keeps its draft; report any lost edit or failed save.
+
+## issue 5294730280 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/68
+
+Created: 2026-08-30T22:32:47Z; updated: 2026-09-06T13:06:56Z
+
 Exact metadata: [source record](sources/issue-5294730280-cae628efd5aee690eb0a4c5ed5b64aff58bb67da63646f6d4cf888025b255cd9.json).
 
 **Status: Implemented; latest save-dialog repairs need your check.** The settings floppy tracks only settings changes. Successful saves close the dialog; dirty dismissal must not silently discard work.

@@ -5923,7 +5923,7 @@ async function renderDataMap() {
     changeStatus:value=>{f.mapStatus=value;f.mapPage=0;renderDataMap();},
     changePage:page=>{f.mapPage=page;renderDataMap();},
     changeSort:key=>{const [active,direction]=state.dataMapSort;state.dataMapSort=[key,active===key?-direction:1];renderDataMap();},
-    open:row=>{if(row.target)navigate(row.target);}
+    open:row=>{if(row.target)navigate(row.target,row.filename==="projectile_speed_multipliers.csv"?{weaponSection:"velocity"}:row.filename==="honor_actions.csv"?{crimeSection:"honor"}:{});}
   });
   f.mapPage=view.page;
   $("#toolbar").replaceChildren(...view.controls);

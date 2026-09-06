@@ -25,6 +25,19 @@ Exact metadata: [source record](sources/issue-5288099278-16a5603c18e2c7dd3e26917
 - [ ] With RDR1 and FF8 already prepared, fully close and reopen Lexeditor, then open each plugin. Do not delete their caches.
 - [ ] Repeat once without changing the games. Confirm neither runs full extraction again; a brief readiness check is normal. Report the game and message that repeats.
 
+## issue 5288099278 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/55
+
+Created: 2026-08-29T18:10:28Z; updated: 2026-09-06T13:06:52Z
+
+Exact metadata: [source record](sources/issue-5288099278-67c3ee476e8ec1ea9dd348b0001f3d9938d83ca2a4de01f35c00c61b5e53e579.json).
+
+**Status: Both cache checks are repaired; needs your startup check.** Valid prepared data should be reused rather than extracted every time.
+
+- [ ] With RDR1 and FF8 already prepared, fully close and reopen Lexeditor, then open each plugin. Do not delete their caches.
+- [ ] Repeat once without changing the games. Confirm neither runs full extraction again; a brief readiness check is normal. Report the game and message that repeats.
+
 ## comment 5473643581 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/55#issuecomment-5473643581

@@ -22,6 +22,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/332
 
 Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T13:07:46Z
 
+Exact metadata: [source record](sources/issue-5356487433-d0c4d18b8c088eeea3093f95b9e4113b19a32ed690471d8efede94336378c690.json).
+
+**Status: RedHook and the development plugin are installed.** The former manual-download blocker is resolved.
+
+- [ ] Start Story Mode. Press tilde twice and confirm development mode turns on, then off, without breaking normal play.
+- [ ] Quit normally and report any startup error, toggle failure or shutdown hang so the corresponding logs can be checked. Avoid opening the weapon wheel: its crash is tracked in #333.
+
+## issue 5356487433 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/332
+
+Created: 2026-08-24T15:38:07Z; updated: 2026-09-06T13:07:46Z
+
 Exact metadata: [source record](sources/issue-5356487433-eb64275a662eb1248d0fa622f443d4ed831cb7e71cddff15cb050ebafee52130.json).
 
 **Status: RedHook and the development plugin are installed.** The former manual-download blocker is resolved.

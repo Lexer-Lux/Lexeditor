@@ -26,3 +26,15 @@ Exact metadata: [source record](sources/issue-5356184106-e68e1b5b5bfd2295915bb65
 Independent edits from enabled mods should coexist; later mods should win conflicts according to load order.
 
 **Work remains:** prepare a small, repeatable multi-mod setup and verify the resulting game behavior. You should receive the test mods, exact steps and expected values—not be asked to invent the test.
+
+## issue 5356184106 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/100
+
+Created: 2026-09-05T06:34:11Z; updated: 2026-09-06T12:46:27Z
+
+Exact metadata: [source record](sources/issue-5356184106-f807cb1d1101c65444e28ed4e1364671d10cd562eda047d229d2aeb0c832c160.json).
+
+Independent edits from enabled mods should coexist; later mods should win conflicts according to load order.
+
+**Work remains:** prepare a small, repeatable multi-mod setup and verify the resulting game behavior. You should receive the test mods, exact steps and expected values—not be asked to invent the test.

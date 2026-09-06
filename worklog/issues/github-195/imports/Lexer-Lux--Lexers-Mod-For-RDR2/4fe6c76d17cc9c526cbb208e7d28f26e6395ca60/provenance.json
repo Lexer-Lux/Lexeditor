@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356305892,
+    "number": 195,
+    "title": "Check recovering lost money from the last-worn hat",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/195"
+  },
+  "sha256": "7ed825bc0e4912ddce34ff0e6dde819221289c0aa006537abdff6c300c6ab1fc",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-99.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

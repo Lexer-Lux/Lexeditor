@@ -22,6 +22,16 @@ Exact metadata: [source record](sources/issue-5356310129-252d53dcf70a47293d4d43d
 
 **Status: Closed after the installed removal repair.** Developer F3 removal and duplicate prevention use the same physical campsite footprint, including tent/rest positions. Holding F3 remains deliberate; normal player teardown protection is separate in #101.
 
+## issue 5356310129 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/211
+
+Created: 2026-08-06T06:47:02Z; updated: 2026-09-06T13:55:06Z
+
+Exact metadata: [source record](sources/issue-5356310129-b54b4aec4dc062cacd910b5108422f97a9e54873577cf8b69f64c0701a7f6dc1.json).
+
+**Status: Closed after the installed removal repair.** Developer F3 removal and duplicate prevention use the same physical campsite footprint, including tent/rest positions. Holding F3 remains deliberate; normal player teardown protection is separate in #101.
+
 ## comment 5550139035 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/211#issuecomment-5550139035

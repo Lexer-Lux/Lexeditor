@@ -25,3 +25,15 @@ Exact metadata: [source record](sources/issue-5356651898-89737be5e938c6f6bf08dff
 **Actionable — rewrite remains.** Across all plugins and shared controls, explain what each control changes, with relevant units, limits and restart requirements. Wording must match actual behavior and fit onscreen.
 
 This is unfinished development, not a pending user test.
+
+## issue 5356651898 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/349
+
+Created: 2026-09-05T08:16:39Z; updated: 2026-09-06T13:32:14Z
+
+Exact metadata: [source record](sources/issue-5356651898-bfdd1596df5b07bea3762a2f4fc787b1bcafa2afe4710e499186633a0aa98f15.json).
+
+**Actionable — rewrite remains.** Across all plugins and shared controls, explain what each control changes, with relevant units, limits and restart requirements. Wording must match actual behavior and fit onscreen.
+
+This is unfinished development, not a pending user test.

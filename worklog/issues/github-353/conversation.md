@@ -20,6 +20,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/353
 
 Created: 2026-09-05T17:53:10Z; updated: 2026-09-06T13:32:20Z
 
+Exact metadata: [source record](sources/issue-5359857548-192b06543f04e69061c6513fc815592a77e56b5e2477ddee1de2ee596e8725e2.json).
+
+**Actionable — reported broken.** Loading shows only “I'm all out of loading messages” instead of the game’s quotes. Restore quote selection.
+
+No repair is ready for another startup test.
+
+## issue 5359857548 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/353
+
+Created: 2026-09-05T17:53:10Z; updated: 2026-09-06T13:32:20Z
+
 Exact metadata: [source record](sources/issue-5359857548-a81ffe474bdf7ca1eb5bcdafd866c6423d735c6f1738868c77f375f9212ad7e1.json).
 
 **Actionable — reported broken.** Loading shows only “I'm all out of loading messages” instead of the game’s quotes. Restore quote selection.

@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/344
 
 Created: 2026-08-24T17:07:39Z; updated: 2026-09-06T12:39:07Z
 
+Exact metadata: [source record](sources/issue-5356489924-11afffd88f73c09252cba534f476b6e6dba0b9b2220b63b2b823f2bab9e1edcd.json).
+
+**Status: The Missions editor and runtime reward override are connected.** Cash, fame and honor results still need in-game confirmation.
+
+Prepare a named mission, suitable starting save, explicit reward values and exact deployment/revert steps. The current request to ‘change and complete a mission’ leaves too much setup to you, so this is not ready for testing yet.
+
+## issue 5356489924 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/344
+
+Created: 2026-08-24T17:07:39Z; updated: 2026-09-06T12:39:07Z
+
 Exact metadata: [source record](sources/issue-5356489924-69f921bb359239f79d2764cb04fc1f1b9d19a851db0cb17e085cf9a0469f87f9.json).
 
 **Status: The Missions editor and runtime reward override are connected.** Cash, fame and honor results still need in-game confirmation.

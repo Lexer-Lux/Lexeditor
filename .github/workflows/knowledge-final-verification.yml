@@ -1,0 +1,107 @@
+name: Verify centralized knowledge
+on:
+  push:
+    branches: [master]
+    paths: [.github/workflows/knowledge-final-verification.yml]
+permissions:
+  contents: write
+  issues: read
+  actions: read
+concurrency:
+  group: lexeditor-knowledge-store
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: master
+          submodules: false
+          sparse-checkout: |
+            tools/knowledge_store.py
+            codex
+            worklog
+          sparse-checkout-cone-mode: false
+      - name: Read the stopped cleanup result
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh run download 34037390327 --repo Lexer-Lux/Lexeditor --name knowledge-store-result-34037390327 --dir /tmp/cleanup-result
+      - name: Verify text and repair attachment downloads without deleting anything
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import concurrent.futures,datetime,hashlib,importlib.util,json,pathlib,re,subprocess
+          p=pathlib.Path('tools/knowledge_store.py');text=p.read_text()
+          old="if not (host == 'github.com' or host.endswith('.githubusercontent.com')):"
+          new="if not (host == 'github.com' or host.endswith('.githubusercontent.com') or re.fullmatch(r'github-production-user-asset-[a-z0-9-]+[.]s3[.]amazonaws[.]com', host)):"
+          assert old in text or new in text
+          text=text.replace(old,new).replace("raise RuntimeError('Unexpected attachment redirect host')", "raise RuntimeError('Unexpected attachment redirect host: ' + host)")
+          p.write_text(text)
+          spec=importlib.util.spec_from_file_location('store',p);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+          registry_path=m.ATTACHMENTS/'index.json';registry=json.loads(registry_path.read_text())
+          todo=[url for url,record in registry.items() if 'error' in record]
+          def fetch_one(url):
+              result={};m.attachments(url,result);return url,result.get(url,{'error':'Attachment URL was not recognized'})
+          with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+              for url,result in pool.map(fetch_one,todo):registry[url]=result
+          m.write(registry_path,m.encoded(registry))
+          issues=m.all_pages('repos/Lexer-Lux/Lexeditor/issues?state=all&per_page=100')
+          issues={i['number']:i for i in issues if 'pull_request' not in i}
+          comments=m.all_pages('repos/Lexer-Lux/Lexeditor/issues/comments?per_page=100')
+          comments=[c for c in comments if int(c['issue_url'].rsplit('/',1)[1]) in issues]
+          for i in issues.values():m.store(i['number'],'issue',i)
+          for c in comments:m.store(int(c['issue_url'].rsplit('/',1)[1]),'comment',c)
+          for n,i in issues.items():m.regenerate(n,i)
+          verified=0;unique_comments=set();source_bodies=0
+          for path in m.ROOT.glob('github-*/sources/*.json'):
+              obj=json.loads(path.read_text());record=obj.get('record',obj);body=record.get('body') or ''
+              expected=obj.get('body_sha256')
+              if expected is not None:assert hashlib.sha256(body.encode()).hexdigest()==expected, str(path)
+              verified+=1
+              if obj.get('kind')=='comment':unique_comments.add(record['id'])
+              elif obj.get('kind')=='issue':source_bodies+=1
+          cleanup=json.load(open('/tmp/cleanup-result/knowledge-result.json'))
+          log=subprocess.run(['gh','api','repos/Lexer-Lux/Lexeditor/actions/jobs/101497841433/logs'],capture_output=True,timeout=90)
+          failure=[]
+          if log.returncode==0:
+              lines=log.stdout.decode('utf-8-sig',errors='replace').splitlines()
+              failure=[x for x in lines if any(t in x for t in ('RuntimeError:','HTTP 403','secondary rate','rate limit','Could not resolve','FORBIDDEN'))][-8:]
+          else:failure=['Prior job log could not be read; '+log.stderr.decode(errors='replace')[-300:]]
+          candidates=[name for name in subprocess.check_output(['git','ls-files','-z']).decode().split('\0') if name and not name.startswith(('worklog/','codex/','.github/')) and re.search(r'(?i)(codex|worklog|project_memory)',name) and name.lower().endswith(('.md','.txt'))]
+          pending_attachments={u:r for u,r in registry.items() if 'error' in r}
+          report={'verified_at':datetime.datetime.now(datetime.timezone.utc).isoformat(),'issues':len(issues),'source_records_verified':verified,'issue_body_versions':source_bodies,'unique_archived_comments':len(unique_comments),'confirmed_comment_deletions_in_first_run':len(cleanup['deleted']),'comments_still_live':len(comments),'attachments_preserved':sum('path' in r for r in registry.values()),'attachment_failures':pending_attachments,'stopped_cleanup_error':failure,'unclassified_knowledge_paths':candidates,'note':'This verification has read-only issue permission. It performs no deletion. New comments remain until a later archive-verified cleanup. Unsaved chats and uncommitted local files are not recovered by a GitHub snapshot.'}
+          folder=pathlib.Path('worklog/migrations/knowledge-consolidation-2026-09-06');folder.mkdir(parents=True,exist_ok=True)
+          m.write(folder/'verification.json',m.encoded(report))
+          md='# Knowledge consolidation verification\n\n'+f'Verified: {report["verified_at"]}\n\n'+f'- Issues with per-issue archives: {len(issues)}\n- Exact source records verified: {verified}\n- Unique archived comments: {len(unique_comments)}\n- Confirmed deletions in the stopped first cleanup: {len(cleanup["deleted"])}\n- Comments still live at this check: {len(comments)}\n- Attachments preserved: {report["attachments_preserved"]}\n- Attachment failures remaining: {len(pending_attachments)}\n\n'
+          md+='## Remaining agent work\n\nResolve the recorded GitHub cleanup error before another deletion run. Never delete a changed comment or an unpreserved attachment. Recover original local-only game notes when accessible; absence from GitHub does not mean Lexer never supplied them. After parallel branches merge, reconcile source revisions using the game-knowledge ledger; do not overwrite central newer facts.\n\nSee verification.json for exact results and the original cleanup error.\n'
+          m.write(folder/'README.md',md.encode())
+          print(json.dumps({k:v for k,v in report.items() if k!='attachment_failures'}))
+          PY
+      - name: Commit verified archives and report
+        run: |
+          set -euo pipefail
+          git config user.name 'Lexeditor Knowledge Verification'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -f worklog tools/knowledge_store.py
+          if ! git diff --cached --quiet; then
+            git commit -m 'Verify preserved issue sources and attachment recovery; record remaining cleanup [skip ci]'
+            pushed=0
+            for attempt in 1 2 3; do
+              git -c submodule.recurse=false fetch --no-recurse-submodules origin master
+              git -c submodule.recurse=false rebase origin/master
+              if git push origin HEAD:master; then pushed=1; break; fi
+            done
+            test "$pushed" = 1
+          fi
+          git -c submodule.recurse=false fetch --no-recurse-submodules origin master
+          git merge-base --is-ancestor HEAD origin/master
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: final-knowledge-verification-${{ github.run_id }}
+          path: worklog/migrations/knowledge-consolidation-2026-09-06/
+          if-no-files-found: ignore
+          retention-days: 30

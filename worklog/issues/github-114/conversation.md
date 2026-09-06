@@ -30,6 +30,16 @@ Exact metadata: [source record](sources/issue-5356286914-1ba3e485f1eb6fd80872265
 
 **Status: Confirmed working in game and closed.** Opening the full map centers it on the player. Adjustable zoom speed remains a separate, unresolved request in #212.
 
+## issue 5356286914 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/114
+
+Created: 2026-08-06T01:49:10Z; updated: 2026-09-06T13:57:38Z
+
+Exact metadata: [source record](sources/issue-5356286914-e97e163f94c1e6e9f86fe89984360ac6a01281696e788d12be10ade27d9e13ed.json).
+
+**Status: Confirmed working in game and closed.** Opening the full map centers it on the player. Adjustable zoom speed remains a separate, unresolved request in #212.
+
 ## comment 5550112677 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/114#issuecomment-5550112677

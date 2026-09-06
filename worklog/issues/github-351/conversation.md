@@ -20,6 +20,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/351
 
 Created: 2026-09-05T17:46:39Z; updated: 2026-09-06T13:32:16Z
 
+Exact metadata: [source record](sources/issue-5359815365-e429dbed7e6e96cc13055c6662381ccfc2a5c46d0e292901e59a69c5c8333f3c.json).
+
+**Actionable — not written.** Create a short Markdown guide explaining how to add a game plugin and link it from the repository description.
+
+No design answer or test is needed from you.
+
+## issue 5359815365 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/351
+
+Created: 2026-09-05T17:46:39Z; updated: 2026-09-06T13:32:16Z
+
 Exact metadata: [source record](sources/issue-5359815365-f123044335d0dad842eb4775b51819f4995c692c225ceb460885f8db435f82ef.json).
 
 **Actionable — not written.** Create a short Markdown guide explaining how to add a game plugin and link it from the repository description.

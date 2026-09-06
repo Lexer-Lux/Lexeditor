@@ -57,6 +57,18 @@ Exact metadata: [source record](sources/issue-5356286656-6bba629d7800c75ef433fdc
 
 Verify installation of the follow-up probe and resolve manual lantern control in #105 first. Then supply the short F9-gated test sequence. Do not ask you to repeat completed movement trials or infer a universal detection meter.
 
+## issue 5356286656 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/113
+
+Created: 2026-08-06T01:45:22Z; updated: 2026-09-06T13:57:28Z
+
+Exact metadata: [source record](sources/issue-5356286656-2d7b7f1ef8e666181ff1f388511ec9967a5a23afe73ac6ebde2914461acb5385.json).
+
+**Status: Movement/noise research is done; the final seven conditions are not.** Only cover, lantern and weather comparisons remain.
+
+Verify installation of the follow-up probe and resolve manual lantern control in #105 first. Then supply the short F9-gated test sequence. Do not ask you to repeat completed movement trials or infer a universal detection meter.
+
 ## comment 5550112385 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/113#issuecomment-5550112385

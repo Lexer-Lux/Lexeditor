@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356290016,
+    "number": 126,
+    "title": "Test the Baked Beans overflow-storage prototype",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/126"
+  },
+  "sha256": "6112eaef000fd89a8bb8e1f60d7e74557a4bac7c97e42245e9203c3b95b16cc1",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-26.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

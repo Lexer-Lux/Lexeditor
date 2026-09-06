@@ -43,6 +43,20 @@ Exact metadata: [source record](sources/issue-5285751312-3932a40daac853dd69f4ff2
 - [ ] Check folder/version controls, font details where offered, and the bottom-left social buttons. Confirm nothing overlaps at your normal window size.
 - [ ] Confirm minimize, maximize and close are visible bordered buttons. Report any wrong state, missing art or clipping.
 
+## issue 5285751312 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/22
+
+Created: 2026-08-29T09:29:50Z; updated: 2026-09-06T13:06:28Z
+
+Exact metadata: [source record](sources/issue-5285751312-aed147de97446da45dc38b7a5ade410d340dea1a27e2ee9ac65d2e4932d80f62.json).
+
+**Status: Implemented; needs your visual check.** Home uses uncropped box art, Ready/Broken/Absent states, hover details and automatic game discovery. Later title positioning and window-button repairs are included.
+
+- [ ] Restart Lexeditor. Hover or keyboard-focus an installed and an absent game: check the name above the cover, action, status and path; only absent art should be desaturated.
+- [ ] Check folder/version controls, font details where offered, and the bottom-left social buttons. Confirm nothing overlaps at your normal window size.
+- [ ] Confirm minimize, maximize and close are visible bordered buttons. Report any wrong state, missing art or clipping.
+
 ## comment 5461597518 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/22#issuecomment-5461597518

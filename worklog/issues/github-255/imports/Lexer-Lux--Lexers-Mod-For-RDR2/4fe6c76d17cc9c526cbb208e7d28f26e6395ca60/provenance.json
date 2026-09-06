@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356321235,
+    "number": 255,
+    "title": "Fix the F3 campsite-removal crash",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/255"
+  },
+  "sha256": "8d26e8229d692c11077de5f6282f3489cbbcda925543be2d1d8cdf6f19f8c558",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-163.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

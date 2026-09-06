@@ -18,6 +18,18 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/306
 
 Created: 2026-08-30T20:50:34Z; updated: 2026-09-06T12:59:25Z
 
+Exact metadata: [source record](sources/issue-5356482940-07d8589e4f495e56aa37527f7d4ed8d7fa34c744ccb57ad95e89587281c2dbd0.json).
+
+Hide red Target labels from unselected actors and show selected target pointers at full opacity, without changing target eligibility or command behavior.
+
+**Status: A current delivered candidate is not established.** Verify the generated/runtime change and prepare single-target and group-target checks before asking you to test it.
+
+## issue 5356482940 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/306
+
+Created: 2026-08-30T20:50:34Z; updated: 2026-09-06T12:59:25Z
+
 Exact metadata: [source record](sources/issue-5356482940-c22e1ce4da79d80926a4d071b2f1b838d97ff30f844fb778b744de3e1df98096.json).
 
 Hide red Target labels from unselected actors and show selected target pointers at full opacity, without changing target eligibility or command behavior.

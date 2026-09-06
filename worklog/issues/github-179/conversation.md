@@ -24,6 +24,18 @@ Tab should stow the held weapon with its normal animation, not become unresponsi
 
 **Status: The latest repair is described but not confirmed installed.** It restores a working keyboard input and avoids taking Tab when the replacement cannot read it. Verify delivery before another tap/draw-transition test.
 
+## issue 5356301794 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/179
+
+Created: 2026-08-06T03:41:37Z; updated: 2026-09-06T13:58:08Z
+
+Exact metadata: [source record](sources/issue-5356301794-82f273809cb1bcaef03e60082761e9e3ec4968ed833a2314211b6a6a5ef65597.json).
+
+Tab should stow the held weapon with its normal animation, not become unresponsive or disable unrelated actions.
+
+**Status: The latest repair is described but not confirmed installed.** It restores a working keyboard input and avoids taking Tab when the replacement cannot read it. Verify delivery before another tap/draw-transition test.
+
 ## comment 5550130118 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/179#issuecomment-5550130118

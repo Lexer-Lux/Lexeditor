@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356299117,
+    "number": 166,
+    "title": "Deliver the Hunter's Hatchet animal-kill rework",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/166"
+  },
+  "sha256": "220e508409c461d9a736abb5142b2812e3d8a3ccb33758c787cc5a47cb7a8435",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-67.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

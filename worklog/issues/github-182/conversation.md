@@ -53,6 +53,19 @@ Exact metadata: [source record](sources/issue-5356302479-dc5b5145d6862661c08be21
 - [ ] Set [CompendiumGlintProbe] Enabled=1 in GameplayTweaks.ini and restart. While looking at each target, press F10 once: studied/unstudied animal, known/unknown horse breed, herb before/after picking, and known/unknown weapon or equipment. Use ordinary aiming, not binoculars while #357 is unresolved.
 - [ ] Attach GameplayTweaks.compendium-probe.log, identify the targets, and restore Enabled=0. The probe must not alter compendium progress.
 
+## issue 5356302479 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/182
+
+Created: 2026-08-06T03:49:08Z; updated: 2026-09-06T13:57:56Z
+
+Exact metadata: [source record](sources/issue-5356302479-93e175dbf9e65f06aa5304d91f5aa2f210fdbc50a19a20c45bcabccf7b1be2ba.json).
+
+**Status: A read-only probe is installed; the glint feature is not.** Scope includes animals, horses, plants, weapons and equipment—not animals alone.
+
+- [ ] Set [CompendiumGlintProbe] Enabled=1 in GameplayTweaks.ini and restart. While looking at each target, press F10 once: studied/unstudied animal, known/unknown horse breed, herb before/after picking, and known/unknown weapon or equipment. Use ordinary aiming, not binoculars while #357 is unresolved.
+- [ ] Attach GameplayTweaks.compendium-probe.log, identify the targets, and restore Enabled=0. The probe must not alter compendium progress.
+
 ## comment 5550130885 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/182#issuecomment-5550130885

@@ -27,6 +27,19 @@ Source: https://github.com/Lexer-Lux/Lexeditor/issues/315
 
 Created: 2026-08-29T15:23:55Z; updated: 2026-09-06T13:07:42Z
 
+Exact metadata: [source record](sources/issue-5356484437-670f6b8aee5dcac3debf7f9e3e9aa07f85a053bdd8c5ced95a8daad8dc6a49db.json).
+
+**Status: The latest Scan repair is ready for an in-game check.** A banner/animation alone is not a successful Scan.
+
+- [ ] Restart Lexeditor, enable Enhanced Scan and Universal Item, save and enter a two-enemy battle. On your turn press Square/controller X: choose either enemy, cancel once, then reopen and confirm.
+- [ ] Confirm the chosen enemy’s Scan information appears, stock is unchanged and the same character keeps their turn. Press RB/Look Right and confirm Item opens and cancels normally. Report the failed step.
+
+## issue 5356484437 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/315
+
+Created: 2026-08-29T15:23:55Z; updated: 2026-09-06T13:07:42Z
+
 Exact metadata: [source record](sources/issue-5356484437-a9a8bd141358f4c0b85c02baafe90be4af0bddb5348d67514ee4ff266c9b7e92.json).
 
 **Status: The latest Scan repair is ready for an in-game check.** A banner/animation alone is not a successful Scan.

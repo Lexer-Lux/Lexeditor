@@ -35,6 +35,18 @@ Enemy stats, rewards and other verified fields are editable, with save/readback 
 
 **Work remains:** the latest report has curves attached to the wrong side and an unwanted black panel. Restore the intended layout and prepare checks for enemy AI/text changes in game. Wider format coverage remains #84.
 
+## issue 5286522176 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/39
+
+Created: 2026-08-29T12:28:16Z; updated: 2026-09-06T12:45:26Z
+
+Exact metadata: [source record](sources/issue-5286522176-bc938eb527e06a52db76ee9f2583875d76e01132640bc18088a2b0b88e6a76b5.json).
+
+Enemy stats, rewards and other verified fields are editable, with save/readback support. The tab is not merely a read-only inventory anymore.
+
+**Work remains:** the latest report has curves attached to the wrong side and an unwanted black panel. Restore the intended layout and prepare checks for enemy AI/text changes in game. Wider format coverage remains #84.
+
 ## comment 5462451555 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/39#issuecomment-5462451555

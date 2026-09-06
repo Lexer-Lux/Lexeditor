@@ -31,6 +31,16 @@ Exact metadata: [source record](sources/issue-5356300510-ac3a6555dbfd916e69b825d
 
 **Status: Closed after the unwanted effect was removed.** The dropped CoreVignetteRamp plugin had remained installed and was being reinstalled automatically. Its loader files and reinstall path were removed; ordinary intentional game fades were not the target.
 
+## issue 5356300510 — Lexer-Lux
+
+Source: https://github.com/Lexer-Lux/Lexeditor/issues/173
+
+Created: 2026-08-06T03:19:37Z; updated: 2026-09-06T13:54:38Z
+
+Exact metadata: [source record](sources/issue-5356300510-8f3d9cc96b80e960520bae53ec3b0b1718b7ffba9b09ee206f4a03643ffe67d3.json).
+
+**Status: Closed after the unwanted effect was removed.** The dropped CoreVignetteRamp plugin had remained installed and was being reinstalled automatically. Its loader files and reinstall path were removed; ordinary intentional game fades were not the target.
+
 ## comment 5550128754 — Lexer-Lux
 
 Source: https://github.com/Lexer-Lux/Lexeditor/issues/173#issuecomment-5550128754

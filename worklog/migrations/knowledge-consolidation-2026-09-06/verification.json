@@ -1,0 +1,23 @@
+{
+  "attachment_failures": {
+    "https://github.com/user-attachments/assets/17fedf2f-e9cd-470e-b08c-36382e4fa0ff": {
+      "error": "HTTP Error 404: Not Found"
+    },
+    "https://github.com/user-attachments/assets/4bed2d8a-d9a9-403d-a3ac-45cb496a4245": {
+      "error": "HTTP Error 404: Not Found"
+    }
+  },
+  "attachments_preserved": 76,
+  "comments_still_live": 1402,
+  "confirmed_comment_deletions_in_first_run": 319,
+  "issue_body_versions": 961,
+  "issues": 339,
+  "note": "This verification has read-only issue permission. It performs no deletion. New comments remain until a later archive-verified cleanup. Unsaved chats and uncommitted local files are not recovered by a GitHub snapshot.",
+  "source_records_verified": 2701,
+  "stopped_cleanup_error": [
+    "Prior job log could not be read; the response contains terminal escape sequences; pass --allow-escape-sequences to output it anyway\n"
+  ],
+  "unclassified_knowledge_paths": [],
+  "unique_archived_comments": 1736,
+  "verified_at": "2026-09-06T14:20:52.740924+00:00"
+}
