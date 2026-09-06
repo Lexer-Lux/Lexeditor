@@ -326,11 +326,12 @@
         setDialog(plugin.name,"The game is ready.",[button("OPEN",()=>openGame(plugin)),button("CLOSE",closeDialog,true)]);return;
       }
       const scanning=plugin.scanInProgress;
+      // A project warning must not hide repair of the independently missing helper.
+      const canRepair=!!plugin.root&&plugin.helperInstallable&&!plugin.helperInstalled&&!scanning;
       const message=scanning
         ?"Lexeditor is still scanning automatically. You can wait for it to finish or locate the game now."
-        :(plugin.status==="broken"?"This game cannot open until its runtime helper is installed.":plugin.status==="warning"?"Lexeditor found a problem with this game. Locate the game directory or scan again.":"The scan did not find this game. Locate its directory or scan again.");
-      // A broken game is missing its helper, so offer the fix first.
-      const actions=plugin.status==="broken"&&!scanning
+        :(canRepair?"Install or repair the pinned runtime helper. Any remaining project problems are listed below.":plugin.status==="warning"?"Lexeditor found a problem with this game. Locate the game directory or scan again.":"The scan did not find this game. Locate its directory or scan again.");
+      const actions=canRepair
         ?[button(`INSTALL / REPAIR ${(plugin.helperName||"HELPER").toUpperCase()}`,()=>installHelper(plugin)),button("LOCATE GAME",()=>locate(plugin)),button("CLOSE",closeDialog,true)]
         :[button("LOCATE GAME",()=>locate(plugin)),button("SCAN AGAIN",()=>scan(plugin)),button(scanning?"WAIT FOR SCAN":"CLOSE",closeDialog,true)];
       setDialog(plugin.name,message,actions,plugin.problems||[],scanning?(plugin.scanLabel||plugin.statusText):plugin.statusText);
