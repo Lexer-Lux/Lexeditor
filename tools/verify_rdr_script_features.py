@@ -58,7 +58,7 @@ def main():
     assert report['oldJumpTarget'] == jump + 6
 
     # Repatching must refuse the no-longer-stock shape instead of drifting further.
-    expect_failure('already patched', lambda: scripts.patch_auto_carriage_rest(patched, 0), 'found 0')
+    expect_failure('already patched', lambda: scripts.patch_auto_carriage_rest(patched, 0), 'audited JumpFalse')
     wrong, _, _ = fixture(0x12345678)
     expect_failure('wrong native hash', lambda: scripts.patch_auto_carriage_rest(wrong, 0), 'found 0')
     wrong_jump, _, _ = fixture(opcode=98)
