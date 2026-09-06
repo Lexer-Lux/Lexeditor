@@ -1,0 +1,100 @@
+{
+  "body_sha256": "b3fa2c87906b7b587294401c572c523e4315782de4ecc02695ae8789af9286db",
+  "issue": 332,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Build the first RDR PC plugin foundation for this project on the official RedHook SDK. Use the supported .red extension and also produce the requested .asi compatibility copy. Add a development compilation flag and a tilde-key development-mode toggle. Development-only tools and logs must be absent or disabled in release builds.\n\nInstall the current official RedHook files in the selected RDR game root. When the RDR Lexeditor plugin loads, it must check for RedHook.dll, winmm.dll, and RedHook.ini. If RedHook is absent or incomplete, show a clear install notice and automatically open the official RedHook download page once during plugin startup.\n\nAcceptance: RedHook loads, the plugin records an idle heartbeat, tilde toggles development mode once per press in a development build, the release build does not expose the toggle, and the missing-RedHook Lexeditor path reports the prerequisite and automatically opens the official URL once.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 3,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/332/comments",
+    "created_at": "2026-08-24T15:38:07Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/332/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/332",
+    "id": 5356487433,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "b86b3e",
+        "default": false,
+        "description": "Red Dead Redemption plugin",
+        "id": 12062139982,
+        "name": "rdr1",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmTg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr1"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/332/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0WDCQ",
+    "number": 332,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/332/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/332/timeline",
+    "title": "Add the RDR ASI runtime and development mode",
+    "updated_at": "2026-09-05T07:40:27Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/332",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

@@ -1,0 +1,101 @@
+{
+  "body_sha256": "e8af5b5dbe982789f44b66139661945e4afaeb666b731540376b5bfe5ae9928a",
+  "issue": 132,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "REVOLVER-RELOAD GLINT — GIVE ME DIALS FOR IT. Six perfectly synchronised\n     glints on a revolver reload looks fake. I want it understood well enough to\n     expose editable controls, then tuned:\n       - RANDOMISE the timing so the six chambers don't flash in lockstep.\n       - Increase DURATION and SIZE so it actually reads.\n       - Tone down the TRANSPARENCY.\n     Work: trace the glint to whatever actually produces it and report which of\n     timing, size, brightness, fade, transparency and randomness are genuinely\n     editable, before proposing any rework. Whatever is editable becomes\n     settings I can change myself.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/comments",
+    "created_at": "2026-08-06T02:11:07Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/132",
+    "id": 5356291547,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 1,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0KF2w",
+    "number": 132,
+    "parent_issue_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/222",
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132/timeline",
+    "title": "Customize Casing Glint FX",
+    "updated_at": "2026-09-05T06:56:35Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/132",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

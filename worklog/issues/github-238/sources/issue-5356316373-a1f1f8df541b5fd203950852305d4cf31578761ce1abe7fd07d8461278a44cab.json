@@ -1,0 +1,100 @@
+{
+  "body_sha256": "708419d1ee5d3001bf1fb41dd19da58a84a37983e503770df5c5d9f844f7724a",
+  "issue": 238,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "## Player-facing behavior\n\nAn item that decreases one or more cores must be unavailable and greyed out when using it would reduce any affected core below 0.\n\n## Requirements\n\n- Evaluate the item's actual configured core effects before allowing use.\n- For each negatively affected core, compare the current core value with the amount the item would subtract.\n- If any affected core would end below 0, disable/grey out that item in every relevant inventory surface and prevent activation through shortcuts or alternate use paths.\n- A result of exactly 0 is allowed; only a result below 0 is blocked.\n- Positive and zero effects do not contribute to the block.\n- Items affecting multiple cores are blocked if even one negatively affected core would fall below 0.\n- Do not consume the item, play its use animation, or apply only part of its effects when blocked.\n- Restore availability immediately when the relevant core is high enough.\n- Use the same effective item values shown/configured by the overhaul rather than unrelated vanilla defaults.\n\n## Acceptance test\n\n1. Set a core below an item's negative cost and confirm the item is greyed out and cannot be used.\n2. Set the core exactly equal to the cost and confirm the item can be used, ending at 0.\n3. Test an item affecting multiple cores and confirm one insufficient core blocks the entire item.\n4. Raise the insufficient core and confirm the item becomes usable without a restart.\n5. Confirm radial, satchel, hotkey/shortcut, and contextual use paths enforce the same rule.\n6. Confirm blocked attempts do not consume inventory or start an item-use animation.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 16,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/238/comments",
+    "created_at": "2026-08-10T10:22:31Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/238/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/238",
+    "id": 5356316373,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Work remains",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/238/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0Lm1Q",
+    "number": 238,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/238/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": "reopened",
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/238/timeline",
+    "title": "Block Items That Would Reduce a Core Below Zero",
+    "updated_at": "2026-09-05T08:34:06Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/238",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

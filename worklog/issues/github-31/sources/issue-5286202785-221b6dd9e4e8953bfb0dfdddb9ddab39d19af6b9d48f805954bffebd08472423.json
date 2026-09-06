@@ -1,0 +1,109 @@
+{
+  "body_sha256": "73192ae5e6cec2ee1ca3e1ac5e28788364b864ab299b270ca1becdb95a3d85c2",
+  "issue": 31,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "The plugin needs a structured Formulae primary tab for real game calculations and mod-owned formula changes.\n\nRequired behavior:\n- Keep Formulae as a normal primary tab in alphabetical order. Tweaks stays last and visually distinct.\n- Use structured named terms, bounded controls, formula-specific presets, and live output previews. Do not use unrestricted formula text.\n- Show physical damage, physical accuracy, melee damage, magic damage, status infliction, and spell healing with their vanilla and requested reworked formulas.\n- Formulae Rework is one mod-owned feature on this page. Full attacker LUCK for physical accuracy and spell-power x MAG healing are parts of it, not separate Tweaks.\n- The requested reworked formulas are: melee `(STR + weapon STR bonus) * weapon power`, then a percentage reduction from target VIT; magic `spell power * MAG`, then a percentage reduction from target SPR; status `spell power + MAG - target SPR`, then vanilla status defence; healing `spell power * MAG`.\n- Generate only verified FFNx Hext output for the supported FF8 2013 Steam executable. Do not present a preview as an applied game change.\n- Keep Flying EVA Bonus in Tweaks as requested. Formulae can show how it affects accuracy, but must not create a second independent value.\n- Preserve vanilla and reference comparison and restore behavior for every editable formula term.\n\nAcceptance:\n- Formulae contains one Formulae Rework switch. Tweaks contains neither Full LUCK Accuracy nor Spell Healing Rework.\n- The unified switch saves with the selected mod and controls every implemented runtime formula patch.\n- Saved formula-term changes produce deterministic output and read back.\n- FFNx patch-load evidence and in-battle results remain separate runtime acceptance boundaries.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 7,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/31/comments",
+    "created_at": "2026-08-29T11:13:00Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/31/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/31",
+    "id": 5286202785,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "6f7478",
+        "default": false,
+        "description": "Final Fantasy VIII plugin",
+        "id": 12062139654,
+        "name": "ff8",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlBg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff8"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/31/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABOxUNoQ",
+    "number": 31,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/31/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/31/timeline",
+    "title": "Add the missing structured Formulae tab",
+    "updated_at": "2026-09-05T06:51:21Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/31",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

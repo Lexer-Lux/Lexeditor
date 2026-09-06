@@ -1,0 +1,109 @@
+{
+  "body_sha256": "aba0ac288f1d3ef994dcff36d6ef0e6dd70fd1c7966dbe47acd6eb9f3a081c3e",
+  "issue": 328,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "HP bars should sit beneath each HP number, fill right-to-left, and scale to maximum HP out of 9,999. XP bars should be yellow, stay inside their panels, and disappear outside the relevant screens.\n\n**Status: Work remains.** XP progress was confirmed, but HP bars are still too low. The height repair is in draft PR #356; its Windows game driver is not yet built and packaged. There is no new HP-bar build for you to test.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/328/comments",
+    "created_at": "2026-09-05T06:51:22Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/328/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/328",
+    "id": 5356486650,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "d73a4a",
+        "default": true,
+        "description": "Something isn't working",
+        "id": 11671890128,
+        "name": "bug",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo0A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/bug"
+      },
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Agent work remains: research, implementation, repair, delivery or test preparation.",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "6f7478",
+        "default": false,
+        "description": "Final Fantasy VIII plugin",
+        "id": 12062139654,
+        "name": "ff8",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlBg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff8"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/328/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0V_-g",
+    "number": 328,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/328/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/328/timeline",
+    "title": "Correct battle HP bars and XP bars",
+    "updated_at": "2026-09-06T12:31:37Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/328",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

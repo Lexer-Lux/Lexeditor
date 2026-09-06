@@ -1,0 +1,109 @@
+{
+  "body_sha256": "09f0735f44dcf832e056350c0dfb1a3ccff2d5e3e6838c21913f1ff4d1e0ed07",
+  "issue": 313,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "During a character's turn, L1 / Look Left opens the living reserve list. Confirm replaces that character and spends their turn. Cancel keeps the turn.\n\nThe first live test showed only a cursor. The missing names and panel are repaired. Shared Magic must remain off for this test; support for using both features still needs work.\n\nYour check after installing the repaired build:\n- [ ] Enable Party Switch with Shared Magic off. In a normal battle, press L1 during a character's turn. Confirm reserve names appear.\n- [ ] Cancel once. Confirm the same character can still act.\n- [ ] Open the list again and select a reserve. Confirm the character changes, their ATB starts empty, and the other two party members stay intact.\n- [ ] Switch back later. Report any wrong HP, spells, model, or turn behaviour.\n",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 4,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/313/comments",
+    "created_at": "2026-08-30T19:39:43Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/313/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/313",
+    "id": 5356484028,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Work remains",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "6f7478",
+        "default": false,
+        "description": "Final Fantasy VIII plugin",
+        "id": 12062139654,
+        "name": "ff8",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlBg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff8"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/313/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0V1vA",
+    "number": 313,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/313/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/313/timeline",
+    "title": "Settings: FF10-style battle party switch",
+    "updated_at": "2026-09-05T18:37:17Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/313",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

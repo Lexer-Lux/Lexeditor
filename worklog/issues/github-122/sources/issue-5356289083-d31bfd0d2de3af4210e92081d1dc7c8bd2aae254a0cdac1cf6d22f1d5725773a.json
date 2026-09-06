@@ -1,0 +1,109 @@
+{
+  "body_sha256": "349226106c9e0e8a57f6d4150d3dc82458ed1bfe8fb1f12497e4c9c31fb47745",
+  "issue": 122,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "CUSTOM CRAFTING MENU (FUCK CRAFTING WE HAVE SO MUCH FUCKING WORK TO DO)\n     Making my breakdown recipes requires a custom crafting menu to remove the\n     single-output restriction and the other crafting restrictions. There's a\n     crafting menu mod I have installed plus an RDR2 menu creator github project\n     as prior art. It has to show both my \"impossible\" recipes and the vanilla\n     ones, and replace the vanilla crafting menu everywhere it appears. Needs\n     its own data storage since my recipes are separate from vanilla ones. Must\n     be editable in LEXEDITOR, obviously.\n     DECISION (from Lexer-Lux/Lexeditor#154): leave the vanilla crafting system and recipes\n     untouched. All of my custom crafting lives here.\n     Includes: MELT DOWN GOLD / SILVER / PLATINUM — let jewellery and precious\n     metal valuables break down into base metal for crafting (gold ring /\n     necklace / earrings / bracelet -> gold, etc).\n     Resolved worry: the \"4 recipes per item\" limit does not exist — our\n     breakdown recipes are runtime-defined, not catalog-bound. Both more cost\n     variants and more recipe rows per output are unlimited in practice.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 30,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/122/comments",
+    "created_at": "2026-08-06T01:58:26Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/122/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/122",
+    "id": 5356289083,
+    "issue_dependencies_summary": {
+      "blocked_by": 1,
+      "blocking": 1,
+      "total_blocked_by": 1,
+      "total_blocking": 1
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "c2e0c6",
+        "default": false,
+        "description": "Prioritize this issue",
+        "id": 11897589562,
+        "name": "high priority",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbPOg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/high%20priority"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/122/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0J8Ow",
+    "number": 122,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/122/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/122/timeline",
+    "title": "Custom Crafting Menu",
+    "updated_at": "2026-09-05T06:56:00Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/122",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

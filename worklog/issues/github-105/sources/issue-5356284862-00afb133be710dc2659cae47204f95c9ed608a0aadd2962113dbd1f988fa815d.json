@@ -1,0 +1,100 @@
+{
+  "body_sha256": "372b030e3b2ac02808508fd6560e9c93b26a3973a7488b4ae4b907459e5441d2",
+  "issue": 105,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "## Current requested behavior\n\nKeep a lantern attached to the player's belt. The lantern must not hover inside the torso and must not remain held in the player's hand.\n\nThe lantern stays present but unlit when it is off. Selecting the lantern through Rockstar's radial controls the belt lantern's on/off state. The radial is the player control; time of day must not force the light on.\n\nAcceptance:\n\n- The lantern is attached at the correct right-belt/hip bone, not the entity center.\n- Selecting a lantern in the radial toggles the belt light and returns the player from the hand-held lantern state.\n- Turning the light off leaves the unlit lantern on the belt.\n- The attachment has bounded movement and does not push, jitter, or damage the player.\n- Mission-supplied lantern behavior is not intercepted.\n- Failure to resolve either attachment bone is logged and creates no prop.\n\n## Original request\n\nLantern object should no longer appear in radial outside of missions. Instead, it should be physics-rigged and attached to the player's belt, automatically activating/deactivating when it's night and/or dark.\nCurrently it just hovers within my chest lol.\n\n## Later player decisions\n\nThe lantern must remain present when unlit. The radial must be restored so the player can control the light manually. Runtime testing of the vanilla-only fallback failed because it left the lantern in the player's hand.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 30,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/105/comments",
+    "created_at": "2026-08-06T01:29:26Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/105/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/105",
+    "id": 5356284862,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/105/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0Jrvg",
+    "number": 105,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/105/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 2,
+      "percent_completed": 33,
+      "total": 6
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/105/timeline",
+    "title": "On-Belt Lantern",
+    "updated_at": "2026-09-05T06:55:00Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/105",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

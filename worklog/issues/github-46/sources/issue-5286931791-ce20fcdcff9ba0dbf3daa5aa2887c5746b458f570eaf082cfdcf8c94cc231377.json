@@ -1,0 +1,109 @@
+{
+  "body_sha256": "28ccba0205462bbb53f88cb33299b3a5d7d0d46f1b5fef81e1dc0bb7d4ee1fa3",
+  "issue": 46,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Replace the old view-type architecture with reusable panel composition.\n\nDecisions:\n- A panel type owns its internal behavior and appearance.\n- A tab layout only arranges panel instances, their sizes, and their relationships.\n- The RDR2 record detail panel is the default Detail panel template for every plugin. Games can theme and extend it without rebuilding its basic structure.\n- The old list-detail view is a two-panel composition: Table + Detail.\n- The RDR2 Shops screen is a three-panel composition, not a separate three-panel view type.\n- Existing pagination, fitted rows, sorting, N-barrels, split handles, selection, and history remain capabilities of panels or the layout composer.\n- Plugins declare a layout and supply data/render adapters. They do not duplicate panel shells.\n\nInitial panel library:\n1. Table — dense selectable/sortable/filterable records; optional paging and N-barrels.\n2. Detail — RDR2-style record heading, identity, grouped fields, provenance, actions, and help.\n3. Selector — compact peer navigation using text, icons, portraits, or thumbnails.\n4. Tree — hierarchical records such as nested loot, recipes, and dependencies.\n5. Preview — images, icons, 3D models, graphs, loading, unavailable, and error states.\n6. Activity — ordered comments, logs, history, reports, and optional bottom composer.\n\nDo not create a panel type for a one-off visual variation. A new type requires distinct repeated behavior that cannot be expressed as a configuration of an existing type.\n\nMigration must preserve current rendered behavior until each tab is converted and visually verified.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 38,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/46/comments",
+    "created_at": "2026-08-29T13:54:29Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/46/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/46",
+    "id": 5286931791,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/46/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABOyAtTw",
+    "number": 46,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/46/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/46/timeline",
+    "title": "Panel composition: replace fixed view types with reusable panel templates",
+    "updated_at": "2026-09-05T06:27:54Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/46",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

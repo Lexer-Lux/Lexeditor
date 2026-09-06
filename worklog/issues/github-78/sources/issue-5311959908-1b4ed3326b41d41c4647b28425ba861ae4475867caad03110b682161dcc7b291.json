@@ -1,0 +1,100 @@
+{
+  "body_sha256": "c26eb483c638ef90bf85b77c5e1f8b884591010f32a7aa600fd02118b7852142",
+  "issue": 78,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "**Actionable — delivery remains.** Draft PR #361 adds fixed-camera PNG icons, background generation and module-separated caches. It is not merged; real-item framing and generation speed remain unverified.\n\nIcons must regenerate when source assets change, fit boots through long polearms, and keep browsing responsive. The larger interactive preview remains. A ready-to-run test copy and disposable asset-change fixture still need preparing.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/78/comments",
+    "created_at": "2026-09-01T12:42:38Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/78/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/78",
+    "id": 5311959908,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Agent work remains: research, implementation, repair, delivery or test preparation.",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "7a5327",
+        "default": false,
+        "description": "Mount and Blade Warband plugin",
+        "id": 12062140211,
+        "name": "warband",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWnMw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/warband"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/78/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPJ4TZA",
+    "number": 78,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/78/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/78/timeline",
+    "title": "Use clear cached icons for Warband items",
+    "updated_at": "2026-09-06T13:31:00Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/78",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

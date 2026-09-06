@@ -1,0 +1,109 @@
+{
+  "body_sha256": "9edf16342f70241fc33e22332de4524f9400997c20bdf7b3dffe883f1244e94b",
+  "issue": 320,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Add the requested quest menu to Lexer's FF8 mod. First map the quest state already stored by the game, then present active and completed quest information without inventing new progression state where existing state is available.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/320/comments",
+    "created_at": "2026-09-04T06:32:31Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/320/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/320",
+    "id": 5356485265,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Work remains",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "6f7478",
+        "default": false,
+        "description": "Final Fantasy VIII plugin",
+        "id": 12062139654,
+        "name": "ff8",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlBg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff8"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/320/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0V6kQ",
+    "number": 320,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/320/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/320/timeline",
+    "title": "Quest menu",
+    "updated_at": "2026-09-05T07:39:56Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/320",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

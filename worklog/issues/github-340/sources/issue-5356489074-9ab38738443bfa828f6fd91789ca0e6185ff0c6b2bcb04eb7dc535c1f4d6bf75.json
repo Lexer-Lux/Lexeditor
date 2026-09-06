@@ -1,0 +1,100 @@
+{
+  "body_sha256": "4a4d381ae85e9f92b7592e50f3b26d275c055762aae821c56dcb003c8c2226e0",
+  "issue": 340,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "**Status: A repaired build is installed; needs your check.** Money should show as $X above ammunition, only during normal gameplay—not loading. Avoid the weapon-wheel crash in #333.\n\n- [ ] Restart RDR1 and load Story Mode. Confirm no custom money/ammo text appears during loading, then check the money value against your actual balance.\n- [ ] Make one purchase and fire/reload the equipped gun without opening the wheel. Confirm money and ammunition update and the text stays stable.\n- [ ] Report an incorrect value, flicker or bad placement with a screenshot and your display resolution.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 3,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/340/comments",
+    "created_at": "2026-08-24T16:26:46Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/340/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/340",
+    "id": 5356489074,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "b86b3e",
+        "default": false,
+        "description": "Red Dead Redemption plugin",
+        "id": 12062139982,
+        "name": "rdr1",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmTg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr1"
+      },
+      {
+        "color": "fbca04",
+        "default": false,
+        "description": "Ready for Lexer's stated acceptance test; candidate delivered and agent-side checks complete.",
+        "id": 12074236871,
+        "name": "untested",
+        "node_id": "LA_kwDOTn28Ks8AAAACz647xw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/untested"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/340/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0WJcg",
+    "number": 340,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/340/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/340/timeline",
+    "title": "Check the repaired money and ammunition HUD",
+    "updated_at": "2026-09-06T13:07:50Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/340",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

@@ -1,0 +1,100 @@
+{
+  "body_sha256": "b9c1cd7d8b0fdca1fa1baedbb9bd6c1a67b10708ceb98dfe7eef64521ee3ab9e",
+  "issue": 333,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Slow game time while the RDR weapon radial menu is open. Add a setting for the time factor. Restore the prior game time scale when the radial closes or the ASI stops. Use a real radial-open state and a resolved RDR time-scale mechanism, not a guessed RDR2 native or an unrelated input hold.\n\nVertically center the weapon radial menu on screen. Use the actual RDR radial Flash/layout state or a proven archive-relative override. Do not move unrelated HUD surfaces.\n\nAcceptance: opening the radial applies the configured factor, closing it restores normal time, changing the setting changes the observed factor, and the radial center aligns with the vertical screen center at multiple resolutions.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 4,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/333/comments",
+    "created_at": "2026-08-24T15:38:07Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/333/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/333",
+    "id": 5356487639,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "b86b3e",
+        "default": false,
+        "description": "Red Dead Redemption plugin",
+        "id": 12062139982,
+        "name": "rdr1",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmTg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr1"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/333/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0WD1w",
+    "number": 333,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/333/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/333/timeline",
+    "title": "Make weapon-radial slow motion configurable",
+    "updated_at": "2026-09-05T07:40:31Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/333",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

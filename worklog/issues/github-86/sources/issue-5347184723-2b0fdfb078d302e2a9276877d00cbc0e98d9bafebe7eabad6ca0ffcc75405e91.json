@@ -1,0 +1,109 @@
+{
+  "body_sha256": "ba69ab88b16f1545efed6c57148a19d68cc469101f954f66e361c82fadb4e412",
+  "issue": 86,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Keep game-research knowledge in Lexeditor instead of copying agent knowledge stores into each mod repository.\n\nFinal ownership:\n\n- Each Lexer's Mod repository contains only that mod's distributable source, data, assets, build files, user documentation, licenses, and required attribution.\n- Mod repositories do not contain duplicated game-research codices or agent worklogs.\n- Lexeditor owns one settled technical codex for every supported game.\n- Store game formats, schemas, engine behavior, proven paths, and reusable research under a clear per-game codex path.\n- Lexeditor keeps per-attempt implementation evidence in its existing per-issue worklogs.\n- When a new game plugin is scaffolded, create and validate its corresponding game codex location automatically.\n- Shared Lexeditor implementation documentation remains ordinary project documentation; it does not need a separate Lexeditor codex.\n- Migrate existing reusable game research into the appropriate game codex without copying transient attempt history.\n\nAcceptance:\n\n- Every current game plugin has an owned game codex location in Lexeditor.\n- Plugin validation detects a missing game codex.\n- A newly scaffolded game plugin receives one automatically.\n- Lexer's Mod repositories do not receive Lexeditor worklogs or game-research codices.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/comments",
+    "created_at": "2026-09-04T10:51:54Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/86",
+    "id": 5347184723,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "0075ca",
+        "default": true,
+        "description": "Improvements or additions to documentation",
+        "id": 11671890137,
+        "name": "documentation",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo2Q",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/documentation"
+      },
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Work remains",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "5319e7",
+        "default": false,
+        "description": "Shared Lexeditor behavior across games",
+        "id": 12062139372,
+        "name": "global",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWj7A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/global"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPreQUw",
+    "number": 86,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86/timeline",
+    "title": "Keep per-game technical codices in Lexeditor",
+    "updated_at": "2026-09-04T12:25:16Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/86",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

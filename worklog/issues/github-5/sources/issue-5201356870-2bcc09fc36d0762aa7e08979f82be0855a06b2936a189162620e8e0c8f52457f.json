@@ -1,0 +1,109 @@
+{
+  "body_sha256": "6b2deb8d691282370596e1b4ff126b26d408f37582c1899dd418c7618d62ff96",
+  "issue": 5,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Migrated from Lexer-Lux/rdr2-overhaul#200 because this is Lexeditor interface work.\n\nThe original picker request is already implemented: Item Effects and Tags use the shared full selectors and have no browser-native free-entry fields. The remaining request is a consistent reference display for fields that can contain an arbitrary number of entries.\n\nReference screenshots from the original issue:\n\n![Current Items Effects and Tags reference display](https://github.com/user-attachments/assets/4bed2d8a-d9a9-403d-a3ac-45cb496a4245)\n\n![Compact beside-value reference stack](https://github.com/user-attachments/assets/17fedf2f-e9cd-470e-b08c-36382e4fa0ff)\n\n## Required design\n\n- Use one shared multi-value reference component for Item Effects, Item Tags, and Challenge Rewards.\n- The top segment contains the current editable entries.\n- Each current entry has its compact reference stack to the right, like other beside-value references.\n- For each reference dataset, show a green check when that exact entry and value match, a red X when the entry does not exist, and the reference value when the entry exists with a different editable value.\n- A horizontal divider separates current entries from reference-only entries.\n- The bottom segment contains entries that exist in one or more references but not in the current data. These ghost entries are muted or semitransparent but otherwise use the same entry and reference presentation.\n- Existing add, remove, selector, duplicate-prevention, read-only, dirty-state, undo/redo, and save behavior remains unchanged.\n- Do not extend this design to other multi-value fields without approval.\n\n## Acceptance\n\n- Adding or removing a live tag, effect, or reward updates its per-reference check, X, or value immediately.\n- A field-level check cannot remain green when its live membership differs from a reference.\n- Reference-only tags, effects, and rewards appear below the divider as non-editable ghost entries.\n- The three fields use the same shared component and visual rules.\n- Hidden rendered checks cover a matching entry, an absent entry, a different value, and a ghost entry without changing live editor data.\n",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 5,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/5/comments",
+    "created_at": "2026-08-20T08:29:33Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/5/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/5",
+    "id": 5201356870,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/5/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABNgZoRg",
+    "number": 5,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/5/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/5/timeline",
+    "title": "Reference-aware multi-value fields for effects, tags, and challenge rewards",
+    "updated_at": "2026-09-05T06:16:46Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/5",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

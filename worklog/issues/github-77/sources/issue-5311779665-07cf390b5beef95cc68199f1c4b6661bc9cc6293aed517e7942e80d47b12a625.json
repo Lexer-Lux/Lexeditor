@@ -1,0 +1,100 @@
+{
+  "body_sha256": "46ddd093dce91fa14adb70700b72ce761676a1c95d4ec9a78ec674721d59beb5",
+  "issue": 77,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Manage Memoria for the FF9 plugin without forcing its launcher into the normal game-start path.\n\nRequirements:\n\n- Detect whether Memoria is installed and report its version.\n- Download and verify the pinned Memoria release when installation is requested.\n- Refuse installation while FF9 is running, use the publisher's patcher for installation, verify the result, and support safe recovery.\n- Show Memoria state in the FF9 plugin.\n- The normal Lexeditor Play control launches FF9 directly. It must never open the Memoria launcher first.\n- Treat the Memoria launcher as a settings utility only. It may open only after an explicit settings action.\n- Lexeditor's Tweaks view remains the primary typed editor for Memoria.ini under #73.\n- Do not overwrite unknown Memoria settings or user configuration.\n- Do not let the Memoria launcher reassert itself as the default Play target after an update.\n\nAcceptance:\n\n- Play starts FF9 without showing the Memoria launcher.\n- An explicit settings action can open the Memoria launcher when installed.\n- A clean FF9 installation can install the pinned Memoria runtime.\n- Existing Memoria installs are detected without modification.\n- Installation and update failures leave the game recoverable.\n- The installed version is visible.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/77/comments",
+    "created_at": "2026-09-01T12:23:35Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/77/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/77",
+    "id": 5311779665,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "0e8a16",
+        "default": false,
+        "description": "Work remains",
+        "id": 11897589235,
+        "name": "actionable",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbN8w",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/actionable"
+      },
+      {
+        "color": "8a6bbe",
+        "default": false,
+        "description": "Final Fantasy IX plugin",
+        "id": 12062139822,
+        "name": "ff9",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlrg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff9"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/77/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABPJtTUQ",
+    "number": 77,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/77/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/77/timeline",
+    "title": "Managed Memoria install equivalent to the existing FFNx manager",
+    "updated_at": "2026-09-04T12:25:08Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/77",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

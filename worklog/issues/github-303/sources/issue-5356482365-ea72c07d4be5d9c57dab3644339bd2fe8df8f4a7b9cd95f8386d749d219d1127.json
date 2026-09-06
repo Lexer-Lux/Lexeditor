@@ -1,0 +1,109 @@
+{
+  "body_sha256": "cef3d8af8546c04cb7dddfcde645f6967ec4181735224b3cf4c4189eb0b532eb",
+  "issue": 303,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "# Goal\n\nMake FF8 render at the active display refresh rate without making the game simulation, battle timing, input windows, animations, or effects run faster. The main player-visible target is smooth battle rendering instead of the original 15 FPS presentation.\n\n# Preliminary result\n\nThis is plausible, but it is not a normal Hext patch or a larger FPS-limit value.\n\nFFNx already replaces FF8's clock and frame limiter. Its current FF8 modes preserve 15 FPS battles, raise only battles to 30 FPS, or run supported modes at 60 FPS. The current implementation still advances the game loop once for each permitted frame. It does not provide the broad simulation/render separation that this request needs. The current configuration also clamps the FF8 limiter to its 60 FPS enum value.\n\nFF8 battle data confirms direct frame coupling. Status timers are consumed per idle battle frame at about 15 FPS, and other battle counters use battle ticks. Raising the loop rate alone can therefore change gameplay and animation speed.\n\n# Likely implementation path\n\nUse FFNx-level C++ hooks, not only generated Hext:\n\n1. Keep game simulation on fixed logical ticks for each driver mode.\n2. Accumulate real elapsed time with FFNx's existing high-resolution clock.\n3. Render at the selected display refresh rate.\n4. Interpolate model, camera, and effect presentation between completed simulation states.\n5. Never repeat gameplay side effects during interpolation-only frames.\n6. Audit battle ATB and status timers, animation events, input windows, cameras, effects, field scripts, world-map movement, menus, card game, minigames, fades, movies, and audio synchronization.\n\nThe safest first milestone is battle-only: retain the original 15 Hz battle simulation, render at 60 FPS first, and interpolate battle presentation. After that works, test arbitrary refresh rates and other game modes.\n\n# Scope now\n\nResearch only. Do not implement this issue until Lexer chooses a first milestone.\n\n# Decision needed\n\nChoose one initial target:\n\n- 60 FPS battle presentation with original 15 Hz battle logic.\n- Display-refresh battle presentation with original 15 Hz battle logic.\n- Full-game arbitrary-refresh rendering and fixed-step simulation.\n\n# Primary references\n\n- FFNx `src/ff8_opengl.cpp`, current frame limiter and high-resolution clock replacement.\n- FFNx `src/cfg.cpp`, current limiter range.\n- FFNx `misc/FFNx.toml`, documented FF8 FPS modes and risk warning.\n- Lexeditor `games/ff8/schema/kernel_section_fields.json`, confirmed battle-frame and battle-tick timer behavior.\n- FFNx issue 347, an FF7 60 FPS defect inventory used only as analogous evidence for the likely audit size.\n\n# Acceptance boundary for later work\n\nSource, build, and FPS-counter results will not prove this feature. Acceptance needs timed and recorded checks of battle duration, ATB, status duration, input windows, animation events, cameras, effects, field scripts, menus, card game, movies, and audio at several refresh rates.\n",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/303/comments",
+    "created_at": "2026-08-30T22:25:53Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/303/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/303",
+    "id": 5356482365,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "6f7478",
+        "default": false,
+        "description": "Final Fantasy VIII plugin",
+        "id": 12062139654,
+        "name": "ff8",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWlBg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/ff8"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/303/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0VvPQ",
+    "number": 303,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/303/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/303/timeline",
+    "title": "Research: uncouple FF8 rendering from game ticks",
+    "updated_at": "2026-09-05T07:39:15Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/303",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

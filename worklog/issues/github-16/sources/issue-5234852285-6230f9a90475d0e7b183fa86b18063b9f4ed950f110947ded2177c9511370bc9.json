@@ -1,0 +1,109 @@
+{
+  "body_sha256": "e61859c6be89ebdde8988a2233cfb4c96c21c88457009e646807d984e22c12bb",
+  "issue": 16,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "## Goal\n\nWhen RDR2 is added or opened with an empty Lexeditor cache, prepare every vanilla game-data file that the active RDR2 editor needs. Do not require OpenIV or a manual export.\n\n## Required behavior\n\n- Use a bundled, licensed, read-only headless extractor.\n- Extract the complete baseline for the active Items, Effects, Loot, Challenges, Weapons, Crime, Bounty Hunters, Ped Perception, Combat, and Ped Health pages.\n- Convert Rockstar binary metadata to validated XML where the editor needs XML.\n- Keep model-preview extraction lazy. Do not dump the whole model library at startup.\n- Store results only in Lexeditor's private cache. Never write to a game archive.\n- Use an explicit manifest, source stamps, atomic replacement, and clear per-file errors.\n- A failed or unsupported file keeps RDR2 in Warning state. It must not be reported as ready.\n\n## Acceptance\n\nStart with an empty RDR2 cache and the current game archives. Add RDR2 once. Preparation must finish without OpenIV, every required output must parse as XML, and every active RDR2 data page must load its vanilla reference without a missing-baseline error.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 5,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/16/comments",
+    "created_at": "2026-08-24T12:45:06Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/16/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/16",
+    "id": 5234852285,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "a2eeef",
+        "default": true,
+        "description": "New feature or request",
+        "id": 11671890148,
+        "name": "enhancement",
+        "node_id": "LA_kwDOTn28Ks8AAAACt7Lo5A",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/enhancement"
+      },
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/16/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABOAWBvQ",
+    "number": 16,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/16/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/16/timeline",
+    "title": "Prepare all required game data on first start",
+    "updated_at": "2026-09-04T12:24:35Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/16",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

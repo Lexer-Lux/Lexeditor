@@ -1,0 +1,100 @@
+{
+  "body_sha256": "7c6cd63528936428cb7d41a6a6ae8afb3719efd6723fe09560dc27366cb1841f",
+  "issue": 286,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "## Goal\n\nMake Red Dead Online content available in Story Mode so it can be tested before any later cut, niche, or balance decisions.\n\nThis issue is the live replacement for the old design item **16. CUT AND BULK**. GitHub Lexer-Lux/Lexeditor#116 is already used by Bullet Tracers and must not be changed.\n\n## First milestone\n\nImport RDO content into the existing Story Mode mod in controlled category batches:\n\n- weapons and weapon components\n- clothing and wearable equipment\n- provisions, tools, kits, and other inventory items\n- time-limited and Outlaw Pass items that still exist in the installed game data\n\nFor every batch:\n\n1. derive the changes from Rockstar data and independently documented behavior;\n2. do not redistribute files from a mod that forbids redistribution;\n3. merge into the existing MyOverhaul data instead of installing an unreviewed full-file replacement;\n4. provide a clear way to obtain and test each imported item in Story Mode;\n5. prove that each item is usable, not only listed in a catalog or inventory.\n\nDo not start the later content cuts or weapon-role rebalance in this milestone.\n\n## Related follow-up work\n\n- Find and enable the Online bucket helmet for armored enemies.\n- Make Improved/Refined Binoculars a functional upgrade, not a duplicate or dead wheel item; coordinate with Lexer-Lux/Lexeditor#158.\n- Import the intended Outlaw Pass glasses for Bandit rank 4 and find a proven way to reduce the law search radius while worn; coordinate with Lexer-Lux/Lexeditor#148.\n- Inventory merge-hostile weapon-overhaul files before any compatibility work.\n\n## Acceptance\n\nA generated inventory identifies every candidate by category and source record. Selected test batches are installed into Story Mode, visibly obtainable through a documented route, and confirmed to function in game. Items that need Online scripts or other unavailable systems are marked as blocked instead of called complete.\n",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 22,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/286/comments",
+    "created_at": "2026-08-16T02:21:04Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/286/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/286",
+    "id": 5356330248,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/286/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0MdCA",
+    "number": 286,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/286/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": "reopened",
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/286/timeline",
+    "title": "Cut and Bulk: make RDO content usable in Story Mode",
+    "updated_at": "2026-09-05T07:04:53Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/286",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

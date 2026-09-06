@@ -1,0 +1,100 @@
+{
+  "body_sha256": "3e82e0a0ccb112f50efb06e6c45adfb3916b014048846d2818d96844439396dc",
+  "issue": 131,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "ALCOHOL CONSUMABLE EFFECTS — I want to edit how strong each drink is.\n     The real per-drink alcohol values (0.10-0.50 on the game's 0-1 scale;\n     Sober 0-0.49, Drunk 0.50-0.74, Wasted 0.75-0.99, Blackout 1) are not in the\n     catalog and are not the drink-class tag — Moonshine 0.30 and Gin 0.17 share\n     the same tag. Find where that data actually lives, bring it into the\n     project, and expose the numeric value per drink in LEXEDITOR as a real\n     field (the current \"Drink class\" selector is only the coarse tag).\n     If I don't get this working -- moonshine instant KO specifically --\n     then the \"pass out to Guarma\" exploit might not work due to decreased carry\n     limits, which could be extra bad because I want that one challenge\n     implemented that relies on it.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 2,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/131/comments",
+    "created_at": "2026-08-06T02:10:38Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/131/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/131",
+    "id": 5356291314,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 1,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/131/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0KE8g",
+    "number": 131,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/131/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/131/timeline",
+    "title": "Proper Alcohol Tags In Editor",
+    "updated_at": "2026-09-05T06:56:31Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/131",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

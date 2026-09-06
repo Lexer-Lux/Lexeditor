@@ -1,0 +1,100 @@
+{
+  "body_sha256": "ac8821059bb0016f9d7761636dbff11c0223ce3a8641c4f8c2bafb843ac9b6fb",
+  "issue": 214,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "**Status: The repaired F2 authoring tool is installed.** A tap acts on release; holding for 800 ms restores the previous marker coordinates and saved state.\n\n- [ ] With tilde development mode on, move a marker you are auditing using F2, then hold F2 for at least 800 ms. Confirm success/undo notices and the exact original position returns.\n- [ ] Try F2 where no marker is in range: expect a clear notice and no move. Turn development mode off and confirm F2 does nothing. Report the incorrect result.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 7,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/214/comments",
+    "created_at": "2026-08-06T09:58:10Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/214/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/214",
+    "id": 5356310801,
+    "issue_dependencies_summary": {
+      "blocked_by": 1,
+      "blocking": 0,
+      "total_blocked_by": 1,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      },
+      {
+        "color": "fbca04",
+        "default": false,
+        "description": "Ready for Lexer's stated acceptance test; candidate delivered and agent-side checks complete.",
+        "id": 12074236871,
+        "name": "untested",
+        "node_id": "LA_kwDOTn28Ks8AAAACz647xw",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/untested"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/214/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0LREQ",
+    "number": 214,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/214/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/214/timeline",
+    "title": "Check marker-move feedback and hold-to-undo",
+    "updated_at": "2026-09-06T13:07:31Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/214",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}

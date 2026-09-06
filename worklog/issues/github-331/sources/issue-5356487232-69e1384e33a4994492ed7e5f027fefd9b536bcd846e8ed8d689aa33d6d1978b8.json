@@ -1,0 +1,100 @@
+{
+  "body_sha256": "89c45b9096c8e1631c07aae181b2bcfc9b9ae04be18d31270528b7d527b8d682",
+  "issue": 331,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "Create a private Git-backed project for Lexer's Red Dead Redemption mod. Use the existing Lexeditor RDR2 plugin contract and visual language as the base. Detect the installed Steam game, read its RPF6 archives without changing them, prepare an editable project workspace, and expose those files through a managed RDR Lexeditor plugin. Keep original archives and prepared vanilla cache outside Git.\\n\\nAcceptance:\\n- Lexeditor detects the installed RDR game.\\n- Setup reads the installed RPF6 data without writing to the game directory.\\n- An editable project file can be opened, changed, saved, and read back.\\n- The RDR plugin reports the correct managed-plugin identity and installation state.\\n- The private Git repository contains no original game archives.",
+    "closed_at": null,
+    "closed_by": null,
+    "comments": 1,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/331/comments",
+    "created_at": "2026-08-24T15:15:54Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/331/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/331",
+    "id": 5356487232,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "e87924",
+        "default": false,
+        "description": "Needs Lexer",
+        "id": 11897589349,
+        "name": "waiting",
+        "node_id": "LA_kwDOTn28Ks8AAAACxSbOZQ",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/waiting"
+      },
+      {
+        "color": "b86b3e",
+        "default": false,
+        "description": "Red Dead Redemption plugin",
+        "id": 12062139982,
+        "name": "rdr1",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmTg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr1"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/331/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0WCQA",
+    "number": 331,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/331/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "open",
+    "state_reason": null,
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/331/timeline",
+    "title": "Create the RDR Lexeditor plugin and editable mod workspace",
+    "updated_at": "2026-09-05T07:40:24Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/331",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}
