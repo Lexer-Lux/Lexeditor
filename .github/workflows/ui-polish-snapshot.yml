@@ -1,0 +1,41 @@
+name: Snapshot UI polish sources
+on:
+  push:
+    branches: [ui/ff8-blank-global-polish]
+    paths: [.github/workflows/ui-polish-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Fetch exact branch without submodule initialization
+        run: |
+          git config --global core.autocrlf false
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin "$GITHUB_SHA"
+          git -C editor checkout --detach FETCH_HEAD
+      - name: Archive relevant UI and FF8 encounter sources
+        run: |
+          cd editor
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          roots=[Path('ui'),Path('games/ff8'),Path('games/blank'),Path('tools')]
+          wanted=[]
+          for root in roots:
+              if not root.exists(): continue
+              for p in root.rglob('*'):
+                  if p.is_file() and p.suffix.lower() in {'.html','.js','.css','.py','.json','.md','.cpp','.h','.hpp','.yml','.yaml'}:
+                      wanted.append(p)
+          with zipfile.ZipFile('../ui-polish-source.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for p in wanted: z.write(p,p.as_posix())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-polish-source
+          path: ui-polish-source.zip
+          retention-days: 2
+          if-no-files-found: error
