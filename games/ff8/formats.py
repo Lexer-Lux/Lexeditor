@@ -1092,7 +1092,7 @@ def save_enemies(edits: list[dict]) -> dict:
 
 
 def data_map_rows() -> dict:
-    return {"rows": [
+    rows = [
         {"filename": "kernel.bin", "controls": "Character, Magic, GF, weapon, battle-item, command and ability gameplay records; linked names and descriptions", "notes": "Numeric fields with proven schemas are editable. All referenced text in sections 32-56 is editable with FF8 encoding and complete linked-offset and section-offset rebuilds. Unnamed numeric fields remain preserved.", "status": "partial"},
         {"filename": "menu/price.bin", "controls": "Item buy prices and sell-price multipliers", "notes": "", "status": "integrated"},
         {"filename": "menu/shop.bin", "controls": "Twenty shop inventories and rare-stock flags", "notes": "", "status": "integrated"},
@@ -1111,4 +1111,28 @@ def data_map_rows() -> dict:
         {"filename": "hext/ff8/en_nv/Lexeditor.FLYING_EVA.txt", "controls": "Flying-enemy EVA bonus and ranged/Float exceptions", "notes": "Generated in FFNx's effective FF8 English Nvidia Hext directory.", "status": "integrated"},
         {"filename": "FFNx.toml", "controls": "FFNx display, audio, rendering, mod and runtime settings", "notes": "The Tweaks > FFNx tab edits typed values in place and preserves comments and file order.", "status": "integrated" if (paths.GAME_ROOT / "FFNx.toml").is_file() else "partial"},
         {"filename": "field.fs", "controls": "Field-map index, backgrounds, random encounter formations and rates, dialogue, general scripts, walkmesh, gateways, triggers, and Triple Triad CARDGAME parameters", "notes": "The Maps > Field view indexes all 896 complete nested map archive triplets without extracting unrelated assets. It extracts only the selected map's supported assets on demand. The four MRT formation IDs and canonical four-byte RAT encounter rate are editable for all 889 maps that contain the proved pair; no-op writes are exact and ordered mods merge independent formation slots or the rate unit. All 894 MAP/MIM background pairs render from the installed texture and expose 14 Deling-proved tile fields with packed spare bits and terminators preserved. All 22,392 dialogue lines across 883 map MSD files are editable with strict FF8 encoding, rebuilt u32 offsets, stable line counts, and unchanged encoded-payload preservation. Across 882 JSM maps, all 87,218 methods and 1,439,792 instruction words parse and rebuild identically. The 87,197 methods with contained control flow are editable using only Deling's 376 defined opcode names; method positions and intra-method relative branches rebuild after edits. The 21 methods with branches outside their own method remain visible and locked. All 151,651 triangles in 894 proved ID walkmeshes have a top-down X/Z preview and typed signed X/Y/Z and adjacency controls. Walkmesh saves preserve topology, reserved vertex words, and the optional two-byte tail; ordered mods merge independent proved fields and report same-field conflicts. Literal and savemap-variable values in the seven fixed pushes before opcode 0x13A remain available through the focused Triple Triad controls. All 12 INF gateways and triggers expose their proved line endpoints, destination positions, target field IDs, and door IDs. Saves preserve source variants and unrelated bytes. Models and media remain explicitly unsupported.", "status": "partial"},
-    ]}
+    ]
+    targets = {
+        "kernel.bin": ["characters", "magic", "gfs", "weapons", "items", "abilities", "text"],
+        "menu/price.bin": ["items"], "menu/shop.bin": ["shops"],
+        "menu/mwepon.bin": ["weapons"], "init.out": ["starting"],
+        "menu/mitem.bin": ["items"], "menu/mngrp.bin": ["text", "refine"],
+        "battle/c0m*.dat": ["enemies"], "battle/scene.out": ["encounters"],
+        "FF8_EN.exe": ["cards", "text", "enemies"],
+        "ff8/en/exe/battle_scans.msd": ["enemies"],
+        "ff8/en/exe/card_names.msd": ["text"],
+        "ff8/en/exe/draw_point.msd": ["text"],
+        "ff8/en/exe/card_texts.msd": ["text"],
+        "hext/ff8/en_nv/Lexeditor.FLYING_EVA.txt": ["settings"],
+        "FFNx.toml": ["settings"], "field.fs": ["fields"],
+    }
+    for row in rows:
+        row["targets"] = targets.get(row["filename"], ["world"] if row["filename"].startswith("world.fs /") else [])
+        row["coverage"] = "structured" if row["targets"] else "unavailable"
+        row["openable"] = bool(row["targets"])
+        if row["filename"] == "init.out":
+            row["status"] = "partial"
+        if row["filename"] == "FFNx.toml" and not (paths.GAME_ROOT / "FFNx.toml").is_file():
+            row.update(status="not-integrated", coverage="unavailable", openable=False)
+            row["notes"] = "FFNx.toml is missing; its settings editor becomes available after FFNx creates it."
+    return {"rows": rows}

@@ -14,6 +14,8 @@ Reconcile live code, PRs and existing topic/session worklogs. This archive impor
 
 Read the source records and preserve the latest explicit human corrections. Update this handoff, not a shared global Worklog.txt.
 
+- [Original Lexer-Lux/Lexers-Mod-For-RDR2 #45 worklog](github-144/imports/Lexer-Lux--Lexers-Mod-For-RDR2/4fe6c76d17cc9c526cbb208e7d28f26e6395ca60/github-45.md) — verified transferred issue identity; historical evidence, not a replacement for newer central progress.
+
 
 ## 2026-09-06 — RDR2 isolated batch / session rdr2-issue-batch
 

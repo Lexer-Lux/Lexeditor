@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356286914,
+    "number": 114,
+    "title": "Center the map on the player when opened",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/114"
+  },
+  "sha256": "5c8b20f718ad3257872f9bf786004b90c7f107d6f42e06558c2cd248a83e5031",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-14.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

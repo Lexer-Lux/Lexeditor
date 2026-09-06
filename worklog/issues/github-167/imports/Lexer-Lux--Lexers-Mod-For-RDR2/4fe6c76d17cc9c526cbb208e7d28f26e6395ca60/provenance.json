@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356299318,
+    "number": 167,
+    "title": "Build a viable prone weapon-animation prototype",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/167"
+  },
+  "sha256": "33501e5068886934a3b9076e92e6145feb266e8d063f8d8b4a01c91d1696ebc0",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-68.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

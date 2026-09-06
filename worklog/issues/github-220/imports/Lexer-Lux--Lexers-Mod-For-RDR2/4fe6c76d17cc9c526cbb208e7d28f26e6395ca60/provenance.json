@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356312308,
+    "number": 220,
+    "title": "Finish the two-mode vehicle camera handoff",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/220"
+  },
+  "sha256": "67c771d634db99b9b165f81001b49c8a2cf82f6a4a4cb6cd9c89be1cd51b96dd",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-128.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

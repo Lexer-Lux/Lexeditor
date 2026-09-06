@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356285057,
+    "number": 106,
+    "title": "Finish dodge-roll input and stamina behavior",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/106"
+  },
+  "sha256": "91abfa3b817cac62e48639d6be8ab16b9a6fcf91f9bc89a8653950e8b59c42d5",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-6.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

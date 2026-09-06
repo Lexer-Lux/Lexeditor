@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356324954,
+    "number": 268,
+    "title": "Restore animal information through binoculars",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/268"
+  },
+  "sha256": "61d8db6eae4f84715fde0675a556d120b28b4e0e82b3727c76978097af718bac",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-176.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

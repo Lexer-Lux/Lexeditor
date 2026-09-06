@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356298676,
+    "number": 164,
+    "title": "Check Ancient Tomahawk returns on every impact",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/164"
+  },
+  "sha256": "ed2a3a678a79e6ccf247d0e53c8b8b3478fafc1d3c20b801e1db60f3080d0adb",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-65.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

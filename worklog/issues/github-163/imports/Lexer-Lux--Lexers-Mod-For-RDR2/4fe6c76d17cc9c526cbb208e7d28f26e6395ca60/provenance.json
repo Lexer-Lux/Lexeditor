@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356298462,
+    "number": 163,
+    "title": "Remove masks reassigned to challenge rewards",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/163"
+  },
+  "sha256": "7cb45a2f0194173baaa0504b3e2025987597e1fe7759eebee6b11245995bf08e",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-64.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

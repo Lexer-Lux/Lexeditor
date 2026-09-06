@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356320882,
+    "number": 254,
+    "title": "Implement the requested area-based Recon targeting",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/254"
+  },
+  "sha256": "e3c174446be0af4b0add15917d208138ee693cc4159760b7dadb16b676b39461",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-162.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

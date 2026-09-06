@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356301794,
+    "number": 179,
+    "title": "Deliver the repaired animated holster input",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/179"
+  },
+  "sha256": "6faceaaf8a0f1e5f24952d40d2d1a6d3a376ad3650acf56f7a98b0cdb3f0597b",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-82.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

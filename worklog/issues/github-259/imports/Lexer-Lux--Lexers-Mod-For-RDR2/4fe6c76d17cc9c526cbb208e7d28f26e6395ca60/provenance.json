@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356322453,
+    "number": 259,
+    "title": "Revalidate ledge-grab entry on the corrected climbing build",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/259"
+  },
+  "sha256": "cf2ef361d6e2e030eb331a6b3157162de800a3692cc9ba00e3e1f2981efc3e9b",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-167.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

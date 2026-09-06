@@ -5408,62 +5408,74 @@
     }, icon);
   };
 
+  // One fitted Table + Detail map for every plugin. Coverage is an explicit
+  // user-interface claim, never inferred from a parser or a legacy green badge.
+  const dataMapState = new Map();
   const dataMap = options => {
+    const plugin = document.body.dataset.lexPlugin || "plugin";
+    const stateKey = options.searchKey || `${plugin}-data-map`;
+    const saved = dataMapState.get(stateKey) || {pageSize:15, selected:null};
+    dataMapState.set(stateKey, saved);
+    const labels = {structured:"Structured editable", view:"Read-only view", source:"Source only", unavailable:"Unavailable"};
+    const coverage = row => Object.hasOwn(labels, row.coverage) ? row.coverage : "unavailable";
+    const label = row => labels[coverage(row)] + (coverage(row)==="structured" && row.status==="partial" ? " (partial)" : "");
+    const keyOf = row => row.id || `${row.filename}\u001f${row.controls || ""}`;
     const query = String(options.query || "").trim().toLocaleLowerCase();
-    const wantedStatus = options.status || "";
-    const searchFields = ["filename", "controls", "notes"];
-    let filtered = options.rows.filter(row => {
-      if (wantedStatus && row.status !== wantedStatus) return false;
-      return !query || searchFields.some(field => String(row[field] || "").toLocaleLowerCase().includes(query));
+    const wanted = options.status || "";
+    const [sortKey, direction] = options.sort || ["filename", 1];
+    const filtered = (options.rows || []).filter(row => (!wanted ||
+      (Object.hasOwn(labels,wanted) ? coverage(row)===wanted : row.status===wanted)) &&
+      (!query || [row.filename,row.controls,row.notes,label(row)].some(value=>String(value||"").toLocaleLowerCase().includes(query))))
+      .sort((a,b)=>direction*String(sortKey==="status"?label(a):a[sortKey]||"").localeCompare(
+        String(sortKey==="status"?label(b):b[sortKey]||""),undefined,{numeric:true}));
+    const statusFilter = element("select", {"aria-label":"Filter files by coverage",
+      onchange:event=>options.changeStatus?.(event.target.value)},
+      ...[["","All coverage"],...Object.entries(labels)].map(([value,text])=>{
+        const option=element("option",{value},text);option.selected=value===wanted;return option;
+      }));
+    const detail = row => {
+      const body = [element("p",{class:"lex-data-map-scope"},row.controls || "No mapped interface"),
+        element("p",{class:`lex-data-map-coverage ${coverage(row)}`},label(row)),
+        element("p",{class:"lex-data-map-notes"},row.notes || "No further notes.")];
+      const actions=[];
+      const targets = row.targets || (row.target || row.view ? [{id:row.target || row.view,label:row.target || row.view}] : []);
+      if (["structured","view"].includes(coverage(row)) && options.open) {
+        for (const target of targets) {
+          const id=typeof target==="string"?target:target.id;
+          const text=typeof target==="string"?target:target.label || target.id;
+          actions.push(element("button",{type:"button",class:"lex-data-map-open",onclick:()=>options.open({...row,target:id,view:id})},`Open ${text}`));
+        }
+      }
+      if (options.openSource && (row.sourceOpenable || (coverage(row)==="source" && row.openable)))
+        actions.push(element("button",{type:"button",class:"lex-data-map-source",onclick:()=>options.openSource(row)},"Edit source only"));
+      actions.push(element("button",{type:"button",class:"lex-data-map-location",title:"Reveal original file location",
+        onclick:async()=>{try{const opened=await callWindow("open_game_data_location",plugin,row.filename);
+          if(opened===false)throw new Error("Open this page in the desktop editor to reveal original files.");
+        }catch(error){showToast(error.message || String(error),true)}}},folderIcon()," File location"));
+      body.push(element("div",{class:"lex-data-map-actions"},...actions));
+      return detailPanel({className:"lex-data-map-detail",title:row.filename,meta:label(row),body});
+    };
+    let page = Number(options.page)||0;
+    const content = pagedListDetail({
+      rows:filtered,key:keyOf,slots:true,noun:"files",page,pageSize:saved.pageSize,
+      selected:saved.selected,revealSelected:false,fit:{minRowHeight:34},maxBarrels:1,
+      className:"lex-data-map lex-data-map-view",splitKey:`${stateKey}-split`,rowsKey:`${stateKey}-rows`,
+      defaultSplit:54,minLeft:280,minRight:240,
+      search:{key:stateKey,value:options.query || "",label:"Search the data map",
+        placeholder:"Search filenames, systems, or notes…",change:options.changeQuery},filters:[statusFilter],
+      sync:next=>{Object.assign(saved,next);page=next.page},
+      change:next=>{Object.assign(saved,next);options.changePage?.(next.page)},
+      emptyDetail:()=>detailPanel({className:"lex-data-map-detail",title:"Data Map",body:[element("p",{},"No files match this filter.")]}),
+      master:({rows,selected,select})=>columnList({rows,key:keyOf,selected,select,
+        class:`lex-data-map-table ${options.tableClass || ""}`,
+        template:"minmax(100px,1.2fr) minmax(80px,1fr) minmax(90px,.9fr)",
+        sortState:{key:sortKey,dir:direction},sort:options.changeSort,
+        columns:[{key:"filename",label:"Filename",sortable:true,align:"start"},
+          {key:"controls",label:"What it controls",sortable:true,align:"start"},
+          {key:"status",label:"Coverage",sortable:true,align:"start",render:row=>element("span",{title:label(row)},label(row))}]}),
+      detail,
     });
-    const [sortKey, sortDirection] = options.sort || ["filename", 1];
-    const statusRank = {integrated: 0, partial: 1, "not-integrated": 2};
-    filtered = [...filtered].sort((left, right) => {
-      const a = sortKey === "status" ? statusRank[left.status] : left[sortKey];
-      const b = sortKey === "status" ? statusRank[right.status] : right[sortKey];
-      return sortDirection * String(a ?? "").localeCompare(String(b ?? ""), undefined, {numeric: true});
-    });
-    const pageSize = options.pageSize || 100;
-    const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
-    const page = Math.max(0, Math.min(options.page || 0, pages - 1));
-    const shown = filtered.slice(page * pageSize, (page + 1) * pageSize);
-    const statusFilter = element("select", {
-      "aria-label": "Filter files by integration status",
-      onchange: event => options.changeStatus(event.target.value),
-    },
-        ...[["", "All statuses"], ["integrated", "Integrated"], ["partial", "Partial"],
-          ["not-integrated", "Not integrated"]].map(([value, label]) => {
-            const choice = element("option", {value}, label);
-            if (value === wantedStatus) choice.selected = true;
-            return choice;
-          }));
-    const table = columnList({
-      rows: shown,
-      key: row => row.filename,
-      class: "lex-data-map-table",
-      template: "minmax(180px,25fr) minmax(240px,33fr) minmax(240px,34fr) minmax(72px,8fr)",
-      sortState: {key: sortKey, dir: sortDirection},
-      columns: [
-        {key: "filename", label: "Filename", sortable: true, align:"start", render: row => element("span", {class:"lex-data-map-file"},
-          element("button", {class:"lex-data-map-location", type:"button", title:`Open original file location: ${row.filename}`, "aria-label":`Open original file location: ${row.filename}`,
-            onclick: async event => {event.stopPropagation();try {const opened=await callWindow("open_game_data_location", document.body.dataset.lexPlugin, row.filename);if(opened===false)throw new Error("Open this page in the desktop editor to reveal original files.")} catch(error) {showToast(error.message || String(error), true)}}}, folderIcon()),
-          row.openable && options.open
-            ? element("button", {class: "lex-data-map-link", title: row.openLabel || "Open this file's editor", onclick: () => options.open(row)}, row.filename)
-            : element("code", {}, row.filename))},
-        {key: "controls", label: "What it controls", sortable: true, align:"start"},
-        {key: "notes", label: "Notes", sortable: true, align:"start", cellClass:"lex-data-map-notes"},
-        {key: "status", label: "Status", sortable: true, render: row => integrationStatus(row.status)},
-      ],
-      sort: options.changeSort,
-    });
-    const commandBar = pager({page, pages, total: filtered.length, pageSize, noun: "files",
-      change: options.changePage,
-      search: {key: options.searchKey || "data-map", value: options.query || "",
-        placeholder: "Search filenames, systems, or notes…", label: "Search the data map",
-        change: options.changeQuery},
-      filters: [statusFilter]});
-    const content = element("div", {class: "lex-data-map-view"}, table, commandBar);
-    return {controls: [], content, page, pages, filtered};
+    return {controls:[],content,page,pages:Math.max(1,Math.ceil(filtered.length/saved.pageSize)),filtered};
   };
 
   const platformConfigView = options => {

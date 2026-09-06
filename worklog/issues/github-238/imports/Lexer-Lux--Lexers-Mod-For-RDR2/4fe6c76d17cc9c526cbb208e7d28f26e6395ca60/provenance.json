@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356316373,
+    "number": 238,
+    "title": "Grey out items blocked by insufficient cores",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/238"
+  },
+  "sha256": "e90097a3f7bff344d15db19868fbcd282fbe80dcd0f295d7d196ab9dd57dd97a",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-146.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

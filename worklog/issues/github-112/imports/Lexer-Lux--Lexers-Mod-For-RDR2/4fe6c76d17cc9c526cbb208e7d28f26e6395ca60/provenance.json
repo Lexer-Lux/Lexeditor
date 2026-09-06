@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356286403,
+    "number": 112,
+    "title": "Use matching lit and unlit campsite icons",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/112"
+  },
+  "sha256": "b5a946586ff5278d8dbe2c5849bf440d3646aba3d906824873b8b5b609832e8f",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-12.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

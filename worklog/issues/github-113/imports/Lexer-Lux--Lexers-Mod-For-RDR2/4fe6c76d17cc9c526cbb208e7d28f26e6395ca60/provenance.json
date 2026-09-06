@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356286656,
+    "number": 113,
+    "title": "Prepare the remaining stealth audit tests",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/113"
+  },
+  "sha256": "833bcd808a28a4ca2066bfd3596c8fb51c174a21aa78b013e1c9fe583e2c67ec",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-13.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

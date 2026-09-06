@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356287698,
+    "number": 117,
+    "title": "Use readable typed settings with lifecycle tags",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/117"
+  },
+  "sha256": "c100f0df6bc2e1f3dec625dee8e0332e69bcdc215d2d5d834011b799259f601a",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-17.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}
