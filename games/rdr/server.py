@@ -19,7 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path, PurePosixPath
 from urllib.parse import parse_qs, urlparse
 
-from . import mission_rewards, paths
+from . import camera_features, mission_rewards, paths
 from .archive_deployment import (
     ArchiveSpec, deploy_archives, deployment_status, revert_archives,
 )
@@ -38,10 +38,12 @@ CONTENT_OVERRIDE_ROOT = MOD_ROOT / "content"
 GRINGO_PACKED_ROOT = EXTRACT_ROOT / "gringores"
 GRINGO_UNPACKED_ROOT = EXTRACT_ROOT / "gringores-unpacked"
 GRINGO_OVERRIDE_ROOT = MOD_ROOT / "gringores"
+CAMERA_GENERATED_ROOT = PROJECT / ".lexeditor-generated" / "camera"
 ARCHIVE_SPECS = (
     ArchiveSpec("tuning", Path("game") / "tune_d11generic.rpf", OVERRIDE_ROOT),
     ArchiveSpec("content", Path("game") / "content.rpf", CONTENT_OVERRIDE_ROOT),
     ArchiveSpec("gringores", Path("game") / "gringores.rpf", GRINGO_OVERRIDE_ROOT),
+    ArchiveSpec("camera", camera_features.CAMERA_ARCHIVE_RELATIVE, CAMERA_GENERATED_ROOT),
 )
 SETTINGS_FILE = paths.SETTINGS_FILE
 LOOT_FILE = Path(
@@ -1252,6 +1254,34 @@ def data_map_payload() -> dict:
     }
 
 
+def _prepare_cover_shoulder_override() -> str:
+    """Materialize the proven CoverCamera side-switch override when a real install is present."""
+    camera_archive = GAME_ROOT / camera_features.CAMERA_ARCHIVE_RELATIVE
+    if not camera_archive.is_file():
+        return (f"RDR camera archive is missing: {camera_archive}"
+                if (GAME_ROOT / "RDR.exe").is_file() else "")
+    try:
+        camera_features.ensure_cover_shoulder_override(
+            GAME_ROOT, paths.RPF6_TOOL, CAMERA_GENERATED_ROOT)
+        return ""
+    except Exception as error:
+        return f"Cover shoulder-swap override is not ready: {error}"
+
+
+def _deployment_payload() -> dict:
+    problem = _prepare_cover_shoulder_override()
+    payload = deployment_status(GAME_ROOT, ARCHIVE_SPECS)
+    generated = CAMERA_GENERATED_ROOT / camera_features.CAMERA_ENTRY_RELATIVE
+    payload["coverShoulder"] = {
+        "prepared": generated.is_file(),
+        "path": str(generated),
+        "problem": problem,
+        "changedLine": camera_features.COVER_ASSIGNMENT_LINE,
+    }
+    if problem:
+        payload["problem"] = problem
+    return payload
+
 def dashboard_payload() -> dict:
     manifest = {}
     manifest_path = EXTRACT_ROOT / "manifest.json"
@@ -1265,6 +1295,7 @@ def dashboard_payload() -> dict:
             "Editable overrides": str(OVERRIDE_ROOT),
             "Inventory overrides": str(CONTENT_OVERRIDE_ROOT),
             "Shop overrides": str(GRINGO_OVERRIDE_ROOT),
+            "Generated camera fixes": str(CAMERA_GENERATED_ROOT),
             "Mission ASI override": str(mission_rewards.OVERRIDE_FILE),
             "Settings": str(SETTINGS_FILE),
             "Loot ASI override": str(LOOT_FILE),
@@ -1275,7 +1306,7 @@ def dashboard_payload() -> dict:
         },
         "manifest": manifest,
         "redHook": redhook_payload(),
-        "deployment": deployment_status(GAME_ROOT, ARCHIVE_SPECS),
+        "deployment": _deployment_payload(),
         "problems": paths.check()
         + ([] if PREPARED_ROOT.is_dir() else [f"Prepared RDR data is missing: {PREPARED_ROOT}"])
         + ([] if CONTENT_PREPARED_ROOT.is_dir() else [
@@ -1366,7 +1397,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/dashboard":
                 self.json_response(dashboard_payload())
             elif path == "/api/deployment":
-                self.json_response(deployment_status(GAME_ROOT, ARCHIVE_SPECS))
+                self.json_response(_deployment_payload())
             elif path == "/api/files":
                 self.json_response(files_payload())
             elif path == "/api/file":
@@ -1424,6 +1455,9 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/redhook/configure":
                 self.json_response(configure_redhook())
             elif path == "/api/deployment/deploy":
+                cover_problem = _prepare_cover_shoulder_override()
+                if cover_problem:
+                    raise RuntimeError(cover_problem)
                 self.json_response(deploy_archives(
                     GAME_ROOT, paths.RPF6_TOOL, ARCHIVE_SPECS))
             elif path == "/api/deployment/revert":
