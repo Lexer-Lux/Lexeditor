@@ -43,3 +43,4 @@ jobs:
           python tools/verify_ff8_stock_tweak_settings.py
           python tools/verify_ff8_max_spell_menu.py
           python tools/verify_ff8_gameplay_quarantine_issue_21.py
+# rerun after reconciling FF9 baseline coverage
