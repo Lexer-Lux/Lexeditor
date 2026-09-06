@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356324593,
+    "number": 267,
+    "title": "Make shoulder switching reach both sides evenly",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/267"
+  },
+  "sha256": "b268fa4660a9073d6430b233486fb92d2ead4da0920297ef7f89e8d15278a264",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-175.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

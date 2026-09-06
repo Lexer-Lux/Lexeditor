@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356296624,
+    "number": 154,
+    "title": "Explain each bounty-hunter wanted tier",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/154"
+  },
+  "sha256": "d6605073d6eb86f46e86cba4ced4053e5fb3a518b780392abf0b9010b0a5aa52",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-55.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

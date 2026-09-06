@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356295046,
+    "number": 146,
+    "title": "Check the repaired horse-camera centering toggle",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/146"
+  },
+  "sha256": "c3129d1632160a830883e94448adaeab3a9333288140a119c4826ffb77e599a4",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-47.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

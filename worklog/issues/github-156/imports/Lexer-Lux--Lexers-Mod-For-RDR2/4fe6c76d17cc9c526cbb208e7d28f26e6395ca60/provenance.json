@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356297024,
+    "number": 156,
+    "title": "Allow card sales only after the set is mailed",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/156"
+  },
+  "sha256": "cf7d2b7bd87c957cd23d7a55e7ae3ab2dedc61fc2fec569400bc2290ac390990",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-57.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

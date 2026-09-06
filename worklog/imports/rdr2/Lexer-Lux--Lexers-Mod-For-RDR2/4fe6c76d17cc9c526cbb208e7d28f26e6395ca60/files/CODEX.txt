@@ -1,0 +1,20 @@
+# CODEX index (generated)
+
+Settled knowledge lives in topic-owned files under `codex/`. Do not edit
+this index directly. The integration agent regenerates it with:
+`python tools/knowledge_files.py rebuild`.
+
+Search all settled knowledge with `rg -n "TERM" codex CODEX.txt`.
+
+## Topics
+
+- [Project and release policy](codex/project-release-policy.md)
+- [Build and installation](codex/build-installation.md)
+- [Data fundamentals](codex/data-fundamentals.md)
+- [Inventory and radial architecture](codex/inventory-radial.md)
+- [Stealth and perception](codex/stealth-perception.md)
+- [Enemy accuracy, health and the Mobs tab](codex/enemy-mobs.md)
+- [Item and consumable description style](codex/item-description-style.md)
+- [LEXEDITOR UI rules](codex/lexeditor.md)
+- [Archive extraction tooling](codex/archive-extraction.md)
+- [Confirmed runtime behaviour and engine limits](codex/runtime-engine-limits.md)

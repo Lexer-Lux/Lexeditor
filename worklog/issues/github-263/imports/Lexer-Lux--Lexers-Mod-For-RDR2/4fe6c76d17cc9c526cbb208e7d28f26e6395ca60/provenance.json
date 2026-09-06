@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356323445,
+    "number": 263,
+    "title": "Keep new campsite activation and marker states consistent",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/263"
+  },
+  "sha256": "141a08b93e1b54a07a725bc3cb57dc1c8ce19077dd5dbcd5ef831abd45ad6467",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-171.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

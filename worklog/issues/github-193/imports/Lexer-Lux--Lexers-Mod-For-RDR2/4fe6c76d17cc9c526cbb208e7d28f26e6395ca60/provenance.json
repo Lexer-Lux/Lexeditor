@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356305471,
+    "number": 193,
+    "title": "Restore reliable wall grabbing and climbing",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/193"
+  },
+  "sha256": "595ef8c512772f1df2d80519b191dcd2ce8084ff2bbd36a7f156755f370b1d6e",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-97.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}

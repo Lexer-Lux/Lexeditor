@@ -1,0 +1,12 @@
+{
+  "destination_issue": {
+    "id": 5356300510,
+    "number": 173,
+    "title": "Remove the recurring exhaustion-like screen haze",
+    "url": "https://github.com/Lexer-Lux/Lexeditor/issues/173"
+  },
+  "sha256": "a265cf86a1ee05fbe7ea8cd21fea9664410a677da33a38198accb0f3b64aa474",
+  "source_commit": "4fe6c76d17cc9c526cbb208e7d28f26e6395ca60",
+  "source_path": "worklog/issues/github-74.md",
+  "source_repository": "Lexer-Lux/Lexers-Mod-For-RDR2"
+}
