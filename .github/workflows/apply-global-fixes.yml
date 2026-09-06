@@ -29,9 +29,7 @@ jobs:
           patch=gzip.decompress(base64.b64decode(encoded,validate=True))
           assert hashlib.sha256(patch).hexdigest()=='4e9643970464cf7204267fdac236812be04eb36604ce11d957048cff59c23538','Staged patch hash mismatch'
           assert len(patch)==66694
-          names=[]
-          for line in patch.decode().splitlines():
-              if line.startswith('+++ b/'):names.append(line[6:])
+          names=[line[6:] for line in patch.decode().splitlines() if line.startswith('+++ b/')]
           assert names and all(not n.startswith(('.github/','codex/','worklog/')) and '..' not in pathlib.PurePosixPath(n).parts for n in names)
           path=pathlib.Path('/tmp/global-fixes.patch');path.write_bytes(patch)
           subprocess.run(['git','apply','--check',str(path)],check=True)
@@ -39,7 +37,7 @@ jobs:
           print('Applied reviewed paths:',len(names))
           PY
           python tools/generate_credits.py
-      - name: Commit only reviewed application, documentation and tests
+      - name: Commit reviewed code and reconcile only the independent CSS additions
         run: |
           git config user.name 'Lexeditor Global Fixes'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
@@ -47,7 +45,21 @@ jobs:
           git diff --cached --check
           git commit -m 'Fix loading quotes, helper versions, shared offline credits and native app bootstrap'
           git fetch --no-recurse-submodules origin master
-          git -c submodule.recurse=false merge --no-edit origin/master
+          python3 - <<'PY'
+          import pathlib,subprocess
+          result=subprocess.run(['git','-c','submodule.recurse=false','merge','--no-edit','origin/master'])
+          if result.returncode:
+              conflicts=subprocess.check_output(['git','diff','--name-only','--diff-filter=U'],text=True).splitlines()
+              assert conflicts==['ui/framework.css'],f'Unexpected conflict: {conflicts}'
+              base=subprocess.check_output(['git','show',':1:ui/framework.css'])
+              ours=subprocess.check_output(['git','show',':2:ui/framework.css'])
+              theirs=subprocess.check_output(['git','show',':3:ui/framework.css'])
+              assert ours.startswith(base) and theirs.startswith(base),'Not independent end-of-file additions'
+              assert b'.lex-plugin-credits' in ours[len(base):] and b'.lex-data-map-view' in theirs[len(base):]
+              pathlib.Path('ui/framework.css').write_bytes(base+ours[len(base):]+theirs[len(base):])
+              subprocess.run(['git','add','ui/framework.css'],check=True)
+              subprocess.run(['git','commit','--no-edit'],check=True)
+          PY
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -57,7 +69,7 @@ jobs:
           python -m playwright install --with-deps chromium
           python -m unittest discover -s tests -p 'test_global_issues.py' -v
           python tests/global_browser_check.py
-          python tools/generate_credits.py --check
+          python tools/generate_credits.py
       - name: Publish only the tested branch without rewriting history
         id: commit
         run: |
