@@ -26,9 +26,10 @@ def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
     html=(ROOT/'games'/source_game/'editor.html').read_text()
     # Synthetic set_content() documents otherwise use about:blank, which cannot
-    # resolve the shared framework's optional relative assets.
+    # resolve the shared framework's optional relative assets or push fragment URLs.
     html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
-    stub='''const replace=history.replaceState.bind(history);history.replaceState=(s,u)=>replace(s,u);
+    stub='''const replace=history.replaceState.bind(history),push=history.pushState.bind(history);
+    history.replaceState=(s,u)=>replace(s,u);history.pushState=(s,u)=>push(s,u);
     window.fetch=()=>new Promise(()=>{});
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
