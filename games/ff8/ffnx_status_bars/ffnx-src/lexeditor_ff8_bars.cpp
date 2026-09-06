@@ -53,9 +53,10 @@ using GlyphRenderer = std::uint32_t(__cdecl *)(std::uint32_t, std::uint32_t, int
 BattleRowRenderer g_battle_row_renderer = nullptr;
 GlyphRenderer g_hp_glyph_renderer = nullptr, g_atb_glyph_renderer = nullptr;
 struct HpCapture {
-    float left = 0, right = 0, bottom = 0;
+    float left = 0, right = 0, top = 0;
     sprite_viewport viewport{};
     std::uint16_t current = 0, maximum = 0;
+    std::uint32_t gf_current = 0, gf_maximum = 0;
     bool hp_visible = false, atb_visible = false;
 };
 std::array<HpCapture, 3> g_hp_rows;
@@ -77,9 +78,7 @@ void capture_glyph(int x, int y, bool hp)
     const auto *sprite = table + (entry & 0xFFFF);
     for (unsigned i = 0; i < count; ++i, sprite += 8) {
         const float right = x + static_cast<std::int8_t>(sprite[5]) + sprite[4];
-        const float bottom = y + static_cast<std::int8_t>(sprite[7]) + sprite[6];
-        if (hp) g_hp_row->bottom = std::max(g_hp_row->bottom, bottom);
-        else g_hp_row->right = std::max(g_hp_row->right, right);
+        if (!hp) g_hp_row->right = std::max(g_hp_row->right, right);
     }
     g_hp_row->viewport = **g_active_viewport;
     if (hp) g_hp_row->hp_visible = true;
@@ -96,6 +95,35 @@ std::uint32_t __cdecl atb_glyph_hook(std::uint32_t a, std::uint32_t b, int x, in
     capture_glyph(x, y, false);
     return g_atb_glyph_renderer(a, b, x, y);
 }
+// Saved GF HP is authoritative outside a summon. During the charge the
+// engine keeps a live copy in the summoner's computed record (+18/+1A), then
+// writes it back at 0048E664. Reading only saved HP would miss incoming damage.
+void capture_gf_hp(std::uint8_t slot, HpCapture &capture)
+{
+    if (!enable_ff8_gf_hp_bars || ff8_externals.savemap == nullptr ||
+        ff8_externals.char_comp_stats_1CFF000.size() != 3) return;
+    const auto character = ff8_externals.character_data_1CFE74C[slot];
+    if (character >= CHAR_NUM) return;
+    const auto junctions = ff8_externals.savemap->chars[character].gfs;
+    const auto *stats = reinterpret_cast<const std::uint8_t *>(
+        &ff8_externals.char_comp_stats_1CFF000[slot]);
+    const bool summoning = (stats[0x1C] & 1) != 0;
+    const int summoned = static_cast<int>(stats[0x1D]) - 0x40;
+    for (int gf = 0; gf < G_FORCE_NUM; ++gf) {
+        if (!(junctions & (1U << gf)) || !(ff8_externals.savemap->gfs[gf].exists & 1)) continue;
+        // 00495D80 initializes twelve-byte GF stats; +2 is max HP, including
+        // level and learned HP abilities. Do not duplicate the game's formula.
+        auto maximum = *reinterpret_cast<const std::uint16_t *>(0x1CFF61A + gf * 12);
+        auto current = ff8_externals.savemap->gfs[gf].HPs;
+        if (summoning && summoned == gf) {
+            current = *reinterpret_cast<const std::uint16_t *>(stats + 0x18);
+            maximum = *reinterpret_cast<const std::uint16_t *>(stats + 0x1A);
+        }
+        capture.gf_maximum += maximum;
+        capture.gf_current += std::min(current, maximum);
+    }
+}
+
 std::uint32_t __cdecl battle_row_hook(std::uint8_t *row, std::uint32_t a, std::uint32_t b, int state)
 {
     const auto actor = row[0x48];
@@ -106,8 +134,10 @@ std::uint32_t __cdecl battle_row_hook(std::uint8_t *row, std::uint32_t a, std::u
         // Native name origin is row+8 (004B0C0B); HP comes from this same
         // displayed row, not the stat editor's computed-stat scratch buffer.
         capture.left = *reinterpret_cast<const std::int16_t *>(row + 8);
+        capture.top = *reinterpret_cast<const std::int16_t *>(row + 0xA);
         capture.maximum = *reinterpret_cast<const std::uint16_t *>(row + 0x1C);
         capture.current = *reinterpret_cast<const std::uint16_t *>(row + 0x1E);
+        capture_gf_hp(actor, capture);
         g_hp_row = &capture;
     }
     const auto result = g_battle_row_renderer(row, a, b, state);
@@ -120,6 +150,8 @@ constexpr std::uint32_t kMaxSearchExp = 99999999U;
 static_assert(offsetof(ff8_char_computed_stats, curr_hp) == 370);
 static_assert(offsetof(ff8_char_computed_stats, max_hp) == 372);
 static_assert(offsetof(savemap_ff8_character, exp) == 4);
+static_assert(offsetof(savemap_ff8_character, gfs) == 0x58);
+static_assert(offsetof(savemap_ff8_gf, HPs) == 0x12);
 
 std::uint32_t __cdecl main_menu_renderer_hook(
     void *state, std::uint32_t display_list, std::uint32_t ordering_table)
@@ -308,20 +340,37 @@ void draw_battle_hp()
         return;
     }
     for (const auto &row : g_hp_rows) {
-        if (!row.hp_visible || !row.atb_visible || row.maximum == 0 ||
-            row.right <= row.left || row.viewport.scale_x <= 0 || row.viewport.scale_y <= 0) continue;
+        if (!row.atb_visible || row.right <= row.left ||
+            row.viewport.scale_x <= 0 || row.viewport.scale_y <= 0) continue;
         const auto &v = row.viewport;
         const float full_width = (row.right - row.left) * v.scale_x;
-        const float width = full_width * std::min(1.0f, row.maximum / 9999.0f);
-        const float right = row.right * v.scale_x + v.offset_x;
-        const float top = row.bottom * v.scale_y + v.offset_y;
-        const ImVec2 lo(scale_x(right - width), scale_y(top));
-        const ImVec2 hi(scale_x(right), scale_y(top + v.scale_y));
-        auto *draw = ImGui::GetForegroundDrawList();
-        draw->AddRectFilled(lo, hi, IM_COL32(0, 0, 0, 255));
-        const float fraction = std::min(1.0f, row.current / static_cast<float>(row.maximum));
-        if (fraction > 0) draw->AddRectFilled(
-            ImVec2(hi.x - (hi.x - lo.x) * fraction, lo.y), hi, IM_COL32(224, 32, 32, 255));
+        auto draw_line = [&](std::uint32_t current, std::uint32_t maximum,
+                             float native_y, bool from_left, ImU32 color) {
+            if (!maximum) return;
+            const float width = full_width * std::min(1.0f, maximum / 9999.0f);
+            const float x = (from_left ? row.left : row.right) * v.scale_x + v.offset_x;
+            const float top = native_y * v.scale_y + v.offset_y;
+            const ImVec2 lo(scale_x(from_left ? x : x - width), scale_y(top));
+            const ImVec2 hi(scale_x(from_left ? x + width : x), scale_y(top + v.scale_y));
+            if (hi.x <= lo.x || hi.y <= lo.y) return;
+            auto *draw = ImGui::GetForegroundDrawList();
+            draw->AddRectFilled(lo, hi, IM_COL32(0, 0, 0, 255));
+            const float fraction = std::min(1.0f, current / static_cast<float>(maximum));
+            if (fraction <= 0) return;
+            const float filled = (hi.x - lo.x) * fraction;
+            draw->AddRectFilled(
+                ImVec2(from_left ? lo.x : hi.x - filled, lo.y),
+                ImVec2(from_left ? lo.x + filled : hi.x, hi.y), color);
+        };
+        // Native rows are 15 pixels high (004B0FF6) and spaced by 15
+        // (004B1978). Text starts at row_y+2 and is 12 pixels high. Glyph
+        // atlas cells can contain transparent padding beyond that row.
+        // Anchor the red line to its final pixel, never to atlas-cell bounds.
+        if (enable_ff8_hp_bars && row.hp_visible)
+            draw_line(row.current, row.maximum, row.top + 14.0f, false, IM_COL32(224, 32, 32, 255));
+        // One native pixel immediately above the name; independent toggle.
+        if (enable_ff8_gf_hp_bars)
+            draw_line(row.gf_current, row.gf_maximum, row.top + 1.0f, true, IM_COL32(48, 128, 255, 255));
     }
 }
 
@@ -329,12 +378,12 @@ void draw_battle_hp()
 
 bool lexeditor_ff8_bars_enabled()
 {
-    return ff8 && (enable_ff8_xp_bars || enable_ff8_hp_bars);
+    return ff8 && (enable_ff8_xp_bars || enable_ff8_hp_bars || enable_ff8_gf_hp_bars);
 }
 
 void lexeditor_ff8_bars_install()
 {
-    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars)) {
+    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars && !enable_ff8_gf_hp_bars)) {
         return;
     }
 
@@ -344,7 +393,7 @@ void lexeditor_ff8_bars_install()
         return *reinterpret_cast<const std::uint8_t *>(address) == 0xE8 &&
             get_relative_call(address, 0) == target;
     };
-    if (enable_ff8_hp_bars && FF8_US_VERSION &&
+    if ((enable_ff8_hp_bars || enable_ff8_gf_hp_bars) && FF8_US_VERSION &&
         original_call(0x004B17D5, 0x004B0F10) &&
         original_call(0x004B1100, 0x004A7210) &&
         original_call(0x004B127B, 0x004A7210)) {
@@ -390,7 +439,7 @@ void lexeditor_ff8_bars_install()
 
 void lexeditor_ff8_bars_draw()
 {
-    if (enable_ff8_hp_bars) {
+    if (enable_ff8_hp_bars || enable_ff8_gf_hp_bars) {
         draw_battle_hp();
     }
     if (enable_ff8_xp_bars) {

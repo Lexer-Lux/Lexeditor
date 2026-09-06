@@ -1,0 +1,70 @@
+"""Prepare the pinned FFNx derivative with the canonical native battle fixes.
+
+Run only against a disposable, clean FFNx build checkout. This never reads,
+installs, modifies or uploads FF8_EN.exe or a game installation.
+"""
+from __future__ import annotations
+import argparse
+from pathlib import Path
+import shutil
+import subprocess
+
+ROOT=Path(__file__).resolve().parents[1]
+BASE='c056db2783f376a340fcefa6a48cc33618998876'
+
+
+def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> None:
+    source=source.resolve();patch_output=patch_output.resolve()
+    if verify_revision:
+        revision=subprocess.check_output(['git','rev-parse','HEAD'],cwd=source,text=True).strip()
+        if revision!=BASE:
+            raise RuntimeError(f'Expected FFNx {BASE}; found {revision}')
+    if subprocess.check_output(['git','status','--porcelain','--untracked-files=no'],cwd=source,text=True).strip():
+        raise RuntimeError('Refusing to modify a dirty FFNx source checkout')
+    patch=ROOT/'games/ff8/ffnx_issue_51/package/ISSUE51_DERIVATIVE_SOURCE.patch'
+    subprocess.run(['git','apply','--check','--ignore-space-change',str(patch)],cwd=source,check=True)
+    subprocess.run(['git','apply','--ignore-space-change',str(patch)],cwd=source,check=True)
+    for folder,name in (
+        ('ffnx_status_bars','lexeditor_ff8_bars.cpp'),
+        ('ffnx_status_bars','lexeditor_ff8_bars.h'),
+        ('ffnx_party_switch','lexeditor_ff8_party_switch.cpp'),
+        ('ffnx_party_switch','lexeditor_ff8_party_switch.h'),
+    ):
+        shutil.copyfile(ROOT/f'games/ff8/{folder}/ffnx-src/{name}',source/'src'/name)
+    # The packaged provenance patch may already include the new switch after
+    # this candidate has been validated and promoted; support repeat builds.
+    changes={
+        'src/cfg.cpp':[
+            ('bool enable_ff8_hp_bars;','bool enable_ff8_hp_bars;\nbool enable_ff8_gf_hp_bars;'),
+            ('\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);',
+             '\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\n\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);'),
+        ],
+        'src/cfg.h':[
+            ('extern bool enable_ff8_hp_bars;','extern bool enable_ff8_hp_bars;\nextern bool enable_ff8_gf_hp_bars;'),
+        ],
+        'misc/FFNx.toml':[
+            ('enable_ff8_hp_bars = false','enable_ff8_hp_bars = false\n\n# Blue junctioned-GF HP bar above each party name.\nenable_ff8_gf_hp_bars = false'),
+        ],
+    }
+    for relative,pairs in changes.items():
+        path=source/relative;raw=path.read_bytes();newline='\r\n' if b'\r\n' in raw else '\n'
+        text=raw.decode('utf-8').replace('\r\n','\n')
+        for old,new in pairs:
+            # Check the added declaration/parser line, not just the substring
+            # (cfg.cpp contains both the declaration and the parser).
+            addition=new.split('\n')[-1]
+            if addition in text:continue
+            if text.count(old)!=1:raise RuntimeError(f'Integration anchor changed: {relative}: {old}')
+            text=text.replace(old,new,1)
+        path.write_bytes(text.replace('\n',newline).encode('utf-8'))
+    # Include the source files newly introduced by the packaged derivative.
+    subprocess.run(['git','add','--intent-to-add','--','src'],cwd=source,check=True)
+    patch_output.parent.mkdir(parents=True,exist_ok=True)
+    with patch_output.open('wb') as output:
+        subprocess.run(['git','-c','core.autocrlf=false','diff','--binary','HEAD','--','.'],cwd=source,stdout=output,check=True)
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('source',type=Path)
+    parser.add_argument('--patch-output',type=Path,required=True)
+    args=parser.parse_args();prepare(args.source,args.patch_output)
