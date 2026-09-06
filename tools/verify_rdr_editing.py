@@ -207,6 +207,38 @@ class EditingTests(unittest.TestCase):
                 mission_rewards.validate_override({"schemaVersion": 1, "contract": "LexerRDR.mission-rewards",
                     "overrides": [{"id": 2, "rewards": {kind: amount}}]})
 
+    def test_mission_handoff_preserves_and_restores_exact_pretest_override(self):
+        base = server.mission_test_plan()
+        self.assertEqual(base["missionId"], 2)
+        self.assertEqual(base["status"], "baseline")
+        server.save_missions({"schemaVersion": 1, "contract": "LexerRDR.mission-rewards",
+            "overrides": [{"id": 5, "rewards": {"cash": 777}}, {"id": 2, "rewards": {"honor": 7}}]})
+        custom = server.mission_test_plan()
+        self.assertEqual(custom["status"], "custom")
+        staged = server.stage_mission_test()["test"]
+        self.assertEqual(staged["status"], "staged")
+        self.assertEqual(staged["currentOverride"], {"id": 2, "rewards": {"cash": 123, "fame": 321, "honor": 222}})
+        document = server._mission_override_document()
+        self.assertIn({"id": 5, "rewards": {"cash": 777}}, document["overrides"])
+        restored = server.restore_mission_test()["test"]
+        self.assertEqual(restored["status"], "custom")
+        document = server._mission_override_document()
+        self.assertIn({"id": 5, "rewards": {"cash": 777}}, document["overrides"])
+        self.assertIn({"id": 2, "rewards": {"honor": 7}}, document["overrides"])
+        self.assertFalse(server.MISSION_TEST_STATE.exists())
+
+    def test_mission_handoff_refuses_restore_after_mission2_changes(self):
+        server.stage_mission_test()
+        document = server._mission_override_document()
+        rows = [row for row in document["overrides"] if row["id"] != 2]
+        rows.append({"id": 2, "rewards": {"honor": 999}})
+        server.save_missions({"schemaVersion": 1, "contract": "LexerRDR.mission-rewards", "overrides": rows})
+        plan = server.mission_test_plan()
+        self.assertEqual(plan["status"], "conflict")
+        with self.assertRaisesRegex(RuntimeError, "changed after"):
+            server.restore_mission_test()
+        self.assertEqual(server._mission_row(server._mission_override_document(), 2), {"id": 2, "rewards": {"honor": 999}})
+
     def test_mission_save_and_reset_leave_generated_table_unchanged(self):
         original = mission_rewards.GENERATED_FILE.read_bytes()
         doc = {"schemaVersion": 1, "contract": "LexerRDR.mission-rewards",
