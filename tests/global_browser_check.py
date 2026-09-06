@@ -114,8 +114,9 @@ def main():
             load_page(page,base,'/ui/chooser.html');page.wait_for_selector('#chooser-lexer:visible');page.locator('#chooser-lexer').click()
             page.wait_for_selector('.lexer-helper-versions')
             text=page.locator('#lexer-panel').inner_text()
-            assert all(t in text for t in ['Pinned: 1.0','Installed: 1.1','Latest: 1.2','Not installed','2026-09-01','Offline']),text
-            assert page.locator('#lexer-panel a').first.get_attribute('rel')=='noopener noreferrer'
+            assert all(t in text for t in ['Pinned: 1.0','Installed: 1.1','Latest upstream: 1.2','Installed: Not detected','2026-09-01','Offline']),text
+            release=page.locator('#lexer-panel .lexer-helper-source').first
+            assert release.count()==1 and release.evaluate("e=>e.tagName==='BUTTON'&&!e.hasAttribute('href')")
             page.get_by_role('button',name='Check Again',exact=False).click();page.wait_for_timeout(100)
             assert page.evaluate('window.__calls.includes(true)')
             page.screenshot(path=str(OUT/'helper-versions.png'));assert not errors,errors
