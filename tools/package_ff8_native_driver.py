@@ -111,7 +111,12 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
         shutil.copyfile(complete_patch, stage / complete_patch.name)
         manifest = json.loads((stage / 'runtime-manifest.json').read_text())
         patch_hash = sha256(complete_patch)
-        licence_hash = sha256(licence)
+        # Keep the historical pinned licence bytes (CRLF) and include it in
+        # this commit. An attributes-only change does not necessarily rewrite
+        # an existing Windows checkout's previously converted licence file.
+        (stage / 'COPYING.TXT').write_bytes(
+            licence.read_bytes().replace(b'\r\n', b'\n').replace(b'\n', b'\r\n'))
+        licence_hash = sha256(stage / 'COPYING.TXT')
         shader_files = sorted((stage / 'shaders').glob('*'))
         shader_files = [p for p in shader_files if p.is_file()]
         shader_digest = hashlib.sha256(''.join(
@@ -191,7 +196,7 @@ this packaging command. This report does not claim in-game acceptance.
         checked = reviewed.verify(stage)
         require(checked['driverSha256'] == driver_sha256, 'Staged package was not validated')
         outputs = {old_root / name: (stage / name).read_bytes() for name in (
-            'AF3DN.P', 'ISSUE51_DERIVATIVE_SOURCE.patch', 'ISSUE51_BUILD_REPORT.md', 'runtime-manifest.json')}
+            'AF3DN.P', 'COPYING.TXT', 'ISSUE51_DERIVATIVE_SOURCE.patch', 'ISSUE51_BUILD_REPORT.md', 'runtime-manifest.json')}
         outputs[verifier] = code.encode('utf-8')
         before = {p: p.read_bytes() for p in outputs}
         try:
