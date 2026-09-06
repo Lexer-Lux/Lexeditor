@@ -21,6 +21,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.prepare_ff8_native_build import BASE, prepare
+from tools.verify_ff8_linked_runtime import verify as verify_linked
 from games.ff8.ffnx_issue_51 import runtime_package
 
 SUPPORT_FILES = {
@@ -99,8 +100,7 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
         complete_patch = work / 'ISSUE51_DERIVATIVE_SOURCE.patch'
         prepare(ffnx_source, complete_patch)
         verify_compilation_patch((candidate / complete_patch.name).read_bytes(), complete_patch.read_bytes())
-        subprocess.run([sys.executable, str(ffnx_source / 'tools/verify_issue51_runtime_artifact.py'),
-                        str(driver)], check=True)
+        verify_linked(ffnx_source / 'tools/verify_issue51_runtime_artifact.py', driver)
         image, _ = runtime_package._pe_exports(driver)
         runtime_package._reject_unloadable_manifest(image)
         require(all(marker in image for marker in NEW_DRIVER_MARKERS),
@@ -121,6 +121,11 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
         shader_files = [p for p in shader_files if p.is_file()]
         shader_digest = hashlib.sha256(''.join(
             f'{p.name} {sha256(p)}\n' for p in shader_files).encode()).hexdigest()
+        recovery = ('The original run compiled and linked successfully, but licence '
+                    'staging used the wrong filename. The archived DLL/PDB and '
+                    'CMake cache were recovered without changing the binary; all '
+                    'linked-artifact and package checks were rerun before publication.'
+                    if 'Recovered from' in build else '')
         report = f'''# Lexeditor FFNx battle repair build
 
 ## Artifact and source
@@ -139,6 +144,8 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
 - Existing matching-base shader set retained: {len(shader_files)} files;
   sorted filename/hash-list SHA-256 `{shader_digest}`.
 
+{recovery}
+
 ## Changes
 
 Party Switch retires the outgoing model through native event 69 before event
@@ -156,8 +163,9 @@ Use the exact FFNx base and its pinned vcpkg submodule. Apply the complete
 `ISSUE51_DERIVATIVE_SOURCE.patch`. The build uses MSVC x86 on the
 `windows-2025-vs2026` runner, CMake 4.2.0, Ninja, Release, and the
 `x86-windows-static` triplet with `VCPKG_BUILD_TYPE release`.
-Configure with `FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON` and
-`FFNX_DEPLOY_TO_GAME_DIRS=OFF`, then run `cmake --build .build --parallel 4`.
+Configure with `FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON`,
+`FFNX_LEXEDITOR_LIVE_CONDITIONS=ON`, and `FFNX_DEPLOY_TO_GAME_DIRS=OFF`,
+then run `cmake --build .build --parallel 4`.
 The full command sequence is in `.github/workflows/native-dependencies.yml`.
 The complete patch restores test/verifier support omitted by the earlier
 preparation helper; every candidate patch section was compared unchanged.
