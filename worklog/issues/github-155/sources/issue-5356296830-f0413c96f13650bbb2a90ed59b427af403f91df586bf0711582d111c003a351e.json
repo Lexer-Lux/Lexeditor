@@ -1,0 +1,90 @@
+{
+  "body_sha256": "09f8d0956574e535fec3438fc5cd27d55e172d946381aac8858f1ac328f03c64",
+  "issue": 155,
+  "kind": "issue",
+  "record": {
+    "active_lock_reason": null,
+    "assignee": null,
+    "assignees": [],
+    "author_association": "OWNER",
+    "body": "### What actually decides knockout vs death\n\nThere is **not** one `Unarmed = nonlethal` switch in the Weapons data. Three separate pieces participate:\n\n1. **The melee action** chooses its own damage/reaction data. Punches, kicks, stomps, grapples/finishers, etc. are separate actions in the action-damage data. A reaction attribute such as `DRA_KNOCKOUT` means that action can drive the knockout reaction/state; it does **not** mean “ignore lethal damage.”\n2. **Normal health/damage processing still happens.** The hit still removes health and can satisfy a lethal/fatal path. A knockout-capable action therefore is not automatically incapable of killing—especially for very low-health targets, finishers/stomps, environmental impacts, or other fatal reactions.\n3. **The ped health archetype owns the knockout state itself:** thresholds/eligibility, recovery health/behavior, and related shared knockout limits live with ped-health configuration rather than the Unarmed weapon record. That is why two NPCs can respond differently to the same nominal melee damage.\n\nSo vanilla knockout is a real state: an appropriate melee action can put a living NPC into that incapacitated state and the NPC may later recover. Death is a different outcome. The engine first has the action/reaction information, but it does **not** convert all damage from a knockout-capable action into safe/nonlethal damage.\n\n### What editing Weapons → Unarmed can and cannot do\n\nLowering Unarmed damage can make accidental deaths *less likely* because each hit removes less health. It cannot guarantee “punches knock out, never kill,” because it does not rewrite the per-action reaction attributes or the ped-health knockout rules. It also cannot distinguish ordinary punches from kicks, stomps, grapples and finishers where those actions have their own damage definitions.\n\nFor a true **never-kill ordinary punches** feature, the safe design would need to distinguish the actual punch actions and then protect the target from the lethal transition while allowing the normal knockout transition. Kicks/stomps/finishers and mission-specific behavior should be specified separately rather than inheriting that rule accidentally.\n\nThis separation is also reflected in public combat-overhaul code: Ped Damage Overhaul exposes player unarmed damage independently from its melee dying-state/knockout behavior; those are separate controls rather than one nonlethal damage flag.\n\n**Conclusion:** there is no honest set of fields I can tell you to change only under Weapons → Unarmed to guarantee nonlethal fists. That tab controls damage, not the complete knockout/death decision. This issue was specifically the outstanding explanation/research task; no gameplay behavior is being claimed as implemented.",
+    "closed_at": "2026-09-06T18:46:10Z",
+    "comments": 0,
+    "comments_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/155/comments",
+    "created_at": "2026-08-06T02:39:27Z",
+    "events_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/155/events",
+    "html_url": "https://github.com/Lexer-Lux/Lexeditor/issues/155",
+    "id": 5356296830,
+    "issue_dependencies_summary": {
+      "blocked_by": 0,
+      "blocking": 0,
+      "total_blocked_by": 0,
+      "total_blocking": 0
+    },
+    "labels": [
+      {
+        "color": "8b4513",
+        "default": false,
+        "description": "Red Dead Redemption 2 plugin",
+        "id": 12062140094,
+        "name": "rdr2",
+        "node_id": "LA_kwDOTn28Ks8AAAACzvWmvg",
+        "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/labels/rdr2"
+      }
+    ],
+    "labels_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/155/labels{/name}",
+    "locked": false,
+    "milestone": null,
+    "node_id": "I_kwDOTn28Ks8AAAABP0Kafg",
+    "number": 155,
+    "performed_via_github_app": null,
+    "pinned_comment": null,
+    "reactions": {
+      "+1": 0,
+      "-1": 0,
+      "confused": 0,
+      "eyes": 0,
+      "heart": 0,
+      "hooray": 0,
+      "laugh": 0,
+      "rocket": 0,
+      "total_count": 0,
+      "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/155/reactions"
+    },
+    "repository_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor",
+    "state": "closed",
+    "state_reason": "completed",
+    "sub_issues_summary": {
+      "completed": 0,
+      "percent_completed": 0,
+      "total": 0
+    },
+    "timeline_url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/155/timeline",
+    "title": "Explain how punches cause knockouts or deaths",
+    "updated_at": "2026-09-06T18:46:10Z",
+    "url": "https://api.github.com/repos/Lexer-Lux/Lexeditor/issues/155",
+    "user": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/89482099?v=4",
+      "events_url": "https://api.github.com/users/Lexer-Lux/events{/privacy}",
+      "followers_url": "https://api.github.com/users/Lexer-Lux/followers",
+      "following_url": "https://api.github.com/users/Lexer-Lux/following{/other_user}",
+      "gists_url": "https://api.github.com/users/Lexer-Lux/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/Lexer-Lux",
+      "id": 89482099,
+      "login": "Lexer-Lux",
+      "node_id": "MDQ6VXNlcjg5NDgyMDk5",
+      "organizations_url": "https://api.github.com/users/Lexer-Lux/orgs",
+      "received_events_url": "https://api.github.com/users/Lexer-Lux/received_events",
+      "repos_url": "https://api.github.com/users/Lexer-Lux/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/Lexer-Lux/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/Lexer-Lux/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/Lexer-Lux",
+      "user_view_type": "public"
+    }
+  },
+  "repository": "Lexer-Lux/Lexeditor",
+  "schema": 1
+}
