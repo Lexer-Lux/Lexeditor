@@ -1,0 +1,37 @@
+name: Warband source review
+on:
+  push:
+    branches: [fix/warband-issue-batch]
+    paths: ['.github/workflows/warband-source-review.yml']
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: candidate
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          path: base
+      - name: Export tracked review sources
+        run: |
+          python - <<'PY'
+          import pathlib, subprocess, zipfile
+          with zipfile.ZipFile('warband-integration-sources.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for name in ('candidate', 'base'):
+                  root = pathlib.Path(name)
+                  archive.writestr(name + '/COMMIT_SHA', subprocess.check_output(['git', '-C', name, 'rev-parse', 'HEAD']))
+                  for raw in subprocess.check_output(['git', '-C', name, 'ls-files', '-z']).decode().split('\0'):
+                      path = root / raw
+                      if raw and path.is_file() and path.suffix.lower() in {'.py', '.js', '.html', '.css', '.md', '.json', '.ini', '.txt', '.toml', '.yaml', '.yml', '.cmd'}:
+                          archive.write(path)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: warband-integration-sources
+          path: warband-integration-sources.zip
+          retention-days: 1
