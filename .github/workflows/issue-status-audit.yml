@@ -3,30 +3,53 @@ on:
   push:
     paths:
       - .github/workflows/issue-status-audit.yml
+      - worklog/issue-status-audit/apply_review.py
+      - worklog/issue-status-audit/2026-09-06/plan-*.md
+concurrency:
+  group: lexeditor-human-issue-audit-2026-09-06
+  cancel-in-progress: false
 permissions:
-  contents: read
-  issues: read
+  contents: write
+  issues: write
+  actions: read
 jobs:
-  snapshot:
+  apply-reviewed-plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 20
     steps:
-      - name: Snapshot issues and comments without changing them
+      - uses: actions/checkout@v4
+      - name: Download the immutable pre-edit snapshot
         env:
           GH_TOKEN: ${{ github.token }}
-          REPOSITORY: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          test "$REPOSITORY" = "Lexer-Lux/Lexeditor"
-          mkdir -p audit
-          gh api --paginate "repos/$REPOSITORY/issues?state=all&per_page=100&sort=created&direction=asc" --jq '.[] | select(has("pull_request") | not) | {number,title,body,state,state_reason,labels:[.labels[].name],comments,created_at,updated_at,closed_at,html_url}' > audit/issues.jsonl
-          gh api --paginate "repos/$REPOSITORY/issues/comments?per_page=100&sort=created&direction=asc" --jq '.[] | {id,issue_url,body,created_at,updated_at,html_url}' > audit/comments.jsonl
-          gh api "repos/$REPOSITORY/git/trees/${{ github.sha }}?recursive=1" > audit/tree.json
-          printf 'Issue records: '; wc -l < audit/issues.jsonl
-          printf 'Comment records: '; wc -l < audit/comments.jsonl
-      - name: Preserve the audit snapshot
+        run: gh run download 34033412803 --repo Lexer-Lux/Lexeditor --name human-issue-audit --dir baseline
+      - name: Apply reviewed descriptions and verify each change
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python worklog/issue-status-audit/apply_review.py
+      - name: Preserve results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: human-issue-audit
-          path: audit/
-          retention-days: 7
+          name: human-issue-audit-results
+          path: |
+            audit-results/
+            worklog/legacy/issue-status-audit-2026-09-06/
+          retention-days: 30
+      - name: Commit internal evidence without changing game code
+        if: always()
+        run: |
+          set -euo pipefail
+          test -d worklog/legacy/issue-status-audit-2026-09-06
+          git config user.name 'Lexeditor Issue Audit'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add worklog/legacy/issue-status-audit-2026-09-06
+          if test -d worklog/issues; then git add worklog/issues; fi
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Archive issue audit evidence and internal status handoffs [skip ci]'
+          for attempt in 1 2 3; do
+            git fetch origin master
+            git rebase origin/master
+            if git push origin HEAD:master; then exit 0; fi
+          done
+          echo 'Evidence push failed; originals remain in the workflow artifact.' >&2
+          exit 1
