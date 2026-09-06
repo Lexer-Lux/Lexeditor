@@ -59,11 +59,12 @@ def main():
                     page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('!state.booting')
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
                     assert page.locator('.warband-item-thumbnail canvas').count()==0
-                    assert page.locator('.warband-preview-stage canvas').count()==1
+                    assert page.locator('.warband-preview-stage canvas').count()==0
                     assert page.locator('.lex-model-preview-drawer').is_hidden()
                     assert not page.evaluate('window.__warbandPreview?.length')
                     page.get_by_role('button',name='Open model preview',exact=True).click()
                     page.wait_for_function('window.__warbandPreview?.length===1 || document.querySelector(".warband-preview-message")?.textContent.includes("cannot start the WebGL")')
+                    assert page.locator('.warband-preview-stage canvas').count()==1
                     webgl=page.evaluate('window.__warbandPreview?.length===1')
                     if os.environ.get('WARBAND_REQUIRE_WEBGL')=='1':assert webgl,'WebGL fixture rendering required by CI'
                     if webgl:
