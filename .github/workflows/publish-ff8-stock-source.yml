@@ -1,0 +1,83 @@
+name: Publish tested FF8 stock source
+on:
+  push:
+    branches: [fix/ff8-backlog-runtime]
+    paths: [.github/workflows/publish-ff8-stock-source.yml]
+permissions:
+  contents: read
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch exact staging revision
+        run: |
+          git config --global core.autocrlf false
+          git init editor
+          git -C editor remote add origin https://github.com/Lexer-Lux/Lexeditor.git
+          git -C editor fetch --depth=1 origin "$GITHUB_SHA"
+          git -C editor checkout --detach FETCH_HEAD
+      - name: Apply only the exact reviewed source patch
+        working-directory: editor
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import base64, hashlib, subprocess, tempfile, zlib, json
+          data=''.join(Path('.github/ff8-stock-batch.'+str(i)).read_text().strip() for i in range(3))
+          patch=zlib.decompress(base64.b64decode(data,validate=True))
+          assert hashlib.sha256(patch).hexdigest()=='7cb4a7c1e212008bf05f54f0381f0bc6b5476cfc8012f4324032975a6d49fcb7', 'Staged patch differs from tested source'
+          with tempfile.NamedTemporaryFile() as file:
+              file.write(patch); file.flush()
+              subprocess.run(['git','apply','--check',file.name],check=True)
+              subprocess.run(['git','apply',file.name],check=True)
+          paths=[line[6:] for line in patch.decode().splitlines() if line.startswith('+++ b/')]
+          assert len(paths)==21 and len(set(paths))==21
+          assert all(p.startswith(('games/ff8/','tools/')) and '..' not in Path(p).parts for p in paths)
+          Path('../published-files.json').write_text(json.dumps(paths))
+          print('Applied exact tested source; no private executable or game data included.')
+          PY
+      - name: Regression dependencies
+        run: python -m pip install pillow fonttools pefile==2024.8.26 unicorn==2.1.4
+      - name: Verify production runtime policy and settings
+        working-directory: editor
+        run: |
+          python tools/verify_ff8_native_compiled.py
+          python tools/verify_ff8_shared_party.py
+          python tools/verify_ff8_no_magic_consumption.py
+          python tools/verify_ff8_mug_drops.py
+          python tools/verify_ff8_stock_tweak_settings.py
+          python tools/verify_ff8_gameplay_quarantine_issue_21.py
+          python tools/verify_ff8_gf_bar_settings.py
+          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess
+          for script in re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',Path('games/ff8/editor.html').read_text(encoding='utf-8'),re.S):
+              subprocess.run(['node','--check'],input=script,text=True,check=True)
+          PY
+          git diff --check
+      - name: Commit actual source without overwriting concurrent work
+        working-directory: editor
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json, subprocess
+          paths=json.load(open('../published-files.json'))
+          subprocess.run(['git','add','--',*paths],check=True)
+          PY
+          git rm -- .github/ff8-stock-batch.0 .github/ff8-stock-batch.1 .github/ff8-stock-batch.2 .github/workflows/publish-ff8-stock-source.yml .github/workflows/ff8-backlog-source.yml
+          git config user.name 'Lexeditor runtime repair'
+          git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+          git commit -m 'Reconcile shared stocks through Party Switch and add guarded casting and Mug tweaks'
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $AUTH" push origin HEAD:refs/heads/fix/ff8-backlog-runtime
+          git rev-parse HEAD > ../PUBLISHED_REVISION.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ff8-stock-source-receipt
+          path: PUBLISHED_REVISION.txt
+          retention-days: 2
