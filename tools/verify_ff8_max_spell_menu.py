@@ -3,6 +3,7 @@
 Run with the test-only dependency directory on PYTHONPATH when needed.
 No process memory, save, or game installation is modified.
 """
+import argparse
 from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
@@ -16,7 +17,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from games.ff8 import max_spell
 
-EXE = Path(r"D:\SteamLibrary\steamapps\common\FINAL FANTASY VIII\FF8_EN.exe")
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--exe", type=Path, required=True)
+EXE = parser.parse_args().exe
 raw = EXE.read_bytes()
 assert sha256(raw).hexdigest() == "064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570"
 max_spell.verify_executable(BytesIO(raw))

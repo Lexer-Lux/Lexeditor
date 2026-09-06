@@ -33,6 +33,8 @@ SUPPORT_FILES = {
 }
 NEW_DRIVER_MARKERS = (
     b'enable_ff8_gf_hp_bars', b'enable_ff8_party_switch',
+    b'enable_ff8_no_magic_consumption', b'lexeditor_ff8_shared_party_contract_version',
+    b'lexeditor_ff8_no_consume_battle_debit',
     b'Party Switch: slot %d, character %d -> %d; retiring old model.',
     b'Party Switch: slot %d %s; ATB %u.',
 )
@@ -155,7 +157,12 @@ original character; the HUD cache is refreshed after a completed replacement.
 Red HP bars use row y+14, not padded glyph dimensions. The independent blue
 GF HP bar uses row y+1, fills left-to-right, and uses live charging HP rather
 than stale saved HP. Existing XP, targeting, startup and modern-controls code
-is retained. Shared Magic + Party Switch remains blocked, not silently enabled.
+is retained. Party Switch explicitly relinquishes and re-registers the replaced
+actor's shared-stock mirror, rather than copying its private record over the
+canonical pool. Shared Magic works with the configured stock cap (1–255);
+lossless migration refuses overflow. No Magic Consumption hooks only field and
+battle spell-cast debits, never the shared Item debit path. Drops After Mug is
+a separate guarded one-byte Hext change, retaining Mug-once and reward-once checks.
 
 ## Build reproduction
 
@@ -166,7 +173,7 @@ Use the exact FFNx base and its pinned vcpkg submodule. Apply the complete
 Configure with `FFNX_LEXEDITOR_SHARED_MAGIC_RUNTIME=ON`,
 `FFNX_LEXEDITOR_LIVE_CONDITIONS=ON`, and `FFNX_DEPLOY_TO_GAME_DIRS=OFF`,
 then run `cmake --build .build --parallel 4`.
-The full command sequence is in `.github/workflows/native-dependencies.yml`.
+The full command sequence is in `.github/workflows/ff8-stock-build.yml`.
 The complete patch restores test/verifier support omitted by the earlier
 preparation helper; every candidate patch section was compared unchanged.
 No production compilation inputs differ from the reviewed build artifact.
@@ -176,7 +183,10 @@ Pinned package files are marked `-text` to prevent checkout newline conversion.
 
 The linked artifact verifier passed, including its eleven mutation controls,
 and the PE architecture, embedded XML manifest and new runtime markers were
-checked before packaging. Repository regressions exercise compiled production
+checked before packaging. Repository regressions cover all 255 stock caps and three party slots with
+repeated swaps, concurrent Draw/cast, canonical save/reload and cancellation.
+The linked no-consumption register-ABI hook is executed for all 256 stock values.
+Repository regressions also exercise compiled production
 policy/render code and configuration serialization. The private executable
 checks exercise native name resolution and model retirement/loading with
 resource I/O stubbed. None of these is a live-game or visual acceptance test.
@@ -187,6 +197,7 @@ this packaging command. This report does not claim in-game acceptance.
         hashes = {'driver': driver_sha256, 'license': licence_hash,
                   'sourcePatch': patch_hash, 'buildReport': sha256(stage / 'ISSUE51_BUILD_REPORT.md')}
         manifest['driverSha256'] = driver_sha256
+        manifest['exports'] = sorted(runtime_package.REQUIRED_EXPORTS)
         for key in ('license', 'sourcePatch', 'buildReport'):
             manifest['provenance'][key + 'Sha256'] = hashes[key]
         (stage / 'runtime-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')

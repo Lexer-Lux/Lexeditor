@@ -83,3 +83,13 @@ template<class R,class... A> R test_native(std::uintptr_t address,A... args) {
     else if constexpr(std::is_pointer_v<R>) return reinterpret_cast<R>(result);
     else return static_cast<R>(result);
 }
+
+// Shared pool integration is exercised by verify_ff8_shared_party.py. This
+// policy harness records lifecycle calls without substituting private copies.
+enum class SharedPartyStockOwnership { blocked, private_stocks, shared_pool };
+static SharedPartyStockOwnership shared_ownership=SharedPartyStockOwnership::private_stocks;
+static std::vector<std::array<int,2>> shared_events;
+SharedPartyStockOwnership lexeditor_ff8_shared_party_begin(int s) { shared_events.push_back({1,s});return shared_ownership; }
+void lexeditor_ff8_shared_party_materialized(int s) { shared_events.push_back({2,s}); }
+void lexeditor_ff8_shared_party_cancel(int s) { shared_events.push_back({3,s}); }
+void lexeditor_ff8_shared_party_reset() { shared_events.push_back({4,-1}); }
