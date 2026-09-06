@@ -7,7 +7,10 @@ on:
       - 'games/ff7_2013/**'
       - 'platform_config.py'
       - 'process_probe.py'
+      - 'ui/framework.js'
+      - 'ui/framework.css'
       - 'tools/verify_ff7_*.py'
+      - 'tools/FF7-checks.cmd'
       - 'tools/ff7_tests/**'
       - '.github/workflows/ff7-data-regressions.yml'
   workflow_dispatch:
@@ -20,9 +23,14 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  synthetic-data-and-page-logic:
-    runs-on: ubuntu-latest
+  binary-and-http:
+    name: Binary and HTTP - ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       # Avoid traversing the unrelated incomplete RDR submodule.
       - name: Check out the exact event commit
@@ -33,6 +41,7 @@ jobs:
           git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
           git checkout --detach FETCH_HEAD
       - name: Export source-only component test snapshot
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
           name: ff7-component-sources
@@ -47,6 +56,7 @@ jobs:
             ui/**/*.css
             ui/**/*.json
             tools/verify_ff7_*.py
+            tools/FF7-checks.cmd
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -54,6 +64,7 @@ jobs:
         run: |
           python tools/verify_ff7_datasets.py
           python tools/verify_ff7_extended.py
+          python tools/verify_ff7_completion.py
 
   browser-scenarios:
     runs-on: ubuntu-latest
@@ -89,3 +100,32 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Verify page logic with synthetic data and component doubles
         run: python tools/verify_ff7_ui.py ${{ matrix.tests }}
+
+  real-shared-ui:
+    name: Real shared UI, saves and sounds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact event commit
+        shell: bash
+        run: |
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install browser test dependencies
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Exercise actual shared controls and both edition layouts
+        run: python tools/verify_ff7_rendered.py
+      - name: Retain synthetic UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff7-rendered-fixtures
+          retention-days: 7
+          path: out/ff7-rendered/

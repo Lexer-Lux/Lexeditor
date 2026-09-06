@@ -73,6 +73,7 @@ def fixture_sections():
     sections = [bytearray([index + 1] * 64) for index in range(27)]
     sections[3] = bytearray(b"\xa5" * (9 * 132 + 700))
     sections[2] = bytearray(b"\x5a" * (0x61C + 2048))
+    sections[2][0x61C:0xE1C] = b"\xff" * 2048
     for slot in range(9):
         for index, field in enumerate(INITIAL_FIELDS):
             data = sections[3][slot * 132:(slot + 1) * 132]
@@ -112,14 +113,14 @@ class DatasetTests(unittest.TestCase):
         self.source = self.game / PATHS[0]
         write_kernel(self.source)
 
-    def test_both_product_paths_decode_425_records(self):
+    def test_both_product_paths_decode_all_kernel_records(self):
         for relative in PATHS:
             with self.subTest(path=relative):
                 game = self.root / ("edition" + str(PATHS.index(relative)))
                 write_kernel(game / relative)
                 data = load_datasets(game, self.project)
                 self.assertFalse(data["errors"])
-                self.assertEqual(sum(map(len, data["records"].values())), 425)
+                self.assertEqual(sum(map(len, data["records"].values())), 513)
                 self.assertEqual(data["sourceRelativePath"], relative.as_posix())
                 self.assertEqual(len(data["records"]["characters"]), 9)
 
@@ -196,8 +197,10 @@ class DatasetTests(unittest.TestCase):
             sections[section] = sections[section][:size]
             write_kernel(self.source, sections)
             result = load_datasets(self.game, self.project)
-            self.assertEqual(set(result["errors"]), {"characters"})
-            self.assertEqual(set(result["records"]), set(base.CATEGORIES))
+            self.assertIn("characters", result["errors"])
+            self.assertTrue(set(base.CATEGORIES) <= set(result["records"]))
+            expected = {"characters", "growthCurves", "growthBonuses", "characterAI"} if section == 2 else {"characters"}
+            self.assertEqual(set(result["errors"]), expected)
 
     def test_bad_text_category_isolated_and_preserved_on_other_edits(self):
         sections = fixture_sections()
@@ -313,7 +316,7 @@ class HttpTests(unittest.TestCase):
     def test_map_reports_per_category_proof_and_missing_work(self):
         write_kernel(self.game / PATHS[0])
         rows = self.request("/api/datamap")[1]["rows"]
-        self.assertEqual(sum(row["coverage"] == "structured" for row in rows), 6)
+        self.assertEqual(sum(row["coverage"] == "structured" for row in rows), len(CATEGORIES))
         self.assertTrue(all(row["target"] == row["category"] == row["id"] for row in rows))
         for row in rows:
             if row["category"] in ("enemies", "encounters", "shops"):

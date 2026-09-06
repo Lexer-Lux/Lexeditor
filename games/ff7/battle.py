@@ -2,7 +2,7 @@
 
 Layout reference: ff7-mods/ff7-flat-wiki, FF7/Battle/Battle_Scenes.html.
 The 4 * 96-byte formation array is contiguous (third record starts at 0x1D8).
-No AI bytecode, IDs, or scene-to-block mappings are regenerated.
+Unedited AI, IDs and scene-to-block mappings are preserved.
 """
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ import struct
 import zlib
 
 from .format_codec import bounds, decode_text, encode_text, read_int
+from . import ai
 
 
 def number(key, label, offset, size=1, signed=False, maximum=None, group="Data"):
@@ -107,6 +108,8 @@ ATTACK_FIELDS += [number(k,l,o,s) for k,l,o,s in (
     ('statuses','Statuses',20,4), ('elements','Elements',24,2), ('specialFlags','Special flags',26,2))]
 SCENE_CATEGORIES = {
     'enemies': {'label':'Enemies', 'fields':ENEMY_FIELDS},
+    'enemyAI': {'label':'Enemy AI', 'fields':ai.metadata()},
+    'formationAI': {'label':'Formation AI', 'fields':ai.metadata()},
     'encounters': {'label':'Encounters', 'fields':FORMATION_FIELDS},
     'enemyAttacks': {'label':'Enemy attacks', 'fields':ATTACK_FIELDS},
 }
@@ -151,6 +154,10 @@ class SceneArchive:
         return raw[0x4C0 + slot * 28:0x4DC + slot * 28] + raw[0x880 + slot * 32:0x8A0 + slot * 32]
 
     def records(self, category):
+        if category in ('enemyAI', 'formationAI'):
+            start, size, count = (0xE80,4096,3) if category == 'enemyAI' else (0xC80,512,4)
+            return [row for scene, raw in enumerate(self.scenes)
+                    for row in ai.Pool(raw[start:start+size],count).records(f'Scene {scene} / owner',scene*count)]
         count = {'enemies':3, 'encounters':4, 'enemyAttacks':32}[category]
         rows = []
         for scene, raw in enumerate(self.scenes):
@@ -163,10 +170,22 @@ class SceneArchive:
                 suffix = f'Enemy ID {read_int(raw, slot * 2)}' if category == 'enemies' else (
                     f'Attack ID {read_int(raw, 0x840 + slot * 2)}' if category == 'enemyAttacks' else 'Formation composition; not field/world placement')
                 rows.append({'id':scene * count + slot, 'name':values.get('name', f'Battle {scene * 4 + slot}'),
-                             'description':f'Scene {scene}, slot {slot}: {suffix}. AI is preserved.', 'values':values})
+                             'description':f'Scene {scene}, slot {slot}: {suffix}. AI is edited separately.', 'values':values})
         return rows
 
     def apply(self, category, rows):
+        if category in ('enemyAI', 'formationAI'):
+            validate_rows(rows, self.records(category))
+            start, size, count = (0xE80,4096,3) if category == 'enemyAI' else (0xC80,512,4)
+            grouped = {}
+            for row in rows:
+                scene, owner = divmod(row['id'], count)
+                grouped.setdefault(scene, {})[owner] = row.get('values')
+            pending = {}
+            for scene, values in grouped.items():
+                pending[scene] = ai.Pool(self.scenes[scene][start:start+size],count).apply(values)
+            for scene, raw in pending.items(): self.scenes[scene][start:start+size] = raw
+            return
         validate_rows(rows, self.records(category))
         replacement = deepcopy(self.scenes)
         count = {'enemies':3, 'encounters':4, 'enemyAttacks':32}[category]

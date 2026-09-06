@@ -117,7 +117,12 @@ class PageTests(unittest.TestCase):
         self.page.wait_for_function("window.testLoaded === true")
 
     def click(self, label):
-        self.page.locator("header").get_by_role("button", name=label, exact=True).click()
+        button=self.page.locator("header").get_by_role("button", name=label, exact=True)
+        if button.count(): button.click()
+        else:
+            parent={"Prices":"Shops","Enemy attacks":"Enemies"}.get(label)
+            if parent: self.page.locator("header").get_by_role("button", name=parent, exact=True).click()
+            self.page.get_by_role("tab", name=label, exact=True).click()
 
     def test_kernel_api_failure_keeps_auxiliary_tabs_and_runtime_detection(self):
         self.failures["/api/data"] = "Broken test kernel"

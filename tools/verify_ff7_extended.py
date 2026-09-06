@@ -34,7 +34,10 @@ def scene_fixture():
         raw[0x840:0x880] = b'\xff' * 64
         struct.pack_into('<H', raw, 0x840, scene)
         raw[0x880:0x8A0] = codec.encode_text(f'Action{scene}').ljust(32,b'\xff')
-        raw[0xC80:] = b'\xA5' * (len(raw)-0xC80)  # opaque AI/unknown data
+        raw[0xC80:] = b'\xff' * (len(raw)-0xC80)
+        struct.pack_into('<H', raw, 0xE80, 6)
+        struct.pack_into('<H', raw, 0xE86+2, 32)
+        raw[0xEA6:0xEA9] = bytes((0x60,scene,0x73))
         scenes.append(raw)
     output = bytearray()
     for first in range(0,256,8):
@@ -55,6 +58,10 @@ def text_fixture():
 def exe_fixture(shift=0x400):
     data = bytearray(0x525000)
     data[:2] = b'MZ'; data[shift:shift+4]=b'\x55\x8b\xec\xc7'
+    for i in range(10):
+        at=0x5202B8+shift+i*12;data[at:at+12]=codec.encode_text(f'Name{i}').ljust(12,b'\xff')
+    for i in range(2):
+        at=0x520810+shift+i*132+0x10;data[at:at+12]=codec.encode_text(('Cait Sith','Vincent')[i]).ljust(12,b'\xff')
     for i in range(80):
         at=0x521A18+shift+i*84
         data[at:at+4] = bytes((0,0,1,0xAB))
@@ -86,7 +93,7 @@ class BinaryTests(unittest.TestCase):
 
     def test_scene_noop_and_all_families(self):
         obj=battle.SceneArchive(self.scene)
-        self.assertEqual([len(obj.records(k)) for k in battle.SCENE_CATEGORIES],[256,1024,256])
+        self.assertEqual({k:len(obj.records(k)) for k in battle.SCENE_CATEGORIES},{'enemies':256,'encounters':1024,'enemyAttacks':256,'enemyAI':768,'formationAI':1024})
         for key in battle.SCENE_CATEGORIES:obj.apply(key,obj.records(key))
         self.assertEqual(obj.to_bytes(),self.scene)
 

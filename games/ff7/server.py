@@ -56,7 +56,7 @@ def save_platform_data(payload: object) -> dict:
         raise ValueError("FFNx change set contains settings unavailable for FF7")
     result = save_config(GAME_ROOT / "FFNx.toml", "FFNx", "toml",
         str(payload.get("sha256", "")), payload["changes"],
-        (EXECUTABLE, "FF7_EN.exe", "ff7.exe"))
+        (EXECUTABLE, "FFVII.exe", "FF7_Launcher.exe", "FF7_EN.exe", "ff7.exe", "ff7_en"))
     # The shared writer returns all games' fields. Keep its metadata, but filter
     # its response as well so FF8 settings cannot reappear immediately on save.
     for section in result["sections"]:
@@ -73,12 +73,12 @@ def data_map() -> dict:
         error = data["errors"].get(key)
         source_label = data["sourceRelativePath"] or "English KERNEL.BIN"
         notes = error or (
-            f"{len(data['records'][key])} records; {len(category.fields)} bounded numeric fields. "
+            f"{len(data['records'][key])} records; {len(category.fields)} editable fields. "
             f"Saves a project copy to {data['projectPath']}; installed source is unchanged. "
-            "Names are read-only KERNEL.BIN text, not a kernel2.bin text editor."
+            "Inline character names and AI have dedicated subtabs; item/equipment text is edited under Text (kernel2.bin)."
         )
         if key == "characters" and not error:
-            notes += " Initial stats/equipment/materia and growth/limit fields are editable. Curve coefficients, executable-only character initialization and AI remain preserved."
+            notes += " Starting stats, equipment, materia and growth/limit fields; use Characters subtabs for names, curves, AI and executable-only recruits."
         rows.append({"filename": source_label, "controls": category.label,
             "notes": notes, "status": "blocked" if error else "partial",
             "openable": not bool(error), "category": key,
@@ -88,7 +88,7 @@ def data_map() -> dict:
         for key, metadata in info['categories'].items():
             error = data['errors'].get(key)
             rows.append({'filename':report.get('sourceRelativePath') or info['source'],
-                'controls':metadata['label'], 'notes':(error + ' ' if error else '') + info['note'],
+                'controls':metadata['label'], 'notes':(error + ' ' if error else '') + info['note'] + ((' Unreadable archive members left unchanged: ' + '; '.join(f'{name}: {reason}' for name,reason in report['memberErrors'].items())) if report.get('memberErrors') else ''),
                 'status':'not-integrated' if error else 'partial', 'openable':not bool(error),
                 'category':key, 'sourcePath':str(GAME_ROOT / report['sourceRelativePath']) if report.get('sourceRelativePath') else ''})
     config = GAME_ROOT / "FFNx.toml"

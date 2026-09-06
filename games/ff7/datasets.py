@@ -7,8 +7,6 @@ growth and limit fields are in nine 56-byte slots in section 3.
 from __future__ import annotations
 
 from copy import deepcopy
-import os
-import shutil
 import tempfile
 from threading import RLock
 from pathlib import Path
@@ -16,6 +14,8 @@ import struct
 import zlib
 
 from . import kernel as base
+from . import kernel_extra
+from .storage import target_path, replace_project, records_match
 
 INITIAL_FIELDS = (
     base.Field("level", "Starting level", 0x01),
@@ -75,13 +75,16 @@ LIMIT_FIELDS += tuple(base.Field(f"limitHpDivisor{i + 1}", f"Limit level {i + 1}
 CHARACTER_NOTE = (
     "Initial stats, equipment, materia/AP, limit learning and growth-curve selection. "
     "These do not rewrite existing saves; recruitment scripts can override them. "
-    "Curve coefficients, inline names and character AI remain preserved. Slots 6/7 "
+    "Curve coefficients, initial names and AI have their own editors. Slots 6/7 "
     "also hold Young Cloud/Sephiroth; Cait Sith/Vincent initialization in the executable "
-    "is a separate source. Numeric bounds describe storage, not sensible gameplay."
+    "is edited under Recruits. Numeric bounds describe storage, not sensible gameplay."
 )
 CATEGORIES = dict(base.CATEGORIES)
 CATEGORIES["characters"] = base.Category(
     "characters", "Characters", 4, 0, 0, 132, INITIAL_FIELDS + LIMIT_FIELDS)
+for key, spec in kernel_extra.EXTRAS.items():
+    CATEGORIES[key] = base.Category(key, spec['label'], spec['section'], 0, 0,
+                                    spec.get('size', 1), tuple(spec['fields']))
 UNRESOLVED = {}  # Non-kernel source families are handled by extended.py.
 READ_ERRORS = (OSError, ValueError, EOFError, struct.error, zlib.error)
 _SAVE_LOCK = RLock()
@@ -97,6 +100,8 @@ class Kernel(base.Kernel):
         return initial, growth
 
     def records(self, category_key):
+        if category_key in kernel_extra.EXTRAS:
+            return kernel_extra.records(self, category_key)
         if category_key != "characters":
             return super().records(category_key)
         initial, growth = self._character_sections()
@@ -112,6 +117,8 @@ class Kernel(base.Kernel):
         return rows
 
     def apply(self, category_key, records):
+        if category_key in kernel_extra.EXTRAS:
+            return kernel_extra.apply(self, category_key, records)
         # Validate the source before allowing even the legacy writer to touch it.
         self.records(category_key)
         if category_key != "characters":
@@ -148,6 +155,8 @@ def category_metadata():
             "minimum": f.minimum, "maximum": f.maximum, "step": f.scale,
             "group": "Starting stats" if f in INITIAL_FIELDS else "Growth and limits"}
             for f in INITIAL_FIELDS + LIMIT_FIELDS]})
+    result.extend(dict(id=key, label=spec['label'], fields=spec['fields'])
+                  for key, spec in kernel_extra.EXTRAS.items())
     return result
 
 
@@ -159,7 +168,7 @@ def load_datasets(game_root: Path, project_root: Path) -> dict:
         "sourceSha256": None, "activeSha256": None}
     try:
         source, relative = base.resolve_kernel(game_root)
-        project = project_root / relative
+        project = target_path(game_root, project_root, source, relative)
         result.update(sourceRelativePath=relative.as_posix(), projectPath=str(project),
                       usingProject=project.is_file())
         vanilla = Kernel(source)
@@ -187,57 +196,53 @@ def save_datasets(game_root: Path, project_root: Path, payload: object) -> dict:
 
 
 def _save_datasets(game_root: Path, project_root: Path, payload: object) -> dict:
+    if project_root.resolve().is_relative_to(game_root.resolve()):
+        raise ValueError("The project must not overwrite the installed KERNEL or other game data")
     if not isinstance(payload, dict) or not isinstance(payload.get("records"), dict):
         raise ValueError("Save payload must contain a records object")
     available = load_datasets(game_root, project_root)
     records = payload["records"]
     if not records or set(records) != set(available["records"]):
         raise ValueError("Save must contain exactly the readable FF7 datasets; reload the editor")
-    # New clients provide a snapshot; retain compatibility with installed smoke clients.
-    for key in ("activeSha256", "sourceSha256"):
-        if key in payload and payload[key] != available[key]:
-            raise ValueError("FF7 data changed outside this editor. Reload before saving.")
+    for key in ('activeSha256', 'sourceSha256', 'usingProject'):
+        if key not in payload or type(payload[key]) is not type(available[key]) or payload[key] != available[key]:
+            raise ValueError('FF7 data changed outside this editor. Reload before saving.')
     source, relative = base.resolve_kernel(game_root)
-    target = project_root / relative
-    if target.resolve() == source.resolve() or (target.exists() and target.samefile(source)):
-        raise ValueError("The mod project must not overwrite the installed KERNEL.BIN")
-    kernel = Kernel(target if target.is_file() else source)
-    if kernel.sha256 != available["activeSha256"]:
-        raise ValueError("FF7 data changed while preparing the save. Reload before saving.")
+    target = target_path(game_root, project_root, source, relative)
+    existed = target.exists()
+    original = source.read_bytes()
+    from .format_codec import digest
+    if digest(original) != available['sourceSha256']:
+        raise ValueError('Installed FF7 data changed while preparing the save. Reload before saving.')
+    active = target.read_bytes() if existed else original
+    kernel = Kernel(target if existed else source)
+    if kernel.sha256 != available['activeSha256']:
+        raise ValueError('FF7 data changed while preparing the save. Reload before saving.')
     for key, rows in records.items():
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
-            raise ValueError(f"{key} records must be a list of objects")
+            raise ValueError(f'{key} records must be a list of objects')
         kernel.apply(key, rows)
-    # Check all decoded values before replacing the project file.
     for key, rows in records.items():
-        expected = {row["id"]: row["values"] for row in rows}
-        if {row["id"]: row["values"] for row in kernel.records(key)} != expected:
-            raise ValueError(f"{key} failed pre-save verification")
+        if not records_match(key, rows, kernel.records(key)):
+            raise ValueError(f'{key} failed pre-save verification')
+    output = kernel.to_bytes()
+    # Readback must pass before replacing even a project file.
     target.parent.mkdir(parents=True, exist_ok=True)
-    temporary = None
-    backup = None
+    with tempfile.NamedTemporaryFile(dir=target.parent, suffix='.verify', delete=False) as stream:
+        checked = Path(stream.name); stream.write(output)
     try:
-        with tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name + ".", suffix=".tmp", delete=False) as stream:
-            temporary = Path(stream.name)
-            stream.write(kernel.to_bytes())
-        verified = Kernel(temporary)
-        for key in records:
-            if verified.records(key) != kernel.records(key):
-                raise ValueError(f"{key} failed binary readback before replacement")
-        current_path = target if target.is_file() else source
-        if Kernel(current_path).sha256 != available["activeSha256"] or Kernel(source).sha256 != available["sourceSha256"]:
-            raise ValueError("FF7 data changed while preparing the save. Reload before saving.")
-        if target.is_file():
-            backup = target.with_name(target.name + ".lexeditor.bak")
-            shutil.copy2(target, backup)
-        os.replace(temporary, target)
+        verified = Kernel(checked)
+        for key, rows in records.items():
+            if not records_match(key, rows, verified.records(key)):
+                raise ValueError(f'{key} failed binary readback')
     finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
+        checked.unlink(missing_ok=True)
+    def check():
+        target_path(game_root, project_root, source, relative)
+        if source.read_bytes() != original:
+            raise ValueError('FF7 installed source changed while saving; reload')
+    backup = replace_project(target, output, active, existed, check)
     verified = Kernel(target)
-    for key, rows in records.items():
-        if {row["id"]: row["values"] for row in verified.records(key)} != {
-                row["id"]: row["values"] for row in rows}:
-            raise ValueError(f"{key} failed saved-file verification")
-    return {"saved": True, "path": str(target), "sha256": verified.sha256,
-        "bytes": target.stat().st_size, "backup": str(backup) if backup else None}
+    return {'saved': True, 'path': str(target), 'sha256': verified.sha256,
+            'bytes': len(output), 'backup': backup, 'usingProject': True,
+            'records': {key: verified.records(key) for key in records}}

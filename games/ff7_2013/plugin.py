@@ -11,7 +11,7 @@ from pathlib import Path
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession, request_json
-from games.ff7.plugin import prepare_product
+from games.ff7.plugin import prepare_product, kernel_save_payload
 from games.ff7.kernel import Kernel, resolve_kernel
 
 
@@ -95,7 +95,7 @@ def smoke() -> list[str]:
             changed = original + 1 if original < 255 else original - 1
             data["records"]["armor"][0]["values"]["defense"] = changed
             request = urllib.request.Request(session.url + "api/save",
-                data=json.dumps({"records": data["records"]}).encode("utf-8"),
+                data=json.dumps(kernel_save_payload(data)).encode("utf-8"),
                 headers={"Content-Type": "application/json"}, method="POST")
             with urllib.request.urlopen(request, timeout=10) as response:
                 saved = json.loads(response.read().decode("utf-8"))
@@ -115,13 +115,14 @@ PLUGIN = GamePlugin(
     plugin_id="ff7-2013",
     name="Final Fantasy 7 (Remaster)",
     subtitle="FFVII 2013",
-    description="Edits the proved item, equipment, and materia sections of the 2013 Steam product.",
+    description="Edits character, battle, encounter, shop and text data for the 2013 Steam product.",
     accent="#3155b7",
     cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-remaster.png",
     check=check,
     launch=launch,
     smoke=smoke,
     session_factory=FF7LegacySession,
+    process_names=("ff7_en.exe", "ff7.exe", "FF7_Launcher.exe"),
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FF7_2013_PROJECT",
         default_root=DEFAULT_PROJECT,

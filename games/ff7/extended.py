@@ -14,6 +14,9 @@ import tempfile
 from threading import RLock
 import zlib
 
+from .archives import FieldArchive, WorldArchive, FIELD_FIELDS, WORLD_FIELDS, YUFFIE_FIELDS, CHOCOBO_FIELDS
+from .storage import target_path, replace_project, records_match
+from .datasets import INITIAL_FIELDS
 from .battle import SceneArchive, SCENE_CATEGORIES, number, text, read_values, write_values, validate_rows
 from .format_codec import bounds, digest, lzs_decode, lzs_encode, string_table, pack_strings, read_int
 
@@ -88,6 +91,10 @@ for i in range(10):
                            group=f'Inventory slot {i + 1}'),
                     number(f'item{i}', 'Item ID', 8 + i * 8, 2, group=f'Inventory slot {i + 1}')]
 PRICE_FIELDS = [number('price', 'Purchase price (gil)', 0, 4)]
+RECRUIT_FIELDS = [text('name','Initial name',0x10,12)] + [
+    number(f.key, f.label, f.offset, 3 if f.kind == '3' else struct.calcsize('<'+f.kind),
+           signed=f.minimum<0, maximum=f.maximum, group='Starting data') for f in INITIAL_FIELDS]
+DEFAULT_NAME_FIELDS = [text('name','Default name',0,12)]
 PRICE_TABLES = [('Items', 0, 128), ('Weapons', 128, 128), ('Armor', 256, 32),
                 ('Accessories', 288, 32), ('Materia', 384, 96)]
 
@@ -106,10 +113,16 @@ class ShopExecutable:
         self.original, self.data = bytes(data), bytearray(data)
         # Only our documented data ranges may differ from the supported source.
         # This prevents a foreign executable project from inheriting its profile.
-        start = 0x521A18 + self.shift
-        end = 0x523A58 + self.shift + 96 * 4
-        if data[:start] != source[:start] or data[end:] != source[end:]:
-            raise ValueError('Project executable contains changes outside supported shop/price data')
+        ranges = [(0x5202B8,120),(0x520810,264),(0x521A18,80*84),
+                  (0x523458,320*4),(0x523A58,96*4)]
+        cursor = 0
+        for start, size in sorted(ranges):
+            start += self.shift
+            if data[cursor:start] != source[cursor:start]:
+                raise ValueError('Project executable contains changes outside supported data')
+            cursor = start + size
+        if data[cursor:] != source[cursor:]:
+            raise ValueError('Project executable contains changes outside supported data')
         for row in self.records('shops'):
             if row['values']['count'] > 10 or row['values']['type'] > 8:
                 raise ValueError('Executable contains an invalid shop table')
@@ -118,6 +131,11 @@ class ShopExecutable:
         return (0x521A18 + index * 84 if category == 'shops' else 0x523458 + index * 4) + self.shift
 
     def records(self, category):
+        if category in ('recruits','defaultNames'):
+            start, size, count, fields = (0x520810,132,2,RECRUIT_FIELDS) if category == 'recruits' else (0x5202B8,12,10,DEFAULT_NAME_FIELDS)
+            return [{'id':i,'name':('Cait Sith','Vincent')[i] if category=='recruits' else f'Default name {i}',
+                     'description':'English executable initialization; does not modify existing saves.',
+                     'values':read_values(self.data[start+self.shift+i*size:start+self.shift+(i+1)*size],fields)} for i in range(count)]
         if category == 'shops':
             return [{'id':i, 'name':f'Shop {i}', 'description':'Ten inventory slots; only Inventory count slots are active. Field shop-opening scripts are unchanged.',
                      'values':read_values(self.data[self._offset(category,i):self._offset(category,i) + 84], SHOP_FIELDS)} for i in range(80)]
@@ -127,6 +145,14 @@ class ShopExecutable:
 
     def apply(self, category, rows):
         validate_rows(rows, self.records(category))
+        if category in ('recruits','defaultNames'):
+            start, size, fields = (0x520810,132,RECRUIT_FIELDS) if category == 'recruits' else (0x5202B8,12,DEFAULT_NAME_FIELDS)
+            replacement = bytearray(self.data)
+            for row in rows:
+                at = start+self.shift+row['id']*size
+                replacement[at:at+size] = write_values(self.data[at:at+size],fields,row.get('values'))
+            self.data = replacement
+            return
         replacement = bytearray(self.data)
         fields, size = (SHOP_FIELDS, 84) if category == 'shops' else (PRICE_FIELDS, 4)
         for row in rows:
@@ -149,26 +175,23 @@ FAMILIES = {
               'note':'Enemies, attacks and four formations per scene. AI and field/world encounter placement are preserved. Original block membership is retained; an overflowing edit is refused.'},
     'text': {'categories':{'texts':{'label':'Text', 'fields':[text('text','Text',size=65535)]}}, 'source':'kernel2.bin',
              'note':'All 18 English kernel2 text sections, with preserved game-byte escapes and a bounded game buffer. KERNEL.BIN embedded text is not rewritten.'},
-    'shop': {'categories':{'shops':{'label':'Shops','fields':SHOP_FIELDS}, 'prices':{'label':'Prices','fields':PRICE_FIELDS}},
+    'shop': {'categories':{'shops':{'label':'Shops','fields':SHOP_FIELDS}, 'prices':{'label':'Prices','fields':PRICE_FIELDS}, 'recruits':{'label':'Recruits','fields':RECRUIT_FIELDS}, 'defaultNames':{'label':'Default names','fields':DEFAULT_NAME_FIELDS}},
              'source':'Supported English game executable',
              'note':'80 shop inventories and global item/equipment/materia prices in a supported executable. Saves write a project copy, never the installed executable. Shop-opening scripts are unchanged.'},
 }
+FAMILIES['field'] = {'categories':{'fieldEncounters':{'label':'Field encounters','fields':FIELD_FIELDS}},
+                     'source':'flevel.lgp','note':'Two random-encounter tables per readable PC field; scripts, dialogue and graphics remain unchanged.'}
+FAMILIES['world'] = {'categories':{'worldEncounters':{'label':'World encounters','fields':WORLD_FIELDS},
+                                 'yuffieEncounters':{'label':'Yuffie encounters','fields':YUFFIE_FIELDS},
+                                 'chocoboRatings':{'label':'Chocobo ratings','fields':CHOCOBO_FIELDS}},
+                     'source':'world_us.lgp / enc_w.bin','note':'All 64 region/terrain tables, eight Yuffie thresholds and 32 Chocobo ratings. Terrain assignments remain in the executable.'}
+FAMILIES['scene']['note']='Enemies, attacks, formations and their AI scripts. Scene block membership is retained; overflow is refused rather than invalidating KERNEL lookup.'
+FAMILIES['shop']['note']='Shop inventories, prices, default names and Cait Sith/Vincent starting data in a recognized English executable; saves replace project copies only.'
 ERRORS = (OSError, ValueError, EOFError, struct.error, zlib.error)
 LOCK = RLock()
 
 
-def _case_path(root, relative):
-    path = Path(root)
-    for part in Path(relative).parts:
-        if not path.is_dir():
-            return None
-        matches = [p for p in path.iterdir() if p.name.casefold() == part.casefold()]
-        if len(matches) > 1:
-            raise ValueError(f'Ambiguous case-insensitive FF7 source: {relative}')
-        if not matches:
-            return None
-        path = matches[0]
-    return path if path.is_file() else None
+from .storage import case_path as _case_path
 
 
 def resolve_source(game_root, family):
@@ -176,6 +199,9 @@ def resolve_source(game_root, family):
         candidates = [f'{prefix}data/{lang}battle/scene.bin' for prefix in ('', 'ff7/workingdir/') for lang in ('','lang-en/')]
     elif family == 'text':
         candidates = [f'{prefix}data/lang-en/kernel/kernel2.bin' for prefix in ('', 'ff7/workingdir/')]
+    elif family in ('field', 'world'):
+        tails = ('data/field/flevel.lgp','data/lang-en/field/flevel.lgp') if family=='field' else ('data/wm/world_us.lgp','data/world/world_us.lgp','data/lang-en/world/world_us.lgp')
+        candidates = [prefix+tail for prefix in ('','ff7/workingdir/') for tail in tails]
     else:
         candidates = ['ff7/resources/ff7_1.02/ff7_en', 'ff7_en.exe', 'ff7.exe']
     found = {p for name in candidates if (p := _case_path(game_root, name)) is not None}
@@ -188,19 +214,12 @@ def resolve_source(game_root, family):
 
 
 def model(family, data, source):
-    return ShopExecutable(data, source) if family == 'shop' else (SceneArchive(data) if family == 'scene' else KernelText(data))
+    if family == 'shop': return ShopExecutable(data, source)
+    return {'scene':SceneArchive,'text':KernelText,'field':FieldArchive,'world':WorldArchive}[family](data)
 
 
 def _target(game_root, project_root, source, relative):
-    root, game = Path(project_root).resolve(), Path(game_root).resolve()
-    if root == game or root.is_relative_to(game):
-        raise ValueError('The FF7 mod project must be outside the installed game directory')
-    target = Path(project_root) / relative
-    if not target.resolve().is_relative_to(root) or target.is_symlink():
-        raise ValueError('Project output escapes the project directory')
-    if target.exists() and target.samefile(source):
-        raise ValueError('Project output aliases the installed source')
-    return target
+    return target_path(game_root, project_root, source, relative)
 
 
 def load_extended(game_root, project_root):
@@ -217,14 +236,15 @@ def load_extended(game_root, project_root):
             active = target.read_bytes() if target.exists() else original
             vanilla, current = model(family, original, original), model(family, active, original)
             report.update(sourceSha256=digest(original), activeSha256=digest(active), usingProject=target.exists(), projectPath=str(target))
-            pending = {}
+            if getattr(current,'errors',None): report['memberErrors'] = current.errors
             for key in info['categories']:
-                rows, baseline = current.records(key), vanilla.records(key)
-                if [r['id'] for r in rows] != [r['id'] for r in baseline]:
-                    raise ValueError('Project record identities differ from the installed source')
-                pending[key] = (rows, baseline)
-            for key,(rows,baseline) in pending.items():
-                result['records'][key], result['vanilla'][key] = rows, baseline
+                try:
+                    rows, baseline = current.records(key), vanilla.records(key)
+                    if [r['id'] for r in rows] != [r['id'] for r in baseline]:
+                        raise ValueError('Project record identities differ from the installed source')
+                    result['records'][key], result['vanilla'][key] = rows, baseline
+                except ERRORS as error:
+                    result['errors'][key] = str(error)
         except ERRORS as error:
             report['error'] = str(error)
             result['errors'].update({key:str(error) for key in info['categories']})
@@ -237,7 +257,7 @@ def save_extended(game_root, project_root, payload):
             raise ValueError('Save must select a supported FF7 source family')
         family = payload['family']
         records = payload.get('records')
-        if not isinstance(records, dict) or set(records) != set(FAMILIES[family]['categories']):
+        if not isinstance(records, dict) or not records or set(records) - set(FAMILIES[family]['categories']):
             raise ValueError('Save must contain exactly the selected family datasets')
         source, relative = resolve_source(game_root, family)
         target = _target(game_root, project_root, source, relative)
@@ -247,33 +267,23 @@ def save_extended(game_root, project_root, payload):
         if any(key not in payload or type(payload[key]) is not type(value) or payload[key] != value for key,value in expected.items()):
             raise ValueError('FF7 data changed outside this editor. Reload before saving.')
         current = model(family, active, original)
+        readable = set()
+        for key in FAMILIES[family]['categories']:
+            try: current.records(key); readable.add(key)
+            except ERRORS: pass
+        if set(records) != readable: raise ValueError('Save must contain exactly the readable source-family datasets')
         for key,rows in records.items():
             current.apply(key, rows)
         output = current.to_bytes()
         verified = model(family, output, original)
         for key,rows in records.items():
-            if {r['id']:r['values'] for r in verified.records(key)} != {r['id']:r['values'] for r in rows}:
+            if not records_match(key, rows, verified.records(key)):
                 raise ValueError(f'{key} failed binary round-trip verification')
-        target.parent.mkdir(parents=True, exist_ok=True)
-        temporary = None
-        try:
-            with tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name+'.', suffix='.tmp', delete=False) as stream:
-                temporary = Path(stream.name)
-                stream.write(output); stream.flush(); os.fsync(stream.fileno())
-            if temporary.read_bytes() != output:
-                raise ValueError('Temporary FF7 file failed readback')
-            _target(game_root, project_root, source, relative)
-            if source.read_bytes() != original or target.exists() != existed or (existed and target.read_bytes() != active):
+        def check():
+            _target(game_root,project_root,source,relative)
+            if source.read_bytes()!=original:
                 raise ValueError('FF7 data changed while saving. Reload before saving.')
-            backup = None
-            if existed:
-                # An exclusive new backup cannot follow/overwrite another file's symlink.
-                with tempfile.NamedTemporaryFile(dir=target.parent, prefix=target.name+'.lexeditor-', suffix='.bak', delete=False) as stream:
-                    backup = stream.name
-                    stream.write(active); stream.flush(); os.fsync(stream.fileno())
-            os.replace(temporary, target)
-            return {'saved':True, 'path':str(target), 'sha256':digest(output), 'bytes':len(output), 'backup':backup,
-                    'sourceSha256':digest(original), 'activeSha256':digest(output), 'usingProject':True}
-        finally:
-            if temporary is not None:
-                temporary.unlink(missing_ok=True)
+        backup=replace_project(target,output,active,existed,check)
+        return {'saved':True,'path':str(target),'sha256':digest(output),'bytes':len(output),
+                'backup':backup,'sourceSha256':digest(original),'activeSha256':digest(output),'usingProject':True,
+                'records':{key:verified.records(key) for key in records}}
