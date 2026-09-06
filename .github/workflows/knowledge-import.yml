@@ -28,12 +28,16 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p=Path('tools/import_knowledge.py')
-          text=p.read_text()
+          p=Path('tools/import_knowledge.py');text=p.read_text()
           old="put(base/'reconciliation.json',dump({'conflicts':conflicts,'source_skips':manifest.get('skipped',[]),'mapped_issue_worklogs':mapped}),True)"
           new="put(base/'reconciliation.json',dump({'conflicts':conflicts,'source_skips':manifest.get('skipped',[]),'mapped_issue_worklogs':mapped}))"
           assert old in text or new in text
-          p.write_text(text.replace(old,new))
+          text=text.replace(old,new)
+          oldhost="not (parsed.hostname or '').endswith('.oaiusercontent.com')"
+          newhost="not ((parsed.hostname or '').endswith('.oaiusercontent.com') or re.fullmatch(r'productionresults[a-z0-9]+[.]blob[.]core[.]windows[.]net', parsed.hostname or ''))"
+          assert oldhost in text or newhost in text
+          text=text.replace(oldhost,newhost).replace('Only the explicitly reviewed, file-scoped transfer URL is accepted','Only a reviewed file-scoped ChatGPT or GitHub Actions artifact transfer URL is accepted')
+          p.write_text(text)
           import importlib.util,tempfile
           s=importlib.util.spec_from_file_location('importer',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
           with tempfile.TemporaryDirectory() as d:
