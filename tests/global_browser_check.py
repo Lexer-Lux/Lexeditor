@@ -10,7 +10,7 @@ import shutil
 import sys
 import threading
 from urllib.parse import urlparse
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 ROOT=Path(__file__).resolve().parents[1]
 OUT=Path(os.environ.get('LEXEDITOR_TEST_OUTPUT',str(ROOT/'out/global-browser')))
@@ -38,7 +38,6 @@ class Handler(SimpleHTTPRequestHandler):
         return super().translate_path(path)
 
 
-
 def load_page(page, base, path):
     if not os.environ.get("LEXEDITOR_BROWSER_OFFLINE"):
         page.goto(base+path)
@@ -58,6 +57,17 @@ def load_page(page, base, path):
     html=html.replace('<head>','<head><base href="https://offline.invalid/shared/"><script>'+init+'</script>',1)
     page.set_content(html,wait_until='domcontentloaded')
     page.evaluate("dispatchEvent(new Event('pywebviewready'))")
+
+
+def focus_help(page, selector='[aria-label="Test help"]'):
+    """Focus help deterministically; Chromium can occasionally drop one synthetic focus during heavy CI startup."""
+    marker=page.locator(selector)
+    marker.focus()
+    try:
+        page.wait_for_selector('.lex-help-popover',timeout=750)
+    except PlaywrightTimeoutError:
+        marker.blur();page.wait_for_timeout(20);marker.focus()
+        page.wait_for_selector('.lex-help-popover',timeout=3000)
 
 
 def main():
@@ -92,7 +102,7 @@ def main():
                 page.screenshot(path=str(OUT/f'credits-{width}.png'))
                 # Help is reachable from keyboard and remains within the viewport.
                 page.evaluate('''()=>{let m=document.querySelector('#main');m.replaceChildren(LexeditorUI.infoHelp('Signed stamina points per second. Positive restores; negative drains.',{'aria-label':'Test help'}));}''')
-                page.locator('[aria-label="Test help"]').focus();page.wait_for_selector('.lex-help-popover')
+                focus_help(page)
                 box=page.locator('.lex-help-popover').bounding_box()
                 assert box and box['x']>=0 and box['y']>=0 and box['x']+box['width']<=width+1
                 page.keyboard.press('Escape');assert page.locator('.lex-help-popover').count()==0
