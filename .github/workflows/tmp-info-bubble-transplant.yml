@@ -1,0 +1,44 @@
+name: Temporary info bubble transplant
+on:
+  push:
+    branches: [codex/global-semantic-info-bubbles-349-v2]
+    paths: ['.github/workflows/tmp-info-bubble-transplant.yml']
+permissions:
+  contents: write
+jobs:
+  transplant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/global-semantic-info-bubbles-349-v2
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Transplant verified product commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch origin 28d7cc2fbf01ad74bd4f94e8c7791bb809e24e2c
+          git cherry-pick 28d7cc2fbf01ad74bd4f94e8c7791bb809e24e2c
+      - name: Install test dependencies
+        run: |
+          python -m pip install pytest playwright Pillow 'fonttools>=4.59,<5'
+          python -m playwright install --with-deps chromium
+      - name: Verify current-master transplant
+        run: |
+          python -m compileall -q games ui tests
+          python -m pytest -q tests/test_info_bubble_semantics.py tests/test_global_issues.py tests/test_ff9*.py
+          node --test tests/ff9_editor.test.cjs
+          LEXEDITOR_BROWSER_OFFLINE=1 python tests/global_controls_check.py
+          git diff HEAD^ --check
+      - name: Push verified candidate
+        shell: bash
+        run: git push origin HEAD:codex/global-semantic-info-bubbles-349-v2
