@@ -4333,7 +4333,7 @@
       selected: options.selected,
       selectedClass: options.selectedClass,
       select: options.select,
-      class: ["lex-column-list", options.editable ? "lex-editable-table" : "", options.class || ""].filter(Boolean).join(" "),
+      class: ["lex-column-list", options.class || ""].filter(Boolean).join(" "),
       role: "table",
       style: `--lex-column-list-template:${template};grid-template-columns:var(--lex-column-list-template)`,
       "aria-label": options["aria-label"],
