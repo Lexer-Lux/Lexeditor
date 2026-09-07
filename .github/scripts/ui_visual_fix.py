@@ -138,6 +138,17 @@ def fix_blank(text: str) -> str:
     return text
 
 
+def fix_visual_acceptance(text: str) -> str:
+    old = '''            results[prefix] = {\n                "errors": errors,\n'''
+    new = '''            # set_content() runs the fixture at about:blank with a fake <base>.\n            # The app's final history.replaceState therefore raises one expected\n            # null-origin security error that cannot occur in the real HTTP/WebView\n            # host. Keep every other page error fatal.\n            real_errors = [error for error in errors if not (\n                "Failed to execute 'replaceState' on 'History'" in error and\n                "origin 'null'" in error\n            )]\n            results[prefix] = {\n                "errors": real_errors,\n'''
+    if old in text:
+        text = text.replace(old, new, 1)
+    text = text.replace('            assert not errors, (width, errors)\n',
+                        '            assert not real_errors, (width, real_errors)\n', 1)
+    return text
+
+
 edit("ui/framework.css", fix_framework_css)
 edit("ui/framework.js", fix_framework_js)
 edit("games/blank/editor.html", fix_blank)
+edit(".github/scripts/ui_visual_acceptance.py", fix_visual_acceptance)
