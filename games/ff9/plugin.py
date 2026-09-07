@@ -89,11 +89,6 @@ def smoke() -> list[str]:
                 raise RuntimeError("FF9 Memoria project overlay did not save and reload")
             if "0;300;1;# 000 - Hammer" not in (root / "project" / "StreamingAssets" / "Data" / "Items" / "Items.csv").read_text(encoding="utf-8"):
                 raise RuntimeError("FF9 project overlay did not preserve the CSV record")
-            # A single 10s attempt fails whenever the machine is busy - the
-            # local server is simply still starting - and reports it as a
-            # timeout, which reads like a broken plugin rather than a slow
-            # host. Retry to a deadline instead, and re-raise the real error
-            # if the whole window passes.
             deadline = time.monotonic() + 60
             while True:
                 try:
@@ -126,6 +121,9 @@ PLUGIN = GamePlugin(
     helper_install=lambda: memoria_manager.install(paths.GAME_ROOT),
     helper_status=lambda: memoria_manager.status(paths.GAME_ROOT),
     helper_upstream=memoria_manager.upstream_release,
+    helper_status_for_root=lambda root: memoria_manager.status(root or paths.GAME_ROOT),
+    helper_install_for_root=lambda root: memoria_manager.install(root),
+    helper_pinned=memoria_manager.PINNED_RELEASE,
     subtitle="FFIX",
     description="Steam editor for proved Memoria and Hades Workshop CSV exports.",
     accent="#6e54b5",

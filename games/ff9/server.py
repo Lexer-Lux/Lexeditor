@@ -12,9 +12,10 @@ import re
 from urllib.parse import parse_qs, urlparse
 
 from . import paths
-from .memoria_csv import DATASETS, MemoriaDataStore, catalog
+from .memoria_csv import MemoriaDataStore, catalog
+from .battle_scene import BattleSceneStore
 from .memoria_baseline import ensure as ensure_baseline
-from . import memoria_manager
+from . import memoria_manager, features
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
@@ -23,13 +24,14 @@ PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
-POST_ROUTES = {"/api/save", "/api/runtime/install",
-               "/api/runtime/recover", "/api/runtime/settings"}
+POST_ROUTES = {"/api/save", "/api/runtime/install", "/api/runtime/recover",
+               "/api/runtime/settings", "/api/features/save",
+               "/api/deployment/deploy", "/api/deployment/revert"}
 
 
 UNRESOLVED_AREAS = (
-    ("StreamingAssets/p0data*.bin", "Vanilla Unity asset containers", "Direct container editing is not integrated; verified Memoria CSV datasets are listed separately."),
-    ("Battle scenes", "Enemies and encounters", "No editable Memoria battle-scene export is present."),
+    ("StreamingAssets/p0data*.bin", "Vanilla Unity asset containers",
+     "Battle-scene records are decoded read-only from p0data2 and written only as Memoria project overlays; other container data remains outside the integrated surface."),
 )
 
 
@@ -52,7 +54,6 @@ def _steam_build() -> str | None:
 
 
 def data_map() -> dict:
-    """Report exact Memoria files and unresolved vanilla containers."""
     integrated = []
     for row in catalog():
         available = bool(row["available"])
@@ -64,19 +65,29 @@ def data_map() -> dict:
             "openable": available, "target": row["tab"],
             "dataset": row["key"], "datasetKey": row["key"],
         })
+    for row in BattleSceneStore().status_rows():
+        integrated.append({
+            "filename": row["relativePath"], "controls": row["controls"],
+            "notes": row["notes"], "status": "integrated" if row["available"] else "partial",
+            "openable": row["available"], "target": row["tab"], "datasetKey": row["key"],
+        })
     launcher = paths.GAME_ROOT / "FF9_Launcher.exe"
-    return {
-        "contract": "Lexeditor.data-map",
-        "rows": integrated + [{
-            "filename": "FF9_Launcher.exe", "controls": "Memoria settings in its own launcher",
-            "notes": "Play opens the launcher. Lexeditor does not edit Memoria.ini; Tweaks explains this handoff.",
-            "status": "integrated" if launcher.is_file() else "partial", "openable": True,
-            "target": "tweaks",
-        }] + [{
-            "filename": filename, "controls": controls, "notes": notes,
-            "status": "not-integrated", "coverage": "unavailable", "openable": False,
-        } for filename, controls, notes in UNRESOLVED_AREAS],
-    }
+    deployment = features.status()
+    integrated.append({
+        "filename": "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll",
+        "controls": "Improved Interface and Better Eat runtime",
+        "notes": "Lexeditor-owned optional Memoria script runtime. Deploy Project activates the fixed Lexeditor mod folder; Memoria.ini remains otherwise untouched.",
+        "status": "integrated" if deployment["runtimeReady"] else "partial",
+        "openable": True, "target": "tweaks",
+    })
+    return {"contract": "Lexeditor.data-map", "rows": integrated + [{
+        "filename": "FF9_Launcher.exe", "controls": "Memoria settings in its own launcher",
+        "notes": "Play opens the launcher. Lexeditor does not edit Memoria.ini; Tweaks explains this handoff.",
+        "status": "integrated" if launcher.is_file() else "partial", "openable": True, "target": "tweaks",
+    }] + [{
+        "filename": filename, "controls": controls, "notes": notes,
+        "status": "not-integrated", "coverage": "unavailable", "openable": False,
+    } for filename, controls, notes in UNRESOLVED_AREAS]}
 
 
 def dashboard() -> dict:
@@ -87,27 +98,24 @@ def dashboard() -> dict:
     player = paths.GAME_ROOT / "x64" / "FF9.exe"
     assembly = paths.GAME_ROOT / "x64" / "FF9_Data" / "Managed" / "Assembly-CSharp.dll"
     return {
-        "game": {
-            "root": str(paths.GAME_ROOT), "executable": str(launcher),
-            "settingsExecutable": str(launcher), "ready": not problems,
-            "steamAppId": "377840", "steamBuildId": _steam_build(),
-            "launcherSha256": _hash(launcher), "playerSha256": _hash(player),
-            "assemblySha256": _hash(assembly),
-        },
-        "baseline": {
-            "ready": available > 0, "fileCount": available,
-            "message": (f"{available} Memoria CSV datasets are available."
-                        if available else "The verified Memoria data baseline is not available yet."),
-            "memoriaRelease": memoria["release"], "memoriaSource": memoria["source"],
-            "problems": memoria["problems"],
-        },
+        "game": {"root": str(paths.GAME_ROOT), "executable": str(launcher),
+                 "settingsExecutable": str(launcher), "ready": not problems,
+                 "steamAppId": "377840", "steamBuildId": _steam_build(),
+                 "launcherSha256": _hash(launcher), "playerSha256": _hash(player),
+                 "assemblySha256": _hash(assembly)},
+        "baseline": {"ready": available > 0, "fileCount": available,
+                     "message": (f"{available} Memoria CSV datasets are available." if available else
+                                 "The verified Memoria data baseline is not available yet."),
+                     "memoriaRelease": memoria["release"], "memoriaSource": memoria["source"],
+                     "problems": memoria["problems"]},
         "problems": problems, "project": {"root": str(paths.PROJECT_ROOT)},
-        "runtime": memoria_manager.status(paths.GAME_ROOT), "scaffold": False,
+        "runtime": memoria_manager.status(paths.GAME_ROOT), "features": features.load(),
+        "deployment": features.status(), "scaffold": False,
     }
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorFF9/2"
+    server_version = "LexeditorFF9/3"
 
     def log_message(self, _format, *_args):
         return
@@ -144,27 +152,21 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self.file_response(target)
             elif path == "/api/plugin":
-                self.json_response({
-                    "apiVersion": 1, "pluginId": "ff9", "name": "Final Fantasy IX",
-                    "edition": "Steam Unity / Memoria CSV", "hosted": HOSTED,
-                    "windowHost": WINDOW_HOST, "projectRoot": str(paths.PROJECT_ROOT),
-                    "editorRoot": str(PLUGIN_ROOT), "capabilities": ["data-map", "memoria-csv", "read", "save"],
-                })
-            elif path == "/api/dashboard":
-                self.json_response(dashboard())
-            elif path == "/api/datamap":
-                self.json_response(data_map())
-            elif path == "/api/catalog":
-                self.json_response({"datasets": catalog()})
+                self.json_response({"apiVersion": 1, "pluginId": "ff9", "name": "Final Fantasy IX",
+                    "edition": "Steam Unity / Memoria CSV", "hosted": HOSTED, "windowHost": WINDOW_HOST,
+                    "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
+                    "capabilities": ["data-map", "memoria-csv", "battle-scenes", "ff9-features", "deploy", "read", "save"]})
+            elif path == "/api/dashboard": self.json_response(dashboard())
+            elif path == "/api/datamap": self.json_response(data_map())
+            elif path == "/api/catalog": self.json_response({"datasets": catalog() + BattleSceneStore().status_rows()})
             elif path == "/api/dataset":
                 key = parse_qs(parsed.query).get("key", [""])[0]
-                self.json_response(MemoriaDataStore().load(key))
-            elif path == "/api/runtime":
-                self.json_response(memoria_manager.status(paths.GAME_ROOT))
-            elif path == "/api/runtime/available":
-                self.json_response(memoria_manager.available())
-            else:
-                self.json_response({"error": "Not found"}, 404)
+                self.json_response(BattleSceneStore().load(key) if key in {"enemies", "encounters"} else MemoriaDataStore().load(key))
+            elif path == "/api/runtime": self.json_response(memoria_manager.status(paths.GAME_ROOT))
+            elif path == "/api/runtime/available": self.json_response(memoria_manager.available())
+            elif path == "/api/features": self.json_response(features.load())
+            elif path == "/api/deployment": self.json_response(features.status())
+            else: self.json_response({"error": "Not found"}, 404)
         except Exception as error:
             self.json_response({"error": str(error)}, 400)
 
@@ -172,46 +174,36 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             if path not in POST_ROUTES:
-                self.json_response({"error": "Not found"}, 404)
-                return
-            # Installing an executable must not be reachable from a foreign
-            # website via forms, cross-origin requests or DNS rebinding.
+                self.json_response({"error": "Not found"}, 404); return
             port = self.server.server_address[1]
             allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
-            host = self.headers.get("Host", "").casefold()
-            origin = self.headers.get("Origin")
+            host, origin = self.headers.get("Host", "").casefold(), self.headers.get("Origin")
             if host not in allowed_hosts or (origin is not None and origin not in {f"http://{host}"}):
-                self.json_response({"error": "Only this editor may change FF9 data"}, 403)
-                return
+                self.json_response({"error": "Only this editor may change FF9 data"}, 403); return
             if self.headers.get_content_type() != "application/json":
-                self.json_response({"error": "An application/json request is required"}, 415)
-                return
+                self.json_response({"error": "An application/json request is required"}, 415); return
             if self.headers.get("Transfer-Encoding"):
-                self.json_response({"error": "Chunked requests are not supported"}, 400)
-                return
+                self.json_response({"error": "Chunked requests are not supported"}, 400); return
             length = int(self.headers.get("Content-Length", "0"))
             if not 0 < length <= MAX_REQUEST_BYTES:
-                self.json_response({"error": "Invalid or oversized request body"}, 413)
-                return
+                self.json_response({"error": "Invalid or oversized request body"}, 413); return
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            if not isinstance(payload, dict):
-                raise ValueError("The request must be a JSON object")
-            if path == "/api/runtime/install":
-                result = memoria_manager.install(paths.GAME_ROOT)
-            elif path == "/api/runtime/recover":
-                result = memoria_manager.recover(paths.GAME_ROOT)
-            elif path == "/api/runtime/settings":
-                result = memoria_manager.open_settings(paths.GAME_ROOT)
+            if not isinstance(payload, dict): raise ValueError("The request must be a JSON object")
+            if path == "/api/runtime/install": result = memoria_manager.install(paths.GAME_ROOT)
+            elif path == "/api/runtime/recover": result = memoria_manager.recover(paths.GAME_ROOT)
+            elif path == "/api/runtime/settings": result = memoria_manager.open_settings(paths.GAME_ROOT)
+            elif path == "/api/features/save": result = features.save(payload.get("features", {}), str(payload.get("sha256", "")))
+            elif path == "/api/deployment/deploy": result = features.deploy()
+            elif path == "/api/deployment/revert": result = features.revert()
             else:
-                result = MemoriaDataStore().save(str(payload.get("key", "")),
-                                                str(payload.get("sha256", "")), payload.get("changes", []))
+                key = str(payload.get("key", ""))
+                result = (BattleSceneStore().save(key, payload.get("sceneHashes", {}), payload.get("changes", []))
+                          if key in {"enemies", "encounters"} else
+                          MemoriaDataStore().save(key, str(payload.get("sha256", "")), payload.get("changes", [])))
             self.json_response(result)
-        except FileNotFoundError as error:
-            self.json_response({"error": str(error)}, 409)
-        except RuntimeError as error:
-            self.json_response({"error": str(error)}, 409)
-        except Exception as error:
-            self.json_response({"error": str(error)}, 400)
+        except FileNotFoundError as error: self.json_response({"error": str(error)}, 409)
+        except RuntimeError as error: self.json_response({"error": str(error)}, 409)
+        except Exception as error: self.json_response({"error": str(error)}, 400)
 
 
 def create_server(port=PORT):

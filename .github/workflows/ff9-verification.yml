@@ -1,7 +1,7 @@
 name: FF9 verification
 on:
   push:
-    branches: [codex/ff9-issues-20260906]
+    branches: [master]
     paths:
       - 'games/ff9/**'
       - 'tests/*ff9*'
@@ -21,7 +21,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,8 +30,45 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
       - name: Install test dependencies
         run: python -m pip install pytest
+      - name: Verify deterministic FF9 feature UI integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/ff9/patch_features_ui.py
+          git diff --exit-code -- games/ff9/editor.html
+      - name: Rebuild exact Memoria Scripts runtime against pinned publisher assemblies
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python tools/ff9/extract_memoria_refs.py out/ff9-refs
+          mkdir -p out/packages out/ff9-runtime
+          for spec in microsoft.netframework.referenceassemblies.net35:1.0.3 unityengine5:5.5.0; do
+            name=${spec%:*}; version=${spec#*:}
+            curl --fail --location --retry 2 "https://api.nuget.org/v3-flatcontainer/$name/$version/$name.$version.nupkg" -o "out/$name.nupkg"
+            unzip -q "out/$name.nupkg" -d "out/packages/$name"
+          done
+          root=$(dirname "$(readlink -f "$(command -v dotnet)")")
+          sdk=$(dotnet --list-sdks | grep '^8\.' | tail -1 | awk '{print $1}')
+          csc="$root/sdk/$sdk/Roslyn/bincore/csc.dll"
+          ref=out/packages/microsoft.netframework.referenceassemblies.net35/build/.NETFramework/v3.5
+          unity=out/packages/unityengine5/lib/net35/UnityEngine.dll
+          candidate=out/ff9-runtime/Memoria.Scripts.Lexeditor.dll
+          shipped=games/ff9/runtime/Memoria.Scripts.Lexeditor.dll
+          dotnet "$csc" -nologo -target:library -langversion:7.3 -nostdlib+ -deterministic+ \
+            -out:"$candidate" \
+            -r:"$ref/mscorlib.dll" -r:"$ref/System.dll" -r:"$ref/System.Core.dll" \
+            -r:out/ff9-refs/Assembly-CSharp.dll -r:out/ff9-refs/Memoria.Prime.dll -r:"$unity" \
+            games/ff9/runtime/Bootstrap.cs games/ff9/runtime/Runtime.cs games/ff9/runtime/BetterEatScript.cs
+          test -s "$candidate"
+          strings "$candidate" | grep -q BetterEatScript
+          strings "$candidate" | grep -q LexeditorBootstrap
+          cmp "$candidate" "$shipped"
+          sha256sum "$candidate" "$shipped"
       - name: Test FF9 Python and controller code
         run: |
           python -m compileall -q games/ff9
@@ -48,19 +85,6 @@ jobs:
           git -C ff9-evidence/memoria sparse-checkout set Assembly-CSharp Memoria.Prime Memoria.Scripts Memoria.Patcher Memoria.Compiler Memoria.Launcher/Presets
           git -C ff9-evidence/memoria rev-parse HEAD > ff9-evidence/memoria-source-commit.txt
           rm -rf ff9-evidence/memoria/.git
-          python - <<'PY'
-          import hashlib, json, pathlib, urllib.request
-          root = pathlib.Path('ff9-evidence')
-          api = 'https://api.github.com/repos/Albeoris/Memoria/releases/tags/v2025.07.04'
-          req = urllib.request.Request(api, headers={'User-Agent':'Lexeditor-FF9-verification'})
-          release = json.load(urllib.request.urlopen(req, timeout=30))
-          asset = next(a for a in release['assets'] if a['name'] == 'Memoria.Patcher.exe')
-          blob = urllib.request.urlopen(asset['browser_download_url'], timeout=90).read(120*1024*1024+1)
-          assert len(blob) <= 120*1024*1024
-          assert 'sha256:' + hashlib.sha256(blob).hexdigest() == asset['digest']
-          (root / 'Memoria.Patcher.exe').write_bytes(blob)
-          (root / 'memoria-release.json').write_text(json.dumps(release,indent=2))
-          PY
       - name: Upload test source bundle
         if: always()
         uses: actions/upload-artifact@v4

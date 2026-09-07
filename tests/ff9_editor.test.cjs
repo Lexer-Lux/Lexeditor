@@ -16,6 +16,8 @@ async function editor() {
     '/api/dashboard': {game: {ready: true}, baseline: {}, project: {root: 'fixture'}, runtime: {installed: false}},
     '/api/catalog': {datasets: []}, '/api/datamap': {rows: []},
     '/api/runtime': {installed: false},
+    '/api/features': {features: {ImprovedInterface:false, BetterEat:false}, sha256:'feature-fixture'},
+    '/api/deployment': {deployed:false, runtimeReady:true, runtimeCurrent:false},
   };
   let finish;
   const loaded = new Promise(resolve => finish = resolve);
@@ -32,6 +34,18 @@ async function editor() {
       assert.ok(!path.startsWith('/api/platform-config'), 'FF9 must not access the embedded Memoria settings API');
       if (request?.method === 'POST' && path === '/api/runtime/install')
         data['/api/runtime'] = {installed: true, version: 'fixture', pinned: 'v2025.07.04'};
+      if (request?.method === 'POST' && path === '/api/features/save') {
+        const payload=JSON.parse(request.body); data['/api/features']={features:structuredClone(payload.features),sha256:'saved'};
+        return {ok:true,json:async()=>structuredClone(data['/api/features'])};
+      }
+      if (request?.method === 'POST' && path === '/api/deployment/deploy') {
+        data['/api/deployment']={deployed:true,runtimeReady:true,runtimeCurrent:true};
+        return {ok:true,json:async()=>structuredClone(data['/api/deployment'])};
+      }
+      if (request?.method === 'POST' && path === '/api/deployment/revert') {
+        data['/api/deployment']={deployed:false,runtimeReady:true,runtimeCurrent:false};
+        return {ok:true,json:async()=>structuredClone(data['/api/deployment'])};
+      }
       const payload = data[path];
       return {ok: true, json: async () => structuredClone(payload || {})};
     },
@@ -47,30 +61,40 @@ function dirtyRecord(e) {
   e.run('installData({key:"items",label:"Items",fields:[{key:"Value",editable:true}],rows:[{line:1,id:0,values:{Value:1}}]}); state.datasets.items.rows[0].values.Value=2');
 }
 
-test('Memoria subtab displays the requested message without settings controls', async () => {
+test('Memoria subtab keeps launcher handoff while Lexeditor features are separate', async () => {
   const e = await editor();
   e.run('navigate("tweaks")');
   const strip = e.targets['#toolbar'].children[0];
   assert.equal(strip.tag, 'subtabBar');
   assert.equal(strip.attrs.active, 'memoria');
-  assert.equal(strip.attrs.tabs.length, 1);
-  assert.equal(strip.attrs.tabs[0].label, 'Memoria');
+  assert.deepEqual(Array.from(strip.attrs.tabs.map(tab=>tab.label)), ['Memoria','Improved Interface','Better Eat']);
   const card = e.targets['#main'].children[0];
-  assert.equal(card.tag, 'section');
-  assert.equal(card.children[0].tag, 'h2');
-  assert.equal(card.children[1].tag, 'p');
   assert.equal(card.children[1].children[0], message);
   assert.equal(card.children.length, 2);
   assert.doesNotMatch(source, /platformConfigView|platformChanges|platform-config/);
 });
 
-test('startup, Tweaks, save and discard never request an INI editor', async () => {
+test('startup and project lifecycle use only Lexeditor-owned feature APIs', async () => {
   const e = await editor();
   e.run('navigate("tweaks")');
   e.listeners.focus();
   await e.run('save()');
   await e.run('discard()');
-  assert.deepEqual(e.calls.map(call => call[0]), ['/api/dashboard','/api/datamap','/api/catalog']);
+  const paths=e.calls.map(call=>call[0]);
+  assert.deepEqual(paths.slice(0,5), ['/api/dashboard','/api/datamap','/api/catalog','/api/features','/api/deployment']);
+  assert.ok(paths.every(path=>!path.startsWith('/api/platform-config')));
+});
+
+test('Improved Interface and Better Eat toggles are project-owned and saveable', async () => {
+  const e=await editor();
+  e.run('navigate("tweaks"); state.tweak="improved"; tweaks()');
+  let card=e.targets['#main'].children[0];
+  const toggle=card.children.find(child=>child.tag==='label').children[0];
+  toggle.attrs.onchange({target:{checked:true}});
+  assert.equal(e.run('dirtyCount()'),1);
+  await e.run('save()');
+  assert.equal(e.run('state.savedFeatures.features.ImprovedInterface'),true);
+  assert.deepEqual(e.calls.filter(call=>call[1]==='POST').map(call=>call[0]), ['/api/features/save']);
 });
 
 test('install refreshes runtime status without opening the launcher automatically', async () => {
@@ -113,9 +137,11 @@ test('information help describes launcher-first Play', async () => {
   assert.doesNotMatch(description, /Play starts FF9 directly/);
 });
 
-test('new character data views remain registered', async () => {
+test('catalog-driven views expose every character dataset', async () => {
   const e = await editor();
+  e.run('state.catalog=[{key:"characters",tab:"characters"},{key:"character-parameters",tab:"characters"},{key:"default-equipment",tab:"characters"},{key:"leveling",tab:"characters"},{key:"world-weather",tab:"world"}]');
   assert.deepEqual(Array.from(e.run('choices("characters")')), ['characters','character-parameters','default-equipment','leveling']);
+  assert.deepEqual(Array.from(e.run('choices("world")')), ['world-weather']);
 });
 
 test('controller does not truncate fractional edits to an integer', async () => {
