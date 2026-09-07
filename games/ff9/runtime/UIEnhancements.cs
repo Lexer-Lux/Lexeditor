@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Reflection;
 using UnityEngine;
+using Object = System.Object;
 
 namespace Memoria.Scripts.Lexeditor
 {
