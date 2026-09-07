@@ -45,7 +45,8 @@ jobs:
           python tools/verify_ff8_native_package.py
           python tools/verify_ff8_native_compiled.py
           python tools/verify_ff8_gf_bar_settings.py
-          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py
+          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py tools/verify_ff8_cards_players_ui.py
+          node --check games/ff8/cards_ui.js
           python - <<'PY'
           import pathlib, re, subprocess
           text = pathlib.Path('games/ff8/editor.html').read_text(encoding='utf-8')
@@ -60,30 +61,14 @@ jobs:
         run: python tools/verify_ff8_ui_battle_regressions.py --browser ''
       - name: Preserve compact Enemy editor UI
         working-directory: editor
-        run: |
-          set -o pipefail
-          python - <<'PY'
-          from pathlib import Path
-          path=Path('tools/verify_ff8_enemy_compact_ui.py')
-          text=path.read_text()
-          text=text.replace("page.on('pageerror', lambda error: errors.append(str(error)))", "page.on('pageerror', lambda error: errors.append(getattr(error, 'stack', None) or str(error)))")
-          path.write_text(text)
-          PY
-          python tools/verify_ff8_enemy_compact_ui.py --browser '' 2>&1 | tee ff8-enemy-ui.log
-      - name: Upload compact Enemy editor diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ff8-enemy-ui-log
-          path: editor/ff8-enemy-ui.log
-          if-no-files-found: error
-          retention-days: 3
+        run: python tools/verify_ff8_enemy_compact_ui.py --browser ''
+      - name: Preserve Cards and NPC Players UI
+        working-directory: editor
+        run: python tools/verify_ff8_cards_players_ui.py --browser ''
       - name: Preserve FF8 card artwork decoding and route
-        if: always()
         working-directory: editor
         run: python tools/verify_ff8_card_art.py
       - name: Record native test boundary
-        if: always()
         run: echo 'Private executable tests run separately with a supplied FF8_EN.exe. No game executable is downloaded or uploaded. These checks do not claim in-game acceptance.'
   windows-install:
     runs-on: windows-2025-vs2026
