@@ -1,7 +1,7 @@
 name: FF9 Memoria Windows install
 on:
   push:
-    branches: [codex/ff9-complete-20260906]
+    branches: [master]
     paths:
       - 'games/ff9/memoria_*.py'
       - 'games/ff9/plugin.py'
