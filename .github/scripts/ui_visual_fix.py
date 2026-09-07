@@ -88,6 +88,11 @@ def fix_framework_css(text: str) -> str:
 
 
 def fix_framework_js(text: str) -> str:
+    old_slot = '''    const syncCloseSlot = () => {\n      close.style.left = `${icon.offsetLeft}px`;\n      close.style.top = `${icon.offsetTop}px`;\n      close.style.width = `${icon.offsetWidth}px`;\n      close.style.height = `${icon.offsetHeight}px`;\n    };'''
+    new_slot = '''    const syncCloseSlot = () => {\n      // offsetLeft/offsetWidth round fractional grid geometry, which moved the\n      // X by a couple of pixels at narrower window sizes. Measure both boxes\n      // in the same coordinate system so the close button literally overlays\n      // the header icon at any scale.\n      const headingBox = heading.getBoundingClientRect();\n      const iconBox = icon.getBoundingClientRect();\n      const originX = headingBox.left + heading.clientLeft;\n      const originY = headingBox.top + heading.clientTop;\n      close.style.left = `${iconBox.left - originX}px`;\n      close.style.top = `${iconBox.top - originY}px`;\n      close.style.width = `${iconBox.width}px`;\n      close.style.height = `${iconBox.height}px`;\n    };'''
+    if old_slot in text:
+        text = text.replace(old_slot, new_slot, 1)
+
     marker = "LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906"
     if marker in text:
         return text
