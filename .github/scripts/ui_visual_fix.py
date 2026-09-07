@@ -88,10 +88,24 @@ def fix_framework_css(text: str) -> str:
 
 
 def fix_framework_js(text: str) -> str:
-    old_slot = '''    const syncCloseSlot = () => {\n      close.style.left = `${icon.offsetLeft}px`;\n      close.style.top = `${icon.offsetTop}px`;\n      close.style.width = `${icon.offsetWidth}px`;\n      close.style.height = `${icon.offsetHeight}px`;\n    };'''
-    new_slot = '''    const syncCloseSlot = () => {\n      // offsetLeft/offsetWidth round fractional grid geometry, which moved the\n      // X by a couple of pixels at narrower window sizes. Measure both boxes\n      // in the same coordinate system so the close button literally overlays\n      // the header icon at any scale.\n      const headingBox = heading.getBoundingClientRect();\n      const iconBox = icon.getBoundingClientRect();\n      const originX = headingBox.left + heading.clientLeft;\n      const originY = headingBox.top + heading.clientTop;\n      close.style.left = `${iconBox.left - originX}px`;\n      close.style.top = `${iconBox.top - originY}px`;\n      close.style.width = `${iconBox.width}px`;\n      close.style.height = `${iconBox.height}px`;\n    };'''
-    if old_slot in text:
-        text = text.replace(old_slot, new_slot, 1)
+    # First migration: integer offset geometry -> fractional rectangle geometry.
+    slot_v0 = '''    const syncCloseSlot = () => {\n      close.style.left = `${icon.offsetLeft}px`;\n      close.style.top = `${icon.offsetTop}px`;\n      close.style.width = `${icon.offsetWidth}px`;\n      close.style.height = `${icon.offsetHeight}px`;\n    };'''
+    slot_v1 = '''    const syncCloseSlot = () => {\n      // offsetLeft/offsetWidth round fractional grid geometry, which moved the\n      // X by a couple of pixels at narrower window sizes. Measure both boxes\n      // in the same coordinate system so the close button literally overlays\n      // the header icon at any scale.\n      const headingBox = heading.getBoundingClientRect();\n      const iconBox = icon.getBoundingClientRect();\n      const originX = headingBox.left + heading.clientLeft;\n      const originY = headingBox.top + heading.clientTop;\n      close.style.left = `${iconBox.left - originX}px`;\n      close.style.top = `${iconBox.top - originY}px`;\n      close.style.width = `${iconBox.width}px`;\n      close.style.height = `${iconBox.height}px`;\n    };'''
+    if slot_v0 in text:
+        text = text.replace(slot_v0, slot_v1, 1)
+
+    # Final geometry: make the X visible first, then measure its actual rendered
+    # box and translate by the remaining delta. This is independent of the
+    # browser's absolute-position containing-block rules and therefore matches
+    # fractional icon geometry exactly at every window scale.
+    slot_v2 = '''    const syncCloseSlot = () => {\n      const iconBox = icon.getBoundingClientRect();\n      close.style.transform = 'none';\n      close.style.left = `${icon.offsetLeft}px`;\n      close.style.top = `${icon.offsetTop}px`;\n      close.style.width = `${iconBox.width}px`;\n      close.style.height = `${iconBox.height}px`;\n      const closeBox = close.getBoundingClientRect();\n      if (closeBox.width && closeBox.height) {\n        close.style.transform = `translate(${iconBox.left - closeBox.left}px, ${iconBox.top - closeBox.top}px)`;\n      }\n    };'''
+    if slot_v1 in text:
+        text = text.replace(slot_v1, slot_v2, 1)
+
+    open_v0 = '''    const open = async () => {\n      syncCloseSlot();\n      if (!drawer.childNodes.length) {\n        const content = await getContent?.();\n        if (content instanceof Node) drawer.append(content);\n      }\n      drawer.hidden = false;\n      panel.classList.add('lex-model-preview-open');\n      icon.setAttribute('aria-expanded', 'true');'''
+    open_v1 = '''    const open = async () => {\n      if (!drawer.childNodes.length) {\n        const content = await getContent?.();\n        if (content instanceof Node) drawer.append(content);\n      }\n      drawer.hidden = false;\n      panel.classList.add('lex-model-preview-open');\n      syncCloseSlot();\n      icon.setAttribute('aria-expanded', 'true');'''
+    if open_v0 in text:
+        text = text.replace(open_v0, open_v1, 1)
 
     marker = "LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906"
     if marker in text:
