@@ -33,6 +33,18 @@ constexpr std::uintptr_t kExtent = 0x004FDEB4;
 constexpr std::size_t kRuntimeBytes = 8 + sizeof(lex_spell_defs) + sizeof(lex_spell_gf_pages);
 bool g_installed = false;
 
+// MSVC inline assembler cannot encode an absolute immediate as a jmp/call
+// operand. Keep the reviewed FF8 continuation addresses in storage so the
+// naked hooks can transfer control indirectly without borrowing a register.
+std::uint32_t g_debit_loop = 0x004FE6FF;
+std::uint32_t g_debit_done = 0x004FE723;
+std::uint32_t g_row_done = 0x004C8A14;
+std::uint32_t g_number_continue = 0x004C8A4E;
+std::uint32_t g_number_empty = 0x004C8A70;
+std::uint32_t g_extent_done = 0x004FDEBC;
+std::uint32_t g_color_draw = 0x004A3400;
+std::uint32_t g_color_native = 0x004A3570;
+
 struct RuntimeHeader {
     char magic[4];
     std::uint8_t version;
@@ -122,7 +134,7 @@ void nop_tail(std::uintptr_t site, std::size_t original_size)
 // x86 DLL callback. Only its mod-owned storage symbols changed. It deliberately
 // falls through to FF8's native stock list unless exactly one GF is junctioned
 // and that GF has a configured spellbook.
-extern "C" __declspec(dllexport) void * __declspec(naked) lexeditor_ff8_gf_spellbook_list()
+extern "C" __declspec(dllexport) __declspec(naked) void * lexeditor_ff8_gf_spellbook_list()
 {
     __asm {
         push ebx
@@ -139,7 +151,7 @@ extern "C" __declspec(dllexport) void * __declspec(naked) lexeditor_ff8_gf_spell
         movzx ecx,byte ptr [ebp+0141h]
         cmp ecx,7
         ja fallback
-        imul ecx,ecx,098h
+        imul ecx,ecx,152
         movzx ebx,word ptr [ecx+01CFE140h]
         test ebx,ebx
         jz fallback
@@ -223,7 +235,7 @@ extern "C" __declspec(dllexport) void * __declspec(naked) lexeditor_ff8_gf_spell
     }
 }
 
-extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbook_debit()
+extern "C" __declspec(dllexport) __declspec(naked) void lexeditor_ff8_gf_spellbook_debit()
 {
     __asm {
         pushad
@@ -249,12 +261,14 @@ extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbo
         inc edx
         add ecx,5
         cmp edx,esi
-        jl 004FE6FFh
-        jmp 004FE723h
+        jge debit_exit
+        jmp dword ptr [g_debit_loop]
+    debit_exit:
+        jmp dword ptr [g_debit_done]
     }
 }
 
-extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbook_row()
+extern "C" __declspec(dllexport) __declspec(naked) void lexeditor_ff8_gf_spellbook_row()
 {
     __asm {
         mov al,byte ptr [esi+1]
@@ -266,11 +280,11 @@ extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbo
         cmp byte ptr [esi],0
         setne al
     row_done:
-        jmp 004C8A14h
+        jmp dword ptr [g_row_done]
     }
 }
 
-extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbook_number()
+extern "C" __declspec(dllexport) __declspec(naked) void lexeditor_ff8_gf_spellbook_number()
 {
     __asm {
         add esp,01Ch
@@ -278,15 +292,17 @@ extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbo
         jb native_number
         cmp esi,offset lex_spell_views+480
         jae native_number
-        jmp 004C8A4Eh
+        jmp dword ptr [g_number_continue]
     native_number:
         test ebx,ebx
-        je 004C8A70h
-        jmp 004C8A4Eh
+        je number_empty
+        jmp dword ptr [g_number_continue]
+    number_empty:
+        jmp dword ptr [g_number_empty]
     }
 }
 
-extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbook_extent()
+extern "C" __declspec(dllexport) __declspec(naked) void lexeditor_ff8_gf_spellbook_extent()
 {
     __asm {
         push ecx
@@ -304,11 +320,11 @@ extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbo
         pop ecx
         mov eax,ebx
         mov byte ptr ds:[01D768F0h],bl
-        jmp 004FDEBCh
+        jmp dword ptr [g_extent_done]
     }
 }
 
-extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbook_color_number()
+extern "C" __declspec(dllexport) __declspec(naked) void lexeditor_ff8_gf_spellbook_color_number()
 {
     __asm {
         cmp esi,offset lex_spell_views
@@ -326,11 +342,11 @@ extern "C" __declspec(dllexport) void __declspec(naked) lexeditor_ff8_gf_spellbo
         push edx
         push eax
         push ecx
-        call 004A3400h
+        call dword ptr [g_color_draw]
         add esp,018h
         ret
     native_color:
-        jmp 004A3570h
+        jmp dword ptr [g_color_native]
     }
 }
 
