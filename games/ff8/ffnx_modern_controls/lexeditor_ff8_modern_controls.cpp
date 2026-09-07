@@ -36,10 +36,10 @@ bool world_square_pressed = false;
 constexpr std::uintptr_t kWorldInputStates = 0x0203FDE8;
 constexpr std::uintptr_t kWorldInputParity = 0x020409BC;
 constexpr std::uintptr_t kWorldVehicle = 0x020409E0;
-constexpr std::uint32_t kTriangle = 0x10u;
-constexpr std::uint32_t kSquare = 0x80u;
-constexpr std::uint32_t kL2 = 0x100u;
-constexpr std::uint32_t kR2 = 0x200u;
+constexpr std::uint32_t kL2 = 0x0001u;
+constexpr std::uint32_t kR2 = 0x0002u;
+constexpr std::uint32_t kTriangle = 0x0010u;
+constexpr std::uint32_t kSquare = 0x0080u;
 
 constexpr std::uintptr_t kBattleCameraCall = 0x00500988;
 constexpr std::uintptr_t kBattleCameraUpdate = 0x00504060;
