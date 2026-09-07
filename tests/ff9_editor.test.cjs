@@ -16,7 +16,7 @@ async function editor() {
     '/api/dashboard': {game: {ready: true}, baseline: {}, project: {root: 'fixture'}, runtime: {installed: false}},
     '/api/catalog': {datasets: []}, '/api/datamap': {rows: []},
     '/api/runtime': {installed: false},
-    '/api/features': {features: {ImprovedInterface:false, BetterEat:false, XPBars:false, HPMPBars:false}, sha256:'feature-fixture'},
+    '/api/features': {features: {ImprovedInterface:false, BetterEat:false, XPBars:false, HPMPBars:false, RowRework:false}, sha256:'feature-fixture'},
     '/api/deployment': {deployed:false, runtimeReady:true, runtimeCurrent:false},
   };
   let finish;
@@ -67,7 +67,7 @@ test('Memoria subtab keeps launcher handoff while Lexeditor features are separat
   const strip = e.targets['#toolbar'].children[0];
   assert.equal(strip.tag, 'subtabBar');
   assert.equal(strip.attrs.active, 'memoria');
-  assert.deepEqual(Array.from(strip.attrs.tabs.map(tab=>tab.label)), ['Memoria','Improved Interface','Better Eat','XP Bars','HP/MP Bars']);
+  assert.deepEqual(Array.from(strip.attrs.tabs.map(tab=>tab.label)), ['Memoria','Improved Interface','Better Eat','XP Bars','HP/MP Bars','Row Rework']);
   const card = e.targets['#main'].children[0];
   assert.equal(card.children[1].children[0], message);
   assert.equal(card.children.length, 2);
@@ -85,21 +85,22 @@ test('startup and project lifecycle use only Lexeditor-owned feature APIs', asyn
   assert.ok(paths.every(path=>!path.startsWith('/api/platform-config')));
 });
 
-test('all four Lexeditor runtime toggles are project-owned and independently saveable', async () => {
+test('all five Lexeditor runtime toggles are project-owned and independently saveable', async () => {
   const e=await editor();
-  for (const [tweak,key] of [['improved','ImprovedInterface'],['eat','BetterEat'],['xp','XPBars'],['hpmp','HPMPBars']]) {
+  for (const [tweak,key] of [['improved','ImprovedInterface'],['eat','BetterEat'],['xp','XPBars'],['hpmp','HPMPBars'],['row','RowRework']]) {
     e.run(`navigate("tweaks"); state.tweak="${tweak}"; tweaks()`);
     const card=e.targets['#main'].children[0];
     const toggle=card.children.find(child=>child.tag==='label').children[0];
     toggle.attrs.onchange({target:{checked:true}});
     assert.equal(e.run(`state.features.features.${key}`),true);
   }
-  assert.equal(e.run('dirtyCount()'),4);
+  assert.equal(e.run('dirtyCount()'),5);
   await e.run('save()');
   assert.equal(e.run('state.savedFeatures.features.ImprovedInterface'),true);
   assert.equal(e.run('state.savedFeatures.features.BetterEat'),true);
   assert.equal(e.run('state.savedFeatures.features.XPBars'),true);
   assert.equal(e.run('state.savedFeatures.features.HPMPBars'),true);
+  assert.equal(e.run('state.savedFeatures.features.RowRework'),true);
   assert.deepEqual(e.calls.filter(call=>call[1]==='POST').map(call=>call[0]), ['/api/features/save']);
 });
 

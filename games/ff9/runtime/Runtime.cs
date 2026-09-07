@@ -16,36 +16,46 @@ namespace Memoria.Scripts.Lexeditor
         private readonly Dictionary<Int32, String> _capturedDialogText = new Dictionary<Int32, String>();
         private readonly Dictionary<UInt16, Single> _queuedAt = new Dictionary<UInt16, Single>();
         private Single _nextFastForward;
-        private Boolean _eatFilterWasActive;
+        private Boolean _targetFilterWasActive;
+        private readonly Dictionary<BTL_DATA, Single> _rowExtraZ = new Dictionary<BTL_DATA, Single>();
+        private readonly Dictionary<Int32, Byte> _menuRows = new Dictionary<Int32, Byte>();
+        private Boolean _menuRowsInitialized;
+        private Boolean _frontCollapseLatched;
+        private MethodInfo _displayCharacterMethod;
         private FieldInfo _opponentIdField;
         private FieldInfo _currentCommandIdField;
         private FieldInfo _targetPanelField;
 
         public void GameLoopUpdate()
         {
-            if (!LexeditorFeatureConfig.ImprovedInterface && !LexeditorFeatureConfig.BetterEat)
+            Boolean improvedInterface = LexeditorFeatureConfig.ImprovedInterface;
+            Boolean betterEat = LexeditorFeatureConfig.BetterEat;
+            Boolean rowRework = LexeditorFeatureConfig.RowRework;
+            if (!improvedInterface && !betterEat && !rowRework)
             {
-                if (_eatFilterWasActive)
+                if (_targetFilterWasActive)
                     RestoreTargetButtons();
                 RemoveAllGlows();
+                ResetRowRework();
                 return;
             }
-            if (LexeditorFeatureConfig.ImprovedInterface)
+            if (improvedInterface)
             {
                 UpdateDialogueControls();
                 CaptureDialogueHistory();
             }
-            if (LexeditorFeatureConfig.BetterEat)
-            {
+            if (betterEat)
                 UpdateBlueMagicGlows();
-                UpdateEatTargetAvailability();
-            }
             else
-            {
-                if (_eatFilterWasActive)
-                    RestoreTargetButtons();
                 RemoveAllGlows();
-            }
+            if (betterEat || rowRework)
+                UpdateTargetAvailability();
+            else if (_targetFilterWasActive)
+                RestoreTargetButtons();
+            if (rowRework)
+                UpdateRowRework();
+            else
+                ResetRowRework();
         }
 
         private void UpdateDialogueControls()
@@ -174,12 +184,12 @@ namespace Memoria.Scripts.Lexeditor
             return quina != null && blueMagic != 0 && !ff9abil.FF9Abil_IsMaster(quina, blueMagic);
         }
 
-        private void UpdateEatTargetAvailability()
+        private void UpdateTargetAvailability()
         {
             BattleHUD hud = UIManager.Battle;
             if (hud == null || ButtonGroupState.ActiveGroup != BattleHUD.TargetGroupButton)
             {
-                if (_eatFilterWasActive)
+                if (_targetFilterWasActive)
                     RestoreTargetButtons();
                 return;
             }
@@ -190,36 +200,65 @@ namespace Memoria.Scripts.Lexeditor
             if (_currentCommandIdField == null || _targetPanelField == null)
                 return;
             BattleCommandId command = (BattleCommandId)_currentCommandIdField.GetValue(hud);
-            if (command != BattleCommandId.Eat && command != BattleCommandId.Cook)
-            {
-                if (_eatFilterWasActive)
-                    RestoreTargetButtons();
-                return;
-            }
             System.Object panel = _targetPanelField.GetValue(hud);
             Array buttons = GetEntries(panel, "Enemies");
             if (buttons == null)
                 return;
-            PLAYER quina = FindQuinaPlayer();
-            Int32 power = command == BattleCommandId.Cook ? 2 : 4;
-            Int32 enemyIndex = 0;
-            foreach (BattleUnit unit in FF9StateSystem.Battle.FF9Battle.EnumerateBattleUnits())
+
+            if (LexeditorFeatureConfig.RowRework && command == BattleCommandId.Attack)
             {
-                if (unit == null || unit.Id == 0 || !unit.IsTargetable || unit.IsPlayer)
-                    continue;
-                if (enemyIndex >= buttons.Length)
-                    break;
-                GameObject go = GetGameObject(buttons.GetValue(enemyIndex));
-                if (go != null)
-                    ButtonGroupState.SetButtonEnable(go, CanLearnFrom(unit, quina, power));
-                enemyIndex++;
+                BattleUnit caster = CurrentPlayerUnit(hud);
+                if (caster != null && caster.Row == 0 && !caster.HasLongRangeWeapon)
+                {
+                    for (Int32 i = 0; i < buttons.Length; i++)
+                    {
+                        GameObject go = GetGameObject(buttons.GetValue(i));
+                        if (go != null)
+                            ButtonGroupState.SetButtonEnable(go, false);
+                    }
+                    _targetFilterWasActive = true;
+                    return;
+                }
             }
-            _eatFilterWasActive = true;
+
+            if (LexeditorFeatureConfig.BetterEat && (command == BattleCommandId.Eat || command == BattleCommandId.Cook))
+            {
+                PLAYER quina = FindQuinaPlayer();
+                Int32 power = command == BattleCommandId.Cook ? 2 : 4;
+                Int32 enemyIndex = 0;
+                foreach (BattleUnit unit in FF9StateSystem.Battle.FF9Battle.EnumerateBattleUnits())
+                {
+                    if (unit == null || unit.Id == 0 || !unit.IsTargetable || unit.IsPlayer)
+                        continue;
+                    if (enemyIndex >= buttons.Length)
+                        break;
+                    GameObject go = GetGameObject(buttons.GetValue(enemyIndex));
+                    if (go != null)
+                        ButtonGroupState.SetButtonEnable(go, CanLearnFrom(unit, quina, power));
+                    enemyIndex++;
+                }
+                _targetFilterWasActive = true;
+                return;
+            }
+
+            if (_targetFilterWasActive)
+                RestoreTargetButtons();
+        }
+
+        private static BattleUnit CurrentPlayerUnit(BattleHUD hud)
+        {
+            if (hud == null || hud.CurrentPlayerIndex < 0 || hud.CurrentPlayerIndex > 15)
+                return null;
+            UInt16 id = (UInt16)(1 << hud.CurrentPlayerIndex);
+            foreach (BattleUnit unit in FF9StateSystem.Battle.FF9Battle.EnumerateBattleUnits())
+                if (unit != null && unit.IsPlayer && unit.Id == id)
+                    return unit;
+            return null;
         }
 
         private void RestoreTargetButtons()
         {
-            _eatFilterWasActive = false;
+            _targetFilterWasActive = false;
             BattleHUD hud = UIManager.Battle;
             if (hud == null)
                 return;
@@ -243,6 +282,185 @@ namespace Memoria.Scripts.Lexeditor
                     ButtonGroupState.SetButtonEnable(go, unit.CurrentHp > 0);
                 enemyIndex++;
             }
+        }
+
+        private void UpdateRowRework()
+        {
+            UpdateMenuFormationRule();
+            UpdateBattleRows();
+        }
+
+        private void ResetRowRework()
+        {
+            _menuRows.Clear();
+            _menuRowsInitialized = false;
+            _frontCollapseLatched = false;
+            UIManager manager = PersistenSingleton<UIManager>.Instance;
+            if (manager == null || manager.UnityScene != UIManager.Scene.Battle)
+            {
+                _rowExtraZ.Clear();
+                return;
+            }
+            List<BattleUnit> players = PlayerBattleUnits();
+            ApplyBackRowSpacing(players, false);
+        }
+
+        private void UpdateMenuFormationRule()
+        {
+            UIManager manager = PersistenSingleton<UIManager>.Instance;
+            if (manager == null || manager.State != UIManager.UIState.MainMenu)
+            {
+                _menuRows.Clear();
+                _menuRowsInitialized = false;
+                return;
+            }
+            PLAYER[] members = FF9StateSystem.Common.FF9.party.member;
+            List<PLAYER> party = new List<PLAYER>();
+            for (Int32 i = 0; i < members.Length; i++)
+                if (members[i] != null)
+                    party.Add(members[i]);
+            if (party.Count == 0)
+                return;
+
+            if (!_menuRowsInitialized)
+            {
+                _menuRowsInitialized = true;
+                if (AllPartyMembersBack(party))
+                {
+                    party[0].info.row = 1;
+                    RejectAllBackFormation(manager.MainMenuScene);
+                }
+                SnapshotMenuRows(party);
+                return;
+            }
+
+            if (AllPartyMembersBack(party))
+            {
+                PLAYER changed = null;
+                for (Int32 i = 0; i < party.Count; i++)
+                {
+                    Byte previous;
+                    Int32 key = (Int32)party[i].info.slot_no;
+                    if (_menuRows.TryGetValue(key, out previous) && previous == 1 && party[i].info.row == 0)
+                    {
+                        changed = party[i];
+                        break;
+                    }
+                }
+                (changed ?? party[0]).info.row = 1;
+                RejectAllBackFormation(manager.MainMenuScene);
+            }
+            SnapshotMenuRows(party);
+        }
+
+        private static Boolean AllPartyMembersBack(List<PLAYER> party)
+        {
+            for (Int32 i = 0; i < party.Count; i++)
+                if (party[i].info.row != 0)
+                    return false;
+            return party.Count > 0;
+        }
+
+        private void SnapshotMenuRows(List<PLAYER> party)
+        {
+            _menuRows.Clear();
+            for (Int32 i = 0; i < party.Count; i++)
+                _menuRows[(Int32)party[i].info.slot_no] = party[i].info.row;
+        }
+
+        private void RejectAllBackFormation(MainMenuUI menu)
+        {
+            FF9Sfx.FF9SFX_Play(102);
+            if (menu == null)
+                return;
+            if (_displayCharacterMethod == null)
+                _displayCharacterMethod = typeof(MainMenuUI).GetMethod("DisplayCharacter", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (_displayCharacterMethod != null)
+                _displayCharacterMethod.Invoke(menu, null);
+        }
+
+        private void UpdateBattleRows()
+        {
+            UIManager manager = PersistenSingleton<UIManager>.Instance;
+            if (manager == null || manager.UnityScene != UIManager.Scene.Battle)
+            {
+                _rowExtraZ.Clear();
+                _frontCollapseLatched = false;
+                return;
+            }
+            List<BattleUnit> players = PlayerBattleUnits();
+            Boolean anyLiving = false;
+            Boolean anyLivingFront = false;
+            for (Int32 i = 0; i < players.Count; i++)
+            {
+                BattleUnit unit = players[i];
+                if (unit.CurrentHp == 0)
+                    continue;
+                anyLiving = true;
+                if (unit.Row == 1)
+                    anyLivingFront = true;
+            }
+
+            if (anyLiving && !anyLivingFront)
+            {
+                if (!_frontCollapseLatched && UIManager.Battle != null)
+                    UIManager.Battle.SetBattleMessage("Your enemies close in!", 3);
+                for (Int32 i = 0; i < players.Count; i++)
+                {
+                    BattleUnit unit = players[i];
+                    if (unit.Row == 0)
+                        btl_para.SwitchPlayerRow(unit.Data, !btl_util.IsBtlBusy(unit.Data, btl_util.BusyMode.CASTER));
+                    if (unit.Player != null)
+                        unit.Player.info.row = 1;
+                }
+                _frontCollapseLatched = true;
+            }
+            else
+            {
+                _frontCollapseLatched = false;
+            }
+
+            ApplyBackRowSpacing(players, true);
+        }
+
+        private static List<BattleUnit> PlayerBattleUnits()
+        {
+            List<BattleUnit> players = new List<BattleUnit>();
+            foreach (BattleUnit unit in FF9StateSystem.Battle.FF9Battle.EnumerateBattleUnits())
+                if (unit != null && unit.IsPlayer && unit.Id != 0)
+                    players.Add(unit);
+            return players;
+        }
+
+        private void ApplyBackRowSpacing(List<BattleUnit> players, Boolean doubled)
+        {
+            HashSet<BTL_DATA> active = new HashSet<BTL_DATA>();
+            for (Int32 i = 0; i < players.Count; i++)
+            {
+                BattleUnit unit = players[i];
+                active.Add(unit.Data);
+                Single previous;
+                if (!_rowExtraZ.TryGetValue(unit.Data, out previous))
+                    previous = 0f;
+                Single desired = doubled && unit.Row == 0 ? -400f : 0f;
+                Single delta = desired - previous;
+                if (Mathf.Abs(delta) > 0.01f)
+                {
+                    unit.Data.base_pos[2] += delta;
+                    if (!btl_util.IsBtlBusy(unit.Data, btl_util.BusyMode.CASTER))
+                        unit.Data.pos[2] += delta;
+                }
+                if (desired == 0f)
+                    _rowExtraZ.Remove(unit.Data);
+                else
+                    _rowExtraZ[unit.Data] = desired;
+            }
+            List<BTL_DATA> stale = new List<BTL_DATA>();
+            foreach (BTL_DATA data in _rowExtraZ.Keys)
+                if (!active.Contains(data))
+                    stale.Add(data);
+            for (Int32 i = 0; i < stale.Count; i++)
+                _rowExtraZ.Remove(stale[i]);
         }
 
         private static Array GetEntries(System.Object panel, String fieldName)

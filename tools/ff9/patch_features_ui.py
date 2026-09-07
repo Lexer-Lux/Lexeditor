@@ -62,7 +62,7 @@ previous = '''function tweaks(){
     finally{state.busy=false;await render()}
   }'''
 updated = '''function tweaks(){
-    const tabs=[{id:"memoria",label:"Memoria"},{id:"improved",label:"Improved Interface"},{id:"eat",label:"Better Eat"},{id:"xp",label:"XP Bars"},{id:"hpmp",label:"HP/MP Bars"}];
+    const tabs=[{id:"memoria",label:"Memoria"},{id:"improved",label:"Improved Interface"},{id:"eat",label:"Better Eat"},{id:"xp",label:"XP Bars"},{id:"hpmp",label:"HP/MP Bars"},{id:"row",label:"Row Rework"}];
     setToolbar([subtabBar({tabs,active:state.tweak,label:"Tweaks",change:id=>{state.tweak=id;tweaks()}})]);
     if(state.tweak==="memoria"){
       $("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},"Memoria"),el("p",{},"can't be bothered to make this when the memoria guys already did this themselves. just hit play and you can edit the settings in the launcher that comes up")));
@@ -72,7 +72,8 @@ updated = '''function tweaks(){
       improved:{key:"ImprovedInterface",title:"Improved Interface",description:"Adds Circle reveal-only dialogue, Square fast-forward, snapshot-only dialogue history, full-width battle ATB/Trance with HP/MP bars, queued action drain, an unbeaten Tetra Master opponent prompt, and highlights Mognet when the current Moogle can receive one of your carried letters. Keyboard equivalents follow your normal Memoria bindings."},
       eat:{key:"BetterEat",title:"Better Eat",description:"Disables useless Eat/Cook targets, refuses to consume enemies that cannot teach Quina anything, and gives enemies carrying an unlearned Blue Magic ability a blue glow."},
       xp:{key:"XPBars",title:"XP Bars",description:"Adds an experience-progress bar under each party member's block on the post-battle EXP screen."},
-      hpmp:{key:"HPMPBars",title:"HP/MP Bars",description:"Adds a red HP bar and blue MP bar directly below each party member's HP and MP text in battle."}
+      hpmp:{key:"HPMPBars",title:"HP/MP Bars",description:"Adds a red HP bar and blue MP bar directly below each party member's HP and MP text in battle."},
+      row:{key:"RowRework",title:"Row Rework",description:"Doubles the battle distance between the front and back rows, prevents an all-back-row party formation, pulls the whole party to the front when no living front-row character remains, and prevents short-range physical melee from being used by or against back-row party members."}
     };
     const def=defs[state.tweak]||defs.improved,key=def.key,title=def.title,description=def.description;
     const enabled=!!state.features?.features?.[key],deployed=state.deployment?.deployed;

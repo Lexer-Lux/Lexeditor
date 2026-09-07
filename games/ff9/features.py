@@ -25,7 +25,7 @@ MARKER_NAME = ".lexeditor-ff9-owned"
 PROJECT_CONFIG = paths.PROJECT_ROOT / CONFIG_NAME
 RUNTIME_SOURCE = paths.PLUGIN_ROOT / "runtime" / RUNTIME_NAME
 DEPLOY_ROOT = paths.GAME_ROOT / MOD_NAME
-FEATURE_KEYS = ("ImprovedInterface", "BetterEat", "XPBars", "HPMPBars")
+FEATURE_KEYS = ("ImprovedInterface", "BetterEat", "XPBars", "HPMPBars", "RowRework")
 
 
 def _digest_bytes(data: bytes) -> str:
