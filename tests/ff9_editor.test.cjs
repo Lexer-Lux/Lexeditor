@@ -36,9 +36,16 @@ async function editor() {
         data['/api/runtime'] = {installed: true, version: 'fixture', pinned: 'v2025.07.04'};
       if (request?.method === 'POST' && path === '/api/features/save') {
         const payload=JSON.parse(request.body); data['/api/features']={features:structuredClone(payload.features),sha256:'saved'};
+        return {ok:true,json:async()=>structuredClone(data['/api/features'])};
       }
-      if (request?.method === 'POST' && path === '/api/deployment/deploy') data['/api/deployment']={deployed:true,runtimeReady:true,runtimeCurrent:true};
-      if (request?.method === 'POST' && path === '/api/deployment/revert') data['/api/deployment']={deployed:false,runtimeReady:true,runtimeCurrent:false};
+      if (request?.method === 'POST' && path === '/api/deployment/deploy') {
+        data['/api/deployment']={deployed:true,runtimeReady:true,runtimeCurrent:true};
+        return {ok:true,json:async()=>structuredClone(data['/api/deployment'])};
+      }
+      if (request?.method === 'POST' && path === '/api/deployment/revert') {
+        data['/api/deployment']={deployed:false,runtimeReady:true,runtimeCurrent:false};
+        return {ok:true,json:async()=>structuredClone(data['/api/deployment'])};
+      }
       const payload = data[path];
       return {ok: true, json: async () => structuredClone(payload || {})};
     },
