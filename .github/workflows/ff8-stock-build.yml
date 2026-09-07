@@ -9,6 +9,7 @@ on:
       - 'games/ff8/ffnx_gameplay_extensions/**'
       - 'tools/prepare_ff8_native_build.py'
       - 'tools/verify_ff8_modern_controls_binary.py'
+      - 'tools/verify_ff8_reptile_atb_binary.py'
       - '.github/workflows/ff8-stock-build.yml'
   workflow_dispatch:
 permissions:
@@ -97,6 +98,7 @@ jobs:
           python editor/tools/verify_ff8_linked_runtime.py --verifier ffnx/tools/verify_issue51_runtime_artifact.py --driver candidate/AF3DN.P
           python editor/tools/verify_ff8_no_magic_consumption.py --driver candidate/AF3DN.P
           python editor/tools/verify_ff8_modern_controls_binary.py --driver candidate/AF3DN.P
+          python editor/tools/verify_ff8_reptile_atb_binary.py --driver candidate/AF3DN.P
       - uses: actions/upload-artifact@v4
         if: success()
         with:
