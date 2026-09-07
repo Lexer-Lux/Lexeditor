@@ -26,6 +26,7 @@ jobs:
         run: |
           python tools/ff9/_tmp_data_ui_cleanup.py
           python tools/ff9/_tmp_data_ui_cleanup_followup.py
+          python tools/ff9/_tmp_data_ui_cleanup_followup2.py
       - name: Verify feature patcher idempotence
         run: |
           cp games/ff9/editor.html /tmp/editor-before
