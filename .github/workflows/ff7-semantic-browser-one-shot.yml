@@ -37,7 +37,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add tools/verify_ff7_rendered.py tools/verify_ff7_rendered_neutral.py tools/verify_ff7_ui_neutral.py
+          git add tools/verify_ff7_rendered.py tools/verify_ff7_rendered_neutral.py tools/verify_ff7_ui_neutral.py tools/verify_ff7_ui.py
           git diff --cached --check
           git commit -m 'Test the FF7 semantic editor in Chromium'
           git push origin HEAD:fix/ff7-full-semantic-editor
