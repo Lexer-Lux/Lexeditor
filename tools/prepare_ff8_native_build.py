@@ -107,6 +107,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     patch_paths = [line[6:] for line in patch.read_text(encoding="utf-8").splitlines()
                    if line.startswith("+++ b/")]
     patch_paths.extend('src/' + ('ff8/' if name.endswith('.inc') else '') + name for name in extension_files)
+    patch_paths.append('src/battle_camera.h')
     for name in patch_paths:
         relative = Path(name)
         if relative.is_absolute() or ".." in relative.parts or not (source / relative).is_file():
