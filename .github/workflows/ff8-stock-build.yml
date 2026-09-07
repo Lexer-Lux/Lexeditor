@@ -3,6 +3,11 @@ on:
   push:
     branches: [fix/ff8-backlog-runtime]
     paths: [.github/workflows/ff8-stock-build.yml]
+  pull_request:
+    paths:
+      - 'games/ff8/ffnx_modern_controls/**'
+      - 'tools/prepare_ff8_native_build.py'
+      - '.github/workflows/ff8-stock-build.yml'
   workflow_dispatch:
 permissions:
   contents: read
