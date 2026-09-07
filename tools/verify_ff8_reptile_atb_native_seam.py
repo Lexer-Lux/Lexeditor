@@ -11,6 +11,8 @@ import struct
 EXPECTED = '064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570'
 BASE = 0x400000
 DAMAGE_CALLS = (0x4850FA, 0x4851F1, 0x48EA93, 0x48F3CB, 0x48F44C)
+DAMAGE_UPDATE_CALLS = (0x485104, 0x485203, 0x48EA99, 0x48F3D5, 0x48F456)
+ATTACK_HIT_COUNT_1 = 0x1D280C1
 
 
 def at(exe: bytes, address: int, size: int) -> bytes:
@@ -43,11 +45,17 @@ def main():
     assert at(exe, 0x4843A9, 6) == bytes.fromhex('8A 8E AD 00 00 00')
     assert at(exe, 0x484460, 7) == bytes.fromhex('81 C6 D0 00 00 00 47')
 
-    # Every production Battle_applyDamage call is wrapped, while the original
-    # 48FE20 function remains intact for the wrapper to call. Its target index
-    # is converted with the same D0 actor stride.
-    for site in DAMAGE_CALLS:
-        assert call_target(exe, site) == 0x48FE20, hex(site)
+    # Every production Battle_applyDamage call is wrapped. Each path then calls
+    # Battle_UpdateDamage, which reads ATTACK_HIT_COUNT_1, increments it, and
+    # stores it back. Standard action setup explicitly resets the byte to zero.
+    # This provides an action-native multi-hit boundary with no frame heuristic.
+    for damage, update in zip(DAMAGE_CALLS, DAMAGE_UPDATE_CALLS):
+        assert call_target(exe, damage) == 0x48FE20, hex(damage)
+        assert call_target(exe, update) == 0x48EF80, hex(update)
+    assert at(exe, 0x48EF80, 6) == bytes.fromhex('8A 0D C1 80 D2 01')
+    assert at(exe, 0x48EF8F, 7) == bytes.fromhex('FE C1 8D 04 40 88 0D')
+    assert at(exe, 0x48EF96, 4) == struct.pack('<I', ATTACK_HIT_COUNT_1)
+    assert at(exe, 0x4851E4, 7) == bytes.fromhex('C6 05 C1 80 D2 01 00')
     assert at(exe, 0x48FE2A, 10) == bytes.fromhex('8D 0C 40 57 8D 14 88 C1 E2 04')
 
     # Kernel Magic's element byte is record offset 14. Native copies that byte
@@ -62,7 +70,7 @@ def main():
     assert at(exe, 0x47DA79, 17) == bytes.fromhex(
         '8A 90 14 88 D2 01 8D 04 40 D1 E0 88 96 CB 7B D2 01')
 
-    print('Reptile ATB native seam: battle reset, D0 ATB increment, all damage calls, HIT_ELEMENT and scene enemy identity passed')
+    print('Reptile ATB native seam: battle reset, D0 ATB increment, damage/update pairs, native hit counter, HIT_ELEMENT and scene enemy identity passed')
 
 
 if __name__ == '__main__':
