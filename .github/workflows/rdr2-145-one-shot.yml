@@ -75,29 +75,14 @@ jobs:
           missing = [ref for ref in refs if not any(token.upper() in present for token in ref.split())]
           if len(missing) != 48:
               raise SystemExit(f'expected 48 current residual UI_ITEMVIEWER references, found {len(missing)}')
-          multi = [ref for ref in refs if len(ref.split()) > 1]
-
-          worklog = Path('worklog/issues/github-145.md')
-          worklog.parent.mkdir(parents=True, exist_ok=True)
-          worklog.write_text(
-              '# GitHub #145 — Resolve remaining missing editor item icons\n\n'
-              '## Current evidence\n\n'
-              '- Current `master` contains all 347 local `ITEM_TEXTURES` images and **235** local `UI_ITEMVIEWER` images. The issue body\'s older 197-viewer / 86-residual count is stale.\n'
-              '- `MISSING_ICONS.txt` is a pre-import report; comparing its 283 `UI_ITEMVIEWER` reference values with the current checked-in viewer PNGs leaves exactly **48** unresolved reference values.\n'
-              '- Two catalog values contain multiple whitespace-separated texture IDs. The editor previously URL-encoded each whole value as one filename; `inventoryIconCandidates` now treats the component IDs as ordered fallbacks.\n'
-              f'- Multi-ID values: {", ".join(f"`{value}`" for value in multi)}.\n\n'
-              '## Residual UI_ITEMVIEWER reference values (48)\n\n'
-              + ''.join(f'- `{value}`\n' for value in missing)
-              + '\n## Acceptance boundary\n\n'
-              'This change repairs the resolver defect and records the exact current residual set. It does **not** claim the remaining 48 references are resolved or visually accepted. Continue by locating alternate dictionaries/aliases and repairing any decoder failures; do not request another OpenIV export.\n',
-              encoding='utf-8',
-          )
+          print('Current residual UI_ITEMVIEWER references (48):')
+          for value in missing:
+              print(value)
       - name: Static verification
         shell: bash
         run: |
           set -euo pipefail
           grep -F 'split(/\s+/)' games/rdr2/editor.html
-          grep -F 'Residual UI_ITEMVIEWER reference values (48)' worklog/issues/github-145.md
           test "$(find games/rdr2/assets/dictionary_icons/ui_itemviewer -maxdepth 1 -type f -name '*.png' | wc -l)" -eq 235
       - name: Commit repair
         shell: bash
@@ -105,7 +90,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add games/rdr2/editor.html worklog/issues/github-145.md
+          git add games/rdr2/editor.html
           git diff --cached --check
           git commit -m 'RDR2 #145: split multi-texture icon references'
           git push origin HEAD:master
