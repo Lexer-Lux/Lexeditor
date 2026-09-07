@@ -24,4 +24,4 @@ jobs:
           name: ui-visual-iteration
           path: out/ui-visual-acceptance
           if-no-files-found: warn
-          # Temporary branch-only visual loop; remove before merge. Matched-control label-fit rerun.
+          # Temporary branch-only visual loop; remove before merge. Label containment rerun.
