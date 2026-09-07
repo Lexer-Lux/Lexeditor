@@ -4620,3 +4620,41 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-settings-lane-developer>h3,.lex-developer-identity { grid-column:1 / -1; }
 .lex-developer-identity strong { letter-spacing:.06em; }
 @media (max-width:1100px) { .lex-settings-lane-developer { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); } }
+
+
+/* LEXEDITOR_UI_VISUAL_FIX_20260906 */
+/* Barrel controls sit on the divider but extend over the table pane.  The
+   divider's old z-index left the visible +/- buttons underneath table-cell
+   content, so a real pointer click hit the table instead. */
+.lex-panel-layout-divider { z-index:20; }
+.lex-panel-layout-divider > .lex-barrel-control { z-index:30; }
+.lex-barrel-control button { pointer-events:auto; }
+
+/* Boolean references deliberately sit below their checkbox.  Keep that small
+   second line inside the row's visual rhythm and do not give a one-character
+   source tag the full generic 22px reference-label column. */
+.lex-boolean-field:has(.lex-source-control > .lex-reference-values) {
+  padding-bottom:8px;
+}
+.lex-boolean-field .lex-source-control > .lex-reference-values {
+  width:max-content;
+  min-width:0;
+  transform:translateX(-50%);
+  justify-items:center;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  align-items:center;
+  justify-content:center;
+  padding-block:0;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-tag {
+  flex:0 0 auto;
+  width:auto;
+  min-width:0;
+  max-width:none;
+  margin-right:4px;
+}
+.lex-boolean-field .lex-reference-values .lex-boolean-mark {
+  align-self:center;
+  line-height:1;
+}
