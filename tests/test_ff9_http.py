@@ -159,3 +159,14 @@ def test_feature_and_deployment_routes_are_guarded_and_stateful(service):
     assert request(service, "/api/deployment/deploy")[1]["deployed"]
     assert not request(service, "/api/deployment/revert")[1]["deployed"]
     assert request(service, "/api/features/save", headers={"Origin":"https://example.invalid"})[0] == 403
+
+
+
+def test_data_map_reports_editor_integration_even_before_baseline_arrives(service, monkeypatch):
+    monkeypatch.setattr(service[0], "catalog", lambda: [{
+        "available": False, "relativePath": "StreamingAssets/Data/Items/Items.csv",
+        "controls": "Items", "label": "Items", "tab": "items", "key": "items",
+    }])
+    row = service[0].data_map()["rows"][0]
+    assert row["status"] == "integrated" and row["coverage"] == "structured"
+    assert row["openable"] is True and row["sourceAvailable"] is False

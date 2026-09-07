@@ -59,10 +59,10 @@ def data_map() -> dict:
         available = bool(row["available"])
         integrated.append({
             "filename": row["relativePath"], "controls": row["controls"],
-            "notes": f"{row['label']}. Writes a project overlay; the game baseline is never overwritten.",
-            "status": "integrated" if available else "not-integrated",
-            "coverage": "structured" if available else "unavailable",
-            "openable": available, "target": row["tab"],
+            "notes": (f"{row['label']}. Structured editor is integrated; writes a project overlay and never overwrites the game baseline."
+                      + (" Source data is available now." if available else " The local baseline is not available yet; opening the view will retry it.")),
+            "status": "integrated", "coverage": "structured",
+            "openable": True, "sourceAvailable": available, "target": row["tab"],
             "dataset": row["key"], "datasetKey": row["key"],
         })
     for row in BattleSceneStore().status_rows():
@@ -75,7 +75,7 @@ def data_map() -> dict:
     deployment = features.status()
     integrated.append({
         "filename": "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll",
-        "controls": "Improved Interface and Better Eat runtime",
+        "controls": "Lexeditor FF9 runtime tweaks",
         "notes": "Lexeditor-owned optional Memoria script runtime. Deploy Project activates the fixed Lexeditor mod folder; Memoria.ini remains otherwise untouched.",
         "status": "integrated" if deployment["runtimeReady"] else "partial",
         "openable": True, "target": "tweaks",
