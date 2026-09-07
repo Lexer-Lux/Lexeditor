@@ -1,0 +1,63 @@
+/* Approved graph design A (#299): the equation is part of the curve, not a card.
+   The HTML overlay is positioned on the real SVG path by ff8-graph-design-a.js. */
+.ff8-character-curve .lex-curve-path-formula {
+  display:none!important;
+}
+
+.ff8-character-curve .lex-curve-design-a-formula {
+  position:absolute;
+  z-index:5;
+  display:inline-flex;
+  align-items:center;
+  max-width:86%;
+  color:var(--lex-text);
+  border:0;
+  background:transparent;
+  font-family:var(--lex-font);
+  font-size:clamp(9px,.88vw,14px);
+  font-weight:700;
+  line-height:1.02;
+  text-shadow:1px 1px 2px #252525;
+  white-space:nowrap;
+  pointer-events:none;
+  transform-origin:50% 100%;
+}
+
+.ff8-character-curve .lex-curve-design-a-formula .lex-curve-math-row {
+  display:inline-flex;
+  align-items:center;
+  white-space:nowrap;
+}
+
+.ff8-character-curve .lex-curve-design-a-formula .lex-curve-math-fraction {
+  display:inline-flex;
+  flex-direction:column;
+  align-items:center;
+  margin:0 .12em;
+  line-height:.94;
+  vertical-align:middle;
+}
+.ff8-character-curve .lex-curve-design-a-formula .lex-curve-math-numerator {
+  padding:0 .13em .08em;
+  border-bottom:1px solid currentColor;
+}
+.ff8-character-curve .lex-curve-design-a-formula .lex-curve-math-denominator {
+  padding:.08em .13em 0;
+}
+.ff8-character-curve .lex-curve-design-a-formula sup {
+  position:relative;
+  top:-.18em;
+  margin-left:.03em;
+  font-size:.7em;
+  line-height:0;
+}
+
+/* Formula and end values use the same game face, weight, and unobtrusive shadow. */
+.ff8-character-curve .lex-curve-range-value {
+  fill:var(--lex-text);
+  stroke:none!important;
+  font-family:var(--lex-font);
+  font-weight:700;
+  paint-order:normal;
+  filter:drop-shadow(1px 1px 1px #252525);
+}

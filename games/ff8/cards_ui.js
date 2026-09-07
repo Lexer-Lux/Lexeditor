@@ -1,3 +1,14 @@
+/* Page-level graph treatment is isolated under /shared so the huge FF8 editor
+ * does not grow another bespoke formula renderer. This bootstrap is loaded on
+ * every FF8 editor page before any curve card is mounted. */
+(() => {
+  if (document.querySelector('script[data-lex-ff8-graph-design-a]')) return;
+  const script = document.createElement('script');
+  script.src = '/shared/ff8-graph-design-a.js';
+  script.dataset.lexFf8GraphDesignA = 'true';
+  document.head.append(script);
+})();
+
 /* Factory kept independent of the editor's page state. The host supplies its
  * existing list/detail, typed controls, provenance, and history helpers. */
 window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
