@@ -1,0 +1,69 @@
+name: One-shot FF9 UI enhancements build
+on:
+  push:
+    branches: [codex/ff9-ui-bars-mognet-20260906]
+    paths: ['.github/workflows/ff9-ui-enhancements-build.yml']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/ff9-ui-bars-mognet-20260906
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: python -m pip install pytest
+      - name: Integrate editor UI
+        run: python tools/ff9/patch_features_ui.py
+      - name: Build runtime against exact pinned Memoria
+        shell: bash
+        run: |
+          set -euo pipefail
+          PYTHONPATH=. python tools/ff9/extract_memoria_refs.py out/ff9-refs
+          mkdir -p out/packages
+          for spec in microsoft.netframework.referenceassemblies.net35:1.0.3 unityengine5:5.5.0; do
+            name=${spec%:*}; version=${spec#*:}
+            curl --fail --location --retry 2 "https://api.nuget.org/v3-flatcontainer/$name/$version/$name.$version.nupkg" -o "out/$name.nupkg"
+            unzip -q "out/$name.nupkg" -d "out/packages/$name"
+          done
+          root=$(dirname "$(readlink -f "$(command -v dotnet)")")
+          sdk=$(dotnet --list-sdks | grep '^8\.' | tail -1 | awk '{print $1}')
+          csc="$root/sdk/$sdk/Roslyn/bincore/csc.dll"
+          ref=out/packages/microsoft.netframework.referenceassemblies.net35/build/.NETFramework/v3.5
+          unity=out/packages/unityengine5/lib/net35/UnityEngine.dll
+          dotnet "$csc" -nologo -target:library -langversion:7.3 -nostdlib+ -deterministic+ \
+            -out:games/ff9/runtime/Memoria.Scripts.Lexeditor.dll \
+            -r:"$ref/mscorlib.dll" -r:"$ref/System.dll" -r:"$ref/System.Core.dll" \
+            -r:out/ff9-refs/Assembly-CSharp.dll -r:out/ff9-refs/Memoria.Prime.dll -r:"$unity" \
+            games/ff9/runtime/Bootstrap.cs games/ff9/runtime/Runtime.cs games/ff9/runtime/UIEnhancements.cs games/ff9/runtime/BetterEatScript.cs
+          strings games/ff9/runtime/Memoria.Scripts.Lexeditor.dll | grep -q LexeditorUIEnhancements
+      - name: Run FF9 regression suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q games/ff9
+          python -m pytest -q tests/test_ff9*.py
+          node --test tests/ff9_editor.test.cjs
+          python tools/ff9/patch_features_ui.py
+          git diff --exit-code -- games/ff9/editor.html
+      - name: Commit generated runtime and editor, remove one-shot probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Lexeditor FF9 UI Build'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -f .github/workflows/ff9-ui-enhancements-build.yml .github/workflows/ff9-mognet-state-probe.yml
+          git add games/ff9/editor.html games/ff9/runtime/Memoria.Scripts.Lexeditor.dll
+          git commit -m 'Build verified FF9 UI enhancements'
+          git push origin HEAD:codex/ff9-ui-bars-mognet-20260906
