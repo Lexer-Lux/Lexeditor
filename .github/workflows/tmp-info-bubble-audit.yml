@@ -1,0 +1,35 @@
+name: Temporary info bubble audit
+on:
+  push:
+    branches: [codex/global-semantic-info-bubbles-349]
+    paths: ['.github/workflows/tmp-info-bubble-audit.yml']
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit authored help
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          roots=[Path('games'),Path('ui'),Path('desktop_host.py'),Path('plugin_api.py')]
+          files=[]
+          for root in roots:
+              if root.is_file(): files.append(root)
+              elif root.exists(): files += [p for p in root.rglob('*') if p.suffix.lower() in {'.html','.js','.py','.md'}]
+          hits=[]
+          for p in files:
+              text=p.read_text('utf-8',errors='replace')
+              for i,line in enumerate(text.splitlines(),1):
+                  if 'infoHelp' in line or 'aria-description' in line or 'help:' in line or 'help =' in line or 'help=' in line:
+                      hits.append((str(p),i,line.strip()))
+          print(f'AUTHORED_HELP_HITS {len(hits)}')
+          for p,i,line in hits:
+              print(f'{p}:{i}: {line[:900]}')
+          print('--- INFOHELP CALL FILES ---')
+          for p in sorted({p for p,_,line in hits if 'infoHelp' in line}): print(p)
+          PY
