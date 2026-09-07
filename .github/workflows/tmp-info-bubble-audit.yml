@@ -10,12 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Audit authored help
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Audit authored help and FF9 schemas
         shell: bash
+        env:
+          LEXEDITOR_FF9_DATA_ROOT: ${{ runner.temp }}/ff9-data
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
           roots=[Path('games'),Path('ui'),Path('desktop_host.py'),Path('plugin_api.py')]
           files=[]
           for root in roots:
@@ -32,4 +36,18 @@ jobs:
               print(f'{p}:{i}: {line[:900]}')
           print('--- INFOHELP CALL FILES ---')
           for p in sorted({p for p,_,line in hits if 'infoHelp' in line}): print(p)
+
+          print('--- FF9 SCHEMAS ---')
+          from games.ff9 import memoria_catalog
+          memoria_catalog.install()
+          from games.ff9.memoria_csv import MemoriaDataStore, DATASETS
+          store=MemoriaDataStore()
+          for dataset in DATASETS:
+              try:
+                  loaded=store.load(dataset.key)
+              except Exception as exc:
+                  print(f'{dataset.key}: ERROR {exc}')
+                  continue
+              fields=', '.join(f"{f['key']}:{f['declaredType']}" for f in loaded['fields'])
+              print(f'{dataset.key} | {dataset.relative_path} | {fields}')
           PY
