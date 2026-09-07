@@ -43,6 +43,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     extension_files = [
         'lexeditor_ff8_shared_party.h', 'lexeditor_ff8_shared_party.inc',
         'lexeditor_ff8_stock_tweaks.h', 'lexeditor_ff8_stock_tweaks.cpp',
+        'lexeditor_ff8_gf_spellbooks.h', 'lexeditor_ff8_gf_spellbooks.cpp',
     ]
     for name in extension_files:
         destination = source / 'src' / ('ff8' if name.endswith('.inc') else '') / name
@@ -68,8 +69,8 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         ],
     }
     changes['src/ff8_opengl.cpp'] = [
-        ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_stock_tweaks.h"'),
-        ('\tlexeditor_ff8_party_switch_install();', '\tlexeditor_ff8_party_switch_install();\n\tlexeditor_ff8_stock_tweaks_install();'),
+        ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_stock_tweaks.h"\n#include "lexeditor_ff8_gf_spellbooks.h"'),
+        ('\tlexeditor_ff8_party_switch_install();', '\tlexeditor_ff8_party_switch_install();\n\tlexeditor_ff8_stock_tweaks_install();\n\tlexeditor_ff8_gf_spellbooks_install();'),
     ]
     # Stock reconciliation and actor readiness stay owned by the existing
     # Shared Magic runtime. Add the explicit DLL-caller lifecycle there.
