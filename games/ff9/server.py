@@ -71,7 +71,7 @@ def data_map() -> dict:
     launcher = paths.GAME_ROOT / "FF9_Launcher.exe"
     deployment = features.status()
     integrated.append({
-        "filename": "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.dll",
+        "filename": "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll",
         "controls": "Improved Interface and Better Eat runtime",
         "notes": "Lexeditor-owned optional Memoria script runtime. Deploy Project activates the fixed Lexeditor mod folder; Memoria.ini remains otherwise untouched.",
         "status": "integrated" if deployment["runtimeReady"] else "partial",
