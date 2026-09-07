@@ -17,8 +17,6 @@ replacement = r'''  const attachModelPreview = (panel, spec) => {
     const openLabel = typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview';
     const closeLabel = typeof spec === 'object' && spec.closeLabel ? spec.closeLabel : 'Close model preview';
 
-    // The open icon and X are two states of ONE header control. No duplicate
-    // close button exists, so the X inherits the exact same hit target/box.
     const iconContent = document.createElement('span');
     iconContent.className = 'lex-model-preview-icon-content';
     while (icon.firstChild) iconContent.append(icon.firstChild);
@@ -34,22 +32,25 @@ replacement = r'''  const attachModelPreview = (panel, spec) => {
     drawer.setAttribute('aria-label', typeof spec === 'object' && spec.label ? spec.label : 'Model preview');
     heading.after(drawer);
 
-    // Some narrow layouts re-center the Detail heading by ~2 px once the
-    // drawer becomes visible. Freeze the user's header control at its closed
-    // rendered coordinates instead of letting the replacement jump.
     let frozenSlot = null;
+    let slotLockGeneration = 0;
     const lockIconSlot = target => {
-      if (!target) return;
+      if (!target || !panel.classList.contains('lex-model-preview-open')) return;
       icon.style.translate = 'none';
       const current = icon.getBoundingClientRect();
       icon.style.translate = `${target.left - current.left}px ${target.top - current.top}px`;
     };
-    const settleIconSlot = target => {
-      lockIconSlot(target);
-      requestAnimationFrame(() => {
+    const holdIconSlot = target => {
+      const generation = ++slotLockGeneration;
+      const started = performance.now();
+      const tick = now => {
+        if (generation !== slotLockGeneration || !panel.classList.contains('lex-model-preview-open')) return;
         lockIconSlot(target);
-        requestAnimationFrame(() => lockIconSlot(target));
-      });
+        // Cover the complete 200 ms drawer animation plus delayed label/font
+        // fitting. A layout that settles late therefore cannot make the X jump.
+        if (now - started < 360) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
     };
 
     let busy = false;
@@ -64,7 +65,8 @@ replacement = r'''  const attachModelPreview = (panel, spec) => {
         }
         drawer.hidden = false;
         panel.classList.add('lex-model-preview-open');
-        settleIconSlot(frozenSlot);
+        lockIconSlot(frozenSlot);
+        holdIconSlot(frozenSlot);
         icon.setAttribute('aria-expanded', 'true');
         icon.setAttribute('aria-label', closeLabel);
         icon.title = closeLabel;
@@ -75,6 +77,7 @@ replacement = r'''  const attachModelPreview = (panel, spec) => {
       if (busy || !panel.classList.contains('lex-model-preview-open')) return;
       busy = true;
       try {
+        ++slotLockGeneration;
         await onClose?.(drawer);
         panel.classList.remove('lex-model-preview-open');
         drawer.hidden = true;
@@ -106,11 +109,10 @@ replacement = r'''  const attachModelPreview = (panel, spec) => {
     });
     window.addEventListener('resize', () => {
       if (!frozenSlot || !panel.classList.contains('lex-model-preview-open')) return;
-      // On a resize, release the old absolute target and use the new natural
-      // closed slot as the basis for the open state.
       icon.style.translate = '';
       frozenSlot = icon.getBoundingClientRect();
-      settleIconSlot(frozenSlot);
+      lockIconSlot(frozenSlot);
+      holdIconSlot(frozenSlot);
     });
     panel.lexModelPreview = {open, close: shut, drawer};
     return panel;
@@ -133,9 +135,6 @@ if marker not in css:
     css += r'''
 
 /* LEXEDITOR_MODEL_PREVIEW_SAME_SLOT_20260906 */
-/* The preview X is not a second control positioned near the icon. It is a
-   state of the standard Detail header icon itself, so both states have the
-   exact same box at every size/theme/scale. */
 .lex-model-preview-trigger { position:relative; }
 .lex-model-preview-trigger > .lex-model-preview-icon-content,
 .lex-model-preview-trigger > .lex-model-preview-close {
