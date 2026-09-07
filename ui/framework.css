@@ -4673,3 +4673,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   text-align:right;
 }
 .lex-field-type-rail { overflow:visible; }
+
+
+/* LEXEDITOR_BOOLEAN_REF_BOTTOM_MARGIN_20260906 */
+/* The ref rail is absolutely positioned so padding alone cannot keep the next
+   property from touching it. Reserve actual inter-row space after any Boolean
+   that is showing provenance. */
+.lex-boolean-field:has(.lex-source-control > .lex-reference-values) {
+  margin-bottom:8px;
+}
