@@ -1,8 +1,15 @@
 #pragma once
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace lexeditor_vehicle_drive {
+// FF8's remapped 16-bit pad mask (PSX layout as used by World_HandleInputs).
+constexpr std::uint32_t kL2 = 0x0001u;
+constexpr std::uint32_t kR2 = 0x0002u;
+constexpr std::uint32_t kTriangle = 0x0010u;
+constexpr std::uint32_t kSquare = 0x0080u;
+
 inline bool supported_state(unsigned state) {
     return state == 0x30u || state == 0x32u || state == 0x84u ||
         (state >= 0x20u && state <= 0x28u);
