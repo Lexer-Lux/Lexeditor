@@ -14,7 +14,7 @@
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
-  const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,recordId,infoHelp,pagedListDetail,provenanceControl,platformConfigView,clone,EditHistory,subtabBar,tabbedPanel,readonlyField,infoIcon,integrationStatus}=LexeditorUI;
+  const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,recordId,infoHelp,pagedListDetail,provenanceControl,platformConfigView,clone,EditHistory,subtabBar,tabbedPanel,readonlyField,infoIcon,integrationStatus,toggleRow}=LexeditorUI;
   const identity=window.__lexeditorPlugin||{id:"ff7",name:"Final Fantasy 7 (Original)",edition:"Steam"};
   const integrated=["accessories","armor","characters","items","materia","weapons","enemies","encounters","enemyAttacks","shops","prices","texts","characterNames","growthCurves","growthBonuses","characterAI","enemyAI","formationAI","recruits","defaultNames","fieldEncounters","worldEncounters","yuffieEncounters","chocoboRatings"];
   const unresolved=["tweaks"];
@@ -60,6 +60,61 @@
     return provenanceControl({control:input,current:()=>row.values[field.key],vanilla,internal:true,
       apply:value=>{if(readonly())return;row.values[field.key]=String(value);input.value=String(value);shellRefresh()}});
   }
+  function enumSummary(field,value){
+    const choice=(field.choices||[]).find(candidate=>Number(candidate.value)===Number(value));
+    if(choice)return choice.label;
+    const number=Number(value),hex=Number.isInteger(number)?`0x${number.toString(16).toUpperCase().padStart(2,"0")}`:String(value);
+    return `Unknown / modded (${hex})`;
+  }
+  function enumControl(row,field){
+    const vanilla=Number(rowById(state.tab,row.id,state.data.vanilla).values[field.key]);
+    const current=Number(row.values[field.key]),choices=[...(field.choices||[])];
+    for(const value of [current,vanilla]){
+      if(!choices.some(choice=>Number(choice.value)===value))choices.push({value,label:enumSummary(field,value)});
+    }
+    const select=el("select",{disabled:readonly(),"aria-label":`${field.label} for ${row.name}`,onchange:event=>{
+      if(readonly())return;row.values[field.key]=Number(event.target.value);shellRefresh();
+    }},...choices.map(choice=>el("option",{value:choice.value},choice.label)));
+    select.value=String(current);
+    return provenanceControl({control:select,current:()=>row.values[field.key],vanilla,internal:true,format:value=>enumSummary(field,value),
+      apply:value=>{if(readonly())return;row.values[field.key]=Number(value);select.value=String(value);shellRefresh()}});
+  }
+  function flagsSummary(field,value){
+    const number=Number(value)||0,labels=(field.flags||[]).filter(flag=>(number&Number(flag.value))!==0).map(flag=>flag.label);
+    return labels.length?labels.join(", "):"None";
+  }
+  function flagsControl(row,field){
+    const vanilla=Number(rowById(state.tab,row.id,state.data.vanilla).values[field.key]);
+    const current=()=>Number(row.values[field.key])||0;
+    const group=toggleRow({label:`${field.label} for ${row.name}`,columns:3,toggles:(field.flags||[]).map(flag=>({
+      label:flag.label,checked:(current()&Number(flag.value))!==0,disabled:readonly(),help:flag.help,change:checked=>{
+        if(readonly())return;
+        const bit=Number(flag.value),value=current();
+        row.values[field.key]=checked?(value|bit):(value&~bit);
+        shellRefresh();
+      }
+    }))});
+    return provenanceControl({control:group,current,vanilla,internal:true,format:value=>flagsSummary(field,value),
+      apply:value=>{if(readonly())return;row.values[field.key]=Number(value);render()}});
+  }
+  function semanticControl(row,field){
+    if(field.dataType==="text")return textControl(row,field);
+    if(field.dataType==="enum")return enumControl(row,field);
+    if(field.dataType==="flags")return flagsControl(row,field);
+    return numberControl(row,field);
+  }
+  function semanticHelp(field){
+    if(field.help)return field.help;
+    if(field.dataType==="text")return "English game text. Use byte escapes for control codes; unsupported characters and oversized text are refused on save.";
+    return `Stored as a bounded ${field.dataType}. Storage range: ${field.minimum} to ${field.maximum}${field.step>1?`; step ${field.step}`:""}.`;
+  }
+  function semanticType(field){
+    if(field.dataType==="text")return "TEXT";
+    if(field.dataType==="enum")return "SELECT";
+    if(field.dataType==="flags")return "FLAGS";
+    return "INT";
+  }
+
   function descriptionControl(row){
     const input=el("textarea",{rows:3,spellcheck:"false",value:row.description||"",disabled:readonly(),
       "aria-label":`Description for ${row.name}`,oninput:event=>{
@@ -75,7 +130,7 @@
     const metadata=category(),groups=[...new Set(metadata.fields.map(field=>field.group||"Kernel data"))];
     const body=[];
     if(metadata.descriptionEditable)body.push(detailSection({title:"TEXT",body:detailField({label:"DESCRIPTION",help:infoHelp("The in-game description stored in this FF7 KERNEL.BIN. Byte escapes are preserved for game control codes."),control:descriptionControl(row),dataType:"TEXT"})}));
-    body.push(...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>detailField({className:"ff7-field",label:field.label,help:infoHelp(field.dataType==="text"?"English game text; AI uses named assembly instructions and labels. Use byte escapes for control codes; unsupported characters and oversized text are refused on save.":`Stored as a bounded ${field.dataType}. Storage range: ${field.minimum} to ${field.maximum}${field.step>1?`; step ${field.step}`:""}.`),control:field.dataType==="text"?textControl(row,field):numberControl(row,field),dataType:field.dataType==="text"?"TEXT":"INT",min:field.minimum,max:field.maximum}))})));
+    body.push(...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>detailField({className:"ff7-field",label:field.label,help:infoHelp(semanticHelp(field)),control:semanticControl(row,field),dataType:semanticType(field),min:field.minimum,max:field.maximum}))})));
     return detailPanel({className:"ff7-detail",title:row.values.name||row.name,identity:recordId(row.id),meta:null,body});
   }
   function listTable(rows,selected,select){

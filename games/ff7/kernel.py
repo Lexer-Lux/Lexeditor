@@ -33,6 +33,99 @@ TEXT_COMMANDS = {
 }
 
 
+MATERIA_EQUIP_EFFECTS = (
+    (0x00, "No stat changes"),
+    (0x01, "MAG +2, SPR +1, STR -2, VIT -1, HP -5%, MP +5%"),
+    (0x02, "MAG +4, SPR +2, STR -4, VIT -2, HP -10%, MP +10%"),
+    (0x03, "DEX +2, LUCK -2"),
+    (0x04, "MAG +1, SPR +1, STR -1, VIT -1"),
+    (0x05, "STR +1, VIT +1, MAG -1, SPR -1"),
+    (0x06, "VIT +1"),
+    (0x07, "LUCK +1"),
+    (0x08, "LUCK -1"),
+    (0x09, "DEX -2"),
+    (0x0A, "DEX +2"),
+    (0x0B, "MAG +1, STR -1, HP -2%, MP +2%"),
+    (0x0C, "MAG +1, HP -2%, MP +2%"),
+    (0x0D, "MAG +1, SPR +1, HP -5%, MP +5%"),
+    (0x0E, "MAG +2, SPR +2, HP -10%, MP +10%"),
+    (0x0F, "MAG +4, SPR +4, HP -10%, MP +15%"),
+    (0x10, "MAG +8, SPR +8, HP -10%, MP +20%"),
+    (0x11, "Unused PC equip-effect slot"),
+    (0x12, "Unused PC equip-effect slot"),
+    (0x13, "Unused PC equip-effect slot"),
+    (0x14, "Unused PC equip-effect slot"),
+)
+
+MATERIA_STATUS_FLAGS = tuple((1 << index, label) for index, label in enumerate((
+    "Death", "Near Death", "Sleep", "Poison", "Sadness", "Fury", "Confusion", "Silence",
+    "Haste", "Slow", "Stop", "Frog", "Small", "Slow Numb", "Petrify", "Regen",
+    "Barrier", "Magic Barrier", "Reflect", "Dual", "Shield", "Death Sentence", "Manipulate", "Berserk",
+)))
+
+MATERIA_ELEMENTS = (
+    (0x00, "Fire"), (0x01, "Ice"), (0x02, "Lightning"), (0x03, "Earth"),
+    (0x04, "Poison"), (0x05, "Gravity"), (0x06, "Water"), (0x07, "Wind"),
+    (0x08, "Holy"), (0x09, "Restorative"), (0x0A, "Cut"), (0x0B, "Hit"),
+    (0x0C, "Punch"), (0x0D, "Shoot"), (0x0E, "Shout"), (0x0F, "Hidden"),
+    (0xFF, "None"),
+)
+
+# Canonical vanilla/Scarlet behavior bytes. Unknown or modded values remain
+# legal in the binary and are shown as an explicit preserved unknown choice.
+MATERIA_BEHAVIORS = (
+    (0x19, "Magic"),
+    (0x0A, "Master Magic"),
+    (0x3B, "Summon"),
+    (0x0C, "Master Summon"),
+    (0x16, "Command — add commands"),
+    (0x12, "Command — replace Attack"),
+    (0x33, "Command — W-Magic / W-Summon / W-Item"),
+    (0x57, "Command — Enemy Skill"),
+    (0x08, "Master Command"),
+    (0x25, "Support — counters / Elemental / Added Effect / etc."),
+    (0x35, "Support — All / Final Attack / Quadra Magic"),
+    (0x20, "Independent — stat bonus"),
+    (0x21, "Independent — pre-emptive / scaled chance"),
+    (0x41, "Independent — scaled special effect"),
+    (0x30, "Independent — Long Range"),
+    (0x34, "Independent — Mega All"),
+    (0x40, "Independent — EXP Plus"),
+    (0x00, "Independent — special function (Underwater / HP↔MP)"),
+)
+
+MATERIA_FIELD_UI = {
+    "level2Ap": {"group": "Level progression", "help": "AP required to reach Materia level 2."},
+    "level3Ap": {"group": "Level progression", "help": "AP required to reach Materia level 3."},
+    "level4Ap": {"group": "Level progression", "help": "AP required to reach Materia level 4."},
+    "level5Ap": {"group": "Level progression", "help": "AP required to reach Materia level 5."},
+    "equipEffect": {
+        "label": "Stats while equipped", "dataType": "enum", "group": "Equipped effects",
+        "choices": [{"value": value, "label": label} for value, label in MATERIA_EQUIP_EFFECTS],
+        "help": "The fixed stat modifier applied while this Materia is equipped. FF7's menu calls the SPR changes Magic Defense, but the game actually changes Spirit. Unsafe/undocumented values are not offered; an existing modded value is preserved.",
+    },
+    "statusFlags": {
+        "label": "Status effects", "dataType": "flags", "group": "Equipped effects",
+        "flags": [{"value": value, "label": label} for value, label in MATERIA_STATUS_FLAGS],
+        "help": "The 24 status bits associated with this Materia. Added Effect uses the paired Materia's statuses for weapon infliction or armor protection.",
+    },
+    "element": {
+        "label": "Element", "dataType": "enum", "group": "Equipped effects",
+        "choices": [{"value": value, "label": label} for value, label in MATERIA_ELEMENTS],
+        "help": "The element associated with this Materia, used by effects such as Elemental pairing. 'None' is stored as 0xFF.",
+    },
+    "materiaType": {
+        "label": "Materia behavior", "dataType": "enum", "group": "Materia behavior",
+        "choices": [{"value": value, "label": label} for value, label in MATERIA_BEHAVIORS],
+        "help": "How the battle engine interprets this Materia and its six behavior parameters. The stored byte combines a base type and subtype; this editor shows the known behavior instead of the byte. Changing behavior preserves the parameter bytes until their semantic editors are changed explicitly.",
+    },
+    **{f"attribute{index}": {
+        "label": f"Behavior parameter {index}", "group": "Advanced behavior data",
+        "help": "Advanced storage used differently by each Materia behavior (spell/command IDs, support effect, stat target, or per-level scaling). Kept visible for unknown/modded types; use the semantic controls above instead of changing this unless you know the selected behavior's layout.",
+    } for index in range(1, 7)},
+}
+
+
 @dataclass(frozen=True)
 class Field:
     key: str
@@ -356,12 +449,19 @@ def resolve_kernel(game_root: Path) -> tuple[Path, Path]:
 
 
 def category_metadata() -> list[dict[str, Any]]:
-    return [{
-        "id": category.key,
-        "label": category.label,
-        "descriptionEditable": True,
-        "fields": [{
-            "key": field.key, "label": field.label, "dataType": "int",
-            "minimum": field.minimum, "maximum": field.maximum, "step": field.scale,
-        } for field in category.fields],
-    } for category in CATEGORIES.values()]
+    result = []
+    for category in CATEGORIES.values():
+        fields = []
+        for field in category.fields:
+            metadata = {
+                "key": field.key, "label": field.label, "dataType": "int",
+                "minimum": field.minimum, "maximum": field.maximum, "step": field.scale,
+            }
+            if category.key == "materia":
+                metadata.update(MATERIA_FIELD_UI.get(field.key, {}))
+            fields.append(metadata)
+        result.append({
+            "id": category.key, "label": category.label,
+            "descriptionEditable": True, "fields": fields,
+        })
+    return result
