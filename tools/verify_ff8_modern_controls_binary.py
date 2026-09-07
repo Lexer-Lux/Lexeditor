@@ -1,8 +1,8 @@
-"""Verify that the packaged PE32 FFNx driver contains Modern Controls #330.
+"""Verify packaged PE32 FFNx contains Modern Controls camera/vehicle runtime.
 
 This is deliberately an artifact test: source-only presence is insufficient for
-native features. It verifies the x86 image architecture plus the executable seam
-and native state addresses consumed by the compiled battle-camera hook.
+native features. It verifies the x86 image architecture plus the executable
+state addresses consumed by the compiled battle-camera and vehicle-input logic.
 """
 from __future__ import annotations
 import argparse
@@ -18,10 +18,13 @@ ADDRESSES = {
     'live camera position': 0x00B8B7F0,
     'idle camera position': 0x00B8B800,
     'idle camera look-at': 0x00B8B808,
+    'world input states': 0x0203FDE8,
+    'world input parity': 0x020409BC,
+    'world vehicle state': 0x020409E0,
 }
 STRINGS = (
     b'unsupported battle-camera call site',
-    b'analog camera update installed (world=%u battle=%u)',
+    b'analog camera/vehicle update installed (world=%u battle=%u)',
 )
 
 
@@ -35,7 +38,7 @@ def run(driver: Path) -> None:
         assert encoded in image, f'Shipped driver does not reference {label} ({address:#x})'
     for marker in STRINGS:
         assert marker in image, f'Shipped driver is missing Modern Controls diagnostic: {marker!r}'
-    print('PASS: shipped PE32 driver contains the #330 hook site, native camera ownership/pose addresses, and battle-camera diagnostics.')
+    print('PASS: shipped PE32 driver contains #330 battle camera plus #327 world vehicle input state and diagnostics.')
 
 
 if __name__ == '__main__':
