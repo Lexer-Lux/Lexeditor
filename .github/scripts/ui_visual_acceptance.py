@@ -168,9 +168,11 @@ with sync_playwright() as p:
             drawer = page.locator('.lex-model-preview-drawer').first
             close = page.locator('.lex-model-preview-close').first
             assert drawer.is_visible(), (width, 'shared model preview did not open')
-            close_box = close.bounding_box()
-            assert max(abs(icon_box[k] - close_box[k]) for k in ('x','y','width','height')) <= 1.5, (width, 'model preview X is not in the header-icon slot', icon_box, close_box)
-            close.click(); page.wait_for_timeout(80)
+            assert close.is_visible(), (width, 'model preview X is not visible')
+            open_icon_box = icon.bounding_box()
+            assert max(abs(icon_box[k] - open_icon_box[k]) for k in ('x','y','width','height')) <= 0.5, (width, 'model preview changed the header-icon control slot', icon_box, open_icon_box)
+            assert icon.get_attribute('aria-label') == 'Close model preview', (width, 'header icon did not become the close control')
+            icon.click(); page.wait_for_timeout(80)
             assert not drawer.is_visible(), (width, 'shared model preview did not close')
 
             # Standard 2-panel table. Pinning Enabled must work without moving
