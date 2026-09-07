@@ -95,6 +95,7 @@
       state.dashboard.runtime=await api("/api/runtime");
       state.dataMap=await api("/api/datamap");
       state.deployment=await api("/api/deployment");
+      state.deployment=await api("/api/deployment");
     })();
     try{await runtimeRefresh}finally{runtimeRefresh=null}
   }
