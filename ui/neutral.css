@@ -1,0 +1,87 @@
+/*
+ * Canonical unthemed Lexeditor presentation.
+ *
+ * Blank is the visual reference for this stylesheet. Games that intentionally
+ * use the Blank UI load this file and add `lex-neutral-ui` to <body>; they do
+ * not restyle shared controls in their own editor page.
+ */
+
+body.lex-neutral-ui {
+  --lex-accent:#72ff1e;
+  --lex-accent-text:#102008;
+  --lex-highlight:#405247;
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+  margin:0;
+  overflow:hidden;
+  color:var(--lex-text);
+  background:var(--lex-bg);
+  font:15px/1.35 var(--lex-font);
+}
+
+body.lex-neutral-ui,
+body.lex-neutral-ui * { box-sizing:border-box; }
+
+.lex-neutral-ui .lex-shell-command-row { background:#fff; }
+.lex-neutral-ui .lex-nav-frame,
+.lex-neutral-ui .lex-shell-header nav { background:#e5e9ed; }
+.lex-neutral-ui > main { flex:1;min-height:0;padding:var(--lex-panel-gap); }
+
+.lex-neutral-ui .lex-panel-layout,
+.lex-neutral-ui .lex-paged-list-detail { height:100%; }
+.lex-neutral-ui .lex-detail-panel,
+.lex-neutral-ui .lex-column-list { height:100%;min-height:0; }
+.lex-neutral-ui .lex-detail-panel { overflow:visible; }
+
+.lex-neutral-ui .lex-detail-panel-heading {
+  padding:4px 18px 4px 4px;
+  border-bottom:1px solid var(--lex-border);
+  background:#f1f3f5;
+}
+.lex-neutral-ui .lex-detail-panel-icon {
+  display:grid;
+  width:auto;
+  height:100%;
+  aspect-ratio:1;
+  place-items:center;
+  color:var(--lex-accent);
+  border:1px solid var(--lex-border);
+  background:#fff;
+}
+.lex-neutral-ui .lex-detail-panel-icon svg {
+  width:64%;
+  height:64%;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.7;
+}
+
+.lex-neutral-ui .lex-detail-panel .lex-column-pin {
+  width:1em;
+  min-width:1em;
+  height:1em;
+  min-height:1em;
+  flex-basis:1em;
+}
+.lex-neutral-ui .lex-detail-panel .lex-column-pin > svg { width:.95em;height:.95em; }
+.lex-neutral-ui .lex-detail-panel .lex-source-control-internal:not(:has(>select)) > :is(.lex-reference-values,.lex-reference-placeholder) { right:.35em; }
+.lex-neutral-ui .lex-detail-panel .lex-reference-tag { margin-right:.08em; }
+.lex-neutral-ui .lex-detail-panel-body { padding:10px;gap:10px; }
+.lex-neutral-ui .lex-detail-section { flex:1 1 auto; }
+
+.lex-neutral-ui .lex-tabbed-panel {
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  min-height:0;
+  border:1px solid var(--lex-border);
+  background:var(--lex-panel);
+}
+.lex-neutral-ui .lex-tabbed-panel > .lex-tabbed-panel-content { padding:12px; }
+
+.lex-neutral-ui .lex-column-list .lex-boolean-mark {
+  display:block;
+  font-size:1.45em;
+  text-align:center;
+}
