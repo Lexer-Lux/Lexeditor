@@ -4658,3 +4658,18 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   align-self:center;
   line-height:1;
 }
+
+
+/* LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906 */
+/* Property names own exactly ten percent of an ordinary Detail row.  The text
+   sits against the value side of that lane; the shared type/help rail occupies
+   the metadata space to its left and is positioned by framework.js from the
+   actually rendered text width. */
+.lex-detail-field:not(.lex-boolean-field) {
+  grid-template-columns:10% minmax(0,1fr) !important;
+}
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label {
+  justify-content:flex-end;
+  text-align:right;
+}
+.lex-field-type-rail { overflow:visible; }
