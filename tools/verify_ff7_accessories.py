@@ -63,5 +63,7 @@ class AccessoryDescriptionTests(unittest.TestCase):
         self.assertEqual(self.source.read_bytes(), self.original_source)
 
 
+from verify_ff7_materia_semantics import MateriaSemanticTests
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -43,7 +43,40 @@ def test_accessory_description_is_editable_game_text(self):
     self.originals_unchanged()
 
 
+
+def test_materia_uses_human_semantic_controls(self):
+    self.install()
+    self.open()
+    self.navigate("materia")
+
+    equip = self.page.get_by_label("Stats while equipped for Record0", exact=True)
+    behavior = self.page.get_by_label("Materia behavior for Record0", exact=True)
+    element = self.page.get_by_label("Element for Record0", exact=True)
+    statuses = self.page.get_by_role("group", name="Status effects for Record0", exact=True)
+    self.assertEqual(equip.evaluate("e=>e.tagName"), "SELECT")
+    self.assertEqual(behavior.evaluate("e=>e.tagName"), "SELECT")
+    self.assertEqual(element.evaluate("e=>e.tagName"), "SELECT")
+    self.assertEqual(statuses.locator('input[type="checkbox"]').count(), 24)
+    self.assertEqual(self.page.get_by_label("Status flags for Record0", exact=True).count(), 0)
+    self.assertEqual(self.page.get_by_label("Materia type byte for Record0", exact=True).count(), 0)
+
+    equip.select_option("6")
+    behavior.select_option(str(0x19))
+    element.select_option("2")
+    self.page.get_by_label("Poison", exact=True).check()
+    self.save()
+
+    status, data = self.backend.request("/api/data")
+    self.assertEqual(status, 200)
+    values = data["records"]["materia"][0]["values"]
+    self.assertEqual(values["equipEffect"], 6)
+    self.assertEqual(values["materiaType"], 0x19)
+    self.assertEqual(values["element"], 2)
+    self.assertEqual(values["statusFlags"], 1 << 3)
+    self.originals_unchanged()
+
 target.RenderedTests.open = open_with_neutral
+target.RenderedTests.test_materia_uses_human_semantic_controls = test_materia_uses_human_semantic_controls
 target.RenderedTests.test_accessory_description_is_editable_game_text = test_accessory_description_is_editable_game_text
 
 if __name__ == "__main__":
