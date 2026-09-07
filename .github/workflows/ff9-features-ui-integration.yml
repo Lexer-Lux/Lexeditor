@@ -1,0 +1,48 @@
+name: One-shot FF9 feature UI integration
+on:
+  push:
+    branches: [codex/ff9-complete-20260906]
+    paths: ['.github/workflows/ff9-features-ui-integration.yml']
+permissions:
+  contents: write
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/ff9-complete-20260906
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply feature UI patch
+        run: python tools/ff9/patch_features_ui.py
+      - name: Verify controller and backend syntax
+        run: |
+          python -m pip install pytest
+          python -m compileall -q games/ff9
+          python -m pytest -q tests/test_ff9_features.py tests/test_ff9_http.py tests/test_ff9_battle_scene.py
+          node --check <(python - <<'PY'
+          from pathlib import Path
+          import re
+          text=Path('games/ff9/editor.html').read_text(encoding='utf-8')
+          match=re.search(r'<script>\s*"use strict";([\s\S]*?)</script>',text)
+          print('"use strict";'+match.group(1))
+          PY
+          )
+          node --test tests/ff9_editor.test.cjs
+      - name: Commit integrated UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Lexeditor FF9 Agent'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add games/ff9/editor.html
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Add FF9 Improved Interface and Better Eat controls'
+          git push origin HEAD:codex/ff9-complete-20260906
