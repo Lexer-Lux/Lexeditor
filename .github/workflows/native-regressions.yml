@@ -60,7 +60,17 @@ jobs:
         run: python tools/verify_ff8_ui_battle_regressions.py --browser ''
       - name: Preserve compact Enemy editor UI
         working-directory: editor
-        run: python tools/verify_ff8_enemy_compact_ui.py --browser ''
+        run: |
+          set -o pipefail
+          python tools/verify_ff8_enemy_compact_ui.py --browser '' 2>&1 | tee ff8-enemy-ui.log
+      - name: Upload compact Enemy editor diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff8-enemy-ui-log
+          path: editor/ff8-enemy-ui.log
+          if-no-files-found: error
+          retention-days: 3
       - name: Preserve FF8 card artwork decoding and route
         working-directory: editor
         run: python tools/verify_ff8_card_art.py
