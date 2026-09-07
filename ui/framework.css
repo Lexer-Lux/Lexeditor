@@ -4701,3 +4701,36 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   min-height:0;
   background:var(--lex-panel);
 }
+
+
+/* LEXEDITOR_MODEL_PREVIEW_SAME_SLOT_20260906 */
+/* The preview X is not a second control positioned near the icon. It is a
+   state of the standard Detail header icon itself, so both states have the
+   exact same box at every size/theme/scale. */
+.lex-model-preview-trigger { position:relative; }
+.lex-model-preview-trigger > .lex-model-preview-icon-content,
+.lex-model-preview-trigger > .lex-model-preview-close {
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  margin:0 !important;
+  transform:none !important;
+  place-items:center;
+}
+.lex-model-preview-trigger > .lex-model-preview-icon-content { display:grid; }
+.lex-model-preview-trigger > .lex-model-preview-close {
+  display:none;
+  box-sizing:border-box;
+  padding:0;
+  color:inherit;
+  background:transparent;
+  font:700 1.6em/1 var(--lex-symbol-font);
+  pointer-events:none;
+}
+.lex-model-preview-open > .lex-detail-panel-heading .lex-detail-panel-icon {
+  visibility:visible !important;
+  pointer-events:auto !important;
+}
+.lex-model-preview-open > .lex-detail-panel-heading .lex-model-preview-icon-content { display:none; }
+.lex-model-preview-open > .lex-detail-panel-heading .lex-model-preview-close { display:grid; }

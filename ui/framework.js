@@ -5765,75 +5765,74 @@
     const getContent = typeof spec === 'function' ? spec : () => spec.content;
     const onOpen = typeof spec === 'object' ? spec.onOpen : null;
     const onClose = typeof spec === 'object' ? spec.onClose : null;
+    const openLabel = typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview';
+    const closeLabel = typeof spec === 'object' && spec.closeLabel ? spec.closeLabel : 'Close model preview';
+
+    // Keep the SAME header icon element as the control in both states. This
+    // makes the X occupy the exact same rendered box by construction instead
+    // of trying to chase the icon with a separately positioned button.
+    const iconContent = document.createElement('span');
+    iconContent.className = 'lex-model-preview-icon-content';
+    while (icon.firstChild) iconContent.append(icon.firstChild);
+    const closeMark = document.createElement('span');
+    closeMark.className = 'lex-model-preview-close';
+    closeMark.setAttribute('aria-hidden', 'true');
+    closeMark.textContent = '×';
+    icon.append(iconContent, closeMark);
+
     const drawer = document.createElement('section');
     drawer.className = 'lex-model-preview-drawer';
     drawer.hidden = true;
     drawer.setAttribute('aria-label', typeof spec === 'object' && spec.label ? spec.label : 'Model preview');
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'lex-model-preview-close';
-    close.textContent = '×';
-    close.title = 'Close model preview';
-    close.setAttribute('aria-label', close.title);
-    heading.style.position = 'relative';
-    heading.append(close);
     heading.after(drawer);
-    const syncCloseSlot = targetBox => {
-      const iconBox = targetBox || icon.getBoundingClientRect();
-      close.style.transform = 'none';
-      close.style.left = `${icon.offsetLeft}px`;
-      close.style.top = `${icon.offsetTop}px`;
-      close.style.width = `${iconBox.width}px`;
-      close.style.height = `${iconBox.height}px`;
-      const closeBox = close.getBoundingClientRect();
-      if (closeBox.width && closeBox.height) {
-        close.style.transform = `translate(${iconBox.left - closeBox.left}px, ${iconBox.top - closeBox.top}px)`;
-      }
-    };
-    const settleCloseSlot = targetBox => {
-      syncCloseSlot(targetBox);
-      requestAnimationFrame(() => {
-        syncCloseSlot(targetBox);
-        requestAnimationFrame(() => syncCloseSlot(targetBox));
-      });
-    };
+
+    let busy = false;
     const open = async () => {
-      // Capture the slot while the ordinary header icon is still visible. The
-      // close control replaces THAT exact box even if opening the drawer causes
-      // a plugin theme to restyle or realign the hidden icon afterward.
-      const closedIconBox = icon.getBoundingClientRect();
-      if (!drawer.childNodes.length) {
-        const content = await getContent?.();
-        if (content instanceof Node) drawer.append(content);
-      }
-      drawer.hidden = false;
-      panel.classList.add('lex-model-preview-open');
-      settleCloseSlot(closedIconBox);
-      icon.setAttribute('aria-expanded', 'true');
-      await onOpen?.(drawer);
+      if (busy || panel.classList.contains('lex-model-preview-open')) return;
+      busy = true;
+      try {
+        if (!drawer.childNodes.length) {
+          const content = await getContent?.();
+          if (content instanceof Node) drawer.append(content);
+        }
+        drawer.hidden = false;
+        panel.classList.add('lex-model-preview-open');
+        icon.setAttribute('aria-expanded', 'true');
+        icon.setAttribute('aria-label', closeLabel);
+        icon.title = closeLabel;
+        await onOpen?.(drawer);
+      } finally { busy = false; }
     };
     const shut = async () => {
-      await onClose?.(drawer);
-      panel.classList.remove('lex-model-preview-open');
-      drawer.hidden = true;
-      icon.setAttribute('aria-expanded', 'false');
+      if (busy || !panel.classList.contains('lex-model-preview-open')) return;
+      busy = true;
+      try {
+        await onClose?.(drawer);
+        panel.classList.remove('lex-model-preview-open');
+        drawer.hidden = true;
+        icon.setAttribute('aria-expanded', 'false');
+        icon.setAttribute('aria-label', openLabel);
+        icon.title = openLabel;
+      } finally { busy = false; }
     };
+    const toggle = () => panel.classList.contains('lex-model-preview-open') ? shut() : open();
+
     icon.classList.add('lex-model-preview-trigger');
     icon.tabIndex = 0;
     icon.setAttribute('role', 'button');
-    icon.setAttribute('aria-label', typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview');
+    icon.setAttribute('aria-label', openLabel);
     icon.setAttribute('aria-expanded', 'false');
-    icon.addEventListener('click', open);
+    icon.title = openLabel;
+    icon.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggle();
+    });
     icon.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
-        open();
+        toggle();
       }
-    });
-    close.addEventListener('click', event => {
-      event.preventDefault();
-      event.stopPropagation();
-      shut();
     });
     panel.lexModelPreview = {open, close: shut, drawer};
     return panel;
