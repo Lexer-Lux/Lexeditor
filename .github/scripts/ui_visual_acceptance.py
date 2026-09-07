@@ -324,8 +324,16 @@ with sync_playwright() as p:
             simple_heights = [page.locator('.lex-detail-field').nth(i).bounding_box()['height'] for i in range(4)]
             assert max(simple_heights) - min(simple_heights) <= 2, (width, 'property-name fitting changed simple row heights', simple_heights)
 
+            # set_content() runs the fixture at about:blank with a fake <base>.
+            # The app's final history.replaceState therefore raises one expected
+            # null-origin security error that cannot occur in the real HTTP/WebView
+            # host. Keep every other page error fatal.
+            real_errors = [error for error in errors if not (
+                "Failed to execute 'replaceState' on 'History'" in error and
+                "origin 'null'" in error
+            )]
             results[prefix] = {
-                "errors": errors,
+                "errors": real_errors,
                 "booleanToggled": [before, after],
                 "booleanRef": bool_ref,
                 "barrelHeights": [round(height_one, 2), round(height_two, 2), round(height_back, 2)],
@@ -335,7 +343,7 @@ with sync_playwright() as p:
                 "graphTitle": {"text": title_text, **title_style},
                 "tabCount": tab_buttons.count(),
             }
-            assert not errors, (width, errors)
+            assert not real_errors, (width, real_errors)
             page.close()
     finally:
         browser.close()
