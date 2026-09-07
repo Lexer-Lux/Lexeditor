@@ -16,11 +16,13 @@ jobs:
           ref: fix/ui-visual-acceptance-20260906
           fetch-depth: 0
       - name: Apply targeted fixes
-        run: python .github/scripts/ui_visual_fix.py
+        run: |
+          python .github/scripts/ui_visual_fix.py
+          python .github/scripts/ui_acceptance_relative_patch.py
       - name: Validate syntax and old editable-table removal
         run: |
           node --check ui/framework.js
-          python -m py_compile .github/scripts/ui_visual_fix.py .github/scripts/ui_visual_acceptance.py
+          python -m py_compile .github/scripts/ui_visual_fix.py .github/scripts/ui_acceptance_relative_patch.py .github/scripts/ui_visual_acceptance.py
           ! grep -q 'function editableTablePanel' games/blank/editor.html
           ! grep -q 'blank-editable-table' games/blank/editor.html
       - name: Commit targeted fixes
