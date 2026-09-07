@@ -1,13 +1,16 @@
 #include "lexeditor_ff8_modern_controls.h"
 #include "camera_axis.h"
 #include "battle_camera.h"
+#include "vehicle_drive.h"
 #include <cstring>
 #include "cfg.h"
 #include "common.h"
 #include "ff8.h"
+#include "gamepad.h"
 #include "globals.h"
 #include "log.h"
 #include "patch.h"
+#include "sdl_gamepad.h"
 
 extern int right_stick_x;
 extern int right_stick_y;
@@ -26,6 +29,17 @@ std::uint32_t last_frame = ~0u;
 int last_axis = -1;
 std::uint32_t last_log = 0;
 std::uint32_t last_state[3] = {~0u, ~0u, ~0u};
+std::uint32_t last_world_input_frame = ~0u;
+bool world_square_down = false;
+bool world_square_pressed = false;
+
+constexpr std::uintptr_t kWorldInputStates = 0x0203FDE8;
+constexpr std::uintptr_t kWorldInputParity = 0x020409BC;
+constexpr std::uintptr_t kWorldVehicle = 0x020409E0;
+constexpr std::uint32_t kTriangle = 0x10u;
+constexpr std::uint32_t kSquare = 0x80u;
+constexpr std::uint32_t kL2 = 0x100u;
+constexpr std::uint32_t kR2 = 0x200u;
 
 constexpr std::uintptr_t kBattleCameraCall = 0x00500988;
 constexpr std::uintptr_t kBattleCameraUpdate = 0x00504060;
@@ -44,6 +58,34 @@ lexeditor_battle_camera::Vec3s read_vec(std::uintptr_t address) {
 
 void write_vec(std::uintptr_t address, const lexeditor_battle_camera::Vec3s &value) {
     std::memcpy(reinterpret_cast<void *>(address), &value, sizeof value);
+}
+
+void reset_world_input_state() {
+    last_world_input_frame = ~0u;
+    world_square_down = false;
+    world_square_pressed = false;
+}
+
+std::uint32_t capture_world_input(bool suppress_legacy_drive) {
+    const int parity = *reinterpret_cast<const std::int16_t *>(kWorldInputParity);
+    if (parity < 0 || parity > 1) return 0;
+    auto *states = reinterpret_cast<std::uint32_t *>(kWorldInputStates);
+    const std::uint32_t keys = states[parity];
+    if (last_world_input_frame != frame_counter) {
+        const bool square = (keys & kSquare) != 0;
+        world_square_pressed = square && !world_square_down;
+        world_square_down = square;
+        last_world_input_frame = frame_counter;
+    }
+    if (suppress_legacy_drive)
+        states[parity] &= ~(kTriangle | kSquare);
+    return keys;
+}
+
+int vehicle_drive_axis(std::uint32_t keys) {
+    const float left = use_sdl_gamepad ? sdlgamepad.leftTrigger : gamepad.leftTrigger;
+    const float right = use_sdl_gamepad ? sdlgamepad.rightTrigger : gamepad.rightTrigger;
+    return lexeditor_vehicle_drive::axis(left, right, (keys & kL2) != 0, (keys & kR2) != 0);
 }
 
 std::uint32_t update(unsigned site, void *movement, void *input, void *player, void *camera) {
@@ -119,7 +161,12 @@ void __cdecl update_battle_camera() {
 bool lexeditor_ff8_modern_controls_world_active() {
     const auto *mode = getmode_cached();
     const bool active = world_installed && enable_ff8_modern_controls && mode && mode->driver_mode == MODE_WORLDMAP;
-    if (!active) { manual.reset(); manual_pitch.reset(); last_frame = ~0u; }
+    if (!active) {
+        manual.reset();
+        manual_pitch.reset();
+        last_frame = ~0u;
+        reset_world_input_state();
+    }
     return active;
 }
 
@@ -128,10 +175,25 @@ bool lexeditor_ff8_modern_controls_battle_active() {
     return battle_installed && enable_ff8_modern_controls && mode && mode->driver_mode == MODE_BATTLE;
 }
 
+bool lexeditor_ff8_modern_controls_take_square_press() {
+    const bool pressed = world_square_pressed;
+    world_square_pressed = false;
+    return pressed;
+}
+
 int lexeditor_ff8_modern_world_axis(std::int8_t port, int type, std::int8_t offset) {
     // The native right-stick fields mean movement/zoom in some camera modes.
-    // The original callbacks stay unchanged outside the world-map call sites.
-    if (lexeditor_ff8_modern_controls_world_active() && (type == 0 || type == 1)) return 128;
+    // Under Modern Controls they are camera-owned, except vehicle rY: cars,
+    // Garden and Ragnarok now use RT/LT proportionally with R2/L2 logical-key
+    // fallbacks. Capture Square before clearing its legacy reverse-drive role so
+    // the Flare shortcut can consume that edge separately.
+    if (lexeditor_ff8_modern_controls_world_active() && (type == 0 || type == 1)) {
+        const unsigned vehicle = *reinterpret_cast<const std::uint32_t *>(kWorldVehicle);
+        const bool drive = lexeditor_vehicle_drive::supported_state(vehicle);
+        const auto keys = capture_world_input(drive);
+        if (type == 1 && drive) return vehicle_drive_axis(keys);
+        return 128;
+    }
     return ff8_get_analog_value(port, type, offset);
 }
 
@@ -160,7 +222,7 @@ void lexeditor_ff8_modern_controls_install() {
     }
 
     if (world_installed || battle_installed) {
-        ffnx_info("Lexeditor Modern Controls: analog camera update installed (world=%u battle=%u).\n",
+        ffnx_info("Lexeditor Modern Controls: analog camera/vehicle update installed (world=%u battle=%u).\n",
             world_installed, battle_installed);
     }
 }
