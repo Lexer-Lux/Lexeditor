@@ -31,7 +31,7 @@ def env(tmp_path, monkeypatch):
 def test_feature_save_is_stale_safe(env):
     _, project, _ = env
     first = features.load(project)
-    expected = {"ImprovedInterface": True, "BetterEat": True, "XPBars": True, "HPMPBars": True}
+    expected = {"ImprovedInterface": True, "BetterEat": True, "XPBars": True, "HPMPBars": True, "RowRework": True}
     saved = features.save(expected, first["sha256"], project)
     assert saved["features"] == expected
     with pytest.raises(RuntimeError):
@@ -40,7 +40,7 @@ def test_feature_save_is_stale_safe(env):
 
 def test_deploy_preserves_ini_and_activates_first(env):
     game, project, runtime = env
-    features.save({"ImprovedInterface": True, "BetterEat": True, "XPBars": True, "HPMPBars": True}, "", project)
+    features.save({"ImprovedInterface": True, "BetterEat": True, "XPBars": True, "HPMPBars": True, "RowRework": True}, "", project)
     state = features.deploy(game, project, runtime)
     assert state["deployed"] and state["runtimeCurrent"]
     ini = (game / "Memoria.ini").read_bytes()
@@ -49,7 +49,7 @@ def test_deploy_preserves_ini_and_activates_first(env):
     assert (game / "Lexeditor/StreamingAssets/Data/Items/Items.csv").read_bytes() == b"data"
     assert (game / "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll").read_bytes() == runtime.read_bytes()
     config = (game / "Lexeditor/lexeditor-ff9.ini").read_text()
-    assert "XPBars = 1" in config and "HPMPBars = 1" in config
+    assert "XPBars = 1" in config and "HPMPBars = 1" in config and "RowRework = 1" in config
     state = features.revert(game, project, runtime)
     assert not state["deployed"]
     assert b'FolderNames = "OtherMod"' in (game / "Memoria.ini").read_bytes()

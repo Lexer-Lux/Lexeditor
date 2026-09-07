@@ -88,6 +88,7 @@ namespace Memoria.Scripts.Lexeditor
         private static Boolean _betterEat;
         private static Boolean _xpBars;
         private static Boolean _hpmpBars;
+        private static Boolean _rowRework;
 
         public static Boolean ImprovedInterface
         {
@@ -109,6 +110,11 @@ namespace Memoria.Scripts.Lexeditor
             get { Refresh(); return _hpmpBars; }
         }
 
+        public static Boolean RowRework
+        {
+            get { Refresh(); return _rowRework; }
+        }
+
         private static void Refresh()
         {
             if (Time.realtimeSinceStartup < _nextPoll)
@@ -127,6 +133,7 @@ namespace Memoria.Scripts.Lexeditor
                     _betterEat = false;
                     _xpBars = false;
                     _hpmpBars = false;
+                    _rowRework = false;
                     return;
                 }
                 DateTime stamp = File.GetLastWriteTimeUtc(_path);
@@ -137,6 +144,7 @@ namespace Memoria.Scripts.Lexeditor
                 Boolean eat = false;
                 Boolean xpBars = false;
                 Boolean hpmpBars = false;
+                Boolean rowRework = false;
                 foreach (String sourceLine in File.ReadAllLines(_path))
                 {
                     String line = sourceLine.Trim();
@@ -156,11 +164,14 @@ namespace Memoria.Scripts.Lexeditor
                         xpBars = enabled;
                     else if (key.Equals("HPMPBars", StringComparison.OrdinalIgnoreCase))
                         hpmpBars = enabled;
+                    else if (key.Equals("RowRework", StringComparison.OrdinalIgnoreCase))
+                        rowRework = enabled;
                 }
                 _improvedInterface = improved;
                 _betterEat = eat;
                 _xpBars = xpBars;
                 _hpmpBars = hpmpBars;
+                _rowRework = rowRework;
             }
             catch (Exception ex)
             {
@@ -169,6 +180,7 @@ namespace Memoria.Scripts.Lexeditor
                 _betterEat = false;
                 _xpBars = false;
                 _hpmpBars = false;
+                _rowRework = false;
             }
         }
     }

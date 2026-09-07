@@ -73,13 +73,31 @@ def test_bootstrap_defers_unity_work_to_game_loop_update():
     assert "LexeditorUIEnhancements" in update
 
 
-def test_feature_config_has_independent_xp_and_hpmp_toggles():
+def test_feature_config_has_independent_xp_hpmp_and_row_toggles():
     text = source("Bootstrap.cs")
     assert "public static Boolean XPBars" in text
     assert "public static Boolean HPMPBars" in text
     assert 'key.Equals("XPBars"' in text
     assert 'key.Equals("HPMPBars"' in text
+    assert "public static Boolean RowRework" in text
+    assert 'key.Equals("RowRework"' in text
 
+
+
+def test_row_rework_uses_memoria_row_and_melee_contracts():
+    runtime = source("Runtime.cs")
+    script = source("RowReworkScript.cs")
+    assert 'SetBattleMessage("Your enemies close in!", 3)' in runtime
+    assert "AllPartyMembersBack" in runtime and "RejectAllBackFormation" in runtime
+    assert "desired = doubled && unit.Row == 0 ? -400f : 0f" in runtime
+    assert "btl_para.SwitchPlayerRow" in runtime
+    assert "BattleCommandId.Attack" in runtime and "!caster.HasLongRangeWeapon" in runtime
+    assert "IOverloadOnBattleScriptStartScript" in script
+    assert "v.Command.IsShortRange" in script
+    assert "(v.Command.AbilityCategory & 8) != 0" in script
+    assert "v.Caster.Row == 0" in script and "v.Target.Row == 0" in script
+    assert "BonusBackstabAndPenaltyLongDistanceVisually" in script
+    assert "TryKillFrozen" in script
 
 def test_runtime_uses_mod_specific_scriptsloader_filename():
     from games.ff9 import features
@@ -94,3 +112,4 @@ def test_shipped_runtime_is_mod_specific_memoria_script_and_real_pe():
     assert data.startswith(b"MZ") and len(data) > 10_000
     assert b"BetterEatScript" in data and b"LexeditorBootstrap" in data
     assert b"LexeditorUIEnhancements" in data
+    assert b"LexeditorRowReworkScriptStart" in data
