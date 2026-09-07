@@ -27,15 +27,16 @@ class CoverageTests(unittest.TestCase):
                 self.assertTrue(all(row['coverage']=='unavailable' for row in broken))
                 self.assertTrue(all(not row['openable'] for row in broken))
 
-    def test_ff9_dataset_target_and_missing_data(self):
+    def test_ff9_dataset_target_and_source_availability_are_independent(self):
         from games.ff9 import server
         fixture=[{'key':'one','tab':'characters','relativePath':'one.csv','label':'One','controls':'Starting data','available':True},
                  {'key':'two','tab':'characters','relativePath':'two.csv','label':'Two','controls':'Growth data','available':False}]
         with tempfile.TemporaryDirectory() as name,patch.object(server,'catalog',return_value=fixture),patch.object(server.paths,'GAME_ROOT',Path(name)):
             rows=server.data_map()['rows']
             self.assertEqual(rows[0]['coverage'],'structured');self.assertEqual(rows[0]['dataset'],'one')
-            self.assertEqual(rows[1]['coverage'],'unavailable');self.assertEqual(rows[1]['status'],'not-integrated')
-            self.assertFalse(rows[1]['openable'])
+            self.assertTrue(rows[0]['sourceAvailable']);self.assertTrue(rows[0]['openable'])
+            self.assertEqual(rows[1]['coverage'],'structured');self.assertEqual(rows[1]['status'],'integrated')
+            self.assertFalse(rows[1]['sourceAvailable']);self.assertTrue(rows[1]['openable'])
 
     def test_ff8_partial_fields_and_exact_navigation(self):
         from games.ff8 import formats
