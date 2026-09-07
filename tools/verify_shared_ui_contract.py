@@ -99,10 +99,19 @@ require("enabledColumn(null)" in framework,
 require("localStorage.removeItem(layoutKey)" not in framework,
         "pinning still clears the saved panel split and causes a flash")
 
-# Reset feedback and live-control synchronization.
-require("lex-property-reset-flash" in framework and "lex-property-reset-flash" in css,
-        "property reset accent/ease feedback is missing")
-require("dispatchEvent(new Event(\"input\"" in framework or "dispatchEvent(new Event('input'" in framework,
+# Reset feedback and live-control synchronization. The animation must resolve
+# the destination color at reset time, so a hovered row returns to its hovered
+# color instead of a hard-coded normal background.
+require("syncRange(field)" in framework,
+        "reset path does not synchronize number/range controls")
+require("const target = getComputedStyle(field).backgroundColor" in framework,
+        "property reset does not capture the current destination background")
+require("getPropertyValue('--lex-accent')" in framework and "field.animate(" in framework,
+        "property reset does not animate from the active accent color")
+require("{backgroundColor: accent}, {backgroundColor: target}" in framework,
+        "property reset does not ease back to the computed destination color")
+require("dispatchEvent(new Event('input', {bubbles: true}))" in framework or
+        'dispatchEvent(new Event("input", {bubbles: true}))' in framework,
         "reset path does not synchronize dependent slider/fill state")
 
 # Shortcut badges are not duplicated on hover.
