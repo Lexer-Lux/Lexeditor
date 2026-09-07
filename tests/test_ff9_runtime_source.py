@@ -39,6 +39,28 @@ def test_better_eat_glow_and_target_filter_are_present():
     assert "CanLearnFrom" in text
 
 
+def test_new_ui_tweaks_anchor_to_memoria_widgets():
+    text = source("UIEnhancements.cs")
+    assert "characterBRInfoHudList" in text
+    assert "_partyDetail" in text
+    assert "NGUITools.FindCameraForLayer" in text
+    assert "worldCorners" in text
+    assert "ExperienceFraction" in text
+    assert "CharacterLevelUps" in text
+    assert "new Color(0.92f, 0.18f, 0.18f" in text
+    assert "new Color(0.18f, 0.48f, 1.0f" in text
+
+
+def test_mognet_highlight_uses_vanilla_delivery_choice_mask():
+    text = source("UIEnhancements.cs")
+    assert "Moogle_Make_SpeakBTN" in text
+    assert "VAR_B3_1 >= 0" in text
+    assert "(mask & 0x47) != 0x47" in text
+    assert "(mask & 0x08) == 0" in text
+    assert "choices[2]" in text
+    assert "dialog.ChooseMask" in text
+
+
 def test_bootstrap_defers_unity_work_to_game_loop_update():
     text = source("Bootstrap.cs")
     ctor = text[text.index("public LexeditorBootstrapAttribute()") : text.index("internal static class LexeditorBootstrap")]
@@ -46,7 +68,17 @@ def test_bootstrap_defers_unity_work_to_game_loop_update():
     install = text[text.index("public static void Install()") : text.index("private static void OnUpdate()")]
     assert "GameLoopManager.Update += OnUpdate" in install
     assert "new GameObject" not in install
-    assert "new GameObject" in text[text.index("private static void OnUpdate()") :]
+    update = text[text.index("private static void OnUpdate()") :]
+    assert "new GameObject" in update
+    assert "LexeditorUIEnhancements" in update
+
+
+def test_feature_config_has_independent_xp_and_hpmp_toggles():
+    text = source("Bootstrap.cs")
+    assert "public static Boolean XPBars" in text
+    assert "public static Boolean HPMPBars" in text
+    assert 'key.Equals("XPBars"' in text
+    assert 'key.Equals("HPMPBars"' in text
 
 
 def test_runtime_uses_mod_specific_scriptsloader_filename():
@@ -60,6 +92,5 @@ def test_shipped_runtime_is_mod_specific_memoria_script_and_real_pe():
     assert binary.is_file(), "runtime build must ship Memoria's mod-specific ScriptsLoader filename"
     data = binary.read_bytes()
     assert data.startswith(b"MZ") and len(data) > 10_000
-    # The compile workflow builds this file from the three audited source units
-    # against the pinned publisher assemblies on every FF9 change.
     assert b"BetterEatScript" in data and b"LexeditorBootstrap" in data
+    assert b"LexeditorUIEnhancements" in data
