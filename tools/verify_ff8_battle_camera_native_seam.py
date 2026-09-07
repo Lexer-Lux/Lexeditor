@@ -40,8 +40,8 @@ def main():
     assert call_target(exe,0x50406C)==0x509610
     # BS_UpdateCameraSequence owns a nullable current-sequence pointer and writes
     # its returned next pointer back each frame.
-    assert at(exe,0x509610,8)==bytes.fromhex('8B 15 34 9A D9 01 85 D2')
-    assert bytes.fromhex('A3 34 9A D9 01') in at(exe,0x509630,0x30)
+    assert at(exe,0x509610,7)==bytes.fromhex('A1 34 9A D9 01 85 C0')
+    assert bytes.fromhex('A3 34 9A D9 01') in at(exe,0x509619,0x20)
 
     # Stable idle after native update is blend==0 plus the exact native
     # meaningful-flags mask (0xFFFFDFFF). The 0x2000 bit is ignored by FF8.
@@ -66,14 +66,16 @@ def main():
     ):
         assert bytes.fromhex(pattern) in handoff, pattern
 
-    # Camera vectors are three signed 16-bit components; this helper consumes
-    # offsets +0,+2,+4 from a vector pointer.
-    vector=at(exe,0x45E0B0,0x30)
-    assert bytes.fromhex('0F BF 01') in vector
-    assert bytes.fromhex('0F BF 51 02') in vector
-    assert bytes.fromhex('0F BF 41 04') in vector
+    # The battle-camera vector math sign-extends x/y/z from offsets +0,+2,+4.
+    # The +8 look-at register begins at B8B7F8, so each pose record is 8 bytes
+    # (three signed words plus an untouched padding word).
+    vector=at(exe,0x503350,0x35)
+    assert bytes.fromhex('0F BF 0D F0 B7 B8 00') in vector
+    assert bytes.fromhex('0F BF 05 F2 B7 B8 00') in vector
+    assert bytes.fromhex('0F BF 15 FA B7 B8 00') in vector
+    assert bytes.fromhex('0F BF 05 F8 B7 B8 00') in vector
 
-    print('Battle camera native seam: call, sequence owner, stable-idle gate, default/live handoff and int16 XYZ vectors passed')
+    print('Battle camera native seam: call, sequence owner, stable-idle gate, default/live handoff and signed int16 XYZ vectors passed')
 
 
 if __name__=='__main__':
