@@ -5911,3 +5911,38 @@
   window.addEventListener('resize', () => fitAllLabels(document));
   requestAnimationFrame(() => fitAllLabels(document));
 })();
+
+
+/* LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906 */
+(() => {
+  const alignFieldMetadata = root => {
+    const fields = root?.matches?.('.lex-detail-field')
+      ? [root] : [...(root?.querySelectorAll?.('.lex-detail-field') || [])];
+    for (const field of fields) {
+      if (field.classList.contains('lex-boolean-field')) continue;
+      const rail = field.querySelector(':scope > .lex-field-type-rail');
+      const help = rail?.querySelector('.lex-info-help');
+      const label = field.querySelector(':scope > .lex-detail-field-label');
+      if (!rail || !help || !label) continue;
+      const text = [...label.childNodes].find(node =>
+        node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+      if (!text) continue;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const fieldBox = field.getBoundingClientRect();
+      const textBox = range.getBoundingClientRect();
+      const railBox = rail.getBoundingClientRect();
+      if (!fieldBox.width || !textBox.width || !railBox.width) continue;
+      // User-facing contract: the info bubble/type rail is centred between the
+      // panel-side edge of the property row and the RIGHT edge of its label.
+      const centre = (fieldBox.left + textBox.right) / 2;
+      rail.style.left = `${Math.max(0, centre - fieldBox.left - railBox.width / 2)}px`;
+    }
+  };
+  const schedule = root => requestAnimationFrame(() => alignFieldMetadata(root || document));
+  new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (node instanceof Element) schedule(node);
+  }))).observe(document.documentElement, {childList:true, subtree:true});
+  window.addEventListener('resize', () => schedule(document));
+  schedule(document);
+})();
