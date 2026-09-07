@@ -1,48 +1,81 @@
-"""Reject FF7-only presentation drift from the shared Blank/UI framework."""
+"""Reject FF7 presentation drift from the Blank/shared neutral UI contract."""
 from __future__ import annotations
 
 from pathlib import Path
-import re
 
 ROOT = Path(__file__).resolve().parents[1]
 FF7 = ROOT / "games" / "ff7" / "editor.html"
 BLANK = ROOT / "games" / "blank" / "editor.html"
+NEUTRAL = ROOT / "ui" / "neutral.css"
+
+
+def compact(value: str) -> str:
+    return "".join(value.split())
 
 
 def main() -> None:
     ff7 = FF7.read_text(encoding="utf-8")
     blank = BLANK.read_text(encoding="utf-8")
+    neutral = NEUTRAL.read_text(encoding="utf-8")
 
-    style_match = re.search(r"<style>(.*?)</style>", ff7, re.S)
-    if not style_match:
-        raise AssertionError("FF7 editor must retain the shared page-frame CSS block")
-    style = style_match.group(1)
+    # "Blank UI, no overrides" is literal for FF7: it may supply data/classes
+    # for semantics/testing, but it owns no CSS at all.
+    if "<style" in ff7.casefold() or "style=" in ff7.casefold():
+        raise AssertionError("FF7 contains local CSS/style overrides")
+    for marker in (
+        '<link rel="stylesheet" href="/shared/framework.css">',
+        '<link rel="stylesheet" href="/shared/neutral.css">',
+        '<body class="lex-neutral-ui">',
+    ):
+        if marker not in ff7:
+            raise AssertionError(f"FF7 is not consuming the shared neutral UI: {marker}")
 
-    # FF7 may own page framing, but not private restyles of shared controls.
-    forbidden_style = (
-        ".ff7-", "#ff7-", ".lex-detail-", ".lex-column-", ".lex-subtab-",
-        ".lex-source-", ".lex-reference-", ".lex-data-map-", ".lex-platform-",
+    # neutral.css is shared infrastructure, never a disguised FF7/Blank patch.
+    lower_neutral = neutral.casefold()
+    for token in (".ff7-", "#ff7-", ".blank-", "#blank-"):
+        if token in lower_neutral:
+            raise AssertionError(f"Shared neutral stylesheet contains plugin-specific selector {token}")
+
+    # These declarations are the existing Blank visual baseline promoted into
+    # shared neutral.css. If Blank's benchmark changes, this guard forces the
+    # shared neutral contract to be updated rather than letting FF7 drift.
+    blank_compact = compact(blank)
+    neutral_compact = compact(neutral)
+    blank_baseline_declarations = (
+        "--lex-accent:#72ff1e;--lex-accent-text:#102008;--lex-highlight:#405247",
+        "padding:4px18px4px4px;border-bottom:1pxsolidvar(--lex-border);background:#f1f3f5",
+        "display:grid;width:auto;height:100%;aspect-ratio:1;place-items:center;color:var(--lex-accent);border:1pxsolidvar(--lex-border);background:#fff",
+        "width:64%;height:64%;fill:none;stroke:currentColor;stroke-width:1.7",
+        "width:1em;min-width:1em;height:1em;min-height:1em;flex-basis:1em",
+        "width:.95em;height:.95em",
+        "right:.35em",
+        "margin-right:.08em",
+        "padding:10px;gap:10px",
+        "flex:1 1 auto",
+        "padding:12px",
+        "display:flex;flex-direction:column;height:100%;min-height:0;border:1pxsolidvar(--lex-border);background:var(--lex-panel)",
+        "display:block;font-size:1.45em;text-align:center",
     )
-    found = [token for token in forbidden_style if token in style]
-    if found:
-        raise AssertionError("FF7 contains private shared-control CSS overrides: " + ", ".join(found))
+    for declaration in blank_baseline_declarations:
+        if declaration not in blank_compact:
+            raise AssertionError(f"Blank benchmark changed without updating the shared neutral contract: {declaration}")
+        if declaration not in neutral_compact:
+            raise AssertionError(f"neutral.css does not reproduce Blank's benchmark declaration: {declaration}")
 
-    # The neutral page frame is copied exactly from Blank; only the shared
-    # controls beneath it are allowed to determine panel/table/detail styling.
-    required_frame = (
-        "*{box-sizing:border-box}",
-        "body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}",
-        ".lex-shell-command-row{background:#fff}",
-        ".lex-nav-frame,.lex-shell-header nav{background:#e5e9ed}",
-        "main{flex:1;min-height:0;padding:var(--lex-panel-gap)}",
+    # FF7's master/detail geometry uses Blank's own paged two-panel defaults.
+    layout_contract = (
+        "slots:false",
+        "pageSize:state.pageSize[group]||12",
+        "defaultSplit:50",
+        "minLeft:320",
+        "minRight:360",
     )
-    for rule in required_frame:
-        if rule not in blank:
-            raise AssertionError(f"Blank no longer contains canonical page-frame rule: {rule}")
-        if rule not in ff7:
-            raise AssertionError(f"FF7 does not use Blank's canonical page-frame rule: {rule}")
+    missing_layout = [value for value in layout_contract if value not in ff7]
+    if missing_layout:
+        raise AssertionError("FF7 master/detail geometry drifted from Blank: " + ", ".join(missing_layout))
 
-    # Nested navigation belongs to the shared helpers, not hand-authored bars.
+    # Nested navigation and ordinary content must be shared helpers, not local
+    # approximations with subtly different DOM/keyboard behavior.
     for legacy in (
         'class:"lex-subtab-bar ff7-subtabs"',
         'class:"lex-subtab-button"',
@@ -51,16 +84,15 @@ def main() -> None:
     ):
         if legacy in ff7:
             raise AssertionError(f"FF7 still hand-builds shared UI markup: {legacy}")
-
     required_helpers = (
         "subtabBar", "tabbedPanel", "detailPanel", "detailSection", "detailField",
         "columnList", "pagedListDetail", "readonlyField", "infoIcon",
     )
-    missing = [name for name in required_helpers if name not in ff7]
-    if missing:
-        raise AssertionError("FF7 stopped using required shared UI helpers: " + ", ".join(missing))
+    missing_helpers = [name for name in required_helpers if name not in ff7]
+    if missing_helpers:
+        raise AssertionError("FF7 stopped using required shared UI helpers: " + ", ".join(missing_helpers))
 
-    print("FF7 Blank UI contract: no FF7-specific shared-control CSS or private subtab markup")
+    print("FF7 Blank UI contract: zero local CSS, shared neutral presentation, Blank geometry")
 
 
 if __name__ == "__main__":
