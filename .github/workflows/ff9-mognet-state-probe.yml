@@ -1,0 +1,28 @@
+name: FF9 Mognet state probe
+on:
+  push:
+    branches: [codex/ff9-ui-bars-mognet-20260906]
+    paths: ['.github/workflows/ff9-mognet-state-probe.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect public FF9 save fixtures around Mognet state
+        shell: python
+        run: |
+          import base64, json, urllib.request
+          api='https://api.github.com/repos/EuanFH/ff9SaveLib/contents/testdata/JsonSavedData'
+          req=urllib.request.Request(api,headers={'User-Agent':'Lexeditor-FF9-probe'})
+          files=json.load(urllib.request.urlopen(req,timeout=30))
+          for item in files:
+              if item['name']=='AUTO' or item['name'].startswith('DATA_SLOT'):
+                  raw=urllib.request.urlopen(item['download_url'],timeout=30).read()
+                  doc=json.loads(raw)
+                  state=doc['Data']['10000_State']
+                  event=doc['Data']['20000_Event']
+                  blob=base64.b64decode(event['gEventGlobal'])
+                  scenario=int.from_bytes(blob[0:2],'little')
+                  print(item['name'], 'field=',state['fldMapNo'],'loc=',state['fldLocNo'],'scenario=',scenario,
+                        '1016:1040=',list(blob[1016:1041]))
