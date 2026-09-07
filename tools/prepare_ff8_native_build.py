@@ -36,6 +36,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     # current audited implementation after applying the pinned derivative patch.
     for name in (
         'camera_axis.h',
+        'battle_camera.h',
         'lexeditor_ff8_modern_controls.cpp',
         'lexeditor_ff8_modern_controls.h',
     ):
