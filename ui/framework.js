@@ -5765,58 +5765,122 @@
     const getContent = typeof spec === 'function' ? spec : () => spec.content;
     const onOpen = typeof spec === 'object' ? spec.onOpen : null;
     const onClose = typeof spec === 'object' ? spec.onClose : null;
+    const openLabel = typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview';
+    const closeLabel = typeof spec === 'object' && spec.closeLabel ? spec.closeLabel : 'Close model preview';
+
+    const iconContent = document.createElement('span');
+    iconContent.className = 'lex-model-preview-icon-content';
+    while (icon.firstChild) iconContent.append(icon.firstChild);
+    const closeMark = document.createElement('span');
+    closeMark.className = 'lex-model-preview-close';
+    closeMark.setAttribute('aria-hidden', 'true');
+    closeMark.textContent = '×';
+    icon.append(iconContent, closeMark);
+
     const drawer = document.createElement('section');
     drawer.className = 'lex-model-preview-drawer';
     drawer.hidden = true;
     drawer.setAttribute('aria-label', typeof spec === 'object' && spec.label ? spec.label : 'Model preview');
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'lex-model-preview-close';
-    close.textContent = '×';
-    close.title = 'Close model preview';
-    close.setAttribute('aria-label', close.title);
-    heading.style.position = 'relative';
-    heading.append(close);
     heading.after(drawer);
-    const syncCloseSlot = () => {
-      close.style.left = `${icon.offsetLeft}px`;
-      close.style.top = `${icon.offsetTop}px`;
-      close.style.width = `${icon.offsetWidth}px`;
-      close.style.height = `${icon.offsetHeight}px`;
+
+    const snapshotSlot = () => {
+      const box = icon.getBoundingClientRect();
+      return {left:box.left, top:box.top, width:box.width, height:box.height};
     };
+    let activationSlot = null;
+    let frozenSlot = null;
+    let slotLockGeneration = 0;
+    const releaseIconSlot = () => {
+      icon.style.left = '';
+      icon.style.top = '';
+    };
+    const lockIconSlot = target => {
+      if (!target || !panel.classList.contains('lex-model-preview-open')) return;
+      releaseIconSlot();
+      const current = icon.getBoundingClientRect();
+      icon.style.left = `${target.left - current.left}px`;
+      icon.style.top = `${target.top - current.top}px`;
+    };
+    const holdIconSlot = target => {
+      const generation = ++slotLockGeneration;
+      const started = performance.now();
+      const tick = now => {
+        if (generation !== slotLockGeneration || !panel.classList.contains('lex-model-preview-open')) return;
+        lockIconSlot(target);
+        if (now - started < 360) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    };
+
+    let busy = false;
     const open = async () => {
-      syncCloseSlot();
-      if (!drawer.childNodes.length) {
-        const content = await getContent?.();
-        if (content instanceof Node) drawer.append(content);
-      }
-      drawer.hidden = false;
-      panel.classList.add('lex-model-preview-open');
-      icon.setAttribute('aria-expanded', 'true');
-      await onOpen?.(drawer);
+      if (busy || panel.classList.contains('lex-model-preview-open')) return;
+      busy = true;
+      try {
+        // pointerdown is captured before the browser focuses the role=button.
+        // Use that box so changing focus state cannot make the replacement X
+        // jump before the click handler even starts.
+        frozenSlot = activationSlot || snapshotSlot();
+        activationSlot = null;
+        if (!drawer.childNodes.length) {
+          const content = await getContent?.();
+          if (content instanceof Node) drawer.append(content);
+        }
+        drawer.hidden = false;
+        panel.classList.add('lex-model-preview-open');
+        lockIconSlot(frozenSlot);
+        holdIconSlot(frozenSlot);
+        icon.setAttribute('aria-expanded', 'true');
+        icon.setAttribute('aria-label', closeLabel);
+        icon.title = closeLabel;
+        await onOpen?.(drawer);
+      } finally { busy = false; }
     };
     const shut = async () => {
-      await onClose?.(drawer);
-      panel.classList.remove('lex-model-preview-open');
-      drawer.hidden = true;
-      icon.setAttribute('aria-expanded', 'false');
+      if (busy || !panel.classList.contains('lex-model-preview-open')) return;
+      busy = true;
+      try {
+        ++slotLockGeneration;
+        await onClose?.(drawer);
+        panel.classList.remove('lex-model-preview-open');
+        drawer.hidden = true;
+        releaseIconSlot();
+        activationSlot = null;
+        frozenSlot = null;
+        icon.setAttribute('aria-expanded', 'false');
+        icon.setAttribute('aria-label', openLabel);
+        icon.title = openLabel;
+      } finally { busy = false; }
     };
+    const toggle = () => panel.classList.contains('lex-model-preview-open') ? shut() : open();
+
     icon.classList.add('lex-model-preview-trigger');
     icon.tabIndex = 0;
     icon.setAttribute('role', 'button');
-    icon.setAttribute('aria-label', typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview');
+    icon.setAttribute('aria-label', openLabel);
     icon.setAttribute('aria-expanded', 'false');
-    icon.addEventListener('click', open);
-    icon.addEventListener('keydown', event => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        open();
-      }
+    icon.title = openLabel;
+    icon.addEventListener('pointerdown', () => {
+      if (!panel.classList.contains('lex-model-preview-open')) activationSlot = snapshotSlot();
     });
-    close.addEventListener('click', event => {
+    icon.addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
-      shut();
+      toggle();
+    });
+    icon.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        if (!panel.classList.contains('lex-model-preview-open')) activationSlot = snapshotSlot();
+        event.preventDefault();
+        toggle();
+      }
+    });
+    window.addEventListener('resize', () => {
+      if (!frozenSlot || !panel.classList.contains('lex-model-preview-open')) return;
+      releaseIconSlot();
+      frozenSlot = snapshotSlot();
+      lockIconSlot(frozenSlot);
+      holdIconSlot(frozenSlot);
     });
     panel.lexModelPreview = {open, close: shut, drawer};
     return panel;
@@ -5896,7 +5960,7 @@
     if (!(label instanceof HTMLElement)) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
-    while (size > 8 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth + 1)) {
+    while (size > 6 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth + 1)) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }
@@ -5910,4 +5974,39 @@
   labelObserver.observe(document.documentElement, {childList: true, subtree: true});
   window.addEventListener('resize', () => fitAllLabels(document));
   requestAnimationFrame(() => fitAllLabels(document));
+})();
+
+
+/* LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906 */
+(() => {
+  const alignFieldMetadata = root => {
+    const fields = root?.matches?.('.lex-detail-field')
+      ? [root] : [...(root?.querySelectorAll?.('.lex-detail-field') || [])];
+    for (const field of fields) {
+      if (field.classList.contains('lex-boolean-field')) continue;
+      const rail = field.querySelector(':scope > .lex-field-type-rail');
+      const help = rail?.querySelector('.lex-info-help');
+      const label = field.querySelector(':scope > .lex-detail-field-label');
+      if (!rail || !help || !label) continue;
+      const text = [...label.childNodes].find(node =>
+        node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+      if (!text) continue;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const fieldBox = field.getBoundingClientRect();
+      const textBox = range.getBoundingClientRect();
+      const railBox = rail.getBoundingClientRect();
+      if (!fieldBox.width || !textBox.width || !railBox.width) continue;
+      // User-facing contract: the info bubble/type rail is centred between the
+      // panel-side edge of the property row and the RIGHT edge of its label.
+      const centre = (fieldBox.left + textBox.right) / 2;
+      rail.style.left = `${Math.max(0, centre - fieldBox.left - railBox.width / 2)}px`;
+    }
+  };
+  const schedule = root => requestAnimationFrame(() => alignFieldMetadata(root || document));
+  new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (node instanceof Element) schedule(node);
+  }))).observe(document.documentElement, {childList:true, subtree:true});
+  window.addEventListener('resize', () => schedule(document));
+  schedule(document);
 })();
