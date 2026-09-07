@@ -45,8 +45,9 @@ jobs:
           python tools/verify_ff8_native_package.py
           python tools/verify_ff8_native_compiled.py
           python tools/verify_ff8_battle_camera.py
+          python tools/verify_ff8_reptile_atb.py
           python tools/verify_ff8_gf_bar_settings.py
-          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py tools/verify_ff8_cards_players_ui.py tools/verify_ff8_battle_camera.py tools/verify_ff8_battle_camera_native_seam.py
+          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py tools/verify_ff8_cards_players_ui.py tools/verify_ff8_battle_camera.py tools/verify_ff8_battle_camera_native_seam.py tools/verify_ff8_reptile_atb.py tools/verify_ff8_reptile_atb_native_seam.py tools/verify_ff8_reptile_atb_binary.py
           node --check games/ff8/cards_ui.js
           python - <<'PY'
           import pathlib, re, subprocess
