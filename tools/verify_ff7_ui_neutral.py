@@ -41,6 +41,14 @@ def _diagnostic_kernel_failure(self):
             print("NEUTRAL-HARNESS platformLoading:", self.page.evaluate("state.platformLoading"))
             print("NEUTRAL-HARNESS main text:", self.page.locator("main").inner_text())
             print("NEUTRAL-HARNESS buttons:", self.page.locator("main button").all_inner_texts())
+            print("NEUTRAL-HARNESS reload DOM:", self.page.evaluate("""()=>{
+              const b=[...document.querySelectorAll('main button')].find(e=>e.textContent.trim()==='Reload settings');
+              if(!b)return null;
+              const r=b.getBoundingClientRect(),s=getComputedStyle(b),chain=[];
+              for(let n=b;n;n=n.parentElement){chain.push({tag:n.tagName,role:n.getAttribute('role'),hidden:n.hidden,ariaHidden:n.getAttribute('aria-hidden'),inert:n.inert,display:getComputedStyle(n).display,visibility:getComputedStyle(n).visibility,opacity:getComputedStyle(n).opacity});if(n.tagName==='MAIN')break}
+              return {disabled:b.disabled,hidden:b.hidden,ariaHidden:b.getAttribute('aria-hidden'),rect:{x:r.x,y:r.y,width:r.width,height:r.height},display:s.display,visibility:s.visibility,opacity:s.opacity,offsetParent:!!b.offsetParent,chain};
+            }"""))
+            print("NEUTRAL-HARNESS role count:", self.page.get_by_role("button", name="Reload settings", exact=True).count())
             print("NEUTRAL-HARNESS page errors:", self.errors)
         except Exception as diagnostic_error:
             print("NEUTRAL-HARNESS diagnostic failed:", diagnostic_error)
