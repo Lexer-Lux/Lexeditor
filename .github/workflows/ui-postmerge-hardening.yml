@@ -1,0 +1,20 @@
+name: Shared UI post-merge hardening
+
+on:
+  push:
+    branches: [fix/ui-postmerge-hardening-20260906]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shared UI contract
+        run: python tools/verify_shared_ui_contract.py
+      - name: JavaScript syntax
+        run: node --check ui/framework.js
+      - name: Python syntax
+        run: python -m py_compile desktop_host.py github_integration.py plugin_api.py settings_manager.py
