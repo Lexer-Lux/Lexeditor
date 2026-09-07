@@ -5779,10 +5779,18 @@
     heading.append(close);
     heading.after(drawer);
     const syncCloseSlot = () => {
-      close.style.left = `${icon.offsetLeft}px`;
-      close.style.top = `${icon.offsetTop}px`;
-      close.style.width = `${icon.offsetWidth}px`;
-      close.style.height = `${icon.offsetHeight}px`;
+      // offsetLeft/offsetWidth round fractional grid geometry, which moved the
+      // X by a couple of pixels at narrower window sizes. Measure both boxes
+      // in the same coordinate system so the close button literally overlays
+      // the header icon at any scale.
+      const headingBox = heading.getBoundingClientRect();
+      const iconBox = icon.getBoundingClientRect();
+      const originX = headingBox.left + heading.clientLeft;
+      const originY = headingBox.top + heading.clientTop;
+      close.style.left = `${iconBox.left - originX}px`;
+      close.style.top = `${iconBox.top - originY}px`;
+      close.style.width = `${iconBox.width}px`;
+      close.style.height = `${iconBox.height}px`;
     };
     const open = async () => {
       syncCloseSlot();
