@@ -2563,19 +2563,26 @@ const inventoryIconLoads=new Map();
 function inventoryIconCandidates(texture){
   if(!texture?.id)return [];
   const dict=(texture.dict||"").toUpperCase();
-  const id=encodeURIComponent(texture.id.toLowerCase());
-  if(dict==="INVENTORY_ITEMS")return [
+  // Some catalog viewer references contain multiple texture names (for
+  // example a two-page book) separated by whitespace. Treat those as
+  // ordered fallbacks instead of URL-encoding the whole string into one
+  // impossible filename.
+  const ids=String(texture.id).trim().split(/\s+/).filter(Boolean)
+    .map(value=>encodeURIComponent(value.toLowerCase()));
+  if(!ids.length)return [];
+  if(dict==="INVENTORY_ITEMS")return ids.flatMap(id=>[
     `/assets/inventory_icons/inventory_items/${id}.png`,
     `https://femga.com:8080/images/samples/ui_textures_no_bg/inventory_items/${id}.png`,
-  ];
+  ]);
   // Femga stores the RDO dictionary below its ui_textures_mp family. The old
   // generic dictionary path omitted that family and returned an HTML 404.
-  if(dict==="INVENTORY_ITEMS_MP")return [
-    `https://femga.com:8080/images/samples/ui_textures_no_bg/ui_textures_mp/inventory_items_mp/${id}.png`,
-  ];
-  if(dict==="LEX_INVENTORY_ITEMS")return [`/assets/item-icons/${id}.png`];
-  if(dict==="ITEM_TEXTURES"||dict==="UI_ITEMVIEWER")return [`/assets/dictionary_icons/${dict.toLowerCase()}/${id}.png`];
-  if(dict)return [`https://femga.com:8080/images/samples/ui_textures_no_bg/${dict.toLowerCase()}/${id}.png`];
+  if(dict==="INVENTORY_ITEMS_MP")return ids.map(id=>
+    `https://femga.com:8080/images/samples/ui_textures_no_bg/ui_textures_mp/inventory_items_mp/${id}.png`);
+  if(dict==="LEX_INVENTORY_ITEMS")return ids.map(id=>`/assets/item-icons/${id}.png`);
+  if(dict==="ITEM_TEXTURES"||dict==="UI_ITEMVIEWER")return ids.map(id=>
+    `/assets/dictionary_icons/${dict.toLowerCase()}/${id}.png`);
+  if(dict)return ids.map(id=>
+    `https://femga.com:8080/images/samples/ui_textures_no_bg/${dict.toLowerCase()}/${id}.png`);
   return [];
 }
 
