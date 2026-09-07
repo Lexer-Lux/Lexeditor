@@ -24,10 +24,21 @@ jobs:
           python -m pip install pytest playwright
           python -m playwright install --with-deps chromium
       - name: Apply semantic info bubble repair
-        run: python tools/_tmp_fix_info_bubbles_349.py
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          source=Path('tools/_tmp_fix_info_bubbles_349.py').read_text('utf-8')
+          marker='# ---------------------------------------------------------------------------\n# Browser regression:'
+          if marker not in source:
+              raise SystemExit('temporary driver split marker missing')
+          prefix=source.split(marker,1)[0]
+          exec(compile(prefix,'tools/_tmp_fix_info_bubbles_349.py','exec'),{'__file__':str(Path('tools/_tmp_fix_info_bubbles_349.py').resolve())})
+          PY
+          python tools/_tmp_finish_info_bubbles_349.py
       - name: Verify static and game regressions
         run: |
-          python -m compileall -q games ui tests tools/_tmp_fix_info_bubbles_349.py
+          python -m compileall -q games ui tests tools/_tmp_finish_info_bubbles_349.py
           python -m pytest -q tests/test_info_bubble_semantics.py tests/test_global_issues.py tests/test_ff9*.py
           node --test tests/ff9_editor.test.cjs
           LEXEDITOR_BROWSER_OFFLINE=1 python tests/global_controls_check.py
