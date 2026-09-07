@@ -1,4 +1,4 @@
-# corrected fixture pass
+# scoped unit fixture pass
 name: Temporary semantic info bubble repair
 on:
   push:
@@ -37,9 +37,10 @@ jobs:
           exec(compile(prefix,'tools/_tmp_fix_info_bubbles_349.py','exec'),{'__file__':str(Path('tools/_tmp_fix_info_bubbles_349.py').resolve())})
           PY
           python tools/_tmp_finish_info_bubbles_349.py
+          python tools/_tmp_selector_fix_349.py
       - name: Verify static and game regressions
         run: |
-          python -m compileall -q games ui tests tools/_tmp_finish_info_bubbles_349.py
+          python -m compileall -q games ui tests tools/_tmp_finish_info_bubbles_349.py tools/_tmp_selector_fix_349.py
           python -m pytest -q tests/test_info_bubble_semantics.py tests/test_global_issues.py tests/test_ff9*.py
           node --test tests/ff9_editor.test.cjs
           LEXEDITOR_BROWSER_OFFLINE=1 python tests/global_controls_check.py
