@@ -5785,11 +5785,18 @@
 
     let frozenSlot = null;
     let slotLockGeneration = 0;
+    const releaseIconSlot = () => {
+      icon.style.left = '';
+      icon.style.top = '';
+    };
     const lockIconSlot = target => {
       if (!target || !panel.classList.contains('lex-model-preview-open')) return;
-      icon.style.translate = 'none';
+      releaseIconSlot();
       const current = icon.getBoundingClientRect();
-      icon.style.translate = `${target.left - current.left}px ${target.top - current.top}px`;
+      // Relative offsets affect only paint position, not the heading's grid
+      // geometry, so the control cannot feed its correction back into layout.
+      icon.style.left = `${target.left - current.left}px`;
+      icon.style.top = `${target.top - current.top}px`;
     };
     const holdIconSlot = target => {
       const generation = ++slotLockGeneration;
@@ -5797,8 +5804,6 @@
       const tick = now => {
         if (generation !== slotLockGeneration || !panel.classList.contains('lex-model-preview-open')) return;
         lockIconSlot(target);
-        // Cover the complete 200 ms drawer animation plus delayed label/font
-        // fitting. A layout that settles late therefore cannot make the X jump.
         if (now - started < 360) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
@@ -5809,7 +5814,8 @@
       if (busy || panel.classList.contains('lex-model-preview-open')) return;
       busy = true;
       try {
-        frozenSlot = icon.getBoundingClientRect();
+        const box = icon.getBoundingClientRect();
+        frozenSlot = {left:box.left, top:box.top, width:box.width, height:box.height};
         if (!drawer.childNodes.length) {
           const content = await getContent?.();
           if (content instanceof Node) drawer.append(content);
@@ -5832,7 +5838,7 @@
         await onClose?.(drawer);
         panel.classList.remove('lex-model-preview-open');
         drawer.hidden = true;
-        icon.style.translate = '';
+        releaseIconSlot();
         frozenSlot = null;
         icon.setAttribute('aria-expanded', 'false');
         icon.setAttribute('aria-label', openLabel);
@@ -5860,8 +5866,9 @@
     });
     window.addEventListener('resize', () => {
       if (!frozenSlot || !panel.classList.contains('lex-model-preview-open')) return;
-      icon.style.translate = '';
-      frozenSlot = icon.getBoundingClientRect();
+      releaseIconSlot();
+      const box = icon.getBoundingClientRect();
+      frozenSlot = {left:box.left, top:box.top, width:box.width, height:box.height};
       lockIconSlot(frozenSlot);
       holdIconSlot(frozenSlot);
     });
