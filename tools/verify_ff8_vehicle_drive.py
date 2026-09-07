@@ -13,6 +13,8 @@ CASES = r'''
 using namespace lexeditor_vehicle_drive;
 
 int main() {
+    assert(kL2 == 0x0001u && kR2 == 0x0002u);
+    assert(kTriangle == 0x0010u && kSquare == 0x0080u);
     for (unsigned state : {0x20u,0x21u,0x28u,0x30u,0x32u,0x84u})
         assert(supported_state(state));
     for (unsigned state : {0u,9u,0x10u,0x16u,0x29u,0x31u,0x40u,0x42u,0x80u})
@@ -34,7 +36,7 @@ int main() {
     // Tiny trigger noise is dead-zoned around center.
     assert(axis(0.00f,0.01f) == 128);
     assert(axis(0.01f,0.00f) == 128);
-    std::cout << "Vehicle drive policy: supported states, proportional LT/RT, L2/R2 keyboard fallback, cancellation and dead zone passed\n";
+    std::cout << "Vehicle drive policy: FF8 pad masks, supported states, proportional LT/RT, L2/R2 keyboard fallback, cancellation and dead zone passed\n";
 }
 '''
 
