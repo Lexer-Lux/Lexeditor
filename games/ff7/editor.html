@@ -6,32 +6,15 @@
   <title>Lexeditor - Final Fantasy 7 (Original)</title>
   <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
   <link rel="stylesheet" href="/shared/framework.css">
-  <style>
-    :root{--lex-radius:5px}
-    *{box-sizing:border-box}body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
-    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
-    .ff7-layout,.lex-paged-list-detail{height:100%}.ff7-table,.ff7-detail{height:100%;min-height:0}
-    .ff7-detail .lex-detail-panel-heading,.ff7-table,.ff7-table .lex-column-list-header,.ff7-message{background:var(--lex-panel);box-shadow:none}
-    .ff7-detail .lex-detail-panel-body{padding:10px;gap:9px;display:block;overflow:auto}.ff7-detail .lex-detail-section{flex:none;margin-bottom:12px}
-    .ff7-field input,.ff7-field textarea{width:100%;min-width:0}.ff7-description{white-space:pre-wrap}
-    .ff7-message{height:100%;overflow:auto;padding:24px;border:2px solid var(--lex-border)}
-    .ff7-message h2{margin:0 0 14px;font:30px/1.15 var(--lex-heading-font)}.ff7-message p{max-width:850px}
-    .ff7-status{display:inline-block;padding:5px 9px;border:1px solid var(--lex-border);font-weight:700}
-    .ff7-info-grid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:8px 16px}.ff7-info-grid code{overflow-wrap:anywhere}
-    .ff7-map,.ff7-tweaks{display:flex;flex-direction:column;height:100%;min-height:0}.ff7-map-controls{display:flex;gap:8px;padding:0 0 var(--lex-panel-gap)}.ff7-map .lex-data-map-view{flex:1;min-height:0}
-    .ff7-config-body{flex:1;min-height:0;overflow:auto}.ff7-config-error{padding:8px;border:1px solid var(--lex-border)}
-    .ff7-workspace{display:flex;flex-direction:column;height:100%;min-height:0}.ff7-record-body{flex:1;min-height:0}.ff7-subtabs{flex-wrap:wrap;flex:none}.ff7-subtabs [aria-selected="true"]{font-weight:bold;border-bottom:3px solid var(--lex-border)}
-    .ff7-tweak-panel{display:flex;flex-direction:column;flex:1;min-height:0}
-    .ff7-subtabs{flex-wrap:wrap;gap:0}.ff7-subtabs .lex-subtab-button{flex:1 0 max-content;height:auto;min-height:34px;padding:7px 12px;white-space:nowrap}
-  </style>
+  <link rel="stylesheet" href="/shared/neutral.css">
 </head>
-<body>
+<body class="lex-neutral-ui">
   <header id="lexeditor-shell"></header>
   <main id="main"></main>
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
-  const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,recordId,infoHelp,pagedListDetail,provenanceControl,platformConfigView,clone,EditHistory}=LexeditorUI;
+  const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,recordId,infoHelp,pagedListDetail,provenanceControl,platformConfigView,clone,EditHistory,subtabBar,tabbedPanel,readonlyField,infoIcon,integrationStatus}=LexeditorUI;
   const identity=window.__lexeditorPlugin||{id:"ff7",name:"Final Fantasy 7 (Original)",edition:"Steam"};
   const integrated=["accessories","armor","characters","items","materia","weapons","enemies","encounters","enemyAttacks","shops","prices","texts","characterNames","growthCurves","growthBonuses","characterAI","enemyAI","formationAI","recruits","defaultNames","fieldEncounters","worldEncounters","yuffieEncounters","chocoboRatings"];
   const unresolved=["tweaks"];
@@ -80,7 +63,7 @@
   function recordDetail(row){
     const metadata=category(),groups=[...new Set(metadata.fields.map(field=>field.group||"Kernel data"))];
     return detailPanel({className:"ff7-detail",title:row.values.name||row.name,identity:recordId(row.id),meta:identity.edition,body:[
-      detailSection({title:"DESCRIPTION",body:detailField({label:"HELP TEXT",control:el("div",{class:"ff7-description"},row.description||"No description stored.")})}),
+      detailSection({title:"DESCRIPTION",body:detailField({label:"HELP TEXT",control:readonlyField(row.description||"No description stored.")})}),
       ...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>detailField({className:"ff7-field",label:field.label,help:infoHelp(field.dataType==="text"?"English game text; AI uses named assembly instructions and labels. Use byte escapes for control codes; unsupported characters and oversized text are refused on save.":`Stored as a bounded ${field.dataType}. Storage range: ${field.minimum} to ${field.maximum}${field.step>1?`; step ${field.step}`:""}.`),control:field.dataType==="text"?textControl(row,field):numberControl(row,field),dataType:field.dataType==="text"?"TEXT":"INT",min:field.minimum,max:field.maximum}))})),
     ]});
   }
@@ -92,28 +75,33 @@
   }
   function unavailableView(){
     const error=state.data.errors?.[state.tab];
-    return el("section",{class:"ff7-message"},el("h2",{},labels[state.tab]),
-      el("p",{},error||"No readable records are available for this dataset."),
-      el("p",{},`Source: ${state.data.families?.[category()?.family]?.sourceRelativePath||category()?.family||state.data.sourceRelativePath||"English KERNEL.BIN in the selected installation"}`),
-      el("p",{},"Repair the reported source or project data, then reopen the editor. Other readable tabs and Tweaks remain available. No replacement records are generated."),
-      el("span",{class:"ff7-status"},"DATA UNAVAILABLE"),
-      el("p",{},el("button",{type:"button",onclick:()=>navigate("datamap")},"Open Data Map")));
+    const source=state.data.families?.[category()?.family]?.sourceRelativePath||category()?.family||state.data.sourceRelativePath||"English KERNEL.BIN in the selected installation";
+    return detailPanel({className:"ff7-detail",title:labels[state.tab],identity:null,meta:"Data unavailable",body:[
+      detailSection({title:"STATUS",body:[
+        detailField({label:"STATE",control:integrationStatus("not-integrated")}),
+        detailField({label:"SOURCE",control:readonlyField(source)}),
+        detailField({label:"PROBLEM",control:readonlyField(error||"No readable records are available for this dataset.")}),
+        detailField({label:"NEXT",control:el("button",{type:"button",onclick:()=>navigate("datamap")},"Open Data Map")}),
+      ]}),
+    ]});
   }
   function integratedView(){
     const group=state.tab,query=state.query[group]||"",sort=state.sort[group]||{key:"name",dir:1};
     if(!state.records[group]?.length)return unavailableView();
     const rows=[...state.records[group]].filter(row=>!query||`${row.id} ${row.values.name||row.name} ${row.description} ${row.values.text||""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).sort((a,b)=>{const left=a[sort.key],right=b[sort.key];return(typeof left==="string"?left.localeCompare(right):Number(left)-Number(right))*sort.dir});
     if(!rows.some(row=>row.id===state.selected[group]))state.selected[group]=rows[0]?.id??null;
-    return pagedListDetail({rows,key:row=>row.id,slots:true,selected:state.selected[group],page:state.page[group]||0,pageSize:state.pageSize[group]||16,noun:labels[group],className:"ff7-layout",splitKey:`ff7-${group}`,rowsKey:`ff7-${group}`,defaultSplit:42,minLeft:340,minRight:440,search:{key:`ff7-${group}`,value:query,label:`Search ${labels[group]}`,change:value=>{state.query[group]=value;state.page[group]=0;render()}},sync:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected},change:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected;render()},master:view=>listTable(view.rows,view.selected,view.select),detail:row=>recordDetail(row)});
+    return pagedListDetail({rows,key:row=>row.id,slots:false,selected:state.selected[group],page:state.page[group]||0,pageSize:state.pageSize[group]||12,noun:labels[group],className:"ff7-layout",splitKey:`ff7-${group}`,rowsKey:`ff7-${group}`,defaultSplit:50,minLeft:320,minRight:360,search:{key:`ff7-${group}`,value:query,label:`Search ${labels[group]}`,change:value=>{state.query[group]=value;state.page[group]=0;render()}},sync:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected},change:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected;render()},master:view=>listTable(view.rows,view.selected,view.select),detail:row=>recordDetail(row)});
   }
   function unresolvedView(){
     const area=state.data.unresolved?.[state.tab];
-    return el("section",{class:"ff7-message"},el("h2",{},labels[state.tab]),
-      el("p",{},area?.source||"Dataset source information could not be loaded."),
-      el("p",{},area?.reason||"This tab has no connected editor. See Info for loading errors."),
-      el("h3",{},"What is still needed"),el("p",{},area?.unlock||"Reload the dataset availability report."),
-      el("span",{class:"ff7-status"},"NOT INTEGRATED"),
-      el("p",{},el("button",{type:"button",onclick:()=>navigate("datamap")},"Open Data Map")));
+    return detailPanel({className:"ff7-detail",title:labels[state.tab],identity:null,meta:"Not integrated",body:[
+      detailSection({title:"STATUS",body:[
+        detailField({label:"STATE",control:integrationStatus("not-integrated")}),
+        detailField({label:"SOURCE",control:readonlyField(area?.source||"Dataset source information could not be loaded.")}),
+        detailField({label:"REASON",control:readonlyField(area?.reason||"This tab has no connected editor. See Info for loading errors.")}),
+        detailField({label:"NEXT",control:readonlyField(area?.unlock||"Reload the dataset availability report.")}),
+      ]}),
+    ]});
   }
   function syncConfigMap(config){
     const row=state.dataMap?.rows.find(item=>item.category==="tweaks");
@@ -135,28 +123,41 @@
     finally{state.platformLoading=false;shellRefresh()}
   }
   function tweakView(){
-    const controls=el("div",{class:"ff7-map-controls"},el("button",{type:"button",disabled:readonly(),onclick:()=>refreshPlatformConfig(true)},"Reload settings"));
+    const reload=el("button",{type:"button",disabled:readonly(),onclick:()=>refreshPlatformConfig(true)},"Reload settings");
     const view=platformConfigView({config:state.platformConfig,query:state.platformQuery,disabled:readonly(),search:value=>{state.platformQuery=value},change:(id,value)=>{
       if(readonly())return;
       const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);
       if(field){field.value=value;state.platformRevision++;shellRefresh()}
     }});
-    const tabs=el("nav",{class:"ff7-map-controls",role:"tablist","aria-label":"Tweaks sections"},
-      el("button",{type:"button",role:"tab",id:"ff7-ffnx-tab",class:"active","aria-selected":"true","aria-controls":"ff7-ffnx-panel"},"FFNx"));
-    return el("section",{class:"ff7-tweaks"},tabs,
-      el("section",{class:"ff7-tweak-panel",role:"tabpanel",id:"ff7-ffnx-panel","aria-labelledby":"ff7-ffnx-tab"},controls,
-        state.platformError?el("div",{class:"ff7-config-error",role:"alert"},state.platformError):null,
-        el("div",{class:"ff7-config-body"},view)));
+    const panel=detailPanel({className:"ff7-detail",title:"FFNx",identity:null,meta:"Runtime settings",body:[
+      detailSection({title:"ACTIONS",body:[detailField({label:"CONFIGURATION",control:reload})]}),
+      ...(state.platformError?[detailSection({title:"ERROR",body:[detailField({label:"MESSAGE",control:readonlyField(state.platformError)})]})]:[]),
+      detailSection({title:"SETTINGS",body:[view]}),
+    ]});
+    return tabbedPanel({tabs:[{id:"ffnx",label:"FFNx"}],active:"ffnx",label:"Tweaks sections",change:()=>{},content:panel});
   }
   function infoView(){
     const baseline=state.dashboard.baseline,sounds=LexeditorUI.sharedSettings()?.developerMode?LexeditorUI.soundCoverageTable(state.dashboard.themeSounds?.rows||[]):null;
-    return el("section",{class:"ff7-message"},el("h2",{},identity.name),el("div",{class:"ff7-info-grid"},el("b",{},"Edition"),el("span",{},identity.edition),el("b",{},"Game root"),el("code",{},state.dashboard.game.root||"Unavailable"),el("b",{},"Source"),el("code",{},baseline.source||"Unavailable"),el("b",{},"Project output"),el("code",{},baseline.projectPath||"Unavailable"),el("b",{},"Vanilla SHA-256"),el("code",{},baseline.sha256||"Unavailable")),el("p",{},baseline.message),...(state.dashboard.problems||[]).map(problem=>el("p",{},problem)),sounds);
+    return detailPanel({className:"lex-information-panel ff7-detail",icon:infoIcon(),title:identity.name,identity:null,meta:identity.edition,body:[
+      detailSection({title:"GAME",body:[
+        detailField({label:"Game root",control:readonlyField(state.dashboard.game.root||"Unavailable")}),
+        detailField({label:"Source",control:readonlyField(baseline.source||"Unavailable")}),
+      ]}),
+      detailSection({title:"PROJECT",body:[
+        detailField({label:"Project output",control:readonlyField(baseline.projectPath||"Unavailable")}),
+        detailField({label:"Vanilla SHA-256",control:readonlyField(baseline.sha256||"Unavailable")}),
+        detailField({label:"Status",control:readonlyField(baseline.message||"Unavailable")}),
+      ]}),
+      ...((state.dashboard.problems||[]).length?[detailSection({title:"PROBLEMS",body:(state.dashboard.problems||[]).map((problem,index)=>detailField({label:`Problem ${index+1}`,control:readonlyField(problem)}))})]:[]),
+      ...(sounds?[detailSection({title:"THEME SOUNDS",body:[sounds]})]:[]),
+    ]});
   }
-  function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,open:row=>{const target=row.target||row.category;if(target)navigate(target)},query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return el("section",{class:"ff7-map"},el("div",{class:"ff7-map-controls"},...view.controls),view.content)}
+  function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,open:row=>{const target=row.target||row.category;if(target)navigate(target)},query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return view.content}
   function dataWorkspace(){
     const sub=groups[parentTab(state.tab)];
-    const nav=sub?el("nav",{class:"lex-subtab-bar ff7-subtabs",role:"tablist","aria-label":labels[parentTab(state.tab)]+" datasets"},...sub.map(id=>el("button",{type:"button",role:"tab",class:"lex-subtab-button"+(id===state.tab?" active":""),"aria-selected":String(id===state.tab),onclick:()=>{if(id!==state.tab)LexeditorUI.playThemeSound?.("confirm");navigate(id)}},labels[id]))):null;
-    return el("section",{class:"ff7-workspace"},nav,el("div",{class:"ff7-record-body"},integratedView()));
+    if(!sub)return integratedView();
+    const nav=subtabBar({tabs:sub.map(id=>({id,label:labels[id]})),active:state.tab,label:labels[parentTab(state.tab)]+" datasets",change:id=>{if(id!==state.tab)LexeditorUI.playThemeSound?.("confirm");navigate(id)}});
+    return el("section",{class:"ff7-workspace lex-tabbed-panel"},nav,el("div",{class:"lex-tabbed-panel-content"},integratedView()));
   }
   function render(){if(!state.loaded)return;let content;if(state.tab==="info")content=infoView();else if(state.tab==="datamap")content=mapView();else if(state.tab==="tweaks")content=tweakView();else if(integrated.includes(state.tab))content=dataWorkspace();else content=unresolvedView();main.replaceChildren(content);shellRefresh()}
   function navigate(tab){state.tab=tab;render();if(tab==="tweaks")void refreshPlatformConfig()}
@@ -204,7 +205,7 @@
     state.loaded=true;
     if(state.dashboard.themeSounds)LexeditorUI.configureThemeSounds(state.dashboard.themeSounds);
     render();LexeditorUI.finishPluginLoading();
-  }).catch(error=>{main.replaceChildren(el("section",{class:"ff7-message"},el("h2",{},"FF7 interface error"),el("p",{},error.message)));LexeditorUI.finishPluginLoading()});
+  }).catch(error=>{main.replaceChildren(detailPanel({className:"ff7-detail",title:"FF7 interface error",identity:null,meta:"Load failed",body:[detailSection({title:"ERROR",body:[detailField({label:"MESSAGE",control:readonlyField(error.message)})]})]}));LexeditorUI.finishPluginLoading()});
   window.addEventListener("focus",()=>{if(state.loaded&&state.tab==="tweaks")void refreshPlatformConfig()});
   setInterval(()=>{if(state.loaded&&state.tab==="tweaks"&&!state.platformConfig?.available&&document.visibilityState==="visible")void refreshPlatformConfig()},3000);
   window.addEventListener("lexeditor-settings-ready",()=>{if(state.loaded&&state.tab==="info")render()});

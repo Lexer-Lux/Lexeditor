@@ -66,6 +66,7 @@ jobs:
           python tools/verify_ff7_extended.py
           python tools/verify_ff7_completion.py
           python tools/verify_ff7_edition_parity.py
+          python tools/verify_ff7_blank_ui.py
 
   browser-scenarios:
     runs-on: ubuntu-latest
@@ -100,7 +101,7 @@ jobs:
           python -m pip install playwright==1.57.0
           python -m playwright install --with-deps chromium
       - name: Verify page logic with synthetic data and component doubles
-        run: python tools/verify_ff7_ui.py ${{ matrix.tests }}
+        run: python tools/verify_ff7_ui_neutral.py ${{ matrix.tests }}
 
   real-shared-ui:
     name: Real shared UI, saves and sounds
@@ -122,7 +123,7 @@ jobs:
           python -m pip install playwright==1.57.0
           python -m playwright install --with-deps chromium
       - name: Exercise actual shared controls and both edition layouts
-        run: python tools/verify_ff7_rendered.py
+        run: python tools/verify_ff7_rendered_neutral.py
       - name: Retain synthetic UI screenshots
         if: always()
         uses: actions/upload-artifact@v4
