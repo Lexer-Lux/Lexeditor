@@ -18,6 +18,7 @@ import struct
 from typing import Any
 
 from .format_codec import pack_strings, string_table
+from . import semantics
 
 
 TEXT_MAP_EN = tuple(
@@ -459,6 +460,9 @@ def category_metadata() -> list[dict[str, Any]]:
             }
             if category.key == "materia":
                 metadata.update(MATERIA_FIELD_UI.get(field.key, {}))
+            metadata.update(semantics.metadata_for(category.key, field.key))
+            metadata.setdefault("group", semantics.DEFAULT_GROUPS.get(category.key, "Data"))
+            metadata.setdefault("help", "Numeric game value. Lexeditor writes the original FF7 field directly and preserves unrelated bytes.")
             fields.append(metadata)
         result.append({
             "id": category.key, "label": category.label,

@@ -169,7 +169,10 @@ class SceneArchive:
                 values = read_values(self._record(category, scene, slot), SCENE_CATEGORIES[category]['fields'])
                 suffix = f'Enemy ID {read_int(raw, slot * 2)}' if category == 'enemies' else (
                     f'Attack ID {read_int(raw, 0x840 + slot * 2)}' if category == 'enemyAttacks' else 'Formation composition; not field/world placement')
-                rows.append({'id':scene * count + slot, 'name':values.get('name', f'Battle {scene * 4 + slot}'),
+                game_id = (read_int(raw, slot * 2) if category == 'enemies' else
+                           read_int(raw, 0x840 + slot * 2) if category == 'enemyAttacks' else scene * 4 + slot)
+                rows.append({'id':scene * count + slot, 'scene':scene, 'gameId':game_id,
+                             'name':values.get('name', f'Battle {scene * 4 + slot}'),
                              'description':f'Scene {scene}, slot {slot}: {suffix}. AI is edited separately.', 'values':values})
         return rows
 
