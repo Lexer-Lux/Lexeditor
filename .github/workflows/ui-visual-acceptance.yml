@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - fix/ui-visual-acceptance-20260906
     paths:
       - 'ui/**'
       - 'games/blank/**'
