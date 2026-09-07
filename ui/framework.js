@@ -5778,8 +5778,8 @@
     heading.style.position = 'relative';
     heading.append(close);
     heading.after(drawer);
-    const syncCloseSlot = () => {
-      const iconBox = icon.getBoundingClientRect();
+    const syncCloseSlot = targetBox => {
+      const iconBox = targetBox || icon.getBoundingClientRect();
       close.style.transform = 'none';
       close.style.left = `${icon.offsetLeft}px`;
       close.style.top = `${icon.offsetTop}px`;
@@ -5790,21 +5790,25 @@
         close.style.transform = `translate(${iconBox.left - closeBox.left}px, ${iconBox.top - closeBox.top}px)`;
       }
     };
-    const settleCloseSlot = () => {
-      syncCloseSlot();
+    const settleCloseSlot = targetBox => {
+      syncCloseSlot(targetBox);
       requestAnimationFrame(() => {
-        syncCloseSlot();
-        requestAnimationFrame(syncCloseSlot);
+        syncCloseSlot(targetBox);
+        requestAnimationFrame(() => syncCloseSlot(targetBox));
       });
     };
     const open = async () => {
+      // Capture the slot while the ordinary header icon is still visible. The
+      // close control replaces THAT exact box even if opening the drawer causes
+      // a plugin theme to restyle or realign the hidden icon afterward.
+      const closedIconBox = icon.getBoundingClientRect();
       if (!drawer.childNodes.length) {
         const content = await getContent?.();
         if (content instanceof Node) drawer.append(content);
       }
       drawer.hidden = false;
       panel.classList.add('lex-model-preview-open');
-      settleCloseSlot();
+      settleCloseSlot(closedIconBox);
       icon.setAttribute('aria-expanded', 'true');
       await onOpen?.(drawer);
     };
