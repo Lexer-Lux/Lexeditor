@@ -2401,23 +2401,23 @@ body.lex-panel-layout-dragging * {
   justify-self:center;
 }
 
-.lex-editable-table .lex-column-cell-content { width:100%; }
+.lex-column-list .lex-column-cell-content { width:100%; }
 .lex-column-list-cell:has(.lex-source-control) .lex-column-cell-content { width:100%; }
 
 /* Editable table controls occupy the complete cell. Their compact provenance
    lane overlays the right edge instead of shortening the input or select. */
-.lex-editable-table .lex-source-control {
+.lex-column-list .lex-source-control {
   --lex-reference-rail-width:clamp(1.8em,20%,3.2em) !important;
   position:relative;
   display:block;
   width:100%;
 }
-.lex-editable-table .lex-source-control > :is(input:not([type="checkbox"]),select,textarea,.lex-unit-field,.lex-readonly-field) {
+.lex-column-list .lex-source-control > :is(input:not([type="checkbox"]),select,textarea,.lex-unit-field,.lex-readonly-field) {
   box-sizing:border-box;
   width:100%;
   padding-right:calc(var(--lex-reference-rail-width) + .4em);
 }
-.lex-editable-table .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+.lex-column-list .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
   position:absolute;
   z-index:2;
   top:1px;
@@ -2428,7 +2428,7 @@ body.lex-panel-layout-dragging * {
   justify-content:center;
 }
 
-.lex-editable-table input[type="checkbox"] {
+.lex-column-list input[type="checkbox"] {
   width:18px;
   height:18px;
   justify-self:center;
@@ -2582,7 +2582,7 @@ body.lex-panel-layout-dragging * {
 .lex-column-list-head-cell.dragging { opacity:.45;cursor:grabbing; }
 .lex-column-list-head-cell.drag-target { box-shadow:inset 3px 0 var(--lex-accent); }
 
-.lex-editable-table :is(input,select,textarea) {
+.lex-column-list :is(input,select,textarea) {
   width:100%;
   min-width:0;
   min-height:0;
@@ -2597,18 +2597,18 @@ body.lex-panel-layout-dragging * {
   text-align:center;
   text-shadow:inherit;
 }
-.lex-editable-table select:not(:focus) { appearance:none;background-image:none; }
+.lex-column-list select:not(:focus) { appearance:none;background-image:none; }
 
-.lex-editable-table :is(input,select,textarea):hover {
+.lex-column-list :is(input,select,textarea):hover {
   border-color:color-mix(in srgb, var(--lex-highlight) 42%, transparent);
 }
 
-.lex-editable-table :is(input,select,textarea):focus {
+.lex-column-list :is(input,select,textarea):focus {
   border-color:var(--lex-highlight);
   background:var(--lex-panel-2) !important;
   box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--lex-highlight) 35%, transparent);
 }
-.lex-editable-table .lex-column-list-cell:focus-within :is(input,select,textarea) {
+.lex-column-list .lex-column-list-cell:focus-within :is(input,select,textarea) {
   border-color:var(--lex-highlight);
   background:var(--lex-panel-2) !important;
   box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--lex-highlight) 35%, transparent);
@@ -2988,7 +2988,7 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
   min-width:0;
   transform:translateY(-50%);
 }
-.lex-editable-table .lex-source-control > .lex-reference-values {
+.lex-column-list .lex-source-control > .lex-reference-values {
   position:absolute;
   top:1px;
   right:2px;
