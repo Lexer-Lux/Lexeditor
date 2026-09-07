@@ -17,7 +17,7 @@ def test_detail_field_never_fabricates_info_bubbles_from_metadata():
 def test_manual_defines_semantic_only_contract():
     manual = text("docs/UI-MANUAL.md")
     assert "Info-bubble text explains **meaning and consequences**" in manual
-    assert "Never put the property's data type, numeric range, step size, displayed unit" in manual
+    assert "Never put the property's data type, allowed/storage numeric range, step size, displayed unit" in manual
     assert "If no useful semantic explanation is known, omit the info" in manual
 
 def test_known_metadata_filler_is_gone_from_plugins():
@@ -29,6 +29,11 @@ def test_known_metadata_filler_is_gone_from_plugins():
         "Storage range:", "Editor range:", "This Memoria array is edited as a comma-separated list.",
         "Stored parameter 1.", "Stored parameter 2.", "These are the exact stored Renzokuken table values.",
         "A bounded whole-number property. Focus it to reveal its type and valid range.",
+        "Both curves come from the routines the game uses",
+        "across levels 1–100",
+        "The first stop keypoint used by this train track.",
+        "The second stop keypoint used by this train track.",
+        "Probability from 0 to 1.",
     ):
         assert forbidden not in sources
 

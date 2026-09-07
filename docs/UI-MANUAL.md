@@ -142,7 +142,7 @@ It should tell a mod author what the property represents in the game/editor, wha
 changing it affects, non-obvious value semantics, important relationships with
 other properties, or caveats that cannot be inferred from the label alone.
 
-Never put the property's data type, numeric range, step size, displayed unit,
+Never put the property's data type, allowed/storage numeric range, step size, displayed unit,
 current value, or generic instructions such as `Set X`, `Edit X`, `Choose X`, or
 `Enable/disable X` in an info bubble. Those facts are already represented by the
 field and its metadata. If no useful semantic explanation is known, omit the info

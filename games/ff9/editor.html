@@ -189,7 +189,7 @@
       icon:infoIcon(),title:"Information",meta:"Installation, baseline data, and the Memoria helper",body:[
       detailSection({title:"GAME",body:[
         detailField({label:"STATE",control:value(game.ready?"Ready":"Incomplete"),
-          help:infoHelp(game.ready?"The installed game layout is confirmed.":"The installed game layout is incomplete.")}),
+          help:infoHelp(game.ready?"Ready means Lexeditor found the FF9 installation layout and the launcher/player files this editor depends on.":"Incomplete means one or more FF9 installation paths required by Lexeditor are missing or unreadable; the installation problems identify the concrete cause.")}),
         detailField({label:"FOLDER",control:value(game.root)}),
         detailField({label:"STEAM APP",control:value(`${game.steamAppId} · build ${game.steamBuildId||"unknown"}`)}),
       ]}),

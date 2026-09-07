@@ -1294,7 +1294,7 @@
       formula:coloredCurveFormula("XP(L) = 10 * L * A + floor(L^2 * B / 256)")}));
     if(!cards.length)return null;
     return detailSection({className:"gf-stat-growth",title:"LEVEL CURVES",
-      help:infoHelp("Both curves come from the routines the game uses: getGFhpForLvl and GetGFLevelFromExperience in FF8_EN.exe."),
+      help:infoHelp("The HP curve controls this GF's maximum HP as it levels; the XP curve controls the cumulative experience thresholds for GF levels. Both use FF8's verified game routines."),
       body:el("div",{class:"character-curve-grid"},...cards)});
   }
   function characterDetail(row){
@@ -1445,7 +1445,7 @@
       const statFields=enemyCurveFields(fields,stat),variables=statFields.map((field,index)=>({label:"ABCD"[index],control:fieldSourceControl(field,"enemies",rowId,{internal:true})}));
       return curveEditor({title:stat,className:"ff8-character-curve ff8-enemy-curve",overlayExtrema:true,variables,domain:{min:1,max:100},range:()=>enemyCurveRange(stat,statFields),graphLabel:`${stat} from enemy level 1 to 100`,evaluate:level=>enemyCurveValue(stat,statFields,level),formula:coloredCurveFormula(enemyCurveFormula(stat))});
     });
-    return detailSection({className:"enemy-stat-growth character-stat-growth",title:"STAT CURVES",help:infoHelp("Each graph uses FF8's verified four-byte enemy stat equation across levels 1–100."),body:el("div",{class:"character-curve-grid"},...cards)});
+    return detailSection({className:"enemy-stat-growth character-stat-growth",title:"STAT CURVES",help:infoHelp("Each graph previews how this enemy stat changes as enemy level changes, using FF8's verified four-byte stat equation."),body:el("div",{class:"character-curve-grid"},...cards)});
   }
   function magicSearchControl(value,prompt,accept,origin){
     const magic=state.data.magic.rows.find(row=>Number(row.id)===Number(value))||{id:value,name:`Magic ${value}`};
@@ -1658,7 +1658,7 @@
   function railPointNumber(row,point,key){const find=dataset=>worldRow(dataset,"railTrack",row.id)?.points?.[point.id]?.[key],refs=state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:find(state.referenceData[reference.id])})).filter(entry=>entry.value!==undefined),update=value=>point[key]=Number(value);return sourceControl(numberControl(point[key],-2147483648,2147483647,1,update,{"aria-label":`Track ${row.id} point ${point.id} ${key.toLocaleUpperCase()}`}),()=>point[key],find(state.vanilla),refs,update)}
   function railTrackDetail(row,prefs){
     const vanilla=worldRow(state.vanilla,"railTrack",row.id),refs=key=>state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:worldRow(state.referenceData[reference.id],"railTrack",row.id)?.[key]})).filter(entry=>entry.value!==undefined),choices=row.points.map(point=>({value:point.id,name:`Point ${point.id}`})),stop=(key,label)=>{const control=selectControl(row[key],choices,value=>row[key]=value);control.setAttribute("aria-label",label);return sourceControl(control,()=>row[key],vanilla?.[key],refs(key),value=>row[key]=Number(value),value=>`Point ${value}`)},points=columnList({rows:row.points,key:point=>point.id,class:"rail-point-table ff8-record-list",editable:true,template:"70px repeat(3,minmax(110px,1fr))",columns:[{key:"id",label:"POINT",numberedId:true,sortable:false,render:point=>point.id},{key:"x",label:"X",numeric:true,sortable:false,render:point=>railPointNumber(row,point,"x")},{key:"y",label:"Y",numeric:true,sortable:false,render:point=>railPointNumber(row,point,"y")},{key:"z",label:"Z",numeric:true,sortable:false,render:point=>railPointNumber(row,point,"z")}]});
-    return sharedDetail({...row,name:`TRAIN TRACK ${row.id}`},prefs,[detailSection({title:"TRAIN STOPS",body:[detailField({label:"STOP 1",help:infoHelp("The first stop keypoint used by this train track."),control:stop("trainStop1","Train stop 1")}),detailField({label:"STOP 2",help:infoHelp("The second stop keypoint used by this train track."),control:stop("trainStop2","Train stop 2")})]}),detailSection({className:"rail-track-points",title:"KEYPOINTS",body:[points]})],"world-map-detail world-rail");
+    return sharedDetail({...row,name:`TRAIN TRACK ${row.id}`},prefs,[detailSection({title:"TRAIN STOPS",body:[detailField({label:"STOP 1",help:infoHelp("Together with Stop 2, this keypoint defines one endpoint of the rail route used by this train track."),control:stop("trainStop1","Train stop 1")}),detailField({label:"STOP 2",help:infoHelp("Together with Stop 1, this keypoint defines the other endpoint of the rail route used by this train track."),control:stop("trainStop2","Train stop 2")})]}),detailSection({className:"rail-track-points",title:"KEYPOINTS",body:[points]})],"world-map-detail world-rail");
   }
   const worldTexturePalettes={};
   function worldTextureDataset(){return state.activeSource==="mine"?"current":state.activeSource}
@@ -1838,7 +1838,7 @@
     const body=[
       detailSection({title:"GAME",body:[
         detailField({label:"STATE",control:value(game.ready?"Ready":"Needs attention"),
-          help:infoHelp(game.ready?"Final Fantasy 8 is installed and its files are readable.":"The configured installation needs attention before this plugin can edit it.")}),
+          help:infoHelp(game.ready?"Ready means Lexeditor found the configured FF8 installation and can read the game files this editor depends on.":"Not ready means one or more required FF8 paths or files are missing or unreadable; the reported installation problems identify the concrete cause.")}),
         detailField({label:"FOLDER",control:value(game.root),
           pin:el("button",{class:"ff8-folder-button",type:"button",title:"Open the game folder","aria-label":"Open the game folder",onclick:openFolder},folderIcon())}),
         detailField({label:"EXECUTABLE",control:value(game.executable)}),
