@@ -53,8 +53,8 @@ def main():
         assert call_target(exe, damage) == 0x48FE20, hex(damage)
         assert call_target(exe, update) == 0x48EF80, hex(update)
     assert at(exe, 0x48EF80, 6) == bytes.fromhex('8A 0D C1 80 D2 01')
-    assert at(exe, 0x48EF8F, 7) == bytes.fromhex('FE C1 8D 04 40 88 0D')
-    assert at(exe, 0x48EF96, 4) == struct.pack('<I', ATTACK_HIT_COUNT_1)
+    assert at(exe, 0x48EF90, 5) == bytes.fromhex('FE C1 8D 04 40')
+    assert at(exe, 0x48EF95, 6) == b'\x88\x0D' + struct.pack('<I', ATTACK_HIT_COUNT_1)
     assert at(exe, 0x4851E4, 7) == bytes.fromhex('C6 05 C1 80 D2 01 00')
     assert at(exe, 0x48FE2A, 10) == bytes.fromhex('8D 0C 40 57 8D 14 88 C1 E2 04')
 
