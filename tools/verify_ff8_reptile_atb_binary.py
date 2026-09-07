@@ -9,7 +9,8 @@ ADDRESSES = {
     'ATB increment seam': 0x004843CF,
     'Battle_applyDamage': 0x0048FE20,
     'HIT_ELEMENT': 0x01D2A239,
-    'scene enemy identities': 0x01D287DC,
+    # Runtime indexes kEncounter + 0x38; MSVC constant-folds that expression.
+    'scene enemy identities': 0x01D28814,
 }
 EXPORTS = {
     b'lexeditor_ff8_reptile_atb_increment',
