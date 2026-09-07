@@ -46,7 +46,7 @@ def test_deploy_preserves_ini_and_activates_first(env):
     assert b'[Unknown]\r\nThing = 7 ; keep\r\n' in ini
     assert b'FolderNames = "Lexeditor", "OtherMod"' in ini
     assert (game / "Lexeditor/StreamingAssets/Data/Items/Items.csv").read_bytes() == b"data"
-    assert (game / "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.dll").read_bytes() == runtime.read_bytes()
+    assert (game / "Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll").read_bytes() == runtime.read_bytes()
     state = features.revert(game, project, runtime)
     assert not state["deployed"]
     assert b'FolderNames = "OtherMod"' in (game / "Memoria.ini").read_bytes()
