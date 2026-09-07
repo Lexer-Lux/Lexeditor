@@ -24,4 +24,4 @@ jobs:
           name: ui-visual-iteration
           path: out/ui-visual-acceptance
           if-no-files-found: warn
-          # Temporary branch-only visual loop; remove before merge. Full current-branch rerun.
+          # Temporary branch-only visual loop; remove before merge. Fixed-row label rerun.
