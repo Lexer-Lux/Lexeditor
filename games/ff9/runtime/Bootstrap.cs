@@ -23,6 +23,7 @@ namespace Memoria.Scripts.Lexeditor
     {
         private static Boolean _installed;
         private static LexeditorRuntime _runtime;
+        private static LexeditorUIEnhancements _uiEnhancements;
 
         public static void Install()
         {
@@ -39,7 +40,7 @@ namespace Memoria.Scripts.Lexeditor
         {
             try
             {
-                if (_runtime == null)
+                if (_runtime == null || _uiEnhancements == null)
                 {
                     GameObject host = GameObject.Find("Lexeditor FF9 Runtime");
                     if (host == null)
@@ -47,9 +48,18 @@ namespace Memoria.Scripts.Lexeditor
                         host = new GameObject("Lexeditor FF9 Runtime");
                         UnityEngine.Object.DontDestroyOnLoad(host);
                     }
-                    _runtime = host.GetComponent<LexeditorRuntime>();
                     if (_runtime == null)
-                        _runtime = host.AddComponent<LexeditorRuntime>();
+                    {
+                        _runtime = host.GetComponent<LexeditorRuntime>();
+                        if (_runtime == null)
+                            _runtime = host.AddComponent<LexeditorRuntime>();
+                    }
+                    if (_uiEnhancements == null)
+                    {
+                        _uiEnhancements = host.GetComponent<LexeditorUIEnhancements>();
+                        if (_uiEnhancements == null)
+                            _uiEnhancements = host.AddComponent<LexeditorUIEnhancements>();
+                    }
                 }
                 _runtime.GameLoopUpdate();
             }
@@ -65,6 +75,7 @@ namespace Memoria.Scripts.Lexeditor
             GameLoopManager.Quit -= OnQuit;
             _installed = false;
             _runtime = null;
+            _uiEnhancements = null;
         }
     }
 
@@ -75,6 +86,8 @@ namespace Memoria.Scripts.Lexeditor
         private static Single _nextPoll;
         private static Boolean _improvedInterface;
         private static Boolean _betterEat;
+        private static Boolean _xpBars;
+        private static Boolean _hpmpBars;
 
         public static Boolean ImprovedInterface
         {
@@ -84,6 +97,16 @@ namespace Memoria.Scripts.Lexeditor
         public static Boolean BetterEat
         {
             get { Refresh(); return _betterEat; }
+        }
+
+        public static Boolean XPBars
+        {
+            get { Refresh(); return _xpBars; }
+        }
+
+        public static Boolean HPMPBars
+        {
+            get { Refresh(); return _hpmpBars; }
         }
 
         private static void Refresh()
@@ -102,6 +125,8 @@ namespace Memoria.Scripts.Lexeditor
                 {
                     _improvedInterface = false;
                     _betterEat = false;
+                    _xpBars = false;
+                    _hpmpBars = false;
                     return;
                 }
                 DateTime stamp = File.GetLastWriteTimeUtc(_path);
@@ -110,6 +135,8 @@ namespace Memoria.Scripts.Lexeditor
                 _lastWriteUtc = stamp;
                 Boolean improved = false;
                 Boolean eat = false;
+                Boolean xpBars = false;
+                Boolean hpmpBars = false;
                 foreach (String sourceLine in File.ReadAllLines(_path))
                 {
                     String line = sourceLine.Trim();
@@ -125,15 +152,23 @@ namespace Memoria.Scripts.Lexeditor
                         improved = enabled;
                     else if (key.Equals("BetterEat", StringComparison.OrdinalIgnoreCase))
                         eat = enabled;
+                    else if (key.Equals("XPBars", StringComparison.OrdinalIgnoreCase))
+                        xpBars = enabled;
+                    else if (key.Equals("HPMPBars", StringComparison.OrdinalIgnoreCase))
+                        hpmpBars = enabled;
                 }
                 _improvedInterface = improved;
                 _betterEat = eat;
+                _xpBars = xpBars;
+                _hpmpBars = hpmpBars;
             }
             catch (Exception ex)
             {
                 Log.Error(ex, "[LexeditorFF9] Could not read feature configuration.");
                 _improvedInterface = false;
                 _betterEat = false;
+                _xpBars = false;
+                _hpmpBars = false;
             }
         }
     }

@@ -63,10 +63,11 @@ jobs:
             -out:"$candidate" \
             -r:"$ref/mscorlib.dll" -r:"$ref/System.dll" -r:"$ref/System.Core.dll" \
             -r:out/ff9-refs/Assembly-CSharp.dll -r:out/ff9-refs/Memoria.Prime.dll -r:"$unity" \
-            games/ff9/runtime/Bootstrap.cs games/ff9/runtime/Runtime.cs games/ff9/runtime/BetterEatScript.cs
+            games/ff9/runtime/Bootstrap.cs games/ff9/runtime/Runtime.cs games/ff9/runtime/UIEnhancements.cs games/ff9/runtime/BetterEatScript.cs
           test -s "$candidate"
           strings "$candidate" | grep -q BetterEatScript
           strings "$candidate" | grep -q LexeditorBootstrap
+          strings "$candidate" | grep -q LexeditorUIEnhancements
           cmp "$candidate" "$shipped"
           sha256sum "$candidate" "$shipped"
       - name: Test FF9 Python and controller code

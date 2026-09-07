@@ -18,12 +18,21 @@ s = s.replace(
 '''state.dashboard.runtime=await api("/api/runtime");
       state.dataMap=await api("/api/datamap");
       state.deployment=await api("/api/deployment");''')
+# The replacement above deliberately matches both legacy and integrated files.
+# Collapse any repeated insertion so running this patcher twice is a no-op.
+duplicate_deployment = '''state.dataMap=await api("/api/datamap");
+      state.deployment=await api("/api/deployment");
+      state.deployment=await api("/api/deployment");'''
+single_deployment = '''state.dataMap=await api("/api/datamap");
+      state.deployment=await api("/api/deployment");'''
+while duplicate_deployment in s:
+    s = s.replace(duplicate_deployment, single_deployment)
 
-old = '''function tweaks(){
+legacy = '''function tweaks(){
     setToolbar([subtabBar({tabs:[{id:"memoria",label:"Memoria"}],active:"memoria",label:"Tweaks",change:()=>{}})]);
     $("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},"Memoria"),el("p",{},"can't be bothered to make this when the memoria guys already did this themselves. just hit play and you can edit the settings in the launcher that comes up")));
   }'''
-new = '''function tweaks(){
+previous = '''function tweaks(){
     const tabs=[{id:"memoria",label:"Memoria"},{id:"improved",label:"Improved Interface"},{id:"eat",label:"Better Eat"}];
     setToolbar([subtabBar({tabs,active:state.tweak,label:"Tweaks",change:id=>{state.tweak=id;tweaks()}})]);
     if(state.tweak==="memoria"){
@@ -52,9 +61,42 @@ new = '''function tweaks(){
     catch(error){state.runtimeError=error.message;throw error}
     finally{state.busy=false;await render()}
   }'''
-if old in s:
-    s = s.replace(old, new)
-elif new not in s:
+updated = '''function tweaks(){
+    const tabs=[{id:"memoria",label:"Memoria"},{id:"improved",label:"Improved Interface"},{id:"eat",label:"Better Eat"},{id:"xp",label:"XP Bars"},{id:"hpmp",label:"HP/MP Bars"}];
+    setToolbar([subtabBar({tabs,active:state.tweak,label:"Tweaks",change:id=>{state.tweak=id;tweaks()}})]);
+    if(state.tweak==="memoria"){
+      $("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},"Memoria"),el("p",{},"can't be bothered to make this when the memoria guys already did this themselves. just hit play and you can edit the settings in the launcher that comes up")));
+      return;
+    }
+    const defs={
+      improved:{key:"ImprovedInterface",title:"Improved Interface",description:"Adds Circle reveal-only dialogue, Square fast-forward, snapshot-only dialogue history, full-width battle ATB/Trance with HP/MP bars, queued action drain, an unbeaten Tetra Master opponent prompt, and highlights Mognet when the current Moogle can receive one of your carried letters. Keyboard equivalents follow your normal Memoria bindings."},
+      eat:{key:"BetterEat",title:"Better Eat",description:"Disables useless Eat/Cook targets, refuses to consume enemies that cannot teach Quina anything, and gives enemies carrying an unlearned Blue Magic ability a blue glow."},
+      xp:{key:"XPBars",title:"XP Bars",description:"Adds an experience-progress bar under each party member's block on the post-battle EXP screen."},
+      hpmp:{key:"HPMPBars",title:"HP/MP Bars",description:"Adds a red HP bar and blue MP bar directly below each party member's HP and MP text in battle."}
+    };
+    const def=defs[state.tweak]||defs.improved,key=def.key,title=def.title,description=def.description;
+    const enabled=!!state.features?.features?.[key],deployed=state.deployment?.deployed;
+    const toggle=el("label",{},el("input",{type:"checkbox",checked:enabled,disabled:state.busy||state.activeSource!=="mine",onchange:event=>{state.features.features[key]=event.target.checked;shell.refresh()}})," Enabled");
+    const actions=el("div",{class:"ff9-runtime-actions"},
+      el("button",{type:"button",disabled:state.busy||dirtyCount()>0||state.activeSource!=="mine",onclick:()=>deploymentAction("deploy")},deployed?"Redeploy Project":"Deploy Project"),
+      el("button",{type:"button",disabled:state.busy||!deployed||state.activeSource!=="mine",onclick:()=>deploymentAction("revert")},"Revert Lexeditor Mod"));
+    $("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},title),el("p",{},description),toggle,
+      el("p",{class:"ff9-source"},deployed?(state.deployment.runtimeCurrent?"Deployed runtime is current.":"Deployed runtime needs redeployment."):"Save changes, then Deploy Project to activate them in Memoria."),actions));
+  }
+  async function deploymentAction(action){
+    if(state.busy||state.activeSource!=="mine")return;
+    if(dirtyCount()){state.runtimeError="Save your project changes before deployment.";await render();return}
+    if(action==="revert"&&!window.confirm("Remove only the Lexeditor-owned FF9 Memoria mod folder and its FolderNames entry?"))return;
+    state.busy=true;shell.refresh();
+    try{state.deployment=await api(`/api/deployment/${action}`,{});state.dataMap=await api("/api/datamap");state.runtimeError=""}
+    catch(error){state.runtimeError=error.message;throw error}
+    finally{state.busy=false;await render()}
+  }'''
+if previous in s:
+    s = s.replace(previous, updated)
+elif legacy in s:
+    s = s.replace(legacy, updated)
+elif updated not in s:
     raise SystemExit('tweaks block not found and integrated block not present')
 
 s = s.replace(
