@@ -5768,9 +5768,8 @@
     const openLabel = typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview';
     const closeLabel = typeof spec === 'object' && spec.closeLabel ? spec.closeLabel : 'Close model preview';
 
-    // Keep the SAME header icon element as the control in both states. This
-    // makes the X occupy the exact same rendered box by construction instead
-    // of trying to chase the icon with a separately positioned button.
+    // The open icon and X are two states of ONE header control. No duplicate
+    // close button exists, so the X inherits the exact same hit target/box.
     const iconContent = document.createElement('span');
     iconContent.className = 'lex-model-preview-icon-content';
     while (icon.firstChild) iconContent.append(icon.firstChild);
@@ -5786,17 +5785,37 @@
     drawer.setAttribute('aria-label', typeof spec === 'object' && spec.label ? spec.label : 'Model preview');
     heading.after(drawer);
 
+    // Some narrow layouts re-center the Detail heading by ~2 px once the
+    // drawer becomes visible. Freeze the user's header control at its closed
+    // rendered coordinates instead of letting the replacement jump.
+    let frozenSlot = null;
+    const lockIconSlot = target => {
+      if (!target) return;
+      icon.style.translate = 'none';
+      const current = icon.getBoundingClientRect();
+      icon.style.translate = `${target.left - current.left}px ${target.top - current.top}px`;
+    };
+    const settleIconSlot = target => {
+      lockIconSlot(target);
+      requestAnimationFrame(() => {
+        lockIconSlot(target);
+        requestAnimationFrame(() => lockIconSlot(target));
+      });
+    };
+
     let busy = false;
     const open = async () => {
       if (busy || panel.classList.contains('lex-model-preview-open')) return;
       busy = true;
       try {
+        frozenSlot = icon.getBoundingClientRect();
         if (!drawer.childNodes.length) {
           const content = await getContent?.();
           if (content instanceof Node) drawer.append(content);
         }
         drawer.hidden = false;
         panel.classList.add('lex-model-preview-open');
+        settleIconSlot(frozenSlot);
         icon.setAttribute('aria-expanded', 'true');
         icon.setAttribute('aria-label', closeLabel);
         icon.title = closeLabel;
@@ -5810,6 +5829,8 @@
         await onClose?.(drawer);
         panel.classList.remove('lex-model-preview-open');
         drawer.hidden = true;
+        icon.style.translate = '';
+        frozenSlot = null;
         icon.setAttribute('aria-expanded', 'false');
         icon.setAttribute('aria-label', openLabel);
         icon.title = openLabel;
@@ -5833,6 +5854,14 @@
         event.preventDefault();
         toggle();
       }
+    });
+    window.addEventListener('resize', () => {
+      if (!frozenSlot || !panel.classList.contains('lex-model-preview-open')) return;
+      // On a resize, release the old absolute target and use the new natural
+      // closed slot as the basis for the open state.
+      icon.style.translate = '';
+      frozenSlot = icon.getBoundingClientRect();
+      settleIconSlot(frozenSlot);
     });
     panel.lexModelPreview = {open, close: shut, drawer};
     return panel;
