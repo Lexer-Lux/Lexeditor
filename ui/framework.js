@@ -5960,7 +5960,7 @@
     if (!(label instanceof HTMLElement)) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
-    while (size > 8 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth + 1)) {
+    while (size > 6 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth + 1)) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }
