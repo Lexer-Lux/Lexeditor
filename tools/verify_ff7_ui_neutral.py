@@ -29,5 +29,24 @@ Object.assign(window.LexeditorUI,{
 })();
 '''
 
+_original_kernel_failure = target.PageTests.test_kernel_api_failure_keeps_auxiliary_tabs_and_runtime_detection
+
+def _diagnostic_kernel_failure(self):
+    try:
+        _original_kernel_failure(self)
+    except Exception:
+        try:
+            print("NEUTRAL-HARNESS state.tab:", self.page.evaluate("state.tab"))
+            print("NEUTRAL-HARNESS state.saving:", self.page.evaluate("state.saving"))
+            print("NEUTRAL-HARNESS platformLoading:", self.page.evaluate("state.platformLoading"))
+            print("NEUTRAL-HARNESS main text:", self.page.locator("main").inner_text())
+            print("NEUTRAL-HARNESS buttons:", self.page.locator("main button").all_inner_texts())
+            print("NEUTRAL-HARNESS page errors:", self.errors)
+        except Exception as diagnostic_error:
+            print("NEUTRAL-HARNESS diagnostic failed:", diagnostic_error)
+        raise
+
+target.PageTests.test_kernel_api_failure_keeps_auxiliary_tabs_and_runtime_detection = _diagnostic_kernel_failure
+
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)
