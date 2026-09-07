@@ -24,11 +24,8 @@ constexpr std::uintptr_t kAtbPatch = 0x004843CF;
 constexpr std::uintptr_t kAtbContinueAddress = 0x004843D5;
 constexpr std::uintptr_t kApplyDamage = 0x0048FE20;
 constexpr std::uintptr_t kHitElement = 0x01D2A239;
+constexpr std::uintptr_t kAttackHitCount = 0x01D280C1;
 constexpr std::uintptr_t kEncounter = 0x01D287DC;
-constexpr std::uintptr_t kCurrentAttacker = 0x01D27AD8;
-constexpr std::uintptr_t kCommandType = 0x01D27AD9;
-constexpr std::uintptr_t kActionVariant = 0x01D27ADB;
-constexpr std::uintptr_t kActionId = 0x01D27AF4;
 constexpr std::uintptr_t kDamageCalls[] = {
     0x004850FA, 0x004851F1, 0x0048EA93, 0x0048F3CB, 0x0048F44C,
 };
@@ -40,8 +37,8 @@ lexeditor_reptile_atb::SpeedState g_speed;
 bool g_reptile_ids[255]{};
 bool g_enabled = false;
 bool g_installed = false;
-std::uint64_t g_action_signature = ~std::uint64_t{0};
 std::uint16_t g_seen_targets = 0;
+std::uint8_t g_last_hit_count = 0xFF;
 
 std::string trim(std::string value)
 {
@@ -121,8 +118,8 @@ bool load_runtime()
 void reset_battle_state()
 {
     g_speed.reset();
-    g_action_signature = ~std::uint64_t{0};
     g_seen_targets = 0;
+    g_last_hit_count = 0xFF;
 }
 
 bool relative_call_targets(std::uintptr_t site, std::uintptr_t target)
@@ -144,33 +141,25 @@ bool reptile_target(unsigned target)
     return id >= 0 && id < 255 && g_reptile_ids[id];
 }
 
-std::uint64_t current_action_signature()
+void begin_resolved_hit()
 {
-    const auto attacker = *reinterpret_cast<const std::uint8_t *>(kCurrentAttacker);
-    const auto command = *reinterpret_cast<const std::uint8_t *>(kCommandType);
-    const auto variant = *reinterpret_cast<const std::uint8_t *>(kActionVariant);
-    const auto action = *reinterpret_cast<const std::uint16_t *>(kActionId);
-    // Damage for all hits/targets of one action is resolved in the same native
-    // battle tick. Include the action metadata as well as the frame so repeated
-    // hits cannot multiply speed repeatedly, while a later identical cast can.
-    return (static_cast<std::uint64_t>(frame_counter) << 32) ^
-        (static_cast<std::uint64_t>(variant) << 56) ^
-        (static_cast<std::uint64_t>(attacker) << 24) ^
-        (static_cast<std::uint64_t>(command) << 16) ^
-        static_cast<std::uint64_t>(action);
+    // Battle_UpdateDamage increments this byte immediately after every one of
+    // the five Battle_applyDamage call sites below. FF8 resets it to zero at
+    // the next action. A non-increasing value therefore marks a new move even
+    // when a multi-hit animation spans several rendered frames.
+    const auto hit_count = *reinterpret_cast<const std::uint8_t *>(kAttackHitCount);
+    if (hit_count <= g_last_hit_count)
+        g_seen_targets = 0;
+    g_last_hit_count = hit_count;
 }
 
 void apply_resolved_element(unsigned target)
 {
+    begin_resolved_hit();
     if (!g_enabled || !reptile_target(target)) return;
     const auto element = *reinterpret_cast<const std::uint8_t *>(kHitElement);
     if (!(element & (lexeditor_reptile_atb::kFireElement | lexeditor_reptile_atb::kIceElement))) return;
 
-    const auto signature = current_action_signature();
-    if (signature != g_action_signature) {
-        g_action_signature = signature;
-        g_seen_targets = 0;
-    }
     const auto bit = static_cast<std::uint16_t>(1u << target);
     if (g_seen_targets & bit) return;
     g_seen_targets = static_cast<std::uint16_t>(g_seen_targets | bit);
