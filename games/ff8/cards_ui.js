@@ -124,7 +124,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       el("div",{className:"ff8-card-player-grid"},...player.params.map(param=>el("label",{className:"ff8-card-player-field"},
         el("span",{},param.name),
         el("input",{type:"number",min:0,max:16777215,step:1,value:param.value,disabled:!param.editable,oninput:event=>{param.value=Number(event.target.value);playerStatus="Unsaved player changes";}}),
-        el("span",{className:"ff8-card-player-mode"},param.mode==="variable"?`savemap variable ${param.value}`:param.mode))))));
+        el("span",{className:"ff8-card-player-mode"},param.mode==="variable"?`savemap variable ${param.value}`:param.mode)))))));
     return el("div",{},toolbar,
       el("p",{className:"muted"},"NPC card-player data comes from the seven fixed-size values immediately before field opcode CARDGAME (0x13A). Variable pushes remain variables; Lexeditor changes only their stored value."),
       content,el("div",{className:"ff8-card-player-mode"},playerStatus));
