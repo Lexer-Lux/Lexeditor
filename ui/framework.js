@@ -5783,6 +5783,11 @@
     drawer.setAttribute('aria-label', typeof spec === 'object' && spec.label ? spec.label : 'Model preview');
     heading.after(drawer);
 
+    const snapshotSlot = () => {
+      const box = icon.getBoundingClientRect();
+      return {left:box.left, top:box.top, width:box.width, height:box.height};
+    };
+    let activationSlot = null;
     let frozenSlot = null;
     let slotLockGeneration = 0;
     const releaseIconSlot = () => {
@@ -5793,8 +5798,6 @@
       if (!target || !panel.classList.contains('lex-model-preview-open')) return;
       releaseIconSlot();
       const current = icon.getBoundingClientRect();
-      // Relative offsets affect only paint position, not the heading's grid
-      // geometry, so the control cannot feed its correction back into layout.
       icon.style.left = `${target.left - current.left}px`;
       icon.style.top = `${target.top - current.top}px`;
     };
@@ -5814,8 +5817,11 @@
       if (busy || panel.classList.contains('lex-model-preview-open')) return;
       busy = true;
       try {
-        const box = icon.getBoundingClientRect();
-        frozenSlot = {left:box.left, top:box.top, width:box.width, height:box.height};
+        // pointerdown is captured before the browser focuses the role=button.
+        // Use that box so changing focus state cannot make the replacement X
+        // jump before the click handler even starts.
+        frozenSlot = activationSlot || snapshotSlot();
+        activationSlot = null;
         if (!drawer.childNodes.length) {
           const content = await getContent?.();
           if (content instanceof Node) drawer.append(content);
@@ -5839,6 +5845,7 @@
         panel.classList.remove('lex-model-preview-open');
         drawer.hidden = true;
         releaseIconSlot();
+        activationSlot = null;
         frozenSlot = null;
         icon.setAttribute('aria-expanded', 'false');
         icon.setAttribute('aria-label', openLabel);
@@ -5853,6 +5860,9 @@
     icon.setAttribute('aria-label', openLabel);
     icon.setAttribute('aria-expanded', 'false');
     icon.title = openLabel;
+    icon.addEventListener('pointerdown', () => {
+      if (!panel.classList.contains('lex-model-preview-open')) activationSlot = snapshotSlot();
+    });
     icon.addEventListener('click', event => {
       event.preventDefault();
       event.stopPropagation();
@@ -5860,6 +5870,7 @@
     });
     icon.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') {
+        if (!panel.classList.contains('lex-model-preview-open')) activationSlot = snapshotSlot();
         event.preventDefault();
         toggle();
       }
@@ -5867,8 +5878,7 @@
     window.addEventListener('resize', () => {
       if (!frozenSlot || !panel.classList.contains('lex-model-preview-open')) return;
       releaseIconSlot();
-      const box = icon.getBoundingClientRect();
-      frozenSlot = {left:box.left, top:box.top, width:box.width, height:box.height};
+      frozenSlot = snapshotSlot();
       lockIconSlot(frozenSlot);
       holdIconSlot(frozenSlot);
     });
