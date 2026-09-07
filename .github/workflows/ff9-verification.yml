@@ -1,7 +1,7 @@
 name: FF9 verification
 on:
   push:
-    branches: [codex/ff9-complete-20260906]
+    branches: [master]
     paths:
       - 'games/ff9/**'
       - 'tests/*ff9*'
@@ -14,7 +14,7 @@ on:
       - 'tools/ff9/**'
       - '.github/workflows/ff9-verification.yml'
 permissions:
-  contents: write
+  contents: read
 concurrency:
   group: ff9-${{ github.ref }}
   cancel-in-progress: true
@@ -24,9 +24,6 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'push' && 'codex/ff9-complete-20260906' || github.ref }}
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -38,14 +35,18 @@ jobs:
           dotnet-version: '8.0.x'
       - name: Install test dependencies
         run: python -m pip install pytest
-      - name: Apply deterministic FF9 feature UI integration
-        run: python tools/ff9/patch_features_ui.py
-      - name: Build exact Memoria Scripts runtime against pinned publisher assemblies
+      - name: Verify deterministic FF9 feature UI integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/ff9/patch_features_ui.py
+          git diff --exit-code -- games/ff9/editor.html
+      - name: Rebuild exact Memoria Scripts runtime against pinned publisher assemblies
         shell: bash
         run: |
           set -euo pipefail
           PYTHONPATH=. python tools/ff9/extract_memoria_refs.py out/ff9-refs
-          mkdir -p out/packages
+          mkdir -p out/packages out/ff9-runtime
           for spec in microsoft.netframework.referenceassemblies.net35:1.0.3 unityengine5:5.5.0; do
             name=${spec%:*}; version=${spec#*:}
             curl --fail --location --retry 2 "https://api.nuget.org/v3-flatcontainer/$name/$version/$name.$version.nupkg" -o "out/$name.nupkg"
@@ -56,37 +57,23 @@ jobs:
           csc="$root/sdk/$sdk/Roslyn/bincore/csc.dll"
           ref=out/packages/microsoft.netframework.referenceassemblies.net35/build/.NETFramework/v3.5
           unity=out/packages/unityengine5/lib/net35/UnityEngine.dll
+          candidate=out/ff9-runtime/Memoria.Scripts.Lexeditor.dll
+          shipped=games/ff9/runtime/Memoria.Scripts.Lexeditor.dll
           dotnet "$csc" -nologo -target:library -langversion:7.3 -nostdlib+ -deterministic+ \
-            -out:games/ff9/runtime/Memoria.Scripts.Lexeditor.dll \
+            -out:"$candidate" \
             -r:"$ref/mscorlib.dll" -r:"$ref/System.dll" -r:"$ref/System.Core.dll" \
             -r:out/ff9-refs/Assembly-CSharp.dll -r:out/ff9-refs/Memoria.Prime.dll -r:"$unity" \
             games/ff9/runtime/Bootstrap.cs games/ff9/runtime/Runtime.cs games/ff9/runtime/BetterEatScript.cs
-          test -s games/ff9/runtime/Memoria.Scripts.Lexeditor.dll
-          strings games/ff9/runtime/Memoria.Scripts.Lexeditor.dll | grep -q BetterEatScript
-          strings games/ff9/runtime/Memoria.Scripts.Lexeditor.dll | grep -q LexeditorBootstrap
-          sha256sum games/ff9/runtime/Memoria.Scripts.Lexeditor.dll
+          test -s "$candidate"
+          strings "$candidate" | grep -q BetterEatScript
+          strings "$candidate" | grep -q LexeditorBootstrap
+          cmp "$candidate" "$shipped"
+          sha256sum "$candidate" "$shipped"
       - name: Test FF9 Python and controller code
         run: |
           python -m compileall -q games/ff9
           python -m pytest -q tests/test_ff9*.py
           node --test tests/ff9_editor.test.cjs
-      - name: Upload verified FF9 runtime
-        uses: actions/upload-artifact@v4
-        with:
-          name: ff9-compiled-runtime
-          path: games/ff9/runtime/Memoria.Scripts.Lexeditor.dll
-          retention-days: 1
-      - name: Commit verified runtime and feature UI
-        if: github.event_name == 'push'
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'Lexeditor FF9 Runtime Build'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add games/ff9/runtime/Memoria.Scripts.Lexeditor.dll games/ff9/editor.html
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Build verified FF9 runtime and feature controls'
-          git push origin HEAD:codex/ff9-complete-20260906
       - name: Collect exact public sources for offline integration checks
         if: always()
         shell: bash
