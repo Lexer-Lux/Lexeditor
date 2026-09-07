@@ -60,8 +60,12 @@ struct SpeedState {
             remainder[index] = 0.0;
             return std::numeric_limits<std::uint32_t>::max();
         }
-        const double whole = std::floor(std::max(0.0, value));
-        remainder[index] = value - whole;
+        // Decimal rates such as 0.92 are not exactly representable in binary.
+        // Snap values that are only floating-point epsilon below the next
+        // integer so 1000 frames at 0.92 really total 920 native ATB ticks.
+        const double nonnegative = std::max(0.0, value);
+        const double whole = std::floor(nonnegative + 1e-9);
+        remainder[index] = std::max(0.0, nonnegative - whole);
         return static_cast<std::uint32_t>(whole);
     }
 };
