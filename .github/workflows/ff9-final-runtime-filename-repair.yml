@@ -1,0 +1,119 @@
+name: One-shot FF9 final runtime filename repair
+on:
+  push:
+    branches: [codex/ff9-complete-20260906]
+    paths: ['.github/workflows/ff9-final-runtime-filename-repair.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/ff9-complete-20260906
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Switch Lexeditor to Memoria's mod-specific ScriptsLoader filename
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'missing expected text in {path}: {old!r}')
+              p.write_text(text.replace(old, new), encoding='utf-8')
+
+          replace('games/ff9/features.py',
+                  '# ScriptsLoader searches this exact relative filename in every active mod folder.\nRUNTIME_NAME = "Memoria.Scripts.dll"',
+                  '# Pinned Memoria ScriptsLoader loads a mod-specific assembly before the stock script set.\n# For the Lexeditor mod folder its required assembly name is Memoria.Scripts.Lexeditor.dll.\nRUNTIME_NAME = "Memoria.Scripts.Lexeditor.dll"')
+          replace('games/ff9/server.py',
+                  'Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.dll',
+                  'Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll')
+          replace('tests/test_ff9_features.py',
+                  'Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.dll',
+                  'Lexeditor/StreamingAssets/Scripts/Memoria.Scripts.Lexeditor.dll')
+          replace('tests/test_ff9_runtime_source.py',
+                  'binary = RUNTIME / "Memoria.Scripts.dll"',
+                  'binary = RUNTIME / "Memoria.Scripts.Lexeditor.dll"')
+          replace('.github/workflows/ff9-verification.yml',
+                  'games/ff9/runtime/Memoria.Scripts.dll',
+                  'games/ff9/runtime/Memoria.Scripts.Lexeditor.dll')
+
+          test = Path('tests/test_ff9_runtime_source.py')
+          text = test.read_text(encoding='utf-8')
+          marker = 'def test_shipped_runtime_is_exact_memoria_script_filename_and_real_pe():'
+          text = text.replace(marker, 'def test_runtime_uses_mod_specific_scriptsloader_filename():\n    from games.ff9 import features\n    assert features.RUNTIME_NAME == "Memoria.Scripts.Lexeditor.dll"\n    assert not (RUNTIME / "Memoria.Scripts.dll").exists()\n\n\n' + marker)
+          test.write_text(text, encoding='utf-8')
+          PY
+
+          git rm -f \
+            .github/workflows/ff9-branch-layout-repair.yml \
+            .github/workflows/ff9-branch-repair-run2.yml \
+            .github/workflows/ff9-features-ui-integration.yml \
+            .github/workflows/ff9-runtime-build.yml \
+            games/ff9/runtime/LexeditorFF9.cs \
+            games/ff9/runtime/Memoria.Scripts.dll \
+            games/ff9/runtime/Memoria.Scripts.dll.sha256 \
+            tools/ff9/repair_battle_layout.py
+
+      - name: Build mod-specific runtime against pinned Memoria
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install pytest
+          PYTHONPATH=. python tools/ff9/extract_memoria_refs.py out/ff9-refs
+          mkdir -p out/packages
+          for spec in microsoft.netframework.referenceassemblies.net35:1.0.3 unityengine5:5.5.0; do
+            name=${spec%:*}; version=${spec#*:}
+            curl --fail --location --retry 2 "https://api.nuget.org/v3-flatcontainer/$name/$version/$name.$version.nupkg" -o "out/$name.nupkg"
+            unzip -q "out/$name.nupkg" -d "out/packages/$name"
+          done
+          root=$(dirname "$(readlink -f "$(command -v dotnet)")")
+          sdk=$(dotnet --list-sdks | grep '^8\.' | tail -1 | awk '{print $1}')
+          csc="$root/sdk/$sdk/Roslyn/bincore/csc.dll"
+          ref=out/packages/microsoft.netframework.referenceassemblies.net35/build/.NETFramework/v3.5
+          unity=out/packages/unityengine5/lib/net35/UnityEngine.dll
+          dotnet "$csc" -nologo -target:library -langversion:7.3 -nostdlib+ -deterministic+ \
+            -out:games/ff9/runtime/Memoria.Scripts.Lexeditor.dll \
+            -r:"$ref/mscorlib.dll" -r:"$ref/System.dll" -r:"$ref/System.Core.dll" \
+            -r:out/ff9-refs/Assembly-CSharp.dll -r:out/ff9-refs/Memoria.Prime.dll -r:"$unity" \
+            games/ff9/runtime/Bootstrap.cs games/ff9/runtime/Runtime.cs games/ff9/runtime/BetterEatScript.cs
+          test -s games/ff9/runtime/Memoria.Scripts.Lexeditor.dll
+          strings games/ff9/runtime/Memoria.Scripts.Lexeditor.dll | grep -q BetterEatScript
+          strings games/ff9/runtime/Memoria.Scripts.Lexeditor.dll | grep -q LexeditorBootstrap
+
+      - name: Run complete FF9 regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/ff9/patch_features_ui.py
+          python -m compileall -q games/ff9
+          python -m pytest -q tests/test_ff9*.py
+          node --test tests/ff9_editor.test.cjs
+          echo 'Remaining main-assembly references (should be none in Lexeditor FF9 code):'
+          git grep -n 'Memoria.Scripts.dll' -- games/ff9 tests .github/workflows tools/ff9 || true
+
+      - name: Commit repaired and cleaned FF9 branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'Lexeditor FF9 Agent'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm -f .github/workflows/ff9-final-runtime-filename-repair.yml
+          git add games/ff9 tests tools/ff9 .github/workflows
+          git commit -m 'Fix FF9 Memoria mod script loading and clean branch scaffolding'
+          git push origin HEAD:codex/ff9-complete-20260906
