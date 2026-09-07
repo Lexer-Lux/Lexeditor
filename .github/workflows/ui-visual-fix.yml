@@ -19,11 +19,12 @@ jobs:
         run: |
           python .github/scripts/ui_graph_patch.py
           python .github/scripts/ui_blank_graph_patch.py
+          python .github/scripts/ui_label_fit_css_patch.py
           python .github/scripts/ui_acceptance_relative_patch.py
           python .github/scripts/ui_label_height_patch.py
       - name: Validate fixture
         run: |
-          python -m py_compile .github/scripts/ui_graph_patch.py .github/scripts/ui_blank_graph_patch.py .github/scripts/ui_acceptance_relative_patch.py .github/scripts/ui_label_height_patch.py .github/scripts/ui_visual_acceptance.py
+          python -m py_compile .github/scripts/ui_graph_patch.py .github/scripts/ui_blank_graph_patch.py .github/scripts/ui_label_fit_css_patch.py .github/scripts/ui_acceptance_relative_patch.py .github/scripts/ui_label_height_patch.py .github/scripts/ui_visual_acceptance.py
           node --check ui/framework.js
           ! grep -q 'function editableTablePanel' games/blank/editor.html
           ! grep -q 'blank-editable-table' games/blank/editor.html
@@ -33,5 +34,5 @@ jobs:
           git config user.name 'Lexeditor UI maintenance'
           git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
           git add ui/framework.css games/blank/editor.html .github/scripts/ui_visual_acceptance.py
-          git commit -m 'Test fixed-height property label fitting'
+          git commit -m 'Keep long property labels inside fixed row height'
           git push origin HEAD:fix/ui-visual-acceptance-20260906
