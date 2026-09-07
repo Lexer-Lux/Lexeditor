@@ -1,0 +1,44 @@
+name: FF7 full semantic editor one-shot
+
+on:
+  push:
+    branches: [fix/ff7-full-semantic-editor]
+    paths:
+      - '.github/workflows/ff7-full-semantic-one-shot.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ff7-full-semantic-editor
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Apply semantic conversion
+        run: python tools/_ff7_full_semantic_patch.py
+      - name: Verify semantic metadata and binary preservation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m py_compile games/ff7/semantics.py games/ff7/kernel.py games/ff7/datasets.py games/ff7/battle.py games/ff7/extended.py tools/verify_ff7_semantic_surface.py
+          python tools/verify_ff7_semantic_surface.py
+          python tools/verify_ff7_accessories.py
+          python tools/verify_ff7_datasets.py
+          python tools/verify_ff7_extended.py
+          python tools/verify_ff7_blank_ui.py
+      - name: Commit production semantic editor
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add games/ff7/semantics.py games/ff7/kernel.py games/ff7/datasets.py games/ff7/battle.py games/ff7/extended.py games/ff7/editor.html tools/verify_ff7_semantic_surface.py tools/verify_ff7_accessories.py
+          git diff --cached --check
+          git commit -m 'Humanize the FF7 editor surface'
+          git push origin HEAD:fix/ff7-full-semantic-editor
