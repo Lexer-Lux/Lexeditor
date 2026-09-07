@@ -22,8 +22,8 @@ PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 PLUGIN_ID = os.environ.get("LEXEDITOR_FF7_PLUGIN_ID", "ff7")
-PLUGIN_NAME = os.environ.get("LEXEDITOR_FF7_PLUGIN_NAME", "Final Fantasy 7 (Original)")
-PLUGIN_EDITION = os.environ.get("LEXEDITOR_FF7_EDITION", "Current Steam release")
+PLUGIN_NAME = os.environ.get("LEXEDITOR_FF7_PLUGIN_NAME", "Final Fantasy 7")
+PLUGIN_EDITION = os.environ.get("LEXEDITOR_FF7_EDITION", "Shared FF7 editor")
 GAME_ROOT = Path(os.environ.get("LEXEDITOR_FF7_ROOT", str(paths.GAME_ROOT)))
 DATA_ROOT = Path(os.environ.get("LEXEDITOR_FF7_DATA_ROOT", str(paths.DATA_ROOT)))
 PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_FF7_PROJECT", str(paths.PROJECT_ROOT)))
@@ -49,7 +49,6 @@ def platform_data() -> dict:
 def save_platform_data(payload: object) -> dict:
     if not isinstance(payload, dict) or not isinstance(payload.get("changes"), dict):
         raise ValueError("FFNx save payload must contain a changes object")
-    # Do not accept FF8-only keys through a hand-crafted FF7 request either.
     allowed = {field["id"] for section in platform_data()["sections"]
                for field in section["fields"]}
     if set(payload["changes"]) - allowed:
@@ -57,8 +56,6 @@ def save_platform_data(payload: object) -> dict:
     result = save_config(GAME_ROOT / "FFNx.toml", "FFNx", "toml",
         str(payload.get("sha256", "")), payload["changes"],
         (EXECUTABLE, "FFVII.exe", "FF7_Launcher.exe", "FF7_EN.exe", "ff7.exe", "ff7_en"))
-    # The shared writer returns all games' fields. Keep its metadata, but filter
-    # its response as well so FF8 settings cannot reappear immediately on save.
     for section in result["sections"]:
         section["fields"] = [field for field in section["fields"]
             if not field.get("onlyFor") or field["onlyFor"] == "FF7"]
@@ -102,8 +99,6 @@ def data_map() -> dict:
     rows.append({"filename": "FFNx.toml", "controls": "FFNx runtime settings",
         "notes": note, "status": status, "openable": available,
         "sourcePath": str(config), "category": "tweaks"})
-    # Preserve the shared coverage/navigation contract merged into master.
-    # A bounded subset of a file is structured editing, not complete coverage.
     for row in rows:
         row["coverage"] = "structured" if row["openable"] else "unavailable"
         row["target"] = row["category"]
@@ -162,6 +157,8 @@ class Handler(BaseHTTPRequestHandler):
     def editor_response(self):
         identity = {"id": PLUGIN_ID, "name": PLUGIN_NAME, "edition": PLUGIN_EDITION}
         html = (PLUGIN_ROOT / "editor.html").read_text(encoding="utf-8")
+        html = html.replace("<title>Lexeditor - Final Fantasy 7 (Original)</title>",
+                            f"<title>Lexeditor - {PLUGIN_NAME}</title>", 1)
         injected = f"<script>window.__lexeditorPlugin={json.dumps(identity)};</script></head>"
         data = html.replace("</head>", injected, 1).encode("utf-8")
         self.send_response(200)

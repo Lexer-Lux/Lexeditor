@@ -51,7 +51,7 @@ class FF7LegacySession(LocalPluginSession):
             "LEXEDITOR_FF7_DATA_ROOT": os.environ.get("LEXEDITOR_FF7_2013_DATA_ROOT", str(DEFAULT_DATA)),
             "LEXEDITOR_FF7_PROJECT": str(DEFAULT_PROJECT),
             "LEXEDITOR_FF7_PLUGIN_ID": "ff7-2013",
-            "LEXEDITOR_FF7_PLUGIN_NAME": "Final Fantasy 7 (Remaster)",
+            "LEXEDITOR_FF7_PLUGIN_NAME": "Final Fantasy 7 (Original)",
             "LEXEDITOR_FF7_EDITION": "2013 Steam release",
             "LEXEDITOR_FF7_EXECUTABLE": "ff7_en.exe",
         }
@@ -113,11 +113,11 @@ def smoke() -> list[str]:
 
 PLUGIN = GamePlugin(
     plugin_id="ff7-2013",
-    name="Final Fantasy 7 (Remaster)",
+    name="Final Fantasy 7 (Original)",
     subtitle="FFVII 2013",
     description="Edits character, battle, encounter, shop and text data for the 2013 Steam product.",
     accent="#3155b7",
-    cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-remaster.png",
+    cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-original.png",
     check=check,
     launch=launch,
     smoke=smoke,

@@ -18,6 +18,7 @@ from .storage import target_path, replace_project
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
+DISPLAY_NAME = "Final Fantasy 7 (Completely Pointless 2026 Re-Release That Really Should Have Just Been A Patch)"
 
 
 def check() -> list[str]:
@@ -96,6 +97,9 @@ class FF7Session(LocalPluginSession):
             "LEXEDITOR_FF7_ROOT": str(paths.GAME_ROOT),
             "LEXEDITOR_FF7_DATA_ROOT": str(paths.DATA_ROOT),
             "LEXEDITOR_FF7_PROJECT": str(paths.PROJECT_ROOT),
+            "LEXEDITOR_FF7_PLUGIN_NAME": DISPLAY_NAME,
+            "LEXEDITOR_FF7_EDITION": "2026 Steam re-release",
+            "LEXEDITOR_FF7_EXECUTABLE": "FFVII_LAUNCHER.exe",
         }
         environment.update(extra_env or {})
         super().__init__(
@@ -137,6 +141,8 @@ def smoke() -> list[str]:
             identity = request_json(session.url + "api/plugin")
             if identity.get("pluginId") != "ff7" or identity.get("windowHost") != "webview2":
                 raise RuntimeError("FF7 editor returned the wrong managed identity")
+            if identity.get("name") != DISPLAY_NAME:
+                raise RuntimeError("FF7 editor returned the wrong display name")
             if identity.get("capabilities") != ["data-map", "kernel-data", "save"]:
                 raise RuntimeError("FF7 editor did not advertise its proved capabilities")
             data_map = request_json(session.url + "api/datamap")
@@ -162,7 +168,7 @@ def smoke() -> list[str]:
             with urllib.request.urlopen(session.url, timeout=10) as response:
                 html = response.read().decode("utf-8")
             if ('id="lexeditor-shell"' not in html or '/shared/framework.js' not in html
-                    or "Lexeditor - Final Fantasy 7 (Original)" not in html):
+                    or f"Lexeditor - {DISPLAY_NAME}" not in html):
                 raise RuntimeError("FF7 editor did not serve the shared editor shell")
         if not session.wait_closed():
             raise RuntimeError("FF7 child port is still open after host shutdown")
@@ -176,11 +182,11 @@ def smoke() -> list[str]:
 
 PLUGIN = GamePlugin(
     plugin_id="ff7",
-    name="Final Fantasy 7 (Original)",
-    subtitle="FFVII",
+    name=DISPLAY_NAME,
+    subtitle="FFVII 2026",
     description="Edits character, battle, encounter, shop and text data for the current Steam release.",
     accent="#3155b7",
-    cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-original.png",
+    cover_art=LEXEDITOR_ROOT / "assets" / "covers" / "ff7-remaster.png",
     check=check,
     launch=launch,
     smoke=smoke,
