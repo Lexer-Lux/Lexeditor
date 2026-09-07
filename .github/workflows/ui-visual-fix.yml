@@ -15,19 +15,21 @@ jobs:
         with:
           ref: fix/ui-visual-acceptance-20260906
           fetch-depth: 0
-      - name: Apply acceptance fixture update
-        run: python .github/scripts/ui_acceptance_relative_patch.py
+      - name: Apply targeted visual fixes
+        run: |
+          python .github/scripts/ui_graph_patch.py
+          python .github/scripts/ui_acceptance_relative_patch.py
       - name: Validate fixture
         run: |
-          python -m py_compile .github/scripts/ui_acceptance_relative_patch.py .github/scripts/ui_visual_acceptance.py
+          python -m py_compile .github/scripts/ui_graph_patch.py .github/scripts/ui_acceptance_relative_patch.py .github/scripts/ui_visual_acceptance.py
           node --check ui/framework.js
           ! grep -q 'function editableTablePanel' games/blank/editor.html
           ! grep -q 'blank-editable-table' games/blank/editor.html
-      - name: Commit acceptance fixture
+      - name: Commit targeted fixes
         run: |
           if git diff --quiet; then exit 0; fi
           git config user.name 'Lexeditor UI maintenance'
           git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
-          git add .github/scripts/ui_visual_acceptance.py
-          git commit -m 'Measure preview replacement in its clicked header slot'
+          git add ui/framework.css .github/scripts/ui_visual_acceptance.py
+          git commit -m 'Fix graph axis margin positioning'
           git push origin HEAD:fix/ui-visual-acceptance-20260906
