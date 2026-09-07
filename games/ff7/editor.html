@@ -140,15 +140,15 @@
     const baseline=state.dashboard.baseline,sounds=LexeditorUI.sharedSettings()?.developerMode?LexeditorUI.soundCoverageTable(state.dashboard.themeSounds?.rows||[]):null;
     return detailPanel({className:"lex-information-panel ff7-detail",icon:infoIcon(),title:identity.name,identity:null,meta:identity.edition,body:[
       detailSection({title:"GAME",body:[
-        detailField({label:"ROOT",control:readonlyField(state.dashboard.game.root||"Unavailable")}),
-        detailField({label:"SOURCE",control:readonlyField(baseline.source||"Unavailable")}),
+        detailField({label:"Game root",control:readonlyField(state.dashboard.game.root||"Unavailable")}),
+        detailField({label:"Source",control:readonlyField(baseline.source||"Unavailable")}),
       ]}),
       detailSection({title:"PROJECT",body:[
-        detailField({label:"OUTPUT",control:readonlyField(baseline.projectPath||"Unavailable")}),
-        detailField({label:"VANILLA SHA-256",control:readonlyField(baseline.sha256||"Unavailable")}),
-        detailField({label:"STATUS",control:readonlyField(baseline.message||"Unavailable")}),
+        detailField({label:"Project output",control:readonlyField(baseline.projectPath||"Unavailable")}),
+        detailField({label:"Vanilla SHA-256",control:readonlyField(baseline.sha256||"Unavailable")}),
+        detailField({label:"Status",control:readonlyField(baseline.message||"Unavailable")}),
       ]}),
-      ...((state.dashboard.problems||[]).length?[detailSection({title:"PROBLEMS",body:(state.dashboard.problems||[]).map((problem,index)=>detailField({label:`PROBLEM ${index+1}`,control:readonlyField(problem)}))})]:[]),
+      ...((state.dashboard.problems||[]).length?[detailSection({title:"PROBLEMS",body:(state.dashboard.problems||[]).map((problem,index)=>detailField({label:`Problem ${index+1}`,control:readonlyField(problem)}))})]:[]),
       ...(sounds?[detailSection({title:"THEME SOUNDS",body:[sounds]})]:[]),
     ]});
   }
