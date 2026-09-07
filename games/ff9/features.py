@@ -18,7 +18,8 @@ from . import memoria_manager, paths
 
 MOD_NAME = "Lexeditor"
 CONFIG_NAME = "lexeditor-ff9.ini"
-RUNTIME_NAME = "Memoria.Scripts.Lexeditor.dll"
+# ScriptsLoader searches this exact relative filename in every active mod folder.
+RUNTIME_NAME = "Memoria.Scripts.dll"
 MARKER_NAME = ".lexeditor-ff9-owned"
 PROJECT_CONFIG = paths.PROJECT_ROOT / CONFIG_NAME
 RUNTIME_SOURCE = paths.PLUGIN_ROOT / "runtime" / RUNTIME_NAME
