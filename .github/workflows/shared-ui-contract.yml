@@ -5,8 +5,8 @@ on:
     branches: [master]
     paths:
       - 'ui/**'
-      - 'games/blank/**'
-      - 'games/warband/editor.html'
+      - 'games/**/editor.html'
+      - 'games/**/plugin.py'
       - 'desktop_host.py'
       - 'github_integration.py'
       - 'plugin_api.py'
@@ -14,12 +14,13 @@ on:
       - 'docs/UI-MANUAL.md'
       - 'worklog/acceptance/warband/**'
       - 'tools/verify_shared_ui_contract.py'
+      - 'tools/verify_all_plugin_ui_contract.py'
       - '.github/workflows/shared-ui-contract.yml'
   pull_request:
     paths:
       - 'ui/**'
-      - 'games/blank/**'
-      - 'games/warband/editor.html'
+      - 'games/**/editor.html'
+      - 'games/**/plugin.py'
       - 'desktop_host.py'
       - 'github_integration.py'
       - 'plugin_api.py'
@@ -27,6 +28,7 @@ on:
       - 'docs/UI-MANUAL.md'
       - 'worklog/acceptance/warband/**'
       - 'tools/verify_shared_ui_contract.py'
+      - 'tools/verify_all_plugin_ui_contract.py'
       - '.github/workflows/shared-ui-contract.yml'
 
 permissions:
@@ -38,7 +40,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Shared UI contract
-        run: python tools/verify_shared_ui_contract.py
+        run: |
+          python tools/verify_shared_ui_contract.py
+          python tools/verify_all_plugin_ui_contract.py
       - name: JavaScript syntax
         run: node --check ui/framework.js
       - name: Python syntax
