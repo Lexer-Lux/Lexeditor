@@ -70,11 +70,11 @@ jobs:
               raise SystemExit(f'expected 283 UI_ITEMVIEWER source references, found {len(refs)}')
           icon_dir = Path('games/rdr2/assets/dictionary_icons/ui_itemviewer')
           present = {p.stem.upper() for p in icon_dir.glob('*.png')}
-          if len(present) != 197:
-              raise SystemExit(f'expected 197 imported UI_ITEMVIEWER PNGs, found {len(present)}')
+          if len(present) != 235:
+              raise SystemExit(f'expected 235 current UI_ITEMVIEWER PNGs, found {len(present)}')
           missing = [ref for ref in refs if not any(token.upper() in present for token in ref.split())]
-          if len(missing) != 86:
-              raise SystemExit(f'expected 86 residual UI_ITEMVIEWER references, found {len(missing)}')
+          if len(missing) != 48:
+              raise SystemExit(f'expected 48 current residual UI_ITEMVIEWER references, found {len(missing)}')
           multi = [ref for ref in refs if len(ref.split()) > 1]
 
           worklog = Path('worklog/issues/github-145.md')
@@ -82,15 +82,14 @@ jobs:
           worklog.write_text(
               '# GitHub #145 — Resolve remaining missing editor item icons\n\n'
               '## Current evidence\n\n'
-              '- The completed manual import supplied exactly 544 local images: all 347 `ITEM_TEXTURES` images plus 197 `UI_ITEMVIEWER` images.\n'
-              '- The old `MISSING_ICONS.txt` is a pre-import report; its `ITEM_TEXTURES` and `UI_ITEMVIEWER` totals are not current status.\n'
-              '- Comparing its 283 `UI_ITEMVIEWER` reference values with the 197 checked-in viewer PNGs leaves exactly **86** unresolved reference values, matching the issue body\'s 84 unresolved references + 2 converter failures.\n'
+              '- Current `master` contains all 347 local `ITEM_TEXTURES` images and **235** local `UI_ITEMVIEWER` images. The issue body\'s older 197-viewer / 86-residual count is stale.\n'
+              '- `MISSING_ICONS.txt` is a pre-import report; comparing its 283 `UI_ITEMVIEWER` reference values with the current checked-in viewer PNGs leaves exactly **48** unresolved reference values.\n'
               '- Two catalog values contain multiple whitespace-separated texture IDs. The editor previously URL-encoded each whole value as one filename; `inventoryIconCandidates` now treats the component IDs as ordered fallbacks.\n'
               f'- Multi-ID values: {", ".join(f"`{value}`" for value in multi)}.\n\n'
-              '## Residual UI_ITEMVIEWER reference values (86)\n\n'
+              '## Residual UI_ITEMVIEWER reference values (48)\n\n'
               + ''.join(f'- `{value}`\n' for value in missing)
               + '\n## Acceptance boundary\n\n'
-              'This change repairs the resolver defect and records the exact residual set. It does **not** claim the remaining 86 images are resolved or visually accepted. Continue by locating alternate dictionaries/aliases and repairing the two decoder failures; do not request another OpenIV export.\n',
+              'This change repairs the resolver defect and records the exact current residual set. It does **not** claim the remaining 48 references are resolved or visually accepted. Continue by locating alternate dictionaries/aliases and repairing any decoder failures; do not request another OpenIV export.\n',
               encoding='utf-8',
           )
       - name: Static verification
@@ -98,8 +97,8 @@ jobs:
         run: |
           set -euo pipefail
           grep -F 'split(/\s+/)' games/rdr2/editor.html
-          grep -F 'Residual UI_ITEMVIEWER reference values (86)' worklog/issues/github-145.md
-          test "$(find games/rdr2/assets/dictionary_icons/ui_itemviewer -maxdepth 1 -type f -name '*.png' | wc -l)" -eq 197
+          grep -F 'Residual UI_ITEMVIEWER reference values (48)' worklog/issues/github-145.md
+          test "$(find games/rdr2/assets/dictionary_icons/ui_itemviewer -maxdepth 1 -type f -name '*.png' | wc -l)" -eq 235
       - name: Commit repair
         shell: bash
         run: |
