@@ -1,0 +1,33 @@
+name: Targeted UI visual fixes
+
+on:
+  push:
+    branches: [fix/ui-visual-acceptance-20260906]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/ui-visual-acceptance-20260906
+          fetch-depth: 0
+      - name: Apply targeted fixes
+        run: python .github/scripts/ui_visual_fix.py
+      - name: Validate syntax and old editable-table removal
+        run: |
+          node --check ui/framework.js
+          python -m py_compile .github/scripts/ui_visual_fix.py
+          ! grep -q 'function editableTablePanel' games/blank/editor.html
+          ! grep -q 'blank-editable-table' games/blank/editor.html
+      - name: Commit targeted fixes
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'Lexeditor UI maintenance'
+          git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+          git add ui/framework.css games/blank/editor.html
+          git commit -m 'Fix barrel controls and boolean reference spacing'
+          git push origin HEAD:fix/ui-visual-acceptance-20260906
