@@ -56,6 +56,12 @@ groups of rows. Every row uses the same label-to-value division. A plugin can
 change that division for a page, but individual rows do not choose unrelated
 positions.
 
+A **property** is one labeled row in a Detail panel. A property can contain one
+variable or several tightly related variables. Related booleans that together
+describe one concept belong in one multi-boolean property row (the shared
+`toggleRow()` control); they are not split into a stack of separate properties
+just because the source format stores them as separate bits or columns.
+
 A group title is an in-flow divider in the neutral shared theme. A game theme
 can deliberately overlap it with the group border, as FF8 does, without
 changing the shared structure. Fields can contain text, numbers, booleans,

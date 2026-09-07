@@ -83,7 +83,7 @@ def ensure(root: Path | None = None, downloader=_download, force: bool = False) 
     global _last
     baseline = Path(root or paths.DATA_ROOT) / "StreamingAssets" / "Data"
     with _lock:
-        if root is None and _last is not None and not force:
+        if root is None and _last is not None and not force and _last.get("ready"):
             return _last
         prepared, problems = 0, []
         for relative, expected in FILES.items():

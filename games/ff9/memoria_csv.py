@@ -130,7 +130,13 @@ class MemoriaCsvDocument:
             suffix = values[len(self.columns):]
             by_name = dict(zip(self.columns, data))
             identity = by_name.get("Id", by_name.get("id", str(len(rows))))
-            name = by_name.get("Comment") or by_name.get("Name") or _comment_text(suffix)
+            comment_name = by_name.get("Comment") or by_name.get("Name")
+            suffix_name = _comment_text(suffix)
+            name = comment_name or suffix_name
+            if comment_name and suffix_name and re.fullmatch(r"Shop\s+\d+", comment_name.strip(), flags=re.I):
+                richer = re.sub(r"^Shop\s+\d+\s*", "", suffix_name, flags=re.I).strip()
+                if richer:
+                    name = richer
             rows.append({"line": line_number, "id": identity,
                          "name": name or f"Record {identity}", "raw": by_name, "suffix": suffix})
         return rows
@@ -154,6 +160,13 @@ class MemoriaCsvDocument:
                     descriptor.update(kind="integer", min=_INTEGER_RANGES[normalized][0], max=_INTEGER_RANGES[normalized][1])
             elif normalized in _FLOAT_TYPES:
                 descriptor.update(kind="number", step="any")
+            elif normalized.endswith("[]"):
+                item_type = normalized[:-2].strip()
+                descriptor.update(kind="list", itemType=item_type)
+                if item_type in _INTEGER_RANGES:
+                    descriptor.update(itemKind="integer", itemMin=_INTEGER_RANGES[item_type][0], itemMax=_INTEGER_RANGES[item_type][1])
+                else:
+                    descriptor.update(itemKind="token")
             elif "[" in normalized or "{" in normalized:
                 descriptor.update(kind="stored", editable=False)
             elif normalized in {"string", ""}:
@@ -229,6 +242,23 @@ class MemoriaCsvDocument:
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
                 raise ValueError(f"{field['key']} must be a finite number")
             return format(value, ".15g")
+        if kind == "list":
+            if not isinstance(value, str) or "\n" in value or "\r" in value or ";" in value:
+                raise ValueError(f"{field['key']} must be a comma-separated one-line list")
+            tokens = [token.strip() for token in value.split(",") if token.strip()]
+            if field.get("itemKind") == "integer":
+                minimum, maximum = field["itemMin"], field["itemMax"]
+                for token in tokens:
+                    if not re.fullmatch(r"[-+]?\d+", token):
+                        raise ValueError(f"{field['key']} must contain only whole numbers")
+                    number = int(token)
+                    if not minimum <= number <= maximum:
+                        raise ValueError(f"{field['key']} entries must be from {minimum} through {maximum}")
+            else:
+                for token in tokens:
+                    if not re.fullmatch(r"[A-Za-z0-9_.:+-]+", token):
+                        raise ValueError(f"{field['key']} contains an invalid list token")
+            return ", ".join(tokens)
         if kind == "text":
             if not isinstance(value, str) or "\n" in value or "\r" in value:
                 raise ValueError(f"{field['key']} must be one line of text")

@@ -152,3 +152,38 @@ def test_schema_column_names_are_trimmed(tmp_path):
     path.write_text("# Id\t;Value\t\n# Int32;UInt8\n0;7\n", encoding="utf-8")
     doc = csv.MemoriaCsvDocument(path)
     assert doc.columns == ["Id", "Value"]
+
+
+
+def test_shop_integer_array_is_editable_and_uses_real_suffix_name(store):
+    fixture(store, "shops", b"# Comment;Id;Items\n# ;Int32;Int32[]\nShop 0000;0;1, 2;# Shop 0000 Dali Weapon Shop\n")
+    loaded = store.load("shops")
+    field = next(value for value in loaded["fields"] if value["key"] == "Items")
+    assert field["kind"] == "list" and field["itemKind"] == "integer" and field["editable"]
+    assert loaded["rows"][0]["name"] == "Dali Weapon Shop"
+    saved = store.save("shops", loaded["sha256"], [{"line": loaded["rows"][0]["line"], "values": {"Items": "3, 4, 5"}}])
+    assert saved["rows"][0]["values"]["Items"] == "3, 4, 5"
+    assert b"Shop 0000;0;3, 4, 5;# Shop 0000 Dali Weapon Shop" in Path(saved["sourcePath"]).read_bytes()
+
+
+def test_integer_array_rejects_non_numeric_entries(store):
+    fixture(store, "shops", b"# Comment;Id;Items\n# ;Int32;Int32[]\nShop 0000;0;1, 2;# Shop 0000 Test\n")
+    loaded = store.load("shops")
+    with pytest.raises(ValueError, match="whole numbers"):
+        store.save("shops", loaded["sha256"], [{"line": loaded["rows"][0]["line"], "values": {"Items": "1, nope"}}])
+
+
+def test_failed_default_baseline_is_retried(tmp_path, monkeypatch):
+    payload = b"# Id;Value\n# Int32;UInt8\n0;1\n"
+    monkeypatch.setattr(paths, "DATA_ROOT", tmp_path / "cache")
+    monkeypatch.setattr(baseline, "FILES", {"Items/Test.csv": hashlib.sha256(payload).hexdigest()})
+    monkeypatch.setattr(baseline, "_last", None)
+    calls = {"count": 0}
+    def downloader(_relative):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise OSError("temporary network failure")
+        return payload
+    first = baseline.ensure(downloader=downloader)
+    second = baseline.ensure(downloader=downloader)
+    assert not first["ready"] and second["ready"] and calls["count"] == 2

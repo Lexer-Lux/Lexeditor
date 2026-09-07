@@ -144,10 +144,10 @@ test('information help describes launcher-first Play', async () => {
   assert.doesNotMatch(description, /Play starts FF9 directly/);
 });
 
-test('catalog-driven views expose every character dataset', async () => {
+test('catalog-driven views combine character implementation tables behind conceptual navigation', async () => {
   const e = await editor();
   e.run('state.catalog=[{key:"characters",tab:"characters"},{key:"character-parameters",tab:"characters"},{key:"default-equipment",tab:"characters"},{key:"leveling",tab:"characters"},{key:"world-weather",tab:"world"}]');
-  assert.deepEqual(Array.from(e.run('choices("characters")')), ['characters','character-parameters','default-equipment','leveling']);
+  assert.deepEqual(Array.from(e.run('choices("characters")')), ['characters','leveling']);
   assert.deepEqual(Array.from(e.run('choices("world")')), ['world-weather']);
 });
 
@@ -160,4 +160,17 @@ test('controller does not truncate fractional edits to an integer', async () => 
   e.run('globalThis.result=null; setValue=(d,r,f,v)=>globalThis.result=v');
   input.attrs.oninput({target:{value:'1.5'}});
   assert.equal(e.run('result'), 1.5);
+});
+
+
+
+test('FF9 uses shared multi-boolean properties and conceptual character/equipment views', async () => {
+  const e = await editor();
+  assert.match(source, /toggleRow/);
+  assert.match(source, /ITEM_CATEGORY_FLAGS/);
+  assert.match(source, /ITEM_PARTY_FLAGS/);
+  assert.match(source, /renderCharacterComposite/);
+  assert.match(source, /renderEquipmentComposite/);
+  e.run('state.catalog=[{key:"characters",tab:"characters"},{key:"character-parameters",tab:"characters"},{key:"default-equipment",tab:"characters"},{key:"leveling",tab:"characters"}]');
+  assert.deepEqual(Array.from(e.run('choices("characters")')), ['characters','leveling']);
 });
