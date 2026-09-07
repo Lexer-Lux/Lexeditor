@@ -66,6 +66,7 @@ jobs:
           python tools/verify_ff7_extended.py
           python tools/verify_ff7_completion.py
           python tools/verify_ff7_edition_parity.py
+          python tools/verify_ff7_blank_ui.py
 
   browser-scenarios:
     runs-on: ubuntu-latest
