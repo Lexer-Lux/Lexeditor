@@ -1,3 +1,4 @@
+# corrected fixture pass
 name: Temporary semantic info bubble repair
 on:
   push:
