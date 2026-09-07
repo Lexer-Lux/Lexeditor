@@ -1,0 +1,33 @@
+name: All-plugin UI conformance migration
+
+on:
+  push:
+    branches: [fix/all-plugin-ui-conformance-20260906]
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/all-plugin-ui-conformance-20260906
+          fetch-depth: 0
+      - name: Apply migration
+        run: python .github/scripts/all_plugin_ui_conformance_fix.py
+      - name: Validate shared contracts
+        run: |
+          python tools/verify_shared_ui_contract.py
+          python tools/verify_all_plugin_ui_contract.py
+          node --check ui/framework.js
+          python -m py_compile desktop_host.py github_integration.py plugin_api.py settings_manager.py
+      - name: Commit migrated editors
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'Lexeditor UI maintenance'
+          git config user.email '89482099+Lexer-Lux@users.noreply.github.com'
+          git add games
+          git commit -m 'Make every plugin inherit shared UI contracts'
+          git push origin HEAD:fix/all-plugin-ui-conformance-20260906
