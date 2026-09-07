@@ -54,9 +54,18 @@ def install() -> None:
         result["spellbook"] = {
             "magicIds": sorted(gf_spellbooks.MAGIC_IDS),
             "abilityIds": sorted(gf_spellbooks.ABILITY_IDS),
+            "magicOptions": [
+                {"id": int(row["id"]), "name": row["name"]}
+                for row in formats.MAGIC if int(row["id"]) in gf_spellbooks.MAGIC_IDS
+            ],
+            "abilityOptions": [
+                {"id": int(row["id"]), "name": row["name"]}
+                for row in formats.INIT_ABILITIES if int(row["id"]) in gf_spellbooks.ABILITY_IDS
+            ],
             "maxPages": 8,
             "slotsPerPage": 4,
             "runtimeOwnedBy": "FFNx DLL",
+            "runtimeRequires": {"singleGf": True, "sharedMagicInventory": False},
         }
         return result
 
