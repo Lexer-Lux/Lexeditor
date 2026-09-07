@@ -4230,7 +4230,7 @@ function settingIsBoolean(section,key){
 // large, unrelated block behind that field's "?".
 function settingPatternHelp(section,key){
   let m;
-  if(key==="Enabled")return `Enable or disable ${humanSettingName(section)}. This switch does not delete its saved settings.`;
+  if(key==="Enabled")return `Master switch for ${humanSettingName(section)}. Turning it off leaves the rest of this section saved so the same configuration returns when it is re-enabled.`;
   if(section==="WalletCap"&&(m=/^Rank(\d+)Dollars$/.exec(key)))
     return `Wallet capacity in dollars at Gambler challenge rank ${m[1]}.`;
   if(section==="HonorPrices"&&(m=/^Rank([+-]\d+)Multiplier$/.exec(key)))
@@ -4243,23 +4243,18 @@ function settingPatternHelp(section,key){
     return `Choose LOW instead of NORMAL framing for the ${humanSettingName(m[1]).toLowerCase()} camera. This is a two-state setting, not continuous height; some camera states ignore it.`;
   if((m=/^(SpentBar|SpentCore|Live|Zero)([RGBA])$/.exec(key))){
     const channel={R:"Red",G:"Green",B:"Blue",A:"Alpha"}[m[2]];
-    return `${channel} channel, 0-255, of the ${humanSettingName(m[1]).toLowerCase()} colour.`;
+    return `${channel} component of the ${humanSettingName(m[1]).toLowerCase()} colour. RGB components control hue/brightness while Alpha controls opacity.`;
   }
   return "";
 }
 function settingHelp(section,setting){
   const compound=`${section.name}|${setting.key}`;
-  const ordinary=(setting.help||"").trim()||schemaMap("help")[compound]||
-    settingPatternHelp(section.name,setting.key)||
-    `Edits ${setting.key} in the [${section.name}] section of this mod's INI. This installed setting has no field-specific behavior description.`;
+  const ordinary=(setting.help||"").trim()||schemaMap("help")[compound]||settingPatternHelp(section.name,setting.key)||"";
   const boundary=settingConstBoundary(section.name,setting.key);
-  const range=settingRange(section.name,setting.key);
-  const facts=[];
-  if(range&&range.min!==undefined&&range.max!==undefined)facts.push(`Editor range: ${range.min} to ${range.max}.`);
-  const authoredUnit=schemaMap("units")[compound];
-  if(typeof authoredUnit==="string"&&authoredUnit.trim())facts.push(`Unit: ${authoredUnit}.`);
-  if(boundary)facts.push(`Apply requirement: ${boundary}`);
-  return [ordinary,...facts].join(" ");
+  if(!ordinary&&!boundary)return "";
+  // Bounds and units are already printed by the property control/metadata. Only
+  // lifecycle consequences belong here in addition to authored behavior help.
+  return [ordinary,boundary?`Changing this setting requires: ${boundary}`:""].filter(Boolean).join(" ");
 }
 
 function settingUnit(section,key){

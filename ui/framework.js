@@ -335,10 +335,9 @@
     activeHelpPopup = null;
   };
 
-  // Every interactive control gets a concise native tooltip even when a plugin
-  // has no richer ?-marker description. We only derive facts visible in the DOM
-  // (label, type, bounds, unit and authored apply requirement); we never guess
-  // undocumented gameplay semantics from a field name.
+  // Native control tooltips are an operational/accessibility fallback. They are
+  // deliberately separate from the circular ? info bubble, which is reserved for
+  // authored semantic help about what a property means and affects.
   const controlHelp = control => {
     if (!(control instanceof Element) || !control.matches("button,input,select,textarea,[role='button'],[role='slider'],[role='separator']")) return "";
     const authored = String(control.getAttribute("aria-description") || "").trim();
@@ -871,37 +870,21 @@
     const typeName = element("span", {class: "lex-field-type-name"},
       TYPE_CODES[dataType] || dataType);
     const typeRange = rangeText ? element("span", {class: "lex-field-type-range"}, rangeText) : null;
-    // Describe the actual control's contract. Never infer an engine behavior or
-    // restart rule from a raw field name; retain the plugin's authored meaning.
+    // The metadata rail already displays the type and numeric range. An info
+    // bubble appears only when the caller authored semantic help. Never fabricate
+    // a ? from the label, storage type, bounds, step, unit, or edit operation.
     const labelText = (options.label instanceof Node ? options.label.textContent : String(options.label || "value")).trim();
     const suppliedHelp = options.help instanceof Element
       ? String(options.help.getAttribute("aria-label") || options.help.getAttribute("title") || "").trim()
       : String(options.description || "").trim();
-    const meaning = suppliedHelp || (readOnly
-      ? `${labelText} is read-only in this view.`
-      : inputType === "checkbox" ? `Enable or disable ${labelText}.`
-      : input?.tagName === "SELECT" ? `Choose ${labelText} from the listed values.`
-      : `Edit the stored ${labelText} value. A gameplay interpretation is not documented for this field.`);
-    const finiteBound = bound => bound !== null && bound !== undefined && bound !== "" && Number.isFinite(Number(bound));
-    const facts = [];
-    if (readOnly && !/read.only/i.test(meaning)) facts.push("Read-only in this view.");
-    if (numericLike) {
-      if (finiteBound(min) && finiteBound(max)) facts.push(`Allowed range: ${min} to ${max}.`);
-      else if (finiteBound(min)) facts.push(`Minimum: ${min}.`);
-      else if (finiteBound(max)) facts.push(`Maximum: ${max}.`);
-      if (dataType === "INT") facts.push("Whole numbers only.");
-      else if (finiteBound(step) && Number(step) > 0) facts.push(`Step: ${step}.`);
-    }
-    const unit = String(options.unit || control?.querySelector?.(".lex-unit")?.textContent || "").trim();
-    if (unit) facts.push(`Unit: ${unit}.`);
-    if (options.applyRequirement) facts.push(`Apply: ${String(options.applyRequirement).trim()}`);
-    const helpText = [meaning, ...facts].join(" ");
-    const helpMarker = options.help || infoHelp(helpText);
-    // Native fallback and assistive text exist on the input itself, not just '?'.
+    const helpMarker = options.help || (suppliedHelp ? infoHelp(suppliedHelp) : null);
     if (input) {
       if (!input.getAttribute("aria-label") && labelText) input.setAttribute("aria-label", labelText);
-      input.setAttribute("aria-description", helpText);
-      if (!input.title) input.title = helpText;
+      // Semantic authored help is also useful to assistive technology. When no
+      // semantic help exists, installControlHelp may still add an operational
+      // native tooltip/description, but that never creates a circular ?.
+      if (suppliedHelp && !input.getAttribute("aria-description"))
+        input.setAttribute("aria-description", suppliedHelp);
     }
     const typeRail = element("div", {class: "lex-field-type-rail"},
       typeName, typeRange, helpMarker);
