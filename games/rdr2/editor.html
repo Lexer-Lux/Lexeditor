@@ -2539,8 +2539,7 @@ function itemDetailPane(it, cells){
   };
   const field=(label,cell,help)=>{
     const control=controlFor(cell);
-    return el("div",{class:"detail-field"},
-      el("div",{class:"detail-label"},label,help?fieldHelp(help):""),control);
+    return LexeditorUI.detailField({label,control,help:help?LexeditorUI.infoHelp(help):null});
   };
   const identityField=cell=>el("div",{class: "detail-field item-name-field"},controlFor(cell));
   pane.append(
@@ -4453,8 +4452,8 @@ function behaviorDetail(row){
   const usage=el("div",{class:"effect-usage-list"});
   for(const effect of effects)usage.append(effectLink(effect.key,
     `${humanName("effects",effect.key)||effect.symbol||effect.label||effect.key} · ${effect.key}`));
-  pane.append(el("div",{class:"detail-field"},el("div",{class:"detail-label"},"Used by"),
-    el("div",{class:"detail-control"},usage.childElementCount?usage:el("span",{class:"cat"},"No effects"))));
+  pane.append(LexeditorUI.detailField({label:"Used by",
+    control:usage.childElementCount?usage:el("span",{class:"cat"},"No effects")}));
   return pane;
 }
 
@@ -4508,8 +4507,9 @@ function effectNumberEditor(e,field,currentBehavior){
 function effectDetail(e,behaviors,used){
   const pane=el("div",{class:"loot-detail-pane lex-detail item-detail effect-detail"});
   const behaviorKey=e.key+"|id",currentBehavior=state.effectEdits[behaviorKey]??e.id;
-  const field=(label,control,help="")=>el("div",{class:"detail-field"},
-    el("div",{class:"detail-label"},label,help?fieldHelp(help):""),el("div",{class:"detail-control"},control));
+  const field=(label,control,help="")=>LexeditorUI.detailField({
+    label,control,help:help?LexeditorUI.infoHelp(help):null
+  });
   pane.append(el("div",{class:"detail-field effect-identity"},el("div",{class:"detail-control"},
     el("div",{class:"effect-detail-head"},originMarker(e),humanNameInput("effects",e.key)),
     el("div",{class:"effect-detail-id"},`${e.symbol||e.label?`${e.symbol||e.label} · `:""}${e.key}`))));

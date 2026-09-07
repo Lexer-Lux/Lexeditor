@@ -126,8 +126,9 @@ PLUGIN = GamePlugin(
     smoke=smoke,
     session_factory=Rdr2Session,
     github=GitHubRepository(
-        full_name="Lexer-Lux/rdr2-overhaul",
+        full_name="Lexer-Lux/Lexeditor",
         authorized_logins=("Lexer-Lux",),
+        issue_label="rdr2",
     ),
     projects=ModProjectSpec(
         root_env="LEXEDITOR_MOD_ROOT",

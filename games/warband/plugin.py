@@ -145,8 +145,9 @@ PLUGIN = GamePlugin(
     smoke=smoke,
     session_factory=WarbandSession,
     github=GitHubRepository(
-        full_name="Lexer-Lux/LexersModForWarband",
+        full_name="Lexer-Lux/Lexeditor",
         authorized_logins=("Lexer-Lux",),
+        issue_label="warband",
     ),
     projects=ModProjectSpec(
         root_env="LEXEDITOR_MOD_PROJECT",

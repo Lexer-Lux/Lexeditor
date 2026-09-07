@@ -314,8 +314,9 @@ PLUGIN = GamePlugin(
     smoke=smoke,
     session_factory=RdrSession,
     github=GitHubRepository(
-        full_name="Lexer-Lux/Lexers-Mod-For-RDR",
+        full_name="Lexer-Lux/Lexeditor",
         authorized_logins=("Lexer-Lux",),
+        issue_label="rdr",
     ),
     projects=ModProjectSpec(
         root_env="LEXEDITOR_RDR_MOD_ROOT",
