@@ -24,3 +24,4 @@ jobs:
           name: ui-visual-iteration
           path: out/ui-visual-acceptance
           if-no-files-found: warn
+          # This temporary workflow is intentionally rerun after each branch-side visual fix.
