@@ -4682,3 +4682,22 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-boolean-field:has(.lex-source-control > .lex-reference-values) {
   margin-bottom:8px;
 }
+
+
+/* LEXEDITOR_MODEL_PREVIEW_OVERLAY_20260906 */
+/* A preview is a drawer over the Detail body, not a third grid row.  Letting it
+   auto-place as a third child changed the height of the 10% header row when it
+   opened, so the icon itself moved before the X replaced it.  Absolute overlay
+   keeps the heading geometrically invariant and makes the drawer actually slide
+   out over the editing surface. */
+.lex-detail-panel:has(> .lex-model-preview-drawer) { position:relative; }
+.lex-model-preview-drawer {
+  position:absolute;
+  z-index:3;
+  left:0;
+  right:0;
+  top:10%;
+  bottom:0;
+  min-height:0;
+  background:var(--lex-panel);
+}
