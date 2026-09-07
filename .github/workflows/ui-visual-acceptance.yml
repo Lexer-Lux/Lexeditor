@@ -8,24 +8,28 @@ on:
       - 'ui/**'
       - 'games/blank/**'
       - 'games/warband/editor.html'
+      - 'games/ff8/cards_ui.js'
       - 'desktop_host.py'
       - 'github_integration.py'
       - 'plugin_api.py'
       - 'settings_manager.py'
       - 'docs/UI-MANUAL.md'
       - '.github/scripts/ui_visual_acceptance.py'
+      - 'tests/ff8_graph_design_a_browser_check.py'
       - '.github/workflows/ui-visual-acceptance.yml'
   pull_request:
     paths:
       - 'ui/**'
       - 'games/blank/**'
       - 'games/warband/editor.html'
+      - 'games/ff8/cards_ui.js'
       - 'desktop_host.py'
       - 'github_integration.py'
       - 'plugin_api.py'
       - 'settings_manager.py'
       - 'docs/UI-MANUAL.md'
       - '.github/scripts/ui_visual_acceptance.py'
+      - 'tests/ff8_graph_design_a_browser_check.py'
       - '.github/workflows/ui-visual-acceptance.yml'
 
 permissions:
@@ -44,6 +48,8 @@ jobs:
         run: python .github/scripts/ui_visual_acceptance.py out/ui-visual-acceptance
       - name: Data Map browser regression
         run: python tests/data_map_browser_check.py out/data-map-browser
+      - name: FF8 graph design A acceptance
+        run: python tests/ff8_graph_design_a_browser_check.py out/ff8-graph-design-a
       - name: Developer helper browser regression
         run: python tests/wse2_helper_browser_check.py out/wse2-helper-browser
       - uses: actions/upload-artifact@v4
@@ -53,5 +59,6 @@ jobs:
           path: |
             out/ui-visual-acceptance
             out/data-map-browser
+            out/ff8-graph-design-a
             out/wse2-helper-browser
           if-no-files-found: warn
