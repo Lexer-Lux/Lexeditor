@@ -42,12 +42,14 @@ require("full_name=LEXEDITOR_REPOSITORY.full_name" in host, "host no longer cent
 require("issue_label=plugin_id" in host, "host no longer scopes GitHub issues by plugin")
 for plugin in sorted(GAMES.glob("*/plugin.py")):
     text = read(plugin)
-    if "github=GitHubRepository(" not in text:
+    marker = "github=GitHubRepository("
+    if marker not in text:
         continue
     match = re.search(r'plugin_id\s*=\s*["\']([^"\']+)["\']', text)
     require(bool(match), f"{plugin.parent.name}: cannot determine plugin id")
     game = match.group(1)
-    block = text.split("github=GitHubRepository(", 1)[1].split(")", 1)[0]
+    start = text.index(marker)
+    block = text[start:start + 600]
     require('full_name="Lexer-Lux/Lexeditor"' in block,
             f"{game}: plugin metadata still points its GitHub button at another repository")
     require(f'issue_label="{game}"' in block,
