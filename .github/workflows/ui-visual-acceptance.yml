@@ -3,7 +3,31 @@ name: Shared UI visual acceptance
 on:
   push:
     branches:
-      - fix/ui-standardization-20260906
+      - master
+      - fix/ui-visual-acceptance-20260906
+    paths:
+      - 'ui/**'
+      - 'games/blank/**'
+      - 'games/warband/editor.html'
+      - 'desktop_host.py'
+      - 'github_integration.py'
+      - 'plugin_api.py'
+      - 'settings_manager.py'
+      - 'docs/UI-MANUAL.md'
+      - '.github/scripts/ui_visual_acceptance.py'
+      - '.github/workflows/ui-visual-acceptance.yml'
+  pull_request:
+    paths:
+      - 'ui/**'
+      - 'games/blank/**'
+      - 'games/warband/editor.html'
+      - 'desktop_host.py'
+      - 'github_integration.py'
+      - 'plugin_api.py'
+      - 'settings_manager.py'
+      - 'docs/UI-MANUAL.md'
+      - '.github/scripts/ui_visual_acceptance.py'
+      - '.github/workflows/ui-visual-acceptance.yml'
 
 permissions:
   contents: read
@@ -13,8 +37,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: fix/ui-standardization-20260906
       - name: Install browser tools
         run: |
           python -m pip install playwright Pillow
