@@ -52,9 +52,10 @@ new = '''function tweaks(){
     catch(error){state.runtimeError=error.message;throw error}
     finally{state.busy=false;await render()}
   }'''
-if old not in s:
-    raise SystemExit('tweaks block not found')
-s = s.replace(old, new)
+if old in s:
+    s = s.replace(old, new)
+elif new not in s:
+    raise SystemExit('tweaks block not found and integrated block not present')
 
 s = s.replace(
 '''async function save(){if(state.busy)return;state.busy=true;shell.refresh();try{for(const [key,data] of Object.entries(state.datasets)){if(!data?.rows)continue;const changes=data.rows.map(row=>({line:row.line,scene:row.scene,record:row.record,values:changedFields(data,row)})).filter(change=>Object.keys(change.values).length);if(changes.length)installData(await api("/api/save",{key,sha256:data.sha256,sceneHashes:data.sceneHashes||{},changes}))}state.error=""}catch(error){state.error=error.message;throw error}finally{state.busy=false;render()}}''',
