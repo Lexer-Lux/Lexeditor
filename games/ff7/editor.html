@@ -6,15 +6,9 @@
   <title>Lexeditor - Final Fantasy 7 (Original)</title>
   <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
   <link rel="stylesheet" href="/shared/framework.css">
-  <style>
-    *{box-sizing:border-box}
-    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
-    .lex-shell-command-row{background:#fff}
-    .lex-nav-frame,.lex-shell-header nav{background:#e5e9ed}
-    main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
-  </style>
+  <link rel="stylesheet" href="/shared/neutral.css">
 </head>
-<body>
+<body class="lex-neutral-ui">
   <header id="lexeditor-shell"></header>
   <main id="main"></main>
   <script src="/shared/framework.js"></script>
@@ -96,7 +90,7 @@
     if(!state.records[group]?.length)return unavailableView();
     const rows=[...state.records[group]].filter(row=>!query||`${row.id} ${row.values.name||row.name} ${row.description} ${row.values.text||""}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).sort((a,b)=>{const left=a[sort.key],right=b[sort.key];return(typeof left==="string"?left.localeCompare(right):Number(left)-Number(right))*sort.dir});
     if(!rows.some(row=>row.id===state.selected[group]))state.selected[group]=rows[0]?.id??null;
-    return pagedListDetail({rows,key:row=>row.id,slots:true,selected:state.selected[group],page:state.page[group]||0,pageSize:state.pageSize[group]||16,noun:labels[group],className:"ff7-layout",splitKey:`ff7-${group}`,rowsKey:`ff7-${group}`,defaultSplit:42,minLeft:340,minRight:440,search:{key:`ff7-${group}`,value:query,label:`Search ${labels[group]}`,change:value=>{state.query[group]=value;state.page[group]=0;render()}},sync:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected},change:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected;render()},master:view=>listTable(view.rows,view.selected,view.select),detail:row=>recordDetail(row)});
+    return pagedListDetail({rows,key:row=>row.id,slots:false,selected:state.selected[group],page:state.page[group]||0,pageSize:state.pageSize[group]||12,noun:labels[group],className:"ff7-layout",splitKey:`ff7-${group}`,rowsKey:`ff7-${group}`,defaultSplit:50,minLeft:320,minRight:360,search:{key:`ff7-${group}`,value:query,label:`Search ${labels[group]}`,change:value=>{state.query[group]=value;state.page[group]=0;render()}},sync:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected},change:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected;render()},master:view=>listTable(view.rows,view.selected,view.select),detail:row=>recordDetail(row)});
   }
   function unresolvedView(){
     const area=state.data.unresolved?.[state.tab];
