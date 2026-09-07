@@ -1,4 +1,5 @@
 name: One-shot FF9 final runtime filename repair
+# rerun after making the UI integration patcher idempotent
 on:
   push:
     branches: [codex/ff9-complete-20260906]
