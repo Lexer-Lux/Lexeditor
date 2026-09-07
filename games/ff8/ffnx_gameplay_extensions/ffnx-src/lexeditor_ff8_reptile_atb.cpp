@@ -98,7 +98,7 @@ bool load_runtime()
             continue;
         }
         if ((line == "enabled = true" || line == "enabled = false") && !saw_enabled) {
-            enabled = line.back() == 'e';
+            enabled = line == "enabled = true";
             saw_enabled = true;
             continue;
         }
@@ -150,12 +150,14 @@ std::uint64_t current_action_signature()
     const auto command = *reinterpret_cast<const std::uint8_t *>(kCommandType);
     const auto variant = *reinterpret_cast<const std::uint8_t *>(kActionVariant);
     const auto action = *reinterpret_cast<const std::uint16_t *>(kActionId);
-    return (static_cast<std::uint64_t>(frame_counter) << 32) |
-        (static_cast<std::uint64_t>(variant) << 24) |
-        (static_cast<std::uint64_t>(attacker) << 16) |
-        (static_cast<std::uint64_t>(command) << 8) |
-        (static_cast<std::uint64_t>(action) & 0xFFu) ^
-        (static_cast<std::uint64_t>(action) << 40);
+    // Damage for all hits/targets of one action is resolved in the same native
+    // battle tick. Include the action metadata as well as the frame so repeated
+    // hits cannot multiply speed repeatedly, while a later identical cast can.
+    return (static_cast<std::uint64_t>(frame_counter) << 32) ^
+        (static_cast<std::uint64_t>(variant) << 56) ^
+        (static_cast<std::uint64_t>(attacker) << 24) ^
+        (static_cast<std::uint64_t>(command) << 16) ^
+        static_cast<std::uint64_t>(action);
 }
 
 void apply_resolved_element(unsigned target)
