@@ -5,6 +5,36 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
   referenceValues, infoHelp, shell, noteFieldEdit}) => {
   const fields = ["top", "bottom", "left", "right", "element", "power"];
   const labels = {top:"Top", bottom:"Bottom", left:"Left", right:"Right", element:"Element", power:"Selection power"};
+  const clone = value => JSON.parse(JSON.stringify(value));
+  let mode = "cards", playerMap = "", playerData = null, playerBase = null,
+      playerLoading = false, playerError = "", playerStatus = "";
+  if (!document.getElementById("ff8-card-redesign-style")) {
+    const style = document.createElement("style");
+    style.id = "ff8-card-redesign-style";
+    style.textContent = `
+      .ff8-card-tabs{display:flex;gap:8px;margin:0 0 10px}.ff8-card-tabs button[aria-pressed="true"]{font-weight:800;text-decoration:underline}
+      .ff8-card-preview{position:relative;width:min(260px,72vw);aspect-ratio:3/4;margin:3px auto 10px;overflow:hidden;border-radius:8px;background:#111;box-shadow:0 0 0 1px rgba(180,200,240,.35)}
+      .ff8-card-preview img{width:100%;height:100%;display:block;object-fit:cover;image-rendering:auto}
+      .ff8-card-rank{position:absolute;font:800 21px/1 var(--ui-font,Arial,sans-serif);text-shadow:0 1px 2px #000,0 0 3px #000;color:#fff;min-width:24px;text-align:center}
+      .ff8-card-rank.top{top:8px;left:50%;transform:translateX(-50%)}.ff8-card-rank.right{right:8px;top:50%;transform:translateY(-50%)}
+      .ff8-card-rank.bottom{bottom:8px;left:50%;transform:translateX(-50%)}.ff8-card-rank.left{left:8px;top:50%;transform:translateY(-50%)}
+      .ff8-card-element{position:absolute;right:8px;bottom:8px;padding:3px 6px;border-radius:999px;background:rgba(0,0,0,.72);font-size:11px;font-weight:700}
+      .ff8-card-player-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.ff8-card-player-toolbar select{min-width:min(430px,75vw)}
+      .ff8-card-player{border:1px solid rgba(160,180,215,.28);border-radius:7px;padding:9px;margin:8px 0}.ff8-card-player h4{margin:0 0 7px}
+      .ff8-card-player-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}.ff8-card-player-field{display:grid;gap:3px;font-size:11px}.ff8-card-player-field input{width:100%}
+      .ff8-card-player-mode{opacity:.72;font-size:10px}
+    `;
+    document.head.append(style);
+  }
+  const rank = value => Number(value) === 10 ? "A" : String(value);
+  const preview = row => {
+    const options = state.data.cards.elements || [];
+    const element = options.find(entry => Number(entry.id) === Number(row.element));
+    return el("div",{className:"ff8-card-preview"},
+      el("img",{src:`/assets/cards/${row.id}.png`,alt:`${row.name} card artwork`}),
+      ...["top","right","bottom","left"].map(side=>el("span",{className:`ff8-card-rank ${side}`},rank(row[side]))),
+      element && Number(row.element) !== 255 ? el("span",{className:"ff8-card-element",title:"Element"},element.name) : null);
+  };
   const detail = (row, prefs) => {
     const vanilla = rowOf(state.vanilla, "cards", row.id);
     const properties = fields.map(field => {
@@ -37,13 +67,75 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         const text=state.data.text.rows.find(entry=>entry.source==="exe_card_names"&&entry.recordId===row.id);
         if(text)text.value=row.name;
       })}));
-    return sharedDetail(row,prefs,[detailSection({title:"CARD",body:properties})]);
+    return sharedDetail(row,prefs,[
+      detailSection({title:"PREVIEW",body:[preview(row)]}),
+      detailSection({title:"CARD",body:properties})
+    ]);
   };
+  const renderCards = () => showPaged("cards",filtered("cards",["id","name"]),[
+    {key:"id",label:"ID"},{key:"name",label:"Card"},
+    ...fields.map(field=>({key:field,label:labels[field],pinned:false,numeric:true}))
+  ],detail,"74px minmax(240px,1fr)");
+  const loadPlayerMap = async key => {
+    if (!key || playerLoading) return;
+    playerLoading=true;playerError="";playerStatus="";
+    try {
+      const response=await fetch(`/api/field?map=${encodeURIComponent(key)}&dataset=current`);
+      const payload=await response.json();
+      if(!response.ok||payload.error)throw new Error(payload.error||`HTTP ${response.status}`);
+      if(playerMap!==key)return;
+      playerData=payload;playerBase=clone(payload);
+    } catch(error) {if(playerMap===key)playerError=error.message;}
+    finally {playerLoading=false;shell.refresh();}
+  };
+  const savePlayers = async () => {
+    if(!playerData||!playerBase)return;
+    const edits=[];
+    for(const player of playerData.players||[])for(const param of player.params||[]){
+      const before=playerBase.players?.[player.id]?.params?.[param.id];
+      if(before&&Number(before.value)!==Number(param.value))edits.push({map:playerData.key,player:player.id,param:param.id,value:Number(param.value)});
+    }
+    if(!edits.length){playerStatus="No player changes to save.";shell.refresh();return;}
+    try {
+      const response=await fetch("/api/field/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});
+      const payload=await response.json();
+      if(!response.ok||payload.error)throw new Error(payload.error||`HTTP ${response.status}`);
+      playerBase=clone(playerData);playerStatus=`Saved ${edits.length} CARDGAME parameter change${edits.length===1?"":"s"}.`;
+    } catch(error) {playerStatus=error.message;}
+    shell.refresh();
+  };
+  const renderPlayers = () => {
+    const maps=state.data.fields?.rows||[];
+    if(!playerMap&&maps.length)playerMap=maps[0].key;
+    if(playerMap&&!playerData&&!playerLoading)queueMicrotask(()=>loadPlayerMap(playerMap));
+    const selector=el("select",{value:playerMap,onchange:event=>{
+      playerMap=event.target.value;playerData=null;playerBase=null;playerError="";playerStatus="";shell.refresh();queueMicrotask(()=>loadPlayerMap(playerMap));
+    }},...maps.map(row=>el("option",{value:row.key,selected:row.key===playerMap},`${row.name} — ${row.key}`)));
+    const toolbar=el("div",{className:"ff8-card-player-toolbar"},
+      el("strong",{},"FIELD"),selector,
+      playerData?el("button",{type:"button",onclick:savePlayers},"SAVE PLAYERS"):null);
+    let content;
+    if(playerLoading)content=el("div",{},"Loading field card players…");
+    else if(playerError)content=el("div",{},`Players unavailable: ${playerError}`);
+    else if(!playerData)content=el("div",{},"Choose a field to inspect its Triple Triad opponents.");
+    else if(!(playerData.players||[]).length)content=el("div",{},"This field has no CARDGAME calls.");
+    else content=el("div",{},...(playerData.players||[]).map(player=>el("section",{className:"ff8-card-player"},
+      el("h4",{},`${player.entity} :: ${player.script}`),
+      el("div",{className:"ff8-card-player-grid"},...player.params.map(param=>el("label",{className:"ff8-card-player-field"},
+        el("span",{},param.name),
+        el("input",{type:"number",min:0,max:16777215,step:1,value:param.value,disabled:!param.editable,oninput:event=>{param.value=Number(event.target.value);playerStatus="Unsaved player changes";}}),
+        el("span",{className:"ff8-card-player-mode"},param.mode==="variable"?`savemap variable ${param.value}`:param.mode))))));
+    return el("div",{},toolbar,
+      el("p",{className:"muted"},"NPC card-player data comes from the seven fixed-size values immediately before field opcode CARDGAME (0x13A). Variable pushes remain variables; Lexeditor changes only their stored value."),
+      content,el("div",{className:"ff8-card-player-mode"},playerStatus));
+  };
+  const render = () => el("div",{},
+    el("div",{className:"ff8-card-tabs"},
+      el("button",{type:"button","aria-pressed":mode==="cards",onclick:()=>{mode="cards";shell.refresh();}},"CARDS"),
+      el("button",{type:"button","aria-pressed":mode==="players",onclick:()=>{mode="players";shell.refresh();}},"PLAYERS")),
+    mode==="players"?renderPlayers():renderCards());
   return {
-    render:()=>showPaged("cards",filtered("cards",["id","name"]),[
-      {key:"id",label:"ID"},{key:"name",label:"Card"},
-      ...fields.map(field=>({key:field,label:labels[field],pinned:false,numeric:true}))
-    ],detail,"74px minmax(240px,1fr)"),
+    render,
     edits:()=>state.data.cards.rows.flatMap(row=>{
       const base=state.base.cards.find(value=>value.id===row.id);
       return fields.filter(field=>row[field]!==base[field])
