@@ -4,12 +4,16 @@
 
 ## Requirements and decisions
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+- The fixed menu must expose Attack, Magic, the character's fixed command, and the learned command from the single junctioned GF.
+- Removing the GF must remove its learned command.
+- #314 is now acceptance-only; it is no longer the implementation blocker for this issue.
 
 ## Current implementation and evidence
 
-Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
+- `games/ff8/fixed_command_menu.py` implements the GF learned-command selection and the Siren/Treatment learning gate.
+- Switch, Shoot, Defend, Draw, and Summon have concrete sources or custom payloads.
+- Rinoa/Angelo is still explicitly unimplemented. That is the remaining functional blocker before #312 can enter player acceptance.
 
 ## Next agent work
 
-Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+Determine the correct native Angelo/Combine dispatcher/menu path from executable or source evidence, then implement a guarded candidate with executable-backed tests. Only after those checks pass should #312 move to `untested`.
