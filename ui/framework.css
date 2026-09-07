@@ -4620,3 +4620,161 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-settings-lane-developer>h3,.lex-developer-identity { grid-column:1 / -1; }
 .lex-developer-identity strong { letter-spacing:.06em; }
 @media (max-width:1100px) { .lex-settings-lane-developer { grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); } }
+
+
+/* LEXEDITOR_UI_VISUAL_FIX_20260906 */
+/* Barrel controls sit on the divider but extend over the table pane.  The
+   divider's old z-index left the visible +/- buttons underneath table-cell
+   content, so a real pointer click hit the table instead. */
+.lex-panel-layout-divider { z-index:20; }
+.lex-panel-layout-divider > .lex-barrel-control { z-index:30; }
+.lex-barrel-control button { pointer-events:auto; }
+
+/* Boolean references deliberately sit below their checkbox.  Keep that small
+   second line inside the row's visual rhythm and do not give a one-character
+   source tag the full generic 22px reference-label column. */
+.lex-boolean-field:has(.lex-source-control > .lex-reference-values) {
+  padding-bottom:8px;
+}
+.lex-boolean-field .lex-source-control > .lex-reference-values {
+  width:max-content;
+  min-width:0;
+  transform:translateX(-50%);
+  justify-items:center;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  align-items:center;
+  justify-content:center;
+  padding-block:0;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-tag {
+  flex:0 0 auto;
+  width:auto;
+  min-width:0;
+  max-width:none;
+  margin-right:4px;
+}
+.lex-boolean-field .lex-reference-values .lex-boolean-mark {
+  align-self:center;
+  line-height:1;
+}
+
+
+/* LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906 */
+/* Property names own exactly ten percent of an ordinary Detail row.  The text
+   sits against the value side of that lane; the shared type/help rail occupies
+   the metadata space to its left and is positioned by framework.js from the
+   actually rendered text width. */
+.lex-detail-field:not(.lex-boolean-field) {
+  grid-template-columns:10% minmax(0,1fr) !important;
+}
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label {
+  justify-content:flex-end;
+  text-align:right;
+}
+.lex-field-type-rail { overflow:visible; }
+
+
+/* LEXEDITOR_BOOLEAN_REF_BOTTOM_MARGIN_20260906 */
+/* The ref rail is absolutely positioned so padding alone cannot keep the next
+   property from touching it. Reserve actual inter-row space after any Boolean
+   that is showing provenance. */
+.lex-boolean-field:has(.lex-source-control > .lex-reference-values) {
+  margin-bottom:8px;
+}
+
+
+/* LEXEDITOR_MODEL_PREVIEW_OVERLAY_20260906 */
+/* A preview is a drawer over the Detail body, not a third grid row.  Letting it
+   auto-place as a third child changed the height of the 10% header row when it
+   opened, so the icon itself moved before the X replaced it.  Absolute overlay
+   keeps the heading geometrically invariant and makes the drawer actually slide
+   out over the editing surface. */
+.lex-detail-panel:has(> .lex-model-preview-drawer) { position:relative; }
+.lex-model-preview-drawer {
+  position:absolute;
+  z-index:3;
+  left:0;
+  right:0;
+  top:10%;
+  bottom:0;
+  min-height:0;
+  background:var(--lex-panel);
+}
+
+
+/* LEXEDITOR_MODEL_PREVIEW_SAME_SLOT_20260906 */
+/* The preview X is not a second control positioned near the icon. It is a
+   state of the standard Detail header icon itself, so both states have the
+   exact same box at every size/theme/scale. */
+.lex-model-preview-trigger { position:relative; }
+.lex-model-preview-trigger > .lex-model-preview-icon-content,
+.lex-model-preview-trigger > .lex-model-preview-close {
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  margin:0 !important;
+  transform:none !important;
+  place-items:center;
+}
+.lex-model-preview-trigger > .lex-model-preview-icon-content { display:grid; }
+.lex-model-preview-trigger > .lex-model-preview-close {
+  display:none;
+  box-sizing:border-box;
+  padding:0;
+  color:inherit;
+  background:transparent;
+  font:700 1.6em/1 var(--lex-symbol-font);
+  pointer-events:none;
+}
+.lex-model-preview-open > .lex-detail-panel-heading .lex-detail-panel-icon {
+  visibility:visible !important;
+  pointer-events:auto !important;
+}
+.lex-model-preview-open > .lex-detail-panel-heading .lex-model-preview-icon-content { display:none; }
+.lex-model-preview-open > .lex-detail-panel-heading .lex-model-preview-close { display:grid; }
+
+
+/* LEXEDITOR_GRAPH_MARGIN_POSITIONING_20260906 */
+/* Axis text belongs to the plot margin, not to normal document flow. An
+   older shared selector reset .lex-curve-axis and .lex-curve-axis-name to
+   position:relative after their original absolute rules, so right-axis
+   values drifted into the graph. Reassert the graph contract last. */
+.lex-curve-plot > :is(.lex-curve-axis,.lex-curve-axis-name) {
+  position:absolute !important;
+  z-index:2;
+}
+.lex-curve-axis-top,.lex-curve-axis-bottom {
+  left:auto !important;
+  right:7px !important;
+  writing-mode:vertical-rl !important;
+  text-orientation:mixed !important;
+  transform:rotate(180deg) !important;
+}
+.lex-curve-axis-name-y {
+  left:auto !important;
+  right:22px !important;
+  top:50% !important;
+  bottom:auto !important;
+  writing-mode:vertical-rl !important;
+  text-orientation:mixed !important;
+  transform:translateY(-50%) rotate(180deg) !important;
+}
+.lex-curve-axis-start,.lex-curve-axis-end,.lex-curve-axis-name-x {
+  top:auto !important;
+  bottom:4px !important;
+}
+
+
+/* LEXEDITOR_FIXED_PROPERTY_LABEL_TRACK_20260906 */
+/* A long property NAME is allowed to wrap/shrink inside its allocated lane,
+   but its intrinsic text height must never make the property row taller.
+   Size containment removes the label's intrinsic block-size contribution;
+   the row is then sized by the actual control, and fitLabel() scales/wraps the
+   label into that fixed space. */
+.lex-detail-field > .lex-detail-field-label {
+  contain:size;
+  min-block-size:0;
+  overflow:hidden;
+}
