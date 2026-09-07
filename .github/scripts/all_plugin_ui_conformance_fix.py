@@ -22,6 +22,8 @@ def fix_ff8(text: str) -> str:
                         '.lex-detail-panel{--lex-detail-label-width:10%}')
     text = text.replace('.ff8-character-curve:not(.ff8-enemy-curve){grid-template-columns:minmax(0,1fr) minmax(150px,16%)}', '')
     text = text.replace('color:#fff;font-size:22px}', 'color:#fff}', 1)
+    # Editable is a cell/column capability, never a separate Table type.
+    text = text.replace('.lex-editable-table', '.lex-column-list')
     return text
 
 
