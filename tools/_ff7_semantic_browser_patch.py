@@ -50,6 +50,29 @@ s=s.replace(old,new,1).replace('''  subtabBar,
 });''',1)
 p.write_text(s,encoding='utf-8')
 
+# The old shop persistence test was itself asserting the rejected UI contract:
+# a bare numeric "Item ID" input. Install the KERNEL name tables and select the
+# same underlying value through the semantic product selector instead.
+p=ROOT/'tools/verify_ff7_ui.py';s=p.read_text(encoding='utf-8')
+old='''        text=self.install_extra("text");shop=self.install_extra("shop")
+        text_before,shop_before=text.read_bytes(),shop.read_bytes()
+'''
+new='''        write_kernel(self.backend.game/PATHS[0])
+        text=self.install_extra("text");shop=self.install_extra("shop")
+        text_before,shop_before=text.read_bytes(),shop.read_bytes()
+'''
+if old not in s:raise SystemExit('shop test setup marker missing')
+s=s.replace(old,new,1)
+old='''        self.page.get_by_label("Item ID for Shop 0",exact=True).first.fill("17")
+'''
+new='''        product=self.page.get_by_label("Slot 1 product for Shop 0",exact=True).first
+        self.assertEqual(product.evaluate("e=>e.tagName"),"SELECT")
+        product.select_option("17")
+'''
+if old not in s:raise SystemExit('raw shop Item ID test marker missing')
+s=s.replace(old,new,1)
+p.write_text(s,encoding='utf-8')
+
 # Real shared-UI acceptance across core KERNEL, characters, scene, encounters
 # and shops. This is intentionally representative rather than screenshot-only.
 p=ROOT/'tools/verify_ff7_rendered_neutral.py';s=p.read_text(encoding='utf-8')
