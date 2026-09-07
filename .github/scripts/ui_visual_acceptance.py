@@ -333,8 +333,33 @@ with sync_playwright() as p:
             field_box = field.bounding_box(); label_box = label.bounding_box()
             label_ratio = label_box['width'] / field_box['width'] if field_box['width'] else 0
             assert .07 <= label_ratio <= .13, (width, "label lane is not approximately 10%", label_ratio)
-            simple_heights = [page.locator('.lex-detail-field').nth(i).bounding_box()['height'] for i in range(4)]
-            assert max(simple_heights) - min(simple_heights) <= 2, (width, 'property-name fitting changed simple row heights', simple_heights)
+            # Test label fitting with two otherwise identical rows. Different
+            # control types legitimately reserve different vertical space (for
+            # example a provenance/ref rail), so comparing arbitrary gallery
+            # rows would not test the user's requirement. A long PROPERTY NAME
+            # must fit by wrapping/scaling without making its row taller.
+            page.evaluate("""()=>{
+              const make = label => LexeditorUI.detailField({
+                label,
+                control: LexeditorUI.el('input',{type:'text',value:'x'})
+              });
+              const panel = LexeditorUI.detailPanel({
+                className:'blank-detail', title:'Label Fit Contract',
+                icon:LexeditorUI.el('span',{},'L'), identity:'TEST', meta:'Shared label fitting',
+                body:[LexeditorUI.detailSection({title:'LABELS',body:[
+                  make('SHORT'),
+                  make('A DELIBERATELY VERY LONG PROPERTY NAME')
+                ]})]
+              });
+              document.querySelector('#main').replaceChildren(panel);
+            }""")
+            page.wait_for_timeout(120)
+            fit_fields = page.locator('.lex-detail-field')
+            simple_heights = [fit_fields.nth(i).bounding_box()['height'] for i in range(2)]
+            assert abs(simple_heights[0] - simple_heights[1]) <= 2, (width, 'long property name changed row height', simple_heights)
+            long_label = fit_fields.nth(1).locator('.lex-detail-field-label')
+            long_fit = long_label.evaluate("e=>({sw:e.scrollWidth,cw:e.clientWidth,sh:e.scrollHeight,ch:e.clientHeight,font:getComputedStyle(e).fontSize})")
+            assert long_fit['sw'] <= long_fit['cw'] + 1 and long_fit['sh'] <= long_fit['ch'] + 1, (width, 'long property name did not fit its fixed label lane', long_fit)
 
             # set_content() runs the fixture at about:blank with a fake <base>.
             # The app's final history.replaceState therefore raises one expected
