@@ -43,12 +43,18 @@ def replace_project(target:Path,output:bytes,active:bytes,existed:bool,check):
 def records_match(category,expected,actual):
     left={r['id']:r['values'] for r in expected};right={r['id']:r['values'] for r in actual}
     if left.keys()!=right.keys():return False
-    if category not in {'characterAI','enemyAI','formationAI'}:return left==right
-    from .ai import assemble
-    for index,values in left.items():
-        if not isinstance(values,dict) or values.keys()!=right[index].keys():return False
-        for key,value in values.items():
-            if value!=right[index][key] and assemble(value)!=assemble(right[index][key]):return False
+    if category not in {'characterAI','enemyAI','formationAI'}:
+        if left!=right:return False
+    else:
+        from .ai import assemble
+        for index,values in left.items():
+            if not isinstance(values,dict) or values.keys()!=right[index].keys():return False
+            for key,value in values.items():
+                if value!=right[index][key] and assemble(value)!=assemble(right[index][key]):return False
+    if category in {'items','weapons','armor','accessories','materia'}:
+        descriptions={r['id']:r.get('description') for r in expected}
+        restored={r['id']:r.get('description') for r in actual}
+        if descriptions!=restored:return False
     return True
 
 
