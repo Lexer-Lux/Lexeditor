@@ -5790,6 +5790,13 @@
         close.style.transform = `translate(${iconBox.left - closeBox.left}px, ${iconBox.top - closeBox.top}px)`;
       }
     };
+    const settleCloseSlot = () => {
+      syncCloseSlot();
+      requestAnimationFrame(() => {
+        syncCloseSlot();
+        requestAnimationFrame(syncCloseSlot);
+      });
+    };
     const open = async () => {
       if (!drawer.childNodes.length) {
         const content = await getContent?.();
@@ -5797,7 +5804,7 @@
       }
       drawer.hidden = false;
       panel.classList.add('lex-model-preview-open');
-      syncCloseSlot();
+      settleCloseSlot();
       icon.setAttribute('aria-expanded', 'true');
       await onOpen?.(drawer);
     };
