@@ -17,6 +17,8 @@ from pathlib import Path
 import struct
 from typing import Any
 
+from .format_codec import pack_strings, string_table
+
 
 TEXT_MAP_EN = tuple(
     " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_"
@@ -264,7 +266,7 @@ class Kernel:
         if len(section) % category.record_size:
             raise ValueError(f"{category.label} section does not contain whole records")
         names = _text_section(self.sections[category.text_name_section - 1])
-        descriptions = _text_section(self.sections[category.text_description_section - 1])
+        descriptions = string_table(bytes(self.sections[category.text_description_section - 1]))
         count = len(section) // category.record_size
         if len(names) < count or len(descriptions) < count:
             raise ValueError(f"{category.label} text count does not match its records")
@@ -286,6 +288,12 @@ class Kernel:
         if len(records) != expected_count:
             raise ValueError(f"{category.label} must contain exactly {expected_count} records")
         fields = {field.key: field for field in category.fields}
+        next_section = bytearray(section)
+        description_index = category.text_description_section - 1
+        current_descriptions = string_table(bytes(self.sections[description_index]))
+        if len(current_descriptions) < expected_count:
+            raise ValueError(f"{category.label} description count does not match its records")
+        next_descriptions = list(current_descriptions)
         seen: set[int] = set()
         for record in records:
             record_index = record.get("id")
@@ -297,11 +305,21 @@ class Kernel:
             values = record.get("values")
             if not isinstance(values, dict) or set(values) != set(fields):
                 raise ValueError(f"{category.label} record {record_index} has an invalid field set")
+            description = record.get("description")
+            if type(description) is not str:
+                raise ValueError(f"{category.label} record {record_index} description must be text")
             start = record_index * category.record_size
-            current = bytearray(section[start:start + category.record_size])
+            current = bytearray(next_section[start:start + category.record_size])
             for key, field in fields.items():
                 _write_field(current, field, values[key])
-            section[start:start + category.record_size] = current
+            next_section[start:start + category.record_size] = current
+            next_descriptions[record_index] = description
+        packed_descriptions = None
+        if next_descriptions != current_descriptions:
+            packed_descriptions = pack_strings(next_descriptions)
+        self.sections[category.section - 1] = next_section
+        if packed_descriptions is not None:
+            self.sections[description_index] = bytearray(packed_descriptions)
 
     def to_bytes(self) -> bytes:
         output = bytearray()
@@ -341,6 +359,7 @@ def category_metadata() -> list[dict[str, Any]]:
     return [{
         "id": category.key,
         "label": category.label,
+        "descriptionEditable": True,
         "fields": [{
             "key": field.key, "label": field.label, "dataType": "int",
             "minimum": field.minimum, "maximum": field.maximum, "step": field.scale,

@@ -22,7 +22,29 @@ def open_with_neutral(self, edition="ff7"):
     self.assertEqual(self.errors, [])
 
 
+def test_accessory_description_is_editable_game_text(self):
+    self.install()
+    self.open()
+    self.navigate("accessories")
+    description = self.page.get_by_label("Description for Record0", exact=True)
+    self.assertTrue(description.is_editable())
+    self.assertEqual(description.input_value(), "Help0")
+    heading = self.page.locator(".ff7-detail .lex-detail-panel-heading").first.inner_text()
+    self.assertNotIn("ff7", heading.casefold())
+    description.fill("Edited accessory description")
+    self.save()
+    status, data = self.backend.request("/api/data")
+    self.assertEqual(status, 200)
+    self.assertEqual(data["records"]["accessories"][0]["description"], "Edited accessory description")
+
+    self.navigate("characters")
+    self.assertEqual(self.page.get_by_label("Description for Slot0", exact=True).count(), 0)
+    self.assertNotIn("Initial stats, equipment, materia/AP", self.page.locator("main").inner_text())
+    self.originals_unchanged()
+
+
 target.RenderedTests.open = open_with_neutral
+target.RenderedTests.test_accessory_description_is_editable_game_text = test_accessory_description_is_editable_game_text
 
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)
