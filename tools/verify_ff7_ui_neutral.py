@@ -11,6 +11,10 @@ import verify_ff7_ui as target
 target.FRAMEWORK += r'''
 (()=>{
 const el=window.LexeditorUI.el;
+const originalDetailField=window.LexeditorUI.detailField;
+const detailField=o=>o.control instanceof HTMLButtonElement
+  ? el("div",{},el("span",{},o.label),o.control)
+  : originalDetailField(o);
 const subtabBar=o=>el("div",{role:"tablist","aria-label":o.label||"Subsections"},
   ...(o.tabs||[]).map(tab=>el("button",{type:"button",role:"tab","aria-selected":String(tab.id===o.active),onclick:()=>o.change?.(tab.id)},tab.label)));
 const tabbedPanel=o=>{
@@ -20,6 +24,7 @@ const tabbedPanel=o=>{
     el("section",{role:"tabpanel","aria-label":active?.label||"Panel"},o.content));
 };
 Object.assign(window.LexeditorUI,{
+  detailField,
   readonlyField:value=>el("span",{},String(value??"")),
   infoIcon:()=>el("span",{"aria-hidden":"true"},"i"),
   integrationStatus:value=>el("span",{},String(value??"")),
