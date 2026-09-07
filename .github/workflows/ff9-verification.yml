@@ -70,6 +70,12 @@ jobs:
           python -m compileall -q games/ff9
           python -m pytest -q tests/test_ff9*.py
           node --test tests/ff9_editor.test.cjs
+      - name: Upload verified FF9 runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff9-compiled-runtime
+          path: games/ff9/runtime/Memoria.Scripts.Lexeditor.dll
+          retention-days: 1
       - name: Commit verified runtime and feature UI
         if: github.event_name == 'push'
         shell: bash
