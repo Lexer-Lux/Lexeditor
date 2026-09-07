@@ -5779,27 +5779,25 @@
     heading.append(close);
     heading.after(drawer);
     const syncCloseSlot = () => {
-      // offsetLeft/offsetWidth round fractional grid geometry, which moved the
-      // X by a couple of pixels at narrower window sizes. Measure both boxes
-      // in the same coordinate system so the close button literally overlays
-      // the header icon at any scale.
-      const headingBox = heading.getBoundingClientRect();
       const iconBox = icon.getBoundingClientRect();
-      const originX = headingBox.left + heading.clientLeft;
-      const originY = headingBox.top + heading.clientTop;
-      close.style.left = `${iconBox.left - originX}px`;
-      close.style.top = `${iconBox.top - originY}px`;
+      close.style.transform = 'none';
+      close.style.left = `${icon.offsetLeft}px`;
+      close.style.top = `${icon.offsetTop}px`;
       close.style.width = `${iconBox.width}px`;
       close.style.height = `${iconBox.height}px`;
+      const closeBox = close.getBoundingClientRect();
+      if (closeBox.width && closeBox.height) {
+        close.style.transform = `translate(${iconBox.left - closeBox.left}px, ${iconBox.top - closeBox.top}px)`;
+      }
     };
     const open = async () => {
-      syncCloseSlot();
       if (!drawer.childNodes.length) {
         const content = await getContent?.();
         if (content instanceof Node) drawer.append(content);
       }
       drawer.hidden = false;
       panel.classList.add('lex-model-preview-open');
+      syncCloseSlot();
       icon.setAttribute('aria-expanded', 'true');
       await onOpen?.(drawer);
     };
