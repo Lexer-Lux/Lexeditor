@@ -13,10 +13,9 @@ def edit(path: str, transform):
 
 
 def fix_framework_css(text: str) -> str:
-    marker = "LEXEDITOR_UI_VISUAL_FIX_20260906"
-    if marker in text:
-        return text
-    return text + r'''
+    first = "LEXEDITOR_UI_VISUAL_FIX_20260906"
+    if first not in text:
+        text += r'''
 
 /* LEXEDITOR_UI_VISUAL_FIX_20260906 */
 /* Barrel controls sit on the divider but extend over the table pane.  The
@@ -55,6 +54,67 @@ def fix_framework_css(text: str) -> str:
   line-height:1;
 }
 '''
+    second = "LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906"
+    if second not in text:
+        text += r'''
+
+/* LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906 */
+/* Property names own exactly ten percent of an ordinary Detail row.  The text
+   sits against the value side of that lane; the shared type/help rail occupies
+   the metadata space to its left and is positioned by framework.js from the
+   actually rendered text width. */
+.lex-detail-field:not(.lex-boolean-field) {
+  grid-template-columns:10% minmax(0,1fr) !important;
+}
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label {
+  justify-content:flex-end;
+  text-align:right;
+}
+.lex-field-type-rail { overflow:visible; }
+'''
+    return text
+
+
+def fix_framework_js(text: str) -> str:
+    marker = "LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906"
+    if marker in text:
+        return text
+    return text + r'''
+
+/* LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906 */
+(() => {
+  const alignFieldMetadata = root => {
+    const fields = root?.matches?.('.lex-detail-field')
+      ? [root] : [...(root?.querySelectorAll?.('.lex-detail-field') || [])];
+    for (const field of fields) {
+      if (field.classList.contains('lex-boolean-field')) continue;
+      const rail = field.querySelector(':scope > .lex-field-type-rail');
+      const help = rail?.querySelector('.lex-info-help');
+      const label = field.querySelector(':scope > .lex-detail-field-label');
+      if (!rail || !help || !label) continue;
+      const text = [...label.childNodes].find(node =>
+        node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+      if (!text) continue;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const fieldBox = field.getBoundingClientRect();
+      const textBox = range.getBoundingClientRect();
+      const railBox = rail.getBoundingClientRect();
+      if (!fieldBox.width || !textBox.width || !railBox.width) continue;
+      // User-facing contract: the info bubble/type rail is centred between the
+      // panel-side edge of the property row and the RIGHT edge of its label.
+      const centre = (fieldBox.left + textBox.right) / 2;
+      rail.style.left = `${Math.max(0, centre - fieldBox.left - railBox.width / 2)}px`;
+    }
+  };
+  const schedule = root => requestAnimationFrame(() => alignFieldMetadata(root || document));
+  new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
+    if (node instanceof Element) schedule(node);
+  }))).observe(document.documentElement, {childList:true, subtree:true});
+  window.addEventListener('resize', () => schedule(document));
+  schedule(document);
+})();
+'''
 
 
 def fix_blank(text: str) -> str:
@@ -67,4 +127,5 @@ def fix_blank(text: str) -> str:
 
 
 edit("ui/framework.css", fix_framework_css)
+edit("ui/framework.js", fix_framework_js)
 edit("games/blank/editor.html", fix_blank)
