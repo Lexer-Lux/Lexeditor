@@ -18,6 +18,15 @@ s = s.replace(
 '''state.dashboard.runtime=await api("/api/runtime");
       state.dataMap=await api("/api/datamap");
       state.deployment=await api("/api/deployment");''')
+# The replacement above deliberately matches both legacy and integrated files.
+# Collapse any repeated insertion so running this patcher twice is a no-op.
+duplicate_deployment = '''state.dataMap=await api("/api/datamap");
+      state.deployment=await api("/api/deployment");
+      state.deployment=await api("/api/deployment");'''
+single_deployment = '''state.dataMap=await api("/api/datamap");
+      state.deployment=await api("/api/deployment");'''
+while duplicate_deployment in s:
+    s = s.replace(duplicate_deployment, single_deployment)
 
 legacy = '''function tweaks(){
     setToolbar([subtabBar({tabs:[{id:"memoria",label:"Memoria"}],active:"memoria",label:"Tweaks",change:()=>{}})]);
