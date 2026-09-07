@@ -84,6 +84,28 @@ def fix_framework_css(text: str) -> str:
   margin-bottom:8px;
 }
 '''
+    fourth = "LEXEDITOR_MODEL_PREVIEW_OVERLAY_20260906"
+    if fourth not in text:
+        text += r'''
+
+/* LEXEDITOR_MODEL_PREVIEW_OVERLAY_20260906 */
+/* A preview is a drawer over the Detail body, not a third grid row.  Letting it
+   auto-place as a third child changed the height of the 10% header row when it
+   opened, so the icon itself moved before the X replaced it.  Absolute overlay
+   keeps the heading geometrically invariant and makes the drawer actually slide
+   out over the editing surface. */
+.lex-detail-panel:has(> .lex-model-preview-drawer) { position:relative; }
+.lex-model-preview-drawer {
+  position:absolute;
+  z-index:3;
+  left:0;
+  right:0;
+  top:10%;
+  bottom:0;
+  min-height:0;
+  background:var(--lex-panel);
+}
+'''
     return text
 
 
@@ -98,9 +120,8 @@ def fix_framework_js(text: str) -> str:
     if slot_v1 in text:
         text = text.replace(slot_v1, slot_v2, 1)
 
-    # The drawer changes the Detail panel's grid after the open class is applied.
-    # Correct once immediately and twice on settled animation frames so the close
-    # button tracks the FINAL icon box, not the transient pre-layout box.
+    # The drawer may still cause plugin content to settle asynchronously. Keep
+    # the replacement locked to the rendered icon box across two paint frames.
     slot_v3 = slot_v2 + '''\n    const settleCloseSlot = () => {\n      syncCloseSlot();\n      requestAnimationFrame(() => {\n        syncCloseSlot();\n        requestAnimationFrame(syncCloseSlot);\n      });\n    };'''
     if slot_v2 in text and 'const settleCloseSlot = () =>' not in text:
         text = text.replace(slot_v2, slot_v3, 1)
