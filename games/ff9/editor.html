@@ -53,11 +53,119 @@
     "shops:Comment":"Final Fantasy 9 has no shop names. Memoria's shop export carries only Comment, Id and Items, and it fills Comment with a generated placeholder such as “Shop 0000” so the rows can be told apart. Lexeditor shows it as the shop's name, but the game never reads it, so editing it would rename nothing.",
   };
   const readOnlyNote=(data,field)=>EXPLAINED_READ_ONLY[`${data.key}:${field.key}`]||null;
+  const FIELD_HELP={
+    "characters:Dexterity":"The character's base Dexterity/Speed component. FF9 adds level growth and accumulated bonuses to it; the normal speed calculation caps the result at 50.",
+    "characters:Strength":"The character's base Strength component. Level growth and accumulated bonuses build on it, and current Strength is also the stat used to scale maximum HP.",
+    "characters:Magic":"The character's base Magic component. Level growth and accumulated bonuses build on it, and current Magic is also the stat used to scale maximum MP.",
+    "characters:Will":"The character's base Will/Spirit component. FF9 adds level growth and accumulated bonuses to it; the normal Spirit calculation caps the result at 50.",
+    "characters:Gems":"Base Magic Stone capacity. Character level and accumulated capacity bonuses add to this value to determine the support-ability budget.",
+    "leveling:Experience":"The cumulative EXP threshold associated with this level on FF9's shared level curve.",
+    "leveling:BonusHP":"The shared HP coefficient for this level. Maximum HP uses this coefficient multiplied by the character's current Strength, then divided by 50.",
+    "leveling:BonusMP":"The shared MP coefficient for this level. Maximum MP uses this coefficient multiplied by the character's current Magic, then divided by 100.",
+    "items:WeaponId":"Links this item record to its weapon-performance row. Items that are not weapons do not use a weapon row.",
+    "items:ArmorId":"Links this item record to the defence/evasion row used by armor and accessories.",
+    "items:EffectId":"Links a usable item to the Item Effects record that defines what happens when the item is used.",
+    "items:Price":"Base gil purchase price used when a normal shop sells this item.",
+    "items:SellingPrice":"Gil paid to the player when this item is sold back where selling is allowed.",
+    "items:BonusId":"Links equipment to the shared stat/element bonus record applied by that piece of equipment.",
+    "items:AbilityIds":"Abilities associated with this equipment for FF9's equipment-learning system. These are the abilities a character can access/learn from the item when the character is eligible for them.",
+    "items:GraphicsId":"Selects the inventory/menu graphic associated with this item record.",
+    "items:ColorId":"Selects the color variant used with the item's menu graphic.",
+    "weapons:Category":"Weapon family/category used by FF9's weapon handling and presentation.",
+    "weapons:StatusIndex":"Selects the status-set entry associated with this weapon's attack behavior.",
+    "weapons:Model":"Battle model used for this weapon.",
+    "weapons:ScriptId":"Battle script used to resolve this weapon's normal attack behavior.",
+    "weapons:Power":"Attack-power input supplied to the weapon's battle script.",
+    "weapons:Elements":"Element flags carried by the weapon attack and consumed by the battle calculation.",
+    "weapons:Rate":"Rate parameter supplied to the weapon/status attack logic; its exact effect depends on the selected battle script.",
+    "weapons:HitSfx":"Sound effect played for this weapon's hit/impact presentation.",
+    "armor:P.Def":"Physical defence contributed by this armor-data row.",
+    "armor:P.Eva":"Physical evasion contributed by this armor-data row.",
+    "armor:M.Def":"Magical defence contributed by this armor-data row.",
+    "armor:M.Eva":"Magical evasion contributed by this armor-data row.",
+    "item-effects:Targets":"Targeting mode used when this item effect is selected in battle or a menu that invokes the effect.",
+    "item-effects:DefaultAlly":"Controls whether the targeting cursor begins on allies when this effect is opened.",
+    "item-effects:Dead":"Allows this effect to target KO'd/dead characters.",
+    "item-effects:DefaultDead":"Makes a KO'd/dead target the default target class for this effect when applicable.",
+    "item-effects:ScriptId":"Battle/effect script that implements what this item actually does.",
+    "item-effects:Power":"Magnitude input supplied to the selected item-effect script.",
+    "item-effects:Rate":"Success/rate input supplied to the selected item-effect script; interpretation can vary by script.",
+    "item-effects:Element":"Element associated with this item effect for scripts that consume an element.",
+    "item-effects:Status":"Status flags associated with this effect for scripts that apply or inspect statuses.",
+    "initial-items:ItemID":"Item placed in the party's starting inventory by this initial-inventory entry.",
+    "initial-items:Count":"Starting quantity of the linked item.",
+    "mix-items:Result":"Item produced by this mix recipe.",
+    "mix-items:Ingredients":"Items consumed by this mix recipe.",
+    "shops:Items":"This ordered list is the shop's actual stock. Adding or removing item IDs changes what the shop offers for sale.",
+    "synthesis:Shops":"Shop IDs in which this synthesis recipe is available.",
+    "synthesis:Price":"Gil charged to perform this synthesis recipe; ingredient items are consumed separately.",
+    "synthesis:Result":"Item produced when the synthesis succeeds.",
+    "synthesis:Ingredients":"Items consumed by this synthesis recipe.",
+    "abilities:Gems":"Magic Stones required to equip this support ability. This cost consumes part of the character's available Magic Stone capacity.",
+    "character-parameters:DefaultRow":"Initial battle-row flag assigned when this character setup is created. Normal row-changing mechanics can change the character's row afterward.",
+    "character-parameters:DefaultWinPose":"Selects the default victory-pose behavior for this character setup.",
+    "character-parameters:DefaultCategory":"Character-category flags used by FF9 to distinguish actor capabilities/roles in battle logic.",
+    "character-parameters:DefaultCommandSet":"Links this character setup to the command-set row that fills the battle command menu.",
+    "character-parameters:DefaultEquipmentSet":"Links this character setup to the predefined equipment set used for starting/default gear.",
+    "character-parameters:BattleParameterFormula":"Memoria expression that chooses the character's battle-parameter/model setup from runtime context such as weapon shape or story state.",
+    "character-parameters:NameKeyword":"Localization keyword used to resolve the character's default/display name.",
+    "commands:Ability":"Single ability associated with commands that dispatch one fixed ability.",
+    "commands:Abilities":"Ability list exposed by commands that open a selectable ability menu.",
+    "default-equipment:Weapon":"Weapon equipped by this predefined starting-equipment set.",
+    "default-equipment:Head":"Headgear equipped by this predefined starting-equipment set.",
+    "default-equipment:Wrist":"Wrist/arm equipment in this predefined starting-equipment set.",
+    "default-equipment:Armor":"Body armor in this predefined starting-equipment set.",
+    "default-equipment:Accessory":"Accessory in this predefined starting-equipment set.",
+    "actions:targets":"Targeting mode used when this battle action is selected.",
+    "actions:defaultAlly":"Controls whether the action's targeting cursor begins on the ally side.",
+    "actions:forDead":"Allows the action to target KO'd/dead units.",
+    "actions:defaultOnDead":"Makes KO'd/dead units the default target class when the action supports them.",
+    "actions:defaultCamera":"Lets the action use its normal battle-camera behavior rather than suppressing it.",
+    "actions:scriptId":"Battle script that implements this action's gameplay effect.",
+    "actions:power":"Magnitude input supplied to the selected battle script.",
+    "actions:elements":"Element flags associated with the action for scripts/calculations that consume elements.",
+    "actions:rate":"Success/rate input supplied to the selected battle script; interpretation can vary by script.",
+    "actions:statusIndex":"Selects the status-set entry associated with this action.",
+    "actions:mp":"MP consumed when this action is used through a command that charges its listed cost.",
+    "magic-sword-sets:Supporter":"Character whose presence/ability support enables this Magic Sword relationship.",
+    "magic-sword-sets:Beneficiary":"Character who receives the Magic Sword ability set from this relationship.",
+    "magic-sword-sets:BaseAbilities":"Base abilities considered for this Magic Sword pairing.",
+    "magic-sword-sets:UnlockedAbilities":"Magic Sword abilities made available when their corresponding conditions are satisfied.",
+    "status-data:OprCount(tick)":"Controls the periodic-operation cadence for statuses that execute repeated tick logic.",
+    "status-data:ContiCount(duration)":"Base duration counter used by statuses whose lifetime is measured by the status system.",
+    "status-data:ClearOnApply":"Statuses cleared when this status is successfully applied.",
+    "status-data:ImmunityProvided":"Statuses the affected unit becomes immune to while this status is providing immunity.",
+    "status-data:SPSEffect":"Sprite-particle effect associated with this status's visual presentation.",
+    "status-data:SHPEffect":"Shape-particle effect associated with this status's visual presentation.",
+    "status-sets:Statuses":"Statuses grouped under this reusable status-set ID. Actions, weapons, and other records can refer to the set by index.",
+    "tetra-cards:ATK(UP)":"Attack value printed/used on the card's upper edge in Tetra Master data.",
+    "tetra-cards:MDEF(RIGHT)":"Defence value associated with the card's right edge in Tetra Master data.",
+    "tetra-cards:MATK(DOWN)":"Attack value associated with the card's lower edge in Tetra Master data.",
+    "tetra-cards:PDEF(LEFT)":"Defence value associated with the card's left edge in Tetra Master data.",
+    "world-transport:speed_move":"Forward movement speed for this world-map transport type.",
+    "world-transport:speed_rotation":"Turning speed for this world-map transport type.",
+    "world-transport:speed_updown":"Vertical movement speed for transports that can change altitude.",
+    "world-transport:flg_fly":"Controls whether this transport type uses flying/airborne movement behavior.",
+    "world-transport:encount":"Controls whether random world-map encounters can occur while using this transport type.",
+    "world-transport:radius":"Collision/footprint radius used for this transport on the world map.",
+  };
+  function semanticFieldHelp(data,field){
+    const dataKey=String(data?.key||"");
+    if(dataKey.startsWith("ability-")&&field.key==="AP")return "AP this character must earn from eligible equipment to permanently learn the linked ability.";
+    if(dataKey==="item-stats"&&["Dexterity","Strength","Magic","Will"].includes(field.key))return `When a character levels while equipment using this bonus row is equipped, FF9 adds this ${field.key} bonus into the character's accumulated stat-growth bonus.`;
+    if(dataKey==="item-stats"&&field.key==="AttackElement")return "Element added to physical attacks by equipment that references this bonus row.";
+    if(dataKey==="item-stats"&&field.key==="GuardElement")return "Elements guarded against by equipment that references this bonus row.";
+    if(dataKey==="item-stats"&&field.key==="AbsorbElement")return "Elements converted from damage into healing by equipment that references this bonus row.";
+    if(dataKey==="item-stats"&&field.key==="HalfElement")return "Elements whose incoming damage is halved by equipment that references this bonus row.";
+    if(dataKey==="item-stats"&&field.key==="WeakElement")return "Elements to which equipment using this bonus row makes the wearer weak.";
+    if(dataKey==="command-sets"&&field.key!=="Id")return field.key.includes("Trance")?"Command ID placed in this battle-menu slot while the character is in Trance.":"Command ID placed in this battle-menu slot in the character's normal state.";
+    return FIELD_HELP[`${dataKey}:${field.key}`]||"";
+  }
   function setValue(data,row,field,value){row.values[field.key]=value;shell.refresh()}
-  function fieldControl(data,row,field){const note=readOnlyNote(data,field);let control;if(note||!field.editable||field.kind==="stored")control=readonlyField(String(row.values[field.key]??""),{className:"ff9-readonly"});else if(field.kind==="boolean")control=el("input",{type:"checkbox",checked:!!row.values[field.key],onchange:event=>setValue(data,row,field,event.target.checked)});else if(field.kind==="integer"||field.kind==="number")control=el("input",{type:"number",min:field.min,max:field.max,step:field.step||1,value:row.values[field.key],oninput:event=>{if(event.target.value!=="")setValue(data,row,field,Number(event.target.value))}});else control=el("input",{type:"text",value:row.values[field.key]??"",oninput:event=>setValue(data,row,field,event.target.value)});const listNote=field.kind==="list"?(data.key==="shops"&&field.key==="Items"?"Ordered item IDs sold by this shop. Separate entries with commas.":"This Memoria array is edited as a comma-separated list."):null;return detailField({label:field.label.toLocaleUpperCase(),help:note?infoHelp(note):listNote?infoHelp(listNote):null,control,dataType:note?"READ ONLY":field.declaredType,min:field.min,max:field.max})}
+  function fieldControl(data,row,field){const note=readOnlyNote(data,field),semantic=note||semanticFieldHelp(data,field);let control;if(note||!field.editable||field.kind==="stored")control=readonlyField(String(row.values[field.key]??""),{className:"ff9-readonly"});else if(field.kind==="boolean")control=el("input",{type:"checkbox",checked:!!row.values[field.key],onchange:event=>setValue(data,row,field,event.target.checked)});else if(field.kind==="integer"||field.kind==="number")control=el("input",{type:"number",min:field.min,max:field.max,step:field.step||1,value:row.values[field.key],oninput:event=>{if(event.target.value!=="")setValue(data,row,field,Number(event.target.value))}});else control=el("input",{type:"text",value:row.values[field.key]??"",oninput:event=>setValue(data,row,field,event.target.value)});return detailField({label:field.label.toLocaleUpperCase(),help:semantic?infoHelp(semantic):null,control,dataType:note?"READ ONLY":field.declaredType,min:field.min,max:field.max})}
   const fieldRows=(data,row,exclude=[])=>{const blocked=new Set(exclude.map(String));return data&&row?data.fields.filter(field=>!blocked.has(field.key)&&field.key.toLocaleLowerCase()!=="id"&&field.key.toLocaleLowerCase()!=="comment").map(field=>fieldControl(data,row,field)):[]};
   function boolProperty(data,row,label,keys,help){const fields=new Map(data.fields.map(field=>[field.key,field]));const toggles=keys.filter(key=>fields.has(key)).map(key=>({key,label:key,checked:!!row.values[key],disabled:state.activeSource!=="mine",change:value=>setValue(data,row,fields.get(key),value)}));return toggles.length?detailField({label,help:help?infoHelp(help):null,control:toggleRow({label,toggles}),dataType:"FLAGS"}):null}
-  function itemSections(data,row,title="ITEM DATA"){const grouped=[...ITEM_CATEGORY_FLAGS,...ITEM_PARTY_FLAGS];const body=fieldRows(data,row,grouped);const categories=boolProperty(data,row,"CATEGORIES",ITEM_CATEGORY_FLAGS,"Related item category/usability checks are one property; the stored bits are an implementation detail.");const party=boolProperty(data,row,"EQUIPPABLE BY",ITEM_PARTY_FLAGS,"The party-member equipment checks are one multi-boolean property.");if(categories)body.push(categories);if(party)body.push(party);return detailSection({title,body})}
+  function itemSections(data,row,title="ITEM DATA"){const grouped=[...ITEM_CATEGORY_FLAGS,...ITEM_PARTY_FLAGS];const body=fieldRows(data,row,grouped);const categories=boolProperty(data,row,"CATEGORIES",ITEM_CATEGORY_FLAGS,"These switches decide which FF9 item/equipment categories this record belongs to and whether it behaves as a normal usable item. More than one category can apply to the same underlying item record.");const party=boolProperty(data,row,"EQUIPPABLE BY",ITEM_PARTY_FLAGS,"Each switch controls whether that character is allowed to equip this record. Guest-character switches matter only while that character is actually available.");if(categories)body.push(categories);if(party)body.push(party);return detailSection({title,body})}
   function detail(data,row){if(data.key==="items")return detailPanel({className:"ff9-detail",title:row.name,identity:recordId(row.id),meta:`Items · ${data.source} CSV`,body:[itemSections(data,row)]});const editable=data.fields.filter(field=>field.editable&&field.kind!=="stored"&&!readOnlyNote(data,field)),stored=data.fields.filter(field=>!field.editable||field.kind==="stored"||readOnlyNote(data,field));const body=[];if(editable.length)body.push(detailSection({title:"EDITABLE DATA",body:editable.map(field=>fieldControl(data,row,field))}));if(stored.length)body.push(detailSection({title:"STORED DATA",body:stored.map(field=>fieldControl(data,row,field))}));return detailPanel({className:"ff9-detail",title:row.name,identity:recordId(row.id),meta:`${data.label} · ${data.source} CSV`,body})}
   function unavailable(key){const meta=catalogRow(key);const data=state.datasets[key];return el("section",{class:"ff9-card"},el("h2",{},meta?.label||tabs.find(tab=>tab.id===state.tab)?.label||"FF9 data"),el("p",{},data?.error||"The verified source data could not be loaded right now."),el("p",{},"This editor format is integrated. Reopening it retries the verified Memoria baseline; saves still write only to the selected project overlay and never overwrite the installed-game baseline."),el("code",{class:"ff9-path"},meta?.projectPath||state.dashboard.project.root),el("span",{class:"ff9-warning"},"SOURCE CURRENTLY UNAVAILABLE"))}
   function renderDataset(data,key){if(!data||data.unavailable){$("#main").replaceChildren(unavailable(key));return}const rows=viewRows(data,key),selected=rows.find(row=>row.line===state.selected[key])||rows[0];if(selected)state.selected[key]=selected.line;const layout=pagedListDetail({rows,key:row=>row.line,slots:true,selected:selected?.line??null,page:state.page[key]||0,pageSize:state.pageSize[key]||12,noun:"records",className:"ff9-layout",splitKey:`ff9-${state.tab}-${key}`,rowsKey:`ff9-${state.tab}-${key}`,defaultSplit:44,minLeft:340,minRight:420,search:{key:`ff9-${key}`,value:state.query[key]||"",label:`Search ${data.label}`,change:value=>{state.query[key]=value;state.page[key]=0;render()}},sync:next=>{state.page[key]=next.page;state.pageSize[key]=next.pageSize;if(next.selected!==null)state.selected[key]=next.selected},change:next=>{state.page[key]=next.page;state.pageSize[key]=next.pageSize;if(next.selected!==null)state.selected[key]=next.selected;render()},master:view=>tablePanel(data,key,view.rows,view.selected,view.select),detail:row=>detail(data,row)});$("#main").replaceChildren(layout)}

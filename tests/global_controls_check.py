@@ -97,10 +97,26 @@ def main() -> None:
           const input=e('input',{id:'quantity',type:'number',value:15,min:0,max:100,step:1,oninput:event=>__value=Number(event.target.value)});
           document.querySelector('#main').replaceChildren(U.detailField({label:'Quantity',dataType:'INT',min:0,max:100,control:U.unitField(input,'%')}));
         }''')
+        # Type/range metadata stays visible in the rail, but metadata alone must
+        # never manufacture a circular semantic-help bubble.
+        assert page.locator('.lex-field-type-name').inner_text() == 'INT'
+        assert '0-100' in page.locator('.lex-field-type-range').inner_text().replace(' ', '')
+        assert page.locator('.lex-info-help').count() == 0
+        page.evaluate('''()=>{
+          const U=LexeditorUI,e=U.el,input=e('input',{id:'semantic-quantity',type:'number',value:15,min:0,max:100,step:1});
+          document.querySelector('#main').append(U.detailField({label:'Semantic quantity',dataType:'INT',min:0,max:100,
+            help:U.infoHelp('Controls how many copies the game grants when this reward is awarded.'),control:U.unitField(input,'%')}));
+        }''')
+        semantic_help=page.locator('.lex-info-help').last
+        assert semantic_help.get_attribute('aria-label') == 'Controls how many copies the game grants when this reward is awarded.'
+        semantic_help.hover();page.locator('.lex-help-popover').wait_for()
+        bubble=page.locator('.lex-help-popover').inner_text()
+        assert bubble == 'Controls how many copies the game grants when this reward is awarded.'
+        assert not any(word in bubble for word in ('Range:', 'Step:', 'Unit:', 'Set Semantic', 'Edit Semantic'))
         number = page.locator('#quantity')
         number.fill('300');number.blur();assert number.input_value()=='100'
         number.focus();page.keyboard.press('e');assert number.input_value()=='100'
-        unit=page.locator('.lex-unit').bounding_box();box=page.locator('.lex-unit-field').bounding_box()
+        unit=page.locator('.lex-unit-field:has(#quantity) .lex-unit').bounding_box();box=page.locator('.lex-unit-field:has(#quantity)').bounding_box()
         assert unit and box and unit['x']+unit['width']<=box['x']+box['width']+1
         page.evaluate('''()=>{
           window.__draft={setting:2,saved:1,record:99,failed:false};
@@ -133,7 +149,7 @@ def main() -> None:
         assert not errors, errors
         results={'new_button':'pass','whole_header_sort':'pass','selection_retained':'pass',
           'divider_keyboard_persistence_doubleclick_contextmenu_stack':'pass','units_integer_bounds':'pass',
-          'settings_save_discard_isolation_and_visible_failure':'pass','automatic_control_tooltips':'pass','history_cancellation_and_failure':'pass',
+          'settings_save_discard_isolation_and_visible_failure':'pass','native_control_tooltips':'pass','semantic_info_bubbles':'pass','history_cancellation_and_failure':'pass',
           'page_errors':errors,'storage':'in-memory test double' if server is None else 'browser localStorage',
           'note':'Shared browser fixtures; not physical mouse, native window, sound or installed-game acceptance.'}
         (OUT/'results.json').write_text(json.dumps(results,indent=2)+'\n')
