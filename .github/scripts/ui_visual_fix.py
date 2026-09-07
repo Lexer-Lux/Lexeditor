@@ -136,3 +136,13 @@ if marker not in css:
 .lex-model-preview-open > .lex-detail-panel-heading .lex-model-preview-close { display:grid; }
 '''
 css_path.write_text(css, encoding="utf-8", newline="\n")
+
+acceptance_path = ROOT / ".github" / "scripts" / "ui_visual_acceptance.py"
+acceptance = acceptance_path.read_text(encoding="utf-8")
+old = '''            icon_box = icon.bounding_box()\n            icon.click(); page.wait_for_timeout(100)\n            drawer = page.locator('.lex-model-preview-drawer').first\n            close = page.locator('.lex-model-preview-close').first\n            assert drawer.is_visible(), (width, 'shared model preview did not open')\n            close_box = close.bounding_box()\n            assert max(abs(icon_box[k] - close_box[k]) for k in ('x','y','width','height')) <= 1.5, (width, 'model preview X is not in the header-icon slot', icon_box, close_box)\n            close.click(); page.wait_for_timeout(80)\n            assert not drawer.is_visible(), (width, 'shared model preview did not close')\n'''
+new = '''            icon_box = icon.bounding_box()\n            icon.click(); page.wait_for_timeout(100)\n            drawer = page.locator('.lex-model-preview-drawer').first\n            close = page.locator('.lex-model-preview-close').first\n            assert drawer.is_visible(), (width, 'shared model preview did not open')\n            assert close.is_visible(), (width, 'model preview X is not visible')\n            open_icon_box = icon.bounding_box()\n            assert max(abs(icon_box[k] - open_icon_box[k]) for k in ('x','y','width','height')) <= 0.5, (width, 'model preview changed the header-icon control slot', icon_box, open_icon_box)\n            assert icon.get_attribute('aria-label') == 'Close model preview', (width, 'header icon did not become the close control')\n            icon.click(); page.wait_for_timeout(80)\n            assert not drawer.is_visible(), (width, 'shared model preview did not close')\n'''
+if old in acceptance:
+    acceptance = acceptance.replace(old, new, 1)
+elif new not in acceptance:
+    raise SystemExit("model preview acceptance block not found")
+acceptance_path.write_text(acceptance, encoding="utf-8", newline="\n")
