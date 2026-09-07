@@ -43,8 +43,8 @@ def main() -> None:
     neutral_compact = compact(neutral)
     blank_baseline_declarations = (
         "--lex-accent:#72ff1e;--lex-accent-text:#102008;--lex-highlight:#405247",
-        "padding:4px18px4px4px;border-bottom:1pxsolidvar(--lex-border);background:#f1f3f5",
-        "display:grid;width:auto;height:100%;aspect-ratio:1;place-items:center;color:var(--lex-accent);border:1pxsolidvar(--lex-border);background:#fff",
+        "padding:4px 18px 4px 4px;border-bottom:1px solid var(--lex-border);background:#f1f3f5",
+        "display:grid;width:auto;height:100%;aspect-ratio:1;place-items:center;color:var(--lex-accent);border:1px solid var(--lex-border);background:#fff",
         "width:64%;height:64%;fill:none;stroke:currentColor;stroke-width:1.7",
         "width:1em;min-width:1em;height:1em;min-height:1em;flex-basis:1em",
         "width:.95em;height:.95em",
@@ -53,13 +53,14 @@ def main() -> None:
         "padding:10px;gap:10px",
         "flex:1 1 auto",
         "padding:12px",
-        "display:flex;flex-direction:column;height:100%;min-height:0;border:1pxsolidvar(--lex-border);background:var(--lex-panel)",
+        "display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)",
         "display:block;font-size:1.45em;text-align:center",
     )
     for declaration in blank_baseline_declarations:
-        if declaration not in blank_compact:
+        normalized = compact(declaration)
+        if normalized not in blank_compact:
             raise AssertionError(f"Blank benchmark changed without updating the shared neutral contract: {declaration}")
-        if declaration not in neutral_compact:
+        if normalized not in neutral_compact:
             raise AssertionError(f"neutral.css does not reproduce Blank's benchmark declaration: {declaration}")
 
     # FF7's master/detail geometry uses Blank's own paged two-panel defaults.
