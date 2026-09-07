@@ -72,6 +72,18 @@ def fix_framework_css(text: str) -> str:
 }
 .lex-field-type-rail { overflow:visible; }
 '''
+    third = "LEXEDITOR_BOOLEAN_REF_BOTTOM_MARGIN_20260906"
+    if third not in text:
+        text += r'''
+
+/* LEXEDITOR_BOOLEAN_REF_BOTTOM_MARGIN_20260906 */
+/* The ref rail is absolutely positioned so padding alone cannot keep the next
+   property from touching it. Reserve actual inter-row space after any Boolean
+   that is showing provenance. */
+.lex-boolean-field:has(.lex-source-control > .lex-reference-values) {
+  margin-bottom:8px;
+}
+'''
     return text
 
 
