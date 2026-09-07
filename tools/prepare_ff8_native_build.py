@@ -31,6 +31,15 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         ('ffnx_party_switch','lexeditor_ff8_party_switch.h'),
     ):
         shutil.copyfile(ROOT/f'games/ff8/{folder}/ffnx-src/{name}',source/'src'/name)
+    # Modern Controls is also present in the provenance patch, but its maintained
+    # sources move faster than that immutable build snapshot. Always overlay the
+    # current audited implementation after applying the pinned derivative patch.
+    for name in (
+        'camera_axis.h',
+        'lexeditor_ff8_modern_controls.cpp',
+        'lexeditor_ff8_modern_controls.h',
+    ):
+        shutil.copyfile(ROOT/'games/ff8/ffnx_modern_controls'/name, source/'src'/name)
     extension_files = [
         'lexeditor_ff8_shared_party.h', 'lexeditor_ff8_shared_party.inc',
         'lexeditor_ff8_stock_tweaks.h', 'lexeditor_ff8_stock_tweaks.cpp',
