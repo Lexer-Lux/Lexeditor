@@ -20,4 +20,21 @@ def clean_warband(text: str) -> str:
     return text
 
 
+def unify_table_editing_js(text: str) -> str:
+    old = 'class: ["lex-column-list", options.editable ? "lex-editable-table" : "", options.class || ""].filter(Boolean).join(" "),'
+    new = 'class: ["lex-column-list", options.class || ""].filter(Boolean).join(" "),'
+    if old in text:
+        text = text.replace(old, new, 1)
+    return text
+
+
+def unify_table_editing_css(text: str) -> str:
+    # Editing is a per-cell/column capability. Any actual input/select/textarea
+    # inside a Table receives the same geometry and focus treatment; there is no
+    # separate Editable Table presentation mode.
+    return text.replace('.lex-editable-table', '.lex-column-list')
+
+
 edit("games/warband/editor.html", clean_warband)
+edit("ui/framework.js", unify_table_editing_js)
+edit("ui/framework.css", unify_table_editing_css)
