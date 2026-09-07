@@ -49,9 +49,15 @@ def test_bootstrap_defers_unity_work_to_game_loop_update():
     assert "new GameObject" in text[text.index("private static void OnUpdate()") :]
 
 
-def test_shipped_runtime_is_exact_memoria_script_filename_and_real_pe():
-    binary = RUNTIME / "Memoria.Scripts.dll"
-    assert binary.is_file(), "runtime build must ship Memoria's exact ScriptsLoader filename"
+def test_runtime_uses_mod_specific_scriptsloader_filename():
+    from games.ff9 import features
+    assert features.RUNTIME_NAME == "Memoria.Scripts.Lexeditor.dll"
+    assert not (RUNTIME / "Memoria.Scripts.dll").exists()
+
+
+def test_shipped_runtime_is_mod_specific_memoria_script_and_real_pe():
+    binary = RUNTIME / "Memoria.Scripts.Lexeditor.dll"
+    assert binary.is_file(), "runtime build must ship Memoria's mod-specific ScriptsLoader filename"
     data = binary.read_bytes()
     assert data.startswith(b"MZ") and len(data) > 10_000
     # The compile workflow builds this file from the three audited source units
