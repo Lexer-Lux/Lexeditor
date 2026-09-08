@@ -68,9 +68,15 @@ inline MinimapGestureAction observeMinimapVisibility(
 }
 
 inline MinimapGestureAction toggleChosenMinimap(MinimapToggleState& state) noexcept {
+    // Never guess the initial state. The installed hook must first observe an
+    // authoritative current minimap state (or retain an existing player choice)
+    // before a hold can safely decide which visibility value is the toggle.
+    if (!state.playerChoiceInitialized && !state.observedInitialized) {
+        return noMinimapAction();
+    }
     const bool baseline = state.playerChoiceInitialized
         ? state.chosenVisible
-        : (state.observedInitialized ? state.observedVisible : true);
+        : state.observedVisible;
     state.playerChoiceInitialized = true;
     state.chosenVisible = !baseline;
     return {
@@ -113,6 +119,8 @@ inline MinimapGestureAction minimapButtonTick(
     if (!held) {
         return noMinimapAction();
     }
+    // A long press is consumed even when state observation is not ready. This is
+    // safer than converting an unclassifiable hold into a vanilla map-opening tap.
     state.holdTriggered = true;
     return toggleChosenMinimap(state);
 }
@@ -142,7 +150,8 @@ inline MinimapGestureAction minimapButtonUp(
     state.buttonDown = false;
     state.holdTriggered = false;
     if (alreadyHeld) {
-        // Hold already toggled while down: release must not also open the map.
+        // Hold already crossed the threshold: release must not also open the map,
+        // even if the hold itself failed closed because no live state was known.
         return noMinimapAction();
     }
     if (held) {
