@@ -40,12 +40,20 @@ def patch_settings() -> None:
             "load setting",
         ),
         (
+            '        "noMagicConsumption": no_magic_consumption,\n'
             '        "dropsAfterMug": drops_after_mug,\n'
-            '        "flatStatAbilities": flat_stat_abilities_enabled,\n',
+            '        "flatStatAbilities": flat_stat_abilities_enabled,\n'
+            '        "maxSpellEnabled": max_spell_enabled,\n'
+            '        "maxSpell": max_spell_value,\n'
+            '        "maxSpellMinimum": max_spell.MIN_MAX_SPELL,\n',
+            '        "noMagicConsumption": no_magic_consumption,\n'
             '        "dropsAfterMug": drops_after_mug,\n'
             '        "dropChance": drop_chance_enabled,\n'
             '        "dropChanceWeights": drop_chance.metadata(),\n'
-            '        "flatStatAbilities": flat_stat_abilities_enabled,\n',
+            '        "flatStatAbilities": flat_stat_abilities_enabled,\n'
+            '        "maxSpellEnabled": max_spell_enabled,\n'
+            '        "maxSpell": max_spell_value,\n'
+            '        "maxSpellMinimum": max_spell.MIN_MAX_SPELL,\n',
             "load payload",
         ),
         (
@@ -122,16 +130,19 @@ def patch_settings() -> None:
         ),
         (
             '        "dropsAfterMug": drops_after_mug,\n'
-            '        "flatStatAbilities": flat_stat_abilities_enabled,\n',
+            '        "flatStatAbilities": flat_stat_abilities_enabled,\n'
+            '        "maxSpellEnabled": max_spell_enabled,\n'
+            '        "maxSpell": max_spell_value,\n'
+            '    }\n',
             '        "dropsAfterMug": drops_after_mug,\n'
             '        "dropChance": drop_chance_enabled,\n'
-            '        "flatStatAbilities": flat_stat_abilities_enabled,\n',
+            '        "flatStatAbilities": flat_stat_abilities_enabled,\n'
+            '        "maxSpellEnabled": max_spell_enabled,\n'
+            '        "maxSpell": max_spell_value,\n'
+            '    }\n',
             "saved settings",
         ),
     ]
-    # Two integration sites intentionally share the same old snippet. Apply the
-    # load-payload replacement before the saved-settings replacement by making
-    # the former's new text distinct; after that exactly one old seam remains.
     for old, new, label in replacements:
         text = replace_once(text, old, new, label)
     path.write_text(text, encoding="utf-8", newline="\n")
