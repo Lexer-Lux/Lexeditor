@@ -80,7 +80,7 @@ def test_dog_whistle_probe_correlates_item_names_chapter_awards_canines_and_runt
     })
 
     result = probe.probe_dog_whistle_sources("game", "data", "project", {})
-    assert result["item"]["whistleNameMapCandidates"] == ["DogWhistle"]
+    assert result["item"]["whistleNameMapCandidates"] == ["DogWhistle", "KEY_WEDGE_WHISTLE"]
     assert result["item"]["unusedWhistleNameMapCandidates"] == ["DogWhistle"]
     assert result["item"]["rowCandidates"][0]["tag"] == "KEY_WEDGE_WHISTLE"
     assert result["item"]["abilityBackedTemplateCandidates"][0]["tag"] == "POTION"
