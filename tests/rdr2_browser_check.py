@@ -1,8 +1,9 @@
 """Offline Chromium UI checks using production HTML/CSS/JS and synthetic API data.
 
 No game data, fonts, installed mods, HTTP navigation, or native WebView2 host is
-used. History URLs are inert in this about:blank fixture; this does not test
-navigation. The real editor renderers, controls and save handlers are executed.
+used. History URLs use a synthetic https://lexeditor.test base in this fixture;
+this does not test navigation. The real editor renderers, controls and save handlers
+are executed.
 """
 from pathlib import Path
 import argparse
@@ -71,7 +72,9 @@ def run(output: Path, executable: str | None):
                 errors=[]
                 page.on('pageerror',lambda error:errors.append(str(error)))
                 page.route('**/*',lambda route:route.abort())
-                page.set_content(document(unavailable=case=='unavailable'),wait_until='domcontentloaded')
+                html=document(unavailable=case=='unavailable').replace(
+                    '<head>','<head><base href="https://lexeditor.test/">',1)
+                page.set_content(html,wait_until='domcontentloaded')
                 control=page.locator('.alcohol-strength input')
                 expect(control).to_have_count(1)
                 expect(page.locator('.loot-item')).to_have_count(3)
