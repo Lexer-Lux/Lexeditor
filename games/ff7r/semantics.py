@@ -297,7 +297,7 @@ def save_economy_edits(game_root, data_root, project_root, index: dict, asset: s
             raise ValueError(f"Unknown economy field: {field}")
         if prop_name not in props:
             raise ValueError(f"{prop_name} is not present in this installed FF7R DataObject")
-        if props[prop_name].array:
+        if props[prop_name].is_array:
             raise ValueError(f"{prop_name} unexpectedly uses an array in this installed FF7R DataObject")
         if "index" in edit:
             raise ValueError("Economy fields are scalar and do not accept an array index")
