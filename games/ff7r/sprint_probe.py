@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from .dataobject import DataObjectPackage
+from .movement_signature_probe import probe_public_joystick_movement_signature
 from .native_probe import probe_installed_exe
 
 
@@ -73,6 +74,12 @@ KNOWN_CONTRACTS = (
         "meaning": "per-animation root-motion modifier whose generated default is 1.0",
         "sprintAuthority": "unproven",
         "risk": "candidate animation-local mechanism; authoritative sprint animation/callsite is unknown",
+    },
+    {
+        "symbol": "TheUnlocked MovementHook raw joystick post-fetch signature",
+        "meaning": "MIT hook site immediately after raw joystick X/Y fetch, used upstream to clamp input magnitude for walking",
+        "sprintAuthority": "rejected-as-speed-authority",
+        "risk": "scaling stick input changes locomotion input/state selection; it does not prove proportional player sprint velocity",
     },
 )
 
@@ -221,16 +228,22 @@ def _function_clusters(function_evidence: dict[str, dict[str, list[int]]]) -> li
     return result
 
 
-def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[str, Any]],
-                           *, scan_errors: list[str] | tuple[str, ...] = (),
-                           data_scan_truncated: bool = False) -> dict[str, Any]:
-    """Classify evidence without confusing animation/root motion with sprint velocity."""
+def assess_sprint_evidence(
+    native: dict[str, Any],
+    data_candidates: list[dict[str, Any]],
+    *,
+    movement_signature: dict[str, Any] | None = None,
+    scan_errors: list[str] | tuple[str, ...] = (),
+    data_scan_truncated: bool = False,
+) -> dict[str, Any]:
+    """Classify evidence without confusing input/animation/root motion with sprint velocity."""
     native_rows = _needle_rows(native)
     function_evidence = _native_function_evidence(native)
     function_clusters = _function_clusters(function_evidence)
     cross_family_clusters = [row for row in function_clusters if row["crossFamily"]]
     three_family_clusters = [row for row in function_clusters if row["allThreeFamilies"]]
     field_counts = Counter(str(row.get("field", "")) for row in data_candidates)
+    movement_signature = dict(movement_signature or {})
 
     dash_functions = _expanded_functions(function_evidence, "DashRootMotionTranslationScale")
     transition_functions = _expanded_functions(function_evidence, "RunToDashBlendInputThreshold")
@@ -304,6 +317,11 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
         f"{len(three_family_clusters)} three-family exact .pdata leads. Direct string owners and "
         "one-hop code targets remain separate so registration collisions are auditable."
     )
+    public_input_note = (
+        "The public MIT JoystickMovement signature matched this installed build, but its upstream source identifies the site as raw joystick X/Y post-fetch input processing; it is rejected as sprint-speed authority."
+        if movement_signature.get("matchCount")
+        else "The public MIT JoystickMovement signature is retained only as a rejected raw-input reference; its presence or absence cannot resolve sprint velocity."
+    )
 
     return {
         "implementationReady": False,
@@ -314,6 +332,9 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
         "nativeFunctionClusters": function_clusters,
         "crossFamilyFunctionCount": len(cross_family_clusters),
         "threeFamilyFunctionCount": len(three_family_clusters),
+        "publicJoystickMovementSignature": movement_signature,
+        "publicJoystickMovementSignaturePresent": bool(movement_signature.get("matchCount")),
+        "publicJoystickMovementRejectedAsSprintAuthority": True,
         "fieldCandidateCounts": dict(sorted(field_counts.items())),
         "dataCandidates": data_candidates,
         "knownContracts": [dict(row) for row in KNOWN_CONTRACTS],
@@ -324,6 +345,7 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
             "DashRootMotionTranslationScale is kept as an indoor-volume authored candidate, not promoted to a global sprint multiplier.",
             "CharaSpec RootMotionTranslationScale is intentionally rejected as a safe tweak until sprint-only scope is proved.",
             "AnimNotify_EndModifyRootMotionScale is a per-animation lead with a generated 1.0 RootMotionScale default; the installed sprint animation/callsite still needs validation.",
+            public_input_note,
             correlation_note,
             caller_note,
             cluster_note,
@@ -338,6 +360,17 @@ def probe_better_sprint_sources(game_root: Path, data_root: Path, index: dict) -
     from .archive import extract_pair
 
     native = probe_installed_exe(game_root, needles=SPRINT_NATIVE_NEEDLES)
+    movement_signature = (
+        probe_public_joystick_movement_signature(Path(str(native["path"])))
+        if native.get("path")
+        else {
+            "matchCount": 0,
+            "matches": [],
+            "scanError": "installed executable path was not resolved",
+            "classification": "raw-joystick-input-post-fetch",
+            "sprintSpeedAuthority": False,
+        }
+    )
     candidates: list[dict[str, Any]] = []
     errors: list[str] = []
     truncated = False
@@ -380,6 +413,7 @@ def probe_better_sprint_sources(game_root: Path, data_root: Path, index: dict) -
     assessed = assess_sprint_evidence(
         native,
         candidates,
+        movement_signature=movement_signature,
         scan_errors=errors,
         data_scan_truncated=truncated,
     )
