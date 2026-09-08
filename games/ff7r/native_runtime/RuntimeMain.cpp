@@ -1,5 +1,6 @@
 #include <windows.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -9,11 +10,12 @@ namespace {
 
 HMODULE g_module = nullptr;
 constexpr wchar_t kStatusFileName[] = L"LexeditorFF7RRuntime.status.json";
+constexpr DWORD kPathBufferSize = 32768;
 
 std::filesystem::path status_path() {
-    wchar_t buffer[32768]{};
-    const DWORD length = GetModuleFileNameW(g_module, buffer, static_cast<DWORD>(std::size(buffer)));
-    if (length == 0 || length >= std::size(buffer)) {
+    wchar_t buffer[kPathBufferSize]{};
+    const DWORD length = GetModuleFileNameW(g_module, buffer, kPathBufferSize);
+    if (length == 0 || length >= kPathBufferSize) {
         return {};
     }
     return std::filesystem::path(buffer).parent_path() / kStatusFileName;
@@ -33,17 +35,6 @@ std::uint32_t executable_timestamp() noexcept {
         return 0;
     }
     return nt->FileHeader.TimeDateStamp;
-}
-
-void remove_status() noexcept {
-    try {
-        const auto path = status_path();
-        if (!path.empty()) {
-            DeleteFileW(path.c_str());
-        }
-    } catch (...) {
-        // Never allow runtime-status cleanup to escape DllMain.
-    }
 }
 
 void write_status() {
@@ -91,6 +82,9 @@ void write_status() {
 
 extern "C" __declspec(dllexport) void Init() noexcept {
     try {
+        // Init runs after the loader has finished loading this module, so it is
+        // safe to do filesystem work here. The live PID check on the Python side
+        // makes stale heartbeat files harmless after normal exit or a crash.
         write_status();
     } catch (...) {
         // Native Mod Loader must never receive an exception from plugin Init().
@@ -101,9 +95,6 @@ BOOL APIENTRY DllMain(HMODULE module, DWORD reason, LPVOID) {
     if (reason == DLL_PROCESS_ATTACH) {
         g_module = module;
         DisableThreadLibraryCalls(module);
-        remove_status();
-    } else if (reason == DLL_PROCESS_DETACH) {
-        remove_status();
     }
     return TRUE;
 }
