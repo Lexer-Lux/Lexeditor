@@ -19,6 +19,21 @@ def patch_fixed_command_menu() -> None:
 
     text = replace_once(
         text,
+        "POST_BUILDER_CAVE = 0x0279FA40\n"
+        "SWITCH_RESERVED_CAVE_START = 0x0279FB00\n"
+        "LEARNED_COMMAND_CAVE = POST_BUILDER_CAVE + 0x60\n",
+        "# The command-label, post-builder and learned-command helpers share the\n"
+        "# existing 0x0279F9A0..0x0279FAFF fixed-command reservation. Angelo\n"
+        "# needs slightly more of both variable-sized helpers, so repartition the\n"
+        "# same block without crossing Switch's reserved cave at 0x0279FB00.\n"
+        "POST_BUILDER_CAVE = 0x0279FA60\n"
+        "SWITCH_RESERVED_CAVE_START = 0x0279FB00\n"
+        "LEARNED_COMMAND_CAVE = POST_BUILDER_CAVE + 0x80\n",
+        "fixed-command cave repartition",
+    )
+
+    text = replace_once(
+        text,
         "CHARACTER_ID_OFFSET = 0x1C3\nSELPHIE = 5\n",
         "CHARACTER_ID_OFFSET = 0x1C3\nRINOA = 4\nSELPHIE = 5\n\n"
         "# OpenFF8's runtime Kernel layout and the current FF8 decomp agree that\n"
