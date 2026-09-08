@@ -15,16 +15,6 @@ replace_once(
     "      font-family:var(--lex-symbol-font)!important;\n",
 )
 
-# Any game editor can regress shared chrome, so every editor shell must now run
-# the shared contract job, not only Blank and Warband.
-workflow = ".github/workflows/shared-ui-contract.yml"
-p = Path(workflow)
-s = p.read_text(encoding="utf-8")
-old = "      - 'games/blank/**'\n      - 'games/warband/editor.html'\n"
-assert s.count(old) == 2, "shared-ui workflow path contract drifted"
-s = s.replace(old, "      - 'games/**/editor.html'\n")
-p.write_text(s, encoding="utf-8")
-
 verifier = "tools/verify_shared_ui_contract.py"
 p = Path(verifier)
 s = p.read_text(encoding="utf-8")
