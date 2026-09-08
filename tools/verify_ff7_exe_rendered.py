@@ -60,4 +60,5 @@ def test_executable_surface_navigation_save_and_reopen(self):
 target.RenderedTests.test_executable_surface_navigation_save_and_reopen = test_executable_surface_navigation_save_and_reopen
 
 if __name__ == "__main__":
-    unittest.main(module=target, verbosity=2)
+    unittest.main(module=target, verbosity=2,
+                  defaultTest="RenderedTests.test_executable_surface_navigation_save_and_reopen")
