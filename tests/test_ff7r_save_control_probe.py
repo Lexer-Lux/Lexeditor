@@ -1,4 +1,7 @@
-from games.ff7r.save_control_probe import analyze_controlled_save_pairs
+from games.ff7r.save_control_probe import (
+    analyze_controlled_experiment_groups,
+    analyze_controlled_save_pairs,
+)
 from games.ff7r.save_diff_probe import SavePair
 
 
@@ -77,3 +80,55 @@ def test_control_analysis_requires_both_experiment_and_noop_pairs():
             assert text in str(error)
         else:
             raise AssertionError("expected ValueError")
+
+
+def test_cross_enemy_controls_remove_shared_noop_noise_before_discrimination():
+    groups = {
+        "enemy-a": [
+            _pair((10, 0x01), (70, 0x80), (80, 1), label="a1"),
+            _pair((10, 0x01), (70, 0x80), (81, 2), label="a2"),
+        ],
+        "enemy-b": [
+            _pair((20, 0x04), (70, 0x80), (82, 3), label="b1"),
+            _pair((20, 0x04), (70, 0x80), (83, 4), label="b2"),
+        ],
+    }
+    controls = [
+        _pair((70, 0x80), (84, 5), label="noop1"),
+        _pair((70, 0x80), (85, 6), label="noop2"),
+    ]
+
+    result = analyze_controlled_experiment_groups(groups, controls)
+
+    assert result["controlStableOffsets"] == [70]
+    assert result["sharedCandidateOffsets"] == []
+    assert result["discriminatingCandidateOffsets"] == [10, 20]
+    rows = {row["name"]: row for row in result["groups"]}
+    assert rows["enemy-a"]["exclusiveCandidateOffsets"] == [10]
+    assert rows["enemy-b"]["exclusiveCandidateOffsets"] == [20]
+
+
+def test_cross_enemy_control_keeps_different_xor_bitset_lead_when_noop_does_not_touch_byte():
+    groups = {
+        "enemy-a": [
+            _pair((12, 0x01), (70, 0x80), (80, 1)),
+            _pair((12, 0x01), (70, 0x80), (81, 2)),
+        ],
+        "enemy-b": [
+            _pair((12, 0x04), (70, 0x80), (82, 3)),
+            _pair((12, 0x04), (70, 0x80), (83, 4)),
+        ],
+    }
+    controls = [
+        _pair((70, 0x80), (84, 5)),
+        _pair((70, 0x80), (85, 6)),
+    ]
+
+    result = analyze_controlled_experiment_groups(groups, controls)
+
+    assert result["sharedCandidateOffsets"] == [12]
+    assert result["sameOffsetDifferentXorCandidates"] == [{
+        "offset": 12,
+        "groupXorMasks": {"enemy-a": 0x01, "enemy-b": 0x04},
+        "singleBitMasks": True,
+    }]
