@@ -15,10 +15,10 @@ class SemanticSurfaceTests(unittest.TestCase):
         expected={
             "commands":{"initialCursorAction":"enum","targetData":"flags"},
             "playerAttacks":{"targetData":"flags","damageCalculationId":"enum","statusChange":"statusChange","statusFlags":"flags","elementFlags":"flags","specialAttackFlags":"flags"},
-            "items":{"targetData":"flags","damageCalculationId":"enum","statusChange":"statusChange","statusFlags":"flags","elementFlags":"flags"},
-            "weapons":{"targetData":"flags","damageCalculationId":"enum","growthRate":"enum","equipableBy":"flags","attackElements":"flags"},
-            "armor":{"elementDamageModifier":"enum","status":"enum","growthRate":"enum","equipableBy":"flags","elementalDefense":"flags"},
-            "accessories":{"boostedStat1":"enum","specialEffect":"enum","elementalDefense":"flags","statusDefense":"flags","equipableBy":"flags"},
+            "items":{"targetData":"flags","damageCalculationId":"enum","statusChange":"statusChange","statusFlags":"flags","elementFlags":"flags","restrictions":"flags","specialAttackFlags":"flags"},
+            "weapons":{"targetData":"flags","damageCalculationId":"enum","growthRate":"enum","equipableBy":"flags","attackElements":"flags","boostedStat1":"enum","materiaSlot1":"enum","restrictions":"flags"},
+            "armor":{"elementDamageModifier":"enum","status":"enum","growthRate":"enum","equipableBy":"flags","elementalDefense":"flags","boostedStat1":"enum","materiaSlot1":"enum","restrictions":"flags"},
+            "accessories":{"boostedStat1":"enum","specialEffect":"enum","elementalDefense":"flags","statusDefense":"flags","equipableBy":"flags","restrictions":"flags"},
             "characters":{"weaponId":"reference","armorId":"reference","accessoryId":"reference","characterFlags":"flags","rowByte":"enum","learnedLimits":"flags","weaponMateria0":"reference","strengthCurve":"reference","recruitOffsetRaw":"scaled"},
         }
         for category, fields in expected.items():
@@ -26,6 +26,11 @@ class SemanticSurfaceTests(unittest.TestCase):
         self.assertEqual(next(c for c in meta["characters"]["rowByte"]["choices"] if c["label"]=="Front row")["value"],0xFF)
         self.assertEqual(meta["characters"]["limitAttack11"]["referenceCategory"],"playerAttacks")
         self.assertTrue(meta["playerAttacks"]["specialAttackFlags"]["invertBits"])
+        for category in ("items","weapons","armor","accessories"):
+            self.assertTrue(meta[category]["restrictions"]["invertBits"],category)
+            self.assertEqual(meta[category]["restrictions"]["bitWidth"],16,category)
+        self.assertTrue(meta["items"]["specialAttackFlags"]["invertBits"])
+        self.assertEqual([c["value"] for c in meta["weapons"]["materiaSlot1"]["choices"]],[0,1,2,3,5,6,7])
 
     def test_extended_categories_are_humanized(self):
         categories={}

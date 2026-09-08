@@ -74,6 +74,16 @@ COMMAND_ACTIONS = (
     (0xFF, "No initial cursor action"),
 )
 
+RESTRICTION_FLAGS = (
+    (0x0001, "Can be sold"), (0x0002, "Can be used in battle"),
+    (0x0004, "Can be used from the menu"), (0x0008, "Can be thrown"),
+)
+MATERIA_SLOTS = (
+    (0, "No slot"), (1, "Unlinked — no AP growth"),
+    (2, "Linked left — no AP growth"), (3, "Linked right — no AP growth"),
+    (5, "Unlinked"), (6, "Linked left"), (7, "Linked right"),
+)
+
 SPECIAL_ATTACK_FLAGS = (
     (0x0001, "Damage MP instead of HP"),
     (0x0004, "Force physical damage"),
@@ -200,6 +210,8 @@ CORE = {
         "additionalEffectsModifier": _field(label="Additional-behavior modifier", group="Effect", help="Parameter consumed only by additional behaviors that require one; otherwise ignored."),
         "statusFlags": _field(label="Statuses affected", dataType="flags", flags=flags(*STATUSES), group="Status", help="Named statuses this item can inflict/cure/swap according to Status change."),
         "elementFlags": _field(label="Elements", dataType="flags", flags=flags(*ELEMENTS), group="Effect", help="Elemental tags used by the battle engine."),
+        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Where this item is allowed to be sold or used. KERNEL.BIN stores these permission bits inverted."),
+        "specialAttackFlags": _field(label="Special attack properties", dataType="flags", flags=flags(*SPECIAL_ATTACK_FLAGS), invertBits=True, bitWidth=16, group="Effect", help="Special battle properties such as reflection, defense bypass or MP damage. KERNEL.BIN stores these bits inverted."),
         "cameraMovementId": advanced("Camera movement ID", "Raw battle-camera program ID. No stable semantic name table is exposed by this plugin yet."),
         "attackEffectId": advanced("Visual attack effect ID", "Raw visual-effect program ID. Kept in Advanced because the current plugin has no authoritative effect-name table."),
     },
@@ -210,7 +222,16 @@ CORE = {
         "growthRate": _field(label="Materia AP growth", dataType="enum", choices=choices(*GROWTH_RATES), group="Materia slots", help="AP growth multiplier for Materia installed in this weapon."),
         "equipableBy": _field(label="Usable by", dataType="flags", flags=flags(*EQUIPABLE), group="Equipment", help="Characters allowed to equip this weapon."),
         "attackElements": _field(label="Attack elements", dataType="flags", flags=flags(*ELEMENTS), group="Combat", help="Elements applied by the weapon's basic attack."),
+        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Whether this weapon may be sold, used in battle/menu contexts, or thrown. KERNEL.BIN stores these permission bits inverted."),
         "weaponModelId": advanced("Weapon model ID", "Raw model index used by the battle renderer; no authoritative model-name table is currently exposed."),
+        "highSoundIdMask": advanced("Sound ID high-bit mask", "Raw high-bit selector used with this weapon's hit/miss sound IDs."),
+        "normalHitSoundId": advanced("Normal hit sound ID", "Raw sound-effect selector for a normal weapon hit."),
+        "criticalHitSoundId": advanced("Critical hit sound ID", "Raw sound-effect selector for a critical weapon hit."),
+        "missedAttackSoundId": advanced("Miss sound ID", "Raw sound-effect selector for a missed weapon attack."),
+        "impactEffectId": advanced("Impact effect ID", "Raw impact visual-effect selector for this weapon."),
+        **{f"boostedStat{i}": _field(label=f"Stat bonus {i}", dataType="enum", choices=choices(*CHARACTER_STATS), group="Stat bonuses", help=f"Character stat modified by equipment bonus slot {i}.") for i in range(1,5)},
+        **{f"boostedStat{i}Bonus": _field(label=f"Stat bonus {i} amount", group="Stat bonuses", help=f"Amount added to equipment stat bonus slot {i}.") for i in range(1,5)},
+        **{f"materiaSlot{i}": _field(label=f"Materia slot {i}", dataType="enum", choices=choices(*MATERIA_SLOTS), group="Materia slots", help="Whether this position exists, links to its neighbor, and supports AP growth.") for i in range(1,9)},
     },
     "armor": {
         "elementDamageModifier": _field(label="Elemental response", dataType="enum", choices=choices(*DAMAGE_MODIFIERS), group="Elemental defense", help="How the selected elemental-defense bits are treated: absorb, nullify, halve, or normal."),
@@ -218,6 +239,10 @@ CORE = {
         "growthRate": _field(label="Materia AP growth", dataType="enum", choices=choices(*GROWTH_RATES), group="Materia slots", help="AP growth multiplier for Materia installed in this armor."),
         "equipableBy": _field(label="Usable by", dataType="flags", flags=flags(*EQUIPABLE), group="Equipment", help="Characters allowed to equip this armor."),
         "elementalDefense": _field(label="Affected elements", dataType="flags", flags=flags(*ELEMENTS), group="Elemental defense", help="Elements affected by Elemental response."),
+        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Whether this armor may be sold, used in battle/menu contexts, or thrown. KERNEL.BIN stores these permission bits inverted."),
+        **{f"boostedStat{i}": _field(label=f"Stat bonus {i}", dataType="enum", choices=choices(*CHARACTER_STATS), group="Stat bonuses", help=f"Character stat modified by equipment bonus slot {i}.") for i in range(1,5)},
+        **{f"boostedStat{i}Bonus": _field(label=f"Stat bonus {i} amount", group="Stat bonuses", help=f"Amount added to equipment stat bonus slot {i}.") for i in range(1,5)},
+        **{f"materiaSlot{i}": _field(label=f"Materia slot {i}", dataType="enum", choices=choices(*MATERIA_SLOTS), group="Materia slots", help="Whether this position exists, links to its neighbor, and supports AP growth.") for i in range(1,9)},
     },
     "accessories": {
         "boostedStat1": _field(label="Stat bonus 1", dataType="enum", choices=choices(*CHARACTER_STATS), group="Stat bonuses", help="First character stat modified by the accessory."),
@@ -229,6 +254,7 @@ CORE = {
         "elementalDefense": _field(label="Affected elements", dataType="flags", flags=flags(*ELEMENTS), group="Elemental defense", help="Elements affected by Elemental response."),
         "statusDefense": _field(label="Protected statuses", dataType="flags", flags=flags(*STATUSES), group="Status defense", help="Statuses this accessory protects against."),
         "equipableBy": _field(label="Usable by", dataType="flags", flags=flags(*EQUIPABLE), group="Equipment", help="Characters allowed to equip this accessory."),
+        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Whether this accessory may be sold, used in battle/menu contexts, or thrown. KERNEL.BIN stores these permission bits inverted."),
     },
 }
 
