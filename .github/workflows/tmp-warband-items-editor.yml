@@ -30,6 +30,25 @@ jobs:
           p.write_text(s,'utf-8')
           PY
           python tools/warband/apply_item_editor_rework.py
+          # The temporary driver stores the replacement block inside a raw
+          # string, so normalize its one extra quoting layer before compiling.
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('games/warband/server.py')
+          text=p.read_text('utf-8')
+          start=text.index('ITEM_FIELD_NAMES')
+          end=text.index('\ndef upgrade_rows()', start)
+          block=text[start:end]
+          slash=chr(92)
+          block=block.replace(slash*2, slash)
+          fixed=[]
+          for line in block.splitlines(True):
+              if line.strip().startswith('if text[cursor] == '):
+                  indent=line[:len(line)-len(line.lstrip())]
+                  line=f'{indent}if text[cursor] == "{slash}{slash}":\n'
+              fixed.append(line)
+          p.write_text(text[:start]+''.join(fixed)+text[end:], 'utf-8')
+          PY
       - name: Verify source and structured item behavior
         shell: bash
         run: |
