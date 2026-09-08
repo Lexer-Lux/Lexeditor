@@ -13,7 +13,7 @@ class SemanticSurfaceTests(unittest.TestCase):
     def test_core_kernel_categories_are_humanized(self):
         meta={category["id"]:{f["key"]:f for f in category["fields"]} for category in datasets.category_metadata()}
         expected={
-            "initialState":{"party1":"reference"},
+            "initialState":{"party1":"enum"},
             "initialInventory":{"item":"inventoryReference"},
             "initialMateria":{"materia":"reference"},
             "stolenMateria":{"materia":"reference"},
@@ -31,6 +31,12 @@ class SemanticSurfaceTests(unittest.TestCase):
         self.assertEqual(next(c for c in meta["characters"]["rowByte"]["choices"] if c["label"]=="Front row")["value"],0xFF)
         self.assertEqual([c["value"] for c in meta["characters"]["characterFlags"]["choices"]],[0x00,0x10,0x20])
         self.assertNotIn("flags",meta["characters"]["characterFlags"])
+        self.assertEqual([c["value"] for c in meta["characters"]["storedId"]["choices"]],list(range(11)))
+        identity_labels={c["value"]:c["label"] for c in meta["characters"]["storedId"]["choices"]}
+        self.assertEqual({i:identity_labels[i] for i in (6,7,9,10)}, {6:"Cait Sith",7:"Vincent",9:"Young Cloud",10:"Sephiroth"})
+        party_choices=meta["initialState"]["party1"]["choices"]
+        self.assertEqual([c["value"] for c in party_choices],[0xFF,*range(11)])
+        self.assertEqual(party_choices[0]["label"],"None")
         self.assertEqual(meta["characters"]["limitAttack11"]["referenceCategory"],"limitBreaks")
         self.assertEqual(meta["characters"]["limitAttack11"]["referenceValueKey"],"gameId")
         self.assertTrue(meta["playerAttacks"]["specialAttackFlags"]["invertBits"])
