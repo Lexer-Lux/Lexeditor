@@ -18,6 +18,7 @@ from games.ff7r.atb_tweaks import (
     resource_spec,
     save_atb_config,
     save_virtual_edits,
+    unvalidated_runtime_requests,
     validate_atb_config,
 )
 from games.ff7r.dataobject import FLOAT, INT32, DataObjectPackage
@@ -207,10 +208,11 @@ def test_atb_virtual_resources_save_only_semantic_config(tmp_path):
     assert config["rollReduction"] == 125.0
     assert config["residentOverrides"]["ATB_Player|ParamFloat"] == 1.5
     assert config["abilityCostOverrides"]["Cloud_Braver"] == 500
+    assert unvalidated_runtime_requests(project) == ["MovementMultiplier", "RollReduction"]
     assert not (project / "content").exists()
 
 
-def test_enabled_atb_overrides_materialize_to_staging_without_touching_source(tmp_path):
+def test_enabled_atb_data_overrides_materialize_to_staging_without_touching_source(tmp_path):
     index = _index(tmp_path)
     project = tmp_path / "project"
     staging = tmp_path / "staging"
@@ -219,7 +221,7 @@ def test_enabled_atb_overrides_materialize_to_staging_without_touching_source(tm
     source_ability_before = _source_package(tmp_path, index, "BattleAbility").entries[0].values["ATB"]
 
     config = json.loads(json.dumps(DEFAULT_ATB_CONFIG))
-    config.update(enabled=True, movementMultiplier=0.5, rollReduction=100.0)
+    config["enabled"] = True
     config["residentOverrides"] = {"ATB_Player|ParamFloat": 1.75}
     config["guardOverrides"] = {"Cloud|GuardReactionNoneAddATB_Array|0": 66.0}
     config["abilityCostOverrides"] = {"Cloud_Braver": 500}
@@ -244,14 +246,33 @@ def test_enabled_atb_overrides_materialize_to_staging_without_touching_source(tm
     assert _source_package(tmp_path, index, "BattleAbility").entries[0].values["ATB"] == source_ability_before
 
 
+def test_unvalidated_atb_runtime_settings_refuse_mixed_partial_materialization(tmp_path):
+    index = _index(tmp_path)
+    project = tmp_path / "project"
+    staging = tmp_path / "staging"
+    config = json.loads(json.dumps(DEFAULT_ATB_CONFIG))
+    config.update(enabled=True, movementMultiplier=0.5, rollReduction=100.0)
+    config["residentOverrides"] = {"ATB_Player|ParamFloat": 1.75}
+    save_atb_config(project, config)
+
+    with pytest.raises(RuntimeError, match="native accumulator hooks") as error:
+        materialize_atb_overrides(tmp_path, tmp_path / "cache", project, index, staging)
+    assert "MovementMultiplier" in str(error.value)
+    assert "RollReduction" in str(error.value)
+    assert not staging.exists()
+
+
 def test_disabled_atb_tweak_never_materializes_saved_overrides(tmp_path):
     index = _index(tmp_path)
     project = tmp_path / "project"
     config = json.loads(json.dumps(DEFAULT_ATB_CONFIG))
     config["enabled"] = False
+    config["movementMultiplier"] = 0.5
+    config["rollReduction"] = 100.0
     config["residentOverrides"] = {"ATB_Player|ParamFloat": 2.0}
     save_atb_config(project, config)
     staging = tmp_path / "staging"
+    assert unvalidated_runtime_requests(project) == []
     assert materialize_atb_overrides(tmp_path, tmp_path / "cache", project, index, staging) == []
     assert not staging.exists()
 
