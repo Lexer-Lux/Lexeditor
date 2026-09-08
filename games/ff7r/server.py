@@ -12,7 +12,12 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from .archive import build_index, preferred_pak_version
-from .semantics import economy_payload, loot_payload
+from .semantics import (
+    economy_payload,
+    loot_payload,
+    save_economy_edits,
+    save_loot_edits,
+)
 from .storage import load_package, save_edits
 from .text_storage import load_text_package, resident_text_map, save_text_edits
 from .tooling import FF7R_MOUNT_POINT, helper_status, pack_directory
@@ -52,11 +57,12 @@ def data_payload(asset: str, *, vanilla: bool = False, language: str = "US") -> 
     package, source_sha, using_project = load_package(
         GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset, vanilla=vanilla)
     payload = package.api_payload(source_sha256=source_sha, using_project=using_project)
-    # Resolve only text IDs referenced by this table, from the user's installed
-    # Resident_TxtRes. Failure to load localization must never make gameplay data
-    # itself unusable.
-    referenced = {value for entry in package.entries for value in _walk_strings(entry.values)
-                  if value.startswith("$")}
+    referenced = {
+        value
+        for entry in package.entries
+        for value in _walk_strings(entry.values)
+        if value.startswith("$")
+    }
     lookup: dict[str, str] = {}
     if referenced:
         try:
@@ -89,14 +95,20 @@ def data_map_payload() -> dict:
             semantic.append("economy / prices when BuyValue/SaleValue fields exist")
         if asset_name == "battleitempossession":
             semantic.append("enemy normal/rare drops, chances and steal data")
-        controls = "Structured DataObject records; booleans, fixed-width numbers, floats and existing FNames are editable."
+        controls = (
+            "Structured DataObject records; booleans, fixed-width numbers, floats "
+            "and existing FNames are editable."
+        )
         if semantic:
             controls += " Semantic surface: " + "; ".join(semantic) + "."
         rows.append({
             "filename": item["asset"] + ".uasset / .uexp",
             "target": item["asset"],
             "controls": controls,
-            "notes": "FString and structural/size-changing edits remain read-only; unknown bytes are preserved in the project overlay.",
+            "notes": (
+                "FString and structural/size-changing edits remain read-only; "
+                "unknown bytes are preserved in the project overlay."
+            ),
             "coverage": "structured",
             "status": "partial",
         })
@@ -104,8 +116,14 @@ def data_map_payload() -> dict:
         rows.append({
             "filename": item["asset"] + ".uasset / .uexp",
             "target": item["asset"],
-            "controls": "Localized menu, item, dialogue, subtitle and other text-resource strings, including existing sub-entry text.",
-            "notes": "Text can change length and encoding. IDs, entry counts and sub-entry structure remain fixed.",
+            "controls": (
+                "Localized menu, item, dialogue, subtitle and other text-resource "
+                "strings, including existing sub-entry text."
+            ),
+            "notes": (
+                "Text can change length and encoding. IDs, entry counts and "
+                "sub-entry structure remain fixed."
+            ),
             "coverage": "structured",
             "status": "partial",
         })
@@ -114,8 +132,11 @@ def data_map_payload() -> dict:
 
 def info_payload() -> dict:
     current = catalog()
-    languages = sorted({str(row.get("language", "")) for row in current.get("textAssets", [])
-                        if row.get("language")})
+    languages = sorted({
+        str(row.get("language", ""))
+        for row in current.get("textAssets", [])
+        if row.get("language")
+    })
     return {
         "gameRoot": str(GAME_ROOT),
         "dataRoot": str(DATA_ROOT),
@@ -127,7 +148,9 @@ def info_payload() -> dict:
         "pakVersion": preferred_pak_version(current),
         "pakMountPoint": FF7R_MOUNT_POINT,
         "buildPath": str(PROJECT_ROOT / "build" / "Lexeditor-FF7R_P.pak"),
-        "deployPath": str(GAME_ROOT / "End" / "Content" / "Paks" / "~mods" / "Lexeditor-FF7R_P.pak"),
+        "deployPath": str(
+            GAME_ROOT / "End" / "Content" / "Paks" / "~mods" / "Lexeditor-FF7R_P.pak"
+        ),
     }
 
 
@@ -207,7 +230,8 @@ class Handler(BaseHTTPRequestHandler):
                     "windowHost": "webview2",
                     "capabilities": [
                         "data-map", "dataobject", "text-resource", "economy",
-                        "enemy-loot", "save", "text-save", "build", "deploy",
+                        "enemy-loot", "save", "economy-save", "enemy-loot-save",
+                        "text-save", "build", "deploy",
                     ],
                 })
             if path == "/api/catalog":
@@ -228,13 +252,15 @@ class Handler(BaseHTTPRequestHandler):
                 language = (query.get("language") or ["US"])[0]
                 return self.send_json(economy_payload(
                     GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(),
-                    language=language, vanilla=vanilla))
+                    language=language, vanilla=vanilla,
+                ))
             if path == "/api/loot":
                 vanilla = (query.get("source") or [""])[0] == "vanilla"
                 language = (query.get("language") or ["US"])[0]
                 return self.send_json(loot_payload(
                     GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(),
-                    language=language, vanilla=vanilla))
+                    language=language, vanilla=vanilla,
+                ))
             if path == "/api/text":
                 asset = (query.get("asset") or [""])[0]
                 if not asset:
@@ -257,6 +283,28 @@ class Handler(BaseHTTPRequestHandler):
                 if not asset or not isinstance(edits, list):
                     raise ValueError("asset and edits are required")
                 return self.send_json(save_edits(
+                    GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
+                    source_sha256=str(payload.get("sourceSha256", "")),
+                    active_sha256=str(payload.get("activeSha256", "")),
+                    edits=edits,
+                ))
+            if path == "/api/economy/save":
+                asset = str(payload.get("asset", ""))
+                edits = payload.get("edits", [])
+                if not asset or not isinstance(edits, list):
+                    raise ValueError("asset and edits are required")
+                return self.send_json(save_economy_edits(
+                    GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
+                    source_sha256=str(payload.get("sourceSha256", "")),
+                    active_sha256=str(payload.get("activeSha256", "")),
+                    edits=edits,
+                ))
+            if path == "/api/loot/save":
+                asset = str(payload.get("asset", ""))
+                edits = payload.get("edits", [])
+                if not asset or not isinstance(edits, list):
+                    raise ValueError("asset and edits are required")
+                return self.send_json(save_loot_edits(
                     GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
                     source_sha256=str(payload.get("sourceSha256", "")),
                     active_sha256=str(payload.get("activeSha256", "")),
