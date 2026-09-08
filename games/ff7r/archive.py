@@ -1,4 +1,4 @@
-"""Locate FF7R DataObjects inside installed PAKs and extract them on demand."""
+"""Locate FF7R gameplay/text packages inside installed PAKs and extract on demand."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ from .tooling import REPAK_TAG, get_file, list_pak, pak_info
 
 
 DATA_PREFIX = "End/Content/GameContents/DataObject/"
-INDEX_SCHEMA = 1
+TEXT_PREFIX = "End/Content/GameContents/Text/"
+INDEX_SCHEMA = 2
 
 
 def _normalize(path: str) -> str:
@@ -51,6 +52,22 @@ def _signature_id(signature: dict) -> str:
     return hashlib.sha256(raw).hexdigest()[:20]
 
 
+def _pair_rows(by_asset: dict[str, dict], prefix: str, *, text: bool = False) -> list[dict]:
+    rows: list[dict] = []
+    for asset, record in sorted(by_asset.items(), key=lambda pair: pair[0].casefold()):
+        if "uasset" not in record or "uexp" not in record:
+            continue
+        display = asset[len(prefix):] if asset.casefold().startswith(prefix.casefold()) else asset
+        folder, _, name = display.rpartition("/")
+        row = {**record, "name": name, "group": folder or ("Text" if text else "DataObject")}
+        if text:
+            parts = display.split("/", 1)
+            row["language"] = parts[0] if len(parts) > 1 else ""
+            row["group"] = parts[1].rsplit("/", 1)[0] if len(parts) > 1 and "/" in parts[1] else "Text"
+        rows.append(row)
+    return rows
+
+
 def build_index(game_root: Path, data_root: Path) -> dict:
     game_root = Path(game_root).resolve()
     data_root = Path(data_root).resolve()
@@ -64,16 +81,18 @@ def build_index(game_root: Path, data_root: Path) -> dict:
         raise RuntimeError("No FF7R .pak archives were found")
     signature = _signature(game_root, paks)
     signature_id = _signature_id(signature)
-    cache_path = data_root / "dataobject-index.json"
+    cache_path = data_root / "ff7r-index.json"
     try:
         cached = json.loads(cache_path.read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError):
         cached = {}
     if (cached.get("schema") == INDEX_SCHEMA and cached.get("signature") == signature
-            and isinstance(cached.get("assets"), list)):
+            and isinstance(cached.get("assets"), list)
+            and isinstance(cached.get("textAssets"), list)):
         return cached
 
-    by_asset: dict[str, dict] = {}
+    by_data: dict[str, dict] = {}
+    by_text: dict[str, dict] = {}
     pak_versions: dict[str, str] = {}
     for pak in paks:
         relative_pak = pak.relative_to(game_root).as_posix()
@@ -85,23 +104,22 @@ def build_index(game_root: Path, data_root: Path) -> dict:
             raise RuntimeError(f"Could not index FF7R archive {pak.name}: {error}") from error
         for internal in entries:
             internal = _normalize(internal)
-            if not internal.casefold().startswith(DATA_PREFIX.casefold()):
-                continue
             suffix = Path(internal).suffix.casefold()
             if suffix not in {".uasset", ".uexp"}:
                 continue
+            if internal.casefold().startswith(DATA_PREFIX.casefold()):
+                target = by_data
+            elif internal.casefold().startswith(TEXT_PREFIX.casefold()):
+                target = by_text
+            else:
+                continue
             asset = internal[:-len(suffix)]
-            record = by_asset.setdefault(asset, {"asset": asset})
+            record = target.setdefault(asset, {"asset": asset})
             # Later archives in the installed set replace earlier definitions.
             record[suffix[1:]] = {"pak": relative_pak, "path": internal}
 
-    assets = []
-    for asset, record in sorted(by_asset.items(), key=lambda pair: pair[0].casefold()):
-        if "uasset" not in record or "uexp" not in record:
-            continue
-        display = asset[len(DATA_PREFIX):] if asset.casefold().startswith(DATA_PREFIX.casefold()) else asset
-        folder, _, name = display.rpartition("/")
-        assets.append({**record, "name": name, "group": folder or "DataObject"})
+    assets = _pair_rows(by_data, DATA_PREFIX)
+    text_assets = _pair_rows(by_text, TEXT_PREFIX, text=True)
     if not assets:
         raise RuntimeError("FF7R archives contained no paired DataObject .uasset/.uexp files")
 
@@ -111,6 +129,7 @@ def build_index(game_root: Path, data_root: Path) -> dict:
         "signatureId": signature_id,
         "pakVersions": pak_versions,
         "assets": assets,
+        "textAssets": text_assets,
     }
     temporary = cache_path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
@@ -119,39 +138,48 @@ def build_index(game_root: Path, data_root: Path) -> dict:
 
 
 def _fixture_index(root: Path) -> dict:
-    by_asset = {}
+    by_data: dict[str, dict] = {}
+    by_text: dict[str, dict] = {}
     for path in root.rglob("*.uasset"):
         relative = path.relative_to(root).as_posix()
         uexp = path.with_suffix(".uexp")
         if not uexp.is_file():
             continue
         asset = relative[:-len(".uasset")]
-        display = asset[len(DATA_PREFIX):] if asset.casefold().startswith(DATA_PREFIX.casefold()) else asset
-        folder, _, name = display.rpartition("/")
-        by_asset[asset] = {
-            "asset": asset, "name": name, "group": folder or "DataObject",
+        record = {
+            "asset": asset,
             "uasset": {"fixture": path.as_posix()},
             "uexp": {"fixture": uexp.as_posix()},
         }
+        if asset.casefold().startswith(TEXT_PREFIX.casefold()):
+            by_text[asset] = record
+        else:
+            by_data[asset] = record
     return {
         "schema": INDEX_SCHEMA,
         "signature": {"fixture": str(root)},
         "signatureId": hashlib.sha256(str(root).encode()).hexdigest()[:20],
         "pakVersions": {},
-        "assets": list(by_asset.values()),
+        "assets": _pair_rows(by_data, DATA_PREFIX),
+        "textAssets": _pair_rows(by_text, TEXT_PREFIX, text=True),
     }
 
 
-def _find(index: dict, asset: str) -> dict:
+def _find(index: dict, asset: str, collection: str = "assets") -> dict:
     normalized = _normalize(asset)
-    for row in index.get("assets", []):
+    rows = index.get(collection, [])
+    if not isinstance(rows, list):
+        raise KeyError(f"Unknown FF7R index collection: {collection}")
+    for row in rows:
         if row.get("asset") == normalized:
             return row
-    raise KeyError(f"Unknown FF7R DataObject: {asset}")
+    kind = "text resource" if collection == "textAssets" else "DataObject"
+    raise KeyError(f"Unknown FF7R {kind}: {asset}")
 
 
-def extract_pair(game_root: Path, data_root: Path, index: dict, asset: str) -> tuple[Path, Path]:
-    row = _find(index, asset)
+def extract_pair(game_root: Path, data_root: Path, index: dict, asset: str,
+                 *, collection: str = "assets") -> tuple[Path, Path]:
+    row = _find(index, asset, collection)
     if "fixture" in row["uasset"]:
         return Path(row["uasset"]["fixture"]), Path(row["uexp"]["fixture"])
     source_root = Path(data_root).resolve() / "sources" / str(index["signatureId"])
