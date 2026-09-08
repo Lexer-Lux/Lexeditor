@@ -54,3 +54,40 @@ def test_bench_probe_recognizes_common_program_ids_not_only_class_names():
     ])
     assert len(rows) == 1
     assert rows[0]["containsBenchAndVending"] is True
+
+
+def test_bench_probe_prefers_resolved_same_outer_exports_over_string_only_pair():
+    string_only = {
+        "path": "End/Content/slum7/string-only.umap",
+        "interestingStrings": [
+            {"encoding": "ascii", "offset": 1, "text": "EndFieldActionActorBenchBreak"},
+            {"encoding": "ascii", "offset": 2, "text": "VendingMachine"},
+        ],
+    }
+    resolved = {
+        "path": "End/Content/slum7/resolved.umap",
+        "interestingStrings": [],
+        "benchExports": [{
+            "index": 10,
+            "objectName": "BenchActor_0",
+            "classPath": "/Script/EndGame.EndFieldActionActorBenchBreak",
+            "outerPath": "PersistentLevel",
+        }],
+        "vendingExports": [{
+            "index": 11,
+            "objectName": "VendingActor_0",
+            "classPath": "/Script/EndGame.EndFieldActionActorVendingMachine",
+            "outerPath": "PersistentLevel",
+        }],
+        "sharedOuterPairs": [{
+            "outerPath": "PersistentLevel",
+            "benchExportIndex": 10,
+            "vendingExportIndex": 11,
+        }],
+    }
+
+    rows = rank_bench_candidates([string_only, resolved])
+    assert rows[0]["path"].endswith("resolved.umap")
+    assert rows[0]["containsBenchAndVending"] is False
+    assert rows[0]["containsBenchAndVendingExports"] is True
+    assert rows[0]["score"] > rows[1]["score"]
