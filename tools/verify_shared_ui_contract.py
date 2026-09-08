@@ -71,11 +71,16 @@ require("Editable Table" not in blank, "Blank still exposes a separate Editable 
 require(not (ROOT / "ui/design-review.js").exists() and not (ROOT / "ui/design-review.css").exists(),
         "Design Review implementation files still exist")
 
-# Shared model preview drawer; Warband consumes it rather than owning a panel type.
+# The shared model-preview drawer remains a reusable Detail capability, but the
+# Warband Items detail is now the actual record editor rather than a preview
+# surface. Do not regress it back into a model viewer just because the shared
+# framework still supports model previews elsewhere.
 require("modelPreview" in framework and "lex-model-preview-drawer" in framework,
         "shared Detail-panel model preview drawer is missing")
-require("modelPreview:" in warband,
-        "Warband is not using the shared model preview contract")
+require("modelPreview:" not in warband and "Open model preview" not in warband,
+        "Warband Items regressed back to a model-preview detail pane")
+require("detailField" in warband and "/api/items/save" in warband,
+        "Warband Items is not using structured editable Detail properties")
 require("warband-item-preview-action" not in warband,
         "Warband still owns its old separate model-preview action")
 
