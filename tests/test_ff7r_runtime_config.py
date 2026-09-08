@@ -7,10 +7,13 @@ from games.ff7r.runtime_config import (
     DEFAULT_RUNTIME_CONFIG,
     RUNTIME_CONFIG_NAME,
     RUNTIME_DLL_NAME,
+    RUNTIME_PROBE_REPORT_NAME,
     deploy_runtime,
     load_runtime_config,
+    runtime_probe_status,
     runtime_status,
     save_runtime_config,
+    validate_probe_report,
     validate_runtime_config,
 )
 
@@ -59,6 +62,7 @@ def test_runtime_status_never_claims_active_without_native_dll_and_loader(tmp_pa
     assert status["active"] is False
     assert status["projectDllPresent"] is False
     assert status["loaderCandidatePresent"] is False
+    assert status["probe"]["reportPresent"] is False
 
 
 def test_runtime_deploy_fails_closed_without_dll_or_loader(tmp_path):
@@ -95,3 +99,69 @@ def test_runtime_deploy_copies_dll_and_validated_config_when_loader_exists(tmp_p
     status = runtime_status(game, project)
     assert status["runtimeReady"] is True
     assert status["active"] is True
+
+
+def _probe_report(*, map_matches=None, input_matches=None):
+    return {
+        "schemaVersion": 1,
+        "probeOnly": True,
+        "process": r"C:\Games\FF7R\End\Binaries\Win64\ff7remake_.exe",
+        "processSize": 123456789,
+        "textBase": "0x140001000",
+        "textSize": 987654,
+        "probes": [
+            {"name": "knownMapControl", "matches": map_matches or ["0x1518D175"]},
+            {"name": "knownRawInputRegistration", "matches": input_matches or ["0x15D0F290"]},
+            {"name": "ascii:EventScene", "matches": ["0x145000000"]},
+        ],
+    }
+
+
+def test_probe_report_requires_probe_only_schema_and_hex_addresses():
+    report = _probe_report()
+    assert validate_probe_report(report)["probeOnly"] is True
+
+    bad = _probe_report()
+    bad["probeOnly"] = False
+    with pytest.raises(ValueError, match="probeOnly"):
+        validate_probe_report(bad)
+
+    bad = _probe_report()
+    bad["probes"][0]["matches"] = ["not-an-address"]
+    with pytest.raises(ValueError, match="address"):
+        validate_probe_report(bad)
+
+
+def test_probe_status_requires_unique_known_current_build_signatures(tmp_path):
+    game = tmp_path / "game"
+    native_mods = game / "NativeMods"
+    native_mods.mkdir(parents=True)
+    target = native_mods / RUNTIME_PROBE_REPORT_NAME
+    target.write_text(json.dumps(_probe_report()), encoding="utf-8")
+
+    status = runtime_probe_status(game)
+    assert status["valid"] is True
+    assert status["baselineCompatible"] is True
+    assert status["knownMapControlMatches"] == ["0x1518D175"]
+    assert status["candidateRuntimeStrings"]["EventScene"] == ["0x145000000"]
+
+    target.write_text(
+        json.dumps(_probe_report(map_matches=["0x1518D175", "0x1518D200"])),
+        encoding="utf-8",
+    )
+    status = runtime_probe_status(game)
+    assert status["valid"] is True
+    assert status["baselineCompatible"] is False
+    assert "do not apply runtime patches" in status["reason"]
+
+
+def test_probe_status_fails_closed_on_malformed_report(tmp_path):
+    game = tmp_path / "game"
+    native_mods = game / "NativeMods"
+    native_mods.mkdir(parents=True)
+    target = native_mods / RUNTIME_PROBE_REPORT_NAME
+    target.write_text("{broken", encoding="utf-8")
+    status = runtime_probe_status(game)
+    assert status["reportPresent"] is True
+    assert status["valid"] is False
+    assert status["baselineCompatible"] is False
