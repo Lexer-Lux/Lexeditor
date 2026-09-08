@@ -30,8 +30,22 @@ PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_FF7_PROJECT", str(paths.PROJECT_RO
 EXECUTABLE = os.environ.get("LEXEDITOR_FF7_EXECUTABLE", "FFVII_LAUNCHER.exe")
 
 
+def _link_limit_rows(rows, texts) -> None:
+    """Decorate EXE Limit rows from KERNEL2 Magic help/name tables."""
+    names = {row["id"] & 0xFFFF: row.get("values", {}).get("text")
+             for row in texts if row.get("id", -1) >> 16 == 9}
+    descriptions = {row["id"] & 0xFFFF: row.get("values", {}).get("text")
+                    for row in texts if row.get("id", -1) >> 16 == 1}
+    for row in rows:
+        game_id = row.get("gameId")
+        if isinstance(names.get(game_id), str) and names[game_id]:
+            row["name"] = names[game_id]
+        if isinstance(descriptions.get(game_id), str) and descriptions[game_id]:
+            row["description"] = descriptions[game_id]
+
+
 def _link_limit_text(data: dict) -> None:
-    """Decorate EXE Limit records with the matching KERNEL2 text.
+    """Decorate loaded EXE Limit records with the matching KERNEL2 text.
 
     KERNEL2 Magic help is section 1 and Magic names is section 9. Both tables
     use the stored attack ID, so Limit records 0..70 resolve at IDs 128..198.
@@ -39,17 +53,15 @@ def _link_limit_text(data: dict) -> None:
     """
     for source in ("records", "vanilla"):
         groups = data.get(source, {})
-        texts = groups.get("texts", [])
-        names = {row["id"] & 0xFFFF: row.get("values", {}).get("text")
-                 for row in texts if row.get("id", -1) >> 16 == 9}
-        descriptions = {row["id"] & 0xFFFF: row.get("values", {}).get("text")
-                        for row in texts if row.get("id", -1) >> 16 == 1}
-        for row in groups.get("limitBreaks", []):
-            game_id = row.get("gameId")
-            if isinstance(names.get(game_id), str) and names[game_id]:
-                row["name"] = names[game_id]
-            if isinstance(descriptions.get(game_id), str) and descriptions[game_id]:
-                row["description"] = descriptions[game_id]
+        _link_limit_rows(groups.get("limitBreaks", []), groups.get("texts", []))
+
+
+def _link_saved_limit_text(result: dict, extra: dict) -> dict:
+    """Keep canonical save responses as human-readable as normal API loads."""
+    rows = result.get("records", {}).get("limitBreaks")
+    if rows is not None:
+        _link_limit_rows(rows, extra.get("records", {}).get("texts", []))
+    return result
 
 
 def editor_data() -> dict:
@@ -63,6 +75,13 @@ def editor_data() -> dict:
     data['unresolved'] = {}
     _link_limit_text(data)
     return data
+
+
+def save_extended_data(payload: object) -> dict:
+    result = save_extended(GAME_ROOT, PROJECT_ROOT, payload)
+    if "limitBreaks" in result.get("records", {}):
+        _link_saved_limit_text(result, load_extended(GAME_ROOT, PROJECT_ROOT))
+    return result
 
 
 def platform_data() -> dict:
@@ -237,7 +256,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("FF7 save payload has an invalid size")
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             if path == "/api/extended/save":
-                self.json_response(save_extended(GAME_ROOT, PROJECT_ROOT, payload))
+                self.json_response(save_extended_data(payload))
             elif path == "/api/platform-config/save":
                 self.json_response(save_platform_data(payload))
             else:
