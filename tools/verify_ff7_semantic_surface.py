@@ -13,6 +13,11 @@ class SemanticSurfaceTests(unittest.TestCase):
     def test_core_kernel_categories_are_humanized(self):
         meta={category["id"]:{f["key"]:f for f in category["fields"]} for category in datasets.category_metadata()}
         expected={
+            "initialState":{"party1":"reference"},
+            "initialInventory":{"item":"inventoryReference"},
+            "initialMateria":{"materia":"reference"},
+            "stolenMateria":{"materia":"reference"},
+            "magicOrder":{"menuGroup":"enum"},
             "commands":{"initialCursorAction":"enum","targetData":"flags"},
             "playerAttacks":{"targetData":"flags","damageCalculationId":"enum","statusChange":"statusChange","statusFlags":"flags","elementFlags":"flags","specialAttackFlags":"flags"},
             "items":{"targetData":"flags","damageCalculationId":"enum","statusChange":"statusChange","statusFlags":"flags","elementFlags":"flags","restrictions":"flags","specialAttackFlags":"flags"},
@@ -30,6 +35,7 @@ class SemanticSurfaceTests(unittest.TestCase):
             self.assertTrue(meta[category]["restrictions"]["invertBits"],category)
             self.assertEqual(meta[category]["restrictions"]["bitWidth"],16,category)
         self.assertTrue(meta["items"]["specialAttackFlags"]["invertBits"])
+        self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
         self.assertEqual([c["value"] for c in meta["weapons"]["materiaSlot1"]["choices"]],[0,1,2,3,5,6,7])
 
     def test_extended_categories_are_humanized(self):
@@ -48,6 +54,9 @@ class SemanticSurfaceTests(unittest.TestCase):
         self.assertEqual(by["enemyAttacks"]["statusChance"]["dataType"],"statusChange")
         self.assertEqual(by["enemyAttacks"]["specialFlags"]["dataType"],"flags")
         self.assertTrue(by["enemyAttacks"]["specialFlags"]["invertBits"])
+        self.assertEqual(by["enemies"]["dropRate0"]["dataType"], "lootRate")
+        self.assertEqual(by["enemies"]["backMultiplier"]["dataType"], "scaled")
+        self.assertEqual(by["enemies"]["backMultiplier"]["displayScale"], 0.125)
         self.assertEqual(by["encounters"]["slot0_enemy"]["dataType"],"reference")
         self.assertEqual(by["shops"]["type"]["dataType"],"enum")
         self.assertEqual(by["shops"]["item0"]["dataType"],"shopReference")

@@ -71,8 +71,8 @@ def text_table(count, prefix):
 
 def fixture_sections():
     sections = [bytearray([index + 1] * 64) for index in range(27)]
-    sections[3] = bytearray(b"\xa5" * (9 * 132 + 700))
-    sections[2] = bytearray(b"\x5a" * (0x61C + 2048))
+    sections[3] = bytearray(b"\xa5" * 0xB2C)
+    sections[2] = bytearray(b"\x5a" * 0xF94)
     sections[2][0x61C:0xE1C] = b"\xff" * 2048
     for slot in range(9):
         for index, field in enumerate(INITIAL_FIELDS):
@@ -120,7 +120,7 @@ class DatasetTests(unittest.TestCase):
                 write_kernel(game / relative)
                 data = load_datasets(game, self.project)
                 self.assertFalse(data["errors"])
-                self.assertEqual(sum(map(len, data["records"].values())), 673)
+                self.assertEqual(sum(map(len, data["records"].values())), 1298)
                 self.assertEqual(data["sourceRelativePath"], relative.as_posix())
                 self.assertEqual(len(data["records"]["characters"]), 9)
 
@@ -162,6 +162,41 @@ class DatasetTests(unittest.TestCase):
                     base._write_field(record, field, value)
                     expected[category.section - 1][:category.record_size] = record
                     self.assertEqual(kernel.sections, expected)
+
+
+    def test_remaining_documented_initial_and_menu_data_round_trip_exact_bytes(self):
+        original = Kernel(self.source)
+        cases = [
+            ("initialState", 0, "gil", 1234567, 3, 0xB28, 4),
+            ("initialMateria", 11, "ap", 0x123456, 3, 0x728 + 11 * 4 + 1, 3),
+            ("stolenMateria", 7, "ap", 0x654321, 3, 0xA48 + 7 * 4 + 1, 3),
+        ]
+        for category, record_id, field, value, section, offset, size in cases:
+            with self.subTest(category=category, field=field):
+                kernel = Kernel(self.source); rows = kernel.records(category)
+                rows[record_id]["values"][field] = value
+                kernel.apply(category, rows)
+                expected = deepcopy(original.sections)
+                expected[section][offset:offset + size] = value.to_bytes(size, "little")
+                self.assertEqual(kernel.sections, expected)
+
+        kernel = Kernel(self.source); rows = kernel.records("initialInventory")
+        rows[3]["values"].update(item=0x12A, amount=63); kernel.apply("initialInventory", rows)
+        expected = deepcopy(original.sections); packed = 0x12A | (63 << 9); at = 0x4A8 + 3 * 2
+        expected[3][at:at+2] = packed.to_bytes(2, "little")
+        self.assertEqual(kernel.sections, expected)
+
+        kernel = Kernel(self.source); rows = kernel.records("initialMateria")
+        rows[4]["values"].update(materia=23, ap=0x010203); kernel.apply("initialMateria", rows)
+        expected = deepcopy(original.sections); at = 0x728 + 4 * 4
+        expected[3][at:at+4] = bytes((23, 3, 2, 1))
+        self.assertEqual(kernel.sections, expected)
+
+        kernel = Kernel(self.source); rows = kernel.records("magicOrder")
+        rows[5]["values"].update(menuGroup=3, position=17); kernel.apply("magicOrder", rows)
+        expected = deepcopy(original.sections); expected[2][0xF5C + 5] = (3 << 5) | 17
+        self.assertEqual(kernel.sections, expected)
+        self.assertEqual(kernel.records("magicOrder")[5]["values"], {"menuGroup": 3, "position": 17})
 
     def test_noop_preserves_all_decoded_bytes(self):
         original = Kernel(self.source)
@@ -215,7 +250,8 @@ class DatasetTests(unittest.TestCase):
             result = load_datasets(self.game, self.project)
             self.assertIn("characters", result["errors"])
             self.assertTrue(set(base.CATEGORIES) <= set(result["records"]))
-            expected = {"characters", "growthCurves", "growthBonuses", "characterAI"} if section == 2 else {"characters"}
+            expected = ({"characters", "growthCurves", "growthBonuses", "characterAI", "magicOrder"} if section == 2 else
+                        {"characters", "initialState", "initialInventory", "initialMateria", "stolenMateria"})
             self.assertEqual(set(result["errors"]), expected)
 
     def test_bad_text_category_isolated_and_preserved_on_other_edits(self):

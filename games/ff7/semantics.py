@@ -73,6 +73,7 @@ COMMAND_ACTIONS = (
     (0x09, "W-Summon menu"), (0x0A, "W-Item menu"), (0x0B, "Coin menu"),
     (0xFF, "No initial cursor action"),
 )
+MAGIC_MENU_GROUPS = ((0, "Restore"), (1, "Attack"), (2, "Indirect"), (3, "Special"), (0xFF, "Not listed"))
 
 RESTRICTION_FLAGS = (
     (0x0001, "Can be sold"), (0x0002, "Can be used in battle"),
@@ -175,6 +176,35 @@ def advanced(label, help):
 
 
 CORE = {
+    "initialState": {
+        "party1": reference("characters", label="Party member 1", empty=255, help="First character placed in the party when a new save is initialized."),
+        "party2": reference("characters", label="Party member 2", empty=255, help="Second character placed in the party when a new save is initialized."),
+        "party3": reference("characters", label="Party member 3", empty=255, help="Third character placed in the party when a new save is initialized."),
+        "gil": _field(label="Starting gil", group="Starting resources", help="Gil copied into a newly initialized save. Existing saves are not changed."),
+    },
+    "initialInventory": {
+        "item": _field(label="Item / equipment", dataType="inventoryReference", emptyValue=0x1FF, includeMateria=False, group="Starting inventory", help="Item or equipment stored in this new-game inventory slot. 511 means empty."),
+        "amount": _field(label="Quantity", group="Starting inventory", help="Initial quantity in this packed inventory slot (0–127)."),
+    },
+    "initialMateria": {
+        "materia": reference("materia", label="Materia", empty=255, help="Materia stored in this initial stock slot; 255 means empty."),
+        "ap": _field(label="AP", group="Starting Materia", help="AP already accumulated on this initial Materia instance."),
+    },
+    "stolenMateria": {
+        "materia": reference("materia", label="Materia", empty=255, help="Materia in Yuffie's temporary stolen-Materia inventory for the Wutai sequence."),
+        "ap": _field(label="AP", group="Stolen Materia", help="AP retained on this temporary stolen-Materia instance."),
+    },
+    "magicOrder": {
+        "menuGroup": _field(label="Magic-menu section", dataType="enum", choices=choices(*MAGIC_MENU_GROUPS), group="Menu placement", help="Which Magic submenu section contains this player spell: Restore, Attack, Indirect or Special. Not listed stores 0xFF."),
+        "position": _field(label="Position within section", group="Menu placement", help="Zero-based position inside the selected Magic submenu section."),
+    },
+    "growthCurves": {
+        **{f"gradient{i}": _field(label="Gradient", group=f"Levels {bracket}", help="Slope/coefficient used by this level bracket's growth formula.") for i, bracket in enumerate(("2–11","12–21","22–31","32–41","42–51","52–61","62–81","82–99"))},
+        **{f"base{i}": _field(label="Base", group=f"Levels {bracket}", help="Base/intercept used by this level bracket. Experience curves store this byte but do not use it in the EXP formula.") for i, bracket in enumerate(("2–11","12–21","22–31","32–41","42–51","52–61","62–81","82–99"))},
+    },
+    "growthBonuses": {
+        **{f"bonus{i}": _field(label=f"Difference bracket {i}", group="Randomized level gain", help="Result/factor selected when the growth calculation lands in difference bracket %d." % i) for i in range(12)},
+    },
     "commands": {
         "initialCursorAction": _field(label="Command action", dataType="enum", choices=choices(*COMMAND_ACTIONS), group="Command behavior", help="What selecting this battle command does first: perform the command directly, open a submenu such as Magic/Item/Limit, or enter target selection."),
         "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who a directly executed command can target and how the battle cursor behaves."),
@@ -280,6 +310,7 @@ for stat in ("strength","vitality","magic","spirit","dexterity","luck","hp","mp"
 SCENE = {
     "enemies": {
         "morph": _field(label="Morph reward", dataType="inventoryReference", emptyValue=65535, group="Rewards", help="Global item/equipment rewarded by Morph; 65535 means none."),
+        "backMultiplier": _field(label="Back-attack damage multiplier", dataType="scaled", displayScale=0.125, group="Stats / rewards", help="Damage multiplier when this enemy is struck from behind. The stored byte is measured in eighths."),
         "statusImmunity": _field(label="Status immunities", dataType="flags", flags=flags(*STATUSES), invertBits=True, bitWidth=32, group="Defenses", help="Statuses this enemy cannot normally receive. scene.bin stores this mask inverted; Lexeditor shows the logical immunities."),
         **{f"element{i}": _field(label=f"Resistance slot {i+1} target", dataType="enum", choices=choices(
             *(([(value, label) for value, label in ((0,"Fire"),(1,"Ice"),(2,"Lightning"),(3,"Earth"),(4,"Poison"),(5,"Gravity"),(6,"Water"),(7,"Wind"),(8,"Holy"),(9,"Restorative"),(10,"Cut"),(11,"Hit"),(12,"Punch"),(13,"Shoot"),(14,"Shout"),(15,"Hidden"))] +
@@ -288,7 +319,7 @@ SCENE = {
         **{f"attack{i}": reference("enemyAttacks", label=f"Action {i+1} attack", empty=65535, help="Scene-local enemy attack used by this action slot.", value_key="gameId", scope="scene") for i in range(16)},
         **{f"manipulate{i}": reference("enemyAttacks", label=f"Manipulate / Berserk action {i+1}", empty=65535, help="Scene-local attack available to Manipulate/Berserk logic.", value_key="gameId", scope="scene") for i in range(3)},
         **{f"item{i}": _field(label=f"Loot slot {i+1}", dataType="inventoryReference", emptyValue=65535, group="Loot", help="Global item/equipment referenced by this drop/steal slot.") for i in range(4)},
-        **{f"dropRate{i}": _field(label=f"Loot slot {i+1} rate", group="Loot", help="Drop/steal probability parameter expressed as x/63 by Scarlet. 0xFF is also used with an empty item slot.") for i in range(4)},
+        **{f"dropRate{i}": _field(label=f"Loot slot {i+1} method / chance", dataType="lootRate", group="Loot", help="Values below 0x80 are drops; values from 0x80 are steals. The low seven bits are the chance parameter expressed as x/63.") for i in range(4)},
         **{f"animation{i}": advanced(f"Action {i+1} animation ID", "Raw enemy action-animation index; no authoritative human animation-name table is available.") for i in range(16)},
         **{f"camera{i}": advanced(f"Action {i+1} camera ID", "Raw battle-camera program ID; no authoritative human camera-name table is available.") for i in range(16)},
     },
