@@ -6,16 +6,19 @@ from games.ff7r.archive import _with_virtual_assets
 from games.ff7r.research_dataobject import (
     ATB_RUNTIME_PROBE_ASSET,
     BETTER_LOCKON_PROBE_ASSET,
+    BETTER_SPRINT_PROBE_ASSET,
     CHAPTER3_BENCH_PROBE_ASSET,
     DOG_WHISTLE_PROBE_ASSET,
     READ_ONLY_RESEARCH_ASSETS,
     UNSCANNED_NAME_PROBE_ASSET,
     atb_runtime_result_package,
     better_lockon_result_package,
+    better_sprint_result_package,
     chapter3_bench_result_package,
     dog_whistle_result_package,
     unscanned_name_result_package,
 )
+from games.ff7r.sprint_probe import assess_sprint_evidence
 from games.ff7r.storage import save_edits
 
 
@@ -156,6 +159,74 @@ def test_better_lockon_result_exposes_ranked_presentation_evidence():
     assert values["StrongCandidates"] == 1
     assert values["LiteralLabelCandidates"] == 1
     assert "BattleLockonMarker=2" in values["NativeNeedleHits"]
+
+
+def test_better_sprint_assessment_never_promotes_animation_or_root_motion_hints():
+    native = {
+        "needles": [
+            {
+                "needle": "RunToDashBlendInputThreshold",
+                "hits": [{"leaRipXrefs": [{"candidateFunctionRva": 0x1000}]}],
+            },
+            {
+                "needle": "DashRootMotionTranslationScale",
+                "hits": [{"leaRipXrefs": [{"candidateFunctionRva": 0x2000}]}],
+            },
+        ]
+    }
+    candidates = [
+        {
+            "asset": "End/Content/GameContents/DataObject/InDoorVolume",
+            "entryIndex": 1,
+            "record": "Sector7",
+            "field": "DashRootMotionTranslationScale",
+            "value": 1.2,
+        },
+        {
+            "asset": "End/Content/GameContents/DataObject/CharaSpec",
+            "entryIndex": 2,
+            "record": "Cloud",
+            "field": "RootMotionTranslationScale",
+            "value": 1.0,
+        },
+    ]
+    result = assess_sprint_evidence(native, candidates)
+    assert result["implementationReady"] is False
+    assert "authoritative-player-sprint-speed-path-unvalidated" in result["blockers"]
+    assert result["nativeNeedleStats"]["RunToDashBlendInputThreshold"]["candidateFunctions"] == 1
+    assert result["fieldCandidateCounts"]["DashRootMotionTranslationScale"] == 1
+    assert result["fieldCandidateCounts"]["RootMotionTranslationScale"] == 1
+    assert any(
+        row["symbol"].endswith("RunToDashBlendInputThreshold")
+        and row["sprintAuthority"] == "rejected-as-speed-coefficient"
+        for row in result["knownContracts"]
+    )
+
+
+def test_better_sprint_result_surface_preserves_scope_risks():
+    assessed = assess_sprint_evidence(
+        {
+            "needles": [{
+                "needle": "DashRootMotionTranslationScale",
+                "hits": [{"leaRipXrefs": [{"candidateFunctionRva": 0x3000}]}],
+            }]
+        },
+        [{
+            "asset": "End/Content/GameContents/DataObject/InDoorVolume",
+            "entryIndex": 0,
+            "record": "Town",
+            "field": "DashRootMotionTranslationScale",
+            "value": 0.9,
+        }],
+    )
+    payload = _payload(better_sprint_result_package(assessed))
+    assert payload["asset"] == BETTER_SPRINT_PROBE_ASSET
+    values = payload["records"][0]["values"]
+    assert values["ImplementationReady"] is False
+    assert values["DashRootMotionRows"] == 1
+    assert "strings=1" in values["NativeEvidence"]
+    assert "RunToDashBlendInputThreshold" in values["KnownContracts"]
+    assert "authoritative-player-sprint-speed-path-unvalidated" in values["Blockers"]
 
 
 @pytest.mark.parametrize("asset", sorted(READ_ONLY_RESEARCH_ASSETS))
