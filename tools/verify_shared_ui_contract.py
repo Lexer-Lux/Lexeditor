@@ -29,6 +29,23 @@ github = text("github_integration.py")
 blank = text("games/blank/editor.html")
 warband = text("games/warband/editor.html")
 
+# Shared chrome is global by construction. Every real editor shell must load the
+# shared framework, and a game theme may not swap the info-bubble glyph back to
+# its own game font. This is what keeps Blank fixes from becoming Blank-only.
+plugin_editors = sorted((ROOT / "games").glob("*/editor.html"))
+require(plugin_editors, "no game editor shells were found")
+for editor_path in plugin_editors:
+    source = editor_path.read_text(encoding="utf-8")
+    relative = editor_path.relative_to(ROOT).as_posix()
+    require('/shared/framework.css' in source and '/shared/framework.js' in source,
+            f"{relative} is bypassing the shared UI framework")
+    require("Lexer Mode" not in source and "lexerMode" not in source,
+            f"legacy Lexer Mode leaked into {relative}")
+    for block in re.findall(r"\.lex-info-help\s*\{([^}]*)\}", source, re.I | re.S):
+        family = re.search(r"font-family\s*:\s*([^;]+)", block, re.I)
+        require(not family or "--lex-symbol-font" in family.group(1),
+                f"{relative} overrides info-bubble glyph typography with a game font")
+
 # One central GitHub workspace, filtered per game.
 require('full_name=LEXEDITOR_REPOSITORY.full_name' in host,
         "game GitHub workspaces must use Lexer-Lux/Lexeditor")
