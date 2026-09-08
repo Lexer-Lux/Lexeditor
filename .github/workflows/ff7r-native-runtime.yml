@@ -1,0 +1,40 @@
+name: FF7R native runtime probe
+
+on:
+  push:
+    branches: [work/ff7r-native-runtime]
+    paths:
+      - 'games/ff7r/native/**'
+      - '.github/workflows/ff7r-native-runtime.yml'
+  pull_request:
+    paths:
+      - 'games/ff7r/native/**'
+      - '.github/workflows/ff7r-native-runtime.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S games/ff7r/native -B out/ff7r-native -A x64
+      - name: Build
+        run: cmake --build out/ff7r-native --config Release --parallel
+      - name: Verify exported Init
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem out/ff7r-native -Recurse -Filter LexeditorFF7RRuntimeProbe.dll | Select-Object -First 1
+          if (-not $dll) { throw 'Probe DLL was not built' }
+          $dumpbin = (Get-Command dumpbin.exe -ErrorAction Stop).Source
+          $exports = & $dumpbin /exports $dll.FullName
+          if ($exports -notmatch '\bInit\b') { throw 'Probe DLL does not export Init' }
+          Write-Host $dll.FullName
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LexeditorFF7RRuntimeProbe
+          path: out/ff7r-native/**/LexeditorFF7RRuntimeProbe.dll
+          if-no-files-found: error
