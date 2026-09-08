@@ -119,6 +119,22 @@ def test_probe_falls_back_to_padding_when_pdata_is_unavailable():
     assert xref["candidateFunctionBytes"]["byteCount"] == 64
 
 
+def test_probe_correlates_multiple_string_targets_in_one_text_scan():
+    data = bytearray(fixture_pe(with_pdata=False))
+    data[0x440:0x440 + len(b"FastForward\0")] = b"FastForward\0"
+    data[0x228:0x230] = b"\xCC" * 8
+    displacement = 0x2040 - 0x1037
+    data[0x230:0x237] = b"\x48\x8D\x15" + struct.pack("<i", displacement)
+
+    result = probe_bytes(bytes(data), needles=["NaviMap", "FastForward"])
+    instructions = {}
+    for entry in result["needles"]:
+        ascii_hit = next(hit for hit in entry["hits"] if hit["encoding"] == "ascii")
+        instructions[entry["needle"]] = ascii_hit["leaRipXrefs"][0]["instructionRva"]
+
+    assert instructions == {"NaviMap": 0x1010, "FastForward": 0x1030}
+
+
 def test_probe_rejects_non_pe_and_truncated_images():
     with pytest.raises(PEFormatError):
         probe_bytes(b"not a pe", needles=[])
