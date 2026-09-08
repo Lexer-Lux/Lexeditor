@@ -229,3 +229,119 @@ def test_cross_enemy_control_subtracts_shared_bits_but_keeps_residual_bitset_lea
     rows = {row["name"]: row for row in result["groups"]}
     assert rows["enemy-a"]["residualBitCandidates"][0]["residualXorMask"] == 0x01
     assert rows["enemy-b"]["residualBitCandidates"][0]["residualXorMask"] == 0x02
+
+
+from games.ff7r.save_bit_signature_probe import analyze_controlled_bit_signatures
+
+
+def test_bit_signatures_map_distinct_enemy_bits_inside_one_shared_byte():
+    groups = {
+        "enemy-a": [
+            _pair((12, 0x01), (70, 0x80), label="a1"),
+            _pair((12, 0x01), (70, 0x80), label="a2"),
+        ],
+        "enemy-b": [
+            _pair((12, 0x04), (70, 0x80), label="b1"),
+            _pair((12, 0x04), (70, 0x80), label="b2"),
+        ],
+        "enemy-c": [
+            _pair((20, 0x02), (70, 0x80), label="c1"),
+            _pair((20, 0x02), (70, 0x80), label="c2"),
+        ],
+    }
+    controls = [
+        _pair((70, 0x80), label="noop1"),
+        _pair((70, 0x80), label="noop2"),
+    ]
+
+    result = analyze_controlled_bit_signatures(groups, controls)
+
+    assert result["candidateOffsets"] == [12, 20]
+    assert result["packedFlagByteCandidates"] == [{
+        "offset": 12,
+        "groupBits": {"enemy-a": 0, "enemy-b": 2},
+        "groupMasks": {"enemy-a": 0x01, "enemy-b": 0x04},
+        "rawGroupMasks": {"enemy-a": 0x01, "enemy-b": 0x04},
+        "controlXorMask": None,
+    }]
+    assert result["exclusiveSingleBitFlagCandidates"] == [
+        {
+            "group": "enemy-a",
+            "offset": 12,
+            "bit": 0,
+            "mask": 0x01,
+            "rawMask": 0x01,
+            "controlXorMask": None,
+        },
+        {
+            "group": "enemy-b",
+            "offset": 12,
+            "bit": 2,
+            "mask": 0x04,
+            "rawMask": 0x04,
+            "controlXorMask": None,
+        },
+        {
+            "group": "enemy-c",
+            "offset": 20,
+            "bit": 1,
+            "mask": 0x02,
+            "rawMask": 0x02,
+            "controlXorMask": None,
+        },
+    ]
+    assert result["implementationReady"] is False
+
+
+def test_bit_signatures_subtract_stable_noop_bits_before_mapping_enemy_bits():
+    groups = {
+        "enemy-a": [
+            _pair((12, 0x05), label="a1"),
+            _pair((12, 0x05), label="a2"),
+        ],
+        "enemy-b": [
+            _pair((12, 0x06), label="b1"),
+            _pair((12, 0x06), label="b2"),
+        ],
+    }
+    controls = [
+        _pair((12, 0x04), label="noop1"),
+        _pair((12, 0x04), label="noop2"),
+    ]
+
+    result = analyze_controlled_bit_signatures(groups, controls)
+
+    assert result["packedFlagByteCandidates"] == [{
+        "offset": 12,
+        "groupBits": {"enemy-a": 0, "enemy-b": 1},
+        "groupMasks": {"enemy-a": 0x01, "enemy-b": 0x02},
+        "rawGroupMasks": {"enemy-a": 0x05, "enemy-b": 0x06},
+        "controlXorMask": 0x04,
+    }]
+    assert [row["mask"] for row in result["exclusiveSingleBitFlagCandidates"]] == [0x01, 0x02]
+
+
+def test_bit_signatures_do_not_false-promote_when_one_group_has_unstable_mask():
+    groups = {
+        "enemy-a": [
+            _pair((12, 0x01), label="a1"),
+            _pair((12, 0x01), label="a2"),
+        ],
+        "enemy-b": [
+            _pair((12, 0x02), label="b1"),
+            _pair((12, 0x04), label="b2"),
+        ],
+    }
+    controls = [
+        _pair((70, 0x80), label="noop1"),
+        _pair((70, 0x80), label="noop2"),
+    ]
+
+    result = analyze_controlled_bit_signatures(groups, controls)
+
+    row = next(row for row in result["offsetSignatures"] if row["offset"] == 12)
+    assert row["groupMasks"] == {"enemy-a": 0x01}
+    assert row["unresolvedGroups"] == {"enemy-b": "unstable-xor-mask"}
+    assert row["packedDistinctSingleBitCandidate"] is False
+    assert result["exclusiveSingleBitFlagCandidates"] == []
+    assert result["unresolvedOffsets"] == [12]
