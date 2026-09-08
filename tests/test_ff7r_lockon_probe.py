@@ -51,13 +51,17 @@ def _resolved_lockon_asset(name="UI/ResolvedLockon"):
 
 def _serialized_lockon_asset(
     name="UI/SerializedLockon", *, property_name="ColorAndOpacity", dedicated=True,
+    mapping_trusted=True, header_plausible=True,
 ):
     asset = _asset(name)
     object_name = "BattleLockonMarker" if dedicated else "GenericTargetImage"
     class_name = "EndBattleLockonMarkerIcon" if dedicated else "Image"
     asset["serializedExportEvidence"] = {
-        "mappingTrusted": True,
-        "mappingReason": "serial-offset-minus-total-header-size",
+        "mappingTrusted": mapping_trusted,
+        "mappingReason": (
+            "serial-offset-minus-total-header-size" if mapping_trusted
+            else "total-header-size-does-not-match-uasset-length"
+        ),
         "refs": [{
             "objectName": object_name,
             "objectPath": f"WidgetTree.{object_name}",
@@ -67,6 +71,9 @@ def _serialized_lockon_asset(
             "name": property_name,
             "propertyType": "StructProperty",
             "propertyTagLike": True,
+            "propertyTagHeaderPlausible": header_plausible,
+            "declaredValueSize": 16 if header_plausible else None,
+            "arrayIndex": 0 if header_plausible else None,
         }],
     }
     return asset
@@ -146,7 +153,16 @@ def test_serialized_dedicated_tint_property_outranks_string_only_candidate():
     assert ranked[0]["serializedExportMappingTrusted"] is True
     assert ranked[0]["serializedDedicatedPropertyRefs"]
     assert ranked[0]["serializedTintPropertyEvidence"] is True
+    assert ranked[0]["serializedPlausibleTintTagEvidence"] is True
     assert ranked[0]["strongPresentationCandidate"] is True
+
+
+def test_untrusted_serialized_mapping_cannot_promote_injected_refs():
+    ranked = rank_lockon_assets([
+        _serialized_lockon_asset(mapping_trusted=False),
+    ])
+
+    assert ranked == []
 
 
 def test_serialized_property_on_unrelated_widget_is_not_promoted():
@@ -155,6 +171,17 @@ def test_serialized_property_on_unrelated_widget_is_not_promoted():
     ])
 
     assert ranked == []
+
+
+def test_serialized_tint_without_plausible_generic_header_stays_weak():
+    ranked = rank_lockon_assets([
+        _serialized_lockon_asset(header_plausible=False),
+    ])
+
+    assert len(ranked) == 1
+    assert ranked[0]["serializedTintPropertyEvidence"] is True
+    assert ranked[0]["serializedPlausibleTintTagEvidence"] is False
+    assert ranked[0]["strongPresentationCandidate"] is False
 
 
 def test_serialized_dedicated_non_tint_property_does_not_claim_tint_semantics():
@@ -166,6 +193,7 @@ def test_serialized_dedicated_non_tint_property_does_not_claim_tint_semantics():
     assert ranked[0]["serializedDedicatedPropertyRefs"]
     assert ranked[0]["serializedTintPropertyRefs"] == []
     assert ranked[0]["serializedTintPropertyEvidence"] is False
+    assert ranked[0]["serializedPlausibleTintTagEvidence"] is False
     assert ranked[0]["strongPresentationCandidate"] is False
 
 
