@@ -113,15 +113,16 @@ def _fixture_index(tmp_path: Path):
             ("BuyValue", INT32, False),
             ("SaleValue", INT32, False),
             ("CanSale", BOOLEAN_BYTE, False),
+            ("MaxCount", INT32, False),
         ],
         [
             {"tag": "WEP_CLOUD_01", "values": {
                 "ItemNameLabel": "$Item_BusterSword", "BuyValue": 1000,
-                "SaleValue": 500, "CanSale": 1,
+                "SaleValue": 500, "CanSale": 1, "MaxCount": 1,
             }},
             {"tag": "POTION", "values": {
                 "ItemNameLabel": "$Item_Potion", "BuyValue": 50,
-                "SaleValue": 25, "CanSale": 1,
+                "SaleValue": 25, "CanSale": 1, "MaxCount": 99,
             }},
         ],
     )
@@ -166,10 +167,12 @@ def test_economy_exposes_only_authoritative_installed_fields(tmp_path):
     assert len(payload["tables"]) == 1
     table = payload["tables"][0]
     assert table["name"] == "Equipment"
-    assert table["properties"] == ["BuyValue", "SaleValue", "CanSale"]
+    assert table["properties"] == ["BuyValue", "SaleValue", "CanSale", "MaxCount"]
     assert table["rows"][0]["fields"]["BuyValue"]["value"] == 1000
     assert table["rows"][0]["fields"]["SaleValue"]["value"] == 500
     assert table["rows"][0]["fields"]["CanSale"]["value"] is True
+    assert table["rows"][0]["fields"]["MaxCount"]["value"] == 1
+    assert table["rows"][1]["fields"]["MaxCount"]["value"] == 99
 
 
 def test_loot_keeps_normal_rare_and_steal_semantics_separate(tmp_path):
@@ -220,15 +223,17 @@ def test_economy_semantic_save_maps_to_authoritative_fields(tmp_path):
         edits=[
             {"entry": 0, "field": "buy", "value": 1250},
             {"entry": 1, "field": "canSell", "value": False},
+            {"entry": 1, "field": "maxCount", "value": 50},
         ],
     )
     assert result["surface"] == "economy"
-    assert result["saved"] == 2
+    assert result["saved"] == 3
 
     after = economy_payload(tmp_path, tmp_path / "cache", project, index)
     rows = after["tables"][0]["rows"]
     assert rows[0]["fields"]["BuyValue"]["value"] == 1250
     assert rows[1]["fields"]["CanSale"]["value"] is False
+    assert rows[1]["fields"]["MaxCount"]["value"] == 50
 
     with pytest.raises(ValueError, match="Unknown economy field"):
         save_economy_edits(
