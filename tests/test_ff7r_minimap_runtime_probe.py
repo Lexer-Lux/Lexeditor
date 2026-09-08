@@ -1,4 +1,8 @@
-from games.ff7r.minimap_runtime_probe import assess_minimap_runtime_evidence
+from games.ff7r import minimap_runtime_probe as probe_module
+from games.ff7r.minimap_runtime_probe import (
+    assess_minimap_runtime_evidence,
+    probe_minimap_runtime,
+)
 
 
 def _inbound(*callers):
@@ -201,4 +205,40 @@ def test_minimap_probe_ignores_heuristic_bound_next_hops_and_inbound_callers():
     assert functions["hideGate"]["directCallers"] == []
     assert functions["stateReachableOverlap"] == []
     assert functions["inputStateCallerOverlap"] == []
+    assert result["implementationReady"] is False
+
+
+def test_installed_minimap_probe_exposes_public_signature_classification_without_using_it_as_action(monkeypatch):
+    native = _native(
+        KeyboardMapMenu=_hit(0x3000),
+        KeyboardToggleMap=_hit(0x4000),
+    )
+    native["path"] = "C:/Games/FF7R/End/Binaries/Win64/ff7remake_.exe"
+    public = {
+        "path": native["path"],
+        "scanError": "",
+        "mapControl": {
+            "matchCount": 1,
+            "classification": "full-screen-map-controller",
+            "mapButtonAuthority": False,
+        },
+        "rawInputRegistration": {
+            "matchCount": 1,
+            "classification": "raw-input-device-registration",
+            "mapButtonAuthority": False,
+        },
+    }
+    monkeypatch.setattr(probe_module, "probe_installed_exe", lambda *_args, **_kwargs: native)
+    monkeypatch.setattr(
+        probe_module,
+        "probe_public_map_input_signatures",
+        lambda *_args, **_kwargs: public,
+    )
+
+    result = probe_minimap_runtime("C:/Games/FF7R")
+
+    assert result["publicSignatureResearch"] == public
+    assert result["publicSignatureResearch"]["mapControl"]["mapButtonAuthority"] is False
+    assert result["publicSignatureResearch"]["rawInputRegistration"]["mapButtonAuthority"] is False
+    assert "map-button-press-release-semantics-unvalidated" in result["blockers"]
     assert result["implementationReady"] is False
