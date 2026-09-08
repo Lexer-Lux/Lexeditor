@@ -11,12 +11,17 @@
     body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
     main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
     .ff7r-view{display:flex;flex-direction:column;height:100%;min-height:0;gap:var(--lex-panel-gap)}
-    .ff7r-toolbar{display:flex;gap:8px;align-items:center;min-height:38px}
-    .ff7r-toolbar label{font-weight:700}.ff7r-toolbar select{min-width:min(760px,70vw);max-width:100%}
+    .ff7r-toolbar{display:flex;gap:8px;align-items:center;min-height:38px;flex-wrap:wrap}
+    .ff7r-toolbar label{font-weight:700}.ff7r-toolbar select{min-width:180px;max-width:min(720px,70vw)}
+    .ff7r-toolbar input[type=search]{min-width:220px;flex:1}
     .ff7r-layout{height:100%;min-height:0}.ff7r-table,.ff7r-detail{height:100%;min-height:0}
     .ff7r-array{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;width:100%}
     .ff7r-array label{display:flex;gap:5px;align-items:center;min-width:0}.ff7r-array label>span{min-width:2.5em;color:var(--lex-muted);font-size:.86em}
     .ff7r-array input,.ff7r-array select{min-width:0;width:100%}
+    .ff7r-textarea{display:block;width:100%;min-height:110px;resize:vertical;font:inherit;line-height:1.35}
+    .ff7r-subtext{min-height:72px}
+    .ff7r-resolved{display:flex;flex-direction:column;gap:2px;min-width:0}
+    .ff7r-resolved small{color:var(--lex-muted);overflow-wrap:anywhere}
     .ff7r-actions{display:flex;flex-wrap:wrap;gap:8px}.ff7r-actions button{padding:7px 12px}
     .ff7r-message{white-space:pre-wrap;overflow-wrap:anywhere}.ff7r-error{color:var(--lex-danger,#b42318)}
   </style>
@@ -31,44 +36,182 @@
   const $=selector=>document.querySelector(selector);
   async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
-  const state={tab:"data",catalog:null,info:null,dataMap:null,asset:"",data:null,baseline:null,selected:0,query:"",sort:{key:"tag",dir:1},activeSource:"mine",busy:false,error:"",projectMessage:"",mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
-  const columns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
-  const prefs=columnPreferences("ff7r-records",columns,()=>render());
+  const state={
+    tab:"data",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
+    asset:"",data:null,dataBaseline:null,selected:0,query:"",sort:{key:"tag",dir:1},
+    textLanguage:"US",textAsset:"",textData:null,textBaseline:null,textSelected:0,textQuery:"",textSort:{key:"key",dir:1},
+    mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]
+  };
+  const dataColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
+  const textColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
+  const dataPrefs=columnPreferences("ff7r-records",dataColumns,()=>render());
+  const textPrefs=columnPreferences("ff7r-text-records",textColumns,()=>render());
   const assets=()=>state.catalog?.assets||[];
+  const textAssets=()=>state.catalog?.textAssets||[];
   const currentAsset=()=>assets().find(row=>row.asset===state.asset)||assets()[0]||null;
+  const currentTextAsset=()=>textAssets().find(row=>row.asset===state.textAsset)||null;
   const records=()=>state.data?.records||[];
+  const textRecords=()=>state.textData?.records||[];
   const selectedRecord=()=>records().find(row=>row.id===state.selected)||records()[0]||null;
-  function comparable(value){return JSON.stringify(value)}
-  function edits(){if(state.activeSource!=="mine"||!state.data||!state.baseline)return[];const out=[];for(let i=0;i<state.data.records.length;i++){const row=state.data.records[i],base=state.baseline.records[i];if(!base)continue;for(const prop of state.data.properties){if(!prop.editable)continue;const value=row.values[prop.name],old=base.values[prop.name];if(prop.array){const count=Math.min(value.length,old.length);for(let j=0;j<count;j++)if(comparable(value[j])!==comparable(old[j]))out.push({entry:i,property:prop.name,index:j,value:value[j]})}else if(comparable(value)!==comparable(old))out.push({entry:i,property:prop.name,value})}}return out}
-  const dirtyCount=()=>edits().length;
+  const selectedTextRecord=()=>textRecords().find(row=>row.id===state.textSelected)||textRecords()[0]||null;
+  const comparable=value=>JSON.stringify(value);
   const refreshShell=()=>shell?.refresh?.();
-  function sortedRows(){const q=state.query.toLocaleLowerCase();return [...records()].filter(row=>!q||`${row.id} ${row.tag} ${Object.values(row.values).join(" ")}`.toLocaleLowerCase().includes(q)).sort((a,b)=>{const av=a[state.sort.key],bv=b[state.sort.key];const cmp=typeof av==="string"?av.localeCompare(String(bv),undefined,{numeric:true,sensitivity:"base"}):Number(av)-Number(bv);return cmp*state.sort.dir})}
-  async function maybeDiscard(){if(!dirtyCount())return true;return window.confirm("Discard unsaved FF7R changes and switch data?")}
-  async function loadAsset(asset=state.asset){if(!asset)return;state.busy=true;state.error="";render();try{const source=state.activeSource==="vanilla"?"&source=vanilla":"";state.data=await api(`/api/data?asset=${encodeURIComponent(asset)}${source}`);state.baseline=clone(state.data);state.selected=state.data.records[0]?.id??0;state.asset=asset;state.query=""}catch(error){state.data=null;state.baseline=null;state.error=error.message}finally{state.busy=false;render();refreshShell()}}
-  async function selectAsset(asset){if(asset===state.asset)return;if(!await maybeDiscard())return;state.asset=asset;await loadAsset(asset)}
+
+  function dataEdits(){
+    if(state.activeSource!=="mine"||!state.data||!state.dataBaseline)return[];
+    const out=[];
+    for(let i=0;i<state.data.records.length;i++){
+      const row=state.data.records[i],base=state.dataBaseline.records[i];if(!base)continue;
+      for(const prop of state.data.properties){
+        if(!prop.editable)continue;
+        const value=row.values[prop.name],old=base.values[prop.name];
+        if(prop.array){const count=Math.min(value.length,old.length);for(let j=0;j<count;j++)if(comparable(value[j])!==comparable(old[j]))out.push({entry:i,property:prop.name,index:j,value:value[j]})}
+        else if(comparable(value)!==comparable(old))out.push({entry:i,property:prop.name,value});
+      }
+    }
+    return out;
+  }
+  function textEdits(){
+    if(state.activeSource!=="mine"||!state.textData||!state.textBaseline)return[];
+    const out=[];
+    for(let i=0;i<state.textData.records.length;i++){
+      const row=state.textData.records[i],base=state.textBaseline.records[i];if(!base)continue;
+      if(row.text!==base.text)out.push({entry:i,text:row.text});
+      const baseSubs=new Map((base.subentries||[]).map(sub=>[sub.id,sub.text]));
+      for(const sub of row.subentries||[])if(baseSubs.has(sub.id)&&sub.text!==baseSubs.get(sub.id))out.push({entry:i,subId:sub.id,text:sub.text});
+    }
+    return out;
+  }
+  const dirtyCount=()=>dataEdits().length+textEdits().length;
+
+  function flattenStrings(value,out=[]){if(typeof value==="string")out.push(value);else if(Array.isArray(value))for(const child of value)flattenStrings(child,out);else if(value&&typeof value==="object")for(const child of Object.values(value))flattenStrings(child,out);return out}
+  function resolvedText(value){return typeof value==="string"?state.data?.textLookup?.[value]||"":""}
+  function sortedRows(){
+    const q=state.query.toLocaleLowerCase();
+    return [...records()].filter(row=>{
+      if(!q)return true;
+      const values=flattenStrings(row.values);
+      const resolved=values.map(value=>state.data?.textLookup?.[value]||"");
+      return `${row.id} ${row.tag} ${values.join(" ")} ${resolved.join(" ")}`.toLocaleLowerCase().includes(q);
+    }).sort((a,b)=>{const av=a[state.sort.key],bv=b[state.sort.key];const cmp=typeof av==="string"?av.localeCompare(String(bv),undefined,{numeric:true,sensitivity:"base"}):Number(av)-Number(bv);return cmp*state.sort.dir});
+  }
+  function sortedTextRows(){
+    const q=state.textQuery.toLocaleLowerCase();
+    return [...textRecords()].filter(row=>!q||`${row.id} ${row.key} ${row.text} ${(row.subentries||[]).map(sub=>`${sub.id} ${sub.text}`).join(" ")}`.toLocaleLowerCase().includes(q))
+      .sort((a,b)=>{const av=a[state.textSort.key],bv=b[state.textSort.key];const cmp=typeof av==="string"?av.localeCompare(String(bv),undefined,{numeric:true,sensitivity:"base"}):Number(av)-Number(bv);return cmp*state.textSort.dir});
+  }
+
+  async function confirmReplace(kind){
+    const count=kind==="text"?textEdits().length:dataEdits().length;
+    if(!count)return true;
+    return window.confirm(`Discard ${count} unsaved ${kind==="text"?"text":"game-data"} change${count===1?"":"s"} and open another resource?`);
+  }
+  async function loadAsset(asset=state.asset){
+    if(!asset)return;
+    state.busy=true;state.error="";render();
+    try{const source=state.activeSource==="vanilla"?"&source=vanilla":"";state.data=await api(`/api/data?asset=${encodeURIComponent(asset)}${source}&language=${encodeURIComponent(state.textLanguage||"US")}`);state.dataBaseline=clone(state.data);state.selected=state.data.records[0]?.id??0;state.asset=asset;state.query=""}
+    catch(error){state.data=null;state.dataBaseline=null;state.error=error.message}
+    finally{state.busy=false;render();refreshShell()}
+  }
+  async function selectAsset(asset){if(asset===state.asset)return;if(!await confirmReplace("data"))return;state.asset=asset;await loadAsset(asset)}
+
+  async function loadTextAsset(asset=state.textAsset){
+    if(!asset)return;
+    state.busy=true;state.error="";render();
+    try{const source=state.activeSource==="vanilla"?"&source=vanilla":"";state.textData=await api(`/api/text?asset=${encodeURIComponent(asset)}${source}`);state.textBaseline=clone(state.textData);state.textSelected=state.textData.records[0]?.id??0;state.textAsset=asset;state.textQuery="";if(state.textData.language)state.textLanguage=state.textData.language}
+    catch(error){state.textData=null;state.textBaseline=null;state.error=error.message}
+    finally{state.busy=false;render();refreshShell()}
+  }
+  async function selectTextAsset(asset){if(asset===state.textAsset)return;if(!await confirmReplace("text"))return;state.textAsset=asset;await loadTextAsset(asset)}
+  async function selectTextLanguage(language){
+    if(language===state.textLanguage)return;
+    if(!await confirmReplace("text"))return;
+    state.textLanguage=language;
+    const next=textAssets().find(row=>row.language===language);
+    state.textAsset=next?.asset||"";state.textData=null;state.textBaseline=null;
+    if(state.data)await loadAsset(state.asset);
+    if(state.textAsset)await loadTextAsset(state.textAsset);else render();
+  }
+
   function setScalar(row,prop,value){row.values[prop.name]=value;refreshShell()}
   function numericInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const attrs={type:"number",value:current,disabled:state.activeSource!=="mine",oninput:event=>{if(event.target.value==="")return;const value=prop.type==="FLOAT"?Number(event.target.value):Number.parseInt(event.target.value,10);if(index===null)setScalar(row,prop,value);else{row.values[prop.name][index]=value;refreshShell()}}};if(prop.min!==null&&prop.min!==undefined)attrs.min=prop.min;if(prop.max!==null&&prop.max!==undefined)attrs.max=prop.max;attrs.step=prop.type==="FLOAT"?"any":1;return el("input",attrs)}
   function boolInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];return el("input",{type:"checkbox",checked:!!current,disabled:state.activeSource!=="mine",onchange:event=>{if(index===null)setScalar(row,prop,event.target.checked);else{row.values[prop.name][index]=event.target.checked;refreshShell()}}})}
   function nameInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const select=el("select",{disabled:state.activeSource!=="mine",onchange:event=>{if(index===null)setScalar(row,prop,event.target.value);else{row.values[prop.name][index]=event.target.value;refreshShell()}}});for(const name of state.data.names){const option=el("option",{value:name},name);option.selected=name===current;select.append(option)}return select}
-  function scalarControl(row,prop,index=null){if(prop.type==="BOOL")return boolInput(row,prop,index);if(prop.type==="ENUM")return nameInput(row,prop,index);if(["BYTE","INT16","INT32","FLOAT"].includes(prop.type))return numericInput(row,prop,index);const value=index===null?row.values[prop.name]:row.values[prop.name][index];return readonlyField(String(value??""))}
+  function readonlyResolved(value){const resolved=resolvedText(value);return resolved?el("div",{class:"ff7r-resolved"},readonlyField(resolved),el("small",{},value)):readonlyField(String(value??""))}
+  function scalarControl(row,prop,index=null){if(prop.type==="BOOL")return boolInput(row,prop,index);if(prop.type==="ENUM")return nameInput(row,prop,index);if(["BYTE","INT16","UINT16","INT32","FLOAT"].includes(prop.type))return numericInput(row,prop,index);const value=index===null?row.values[prop.name]:row.values[prop.name][index];return readonlyResolved(value)}
   function propertyControl(row,prop){if(!prop.array)return scalarControl(row,prop);const values=row.values[prop.name]||[];return el("div",{class:"ff7r-array"},...values.map((_value,index)=>el("label",{},el("span",{},`#${index+1}`),scalarControl(row,prop,index))))}
-  function propertyHelp(prop){if(!prop.editable)return infoHelp("FF7R stores this value as a variable-length FString. This editor preserves the package layout, so text is currently read-only instead of shifting every following byte.");if(prop.type==="ENUM")return infoHelp("This value is an Unreal FName. A safe same-size edit can choose only a name already present in this .uasset's name table.");if(prop.array)return infoHelp("This is a fixed-length DataObject array. Existing elements can be edited, but the array cannot be resized without rebuilding the package layout.");return null}
-  function recordPanel(row=selectedRecord()){if(!row)return detailPanel({className:"ff7r-detail",title:"No record",body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField("This DataObject has no rows.")})]})]});const fields=state.data.properties.map(prop=>detailField({label:prop.label,control:propertyControl(row,prop),dataType:prop.array?`${prop.type}[]`:prop.type,min:prop.min,max:prop.max,help:propertyHelp(prop)}));return detailPanel({className:"ff7r-detail",title:row.tag||`Record ${row.id}`,identity:recordId(row.id),meta:currentAsset()?.name||state.asset,body:[detailSection({title:"PROPERTIES",body:fields})]})}
-  function tablePanel(){const rows=sortedRows();return columnList({rows,key:row=>row.id,selected:state.selected,select:row=>{state.selected=row.id;render()},sortState:state.sort,sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};render()},columnPreferences:prefs,columns,class:"ff7r-table","aria-label":"FF7 Remake DataObject records"})}
-  function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake DataObject",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of assets()){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}const search=el("input",{type:"search",placeholder:"Search records",value:state.query,"aria-label":"Search FF7 Remake records",oninput:event=>{state.query=event.target.value;render()}});return el("div",{class:"ff7r-toolbar"},el("label",{},"DataObject"),select,search)}
-  function dataPanel(){if(state.busy)return detailPanel({className:"ff7r-detail",title:"Loading DataObject",body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField("Reading the selected .uasset/.uexp pair…")})]})]});if(state.error)return detailPanel({className:"ff7r-detail",title:"DataObject unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:el("div",{class:"ff7r-message ff7r-error"},state.error)})]})]});return el("div",{class:"ff7r-view"},assetToolbar(),panelLayout([tablePanel(),recordPanel()],"ff7r-layout",{layoutKey:"ff7r-data",defaultSizes:[36,64],minSizes:[320,420],stackAt:850}))}
+  function propertyHelp(prop){if(!prop.editable)return infoHelp("This DataObject stores the value as a variable-length FString. Use the Text tab for FF7R text resources; arbitrary DataObject string resizing remains read-only because it changes the row layout.");if(prop.type==="ENUM")return infoHelp("This value is an Unreal FName. A same-size edit can choose only a name already present in this .uasset's name table.");if(prop.array)return infoHelp("Existing array elements are editable. Resizing the array would move later row data and is not yet supported.");return null}
+  function recordPanel(row=selectedRecord()){
+    if(!row)return detailPanel({className:"ff7r-detail",title:"No record",body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField("This DataObject has no rows.")})]})]});
+    const fields=state.data.properties.map(prop=>detailField({label:prop.label,control:propertyControl(row,prop),dataType:prop.array?`${prop.type}[]`:prop.type,min:prop.min,max:prop.max,help:propertyHelp(prop)}));
+    return detailPanel({className:"ff7r-detail",title:row.tag||`Record ${row.id}`,identity:recordId(row.id),meta:currentAsset()?.name||state.asset,body:[detailSection({title:"PROPERTIES",body:fields})]});
+  }
+  function tablePanel(){const rows=sortedRows();return columnList({rows,key:row=>row.id,selected:state.selected,select:row=>{state.selected=row.id;render()},sortState:state.sort,sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};render()},columnPreferences:dataPrefs,columns:dataColumns,class:"ff7r-table","aria-label":"FF7 Remake DataObject records"})}
+  function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake DataObject",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of assets()){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}const search=el("input",{type:"search",placeholder:"Search IDs, values, and resolved names",value:state.query,"aria-label":"Search FF7 Remake records",oninput:event=>{state.query=event.target.value;render()}});return el("div",{class:"ff7r-toolbar"},el("label",{},"DataObject"),select,search)}
+  function dataPanel(){if(state.busy&&state.tab==="data")return loadingPanel("Loading DataObject","Reading the selected gameplay .uasset/.uexp pair…");if(state.error&&!state.data)return errorPanel(state.error);return el("div",{class:"ff7r-view"},assetToolbar(),panelLayout([tablePanel(),recordPanel()],"ff7r-layout",{layoutKey:"ff7r-data",defaultSizes:[36,64],minSizes:[320,420],stackAt:850}))}
+
+  function languages(){return [...new Set(textAssets().map(row=>row.language).filter(Boolean))].sort()}
+  function textAssetsForLanguage(){return textAssets().filter(row=>row.language===state.textLanguage)}
+  function textToolbar(){
+    const language=el("select",{"aria-label":"Text language",onchange:event=>selectTextLanguage(event.target.value),disabled:state.busy});
+    for(const code of languages()){const option=el("option",{value:code},code);option.selected=code===state.textLanguage;language.append(option)}
+    const select=el("select",{"aria-label":"FF7 Remake text resource",onchange:event=>selectTextAsset(event.target.value),disabled:state.busy});
+    for(const item of textAssetsForLanguage()){const label=item.group&&item.group!=="Text"?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.textAsset;select.append(option)}
+    const search=el("input",{type:"search",placeholder:"Search text IDs and contents",value:state.textQuery,"aria-label":"Search FF7 Remake text",oninput:event=>{state.textQuery=event.target.value;render()}});
+    return el("div",{class:"ff7r-toolbar"},el("label",{},"Language"),language,el("label",{},"Resource"),select,search);
+  }
+  function textArea(value,oninput,sub=false){const area=el("textarea",{class:`ff7r-textarea${sub?" ff7r-subtext":""}`,value:value??"",disabled:state.activeSource!=="mine",oninput:event=>oninput(event.target.value)});area.value=value??"";return area}
+  function textRecordPanel(row=selectedTextRecord()){
+    if(!row)return detailPanel({className:"ff7r-detail",title:"No text entry",body:[detailSection({title:"TEXT",body:[detailField({label:"STATE",control:readonlyField("This text resource has no entries.")})]})]});
+    const main=detailField({label:"TEXT",dataType:"STRING",control:textArea(row.text,value=>{row.text=value;refreshShell()})});
+    const subs=(row.subentries||[]).map(sub=>detailField({label:sub.id,dataType:"STRING",control:textArea(sub.text,value=>{sub.text=value;refreshShell()},true),help:sub.id==="ACTOR"?infoHelp("Actor/speaker metadata stored as an existing text-resource sub-entry."):null}));
+    const sections=[detailSection({title:"ENTRY",body:[detailField({label:"TEXT ID",dataType:"STRING",control:readonlyField(row.key)}),main]})];
+    if(subs.length)sections.push(detailSection({title:"SUB-ENTRIES",body:subs}));
+    return detailPanel({className:"ff7r-detail",title:row.key||`Text ${row.id}`,identity:recordId(row.id),meta:`${state.textData?.language||state.textLanguage} · ${currentTextAsset()?.name||"Text resource"}`,body:sections});
+  }
+  function textTablePanel(){const rows=sortedTextRows();return columnList({rows,key:row=>row.id,selected:state.textSelected,select:row=>{state.textSelected=row.id;render()},sortState:state.textSort,sort:key=>{state.textSort=state.textSort.key===key?{key,dir:-state.textSort.dir}:{key,dir:1};render()},columnPreferences:textPrefs,columns:textColumns,class:"ff7r-table","aria-label":"FF7 Remake localized text entries"})}
+  function textPanel(){
+    if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");
+    if(state.busy&&state.tab==="text")return loadingPanel("Loading text resource","Reading localized FF7R text…");
+    if(state.error&&!state.textData)return errorPanel(state.error);
+    if(!state.textData)return loadingPanel("Text resource","Choose a language/resource to load localized text.");
+    return el("div",{class:"ff7r-view"},textToolbar(),panelLayout([textTablePanel(),textRecordPanel()],"ff7r-layout",{layoutKey:"ff7r-text",defaultSizes:[40,60],minSizes:[360,420],stackAt:850}));
+  }
+
+  function loadingPanel(title,message){return detailPanel({className:"ff7r-detail",title,body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField(message)})]})]})}
+  function errorPanel(message){return detailPanel({className:"ff7r-detail",title:"Resource unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:el("div",{class:"ff7r-message ff7r-error"},message)})]})]})}
   function dataMapPanel(){const rows=state.dataMap?.rows||[];return LexeditorUI.dataMap({rows,page:state.mapPage,query:state.mapQuery,status:state.mapStatus,sort:state.mapSort,changePage:value=>{state.mapPage=value;render()},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changeSort:key=>{state.mapSort=state.mapSort[0]===key?[key,-state.mapSort[1]]:[key,1];render()}}).content}
-  async function projectAction(kind){if(dirtyCount()){state.projectMessage="Save your current DataObject changes before building or deploying.";render();return}state.busy=true;state.projectMessage=`${kind==="deploy"?"Building and deploying":"Building"}…`;render();try{const result=await api(`/api/${kind}`,{});state.projectMessage=`${kind==="deploy"?"Deployed":"Built"}: ${result.path}`;state.info=await api("/api/info")}catch(error){state.projectMessage=`Error: ${error.message}`}finally{state.busy=false;render()}}
-  function projectPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Mod Project",meta:"Project output never overwrites the installed game archives",body:[detailSection({title:"PROJECT",body:[detailField({label:"ROOT",control:readonlyField(info.projectRoot||"—")}),detailField({label:"BUILD",control:readonlyField(info.buildPath||"—")}),detailField({label:"DEPLOY",control:readonlyField(info.deployPath||"—")})]}),detailSection({title:"ACTIONS",body:[detailField({label:"MOD PAK",control:el("div",{class:"ff7r-actions"},el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("build")},"Build Mod PAK"),el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("deploy")},"Build & Deploy to ~mods"))}),detailField({label:"STATUS",control:el("div",{class:"ff7r-message"},state.projectMessage||"Save edits, then build a separate _P.pak or explicitly deploy it to FF7R's ~mods folder.")})]})]})}
-  function infoPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Information",icon:infoIcon(),meta:"FINAL FANTASY VII REMAKE INTERGRADE",body:[detailSection({title:"GAME",body:[detailField({label:"ROOT",control:readonlyField(info.gameRoot||"—")}),detailField({label:"DATAOBJECTS",control:readonlyField(String(info.dataObjects??"—"))}),detailField({label:"PAK VERSION",control:readonlyField(info.pakVersion||"Detected when archives are indexed")})]}),detailSection({title:"HELPER",body:[detailField({label:"REPAK",control:readonlyField(info.helper?.installed?`${info.helper.version} installed`:"Not installed")})]}),detailSection({title:"EDITOR COVERAGE",body:[detailField({label:"WRITES",control:readonlyField("Booleans, fixed-width integers, floats, existing FNames, and fixed array elements")}),detailField({label:"READ ONLY",control:readonlyField("FStrings and size-changing structural edits")})]})]})}
-  function render(){let content;if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="project")content=projectPanel();else if(state.tab==="info")content=infoPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
-  async function navigate(tab){state.tab=tab;render()}
-  async function save(){if(state.activeSource!=="mine"||!state.data)return;const changes=edits();if(!changes.length)return;state.busy=true;render();try{const result=await api("/api/save",{asset:state.data.asset,sourceSha256:state.data.sourceSha256,activeSha256:state.data.activeSha256,edits:changes});state.data.activeSha256=result.activeSha256;state.data.usingProject=true;state.baseline=clone(state.data);state.projectMessage=`Saved ${result.saved} value${result.saved===1?"":"s"} to the mod project.`;editHistory.clear()}finally{state.busy=false;render();refreshShell()}}
-  async function discard(){if(!state.data)return;state.data=clone(state.baseline);editHistory.clear();render();refreshShell()}
-  const editHistory=new EditHistory({capture:()=>state.data?clone(state.data.records):null,restore:snapshot=>{if(state.data&&snapshot)state.data.records=clone(snapshot)},render:async()=>render(),enabled:()=>state.activeSource==="mine",changed:()=>refreshShell()});
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"data",label:"Game Data"},{id:"project",label:"Project"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK DataObjects"}],projectActiveSource:()=>state.activeSource,selectProjectSource:async value=>{if(!await maybeDiscard())return;state.activeSource=String(value||"mine");await loadAsset(state.asset)},info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
+  async function projectAction(kind){if(dirtyCount()){state.projectMessage="Save or discard all current gameplay/text changes before building or deploying.";render();return}state.busy=true;state.projectMessage=`${kind==="deploy"?"Building and deploying":"Building"}…`;render();try{const result=await api(`/api/${kind}`,{});state.projectMessage=`${kind==="deploy"?"Deployed":"Built"}: ${result.path}`;state.info=await api("/api/info")}catch(error){state.projectMessage=`Error: ${error.message}`}finally{state.busy=false;render()}}
+  function projectPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Mod Project",meta:"Gameplay and text edits share one project; installed base PAKs are never overwritten",body:[detailSection({title:"PROJECT",body:[detailField({label:"ROOT",control:readonlyField(info.projectRoot||"—")}),detailField({label:"BUILD",control:readonlyField(info.buildPath||"—")}),detailField({label:"DEPLOY",control:readonlyField(info.deployPath||"—")}),detailField({label:"MOUNT",control:readonlyField(info.pakMountPoint||"../../../")})]}),detailSection({title:"ACTIONS",body:[detailField({label:"MOD PAK",control:el("div",{class:"ff7r-actions"},el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("build")},"Build Mod PAK"),el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("deploy")},"Build & Deploy to ~mods"))}),detailField({label:"STATUS",control:el("div",{class:"ff7r-message"},state.projectMessage||"Save edits, then build a separate _P.pak or explicitly deploy it to FF7R's ~mods folder.")})]})]})}
+  function infoPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Information",icon:infoIcon(),meta:"FINAL FANTASY VII REMAKE INTERGRADE",body:[detailSection({title:"GAME",body:[detailField({label:"ROOT",control:readonlyField(info.gameRoot||"—")}),detailField({label:"DATAOBJECTS",control:readonlyField(String(info.dataObjects??"—"))}),detailField({label:"TEXT RESOURCES",control:readonlyField(String(info.textResources??"—"))}),detailField({label:"LANGUAGES",control:readonlyField((info.textLanguages||[]).join(", ")||"—")}),detailField({label:"PAK VERSION",control:readonlyField(info.pakVersion||"Detected when archives are indexed")})]}),detailSection({title:"HELPER",body:[detailField({label:"REPAK",control:readonlyField(info.helper?.installed?`${info.helper.version} installed`:"Not installed")}),detailField({label:"MOUNT POINT",control:readonlyField(info.pakMountPoint||"../../../")})]}),detailSection({title:"EDITOR COVERAGE",body:[detailField({label:"GAMEPLAY",control:readonlyField("DataObject booleans, bytes, 16/32-bit numbers, floats, existing FNames and fixed array elements")}),detailField({label:"TEXT",control:readonlyField("Variable-length localized text and existing text sub-entry contents")}),detailField({label:"READ ONLY",control:readonlyField("DataObject FStrings, structural row/property changes, array resizing, text IDs and text entry structure")})]})]})}
+
+  function render(){let content;if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="project")content=projectPanel();else if(state.tab==="info")content=infoPanel();else if(state.tab==="text")content=textPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
+  async function navigate(tab){state.tab=tab;render();if(tab==="text"&&state.textAsset&&!state.textData)await loadTextAsset(state.textAsset)}
+
+  async function save(){
+    if(state.activeSource!=="mine")return;
+    const gameplay=dataEdits(),text=textEdits();if(!gameplay.length&&!text.length)return;
+    state.busy=true;state.error="";render();
+    try{
+      if(gameplay.length){const result=await api("/api/save",{asset:state.data.asset,sourceSha256:state.data.sourceSha256,activeSha256:state.data.activeSha256,edits:gameplay});state.data.activeSha256=result.activeSha256;state.data.usingProject=true;state.dataBaseline=clone(state.data);state.projectMessage=`Saved ${result.saved} gameplay value${result.saved===1?"":"s"}.`}
+      if(text.length){const result=await api("/api/text/save",{asset:state.textData.asset,sourceUassetSha256:state.textData.sourceUassetSha256,sourceUexpSha256:state.textData.sourceUexpSha256,activeUassetSha256:state.textData.activeUassetSha256,activeUexpSha256:state.textData.activeUexpSha256,edits:text});state.textData.activeUassetSha256=result.activeUassetSha256;state.textData.activeUexpSha256=result.activeUexpSha256;state.textData.usingProject=true;state.textBaseline=clone(state.textData);state.projectMessage=`${state.projectMessage?state.projectMessage+" ":""}Saved ${result.saved} text value${result.saved===1?"":"s"}.`}
+      editHistory.clear();
+    }catch(error){state.error=error.message;throw error}
+    finally{state.busy=false;render();refreshShell()}
+  }
+  async function discard(){if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
+  const editHistory=new EditHistory({capture:()=>({data:state.data?clone(state.data.records):null,text:state.textData?clone(state.textData.records):null}),restore:snapshot=>{if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);if(state.textData&&snapshot?.text)state.textData.records=clone(snapshot.text)},render:async()=>render(),enabled:()=>state.activeSource==="mine"&&(state.tab==="data"||state.tab==="text"),changed:()=>refreshShell()});
+
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"data",label:"Game Data"},{id:"text",label:"Text"},{id:"project",label:"Project"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK resources"}],projectActiveSource:()=>state.activeSource,selectProjectSource:async value=>{if(dirtyCount()&&!window.confirm("Discard all unsaved FF7R changes and switch source?"))return;state.activeSource=String(value||"mine");if(state.data)await loadAsset(state.asset);if(state.textData)await loadTextAsset(state.textAsset)},info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
   editHistory.observe(document);
-  (async()=>{try{[state.catalog,state.dataMap,state.info]=await Promise.all([api("/api/catalog"),api("/api/datamap"),api("/api/info")]);state.asset=assets()[0]?.asset||"";if(state.asset)await loadAsset(state.asset);else state.error="No FF7 Remake DataObject pairs were found in the installed PAKs."}catch(error){state.error=error.message;render()}finally{LexeditorUI.finishPluginLoading();render()}})();
+
+  (async()=>{try{
+    [state.catalog,state.dataMap,state.info]=await Promise.all([api("/api/catalog"),api("/api/datamap"),api("/api/info")]);
+    state.asset=assets()[0]?.asset||"";
+    const availableLanguages=languages();state.textLanguage=availableLanguages.includes("US")?"US":availableLanguages[0]||"US";
+    state.textAsset=textAssets().find(row=>row.language===state.textLanguage)?.asset||"";
+    if(state.asset)await loadAsset(state.asset);else state.error="No FF7 Remake DataObject pairs were found in the installed PAKs.";
+  }catch(error){state.error=error.message;render()}finally{LexeditorUI.finishPluginLoading();render()}})();
   </script>
 </body>
 </html>
