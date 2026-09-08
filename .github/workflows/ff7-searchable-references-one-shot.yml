@@ -39,7 +39,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add games/ff7/editor.html tools/verify_ff7_rendered_neutral.py .github/workflows/ff7-data-regressions.yml
+          git add games/ff7/editor.html games/ff7/semantics.py games/ff7/kernel.py tools/verify_ff7_rendered_neutral.py tools/verify_ff7_semantic_surface.py .github/workflows/ff7-data-regressions.yml
           git diff --cached --check
           git commit -m 'Make FF7 semantic references searchable and navigable'
           git push origin HEAD:fix/ff7-full-semantic-editor
