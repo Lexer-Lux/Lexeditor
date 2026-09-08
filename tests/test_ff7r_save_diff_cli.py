@@ -50,6 +50,58 @@ def test_cli_builder_groups_repeated_experiments_by_enemy(tmp_path):
     assert report["analysis"]["discriminatingStableOffsets"] == [10, 20]
 
 
+def test_cli_builder_enemy_indices_correlate_reproduced_bits(tmp_path):
+    a1 = _write_pair(tmp_path, "a1", 12, 0x01)
+    a2 = _write_pair(tmp_path, "a2", 12, 0x01)
+    b1 = _write_pair(tmp_path, "b1", 12, 0x02)
+    b2 = _write_pair(tmp_path, "b2", 12, 0x02)
+    c1 = _write_pair(tmp_path, "c1", 50, 0x20)
+    c2 = _write_pair(tmp_path, "c2", 50, 0x20)
+
+    report = MODULE.build_report(
+        group_specs=[
+            ("enemy-a", *a1),
+            ("enemy-a", *a2),
+            ("enemy-b", *b1),
+            ("enemy-b", *b2),
+        ],
+        control_specs=[
+            ("noop-1", *c1),
+            ("noop-2", *c2),
+        ],
+        enemy_index_specs=[
+            ("enemy-a", "0"),
+            ("enemy-b", "0x1"),
+        ],
+        bit_signatures=True,
+    )
+
+    assert report["mode"] == "cross-enemy-bit-signatures-with-noop-control"
+    layout = report["analysis"]["indexedBitsetLayout"]
+    assert layout["enemyBookIds"] == {"enemy-a": 0, "enemy-b": 1}
+    assert layout["exactMappedAgreement"] is True
+    assert layout["exactBaseBit"] == 96
+    assert layout["implementationReady"] is False
+
+
+def test_cli_builder_rejects_enemy_indices_without_bit_signatures(tmp_path):
+    a1 = _write_pair(tmp_path, "a1", 12, 0x01)
+    a2 = _write_pair(tmp_path, "a2", 12, 0x01)
+    c1 = _write_pair(tmp_path, "c1", 50, 0x20)
+    c2 = _write_pair(tmp_path, "c2", 50, 0x20)
+
+    try:
+        MODULE.build_report(
+            group_specs=[("enemy-a", *a1), ("enemy-a", *a2)],
+            control_specs=[("noop-1", *c1), ("noop-2", *c2)],
+            enemy_index_specs=[("enemy-a", "0")],
+        )
+    except ValueError as error:
+        assert "--enemy-index requires --bit-signatures" in str(error)
+    else:
+        raise AssertionError("expected --enemy-index validation error")
+
+
 def test_cli_builder_rejects_mixed_or_empty_modes(tmp_path):
     before, after = _write_pair(tmp_path, "one", 10, 1)
 
