@@ -1,11 +1,10 @@
 """Bit-level cross-enemy Assessed-state save research for FF7R (#424).
 
-The byte-level controlled diff probe can identify offsets that recur across
-Assessment experiments, including cases where different enemies toggle different
-XOR masks in the same byte. This module goes one step further and turns those
-stable, control-subtracted masks into explicit per-bit signatures.
+Repeated controlled diffs can produce per-bit candidates after no-op subtraction.
+A second, held-out set can now be analyzed independently and compared against the
+discovery set so recurrence in the training runs is not mistaken for validation.
 
-This remains read-only research evidence. A unique bit signature does not prove
+This remains read-only research evidence. A repeated bit signature does not prove
 EnemyBook indexing, save serialization semantics, or that writing the bit is safe.
 """
 
@@ -209,5 +208,76 @@ def analyze_controlled_bit_signatures(
             "A packedFlagByteCandidate requires at least two enemy groups to toggle distinct single bits in the same byte with no unresolved group evidence at that offset.",
             "exclusiveSingleBitFlagCandidates are high-value mapping leads, not proof of EnemyBook indexing or authorization to mutate a save.",
             "The probe never parses or writes FF7R save structures.",
+        ],
+    }
+
+
+def _candidate_key(row: Mapping[str, Any]) -> tuple[str, int, int]:
+    return (
+        str(row.get("group", "")),
+        int(row.get("offset", -1)),
+        int(row.get("mask", 0)),
+    )
+
+
+def _key_row(key: tuple[str, int, int]) -> dict[str, Any]:
+    group, offset, mask = key
+    return {
+        "group": group,
+        "offset": offset,
+        "bit": _bit_index(mask) if _is_single_bit(mask) else None,
+        "mask": mask,
+    }
+
+
+def validate_controlled_bit_signatures(
+    discovery_groups: Mapping[str, Sequence[SavePair]],
+    control_pairs: Sequence[SavePair],
+    holdout_groups: Mapping[str, Sequence[SavePair]],
+) -> dict[str, Any]:
+    """Compare independently analyzed discovery and held-out Assess experiments."""
+    discovery = analyze_controlled_bit_signatures(discovery_groups, control_pairs)
+    holdout = analyze_controlled_bit_signatures(holdout_groups, control_pairs)
+
+    discovery_keys = {
+        _candidate_key(row)
+        for row in discovery.get("exclusiveSingleBitFlagCandidates", ())
+    }
+    holdout_keys = {
+        _candidate_key(row)
+        for row in holdout.get("exclusiveSingleBitFlagCandidates", ())
+    }
+    discovery_names = {str(name).strip() for name in discovery_groups}
+    holdout_names = {str(name).strip() for name in holdout_groups}
+
+    confirmed = sorted(discovery_keys & holdout_keys)
+    missing = sorted(discovery_keys - holdout_keys)
+    unexpected = sorted(holdout_keys - discovery_keys)
+    missing_groups = sorted(discovery_names - holdout_names)
+    extra_groups = sorted(holdout_names - discovery_names)
+    all_confirmed = bool(discovery_keys) and not missing and not missing_groups
+    exact_agreement = bool(all_confirmed and not unexpected and not extra_groups)
+
+    return {
+        "implementationReady": False,
+        "discovery": discovery,
+        "holdout": holdout,
+        "discoveryCandidateCount": len(discovery_keys),
+        "holdoutCandidateCount": len(holdout_keys),
+        "confirmedCandidateCount": len(confirmed),
+        "confirmedCandidates": [_key_row(key) for key in confirmed],
+        "missingCandidateCount": len(missing),
+        "missingCandidates": [_key_row(key) for key in missing],
+        "unexpectedCandidateCount": len(unexpected),
+        "unexpectedCandidates": [_key_row(key) for key in unexpected],
+        "missingHoldoutGroups": missing_groups,
+        "extraHoldoutGroups": extra_groups,
+        "allDiscoveryCandidatesConfirmed": all_confirmed,
+        "exactHoldoutAgreement": exact_agreement,
+        "notes": [
+            "Discovery and holdout groups are analyzed independently with the same no-op control subtraction rules before candidate sets are compared.",
+            "A confirmed candidate must reproduce the same enemy/group, byte offset and effective single-bit mask in the held-out experiments.",
+            "The caller must ensure holdout saves are genuinely independent runs; this function cannot detect reused files or experimental leakage.",
+            "Even exact held-out recurrence remains format-agnostic evidence only and does not prove EnemyBook index ordering or authorize save mutation.",
         ],
     }
