@@ -206,7 +206,7 @@ CHARACTERS = {
     "armorId": reference("armor", label="Starting armor", help="Armor equipped when this initialization record is used."),
     "accessoryId": reference("accessories", label="Starting accessory", empty=255, help="Accessory equipped when this initialization record is used; 255 means none."),
     "characterFlags": _field(label="Starting battle mood", dataType="flags", flags=flags(*CHARACTER_FLAGS), group="Starting status", help="Initial Sadness/Fury flags."),
-    "rowByte": _field(label="Starting row", dataType="enum", choices=choices((0x00,"Front row"),(0xFE,"Back row")), group="Starting status", help="Initial battle row. FF7 stores back row as 0xFE."),
+    "rowByte": _field(label="Starting row", dataType="enum", choices=choices((0xFF,"Front row"),(0xFE,"Back row")), group="Starting status", help="Initial battle row. FF7 stores back row as 0xFE."),
     "learnedLimits": _field(label="Limits already learned", dataType="flags", flags=flags(*LEARNED_LIMITS), group="Starting Limit", help="Limit Breaks marked learned in the initialization record."),
     "recruitOffsetRaw": _field(label="Recruitment level adjustment", dataType="scaled", displayScale=0.5, group="Recruitment", help="Level adjustment relative to Cloud when this growth record is recruited. Stored in half-level units."),
 }
@@ -220,10 +220,17 @@ for stat in ("strength","vitality","magic","spirit","dexterity","luck","hp","mp"
 SCENE = {
     "enemies": {
         "morph": _field(label="Morph reward", dataType="inventoryReference", emptyValue=65535, group="Rewards", help="Global item/equipment rewarded by Morph; 65535 means none."),
-        "statusImmunity": _field(label="Status immunities", dataType="flags", flags=flags(*STATUSES), group="Defenses", help="Statuses this enemy cannot normally receive."),
+        "statusImmunity": _field(label="Status immunities", dataType="flags", flags=flags(*STATUSES), invertBits=True, bitWidth=32, group="Defenses", help="Statuses this enemy cannot normally receive. scene.bin stores this mask inverted; Lexeditor shows the logical immunities."),
+        **{f"element{i}": _field(label=f"Resistance slot {i+1} target", dataType="enum", choices=choices(
+            *(([(value, label) for value, label in ((0,"Fire"),(1,"Ice"),(2,"Lightning"),(3,"Earth"),(4,"Poison"),(5,"Gravity"),(6,"Water"),(7,"Wind"),(8,"Holy"),(9,"Restorative"),(10,"Cut"),(11,"Hit"),(12,"Punch"),(13,"Shoot"),(14,"Shout"),(15,"Hidden"))] +
+              [(0x20 + value, label + " (status)") for value, label in STATUS_INDEX if value != 0xFF] + [(0xFF,"None")]))), group="Resistances", help="Element or status affected by this resistance slot. Status IDs are stored with FF7's 0x20 offset." ) for i in range(8)},
+        **{f"rate{i}": _field(label=f"Resistance slot {i+1} response", dataType="enum", choices=choices((0,"Killed by"),(1,"Cannot miss"),(2,"Double damage"),(4,"Half damage"),(5,"Nullify"),(6,"Absorb"),(7,"Full cure"),(0xFF,"None")), group="Resistances", help="How this enemy reacts to the element/status in the matching resistance slot.") for i in range(8)},
         **{f"attack{i}": reference("enemyAttacks", label=f"Action {i+1} attack", empty=65535, help="Scene-local enemy attack used by this action slot.", value_key="gameId", scope="scene") for i in range(16)},
         **{f"manipulate{i}": reference("enemyAttacks", label=f"Manipulate / Berserk action {i+1}", empty=65535, help="Scene-local attack available to Manipulate/Berserk logic.", value_key="gameId", scope="scene") for i in range(3)},
         **{f"item{i}": _field(label=f"Loot slot {i+1}", dataType="inventoryReference", emptyValue=65535, group="Loot", help="Global item/equipment referenced by this drop/steal slot.") for i in range(4)},
+        **{f"dropRate{i}": _field(label=f"Loot slot {i+1} rate", group="Loot", help="Drop/steal probability parameter expressed as x/63 by Scarlet. 0xFF is also used with an empty item slot.") for i in range(4)},
+        **{f"animation{i}": advanced(f"Action {i+1} animation ID", "Raw enemy action-animation index; no authoritative human animation-name table is available.") for i in range(16)},
+        **{f"camera{i}": advanced(f"Action {i+1} camera ID", "Raw battle-camera program ID; no authoritative human camera-name table is available.") for i in range(16)},
     },
     "enemyAttacks": {
         "target": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who this attack can target and how its battle cursor/selection behaves."),
@@ -266,7 +273,7 @@ ENCOUNTERS = {
 }
 for i in range(14):
     ENCOUNTERS[f"battle{i}"] = reference("encounters", label=None, help="Battle/formation selected by this weighted encounter entry.")
-    ENCOUNTERS[f"chance{i}"] = _field(label=None, help="Relative weight out of 64 for this encounter entry.")
+    ENCOUNTERS[f"chance{i}"] = _field(help="Relative weight out of 64 for this encounter entry.")
 
 SPECIAL = {
     "yuffieEncounters": {"battle": reference("encounters", label="Battle", help="Battle used once Cloud meets this level threshold.")},
@@ -280,11 +287,20 @@ SPECIAL = {
 def metadata_for(category: str, key: str) -> dict:
     if category in CORE and key in CORE[category]: return dict(CORE[category][key])
     if category in SCENE and key in SCENE[category]: return dict(SCENE[category][key])
-    if category == "characters" and key in CHARACTERS: return dict(CHARACTERS[key])
+    if category in ("characters", "recruits") and key in CHARACTERS: return dict(CHARACTERS[key])
     if category == "shops" and key in SHOP: return dict(SHOP[key])
     if category in ("fieldEncounters", "worldEncounters") and key in ENCOUNTERS: return dict(ENCOUNTERS[key])
     if category in SPECIAL and key in SPECIAL[category]: return dict(SPECIAL[category][key])
     return {}
+
+
+DEFAULT_GROUPS = {
+    "items": "Effect", "weapons": "Combat", "armor": "Defense", "accessories": "Equipment",
+    "characters": "Starting stats", "recruits": "Starting data", "enemies": "Stats / rewards",
+    "enemyAttacks": "Attack", "encounters": "Battle setup", "shops": "Shop",
+    "prices": "Price", "fieldEncounters": "Encounter settings", "worldEncounters": "Encounter settings",
+}
+RAW_HINTS = (" id", " flags", " mask", " byte", "camera", "animation", "layout", "arena", "cover flags")
 
 
 def apply(category: str, fields_in):
@@ -295,8 +311,38 @@ def apply(category: str, fields_in):
             "key": field.key, "label": field.label, "dataType": "int",
             "minimum": field.minimum, "maximum": field.maximum, "step": field.scale,
         }
-        value.update(metadata_for(category, value["key"]))
-        if "group" not in value:
-            value["group"] = "Data"
+        authored = metadata_for(category, value["key"])
+        value.update(authored)
+        label = str(value.get("label") or value["key"])
+        if not authored and any(hint in label.casefold() for hint in RAW_HINTS):
+            value.update(advanced(label, "Engine/storage identifier retained for advanced editing because no authoritative human name mapping is available yet."))
+        value.setdefault("group", DEFAULT_GROUPS.get(category, "Data"))
         result.append(value)
     return result
+
+# Scalar fields that are genuinely numeric but still need domain language.
+for key, label, help_text in (
+    ("attackPower", "Power", "Base power consumed by the selected item formula."),
+    ("attackStrength", "Attack power", "Base power used by this weapon's damage formula."),
+    ("criticalRate", "Critical rate", "Weapon critical-hit rate parameter."),
+    ("accuracyRate", "Accuracy", "Weapon accuracy rate parameter."),
+):
+    target = CORE["items"] if key == "attackPower" else CORE["weapons"]
+    target[key] = _field(label=label, group="Effect" if key == "attackPower" else "Combat", help=help_text)
+for key, label in (("defense","Defense"),("magicDefense","Magic defense"),("evade","Evade"),("magicEvade","Magic evade")):
+    CORE["armor"][key] = _field(label=label, group="Defense", help=f"Armor {label.casefold()} value.")
+for key in ("dialogue",):
+    SHOP[key] = advanced("Dialogue set", "Raw shop dialogue/menu text set index; no authoritative named dialogue table is exposed by this plugin.")
+for i in range(4):
+    SCENE["encounters"][f"arena{i}"] = advanced(f"Arena candidate {i+1} ID", "Raw battle arena candidate ID; no authoritative arena-name table is available here.")
+for camera in range(3):
+    for axis in ("x","y","z","directionX","directionY","directionZ"):
+        SCENE["encounters"][f"camera{camera}_{axis}"] = _field(label=f"Camera {camera+1} {axis}", group="Advanced / engine data", help="Raw formation camera coordinate/direction value.", advanced=True)
+for slot in range(6):
+    for suffix, label in (("cover","Cover flags"),("flags","Initial condition flags")):
+        SCENE["encounters"][f"slot{slot}_{suffix}"] = advanced(f"Enemy slot {slot+1} {label}", "Packed formation-engine flags; retained under Advanced until every bit is authoritatively named.")
+for level in ("11","12","21","22","31","32","4"):
+    CHARACTERS[f"limitAttack{level}"] = advanced(f"Limit {level} attack ID", "Raw global Limit attack index. Kept under Advanced until the plugin exposes the corresponding named attack table.")
+CHARACTERS["levelProgress"] = _field(label="Starting level progress", group="Starting progression", help="Progress within the current level at initialization (0–255 gauge).")
+for i in range(1,5):
+    CHARACTERS[f"limitHpDivisor{i}"] = _field(label=f"Limit level {i} HP divisor", group="Limit gain", help="HP-loss divisor used by FF7's Limit gauge gain calculation for this Limit level.")

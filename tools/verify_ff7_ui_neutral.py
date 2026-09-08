@@ -23,6 +23,8 @@ const tabbedPanel=o=>{
     subtabBar({tabs:o.tabs,active:o.active,label:o.label,change:o.change}),
     el("section",{role:"tabpanel","aria-label":active?.label||"Panel"},o.content));
 };
+const toggleRow=o=>el("div",{role:"group","aria-label":o.label||"Toggles"},...(o.toggles||[]).map(t=>
+  el("label",{},el("input",{type:"checkbox",checked:!!t.checked,disabled:!!t.disabled,"aria-label":t.label,onchange:e=>t.change?.(e.target.checked,e)}),el("span",{},t.label))));
 Object.assign(window.LexeditorUI,{
   detailField,
   readonlyField:value=>el("span",{},String(value??"")),
@@ -30,6 +32,7 @@ Object.assign(window.LexeditorUI,{
   integrationStatus:value=>el("span",{},String(value??"")),
   subtabBar,
   tabbedPanel,
+  toggleRow,
 });
 })();
 '''
