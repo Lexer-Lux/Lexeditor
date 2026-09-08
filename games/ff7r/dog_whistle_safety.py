@@ -22,7 +22,13 @@ REQUIRED_RETARGET_NEEDLE = "SetTarget"
 AI_LOOKUP_NEEDLES = ("GetBattleAI", "GetBattleAIControllerFromID")
 ENEMY_ENUMERATION_NEEDLE = "GetEnemyMembersRef"
 BATTLE_CHARA_ID_NEEDLE = "GetBattleCharaSpec_DataTableID"
-ABILITY_DISPATCH_NEEDLE = "RequestUseAbility"
+ITEM_CLASSIFIER_NEEDLE = "IsItem"
+ABILITY_EXECUTION_NEEDLES = (
+    "RequestAIPCAbility",
+    "RequestAIPCExecuteAbility",
+    "ReserveAbility",
+    "RequestUseAbility",
+)
 AWARD_NEEDLES = ("Item_Add", "AddKeyItem")
 
 
@@ -47,6 +53,7 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
     unused_whistle_names = list(item.get("unusedWhistleNameMapCandidates", ()))
     ability_templates = list(item.get("abilityBackedTemplateCandidates", ()))
     linked_ability_templates = list(item.get("linkedBattleAbilityTemplateCandidates", ()))
+    item_command_templates = list(item.get("itemCommandTemplateCandidates", ()))
     unresolved_ability_templates = list(item.get("unresolvedAbilityTemplateCandidates", ()))
     item_properties = {str(value) for value in item.get("itemProperties", ())}
 
@@ -57,7 +64,7 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
 
     template_text_assets = sorted({
         str(text_row.get("textAsset", ""))
-        for template in linked_ability_templates or ability_templates
+        for template in item_command_templates or linked_ability_templates or ability_templates
         for text_row in template.get("resolvedText", ())
         if text_row.get("textAsset")
     })
@@ -75,7 +82,8 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         *AI_LOOKUP_NEEDLES,
         ENEMY_ENUMERATION_NEEDLE,
         BATTLE_CHARA_ID_NEEDLE,
-        ABILITY_DISPATCH_NEEDLE,
+        ITEM_CLASSIFIER_NEEDLE,
+        *ABILITY_EXECUTION_NEEDLES,
         *AWARD_NEEDLES,
     )
     native_hits = {
@@ -86,7 +94,13 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
     active_enemy_enumeration_present = bool(native_hits[ENEMY_ENUMERATION_NEEDLE])
     battle_chara_id_lookup_present = bool(native_hits[BATTLE_CHARA_ID_NEEDLE])
     set_target_present = bool(native_hits[REQUIRED_RETARGET_NEEDLE])
-    ability_dispatch_candidate_present = bool(native_hits[ABILITY_DISPATCH_NEEDLE])
+    item_classifier_present = bool(native_hits[ITEM_CLASSIFIER_NEEDLE])
+    ability_execution_bridge_present = any(
+        native_hits[needle] for needle in ABILITY_EXECUTION_NEEDLES
+    )
+    item_ability_runtime_bridge_present = bool(
+        item_classifier_present and ability_execution_bridge_present
+    )
     retarget_pipeline_present = bool(
         active_enemy_enumeration_present
         and battle_chara_id_lookup_present
@@ -123,12 +137,14 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         blockers.append("unused-whistle-item-fname-unresolved")
     if not writer_supports_new_item_row:
         blockers.append("writer-cannot-clone-new-item-row-with-existing-fname")
-    else:
-        blockers.append("battle-usable-item-template-unproved")
     if not ability_templates:
         blockers.append("ability-backed-item-template-set-unresolved")
     if ability_templates and not linked_ability_templates:
         blockers.append("battle-ability-template-linkage-unresolved")
+    if not item_command_templates:
+        blockers.append("item-command-template-unproved")
+    else:
+        blockers.append("item-command-template-behavior-unvalidated")
     if unresolved_ability_templates:
         blockers.append("item-ability-links-partially-unresolved")
     if "AbilityID" not in item_properties:
@@ -173,10 +189,22 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         blockers.append("runtime-retarget-pipeline-unproved")
     else:
         blockers.append("runtime-retarget-semantics-unvalidated")
-    if not ability_dispatch_candidate_present:
-        blockers.append("item-use-dispatch-path-unresolved")
+    if not item_classifier_present:
+        blockers.append("runtime-item-classifier-unresolved")
     else:
-        blockers.append("item-use-dispatch-path-unvalidated")
+        blockers.append("runtime-item-classifier-unvalidated")
+    if not ability_execution_bridge_present:
+        blockers.append("runtime-ability-execution-bridge-unresolved")
+    else:
+        blockers.append("runtime-ability-execution-bridge-unvalidated")
+    if not item_ability_runtime_bridge_present:
+        blockers.append("runtime-item-ability-bridge-unproved")
+    else:
+        blockers.append("runtime-item-ability-bridge-unvalidated")
+    # None of the reflected execution helpers proves where a human-confirmed
+    # Items-menu command commits. Keep that as an independent hard blocker so
+    # AI/script-only ability calls cannot accidentally authorize the feature.
+    blockers.append("player-item-command-commit-hook-unresolved")
     blockers.append("whistle-user-character-mapping-unvalidated")
     blockers.append("scripted-boss-retarget-exceptions-unvalidated")
 
@@ -194,6 +222,7 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             "unusedWhistleNameMapCandidates": unused_whistle_names,
             "abilityBackedTemplateCandidates": len(ability_templates),
             "linkedBattleAbilityTemplateCandidates": len(linked_ability_templates),
+            "itemCommandTemplateCandidates": len(item_command_templates),
             "unresolvedAbilityTemplateCandidates": len(unresolved_ability_templates),
             "templateTextResourceCandidates": template_text_assets,
             "writerSupportsNewItemRow": writer_supports_new_item_row,
@@ -227,10 +256,14 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             "setTargetCandidatePresent": set_target_present,
             "retargetPipelinePresent": retarget_pipeline_present,
             "retargetAnchorsPresent": retarget_pipeline_present,
-            "itemUseDispatchCandidatePresent": ability_dispatch_candidate_present,
+            "itemClassifierCandidatePresent": item_classifier_present,
+            "abilityExecutionBridgeCandidatePresent": ability_execution_bridge_present,
+            "itemAbilityRuntimeBridgePresent": item_ability_runtime_bridge_present,
+            "playerItemCommandCommitValidated": False,
             "activeEnemyEnumeration": "UEndBattleAPI::GetEnemyMembersRef(TArray<AEndCharacter*>&)",
             "battleCharaIdLookup": "UEndBattleAPI::GetBattleCharaSpec_DataTableID(AEndCharacter*)",
             "requiredMethod": "AEndBattleAIController::SetTarget(AEndCharacter*)",
+            "itemClassifier": "UEndBattleAPI::IsItem(FName InAbilityName)",
         },
         "canineCoverage": {
             "candidateGroups": len(canine_rows),
@@ -240,10 +273,11 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         "notes": [
             "An existing whistle-like Item or BattleAbility row is never permission to hijack it. Safe new-row paths require unused whistle-like FNames independently in each package name map.",
             "Item.AbilityID must resolve to an installed BattleAbility row before that template contributes executable-path evidence; unresolved IDs remain explicit blockers.",
+            "Only linked BattleAbility rows classified as the generated Item command category count as battle-usable item template evidence; arbitrary AbilityID links do not.",
             "The writer can clone proved Item/BattleAbility templates, resize scalar FString IDs, and append localized top-level text IDs without expanding package name maps. Exact template behavior and item-use interception still require installed evidence.",
             "Fixed-width array insertion can append the eventual new Item row tag to a proved Chapter 4 AddKeyItem_Array without replacing another reward; exact once-only semantics still require validation.",
-            "The reflected retarget route is now explicit: GetEnemyMembersRef -> GetBattleCharaSpec_DataTableID -> canine set filter -> AI lookup -> SetTarget(user). Every callsite/ABI and user-character mapping still requires installed validation before native mutation.",
-            "RequestUseAbility is a useful ability-dispatch lead but is not assumed to be the player Item command dispatch path.",
+            "The reflected retarget route is explicit: GetEnemyMembersRef -> GetBattleCharaSpec_DataTableID -> canine set filter -> AI lookup -> SetTarget(user). Every callsite/ABI and user-character mapping still requires installed validation before native mutation.",
+            "IsItem plus the reflected ability execution helpers establishes a narrower item/AbilityID bridge, but AI/script execution is not permission to hook the human Items-menu commit path.",
             "The assessment is read-only and cannot make the Dog Whistle implementation ready by itself.",
         ],
     }
