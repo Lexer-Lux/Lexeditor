@@ -33,7 +33,7 @@ class InGameTimeTests(unittest.TestCase):
 
     def test_editor_exposes_clock_and_explains_semantics(self):
         editor = (ROOT / "games/ff8/editor.html").read_text(encoding="utf-8")
-        self.assertIn('aria-label="In-game Time"', editor)
+        self.assertIn('"aria-label":"In-game Time"', editor)
         self.assertIn('row("IN-GAME TIME"', editor)
         self.assertIn("local clock", editor)
         self.assertIn("does not replace FF8's saved play-time counter", editor)
