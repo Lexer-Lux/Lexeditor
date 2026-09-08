@@ -16,7 +16,9 @@ Examples:
     --group GuardDog before-dog-1.sav after-dog-1.sav \
     --group GuardDog before-dog-2.sav after-dog-2.sav \
     --group SecurityOfficer before-officer-1.sav after-officer-1.sav \
-    --group SecurityOfficer before-officer-2.sav after-officer-2.sav
+    --group SecurityOfficer before-officer-2.sav after-officer-2.sav \
+    --control noop1 before-c1.sav after-c1.sav \
+    --control noop2 before-c2.sav after-c2.sav
 
 The tool is read-only and format-agnostic. It never modifies a save file.
 """
@@ -36,7 +38,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from games.ff7r.save_control_probe import analyze_controlled_save_pairs  # noqa: E402
+from games.ff7r.save_control_probe import (  # noqa: E402
+    analyze_controlled_experiment_groups,
+    analyze_controlled_save_pairs,
+)
 from games.ff7r.save_diff_probe import (  # noqa: E402
     SavePair,
     analyze_experiment_groups,
@@ -58,8 +63,8 @@ def build_report(
 ) -> dict:
     if pair_specs and group_specs:
         raise ValueError("use either --pair or --group experiments, not both")
-    if control_specs and not pair_specs:
-        raise ValueError("--control is supported only with repeated --pair Assess experiments")
+    if control_specs and not (pair_specs or group_specs):
+        raise ValueError("--control requires --pair or --group Assess experiments")
     if pair_specs:
         pairs = [
             _read_pair(str(label), before, after)
@@ -84,6 +89,15 @@ def build_report(
             groups.setdefault(str(name), []).append(
                 _read_pair(str(name), before, after)
             )
+        if control_specs:
+            controls = [
+                _read_pair(str(label), before, after)
+                for label, before, after in control_specs
+            ]
+            return {
+                "mode": "cross-enemy-experiments-with-noop-control",
+                "analysis": analyze_controlled_experiment_groups(groups, controls),
+            }
         return {
             "mode": "cross-enemy-experiments",
             "analysis": analyze_experiment_groups(groups),
