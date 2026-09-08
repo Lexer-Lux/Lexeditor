@@ -46,7 +46,7 @@ def test_dog_whistle_probe_correlates_item_ability_chapter_canines_and_runtime(m
             _entry("PotionAbility", {
                 "UniqueID": 100,
                 "Name": "$PotionAbility",
-                "CommandType": 2,
+                "CommandType": probe.ITEM_COMMAND_TYPE,
                 "CommandTargetType": 1,
                 "ATB": 1000,
                 "MP": 0,
@@ -106,6 +106,7 @@ def test_dog_whistle_probe_correlates_item_ability_chapter_canines_and_runtime(m
     assert linked["battleAbilityTag"] == "PotionAbility"
     assert linked["battleAbilityValues"]["ATB"] == 1000
     assert linked["battleAbilityValues"]["CommandTargetType"] == 1
+    assert result["item"]["itemCommandTemplateCandidates"] == [linked]
     assert result["item"]["unresolvedAbilityTemplateCandidates"] == []
     template_text = linked["resolvedText"][0]
     assert template_text["textAsset"] == "End/Text/US/Resident_TxtRes"
@@ -125,9 +126,31 @@ def test_dog_whistle_probe_correlates_item_ability_chapter_canines_and_runtime(m
     assert canine["enemyBookId"] == "EB_GUARD_DOG"
     assert canine["battleCharaRows"] == ["EN_GUARD_DOG"]
     assert result["knownContracts"]["itemUseField"].startswith("FEndDataTableItem.AbilityID")
+    assert result["knownContracts"]["battleAbilityItemCommandType"] == probe.ITEM_COMMAND_TYPE
+    assert result["knownContracts"]["itemClassifier"].startswith("UEndBattleAPI::IsItem")
     assert result["knownContracts"]["activeEnemyEnumeration"].startswith("UEndBattleAPI::GetEnemyMembersRef")
     assert result["knownContracts"]["battleCharaIdLookup"].startswith("UEndBattleAPI::GetBattleCharaSpec_DataTableID")
     assert result["knownContracts"]["enemyRetargetMethod"].endswith("SetTarget(AEndCharacter*)")
+
+
+def test_linked_non_item_ability_does_not_count_as_item_command_template(monkeypatch):
+    item = _package(
+        "Item", ["AbilityID"], [_entry("ODD_ITEM", {"AbilityID": "MagicLikeAbility"})]
+    )
+    ability = _package(
+        "BattleAbility",
+        ["CommandType", "CommandTargetType"],
+        [_entry("MagicLikeAbility", {"CommandType": 2, "CommandTargetType": 1})],
+        names=["DogWhistleAbility"],
+    )
+    packages = {probe.ITEM_TABLE: item, probe.BATTLE_ABILITY_TABLE: ability}
+    monkeypatch.setattr(probe, "_load_data", lambda _g, _d, _i, name: packages.get(name))
+    monkeypatch.setattr(probe, "_all_text_map", lambda *_args, **_kwargs: ({}, {}, []))
+    monkeypatch.setattr(probe, "probe_installed_exe", lambda _root, *, needles: {"needles": []})
+
+    result = probe.probe_dog_whistle_sources("g", "d", "p", {})
+    assert len(result["item"]["linkedBattleAbilityTemplateCandidates"]) == 1
+    assert result["item"]["itemCommandTemplateCandidates"] == []
 
 
 def test_item_ability_id_without_matching_battleability_row_stays_explicitly_unresolved(monkeypatch):
@@ -142,6 +165,7 @@ def test_item_ability_id_without_matching_battleability_row_stays_explicitly_unr
 
     result = probe.probe_dog_whistle_sources("g", "d", "p", {})
     assert result["item"]["linkedBattleAbilityTemplateCandidates"] == []
+    assert result["item"]["itemCommandTemplateCandidates"] == []
     assert result["item"]["unresolvedAbilityTemplateCandidates"][0]["abilityId"] == "MissingAbility"
 
 
@@ -191,4 +215,8 @@ def test_native_probe_requests_full_active_enemy_and_item_dispatch_research_rout
     assert "GetBattleCharaSpec_DataTableID" in captured["needles"]
     assert "GetBattleAIControllerFromID" in captured["needles"]
     assert "SetTarget" in captured["needles"]
+    assert "IsItem" in captured["needles"]
+    assert "RequestAIPCAbility" in captured["needles"]
+    assert "RequestAIPCExecuteAbility" in captured["needles"]
+    assert "ReserveAbility" in captured["needles"]
     assert "RequestUseAbility" in captured["needles"]
