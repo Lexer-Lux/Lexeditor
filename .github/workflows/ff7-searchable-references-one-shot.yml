@@ -22,7 +22,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: Apply searchable reference UX patch
-        run: python tools/_ff7_searchable_reference_patch.py
+        run: |
+          python tools/_ff7_searchable_reference_patch.py
+          python tools/_ff7_searchable_reference_test_fix.py
       - name: Verify semantic metadata and binary preservation
         run: python tools/verify_ff7_semantic_surface.py
       - name: Install Chromium test dependency
