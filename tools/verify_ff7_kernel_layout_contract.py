@@ -5,7 +5,7 @@ that test derives offsets from games.ff7.kernel.CATEGORIES, while this test
 hard-codes the documented offsets so a mistaken table entry cannot validate
 itself.
 
-Primary source: Shojy/Elena d85e02678670763c663cd058463f7578b957912e
+Pinned primary source: Shojy/Elena d85e02678670763c663cd058463f7578b957912e
 CommandData.cs, AttackData.cs, ItemData.cs, WeaponData.cs, ArmorData.cs and
 AccessoryData.cs. Unknown/unused bytes are deliberately absent.
 """
