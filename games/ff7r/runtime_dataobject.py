@@ -48,7 +48,7 @@ VIRTUAL_ASSET_ROWS = (
     },
 )
 
-_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v2").hexdigest()
+_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v3").hexdigest()
 
 
 @dataclass(frozen=True)
@@ -122,6 +122,9 @@ def _runtime_properties() -> list[VirtualProperty]:
         VirtualProperty("HPRebalanceEnabled", "HP Rebalance Enabled", "BOOL", True, 0, 1),
         VirtualProperty("HPMultiplier", "HP Multiplier", "FLOAT", True, 0.000001, None),
         VirtualProperty("HPRebalanceHookValidated", "HP Rebalance Hook Validated", "BOOL"),
+        VirtualProperty("BetterSprintEnabled", "Better Sprint Enabled", "BOOL", True, 0, 1),
+        VirtualProperty("SprintSpeedMultiplier", "Sprint Speed Multiplier", "FLOAT", True, 0.000001, None),
+        VirtualProperty("BetterSprintHookValidated", "Better Sprint Hook Validated", "BOOL"),
         VirtualProperty("LoaderCandidatePresent", "Native Loader Detected", "BOOL"),
         VirtualProperty("ProjectDllPresent", "Runtime DLL Built", "BOOL"),
         VirtualProperty("ManifestPresent", "Validation Manifest Present", "BOOL"),
@@ -143,6 +146,7 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
     cutscene = config["cutsceneSpeed"]
     minimap = config["minimap"]
     hp_rebalance = config["hpRebalance"]
+    better_sprint = config["betterSprint"]
     values = {
         "CutsceneEnabled": cutscene["enabled"],
         "CutsceneBaseMultiplier": cutscene["baseMultiplier"],
@@ -155,6 +159,9 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
         "HPRebalanceEnabled": hp_rebalance["enabled"],
         "HPMultiplier": hp_rebalance["hpMultiplier"],
         "HPRebalanceHookValidated": status["hpRebalanceHookValidated"],
+        "BetterSprintEnabled": better_sprint["enabled"],
+        "SprintSpeedMultiplier": better_sprint["speedMultiplier"],
+        "BetterSprintHookValidated": status["betterSprintHookValidated"],
         "LoaderCandidatePresent": status["loaderCandidatePresent"],
         "ProjectDllPresent": status["projectDllPresent"],
         "ManifestPresent": status["manifestPresent"],
@@ -331,6 +338,8 @@ _EDIT_PATHS = {
     "MinimapPersistChosenState": ("minimap", "persistChosenState"),
     "HPRebalanceEnabled": ("hpRebalance", "enabled"),
     "HPMultiplier": ("hpRebalance", "hpMultiplier"),
+    "BetterSprintEnabled": ("betterSprint", "enabled"),
+    "SprintSpeedMultiplier": ("betterSprint", "speedMultiplier"),
 }
 
 

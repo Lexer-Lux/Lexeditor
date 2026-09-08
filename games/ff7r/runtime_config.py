@@ -2,7 +2,7 @@
 
 The DataObject/PAK pipeline cannot implement input or event-scene runtime behavior.
 Runtime configuration, native binaries and hook-validation evidence therefore live
-as separate project artifacts.  A DLL merely existing is never enough to call the
+as separate project artifacts. A DLL merely existing is never enough to call the
 runtime ready: deployment requires a manifest proving every requested hook was
 validated for the installed executable timestamp.
 """
@@ -30,6 +30,7 @@ REQUIRED_HOOKS = (
 )
 OPTIONAL_HOOKS = (
     "hpRebalance",
+    "betterSprint",
 )
 
 DEFAULT_RUNTIME_CONFIG = {
@@ -50,10 +51,17 @@ DEFAULT_RUNTIME_CONFIG = {
     },
     "hpRebalance": {
         "enabled": False,
-        # Scale the final playable-party maximum HP.  This must not be
+        # Scale the final playable-party maximum HP. This must not be
         # implemented by merely scaling PlayerParameter.HPMax because equipment
         # and materia can add/scale max HP through separate data paths.
         "hpMultiplier": 0.5,
+    },
+    "betterSprint": {
+        "enabled": False,
+        # 1.0x is deliberately the default because the issue does not prescribe
+        # a faster default. The validated runtime hook must scale actual player
+        # dash/sprint translation while leaving walk/jog/scripted movement alone.
+        "speedMultiplier": 1.0,
     },
 }
 
@@ -89,7 +97,7 @@ def _clone_default() -> dict:
 def validate_runtime_config(value: dict) -> dict:
     if not isinstance(value, dict):
         raise ValueError("runtime config must be an object")
-    if set(value) - {"schemaVersion", "cutsceneSpeed", "minimap", "hpRebalance"}:
+    if set(value) - {"schemaVersion", "cutsceneSpeed", "minimap", "hpRebalance", "betterSprint"}:
         raise ValueError("runtime config contains unsupported top-level fields")
     if value.get("schemaVersion", RUNTIME_SCHEMA_VERSION) != RUNTIME_SCHEMA_VERSION:
         raise ValueError(f"unsupported FF7R runtime config schema: {value.get('schemaVersion')}")
@@ -147,6 +155,22 @@ def validate_runtime_config(value: dict) -> dict:
     if not math.isfinite(hp_multiplier) or hp_multiplier <= 0.0:
         raise ValueError("hpRebalance.hpMultiplier must be greater than 0")
 
+    better_sprint = value.get("betterSprint", {})
+    if not isinstance(better_sprint, dict):
+        raise ValueError("betterSprint must be an object")
+    if set(better_sprint) - {"enabled", "speedMultiplier"}:
+        raise ValueError("betterSprint contains unsupported fields")
+    sprint_enabled = better_sprint.get("enabled", False)
+    if not isinstance(sprint_enabled, bool):
+        raise ValueError("betterSprint.enabled must be boolean")
+    sprint_multiplier = better_sprint.get(
+        "speedMultiplier", DEFAULT_RUNTIME_CONFIG["betterSprint"]["speedMultiplier"])
+    if isinstance(sprint_multiplier, bool) or not isinstance(sprint_multiplier, (int, float)):
+        raise ValueError("betterSprint.speedMultiplier must be numeric")
+    sprint_multiplier = float(sprint_multiplier)
+    if not math.isfinite(sprint_multiplier) or sprint_multiplier <= 0.0:
+        raise ValueError("betterSprint.speedMultiplier must be greater than 0")
+
     return {
         "schemaVersion": RUNTIME_SCHEMA_VERSION,
         "cutsceneSpeed": {
@@ -164,6 +188,10 @@ def validate_runtime_config(value: dict) -> dict:
         "hpRebalance": {
             "enabled": hp_enabled,
             "hpMultiplier": hp_multiplier,
+        },
+        "betterSprint": {
+            "enabled": sprint_enabled,
+            "speedMultiplier": sprint_multiplier,
         },
     }
 
@@ -302,9 +330,16 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
     native_mods = Path(game_root) / NATIVE_MODS_DIR
     config = load_runtime_config(project_root)
     manifest, timestamp, hooks_validated, build_supported = _manifest_state(game_root, project_root)
+
     hp_requested = config["hpRebalance"]["enabled"]
     hp_hook_validated = bool(manifest) and manifest["hooks"].get("hpRebalance", False)
-    requested_hooks_validated = hooks_validated and (not hp_requested or hp_hook_validated)
+    sprint_requested = config["betterSprint"]["enabled"]
+    sprint_hook_validated = bool(manifest) and manifest["hooks"].get("betterSprint", False)
+    requested_hooks_validated = (
+        hooks_validated
+        and (not hp_requested or hp_hook_validated)
+        and (not sprint_requested or sprint_hook_validated)
+    )
     ready = project_dll.is_file() and bool(loaders) and requested_hooks_validated and build_supported
     active = deployed_dll.is_file() and bool(loaders) and requested_hooks_validated and build_supported
     return {
@@ -324,6 +359,8 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
         "requestedHooksValidated": requested_hooks_validated,
         "hpRebalanceRequested": hp_requested,
         "hpRebalanceHookValidated": hp_hook_validated,
+        "betterSprintRequested": sprint_requested,
+        "betterSprintHookValidated": sprint_hook_validated,
         "installedExeTimestamp": timestamp,
         "installedExeTimestampHex": f"0x{timestamp:08X}" if timestamp is not None else None,
         "buildSupported": build_supported,
@@ -360,6 +397,8 @@ def deploy_runtime(game_root: Path, project_root: Path) -> dict:
         raise RuntimeError("FF7R runtime hooks are not all validated; runtime was not deployed")
     if status["hpRebalanceRequested"] and not status["hpRebalanceHookValidated"]:
         raise RuntimeError("FF7R HP Rebalance hook is enabled but not validated; runtime was not deployed")
+    if status["betterSprintRequested"] and not status["betterSprintHookValidated"]:
+        raise RuntimeError("FF7R Better Sprint hook is enabled but not validated; runtime was not deployed")
     if status["installedExeTimestamp"] is None:
         raise RuntimeError("Installed ff7remake_.exe timestamp could not be read; runtime was not deployed")
     if not status["buildSupported"]:
