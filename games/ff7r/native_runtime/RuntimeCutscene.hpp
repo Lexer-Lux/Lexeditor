@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <span>
 #include <vector>
 
@@ -62,6 +63,26 @@ inline bool plausibleNativeGameSpeed(float speed) noexcept {
         && speed <= kMaxPlausibleNativeGameSpeed;
 }
 
+// The polling worker has no write notification from AEndGameState::SetGameSpeed.
+// If Lexeditor wrote exactly 1.5 and the game later independently wrote native
+// R2=1.5, value-only polling could not tell those writes apart. Store our applied
+// value one representable float above the logical product instead. The one-ULP
+// delta is negligible for playback but provides an ownership marker: an exact
+// native write becomes observably different even when its logical value equals
+// Lexeditor's previous product.
+inline float tagOwnedGameSpeed(float logicalSpeed) noexcept {
+    if (!std::isfinite(logicalSpeed) || logicalSpeed <= 0.0F) {
+        return 0.0F;
+    }
+    const float tagged = std::nextafter(logicalSpeed, std::numeric_limits<float>::infinity());
+    if (!std::isfinite(tagged)
+            || tagged <= 0.0F
+            || tagged > kMaxPlausibleAppliedGameSpeed) {
+        return 0.0F;
+    }
+    return tagged;
+}
+
 struct CutsceneSpeedTrack {
     bool initialized = false;
     float nativeSpeed = kVanillaGameSpeed;
@@ -72,6 +93,7 @@ struct CutsceneSpeedWritePlan {
     bool valid = false;
     bool write = false;
     float nativeSpeed = kVanillaGameSpeed;
+    float logicalAppliedSpeed = kVanillaGameSpeed;
     float appliedSpeed = kVanillaGameSpeed;
 };
 
@@ -85,10 +107,11 @@ inline CutsceneSpeedWritePlan makeCutsceneSpeedWritePlan(
         return {};
     }
 
-    // If the game has not changed the channel since our last write, retain the
-    // native value we observed before applying Lexeditor's multiplier. If the
-    // value differs, treat it as a fresh native transition (for example R2
-    // fast-forward engaging/releasing) and compose the configured base on top.
+    // If the game has not changed the channel since our last tagged write,
+    // retain the native value observed before applying Lexeditor's multiplier.
+    // Any exact game write differs from the one-ULP ownership tag, so even a
+    // native transition whose scalar equals our previous logical product is
+    // detected and composed rather than mistaken for our own write.
     float nativeSpeed = currentSpeed;
     if (state.initialized && currentSpeed == state.lastAppliedSpeed) {
         nativeSpeed = state.nativeSpeed;
@@ -103,16 +126,21 @@ inline CutsceneSpeedWritePlan makeCutsceneSpeedWritePlan(
             || desired > static_cast<double>(kMaxPlausibleAppliedGameSpeed)) {
         return {};
     }
-    const float applied = static_cast<float>(desired);
-    if (!std::isfinite(applied) || applied <= 0.0F) {
+    const float logicalApplied = static_cast<float>(desired);
+    if (!std::isfinite(logicalApplied) || logicalApplied <= 0.0F) {
+        return {};
+    }
+    const float taggedApplied = tagOwnedGameSpeed(logicalApplied);
+    if (taggedApplied == 0.0F) {
         return {};
     }
 
     return {
         true,
-        currentSpeed != applied,
+        currentSpeed != taggedApplied,
         nativeSpeed,
-        applied,
+        logicalApplied,
+        taggedApplied,
     };
 }
 
