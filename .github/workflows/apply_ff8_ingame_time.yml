@@ -25,7 +25,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          {
+          (
             python -m unittest tests.test_ff8_ingame_time -v
             TEST=$?
             python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py
@@ -41,7 +41,7 @@ jobs:
             DIFF=$?
             echo "RESULT test=$TEST compile=$COMPILE js=$JS diff=$DIFF"
             exit $(( TEST || COMPILE || JS || DIFF ))
-          } > clock-validation.txt 2>&1
+          ) > clock-validation.txt 2>&1
           STATUS=$?
           cat clock-validation.txt
           echo "status=$STATUS" >> "$GITHUB_OUTPUT"
