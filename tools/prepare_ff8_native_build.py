@@ -48,14 +48,19 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             ('bool enable_ff8_hp_bars;','bool enable_ff8_hp_bars;\nbool enable_ff8_gf_hp_bars;'),
             ('\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);',
              '\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\n\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);'),
+            ('bool enable_ff8_gf_hp_bars;','bool enable_ff8_gf_hp_bars;\nbool enable_ff8_ingame_time;'),
+            ('\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);',
+             '\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);\n\tenable_ff8_ingame_time = config["enable_ff8_ingame_time"].value_or(false);'),
         ],
         'src/cfg.h':[
             ('extern bool enable_ff8_party_switch;', 'extern bool enable_ff8_party_switch;\nextern bool enable_ff8_no_magic_consumption;'),
             ('extern bool enable_ff8_hp_bars;','extern bool enable_ff8_hp_bars;\nextern bool enable_ff8_gf_hp_bars;'),
+            ('extern bool enable_ff8_gf_hp_bars;','extern bool enable_ff8_gf_hp_bars;\nextern bool enable_ff8_ingame_time;'),
         ],
         'misc/FFNx.toml':[
             ('enable_ff8_party_switch = false', 'enable_ff8_party_switch = false\n\n# Keep spell stock on successful field/battle casts; items still consume.\nenable_ff8_no_magic_consumption = false'),
             ('enable_ff8_hp_bars = false','enable_ff8_hp_bars = false\n\n# Blue junctioned-GF HP bar above each party name.\nenable_ff8_gf_hp_bars = false'),
+            ('enable_ff8_gf_hp_bars = false','enable_ff8_gf_hp_bars = false\n\n# Show the computer local clock on FF8 main menu without changing PLAY time.\nenable_ff8_ingame_time = false'),
         ],
     }
     changes['src/ff8_opengl.cpp'] = [
