@@ -33,10 +33,6 @@ SPRINT_DATA_FIELDS = frozenset({
 SPRINT_DATA_ASSET_TOKENS = ("indoorvolume", "charaspec")
 MAX_DATA_CANDIDATES = 128
 
-# Keep the reflected/native strings grouped by what they can actually establish.
-# A cross-family function is a better *research lead*, but still not proof of an
-# authoritative player-sprint write path: UE reflection/registration glue can
-# legitimately bring unrelated reflected names together.
 SPRINT_FUNCTION_FAMILIES = {
     "dash-scale": (
         "DashRootMotionTranslationScale",
@@ -53,8 +49,6 @@ SPRINT_FUNCTION_FAMILIES = {
     ),
 }
 
-# Generated Remake SDK evidence used only to classify candidate semantics. These
-# declarations do not prove which installed native callsite controls movement.
 KNOWN_CONTRACTS = (
     {
         "symbol": "FEndDataTableInDoorVolume.DashRootMotionTranslationScale",
@@ -83,14 +77,17 @@ KNOWN_CONTRACTS = (
 )
 
 
-def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, list[int]]]:
-    """Collect exact .pdata-bounded direct and one-hop function candidates.
+def _caller_rvas(inbound: dict[str, Any] | None) -> set[int]:
+    callers: set[int] = set()
+    for ref in (inbound or {}).get("refs", ()):
+        value = ref.get("sourceFunctionRva")
+        if value is not None:
+            callers.add(int(value))
+    return callers
 
-    Padding-heuristic function guesses are excluded from correlation. A direct
-    candidate is a .pdata-described function containing the reflected-string LEA;
-    a next-hop candidate is a .pdata-described function reached through one of the
-    probe's conservative direct CALL/JMP/RIP-relative code references.
-    """
+
+def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, list[int]]]:
+    """Collect exact .pdata direct/next-hop candidates plus exact inbound callers."""
     result: dict[str, dict[str, list[int]]] = {}
     for row in native.get("needles", ()):
         needle = str(row.get("needle", ""))
@@ -98,6 +95,8 @@ def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, lis
             continue
         direct: set[int] = set()
         next_hops: set[int] = set()
+        direct_callers: set[int] = set()
+        next_hop_callers: set[int] = set()
         for hit in row.get("hits", ()):
             for xref in hit.get("leaRipXrefs", ()):
                 if xref.get("candidateFunctionSource") != "pdata":
@@ -105,15 +104,24 @@ def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, lis
                 function_rva = xref.get("candidateFunctionRva")
                 if function_rva is not None:
                     direct.add(int(function_rva))
+                direct_callers.update(
+                    _caller_rvas(xref.get("candidateFunctionInboundCodeRefs"))
+                )
                 code_refs = xref.get("candidateFunctionCodeRefs") or {}
                 for code_ref in code_refs.get("refs", ()):
                     target_rva = code_ref.get("targetFunctionRva")
                     if target_rva is not None:
                         next_hops.add(int(target_rva))
+                    next_hop_callers.update(
+                        _caller_rvas(code_ref.get("targetFunctionInboundCodeRefs"))
+                    )
         result[needle] = {
             "directPdataFunctions": sorted(direct),
             "nextHopPdataFunctions": sorted(next_hops),
             "expandedPdataFunctions": sorted(direct | next_hops),
+            "directInboundCallerFunctions": sorted(direct_callers),
+            "nextHopInboundCallerFunctions": sorted(next_hop_callers),
+            "expandedInboundCallerFunctions": sorted(direct_callers | next_hop_callers),
         }
     return result
 
@@ -139,6 +147,7 @@ def _needle_rows(native: dict[str, Any]) -> dict[str, dict[str, int]]:
             "candidateFunctions": len(functions),
             "pdataFunctions": len(exact.get("directPdataFunctions", ())),
             "nextHopPdataFunctions": len(exact.get("nextHopPdataFunctions", ())),
+            "inboundCallerFunctions": len(exact.get("expandedInboundCallerFunctions", ())),
         }
     return result
 
@@ -148,6 +157,13 @@ def _expanded_functions(function_evidence: dict[str, dict[str, list[int]]], *nee
     for needle in needles:
         functions.update(function_evidence.get(needle, {}).get("expandedPdataFunctions", ()))
     return functions
+
+
+def _inbound_callers(function_evidence: dict[str, dict[str, list[int]]], *needles: str) -> set[int]:
+    callers: set[int] = set()
+    for needle in needles:
+        callers.update(function_evidence.get(needle, {}).get("expandedInboundCallerFunctions", ()))
+    return callers
 
 
 def _function_clusters(function_evidence: dict[str, dict[str, list[int]]]) -> list[dict[str, Any]]:
@@ -229,12 +245,32 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
         "RootMotionScale",
     )
     general_root_motion_functions = _expanded_functions(function_evidence, "RootMotionTranslationScale")
+
+    dash_callers = _inbound_callers(function_evidence, "DashRootMotionTranslationScale")
+    transition_callers = _inbound_callers(function_evidence, "RunToDashBlendInputThreshold")
+    dash_behavior_callers = _inbound_callers(
+        function_evidence,
+        "IdleSwitchBehaviorDashInputBlockTime",
+        "RunSwitchBehaviorDashInputBlockTime",
+    )
+    animation_root_motion_callers = _inbound_callers(
+        function_evidence,
+        "AnimNotify_EndModifyRootMotionScale",
+        "RootMotionScale",
+    )
+    general_root_motion_callers = _inbound_callers(function_evidence, "RootMotionTranslationScale")
+
     correlations = {
         "dashToAnimationRootMotion": sorted(dash_functions & animation_root_motion_functions),
         "runToDashToAnimationRootMotion": sorted(transition_functions & animation_root_motion_functions),
         "dashToGeneralRootMotion": sorted(dash_functions & general_root_motion_functions),
         "dashScaleToBehaviorState": sorted(dash_functions & dash_behavior_functions),
         "dashBehaviorToAnimationRootMotion": sorted(dash_behavior_functions & animation_root_motion_functions),
+        "dashToAnimationRootMotionCallers": sorted(dash_callers & animation_root_motion_callers),
+        "runToDashToAnimationRootMotionCallers": sorted(transition_callers & animation_root_motion_callers),
+        "dashToGeneralRootMotionCallers": sorted(dash_callers & general_root_motion_callers),
+        "dashScaleToBehaviorStateCallers": sorted(dash_callers & dash_behavior_callers),
+        "dashBehaviorToAnimationRootMotionCallers": sorted(dash_behavior_callers & animation_root_motion_callers),
     }
 
     blockers = [
@@ -255,6 +291,13 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
         f"dash-scale↔behavior-state={len(correlations['dashScaleToBehaviorState'])}, "
         f"behavior-state↔animation-root-motion={len(correlations['dashBehaviorToAnimationRootMotion'])}. "
         "These overlaps are research leads only; reflected registration glue can share functions without proving runtime sprint authority."
+    )
+    caller_note = (
+        "Exact .pdata inbound-caller correlation: "
+        f"dash↔animation-root-motion={len(correlations['dashToAnimationRootMotionCallers'])}, "
+        f"run-to-dash↔animation-root-motion={len(correlations['runToDashToAnimationRootMotionCallers'])}, "
+        f"dash↔general-root-motion={len(correlations['dashToGeneralRootMotionCallers'])}. "
+        "A common caller is a dispatcher/controller lead, not proof that it writes player sprint velocity."
     )
     cluster_note = (
         f"Function-family clustering found {len(cross_family_clusters)} cross-family and "
@@ -282,8 +325,9 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
             "CharaSpec RootMotionTranslationScale is intentionally rejected as a safe tweak until sprint-only scope is proved.",
             "AnimNotify_EndModifyRootMotionScale is a per-animation lead with a generated 1.0 RootMotionScale default; the installed sprint animation/callsite still needs validation.",
             correlation_note,
+            caller_note,
             cluster_note,
-            "Even a three-family cluster remains research-only until runtime observation proves player sprint displacement/velocity authority and the required isolation boundaries.",
+            "Even a three-family cluster or shared exact caller remains research-only until runtime observation proves player sprint displacement/velocity authority and the required isolation boundaries.",
             "A valid implementation must multiply actual player sprint displacement/velocity while leaving walking, jogging, scripted movement, cutscenes and non-player actors unchanged.",
         ],
     }
