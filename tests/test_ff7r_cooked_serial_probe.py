@@ -64,9 +64,11 @@ def _fixture():
     payload = bytearray()
     payload += _fname(ni["ColorAndOpacity"])
     payload += _fname(ni["StructProperty"])
-    payload += b"\xAA" * 16
+    payload += struct.pack("<ii", 16, 0)
+    payload += b"\xAA" * 8
     payload += _fname(ni["BrushTintColor"])
     payload += _fname(ni["StructProperty"])
+    payload += struct.pack("<ii", 4, 0)
     # FName-shaped but followed by a non-property type: useful weaker evidence,
     # never a parsed/property-tag claim.
     payload += _fname(ni["RandomTintWord"])
@@ -114,12 +116,37 @@ def test_serialized_export_probe_maps_split_payload_and_property_tag_like_refs()
     refs = {row["name"]: row for row in result["refs"]}
     assert refs["ColorAndOpacity"]["propertyTagLike"] is True
     assert refs["ColorAndOpacity"]["propertyType"] == "StructProperty"
+    assert refs["ColorAndOpacity"]["propertyTagHeaderPlausible"] is True
+    assert refs["ColorAndOpacity"]["declaredValueSize"] == 16
+    assert refs["ColorAndOpacity"]["arrayIndex"] == 0
     assert refs["BrushTintColor"]["propertyTagLike"] is True
+    assert refs["BrushTintColor"]["propertyTagHeaderPlausible"] is True
+    assert refs["BrushTintColor"]["declaredValueSize"] == 4
     assert refs["BrushTintColor"]["exportRelativeOffset"] == 32
     assert refs["RandomTintWord"]["propertyTagLike"] is False
+    assert refs["RandomTintWord"]["propertyTagHeaderPlausible"] is False
     assert refs["ColorAndOpacity"]["className"] == "EndBattleLockonMarkerIcon"
     assert refs["ColorAndOpacity"]["objectName"] == "LockonWidget"
     assert result["propertyTagLikeCount"] == 2
+    assert result["propertyTagHeaderPlausibleCount"] == 2
+
+
+def test_property_type_match_with_invalid_generic_header_remains_weaker_evidence():
+    uasset, uexp = _fixture()
+    data = bytearray(uexp)
+    struct.pack_into("<i", data, 16, -1)
+
+    result = extract_serialized_name_refs(
+        uasset,
+        bytes(data),
+        tokens=["ColorAndOpacity"],
+    )
+    ref = result["refs"][0]
+    assert ref["propertyTagLike"] is True
+    assert ref["propertyTagHeaderPlausible"] is False
+    assert ref["declaredValueSize"] is None
+    assert ref["arrayIndex"] is None
+    assert result["propertyTagHeaderPlausibleCount"] == 0
 
 
 def test_serialized_export_probe_fails_closed_when_physical_header_boundary_disagrees():
