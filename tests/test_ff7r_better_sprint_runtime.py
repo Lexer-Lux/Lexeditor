@@ -83,6 +83,25 @@ def _native_function_needle(needle, function_rva, *targets, source="pdata"):
     }
 
 
+def _native_function_needle_with_callers(needle, function_rva, *callers):
+    return {
+        "needle": needle,
+        "hits": [{
+            "leaRipXrefs": [{
+                "candidateFunctionRva": function_rva,
+                "candidateFunctionSource": "pdata",
+                "candidateFunctionInboundCodeRefs": {
+                    "refs": [
+                        {"sourceFunctionRva": caller, "kind": "call-rel32"}
+                        for caller in callers
+                    ],
+                },
+                "candidateFunctionCodeRefs": {"refs": []},
+            }],
+        }],
+    }
+
+
 def test_better_sprint_defaults_to_vanilla_one_x_and_old_configs_upgrade_in_memory(tmp_path):
     defaults = load_runtime_config(tmp_path)
     assert defaults["betterSprint"] == {"enabled": False, "speedMultiplier": 1.0}
@@ -250,6 +269,28 @@ def test_sprint_probe_clusters_dash_state_scale_and_root_motion_with_provenance(
     assert result["nativeFunctionCorrelations"]["dashScaleToBehaviorState"] == [0x1800]
     assert result["nativeFunctionCorrelations"]["dashBehaviorToAnimationRootMotion"] == [0x1800]
     assert result["threeFamilyFunctionCount"] == 1
+    assert result["implementationReady"] is False
+
+
+def test_sprint_probe_reports_shared_inbound_dispatcher_without_promoting_sprint_authority():
+    native = {
+        "needles": [
+            _native_function_needle_with_callers("DashRootMotionTranslationScale", 0x1000, 0x9000),
+            _native_function_needle_with_callers("RunSwitchBehaviorDashInputBlockTime", 0x1100, 0x9000),
+            _native_function_needle_with_callers("RootMotionScale", 0x1200, 0x9000),
+        ]
+    }
+
+    result = assess_sprint_evidence(native, [])
+    correlations = result["nativeFunctionCorrelations"]
+    assert correlations["dashToAnimationRootMotion"] == []
+    assert correlations["dashScaleToBehaviorState"] == []
+    assert correlations["dashToAnimationRootMotionCallers"] == [0x9000]
+    assert correlations["dashScaleToBehaviorStateCallers"] == [0x9000]
+    assert correlations["dashBehaviorToAnimationRootMotionCallers"] == [0x9000]
+    assert result["nativeFunctionEvidence"]["DashRootMotionTranslationScale"]["directInboundCallerFunctions"] == [0x9000]
+    assert result["nativeNeedleStats"]["DashRootMotionTranslationScale"]["inboundCallerFunctions"] == 1
+    assert "authoritative-player-sprint-speed-path-unvalidated" in result["blockers"]
     assert result["implementationReady"] is False
 
 
