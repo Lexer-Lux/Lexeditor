@@ -30,7 +30,7 @@ from . import damage_limit
 from . import fast_start
 from . import streamlined_draw
 from . import healing_rework
-from . import formulae_rework
+from . import formulae_rework as formulae_rework_contract
 from . import flat_stat_abilities
 from . import max_spell
 from . import mug_drops
@@ -362,7 +362,7 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
     # A formula description is not an implementation. Keep the owning toggle
     # off until every row in the central Formulae Rework contract has a real
     # guarded runtime component.
-    if not formulae_rework.available():
+    if not formulae_rework_contract.available():
         formulae_rework = False
     shared_magic = _shared_magic_payload(project, game, runtime_root)
     return {
@@ -380,8 +380,8 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "drawOncePerEnemy": draw_once,
         "streamlinedDraw": streamlined_draw_enabled,
         "formulaeRework": formulae_rework,
-        "formulaeReworkAvailable": formulae_rework.available(),
-        "formulaeReworkFormulas": formulae_rework.rows(),
+        "formulaeReworkAvailable": formulae_rework_contract.available(),
+        "formulaeReworkFormulas": formulae_rework_contract.rows(),
         "betterCard": better_card_enabled,
         "fixedCommandMenu": fixed_command_menu_enabled,
         "trueAtbWait": true_atb_wait,
@@ -913,8 +913,8 @@ def save(data: dict, game_root: Path | None = None,
     )
     # Do not let an old page or direct API call arm incomplete hidden features.
     # Visible Tweaks must keep the value the user selected.
-    if formulae_rework and not formulae_rework.available():
-        missing = ", ".join(formulae_rework.incomplete_ids())
+    if formulae_rework and not formulae_rework_contract.available():
+        missing = ", ".join(formulae_rework_contract.incomplete_ids())
         raise ValueError(f"Formulae Rework is not available; incomplete: {missing}")
     if party_switch and not party_switch_issue_62.PARTY_SWITCH_AVAILABLE:
         raise ValueError(party_switch_issue_62.PARTY_SWITCH_BLOCKER)
