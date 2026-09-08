@@ -135,6 +135,19 @@ def test_probe_correlates_multiple_string_targets_in_one_text_scan():
     assert instructions == {"NaviMap": 0x1010, "FastForward": 0x1030}
 
 
+def test_probe_scans_lea_at_last_possible_text_offset():
+    data = bytearray(fixture_pe(with_pdata=False))
+    instruction_rva = 0x10F9
+    displacement = 0x2020 - (instruction_rva + 7)
+    data[0x2F9:0x300] = b"\x48\x8D\x0D" + struct.pack("<i", displacement)
+
+    result = probe_bytes(bytes(data), needles=["NaviMap"])
+    ascii_hit = next(
+        hit for hit in result["needles"][0]["hits"] if hit["encoding"] == "ascii"
+    )
+    assert any(xref["instructionRva"] == instruction_rva for xref in ascii_hit["leaRipXrefs"])
+
+
 def test_probe_rejects_non_pe_and_truncated_images():
     with pytest.raises(PEFormatError):
         probe_bytes(b"not a pe", needles=[])
