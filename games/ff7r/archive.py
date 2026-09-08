@@ -45,6 +45,12 @@ TWEAK_VIRTUAL_ASSET_ROWS = (
         "group": "Lexeditor Tweaks",
         "synthetic": "no-more-cheats",
     },
+    {
+        "asset": "Lexeditor/BetterLockon",
+        "name": "Better Lock-on",
+        "group": "Lexeditor Tweaks",
+        "synthetic": "better-lockon",
+    },
 )
 
 
@@ -250,7 +256,7 @@ def extract_pair(game_root: Path, data_root: Path, index: dict, asset: str,
         data = get_file(pak, source["path"])
         temporary = target.with_suffix(target.suffix + ".tmp")
         temporary.write_bytes(data)
-        temporary.replace(target)
+        temporary.replace(cache_path)
     return uasset_target, uexp_target
 
 
