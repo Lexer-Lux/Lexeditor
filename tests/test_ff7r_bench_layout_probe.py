@@ -34,6 +34,25 @@ def _entry(index, tag, **values):
     return SimpleNamespace(index=index, tag=tag, values=defaults)
 
 
+def _layout_pair(bench_level="slum7_03", vending_level="slum7_03"):
+    return classify_object_layout_rows(_package([
+        _entry(
+            0,
+            "slum7_bench_layout",
+            LevelName=bench_level,
+            BGActorName="BenchActor_42",
+            AttributeList_Array=["objCmn_ProgBench"],
+        ),
+        _entry(
+            1,
+            "slum7_vending_layout",
+            LevelName=vending_level,
+            BGActorName="VendingActor_9",
+            AttributeList_Array=["objCmn_ProgVendingMachine"],
+        ),
+    ]))
+
+
 def test_object_layout_classification_requires_literal_bench_or_vending_evidence_and_tracks_sector7():
     result = classify_object_layout_rows(_package([
         _entry(
@@ -68,22 +87,7 @@ def test_object_layout_classification_requires_literal_bench_or_vending_evidence
 
 
 def test_object_layout_correlation_requires_exact_actor_name_and_level_path_match():
-    layout = classify_object_layout_rows(_package([
-        _entry(
-            0,
-            "slum7_bench_layout",
-            LevelName="slum7_03",
-            BGActorName="BenchActor_42",
-            AttributeList_Array=["objCmn_ProgBench"],
-        ),
-        _entry(
-            1,
-            "slum7_vending_layout",
-            LevelName="slum7_03",
-            BGActorName="VendingActor_9",
-            AttributeList_Array=["objCmn_ProgVendingMachine"],
-        ),
-    ]))
+    layout = _layout_pair()
     report = {
         "allEvidenceCandidates": [{
             "path": "End/Content/Maps/slum7/slum7_03.umap",
@@ -124,22 +128,6 @@ def test_object_layout_correlation_requires_exact_actor_name_and_level_path_matc
 
 
 def test_near_match_actor_name_is_rejected_instead_of_fuzzy_correlated():
-    layout = classify_object_layout_rows(_package([
-        _entry(
-            0,
-            "slum7_bench_layout",
-            LevelName="slum7_03",
-            BGActorName="BenchActor_42",
-            AttributeList_Array=["objCmn_ProgBench"],
-        ),
-        _entry(
-            1,
-            "slum7_vending_layout",
-            LevelName="slum7_03",
-            BGActorName="VendingActor_9",
-            AttributeList_Array=["objCmn_ProgVendingMachine"],
-        ),
-    ]))
     report = {
         "allEvidenceCandidates": [{
             "path": "End/Content/Maps/slum7/slum7_03.umap",
@@ -147,27 +135,10 @@ def test_near_match_actor_name_is_rejected_instead_of_fuzzy_correlated():
             "vendingExports": [{"index": 11, "objectName": "VendingActor_9"}],
         }],
     }
-
-    assert correlate_object_layout_rows(layout, report) == []
+    assert correlate_object_layout_rows(_layout_pair(), report) == []
 
 
 def test_matching_actor_names_in_wrong_level_are_rejected():
-    layout = classify_object_layout_rows(_package([
-        _entry(
-            0,
-            "slum7_bench_layout",
-            LevelName="slum7_03",
-            BGActorName="BenchActor_42",
-            AttributeList_Array=["objCmn_ProgBench"],
-        ),
-        _entry(
-            1,
-            "slum7_vending_layout",
-            LevelName="slum7_03",
-            BGActorName="VendingActor_9",
-            AttributeList_Array=["objCmn_ProgVendingMachine"],
-        ),
-    ]))
     report = {
         "allEvidenceCandidates": [{
             "path": "End/Content/Maps/slum7/slum7_09.umap",
@@ -175,27 +146,32 @@ def test_matching_actor_names_in_wrong_level_are_rejected():
             "vendingExports": [{"index": 11, "objectName": "VendingActor_9"}],
         }],
     }
+    assert correlate_object_layout_rows(_layout_pair(), report) == []
 
-    assert correlate_object_layout_rows(layout, report) == []
+
+def test_near_match_level_name_is_rejected_instead_of_compact_substring_correlated():
+    report = {
+        "allEvidenceCandidates": [{
+            "path": "End/Content/Maps/slum7/slum7_030.umap",
+            "benchExports": [{"index": 10, "objectName": "BenchActor_42"}],
+            "vendingExports": [{"index": 11, "objectName": "VendingActor_9"}],
+        }],
+    }
+    assert correlate_object_layout_rows(_layout_pair(), report) == []
+
+
+def test_level_name_allows_explicit_child_package_suffix_boundary():
+    report = {
+        "allEvidenceCandidates": [{
+            "path": "End/Content/Maps/slum7/slum7_03_sub.umap",
+            "benchExports": [{"index": 10, "objectName": "BenchActor_42"}],
+            "vendingExports": [{"index": 11, "objectName": "VendingActor_9"}],
+        }],
+    }
+    assert len(correlate_object_layout_rows(_layout_pair(), report)) == 1
 
 
 def test_bench_and_vending_layout_rows_must_share_same_level_name():
-    layout = classify_object_layout_rows(_package([
-        _entry(
-            0,
-            "slum7_bench_layout",
-            LevelName="slum7_03",
-            BGActorName="BenchActor_42",
-            AttributeList_Array=["objCmn_ProgBench"],
-        ),
-        _entry(
-            1,
-            "slum7_vending_layout",
-            LevelName="slum7_04",
-            BGActorName="VendingActor_9",
-            AttributeList_Array=["objCmn_ProgVendingMachine"],
-        ),
-    ]))
     report = {
         "allEvidenceCandidates": [{
             "path": "End/Content/Maps/slum7/slum7_03.umap",
@@ -203,5 +179,6 @@ def test_bench_and_vending_layout_rows_must_share_same_level_name():
             "vendingExports": [{"index": 11, "objectName": "VendingActor_9"}],
         }],
     }
-
-    assert correlate_object_layout_rows(layout, report) == []
+    assert correlate_object_layout_rows(
+        _layout_pair(bench_level="slum7_03", vending_level="slum7_04"), report
+    ) == []
