@@ -78,8 +78,9 @@ SEMANTIC_FINGERPRINTS: dict[str, dict[str, Any]] = {
 
 
 def _tag_words(tag: str) -> tuple[str, ...]:
-    """Split snake/kebab/space and CamelCase identifiers into lowercase tokens."""
-    expanded = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", str(tag))
+    """Split separators, CamelCase, and acronym-to-word boundaries."""
+    expanded = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1 \2", str(tag))
+    expanded = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", expanded)
     return tuple(
         token.casefold()
         for token in re.findall(r"[A-Za-z]+|\d+", expanded)
