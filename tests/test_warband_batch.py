@@ -28,13 +28,15 @@ class CoverageTests(unittest.TestCase):
         for key,value in {'PROJECT':self.root,'MODULE_SYSTEM':self.root/'ModuleSystem','SETTINGS':self.root/'settings.ini'}.items():
             p=patch.object(server,key,value);p.start();self.addCleanup(p.stop)
 
-    def test_only_structured_settings_count_integrated(self):
+    def test_structured_settings_and_items_count_integrated(self):
         rows={r['filename']:r for r in server.data_map_rows()['rows']}
         self.assertEqual(rows['settings.ini']['coverage'],'structured')
         self.assertEqual(rows['module_skills.py']['coverage'],'source')
-        self.assertEqual(rows['module_items.py']['coverage'],'view')
+        self.assertEqual(rows['module_items.py']['coverage'],'structured')
+        self.assertEqual(rows['module_items.py']['status'],'integrated')
+        self.assertEqual(rows['module_items.py']['view'],'items')
         self.assertEqual(rows['module_troops.py']['view'],'troops')
-        self.assertEqual(server.data_map_rows()['counts']['integrated'],1)
+        self.assertEqual(server.data_map_rows()['counts']['integrated'],2)
         self.assertTrue(rows['module_skills.py']['openable'])
         self.assertFalse(rows['module_quests.py']['openable'])
         self.assertEqual(rows['module_quests.py']['coverage'],'unavailable')
@@ -141,6 +143,20 @@ class IconTests(unittest.TestCase):
             self.assertEqual(image.size,(192,192));self.assertEqual(image.format,'PNG')
             self.assertGreater(len(set(image.get_flattened_data() if hasattr(image,"get_flattened_data") else image.getdata())),2)
             self.assertEqual(image.getpixel((0,0)),(222,216,203,255))
+    def test_geometry_chooses_yaw_without_per_item_overrides(self):
+        base=[[-3,-1,0],[3,-1,0],[3,1,0],[-3,1,0]]
+        rotated=[[-y,x,z] for x,y,z in base]
+        def projected_variance(points):
+            yaw=icons._canonical_yaw(points);c,s=__import__('math').cos(yaw),__import__('math').sin(yaw)
+            projected=[(c*x+s*(-y),-s*x+c*(-y)) for x,y,_z in points]
+            mx=sum(x for x,_ in projected)/len(projected);mz=sum(z for _,z in projected)/len(projected)
+            return sum((x-mx)**2 for x,_ in projected),sum((z-mz)**2 for _,z in projected)
+        for points in (base,rotated):
+            wide,deep=projected_variance(points)
+            self.assertGreater(wide,deep*5)
+        square=[[-1,-1,0],[1,-1,0],[1,1,0],[-1,1,0]]
+        self.assertAlmostEqual(icons._canonical_yaw(square),.64)
+
     def test_renderer_revision_part_of_identity(self):
         before=icons.icon_key('a'*64)
         with patch.object(icons,'RENDER_VERSION','changed'):self.assertNotEqual(before,icons.icon_key('a'*64))
