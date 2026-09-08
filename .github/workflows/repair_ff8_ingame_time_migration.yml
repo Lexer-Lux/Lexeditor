@@ -1,0 +1,36 @@
+name: Repair FF8 clock migration seam
+on:
+  push:
+    branches: [master]
+    paths: ['.github/workflows/repair_ff8_ingame_time_migration.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 1
+      - name: Make the duplicate payload seam explicit
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tools/apply_ff8_ingame_time.py')
+          t=p.read_text(encoding='utf-8')
+          old='''    text = replace_once(text, '        "gfHpBars": gf_hp_bars,\\n        "noMagicConsumption": no_magic_consumption,\\n', '        "gfHpBars": gf_hp_bars,\\n        "inGameTime": in_game_time,\\n        "noMagicConsumption": no_magic_consumption,\\n', "load clock payload")\n'''
+          new='''    old_payload = '        "gfHpBars": gf_hp_bars,\\n        "noMagicConsumption": no_magic_consumption,\\n'\n    new_payload = '        "gfHpBars": gf_hp_bars,\\n        "inGameTime": in_game_time,\\n        "noMagicConsumption": no_magic_consumption,\\n'\n    if text.count(old_payload) != 2:\n        raise RuntimeError(f"load/save clock payload: expected two integration seams, found {text.count(old_payload)}")\n    text = text.replace(old_payload, new_payload, 1)\n'''
+          if t.count(old)!=1:
+              raise SystemExit(f'expected one migration statement, found {t.count(old)}')
+          p.write_text(t.replace(old,new,1),encoding='utf-8',newline='\n')
+          PY
+          python -m py_compile tools/apply_ff8_ingame_time.py
+      - name: Commit repair
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tools/apply_ff8_ingame_time.py
+          git commit -m 'Fix guarded FF8 clock payload seam'
+          git push origin HEAD:master
