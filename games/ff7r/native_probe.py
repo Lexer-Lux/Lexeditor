@@ -375,7 +375,7 @@ def _bounded_function_code_refs(image: PEImage, function: RuntimeFunction) -> di
     def append_ref(kind: str, index: int, target_rva: int) -> bool:
         nonlocal refs_truncated
         target = _pdata_code_target(image, target_rva)
-        if target is None:
+        if target is None or target["targetFunctionRva"] == function.begin_rva:
             return False
         refs.append({
             "kind": kind,
@@ -558,7 +558,7 @@ def probe_bytes(data: bytes, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dic
             "AMD64 candidate function ranges prefer PE exception-directory (.pdata) unwind metadata when available.",
             "When unwind metadata is unavailable, candidate starts fall back to compiler-padding heuristics.",
             "Candidate byte windows are raw executable evidence for signature research; they are not instruction-decoded or stability-validated.",
-            "Candidate function code refs are opcode-shape heuristics restricted to .pdata-described .text targets; they are not a full disassembly.",
+            "Candidate function code refs are opcode-shape heuristics restricted to cross-function .pdata-described .text targets; they are not a full disassembly.",
             "The probe is read-only and does not modify the installed executable.",
         ],
     }
