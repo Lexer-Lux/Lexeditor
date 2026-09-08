@@ -9,8 +9,9 @@ call/argument semantics.
 
 Reflected Unreal names often land in registration glue. When the generic native
 probe has exact PE ``.pdata`` function bounds, it also reports conservative
-cross-function next hops. This classifier records those separately from direct
-string-owner functions rather than pretending a next hop is already a hook.
+cross-function next hops and exact inbound callers. This classifier records
+those separately from direct string-owner functions rather than pretending a
+code-reference relationship is already a hook.
 """
 
 from __future__ import annotations
@@ -77,10 +78,21 @@ def _hit_counts(native: dict[str, Any], needles: Iterable[str]) -> dict[str, int
     }
 
 
+def _caller_rvas(inbound: dict[str, Any] | None) -> set[int]:
+    callers: set[int] = set()
+    for ref in (inbound or {}).get("refs", ()):
+        value = ref.get("sourceFunctionRva")
+        if value is not None:
+            callers.add(int(value))
+    return callers
+
+
 def _function_evidence(native: dict[str, Any], needles: Iterable[str]) -> dict[str, set[int]]:
-    """Collect direct bounded string owners and their trusted cross-function hops."""
+    """Collect exact direct owners, bounded next hops, and exact inbound callers."""
     direct: set[int] = set()
     next_hops: set[int] = set()
+    direct_callers: set[int] = set()
+    next_hop_callers: set[int] = set()
     for needle in needles:
         row = _needle_row(native, needle)
         for hit in row.get("hits", ()):
@@ -88,25 +100,37 @@ def _function_evidence(native: dict[str, Any], needles: Iterable[str]) -> dict[s
                 source = xref.get("candidateFunctionSource")
                 rva = xref.get("candidateFunctionRva")
                 # Older/synthetic evidence without a source can still be shown as
-                # a direct candidate; stronger cross-function navigation requires
-                # the explicit exact-bounds marker.
+                # a direct candidate; stronger code navigation requires exact
+                # .pdata provenance.
                 if rva is not None and source in (None, "pdata"):
                     direct.add(int(rva))
                 if source != "pdata":
                     continue
-                # The generic probe emits code refs only for exact .pdata-bounded
-                # functions. Recheck that provenance here so malformed inputs
-                # cannot smuggle heuristic next hops into the stronger evidence.
+                direct_callers.update(
+                    _caller_rvas(xref.get("candidateFunctionInboundCodeRefs"))
+                )
                 code_refs = xref.get("candidateFunctionCodeRefs") or {}
                 for ref in code_refs.get("refs", ()):
                     target = ref.get("targetFunctionRva")
                     if target is not None:
                         next_hops.add(int(target))
-    return {"direct": direct, "nextHops": next_hops}
+                    next_hop_callers.update(
+                        _caller_rvas(ref.get("targetFunctionInboundCodeRefs"))
+                    )
+    return {
+        "direct": direct,
+        "nextHops": next_hops,
+        "directCallers": direct_callers,
+        "nextHopCallers": next_hop_callers,
+    }
 
 
 def _all_functions(evidence: dict[str, set[int]]) -> set[int]:
     return set(evidence["direct"]) | set(evidence["nextHops"])
+
+
+def _all_callers(evidence: dict[str, set[int]]) -> set[int]:
+    return set(evidence["directCallers"]) | set(evidence["nextHopCallers"])
 
 
 def _function_clusters(native: dict[str, Any]) -> list[dict[str, Any]]:
@@ -185,31 +209,41 @@ def assess_cutscene_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
 
     speed_direct = set_speed["direct"] | get_speed["direct"]
     speed_all = _all_functions(set_speed) | _all_functions(get_speed)
+    speed_callers = _all_callers(set_speed) | _all_callers(get_speed)
     cut_direct = cut_channel["direct"]
     cut_all = _all_functions(cut_channel)
+    cut_callers = _all_callers(cut_channel)
     lifecycle_action_direct = lifecycle_action["direct"]
     lifecycle_action_all = _all_functions(lifecycle_action)
+    lifecycle_action_callers = _all_callers(lifecycle_action)
     fast_state_direct = fast_forward_state["direct"]
     fast_state_all = _all_functions(fast_forward_state)
+    fast_state_callers = _all_callers(fast_forward_state)
 
     direct_cut_speed_overlap = sorted(speed_direct & cut_direct)
     reachable_cut_speed_overlap = sorted(speed_all & cut_all)
+    caller_cut_speed_overlap = sorted(speed_callers & cut_callers)
     direct_lifecycle_speed_overlap = sorted(lifecycle_action_direct & (speed_direct | cut_direct))
     reachable_lifecycle_speed_overlap = sorted(lifecycle_action_all & (speed_all | cut_all))
+    caller_lifecycle_speed_overlap = sorted(
+        lifecycle_action_callers & (speed_callers | cut_callers)
+    )
     direct_fast_forward_speed_overlap = sorted(fast_state_direct & (speed_direct | cut_direct))
     reachable_fast_forward_speed_overlap = sorted(fast_state_all & (speed_all | cut_all))
+    caller_fast_forward_speed_overlap = sorted(
+        fast_state_callers & (speed_callers | cut_callers)
+    )
+    caller_non_cut_speed_overlap = sorted(
+        _all_callers(non_cut) & (speed_callers | cut_callers)
+    )
 
     cut_contract_present = bool(
         speed_counts.get("SetGameSpeed")
         and speed_counts.get("GetGameSpeed")
         and speed_counts.get("EGameSpeed_CUT")
     )
-    # Generic EventScene/CutScene labels are useful search anchors but cannot
-    # establish the lifecycle call path. Require a generated callable action.
     lifecycle_present = any(lifecycle_action_counts.values())
     lifecycle_support_present = any(lifecycle_support_counts.values())
-    # Likewise, generic FastForward text cannot stand in for the generated
-    # SkipCinema/IsSkipCinema state contracts used to investigate held-R2.
     fast_forward_state_present = any(fast_state_counts.values())
     fast_forward_support_present = any(fast_support_counts.values())
 
@@ -241,8 +275,6 @@ def assess_cutscene_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
     else:
         blockers.append("native-fast-forward-to-speed-link-unvalidated")
 
-    # Even perfect co-location or a bounded code edge cannot prove whether the
-    # native R2 path replaces, multiplies, or independently layers time scale.
     blockers.extend((
         "base-times-native-fast-forward-formula-unvalidated",
         "cut-only-gameplay-speed-isolation-unvalidated",
@@ -254,6 +286,9 @@ def assess_cutscene_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
             "direct": sorted(evidence["direct"]),
             "nextHops": sorted(evidence["nextHops"]),
             "all": sorted(_all_functions(evidence)),
+            "directCallers": sorted(evidence["directCallers"]),
+            "nextHopCallers": sorted(evidence["nextHopCallers"]),
+            "allCallers": sorted(_all_callers(evidence)),
         }
 
     return {
@@ -278,17 +313,21 @@ def assess_cutscene_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
             "cutChannel": serialize(cut_channel),
             "cutSpeedDirectOverlap": direct_cut_speed_overlap,
             "cutSpeedReachableOverlap": reachable_cut_speed_overlap,
+            "cutSpeedCallerOverlap": caller_cut_speed_overlap,
             "cutsceneLifecycle": serialize(lifecycle),
             "cutsceneAction": serialize(lifecycle_action),
             "cutsceneSupport": serialize(lifecycle_support),
             "lifecycleSpeedDirectOverlap": direct_lifecycle_speed_overlap,
             "lifecycleSpeedReachableOverlap": reachable_lifecycle_speed_overlap,
+            "lifecycleSpeedCallerOverlap": caller_lifecycle_speed_overlap,
             "nativeFastForward": serialize(fast_forward),
             "nativeFastForwardState": serialize(fast_forward_state),
             "nativeFastForwardSupport": serialize(fast_forward_support),
             "fastForwardSpeedDirectOverlap": direct_fast_forward_speed_overlap,
             "fastForwardSpeedReachableOverlap": reachable_fast_forward_speed_overlap,
+            "fastForwardSpeedCallerOverlap": caller_fast_forward_speed_overlap,
             "nonCutSpeedCategories": serialize(non_cut),
+            "nonCutSpeedCallerOverlap": caller_non_cut_speed_overlap,
             "functionClusters": clusters,
         },
         "knownContracts": {
@@ -304,7 +343,8 @@ def assess_cutscene_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
             "Remake's generated EGameSpeed surface gives CUT its own speed category, so the intended base multiplier has a plausible cutscene-only channel without modifying SYSTEM or BATTLE categories.",
             "PlayCutScene/RequestPlayCutScene are treated as lifecycle action contracts. Generic EventScene/CutScene labels remain supporting navigation evidence and cannot satisfy the lifecycle-action blocker by themselves.",
             "SkipCinema/IsSkipCinema/IsSkipCinemaAtThisFrame are the specific native skip-state contracts used for held-R2 research. Generic FastForward evidence remains support-only and cannot satisfy the native fast-forward-state blocker.",
-            "When exact PE .pdata bounds are available, bounded CALL/JMP/code-LEA next hops are shown separately from direct reflected-string owner functions. A next hop is stronger navigation evidence, not semantic validation.",
+            "When exact PE .pdata bounds are available, bounded CALL/JMP/code-LEA next hops are shown separately from direct reflected-string owner functions. Exact inbound CALL/JMP callers are another directional correlation layer, not semantic validation.",
+            "Caller overlaps can expose a shared dispatcher/controller neighborhood without proving argument values, call ordering, held-R2 semantics, or a safe interception point.",
             "Multi-name direct owners can be Unreal reflection/registration glue; functionClusters keeps that provenance visible through registrationCollisionRisk.",
             "The requested behavior must preserve the game's native fast-forward factor and multiply it by the configured base rather than replacing it; that composition must be measured/validated on the installed build.",
             "No fixed executable offsets or enum-memory offsets are emitted by this probe.",
