@@ -322,13 +322,61 @@ def _string_hits(image: PEImage, needle: str) -> list[dict]:
     return hits
 
 
-def _lea_rip_xrefs(image: PEImage, target_rva: int) -> list[dict]:
-    """Find common `REX.W + LEA reg,[RIP+disp32]` references to one RVA."""
+def _xref_candidate(image: PEImage, text: Section, raw: bytes, index: int) -> dict:
+    instruction_rva = text.virtual_address + index
+    runtime_function = image.runtime_function_for_rva(instruction_rva)
+    if runtime_function is not None:
+        function_rva = runtime_function.begin_rva
+        function_end_rva = runtime_function.end_rva
+        function_source = "pdata"
+        unwind_info_rva = runtime_function.unwind_info_rva
+    else:
+        function_rva = _nearest_padded_function_start(raw, index, text.virtual_address)
+        function_end_rva = None
+        function_source = "padding-heuristic" if function_rva is not None else None
+        unwind_info_rva = None
+
+    function_window = FUNCTION_WINDOW_BYTES
+    if function_rva is not None and function_end_rva is not None:
+        function_window = min(function_window, function_end_rva - function_rva)
+
+    return {
+        "instructionRva": instruction_rva,
+        "instructionVa": image.image_base + instruction_rva,
+        "candidateFunctionRva": function_rva,
+        "candidateFunctionVa": image.image_base + function_rva if function_rva is not None else None,
+        "candidateFunctionEndRva": function_end_rva,
+        "candidateFunctionEndVa": (
+            image.image_base + function_end_rva if function_end_rva is not None else None
+        ),
+        "candidateFunctionSource": function_source,
+        "candidateFunctionUnwindInfoRva": unwind_info_rva,
+        "candidateFunctionUnwindInfoVa": (
+            image.image_base + unwind_info_rva if unwind_info_rva is not None else None
+        ),
+        "xrefContext": _byte_window(
+            image,
+            instruction_rva,
+            before=XREF_CONTEXT_BEFORE,
+            after=XREF_CONTEXT_AFTER,
+        ),
+        "candidateFunctionBytes": (
+            _byte_window(image, function_rva, after=function_window)
+            if function_rva is not None
+            else None
+        ),
+    }
+
+
+def _lea_rip_xrefs_many(image: PEImage, target_rvas: Iterable[int]) -> dict[int, list[dict]]:
+    """Scan .text once for common RIP-relative LEAs resolving to requested RVAs."""
+    targets = {int(rva) for rva in target_rvas}
+    results = {rva: [] for rva in targets}
     text = image.section(".text")
-    if text is None:
-        return []
+    if text is None or not targets:
+        return results
     raw = image.data[text.raw_offset:text.raw_offset + text.raw_size]
-    results = []
+    remaining = set(targets)
     # 4? 8D /r, mod=00 r/m=101. This deliberately recognizes only the very
     # common RIP-relative LEA form instead of pretending to be an x86 decoder.
     for index in range(max(0, len(raw) - 7)):
@@ -341,55 +389,20 @@ def _lea_rip_xrefs(image: PEImage, target_rva: int) -> list[dict]:
         displacement = struct.unpack_from("<i", raw, index + 3)[0]
         instruction_rva = text.virtual_address + index
         resolved = instruction_rva + 7 + displacement
-        if resolved != target_rva:
+        if resolved not in remaining:
             continue
-
-        runtime_function = image.runtime_function_for_rva(instruction_rva)
-        if runtime_function is not None:
-            function_rva = runtime_function.begin_rva
-            function_end_rva = runtime_function.end_rva
-            function_source = "pdata"
-            unwind_info_rva = runtime_function.unwind_info_rva
-        else:
-            function_rva = _nearest_padded_function_start(raw, index, text.virtual_address)
-            function_end_rva = None
-            function_source = "padding-heuristic" if function_rva is not None else None
-            unwind_info_rva = None
-
-        function_window = FUNCTION_WINDOW_BYTES
-        if function_rva is not None and function_end_rva is not None:
-            function_window = min(function_window, function_end_rva - function_rva)
-
-        result = {
-            "instructionRva": instruction_rva,
-            "instructionVa": image.image_base + instruction_rva,
-            "candidateFunctionRva": function_rva,
-            "candidateFunctionVa": image.image_base + function_rva if function_rva is not None else None,
-            "candidateFunctionEndRva": function_end_rva,
-            "candidateFunctionEndVa": (
-                image.image_base + function_end_rva if function_end_rva is not None else None
-            ),
-            "candidateFunctionSource": function_source,
-            "candidateFunctionUnwindInfoRva": unwind_info_rva,
-            "candidateFunctionUnwindInfoVa": (
-                image.image_base + unwind_info_rva if unwind_info_rva is not None else None
-            ),
-            "xrefContext": _byte_window(
-                image,
-                instruction_rva,
-                before=XREF_CONTEXT_BEFORE,
-                after=XREF_CONTEXT_AFTER,
-            ),
-            "candidateFunctionBytes": (
-                _byte_window(image, function_rva, after=function_window)
-                if function_rva is not None
-                else None
-            ),
-        }
-        results.append(result)
-        if len(results) >= MAX_XREFS_PER_STRING:
-            break
+        bucket = results[resolved]
+        bucket.append(_xref_candidate(image, text, raw, index))
+        if len(bucket) >= MAX_XREFS_PER_STRING:
+            remaining.remove(resolved)
+            if not remaining:
+                break
     return results
+
+
+def _lea_rip_xrefs(image: PEImage, target_rva: int) -> list[dict]:
+    """Compatibility helper for one target RVA."""
+    return _lea_rip_xrefs_many(image, (target_rva,)).get(target_rva, [])
 
 
 def _nearest_padded_function_start(text: bytes, index: int, text_rva: int) -> int | None:
@@ -411,11 +424,17 @@ def _nearest_padded_function_start(text: bytes, index: int, text_rva: int) -> in
 def probe_bytes(data: bytes, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dict:
     image = PEImage.from_bytes(data)
     entries = []
+    target_rvas = set()
     for needle in needles:
         strings = _string_hits(image, str(needle))
-        for hit in strings:
-            hit["leaRipXrefs"] = _lea_rip_xrefs(image, hit["rva"])
+        target_rvas.update(hit["rva"] for hit in strings)
         entries.append({"needle": str(needle), "hits": strings})
+
+    xrefs = _lea_rip_xrefs_many(image, target_rvas)
+    for entry in entries:
+        for hit in entry["hits"]:
+            hit["leaRipXrefs"] = xrefs.get(hit["rva"], [])
+
     return {
         "machine": image.machine,
         "machineHex": f"0x{image.machine:04X}",
