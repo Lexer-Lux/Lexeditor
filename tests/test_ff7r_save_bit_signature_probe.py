@@ -1,5 +1,6 @@
 from games.ff7r.save_bit_signature_probe import (
     analyze_controlled_bit_signatures,
+    assess_indexed_bitset_layout,
     validate_controlled_bit_signatures,
 )
 from games.ff7r.save_diff_probe import SavePair
@@ -237,3 +238,94 @@ def test_holdout_validation_requires_group_coverage_for_full_confirmation():
     assert result["missingHoldoutGroups"] == ["enemy-b"]
     assert result["allDiscoveryCandidatesConfirmed"] is False
     assert result["exactHoldoutAgreement"] is False
+
+
+def test_enemybook_indices_detect_contiguous_bitset_across_byte_boundary():
+    groups = {
+        "enemy-a": [_pair((12, 0x40)), _pair((12, 0x40))],
+        "enemy-b": [_pair((12, 0x80)), _pair((12, 0x80))],
+        "enemy-c": [_pair((13, 0x01)), _pair((13, 0x01))],
+    }
+    controls = [_pair((70, 0x20)), _pair((70, 0x20))]
+    bit_analysis = analyze_controlled_bit_signatures(groups, controls)
+
+    result = assess_indexed_bitset_layout(
+        bit_analysis,
+        {"enemy-a": 6, "enemy-b": 7, "enemy-c": 8},
+    )
+
+    assert result["candidateSource"] == "discovery"
+    assert result["mappedGroupCount"] == 3
+    assert result["bestSupportGroupCount"] == 3
+    assert result["uniqueBestLayout"] is True
+    assert result["uniqueBestBaseBit"] == 96
+    assert result["exactMappedAgreement"] is True
+    assert result["exactBaseBit"] == 96
+    layout = result["layoutCandidates"][0]
+    assert layout["baseByteOffset"] == 12
+    assert layout["baseBitInByte"] == 0
+    assert layout["supportingGroups"] == ["enemy-a", "enemy-b", "enemy-c"]
+    assert layout["predictedLocations"]["enemy-c"] == {
+        "enemyBookId": 8,
+        "absoluteBit": 104,
+        "offset": 13,
+        "bit": 0,
+        "mask": 0x01,
+    }
+    assert result["implementationReady"] is False
+
+
+def test_enemybook_index_mismatch_does_not_promote_single_group_coincidences():
+    groups = {
+        "enemy-a": [_pair((12, 0x01)), _pair((12, 0x01))],
+        "enemy-b": [_pair((12, 0x02)), _pair((12, 0x02))],
+    }
+    controls = [_pair((70, 0x20)), _pair((70, 0x20))]
+    bit_analysis = analyze_controlled_bit_signatures(groups, controls)
+
+    result = assess_indexed_bitset_layout(
+        bit_analysis,
+        {"enemy-a": 0, "enemy-b": 2},
+    )
+
+    assert result["bestSupportGroupCount"] == 1
+    assert result["uniqueBestLayout"] is False
+    assert result["uniqueBestBaseBit"] is None
+    assert result["exactMappedAgreement"] is False
+    assert all(
+        row["plausibleContiguousBitsetCandidate"] is False
+        for row in result["layoutCandidates"]
+    )
+
+
+def test_indexed_layout_uses_only_holdout_confirmed_candidates_when_available():
+    validation = {
+        "confirmedCandidates": [
+            {"group": "enemy-a", "offset": 20, "bit": 2, "mask": 0x04},
+            {"group": "enemy-b", "offset": 20, "bit": 3, "mask": 0x08},
+        ],
+        "discovery": {
+            "exclusiveSingleBitFlagCandidates": [
+                {"group": "enemy-a", "offset": 1, "bit": 0, "mask": 0x01},
+            ],
+        },
+    }
+
+    result = assess_indexed_bitset_layout(
+        validation,
+        {"enemy-a": 2, "enemy-b": 3},
+    )
+
+    assert result["candidateSource"] == "holdout-confirmed"
+    assert result["exactMappedAgreement"] is True
+    assert result["exactBaseBit"] == 160
+
+
+def test_indexed_layout_rejects_duplicate_enemybook_ids():
+    analysis = {"exclusiveSingleBitFlagCandidates": []}
+    try:
+        assess_indexed_bitset_layout(analysis, {"enemy-a": 3, "enemy-b": 3})
+    except ValueError as error:
+        assert "assigned to both" in str(error)
+    else:
+        raise AssertionError("expected duplicate EnemyBookID ValueError")
