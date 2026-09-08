@@ -23,12 +23,13 @@ def _text_fixture():
         "$GuardDog": "Guard Dog",
         "$Soldier": "Security Officer",
         "$Potion": "Potion",
+        "$PotionAbility": "Restore HP.",
     }
     owners = {key: "End/Text/US/Resident_TxtRes" for key in lookup}
     return lookup, owners, []
 
 
-def test_dog_whistle_probe_correlates_item_names_chapter_awards_canines_and_runtime(monkeypatch):
+def test_dog_whistle_probe_correlates_item_ability_chapter_canines_and_runtime(monkeypatch):
     item = _package(
         "End/DataObject/Item",
         ["ItemNameLabel", "AbilityID", "Category"],
@@ -37,6 +38,22 @@ def test_dog_whistle_probe_correlates_item_names_chapter_awards_canines_and_runt
             _entry("KEY_WEDGE_WHISTLE", {"ItemNameLabel": "$DogWhistle", "AbilityID": "", "Category": 5}),
         ],
         names=["Item", "POTION", "KEY_WEDGE_WHISTLE", "DogWhistle"],
+    )
+    ability = _package(
+        "End/DataObject/BattleAbility",
+        ["UniqueID", "Name", "CommandType", "CommandTargetType", "ATB", "MP", "TargetCount"],
+        [
+            _entry("PotionAbility", {
+                "UniqueID": 100,
+                "Name": "$PotionAbility",
+                "CommandType": 2,
+                "CommandTargetType": 1,
+                "ATB": 1000,
+                "MP": 0,
+                "TargetCount": 1,
+            }),
+        ],
+        names=["BattleAbility", "PotionAbility", "DogWhistleAbility"],
     )
     chapter = _package(
         "End/DataObject/Chapter",
@@ -68,6 +85,7 @@ def test_dog_whistle_probe_correlates_item_names_chapter_awards_canines_and_runt
 
     packages = {
         probe.ITEM_TABLE: item,
+        probe.BATTLE_ABILITY_TABLE: ability,
         probe.CHAPTER_TABLE: chapter,
         probe.ENEMY_BOOK_TABLE: enemy_book,
         probe.BATTLE_CHARA_TABLE: battle,
@@ -84,8 +102,18 @@ def test_dog_whistle_probe_correlates_item_names_chapter_awards_canines_and_runt
     assert result["item"]["unusedWhistleNameMapCandidates"] == ["DogWhistle"]
     assert result["item"]["rowCandidates"][0]["tag"] == "KEY_WEDGE_WHISTLE"
     assert result["item"]["abilityBackedTemplateCandidates"][0]["tag"] == "POTION"
-    template_text = result["item"]["abilityBackedTemplateCandidates"][0]["resolvedText"][0]
+    linked = result["item"]["linkedBattleAbilityTemplateCandidates"][0]
+    assert linked["battleAbilityTag"] == "PotionAbility"
+    assert linked["battleAbilityValues"]["ATB"] == 1000
+    assert linked["battleAbilityValues"]["CommandTargetType"] == 1
+    assert result["item"]["unresolvedAbilityTemplateCandidates"] == []
+    template_text = linked["resolvedText"][0]
     assert template_text["textAsset"] == "End/Text/US/Resident_TxtRes"
+
+    ability_result = result["battleAbility"]
+    assert ability_result["whistleNameMapCandidates"] == ["DogWhistleAbility"]
+    assert ability_result["unusedWhistleNameMapCandidates"] == ["DogWhistleAbility"]
+    assert "CommandType" in ability_result["properties"]
 
     chapter_result = result["chapterProgression"]
     assert chapter_result["referencedKeyItemsThatAreItemRows"] == ["KEY_WEDGE_WHISTLE"]
@@ -96,8 +124,25 @@ def test_dog_whistle_probe_correlates_item_names_chapter_awards_canines_and_runt
     canine = result["canineEnemies"][0]
     assert canine["enemyBookId"] == "EB_GUARD_DOG"
     assert canine["battleCharaRows"] == ["EN_GUARD_DOG"]
-    assert result["knownContracts"]["itemUseField"] == "Item.AbilityID"
+    assert result["knownContracts"]["itemUseField"].startswith("FEndDataTableItem.AbilityID")
+    assert result["knownContracts"]["activeEnemyEnumeration"].startswith("UEndBattleAPI::GetEnemyMembersRef")
+    assert result["knownContracts"]["battleCharaIdLookup"].startswith("UEndBattleAPI::GetBattleCharaSpec_DataTableID")
     assert result["knownContracts"]["enemyRetargetMethod"].endswith("SetTarget(AEndCharacter*)")
+
+
+def test_item_ability_id_without_matching_battleability_row_stays_explicitly_unresolved(monkeypatch):
+    item = _package(
+        "Item", ["AbilityID"], [_entry("POTION", {"AbilityID": "MissingAbility"})]
+    )
+    ability = _package("BattleAbility", ["CommandType"], [], names=["DogWhistleAbility"])
+    packages = {probe.ITEM_TABLE: item, probe.BATTLE_ABILITY_TABLE: ability}
+    monkeypatch.setattr(probe, "_load_data", lambda _g, _d, _i, name: packages.get(name))
+    monkeypatch.setattr(probe, "_all_text_map", lambda *_args, **_kwargs: ({}, {}, []))
+    monkeypatch.setattr(probe, "probe_installed_exe", lambda _root, *, needles: {"needles": []})
+
+    result = probe.probe_dog_whistle_sources("g", "d", "p", {})
+    assert result["item"]["linkedBattleAbilityTemplateCandidates"] == []
+    assert result["item"]["unresolvedAbilityTemplateCandidates"][0]["abilityId"] == "MissingAbility"
 
 
 def test_whistle_term_matching_handles_underscores_and_compact_identifiers():
@@ -129,3 +174,21 @@ def test_probe_does_not_claim_keyitem_award_targets_item_table_when_ids_do_not_c
     monkeypatch.setattr(probe, "probe_installed_exe", lambda _root, *, needles: {"needles": []})
     result = probe.probe_dog_whistle_sources("g", "d", "p", {})
     assert result["chapterProgression"]["referencedKeyItemsThatAreItemRows"] == []
+
+
+def test_native_probe_requests_full_active_enemy_and_item_dispatch_research_route(monkeypatch):
+    monkeypatch.setattr(probe, "_load_data", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(probe, "_all_text_map", lambda *_args, **_kwargs: ({}, {}, []))
+    captured = {}
+
+    def fake_native(_root, *, needles):
+        captured["needles"] = tuple(needles)
+        return {"needles": []}
+
+    monkeypatch.setattr(probe, "probe_installed_exe", fake_native)
+    probe.probe_dog_whistle_sources("g", "d", "p", {})
+    assert "GetEnemyMembersRef" in captured["needles"]
+    assert "GetBattleCharaSpec_DataTableID" in captured["needles"]
+    assert "GetBattleAIControllerFromID" in captured["needles"]
+    assert "SetTarget" in captured["needles"]
+    assert "RequestUseAbility" in captured["needles"]
