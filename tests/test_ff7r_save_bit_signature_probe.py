@@ -1,4 +1,7 @@
-from games.ff7r.save_bit_signature_probe import analyze_controlled_bit_signatures
+from games.ff7r.save_bit_signature_probe import (
+    analyze_controlled_bit_signatures,
+    validate_controlled_bit_signatures,
+)
 from games.ff7r.save_diff_probe import SavePair
 
 
@@ -164,3 +167,73 @@ def test_control_fully_explained_byte_drops_out_of_bit_candidates():
         "controlXorMask": None,
     }]
     assert result["implementationReady"] is False
+
+
+def test_holdout_validation_confirms_same_control_subtracted_enemy_bits():
+    discovery = {
+        "enemy-a": [_pair((12, 0x05), (80, 1)), _pair((12, 0x05), (81, 2))],
+        "enemy-b": [_pair((12, 0x06), (82, 3)), _pair((12, 0x06), (83, 4))],
+    }
+    holdout = {
+        "enemy-a": [_pair((12, 0x05), (86, 7)), _pair((12, 0x05), (87, 8))],
+        "enemy-b": [_pair((12, 0x06), (88, 9)), _pair((12, 0x06), (89, 10))],
+    }
+    controls = [_pair((12, 0x04), (84, 5)), _pair((12, 0x04), (85, 6))]
+
+    result = validate_controlled_bit_signatures(discovery, controls, holdout)
+
+    assert result["discoveryCandidateCount"] == 2
+    assert result["holdoutCandidateCount"] == 2
+    assert result["confirmedCandidates"] == [
+        {"group": "enemy-a", "offset": 12, "bit": 0, "mask": 0x01},
+        {"group": "enemy-b", "offset": 12, "bit": 1, "mask": 0x02},
+    ]
+    assert result["missingCandidates"] == []
+    assert result["unexpectedCandidates"] == []
+    assert result["missingHoldoutGroups"] == []
+    assert result["allDiscoveryCandidatesConfirmed"] is True
+    assert result["exactHoldoutAgreement"] is True
+    assert result["implementationReady"] is False
+
+
+def test_holdout_validation_exposes_missing_changed_and_unexpected_bits():
+    discovery = {
+        "enemy-a": [_pair((12, 0x01)), _pair((12, 0x01))],
+        "enemy-b": [_pair((12, 0x02)), _pair((12, 0x02))],
+    }
+    holdout = {
+        "enemy-a": [_pair((12, 0x04)), _pair((12, 0x04))],
+        "enemy-b": [_pair((12, 0x02)), _pair((12, 0x02))],
+    }
+    controls = [_pair((70, 0x80)), _pair((70, 0x80))]
+
+    result = validate_controlled_bit_signatures(discovery, controls, holdout)
+
+    assert result["confirmedCandidates"] == [
+        {"group": "enemy-b", "offset": 12, "bit": 1, "mask": 0x02},
+    ]
+    assert result["missingCandidates"] == [
+        {"group": "enemy-a", "offset": 12, "bit": 0, "mask": 0x01},
+    ]
+    assert result["unexpectedCandidates"] == [
+        {"group": "enemy-a", "offset": 12, "bit": 2, "mask": 0x04},
+    ]
+    assert result["allDiscoveryCandidatesConfirmed"] is False
+    assert result["exactHoldoutAgreement"] is False
+
+
+def test_holdout_validation_requires_group_coverage_for_full_confirmation():
+    discovery = {
+        "enemy-a": [_pair((12, 0x01)), _pair((12, 0x01))],
+        "enemy-b": [_pair((12, 0x02)), _pair((12, 0x02))],
+    }
+    holdout = {
+        "enemy-a": [_pair((12, 0x01)), _pair((12, 0x01))],
+    }
+    controls = [_pair((70, 0x80)), _pair((70, 0x80))]
+
+    result = validate_controlled_bit_signatures(discovery, controls, holdout)
+
+    assert result["missingHoldoutGroups"] == ["enemy-b"]
+    assert result["allDiscoveryCandidatesConfirmed"] is False
+    assert result["exactHoldoutAgreement"] is False
