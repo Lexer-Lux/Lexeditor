@@ -9,12 +9,16 @@ validated for the installed executable timestamp.
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 import struct
+import zlib
 
 
 RUNTIME_SCHEMA_VERSION = 1
@@ -23,6 +27,11 @@ RUNTIME_DLL_NAME = "LexeditorFF7RRuntime.dll"
 RUNTIME_CONFIG_NAME = "LexeditorFF7RRuntime.json"
 RUNTIME_MANIFEST_NAME = "LexeditorFF7RRuntime.manifest.json"
 NATIVE_MODS_DIR = "NativeMods"
+BUNDLED_RUNTIME_NAME = "LexeditorFF7RRuntime.dll.zlib.b85"
+BUNDLED_RUNTIME_PATH = Path(__file__).resolve().parent / "native_runtime" / BUNDLED_RUNTIME_NAME
+# Green Windows artifact produced by ff7r-native-loader-scaffold for commit
+# a62be77588e71dd5f4e62ad7be4c59aeecf6c6a9 (merged as #449).
+BUNDLED_RUNTIME_SHA256 = "ed9c7f252e517473d181e29e3d4b2fcc4856f8beb4794b6a5779df696977a071"
 REQUIRED_HOOKS = (
     "cutsceneSpeed",
     "minimapTapHold",
@@ -75,7 +84,12 @@ def manifest_path(project_root: Path) -> Path:
 
 
 def project_dll_path(project_root: Path) -> Path:
+    """Optional developer/test override for the bundled runtime binary."""
     return Path(project_root) / "runtime" / RUNTIME_DLL_NAME
+
+
+def bundled_dll_path() -> Path:
+    return BUNDLED_RUNTIME_PATH
 
 
 def deployed_dll_path(game_root: Path) -> Path:
@@ -92,6 +106,90 @@ def deployed_manifest_path(game_root: Path) -> Path:
 
 def _clone_default() -> dict:
     return json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
+
+
+def _sha256_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _sha256_file(path: Path) -> str | None:
+    try:
+        return _sha256_bytes(Path(path).read_bytes()) if Path(path).is_file() else None
+    except OSError:
+        return None
+
+
+def _decode_bundled_runtime() -> tuple[bytes | None, str]:
+    target = bundled_dll_path()
+    if not target.is_file():
+        return None, f"bundled runtime payload is missing: {target}"
+    try:
+        encoded = "".join(target.read_text(encoding="ascii").split()).encode("ascii")
+        compressed = base64.b85decode(encoded)
+        data = zlib.decompress(compressed)
+    except (OSError, ValueError, zlib.error) as error:
+        return None, f"bundled runtime payload could not be decoded: {error}"
+    digest = _sha256_bytes(data)
+    if digest != BUNDLED_RUNTIME_SHA256:
+        return None, (
+            "bundled runtime payload failed SHA-256 verification: "
+            f"expected {BUNDLED_RUNTIME_SHA256}, got {digest}"
+        )
+    if len(data) < 2 or data[:2] != b"MZ":
+        return None, "bundled runtime payload is not a Windows PE image"
+    return data, ""
+
+
+def _selected_runtime_binary(project_root: Path) -> dict:
+    override = project_dll_path(project_root)
+    if override.is_file():
+        try:
+            data = override.read_bytes()
+        except OSError as error:
+            return {
+                "present": False,
+                "source": "project",
+                "path": str(override),
+                "sha256": None,
+                "data": None,
+                "error": f"project runtime override could not be read: {error}",
+            }
+        if len(data) < 2 or data[:2] != b"MZ":
+            return {
+                "present": False,
+                "source": "project",
+                "path": str(override),
+                "sha256": _sha256_bytes(data),
+                "data": None,
+                "error": "project runtime override is not a Windows PE image",
+            }
+        return {
+            "present": True,
+            "source": "project",
+            "path": str(override),
+            "sha256": _sha256_bytes(data),
+            "data": data,
+            "error": "",
+        }
+
+    bundled, error = _decode_bundled_runtime()
+    if bundled is None:
+        return {
+            "present": False,
+            "source": "bundled",
+            "path": str(bundled_dll_path()),
+            "sha256": None,
+            "data": None,
+            "error": error,
+        }
+    return {
+        "present": True,
+        "source": "bundled",
+        "path": str(bundled_dll_path()),
+        "sha256": _sha256_bytes(bundled),
+        "data": bundled,
+        "error": "",
+    }
 
 
 def validate_runtime_config(value: dict) -> dict:
@@ -213,10 +311,24 @@ def _timestamp_value(value) -> int:
     return timestamp
 
 
+def _runtime_sha256(value) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or re.fullmatch(r"[0-9A-Fa-f]{64}", value) is None:
+        raise ValueError("runtimeDllSha256 must be a 64-character hexadecimal SHA-256 digest")
+    return value.lower()
+
+
 def validate_runtime_manifest(value: dict) -> dict:
     if not isinstance(value, dict):
         raise ValueError("runtime manifest must be an object")
-    allowed = {"manifestVersion", "hooks", "supportedExeTimestamps", "notes"}
+    allowed = {
+        "manifestVersion",
+        "hooks",
+        "supportedExeTimestamps",
+        "runtimeDllSha256",
+        "notes",
+    }
     if set(value) - allowed:
         raise ValueError("runtime manifest contains unsupported fields")
     if value.get("manifestVersion") != RUNTIME_MANIFEST_VERSION:
@@ -235,15 +347,19 @@ def validate_runtime_manifest(value: dict) -> dict:
     if not isinstance(raw_timestamps, list) or not raw_timestamps:
         raise ValueError("runtime manifest must list at least one supported executable timestamp")
     timestamps = sorted({_timestamp_value(item) for item in raw_timestamps})
+    dll_sha256 = _runtime_sha256(value.get("runtimeDllSha256"))
     notes = value.get("notes", "")
     if not isinstance(notes, str):
         raise ValueError("runtime manifest notes must be a string")
-    return {
+    result = {
         "manifestVersion": RUNTIME_MANIFEST_VERSION,
         "hooks": {name: hooks[name] for name in (*REQUIRED_HOOKS, *OPTIONAL_HOOKS) if name in hooks},
         "supportedExeTimestamps": timestamps,
         "notes": notes,
     }
+    if dll_sha256 is not None:
+        result["runtimeDllSha256"] = dll_sha256
+    return result
 
 
 def load_runtime_config(project_root: Path) -> dict:
@@ -326,6 +442,10 @@ def _manifest_state(game_root: Path, project_root: Path) -> tuple[dict | None, i
 def runtime_status(game_root: Path, project_root: Path) -> dict:
     project_dll = project_dll_path(project_root)
     deployed_dll = deployed_dll_path(game_root)
+    binary = _selected_runtime_binary(project_root)
+    bundled_bytes, bundled_error = _decode_bundled_runtime()
+    bundled_present = bundled_dll_path().is_file()
+    bundled_valid = bundled_bytes is not None
     loaders = [path for path in _loader_candidates(game_root) if path.is_file()]
     native_mods = Path(game_root) / NATIVE_MODS_DIR
     config = load_runtime_config(project_root)
@@ -340,19 +460,73 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
         and (not hp_requested or hp_hook_validated)
         and (not sprint_requested or sprint_hook_validated)
     )
-    ready = project_dll.is_file() and bool(loaders) and requested_hooks_validated and build_supported
-    active = deployed_dll.is_file() and bool(loaders) and requested_hooks_validated and build_supported
+
+    manifest_dll_sha = manifest.get("runtimeDllSha256") if manifest else None
+    binary_hash_validated = (
+        bool(binary["present"])
+        and (manifest_dll_sha is None or binary["sha256"] == manifest_dll_sha)
+    )
+    deployed_sha = _sha256_file(deployed_dll)
+    deployed_hash_validated = (
+        deployed_sha is not None
+        and (manifest_dll_sha is None or deployed_sha == manifest_dll_sha)
+    )
+    ready = (
+        bool(binary["present"])
+        and bool(loaders)
+        and requested_hooks_validated
+        and build_supported
+        and binary_hash_validated
+    )
+    active = (
+        deployed_dll.is_file()
+        and bool(loaders)
+        and requested_hooks_validated
+        and build_supported
+        and deployed_hash_validated
+    )
+
+    binary_error = binary["error"]
+    notes = (
+        "Runtime behavior patches require a native DLL, a compatible loader, validation for every enabled "
+        "runtime hook, and an installed executable timestamp covered by that manifest. "
+        "Lexeditor uses a project-local runtime DLL as a developer override when present; otherwise it uses "
+        "the bundled CI-built runtime after verifying its pinned SHA-256."
+    )
+    if manifest_dll_sha is not None and binary["present"] and not binary_hash_validated:
+        notes += (
+            f" The selected runtime binary SHA-256 {binary['sha256']} does not match manifest pin "
+            f"{manifest_dll_sha}."
+        )
+    if binary_error:
+        notes += f" Runtime binary error: {binary_error}"
+    if bundled_error and binary["source"] != "project":
+        notes += f" Bundled runtime error: {bundled_error}"
+
     return {
         "schemaVersion": RUNTIME_SCHEMA_VERSION,
         "config": config,
         "configPath": str(config_path(project_root)),
         "manifestPath": str(manifest_path(project_root)),
         "projectDllPath": str(project_dll),
+        "bundledDllPath": str(bundled_dll_path()),
         "deployedDllPath": str(deployed_dll),
         "deployedConfigPath": str(deployed_config_path(game_root)),
         "deployedManifestPath": str(deployed_manifest_path(game_root)),
         "projectDllPresent": project_dll.is_file(),
+        "bundledDllPresent": bundled_present,
+        "bundledDllValid": bundled_valid,
+        "bundledDllSha256": BUNDLED_RUNTIME_SHA256 if bundled_valid else None,
+        "runtimeBinaryPresent": bool(binary["present"]),
+        "runtimeBinarySource": binary["source"] if binary["present"] else "none",
+        "runtimeBinaryPath": binary["path"],
+        "runtimeBinarySha256": binary["sha256"],
+        "runtimeBinaryError": binary_error,
+        "manifestRuntimeDllSha256": manifest_dll_sha,
+        "runtimeBinaryHashValidated": binary_hash_validated,
         "deployedDllPresent": deployed_dll.is_file(),
+        "deployedDllSha256": deployed_sha,
+        "deployedDllHashValidated": deployed_hash_validated,
         "manifestPresent": manifest is not None,
         "manifest": manifest,
         "hooksValidated": hooks_validated,
@@ -371,21 +545,17 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
         "loaderCandidatePresent": bool(loaders),
         "runtimeReady": ready,
         "active": active,
-        "notes": (
-            "Runtime behavior patches require a native DLL, a compatible loader, validation for every enabled "
-            "runtime hook, and an installed executable timestamp covered by that manifest."
-        ),
+        "notes": notes,
     }
 
 
 def deploy_runtime(game_root: Path, project_root: Path) -> dict:
-    source_dll = project_dll_path(project_root)
-    if not source_dll.is_file():
-        raise RuntimeError(
-            f"FF7R native runtime DLL is not built: {source_dll}. "
-            "Runtime settings were not deployed."
-        )
     status = runtime_status(game_root, project_root)
+    if not status["runtimeBinaryPresent"]:
+        raise RuntimeError(
+            "No valid FF7R native runtime binary is available; runtime settings were not deployed. "
+            + status["notes"]
+        )
     if not status["loaderCandidatePresent"]:
         raise RuntimeError(
             "No compatible FF7R native loader proxy was detected in End/Binaries/Win64; "
@@ -406,23 +576,39 @@ def deploy_runtime(game_root: Path, project_root: Path) -> dict:
             f"FF7R runtime is not validated for installed executable timestamp "
             f"{status['installedExeTimestampHex']}; runtime was not deployed"
         )
+    if not status["runtimeBinaryHashValidated"]:
+        raise RuntimeError(
+            "FF7R runtime binary does not match the hook-validation manifest SHA-256; runtime was not deployed"
+        )
 
+    selected = _selected_runtime_binary(project_root)
+    if not selected["present"] or selected["data"] is None:
+        raise RuntimeError("FF7R runtime binary became unavailable during deployment")
     config = save_runtime_config(project_root, load_runtime_config(project_root))
     manifest = load_runtime_manifest(project_root)
     destination = deployed_dll_path(game_root)
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination_config = deployed_config_path(game_root)
     destination_manifest = deployed_manifest_path(game_root)
+
+    temporary_dll = destination.with_suffix(destination.suffix + ".tmp")
+    temporary_dll.write_bytes(selected["data"])
+    os.replace(temporary_dll, destination)
     for source, target in (
-        (source_dll, destination),
         (config_path(project_root), destination_config),
         (manifest_path(project_root), destination_manifest),
     ):
         temporary = target.with_suffix(target.suffix + ".tmp")
         shutil.copy2(source, temporary)
         os.replace(temporary, target)
+
+    deployed_sha = _sha256_file(destination)
+    if deployed_sha != selected["sha256"]:
+        raise RuntimeError("FF7R runtime DLL failed deployment SHA-256 readback verification")
     return {
         "dll": str(destination),
+        "dllSource": selected["source"],
+        "dllSha256": deployed_sha,
         "config": str(destination_config),
         "manifest": str(destination_manifest),
         "settings": config,
