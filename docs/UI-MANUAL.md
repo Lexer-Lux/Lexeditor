@@ -133,9 +133,10 @@ same linked record has the same hover behavior in every list, Table, Detail
 panel, and reference display.
 
 An **info bubble** is the filled circular `?` beside a property. Its circle,
-glyph, placement and interaction are shared. It is centred in the metadata space
-between the panel edge and the property label, and its glyph is centred inside the
-circle.
+glyph, placement and interaction are shared. The bubble is centered horizontally
+between the left edge of the property-label lane and the rendered right edge of
+the property-name text; it is not merely centered in a generic metadata slot.
+Its `?` glyph is optically centered inside the circle by the shared framework.
 
 Info-bubble text explains **meaning and consequences**, not visible UI metadata.
 It should tell a mod author what the property represents in the game/editor, what
