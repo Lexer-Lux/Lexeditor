@@ -21,7 +21,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: Apply Limit/name audit fixes
-        run: python tools/_ff7_limit_name_audit_patch.py
+        run: |
+          python tools/_ff7_limit_name_audit_patch.py
+          python tools/_ff7_limit_name_audit_fix.py
       - name: Compile changed Python
         run: python -m py_compile games/ff7/kernel.py games/ff7/kernel_extra.py games/ff7/extended.py games/ff7/semantics.py games/ff7/storage.py tools/verify_ff7_datasets.py tools/verify_ff7_extended.py tools/verify_ff7_semantic_surface.py tools/verify_ff7_rendered_neutral.py
       - name: Verify binary and semantic contracts
