@@ -20,8 +20,8 @@ from .dataobject import DataObjectPackage
 OBJECT_LAYOUT_TABLE = "objectlayout"
 AREA_TERM = "slum7"
 MAX_ROWS = 512
-BENCH_TERMS = ("objcmm_progbench", "objcmn_progbench", "benchbreak", "bench")
-VENDING_TERMS = ("objcmm_progvendingmachine", "objcmn_progvendingmachine", "vendingmachine", "vending")
+BENCH_TERMS = ("objcmn_progbench", "benchbreak", "bench")
+VENDING_TERMS = ("objcmn_progvendingmachine", "vendingmachine", "vending")
 
 
 def _basename(asset: str) -> str:
@@ -99,14 +99,19 @@ def classify_object_layout_rows(package: DataObjectPackage) -> dict[str, Any]:
 
 
 def _level_matches_path(level_name: str, path: str) -> bool:
+    """Require a path-component/stem boundary; never use compact substring matches."""
     level = str(level_name).strip().casefold()
     if not level:
         return False
     normalized = str(path).replace("\\", "/").casefold()
-    stem = PurePosixPath(normalized).stem
-    compact_level = level.replace("_", "").replace("-", "")
-    compact_path = normalized.replace("_", "").replace("-", "")
-    return level == stem or f"/{level}." in normalized or compact_level in compact_path
+    pure = PurePosixPath(normalized)
+    stem = pure.stem
+    parts = tuple(part.casefold() for part in pure.parts)
+    return bool(
+        stem == level
+        or stem.startswith(level + "_")
+        or level in parts
+    )
 
 
 def _actor_matches_export(actor_name: str, export: dict[str, Any]) -> bool:
@@ -225,7 +230,7 @@ def probe_chapter3_bench_with_layout(
     notes = list(bench_report.get("notes", ()))
     notes.extend([
         "ObjectLayout LevelName + BGActorName provides an independent installed identity bridge from a Sector 7 layout row to a specific cooked actor export.",
-        "A layout correlation is accepted only when BGActorName exactly matches the resolved export object and LevelName matches the candidate package path; fuzzy actor-name matching is not used.",
+        "A layout correlation is accepted only when BGActorName exactly matches the resolved export object and LevelName matches a package path component/stem boundary; fuzzy actor/level matching is not used.",
         "Even a unique ObjectLayout + export + Vector correlation remains read-only evidence. Suppression requires a proven per-instance mutation path that removes both visible bench and interaction/navigation behavior while preserving the vending actor.",
     ])
     return {
