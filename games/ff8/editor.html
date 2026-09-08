@@ -1957,30 +1957,20 @@
     const accuracyLuck=settings.formulaeRework?"attacker LUCK":"floor(attacker LUCK / 2)";
     const accuracy=el("section",{class:"formula-card"},el("h2",{},"PHYSICAL ACCURACY"),preset(),el("p",{},"A hit rate of 255 receives no bypass."),el("h3",{class:"formula-subheading"},"FORMULA"),el("div",{class:"formula-expression"},`EFFECTIVE = clamp(hit rate + ${accuracyLuck} − target EVA − target LUCK − flying penalty, 0, 100)`,el("br"),"HIT CHANCE = (floor(255 × EFFECTIVE / 100) + 1) / 256 × 100%"),el("h3",{class:"formula-subheading"},"EDITABLE FORMULA TERMS"),el("div",{class:"formula-terms"},formulaTerm("hit_rate","WEAPON HIT RATE","Weapon accuracy contributes directly to effective hit chance before target Evasion and Luck; FF8's special 255 value uses the always-hit bypass."),formulaTerm("melee","MELEE WEAPON","Marks the attack as close-range for this formula; grounded melee attacks take the flying-target accuracy penalty."),detailField({label:"FLYING EVA BONUS",help:infoHelp("This penalty applies to grounded melee attackers when the target is flying."),control:flyingTerm})),el("h3",{class:"formula-subheading"},"PREVIEW INPUTS"),el("div",{class:"formula-preview-inputs"},formulaInput("Attacker LUCK","luck",0,255),formulaInput("Target EVA","eva",0,255),formulaInput("Target LUCK","targetLuck",0,255),checkbox("Target is flying","flying"),checkbox("Attacker has Float","float")),accuracyOutput);
     function updateOutputs(){const value=calculate();damageOutput.textContent=`DAMAGE: ${formatNumber(value.low)} TO ${formatNumber(value.high)} · AVERAGE ${formatNumber(value.average)}`;accuracyOutput.textContent=`FLYING PENALTY: ${formatNumber(value.flyingPenalty)}% · HIT CHANCE: ${formatNumber(value.chance,{maximumFractionDigits:1})}%`}
-    // The stat rework, written out beside the vanilla rules so the two can be
-    // compared. Vanilla text is only shown where it has been transcribed from
-    // the game; the rest is marked rather than guessed at.
-    const reworkCard=(title,rework,vanilla)=>el("section",{class:"formula-card formula-rework"},
-      el("h2",{},title),
+    // The backend owns the complete requested inventory and each row's runtime
+    // status. A formula cannot disappear from this page merely because its native
+    // implementation is unfinished.
+    const formulaRows=settings.formulaeReworkFormulas||[];
+    const reworkCard=formula=>el("section",{class:"formula-card formula-rework","data-formula-id":formula.id},
+      el("h2",{},`${String(formula.name||formula.id).toUpperCase()} · ${formula.status==="implemented"?"IMPLEMENTED":"INCOMPLETE"}`),
       el("h3",{class:"formula-subheading"},"REWORKED"),
-      el("div",{class:"formula-expression"},rework),
+      el("div",{class:"formula-expression"},formula.replacement||"Not specified"),
       el("h3",{class:"formula-subheading"},"VANILLA"),
-      el("div",{class:"formula-expression formula-vanilla"},vanilla));
-    const master=el("section",{class:"formula-rework-master"},el("h2",{},"FORMULAE REWORK"),el("label",{class:"formula-rework-toggle"},el("span",{},"Use Lexer's reworked battle formulae"),formulaeRework),el("p",{},"This one mod-owned formula set includes full attacker LUCK in physical accuracy and spell power × MAG healing. The formula cards below define the complete requested rework."));
-    const rework=[
-      reworkCard("MELEE DAMAGE (REWORK)",
-        "DAMAGE = (attacker STR + weapon STR bonus) × weapon power, then a % reduction from the target's VIT",
-        "STR = min(255, attacker STR + weapon STR bonus); DAMAGE = floor(POWER × floor((265 − VIT) × (STR + floor(STR² / 16)) / 256) / 16) × RANDOM / 256"),
-      reworkCard("MAGIC DAMAGE (REWORK)",
-        "DAMAGE = spell power × attacker MAG, then a % reduction from the target's SPR",
-        "FF8_EN.exe Damage_ComputeMagicAndGF at 0x491AD0: BASE = trunc((265 − target SPR) × (spell power + caster MAG) / 4); SCALED = trunc(spell power × BASE / 256); ROLLED = trunc(random[240..272] × SCALED / 256). The game then halves ROLLED for a monster caster, Shell, and Defend in that order; applies ELEMENTAL = trunc(ROLLED × (900 − target elemental defence) / 100); treats a negative result as healing; and caps the final magnitude at 9,999."),
-      reworkCard("STATUS INFLICTION (REWORK)",
-        "CHANCE % = spell power + attacker MAG − target SPR, then the vanilla status-defence rules",
-        "FF8_EN.exe Battle_ApplyStatusWithResistRoll at 0x48F9F0: CHANCE = status accuracy + trunc(attacker stat / 4) − trunc(target stat / 4) − target status resistance. Physical branches use STR and VIT; magical and GF branches use MAG and SPR. A status already present, or resistance of 200 or more, fails first. Accuracy 255 then guarantees success. Otherwise CHANCE ≤ 0 fails; accuracy 250..254 succeeds without a random roll when CHANCE is positive; all other values succeed when trunc(CHANCE × 255 / 100) ≥ random[0..255]."),
-      reworkCard("SPELL HEALING (REWORK)",
-        "HEALING = spell power × attacker MAG",
-        "FF8_EN.exe Damage_ComputeCurativeMagic at 0x493280: HALF = trunc((spell power + caster MAG) / 2); HEALING = trunc(spell power × random[240..272] × HALF / 256). Shell halves the result. Zombie reverses the restorative sign so the same amount becomes damage. The routine then applies the spell's cure statuses unconditionally; status accuracy is not read on this path. This routine has no formula-result clamp; later battle HP handling applies the returned signed amount."),
-    ];
+      el("div",{class:"formula-expression formula-vanilla"},formula.vanilla||"Not documented"),
+      formula.blocker?el("p",{class:"readonly-note"},`INCOMPLETE: ${formula.blocker}`):null);
+    const implementedCount=formulaRows.filter(formula=>formula.status==="implemented").length;
+    const master=el("section",{class:"formula-rework-master"},el("h2",{},"FORMULAE REWORK"),el("label",{class:"formula-rework-toggle"},el("span",{},"Use Lexer's reworked battle formulae"),formulaeRework),el("p",{},`${implementedCount}/${formulaRows.length} requested runtime formulae are implemented. The owning toggle remains unavailable until every listed formula has a guarded game patch.`));
+    const rework=formulaRows.map(reworkCard);
     const view=el("div",{class:"formulae-view",oninput:()=>requestAnimationFrame(updateOutputs)},master,damage,accuracy,...rework);updateOutputs();
     $("#main").replaceChildren(view);
   }
