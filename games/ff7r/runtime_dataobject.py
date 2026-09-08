@@ -48,7 +48,7 @@ VIRTUAL_ASSET_ROWS = (
     },
 )
 
-_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v4").hexdigest()
+_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v5").hexdigest()
 
 
 @dataclass(frozen=True)
@@ -126,7 +126,12 @@ def _runtime_properties() -> list[VirtualProperty]:
         VirtualProperty("SprintSpeedMultiplier", "Sprint Speed Multiplier", "FLOAT", True, 0.000001, None),
         VirtualProperty("BetterSprintHookValidated", "Better Sprint Hook Validated", "BOOL"),
         VirtualProperty("LoaderCandidatePresent", "Native Loader Detected", "BOOL"),
-        VirtualProperty("ProjectDllPresent", "Runtime DLL Built", "BOOL"),
+        VirtualProperty("ProjectDllPresent", "Project Runtime DLL Override Present", "BOOL"),
+        VirtualProperty("BundledDllValid", "Bundled Runtime DLL Valid", "BOOL"),
+        VirtualProperty("RuntimeBinaryPresent", "Runtime Binary Available", "BOOL"),
+        VirtualProperty("RuntimeBinarySource", "Selected Runtime Binary Source", "STRING"),
+        VirtualProperty("RuntimeBinarySha256", "Selected Runtime Binary SHA-256", "STRING"),
+        VirtualProperty("RuntimeBinaryHashValidated", "Runtime Binary Matches Manifest", "BOOL"),
         VirtualProperty("ManifestPresent", "Validation Manifest Present", "BOOL"),
         VirtualProperty("HooksValidated", "Core Runtime Hooks Validated", "BOOL"),
         VirtualProperty("RequestedHooksValidated", "Configured Runtime Hooks Validated", "BOOL"),
@@ -141,7 +146,9 @@ def _runtime_properties() -> list[VirtualProperty]:
         VirtualProperty("ActiveRuntimeFeatures", "Active Runtime Features", "STRING"),
         VirtualProperty("HeartbeatError", "Runtime Heartbeat Error", "STRING"),
         VirtualProperty("InstalledExeTimestamp", "Installed EXE Timestamp", "STRING"),
-        VirtualProperty("ProjectDllPath", "Project Runtime DLL", "STRING"),
+        VirtualProperty("RuntimeBinaryPath", "Selected Runtime Binary", "STRING"),
+        VirtualProperty("ProjectDllPath", "Project Runtime DLL Override", "STRING"),
+        VirtualProperty("BundledDllPath", "Bundled Runtime Payload", "STRING"),
         VirtualProperty("ManifestPath", "Validation Manifest", "STRING"),
         VirtualProperty("RuntimeNotes", "Runtime Validation Notes", "STRING"),
     ]
@@ -171,6 +178,11 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
         "BetterSprintHookValidated": status["betterSprintHookValidated"],
         "LoaderCandidatePresent": status["loaderCandidatePresent"],
         "ProjectDllPresent": status["projectDllPresent"],
+        "BundledDllValid": status["bundledDllValid"],
+        "RuntimeBinaryPresent": status["runtimeBinaryPresent"],
+        "RuntimeBinarySource": status["runtimeBinarySource"],
+        "RuntimeBinarySha256": status["runtimeBinarySha256"] or "Unknown",
+        "RuntimeBinaryHashValidated": status["runtimeBinaryHashValidated"],
         "ManifestPresent": status["manifestPresent"],
         "HooksValidated": status["hooksValidated"],
         "RequestedHooksValidated": status["requestedHooksValidated"],
@@ -185,7 +197,9 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
         "ActiveRuntimeFeatures": ", ".join(status["activeFeatures"]) or "None",
         "HeartbeatError": status["heartbeatError"] or "None",
         "InstalledExeTimestamp": status["installedExeTimestampHex"] or "Unknown",
+        "RuntimeBinaryPath": status["runtimeBinaryPath"],
         "ProjectDllPath": status["projectDllPath"],
+        "BundledDllPath": status["bundledDllPath"],
         "ManifestPath": status["manifestPath"],
         "RuntimeNotes": status["notes"],
     }
