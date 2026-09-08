@@ -6,7 +6,7 @@ import unittest
 
 import verify_ff7_datasets as kernel_fixtures
 import verify_ff7_extended as extended_fixtures
-from games.ff7 import battle, datasets, extended, semantics
+from games.ff7 import battle, datasets, extended, semantics, server
 
 
 class SemanticSurfaceTests(unittest.TestCase):
@@ -50,6 +50,20 @@ class SemanticSurfaceTests(unittest.TestCase):
         rows=obj.records("limitBreaks")
         self.assertEqual((rows[0]["id"],rows[0]["gameId"]),(0,128))
         self.assertEqual((rows[-1]["id"],rows[-1]["gameId"]),(70,198))
+
+    def test_limit_text_linking_uses_kernel2_attack_indices(self):
+        def side(name, description):
+            return {
+                "texts":[
+                    {"id":9*65536+128,"values":{"text":name}},
+                    {"id":1*65536+128,"values":{"text":description}},
+                ],
+                "limitBreaks":[{"id":0,"gameId":128,"name":"Limit break 0","description":"Executable Limit attack data."}],
+            }
+        data={"records":side("Braver","Deal damage."),"vanilla":side("Vanilla Braver","Vanilla help.")}
+        server._link_limit_text(data)
+        self.assertEqual((data["records"]["limitBreaks"][0]["name"],data["records"]["limitBreaks"][0]["description"]),("Braver","Deal damage."))
+        self.assertEqual((data["vanilla"]["limitBreaks"][0]["name"],data["vanilla"]["limitBreaks"][0]["description"]),("Vanilla Braver","Vanilla help."))
 
     def test_extended_categories_are_humanized(self):
         categories={}
