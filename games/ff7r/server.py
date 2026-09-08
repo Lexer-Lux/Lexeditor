@@ -18,6 +18,11 @@ from .encounter_tweaks import (
     has_enabled_encounter_tweaks,
     materialize_encounter_tweaks,
 )
+from .graphics_tweaks import (
+    config_path as graphics_config_path,
+    deploy_graphics_tweaks,
+    graphics_status,
+)
 from .minimap_semantics import (
     ENEMY_TERRITORY_TABLE_NAME,
     HIDE_NAVIMAP_FIELD,
@@ -130,6 +135,8 @@ def data_map_payload() -> dict:
             semantic.append("reversible ATB tweak config materialized only when the ATB tweak is enabled")
         if group == "Lexeditor Encounters":
             semantic.append("reversible authored encounter edits materialized only when their tweak is enabled")
+        if group == "Lexeditor Graphics":
+            semantic.append("reversible Engine.ini graphics overrides applied only by explicit deployment")
         controls = (
             "Structured DataObject records; booleans, fixed-width numbers, floats "
             "and existing FNames are editable."
@@ -184,6 +191,7 @@ def info_payload() -> dict:
         if row.get("language")
     })
     runtime = runtime_status(GAME_ROOT, PROJECT_ROOT)
+    graphics = graphics_status(GAME_ROOT, PROJECT_ROOT)
     return {
         "gameRoot": str(GAME_ROOT),
         "dataRoot": str(DATA_ROOT),
@@ -193,6 +201,8 @@ def info_payload() -> dict:
         "textLanguages": languages,
         "helper": helper_status(),
         "runtime": runtime,
+        "graphics": graphics,
+        "engineIniPath": graphics["engineIniPath"],
         "pakVersion": preferred_pak_version(current),
         "pakMountPoint": FF7R_MOUNT_POINT,
         "buildPath": str(PROJECT_ROOT / "build" / "Lexeditor-FF7R_P.pak"),
@@ -200,6 +210,16 @@ def info_payload() -> dict:
             GAME_ROOT / "End" / "Content" / "Paks" / "~mods" / "Lexeditor-FF7R_P.pak"
         ),
     }
+
+
+def _has_pak_edits() -> bool:
+    content = PROJECT_ROOT / "content"
+    has_content = content.is_dir() and any(path.is_file() for path in content.rglob("*"))
+    return (
+        has_content
+        or has_enabled_data_overrides(PROJECT_ROOT)
+        or has_enabled_encounter_tweaks(PROJECT_ROOT)
+    )
 
 
 def build_mod() -> dict:
@@ -252,6 +272,29 @@ def deploy_mod() -> dict:
     shutil.copy2(built, temporary)
     temporary.replace(target)
     return {"path": str(target), "size": target.stat().st_size}
+
+
+def deploy_project() -> dict:
+    graphics = graphics_status(GAME_ROOT, PROJECT_ROOT)
+    graphics_configured = graphics_config_path(PROJECT_ROOT).is_file() or graphics["managedOverridePresent"]
+    if graphics["disableEyeAdaptationRequested"] and not graphics["deployReady"]:
+        raise RuntimeError(graphics["notes"])
+    has_pak = _has_pak_edits()
+    if not has_pak and not graphics_configured:
+        raise RuntimeError("The FF7R project has no saved edits to deploy")
+
+    pak_result = deploy_mod() if has_pak else None
+    graphics_result = (
+        deploy_graphics_tweaks(GAME_ROOT, PROJECT_ROOT)
+        if graphics_configured
+        else None
+    )
+    path = pak_result["path"] if pak_result else graphics_result["path"]
+    return {
+        "path": path,
+        "pak": pak_result,
+        "graphics": graphics_result,
+    }
 
 
 def _semantic_save_from_generic(asset: str, *, source_sha256: str,
@@ -379,8 +422,9 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": [
                         "data-map", "dataobject", "text-resource", "economy",
                         "enemy-loot", "minimap-visibility", "runtime-config", "native-probe",
-                        "encounter-tweaks", "save", "economy-save", "enemy-loot-save",
-                        "minimap-visibility-save", "text-save", "build", "deploy", "runtime-deploy",
+                        "encounter-tweaks", "graphics-tweaks", "save", "economy-save",
+                        "enemy-loot-save", "minimap-visibility-save", "text-save", "build",
+                        "deploy", "runtime-deploy", "graphics-deploy",
                     ],
                 })
             if path == "/api/catalog":
@@ -395,6 +439,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(status)
             if path == "/api/runtime/probe":
                 return self.send_json(probe_installed_exe(GAME_ROOT))
+            if path == "/api/graphics":
+                return self.send_json(graphics_status(GAME_ROOT, PROJECT_ROOT))
             if path == "/api/data":
                 asset = (query.get("asset") or [""])[0]
                 if not asset:
@@ -498,6 +544,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"config": save_runtime_config(PROJECT_ROOT, config)})
             if path == "/api/runtime/deploy":
                 return self.send_json(deploy_runtime(GAME_ROOT, PROJECT_ROOT))
+            if path == "/api/graphics/deploy":
+                return self.send_json(deploy_graphics_tweaks(GAME_ROOT, PROJECT_ROOT))
             if path == "/api/text/save":
                 asset = str(payload.get("asset", ""))
                 edits = payload.get("edits", [])
@@ -514,7 +562,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/build":
                 return self.send_json(build_mod())
             if path == "/api/deploy":
-                return self.send_json(deploy_mod())
+                return self.send_json(deploy_project())
             return self.send_json({"error": "Not found"}, 404)
         except (ValueError, KeyError, IndexError, TypeError, FileNotFoundError) as error:
             return self.send_json({"error": str(error)}, 400)

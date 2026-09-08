@@ -29,6 +29,14 @@ ENCOUNTER_VIRTUAL_ASSET_ROWS = (
         "synthetic": "encounter-tweaks",
     },
 )
+GRAPHICS_VIRTUAL_ASSET_ROWS = (
+    {
+        "asset": "Lexeditor/GraphicsTweaks",
+        "name": "Graphics Tweaks",
+        "group": "Lexeditor Graphics",
+        "synthetic": "graphics-tweaks",
+    },
+)
 
 
 def _normalize(path: str) -> str:
@@ -89,7 +97,12 @@ def _with_virtual_assets(payload: dict) -> dict:
     existing = {row.get("asset") for row in rows}
     # Semantic resources precede the long-standing runtime/research rows so
     # existing catalog-order assumptions about the Runtime Tweaks/Probe tail remain true.
-    for row in (*ATB_VIRTUAL_ASSET_ROWS, *ENCOUNTER_VIRTUAL_ASSET_ROWS, *VIRTUAL_ASSET_ROWS):
+    for row in (
+        *ATB_VIRTUAL_ASSET_ROWS,
+        *ENCOUNTER_VIRTUAL_ASSET_ROWS,
+        *GRAPHICS_VIRTUAL_ASSET_ROWS,
+        *VIRTUAL_ASSET_ROWS,
+    ):
         if row["asset"] not in existing:
             rows.append(dict(row))
             existing.add(row["asset"])
