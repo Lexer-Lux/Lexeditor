@@ -18,7 +18,8 @@ Examples:
     --group SecurityOfficer before-officer-1.sav after-officer-1.sav \
     --group SecurityOfficer before-officer-2.sav after-officer-2.sav \
     --control noop1 before-c1.sav after-c1.sav \
-    --control noop2 before-c2.sav after-c2.sav
+    --control noop2 before-c2.sav after-c2.sav \
+    --bit-signatures
 
 The tool is read-only and format-agnostic. It never modifies a save file.
 """
@@ -38,6 +39,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from games.ff7r.save_bit_signature_probe import (  # noqa: E402
+    analyze_controlled_bit_signatures,
+)
 from games.ff7r.save_control_probe import (  # noqa: E402
     analyze_controlled_experiment_groups,
     analyze_controlled_save_pairs,
@@ -60,11 +64,14 @@ def build_report(
     pair_specs: Sequence[Sequence[str]] = (),
     group_specs: Sequence[Sequence[str]] = (),
     control_specs: Sequence[Sequence[str]] = (),
+    bit_signatures: bool = False,
 ) -> dict:
     if pair_specs and group_specs:
         raise ValueError("use either --pair or --group experiments, not both")
     if control_specs and not (pair_specs or group_specs):
         raise ValueError("--control requires --pair or --group Assess experiments")
+    if bit_signatures and not (group_specs and control_specs):
+        raise ValueError("--bit-signatures requires --group experiments with --control")
     if pair_specs:
         pairs = [
             _read_pair(str(label), before, after)
@@ -94,6 +101,11 @@ def build_report(
                 _read_pair(str(label), before, after)
                 for label, before, after in control_specs
             ]
+            if bit_signatures:
+                return {
+                    "mode": "cross-enemy-bit-signatures-with-noop-control",
+                    "analysis": analyze_controlled_bit_signatures(groups, controls),
+                }
             return {
                 "mode": "cross-enemy-experiments-with-noop-control",
                 "analysis": analyze_controlled_experiment_groups(groups, controls),
@@ -126,6 +138,13 @@ def _parser() -> argparse.ArgumentParser:
         default=[], help="repeat for multiple named enemies to compare stable changes",
     )
     parser.add_argument(
+        "--bit-signatures", action="store_true",
+        help=(
+            "with --group and --control, resolve stable residual XOR masks into "
+            "per-enemy bit signatures and packed-flag-byte candidates"
+        ),
+    )
+    parser.add_argument(
         "--output", type=Path,
         help="optional JSON output path; stdout is used when omitted",
     )
@@ -139,6 +158,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             pair_specs=args.pair,
             group_specs=args.group,
             control_specs=args.control,
+            bit_signatures=args.bit_signatures,
         )
     except (OSError, ValueError, TypeError) as error:
         print(f"error: {error}", file=sys.stderr)
