@@ -15,6 +15,31 @@ def _asset(name, *strings):
     }
 
 
+def _resolved_lockon_asset(name="UI/ResolvedLockon"):
+    asset = _asset(name, "ColorAndOpacity")
+    asset["files"][0]["resolvedExports"] = [
+        {
+            "index": 0,
+            "packageIndex": 1,
+            "objectName": "BattleLockonMarker",
+            "objectPath": "WidgetTree.BattleLockonMarker",
+            "outerPath": "WidgetTree",
+            "className": "EndBattleLockonMarkerIcon",
+            "classPath": "/Script/EndGame.EndBattleLockonMarkerIcon",
+        },
+        {
+            "index": 1,
+            "packageIndex": 2,
+            "objectName": "LockOnText",
+            "objectPath": "WidgetTree.BattleLockonMarker.LockOnText",
+            "outerPath": "WidgetTree.BattleLockonMarker",
+            "className": "TextBlock",
+            "classPath": "/Script/UMG.TextBlock",
+        },
+    ]
+    return asset
+
+
 def test_dedicated_widget_with_presentation_fields_ranks_above_generic_anchor():
     ranked = rank_lockon_assets([
         _asset("UI/Generic", "BPShowBattleLockonMarkerIcon"),
@@ -54,3 +79,26 @@ def test_ranking_is_deterministic_for_equal_evidence():
     ])
 
     assert [row["asset"] for row in ranked] == ["UI/Alpha", "UI/Zed"]
+
+
+def test_resolved_widget_owner_outranks_printable_string_only_candidate():
+    ranked = rank_lockon_assets([
+        _asset("UI/StringOnly", "EndBattleLockonMarkerIcon", "ColorAndOpacity", "Visibility"),
+        _resolved_lockon_asset(),
+    ])
+
+    assert ranked[0]["asset"] == "UI/ResolvedLockon"
+    assert ranked[0]["resolvedDedicatedOwnerEvidence"] is True
+    assert ranked[0]["resolvedLabelChildEvidence"] is True
+    assert ranked[0]["strongPresentationCandidate"] is True
+
+
+def test_literal_label_without_resolved_owner_does_not_invent_object_ownership():
+    ranked = rank_lockon_assets([
+        _asset("UI/LabelOnly", "BattleLockonMarker", "LOCK ON", "ColorAndOpacity"),
+    ])
+
+    assert len(ranked) == 1
+    assert ranked[0]["containsLiteralLockOnLabel"] is True
+    assert ranked[0]["resolvedDedicatedOwnerEvidence"] is False
+    assert ranked[0]["resolvedLabelChildEvidence"] is False
