@@ -45,7 +45,9 @@ MAX_STRINGS_PER_FILE = 192
 MAX_OBJECT_ROWS_PER_FILE = 48
 MAX_SCAN_ERRORS = 128
 _ASCII_RE = re.compile(rb"[\x20-\x7e]{4,}")
-_UTF16_RE = re.compile(rb"(?:[\x20-\x7e]\x00){4,}")
+# Do not let the final printable byte of an adjacent ASCII string become the
+# first UTF-16LE code unit merely because the ASCII terminator is NUL.
+_UTF16_RE = re.compile(rb"(?<![\x20-\x7e])(?:[\x20-\x7e]\x00){4,}")
 
 
 def _normalize(path: str) -> str:
