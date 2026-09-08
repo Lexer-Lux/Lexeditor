@@ -118,10 +118,10 @@ def save_graphics_config(project_root: Path, value: dict) -> dict:
 
 def _marker_hits(data: bytes) -> list[str]:
     hits: list[str] = []
-    folded = data.casefold()
+    folded = data.lower()
     for marker in INI_UNLOCKER_MARKERS:
-        ascii_marker = marker.encode("ascii").casefold()
-        utf16_marker = marker.encode("utf-16-le").casefold()
+        ascii_marker = marker.encode("ascii").lower()
+        utf16_marker = marker.encode("utf-16-le").lower()
         if ascii_marker in folded or utf16_marker in folded:
             hits.append(marker)
     return hits
@@ -217,8 +217,7 @@ def remove_managed_block(text: str) -> str:
         prefix_start = start - 1
     elif start >= 4 and text[start - 4:start] == "\r\n\r\n":
         prefix_start = start - 2
-    result = text[:prefix_start] + text[end:]
-    return result
+    return text[:prefix_start] + text[end:]
 
 
 def apply_managed_block(text: str) -> str:
