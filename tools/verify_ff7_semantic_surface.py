@@ -67,7 +67,10 @@ class SemanticSurfaceTests(unittest.TestCase):
         self.assertEqual(by["enemyAttacks"]["statusChance"]["dataType"],"statusChange")
         self.assertEqual(by["enemyAttacks"]["specialFlags"]["dataType"],"flags")
         self.assertTrue(by["enemyAttacks"]["specialFlags"]["invertBits"])
-        self.assertEqual(by["enemies"]["dropRate0"]["dataType"], "lootRate")
+        self.assertEqual(by["enemies"]["dropRate0"]["dataType"], "enum")
+        loot_values={choice["value"] for choice in by["enemies"]["dropRate0"]["choices"]}
+        self.assertTrue({0,63,0x81,0xBF} <= loot_values)
+        self.assertTrue({64,0x7F,0x80,0xC0}.isdisjoint(loot_values))
         self.assertEqual(by["enemies"]["backMultiplier"]["dataType"], "scaled")
         self.assertEqual(by["enemies"]["backMultiplier"]["displayScale"], 0.125)
         self.assertEqual(by["encounters"]["slot0_enemy"]["dataType"],"reference")
