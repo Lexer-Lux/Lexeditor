@@ -1,15 +1,33 @@
 from games.ff7r.minimap_runtime_probe import assess_minimap_runtime_evidence
 
 
-def _hit(function_rva, *next_hops):
+def _inbound(*callers):
+    return {
+        "refs": [
+            {"sourceFunctionRva": caller, "kind": "call-rel32"}
+            for caller in callers
+        ]
+    }
+
+
+def _hit(function_rva, *next_hops, callers=(), next_hop_callers=()):
     xref = {
         "candidateFunctionRva": function_rva,
         "candidateFunctionSource": "pdata",
     }
+    if callers:
+        xref["candidateFunctionInboundCodeRefs"] = _inbound(*callers)
     if next_hops:
         xref["candidateFunctionCodeRefs"] = {
             "refs": [
-                {"targetFunctionRva": target, "kind": "call-rel32"}
+                {
+                    "targetFunctionRva": target,
+                    "kind": "call-rel32",
+                    **(
+                        {"targetFunctionInboundCodeRefs": _inbound(*next_hop_callers)}
+                        if next_hop_callers else {}
+                    ),
+                }
                 for target in next_hops
             ]
         }
@@ -140,12 +158,36 @@ def test_minimap_probe_reports_shared_next_hop_without_promoting_it_to_semantics
     assert result["implementationReady"] is False
 
 
-def test_minimap_probe_ignores_heuristic_bound_next_hops():
+def test_minimap_probe_reports_shared_exact_inbound_caller_without_promoting_it_to_hook():
+    result = assess_minimap_runtime_evidence(_native(
+        HideNaviMap=_hit(0x1000, callers=(0x9000,)),
+        BPShowNavimap=_hit(0x2000, callers=(0x9000,)),
+        KeyboardMapMenu=_hit(0x3000, callers=(0x9000,)),
+        KeyboardToggleMap=_hit(0x4000, callers=(0x9000,)),
+    ))
+
+    functions = result["candidateFunctions"]
+    assert functions["stateDirectOverlap"] == []
+    assert functions["inputStateDirectOverlap"] == []
+    assert functions["inputStateCallerOverlap"] == [0x9000]
+    assert functions["mapMenuStateCallerOverlap"] == [0x9000]
+    assert functions["toggleStateCallerOverlap"] == [0x9000]
+    assert functions["mapMenuToggleCallerOverlap"] == [0x9000]
+    assert functions["mapMenuAction"]["directCallers"] == [0x9000]
+    assert functions["nativeToggleInput"]["directCallers"] == [0x9000]
+    assert "tap-hold-input-to-minimap-link-unvalidated" in result["blockers"]
+    assert "map-button-press-release-semantics-unvalidated" in result["blockers"]
+    assert "player-choice-persistence-write-interception-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_minimap_probe_ignores_heuristic_bound_next_hops_and_inbound_callers():
     result = assess_minimap_runtime_evidence(_native(
         EndFieldOnOffTable_HideNaviMap={
             "hits": [{"leaRipXrefs": [{
                 "candidateFunctionRva": 0x1000,
                 "candidateFunctionSource": "padding-heuristic",
+                "candidateFunctionInboundCodeRefs": _inbound(0x9000),
                 "candidateFunctionCodeRefs": {"refs": [{"targetFunctionRva": 0x5000}]},
             }]}]
         },
@@ -156,5 +198,7 @@ def test_minimap_probe_ignores_heuristic_bound_next_hops():
     functions = result["candidateFunctions"]
     assert functions["hideGate"]["direct"] == []
     assert functions["hideGate"]["nextHops"] == []
+    assert functions["hideGate"]["directCallers"] == []
     assert functions["stateReachableOverlap"] == []
+    assert functions["inputStateCallerOverlap"] == []
     assert result["implementationReady"] is False
