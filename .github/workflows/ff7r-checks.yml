@@ -7,6 +7,7 @@ on:
       - 'games/ff7r/**'
       - 'tests/test_ff7r_dataobject.py'
       - 'tests/test_ff7r_textresource.py'
+      - 'tests/test_ff7r_semantics.py'
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
@@ -16,6 +17,7 @@ on:
       - 'games/ff7r/**'
       - 'tests/test_ff7r_dataobject.py'
       - 'tests/test_ff7r_textresource.py'
+      - 'tests/test_ff7r_semantics.py'
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
@@ -46,7 +48,7 @@ jobs:
         run: python -m compileall -q games/ff7r
       - name: Plugin descriptor
         run: python -c "from games.ff7r.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ff7r.server' in SERVICE_MODULES; print(PLUGIN.name)"
-      - name: Gameplay and text parsers/writers
-        run: python -m pytest -q tests/test_ff7r_dataobject.py tests/test_ff7r_textresource.py
+      - name: Gameplay, text and semantic regressions
+        run: python -m pytest -q tests/test_ff7r_dataobject.py tests/test_ff7r_textresource.py tests/test_ff7r_semantics.py
       - name: Managed service smoke
         run: python -c "from games.ff7r.plugin import smoke; [print('PASS:', line) for line in smoke()]"
