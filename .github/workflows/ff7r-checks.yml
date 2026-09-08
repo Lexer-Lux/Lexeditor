@@ -2,7 +2,7 @@ name: FF7R checks
 
 on:
   push:
-    branches: [master, feature/ff7-remake-plugin]
+    branches: [master, feature/ff7-remake-plugin, 'work/ff7r-*']
     paths:
       - 'games/ff7r/**'
       - 'tools/ff7r_assess_save_diff.py'
