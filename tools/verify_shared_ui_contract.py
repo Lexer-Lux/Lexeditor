@@ -45,6 +45,9 @@ for editor_path in plugin_editors:
         family = re.search(r"font-family\s*:\s*([^;]+)", block, re.I)
         require(not family or "--lex-symbol-font" in family.group(1),
                 f"{relative} overrides info-bubble glyph typography with a game font")
+    for block in re.findall(r"\.lex-info-help\s*>\s*span\s*\{([^}]*)\}", source, re.I | re.S):
+        require(not re.search(r"(?:transform|translate|top|bottom|left|right|font-family)\s*:", block, re.I),
+                f"{relative} overrides shared info-bubble glyph geometry")
 
 # One central GitHub workspace, filtered per game.
 require('full_name=LEXEDITOR_REPOSITORY.full_name' in host,
