@@ -12,9 +12,10 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from .archive import build_index, preferred_pak_version
+from .semantics import economy_payload, loot_payload
 from .storage import load_package, save_edits
 from .text_storage import load_text_package, resident_text_map, save_text_edits
-from .tooling import helper_status, pack_directory
+from .tooling import FF7R_MOUNT_POINT, helper_status, pack_directory
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,10 +83,19 @@ def text_payload(asset: str, *, vanilla: bool = False) -> dict:
 def data_map_payload() -> dict:
     rows = []
     for item in catalog().get("assets", []):
+        asset_name = Path(item["asset"]).name.casefold()
+        semantic = []
+        if asset_name in {"item", "equipment", "materia"}:
+            semantic.append("economy / prices when BuyValue/SaleValue fields exist")
+        if asset_name == "battleitempossession":
+            semantic.append("enemy normal/rare drops, chances and steal data")
+        controls = "Structured DataObject records; booleans, fixed-width numbers, floats and existing FNames are editable."
+        if semantic:
+            controls += " Semantic surface: " + "; ".join(semantic) + "."
         rows.append({
             "filename": item["asset"] + ".uasset / .uexp",
             "target": item["asset"],
-            "controls": "Structured DataObject records; booleans, fixed-width numbers, floats and existing FNames are editable.",
+            "controls": controls,
             "notes": "FString and structural/size-changing edits remain read-only; unknown bytes are preserved in the project overlay.",
             "coverage": "structured",
             "status": "partial",
@@ -115,7 +125,7 @@ def info_payload() -> dict:
         "textLanguages": languages,
         "helper": helper_status(),
         "pakVersion": preferred_pak_version(current),
-        "pakMountPoint": "../../../",
+        "pakMountPoint": FF7R_MOUNT_POINT,
         "buildPath": str(PROJECT_ROOT / "build" / "Lexeditor-FF7R_P.pak"),
         "deployPath": str(GAME_ROOT / "End" / "Content" / "Paks" / "~mods" / "Lexeditor-FF7R_P.pak"),
     }
@@ -196,8 +206,8 @@ class Handler(BaseHTTPRequestHandler):
                     "hosted": True,
                     "windowHost": "webview2",
                     "capabilities": [
-                        "data-map", "dataobject", "text-resource", "save",
-                        "text-save", "build", "deploy",
+                        "data-map", "dataobject", "text-resource", "economy",
+                        "enemy-loot", "save", "text-save", "build", "deploy",
                     ],
                 })
             if path == "/api/catalog":
@@ -213,6 +223,18 @@ class Handler(BaseHTTPRequestHandler):
                 vanilla = (query.get("source") or [""])[0] == "vanilla"
                 language = (query.get("language") or ["US"])[0]
                 return self.send_json(data_payload(asset, vanilla=vanilla, language=language))
+            if path == "/api/economy":
+                vanilla = (query.get("source") or [""])[0] == "vanilla"
+                language = (query.get("language") or ["US"])[0]
+                return self.send_json(economy_payload(
+                    GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(),
+                    language=language, vanilla=vanilla))
+            if path == "/api/loot":
+                vanilla = (query.get("source") or [""])[0] == "vanilla"
+                language = (query.get("language") or ["US"])[0]
+                return self.send_json(loot_payload(
+                    GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(),
+                    language=language, vanilla=vanilla))
             if path == "/api/text":
                 asset = (query.get("asset") or [""])[0]
                 if not asset:
