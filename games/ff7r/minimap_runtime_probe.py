@@ -27,11 +27,24 @@ MINIMAP_TRIGGER_NEEDLES = (
     "trgCmn_NaviMap_Update_On",
     "trgCmn_NaviMap_Update_Off",
 )
-MAP_INPUT_NEEDLES = (
+MAP_MENU_INPUT_NEEDLES = (
     "EndFieldOnOffTable_DisableTouchPad",
     "EndFieldOnOffTable_DisableOptionsButton",
     "EndFieldOnOffTable_ShowMapJournal",
     "MapJournal",
+    "KeyboardMapMenu",
+)
+# Generated Remake EOptionCategory exposes KeyboardToggleMap separately from
+# KeyboardMapMenu. That is valuable evidence that minimap toggling is a native
+# input concept rather than something Lexeditor should synthesize purely from
+# show/hide presentation calls. It is still only an enum/option anchor until an
+# installed callsite is proven.
+MINIMAP_TOGGLE_INPUT_NEEDLES = (
+    "KeyboardToggleMap",
+)
+MAP_INPUT_NEEDLES = (
+    *MAP_MENU_INPUT_NEEDLES,
+    *MINIMAP_TOGGLE_INPUT_NEEDLES,
 )
 MINIMAP_NATIVE_NEEDLES = (
     *MINIMAP_STATE_NEEDLES,
@@ -71,6 +84,8 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
     state_counts = _hit_counts(native, MINIMAP_STATE_NEEDLES)
     trigger_counts = _hit_counts(native, MINIMAP_TRIGGER_NEEDLES)
     input_counts = _hit_counts(native, MAP_INPUT_NEEDLES)
+    map_menu_counts = _hit_counts(native, MAP_MENU_INPUT_NEEDLES)
+    toggle_input_counts = _hit_counts(native, MINIMAP_TOGGLE_INPUT_NEEDLES)
 
     hide_gate_functions = _function_rvas(
         native,
@@ -78,10 +93,14 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
     )
     show_hide_functions = _function_rvas(native, ("BPShowNavimap", "BPHideNavimap"))
     trigger_functions = _function_rvas(native, MINIMAP_TRIGGER_NEEDLES)
-    input_functions = _function_rvas(native, MAP_INPUT_NEEDLES)
+    map_menu_functions = _function_rvas(native, MAP_MENU_INPUT_NEEDLES)
+    toggle_input_functions = _function_rvas(native, MINIMAP_TOGGLE_INPUT_NEEDLES)
+    input_functions = map_menu_functions | toggle_input_functions
 
+    state_functions = hide_gate_functions | show_hide_functions | trigger_functions
     state_overlap = sorted(hide_gate_functions & (show_hide_functions | trigger_functions))
-    input_state_overlap = sorted(input_functions & (hide_gate_functions | show_hide_functions | trigger_functions))
+    input_state_overlap = sorted(input_functions & state_functions)
+    toggle_state_overlap = sorted(toggle_input_functions & state_functions)
 
     blockers: list[str] = []
     if not any(state_counts.values()):
@@ -90,12 +109,18 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
         blockers.append("hide-state-writer-function-unresolved")
     if not show_hide_functions and not trigger_functions:
         blockers.append("show-hide-state-function-unresolved")
-    if not input_functions:
+    if not map_menu_functions:
         blockers.append("map-button-full-map-function-unresolved")
+    if not any(toggle_input_counts.values()):
+        blockers.append("native-minimap-toggle-input-anchor-unresolved")
+    elif not toggle_input_functions:
+        blockers.append("native-minimap-toggle-input-function-unresolved")
     if not state_overlap:
         blockers.append("central-minimap-state-controller-unvalidated")
     if not input_state_overlap:
         blockers.append("tap-hold-input-to-minimap-link-unvalidated")
+    if toggle_input_functions and not toggle_state_overlap:
+        blockers.append("native-toggle-input-to-state-link-unvalidated")
 
     # Even a same-function string correlation is only a candidate. Installed
     # disassembly/behavior still has to prove argument semantics and that a hook
@@ -111,13 +136,18 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
         "stateNeedleHits": state_counts,
         "triggerNeedleHits": trigger_counts,
         "inputNeedleHits": input_counts,
+        "mapMenuNeedleHits": map_menu_counts,
+        "toggleInputNeedleHits": toggle_input_counts,
         "candidateFunctions": {
             "hideGate": sorted(hide_gate_functions),
             "showHide": sorted(show_hide_functions),
             "stateTrigger": sorted(trigger_functions),
             "mapInput": sorted(input_functions),
+            "mapMenuInput": sorted(map_menu_functions),
+            "nativeToggleInput": sorted(toggle_input_functions),
             "stateOverlap": state_overlap,
             "inputStateOverlap": input_state_overlap,
+            "toggleStateOverlap": toggle_state_overlap,
         },
         "knownContracts": {
             "hideGate": "EndFieldOnOffTable_HideNaviMap",
@@ -126,12 +156,15 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
             "stateTrigger": "UEndFieldAPI::SendStateTrigger/SendStateTriggerDirect",
             "fullMapGate": "EndFieldOnOffTable_ShowMapJournal",
             "touchInputGate": "EndFieldOnOffTable_DisableTouchPad",
+            "keyboardMapMenuOption": "EOptionCategory::KeyboardMapMenu",
+            "keyboardToggleMapOption": "EOptionCategory::KeyboardToggleMap",
         },
         "notes": [
             "EndFieldOnOffTable_HideNaviMap is a Remake-native central state anchor and is distinct from authored EnemyTerritory.HideNavimap rows.",
             "BPShowNavimap/BPHideNavimap are presentation APIs; their presence alone does not prove the automatic visibility writer.",
+            "Generated EOptionCategory distinguishes KeyboardMapMenu from KeyboardToggleMap. Prefer routing a hold into the game's native toggle action if installed callsite evidence proves it, rather than inventing toggle semantics from presentation calls.",
             "MapJournal/TouchPad/OptionsButton anchors are input/full-map research leads only; no controller binding is assumed from their names.",
-            "The final runtime must delay the vanilla tap action until release, consume it on a hold, toggle exactly once, and reassert the chosen minimap state after automatic transitions.",
+            "The runtime tap/hold state machine is independently tested, but the installed input hook must still delay the vanilla tap action until release, consume it on a hold, toggle exactly once, and reassert the chosen state after automatic transitions.",
         ],
     }
 
