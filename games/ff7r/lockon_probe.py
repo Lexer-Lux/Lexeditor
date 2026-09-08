@@ -1,14 +1,8 @@
 """Read-only installed-build research for the FF7R Better Lock-on reticle.
 
-The localized ``LOCK ON`` prompt is handled separately by ``lockon_tweaks`` once
-its Resident_TxtRes ID is proven across languages. This probe now concentrates
-on the remaining #429 requirement: tint the active lock-on reticle red without
-touching target selection, camera behavior, or unrelated target UI.
-
-Remake exposes both a dedicated battle lock-on marker widget/API and an explicit
-battle-target presentation state enum. Cooked object-table ownership is further
-correlated with read-only serialized FName/property-tag candidates when the
-split-package export mapping can be proven from the installed package header.
+The localized ``LOCK ON`` prompt is handled separately by ``lockon_tweaks``. This
+probe concentrates on the remaining #429 requirement: tint the active lock-on
+reticle red without touching target selection, camera behavior, or unrelated UI.
 """
 
 from __future__ import annotations
@@ -22,18 +16,17 @@ from .native_probe import probe_installed_exe
 from .raw_asset_probe import probe_installed_assets
 
 
-# Resident_TxtRes remains in the broad raw scan as historical/diagnostic label
-# evidence only. Serialized reticle probing deliberately excludes text resources.
-ASSET_TERMS = ("lockon", "lock_on", "battlelock", "battletarget", "resident_txtres")
-SERIALIZED_ASSET_TERMS = ("lockon", "lock_on", "battlelock", "battletarget")
+ASSET_TERMS = (
+    "lockon", "lock_on", "battlelock", "battletarget", "resident_txtres",
+    "menusettings",
+)
+SERIALIZED_ASSET_TERMS = (
+    "lockon", "lock_on", "battlelock", "battletarget", "menusettings",
+)
 WIDGET_ANCHORS = (
     "EndBattleLockonMarkerIcon",
     "BattleLockonMarker",
 )
-# Generated UEndMenuSettings exposes three additional configurable lock-on marker
-# widget slots. Their numeric suffixes line up with the three reflected marker
-# enum values, but the exact 00/01/02 -> Default/Wimp/Libra pairing remains an
-# installed-data hypothesis until their resolved class paths are inspected.
 MARKER_SLOT_ANCHORS = (
     "BattleLockonMarker00Widget",
     "BattleLockonMarker01Widget",
@@ -132,7 +125,6 @@ def _contains_any(value: str, terms: Iterable[str]) -> bool:
 
 
 def _contains_dedicated_widget_anchor(value: str) -> bool:
-    """Match the dedicated class/setting without swallowing numbered slot names."""
     folded = value.casefold()
     if "endbattlelockonmarkericon" in folded:
         return True
@@ -166,6 +158,14 @@ def _serialized_ref_is_dedicated(row: dict[str, Any]) -> bool:
     return _contains_dedicated_widget_anchor(_object_searchable(row))
 
 
+def _serialized_marker_slot_ref(row: dict[str, Any]) -> bool:
+    return bool(
+        str(row.get("name", "")) in MARKER_SLOT_ANCHORS
+        and row.get("propertyTagLayoutPlausible")
+        and row.get("softObjectPathValuePlausible")
+    )
+
+
 def _needle_counts(native: dict[str, Any]) -> dict[str, int]:
     return {
         str(row.get("needle", "")): len(row.get("hits", ()))
@@ -175,7 +175,6 @@ def _needle_counts(native: dict[str, Any]) -> dict[str, int]:
 
 
 def assess_lock_state_evidence(native: dict[str, Any]) -> dict[str, Any]:
-    """Classify the explicit target-state surface without promoting it to a hook."""
     counts = _needle_counts(native)
     show_hits = counts.get("ShowBattleTargetIcon", 0)
     enum_hits = counts.get("EEndMenuBattleTargetState", 0)
@@ -191,13 +190,12 @@ def assess_lock_state_evidence(native: dict[str, Any]) -> dict[str, Any]:
         "validatedAsIssuePredicate": False,
         "notes": [
             "UEndMenuAPI::ShowBattleTargetIcon receives EEndMenuBattleTargetState, whose reflected locked states are LockedEnabled, LockedDisabled, OutLockedEnabled and OutLockedDisabled.",
-            "The dedicated UEndBattleLockonMarkerIcon may itself be lock-state-scoped; the target-state enum is retained as a separate fallback/validation lead until installed behavior proves which surface draws the requested reticle.",
+            "The dedicated UEndBattleLockonMarkerIcon may itself be lock-state-scoped; the target-state enum remains a separate fallback/validation lead.",
         ],
     }
 
 
 def assess_marker_slot_evidence(native: dict[str, Any]) -> dict[str, Any]:
-    """Expose the three configured lock-on widget slots without inventing pairing semantics."""
     counts = _needle_counts(native)
     slot_hits = {slot: counts.get(slot, 0) for slot in MARKER_SLOT_ANCHORS}
     return {
@@ -208,22 +206,65 @@ def assess_marker_slot_evidence(native: dict[str, Any]) -> dict[str, Any]:
         "slotToMarkerTypeMappingValidated": False,
         "notes": [
             "UEndMenuSettings declares BattleLockonMarker00Widget, BattleLockonMarker01Widget and BattleLockonMarker02Widget as separate FSoftClassPath settings.",
-            "EEndMenuLockonMarkerType declares Default, Wimp and Libra in that order. Matching those two ordered trios is a strong hypothesis, not an authorized mapping until installed class-path data confirms it.",
+            "EEndMenuLockonMarkerType declares Default, Wimp and Libra in that order; ordered-trio correspondence remains a hypothesis until installed behavior validates it.",
+        ],
+    }
+
+
+def assess_serialized_marker_slots(candidates: Iterable[dict[str, Any]]) -> dict[str, Any]:
+    """Collect exact decoded SoftClass/SoftObject values for the three numbered slots."""
+    values: dict[str, list[dict[str, Any]]] = {slot: [] for slot in MARKER_SLOT_ANCHORS}
+    for candidate in candidates:
+        asset_name = str(candidate.get("asset", ""))
+        for ref in candidate.get("serializedMarkerSlotRefs", ()):
+            slot = str(ref.get("name", ""))
+            if slot not in values:
+                continue
+            path = dict(ref.get("softObjectPathValue") or {})
+            if not path.get("assetPath"):
+                continue
+            row = {
+                "asset": asset_name,
+                "ownerObjectName": ref.get("objectName"),
+                "ownerClassName": ref.get("className"),
+                "assetPath": path.get("assetPath"),
+                "subPath": path.get("subPath", ""),
+            }
+            if row not in values[slot]:
+                values[slot].append(row)
+
+    unique_values = {
+        slot: rows[0] if len(rows) == 1 else None
+        for slot, rows in values.items()
+    }
+    all_resolved = all(unique_values[slot] is not None for slot in MARKER_SLOT_ANCHORS)
+    resolved_paths = [
+        str(unique_values[slot]["assetPath"])
+        for slot in MARKER_SLOT_ANCHORS
+        if unique_values[slot] is not None
+    ]
+    return {
+        "slotValues": values,
+        "uniqueSlotValues": unique_values,
+        "allSlotValuesResolved": all_resolved,
+        "allResolvedPathsDistinct": all_resolved and len(set(resolved_paths)) == len(resolved_paths),
+        "slotToMarkerTypeMappingValidated": False,
+        "markerTypeOrder": list(MARKER_TYPE_ORDER),
+        "slotOrder": list(MARKER_SLOT_ANCHORS),
+        "notes": [
+            "Decoded SoftClass/SoftObject values establish the installed class path configured for a numbered marker slot when exactly one value is found.",
+            "Even three unique decoded paths do not prove 00/01/02 correspond to Default/Wimp/Libra or identify which one is the requested active blue target square without installed behavior validation.",
         ],
     }
 
 
 def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Rank cooked reticle candidates; versioned serialized tags outrank strings."""
     ranked: list[dict[str, Any]] = []
     for asset in assets:
         strings = _flatten_strings(asset)
         objects = _flatten_objects(asset)
         serial = dict(asset.get("serializedExportEvidence") or {})
         mapping_trusted = bool(serial.get("mappingTrusted", False))
-        # Never allow an inconsistent/synthetic evidence object to bypass the
-        # split-package boundary proof. The installed scanner itself emits no refs
-        # for an untrusted mapping, but ranking remains fail-closed independently.
         serialized_refs = list(serial.get("refs", ())) if mapping_trusted else []
         serialized_dedicated_refs = [
             row for row in serialized_refs
@@ -244,6 +285,10 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
         serialized_linear_color_tint_refs = [
             row for row in serialized_layout_tint_refs
             if row.get("linearColorValuePlausible")
+        ]
+        serialized_marker_slot_refs = [
+            row for row in serialized_refs
+            if _serialized_marker_slot_ref(row)
         ]
 
         widget_hits = [
@@ -291,7 +336,7 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
         ]
         if not (
             widget_hits or marker_slot_hits or api_hits or label_hits or resolved_owners
-            or state_hits or serialized_dedicated_refs
+            or state_hits or serialized_dedicated_refs or serialized_marker_slot_refs
         ):
             continue
 
@@ -299,6 +344,7 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             len(serialized_linear_color_tint_refs) * 20000
             + len(serialized_layout_tint_refs) * 12000
             + len(serialized_plausible_tint_refs) * 9000
+            + len(serialized_marker_slot_refs) * 7000
             + len(serialized_tint_refs) * 3000
             + len(serialized_dedicated_refs) * 1500
             + len(resolved_owners) * 6000
@@ -336,9 +382,10 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             "serializedPlausibleTintTagRefs": serialized_plausible_tint_refs,
             "serializedLayoutTintTagRefs": serialized_layout_tint_refs,
             "serializedLinearColorTintRefs": serialized_linear_color_tint_refs,
+            "serializedMarkerSlotRefs": serialized_marker_slot_refs,
             "objectTableErrors": object_table_errors,
             "containsDedicatedWidgetAnchor": bool(widget_hits or resolved_owners or serialized_dedicated_refs),
-            "containsMarkerSlotAnchor": bool(marker_slot_hits),
+            "containsMarkerSlotAnchor": bool(marker_slot_hits or serialized_marker_slot_refs),
             "containsLiteralLockOnLabel": bool(label_hits),
             "resolvedDedicatedOwnerEvidence": bool(resolved_owners),
             "resolvedLabelChildEvidence": bool(resolved_label_children),
@@ -347,6 +394,7 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             "serializedPlausibleTintTagEvidence": bool(serialized_plausible_tint_refs),
             "serializedTintValueLayoutEvidence": bool(serialized_layout_tint_refs),
             "serializedLinearColorTintValueEvidence": bool(serialized_linear_color_tint_refs),
+            "serializedMarkerSlotValueEvidence": bool(serialized_marker_slot_refs),
             "strongPresentationCandidate": bool(
                 serialized_plausible_tint_refs
                 or ((widget_hits or resolved_owners) and (
@@ -363,7 +411,6 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
 
 
 def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
-    """Inspect installed cooked reticle assets and reflected native anchors read-only."""
     root = Path(game_root)
     raw = probe_installed_assets(
         root,
@@ -386,13 +433,11 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
             **asset,
             "serializedExportEvidence": serial or {},
         })
-    # A serialized candidate may be absent from the broad raw result only after
-    # a partial scan error. Never synthesize it into ranking without the normal
-    # raw/object evidence surface; report the error instead.
     ranked = rank_lockon_assets(enriched)
     native = probe_installed_exe(root, needles=NATIVE_NEEDLES)
     lock_state = assess_lock_state_evidence(native)
     marker_slots = assess_marker_slot_evidence(native)
+    serialized_marker_slots = assess_serialized_marker_slots(ranked)
     resolved_owner_count = sum(
         1 for row in ranked if row.get("resolvedDedicatedOwnerEvidence"))
     serialized_tint_count = sum(
@@ -403,6 +448,9 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         1 for row in ranked if row.get("serializedTintValueLayoutEvidence"))
     linear_color_tint_count = sum(
         1 for row in ranked if row.get("serializedLinearColorTintValueEvidence"))
+    marker_slot_value_candidate_count = sum(
+        len(row.get("serializedMarkerSlotRefs", ())) for row in ranked
+    )
     object_errors = [
         error
         for row in ranked
@@ -428,8 +476,10 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         blockers.append("locked-state-predicate-unvalidated")
     else:
         blockers.append("locked-state-predicate-unresolved")
-    if marker_slots["allSlotAnchorsPresent"]:
-        blockers.append("marker-slot-class-path-mapping-unvalidated")
+    if serialized_marker_slots["allSlotValuesResolved"]:
+        blockers.append("marker-slot-enum-pairing-unvalidated")
+    elif marker_slots["allSlotAnchorsPresent"]:
+        blockers.append("marker-slot-class-path-values-unresolved")
     else:
         blockers.append("marker-slot-class-path-mapping-unresolved")
     if scan_errors:
@@ -442,6 +492,7 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         "native": native,
         "lockStateResearch": lock_state,
         "markerSlotResearch": marker_slots,
+        "serializedMarkerSlotResearch": serialized_marker_slots,
         "serializedExportResearch": serialized,
         "scanErrors": scan_errors,
         "objectTableErrors": object_errors,
@@ -450,6 +501,7 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         "serializedPlausibleTintTagCandidateCount": plausible_tint_count,
         "serializedTintValueLayoutCandidateCount": layout_tint_count,
         "serializedLinearColorTintValueCandidateCount": linear_color_tint_count,
+        "serializedMarkerSlotValueCandidateCount": marker_slot_value_candidate_count,
         "implementationReady": False,
         "blockers": blockers,
         "knownContracts": {
@@ -471,10 +523,10 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         "notes": [
             "The localized LOCK ON prompt is no longer a blocker in this probe; it is an independent staging-only text tweak once its cross-language text ID is proven.",
             "The dedicated battle lock-on marker widget is the preferred reticle owner; generic battle target widgets are not assumed equivalent.",
-            "UEndMenuSettings exposes three dedicated numbered lock-on marker widget settings. Their resolved FSoftClassPath values are first-class ownership targets, but 00/01/02 -> Default/Wimp/Libra remains unvalidated until installed class-path data confirms it.",
-            "Serialized evidence is accepted only when split-package export mapping is proven. A tint property becomes progressively stronger only when its immediate *Property type, generic Size/ArrayIndex header, version-gated UE4 tag metadata, and bounded value range are each independently plausible.",
-            "For exact LinearColor StructProperty candidates the read-only probe can now expose the four serialized float components. That identifies a value encoding candidate, not reticle ownership, lock-state scope, or safe replacement bytes.",
-            "ShowBattleTargetIcon's explicit locked target states remain a separate predicate lead. If installed behavior proves UEndBattleLockonMarkerIcon exists only while locked, the dedicated widget lifecycle may remove the need for a second state hook.",
-            "No cooked UI export is rewritten by this probe. Exact marker-slot mapping, installed visual ownership and reversible cooked-property rewriting must be validated before reticle tinting is implemented.",
+            "The serialized probe can now decode exact SoftClass/SoftObject path values for numbered marker settings. This can establish configured class paths, but not the enum pairing or which configured class owns the requested active blue reticle.",
+            "Serialized tint evidence is accepted only when split-package mapping, property type/header, versioned metadata and bounded value range are independently plausible.",
+            "An exact LinearColor identifies a value encoding candidate, not reticle ownership, lock-state scope, or permission to invoke the generic cooked-value writer.",
+            "ShowBattleTargetIcon's explicit locked target states remain a separate predicate lead.",
+            "No cooked UI export is rewritten by this probe. Exact visual ownership, marker-slot semantics and installed behavior must be validated before reticle tinting is wired to the writer.",
         ],
     }
