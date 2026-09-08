@@ -156,6 +156,9 @@ def damage_formula_choices():
     return tuple(result)
 
 DAMAGE_FORMULAS = damage_formula_choices()
+LOOT_RATES = tuple((rate, f"Drop — {rate}/63 ({rate * 100 / 63:.1f}%)") for rate in range(64)) + tuple(
+    (0x80 + rate, f"Steal — {rate}/63 ({rate * 100 / 63:.1f}%)") for rate in range(1, 64)
+)
 
 
 def _field(**kwargs):
@@ -319,7 +322,7 @@ SCENE = {
         **{f"attack{i}": reference("enemyAttacks", label=f"Action {i+1} attack", empty=65535, help="Scene-local enemy attack used by this action slot.", value_key="gameId", scope="scene") for i in range(16)},
         **{f"manipulate{i}": reference("enemyAttacks", label=f"Manipulate / Berserk action {i+1}", empty=65535, help="Scene-local attack available to Manipulate/Berserk logic.", value_key="gameId", scope="scene") for i in range(3)},
         **{f"item{i}": _field(label=f"Loot slot {i+1}", dataType="inventoryReference", emptyValue=65535, group="Loot", help="Global item/equipment referenced by this drop/steal slot.") for i in range(4)},
-        **{f"dropRate{i}": _field(label=f"Loot slot {i+1} method / chance", dataType="lootRate", group="Loot", help="Values below 0x80 are drops; values from 0x80 are steals. The low seven bits are the chance parameter expressed as x/63.") for i in range(4)},
+        **{f"dropRate{i}": _field(label=f"Loot slot {i+1} method / chance", dataType="enum", choices=choices(*LOOT_RATES), group="Loot", help="Canonical FF7 loot rates are 0–63 for drops and 0x81–0xBF for steals. Existing noncanonical raw bytes are preserved unless edited.") for i in range(4)},
         **{f"animation{i}": advanced(f"Action {i+1} animation ID", "Raw enemy action-animation index; no authoritative human animation-name table is available.") for i in range(16)},
         **{f"camera{i}": advanced(f"Action {i+1} camera ID", "Raw battle-camera program ID; no authoritative human camera-name table is available.") for i in range(16)},
     },
