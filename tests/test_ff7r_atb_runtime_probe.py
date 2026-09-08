@@ -21,6 +21,22 @@ def test_guard_and_ability_data_can_be_ready_while_runtime_is_not():
     assert result["implementationReady"] is False
 
 
+def test_documented_vanilla_atb_values_are_reference_fingerprints_not_validation():
+    result = assess_atb_runtime_evidence(_native(), resident_rows=8)
+    reference = result["dataBacked"]["documentedVanillaReference"]
+
+    assert reference["internalUnitsPerDisplayedBar"] == 1000.0
+    assert reference["normalGaugeInternalUnits"] == 2000.0
+    assert reference["playerPassiveMultiplier"] == 1.0
+    assert reference["aiPassiveMultiplier"] == 0.35
+    assert reference["guardMultiplier"] == 0.1
+    assert reference["dodgeMultiplier"] == 0.0
+    assert reference["hasteMultiplier"] == 1.4
+    assert reference["slowMultiplier"] == 0.6
+    assert result["dataBacked"]["documentedReferenceValidatedAgainstInstalledRows"] is False
+    assert result["dataBacked"]["residentSemanticsValidated"] is False
+
+
 def test_accumulator_string_evidence_never_marks_hook_semantics_validated():
     result = assess_atb_runtime_evidence(
         _native(ATBValue=2, EnableForceUpdateATB=1), guard_rows=1, ability_rows=1)
