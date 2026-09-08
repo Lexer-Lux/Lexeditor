@@ -18,6 +18,7 @@ from games.ff7r.runtime_config import (
     validate_runtime_manifest,
 )
 from games.ff7r.runtime_dataobject import (
+    NO_MORE_CHEATS_PROBE_ASSET,
     RUNTIME_PROBE_ASSET,
     RUNTIME_TWEAKS_ASSET,
     runtime_settings_package,
@@ -206,7 +207,9 @@ def test_virtual_runtime_resources_are_catalogued_without_polluting_cached_asset
         "textAssets": [],
     }
     decorated = _with_virtual_assets(base)
-    assert [row["asset"] for row in decorated["assets"]][-2:] == [RUNTIME_TWEAKS_ASSET, RUNTIME_PROBE_ASSET]
+    assert [row["asset"] for row in decorated["assets"]][-3:] == [
+        RUNTIME_TWEAKS_ASSET, RUNTIME_PROBE_ASSET, NO_MORE_CHEATS_PROBE_ASSET,
+    ]
     assert len(base["assets"]) == 1
     assert len(_with_virtual_assets(decorated)["assets"]) == len(decorated["assets"])
 
@@ -284,4 +287,18 @@ def test_native_hook_probe_virtual_resource_is_read_only(tmp_path):
             source_sha256="unused",
             active_sha256="unused",
             edits=[{"entry": 0, "property": "HitCount", "value": 1}],
+        )
+
+
+def test_no_more_cheats_probe_virtual_resource_is_read_only(tmp_path):
+    with pytest.raises(ValueError, match="read-only"):
+        save_edits(
+            tmp_path / "game",
+            tmp_path / "data",
+            tmp_path / "project",
+            {},
+            NO_MORE_CHEATS_PROBE_ASSET,
+            source_sha256="unused",
+            active_sha256="unused",
+            edits=[{"entry": 0, "property": "TextMatchCount", "value": 1}],
         )
