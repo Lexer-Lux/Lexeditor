@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -219,7 +220,7 @@ void runProbe() {
         return;
     }
 
-    output << "{\n  \"schemaVersion\":1,\n  \"probeOnly\":true,\n"
+    output << "{\n  \"schemaVersion\":2,\n  \"probeOnly\":true,\n"
            << "  \"imageBase\":\"" << hex(imageBase) << "\",\n"
            << "  \"peTimestamp\":\"" << hex(image->timestamp) << "\",\n"
            << "  \"knownMapControl\":";
@@ -228,9 +229,43 @@ void runProbe() {
     writeAddressArray(output, inputMatches, imageBase);
     output << ",\n  \"strings\":[\n";
 
-    constexpr std::array<std::string_view, 8> needles{
-        "FastForward", "EventScene", "CutScene", "NaviMap", "Navimap",
-        "HideNavimap", "trgCmn_NaviMap_Update_On", "trgCmn_NaviMap_Update_Off",
+    // Keep the injected probe aligned with the stricter Python installed-build
+    // classifiers. Generic FastForward/EventScene/CutScene/NaviMap names remain
+    // useful context, but only generated callable/action/state names can resolve
+    // the corresponding #413/#414 blockers.
+    constexpr std::array<std::string_view, 27> needles{
+        // Cutscene speed channel and callable lifecycle/state contracts.
+        "SetGameSpeed",
+        "GetGameSpeed",
+        "EGameSpeed_CUT",
+        "PlayCutScene",
+        "RequestPlayCutScene",
+        "SkipCinema",
+        "IsSkipCinema",
+        "IsSkipCinemaAtThisFrame",
+        // Generic cutscene support-only anchors retained for comparison.
+        "FastForward",
+        "EventScene",
+        "CutScene",
+        // Minimap presentation/state contracts.
+        "EndFieldOnOffTable_HideNaviMap",
+        "HideNaviMap",
+        "HideNavimap",
+        "BPShowNavimap",
+        "BPHideNavimap",
+        "SendStateTrigger",
+        "SendStateTriggerDirect",
+        "trgCmn_NaviMap_Update_On",
+        "trgCmn_NaviMap_Update_Off",
+        // Full-map action, minimap toggle action, and supporting gates.
+        "KeyboardMapMenu",
+        "KeyboardToggleMap",
+        "EndFieldOnOffTable_DisableTouchPad",
+        "EndFieldOnOffTable_DisableOptionsButton",
+        "EndFieldOnOffTable_ShowMapJournal",
+        "MapJournal",
+        // Generic presentation spelling retained as weak context only.
+        "NaviMap",
     };
     for (std::size_t needleIndex = 0; needleIndex < needles.size(); ++needleIndex) {
         const auto hits = stringHits(*image, needles[needleIndex]);
