@@ -30,6 +30,28 @@ PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_FF7_PROJECT", str(paths.PROJECT_RO
 EXECUTABLE = os.environ.get("LEXEDITOR_FF7_EXECUTABLE", "FFVII_LAUNCHER.exe")
 
 
+def _link_limit_text(data: dict) -> None:
+    """Decorate EXE Limit records with the matching KERNEL2 text.
+
+    KERNEL2 Magic help is section 1 and Magic names is section 9. Both tables
+    use the stored attack ID, so Limit records 0..70 resolve at IDs 128..198.
+    The text remains owned and edited by the KERNEL2 Text dataset.
+    """
+    for source in ("records", "vanilla"):
+        groups = data.get(source, {})
+        texts = groups.get("texts", [])
+        names = {row["id"] & 0xFFFF: row.get("values", {}).get("text")
+                 for row in texts if row.get("id", -1) >> 16 == 9}
+        descriptions = {row["id"] & 0xFFFF: row.get("values", {}).get("text")
+                        for row in texts if row.get("id", -1) >> 16 == 1}
+        for row in groups.get("limitBreaks", []):
+            game_id = row.get("gameId")
+            if isinstance(names.get(game_id), str) and names[game_id]:
+                row["name"] = names[game_id]
+            if isinstance(descriptions.get(game_id), str) and descriptions[game_id]:
+                row["description"] = descriptions[game_id]
+
+
 def editor_data() -> dict:
     data = load_datasets(GAME_ROOT, PROJECT_ROOT)
     extra = load_extended(GAME_ROOT, PROJECT_ROOT)
@@ -39,6 +61,7 @@ def editor_data() -> dict:
         data[key].update(extra[key])
     data['families'] = extra['families']
     data['unresolved'] = {}
+    _link_limit_text(data)
     return data
 
 
