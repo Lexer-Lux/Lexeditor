@@ -23,6 +23,10 @@ from .graphics_tweaks import (
     deploy_graphics_tweaks,
     graphics_status,
 )
+from .lockon_tweaks import (
+    has_enabled_better_lockon,
+    materialize_better_lockon,
+)
 from .minimap_semantics import (
     ENEMY_TERRITORY_TABLE_NAME,
     HIDE_NAVIMAP_FIELD,
@@ -142,7 +146,7 @@ def data_map_payload() -> dict:
         if group == "Lexeditor Graphics":
             semantic.append("reversible Engine.ini graphics overrides applied only by explicit deployment")
         if group == "Lexeditor Tweaks":
-            semantic.append("reversible structural menu edits materialized only after installed-source ownership validation")
+            semantic.append("reversible semantic tweaks materialized only after installed-source ownership validation")
         controls = (
             "Structured DataObject records; booleans, fixed-width numbers, floats "
             "and existing FNames are editable."
@@ -226,6 +230,7 @@ def _has_pak_edits() -> bool:
         or has_enabled_data_overrides(PROJECT_ROOT)
         or has_enabled_encounter_tweaks(PROJECT_ROOT)
         or has_enabled_no_more_cheats(PROJECT_ROOT)
+        or has_enabled_better_lockon(PROJECT_ROOT)
     )
 
 
@@ -235,7 +240,10 @@ def build_mod() -> dict:
     has_atb = has_enabled_data_overrides(PROJECT_ROOT)
     has_encounter = has_enabled_encounter_tweaks(PROJECT_ROOT)
     has_no_more_cheats = has_enabled_no_more_cheats(PROJECT_ROOT)
-    has_semantic_materialization = has_atb or has_encounter or has_no_more_cheats
+    has_better_lockon = has_enabled_better_lockon(PROJECT_ROOT)
+    has_semantic_materialization = (
+        has_atb or has_encounter or has_no_more_cheats or has_better_lockon
+    )
     if not has_content and not has_semantic_materialization:
         raise RuntimeError("The FF7R project has no saved edits to build")
 
@@ -248,11 +256,12 @@ def build_mod() -> dict:
             "atbMaterialized": [],
             "encounterMaterialized": [],
             "noMoreCheatsMaterialized": [],
+            "betterLockonMaterialized": [],
         }
 
     # Semantic overrides never live permanently in project/content. Compose
     # them over any ordinary project edits in a temporary staging tree, pack the
-    # result, and then discard the generated DataObjects.
+    # result, and then discard the generated DataObjects/text resources.
     with TemporaryDirectory(prefix="lexeditor-ff7r-build-") as temp_name:
         staging = Path(temp_name) / "content"
         staging.mkdir(parents=True, exist_ok=True)
@@ -264,8 +273,10 @@ def build_mod() -> dict:
             GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), staging)
         no_more_cheats_materialized = materialize_no_more_cheats(
             GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), staging)
+        better_lockon_materialized = materialize_better_lockon(
+            GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), staging)
         if not any(path.is_file() for path in staging.rglob("*")):
-            raise RuntimeError("Enabled FF7R semantic tweaks produced no buildable DataObject edits")
+            raise RuntimeError("Enabled FF7R semantic tweaks produced no buildable package edits")
         pack_directory(staging, target, version=preferred_pak_version(catalog()))
     return {
         "path": str(target),
@@ -273,6 +284,7 @@ def build_mod() -> dict:
         "atbMaterialized": atb_materialized,
         "encounterMaterialized": encounter_materialized,
         "noMoreCheatsMaterialized": no_more_cheats_materialized,
+        "betterLockonMaterialized": better_lockon_materialized,
     }
 
 
@@ -434,7 +446,7 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": [
                         "data-map", "dataobject", "text-resource", "economy",
                         "enemy-loot", "minimap-visibility", "runtime-config", "native-probe",
-                        "encounter-tweaks", "graphics-tweaks", "no-more-cheats", "save", "economy-save",
+                        "encounter-tweaks", "graphics-tweaks", "no-more-cheats", "better-lockon", "save", "economy-save",
                         "enemy-loot-save", "minimap-visibility-save", "text-save", "build",
                         "deploy", "runtime-deploy", "graphics-deploy",
                     ],
