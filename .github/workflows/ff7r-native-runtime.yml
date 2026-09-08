@@ -29,8 +29,15 @@ jobs:
         run: |
           $dll = Get-ChildItem out/ff7r-native -Recurse -Filter LexeditorFF7RRuntimeProbe.dll | Select-Object -First 1
           if (-not $dll) { throw 'Probe DLL was not built' }
-          $dumpbin = (Get-Command dumpbin.exe -ErrorAction Stop).Source
-          $exports = & $dumpbin /exports $dll.FullName
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Visual Studio C++ toolchain was not found' }
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe |
+            Where-Object { $_.FullName -match '\\bin\\Hostx64\\x64\\dumpbin\.exe$' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $dumpbin) { throw 'dumpbin.exe was not found in the Visual Studio toolchain' }
+          $exports = & $dumpbin.FullName /exports $dll.FullName
           if ($exports -notmatch '\bInit\b') { throw 'Probe DLL does not export Init' }
           Write-Host $dll.FullName
       - uses: actions/upload-artifact@v4
