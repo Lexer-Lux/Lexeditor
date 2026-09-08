@@ -220,7 +220,7 @@ void runProbe() {
         return;
     }
 
-    output << "{\n  \"schemaVersion\":2,\n  \"probeOnly\":true,\n"
+    output << "{\n  \"schemaVersion\":1,\n  \"probeOnly\":true,\n"
            << "  \"imageBase\":\"" << hex(imageBase) << "\",\n"
            << "  \"peTimestamp\":\"" << hex(image->timestamp) << "\",\n"
            << "  \"knownMapControl\":";
