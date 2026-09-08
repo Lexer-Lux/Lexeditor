@@ -24,12 +24,12 @@ DEFAULT_NEEDLES = (
     "HideNavimap",
     "trgCmn_NaviMap_Update_On",
     "trgCmn_NaviMap_Update_Off",
+    "BPSetPlayerHPMax",
     "BPGetPlayerStatus",
     "BPGetPlayerStatusWithEquipment",
     "BPGetPlayerStatusWithMateria",
     "BPGetPlayerHPMax",
     "BPGetPlayerHP",
-    "BPSetPlayerHPMax",
     "GetHPMax",
     "GetHP",
     "DashRootMotionTranslationScale",
@@ -37,6 +37,9 @@ DEFAULT_NEEDLES = (
 )
 MAX_HITS_PER_ENCODING = 64
 MAX_XREFS_PER_STRING = 64
+FUNCTION_WINDOW_BYTES = 64
+XREF_CONTEXT_BEFORE = 16
+XREF_CONTEXT_AFTER = 32
 
 
 class PEFormatError(ValueError):
@@ -104,6 +107,13 @@ class PEImage:
         folded = name.casefold()
         return next((section for section in self.sections if section.name.casefold() == folded), None)
 
+    def section_for_rva(self, rva: int) -> Section | None:
+        return next((
+            section
+            for section in self.sections
+            if section.virtual_address <= rva < section.virtual_address + section.mapped_size
+        ), None)
+
     def offset_to_rva(self, offset: int) -> int | None:
         for section in self.sections:
             if section.raw_offset <= offset < section.raw_offset + section.raw_size:
@@ -157,6 +167,36 @@ def _find_all(haystack: bytes, needle: bytes, *, start: int = 0, end: int | None
     return hits
 
 
+def _hex_bytes(value: bytes) -> str:
+    return " ".join(f"{byte:02X}" for byte in value)
+
+
+def _byte_window(image: PEImage, rva: int, *, before: int = 0, after: int) -> dict | None:
+    section = image.section_for_rva(rva)
+    if section is None:
+        return None
+    relative = rva - section.virtual_address
+    if relative >= section.raw_size:
+        return None
+    start_relative = max(0, relative - max(0, before))
+    end_relative = min(section.raw_size, relative + max(0, after))
+    if end_relative <= start_relative:
+        return None
+    start_offset = section.raw_offset + start_relative
+    end_offset = section.raw_offset + end_relative
+    raw = image.data[start_offset:end_offset]
+    start_rva = section.virtual_address + start_relative
+    return {
+        "section": section.name,
+        "startRva": start_rva,
+        "startVa": image.image_base + start_rva,
+        "focusRva": rva,
+        "focusOffset": relative - start_relative,
+        "byteCount": len(raw),
+        "hex": _hex_bytes(raw),
+    }
+
+
 def _string_hits(image: PEImage, needle: str) -> list[dict]:
     hits = []
     variants = (
@@ -201,12 +241,24 @@ def _lea_rip_xrefs(image: PEImage, target_rva: int) -> list[dict]:
         if resolved != target_rva:
             continue
         function_rva = _nearest_padded_function_start(raw, index, text.virtual_address)
-        results.append({
+        result = {
             "instructionRva": instruction_rva,
             "instructionVa": image.image_base + instruction_rva,
             "candidateFunctionRva": function_rva,
             "candidateFunctionVa": image.image_base + function_rva if function_rva is not None else None,
-        })
+            "xrefContext": _byte_window(
+                image,
+                instruction_rva,
+                before=XREF_CONTEXT_BEFORE,
+                after=XREF_CONTEXT_AFTER,
+            ),
+            "candidateFunctionBytes": (
+                _byte_window(image, function_rva, after=FUNCTION_WINDOW_BYTES)
+                if function_rva is not None
+                else None
+            ),
+        }
+        results.append(result)
         if len(results) >= MAX_XREFS_PER_STRING:
             break
     return results
@@ -254,6 +306,7 @@ def probe_bytes(data: bytes, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dic
         "notes": [
             "String and LEA matches are research candidates, not validated hook addresses.",
             "Candidate function starts are compiler-padding heuristics and must be signature-validated before patching.",
+            "Candidate byte windows are raw executable evidence for signature research; they are not instruction-decoded or stability-validated.",
             "The probe is read-only and does not modify the installed executable.",
         ],
     }
