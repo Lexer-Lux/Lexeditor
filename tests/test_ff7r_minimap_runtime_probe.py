@@ -34,6 +34,7 @@ def test_minimap_probe_keeps_string_only_evidence_blocked():
     ))
     assert result["implementationReady"] is False
     assert "hide-state-writer-function-unresolved" in result["blockers"]
+    assert "native-map-menu-input-anchor-unresolved" in result["blockers"]
     assert "map-button-full-map-function-unresolved" in result["blockers"]
     assert "native-minimap-toggle-input-function-unresolved" in result["blockers"]
 
@@ -55,12 +56,36 @@ def test_minimap_probe_reports_shared_state_and_native_toggle_candidate():
     assert functions["stateOverlap"] == [0x1000]
     assert functions["nativeToggleInput"]["direct"] == [0x1000]
     assert functions["mapMenuInput"]["direct"] == [0x1000, 0x2000]
+    assert functions["mapMenuSupport"]["direct"] == [0x1000, 0x2000]
+    assert functions["mapMenuAction"]["direct"] == [0x2000]
+    assert result["mapMenuActionNeedleHits"]["KeyboardMapMenu"] == 1
+    assert "native-map-menu-input-anchor-unresolved" not in result["blockers"]
+    assert "map-button-full-map-function-unresolved" not in result["blockers"]
     assert "central-minimap-state-controller-unvalidated" not in result["blockers"]
     assert "central-minimap-state-controller-next-hop-unvalidated" not in result["blockers"]
     assert "tap-hold-input-to-minimap-link-unvalidated" not in result["blockers"]
     assert "native-minimap-toggle-input-anchor-unresolved" not in result["blockers"]
     assert "native-toggle-input-to-state-link-unvalidated" not in result["blockers"]
     assert "map-button-press-release-semantics-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_generic_map_journal_and_input_gates_cannot_substitute_for_keyboard_map_menu():
+    result = assess_minimap_runtime_evidence(_native(
+        HideNaviMap=_hit(0x1000),
+        BPHideNavimap=_hit(0x1000),
+        EndFieldOnOffTable_ShowMapJournal=_hit(0x1000),
+        EndFieldOnOffTable_DisableTouchPad=_hit(0x1000),
+        MapJournal=_hit(0x1000),
+        KeyboardToggleMap=_hit(0x1000),
+    ))
+
+    functions = result["candidateFunctions"]
+    assert functions["mapMenuSupport"]["direct"] == [0x1000]
+    assert functions["mapMenuAction"]["direct"] == []
+    assert functions["mapInput"]["direct"] == [0x1000]
+    assert "native-map-menu-input-anchor-unresolved" in result["blockers"]
+    assert "map-button-full-map-function-unresolved" in result["blockers"]
     assert result["implementationReady"] is False
 
 
@@ -74,6 +99,8 @@ def test_minimap_probe_keeps_separate_input_and_state_paths_explicit():
     assert result["candidateFunctions"]["stateDirectOverlap"] == [0x1000]
     assert result["candidateFunctions"]["inputStateDirectOverlap"] == []
     assert result["candidateFunctions"]["toggleStateDirectOverlap"] == []
+    assert "native-map-menu-input-anchor-unresolved" in result["blockers"]
+    assert "map-button-full-map-function-unresolved" in result["blockers"]
     assert "tap-hold-input-to-minimap-link-unvalidated" in result["blockers"]
     assert "native-toggle-input-to-state-link-unvalidated" in result["blockers"]
 
@@ -94,6 +121,7 @@ def test_minimap_probe_reports_shared_next_hop_without_promoting_it_to_semantics
         EndFieldOnOffTable_HideNaviMap=_hit(0x1000, 0x5000),
         BPShowNavimap=_hit(0x2000, 0x5000),
         EndFieldOnOffTable_ShowMapJournal=_hit(0x3000, 0x5000),
+        KeyboardMapMenu=_hit(0x3500, 0x5000),
         KeyboardToggleMap=_hit(0x4000, 0x5000),
     ))
     functions = result["candidateFunctions"]
@@ -101,10 +129,13 @@ def test_minimap_probe_reports_shared_next_hop_without_promoting_it_to_semantics
     assert functions["stateReachableOverlap"] == [0x5000]
     assert functions["inputStateDirectOverlap"] == []
     assert functions["inputStateReachableOverlap"] == [0x5000]
+    assert functions["mapMenuStateDirectOverlap"] == []
+    assert functions["mapMenuStateReachableOverlap"] == [0x5000]
     assert functions["toggleStateDirectOverlap"] == []
     assert functions["toggleStateReachableOverlap"] == [0x5000]
     assert "central-minimap-state-controller-next-hop-unvalidated" in result["blockers"]
     assert "tap-hold-input-next-hop-to-minimap-unvalidated" in result["blockers"]
+    assert "native-map-menu-input-next-hop-to-state-unvalidated" in result["blockers"]
     assert "native-toggle-input-next-hop-to-state-unvalidated" in result["blockers"]
     assert result["implementationReady"] is False
 
@@ -119,6 +150,7 @@ def test_minimap_probe_ignores_heuristic_bound_next_hops():
             }]}]
         },
         BPShowNavimap=_hit(0x5000),
+        KeyboardMapMenu=_hit(0x5500, 0x5000),
         KeyboardToggleMap=_hit(0x6000, 0x5000),
     ))
     functions = result["candidateFunctions"]
