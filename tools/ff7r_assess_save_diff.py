@@ -7,6 +7,12 @@ Examples:
     --pair run2 before2.sav after2.sav
 
   python tools/ff7r_assess_save_diff.py \
+    --pair assess1 before-a1.sav after-a1.sav \
+    --pair assess2 before-a2.sav after-a2.sav \
+    --control noop1 before-c1.sav after-c1.sav \
+    --control noop2 before-c2.sav after-c2.sav
+
+  python tools/ff7r_assess_save_diff.py \
     --group GuardDog before-dog-1.sav after-dog-1.sav \
     --group GuardDog before-dog-2.sav after-dog-2.sav \
     --group SecurityOfficer before-officer-1.sav after-officer-1.sav \
@@ -30,6 +36,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from games.ff7r.save_control_probe import analyze_controlled_save_pairs  # noqa: E402
 from games.ff7r.save_diff_probe import (  # noqa: E402
     SavePair,
     analyze_experiment_groups,
@@ -47,14 +54,26 @@ def build_report(
     *,
     pair_specs: Sequence[Sequence[str]] = (),
     group_specs: Sequence[Sequence[str]] = (),
+    control_specs: Sequence[Sequence[str]] = (),
 ) -> dict:
     if pair_specs and group_specs:
         raise ValueError("use either --pair or --group experiments, not both")
+    if control_specs and not pair_specs:
+        raise ValueError("--control is supported only with repeated --pair Assess experiments")
     if pair_specs:
         pairs = [
             _read_pair(str(label), before, after)
             for label, before, after in pair_specs
         ]
+        if control_specs:
+            controls = [
+                _read_pair(str(label), before, after)
+                for label, before, after in control_specs
+            ]
+            return {
+                "mode": "repeated-single-experiment-with-noop-control",
+                "analysis": analyze_controlled_save_pairs(pairs, controls),
+            }
         return {
             "mode": "repeated-single-experiment",
             "analysis": analyze_save_pairs(pairs),
@@ -82,7 +101,11 @@ def _parser() -> argparse.ArgumentParser:
     experiments = parser.add_argument_group("experiments")
     experiments.add_argument(
         "--pair", action="append", nargs=3, metavar=("LABEL", "BEFORE", "AFTER"),
-        default=[], help="repeat one controlled enemy experiment",
+        default=[], help="repeat one controlled enemy Assess experiment",
+    )
+    experiments.add_argument(
+        "--control", action="append", nargs=3, metavar=("LABEL", "BEFORE", "AFTER"),
+        default=[], help="repeat a no-op save from the same duplicated pre-Assessment baseline",
     )
     experiments.add_argument(
         "--group", action="append", nargs=3, metavar=("ENEMY", "BEFORE", "AFTER"),
@@ -98,7 +121,11 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
-        report = build_report(pair_specs=args.pair, group_specs=args.group)
+        report = build_report(
+            pair_specs=args.pair,
+            group_specs=args.group,
+            control_specs=args.control,
+        )
     except (OSError, ValueError, TypeError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 2
