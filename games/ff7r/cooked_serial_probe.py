@@ -7,9 +7,11 @@ actual `.uasset` byte length, map each export's absolute SerialOffset into the
 paired `.uexp` and scan only for FName-shaped references to requested names.
 
 A candidate becomes stronger `propertyTagLike` evidence only when the following
-FName resolves to a known `*Property` serializer name. This is still read-only
-research evidence: integer bytes can resemble FNames, and this module does not
-parse, rewrite, or claim the semantics/value layout of arbitrary UE properties.
+FName resolves to a known `*Property` serializer name. For those candidates the
+probe also records the generic UE4 property-tag size/array fields when they are
+plausible. This is still read-only research evidence: integer bytes can resemble
+FNames/property headers, and this module does not parse, rewrite, or claim the
+semantics/value layout of arbitrary UE properties.
 """
 
 from __future__ import annotations
@@ -27,6 +29,8 @@ from .tooling import get_file, list_pak
 MAX_REFS = 256
 MAX_ERRORS = 128
 MAX_FNAME_NUMBER = 1_000_000
+MAX_PROPERTY_VALUE_SIZE = 256 * 1024 * 1024
+MAX_PROPERTY_ARRAY_INDEX = 1_000_000
 KNOWN_PROPERTY_TYPES = frozenset({
     "ArrayProperty", "BoolProperty", "ByteProperty", "ClassProperty",
     "DelegateProperty", "DoubleProperty", "EnumProperty", "FloatProperty",
@@ -55,6 +59,31 @@ def _fname_at(data: bytes, offset: int, table: PackageObjectTable) -> tuple[str,
         return None
     name = table.names[index]
     return (name if number == 0 else f"{name}_{number - 1}", number)
+
+
+def _property_tag_header_fields(data: bytes, offset: int, property_type: str) -> dict[str, Any]:
+    """Return only the generic size/array prefix after name+type FNames.
+
+    UE4 property tags place signed int32 Size and ArrayIndex values after the
+    property-name and property-type FNames. Type-specific metadata follows those
+    fields, so this helper deliberately does not infer the serialized value start.
+    """
+    if property_type not in KNOWN_PROPERTY_TYPES or offset < 0 or offset + 24 > len(data):
+        return {
+            "propertyTagHeaderPlausible": False,
+            "declaredValueSize": None,
+            "arrayIndex": None,
+        }
+    declared_size, array_index = struct.unpack_from("<ii", data, offset + 16)
+    plausible = bool(
+        0 <= declared_size <= MAX_PROPERTY_VALUE_SIZE
+        and 0 <= array_index <= MAX_PROPERTY_ARRAY_INDEX
+    )
+    return {
+        "propertyTagHeaderPlausible": plausible,
+        "declaredValueSize": declared_size if plausible else None,
+        "arrayIndex": array_index if plausible else None,
+    }
 
 
 def _export_identity(table: PackageObjectTable, export_index: int) -> dict[str, Any]:
@@ -129,8 +158,9 @@ def extract_serialized_name_refs(
             type_ref = _fname_at(payload, relative + 8, table)
             type_name = type_ref[0] if type_ref else ""
             property_like = type_name in KNOWN_PROPERTY_TYPES
+            tag_header = _property_tag_header_fields(payload, relative, type_name)
             context_start = max(0, relative - 16)
-            context_end = min(len(payload), relative + 32)
+            context_end = min(len(payload), relative + 40)
             refs.append({
                 **identity,
                 "name": matched[name_index] if number == 0 else f"{matched[name_index]}_{number - 1}",
@@ -138,6 +168,7 @@ def extract_serialized_name_refs(
                 "nameNumber": number,
                 "propertyType": type_name,
                 "propertyTagLike": property_like,
+                **tag_header,
                 "exportRelativeOffset": relative,
                 "uexpOffset": start + relative,
                 "contextHex": payload[context_start:context_end].hex(),
@@ -149,10 +180,12 @@ def extract_serialized_name_refs(
 
     refs.sort(key=lambda row: (
         not bool(row["propertyTagLike"]),
+        not bool(row["propertyTagHeaderPlausible"]),
         int(row["exportIndex"]),
         int(row["exportRelativeOffset"]),
         str(row["name"]).casefold(),
     ))
+    reported = refs[:limit]
     return {
         "mappingTrusted": True,
         "mappingReason": "serial-offset-minus-total-header-size",
@@ -160,13 +193,18 @@ def extract_serialized_name_refs(
         "uassetSize": len(uasset),
         "uexpSize": len(uexp),
         "matchedNameCount": len(matched),
-        "refs": refs[:limit],
+        "refs": reported,
         "refsTruncated": len(refs) >= limit,
-        "propertyTagLikeCount": sum(bool(row["propertyTagLike"]) for row in refs[:limit]),
+        "propertyTagLikeCount": sum(bool(row["propertyTagLike"]) for row in reported),
+        "propertyTagHeaderPlausibleCount": sum(
+            bool(row["propertyTagHeaderPlausible"]) for row in reported
+        ),
         "unmappedExports": unmapped,
         "notes": [
             "FName-shaped hits are candidate serialized references, not parsed UE property values.",
             "propertyTagLike requires the immediately following FName to resolve to a known UE *Property serializer type.",
+            "propertyTagHeaderPlausible additionally requires non-negative bounded generic Size and ArrayIndex fields after the two FNames.",
+            "Type-specific tag metadata follows those generic fields, so declaredValueSize does not identify the serialized value start or authorize mutation.",
             "No export bytes are modified by this probe.",
         ],
     }
