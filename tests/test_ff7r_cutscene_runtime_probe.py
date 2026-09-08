@@ -156,8 +156,7 @@ def test_padding_heuristic_function_never_contributes_direct_or_next_hop_evidenc
     result = assess_cutscene_runtime_evidence(native)
 
     assert result["candidateFunctions"]["setGameSpeed"]["direct"] == []
-    # The generic native probe never emits code refs for heuristic bounds; even
-    # a malformed/synthetic input must not let them strengthen the result.
-    assert result["candidateFunctions"]["setGameSpeed"]["nextHops"] == [0x5000]
+    assert result["candidateFunctions"]["setGameSpeed"]["nextHops"] == []
     assert result["candidateFunctions"]["cutSpeedDirectOverlap"] == []
+    assert result["candidateFunctions"]["cutSpeedReachableOverlap"] == []
     assert result["implementationReady"] is False
