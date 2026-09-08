@@ -18,6 +18,7 @@ from .minimap_semantics import (
     minimap_visibility_payload,
     save_minimap_visibility_edits,
 )
+from .native_probe import probe_installed_exe
 from .runtime_config import (
     deploy_runtime,
     load_runtime_config,
@@ -337,7 +338,7 @@ class Handler(BaseHTTPRequestHandler):
                     "windowHost": "webview2",
                     "capabilities": [
                         "data-map", "dataobject", "text-resource", "economy",
-                        "enemy-loot", "minimap-visibility", "runtime-config",
+                        "enemy-loot", "minimap-visibility", "runtime-config", "native-probe",
                         "save", "economy-save", "enemy-loot-save", "minimap-visibility-save",
                         "text-save", "build", "deploy", "runtime-deploy",
                     ],
@@ -352,6 +353,8 @@ class Handler(BaseHTTPRequestHandler):
                 status = runtime_status(GAME_ROOT, PROJECT_ROOT)
                 status["config"] = load_runtime_config(PROJECT_ROOT)
                 return self.send_json(status)
+            if path == "/api/runtime/probe":
+                return self.send_json(probe_installed_exe(GAME_ROOT))
             if path == "/api/data":
                 asset = (query.get("asset") or [""])[0]
                 if not asset:
@@ -385,7 +388,7 @@ class Handler(BaseHTTPRequestHandler):
                 vanilla = (query.get("source") or [""])[0] == "vanilla"
                 return self.send_json(text_payload(asset, vanilla=vanilla))
             return self.send_json({"error": "Not found"}, 404)
-        except (ValueError, KeyError, IndexError) as error:
+        except (ValueError, KeyError, IndexError, FileNotFoundError) as error:
             return self.send_json({"error": str(error)}, 400)
         except Exception as error:
             return self.send_json({"error": str(error)}, 500)
@@ -473,7 +476,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/deploy":
                 return self.send_json(deploy_mod())
             return self.send_json({"error": "Not found"}, 404)
-        except (ValueError, KeyError, IndexError, TypeError) as error:
+        except (ValueError, KeyError, IndexError, TypeError, FileNotFoundError) as error:
             return self.send_json({"error": str(error)}, 400)
         except Exception as error:
             return self.send_json({"error": str(error)}, 500)
