@@ -23,6 +23,11 @@ from .graphics_dataobject import (
     save_graphics_virtual_package,
 )
 from .graphics_tweaks import GRAPHICS_TWEAKS_ASSET
+from .lockon_tweaks import (
+    BETTER_LOCKON_ASSET,
+    load_virtual_package as load_better_lockon_virtual_package,
+    save_virtual_edits as save_better_lockon_virtual_edits,
+)
 from .no_more_cheats_tweaks import (
     NO_MORE_CHEATS_ASSET,
     load_virtual_package as load_no_more_cheats_virtual_package,
@@ -61,6 +66,9 @@ def load_package(game_root: Path, data_root: Path, project_root: Path,
         return no_more_cheats_probe_package(game_root, data_root, project_root, index)
     if asset == NO_MORE_CHEATS_ASSET:
         return load_no_more_cheats_virtual_package(
+            game_root, data_root, project_root, index, vanilla=vanilla)
+    if asset == BETTER_LOCKON_ASSET:
+        return load_better_lockon_virtual_package(
             game_root, data_root, project_root, index, vanilla=vanilla)
     if is_research_virtual_asset(asset):
         return load_research_virtual_package(game_root, data_root, project_root, index, asset)
@@ -104,6 +112,13 @@ def save_edits(game_root: Path, data_root: Path, project_root: Path,
         raise ValueError("FF7R No More Cheats Probe is read-only")
     if asset == NO_MORE_CHEATS_ASSET:
         return save_no_more_cheats_virtual_edits(
+            game_root, data_root, project_root, index,
+            source_sha256=source_sha256,
+            active_sha256=active_sha256,
+            edits=edits,
+        )
+    if asset == BETTER_LOCKON_ASSET:
+        return save_better_lockon_virtual_edits(
             game_root, data_root, project_root, index,
             source_sha256=source_sha256,
             active_sha256=active_sha256,
