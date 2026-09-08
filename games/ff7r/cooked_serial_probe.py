@@ -102,7 +102,14 @@ def _read_required_fname(
     row = _fname_at(data, cursor, table)
     if row is None:
         return None
-    return row[0], cursor + 8
+    # FPropertyTag type metadata stores type/member names, not package paths.
+    # Rejecting path-shaped names prevents arbitrary zero-filled bytes from
+    # accidentally resolving to name-table entry 0 (commonly /Script/...) and
+    # being promoted to a strong serialized-layout candidate.
+    name = row[0]
+    if not name or "/" in name or "\\" in name:
+        return None
+    return name, cursor + 8
 
 
 def _property_tag_layout_fields(
@@ -378,6 +385,7 @@ def extract_serialized_name_refs(
             "propertyTagLike requires the immediately following FName to resolve to a known UE *Property serializer type.",
             "propertyTagHeaderPlausible additionally requires non-negative bounded generic Size and ArrayIndex fields after the two FNames.",
             "propertyTagLayoutPlausible parses old-format UE4 type metadata and optional PropertyGuid using the package FileVersionUE4, then proves the declared value range stays inside the export.",
+            "Type-metadata FNames that resolve to package/script paths are rejected rather than treated as struct/enum/container type names.",
             "For StructProperty, typeMetadata records StructName and version-gated StructGuid. A LinearColor value is decoded only when StructName is exactly LinearColor and declared size is exactly 16 bytes.",
             "A valid LinearColor payload is still read-only evidence; this probe does not prove reticle ownership, active-state scope, or authorize replacement bytes.",
             "No export bytes are modified by this probe.",
