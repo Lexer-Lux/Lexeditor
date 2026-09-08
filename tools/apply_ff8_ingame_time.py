@@ -202,7 +202,11 @@ def patch_gameplay_settings() -> None:
         '        in_game_time = DEFAULT_INGAME_TIME\n',
         "load clock setting",
     )
-    text = replace_once(text, '        "gfHpBars": gf_hp_bars,\n        "noMagicConsumption": no_magic_consumption,\n', '        "gfHpBars": gf_hp_bars,\n        "inGameTime": in_game_time,\n        "noMagicConsumption": no_magic_consumption,\n', "load clock payload")
+    old_payload = '        "gfHpBars": gf_hp_bars,\n        "noMagicConsumption": no_magic_consumption,\n'
+    new_payload = '        "gfHpBars": gf_hp_bars,\n        "inGameTime": in_game_time,\n        "noMagicConsumption": no_magic_consumption,\n'
+    if text.count(old_payload) != 2:
+        raise RuntimeError(f"load/save clock payload: expected two integration seams, found {text.count(old_payload)}")
+    text = text.replace(old_payload, new_payload, 1)
     text = replace_once(
         text,
         '                             gf_hp_bars: bool = False,\n                             no_magic_consumption: bool = False) -> None:\n',
