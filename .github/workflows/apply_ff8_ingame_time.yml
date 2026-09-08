@@ -1,4 +1,5 @@
 name: Apply FF8 in-game clock integration
+# Retry after making the duplicate load/save payload seam explicit.
 on:
   push:
     branches: [master]
