@@ -3,12 +3,11 @@
 Repeated controlled diffs can produce per-bit candidates after no-op subtraction.
 A second, held-out set can be analyzed independently and compared against the
 discovery set so recurrence in the training runs is not mistaken for validation.
-Known EnemyBookIDs can additionally be supplied to test a narrow hypothesis: the
-reproduced bits form one contiguous bitset indexed by EnemyBookID.
+Known EnemyBookIDs can additionally test one narrow hypothesis: the reproduced
+bits form one contiguous bitset indexed by EnemyBookID.
 
-This remains read-only research evidence. A repeated bit signature or contiguous
-indexed layout does not prove save serialization semantics or that writing it is
-safe.
+All results remain read-only research evidence. Neither repeated bit signatures
+nor an indexed layout prove save serialization semantics or authorize writes.
 """
 
 from __future__ import annotations
@@ -81,7 +80,9 @@ def analyze_controlled_bit_signatures(
                 if status == "residual":
                     effective_mask = int(comparison.get("residualXorMask") or 0)
                 else:
-                    unresolved[offset] = str(comparison.get("reason") or "ambiguous-control")
+                    unresolved[offset] = str(
+                        comparison.get("reason") or "ambiguous-control"
+                    )
                     continue
 
             if effective_mask:
@@ -91,12 +92,14 @@ def analyze_controlled_bit_signatures(
         raw_by_group[name] = raw_masks
         unresolved_by_group[name] = unresolved
 
-    candidate_offsets = sorted(set().union(*(
-        set(offsets) for offsets in effective_by_group.values()
-    ))) if effective_by_group else []
-    unresolved_offsets = sorted(set().union(*(
-        set(offsets) for offsets in unresolved_by_group.values()
-    ))) if unresolved_by_group else []
+    candidate_offsets = (
+        sorted(set().union(*(set(offsets) for offsets in effective_by_group.values())))
+        if effective_by_group else []
+    )
+    unresolved_offsets = (
+        sorted(set().union(*(set(offsets) for offsets in unresolved_by_group.values())))
+        if unresolved_by_group else []
+    )
 
     offset_rows: list[dict[str, Any]] = []
     exclusive_single_bits: list[dict[str, Any]] = []
@@ -139,7 +142,6 @@ def analyze_controlled_bit_signatures(
                 "groups": owners,
                 "groupCount": len(owners),
             })
-
             if len(owners) == 1 and not unresolved_groups:
                 owner = owners[0]
                 owner_mask = group_masks[owner]
@@ -179,13 +181,16 @@ def analyze_controlled_bit_signatures(
             "unresolvedGroups": dict(sorted(unresolved_groups.items())),
             "controlXorMask": control_mask,
             "activeGroupCount": len(group_masks),
-            "allActiveMasksSingleBit": bool(masks) and all(_is_single_bit(mask) for mask in masks),
+            "allActiveMasksSingleBit": bool(masks)
+            and all(_is_single_bit(mask) for mask in masks),
             "distinctActiveMasks": len(set(masks)) == len(masks),
             "packedDistinctSingleBitCandidate": packed,
             "bits": bit_rows,
         })
 
-    exclusive_single_bits.sort(key=lambda row: (row["offset"], row["bit"], row["group"]))
+    exclusive_single_bits.sort(
+        key=lambda row: (row["offset"], row["bit"], row["group"])
+    )
     packed_flag_bytes.sort(key=lambda row: row["offset"])
 
     return {
@@ -201,7 +206,9 @@ def analyze_controlled_bit_signatures(
         "offsetSignaturesTruncated": len(offset_rows) > MAX_REPORTED_OFFSETS,
         "exclusiveSingleBitFlagCandidateCount": len(exclusive_single_bits),
         "exclusiveSingleBitFlagCandidates": exclusive_single_bits[:MAX_REPORTED_OFFSETS],
-        "exclusiveSingleBitFlagCandidatesTruncated": len(exclusive_single_bits) > MAX_REPORTED_OFFSETS,
+        "exclusiveSingleBitFlagCandidatesTruncated": (
+            len(exclusive_single_bits) > MAX_REPORTED_OFFSETS
+        ),
         "packedFlagByteCandidateCount": len(packed_flag_bytes),
         "packedFlagByteCandidates": packed_flag_bytes[:MAX_REPORTED_OFFSETS],
         "packedFlagByteCandidatesTruncated": len(packed_flag_bytes) > MAX_REPORTED_OFFSETS,
@@ -250,6 +257,10 @@ def validate_controlled_bit_signatures(
         _candidate_key(row)
         for row in holdout.get("exclusiveSingleBitFlagCandidates", ())
     }
+    candidate_inputs_truncated = bool(
+        discovery.get("exclusiveSingleBitFlagCandidatesTruncated", False)
+        or holdout.get("exclusiveSingleBitFlagCandidatesTruncated", False)
+    )
     discovery_names = {str(name).strip() for name in discovery_groups}
     holdout_names = {str(name).strip() for name in holdout_groups}
 
@@ -258,13 +269,23 @@ def validate_controlled_bit_signatures(
     unexpected = sorted(holdout_keys - discovery_keys)
     missing_groups = sorted(discovery_names - holdout_names)
     extra_groups = sorted(holdout_names - discovery_names)
-    all_confirmed = bool(discovery_keys) and not missing and not missing_groups
-    exact_agreement = bool(all_confirmed and not unexpected and not extra_groups)
+    all_confirmed = bool(
+        discovery_keys
+        and not candidate_inputs_truncated
+        and not missing
+        and not missing_groups
+    )
+    exact_agreement = bool(
+        all_confirmed
+        and not unexpected
+        and not extra_groups
+    )
 
     return {
         "implementationReady": False,
         "discovery": discovery,
         "holdout": holdout,
+        "candidateInputsTruncated": candidate_inputs_truncated,
         "discoveryCandidateCount": len(discovery_keys),
         "holdoutCandidateCount": len(holdout_keys),
         "confirmedCandidateCount": len(confirmed),
@@ -280,6 +301,7 @@ def validate_controlled_bit_signatures(
         "notes": [
             "Discovery and holdout groups are analyzed independently with the same no-op control subtraction rules before candidate sets are compared.",
             "A confirmed candidate must reproduce the same enemy/group, byte offset and effective single-bit mask in the held-out experiments.",
+            "Truncated discovery or holdout candidate lists can never produce a complete/exact validation claim.",
             "The caller must ensure holdout saves are genuinely independent runs; this function cannot detect reused files or experimental leakage.",
             "Even exact held-out recurrence remains format-agnostic evidence only and does not prove EnemyBook index ordering or authorize save mutation.",
         ],
@@ -317,9 +339,8 @@ def assess_indexed_bitset_layout(
 ) -> dict[str, Any]:
     """Test whether reproduced per-enemy bits fit one EnemyBookID-indexed bitset.
 
-    This does not infer EnemyBookIDs. The caller supplies independently known IDs
-    and this function asks whether candidate save-bit absolute positions satisfy
-    ``absolute_bit = base_bit + EnemyBookID`` across multiple enemies.
+    EnemyBookIDs must come from independent evidence. This function asks whether
+    candidate save-bit positions satisfy ``absolute_bit = base_bit + EnemyBookID``.
     """
     if not isinstance(bit_analysis, Mapping):
         raise TypeError("bit analysis must be a mapping")
@@ -327,11 +348,17 @@ def assess_indexed_bitset_layout(
     if "confirmedCandidates" in bit_analysis:
         source_field = "confirmedCandidates"
         source_kind = "holdout-confirmed"
+        source_truncated = bool(bit_analysis.get("candidateInputsTruncated", False))
     else:
         source_field = "exclusiveSingleBitFlagCandidates"
         source_kind = "discovery"
+        source_truncated = bool(
+            bit_analysis.get("exclusiveSingleBitFlagCandidatesTruncated", False)
+        )
     raw_candidates = bit_analysis.get(source_field, ())
-    if not isinstance(raw_candidates, Sequence) or isinstance(raw_candidates, (str, bytes, bytearray)):
+    if not isinstance(raw_candidates, Sequence) or isinstance(
+        raw_candidates, (str, bytes, bytearray)
+    ):
         raise ValueError(f"{source_field} must be a candidate sequence")
 
     candidate_rows: list[dict[str, Any]] = []
@@ -347,13 +374,27 @@ def assess_indexed_bitset_layout(
         mask = raw_row.get("mask")
         bit = raw_row.get("bit")
         if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
-            raise ValueError(f"candidate offset for {group} must be a non-negative integer")
-        if isinstance(mask, bool) or not isinstance(mask, int) or not _is_single_bit(mask) or mask > 0x80:
-            raise ValueError(f"candidate mask for {group} must be one byte-wide single bit")
+            raise ValueError(
+                f"candidate offset for {group} must be a non-negative integer"
+            )
+        if (
+            isinstance(mask, bool)
+            or not isinstance(mask, int)
+            or not _is_single_bit(mask)
+            or mask > 0x80
+        ):
+            raise ValueError(
+                f"candidate mask for {group} must be one byte-wide single bit"
+            )
         expected_bit = _bit_index(mask)
         if bit is None:
             bit = expected_bit
-        if isinstance(bit, bool) or not isinstance(bit, int) or bit != expected_bit or not 0 <= bit <= 7:
+        if (
+            isinstance(bit, bool)
+            or not isinstance(bit, int)
+            or bit != expected_bit
+            or not 0 <= bit <= 7
+        ):
             raise ValueError(f"candidate bit/mask disagree for {group}")
 
         enemy_index = indices[group]
@@ -375,8 +416,12 @@ def assess_indexed_bitset_layout(
             layouts.setdefault(base_bit, []).append(row)
 
     mapped_groups = sorted(indices)
-    groups_with_candidates = sorted(name for name, count in candidate_counts.items() if count)
-    groups_without_candidates = sorted(name for name, count in candidate_counts.items() if not count)
+    groups_with_candidates = sorted(
+        name for name, count in candidate_counts.items() if count
+    )
+    groups_without_candidates = sorted(
+        name for name, count in candidate_counts.items() if not count
+    )
     layout_rows: list[dict[str, Any]] = []
     for base_bit, support in layouts.items():
         supporting_groups = sorted({row["group"] for row in support})
@@ -402,7 +447,8 @@ def assess_indexed_bitset_layout(
             for name, enemy_index in sorted(indices.items())
         }
         exact = bool(
-            len(supporting_groups) == len(mapped_groups)
+            not source_truncated
+            and len(supporting_groups) == len(mapped_groups)
             and not missing_groups
             and not extra_candidate_groups
         )
@@ -429,15 +475,24 @@ def assess_indexed_bitset_layout(
             row["baseBit"],
         )
     )
-    best_support = max((row["supportGroupCount"] for row in layout_rows), default=0)
-    best_rows = [row for row in layout_rows if row["supportGroupCount"] == best_support]
+    best_support = max(
+        (row["supportGroupCount"] for row in layout_rows), default=0
+    )
+    best_rows = [
+        row for row in layout_rows if row["supportGroupCount"] == best_support
+    ]
     exact_rows = [row for row in layout_rows if row["exactMappedAgreement"]]
-    unique_best = bool(best_support >= 2 and len(best_rows) == 1)
+    unique_best = bool(
+        not source_truncated
+        and best_support >= 2
+        and len(best_rows) == 1
+    )
 
     return {
         "implementationReady": False,
         "candidateSource": source_kind,
         "candidateField": source_field,
+        "candidateSourceTruncated": source_truncated,
         "enemyBookIds": dict(sorted(indices.items())),
         "mappedGroupCount": len(mapped_groups),
         "groupsWithCandidates": groups_with_candidates,
@@ -459,6 +514,7 @@ def assess_indexed_bitset_layout(
             "EnemyBookIDs are caller-supplied independent evidence; this function never infers IDs from save offsets or group labels.",
             "A layout candidate fits absolute_bit = base_bit + EnemyBookID. Crossing byte boundaries is expected for a contiguous packed bitset.",
             "At least two mapped enemies must support the same base before a layout is called plausible; exact agreement requires every mapped enemy to have exactly one reproduced candidate at its predicted bit.",
+            "A truncated candidate source can show partial topology leads but can never produce a unique-best or exact layout claim.",
             "A unique or exact layout is still correlation evidence only. Live read semantics, save format ownership and write safety remain unvalidated.",
         ],
     }
