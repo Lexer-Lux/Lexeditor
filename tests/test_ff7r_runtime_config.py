@@ -7,6 +7,7 @@ import pytest
 from games.ff7r.archive import _with_virtual_assets
 from games.ff7r.runtime_config import (
     DEFAULT_RUNTIME_CONFIG,
+    LEGACY_MINIMAP_CONFIG,
     RUNTIME_CONFIG_NAME,
     RUNTIME_DLL_NAME,
     RUNTIME_MANIFEST_NAME,
@@ -47,6 +48,8 @@ def write_manifest(project: Path, *, timestamp=FIXTURE_TIMESTAMP, hooks=None):
     runtime.mkdir(parents=True, exist_ok=True)
     payload = {
         "manifestVersion": 1,
+        # Preserve the former minimap flags in this fixture to prove that old
+        # manifests remain readable after #414 is retired.
         "hooks": hooks or {
             "cutsceneSpeed": True,
             "minimapTapHold": True,
@@ -59,13 +62,11 @@ def write_manifest(project: Path, *, timestamp=FIXTURE_TIMESTAMP, hooks=None):
     return payload
 
 
-def test_runtime_defaults_encode_requested_cutscene_and_minimap_contract(tmp_path):
+def test_runtime_defaults_encode_cutscene_contract_without_redundant_minimap_tweak(tmp_path):
     config = load_runtime_config(tmp_path)
     assert config["cutsceneSpeed"]["baseMultiplier"] > 1.0
     assert config["cutsceneSpeed"]["r2Behavior"] == "multiply-native"
-    assert config["minimap"]["tapBehavior"] == "open-map"
-    assert config["minimap"]["holdBehavior"] == "toggle-minimap"
-    assert config["minimap"]["persistChosenState"] is True
+    assert "minimap" not in config
 
 
 def test_cutscene_multiplier_must_be_above_one_and_finite():
@@ -76,40 +77,42 @@ def test_cutscene_multiplier_must_be_above_one_and_finite():
             validate_runtime_config(value)
 
 
-def test_minimap_hold_threshold_is_bounded():
+def test_legacy_minimap_config_is_validated_then_stripped():
+    value = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
+    value["minimap"] = {**LEGACY_MINIMAP_CONFIG, "enabled": True, "holdMilliseconds": 420}
+    validated = validate_runtime_config(value)
+    assert "minimap" not in validated
+
     for invalid in (149, 1501, 350.5, True):
         value = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
-        value["minimap"]["holdMilliseconds"] = invalid
+        value["minimap"] = {**LEGACY_MINIMAP_CONFIG, "holdMilliseconds": invalid}
         with pytest.raises(ValueError):
             validate_runtime_config(value)
 
 
-def test_runtime_config_save_is_atomic_and_round_trips(tmp_path):
+def test_runtime_config_save_is_atomic_round_trips_and_canonicalizes_legacy_minimap(tmp_path):
     value = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
     value["cutsceneSpeed"].update(enabled=True, baseMultiplier=1.75)
-    value["minimap"].update(enabled=True, holdMilliseconds=420)
+    value["minimap"] = {**LEGACY_MINIMAP_CONFIG, "enabled": True, "holdMilliseconds": 420}
     saved = save_runtime_config(tmp_path, value)
     assert saved == load_runtime_config(tmp_path)
     assert saved["cutsceneSpeed"]["baseMultiplier"] == 1.75
-    assert saved["minimap"]["holdMilliseconds"] == 420
-    assert (tmp_path / "runtime" / RUNTIME_CONFIG_NAME).is_file()
+    assert "minimap" not in saved
+    assert "minimap" not in json.loads(
+        (tmp_path / "runtime" / RUNTIME_CONFIG_NAME).read_text(encoding="utf-8"))
 
 
-def test_runtime_manifest_requires_every_hook_and_supported_build():
-    with pytest.raises(ValueError, match="exactly the required"):
+def test_runtime_manifest_requires_cutscene_hook_but_accepts_legacy_minimap_flags():
+    with pytest.raises(ValueError, match="required"):
         validate_runtime_manifest({
             "manifestVersion": 1,
-            "hooks": {"cutsceneSpeed": True},
+            "hooks": {},
             "supportedExeTimestamps": [FIXTURE_TIMESTAMP],
         })
     with pytest.raises(ValueError, match="at least one"):
         validate_runtime_manifest({
             "manifestVersion": 1,
-            "hooks": {
-                "cutsceneSpeed": True,
-                "minimapTapHold": True,
-                "minimapState": True,
-            },
+            "hooks": {"cutsceneSpeed": True},
             "supportedExeTimestamps": [],
         })
 
@@ -124,6 +127,8 @@ def test_runtime_manifest_requires_every_hook_and_supported_build():
         "supportedExeTimestamps": [FIXTURE_TIMESTAMP],
     })
     assert manifest["hooks"]["atbTweaks"] is True
+    assert manifest["hooks"]["minimapTapHold"] is False
+    assert manifest["hooks"]["minimapState"] is False
 
 
 def test_runtime_status_never_claims_active_without_dll_loader_manifest_and_supported_exe(tmp_path):
@@ -173,11 +178,7 @@ def test_runtime_deploy_rejects_unvalidated_requested_hook_and_wrong_exe_timesta
     config = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
     config["cutsceneSpeed"]["enabled"] = True
     save_runtime_config(project, config)
-    write_manifest(project, hooks={
-        "cutsceneSpeed": False,
-        "minimapTapHold": True,
-        "minimapState": True,
-    })
+    write_manifest(project, hooks={"cutsceneSpeed": False})
     with pytest.raises(RuntimeError, match="requested runtime hooks are not validated: cutsceneSpeed"):
         deploy_runtime(game, project)
 
@@ -202,8 +203,6 @@ def test_runtime_deploy_allows_validated_hp_without_unrequested_core_hooks(tmp_p
     save_runtime_config(project, config)
     write_manifest(project, hooks={
         "cutsceneSpeed": False,
-        "minimapTapHold": False,
-        "minimapState": False,
         "hpRebalance": True,
     })
 
@@ -219,7 +218,7 @@ def test_runtime_deploy_allows_validated_hp_without_unrequested_core_hooks(tmp_p
     assert result["validation"]["hooks"]["hpRebalance"] is True
 
 
-def test_runtime_deploy_copies_dll_config_and_manifest_only_for_validated_build(tmp_path):
+def test_runtime_deploy_copies_canonical_config_and_legacy_compatible_manifest(tmp_path):
     game = tmp_path / "game"
     project = tmp_path / "project"
     runtime = project / "runtime"
@@ -233,15 +232,18 @@ def test_runtime_deploy_copies_dll_config_and_manifest_only_for_validated_build(
 
     config = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
     config["cutsceneSpeed"].update(enabled=True, baseMultiplier=1.5)
-    config["minimap"].update(enabled=True, holdMilliseconds=300)
-    save_runtime_config(project, config)
+    config["minimap"] = {**LEGACY_MINIMAP_CONFIG, "enabled": True, "holdMilliseconds": 300}
+    # Write an old-style file directly so deployment itself must canonicalize it.
+    config_target = runtime / RUNTIME_CONFIG_NAME
+    config_target.write_text(json.dumps(config), encoding="utf-8")
 
     result = deploy_runtime(game, project)
-    assert Path(result["dll"]).read_bytes() == b"fixture-runtime"
-    assert json.loads(Path(result["config"]).read_text(encoding="utf-8"))["minimap"]["enabled"] is True
+    deployed_config = json.loads(Path(result["config"]).read_text(encoding="utf-8"))
+    assert "minimap" not in deployed_config
     assert json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))["hooks"]["minimapState"] is True
     assert result["exeTimestamp"] == FIXTURE_TIMESTAMP
     status = runtime_status(game, project)
+    assert status["requestedHooks"] == ["cutsceneSpeed"]
     assert status["hooksValidated"] is True
     assert status["buildSupported"] is True
     assert status["runtimeReady"] is True
@@ -262,7 +264,7 @@ def test_virtual_runtime_resources_are_catalogued_without_polluting_cached_asset
     assert len(_with_virtual_assets(decorated)["assets"]) == len(decorated["assets"])
 
 
-def test_runtime_tweaks_are_editable_through_standard_game_data_contract(tmp_path):
+def test_runtime_tweaks_are_editable_through_standard_game_data_contract_without_minimap(tmp_path):
     game = tmp_path / "game"
     project = tmp_path / "project"
     package, source_sha, using_project = runtime_settings_package(game, project)
@@ -270,8 +272,8 @@ def test_runtime_tweaks_are_editable_through_standard_game_data_contract(tmp_pat
     properties = {prop["name"]: prop for prop in payload["properties"]}
     assert properties["CutsceneEnabled"]["editable"] is True
     assert properties["CutsceneBaseMultiplier"]["type"] == "FLOAT"
-    assert properties["MinimapHoldMilliseconds"]["min"] == 150
-    assert properties["MinimapHoldMilliseconds"]["max"] == 1500
+    assert not any(name.startswith("Minimap") for name in properties)
+    assert "minimap" not in payload["records"][0]["values"]
     assert properties["RuntimeReady"]["editable"] is False
     assert payload["records"][0]["values"]["HooksValidated"] is False
 
@@ -282,19 +284,24 @@ def test_runtime_tweaks_are_editable_through_standard_game_data_contract(tmp_pat
         edits=[
             {"entry": 0, "property": "CutsceneEnabled", "value": True},
             {"entry": 0, "property": "CutsceneBaseMultiplier", "value": 1.75},
-            {"entry": 0, "property": "MinimapEnabled", "value": True},
-            {"entry": 0, "property": "MinimapHoldMilliseconds", "value": 420},
         ],
     )
     saved = load_runtime_config(project)
-    assert result["saved"] == 4
+    assert result["saved"] == 2
     assert saved["cutsceneSpeed"] == {
         "enabled": True,
         "baseMultiplier": 1.75,
         "r2Behavior": "multiply-native",
     }
-    assert saved["minimap"]["enabled"] is True
-    assert saved["minimap"]["holdMilliseconds"] == 420
+    assert "minimap" not in saved
+
+    with pytest.raises(ValueError, match="read-only or unknown"):
+        save_runtime_edits(
+            project,
+            source_sha256=payload["sourceSha256"],
+            active_sha256=result["activeSha256"],
+            edits=[{"entry": 0, "property": "MinimapEnabled", "value": True}],
+        )
 
 
 def test_runtime_tweaks_reject_stale_or_read_only_generic_edits(tmp_path):
