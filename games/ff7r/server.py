@@ -13,6 +13,10 @@ from urllib.parse import parse_qs, urlparse
 
 from .archive import build_index, preferred_pak_version
 from .semantics import (
+    ECONOMY_EDIT_FIELDS,
+    ECONOMY_TABLE_NAMES,
+    LOOT_FIELD_PAIRS,
+    LOOT_TABLE_NAME,
     economy_payload,
     loot_payload,
     save_economy_edits,
@@ -32,6 +36,15 @@ PROJECT_ROOT = Path(os.environ.get("LEXEDITOR_FF7R_PROJECT", ROOT / "out" / "ff7
 MAX_BODY = 16 * 1024 * 1024
 _catalog_lock = threading.RLock()
 _catalog_cache: dict | None = None
+
+ECONOMY_GENERIC_FIELDS = {prop: field for field, prop in ECONOMY_EDIT_FIELDS.items()}
+LOOT_GENERIC_FIELDS: dict[str, tuple[str, str]] = {}
+for _kind, _item_prop, _chance_prop, _quantity_prop in LOOT_FIELD_PAIRS:
+    LOOT_GENERIC_FIELDS[_item_prop] = (_kind, "item")
+    if _chance_prop:
+        LOOT_GENERIC_FIELDS[_chance_prop] = (_kind, "chance")
+    if _quantity_prop:
+        LOOT_GENERIC_FIELDS[_quantity_prop] = (_kind, "quantity")
 
 
 def catalog(*, refresh: bool = False) -> dict:
@@ -91,9 +104,9 @@ def data_map_payload() -> dict:
     for item in catalog().get("assets", []):
         asset_name = Path(item["asset"]).name.casefold()
         semantic = []
-        if asset_name in {"item", "equipment", "materia"}:
+        if asset_name in ECONOMY_TABLE_NAMES:
             semantic.append("economy / prices when BuyValue/SaleValue fields exist")
-        if asset_name == "battleitempossession":
+        if asset_name == LOOT_TABLE_NAME:
             semantic.append("enemy normal/rare drops, chances and steal data")
         controls = (
             "Structured DataObject records; booleans, fixed-width numbers, floats "
@@ -171,6 +184,56 @@ def deploy_mod() -> dict:
     shutil.copy2(built, temporary)
     temporary.replace(target)
     return {"path": str(target), "size": target.stat().st_size}
+
+
+def _semantic_save_from_generic(asset: str, *, source_sha256: str,
+                                active_sha256: str, edits: list[dict]):
+    """Route pure semantic edit sets through the stricter semantic validators."""
+    asset_name = Path(asset).name.casefold()
+    if asset_name in ECONOMY_TABLE_NAMES and edits and all(
+        isinstance(edit, dict)
+        and edit.get("property") in ECONOMY_GENERIC_FIELDS
+        and "index" not in edit
+        for edit in edits
+    ):
+        semantic_edits = [
+            {
+                "entry": edit.get("entry"),
+                "field": ECONOMY_GENERIC_FIELDS[edit["property"]],
+                "value": edit.get("value"),
+            }
+            for edit in edits
+        ]
+        return save_economy_edits(
+            GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
+            source_sha256=source_sha256,
+            active_sha256=active_sha256,
+            edits=semantic_edits,
+        )
+
+    if asset_name == LOOT_TABLE_NAME and edits and all(
+        isinstance(edit, dict)
+        and edit.get("property") in LOOT_GENERIC_FIELDS
+        and "index" in edit
+        for edit in edits
+    ):
+        semantic_edits = []
+        for edit in edits:
+            kind, field = LOOT_GENERIC_FIELDS[edit["property"]]
+            semantic_edits.append({
+                "entry": edit.get("entry"),
+                "kind": kind,
+                "index": edit.get("index"),
+                "field": field,
+                "value": edit.get("value"),
+            })
+        return save_loot_edits(
+            GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
+            source_sha256=source_sha256,
+            active_sha256=active_sha256,
+            edits=semantic_edits,
+        )
+    return None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -282,10 +345,20 @@ class Handler(BaseHTTPRequestHandler):
                 edits = payload.get("edits", [])
                 if not asset or not isinstance(edits, list):
                     raise ValueError("asset and edits are required")
+                source_sha256 = str(payload.get("sourceSha256", ""))
+                active_sha256 = str(payload.get("activeSha256", ""))
+                semantic = _semantic_save_from_generic(
+                    asset,
+                    source_sha256=source_sha256,
+                    active_sha256=active_sha256,
+                    edits=edits,
+                )
+                if semantic is not None:
+                    return self.send_json(semantic)
                 return self.send_json(save_edits(
                     GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
-                    source_sha256=str(payload.get("sourceSha256", "")),
-                    active_sha256=str(payload.get("activeSha256", "")),
+                    source_sha256=source_sha256,
+                    active_sha256=active_sha256,
                     edits=edits,
                 ))
             if path == "/api/economy/save":
