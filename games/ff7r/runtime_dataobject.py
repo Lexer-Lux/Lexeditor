@@ -19,9 +19,9 @@ from .runtime_config import (
     DEFAULT_RUNTIME_CONFIG,
     config_path,
     load_runtime_config,
-    runtime_status,
     save_runtime_config,
 )
+from .runtime_state import runtime_status
 
 
 RUNTIME_TWEAKS_ASSET = "Lexeditor/RuntimeTweaks"
@@ -48,7 +48,7 @@ VIRTUAL_ASSET_ROWS = (
     },
 )
 
-_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v3").hexdigest()
+_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v4").hexdigest()
 
 
 @dataclass(frozen=True)
@@ -129,10 +129,17 @@ def _runtime_properties() -> list[VirtualProperty]:
         VirtualProperty("ProjectDllPresent", "Runtime DLL Built", "BOOL"),
         VirtualProperty("ManifestPresent", "Validation Manifest Present", "BOOL"),
         VirtualProperty("HooksValidated", "Core Runtime Hooks Validated", "BOOL"),
-        VirtualProperty("RequestedHooksValidated", "All Enabled Runtime Hooks Validated", "BOOL"),
+        VirtualProperty("RequestedHooksValidated", "Configured Runtime Hooks Validated", "BOOL"),
+        VirtualProperty("RequestedManifestHooksValidated", "All Enabled Feature Hooks Validated", "BOOL"),
         VirtualProperty("BuildSupported", "Installed EXE Build Supported", "BOOL"),
         VirtualProperty("RuntimeReady", "Runtime Ready To Deploy", "BOOL"),
-        VirtualProperty("RuntimeActive", "Runtime Active", "BOOL"),
+        VirtualProperty("HeartbeatPresent", "Runtime Heartbeat Present", "BOOL"),
+        VirtualProperty("RuntimeProcessAlive", "FF7R Runtime Process Alive", "BOOL"),
+        VirtualProperty("RuntimeLoaded", "Runtime DLL Loaded In FF7R", "BOOL"),
+        VirtualProperty("RuntimeActive", "All Enabled Runtime Features Active", "BOOL"),
+        VirtualProperty("RequestedRuntimeFeatures", "Requested Runtime Features", "STRING"),
+        VirtualProperty("ActiveRuntimeFeatures", "Active Runtime Features", "STRING"),
+        VirtualProperty("HeartbeatError", "Runtime Heartbeat Error", "STRING"),
         VirtualProperty("InstalledExeTimestamp", "Installed EXE Timestamp", "STRING"),
         VirtualProperty("ProjectDllPath", "Project Runtime DLL", "STRING"),
         VirtualProperty("ManifestPath", "Validation Manifest", "STRING"),
@@ -167,9 +174,16 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
         "ManifestPresent": status["manifestPresent"],
         "HooksValidated": status["hooksValidated"],
         "RequestedHooksValidated": status["requestedHooksValidated"],
+        "RequestedManifestHooksValidated": status["requestedManifestHooksValidated"],
         "BuildSupported": status["buildSupported"],
         "RuntimeReady": status["runtimeReady"],
+        "HeartbeatPresent": status["heartbeatPresent"],
+        "RuntimeProcessAlive": status["runtimeProcessAlive"],
+        "RuntimeLoaded": status["runtimeLoaded"],
         "RuntimeActive": status["active"],
+        "RequestedRuntimeFeatures": ", ".join(status["requestedRuntimeFeatures"]) or "None",
+        "ActiveRuntimeFeatures": ", ".join(status["activeFeatures"]) or "None",
+        "HeartbeatError": status["heartbeatError"] or "None",
         "InstalledExeTimestamp": status["installedExeTimestampHex"] or "Unknown",
         "ProjectDllPath": status["projectDllPath"],
         "ManifestPath": status["manifestPath"],

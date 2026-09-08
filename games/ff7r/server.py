@@ -21,12 +21,8 @@ from .minimap_semantics import (
     save_minimap_visibility_edits,
 )
 from .native_probe import probe_installed_exe
-from .runtime_config import (
-    deploy_runtime,
-    load_runtime_config,
-    runtime_status,
-    save_runtime_config,
-)
+from .runtime_config import load_runtime_config, save_runtime_config
+from .runtime_state import deploy_runtime, runtime_status
 from .semantics import (
     ECONOMY_EDIT_FIELDS,
     ECONOMY_TABLE_NAMES,
@@ -164,8 +160,8 @@ def data_map_payload() -> dict:
         "target": "NativeMods runtime behavior",
         "controls": "Cutscene base-speed multiplier and tap/hold minimap behavior.",
         "notes": (
-            "Native runtime behavior is separate from PAK edits and is reported active only when "
-            "the native DLL is deployed with a detected loader candidate."
+            "Native runtime behavior is separate from PAK edits. Deployment/readiness uses build/manifest validation; "
+            "Runtime Active additionally requires a live DLL heartbeat from the current FF7R process."
         ),
         "coverage": "runtime-contract",
         "status": "partial",
