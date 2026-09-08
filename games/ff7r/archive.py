@@ -15,6 +15,12 @@ from .tooling import REPAK_TAG, get_file, list_pak, pak_info
 DATA_PREFIX = "End/Content/GameContents/DataObject/"
 TEXT_PREFIX = "End/Content/GameContents/Text/"
 INDEX_SCHEMA = 2
+ATB_VIRTUAL_ASSET_ROWS = (
+    {"asset": "Lexeditor/ATBTweaks", "name": "ATB Tweaks", "group": "Lexeditor ATB", "synthetic": "atb-settings"},
+    {"asset": "Lexeditor/ATBResidentParameters", "name": "ATB Resident Parameters", "group": "Lexeditor ATB", "synthetic": "atb-resident"},
+    {"asset": "Lexeditor/ATBGuardReactions", "name": "ATB Guard Reactions", "group": "Lexeditor ATB", "synthetic": "atb-guard"},
+    {"asset": "Lexeditor/ATBAbilityCosts", "name": "ATB Ability Costs", "group": "Lexeditor ATB", "synthetic": "atb-abilities"},
+)
 
 
 def _normalize(path: str) -> str:
@@ -73,7 +79,10 @@ def _with_virtual_assets(payload: dict) -> dict:
     """Decorate an index in memory without persisting Lexeditor-only rows to cache."""
     rows = [dict(row) for row in payload.get("assets", [])]
     existing = {row.get("asset") for row in rows}
-    rows.extend(dict(row) for row in VIRTUAL_ASSET_ROWS if row["asset"] not in existing)
+    for row in (*VIRTUAL_ASSET_ROWS, *ATB_VIRTUAL_ASSET_ROWS):
+        if row["asset"] not in existing:
+            rows.append(dict(row))
+            existing.add(row["asset"])
     return {**payload, "assets": rows}
 
 
