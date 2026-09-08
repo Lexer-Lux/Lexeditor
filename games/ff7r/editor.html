@@ -88,7 +88,7 @@
     if(state.activeSource!=="mine"||!state.textData||!state.textBaseline)return[];
     const out=[];
     for(let i=0;i<state.textData.records.length;i++){
-      const row=state.textData.records[i],base=state.textDataBaseline?.records?.[i]||state.textBaseline.records[i];if(!base)continue;
+      const row=state.textData.records[i],base=state.textBaseline.records[i];if(!base)continue;
       if(row.text!==base.text)out.push({entry:i,text:row.text});
       const baseSubs=new Map((base.subentries||[]).map(sub=>[sub.id,sub.text]));
       for(const sub of row.subentries||[])if(baseSubs.has(sub.id)&&sub.text!==baseSubs.get(sub.id))out.push({entry:i,subId:sub.id,text:sub.text});
