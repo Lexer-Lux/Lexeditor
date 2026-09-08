@@ -7,6 +7,13 @@
   <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
   <link rel="stylesheet" href="/shared/framework.css">
   <link rel="stylesheet" href="/shared/neutral.css">
+  <style>
+    .lex-semantic-reference-control{display:grid;grid-template-columns:2rem minmax(8rem,.8fr) minmax(11rem,1.2fr);align-items:center;gap:6px;width:100%;min-width:0}
+    .lex-semantic-reference-control:not(.searchable){grid-template-columns:2rem minmax(0,1fr)}
+    .lex-semantic-reference-control input,.lex-semantic-reference-control select{width:100%;min-width:0}
+    .lex-semantic-reference-open{display:grid;width:2rem;height:2rem;min-width:2rem;padding:0;place-items:center;font:inherit;line-height:1}
+    @media(max-width:860px){.lex-semantic-reference-control.searchable{grid-template-columns:2rem minmax(0,1fr)}.lex-semantic-reference-control.searchable .lex-semantic-reference-search{grid-column:1/-1;grid-row:1}.lex-semantic-reference-control.searchable .lex-semantic-reference-open{grid-row:2}.lex-semantic-reference-control.searchable select{grid-row:2}}
+  </style>
 </head>
 <body class="lex-neutral-ui">
   <header id="lexeditor-shell"></header>
@@ -109,15 +116,19 @@
   }
   function candidateValue(field,candidate){return Number(candidate[field.referenceValueKey||"id"])}
   function candidateLabel(candidate){return String(candidate.values?.name||candidate.name||`Record ${candidate.id}`)}
-  function referenceChoices(field,row){return referenceRows(field,row).map(candidate=>({value:candidateValue(field,candidate),label:candidateLabel(candidate)}))}
+  function referenceChoices(field,row){return referenceRows(field,row).map(candidate=>({value:candidateValue(field,candidate),label:candidateLabel(candidate),category:field.referenceCategory,recordId:Number(candidate.id)}))}
   function inventoryChoices(includeMateria=true){
     const specs=[["items",0],["weapons",128],["armor",256],["accessories",288],...(includeMateria?[["materia",320]]:[])];
-    return specs.flatMap(([category,offset])=>(state.records[category]||[]).map(record=>({value:offset+Number(record.id),label:`${candidateLabel(record)} — ${labels[category]||category}`})));
+    return specs.flatMap(([category,offset])=>(state.records[category]||[]).map(record=>({value:offset+Number(record.id),label:`${candidateLabel(record)} — ${labels[category]||category}`,category,recordId:Number(record.id)})));
   }
   function semanticChoiceSummary(choices,value,emptyValue){
     if(emptyValue!==undefined&&Number(value)===Number(emptyValue))return "None";
     const choice=choices.find(candidate=>Number(candidate.value)===Number(value));
     return choice?.label||enumSummary({choices},value);
+  }
+  function referenceSearchText(choice){
+    const value=Number(choice.value),hex=Number.isInteger(value)?`0x${value.toString(16).toUpperCase()}`:"";
+    return `${choice.label||""} ${choice.value} #${choice.value} ${hex}`.toLocaleLowerCase();
   }
   function selectControl(row,field,choiceFactory){
     const vanilla=Number(rowById(state.tab,row.id,state.data.vanilla).values[field.key]);
@@ -127,14 +138,29 @@
     for(const value of [current,vanilla])if(!choices.some(c=>Number(c.value)===value))choices.push({value,label:semanticChoiceSummary(choices,value,field.emptyValue)});
     const select=el("select",{disabled:readonly(),"aria-label":`${field.label} for ${row.name}`,onchange:event=>{
       if(readonly())return;row.values[field.key]=Number(event.target.value);field.rerenderOnChange?render():shellRefresh();
-    }},...choices.map(choice=>el("option",{value:choice.value},choice.label)));
-    select.value=String(current);
-    return provenanceControl({control:select,current:()=>row.values[field.key],vanilla,internal:true,
-      format:value=>semanticChoiceSummary(choices,value,field.emptyValue),apply:value=>{if(readonly())return;row.values[field.key]=Number(value);render()}});
+    }});
+    const selectedChoice=()=>choices.find(choice=>Number(choice.value)===Number(row.values[field.key]));
+    const openButton=el("button",{type:"button",class:"lex-semantic-reference-open",title:`Open selected ${field.label.toLowerCase()}`,"aria-label":`Open ${field.label} for ${row.name}`,disabled:true,onclick:event=>{
+      event.preventDefault();event.stopPropagation();const choice=selectedChoice();if(!choice?.category||choice.recordId===undefined)return;state.selected[choice.category]=Number(choice.recordId);navigate(choice.category);
+    }},"↗");
+    const rebuild=(query="")=>{
+      const needle=String(query).trim().toLocaleLowerCase(),selected=Number(row.values[field.key]);
+      let visible=needle?choices.filter(choice=>referenceSearchText(choice).includes(needle)):choices.slice();
+      const currentChoice=choices.find(choice=>Number(choice.value)===selected);
+      if(currentChoice&&!visible.some(choice=>Number(choice.value)===selected))visible.unshift(currentChoice);
+      select.replaceChildren(...visible.map(choice=>el("option",{value:choice.value},choice.label)));
+      select.value=String(selected);
+      const choice=selectedChoice();openButton.disabled=!(choice?.category&&choice.recordId!==undefined);
+    };
+    const searchable=choices.length>=12;
+    const search=searchable?el("input",{type:"search",class:"lex-semantic-reference-search",placeholder:`Search ${field.label.toLowerCase()}…`,disabled:readonly(),"aria-label":`Search ${field.label} for ${row.name}`,oninput:event=>rebuild(event.target.value)}):null;
+    rebuild();
+    const root=el("div",{class:`lex-semantic-reference-control${searchable?" searchable":""}`},...(search?[openButton,search,select]:[openButton,select]));
+    return provenanceControl({control:root,current:()=>row.values[field.key],vanilla,internal:true,format:value=>semanticChoiceSummary(choices,value,field.emptyValue),apply:value=>{if(readonly())return;row.values[field.key]=Number(value);render()}});
   }
   function referenceControl(row,field){return selectControl(row,field,()=>referenceChoices(field,row))}
   function inventoryReferenceControl(row,field){return selectControl(row,field,()=>inventoryChoices(true))}
-  function shopReferenceControl(row,field){return selectControl(row,field,()=>Number(row.values[field.kindField])===1?(state.records.materia||[]).map(record=>({value:Number(record.id),label:candidateLabel(record)})):inventoryChoices(false))}
+  function shopReferenceControl(row,field){return selectControl(row,field,()=>Number(row.values[field.kindField])===1?(state.records.materia||[]).map(record=>({value:Number(record.id),label:candidateLabel(record),category:"materia",recordId:Number(record.id)})):inventoryChoices(false))}
   function booleanControl(row,field){
     const vanilla=Number(rowById(state.tab,row.id,state.data.vanilla).values[field.key]);
     const input=el("input",{type:"checkbox",checked:!!Number(row.values[field.key]),disabled:readonly(),"aria-label":`${field.label} for ${row.name}`,onchange:event=>{if(readonly())return;row.values[field.key]=event.target.checked?1:0;shellRefresh()}});
@@ -181,8 +207,8 @@
   }
   function semanticHelp(field){
     if(field.help)return field.help;
-    if(field.dataType==="text")return "English game text. Use byte escapes for control codes; unsupported characters and oversized text are refused on save.";
-    return "Numeric game value. Lexeditor writes the documented FF7 value directly and preserves unrelated bytes.";
+    if(field.dataType==="text")return "This is game-visible text. Byte escapes preserve FF7 control codes; unsupported characters or text that cannot fit are refused on save rather than corrupting the kernel.";
+    return "";
   }
   function semanticType(field){
     return {text:"TEXT",enum:"SELECT",flags:"FLAGS",reference:"REF",inventoryReference:"REF",shopReference:"REF",boolean:"BOOL",scaled:"VALUE",statusChange:"STATUS"}[field.dataType]||"INT";
@@ -203,7 +229,7 @@
     const metadata=category(),groups=[...new Set(metadata.fields.map(field=>field.group||"Kernel data"))];
     const body=[];
     if(metadata.descriptionEditable)body.push(detailSection({title:"TEXT",body:detailField({label:"DESCRIPTION",help:infoHelp("The in-game description stored in this FF7 KERNEL.BIN. Byte escapes are preserved for game control codes."),control:descriptionControl(row),dataType:"TEXT"})}));
-    body.push(...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>detailField({className:"ff7-field",label:field.label,help:infoHelp(semanticHelp(field)),control:semanticControl(row,field),dataType:semanticType(field),min:field.minimum,max:field.maximum}))})));
+    body.push(...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>{const help=semanticHelp(field);return detailField({className:"ff7-field",label:field.label,help:help?infoHelp(help):null,control:semanticControl(row,field),dataType:semanticType(field),min:field.minimum,max:field.maximum})})})));
     return detailPanel({className:"ff7-detail",title:row.values.name||row.name,identity:recordId(row.id),meta:null,body});
   }
   function listTable(rows,selected,select){

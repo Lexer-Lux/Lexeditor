@@ -317,7 +317,6 @@ def apply(category: str, fields_in):
         if not authored and any(hint in label.casefold() for hint in RAW_HINTS):
             value.update(advanced(label, "Engine/storage identifier retained for advanced editing because no authoritative human name mapping is available yet."))
         value.setdefault("group", DEFAULT_GROUPS.get(category, "Data"))
-        value.setdefault("help", "Numeric game value. Lexeditor writes the original FF7 field directly and preserves unrelated bytes.")
         result.append(value)
     return result
 

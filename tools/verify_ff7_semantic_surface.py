@@ -59,6 +59,15 @@ class SemanticSurfaceTests(unittest.TestCase):
                     self.assertTrue(field.get("advanced"),field)
                     self.assertEqual(field.get("group"),"Advanced / engine data",field)
 
+    def test_help_is_semantic_not_generic_storage_filler(self):
+        collections=[*(semantics.apply(key,spec["fields"]) for key,spec in battle.SCENE_CATEGORIES.items()),semantics.apply("shops",extended.SHOP_FIELDS)]
+        for fields in collections:
+            for field in fields:
+                self.assertNotIn("Numeric game value",str(field.get("help", "")),field)
+        editor=(Path(__file__).resolve().parents[1]/"games/ff7/editor.html").read_text(encoding="utf-8")
+        self.assertIn('return "";',editor)
+        self.assertNotIn("help:infoHelp(semanticHelp(field))",editor)
+
     def test_scene_records_expose_reference_identity_without_changing_bytes(self):
         raw=extended_fixtures.scene_fixture(); scene=battle.SceneArchive(raw)
         enemy=scene.records("enemies")[0]; attack=scene.records("enemyAttacks")[0]; formation=scene.records("encounters")[0]

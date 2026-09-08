@@ -462,7 +462,6 @@ def category_metadata() -> list[dict[str, Any]]:
                 metadata.update(MATERIA_FIELD_UI.get(field.key, {}))
             metadata.update(semantics.metadata_for(category.key, field.key))
             metadata.setdefault("group", semantics.DEFAULT_GROUPS.get(category.key, "Data"))
-            metadata.setdefault("help", "Numeric game value. Lexeditor writes the original FF7 field directly and preserves unrelated bytes.")
             fields.append(metadata)
         result.append({
             "id": category.key, "label": category.label,
