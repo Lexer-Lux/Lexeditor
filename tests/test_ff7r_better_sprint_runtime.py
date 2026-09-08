@@ -207,7 +207,72 @@ def test_sprint_probe_correlates_only_exact_pdata_function_evidence():
     assert correlations["dashToAnimationRootMotion"] == [0x1500]
     assert correlations["runToDashToAnimationRootMotion"] == [0x1600]
     assert correlations["dashToGeneralRootMotion"] == [0x1500]
+    assert correlations["dashScaleToBehaviorState"] == []
+    assert correlations["dashBehaviorToAnimationRootMotion"] == []
     assert result["nativeNeedleStats"]["DashRootMotionTranslationScale"]["pdataFunctions"] == 1
     assert result["nativeFunctionEvidence"]["PaddingOnly"]["expandedPdataFunctions"] == []
+    assert result["crossFamilyFunctionCount"] == 2
     assert result["implementationReady"] is False
     assert "authoritative-player-sprint-speed-path-unvalidated" in result["blockers"]
+
+
+def test_sprint_probe_clusters_dash_state_scale_and_root_motion_with_provenance():
+    native = {
+        "needles": [
+            _native_function_needle("DashRootMotionTranslationScale", 0x1000, 0x1800),
+            _native_function_needle("RunSwitchBehaviorDashInputBlockTime", 0x1100, 0x1800),
+            _native_function_needle("RootMotionScale", 0x1200, 0x1800),
+        ]
+    }
+
+    result = assess_sprint_evidence(native, [])
+    cluster = next(
+        row for row in result["nativeFunctionClusters"]
+        if row["functionRva"] == 0x1800
+    )
+
+    assert cluster == {
+        "functionRva": 0x1800,
+        "families": ["dash-scale", "dash-state", "root-motion"],
+        "familyCount": 3,
+        "directNeedles": [],
+        "nextHopNeedles": [
+            "DashRootMotionTranslationScale",
+            "RootMotionScale",
+            "RunSwitchBehaviorDashInputBlockTime",
+        ],
+        "crossFamily": True,
+        "allThreeFamilies": True,
+        "hasNextHopEvidence": True,
+        "registrationCollisionRisk": False,
+        "classification": "three-family-research-lead",
+    }
+    assert result["nativeFunctionCorrelations"]["dashScaleToBehaviorState"] == [0x1800]
+    assert result["nativeFunctionCorrelations"]["dashBehaviorToAnimationRootMotion"] == [0x1800]
+    assert result["threeFamilyFunctionCount"] == 1
+    assert result["implementationReady"] is False
+
+
+def test_sprint_probe_marks_multi_name_direct_owner_as_registration_collision_risk():
+    native = {
+        "needles": [
+            _native_function_needle("DashRootMotionTranslationScale", 0x2000),
+            _native_function_needle("RunToDashBlendInputThreshold", 0x2000),
+        ]
+    }
+
+    result = assess_sprint_evidence(native, [])
+    cluster = next(
+        row for row in result["nativeFunctionClusters"]
+        if row["functionRva"] == 0x2000
+    )
+
+    assert cluster["families"] == ["dash-scale", "dash-state"]
+    assert cluster["directNeedles"] == [
+        "DashRootMotionTranslationScale",
+        "RunToDashBlendInputThreshold",
+    ]
+    assert cluster["nextHopNeedles"] == []
+    assert cluster["registrationCollisionRisk"] is True
+    assert cluster["classification"] == "cross-family-research-lead"
+    assert result["implementationReady"] is False
