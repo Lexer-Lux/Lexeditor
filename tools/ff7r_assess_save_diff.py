@@ -7,16 +7,19 @@ Examples:
     --pair run2 before2.sav after2.sav
 
   python tools/ff7r_assess_save_diff.py \
-    --pair assess1 before-a1.sav after-a1.sav \
-    --pair assess2 before-a2.sav after-a2.sav \
-    --control noop1 before-c1.sav after-c1.sav \
-    --control noop2 before-c2.sav after-c2.sav
-
-  python tools/ff7r_assess_save_diff.py \
     --group GuardDog before-dog-1.sav after-dog-1.sav \
     --group GuardDog before-dog-2.sav after-dog-2.sav \
     --group SecurityOfficer before-officer-1.sav after-officer-1.sav \
     --group SecurityOfficer before-officer-2.sav after-officer-2.sav \
+    --control noop1 before-c1.sav after-c1.sav \
+    --control noop2 before-c2.sav after-c2.sav \
+    --bit-signatures
+
+  python tools/ff7r_assess_save_diff.py \
+    --group GuardDog discovery-dog-1-before.sav discovery-dog-1-after.sav \
+    --group GuardDog discovery-dog-2-before.sav discovery-dog-2-after.sav \
+    --holdout-group GuardDog holdout-dog-1-before.sav holdout-dog-1-after.sav \
+    --holdout-group GuardDog holdout-dog-2-before.sav holdout-dog-2-after.sav \
     --control noop1 before-c1.sav after-c1.sav \
     --control noop2 before-c2.sav after-c2.sav \
     --bit-signatures
@@ -32,15 +35,13 @@ from pathlib import Path
 import sys
 from typing import Sequence
 
-# Running this file directly puts tools/ rather than the repository root on
-# sys.path. Add only the parent directory so the normal games.ff7r package is
-# imported exactly as it is in Lexeditor/tests.
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from games.ff7r.save_bit_signature_probe import (  # noqa: E402
     analyze_controlled_bit_signatures,
+    validate_controlled_bit_signatures,
 )
 from games.ff7r.save_control_probe import (  # noqa: E402
     analyze_controlled_experiment_groups,
@@ -59,11 +60,22 @@ def _read_pair(label: str, before: str | Path, after: str | Path) -> SavePair:
     return SavePair(before_path.read_bytes(), after_path.read_bytes(), label)
 
 
+def _read_groups(specs: Sequence[Sequence[str]]) -> dict[str, list[SavePair]]:
+    groups: dict[str, list[SavePair]] = {}
+    for name, before, after in specs:
+        key = str(name).strip()
+        if not key:
+            raise ValueError("enemy/group names cannot be empty")
+        groups.setdefault(key, []).append(_read_pair(key, before, after))
+    return groups
+
+
 def build_report(
     *,
     pair_specs: Sequence[Sequence[str]] = (),
     group_specs: Sequence[Sequence[str]] = (),
     control_specs: Sequence[Sequence[str]] = (),
+    holdout_group_specs: Sequence[Sequence[str]] = (),
     bit_signatures: bool = False,
 ) -> dict:
     if pair_specs and group_specs:
@@ -72,6 +84,13 @@ def build_report(
         raise ValueError("--control requires --pair or --group Assess experiments")
     if bit_signatures and not (group_specs and control_specs):
         raise ValueError("--bit-signatures requires --group experiments with --control")
+    if holdout_group_specs and not group_specs:
+        raise ValueError("--holdout-group requires --group discovery experiments")
+    if holdout_group_specs and not control_specs:
+        raise ValueError("--holdout-group requires --control")
+    if holdout_group_specs and not bit_signatures:
+        raise ValueError("--holdout-group requires --bit-signatures")
+
     if pair_specs:
         pairs = [
             _read_pair(str(label), before, after)
@@ -90,18 +109,25 @@ def build_report(
             "mode": "repeated-single-experiment",
             "analysis": analyze_save_pairs(pairs),
         }
+
     if group_specs:
-        groups: dict[str, list[SavePair]] = {}
-        for name, before, after in group_specs:
-            groups.setdefault(str(name), []).append(
-                _read_pair(str(name), before, after)
-            )
+        groups = _read_groups(group_specs)
         if control_specs:
             controls = [
                 _read_pair(str(label), before, after)
                 for label, before, after in control_specs
             ]
             if bit_signatures:
+                if holdout_group_specs:
+                    holdout_groups = _read_groups(holdout_group_specs)
+                    return {
+                        "mode": "cross-enemy-bit-signatures-with-holdout-validation",
+                        "analysis": validate_controlled_bit_signatures(
+                            groups,
+                            controls,
+                            holdout_groups,
+                        ),
+                    }
                 return {
                     "mode": "cross-enemy-bit-signatures-with-noop-control",
                     "analysis": analyze_controlled_bit_signatures(groups, controls),
@@ -135,7 +161,15 @@ def _parser() -> argparse.ArgumentParser:
     )
     experiments.add_argument(
         "--group", action="append", nargs=3, metavar=("ENEMY", "BEFORE", "AFTER"),
-        default=[], help="repeat for multiple named enemies to compare stable changes",
+        default=[], help="repeat discovery experiments for multiple named enemies",
+    )
+    experiments.add_argument(
+        "--holdout-group", action="append", nargs=3,
+        metavar=("ENEMY", "BEFORE", "AFTER"), default=[],
+        help=(
+            "independent held-out Assess experiments; requires --group, --control "
+            "and --bit-signatures"
+        ),
     )
     parser.add_argument(
         "--bit-signatures", action="store_true",
@@ -158,6 +192,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             pair_specs=args.pair,
             group_specs=args.group,
             control_specs=args.control,
+            holdout_group_specs=args.holdout_group,
             bit_signatures=args.bit_signatures,
         )
     except (OSError, ValueError, TypeError) as error:
