@@ -121,8 +121,17 @@ def _property_names(package) -> list[str]:
     return [prop.name for prop in package.properties] if package else []
 
 
+def _caller_rvas(inbound: dict[str, Any] | None) -> set[int]:
+    callers: set[int] = set()
+    for ref in (inbound or {}).get("refs", ()):
+        value = ref.get("sourceFunctionRva")
+        if value is not None:
+            callers.add(int(value))
+    return callers
+
+
 def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, list[int]]]:
-    """Collect exact .pdata-owned string functions and bounded one-hop targets."""
+    """Collect exact .pdata owners, bounded next hops, and exact inbound callers."""
     result: dict[str, dict[str, list[int]]] = {}
     for row in native.get("needles", ()):
         needle = str(row.get("needle", ""))
@@ -130,6 +139,8 @@ def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, lis
             continue
         direct: set[int] = set()
         next_hops: set[int] = set()
+        direct_callers: set[int] = set()
+        next_hop_callers: set[int] = set()
         for hit in row.get("hits", ()):
             for xref in hit.get("leaRipXrefs", ()):
                 if xref.get("candidateFunctionSource") != "pdata":
@@ -137,15 +148,24 @@ def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, lis
                 function_rva = xref.get("candidateFunctionRva")
                 if function_rva is not None:
                     direct.add(int(function_rva))
+                direct_callers.update(
+                    _caller_rvas(xref.get("candidateFunctionInboundCodeRefs"))
+                )
                 refs = (xref.get("candidateFunctionCodeRefs") or {}).get("refs", ())
                 for ref in refs:
                     target = ref.get("targetFunctionRva")
                     if target is not None:
                         next_hops.add(int(target))
+                    next_hop_callers.update(
+                        _caller_rvas(ref.get("targetFunctionInboundCodeRefs"))
+                    )
         result[needle] = {
             "directPdataFunctions": sorted(direct),
             "nextHopPdataFunctions": sorted(next_hops),
             "expandedPdataFunctions": sorted(direct | next_hops),
+            "directInboundCallerFunctions": sorted(direct_callers),
+            "nextHopInboundCallerFunctions": sorted(next_hop_callers),
+            "expandedInboundCallerFunctions": sorted(direct_callers | next_hop_callers),
         }
     return result
 
@@ -154,6 +174,13 @@ def _functions(evidence: dict[str, dict[str, list[int]]], needles: Iterable[str]
     result: set[int] = set()
     for needle in needles:
         result.update(evidence.get(needle, {}).get("expandedPdataFunctions", ()))
+    return result
+
+
+def _callers(evidence: dict[str, dict[str, list[int]]], needles: Iterable[str]) -> set[int]:
+    result: set[int] = set()
+    for needle in needles:
+        result.update(evidence.get(needle, {}).get("expandedInboundCallerFunctions", ()))
     return result
 
 
@@ -233,12 +260,28 @@ def assess_hp_native_evidence(native: dict[str, Any]) -> dict[str, Any]:
     current_write = _functions(evidence, PLAYER_CURRENT_WRITE_NEEDLES)
     generic = _functions(evidence, GENERIC_HP_NEEDLES)
 
+    status_callers = _callers(evidence, STATUS_NEEDLES)
+    max_read_callers = _callers(evidence, PLAYER_MAX_READ_NEEDLES)
+    current_read_callers = _callers(evidence, PLAYER_CURRENT_READ_NEEDLES)
+    max_write_callers = _callers(evidence, PLAYER_MAX_WRITE_NEEDLES)
+    current_write_callers = _callers(evidence, PLAYER_CURRENT_WRITE_NEEDLES)
+    generic_callers = _callers(evidence, GENERIC_HP_NEEDLES)
+
     correlations = {
         "maxWriteToMaxRead": sorted(max_write & max_read),
         "maxWriteToStatus": sorted(max_write & status),
         "currentWriteToCurrentRead": sorted(current_write & current_read),
         "maxWriteToCurrentWrite": sorted(max_write & current_write),
         "statusToMaxRead": sorted(status & max_read),
+        "maxWriteToMaxReadCallers": sorted(max_write_callers & max_read_callers),
+        "maxWriteToStatusCallers": sorted(max_write_callers & status_callers),
+        "currentWriteToCurrentReadCallers": sorted(current_write_callers & current_read_callers),
+        "maxWriteToCurrentWriteCallers": sorted(max_write_callers & current_write_callers),
+        "statusToMaxReadCallers": sorted(status_callers & max_read_callers),
+        "genericToExactCallers": sorted(
+            generic_callers
+            & (status_callers | max_read_callers | current_read_callers | max_write_callers | current_write_callers)
+        ),
     }
     blockers = []
     if not max_write:
@@ -273,9 +316,11 @@ def assess_hp_native_evidence(native: dict[str, Any]) -> dict[str, Any]:
         "functionClusters": clusters,
         "crossRoleFunctionCount": sum(1 for row in clusters if row["crossRole"]),
         "genericAnchorFunctions": sorted(generic),
+        "genericAnchorCallerFunctions": sorted(generic_callers),
         "notes": [
             "BPSetPlayerHPMax/BPSetPlayerHP and the BPGetPlayer*/GetCharaHP* families are exact playable/final-status research anchors; generic GetHP/GetHPMax can never satisfy a required player API role.",
-            "Only exact .pdata function owners and their bounded one-hop code targets participate in correlations; padding-heuristic owners are ignored.",
+            "Only exact .pdata function owners, bounded one-hop code targets, and exact inbound callers participate in correlations; padding-heuristic owners are ignored.",
+            "Shared inbound callers can expose a final-stat recomputation/clamp dispatcher neighborhood, but they cannot satisfy the required setter/reader role link or prove playable-only semantics.",
             "Shared reflected-string owner functions can be Unreal registration glue. Multi-name direct owners are tagged registrationCollisionRisk rather than promoted to runtime hooks.",
             "Even a cross-role exact function remains research-only until the installed build proves it owns final playable max-HP recomputation and current-HP clamping with enemies excluded.",
         ],
