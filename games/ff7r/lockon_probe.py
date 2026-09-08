@@ -25,6 +25,16 @@ WIDGET_ANCHORS = (
     "EndBattleLockonMarkerIcon",
     "BattleLockonMarker",
 )
+# Generated UEndMenuSettings exposes three additional configurable lock-on marker
+# widget slots. Their numeric suffixes line up with the three reflected marker
+# enum values, but the exact 00/01/02 -> Default/Wimp/Libra pairing remains an
+# installed-data hypothesis until their resolved class paths are inspected.
+MARKER_SLOT_ANCHORS = (
+    "BattleLockonMarker00Widget",
+    "BattleLockonMarker01Widget",
+    "BattleLockonMarker02Widget",
+)
+MARKER_TYPE_ORDER = ("Default", "Wimp", "Libra")
 API_ANCHORS = (
     "BPShowBattleLockonMarkerIcon",
     "EEndMenuLockonMarkerType",
@@ -52,16 +62,24 @@ PRESENTATION_TERMS = (
 )
 LABEL_CHILD_TERMS = ("text", "label", "caption", "title")
 RETICLE_CHILD_TERMS = ("reticle", "marker", "image", "icon", "brush", "crosshair")
-INTERESTING_TOKENS = WIDGET_ANCHORS + API_ANCHORS + LOCK_STATE_ANCHORS + PRESENTATION_TERMS + (
-    "LOCK ON",
-    "LockOn",
-    "Marker",
-    "Reticle",
-    "Crosshair",
+INTERESTING_TOKENS = (
+    WIDGET_ANCHORS
+    + MARKER_SLOT_ANCHORS
+    + API_ANCHORS
+    + LOCK_STATE_ANCHORS
+    + PRESENTATION_TERMS
+    + (
+        "LOCK ON",
+        "LockOn",
+        "Marker",
+        "Reticle",
+        "Crosshair",
+    )
 )
 NATIVE_NEEDLES = (
     "BPShowBattleLockonMarkerIcon",
     "BattleLockonMarker",
+    *MARKER_SLOT_ANCHORS,
     "EndBattleLockonMarkerIcon",
     "EEndMenuLockonMarkerType",
     *LOCK_STATE_ANCHORS,
@@ -157,6 +175,23 @@ def assess_lock_state_evidence(native: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def assess_marker_slot_evidence(native: dict[str, Any]) -> dict[str, Any]:
+    """Expose the three configured lock-on widget slots without inventing pairing semantics."""
+    counts = _needle_counts(native)
+    slot_hits = {slot: counts.get(slot, 0) for slot in MARKER_SLOT_ANCHORS}
+    return {
+        "slotNeedleHits": slot_hits,
+        "allSlotAnchorsPresent": all(slot_hits.values()),
+        "markerTypeOrder": list(MARKER_TYPE_ORDER),
+        "slotOrder": list(MARKER_SLOT_ANCHORS),
+        "slotToMarkerTypeMappingValidated": False,
+        "notes": [
+            "UEndMenuSettings declares BattleLockonMarker00Widget, BattleLockonMarker01Widget and BattleLockonMarker02Widget as separate FSoftClassPath settings.",
+            "EEndMenuLockonMarkerType declares Default, Wimp and Libra in that order. Matching those two ordered trios is a strong hypothesis, not an authorized mapping until installed class-path data confirms it.",
+        ],
+    }
+
+
 def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     """Rank cooked assets; resolved widget ownership dominates string-only noise."""
     ranked: list[dict[str, Any]] = []
@@ -164,6 +199,10 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
         strings = _flatten_strings(asset)
         objects = _flatten_objects(asset)
         widget_hits = [row for row in strings if _contains_any(str(row.get("text", "")), WIDGET_ANCHORS)]
+        marker_slot_hits = [
+            row for row in strings
+            if _contains_any(str(row.get("text", "")), MARKER_SLOT_ANCHORS)
+        ]
         api_hits = [row for row in strings if _contains_any(str(row.get("text", "")), API_ANCHORS)]
         state_hits = [row for row in strings if _contains_any(str(row.get("text", "")), LOCK_STATE_ANCHORS)]
         presentation_hits = [
@@ -199,13 +238,21 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             for file_row in asset.get("files", ())
             if file_row.get("objectTableError")
         ]
-        if not widget_hits and not api_hits and not label_hits and not resolved_owners and not state_hits:
+        if (
+            not widget_hits
+            and not marker_slot_hits
+            and not api_hits
+            and not label_hits
+            and not resolved_owners
+            and not state_hits
+        ):
             continue
 
         score = (
             len(resolved_owners) * 6000
             + len(resolved_label_children) * 2600
             + len(resolved_reticle_children) * 1800
+            + len(marker_slot_hits) * 1500
             + len(widget_hits) * 1200
             + len(api_hits) * 500
             + len(state_hits) * 250
@@ -216,6 +263,8 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             score += 1800
         if widget_hits and label_hits:
             score += 3500
+        if marker_slot_hits and resolved_owners:
+            score += 3000
         if resolved_owners and label_hits:
             score += 5000
         if resolved_owners and presentation_hits:
@@ -224,6 +273,7 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
         ranked.append({
             **asset,
             "widgetAnchorHits": widget_hits,
+            "markerSlotAnchorHits": marker_slot_hits,
             "apiAnchorHits": api_hits,
             "lockStateAnchorHits": state_hits,
             "literalLockOnLabelHits": label_hits,
@@ -233,6 +283,7 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             "resolvedReticleChildren": resolved_reticle_children,
             "objectTableErrors": object_table_errors,
             "containsDedicatedWidgetAnchor": bool(widget_hits or resolved_owners),
+            "containsMarkerSlotAnchor": bool(marker_slot_hits),
             "containsLiteralLockOnLabel": bool(label_hits),
             "resolvedDedicatedOwnerEvidence": bool(resolved_owners),
             "resolvedLabelChildEvidence": bool(resolved_label_children),
@@ -260,6 +311,7 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
     ranked = rank_lockon_assets(raw.get("assets", ()))
     native = probe_installed_exe(Path(game_root), needles=NATIVE_NEEDLES)
     lock_state = assess_lock_state_evidence(native)
+    marker_slots = assess_marker_slot_evidence(native)
     resolved_owner_count = sum(
         1 for row in ranked if row.get("resolvedDedicatedOwnerEvidence"))
     object_errors = [
@@ -276,6 +328,10 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         blockers.append("locked-state-predicate-unvalidated")
     else:
         blockers.append("locked-state-predicate-unresolved")
+    if marker_slots["allSlotAnchorsPresent"]:
+        blockers.append("marker-slot-class-path-mapping-unvalidated")
+    else:
+        blockers.append("marker-slot-class-path-mapping-unresolved")
     if raw.get("scanErrors"):
         blockers.append("installed-cooked-asset-scan-errors")
     if object_errors and not resolved_owner_count:
@@ -284,6 +340,7 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         "candidates": ranked,
         "native": native,
         "lockStateResearch": lock_state,
+        "markerSlotResearch": marker_slots,
         "scanErrors": list(raw.get("scanErrors", ())),
         "objectTableErrors": object_errors,
         "resolvedOwnerCandidateCount": resolved_owner_count,
@@ -292,6 +349,12 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         "knownContracts": {
             "widgetClass": "UEndBattleLockonMarkerIcon",
             "widgetSetting": "UEndMenuSettings::BattleLockonMarker",
+            "markerWidgetSlots": [
+                "UEndMenuSettings::BattleLockonMarker00Widget",
+                "UEndMenuSettings::BattleLockonMarker01Widget",
+                "UEndMenuSettings::BattleLockonMarker02Widget",
+            ],
+            "markerTypeOrder": list(MARKER_TYPE_ORDER),
             "showFunction": "UEndMenuAPI::BPShowBattleLockonMarkerIcon",
             "markerType": "EEndMenuLockonMarkerType",
             "targetIconFunction": "UEndMenuAPI::ShowBattleTargetIcon(UObject*, FVector, EEndMenuBattleTargetState)",
@@ -301,11 +364,12 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         },
         "notes": [
             "The dedicated battle lock-on marker widget is the preferred presentation owner; generic battle target widgets are not assumed equivalent.",
+            "UEndMenuSettings exposes three dedicated numbered lock-on marker widget settings. Their resolved FSoftClassPath values are now first-class ownership targets instead of relying on generic LOCK ON text.",
             "Resident_TxtRes is scanned as an explicit LOCK ON label-source lead, but a text-resource hit cannot establish widget or reticle ownership.",
             "A standalone LOCK ON string is label evidence only when tied to the same cooked presentation asset; class names containing Lockon do not count as label evidence.",
             "Resolved import/export paths strengthen class/outer ownership beyond printable strings, but still do not prove the exact TextBlock or tint field serialized in the widget payload.",
             "ShowBattleTargetIcon's explicit locked target states provide a separate candidate predicate for active lock state; it is not assumed to drive the same reticle until installed-game behavior validates the relation.",
             "Color/tint/brush/visibility strings rank candidates but do not prove which widget child owns the reticle or label.",
-            "No UI asset is rewritten by this probe; exact label-child, locked-state and tint-property ownership must be validated before implementing suppression/tinting.",
+            "No UI asset is rewritten by this probe; exact marker-slot class paths, label-child, locked-state and tint-property ownership must be validated before implementing suppression/tinting.",
         ],
     }
