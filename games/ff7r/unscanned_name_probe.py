@@ -49,8 +49,7 @@ STATE_LINK_ANCHORS = (
     "EnemyBookIDPlus",
 )
 # These are intentionally only discovery needles. None is treated as an
-# authoritative query unless the installed executable actually contains it and
-# later function-level research validates its semantics.
+# authoritative query unless installed behavior validates its semantics.
 STATE_QUERY_CANDIDATE_NEEDLES = (
     "IsEnemyBook",
     "GetEnemyBook",
@@ -239,6 +238,59 @@ def _needle_hits(native: dict[str, Any], needle: str) -> list[dict[str, Any]]:
     return []
 
 
+def _caller_rvas(inbound: dict[str, Any] | None) -> set[int]:
+    return {
+        int(row["sourceFunctionRva"])
+        for row in (inbound or {}).get("refs", ())
+        if row.get("sourceFunctionRva") is not None
+    }
+
+
+def _native_function_evidence(
+    native: dict[str, Any], needles: Iterable[str]
+) -> dict[str, dict[str, list[int]]]:
+    """Collect only exact .pdata owners, bounded one-hop targets, and callers."""
+    result: dict[str, dict[str, list[int]]] = {}
+    for needle in needles:
+        direct: set[int] = set()
+        next_hops: set[int] = set()
+        callers: set[int] = set()
+        for hit in _needle_hits(native, needle):
+            for xref in hit.get("leaRipXrefs", ()):
+                if xref.get("candidateFunctionSource") != "pdata":
+                    continue
+                function_rva = xref.get("candidateFunctionRva")
+                if function_rva is not None:
+                    direct.add(int(function_rva))
+                callers.update(_caller_rvas(xref.get("candidateFunctionInboundCodeRefs")))
+                for code_ref in (xref.get("candidateFunctionCodeRefs") or {}).get("refs", ()):
+                    target = code_ref.get("targetFunctionRva")
+                    if target is not None:
+                        next_hops.add(int(target))
+                    callers.update(_caller_rvas(code_ref.get("targetFunctionInboundCodeRefs")))
+        result[needle] = {
+            "directPdataFunctions": sorted(direct),
+            "nextHopPdataFunctions": sorted(next_hops),
+            "expandedPdataFunctions": sorted(direct | next_hops),
+            "inboundCallerFunctions": sorted(callers),
+        }
+    return result
+
+
+def _functions(evidence: dict[str, dict[str, list[int]]], needles: Iterable[str]) -> set[int]:
+    functions: set[int] = set()
+    for needle in needles:
+        functions.update(evidence.get(needle, {}).get("expandedPdataFunctions", ()))
+    return functions
+
+
+def _callers(evidence: dict[str, dict[str, list[int]]], needles: Iterable[str]) -> set[int]:
+    callers: set[int] = set()
+    for needle in needles:
+        callers.update(evidence.get(needle, {}).get("inboundCallerFunctions", ()))
+    return callers
+
+
 def assess_unscanned_name_evidence(
     *,
     native: dict[str, Any],
@@ -260,11 +312,32 @@ def assess_unscanned_name_evidence(
         needle: len(_needle_hits(native, needle))
         for needle in PRESENTATION_ANCHORS
     }
+    function_evidence = _native_function_evidence(
+        native,
+        (*STATE_LINK_ANCHORS, *STATE_QUERY_CANDIDATE_NEEDLES, *PRESENTATION_ANCHORS),
+    )
+    query_functions = _functions(function_evidence, STATE_QUERY_CANDIDATE_NEEDLES)
+    link_functions = _functions(function_evidence, STATE_LINK_ANCHORS)
+    battle_functions = _functions(function_evidence, BATTLE_NAME_ANCHORS)
+    target_functions = _functions(function_evidence, ATB_TARGET_ANCHORS)
+    query_callers = _callers(function_evidence, STATE_QUERY_CANDIDATE_NEEDLES)
+    link_callers = _callers(function_evidence, STATE_LINK_ANCHORS)
+    battle_callers = _callers(function_evidence, BATTLE_NAME_ANCHORS)
+    target_callers = _callers(function_evidence, ATB_TARGET_ANCHORS)
+    function_correlations = {
+        "queryToEnemyBookLink": sorted(query_functions & link_functions),
+        "queryToBattleName": sorted(query_functions & battle_functions),
+        "queryToAtbTarget": sorted(query_functions & target_functions),
+        "queryToEnemyBookLinkCallers": sorted(query_callers & link_callers),
+        "queryToBattleNameCallers": sorted(query_callers & battle_callers),
+        "queryToAtbTargetCallers": sorted(query_callers & target_callers),
+    }
 
-    # String presence is only a discovery lead. A candidate query must still be
-    # semantically validated against live save/progression behavior before a
-    # runtime hook can consume it.
+    # String presence is only a discovery lead. An exact function owner/next-hop
+    # is stronger navigation evidence, but still cannot establish what one
+    # query-like name means for the current save or which bit/record it reads.
     state_query_candidate_present = any(query_hits.values())
+    state_query_function_candidate_present = bool(query_functions)
     state_query_validated = False
     battle_name_path_candidate = bool(
         presentation_hits.get("BattleEnemyStatusWidget")
@@ -305,7 +378,12 @@ def assess_unscanned_name_evidence(
         blockers.append("enemy-book-link-not-found-in-native-probe")
     if not state_query_candidate_present:
         blockers.append("assessed-state-query-not-found")
-    # Even if a guessed query-like symbol exists, discovery is not validation.
+    elif not state_query_function_candidate_present:
+        blockers.append("assessed-state-query-function-unresolved")
+    else:
+        blockers.append("assessed-state-query-function-semantics-unvalidated")
+    # Even if a guessed query-like symbol exists and has exact function evidence,
+    # discovery/navigation is not live-save semantic validation.
     if state_query_candidate_present and not state_query_validated:
         blockers.append("assessed-state-query-unvalidated")
     if not battle_name_path_candidate:
@@ -328,6 +406,7 @@ def assess_unscanned_name_evidence(
         "assessedState": {
             "candidateNeedleHits": query_hits,
             "candidatePresent": state_query_candidate_present,
+            "functionCandidatePresent": state_query_function_candidate_present,
             "validated": state_query_validated,
             "explicitlyNotAcceptedAsState": [
                 "FEndDataTableEnemyBook.ViewState",
@@ -349,6 +428,8 @@ def assess_unscanned_name_evidence(
             ),
             "rankedCandidateCount": len(candidates),
         },
+        "nativeFunctionEvidence": function_evidence,
+        "nativeFunctionCorrelations": function_correlations,
         "scanErrors": errors,
         "knownContracts": {
             "battleStatusSetting": "UEndMenuSettings::BattleEnemyStatusWidget",
@@ -359,6 +440,8 @@ def assess_unscanned_name_evidence(
             "BattleCharaSpec.EnemyBookID/EnemyBookIDPlus are authored identity links, not proof that the enemy has been Assessed in this save.",
             "EnemyBook.ViewState is static table data and is deliberately not treated as per-save Assess state.",
             "EnemyBook_IncrementKillCount_BP mutates kill-count bookkeeping and is not treated as an Assess query.",
+            "Query-like reflected names now require exact .pdata function evidence before becoming function candidates; padding-heuristic owners cannot strengthen them.",
+            "Shared exact functions or inbound callers between a query-like name, EnemyBook identity, and battle/target presentation are navigation leads only. Reflection registration glue and generic dispatchers can legitimately produce these correlations.",
             "Resolved cooked object-table evidence can narrow the name-bearing UI children for both requested presentation surfaces, but does not supply the missing per-save Assessed predicate.",
             "The final suffix must wrap the game's localized display string at runtime; no localized EnemyBook text is rewritten by this probe.",
         ],
