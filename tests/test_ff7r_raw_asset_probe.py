@@ -1,4 +1,10 @@
-from games.ff7r.raw_asset_probe import extract_interesting_strings, select_shadowed_assets
+from types import SimpleNamespace
+
+from games.ff7r.raw_asset_probe import (
+    extract_interesting_strings,
+    extract_object_evidence,
+    select_shadowed_assets,
+)
 
 
 def test_raw_asset_selection_is_case_insensitive_and_later_paks_shadow_earlier_files():
@@ -51,3 +57,70 @@ def test_binary_string_probe_can_be_limited():
     data = b"LockA\x00LockB\x00LockC\x00"
     rows = extract_interesting_strings(data, tokens=["lock"], limit=2)
     assert len(rows) == 2
+
+
+def test_object_evidence_prefers_specific_resolved_owner_when_bounded(monkeypatch):
+    import games.ff7r.raw_asset_probe as module
+
+    class FakeTable:
+        imports = (
+            SimpleNamespace(
+                index=0,
+                object_name=SimpleNamespace(display="TextBlock"),
+                outer_index=0,
+                class_package=SimpleNamespace(display="/Script/UMG"),
+                class_name=SimpleNamespace(display="Class"),
+            ),
+        )
+
+        def resolve_path(self, package_index):
+            return "WidgetTree.TextBlock" if package_index == -1 else None
+
+        def export_rows(self):
+            return [
+                {
+                    "index": 0,
+                    "packageIndex": 1,
+                    "objectName": "BattleLockonMarker",
+                    "objectPath": "WidgetTree.BattleLockonMarker",
+                    "outerIndex": 0,
+                    "outerPath": "WidgetTree",
+                    "classIndex": -2,
+                    "className": "EndBattleLockonMarkerIcon",
+                    "classPath": "/Script/EndGame.EndBattleLockonMarkerIcon",
+                    "superIndex": 0,
+                    "templateIndex": 0,
+                    "serialSize": 64,
+                    "serialOffset": 256,
+                },
+                {
+                    "index": 1,
+                    "packageIndex": 2,
+                    "objectName": "TextBlock",
+                    "objectPath": "WidgetTree.TextBlock",
+                    "outerIndex": 0,
+                    "outerPath": "WidgetTree",
+                    "classIndex": -3,
+                    "className": "TextBlock",
+                    "classPath": "/Script/UMG.TextBlock",
+                    "superIndex": 0,
+                    "templateIndex": 0,
+                    "serialSize": 64,
+                    "serialOffset": 320,
+                },
+            ]
+
+        def summary(self):
+            return {"importCount": 1, "exportCount": 2}
+
+    monkeypatch.setattr(module, "parse_object_table", lambda data, label: FakeTable())
+    evidence = extract_object_evidence(
+        b"fixture",
+        tokens=["EndBattleLockonMarkerIcon", "Text"],
+        limit=1,
+    )
+    assert evidence["objectTableParsed"] is True
+    assert evidence["objectTableSummary"]["exportCount"] == 2
+    assert len(evidence["resolvedExports"]) == 1
+    assert evidence["resolvedExports"][0]["objectName"] == "BattleLockonMarker"
+    assert "EndBattleLockonMarkerIcon" in evidence["resolvedExports"][0]["matchedTokens"]
