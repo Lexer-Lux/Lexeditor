@@ -379,7 +379,7 @@ def _lea_rip_xrefs_many(image: PEImage, target_rvas: Iterable[int]) -> dict[int,
     remaining = set(targets)
     # 4? 8D /r, mod=00 r/m=101. This deliberately recognizes only the very
     # common RIP-relative LEA form instead of pretending to be an x86 decoder.
-    for index in range(max(0, len(raw) - 7)):
+    for index in range(max(0, len(raw) - 6)):
         rex = raw[index]
         if not (0x48 <= rex <= 0x4F) or raw[index + 1] != 0x8D:
             continue
