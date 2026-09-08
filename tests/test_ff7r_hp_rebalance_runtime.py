@@ -163,5 +163,13 @@ def test_runtime_manifest_accepts_hp_rebalance_only_as_supported_optional_hook()
         validate_runtime_manifest(payload)
 
 
-def test_native_probe_includes_player_max_hp_api_research_needle():
-    assert "BPSetPlayerHPMax" in DEFAULT_NEEDLES
+def test_native_probe_includes_exact_playable_max_hp_read_write_research_path():
+    required = {
+        "BPSetPlayerHPMax",
+        "BPSetPlayerHP",
+        "BPGetPlayerHPMax",
+        "BPGetPlayerHP",
+        "GetCharaHPMax",
+        "GetCharaHP",
+    }
+    assert required.issubset(DEFAULT_NEEDLES)
