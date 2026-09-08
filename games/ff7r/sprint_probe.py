@@ -33,6 +33,26 @@ SPRINT_DATA_FIELDS = frozenset({
 SPRINT_DATA_ASSET_TOKENS = ("indoorvolume", "charaspec")
 MAX_DATA_CANDIDATES = 128
 
+# Keep the reflected/native strings grouped by what they can actually establish.
+# A cross-family function is a better *research lead*, but still not proof of an
+# authoritative player-sprint write path: UE reflection/registration glue can
+# legitimately bring unrelated reflected names together.
+SPRINT_FUNCTION_FAMILIES = {
+    "dash-scale": (
+        "DashRootMotionTranslationScale",
+    ),
+    "dash-state": (
+        "RunToDashBlendInputThreshold",
+        "IdleSwitchBehaviorDashInputBlockTime",
+        "RunSwitchBehaviorDashInputBlockTime",
+    ),
+    "root-motion": (
+        "AnimNotify_EndModifyRootMotionScale",
+        "RootMotionScale",
+        "RootMotionTranslationScale",
+    ),
+}
+
 # Generated Remake SDK evidence used only to classify candidate semantics. These
 # declarations do not prove which installed native callsite controls movement.
 KNOWN_CONTRACTS = (
@@ -130,16 +150,79 @@ def _expanded_functions(function_evidence: dict[str, dict[str, list[int]]], *nee
     return functions
 
 
+def _function_clusters(function_evidence: dict[str, dict[str, list[int]]]) -> list[dict[str, Any]]:
+    """Report semantic-family collisions without losing direct/next-hop provenance."""
+    rows: dict[int, dict[str, Any]] = {}
+    family_by_needle = {
+        needle: family
+        for family, needles in SPRINT_FUNCTION_FAMILIES.items()
+        for needle in needles
+    }
+    for needle, evidence in function_evidence.items():
+        family = family_by_needle.get(needle)
+        if family is None:
+            continue
+        for key, provenance in (
+            ("directPdataFunctions", "direct"),
+            ("nextHopPdataFunctions", "next-hop"),
+        ):
+            for raw_rva in evidence.get(key, ()):
+                rva = int(raw_rva)
+                row = rows.setdefault(rva, {
+                    "functionRva": rva,
+                    "families": set(),
+                    "directNeedles": set(),
+                    "nextHopNeedles": set(),
+                })
+                row["families"].add(family)
+                row["directNeedles" if provenance == "direct" else "nextHopNeedles"].add(needle)
+
+    result = []
+    for rva in sorted(rows):
+        row = rows[rva]
+        families = sorted(row["families"])
+        direct = sorted(row["directNeedles"])
+        next_hop = sorted(row["nextHopNeedles"])
+        cross_family = len(families) >= 2
+        result.append({
+            "functionRva": rva,
+            "families": families,
+            "familyCount": len(families),
+            "directNeedles": direct,
+            "nextHopNeedles": next_hop,
+            "crossFamily": cross_family,
+            "allThreeFamilies": len(families) == len(SPRINT_FUNCTION_FAMILIES),
+            "hasNextHopEvidence": bool(next_hop),
+            "registrationCollisionRisk": len(direct) >= 2,
+            "classification": (
+                "three-family-research-lead"
+                if len(families) == len(SPRINT_FUNCTION_FAMILIES)
+                else "cross-family-research-lead"
+                if cross_family
+                else "single-family-evidence"
+            ),
+        })
+    return result
+
+
 def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[str, Any]],
                            *, scan_errors: list[str] | tuple[str, ...] = (),
                            data_scan_truncated: bool = False) -> dict[str, Any]:
     """Classify evidence without confusing animation/root motion with sprint velocity."""
     native_rows = _needle_rows(native)
     function_evidence = _native_function_evidence(native)
+    function_clusters = _function_clusters(function_evidence)
+    cross_family_clusters = [row for row in function_clusters if row["crossFamily"]]
+    three_family_clusters = [row for row in function_clusters if row["allThreeFamilies"]]
     field_counts = Counter(str(row.get("field", "")) for row in data_candidates)
 
     dash_functions = _expanded_functions(function_evidence, "DashRootMotionTranslationScale")
     transition_functions = _expanded_functions(function_evidence, "RunToDashBlendInputThreshold")
+    dash_behavior_functions = _expanded_functions(
+        function_evidence,
+        "IdleSwitchBehaviorDashInputBlockTime",
+        "RunSwitchBehaviorDashInputBlockTime",
+    )
     animation_root_motion_functions = _expanded_functions(
         function_evidence,
         "AnimNotify_EndModifyRootMotionScale",
@@ -150,6 +233,8 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
         "dashToAnimationRootMotion": sorted(dash_functions & animation_root_motion_functions),
         "runToDashToAnimationRootMotion": sorted(transition_functions & animation_root_motion_functions),
         "dashToGeneralRootMotion": sorted(dash_functions & general_root_motion_functions),
+        "dashScaleToBehaviorState": sorted(dash_functions & dash_behavior_functions),
+        "dashBehaviorToAnimationRootMotion": sorted(dash_behavior_functions & animation_root_motion_functions),
     }
 
     blockers = [
@@ -166,8 +251,15 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
         "Exact .pdata candidate correlation: "
         f"dash↔animation-root-motion={len(correlations['dashToAnimationRootMotion'])}, "
         f"run-to-dash↔animation-root-motion={len(correlations['runToDashToAnimationRootMotion'])}, "
-        f"dash↔general-root-motion={len(correlations['dashToGeneralRootMotion'])}. "
+        f"dash↔general-root-motion={len(correlations['dashToGeneralRootMotion'])}, "
+        f"dash-scale↔behavior-state={len(correlations['dashScaleToBehaviorState'])}, "
+        f"behavior-state↔animation-root-motion={len(correlations['dashBehaviorToAnimationRootMotion'])}. "
         "These overlaps are research leads only; reflected registration glue can share functions without proving runtime sprint authority."
+    )
+    cluster_note = (
+        f"Function-family clustering found {len(cross_family_clusters)} cross-family and "
+        f"{len(three_family_clusters)} three-family exact .pdata leads. Direct string owners and "
+        "one-hop code targets remain separate so registration collisions are auditable."
     )
 
     return {
@@ -176,6 +268,9 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
         "nativeNeedleStats": native_rows,
         "nativeFunctionEvidence": function_evidence,
         "nativeFunctionCorrelations": correlations,
+        "nativeFunctionClusters": function_clusters,
+        "crossFamilyFunctionCount": len(cross_family_clusters),
+        "threeFamilyFunctionCount": len(three_family_clusters),
         "fieldCandidateCounts": dict(sorted(field_counts.items())),
         "dataCandidates": data_candidates,
         "knownContracts": [dict(row) for row in KNOWN_CONTRACTS],
@@ -187,6 +282,8 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
             "CharaSpec RootMotionTranslationScale is intentionally rejected as a safe tweak until sprint-only scope is proved.",
             "AnimNotify_EndModifyRootMotionScale is a per-animation lead with a generated 1.0 RootMotionScale default; the installed sprint animation/callsite still needs validation.",
             correlation_note,
+            cluster_note,
+            "Even a three-family cluster remains research-only until runtime observation proves player sprint displacement/velocity authority and the required isolation boundaries.",
             "A valid implementation must multiply actual player sprint displacement/velocity while leaving walking, jogging, scripted movement, cutscenes and non-player actors unchanged.",
         ],
     }
