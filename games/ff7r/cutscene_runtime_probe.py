@@ -73,12 +73,18 @@ def _function_evidence(native: dict[str, Any], needles: Iterable[str]) -> dict[s
         row = _needle_row(native, needle)
         for hit in row.get("hits", ()):
             for xref in hit.get("leaRipXrefs", ()):
+                source = xref.get("candidateFunctionSource")
                 rva = xref.get("candidateFunctionRva")
-                if rva is not None and xref.get("candidateFunctionSource") in (None, "pdata"):
+                # Older/synthetic evidence without a source can still be shown as
+                # a direct candidate; stronger cross-function navigation requires
+                # the explicit exact-bounds marker.
+                if rva is not None and source in (None, "pdata"):
                     direct.add(int(rva))
+                if source != "pdata":
+                    continue
                 # The generic probe emits code refs only for exact .pdata-bounded
-                # functions. Heuristic function owners intentionally have no
-                # next-hop graph and therefore cannot become stronger evidence.
+                # functions. Recheck that provenance here so malformed inputs
+                # cannot smuggle heuristic next hops into the stronger evidence.
                 code_refs = xref.get("candidateFunctionCodeRefs") or {}
                 for ref in code_refs.get("refs", ()):
                     target = ref.get("targetFunctionRva")
