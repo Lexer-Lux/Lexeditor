@@ -13,6 +13,19 @@ endif()
 add_test(NAME ff7r_runtime_contract COMMAND ff7r_runtime_contract_test)
 
 if(WIN32)
+    add_library(LexeditorFF7RRuntime SHARED RuntimeMain.cpp)
+    target_compile_features(LexeditorFF7RRuntime PRIVATE cxx_std_20)
+    target_compile_definitions(LexeditorFF7RRuntime PRIVATE
+        UNICODE
+        _UNICODE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+    )
+    if(MSVC)
+        target_compile_options(LexeditorFF7RRuntime PRIVATE /W4 /WX /permissive- /utf-8)
+    endif()
+    set_target_properties(LexeditorFF7RRuntime PROPERTIES PREFIX "")
+
     add_library(LexeditorFF7RRuntimeProbe SHARED RuntimeProbe.cpp)
     target_compile_features(LexeditorFF7RRuntimeProbe PRIVATE cxx_std_20)
     target_compile_definitions(LexeditorFF7RRuntimeProbe PRIVATE
