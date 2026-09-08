@@ -151,6 +151,32 @@ class Category:
 
 CATEGORIES = {
     category.key: category for category in (
+        Category("commands", "Commands", 1, 18, 10, 8, (
+            Field("initialCursorAction", "Command action", 0x00),
+            Field("targetData", "Target flags", 0x01),
+            Field("cameraMovementIdSingle", "Single-target camera ID", 0x04, "H", maximum=65535),
+            Field("cameraMovementIdMulti", "Multi-target camera ID", 0x06, "H", maximum=65535),
+        )),
+        Category("playerAttacks", "Player attacks", 2, 19, 11, 28, (
+            Field("accuracyRate", "Accuracy", 0x00),
+            Field("impactEffectId", "Impact effect ID", 0x01),
+            Field("targetHurtActionIndex", "Target hurt action ID", 0x02),
+            Field("mpCost", "MP cost", 0x04, "H", maximum=65535),
+            Field("impactSound", "Impact sound ID", 0x06, "H", maximum=65535),
+            Field("cameraMovementIdSingle", "Single-target camera ID", 0x08, "H", maximum=65535),
+            Field("cameraMovementIdMulti", "Multi-target camera ID", 0x0A, "H", maximum=65535),
+            Field("targetData", "Target flags", 0x0C),
+            Field("attackEffectId", "Attack effect ID", 0x0D),
+            Field("damageCalculationId", "Damage calculation ID", 0x0E),
+            Field("attackPower", "Attack power", 0x0F),
+            Field("conditionSubmenu", "Condition submenu", 0x10),
+            Field("statusChange", "Status change", 0x11),
+            Field("additionalEffects", "Additional effects", 0x12),
+            Field("additionalEffectsModifier", "Effect modifier", 0x13),
+            Field("statusFlags", "Status flags", 0x14, "I", maximum=0xFFFFFFFF),
+            Field("elementFlags", "Element flags", 0x18, "H", maximum=0xFFFF),
+            Field("specialAttackFlags", "Special attack flags", 0x1A, "H", maximum=0xFFFF),
+        )),
         Category("items", "Items", 5, 20, 12, 28, (
             Field("cameraMovementId", "Camera movement ID", 0x08, "H", maximum=65535),
             Field("targetData", "Target flags", 0x0C),

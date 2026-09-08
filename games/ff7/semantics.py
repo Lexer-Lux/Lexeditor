@@ -65,6 +65,14 @@ ATTACK_CONDITIONS = ((0, "HP"), (1, "MP"), (2, "Status"), (0xFF, "None"))
 SHOP_TYPES = ((0, "Item"), (1, "Weapon"), (2, "Item (alternate)"), (3, "Materia"), (4, "General"), (5, "Vegetable"), (6, "Accessory"), (7, "Tool"), (8, "Hotel"))
 SHOP_SLOT_KINDS = ((0, "Item / equipment"), (1, "Materia"))
 CHOCOBO_RATINGS = ((1, "Wonderful"), (2, "Great"), (3, "Good"), (4, "Fair"), (5, "Average"), (6, "Poor"), (7, "Bad"), (8, "Terrible"))
+COMMAND_ACTIONS = (
+    (0x00, "Perform command using target data"), (0x01, "Magic menu"),
+    (0x02, "Summon menu"), (0x03, "Item menu"), (0x04, "Enemy Skill menu"),
+    (0x05, "Throw menu"), (0x06, "Limit menu"),
+    (0x07, "Enable target selection via cursor"), (0x08, "W-Magic menu"),
+    (0x09, "W-Summon menu"), (0x0A, "W-Item menu"), (0x0B, "Coin menu"),
+    (0xFF, "No initial cursor action"),
+)
 
 SPECIAL_ATTACK_FLAGS = (
     (0x0001, "Damage MP instead of HP"),
@@ -157,6 +165,32 @@ def advanced(label, help):
 
 
 CORE = {
+    "commands": {
+        "initialCursorAction": _field(label="Command action", dataType="enum", choices=choices(*COMMAND_ACTIONS), group="Command behavior", help="What selecting this battle command does first: perform the command directly, open a submenu such as Magic/Item/Limit, or enter target selection."),
+        "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who a directly executed command can target and how the battle cursor behaves."),
+        "cameraMovementIdSingle": advanced("Single-target camera ID", "Raw battle-camera program ID for single-target use."),
+        "cameraMovementIdMulti": advanced("Multi-target camera ID", "Raw battle-camera program ID for multi-target use."),
+    },
+    "playerAttacks": {
+        "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who this player attack/spell can target and how its battle cursor behaves."),
+        "damageCalculationId": _field(label="Damage / healing formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Damage", help="Formula, damage type, accuracy behavior and critical capability encoded in the calculation byte."),
+        "conditionSubmenu": _field(label="Condition submenu", dataType="enum", choices=choices(*ATTACK_CONDITIONS), group="Status / condition", help="Conditional submenu mode used by the attack."),
+        "statusChange": _field(label="Status change", dataType="statusChange", group="Status / condition", help="Inflict/cure/swap mode and chance encoded in one byte."),
+        "additionalEffects": _field(label="Additional behavior", dataType="enum", choices=choices(*ADDITIONAL_EFFECTS), group="Extra behavior", help="Hard-coded behavior beyond ordinary damage/status processing."),
+        "additionalEffectsModifier": _field(label="Additional-behavior modifier", group="Extra behavior", help="Parameter used by additional behaviors that require one."),
+        "statusFlags": _field(label="Statuses affected", dataType="flags", flags=flags(*STATUSES), group="Status / condition", help="Statuses affected according to Status change."),
+        "elementFlags": _field(label="Elements", dataType="flags", flags=flags(*ELEMENTS), group="Damage", help="Elemental tags carried by this attack."),
+        "specialAttackFlags": _field(label="Special attack properties", dataType="flags", flags=flags(*SPECIAL_ATTACK_FLAGS), invertBits=True, bitWidth=16, group="Extra behavior", help="Named special properties. KERNEL.BIN stores these bits inverted; the editor presents their logical meaning."),
+        "accuracyRate": _field(label="Accuracy", group="Damage", help="Base accuracy parameter used by formulas that perform an accuracy check."),
+        "mpCost": _field(label="MP cost", group="Cost", help="MP consumed when this attack is used normally."),
+        "attackPower": _field(label="Power", group="Damage", help="Base power consumed by the selected damage/healing formula."),
+        "impactEffectId": advanced("Impact effect ID", "Raw impact visual-effect ID."),
+        "targetHurtActionIndex": advanced("Target hurt action ID", "Raw target reaction/animation index."),
+        "impactSound": advanced("Impact sound ID", "Raw battle sound-effect ID."),
+        "cameraMovementIdSingle": advanced("Single-target camera ID", "Raw battle-camera program ID for single-target use."),
+        "cameraMovementIdMulti": advanced("Multi-target camera ID", "Raw battle-camera program ID for multi-target use."),
+        "attackEffectId": advanced("Attack visual effect ID", "Raw attack-effect program ID."),
+    },
     "items": {
         "targetData": _field(label="Targeting", dataType="flags", flags=flags(*TARGET_FLAGS), group="Targeting", help="Who this item can target and how the battle cursor behaves."),
         "damageCalculationId": _field(label="Damage / healing formula", dataType="enum", choices=choices(*DAMAGE_FORMULAS), group="Effect", help="The battle formula and accuracy mode used by the item. The raw byte combines formula, physical/magical mode, accuracy and critical-hit behavior."),
@@ -295,6 +329,7 @@ def metadata_for(category: str, key: str) -> dict:
 
 
 DEFAULT_GROUPS = {
+    "commands": "Command behavior", "playerAttacks": "Attack",
     "items": "Effect", "weapons": "Combat", "armor": "Defense", "accessories": "Equipment",
     "characters": "Starting stats", "recruits": "Starting data", "enemies": "Stats / rewards",
     "enemyAttacks": "Attack", "encounters": "Battle setup", "shops": "Shop",
@@ -342,7 +377,7 @@ for slot in range(6):
     for suffix, label in (("cover","Cover flags"),("flags","Initial condition flags")):
         SCENE["encounters"][f"slot{slot}_{suffix}"] = advanced(f"Enemy slot {slot+1} {label}", "Packed formation-engine flags; retained under Advanced until every bit is authoritatively named.")
 for level in ("11","12","21","22","31","32","4"):
-    CHARACTERS[f"limitAttack{level}"] = advanced(f"Limit {level} attack ID", "Raw global Limit attack index. Kept under Advanced until the plugin exposes the corresponding named attack table.")
+    CHARACTERS[f"limitAttack{level}"] = reference("playerAttacks", label=f"Limit {level} attack", help="Player-attack record used by this Limit Break slot.")
 CHARACTERS["levelProgress"] = _field(label="Starting level progress", group="Starting progression", help="Progress within the current level at initialization (0–255 gauge).")
 for i in range(1,5):
     CHARACTERS[f"limitHpDivisor{i}"] = _field(label=f"Limit level {i} HP divisor", group="Limit gain", help="HP-loss divisor used by FF7's Limit gauge gain calculation for this Limit level.")

@@ -13,6 +13,8 @@ class SemanticSurfaceTests(unittest.TestCase):
     def test_core_kernel_categories_are_humanized(self):
         meta={category["id"]:{f["key"]:f for f in category["fields"]} for category in datasets.category_metadata()}
         expected={
+            "commands":{"initialCursorAction":"enum","targetData":"flags"},
+            "playerAttacks":{"targetData":"flags","damageCalculationId":"enum","statusChange":"statusChange","statusFlags":"flags","elementFlags":"flags","specialAttackFlags":"flags"},
             "items":{"targetData":"flags","damageCalculationId":"enum","statusChange":"statusChange","statusFlags":"flags","elementFlags":"flags"},
             "weapons":{"targetData":"flags","damageCalculationId":"enum","growthRate":"enum","equipableBy":"flags","attackElements":"flags"},
             "armor":{"elementDamageModifier":"enum","status":"enum","growthRate":"enum","equipableBy":"flags","elementalDefense":"flags"},
@@ -22,6 +24,8 @@ class SemanticSurfaceTests(unittest.TestCase):
         for category, fields in expected.items():
             for key, kind in fields.items(): self.assertEqual(meta[category][key]["dataType"],kind,(category,key))
         self.assertEqual(next(c for c in meta["characters"]["rowByte"]["choices"] if c["label"]=="Front row")["value"],0xFF)
+        self.assertEqual(meta["characters"]["limitAttack11"]["referenceCategory"],"playerAttacks")
+        self.assertTrue(meta["playerAttacks"]["specialAttackFlags"]["invertBits"])
 
     def test_extended_categories_are_humanized(self):
         categories={}

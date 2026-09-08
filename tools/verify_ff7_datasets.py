@@ -36,7 +36,7 @@ with patch.dict(sys.modules, {
     import platform_config
 
 PATHS = (Path("data/lang-en/kernel/KERNEL.BIN"), Path("ff7/workingdir/data/lang-en/kernel/kernel.bin"))
-COUNTS = {"items": 128, "weapons": 128, "armor": 32, "accessories": 32, "materia": 96}
+COUNTS = {"commands": 32, "playerAttacks": 128, "items": 128, "weapons": 128, "armor": 32, "accessories": 32, "materia": 96}
 CONFIG = b'''# Synthetic FFNx configuration\r
 windowed = true\r
 # 0 to 100\r
@@ -120,7 +120,7 @@ class DatasetTests(unittest.TestCase):
                 write_kernel(game / relative)
                 data = load_datasets(game, self.project)
                 self.assertFalse(data["errors"])
-                self.assertEqual(sum(map(len, data["records"].values())), 513)
+                self.assertEqual(sum(map(len, data["records"].values())), 673)
                 self.assertEqual(data["sourceRelativePath"], relative.as_posix())
                 self.assertEqual(len(data["records"]["characters"]), 9)
 
@@ -146,6 +146,22 @@ class DatasetTests(unittest.TestCase):
                     self.assertEqual(restored.sections, expected)
                     self.assertEqual(restored.trailer, original.trailer)
                     self.assertEqual(restored.file_types, original.file_types)
+
+    def test_every_core_kernel_field_preserves_all_other_bytes(self):
+        original = Kernel(self.source)
+        for category_key, category in base.CATEGORIES.items():
+            for field in category.fields:
+                with self.subTest(category=category_key, field=field.key):
+                    kernel = Kernel(self.source)
+                    rows = kernel.records(category_key)
+                    value = field.maximum - (field.maximum % field.scale)
+                    rows[0]["values"][field.key] = value
+                    kernel.apply(category_key, rows)
+                    expected = deepcopy(original.sections)
+                    record = expected[category.section - 1][:category.record_size]
+                    base._write_field(record, field, value)
+                    expected[category.section - 1][:category.record_size] = record
+                    self.assertEqual(kernel.sections, expected)
 
     def test_noop_preserves_all_decoded_bytes(self):
         original = Kernel(self.source)
