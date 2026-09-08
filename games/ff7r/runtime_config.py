@@ -25,6 +25,11 @@ RUNTIME_MANIFEST_NAME = "LexeditorFF7RRuntime.manifest.json"
 NATIVE_MODS_DIR = "NativeMods"
 REQUIRED_HOOKS = (
     "cutsceneSpeed",
+)
+# #414 was retired after confirming vanilla LT already cycles
+# Compass -> Minimap -> None. Keep the former hook names accepted in old
+# manifests so existing projects load, but never require or request them.
+LEGACY_HOOKS = (
     "minimapTapHold",
     "minimapState",
 )
@@ -33,6 +38,13 @@ OPTIONAL_HOOKS = (
     "betterSprint",
     "atbTweaks",
 )
+LEGACY_MINIMAP_CONFIG = {
+    "enabled": False,
+    "holdMilliseconds": 350,
+    "persistChosenState": True,
+    "tapBehavior": "open-map",
+    "holdBehavior": "toggle-minimap",
+}
 
 DEFAULT_RUNTIME_CONFIG = {
     "schemaVersion": RUNTIME_SCHEMA_VERSION,
@@ -42,13 +54,6 @@ DEFAULT_RUNTIME_CONFIG = {
         # The runtime must multiply the game's selected native event-scene
         # fast-forward multiplier (1.5x/2x) by this base, not replace it.
         "r2Behavior": "multiply-native",
-    },
-    "minimap": {
-        "enabled": False,
-        "holdMilliseconds": 350,
-        "persistChosenState": True,
-        "tapBehavior": "open-map",
-        "holdBehavior": "toggle-minimap",
     },
     "hpRebalance": {
         "enabled": False,
@@ -120,26 +125,30 @@ def validate_runtime_config(value: dict) -> dict:
     if cutscene.get("r2Behavior", "multiply-native") != "multiply-native":
         raise ValueError("cutsceneSpeed.r2Behavior must be multiply-native")
 
-    minimap = value.get("minimap", {})
-    if not isinstance(minimap, dict):
-        raise ValueError("minimap must be an object")
-    if set(minimap) - {
-        "enabled", "holdMilliseconds", "persistChosenState", "tapBehavior", "holdBehavior"
-    }:
-        raise ValueError("minimap contains unsupported fields")
-    map_enabled = minimap.get("enabled", False)
-    persist = minimap.get("persistChosenState", True)
-    if not isinstance(map_enabled, bool) or not isinstance(persist, bool):
-        raise ValueError("minimap enabled/persistence fields must be boolean")
-    hold_ms = minimap.get("holdMilliseconds", DEFAULT_RUNTIME_CONFIG["minimap"]["holdMilliseconds"])
-    if isinstance(hold_ms, bool) or not isinstance(hold_ms, int):
-        raise ValueError("minimap.holdMilliseconds must be an integer")
-    if hold_ms < 150 or hold_ms > 1500:
-        raise ValueError("minimap.holdMilliseconds must be between 150 and 1500 ms")
-    if minimap.get("tapBehavior", "open-map") != "open-map":
-        raise ValueError("minimap.tapBehavior must be open-map")
-    if minimap.get("holdBehavior", "toggle-minimap") != "toggle-minimap":
-        raise ValueError("minimap.holdBehavior must be toggle-minimap")
+    # Backward compatibility only. Old projects may still contain the retired
+    # #414 minimap object. Validate its old shape so corrupt data does not get a
+    # free pass, then intentionally omit it from the canonical configuration.
+    minimap = value.get("minimap")
+    if minimap is not None:
+        if not isinstance(minimap, dict):
+            raise ValueError("minimap must be an object")
+        if set(minimap) - {
+            "enabled", "holdMilliseconds", "persistChosenState", "tapBehavior", "holdBehavior"
+        }:
+            raise ValueError("minimap contains unsupported fields")
+        map_enabled = minimap.get("enabled", LEGACY_MINIMAP_CONFIG["enabled"])
+        persist = minimap.get("persistChosenState", LEGACY_MINIMAP_CONFIG["persistChosenState"])
+        if not isinstance(map_enabled, bool) or not isinstance(persist, bool):
+            raise ValueError("minimap enabled/persistence fields must be boolean")
+        hold_ms = minimap.get("holdMilliseconds", LEGACY_MINIMAP_CONFIG["holdMilliseconds"])
+        if isinstance(hold_ms, bool) or not isinstance(hold_ms, int):
+            raise ValueError("minimap.holdMilliseconds must be an integer")
+        if hold_ms < 150 or hold_ms > 1500:
+            raise ValueError("minimap.holdMilliseconds must be between 150 and 1500 ms")
+        if minimap.get("tapBehavior", LEGACY_MINIMAP_CONFIG["tapBehavior"]) != "open-map":
+            raise ValueError("minimap.tapBehavior must be open-map")
+        if minimap.get("holdBehavior", LEGACY_MINIMAP_CONFIG["holdBehavior"]) != "toggle-minimap":
+            raise ValueError("minimap.holdBehavior must be toggle-minimap")
 
     hp_rebalance = value.get("hpRebalance", {})
     if not isinstance(hp_rebalance, dict):
@@ -178,13 +187,6 @@ def validate_runtime_config(value: dict) -> dict:
             "enabled": enabled,
             "baseMultiplier": multiplier,
             "r2Behavior": "multiply-native",
-        },
-        "minimap": {
-            "enabled": map_enabled,
-            "holdMilliseconds": hold_ms,
-            "persistChosenState": persist,
-            "tapBehavior": "open-map",
-            "holdBehavior": "toggle-minimap",
         },
         "hpRebalance": {
             "enabled": hp_enabled,
@@ -225,10 +227,11 @@ def validate_runtime_manifest(value: dict) -> dict:
     hooks = value.get("hooks")
     required = set(REQUIRED_HOOKS)
     optional = set(OPTIONAL_HOOKS)
+    legacy = set(LEGACY_HOOKS)
     if (not isinstance(hooks, dict) or not required.issubset(hooks)
-            or set(hooks) - required - optional):
+            or set(hooks) - required - optional - legacy):
         raise ValueError(
-            "runtime manifest must declare exactly the required hook validation flags plus supported optional hooks"
+            "runtime manifest must declare the required hook validation flags plus supported optional or legacy hooks"
         )
     if any(not isinstance(flag, bool) for flag in hooks.values()):
         raise ValueError("runtime manifest hook validation flags must be boolean")
@@ -241,7 +244,11 @@ def validate_runtime_manifest(value: dict) -> dict:
         raise ValueError("runtime manifest notes must be a string")
     return {
         "manifestVersion": RUNTIME_MANIFEST_VERSION,
-        "hooks": {name: hooks[name] for name in (*REQUIRED_HOOKS, *OPTIONAL_HOOKS) if name in hooks},
+        "hooks": {
+            name: hooks[name]
+            for name in (*REQUIRED_HOOKS, *OPTIONAL_HOOKS, *LEGACY_HOOKS)
+            if name in hooks
+        },
         "supportedExeTimestamps": timestamps,
         "notes": notes,
     }
@@ -328,8 +335,6 @@ def _requested_hook_names(config: dict) -> tuple[str, ...]:
     requested: list[str] = []
     if config["cutsceneSpeed"]["enabled"]:
         requested.append("cutsceneSpeed")
-    if config["minimap"]["enabled"]:
-        requested.extend(("minimapTapHold", "minimapState"))
     if config["hpRebalance"]["enabled"]:
         requested.append("hpRebalance")
     if config["betterSprint"]["enabled"]:
@@ -424,6 +429,8 @@ def deploy_runtime(game_root: Path, project_root: Path) -> dict:
             f"{status['installedExeTimestampHex']}; runtime was not deployed"
         )
 
+    # Canonicalizing immediately before deployment also strips any retired #414
+    # minimap object from legacy project JSON before the native DLL can read it.
     config = save_runtime_config(project_root, load_runtime_config(project_root))
     manifest = load_runtime_manifest(project_root)
     destination = deployed_dll_path(game_root)
