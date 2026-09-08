@@ -1,8 +1,8 @@
-"""Synthetic DataObject-style surfaces for FF7R native runtime settings/research.
+"""Synthetic DataObject-style surfaces for FF7R runtime settings/research.
 
 These resources intentionally reuse the normal Game Data editor instead of adding
-an FF7R-only UI fork.  Runtime settings write only the project JSON artifact; the
-probe is read-only and scans the installed executable on demand.
+an FF7R-only UI fork. Runtime settings write only the project JSON artifact;
+research probes are read-only and inspect the installed game on demand.
 """
 
 from __future__ import annotations
@@ -26,6 +26,7 @@ from .runtime_config import (
 
 RUNTIME_TWEAKS_ASSET = "Lexeditor/RuntimeTweaks"
 RUNTIME_PROBE_ASSET = "Lexeditor/RuntimeProbe"
+NO_MORE_CHEATS_PROBE_ASSET = "Lexeditor/NoMoreCheatsProbe"
 VIRTUAL_ASSET_ROWS = (
     {
         "asset": RUNTIME_TWEAKS_ASSET,
@@ -38,6 +39,12 @@ VIRTUAL_ASSET_ROWS = (
         "name": "Native Hook Probe",
         "group": "Lexeditor Runtime",
         "synthetic": "runtime-probe",
+    },
+    {
+        "asset": NO_MORE_CHEATS_PROBE_ASSET,
+        "name": "No More Cheats Probe",
+        "group": "Lexeditor Research",
+        "synthetic": "no-more-cheats-probe",
     },
 )
 
@@ -94,7 +101,7 @@ class VirtualPackage:
 
 
 def is_virtual_asset(asset: str) -> bool:
-    return asset in {RUNTIME_TWEAKS_ASSET, RUNTIME_PROBE_ASSET}
+    return asset in {RUNTIME_TWEAKS_ASSET, RUNTIME_PROBE_ASSET, NO_MORE_CHEATS_PROBE_ASSET}
 
 
 def _canonical_hash(value: Any) -> str:
@@ -218,6 +225,97 @@ def runtime_probe_package(game_root: Path) -> tuple[VirtualPackage, str, bool]:
         asset=RUNTIME_PROBE_ASSET,
         export_name="LexeditorRuntimeProbe",
         properties=_probe_properties(),
+        entries=entries,
+        source_sha=active_sha,
+        active_sha=active_sha,
+    )
+    return package, active_sha, False
+
+
+def _cheat_probe_properties() -> list[VirtualProperty]:
+    return [
+        VirtualProperty("SearchTerms", "Search Terms", "STRING"),
+        VirtualProperty("TextMatchCount", "Localized Text Matches", "INT32"),
+        VirtualProperty("TextIds", "Matched Text IDs", "STRING"),
+        VirtualProperty("TextMatches", "Localized Text Evidence", "STRING"),
+        VirtualProperty("DataReferenceCount", "DataObject References", "INT32"),
+        VirtualProperty("DataReferences", "DataObject Reference Evidence", "STRING"),
+        VirtualProperty("SchemaMatches", "Schema / Property Candidates", "STRING"),
+        VirtualProperty("TextResourcesScanned", "Text Resources Scanned", "INT32"),
+        VirtualProperty("DataObjectsScanned", "DataObjects Scanned", "INT32"),
+        VirtualProperty("ScanErrors", "Skipped / Unsupported Resources", "INT32"),
+        VirtualProperty("ResearchNotes", "Research Notes", "STRING"),
+    ]
+
+
+def _lines(rows: list[dict], keys: tuple[str, ...]) -> str:
+    if not rows:
+        return "—"
+    return "\n".join(" | ".join(str(row.get(key, "")) for key in keys) for row in rows)
+
+
+def no_more_cheats_probe_package(game_root: Path, data_root: Path, project_root: Path,
+                                 index: dict, *, language: str = "US") -> tuple[VirtualPackage, str, bool]:
+    # Local imports avoid a module cycle: archive decorates its catalog with the
+    # virtual rows defined in this module.
+    from .archive import extract_pair
+    from .cheat_probe import scan_installed_menu_candidates
+    from .dataobject import DataObjectPackage
+    from .text_storage import load_text_package
+
+    text_sources = []
+    data_sources = []
+    errors: list[str] = []
+    wanted_language = language.upper()
+
+    for row in index.get("textAssets", []):
+        if str(row.get("language", "")).upper() != wanted_language:
+            continue
+        asset = str(row.get("asset", ""))
+        try:
+            package, _source_uasset, _source_uexp, _using_project = load_text_package(
+                game_root, data_root, project_root, index, asset, vanilla=True)
+            text_sources.append((asset, package))
+        except Exception as error:
+            errors.append(f"{asset}: {error}")
+
+    for row in index.get("assets", []):
+        if row.get("synthetic"):
+            continue
+        asset = str(row.get("asset", ""))
+        try:
+            uasset, uexp = extract_pair(game_root, data_root, index, asset)
+            data_sources.append((asset, DataObjectPackage(uasset, uexp, asset=asset)))
+        except Exception as error:
+            errors.append(f"{asset}: {error}")
+
+    result = scan_installed_menu_candidates(
+        text_sources, data_sources, language=wanted_language, scan_errors=errors)
+    entries: list[Entry] = []
+    notes = " ".join(result.get("notes", []))
+    for entry_index, target in enumerate(result["targets"]):
+        text_matches = target.get("textMatches", [])
+        data_refs = target.get("dataReferences", [])
+        values = {
+            "SearchTerms": ", ".join(target.get("searchTerms", [])) or "—",
+            "TextMatchCount": len(text_matches),
+            "TextIds": ", ".join(target.get("textIds", [])) or "—",
+            "TextMatches": _lines(text_matches, ("asset", "textId", "field", "text")),
+            "DataReferenceCount": len(data_refs),
+            "DataReferences": _lines(data_refs, ("asset", "record", "property", "value", "match")),
+            "SchemaMatches": "\n".join(target.get("schemaMatches", [])) or "—",
+            "TextResourcesScanned": result["textResourcesScanned"],
+            "DataObjectsScanned": result["dataObjectsScanned"],
+            "ScanErrors": len(result.get("scanErrors", [])),
+            "ResearchNotes": notes,
+        }
+        entries.append(Entry(entry_index, target["label"], values, {}))
+
+    active_sha = _canonical_hash(result)
+    package = VirtualPackage(
+        asset=NO_MORE_CHEATS_PROBE_ASSET,
+        export_name="LexeditorNoMoreCheatsProbe",
+        properties=_cheat_probe_properties(),
         entries=entries,
         source_sha=active_sha,
         active_sha=active_sha,
