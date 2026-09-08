@@ -109,6 +109,45 @@ def test_fast_forward_and_cut_speed_colocation_is_only_a_multiplier_lead():
     assert result["implementationReady"] is False
 
 
+def test_generic_fast_forward_text_cannot_substitute_for_skip_state_contract():
+    result = assess_cutscene_runtime_evidence(_native(
+        SetGameSpeed=_hit(0x1000),
+        GetGameSpeed=_hit(0x1200),
+        EGameSpeed_CUT=_hit(0x1000),
+        PlayCutScene=_hit(0x1000),
+        FastForward=_hit(0x1000),
+    ))
+
+    assert result["nativeFastForwardSupportPresent"] is True
+    assert result["nativeFastForwardStateCandidatePresent"] is False
+    assert result["candidateFunctions"]["nativeFastForwardSupport"]["direct"] == [0x1000]
+    assert result["candidateFunctions"]["nativeFastForwardState"]["direct"] == []
+    assert "native-fast-forward-state-unresolved" in result["blockers"]
+    assert "generic-fast-forward-support-only" in result["blockers"]
+    assert "native-fast-forward-multiplier-semantics-unvalidated" not in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_generic_cutscene_labels_cannot_substitute_for_play_action_contract():
+    result = assess_cutscene_runtime_evidence(_native(
+        SetGameSpeed=_hit(0x1000),
+        GetGameSpeed=_hit(0x1200),
+        EGameSpeed_CUT=_hit(0x1000),
+        EventScene=_hit(0x1000),
+        CutScene=_hit(0x1000),
+        SkipCinema=_hit(0x1000),
+    ))
+
+    assert result["cutsceneLifecycleSupportPresent"] is True
+    assert result["cutsceneLifecycleCandidatePresent"] is False
+    assert result["candidateFunctions"]["cutsceneSupport"]["direct"] == [0x1000]
+    assert result["candidateFunctions"]["cutsceneAction"]["direct"] == []
+    assert "cutscene-lifecycle-action-unresolved" in result["blockers"]
+    assert "cutscene-generic-lifecycle-support-only" in result["blockers"]
+    assert "cutscene-lifecycle-to-speed-link-unvalidated" not in result["blockers"]
+    assert result["implementationReady"] is False
+
+
 def test_skip_state_without_cut_speed_contract_never_promotes_r2_behavior():
     result = assess_cutscene_runtime_evidence(_native(
         SkipCinema=_hit(0x2000),
@@ -117,6 +156,7 @@ def test_skip_state_without_cut_speed_contract_never_promotes_r2_behavior():
     ))
 
     assert result["nativeFastForwardStateCandidatePresent"] is True
+    assert result["nativeFastForwardSupportPresent"] is True
     assert result["cutGameSpeedContractPresent"] is False
     assert "cut-game-speed-contract-unresolved" in result["blockers"]
     assert result["implementationReady"] is False
@@ -134,6 +174,30 @@ def test_non_cut_speed_categories_are_reported_only_for_isolation_research():
 
     assert result["candidateFunctions"]["nonCutSpeedCategories"]["direct"] == [0x3000, 0x3200]
     assert "cut-only-gameplay-speed-isolation-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_function_clusters_preserve_direct_registration_collision_risk():
+    result = assess_cutscene_runtime_evidence(_native(
+        SetGameSpeed=_hit(0x1000),
+        EGameSpeed_CUT=_hit(0x1000),
+        PlayCutScene=_hit(0x1000),
+        SkipCinema=_hit(0x1000),
+    ))
+    cluster = next(
+        row for row in result["candidateFunctions"]["functionClusters"]
+        if row["functionRva"] == 0x1000
+    )
+
+    assert cluster["families"] == ["cut-speed", "cutscene-action", "fast-forward-state"]
+    assert cluster["directNeedles"] == [
+        "EGameSpeed_CUT",
+        "PlayCutScene",
+        "SetGameSpeed",
+        "SkipCinema",
+    ]
+    assert cluster["crossFamily"] is True
+    assert cluster["registrationCollisionRisk"] is True
     assert result["implementationReady"] is False
 
 
