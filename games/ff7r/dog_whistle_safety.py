@@ -39,10 +39,21 @@ def _needle_hit_count(native: dict[str, Any], needle: str) -> int:
     return 0
 
 
+def _caller_rvas(inbound: dict[str, Any] | None) -> set[int]:
+    callers: set[int] = set()
+    for ref in (inbound or {}).get("refs", ()):
+        value = ref.get("sourceFunctionRva")
+        if value is not None:
+            callers.add(int(value))
+    return callers
+
+
 def _needle_function_evidence(native: dict[str, Any], needle: str) -> dict[str, list[int]]:
-    """Return only exact .pdata string owners and their bounded one-hop targets."""
+    """Return exact .pdata owners, bounded one-hop targets, and inbound callers."""
     direct: set[int] = set()
     next_hops: set[int] = set()
+    direct_callers: set[int] = set()
+    next_hop_callers: set[int] = set()
     for row in native.get("needles", ()):
         if str(row.get("needle", "")) != needle:
             continue
@@ -53,14 +64,23 @@ def _needle_function_evidence(native: dict[str, Any], needle: str) -> dict[str, 
                 function_rva = xref.get("candidateFunctionRva")
                 if function_rva is not None:
                     direct.add(int(function_rva))
+                direct_callers.update(
+                    _caller_rvas(xref.get("candidateFunctionInboundCodeRefs"))
+                )
                 for ref in (xref.get("candidateFunctionCodeRefs") or {}).get("refs", ()):
                     target = ref.get("targetFunctionRva")
                     if target is not None:
                         next_hops.add(int(target))
+                    next_hop_callers.update(
+                        _caller_rvas(ref.get("targetFunctionInboundCodeRefs"))
+                    )
     return {
         "directPdataFunctions": sorted(direct),
         "nextHopPdataFunctions": sorted(next_hops),
         "expandedPdataFunctions": sorted(direct | next_hops),
+        "directInboundCallerFunctions": sorted(direct_callers),
+        "nextHopInboundCallerFunctions": sorted(next_hop_callers),
+        "expandedInboundCallerFunctions": sorted(direct_callers | next_hop_callers),
     }
 
 
@@ -76,6 +96,15 @@ def _function_present(evidence: dict[str, dict[str, list[int]]], needles: Iterab
         evidence.get(needle, {}).get("expandedPdataFunctions")
         for needle in needles
     )
+
+
+def _function_callers(evidence: dict[str, dict[str, list[int]]], needles: Iterable[str]) -> set[int]:
+    callers: set[int] = set()
+    for needle in needles:
+        callers.update(
+            evidence.get(needle, {}).get("expandedInboundCallerFunctions", ())
+        )
+    return callers
 
 
 def _function_clusters(evidence: dict[str, dict[str, list[int]]]) -> list[dict[str, Any]]:
@@ -165,9 +194,6 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
     correlated_key_items = list(chapter.get("referencedKeyItemsThatAreItemRows", ()))
     add_key_item_present = bool(chapter.get("addKeyItemPropertyPresent", False))
     chapter4_candidates = list(chapter.get("chapter4Candidates", ()))
-    # A missing field is not equivalent to a proved empty AddKeyItem array. The
-    # table-level property flag can be true even when a candidate row was emitted
-    # without row-level array evidence, so require the key itself plus list shape.
     chapter4_with_award_field = [
         row for row in chapter4_candidates
         if "addKeyItems" in row and isinstance(row["addKeyItems"], list)
@@ -228,8 +254,44 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         item_classifier_function_present and ability_execution_function_present
     )
 
-    # The writer can clone existing fixed-layout rows without hijacking their IDs
-    # only when unused target FNames already exist in each package's own name map.
+    enumeration_callers = _function_callers(
+        native_functions, (ENEMY_ENUMERATION_NEEDLE,))
+    battle_chara_id_callers = _function_callers(
+        native_functions, (BATTLE_CHARA_ID_NEEDLE,))
+    ai_lookup_callers = _function_callers(native_functions, AI_LOOKUP_NEEDLES)
+    set_target_callers = _function_callers(
+        native_functions, (REQUIRED_RETARGET_NEEDLE,))
+    item_classifier_callers = _function_callers(
+        native_functions, (ITEM_CLASSIFIER_NEEDLE,))
+    ability_execution_callers = _function_callers(
+        native_functions, ABILITY_EXECUTION_NEEDLES)
+    award_callers = _function_callers(native_functions, AWARD_NEEDLES)
+
+    retarget_common_callers = (
+        enumeration_callers
+        & battle_chara_id_callers
+        & ai_lookup_callers
+        & set_target_callers
+    )
+    caller_correlations = {
+        "enumerationToBattleCharaId": sorted(
+            enumeration_callers & battle_chara_id_callers
+        ),
+        "battleCharaIdToAiLookup": sorted(
+            battle_chara_id_callers & ai_lookup_callers
+        ),
+        "aiLookupToSetTarget": sorted(ai_lookup_callers & set_target_callers),
+        "retargetStageCommonCallers": sorted(retarget_common_callers),
+        "itemClassifierToAbilityExecution": sorted(
+            item_classifier_callers & ability_execution_callers
+        ),
+        "itemAbilityToRetarget": sorted(
+            (item_classifier_callers | ability_execution_callers)
+            & (enumeration_callers | battle_chara_id_callers | ai_lookup_callers | set_target_callers)
+        ),
+        "awardToItemClassifier": sorted(award_callers & item_classifier_callers),
+    }
+
     writer_supports_new_item_row = bool(
         EXISTING_FNAME_ROW_CLONE_SUPPORTED
         and SCALAR_FSTRING_REPLACE_SUPPORTED
@@ -339,9 +401,6 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             blockers.append("runtime-item-ability-function-evidence-incomplete")
         else:
             blockers.append("runtime-item-ability-function-path-unvalidated")
-    # None of the reflected execution helpers proves where a human-confirmed
-    # Items-menu command commits. Keep that as an independent hard blocker so
-    # AI/script-only ability calls cannot accidentally authorize the feature.
     blockers.append("player-item-command-commit-hook-unresolved")
     blockers.append("whistle-user-character-mapping-unvalidated")
     blockers.append("scripted-boss-retarget-exceptions-unvalidated")
@@ -391,6 +450,7 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             "needleHits": native_hits,
             "nativeFunctionEvidence": native_functions,
             "nativeFunctionClusters": function_clusters,
+            "nativeCallerCorrelations": caller_correlations,
             "activeEnemyEnumerationCandidatePresent": active_enemy_enumeration_present,
             "activeEnemyEnumerationFunctionCandidatePresent": active_enemy_enumeration_function_present,
             "battleCharaIdLookupCandidatePresent": battle_chara_id_lookup_present,
@@ -426,9 +486,10 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             "The writer can clone proved Item/BattleAbility templates, resize scalar FString IDs, and append localized top-level text IDs without expanding package name maps. Exact template behavior and item-use interception still require installed evidence.",
             "A Chapter 4 candidate counts as reward evidence only when that row explicitly exposes an addKeyItems list; a missing row field is not treated as an empty award array.",
             "Fixed-width array insertion can append the eventual new Item row tag to a proved Chapter 4 AddKeyItem_Array without replacing another reward; exact once-only semantics still require validation.",
-            "The reflected retarget route is explicit: GetEnemyMembersRef -> GetBattleCharaSpec_DataTableID -> canine set filter -> AI lookup -> SetTarget(user). String presence can establish anchors, but exact .pdata function evidence is now tracked independently and still cannot prove call order/ABI.",
-            "Only exact .pdata owners and bounded one-hop targets contribute function evidence. Multi-name direct owners are exposed as registrationCollisionRisk rather than being treated as stronger hooks.",
-            "IsItem plus the reflected ability execution helpers establishes a narrower item/AbilityID bridge, but AI/script execution is not permission to hook the human Items-menu commit path even when exact function evidence exists.",
+            "The reflected retarget route is explicit: GetEnemyMembersRef -> GetBattleCharaSpec_DataTableID -> canine set filter -> AI lookup -> SetTarget(user). String presence can establish anchors, but exact .pdata function evidence still cannot prove call order/ABI.",
+            "Exact .pdata inbound-caller overlaps are additional dispatcher/command-neighborhood leads. Even one common caller across every retarget stage does not prove the four APIs execute in that order or with the required objects.",
+            "IsItem plus the reflected ability execution helpers establishes a narrower item/AbilityID bridge, but a shared exact caller still cannot stand in for the human Items-menu commit path.",
+            "Only exact .pdata owners, bounded one-hop targets, and exact inbound callers contribute stronger function evidence. Multi-name direct owners remain registrationCollisionRisk.",
             "The assessment is read-only and cannot make the Dog Whistle implementation ready by itself.",
         ],
     }
