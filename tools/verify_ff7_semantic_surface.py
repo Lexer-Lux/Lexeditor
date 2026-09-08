@@ -69,6 +69,16 @@ class SemanticSurfaceTests(unittest.TestCase):
         self.assertEqual((data["records"]["limitBreaks"][0]["name"],data["records"]["limitBreaks"][0]["description"]),("Braver","Deal damage."))
         self.assertEqual((data["vanilla"]["limitBreaks"][0]["name"],data["vanilla"]["limitBreaks"][0]["description"]),("Vanilla Braver","Vanilla help."))
 
+    def test_limit_save_response_keeps_linked_text(self):
+        result={"records":{"limitBreaks":[{"id":0,"gameId":128,"name":"Limit break 0","description":"Executable Limit attack data."}]}}
+        extra={"records":{"texts":[
+            {"id":9*65536+128,"values":{"text":"Braver"}},
+            {"id":1*65536+128,"values":{"text":"Deal damage."}},
+        ]}}
+        returned=server._link_saved_limit_text(result,extra)
+        self.assertIs(returned,result)
+        self.assertEqual((result["records"]["limitBreaks"][0]["name"],result["records"]["limitBreaks"][0]["description"]),("Braver","Deal damage."))
+
     def test_extended_categories_are_humanized(self):
         categories={}
         for key, spec in battle.SCENE_CATEGORIES.items(): categories[key]=semantics.apply(key,spec["fields"])
