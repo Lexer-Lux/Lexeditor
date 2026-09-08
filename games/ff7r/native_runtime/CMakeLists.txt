@@ -44,6 +44,11 @@ lexeditor_ff7r_test(
     runtime_minimap_test.cpp
     ff7r_runtime_minimap
 )
+lexeditor_ff7r_test(
+    ff7r_runtime_feature_health_test
+    runtime_feature_health_test.cpp
+    ff7r_runtime_feature_health
+)
 
 if(WIN32)
     add_library(LexeditorFF7RRuntime SHARED RuntimeMain.cpp)
