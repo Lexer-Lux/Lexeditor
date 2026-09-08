@@ -30,6 +30,12 @@ CHAPTER_TABLE = "chapter"
 BATTLE_CHARA_TABLE = "battlecharaspec"
 ENEMY_BOOK_TABLE = "enemybook"
 
+# Public generated Remake declarations expose EEndBattleAbilityCommandType in
+# this order: None, Ability, Magic, Limit, Item, UltimateSummonMagic, Max.
+# BattleAbility.CommandType is stored as uint8, so 4 is the source-backed Item
+# category candidate. Installed data still has to prove the concrete template.
+ITEM_COMMAND_TYPE = 4
+
 WHISTLE_TERMS = ("whistle", "dogwhistle", "dog_whistle")
 CANINE_TERMS = (
     "guard dog", "wrath hound", "wrathhound", "bloodhound", "darkstar",
@@ -58,6 +64,10 @@ NATIVE_NEEDLES = (
     "GetEnemyMembersRef",
     "GetEnemyMembersFromID",
     "GetBattleCharaSpec_DataTableID",
+    "IsItem",
+    "RequestAIPCAbility",
+    "RequestAIPCExecuteAbility",
+    "ReserveAbility",
     "RequestUseAbility",
     "EndFieldOnOffTable_IgnoreBattleCommandItem",
     "Item_Add",
@@ -224,6 +234,7 @@ def probe_dog_whistle_sources(game_root: Path, data_root: Path, project_root: Pa
         "rowCandidates": [],
         "abilityBackedTemplateCandidates": [],
         "linkedBattleAbilityTemplateCandidates": [],
+        "itemCommandTemplateCandidates": [],
         "unresolvedAbilityTemplateCandidates": [],
         "itemProperties": [prop.name for prop in item.properties] if item else [],
     }
@@ -259,19 +270,23 @@ def probe_dog_whistle_sources(game_root: Path, data_root: Path, project_root: Pa
                 if ability_entry is None:
                     item_result["unresolvedAbilityTemplateCandidates"].append(template)
                 else:
-                    item_result["linkedBattleAbilityTemplateCandidates"].append({
+                    linked = {
                         **template,
                         "battleAbilityTag": ability_entry.tag,
                         "battleAbilityValues": _ability_summary(ability_entry),
                         "battleAbilityResolvedText": _resolved_entry_text(
                             ability_entry, text, text_owners),
-                    })
+                    }
+                    item_result["linkedBattleAbilityTemplateCandidates"].append(linked)
+                    if ability_entry.values.get("CommandType") == ITEM_COMMAND_TYPE:
+                        item_result["itemCommandTemplateCandidates"].append(linked)
             if (len(item_result["rowCandidates"]) >= MAX_ROWS
                     and len(item_result["abilityBackedTemplateCandidates"]) >= MAX_ROWS):
                 break
         item_result["rowCandidates"] = item_result["rowCandidates"][:MAX_ROWS]
         item_result["abilityBackedTemplateCandidates"] = item_result["abilityBackedTemplateCandidates"][:MAX_ROWS]
         item_result["linkedBattleAbilityTemplateCandidates"] = item_result["linkedBattleAbilityTemplateCandidates"][:MAX_ROWS]
+        item_result["itemCommandTemplateCandidates"] = item_result["itemCommandTemplateCandidates"][:MAX_ROWS]
         item_result["unresolvedAbilityTemplateCandidates"] = item_result["unresolvedAbilityTemplateCandidates"][:MAX_ROWS]
 
     chapter_result = {
@@ -347,21 +362,29 @@ def probe_dog_whistle_sources(game_root: Path, data_root: Path, project_root: Pa
         "knownContracts": {
             "itemUseField": "FEndDataTableItem.AbilityID (FString)",
             "battleAbilityTable": "FEndDataTableBattleAbility",
+            "battleAbilityItemCommandType": ITEM_COMMAND_TYPE,
+            "itemClassifier": "UEndBattleAPI::IsItem(FName InAbilityName)",
             "chapterAwardField": "FEndDataTableChapter.AddKeyItem_Array",
             "activeEnemyEnumeration": "UEndBattleAPI::GetEnemyMembersRef(TArray<AEndCharacter*>&)",
             "battleCharaIdLookup": "UEndBattleAPI::GetBattleCharaSpec_DataTableID(AEndCharacter*)",
             "enemyRetargetMethod": "AEndBattleAIController::SetTarget(AEndCharacter*)",
-            "abilityDispatchLead": "AEndBattleAIPcBaseController::RequestUseAbility(FName)",
+            "abilityExecutionLeads": [
+                "UEndBattleAPI::RequestAIPCAbility(EPlayerType,FName,AActor*)",
+                "UEndBattleAPI::RequestAIPCExecuteAbility(AEndCharacter*,FName,EPlayerType)",
+                "AEndBattleAIController::ReserveAbility(FName,bool)",
+                "AEndBattleAIPcBaseController::RequestUseAbility(FName)",
+            ],
         },
         "notes": [
             "An UNUSED whistle-like FName already present in Item.uasset can name a genuinely new cloned row without expanding the Item package name map; an existing row with that tag is never treated as safe to repurpose.",
             "Item.AbilityID is correlated to an actual BattleAbility row before a template is considered executable-path evidence. An Item-only AbilityID string is insufficient.",
+            "Linked templates are separately promoted as Item-command candidates only when installed BattleAbility.CommandType matches the source-backed EEndBattleAbilityCommandType::Item value (4). Arbitrary ability links no longer count as battle-usable item templates.",
             "A new BattleAbility row likewise requires an UNUSED whistle-like FName already present in BattleAbility's own name map; Item and BattleAbility name maps are independent.",
             "BattleAbility summaries expose command/target/cost/animation/effect fields only as template evidence; no unrelated ability effect is authorized for reuse.",
             "Text evidence records the exact installed text resource that owns each resolved ID so a future new name/description can be placed in the corresponding localized resource rather than guessed globally.",
             "Chapter 4 candidates require tag/UniqueID/resolved-name evidence; row order is never used as a Chapter 4 identifier.",
             "GetEnemyMembersRef plus GetBattleCharaSpec_DataTableID provides a narrow reflected route to enumerate active enemies and compare them against the installed canine BattleCharaSpec set before resolving AI and calling SetTarget.",
-            "RequestUseAbility is only a dispatch research lead; it is not assumed to be the player item-use callsite or safe interception point.",
+            "IsItem plus the reflected ability-execution APIs narrows runtime dispatch research to actual item-backed AbilityIDs, but none is assumed to be the player menu's committed item-use callsite without installed validation.",
             "Canine matches are research candidates and require installed battle verification, especially Darkstar/boss/scripted cases.",
         ],
     }
