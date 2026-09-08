@@ -55,7 +55,7 @@ def _fstring(value: str) -> bytes:
 
 
 def _test_package() -> tuple[bytes, bytes]:
-    """Generate a proprietary-data-free package for smoke/round-trip checks."""
+    """Generate a proprietary-data-free DataObject for smoke/round-trip checks."""
     names = ["Fixture", "Power", "Enabled", "Mode", "ModeA", "ModeB", "Description", "Values_Array", "RowA"]
     header = bytearray()
     header += struct.pack("<Iii", 0x9E2A83C1, -4, 0)
@@ -92,13 +92,45 @@ def _test_package() -> tuple[bytes, bytes]:
     uexp += struct.pack("<i", 42)
     uexp += struct.pack("<B", 1)
     uexp += fname("ModeA")
-    uexp += _fstring("Fixture text")
+    uexp += _fstring("$Item_Test")
     uexp += struct.pack("<i3h", 3, 10, 20, 30)
     return bytes(header), bytes(uexp)
 
 
+def _test_text_package() -> tuple[bytes, bytes]:
+    """Generate a proprietary-data-free FF7R Resident_TxtRes pair."""
+    from .textresource import (
+        TEXT_NAME_COUNT_OFFSET,
+        TEXT_NAME_MAP_OFFSET,
+        TEXT_SERIAL_SIZE_FROM_END,
+        UNREAL_SIGNATURE,
+    )
+
+    names = ["ACTOR", "EMOTION"]
+    uasset = bytearray(320)
+    uasset[:4] = UNREAL_SIGNATURE
+    struct.pack_into("<I", uasset, TEXT_NAME_COUNT_OFFSET, len(names))
+    cursor = TEXT_NAME_MAP_OFFSET
+    for name in names:
+        encoded = _fstring(name) + b"\0\0\0\0"
+        uasset[cursor:cursor + len(encoded)] = encoded
+        cursor += len(encoded)
+
+    uexp = bytearray(b"\x00\x03")
+    uexp += _fstring("US")
+    uexp += struct.pack("<iI", 0, 2)
+    uexp += _fstring("$Item_Test") + _fstring("Buster Sword") + struct.pack("<I", 0)
+    uexp += _fstring("$Line_Test") + _fstring("Hello") + struct.pack("<I", 1)
+    uexp += struct.pack("<Ii", 0, 0) + _fstring("Cloud")
+    uexp += UNREAL_SIGNATURE
+    struct.pack_into("<i", uasset, len(uasset) - TEXT_SERIAL_SIZE_FROM_END,
+                     len(uexp) - len(UNREAL_SIGNATURE))
+    return bytes(uasset), bytes(uexp)
+
+
 def smoke() -> list[str]:
     from .dataobject import DataObjectPackage
+    from .textresource import TextResourcePackage
 
     uasset, uexp = _test_package()
     package = DataObjectPackage.from_bytes(uasset, uexp)
@@ -106,22 +138,36 @@ def smoke() -> list[str]:
         {"entry": 0, "property": "Power", "value": 73},
         {"entry": 0, "property": "Enabled", "value": False},
         {"entry": 0, "property": "Mode", "value": "ModeB"},
-        {"entry": 0, "property": "Values_Array", "index": 1, "value": -12},
+        {"entry": 0, "property": "Values_Array", "index": 1, "value": 12},
     ])
     reread = DataObjectPackage.from_bytes(uasset, bytes(package.uexp_bytes))
     if reread.entries[0].values["Power"] != 73 or reread.entries[0].values["Enabled"] is not False:
         raise RuntimeError("FF7R generated DataObject edit failed binary readback")
     if (reread.entries[0].values["Mode"] != "ModeB"
-            or reread.entries[0].values["Values_Array"] != [10, -12, 30]
-            or reread.entries[0].values["Description"] != "Fixture text"):
+            or reread.entries[0].values["Values_Array"] != [10, 12, 30]
+            or reread.entries[0].values["Description"] != "$Item_Test"):
         raise RuntimeError("FF7R generated DataObject edit did not preserve fixed/read-only values")
+
+    text_uasset, text_uexp = _test_text_package()
+    text_package = TextResourcePackage.from_bytes(text_uasset, text_uexp)
+    text_package.apply_edits([{"entry": 0, "text": "A much longer Buster Sword name"}])
+    text_reread = TextResourcePackage.from_bytes(
+        bytes(text_package.uasset_bytes), bytes(text_package.uexp_bytes))
+    if text_reread.entries[0].text != "A much longer Buster Sword name":
+        raise RuntimeError("FF7R generated text-resource edit failed binary readback")
 
     with tempfile.TemporaryDirectory(prefix="lexeditor-ff7r-") as temp_name:
         temp = Path(temp_name)
-        source = temp / "fixture" / "End" / "Content" / "GameContents" / "DataObject" / "Resident"
-        source.mkdir(parents=True)
-        (source / "Equipment.uasset").write_bytes(uasset)
-        (source / "Equipment.uexp").write_bytes(uexp)
+        fixture = temp / "fixture"
+        data_source = fixture / "End" / "Content" / "GameContents" / "DataObject" / "Resident"
+        data_source.mkdir(parents=True)
+        (data_source / "Equipment.uasset").write_bytes(uasset)
+        (data_source / "Equipment.uexp").write_bytes(uexp)
+        text_source = fixture / "End" / "Content" / "GameContents" / "Text" / "US"
+        text_source.mkdir(parents=True)
+        (text_source / "Resident_TxtRes.uasset").write_bytes(text_uasset)
+        (text_source / "Resident_TxtRes.uexp").write_bytes(text_uexp)
+
         game = temp / "game"
         (game / "End" / "Content" / "Paks").mkdir(parents=True)
         project = temp / "project"
@@ -129,16 +175,22 @@ def smoke() -> list[str]:
             "LEXEDITOR_FF7R_ROOT": str(game),
             "LEXEDITOR_FF7R_DATA_ROOT": str(temp / "data"),
             "LEXEDITOR_FF7R_PROJECT": str(project),
-            "LEXEDITOR_FF7R_TEST_DATAOBJECTS": str(temp / "fixture"),
+            "LEXEDITOR_FF7R_TEST_DATAOBJECTS": str(fixture),
         }) as session:
             identity = request_json(session.url + "api/plugin")
             if identity.get("pluginId") != "ff7r" or identity.get("hosted") is not True:
                 raise RuntimeError("FF7R service returned the wrong managed identity")
+            if "text-resource" not in identity.get("capabilities", []):
+                raise RuntimeError("FF7R service did not advertise text-resource editing")
+
             catalog = request_json(session.url + "api/catalog")
-            if len(catalog.get("assets", [])) != 1:
-                raise RuntimeError("FF7R fixture catalog did not expose one DataObject")
+            if len(catalog.get("assets", [])) != 1 or len(catalog.get("textAssets", [])) != 1:
+                raise RuntimeError("FF7R fixture catalog did not expose gameplay and text resources")
+
             asset = catalog["assets"][0]["asset"]
             data = request_json(session.url + "api/data?asset=" + quote(asset, safe=""))
+            if data.get("textLookup", {}).get("$Item_Test") != "Buster Sword":
+                raise RuntimeError("FF7R gameplay data did not resolve its installed Resident text ID")
             result = request_json(session.url + "api/save", {
                 "asset": asset,
                 "sourceSha256": data["sourceSha256"],
@@ -146,16 +198,33 @@ def smoke() -> list[str]:
                 "edits": [{"entry": 0, "property": "Power", "value": 99}],
             })
             if result.get("saved") != 1:
-                raise RuntimeError("FF7R service did not save one generated edit")
+                raise RuntimeError("FF7R service did not save one generated gameplay edit")
             saved = request_json(session.url + "api/data?asset=" + quote(asset, safe=""))
             if saved["records"][0]["values"]["Power"] != 99 or not saved.get("usingProject"):
-                raise RuntimeError("FF7R service save did not survive readback")
+                raise RuntimeError("FF7R gameplay service save did not survive readback")
+
+            text_asset = catalog["textAssets"][0]["asset"]
+            text = request_json(session.url + "api/text?asset=" + quote(text_asset, safe=""))
+            text_result = request_json(session.url + "api/text/save", {
+                "asset": text_asset,
+                "sourceUassetSha256": text["sourceUassetSha256"],
+                "sourceUexpSha256": text["sourceUexpSha256"],
+                "activeUassetSha256": text["activeUassetSha256"],
+                "activeUexpSha256": text["activeUexpSha256"],
+                "edits": [{"entry": 0, "text": "Lexeditor テスト Sword"}],
+            })
+            if text_result.get("saved") != 1:
+                raise RuntimeError("FF7R service did not save one generated text edit")
+            saved_text = request_json(session.url + "api/text?asset=" + quote(text_asset, safe=""))
+            if saved_text["records"][0]["text"] != "Lexeditor テスト Sword" or not saved_text.get("usingProject"):
+                raise RuntimeError("FF7R text service save did not survive variable-length UTF-16 readback")
         if not session.wait_closed():
             raise RuntimeError("FF7R child port is still open after host shutdown")
     return [
         "generated FF7R DataObject parser/write round-trip passed",
-        "read-only FString and untouched bytes survived same-size edits",
-        "managed FF7R service catalogued, saved and read back a fixture project",
+        "installed-style Resident text IDs resolve without bundled game strings",
+        "generated FF7R variable-length text resource round-trip passed",
+        "managed service saved/read back gameplay and UTF-16 text project overlays",
         "host-owned FF7R child service stopped cleanly",
     ]
 
@@ -164,7 +233,7 @@ PLUGIN = GamePlugin(
     plugin_id="ff7r",
     name=DISPLAY_NAME,
     subtitle="FF7 Remake",
-    description="Edit FF7 Remake DataObject tables and build project overlays as mod PAKs.",
+    description="Edit FF7 Remake gameplay DataObjects and localized text, then build project overlays as mod PAKs.",
     accent="#1d6fb8",
     check=check,
     launch=launch,
