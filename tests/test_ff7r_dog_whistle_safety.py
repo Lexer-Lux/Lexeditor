@@ -7,6 +7,7 @@ def _report(
     unused_names=("Whistle",),
     templates=(),
     linked_templates=(),
+    item_command_templates=(),
     unresolved_templates=(),
     ability_rows=(),
     ability_names=("WhistleAbility",),
@@ -25,6 +26,7 @@ def _report(
             "unusedWhistleNameMapCandidates": list(unused_names),
             "abilityBackedTemplateCandidates": list(templates),
             "linkedBattleAbilityTemplateCandidates": list(linked_templates),
+            "itemCommandTemplateCandidates": list(item_command_templates),
             "unresolvedAbilityTemplateCandidates": list(unresolved_templates),
             "itemProperties": ["AbilityID", "NameID", "DescriptionID"],
         },
@@ -73,21 +75,46 @@ def _chapter4(tag="Chapter04"):
     }
 
 
-def test_unused_existing_fname_unlocks_structural_new_row_capability_but_not_template_contract():
-    result = assess_dog_whistle_probe(_report(templates=[_template()]))
+def test_unused_existing_fname_unlocks_structural_new_row_capability_but_not_template_behavior():
+    template = _template()
+    result = assess_dog_whistle_probe(_report(
+        templates=[template],
+        linked_templates=[template],
+        item_command_templates=[template],
+    ))
 
     assert result["implementationReady"] is False
     assert result["itemAuthoring"]["writerSupportsNewItemRow"] is True
     assert result["itemAuthoring"]["writerSupportsExistingFNameRowClone"] is True
     assert result["itemAuthoring"]["writerSupportsScalarFStringRewrite"] is True
     assert result["itemAuthoring"]["writerSupportsNewTextEntry"] is True
+    assert result["itemAuthoring"]["itemCommandTemplateCandidates"] == 1
     assert "writer-cannot-clone-new-item-row-with-existing-fname" not in result["blockers"]
-    assert "battle-usable-item-template-unproved" in result["blockers"]
+    assert "item-command-template-unproved" not in result["blockers"]
+    assert "item-command-template-behavior-unvalidated" in result["blockers"]
     assert "item-name-description-field-linkage-unproved" in result["blockers"]
 
 
+def test_linked_ability_without_item_command_classification_does_not_prove_item_template():
+    template = _template()
+    result = assess_dog_whistle_probe(_report(
+        templates=[template],
+        linked_templates=[template],
+    ))
+
+    assert result["itemAuthoring"]["linkedBattleAbilityTemplateCandidates"] == 1
+    assert result["itemAuthoring"]["itemCommandTemplateCandidates"] == 0
+    assert "item-command-template-unproved" in result["blockers"]
+
+
 def test_missing_unused_whistle_fname_keeps_new_row_authoring_blocked():
-    result = assess_dog_whistle_probe(_report(unused_names=(), templates=[_template()]))
+    template = _template()
+    result = assess_dog_whistle_probe(_report(
+        unused_names=(),
+        templates=[template],
+        linked_templates=[template],
+        item_command_templates=[template],
+    ))
 
     assert result["itemAuthoring"]["writerSupportsNewItemRow"] is False
     assert "unused-whistle-item-fname-unresolved" in result["blockers"]
@@ -170,6 +197,24 @@ def test_full_reflected_retarget_pipeline_is_still_semantically_unvalidated():
     assert runtime["retargetAnchorsPresent"] is True
     assert "runtime-retarget-pipeline-unproved" not in result["blockers"]
     assert "runtime-retarget-semantics-unvalidated" in result["blockers"]
+
+
+def test_item_classifier_and_ability_execution_bridge_still_do_not_prove_player_menu_commit():
+    result = assess_dog_whistle_probe(_report(
+        native_hits=[
+            ("IsItem", 1),
+            ("RequestAIPCExecuteAbility", 1),
+        ],
+    ))
+
+    runtime = result["runtimeRetarget"]
+    assert runtime["itemClassifierCandidatePresent"] is True
+    assert runtime["abilityExecutionBridgeCandidatePresent"] is True
+    assert runtime["itemAbilityRuntimeBridgePresent"] is True
+    assert runtime["playerItemCommandCommitValidated"] is False
+    assert "runtime-item-ability-bridge-unproved" not in result["blockers"]
+    assert "runtime-item-ability-bridge-unvalidated" in result["blockers"]
+    assert "player-item-command-commit-hook-unresolved" in result["blockers"]
 
 
 def test_canine_coverage_counts_groups_and_battle_rows_without_claiming_validation():
