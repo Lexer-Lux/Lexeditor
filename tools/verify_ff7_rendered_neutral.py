@@ -187,7 +187,7 @@ def test_holistic_ff7_concept_views_and_new_game_data(self):
     self.assertEqual(self.page.get_by_role("img", name="Primary stat curve 0 curve preview").count(),1)
     self.assertEqual(self.page.get_by_label("Growth curve brackets").locator("input").count(),16)
     self.navigate("enemies")
-    self.assertEqual(self.page.get_by_label("Loot slot 1 method / chance method for Enemy0", exact=True).evaluate("e=>e.tagName"),"SELECT")
+    self.assertEqual(self.page.get_by_label("Loot slot 1 method / chance for Enemy0", exact=True).evaluate("e=>e.tagName"),"SELECT")
     self.assertEqual(self.page.get_by_label("Back-attack damage multiplier for Enemy0", exact=True).get_attribute("step"),"0.125")
     self.originals_unchanged()
 
