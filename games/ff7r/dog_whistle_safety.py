@@ -1,9 +1,9 @@
 """Fail-closed feasibility assessment for the FF7R Dog Whistle tweak.
 
 The installed-data probe deliberately discovers evidence without inventing an
-item contract or repurposing an existing consumable. Structural helpers now cover
+item/ability contract or repurposing existing content. Structural helpers cover
 several format operations that were previously impossible, so this classifier
-separates raw writer capability from the still-unproved gameplay/template links.
+separates writer capability from still-unproved gameplay/template/runtime links.
 """
 
 from __future__ import annotations
@@ -20,6 +20,9 @@ from .textresource_structural import TOP_LEVEL_TEXT_ENTRY_APPEND_SUPPORTED
 
 REQUIRED_RETARGET_NEEDLE = "SetTarget"
 AI_LOOKUP_NEEDLES = ("GetBattleAI", "GetBattleAIControllerFromID")
+ENEMY_ENUMERATION_NEEDLE = "GetEnemyMembersRef"
+BATTLE_CHARA_ID_NEEDLE = "GetBattleCharaSpec_DataTableID"
+ABILITY_DISPATCH_NEEDLE = "RequestUseAbility"
 AWARD_NEEDLES = ("Item_Add", "AddKeyItem")
 
 
@@ -33,6 +36,7 @@ def _needle_hit_count(native: dict[str, Any], needle: str) -> int:
 def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
     """Classify the current implementation route without authorizing mutation."""
     item = dict(report.get("item", {}))
+    battle_ability = dict(report.get("battleAbility", {}))
     chapter = dict(report.get("chapterProgression", {}))
     native = dict(report.get("native", {}))
     canine_rows = list(report.get("canineEnemies", ()))
@@ -42,10 +46,18 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
     whistle_names = list(item.get("whistleNameMapCandidates", ()))
     unused_whistle_names = list(item.get("unusedWhistleNameMapCandidates", ()))
     ability_templates = list(item.get("abilityBackedTemplateCandidates", ()))
+    linked_ability_templates = list(item.get("linkedBattleAbilityTemplateCandidates", ()))
+    unresolved_ability_templates = list(item.get("unresolvedAbilityTemplateCandidates", ()))
     item_properties = {str(value) for value in item.get("itemProperties", ())}
+
+    ability_whistle_rows = list(battle_ability.get("rowCandidates", ()))
+    ability_whistle_names = list(battle_ability.get("whistleNameMapCandidates", ()))
+    unused_ability_whistle_names = list(battle_ability.get("unusedWhistleNameMapCandidates", ()))
+    ability_properties = {str(value) for value in battle_ability.get("properties", ())}
+
     template_text_assets = sorted({
         str(text_row.get("textAsset", ""))
-        for template in ability_templates
+        for template in linked_ability_templates or ability_templates
         for text_row in template.get("resolvedText", ())
         if text_row.get("textAsset")
     })
@@ -58,24 +70,40 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         if isinstance(row.get("addKeyItems", []), list)
     ]
 
+    native_needles = (
+        REQUIRED_RETARGET_NEEDLE,
+        *AI_LOOKUP_NEEDLES,
+        ENEMY_ENUMERATION_NEEDLE,
+        BATTLE_CHARA_ID_NEEDLE,
+        ABILITY_DISPATCH_NEEDLE,
+        *AWARD_NEEDLES,
+    )
     native_hits = {
         needle: _needle_hit_count(native, needle)
-        for needle in (REQUIRED_RETARGET_NEEDLE, *AI_LOOKUP_NEEDLES, *AWARD_NEEDLES)
+        for needle in native_needles
     }
-    retarget_anchors_present = bool(
-        native_hits[REQUIRED_RETARGET_NEEDLE]
-        and any(native_hits[needle] for needle in AI_LOOKUP_NEEDLES)
+    ai_lookup_present = any(native_hits[needle] for needle in AI_LOOKUP_NEEDLES)
+    active_enemy_enumeration_present = bool(native_hits[ENEMY_ENUMERATION_NEEDLE])
+    battle_chara_id_lookup_present = bool(native_hits[BATTLE_CHARA_ID_NEEDLE])
+    set_target_present = bool(native_hits[REQUIRED_RETARGET_NEEDLE])
+    ability_dispatch_candidate_present = bool(native_hits[ABILITY_DISPATCH_NEEDLE])
+    retarget_pipeline_present = bool(
+        active_enemy_enumeration_present
+        and battle_chara_id_lookup_present
+        and ai_lookup_present
+        and set_target_present
     )
 
-    # The writer can clone an existing row without hijacking its ID only when an
-    # unused target FName already exists in Item's name map. It can also resize
-    # scalar FString IDs and append top-level localized text entries. None of
-    # those format capabilities proves which battle-usable row is the right
-    # template or which Item fields form the display/use contract.
+    # The writer can clone existing fixed-layout rows without hijacking their IDs
+    # only when unused target FNames already exist in each package's own name map.
     writer_supports_new_item_row = bool(
         EXISTING_FNAME_ROW_CLONE_SUPPORTED
         and SCALAR_FSTRING_REPLACE_SUPPORTED
         and unused_whistle_names
+    )
+    writer_supports_new_ability_row = bool(
+        EXISTING_FNAME_ROW_CLONE_SUPPORTED
+        and unused_ability_whistle_names
     )
     writer_supports_new_text_entry = TOP_LEVEL_TEXT_ENTRY_APPEND_SUPPORTED
     writer_supports_array_append = FIXED_WIDTH_ARRAY_INSERT_SUPPORTED
@@ -99,8 +127,24 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         blockers.append("battle-usable-item-template-unproved")
     if not ability_templates:
         blockers.append("ability-backed-item-template-set-unresolved")
+    if ability_templates and not linked_ability_templates:
+        blockers.append("battle-ability-template-linkage-unresolved")
+    if unresolved_ability_templates:
+        blockers.append("item-ability-links-partially-unresolved")
     if "AbilityID" not in item_properties:
         blockers.append("item-ability-field-unresolved")
+
+    if ability_whistle_rows:
+        blockers.append("existing-whistle-ability-row-not-proved-safe-to-repurpose")
+    if not unused_ability_whistle_names:
+        blockers.append("unused-whistle-battleability-fname-unresolved")
+    if not writer_supports_new_ability_row:
+        blockers.append("writer-cannot-clone-new-battleability-row-with-existing-fname")
+    else:
+        blockers.append("battle-ability-template-behavior-unproved")
+    if battle_ability and not {"CommandType", "CommandTargetType"}.issubset(ability_properties):
+        blockers.append("battle-ability-command-contract-incomplete")
+
     if not writer_supports_new_text_entry:
         blockers.append("writer-cannot-add-text-entry")
     if not template_text_assets:
@@ -117,10 +161,25 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
     else:
         blockers.append("chapter4-once-only-award-semantics-unvalidated")
 
-    if not retarget_anchors_present:
-        blockers.append("runtime-retarget-anchors-unproved")
+    if not active_enemy_enumeration_present:
+        blockers.append("runtime-enemy-enumeration-unresolved")
+    else:
+        blockers.append("runtime-enemy-enumeration-unvalidated")
+    if not battle_chara_id_lookup_present:
+        blockers.append("runtime-battlechara-id-lookup-unresolved")
+    else:
+        blockers.append("runtime-battlechara-id-lookup-unvalidated")
+    if not retarget_pipeline_present:
+        blockers.append("runtime-retarget-pipeline-unproved")
     else:
         blockers.append("runtime-retarget-semantics-unvalidated")
+    if not ability_dispatch_candidate_present:
+        blockers.append("item-use-dispatch-path-unresolved")
+    else:
+        blockers.append("item-use-dispatch-path-unvalidated")
+    blockers.append("whistle-user-character-mapping-unvalidated")
+    blockers.append("scripted-boss-retarget-exceptions-unvalidated")
+
     if not canine_rows:
         blockers.append("canine-enemy-set-unresolved")
     else:
@@ -134,11 +193,23 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             "whistleNameMapCandidates": whistle_names,
             "unusedWhistleNameMapCandidates": unused_whistle_names,
             "abilityBackedTemplateCandidates": len(ability_templates),
+            "linkedBattleAbilityTemplateCandidates": len(linked_ability_templates),
+            "unresolvedAbilityTemplateCandidates": len(unresolved_ability_templates),
             "templateTextResourceCandidates": template_text_assets,
             "writerSupportsNewItemRow": writer_supports_new_item_row,
             "writerSupportsExistingFNameRowClone": EXISTING_FNAME_ROW_CLONE_SUPPORTED,
             "writerSupportsScalarFStringRewrite": SCALAR_FSTRING_REPLACE_SUPPORTED,
             "writerSupportsNewTextEntry": writer_supports_new_text_entry,
+            "safeExistingRowProved": False,
+        },
+        "abilityAuthoring": {
+            "existingWhistleAbilityRowCandidates": len(ability_whistle_rows),
+            "whistleNameMapCandidates": ability_whistle_names,
+            "unusedWhistleNameMapCandidates": unused_ability_whistle_names,
+            "writerSupportsNewAbilityRow": writer_supports_new_ability_row,
+            "commandContractFieldsPresent": sorted(
+                {"CommandType", "CommandTargetType"} & ability_properties
+            ),
             "safeExistingRowProved": False,
         },
         "chapterAward": {
@@ -150,7 +221,15 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         },
         "runtimeRetarget": {
             "needleHits": native_hits,
-            "retargetAnchorsPresent": retarget_anchors_present,
+            "activeEnemyEnumerationCandidatePresent": active_enemy_enumeration_present,
+            "battleCharaIdLookupCandidatePresent": battle_chara_id_lookup_present,
+            "aiLookupCandidatePresent": ai_lookup_present,
+            "setTargetCandidatePresent": set_target_present,
+            "retargetPipelinePresent": retarget_pipeline_present,
+            "retargetAnchorsPresent": retarget_pipeline_present,
+            "itemUseDispatchCandidatePresent": ability_dispatch_candidate_present,
+            "activeEnemyEnumeration": "UEndBattleAPI::GetEnemyMembersRef(TArray<AEndCharacter*>&)",
+            "battleCharaIdLookup": "UEndBattleAPI::GetBattleCharaSpec_DataTableID(AEndCharacter*)",
             "requiredMethod": "AEndBattleAIController::SetTarget(AEndCharacter*)",
         },
         "canineCoverage": {
@@ -159,10 +238,12 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             "installedBattleValidationRequired": True,
         },
         "notes": [
-            "An existing whistle-like Item row is never permission to hijack that row; the safe new-row path requires an UNUSED whistle-like FName already in the Item package name map.",
-            "The writer can clone a proved Item template, resize scalar FString IDs, and append new localized top-level text IDs without expanding package name maps. Exact Item template/display/use fields still require installed evidence.",
-            "Fixed-width array insertion can append the eventual new Item row tag to a proved Chapter 4 AddKeyItem_Array without replacing another reward; exact Chapter 4 ownership and once-only semantics still require validation.",
-            "SetTarget is the narrow retarget primitive, but the exact active-enemy enumeration/user-character mapping and scripted/boss exceptions remain unvalidated.",
+            "An existing whistle-like Item or BattleAbility row is never permission to hijack it. Safe new-row paths require unused whistle-like FNames independently in each package name map.",
+            "Item.AbilityID must resolve to an installed BattleAbility row before that template contributes executable-path evidence; unresolved IDs remain explicit blockers.",
+            "The writer can clone proved Item/BattleAbility templates, resize scalar FString IDs, and append localized top-level text IDs without expanding package name maps. Exact template behavior and item-use interception still require installed evidence.",
+            "Fixed-width array insertion can append the eventual new Item row tag to a proved Chapter 4 AddKeyItem_Array without replacing another reward; exact once-only semantics still require validation.",
+            "The reflected retarget route is now explicit: GetEnemyMembersRef -> GetBattleCharaSpec_DataTableID -> canine set filter -> AI lookup -> SetTarget(user). Every callsite/ABI and user-character mapping still requires installed validation before native mutation.",
+            "RequestUseAbility is a useful ability-dispatch lead but is not assumed to be the player Item command dispatch path.",
             "The assessment is read-only and cannot make the Dog Whistle implementation ready by itself.",
         ],
     }
