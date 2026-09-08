@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .atb_tweaks import load_atb_config
 from .runtime_config import (
     deploy_runtime as deploy_runtime_files,
     load_runtime_config,
@@ -34,6 +33,10 @@ def requested_runtime_features(project_root: Path) -> list[str]:
         requested.append("hpRebalance")
     if config["betterSprint"]["enabled"]:
         requested.append("betterSprint")
+
+    # Local import avoids archive -> runtime_dataobject -> runtime_state ->
+    # atb_tweaks -> archive during module initialization.
+    from .atb_tweaks import load_atb_config
 
     atb = load_atb_config(project_root)
     if atb["enabled"] and (
@@ -68,8 +71,6 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
     )
     manifest_requested = _requested_manifest_hooks_valid(project_root, requested)
     deployment_candidate_active = bool(base.get("active", False))
-    # `runtimeReady` now means *every enabled runtime feature*, including ATB's
-    # runtime-only mechanics, is covered by the manifest before deployment.
     runtime_ready = bool(base["projectDllPresent"] and base["loaderCandidatePresent"]
                          and base["buildSupported"] and manifest_requested)
     active = bool(
@@ -101,7 +102,6 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
 def deploy_runtime(game_root: Path, project_root: Path) -> dict:
     requested = requested_runtime_features(project_root)
     if not _requested_manifest_hooks_valid(project_root, requested):
-        missing = []
         manifest = load_runtime_manifest(project_root)
         hooks = manifest["hooks"] if manifest else {}
         missing = [name for name in requested if not hooks.get(name, False)]
