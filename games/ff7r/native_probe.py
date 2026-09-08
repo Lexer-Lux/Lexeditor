@@ -1,8 +1,8 @@
 """Read-only current-build probe for FF7R native runtime hook research.
 
-No fixed executable offsets live here.  The probe parses the installed PE image,
+No fixed executable offsets live here. The probe parses the installed PE image,
 finds useful literal names when Square left them in the binary, and reports
-common x86-64 RIP-relative LEA references to those strings.  Results are
+common x86-64 RIP-relative LEA references to those strings. Results are
 research evidence/candidates only; they are never treated as a safe hook until a
 specific runtime signature is validated.
 """
@@ -25,6 +25,8 @@ DEFAULT_NEEDLES = (
     "trgCmn_NaviMap_Update_On",
     "trgCmn_NaviMap_Update_Off",
     "BPSetPlayerHPMax",
+    "DashRootMotionTranslationScale",
+    "RunToDashBlendInputThreshold",
 )
 MAX_HITS_PER_ENCODING = 64
 MAX_XREFS_PER_STRING = 64
@@ -177,7 +179,7 @@ def _lea_rip_xrefs(image: PEImage, target_rva: int) -> list[dict]:
         return []
     raw = image.data[text.raw_offset:text.raw_offset + text.raw_size]
     results = []
-    # 4? 8D /r, mod=00 r/m=101.  This deliberately recognizes only the very
+    # 4? 8D /r, mod=00 r/m=101. This deliberately recognizes only the very
     # common RIP-relative LEA form instead of pretending to be an x86 decoder.
     for index in range(max(0, len(raw) - 7)):
         rex = raw[index]
