@@ -141,9 +141,27 @@ def test_chapter_reward_requires_unique_chapter4_owner_and_item_row_correlation(
 
     assert result["chapterAward"]["dataAwardPathPlausible"] is True
     assert result["chapterAward"]["chapter4CandidateCount"] == 1
+    assert result["chapterAward"]["chapter4AwardArrayCandidateCount"] == 1
     assert result["chapterAward"]["writerSupportsArrayAppend"] is True
     assert "chapter-reward-contract-unproved" not in result["blockers"]
     assert "chapter4-once-only-award-semantics-unvalidated" in result["blockers"]
+
+
+def test_chapter_reward_missing_row_award_array_fails_closed():
+    chapter = _chapter4()
+    chapter.pop("addKeyItems")
+    result = assess_dog_whistle_probe(_report(
+        templates=[_template()],
+        key_items=["key_item_01"],
+        chapter4=[chapter],
+    ))
+
+    assert result["chapterAward"]["chapter4CandidateCount"] == 1
+    assert result["chapterAward"]["chapter4AwardArrayCandidateCount"] == 0
+    assert result["chapterAward"]["dataAwardPathPlausible"] is False
+    assert "chapter4-award-array-unresolved" in result["blockers"]
+    assert "chapter-reward-contract-unproved" in result["blockers"]
+    assert "chapter4-once-only-award-semantics-unvalidated" not in result["blockers"]
 
 
 def test_ambiguous_chapter4_candidates_fail_closed():
