@@ -128,9 +128,9 @@ ConfigLoadResult load_config() {
     if (!input) {
         return {{}, "LexeditorFF7RRuntime.json is missing or unreadable"};
     }
-    const std::string text(
-        std::istreambuf_iterator<char>(input),
-        std::istreambuf_iterator<char>());
+    const std::string text{
+        std::istreambuf_iterator<char>{input},
+        std::istreambuf_iterator<char>{}};
     if (!input.eof() && input.fail()) {
         return {{}, "LexeditorFF7RRuntime.json could not be read completely"};
     }
