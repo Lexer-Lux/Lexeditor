@@ -8,7 +8,7 @@ separates writer capability from still-unproved gameplay/template/runtime links.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Iterable
 
 from .dataobject_structural import (
     EXISTING_FNAME_ROW_CLONE_SUPPORTED,
@@ -37,6 +37,99 @@ def _needle_hit_count(native: dict[str, Any], needle: str) -> int:
         if str(row.get("needle", "")) == needle:
             return len(row.get("hits", ()))
     return 0
+
+
+def _needle_function_evidence(native: dict[str, Any], needle: str) -> dict[str, list[int]]:
+    """Return only exact .pdata string owners and their bounded one-hop targets."""
+    direct: set[int] = set()
+    next_hops: set[int] = set()
+    for row in native.get("needles", ()):
+        if str(row.get("needle", "")) != needle:
+            continue
+        for hit in row.get("hits", ()):
+            for xref in hit.get("leaRipXrefs", ()):
+                if xref.get("candidateFunctionSource") != "pdata":
+                    continue
+                function_rva = xref.get("candidateFunctionRva")
+                if function_rva is not None:
+                    direct.add(int(function_rva))
+                for ref in (xref.get("candidateFunctionCodeRefs") or {}).get("refs", ()):
+                    target = ref.get("targetFunctionRva")
+                    if target is not None:
+                        next_hops.add(int(target))
+    return {
+        "directPdataFunctions": sorted(direct),
+        "nextHopPdataFunctions": sorted(next_hops),
+        "expandedPdataFunctions": sorted(direct | next_hops),
+    }
+
+
+def _function_evidence(native: dict[str, Any], needles: Iterable[str]) -> dict[str, dict[str, list[int]]]:
+    return {
+        needle: _needle_function_evidence(native, needle)
+        for needle in needles
+    }
+
+
+def _function_present(evidence: dict[str, dict[str, list[int]]], needles: Iterable[str]) -> bool:
+    return any(
+        evidence.get(needle, {}).get("expandedPdataFunctions")
+        for needle in needles
+    )
+
+
+def _function_clusters(evidence: dict[str, dict[str, list[int]]]) -> list[dict[str, Any]]:
+    """Keep reflected registration collisions visible instead of treating them as hooks."""
+    families = {
+        "enemy-enumeration": (ENEMY_ENUMERATION_NEEDLE,),
+        "battlechara-id": (BATTLE_CHARA_ID_NEEDLE,),
+        "ai-lookup": AI_LOOKUP_NEEDLES,
+        "retarget": (REQUIRED_RETARGET_NEEDLE,),
+        "item-classifier": (ITEM_CLASSIFIER_NEEDLE,),
+        "ability-execution": ABILITY_EXECUTION_NEEDLES,
+        "award": AWARD_NEEDLES,
+    }
+    family_by_needle = {
+        needle: family
+        for family, needles in families.items()
+        for needle in needles
+    }
+    rows: dict[int, dict[str, Any]] = {}
+    for needle, needle_evidence in evidence.items():
+        family = family_by_needle.get(needle)
+        if family is None:
+            continue
+        for key, destination in (
+            ("directPdataFunctions", "directNeedles"),
+            ("nextHopPdataFunctions", "nextHopNeedles"),
+        ):
+            for raw_rva in needle_evidence.get(key, ()):
+                rva = int(raw_rva)
+                row = rows.setdefault(rva, {
+                    "functionRva": rva,
+                    "families": set(),
+                    "directNeedles": set(),
+                    "nextHopNeedles": set(),
+                })
+                row["families"].add(family)
+                row[destination].add(needle)
+
+    result = []
+    for rva in sorted(rows):
+        row = rows[rva]
+        families_for_row = sorted(row["families"])
+        direct = sorted(row["directNeedles"])
+        next_hops = sorted(row["nextHopNeedles"])
+        result.append({
+            "functionRva": rva,
+            "families": families_for_row,
+            "familyCount": len(families_for_row),
+            "directNeedles": direct,
+            "nextHopNeedles": next_hops,
+            "crossFamily": len(families_for_row) >= 2,
+            "registrationCollisionRisk": len(direct) >= 2,
+        })
+    return result
 
 
 def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
@@ -93,6 +186,9 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         needle: _needle_hit_count(native, needle)
         for needle in native_needles
     }
+    native_functions = _function_evidence(native, native_needles)
+    function_clusters = _function_clusters(native_functions)
+
     ai_lookup_present = any(native_hits[needle] for needle in AI_LOOKUP_NEEDLES)
     active_enemy_enumeration_present = bool(native_hits[ENEMY_ENUMERATION_NEEDLE])
     battle_chara_id_lookup_present = bool(native_hits[BATTLE_CHARA_ID_NEEDLE])
@@ -109,6 +205,27 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         and battle_chara_id_lookup_present
         and ai_lookup_present
         and set_target_present
+    )
+
+    active_enemy_enumeration_function_present = _function_present(
+        native_functions, (ENEMY_ENUMERATION_NEEDLE,))
+    battle_chara_id_lookup_function_present = _function_present(
+        native_functions, (BATTLE_CHARA_ID_NEEDLE,))
+    ai_lookup_function_present = _function_present(native_functions, AI_LOOKUP_NEEDLES)
+    set_target_function_present = _function_present(
+        native_functions, (REQUIRED_RETARGET_NEEDLE,))
+    retarget_function_evidence_complete = bool(
+        active_enemy_enumeration_function_present
+        and battle_chara_id_lookup_function_present
+        and ai_lookup_function_present
+        and set_target_function_present
+    )
+    item_classifier_function_present = _function_present(
+        native_functions, (ITEM_CLASSIFIER_NEEDLE,))
+    ability_execution_function_present = _function_present(
+        native_functions, ABILITY_EXECUTION_NEEDLES)
+    item_ability_function_evidence_complete = bool(
+        item_classifier_function_present and ability_execution_function_present
     )
 
     # The writer can clone existing fixed-layout rows without hijacking their IDs
@@ -186,26 +303,42 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         blockers.append("runtime-enemy-enumeration-unresolved")
     else:
         blockers.append("runtime-enemy-enumeration-unvalidated")
+        if not active_enemy_enumeration_function_present:
+            blockers.append("runtime-enemy-enumeration-function-unresolved")
     if not battle_chara_id_lookup_present:
         blockers.append("runtime-battlechara-id-lookup-unresolved")
     else:
         blockers.append("runtime-battlechara-id-lookup-unvalidated")
+        if not battle_chara_id_lookup_function_present:
+            blockers.append("runtime-battlechara-id-function-unresolved")
     if not retarget_pipeline_present:
         blockers.append("runtime-retarget-pipeline-unproved")
     else:
         blockers.append("runtime-retarget-semantics-unvalidated")
+        if not retarget_function_evidence_complete:
+            blockers.append("runtime-retarget-function-evidence-incomplete")
+        else:
+            blockers.append("runtime-retarget-function-path-unvalidated")
     if not item_classifier_present:
         blockers.append("runtime-item-classifier-unresolved")
     else:
         blockers.append("runtime-item-classifier-unvalidated")
+        if not item_classifier_function_present:
+            blockers.append("runtime-item-classifier-function-unresolved")
     if not ability_execution_bridge_present:
         blockers.append("runtime-ability-execution-bridge-unresolved")
     else:
         blockers.append("runtime-ability-execution-bridge-unvalidated")
+        if not ability_execution_function_present:
+            blockers.append("runtime-ability-execution-function-unresolved")
     if not item_ability_runtime_bridge_present:
         blockers.append("runtime-item-ability-bridge-unproved")
     else:
         blockers.append("runtime-item-ability-bridge-unvalidated")
+        if not item_ability_function_evidence_complete:
+            blockers.append("runtime-item-ability-function-evidence-incomplete")
+        else:
+            blockers.append("runtime-item-ability-function-path-unvalidated")
     # None of the reflected execution helpers proves where a human-confirmed
     # Items-menu command commits. Keep that as an independent hard blocker so
     # AI/script-only ability calls cannot accidentally authorize the feature.
@@ -256,15 +389,25 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         },
         "runtimeRetarget": {
             "needleHits": native_hits,
+            "nativeFunctionEvidence": native_functions,
+            "nativeFunctionClusters": function_clusters,
             "activeEnemyEnumerationCandidatePresent": active_enemy_enumeration_present,
+            "activeEnemyEnumerationFunctionCandidatePresent": active_enemy_enumeration_function_present,
             "battleCharaIdLookupCandidatePresent": battle_chara_id_lookup_present,
+            "battleCharaIdLookupFunctionCandidatePresent": battle_chara_id_lookup_function_present,
             "aiLookupCandidatePresent": ai_lookup_present,
+            "aiLookupFunctionCandidatePresent": ai_lookup_function_present,
             "setTargetCandidatePresent": set_target_present,
+            "setTargetFunctionCandidatePresent": set_target_function_present,
             "retargetPipelinePresent": retarget_pipeline_present,
+            "retargetFunctionEvidenceComplete": retarget_function_evidence_complete,
             "retargetAnchorsPresent": retarget_pipeline_present,
             "itemClassifierCandidatePresent": item_classifier_present,
+            "itemClassifierFunctionCandidatePresent": item_classifier_function_present,
             "abilityExecutionBridgeCandidatePresent": ability_execution_bridge_present,
+            "abilityExecutionFunctionCandidatePresent": ability_execution_function_present,
             "itemAbilityRuntimeBridgePresent": item_ability_runtime_bridge_present,
+            "itemAbilityFunctionEvidenceComplete": item_ability_function_evidence_complete,
             "playerItemCommandCommitValidated": False,
             "activeEnemyEnumeration": "UEndBattleAPI::GetEnemyMembersRef(TArray<AEndCharacter*>&)",
             "battleCharaIdLookup": "UEndBattleAPI::GetBattleCharaSpec_DataTableID(AEndCharacter*)",
@@ -283,8 +426,9 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             "The writer can clone proved Item/BattleAbility templates, resize scalar FString IDs, and append localized top-level text IDs without expanding package name maps. Exact template behavior and item-use interception still require installed evidence.",
             "A Chapter 4 candidate counts as reward evidence only when that row explicitly exposes an addKeyItems list; a missing row field is not treated as an empty award array.",
             "Fixed-width array insertion can append the eventual new Item row tag to a proved Chapter 4 AddKeyItem_Array without replacing another reward; exact once-only semantics still require validation.",
-            "The reflected retarget route is explicit: GetEnemyMembersRef -> GetBattleCharaSpec_DataTableID -> canine set filter -> AI lookup -> SetTarget(user). Every callsite/ABI and user-character mapping still requires installed validation before native mutation.",
-            "IsItem plus the reflected ability execution helpers establishes a narrower item/AbilityID bridge, but AI/script execution is not permission to hook the human Items-menu commit path.",
+            "The reflected retarget route is explicit: GetEnemyMembersRef -> GetBattleCharaSpec_DataTableID -> canine set filter -> AI lookup -> SetTarget(user). String presence can establish anchors, but exact .pdata function evidence is now tracked independently and still cannot prove call order/ABI.",
+            "Only exact .pdata owners and bounded one-hop targets contribute function evidence. Multi-name direct owners are exposed as registrationCollisionRisk rather than being treated as stronger hooks.",
+            "IsItem plus the reflected ability execution helpers establishes a narrower item/AbilityID bridge, but AI/script execution is not permission to hook the human Items-menu commit path even when exact function evidence exists.",
             "The assessment is read-only and cannot make the Dog Whistle implementation ready by itself.",
         ],
     }
