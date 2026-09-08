@@ -4,7 +4,7 @@ from games.ff7r.unscanned_name_probe import (
 )
 
 
-def _asset(name, *strings):
+def _asset(name, *strings, objects=()):
     return {
         "asset": name,
         "files": [{
@@ -14,6 +14,7 @@ def _asset(name, *strings):
                 {"encoding": "ascii", "offset": index * 16, "text": value}
                 for index, value in enumerate(strings)
             ],
+            "resolvedExports": list(objects),
         }],
     }
 
@@ -27,6 +28,18 @@ def _native(**counts):
     }
 
 
+def _text_object(name, outer, *, class_name="TextBlock"):
+    return {
+        "index": 0,
+        "packageIndex": 1,
+        "objectName": name,
+        "objectPath": f"{outer}.{name}",
+        "outerPath": outer,
+        "className": class_name,
+        "classPath": f"/Script/UMG.{class_name}",
+    }
+
+
 def test_presentation_asset_requires_dedicated_battle_or_target_anchor():
     ranked = rank_unscanned_name_assets([
         _asset("UI/EnemyBook", "EnemyBookID", "Text", "Name"),
@@ -35,6 +48,27 @@ def test_presentation_asset_requires_dedicated_battle_or_target_anchor():
 
     assert [row["asset"] for row in ranked] == ["UI/Battle"]
     assert ranked[0]["strongPresentationCandidate"] is True
+
+
+def test_resolved_battle_and_target_text_children_strengthen_each_surface_independently():
+    ranked = rank_unscanned_name_assets([
+        _asset(
+            "UI/BattleEnemyStatusWidget",
+            objects=[_text_object("EnemyNameText", "WidgetTree.BattleEnemyStatusWidget")],
+        ),
+        _asset(
+            "UI/BattleTargetNewWidget",
+            objects=[_text_object("TargetNameLabel", "WidgetTree.BattleTargetNewWidget")],
+        ),
+    ])
+
+    battle = next(row for row in ranked if row["asset"].endswith("BattleEnemyStatusWidget"))
+    target = next(row for row in ranked if row["asset"].endswith("BattleTargetNewWidget"))
+    assert battle["resolvedBattleNameOwnerEvidence"] is True
+    assert battle["resolvedBattleNameChildren"][0]["objectName"] == "EnemyNameText"
+    assert battle["resolvedAtbTargetOwnerEvidence"] is False
+    assert target["resolvedAtbTargetOwnerEvidence"] is True
+    assert target["resolvedAtbTargetNameChildren"][0]["objectName"] == "TargetNameLabel"
 
 
 def test_view_state_and_libra_do_not_count_as_assessed_state_query():
@@ -77,7 +111,44 @@ def test_both_requested_presentation_paths_are_tracked_independently():
 
     assert result["presentation"]["battleNamePathCandidate"] is True
     assert result["presentation"]["atbTargetPathCandidate"] is False
+    assert "battle-name-text-child-unresolved" in result["blockers"]
     assert "atb-target-presentation-path-unresolved" in result["blockers"]
+
+
+def test_resolved_children_clear_only_presentation_child_blockers_not_assessed_state():
+    ranked = rank_unscanned_name_assets([
+        _asset(
+            "UI/BattleEnemyStatusWidget",
+            objects=[_text_object("EnemyNameText", "WidgetTree.BattleEnemyStatusWidget")],
+        ),
+        _asset(
+            "UI/BattleTargetWidget",
+            objects=[_text_object("TargetNameText", "WidgetTree.BattleTargetWidget")],
+        ),
+    ])
+    result = assess_unscanned_name_evidence(
+        native=_native(EnemyBookID=1),
+        candidates=ranked,
+    )
+
+    assert result["presentation"]["battleNameTextChildCandidate"] is True
+    assert result["presentation"]["atbTargetNameTextChildCandidate"] is True
+    assert result["presentation"]["resolvedBattleOwnerCandidates"] == 1
+    assert result["presentation"]["resolvedAtbTargetOwnerCandidates"] == 1
+    assert "battle-name-text-child-unresolved" not in result["blockers"]
+    assert "atb-target-name-text-child-unresolved" not in result["blockers"]
+    assert "assessed-state-query-not-found" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_enemybook_id_plus_is_reported_as_secondary_identity_not_save_state():
+    result = assess_unscanned_name_evidence(
+        native=_native(EnemyBookID=1, EnemyBookIDPlus=1),
+        candidates=[],
+    )
+    assert result["enemyBookLink"]["authoritativeAuthoredField"] == "BattleCharaSpec.EnemyBookID"
+    assert result["enemyBookLink"]["secondaryAuthoredField"] == "BattleCharaSpec.EnemyBookIDPlus"
+    assert result["assessedState"]["validated"] is False
 
 
 def test_scan_errors_always_block():
