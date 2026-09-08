@@ -40,8 +40,6 @@ class FormulaeReworkTests(unittest.TestCase):
             "spell_healing": "healing_rework",
             "physical_accuracy": "luck_accuracy",
         })
-        # Pin the native ownership too: a metadata-only row must never be able
-        # to make the feature look complete.
         self.assertTrue(healing_rework.build_hext(True))
         self.assertTrue(luck_accuracy.build_hext(True))
         self.assertFalse(formulae_rework.available())
@@ -73,12 +71,23 @@ class FormulaeReworkTests(unittest.TestCase):
         self.assertIn("stored-rate", row["blocker"])
 
     def test_editor_does_not_hard_code_a_fake_complete_formula_inventory(self):
-        # Once integration lands, every row must be supplied by settings data;
-        # this assertion prevents the old misleading sentence from returning.
         editor = (Path(__file__).resolve().parents[1] / "games/ff8/editor.html").read_text(
             encoding="utf-8"
         )
         self.assertNotIn("formula cards below define the complete requested rework", editor)
+
+    def test_settings_module_alias_cannot_be_shadowed_by_boolean(self):
+        settings = (Path(__file__).resolve().parents[1] / "games/ff8/gameplay_settings.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "from . import formulae_rework as formulae_rework_contract",
+            settings,
+        )
+        self.assertIn("formulae_rework_contract.available()", settings)
+        self.assertIn("formulae_rework_contract.rows()", settings)
+        self.assertNotIn("formulae_rework.available()", settings)
+        self.assertNotIn("formulae_rework.rows()", settings)
 
 
 if __name__ == "__main__":
