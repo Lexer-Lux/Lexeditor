@@ -82,14 +82,17 @@ def build_report(
         raise ValueError("use either --pair or --group experiments, not both")
     if control_specs and not (pair_specs or group_specs):
         raise ValueError("--control requires --pair or --group Assess experiments")
-    if bit_signatures and not (group_specs and control_specs):
-        raise ValueError("--bit-signatures requires --group experiments with --control")
+    # Holdout mode is the more specific contract. Validate it before the generic
+    # bit-signature precondition so malformed holdout invocations report the
+    # option that actually made the request invalid.
     if holdout_group_specs and not group_specs:
         raise ValueError("--holdout-group requires --group discovery experiments")
     if holdout_group_specs and not control_specs:
         raise ValueError("--holdout-group requires --control")
     if holdout_group_specs and not bit_signatures:
         raise ValueError("--holdout-group requires --bit-signatures")
+    if bit_signatures and not (group_specs and control_specs):
+        raise ValueError("--bit-signatures requires --group experiments with --control")
 
     if pair_specs:
         pairs = [
