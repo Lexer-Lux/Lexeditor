@@ -6,8 +6,14 @@ old='''            ("initialInventory", 17, "amount", 42, 3, 0x4A8 + 17 * 2, 2),
 if old in text:
     text=text.replace(old,'',1)
 old='''            expected = {"characters", "growthCurves", "growthBonuses", "characterAI"} if section == 2 else {"characters"}\n'''
-new='''            expected = {"characters", "growthCurves", "growthBonuses", "characterAI", "magicOrder"} if section == 2 else {"characters"}\n'''
+intermediate='''            expected = {"characters", "growthCurves", "growthBonuses", "characterAI", "magicOrder"} if section == 2 else {"characters"}\n'''
+new='''            expected = ({"characters", "growthCurves", "growthBonuses", "characterAI", "magicOrder"} if section == 2 else
+                        {"characters", "initialState", "initialInventory", "initialMateria", "stolenMateria"})\n'''
 if new not in text:
-    if old not in text: raise SystemExit('truncated-section expectation insertion point changed')
-    text=text.replace(old,new,1)
+    if intermediate in text:
+        text=text.replace(intermediate,new,1)
+    elif old in text:
+        text=text.replace(old,new,1)
+    else:
+        raise SystemExit('truncated-section expectation insertion point changed')
 path.write_text(text,encoding='utf-8')
