@@ -67,23 +67,38 @@ int main() {
 
     // Repeated key-down events do not reset the original press timestamp.
     MinimapToggleState repeat;
+    observeMinimapVisibility(repeat, true);
     minimapButtonDown(repeat, 6000);
     minimapButtonDown(repeat, 6200);
     const auto repeatHold = minimapButtonTick(repeat, 6350, threshold);
     assert(repeatHold.kind == MinimapGestureKind::applyMinimapVisibility);
 
+    // A first hold without any authoritative visibility observation is consumed
+    // but cannot guess which direction to toggle. It remains uninitialized until
+    // a live state is observed, after which a later hold works normally.
+    MinimapToggleState unknown;
+    minimapButtonDown(unknown, 6500);
+    assert(minimapButtonTick(unknown, 6850, threshold).kind == MinimapGestureKind::none);
+    assert(!unknown.playerChoiceInitialized);
+    assert(minimapButtonUp(unknown, 6900, threshold).kind == MinimapGestureKind::none);
+    observeMinimapVisibility(unknown, false);
+    minimapButtonDown(unknown, 7000);
+    const auto afterObservation = minimapButtonTick(unknown, 7350, threshold);
+    assert(afterObservation.kind == MinimapGestureKind::applyMinimapVisibility);
+    assert(afterObservation.minimapVisible);
+
     // Invalid thresholds and a regressing clock fail closed without opening the
     // full map or mutating the remembered preference.
     MinimapToggleState invalid;
-    minimapButtonDown(invalid, 7000);
-    assert(minimapButtonUp(invalid, 7100, 100).kind == MinimapGestureKind::none);
+    minimapButtonDown(invalid, 8000);
+    assert(minimapButtonUp(invalid, 8100, 100).kind == MinimapGestureKind::none);
     assert(!invalid.buttonDown);
 
     MinimapToggleState regressing;
-    minimapButtonDown(regressing, 8000);
-    assert(minimapButtonTick(regressing, 7999, threshold).kind == MinimapGestureKind::none);
+    minimapButtonDown(regressing, 9000);
+    assert(minimapButtonTick(regressing, 8999, threshold).kind == MinimapGestureKind::none);
     assert(!regressing.buttonDown);
-    assert(minimapButtonUp(regressing, 8100, threshold).kind == MinimapGestureKind::none);
+    assert(minimapButtonUp(regressing, 9100, threshold).kind == MinimapGestureKind::none);
 
     assert(validHoldThreshold(150));
     assert(validHoldThreshold(1500));
