@@ -55,3 +55,31 @@ contract and current FF7R byte signatures around map control and raw-input
 initialization. Lexeditor uses those signatures only as compatibility probes. It
 does not copy the hook implementation and does not treat those known addresses as
 the cutscene-speed or minimap-toggle hook sites required by #413/#414.
+
+## FinalFantasy7Remake-Menu interoperability research
+
+The guarded HP runtime implementation is informed by public interoperability
+information in xCENTx's **FinalFantasy7Remake-Menu** repository:
+
+- https://github.com/xCENTx/FinalFantasy7Remake-Menu
+- No repository license file was present when this reference was recorded.
+
+Lexeditor does not copy or bundle that project's implementation. It uses factual
+process-layout information (the `AGameState` / `APlayerStats` field layout and a
+RIP-relative game-state lookup instruction shape) as a research reference, then
+independently validates the installed executable at runtime. No fixed RVA from
+that project is shipped or trusted.
+
+## EndGameProj generated Remake API research
+
+Public generated Remake headers in narknon's **EndGameProj** are used only as
+interoperability/research evidence for reflected type, property, enum and function
+names such as `EGameSpeed_CUT`, `AEndGameState::SetGameSpeed`, ATB DataObject
+fields, and menu widget settings:
+
+- https://github.com/narknon/EndGameProj
+
+These generated declarations are not bundled into Lexeditor and are not treated
+as current installed-build offsets or validated hook addresses. Installed-game
+probes must still establish the concrete target before a runtime mutation can be
+enabled.
