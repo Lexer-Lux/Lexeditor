@@ -48,7 +48,7 @@ EQUIPABLE = (
     (0x0010, "Red XIII"), (0x0020, "Yuffie"), (0x0040, "Cait Sith"),
     (0x0080, "Vincent"), (0x0100, "Cid"), (0x0200, "Young Cloud"), (0x0400, "Sephiroth"),
 )
-CHARACTER_FLAGS = ((0x10, "Sadness"), (0x20, "Fury"))
+CHARACTER_FLAGS = ((0x00, "None"), (0x10, "Sadness"), (0x20, "Fury"))
 LEARNED_LIMITS = (
     (0x0001, "Limit 1-1"), (0x0002, "Limit 1-2"), (0x0008, "Limit 2-1"),
     (0x0010, "Limit 2-2"), (0x0040, "Limit 3-1"), (0x0080, "Limit 3-2"),
@@ -298,7 +298,7 @@ CHARACTERS = {
     "weaponId": reference("weapons", label="Starting weapon", help="Weapon equipped when this initialization record is used."),
     "armorId": reference("armor", label="Starting armor", help="Armor equipped when this initialization record is used."),
     "accessoryId": reference("accessories", label="Starting accessory", empty=255, help="Accessory equipped when this initialization record is used; 255 means none."),
-    "characterFlags": _field(label="Starting battle mood", dataType="flags", flags=flags(*CHARACTER_FLAGS), group="Starting status", help="Initial Sadness/Fury flags."),
+    "characterFlags": _field(label="Starting battle mood", dataType="enum", choices=choices(*CHARACTER_FLAGS), group="Starting status", help="Initial battle mood. FF7 stores this as one enum byte: None, Sadness, or Fury."),
     "rowByte": _field(label="Starting row", dataType="enum", choices=choices((0xFF,"Front row"),(0xFE,"Back row")), group="Starting status", help="Initial battle row. FF7 stores back row as 0xFE."),
     "learnedLimits": _field(label="Limits already learned", dataType="flags", flags=flags(*LEARNED_LIMITS), group="Starting Limit", help="Limit Breaks marked learned in the initialization record."),
     "recruitOffsetRaw": _field(label="Recruitment level adjustment", dataType="scaled", displayScale=0.5, group="Recruitment", help="Level adjustment relative to Cloud when this growth record is recruited. Stored in half-level units."),
