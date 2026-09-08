@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -6,10 +7,12 @@ import pytest
 
 from games.ff7r.archive import _with_virtual_assets
 from games.ff7r.runtime_config import (
+    BUNDLED_RUNTIME_SHA256,
     DEFAULT_RUNTIME_CONFIG,
     RUNTIME_CONFIG_NAME,
     RUNTIME_DLL_NAME,
     RUNTIME_MANIFEST_NAME,
+    bundled_dll_path,
     deploy_runtime,
     load_runtime_config,
     runtime_status,
@@ -28,6 +31,7 @@ from games.ff7r.storage import save_edits
 
 
 FIXTURE_TIMESTAMP = 0x12345678
+FIXTURE_RUNTIME = b"MZfixture-runtime"
 
 
 def write_fixture_exe(game: Path, timestamp: int = FIXTURE_TIMESTAMP):
@@ -42,7 +46,7 @@ def write_fixture_exe(game: Path, timestamp: int = FIXTURE_TIMESTAMP):
     return target
 
 
-def write_manifest(project: Path, *, timestamp=FIXTURE_TIMESTAMP, hooks=None):
+def write_manifest(project: Path, *, timestamp=FIXTURE_TIMESTAMP, hooks=None, runtime_sha=None):
     runtime = project / "runtime"
     runtime.mkdir(parents=True, exist_ok=True)
     payload = {
@@ -55,6 +59,8 @@ def write_manifest(project: Path, *, timestamp=FIXTURE_TIMESTAMP, hooks=None):
         "supportedExeTimestamps": [f"0x{timestamp:08X}"],
         "notes": "synthetic validated fixture",
     }
+    if runtime_sha is not None:
+        payload["runtimeDllSha256"] = runtime_sha
     (runtime / RUNTIME_MANIFEST_NAME).write_text(json.dumps(payload), encoding="utf-8")
     return payload
 
@@ -95,7 +101,7 @@ def test_runtime_config_save_is_atomic_and_round_trips(tmp_path):
     assert (tmp_path / "runtime" / RUNTIME_CONFIG_NAME).is_file()
 
 
-def test_runtime_manifest_requires_every_hook_and_supported_build():
+def test_runtime_manifest_requires_every_hook_supported_build_and_valid_optional_hash():
     with pytest.raises(ValueError, match="exactly the required"):
         validate_runtime_manifest({
             "manifestVersion": 1,
@@ -112,30 +118,61 @@ def test_runtime_manifest_requires_every_hook_and_supported_build():
             },
             "supportedExeTimestamps": [],
         })
+    with pytest.raises(ValueError, match="64-character hexadecimal"):
+        validate_runtime_manifest({
+            "manifestVersion": 1,
+            "hooks": {
+                "cutsceneSpeed": True,
+                "minimapTapHold": True,
+                "minimapState": True,
+            },
+            "supportedExeTimestamps": [FIXTURE_TIMESTAMP],
+            "runtimeDllSha256": "not-a-sha",
+        })
+    validated = validate_runtime_manifest({
+        "manifestVersion": 1,
+        "hooks": {
+            "cutsceneSpeed": True,
+            "minimapTapHold": True,
+            "minimapState": True,
+        },
+        "supportedExeTimestamps": [FIXTURE_TIMESTAMP],
+        "runtimeDllSha256": "A" * 64,
+    })
+    assert validated["runtimeDllSha256"] == "a" * 64
 
 
-def test_runtime_status_never_claims_active_without_dll_loader_manifest_and_supported_exe(tmp_path):
+def test_bundled_runtime_payload_is_present_valid_pe_and_hash_pinned(tmp_path):
+    assert bundled_dll_path().is_file()
+    status = runtime_status(tmp_path / "game", tmp_path / "project")
+    assert status["projectDllPresent"] is False
+    assert status["bundledDllPresent"] is True
+    assert status["bundledDllValid"] is True
+    assert status["bundledDllSha256"] == BUNDLED_RUNTIME_SHA256
+    assert status["runtimeBinaryPresent"] is True
+    assert status["runtimeBinarySource"] == "bundled"
+    assert status["runtimeBinarySha256"] == BUNDLED_RUNTIME_SHA256
+
+
+def test_runtime_status_never_claims_ready_without_loader_manifest_and_supported_exe(tmp_path):
     game = tmp_path / "game"
     project = tmp_path / "project"
     status = runtime_status(game, project)
     assert status["runtimeReady"] is False
     assert status["active"] is False
     assert status["projectDllPresent"] is False
+    assert status["runtimeBinaryPresent"] is True
+    assert status["runtimeBinarySource"] == "bundled"
     assert status["loaderCandidatePresent"] is False
     assert status["manifestPresent"] is False
     assert status["hooksValidated"] is False
     assert status["buildSupported"] is False
 
 
-def test_runtime_deploy_fails_closed_without_dll_loader_or_manifest(tmp_path):
+def test_runtime_deploy_fails_closed_without_loader_or_manifest(tmp_path):
     game = tmp_path / "game"
     project = tmp_path / "project"
-    with pytest.raises(RuntimeError, match="native runtime DLL is not built"):
-        deploy_runtime(game, project)
-
-    runtime = project / "runtime"
-    runtime.mkdir(parents=True)
-    (runtime / RUNTIME_DLL_NAME).write_bytes(b"fixture-runtime")
+    # A valid bundled DLL now exists by default; loader validation is the first gate.
     with pytest.raises(RuntimeError, match="native loader proxy"):
         deploy_runtime(game, project)
 
@@ -147,12 +184,27 @@ def test_runtime_deploy_fails_closed_without_dll_loader_or_manifest(tmp_path):
         deploy_runtime(game, project)
 
 
-def test_runtime_deploy_rejects_unvalidated_hook_and_wrong_exe_timestamp(tmp_path):
+def test_invalid_project_runtime_override_fails_instead_of_falling_back_to_bundle(tmp_path):
     game = tmp_path / "game"
     project = tmp_path / "project"
     runtime = project / "runtime"
     runtime.mkdir(parents=True)
-    (runtime / RUNTIME_DLL_NAME).write_bytes(b"fixture-runtime")
+    (runtime / RUNTIME_DLL_NAME).write_bytes(b"not-a-pe")
+    status = runtime_status(game, project)
+    assert status["projectDllPresent"] is True
+    assert status["runtimeBinaryPresent"] is False
+    assert status["runtimeBinarySource"] == "none"
+    assert "not a Windows PE" in status["runtimeBinaryError"]
+    with pytest.raises(RuntimeError, match="No valid FF7R native runtime binary"):
+        deploy_runtime(game, project)
+
+
+def test_runtime_deploy_rejects_unvalidated_hook_wrong_exe_timestamp_and_hash_mismatch(tmp_path):
+    game = tmp_path / "game"
+    project = tmp_path / "project"
+    runtime = project / "runtime"
+    runtime.mkdir(parents=True)
+    (runtime / RUNTIME_DLL_NAME).write_bytes(FIXTURE_RUNTIME)
     binaries = game / "End" / "Binaries" / "Win64"
     binaries.mkdir(parents=True)
     (binaries / "dxgi.dll").write_bytes(b"fixture-proxy")
@@ -170,18 +222,23 @@ def test_runtime_deploy_rejects_unvalidated_hook_and_wrong_exe_timestamp(tmp_pat
     with pytest.raises(RuntimeError, match="not validated for installed executable timestamp"):
         deploy_runtime(game, project)
 
+    write_manifest(project, runtime_sha="0" * 64)
+    with pytest.raises(RuntimeError, match="does not match the hook-validation manifest"):
+        deploy_runtime(game, project)
 
-def test_runtime_deploy_copies_dll_config_and_manifest_only_for_validated_build(tmp_path):
+
+def test_runtime_deploy_copies_project_override_config_and_manifest_for_validated_build(tmp_path):
     game = tmp_path / "game"
     project = tmp_path / "project"
     runtime = project / "runtime"
     runtime.mkdir(parents=True)
-    (runtime / RUNTIME_DLL_NAME).write_bytes(b"fixture-runtime")
+    (runtime / RUNTIME_DLL_NAME).write_bytes(FIXTURE_RUNTIME)
+    fixture_sha = hashlib.sha256(FIXTURE_RUNTIME).hexdigest()
     binaries = game / "End" / "Binaries" / "Win64"
     binaries.mkdir(parents=True)
     (binaries / "dxgi.dll").write_bytes(b"fixture-proxy")
     write_fixture_exe(game)
-    write_manifest(project)
+    write_manifest(project, runtime_sha=fixture_sha)
 
     config = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
     config["cutsceneSpeed"].update(enabled=True, baseMultiplier=1.5)
@@ -189,15 +246,41 @@ def test_runtime_deploy_copies_dll_config_and_manifest_only_for_validated_build(
     save_runtime_config(project, config)
 
     result = deploy_runtime(game, project)
-    assert Path(result["dll"]).read_bytes() == b"fixture-runtime"
+    assert Path(result["dll"]).read_bytes() == FIXTURE_RUNTIME
+    assert result["dllSource"] == "project"
+    assert result["dllSha256"] == fixture_sha
     assert json.loads(Path(result["config"]).read_text(encoding="utf-8"))["minimap"]["enabled"] is True
     assert json.loads(Path(result["manifest"]).read_text(encoding="utf-8"))["hooks"]["minimapState"] is True
     assert result["exeTimestamp"] == FIXTURE_TIMESTAMP
     status = runtime_status(game, project)
+    assert status["runtimeBinarySource"] == "project"
+    assert status["runtimeBinaryHashValidated"] is True
     assert status["hooksValidated"] is True
     assert status["buildSupported"] is True
     assert status["runtimeReady"] is True
     assert status["active"] is True
+
+
+def test_runtime_deploy_uses_bundled_binary_without_project_override(tmp_path):
+    game = tmp_path / "game"
+    project = tmp_path / "project"
+    binaries = game / "End" / "Binaries" / "Win64"
+    binaries.mkdir(parents=True)
+    (binaries / "dxgi.dll").write_bytes(b"fixture-proxy")
+    write_fixture_exe(game)
+    write_manifest(project, runtime_sha=BUNDLED_RUNTIME_SHA256)
+
+    result = deploy_runtime(game, project)
+    deployed = Path(result["dll"]).read_bytes()
+    assert deployed[:2] == b"MZ"
+    assert hashlib.sha256(deployed).hexdigest() == BUNDLED_RUNTIME_SHA256
+    assert result["dllSource"] == "bundled"
+    assert result["dllSha256"] == BUNDLED_RUNTIME_SHA256
+    status = runtime_status(game, project)
+    assert status["runtimeBinarySource"] == "bundled"
+    assert status["runtimeBinaryHashValidated"] is True
+    assert status["deployedDllHashValidated"] is True
+    assert status["runtimeReady"] is True
 
 
 def test_virtual_runtime_resources_are_catalogued_without_polluting_cached_assets():
@@ -220,12 +303,15 @@ def test_runtime_tweaks_are_editable_through_standard_game_data_contract(tmp_pat
     package, source_sha, using_project = runtime_settings_package(game, project)
     payload = package.api_payload(source_sha256=source_sha, using_project=using_project)
     properties = {prop["name"]: prop for prop in payload["properties"]}
+    values = payload["records"][0]["values"]
     assert properties["CutsceneEnabled"]["editable"] is True
     assert properties["CutsceneBaseMultiplier"]["type"] == "FLOAT"
     assert properties["MinimapHoldMilliseconds"]["min"] == 150
     assert properties["MinimapHoldMilliseconds"]["max"] == 1500
     assert properties["RuntimeReady"]["editable"] is False
-    assert payload["records"][0]["values"]["HooksValidated"] is False
+    assert values["HooksValidated"] is False
+    assert values["RuntimeBinaryPresent"] is True
+    assert values["RuntimeBinarySource"] == "bundled"
 
     result = save_runtime_edits(
         project,
