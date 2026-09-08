@@ -19,7 +19,7 @@ def test_generated_fixture_decodes_expected_types():
         "Power": 42,
         "Enabled": True,
         "Mode": "ModeA",
-        "Description": "Fixture text",
+        "Description": "$Item_Test",
         "Values_Array": [10, 20, 30],
     }
     assert [prop["type"] for prop in package.api_payload()["properties"]] == [
@@ -42,7 +42,7 @@ def test_same_size_edits_round_trip_and_preserve_string():
     assert row["Enabled"] is False
     assert row["Mode"] == "ModeB"
     assert row["Values_Array"] == [10, 20, -32768]
-    assert row["Description"] == "Fixture text"
+    assert row["Description"] == "$Item_Test"
 
 
 def test_rejects_size_changing_or_out_of_domain_edits():
