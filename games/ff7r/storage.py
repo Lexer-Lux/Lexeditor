@@ -9,8 +9,10 @@ from typing import Any
 from .archive import extract_pair
 from .dataobject import DataObjectPackage, sha256_bytes
 from .runtime_dataobject import (
+    NO_MORE_CHEATS_PROBE_ASSET,
     RUNTIME_PROBE_ASSET,
     RUNTIME_TWEAKS_ASSET,
+    no_more_cheats_probe_package,
     runtime_probe_package,
     runtime_settings_package,
     save_runtime_edits,
@@ -31,6 +33,8 @@ def load_package(game_root: Path, data_root: Path, project_root: Path,
         return runtime_settings_package(game_root, project_root, vanilla=vanilla)
     if asset == RUNTIME_PROBE_ASSET:
         return runtime_probe_package(game_root)
+    if asset == NO_MORE_CHEATS_PROBE_ASSET:
+        return no_more_cheats_probe_package(game_root, data_root, project_root, index)
 
     source_uasset, source_uexp = extract_pair(game_root, data_root, index, asset)
     source_sha = sha256_bytes(source_uexp.read_bytes())
@@ -57,6 +61,8 @@ def save_edits(game_root: Path, data_root: Path, project_root: Path,
         )
     if asset == RUNTIME_PROBE_ASSET:
         raise ValueError("FF7R Native Hook Probe is read-only")
+    if asset == NO_MORE_CHEATS_PROBE_ASSET:
+        raise ValueError("FF7R No More Cheats Probe is read-only")
 
     package, actual_source_sha, using_project = load_package(
         game_root, data_root, project_root, index, asset, vanilla=False)
