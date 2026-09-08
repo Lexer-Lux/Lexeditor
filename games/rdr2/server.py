@@ -111,6 +111,11 @@ except ImportError:
         save_preview_settings as _save_preview_settings,
     )
 
+try:
+    from .inventory_icons import resolve_inventory_icon as _resolve_inventory_icon
+except ImportError:
+    from inventory_icons import resolve_inventory_icon as _resolve_inventory_icon
+
 ROOT = PLUGIN_ROOT
 PLUGIN_ID = "rdr2"
 PLUGIN_API_VERSION = 1
@@ -4921,16 +4926,28 @@ class Handler(BaseHTTPRequestHandler):
                     relative = Path(path.removeprefix("/assets/").replace("/", os.sep))
                     asset = (ROOT / "assets" / relative).resolve()
                     assets_root = (ROOT / "assets").resolve()
-                    if assets_root not in asset.parents or not asset.is_file():
+                    if assets_root not in asset.parents:
                         self._json({"error": "asset not found"}, 404)
                     else:
-                        data = asset.read_bytes()
-                        self.send_response(200)
-                        self.send_header("Content-Type", mimetypes.guess_type(asset.name)[0] or "application/octet-stream")
-                        self.send_header("Cache-Control", "public, max-age=3600")
-                        self.send_header("Content-Length", str(len(data)))
-                        self.end_headers()
-                        self.wfile.write(data)
+                        # #145: seven Story catalog refs live in the DLC UI_ITEMVIEWER
+                        # dictionary, not the base dictionary we imported. Resolve only
+                        # those proven IDs from the installed game into the private cache.
+                        if (not asset.is_file() and len(relative.parts) == 3
+                                and relative.parts[:2] == ("dictionary_icons", "ui_itemviewer")
+                                and relative.suffix.lower() == ".png"):
+                            generated = _resolve_inventory_icon(relative.stem)
+                            if generated is not None:
+                                asset = generated
+                        if not asset.is_file():
+                            self._json({"error": "asset not found"}, 404)
+                        else:
+                            data = asset.read_bytes()
+                            self.send_response(200)
+                            self.send_header("Content-Type", mimetypes.guess_type(asset.name)[0] or "application/octet-stream")
+                            self.send_header("Cache-Control", "public, max-age=3600")
+                            self.send_header("Content-Length", str(len(data)))
+                            self.end_headers()
+                            self.wfile.write(data)
                 elif path.startswith("/shared/"):
                     relative = Path(path.removeprefix("/shared/").replace("/", os.sep))
                     shared_root = (LEXEDITOR_ROOT / "ui").resolve()

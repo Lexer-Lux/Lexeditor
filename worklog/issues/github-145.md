@@ -18,3 +18,7 @@ Complete the editor's item artwork coverage from the existing extracted/imported
 ## Next agent work
 
 Locate the 48 residual textures in alternate/dynamic dictionaries and identify the exact decoder failures. Add aliases only when source evidence proves identity. Repair the decoder for genuinely present-but-unreadable textures, then regenerate/import the missing PNGs and recompute the residual set before changing issue workflow state.
+
+- Branch `fix/rdr2-145-installed-itemviewer` resolves the 7 C5/C6 treasure-map references on demand from the installed `x64/dlcpacks/dlc_content_extra/dlc.rpf` → `x64/textures/ui/ui_itemviewer.ytd`. Generated PNGs stay under Lexeditor's private cache; no new Rockstar textures are committed.
+- `RpfCli` returns decoded resources with an internal uncompressed RSC8 header. The fallback losslessly rewraps that decoded virtual+physical payload as standard raw-deflate RSC8 before `texfury` decodes the YTD.
+- Once this branch lands, the unresolved set drops from 48 to 41 dynamic/document references; those still require proven source/alias resolution rather than guessed substitutes.

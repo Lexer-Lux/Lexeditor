@@ -58,6 +58,12 @@ class InstalledItemviewerTests(unittest.TestCase):
             virtual + physical,
         )
 
+    def test_server_falls_back_only_after_a_local_ui_itemviewer_miss(self):
+        source = (Path(__file__).resolve().parents[1] / "games/rdr2/server.py").read_text(encoding="utf-8")
+        self.assertIn("_resolve_inventory_icon(relative.stem)", source)
+        self.assertIn('relative.parts[:2] == ("dictionary_icons", "ui_itemviewer")', source)
+        self.assertIn("if not asset.is_file():", source)
+
     def test_decoded_rsc8_rejects_truncated_payload(self):
         decoded = struct.pack("<IIII", icons._RSC8_MAGIC, 2 | (31 << 8), 32, 16) + b"short"
         with self.assertRaisesRegex(ValueError, "truncated"):
