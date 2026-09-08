@@ -55,6 +55,7 @@ MAX_XREFS_PER_STRING = 64
 FUNCTION_WINDOW_BYTES = 64
 FUNCTION_CODE_SCAN_MAX_BYTES = 2048
 MAX_CODE_REFS_PER_FUNCTION = 64
+MAX_INBOUND_REFS_PER_FUNCTION = 64
 XREF_CONTEXT_BEFORE = 16
 XREF_CONTEXT_AFTER = 32
 IMAGE_FILE_MACHINE_AMD64 = 0x8664
@@ -418,6 +419,74 @@ def _bounded_function_code_refs(image: PEImage, function: RuntimeFunction) -> di
     }
 
 
+def _pdata_inbound_code_refs_many(
+    image: PEImage,
+    target_function_rvas: Iterable[int],
+) -> dict[int, dict]:
+    """Scan .text once for direct rel32 refs into selected .pdata functions.
+
+    Source and target functions must both be backed by AMD64 exception-directory
+    metadata. The opcode shapes are still heuristics rather than a disassembly,
+    but unlike padding-derived owners they never invent function boundaries.
+    """
+    targets = {int(rva) for rva in target_function_rvas}
+    results = {
+        rva: {
+            "targetFunctionRva": rva,
+            "targetFunctionVa": image.image_base + rva,
+            "refsTruncated": False,
+            "refs": [],
+        }
+        for rva in targets
+    }
+    text = image.section(".text")
+    if text is None or not targets:
+        return results
+
+    raw = image.data[text.raw_offset:text.raw_offset + text.raw_size]
+    saturated: set[int] = set()
+    for index in range(max(0, len(raw) - 4)):
+        opcode = raw[index]
+        if opcode not in (0xE8, 0xE9):
+            continue
+        instruction_rva = text.virtual_address + index
+        source_function = image.runtime_function_for_rva(instruction_rva)
+        if source_function is None:
+            continue
+        displacement = struct.unpack_from("<i", raw, index + 1)[0]
+        target_rva = instruction_rva + 5 + displacement
+        target = _pdata_code_target(image, target_rva)
+        if target is None:
+            continue
+        target_function_rva = int(target["targetFunctionRva"])
+        if (
+            target_function_rva not in targets
+            or target_function_rva in saturated
+            or source_function.begin_rva == target_function_rva
+        ):
+            continue
+
+        bucket = results[target_function_rva]
+        bucket["refs"].append({
+            "kind": "call-rel32" if opcode == 0xE8 else "jump-rel32",
+            "instructionRva": instruction_rva,
+            "instructionVa": image.image_base + instruction_rva,
+            "sourceFunctionRva": source_function.begin_rva,
+            "sourceFunctionVa": image.image_base + source_function.begin_rva,
+            "sourceFunctionEndRva": source_function.end_rva,
+            "sourceFunctionEndVa": image.image_base + source_function.end_rva,
+            "sourceFunctionUnwindInfoRva": source_function.unwind_info_rva,
+            "sourceFunctionUnwindInfoVa": image.image_base + source_function.unwind_info_rva,
+            **target,
+        })
+        if len(bucket["refs"]) >= MAX_INBOUND_REFS_PER_FUNCTION:
+            bucket["refsTruncated"] = True
+            saturated.add(target_function_rva)
+            if len(saturated) == len(targets):
+                break
+    return results
+
+
 def _xref_candidate(image: PEImage, text: Section, raw: bytes, index: int) -> dict:
     instruction_rva = text.virtual_address + index
     runtime_function = image.runtime_function_for_rva(instruction_rva)
@@ -453,6 +522,7 @@ def _xref_candidate(image: PEImage, text: Section, raw: bytes, index: int) -> di
             image.image_base + unwind_info_rva if unwind_info_rva is not None else None
         ),
         "candidateFunctionCodeRefs": code_refs,
+        "candidateFunctionInboundCodeRefs": None,
         "xrefContext": _byte_window(
             image,
             instruction_rva,
@@ -530,9 +600,39 @@ def probe_bytes(data: bytes, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dic
         entries.append({"needle": str(needle), "hits": strings})
 
     xrefs = _lea_rip_xrefs_many(image, target_rvas)
+    pdata_candidates: set[int] = set()
     for entry in entries:
         for hit in entry["hits"]:
-            hit["leaRipXrefs"] = xrefs.get(hit["rva"], [])
+            hit_xrefs = xrefs.get(hit["rva"], [])
+            hit["leaRipXrefs"] = hit_xrefs
+            for xref in hit_xrefs:
+                if xref.get("candidateFunctionSource") != "pdata":
+                    continue
+                function_rva = xref.get("candidateFunctionRva")
+                if function_rva is not None:
+                    pdata_candidates.add(int(function_rva))
+                code_refs = xref.get("candidateFunctionCodeRefs") or {}
+                for code_ref in code_refs.get("refs", ()):
+                    target_function_rva = code_ref.get("targetFunctionRva")
+                    if target_function_rva is not None:
+                        pdata_candidates.add(int(target_function_rva))
+
+    inbound_refs = _pdata_inbound_code_refs_many(image, pdata_candidates)
+    for entry in entries:
+        for hit in entry["hits"]:
+            for xref in hit.get("leaRipXrefs", ()):
+                if xref.get("candidateFunctionSource") != "pdata":
+                    continue
+                function_rva = xref.get("candidateFunctionRva")
+                xref["candidateFunctionInboundCodeRefs"] = inbound_refs.get(
+                    int(function_rva) if function_rva is not None else -1
+                )
+                code_refs = xref.get("candidateFunctionCodeRefs") or {}
+                for code_ref in code_refs.get("refs", ()):
+                    target_function_rva = code_ref.get("targetFunctionRva")
+                    code_ref["targetFunctionInboundCodeRefs"] = inbound_refs.get(
+                        int(target_function_rva) if target_function_rva is not None else -1
+                    )
 
     return {
         "machine": image.machine,
@@ -562,6 +662,8 @@ def probe_bytes(data: bytes, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dic
             "When unwind metadata is unavailable, candidate starts fall back to compiler-padding heuristics.",
             "Candidate byte windows are raw executable evidence for signature research; they are not instruction-decoded or stability-validated.",
             "Candidate function code refs are opcode-shape heuristics restricted to cross-function .pdata-described .text targets; they are not a full disassembly.",
+            "Inbound code refs scan direct rel32 CALL/JMP shapes across .text and report them only when both source and target resolve through exact .pdata function bounds.",
+            "Inbound and outbound opcode-shape refs are correlation evidence, not proof that a byte is a decoded instruction or that a candidate is a safe hook.",
             "The probe is read-only and does not modify the installed executable.",
         ],
     }
