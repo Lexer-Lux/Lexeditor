@@ -21,6 +21,14 @@ ATB_VIRTUAL_ASSET_ROWS = (
     {"asset": "Lexeditor/ATBGuardReactions", "name": "ATB Guard Reactions", "group": "Lexeditor ATB", "synthetic": "atb-guard"},
     {"asset": "Lexeditor/ATBAbilityCosts", "name": "ATB Ability Costs", "group": "Lexeditor ATB", "synthetic": "atb-abilities"},
 )
+ENCOUNTER_VIRTUAL_ASSET_ROWS = (
+    {
+        "asset": "Lexeditor/EncounterTweaks",
+        "name": "Encounter Tweaks",
+        "group": "Lexeditor Encounters",
+        "synthetic": "encounter-tweaks",
+    },
+)
 
 
 def _normalize(path: str) -> str:
@@ -79,9 +87,9 @@ def _with_virtual_assets(payload: dict) -> dict:
     """Decorate an index in memory without persisting Lexeditor-only rows to cache."""
     rows = [dict(row) for row in payload.get("assets", [])]
     existing = {row.get("asset") for row in rows}
-    # ATB resources precede the long-standing runtime/research rows so existing
-    # catalog-order assumptions about the Runtime Tweaks/Probe tail remain true.
-    for row in (*ATB_VIRTUAL_ASSET_ROWS, *VIRTUAL_ASSET_ROWS):
+    # Semantic resources precede the long-standing runtime/research rows so
+    # existing catalog-order assumptions about the Runtime Tweaks/Probe tail remain true.
+    for row in (*ATB_VIRTUAL_ASSET_ROWS, *ENCOUNTER_VIRTUAL_ASSET_ROWS, *VIRTUAL_ASSET_ROWS):
         if row["asset"] not in existing:
             rows.append(dict(row))
             existing.add(row["asset"])

@@ -14,6 +14,10 @@ from urllib.parse import parse_qs, urlparse
 
 from .archive import build_index, preferred_pak_version
 from .atb_tweaks import has_enabled_data_overrides, materialize_atb_overrides
+from .encounter_tweaks import (
+    has_enabled_encounter_tweaks,
+    materialize_encounter_tweaks,
+)
 from .minimap_semantics import (
     ENEMY_TERRITORY_TABLE_NAME,
     HIDE_NAVIMAP_FIELD,
@@ -121,8 +125,11 @@ def data_map_payload() -> dict:
             semantic.append("enemy normal/rare drops, chances and steal data")
         if asset_name == ENEMY_TERRITORY_TABLE_NAME:
             semantic.append("authored minimap forced-hide flags when HideNavimap is a scalar boolean")
-        if str(item.get("group", "")) == "Lexeditor ATB":
+        group = str(item.get("group", ""))
+        if group == "Lexeditor ATB":
             semantic.append("reversible ATB tweak config materialized only when the ATB tweak is enabled")
+        if group == "Lexeditor Encounters":
+            semantic.append("reversible authored encounter edits materialized only when their tweak is enabled")
         controls = (
             "Structured DataObject records; booleans, fixed-width numbers, floats "
             "and existing FNames are editable."
@@ -134,7 +141,7 @@ def data_map_payload() -> dict:
             "target": item["asset"],
             "controls": controls,
             "notes": (
-                "FString and structural/size-changing edits remain read-only; "
+                "FString and arbitrary structural edits remain read-only; "
                 "unknown bytes are preserved in the project overlay."
             ),
             "coverage": "structured",
@@ -199,31 +206,41 @@ def build_mod() -> dict:
     content = PROJECT_ROOT / "content"
     has_content = content.is_dir() and any(path.is_file() for path in content.rglob("*"))
     has_atb = has_enabled_data_overrides(PROJECT_ROOT)
-    if not has_content and not has_atb:
+    has_encounter = has_enabled_encounter_tweaks(PROJECT_ROOT)
+    has_semantic_materialization = has_atb or has_encounter
+    if not has_content and not has_semantic_materialization:
         raise RuntimeError("The FF7R project has no saved edits to build")
 
     target = PROJECT_ROOT / "build" / "Lexeditor-FF7R_P.pak"
-    if not has_atb:
+    if not has_semantic_materialization:
         pack_directory(content, target, version=preferred_pak_version(catalog()))
-        return {"path": str(target), "size": target.stat().st_size, "atbMaterialized": []}
+        return {
+            "path": str(target),
+            "size": target.stat().st_size,
+            "atbMaterialized": [],
+            "encounterMaterialized": [],
+        }
 
-    # ATB semantic overrides never live permanently in project/content. Compose
-    # them over any existing project edits in a temporary staging tree, pack the
+    # Semantic overrides never live permanently in project/content. Compose
+    # them over any ordinary project edits in a temporary staging tree, pack the
     # result, and then discard the generated DataObjects.
     with TemporaryDirectory(prefix="lexeditor-ff7r-build-") as temp_name:
         staging = Path(temp_name) / "content"
         staging.mkdir(parents=True, exist_ok=True)
         if has_content:
             shutil.copytree(content, staging, dirs_exist_ok=True)
-        materialized = materialize_atb_overrides(
+        atb_materialized = materialize_atb_overrides(
+            GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), staging)
+        encounter_materialized = materialize_encounter_tweaks(
             GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), staging)
         if not any(path.is_file() for path in staging.rglob("*")):
-            raise RuntimeError("Enabled FF7R ATB tweaks produced no buildable DataObject edits")
+            raise RuntimeError("Enabled FF7R semantic tweaks produced no buildable DataObject edits")
         pack_directory(staging, target, version=preferred_pak_version(catalog()))
     return {
         "path": str(target),
         "size": target.stat().st_size,
-        "atbMaterialized": materialized,
+        "atbMaterialized": atb_materialized,
+        "encounterMaterialized": encounter_materialized,
     }
 
 
@@ -362,8 +379,8 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": [
                         "data-map", "dataobject", "text-resource", "economy",
                         "enemy-loot", "minimap-visibility", "runtime-config", "native-probe",
-                        "save", "economy-save", "enemy-loot-save", "minimap-visibility-save",
-                        "text-save", "build", "deploy", "runtime-deploy",
+                        "encounter-tweaks", "save", "economy-save", "enemy-loot-save",
+                        "minimap-visibility-save", "text-save", "build", "deploy", "runtime-deploy",
                     ],
                 })
             if path == "/api/catalog":
