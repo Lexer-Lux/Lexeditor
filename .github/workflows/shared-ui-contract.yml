@@ -5,8 +5,7 @@ on:
     branches: [master]
     paths:
       - 'ui/**'
-      - 'games/blank/**'
-      - 'games/warband/editor.html'
+      - 'games/**/editor.html'
       - 'desktop_host.py'
       - 'github_integration.py'
       - 'plugin_api.py'
@@ -18,8 +17,7 @@ on:
   pull_request:
     paths:
       - 'ui/**'
-      - 'games/blank/**'
-      - 'games/warband/editor.html'
+      - 'games/**/editor.html'
       - 'desktop_host.py'
       - 'github_integration.py'
       - 'plugin_api.py'
