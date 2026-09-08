@@ -1,0 +1,33 @@
+name: Global 349 RDR semantic-help one-shot
+
+on:
+  push:
+    branches:
+      - fix/global-349-rdr-semantic-help
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/global-349-rdr-semantic-help
+          fetch-depth: 0
+      - name: Apply exact reviewed repair
+        run: python maintenance/global-349/apply.py
+      - name: Run semantic-help regression
+        run: python -m pytest tests/test_info_bubble_semantics.py -q
+      - name: Commit repaired RDR shared UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Use shared semantic Detail fields in RDR1 (#349)"
+          git push origin HEAD:fix/global-349-rdr-semantic-help
