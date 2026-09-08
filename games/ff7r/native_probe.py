@@ -20,8 +20,15 @@ DEFAULT_NEEDLES = (
     "FastForward",
     "EventScene",
     "CutScene",
+    "SkipCinema",
+    "IsSkipCinemaAtThisFrame",
+    "IsSkipCinema",
+    "RequestPlayCutScene",
+    "PlayCutScene",
     "NaviMap",
     "HideNavimap",
+    "BPShowNavimap",
+    "BPHideNavimap",
     "trgCmn_NaviMap_Update_On",
     "trgCmn_NaviMap_Update_Off",
     "BPSetPlayerHPMax",
@@ -40,6 +47,9 @@ MAX_XREFS_PER_STRING = 64
 FUNCTION_WINDOW_BYTES = 64
 XREF_CONTEXT_BEFORE = 16
 XREF_CONTEXT_AFTER = 32
+IMAGE_FILE_MACHINE_AMD64 = 0x8664
+EXCEPTION_DIRECTORY_INDEX = 3
+RUNTIME_FUNCTION_SIZE = 12
 
 
 class PEFormatError(ValueError):
@@ -60,11 +70,22 @@ class Section:
 
 
 @dataclass(frozen=True)
+class RuntimeFunction:
+    begin_rva: int
+    end_rva: int
+    unwind_info_rva: int
+
+
+@dataclass(frozen=True)
 class PEImage:
     data: bytes
+    machine: int
     timestamp: int
     image_base: int
+    exception_directory_rva: int
+    exception_directory_size: int
     sections: tuple[Section, ...]
+    runtime_functions: tuple[RuntimeFunction, ...]
 
     @classmethod
     def from_bytes(cls, data: bytes) -> "PEImage":
@@ -74,20 +95,36 @@ class PEImage:
         if pe_offset < 0 or pe_offset + 24 > len(data) or data[pe_offset:pe_offset + 4] != b"PE\0\0":
             raise PEFormatError("invalid PE header")
         coff = pe_offset + 4
+        machine = _u16(data, coff)
         section_count = _u16(data, coff + 2)
         timestamp = _u32(data, coff + 4)
         optional_size = _u16(data, coff + 16)
         optional = coff + 20
-        if optional + optional_size > len(data):
+        optional_end = optional + optional_size
+        if optional_end > len(data):
             raise PEFormatError("truncated optional header")
         magic = _u16(data, optional)
         if magic == 0x20B:  # PE32+
             image_base = _u64(data, optional + 24)
+            directory_count_offset = optional + 108
+            directory_table_offset = optional + 112
         elif magic == 0x10B:  # PE32, supported for parser completeness
             image_base = _u32(data, optional + 28)
+            directory_count_offset = optional + 92
+            directory_table_offset = optional + 96
         else:
             raise PEFormatError(f"unsupported optional-header magic 0x{magic:X}")
-        section_table = optional + optional_size
+
+        exception_directory_rva = 0
+        exception_directory_size = 0
+        if directory_count_offset + 4 <= optional_end:
+            directory_count = _u32(data, directory_count_offset)
+            exception_entry = directory_table_offset + EXCEPTION_DIRECTORY_INDEX * 8
+            if directory_count > EXCEPTION_DIRECTORY_INDEX and exception_entry + 8 <= optional_end:
+                exception_directory_rva = _u32(data, exception_entry)
+                exception_directory_size = _u32(data, exception_entry + 4)
+
+        section_table = optional_end
         sections = []
         for index in range(section_count):
             offset = section_table + index * 40
@@ -101,7 +138,28 @@ class PEImage:
             if raw_offset + raw_size > len(data):
                 raise PEFormatError(f"section {name!r} is outside the file")
             sections.append(Section(name, virtual_address, virtual_size, raw_offset, raw_size))
-        return cls(data=data, timestamp=timestamp, image_base=image_base, sections=tuple(sections))
+
+        image = cls(
+            data=data,
+            machine=machine,
+            timestamp=timestamp,
+            image_base=image_base,
+            exception_directory_rva=exception_directory_rva,
+            exception_directory_size=exception_directory_size,
+            sections=tuple(sections),
+            runtime_functions=(),
+        )
+        runtime_functions = _runtime_functions(image)
+        return cls(
+            data=data,
+            machine=machine,
+            timestamp=timestamp,
+            image_base=image_base,
+            exception_directory_rva=exception_directory_rva,
+            exception_directory_size=exception_directory_size,
+            sections=tuple(sections),
+            runtime_functions=runtime_functions,
+        )
 
     def section(self, name: str) -> Section | None:
         folded = name.casefold()
@@ -129,6 +187,21 @@ class PEImage:
                 return section.raw_offset + delta
         return None
 
+    def runtime_function_for_rva(self, rva: int) -> RuntimeFunction | None:
+        """Return the AMD64 unwind-table function containing one RVA, if any."""
+        low = 0
+        high = len(self.runtime_functions)
+        while low < high:
+            middle = (low + high) // 2
+            candidate = self.runtime_functions[middle]
+            if rva < candidate.begin_rva:
+                high = middle
+            elif rva >= candidate.end_rva:
+                low = middle + 1
+            else:
+                return candidate
+        return None
+
 
 def _u16(data: bytes, offset: int) -> int:
     try:
@@ -149,6 +222,36 @@ def _u64(data: bytes, offset: int) -> int:
         return struct.unpack_from("<Q", data, offset)[0]
     except struct.error as error:
         raise PEFormatError("truncated PE integer") from error
+
+
+def _runtime_functions(image: PEImage) -> tuple[RuntimeFunction, ...]:
+    """Parse AMD64 IMAGE_RUNTIME_FUNCTION_ENTRY rows from the exception directory."""
+    if (
+        image.machine != IMAGE_FILE_MACHINE_AMD64
+        or image.exception_directory_rva <= 0
+        or image.exception_directory_size < RUNTIME_FUNCTION_SIZE
+    ):
+        return ()
+    section = image.section_for_rva(image.exception_directory_rva)
+    if section is None:
+        return ()
+    relative = image.exception_directory_rva - section.virtual_address
+    if relative < 0 or relative >= section.raw_size:
+        return ()
+    start = section.raw_offset + relative
+    available = min(
+        image.exception_directory_size,
+        section.raw_size - relative,
+        len(image.data) - start,
+    )
+    functions = []
+    for offset in range(start, start + available - RUNTIME_FUNCTION_SIZE + 1, RUNTIME_FUNCTION_SIZE):
+        begin_rva, end_rva, unwind_info_rva = struct.unpack_from("<III", image.data, offset)
+        if begin_rva <= 0 or end_rva <= begin_rva:
+            continue
+        functions.append(RuntimeFunction(begin_rva, end_rva, unwind_info_rva))
+    functions.sort(key=lambda entry: (entry.begin_rva, entry.end_rva))
+    return tuple(functions)
 
 
 def _find_all(haystack: bytes, needle: bytes, *, start: int = 0, end: int | None = None,
@@ -240,12 +343,37 @@ def _lea_rip_xrefs(image: PEImage, target_rva: int) -> list[dict]:
         resolved = instruction_rva + 7 + displacement
         if resolved != target_rva:
             continue
-        function_rva = _nearest_padded_function_start(raw, index, text.virtual_address)
+
+        runtime_function = image.runtime_function_for_rva(instruction_rva)
+        if runtime_function is not None:
+            function_rva = runtime_function.begin_rva
+            function_end_rva = runtime_function.end_rva
+            function_source = "pdata"
+            unwind_info_rva = runtime_function.unwind_info_rva
+        else:
+            function_rva = _nearest_padded_function_start(raw, index, text.virtual_address)
+            function_end_rva = None
+            function_source = "padding-heuristic" if function_rva is not None else None
+            unwind_info_rva = None
+
+        function_window = FUNCTION_WINDOW_BYTES
+        if function_rva is not None and function_end_rva is not None:
+            function_window = min(function_window, function_end_rva - function_rva)
+
         result = {
             "instructionRva": instruction_rva,
             "instructionVa": image.image_base + instruction_rva,
             "candidateFunctionRva": function_rva,
             "candidateFunctionVa": image.image_base + function_rva if function_rva is not None else None,
+            "candidateFunctionEndRva": function_end_rva,
+            "candidateFunctionEndVa": (
+                image.image_base + function_end_rva if function_end_rva is not None else None
+            ),
+            "candidateFunctionSource": function_source,
+            "candidateFunctionUnwindInfoRva": unwind_info_rva,
+            "candidateFunctionUnwindInfoVa": (
+                image.image_base + unwind_info_rva if unwind_info_rva is not None else None
+            ),
             "xrefContext": _byte_window(
                 image,
                 instruction_rva,
@@ -253,7 +381,7 @@ def _lea_rip_xrefs(image: PEImage, target_rva: int) -> list[dict]:
                 after=XREF_CONTEXT_AFTER,
             ),
             "candidateFunctionBytes": (
-                _byte_window(image, function_rva, after=FUNCTION_WINDOW_BYTES)
+                _byte_window(image, function_rva, after=function_window)
                 if function_rva is not None
                 else None
             ),
@@ -289,9 +417,16 @@ def probe_bytes(data: bytes, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dic
             hit["leaRipXrefs"] = _lea_rip_xrefs(image, hit["rva"])
         entries.append({"needle": str(needle), "hits": strings})
     return {
+        "machine": image.machine,
+        "machineHex": f"0x{image.machine:04X}",
         "timestamp": image.timestamp,
         "timestampHex": f"0x{image.timestamp:08X}",
         "imageBase": image.image_base,
+        "exceptionDirectory": {
+            "rva": image.exception_directory_rva,
+            "size": image.exception_directory_size,
+            "runtimeFunctionCount": len(image.runtime_functions),
+        },
         "sections": [
             {
                 "name": section.name,
@@ -305,7 +440,8 @@ def probe_bytes(data: bytes, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dic
         "needles": entries,
         "notes": [
             "String and LEA matches are research candidates, not validated hook addresses.",
-            "Candidate function starts are compiler-padding heuristics and must be signature-validated before patching.",
+            "AMD64 candidate function ranges prefer PE exception-directory (.pdata) unwind metadata when available.",
+            "When unwind metadata is unavailable, candidate starts fall back to compiler-padding heuristics.",
             "Candidate byte windows are raw executable evidence for signature research; they are not instruction-decoded or stability-validated.",
             "The probe is read-only and does not modify the installed executable.",
         ],
