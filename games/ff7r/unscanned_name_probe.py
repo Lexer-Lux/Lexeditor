@@ -4,7 +4,7 @@ Issue #424 is a runtime presentation change: append ``?`` to an enemy's normal
 localized display name until that EnemyBook entry has actually been Assessed.
 The generated Remake surface gives us a trustworthy BattleCharaSpec ->
 EnemyBookID relationship and dedicated battle/target UI settings, but it does
-not expose a trustworthy per-save "is assessed" query.  This probe therefore
+not expose a trustworthy per-save "is assessed" query. This probe therefore
 keeps state and presentation evidence separate and fails closed until both are
 identified in the installed build.
 """
@@ -25,13 +25,16 @@ ASSET_TERMS = (
     "libra",
 )
 
-PRESENTATION_ANCHORS = (
+BATTLE_NAME_ANCHORS = (
     "BattleEnemyStatusWidget",
+    "ShowBattleEnemyStatusWindow",
+)
+ATB_TARGET_ANCHORS = (
     "BattleTargetWidget",
     "BattleTargetNewWidget",
-    "ShowBattleEnemyStatusWindow",
     "ShowBattleTargetIcon",
 )
+PRESENTATION_ANCHORS = (*BATTLE_NAME_ANCHORS, *ATB_TARGET_ANCHORS)
 TEXT_PRESENTATION_TERMS = (
     "Text",
     "TextBlock",
@@ -89,9 +92,62 @@ def _flatten_strings(asset: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _flatten_objects(asset: dict[str, Any]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for file_row in asset.get("files", ()):
+        suffix = str(file_row.get("suffix", ""))
+        path = str(file_row.get("path", ""))
+        for kind in ("resolvedImports", "resolvedExports"):
+            for object_row in file_row.get(kind, ()):
+                rows.append({
+                    "suffix": suffix,
+                    "path": path,
+                    "objectKind": "import" if kind == "resolvedImports" else "export",
+                    **object_row,
+                })
+    return rows
+
+
 def _contains_any(value: str, terms: Iterable[str]) -> bool:
     folded = value.casefold()
     return any(str(term).casefold() in folded for term in terms)
+
+
+def _object_searchable(row: dict[str, Any]) -> str:
+    return " ".join(
+        str(row.get(key) or "")
+        for key in ("objectName", "objectPath", "outerPath", "className", "classPath", "classPackage")
+    )
+
+
+def _requested_surface(value: str) -> tuple[bool, bool]:
+    folded = value.casefold()
+    battle = any(token in folded for token in ("battleenemy", "enemystatus"))
+    target = any(token in folded for token in ("battletarget", "targetnew"))
+    return battle, target
+
+
+def _resolved_text_children(asset: dict[str, Any], objects: Iterable[dict[str, Any]]) -> tuple[list[dict], list[dict]]:
+    """Return text/name-like object rows scoped to requested battle/target UI assets."""
+    battle_rows: list[dict] = []
+    target_rows: list[dict] = []
+    asset_name = str(asset.get("asset", ""))
+    asset_battle, asset_target = _requested_surface(asset_name)
+    for row in objects:
+        child = " ".join((str(row.get("objectName") or ""), str(row.get("className") or "")))
+        if not _contains_any(child, TEXT_PRESENTATION_TERMS):
+            continue
+        ownership = " ".join((
+            asset_name,
+            str(row.get("objectPath") or ""),
+            str(row.get("outerPath") or ""),
+        ))
+        row_battle, row_target = _requested_surface(ownership)
+        if asset_battle or row_battle:
+            battle_rows.append(row)
+        if asset_target or row_target:
+            target_rows.append(row)
+    return battle_rows, target_rows
 
 
 def rank_unscanned_name_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -99,6 +155,7 @@ def rank_unscanned_name_assets(assets: Iterable[dict[str, Any]]) -> list[dict[st
     ranked: list[dict[str, Any]] = []
     for asset in assets:
         strings = _flatten_strings(asset)
+        objects = _flatten_objects(asset)
         presentation = [
             row for row in strings
             if _contains_any(str(row.get("text", "")), PRESENTATION_ANCHORS)
@@ -115,12 +172,37 @@ def rank_unscanned_name_assets(assets: Iterable[dict[str, Any]]) -> list[dict[st
             row for row in strings
             if _contains_any(str(row.get("text", "")), KNOWN_NON_QUERY_ANCHORS)
         ]
-        if not presentation:
+        resolved_presentation = [
+            row for row in objects
+            if _contains_any(_object_searchable(row), PRESENTATION_ANCHORS)
+        ]
+        resolved_battle_children, resolved_target_children = _resolved_text_children(asset, objects)
+        asset_battle, asset_target = _requested_surface(str(asset.get("asset", "")))
+        resolved_battle_owner = bool(
+            any(_contains_any(_object_searchable(row), BATTLE_NAME_ANCHORS) for row in resolved_presentation)
+            or (asset_battle and resolved_battle_children)
+        )
+        resolved_target_owner = bool(
+            any(_contains_any(_object_searchable(row), ATB_TARGET_ANCHORS) for row in resolved_presentation)
+            or (asset_target and resolved_target_children)
+        )
+
+        if not presentation and not resolved_presentation and not resolved_battle_owner and not resolved_target_owner:
             continue
 
-        score = len(presentation) * 1400 + min(len(text_fields), 32) * 45
+        score = (
+            len(resolved_presentation) * 5000
+            + len(resolved_battle_children) * 1800
+            + len(resolved_target_children) * 1800
+            + len(presentation) * 1400
+            + min(len(text_fields), 32) * 45
+        )
         if text_fields:
             score += 1800
+        if resolved_battle_owner:
+            score += 3500
+        if resolved_target_owner:
+            score += 3500
         # Useful correlation evidence, but never enough to imply save-state
         # ownership or an assessed-state query.
         score += min(len(state_links), 8) * 120
@@ -131,7 +213,16 @@ def rank_unscanned_name_assets(assets: Iterable[dict[str, Any]]) -> list[dict[st
             "textPresentationHits": text_fields,
             "enemyBookLinkHits": state_links,
             "nonQueryStateHits": non_query,
-            "strongPresentationCandidate": bool(presentation and text_fields),
+            "resolvedPresentationOwners": resolved_presentation,
+            "resolvedBattleNameChildren": resolved_battle_children,
+            "resolvedAtbTargetNameChildren": resolved_target_children,
+            "resolvedBattleNameOwnerEvidence": resolved_battle_owner,
+            "resolvedAtbTargetOwnerEvidence": resolved_target_owner,
+            "strongPresentationCandidate": bool(
+                (presentation and text_fields)
+                or resolved_battle_owner
+                or resolved_target_owner
+            ),
             "score": score,
         })
 
@@ -179,8 +270,9 @@ def assess_unscanned_name_evidence(
         presentation_hits.get("BattleEnemyStatusWidget")
         or presentation_hits.get("ShowBattleEnemyStatusWindow")
         or any(
-            any(
-                _contains_any(str(hit.get("text", "")), ("BattleEnemyStatusWidget", "ShowBattleEnemyStatusWindow"))
+            row.get("resolvedBattleNameOwnerEvidence")
+            or any(
+                _contains_any(str(hit.get("text", "")), BATTLE_NAME_ANCHORS)
                 for hit in row.get("presentationAnchorHits", ())
             )
             for row in candidates
@@ -191,15 +283,19 @@ def assess_unscanned_name_evidence(
         or presentation_hits.get("BattleTargetNewWidget")
         or presentation_hits.get("ShowBattleTargetIcon")
         or any(
-            any(
-                _contains_any(
-                    str(hit.get("text", "")),
-                    ("BattleTargetWidget", "BattleTargetNewWidget", "ShowBattleTargetIcon"),
-                )
+            row.get("resolvedAtbTargetOwnerEvidence")
+            or any(
+                _contains_any(str(hit.get("text", "")), ATB_TARGET_ANCHORS)
                 for hit in row.get("presentationAnchorHits", ())
             )
             for row in candidates
         )
+    )
+    battle_name_child_candidate = any(
+        row.get("resolvedBattleNameChildren") for row in candidates
+    )
+    atb_target_name_child_candidate = any(
+        row.get("resolvedAtbTargetNameChildren") for row in candidates
     )
 
     blockers: list[str] = []
@@ -214,8 +310,12 @@ def assess_unscanned_name_evidence(
         blockers.append("assessed-state-query-unvalidated")
     if not battle_name_path_candidate:
         blockers.append("battle-name-presentation-path-unresolved")
+    elif not battle_name_child_candidate:
+        blockers.append("battle-name-text-child-unresolved")
     if not atb_target_path_candidate:
         blockers.append("atb-target-presentation-path-unresolved")
+    elif not atb_target_name_child_candidate:
+        blockers.append("atb-target-name-text-child-unresolved")
 
     return {
         "implementationReady": False,
@@ -223,6 +323,7 @@ def assess_unscanned_name_evidence(
         "enemyBookLink": {
             "needleHits": link_hits,
             "authoritativeAuthoredField": "BattleCharaSpec.EnemyBookID",
+            "secondaryAuthoredField": "BattleCharaSpec.EnemyBookIDPlus",
         },
         "assessedState": {
             "candidateNeedleHits": query_hits,
@@ -238,13 +339,27 @@ def assess_unscanned_name_evidence(
             "nativeNeedleHits": presentation_hits,
             "battleNamePathCandidate": battle_name_path_candidate,
             "atbTargetPathCandidate": atb_target_path_candidate,
+            "battleNameTextChildCandidate": battle_name_child_candidate,
+            "atbTargetNameTextChildCandidate": atb_target_name_child_candidate,
+            "resolvedBattleOwnerCandidates": sum(
+                bool(row.get("resolvedBattleNameOwnerEvidence")) for row in candidates
+            ),
+            "resolvedAtbTargetOwnerCandidates": sum(
+                bool(row.get("resolvedAtbTargetOwnerEvidence")) for row in candidates
+            ),
             "rankedCandidateCount": len(candidates),
         },
         "scanErrors": errors,
+        "knownContracts": {
+            "battleStatusSetting": "UEndMenuSettings::BattleEnemyStatusWidget",
+            "battleTargetSetting": "UEndMenuSettings::BattleTargetWidget",
+            "battleTargetNewSetting": "UEndMenuSettings::BattleTargetNewWidget",
+        },
         "notes": [
-            "BattleCharaSpec.EnemyBookID is an authored identity link, not proof that the enemy has been Assessed in this save.",
+            "BattleCharaSpec.EnemyBookID/EnemyBookIDPlus are authored identity links, not proof that the enemy has been Assessed in this save.",
             "EnemyBook.ViewState is static table data and is deliberately not treated as per-save Assess state.",
             "EnemyBook_IncrementKillCount_BP mutates kill-count bookkeeping and is not treated as an Assess query.",
+            "Resolved cooked object-table evidence can narrow the name-bearing UI children for both requested presentation surfaces, but does not supply the missing per-save Assessed predicate.",
             "The final suffix must wrap the game's localized display string at runtime; no localized EnemyBook text is rewritten by this probe.",
         ],
     }
