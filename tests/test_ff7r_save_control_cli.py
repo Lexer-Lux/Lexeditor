@@ -37,16 +37,33 @@ def test_cli_builder_subtracts_noop_control_from_repeated_assess_pairs(tmp_path)
     assert report["analysis"]["candidateOffsets"] == [10]
 
 
-def test_cli_builder_rejects_control_without_pair_mode(tmp_path):
+def test_cli_builder_subtracts_noop_control_from_cross_enemy_groups(tmp_path):
+    a1 = _write_pair(tmp_path, "a1", {10: 1, 70: 0x80, 80: 1})
+    a2 = _write_pair(tmp_path, "a2", {10: 1, 70: 0x80, 81: 2})
+    b1 = _write_pair(tmp_path, "b1", {20: 4, 70: 0x80, 82: 3})
+    b2 = _write_pair(tmp_path, "b2", {20: 4, 70: 0x80, 83: 4})
+    noop1 = _write_pair(tmp_path, "noop1", {70: 0x80, 84: 5})
+    noop2 = _write_pair(tmp_path, "noop2", {70: 0x80, 85: 6})
+
+    report = MODULE.build_report(
+        group_specs=[
+            ("enemy-a", *a1), ("enemy-a", *a2),
+            ("enemy-b", *b1), ("enemy-b", *b2),
+        ],
+        control_specs=[("noop-1", *noop1), ("noop-2", *noop2)],
+    )
+
+    assert report["mode"] == "cross-enemy-experiments-with-noop-control"
+    assert report["analysis"]["controlStableOffsets"] == [70]
+    assert report["analysis"]["discriminatingCandidateOffsets"] == [10, 20]
+
+
+def test_cli_builder_rejects_control_without_assess_experiment(tmp_path):
     noop = _write_pair(tmp_path, "noop", {70: 0x80})
 
-    for kwargs in (
-        {"control_specs": [("noop", *noop)]},
-        {"group_specs": [("enemy", *noop)], "control_specs": [("noop", *noop)]},
-    ):
-        try:
-            MODULE.build_report(**kwargs)
-        except ValueError as error:
-            assert "--control" in str(error)
-        else:
-            raise AssertionError("expected --control mode ValueError")
+    try:
+        MODULE.build_report(control_specs=[("noop", *noop)])
+    except ValueError as error:
+        assert "--control" in str(error)
+    else:
+        raise AssertionError("expected --control mode ValueError")
