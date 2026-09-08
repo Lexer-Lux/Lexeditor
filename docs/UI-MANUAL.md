@@ -137,6 +137,17 @@ glyph, placement and interaction are shared. It is centred in the metadata space
 between the panel edge and the property label, and its glyph is centred inside the
 circle.
 
+Info-bubble text explains **meaning and consequences**, not visible UI metadata.
+It should tell a mod author what the property represents in the game/editor, what
+changing it affects, non-obvious value semantics, important relationships with
+other properties, or caveats that cannot be inferred from the label alone.
+
+Never put the property's data type, allowed/storage numeric range, step size, displayed unit,
+current value, or generic instructions such as `Set X`, `Edit X`, `Choose X`, or
+`Enable/disable X` in an info bubble. Those facts are already represented by the
+field and its metadata. If no useful semantic explanation is known, omit the info
+bubble rather than filling it with tautological or storage-level text.
+
 ## Projects and Vanilla
 
 The project selector lists Vanilla first, then editable mods. Vanilla is the

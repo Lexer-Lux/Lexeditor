@@ -105,8 +105,8 @@
   }
   function semanticHelp(field){
     if(field.help)return field.help;
-    if(field.dataType==="text")return "English game text. Use byte escapes for control codes; unsupported characters and oversized text are refused on save.";
-    return `Stored as a bounded ${field.dataType}. Storage range: ${field.minimum} to ${field.maximum}${field.step>1?`; step ${field.step}`:""}.`;
+    if(field.dataType==="text")return "This is game-visible text. Byte escapes preserve FF7 control codes; unsupported characters or text that cannot fit are refused on save rather than corrupting the kernel.";
+    return "";
   }
   function semanticType(field){
     if(field.dataType==="text")return "TEXT";
@@ -130,7 +130,7 @@
     const metadata=category(),groups=[...new Set(metadata.fields.map(field=>field.group||"Kernel data"))];
     const body=[];
     if(metadata.descriptionEditable)body.push(detailSection({title:"TEXT",body:detailField({label:"DESCRIPTION",help:infoHelp("The in-game description stored in this FF7 KERNEL.BIN. Byte escapes are preserved for game control codes."),control:descriptionControl(row),dataType:"TEXT"})}));
-    body.push(...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>detailField({className:"ff7-field",label:field.label,help:infoHelp(semanticHelp(field)),control:semanticControl(row,field),dataType:semanticType(field),min:field.minimum,max:field.maximum}))})));
+    body.push(...groups.map(group=>detailSection({title:group.toUpperCase(),body:metadata.fields.filter(field=>(field.group||"Kernel data")===group).map(field=>{const help=semanticHelp(field);return detailField({className:"ff7-field",label:field.label,help:help?infoHelp(help):null,control:semanticControl(row,field),dataType:semanticType(field),min:field.minimum,max:field.maximum})})})));
     return detailPanel({className:"ff7-detail",title:row.values.name||row.name,identity:recordId(row.id),meta:null,body});
   }
   function listTable(rows,selected,select){

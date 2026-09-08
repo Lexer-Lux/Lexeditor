@@ -4230,7 +4230,7 @@ function settingIsBoolean(section,key){
 // large, unrelated block behind that field's "?".
 function settingPatternHelp(section,key){
   let m;
-  if(key==="Enabled")return `Enable or disable ${humanSettingName(section)}. This switch does not delete its saved settings.`;
+  if(key==="Enabled")return `Master switch for ${humanSettingName(section)}. Turning it off leaves the rest of this section saved so the same configuration returns when it is re-enabled.`;
   if(section==="WalletCap"&&(m=/^Rank(\d+)Dollars$/.exec(key)))
     return `Wallet capacity in dollars at Gambler challenge rank ${m[1]}.`;
   if(section==="HonorPrices"&&(m=/^Rank([+-]\d+)Multiplier$/.exec(key)))
@@ -4243,23 +4243,18 @@ function settingPatternHelp(section,key){
     return `Choose LOW instead of NORMAL framing for the ${humanSettingName(m[1]).toLowerCase()} camera. This is a two-state setting, not continuous height; some camera states ignore it.`;
   if((m=/^(SpentBar|SpentCore|Live|Zero)([RGBA])$/.exec(key))){
     const channel={R:"Red",G:"Green",B:"Blue",A:"Alpha"}[m[2]];
-    return `${channel} channel, 0-255, of the ${humanSettingName(m[1]).toLowerCase()} colour.`;
+    return `${channel} component of the ${humanSettingName(m[1]).toLowerCase()} colour. RGB components control hue/brightness while Alpha controls opacity.`;
   }
   return "";
 }
 function settingHelp(section,setting){
   const compound=`${section.name}|${setting.key}`;
-  const ordinary=(setting.help||"").trim()||schemaMap("help")[compound]||
-    settingPatternHelp(section.name,setting.key)||
-    `Edits ${setting.key} in the [${section.name}] section of this mod's INI. This installed setting has no field-specific behavior description.`;
+  const ordinary=(setting.help||"").trim()||schemaMap("help")[compound]||settingPatternHelp(section.name,setting.key)||"";
   const boundary=settingConstBoundary(section.name,setting.key);
-  const range=settingRange(section.name,setting.key);
-  const facts=[];
-  if(range&&range.min!==undefined&&range.max!==undefined)facts.push(`Editor range: ${range.min} to ${range.max}.`);
-  const authoredUnit=schemaMap("units")[compound];
-  if(typeof authoredUnit==="string"&&authoredUnit.trim())facts.push(`Unit: ${authoredUnit}.`);
-  if(boundary)facts.push(`Apply requirement: ${boundary}`);
-  return [ordinary,...facts].join(" ");
+  if(!ordinary&&!boundary)return "";
+  // Bounds and units are already printed by the property control/metadata. Only
+  // lifecycle consequences belong here in addition to authored behavior help.
+  return [ordinary,boundary?`Changing this setting requires: ${boundary}`:""].filter(Boolean).join(" ");
 }
 
 function settingUnit(section,key){
@@ -6062,7 +6057,7 @@ async function renderBountyHunters(){
       "Clean means no active wanted/search level; Arthur can still owe a regional bounty, so the bounty-acquired and hunter-encounter cooldown tables legitimately contain Clean rows. Min and Max are the stored randomized delay range in in-game hours."),
     scrollableCrimeTable(cool)));
   const poolHelp="Fixed responders are always requested by that phase. Random responders are alternatives selected by their relative Weight. Chance is a separate 0–1 gate, used here for police dogs.";
-  const pt=el("table",{},el("thead",{},el("tr",{},el("th",{},"Phase"),el("th",{},"Group scale"),el("th",{},"Pool ",fieldHelp(poolHelp)),el("th",{},"Responder"),el("th",{},"Min"),el("th",{},"Max"),el("th",{},"Chance ",fieldHelp("Probability from 0 to 1. For example, 0.2 means a 20% chance when this group is evaluated.")),el("th",{},"Weight ",fieldHelp("Relative selection weight inside the random pool. It is compared with the other weights in the same phase; it is not an independent percentage."))))),pb=el("tbody");
+  const pt=el("table",{},el("thead",{},el("tr",{},el("th",{},"Phase"),el("th",{},"Group scale"),el("th",{},"Pool ",fieldHelp(poolHelp)),el("th",{},"Responder"),el("th",{},"Min"),el("th",{},"Max"),el("th",{},"Chance ",fieldHelp("A normalized probability used when this group is evaluated; for example, 0.2 means a 20% chance.")),el("th",{},"Weight ",fieldHelp("Relative selection weight inside the random pool. It is compared with the other weights in the same phase; it is not an independent percentage."))))),pb=el("tbody");
   for(const p of d.phases){const rows=p.groups.length?p.groups:[null];for(let i=0;i<rows.length;i++){const g=rows[i];const cell=k=>g?.ids[k]?bountyNumber({id:g.ids[k],value:safeDisplay(g[k],"").replace(/f$/i,"")},"","",vphase(g.ids[k])):el("span",{},"—");const scale=i===0&&p.multiplierId?bountyNumber({id:p.multiplierId,value:safeDisplay(p.multiplier,"").replace(/f$/i,"")},"",p.multiplierHelp,vphase(p.multiplierId)):i===0?el("span",{},"—"):el("span",{},"");pb.append(el("tr",{},el("td",{class:"key"},i===0?p.label:""),el("td",{},scale),el("td",{},g?(g.bucket==="fixed"?"Fixed":"Random"):"No new group"),el("td",{},g?g.presetLabel:"Reuses available hunters"),el("td",{},cell("min")),el("td",{},cell("max")),el("td",{},cell("chance")),el("td",{},cell("weight"))));}}pt.append(pb);m.append(el("section",{},el("h2",{},"Escalation composition"),scrollableCrimeTable(pt)));
   const deps=el("table",{},el("thead",{},el("tr",{},el("th",{},"Responder"),el("th",{},"Weapons / weights"),el("th",{},"Combat profile"),el("th",{},"Mounted tactics")))),db=el("tbody");
   d.presets.forEach(p=>db.append(el("tr",{},
