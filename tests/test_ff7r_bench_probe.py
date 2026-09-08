@@ -1,4 +1,4 @@
-from games.ff7r.bench_probe import rank_bench_candidates
+from games.ff7r.bench_probe import pair_spatial_vectors, rank_bench_candidates
 
 
 def test_bench_probe_ranks_map_with_bench_and_vending_above_single_evidence_files():
@@ -91,3 +91,67 @@ def test_bench_probe_prefers_resolved_same_outer_exports_over_string_only_pair()
     assert rows[0]["containsBenchAndVending"] is False
     assert rows[0]["containsBenchAndVendingExports"] is True
     assert rows[0]["score"] > rows[1]["score"]
+
+
+def test_spatial_vector_pairs_rank_numeric_nearest_without_claiming_world_space():
+    bench = [
+        {
+            "ownerExportIndex": 10,
+            "ownerObjectName": "BenchNear",
+            "propertyName": "RelativeLocation",
+            "vector": {"x": 100.0, "y": 100.0, "z": 0.0},
+        },
+        {
+            "ownerExportIndex": 12,
+            "ownerObjectName": "BenchFar",
+            "propertyName": "RelativeLocation",
+            "vector": {"x": 1000.0, "y": 1000.0, "z": 0.0},
+        },
+    ]
+    vending = [{
+        "ownerExportIndex": 11,
+        "ownerObjectName": "Vending",
+        "propertyName": "RelativeLocation",
+        "vector": {"x": 103.0, "y": 104.0, "z": 0.0},
+    }]
+
+    pairs = pair_spatial_vectors(bench, vending)
+
+    assert len(pairs) == 2
+    assert pairs[0]["bench"]["ownerObjectName"] == "BenchNear"
+    assert pairs[0]["numericDistance"] == 5.0
+    assert pairs[0]["samePropertyName"] is True
+    assert pairs[0]["coordinateSpaceValidated"] is False
+    assert pairs[0]["worldSpaceAdjacencyValidated"] is False
+
+
+def test_serialized_spatial_pair_outranks_same_outer_only_but_remains_unvalidated():
+    same_outer = {
+        "path": "End/Content/slum7/same-outer.umap",
+        "interestingStrings": [],
+        "benchExports": [{"index": 10, "objectName": "BenchA", "outerPath": "PersistentLevel"}],
+        "vendingExports": [{"index": 11, "objectName": "VendA", "outerPath": "PersistentLevel"}],
+        "sharedOuterPairs": [{"benchExportIndex": 10, "vendingExportIndex": 11}],
+    }
+    spatial = {
+        "path": "End/Content/slum7/spatial.umap",
+        "interestingStrings": [],
+        "benchExports": [{"index": 20, "objectName": "BenchB", "outerPath": "PersistentLevel"}],
+        "vendingExports": [{"index": 21, "objectName": "VendB", "outerPath": "PersistentLevel"}],
+        "sharedOuterPairs": [{"benchExportIndex": 20, "vendingExportIndex": 21}],
+        "serializedSpatialPairs": [{
+            "bench": {"ownerObjectName": "BenchB", "propertyName": "RelativeLocation"},
+            "vending": {"ownerObjectName": "VendB", "propertyName": "RelativeLocation"},
+            "samePropertyName": True,
+            "numericDistance": 42.0,
+            "coordinateSpaceValidated": False,
+            "worldSpaceAdjacencyValidated": False,
+        }],
+    }
+
+    rows = rank_bench_candidates([same_outer, spatial])
+
+    assert rows[0]["path"].endswith("spatial.umap")
+    assert rows[0]["containsSerializedSpatialPair"] is True
+    assert rows[0]["nearestSerializedSpatialPair"]["numericDistance"] == 42.0
+    assert rows[0]["nearestSerializedSpatialPair"]["worldSpaceAdjacencyValidated"] is False
