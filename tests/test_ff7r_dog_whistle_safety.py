@@ -1,6 +1,24 @@
 from games.ff7r.dog_whistle_safety import assess_dog_whistle_probe
 
 
+def _native_function_row(needle, function_rva, *next_hops, source="pdata"):
+    return {
+        "needle": needle,
+        "hits": [{
+            "leaRipXrefs": [{
+                "candidateFunctionRva": function_rva,
+                "candidateFunctionSource": source,
+                "candidateFunctionCodeRefs": {
+                    "refs": [
+                        {"targetFunctionRva": target}
+                        for target in next_hops
+                    ],
+                },
+            }],
+        }],
+    }
+
+
 def _report(
     *,
     whistle_rows=(),
@@ -17,8 +35,14 @@ def _report(
     chapter4=(),
     canine=(),
     native_hits=(),
+    native_rows=(),
     errors=(),
 ):
+    rows = [
+        {"needle": needle, "hits": [{}] * count}
+        for needle, count in native_hits
+    ]
+    rows.extend(native_rows)
     return {
         "item": {
             "rowCandidates": list(whistle_rows),
@@ -42,12 +66,7 @@ def _report(
             "chapter4Candidates": list(chapter4),
         },
         "canineEnemies": list(canine),
-        "native": {
-            "needles": [
-                {"needle": needle, "hits": [{}] * count}
-                for needle, count in native_hits
-            ],
-        },
+        "native": {"needles": rows},
         "scanErrors": list(errors),
     }
 
@@ -195,7 +214,7 @@ def test_set_target_plus_ai_lookup_is_not_enough_without_enemy_enumeration_and_i
     assert "runtime-retarget-semantics-unvalidated" not in result["blockers"]
 
 
-def test_full_reflected_retarget_pipeline_is_still_semantically_unvalidated():
+def test_full_reflected_retarget_pipeline_is_still_semantically_and_functionally_unvalidated():
     result = assess_dog_whistle_probe(_report(
         templates=[_template()],
         native_hits=[
@@ -212,9 +231,34 @@ def test_full_reflected_retarget_pipeline_is_still_semantically_unvalidated():
     assert runtime["aiLookupCandidatePresent"] is True
     assert runtime["setTargetCandidatePresent"] is True
     assert runtime["retargetPipelinePresent"] is True
+    assert runtime["retargetFunctionEvidenceComplete"] is False
     assert runtime["retargetAnchorsPresent"] is True
     assert "runtime-retarget-pipeline-unproved" not in result["blockers"]
     assert "runtime-retarget-semantics-unvalidated" in result["blockers"]
+    assert "runtime-retarget-function-evidence-incomplete" in result["blockers"]
+
+
+def test_exact_pdata_evidence_for_each_retarget_anchor_still_does_not_prove_call_path():
+    result = assess_dog_whistle_probe(_report(
+        native_rows=[
+            _native_function_row("GetEnemyMembersRef", 0x1000, 0x5000),
+            _native_function_row("GetBattleCharaSpec_DataTableID", 0x1100, 0x5100),
+            _native_function_row("GetBattleAIControllerFromID", 0x1200, 0x5200),
+            _native_function_row("SetTarget", 0x1300, 0x5300),
+        ],
+    ))
+
+    runtime = result["runtimeRetarget"]
+    assert runtime["retargetPipelinePresent"] is True
+    assert runtime["retargetFunctionEvidenceComplete"] is True
+    assert runtime["activeEnemyEnumerationFunctionCandidatePresent"] is True
+    assert runtime["battleCharaIdLookupFunctionCandidatePresent"] is True
+    assert runtime["aiLookupFunctionCandidatePresent"] is True
+    assert runtime["setTargetFunctionCandidatePresent"] is True
+    assert "runtime-retarget-function-evidence-incomplete" not in result["blockers"]
+    assert "runtime-retarget-function-path-unvalidated" in result["blockers"]
+    assert "runtime-retarget-semantics-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
 
 
 def test_item_classifier_and_ability_execution_bridge_still_do_not_prove_player_menu_commit():
@@ -229,10 +273,71 @@ def test_item_classifier_and_ability_execution_bridge_still_do_not_prove_player_
     assert runtime["itemClassifierCandidatePresent"] is True
     assert runtime["abilityExecutionBridgeCandidatePresent"] is True
     assert runtime["itemAbilityRuntimeBridgePresent"] is True
+    assert runtime["itemAbilityFunctionEvidenceComplete"] is False
     assert runtime["playerItemCommandCommitValidated"] is False
     assert "runtime-item-ability-bridge-unproved" not in result["blockers"]
     assert "runtime-item-ability-bridge-unvalidated" in result["blockers"]
+    assert "runtime-item-ability-function-evidence-incomplete" in result["blockers"]
     assert "player-item-command-commit-hook-unresolved" in result["blockers"]
+
+
+def test_exact_item_and_ai_execution_functions_still_cannot_stand_in_for_player_commit():
+    result = assess_dog_whistle_probe(_report(
+        native_rows=[
+            _native_function_row("IsItem", 0x2000, 0x6000),
+            _native_function_row("RequestAIPCExecuteAbility", 0x2100, 0x6100),
+        ],
+    ))
+
+    runtime = result["runtimeRetarget"]
+    assert runtime["itemAbilityRuntimeBridgePresent"] is True
+    assert runtime["itemAbilityFunctionEvidenceComplete"] is True
+    assert runtime["itemClassifierFunctionCandidatePresent"] is True
+    assert runtime["abilityExecutionFunctionCandidatePresent"] is True
+    assert "runtime-item-ability-function-evidence-incomplete" not in result["blockers"]
+    assert "runtime-item-ability-function-path-unvalidated" in result["blockers"]
+    assert "player-item-command-commit-hook-unresolved" in result["blockers"]
+    assert runtime["playerItemCommandCommitValidated"] is False
+
+
+def test_padding_heuristic_runtime_owners_cannot_strengthen_function_evidence():
+    result = assess_dog_whistle_probe(_report(
+        native_rows=[
+            _native_function_row(
+                "GetEnemyMembersRef", 0x1000, 0x5000,
+                source="padding-heuristic",
+            ),
+            _native_function_row("GetBattleCharaSpec_DataTableID", 0x1100),
+            _native_function_row("GetBattleAIControllerFromID", 0x1200),
+            _native_function_row("SetTarget", 0x1300),
+        ],
+    ))
+
+    runtime = result["runtimeRetarget"]
+    assert runtime["retargetPipelinePresent"] is True
+    assert runtime["activeEnemyEnumerationFunctionCandidatePresent"] is False
+    assert runtime["nativeFunctionEvidence"]["GetEnemyMembersRef"]["expandedPdataFunctions"] == []
+    assert runtime["retargetFunctionEvidenceComplete"] is False
+    assert "runtime-retarget-function-evidence-incomplete" in result["blockers"]
+
+
+def test_multi_name_direct_owner_is_reported_as_registration_collision_risk():
+    result = assess_dog_whistle_probe(_report(
+        native_rows=[
+            _native_function_row("GetBattleAIControllerFromID", 0x7000),
+            _native_function_row("SetTarget", 0x7000),
+        ],
+    ))
+    cluster = next(
+        row for row in result["runtimeRetarget"]["nativeFunctionClusters"]
+        if row["functionRva"] == 0x7000
+    )
+
+    assert cluster["families"] == ["ai-lookup", "retarget"]
+    assert cluster["directNeedles"] == ["GetBattleAIControllerFromID", "SetTarget"]
+    assert cluster["crossFamily"] is True
+    assert cluster["registrationCollisionRisk"] is True
+    assert result["implementationReady"] is False
 
 
 def test_canine_coverage_counts_groups_and_battle_rows_without_claiming_validation():
