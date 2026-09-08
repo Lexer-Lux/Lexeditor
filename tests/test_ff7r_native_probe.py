@@ -22,7 +22,7 @@ def fixture_pe(*, with_pdata=True):
     struct.pack_into("<I", data, optional + 108, 16)  # NumberOfRvaAndSizes
     if with_pdata:
         exception = optional + 112 + 3 * 8
-        struct.pack_into("<II", data, exception, 0x3000, 12)
+        struct.pack_into("<II", data, exception, 0x3000, 24)
 
     sections = optional + 0xF0
 
@@ -39,6 +39,7 @@ def fixture_pe(*, with_pdata=True):
     if with_pdata:
         section(2, ".pdata", 0x3000, 0x500, 0x40)
         struct.pack_into("<III", data, 0x500, 0x1010, 0x1020, 0x3030)
+        struct.pack_into("<III", data, 0x50C, 0x1040, 0x1050, 0x3040)
 
     # String at .rdata+0x20 => RVA 0x2020.
     data[0x420:0x420 + len(b"NaviMap\0")] = b"NaviMap\0"
@@ -52,6 +53,11 @@ def fixture_pe(*, with_pdata=True):
     # raw function window proves it is reading the executable bytes, not merely
     # echoing the string/xref metadata.
     data[0x217:0x21B] = b"\x48\x83\xEC\x28"
+    # End the first unwind-described function with a direct call to the second
+    # unwind-described function. The probe should expose this as a conservative
+    # next-hop code reference.
+    call_rva = 0x101B
+    data[0x21B:0x220] = b"\xE8" + struct.pack("<i", 0x1040 - (call_rva + 5))
     return bytes(data)
 
 
@@ -63,8 +69,8 @@ def test_probe_maps_pdata_function_ranges_and_byte_windows():
     assert result["timestampHex"] == "0x12345678"
     assert result["exceptionDirectory"] == {
         "rva": 0x3000,
-        "size": 12,
-        "runtimeFunctionCount": 1,
+        "size": 24,
+        "runtimeFunctionCount": 2,
     }
 
     navimap = result["needles"][0]
@@ -102,8 +108,29 @@ def test_probe_maps_pdata_function_ranges_and_byte_windows():
     assert function_bytes[:7] == b"\x48\x8D\x0D" + struct.pack("<i", 0x2020 - 0x1017)
     assert function_bytes[7:11] == b"\x48\x83\xEC\x28"
 
+    code_refs = xref["candidateFunctionCodeRefs"]
+    assert code_refs["scanStartRva"] == 0x1010
+    assert code_refs["scanEndRva"] == 0x1020
+    assert code_refs["byteCount"] == 16
+    assert code_refs["rangeTruncated"] is False
+    assert code_refs["refsTruncated"] is False
+    assert code_refs["refs"] == [{
+        "kind": "call-rel32",
+        "instructionRva": 0x101B,
+        "instructionVa": 0x14000101B,
+        "targetRva": 0x1040,
+        "targetVa": 0x140001040,
+        "targetFunctionRva": 0x1040,
+        "targetFunctionVa": 0x140001040,
+        "targetFunctionEndRva": 0x1050,
+        "targetFunctionEndVa": 0x140001050,
+        "targetFunctionUnwindInfoRva": 0x3040,
+        "targetFunctionUnwindInfoVa": 0x140003040,
+    }]
+
     assert result["needles"][1]["hits"] == []
     assert any(".pdata" in note for note in result["notes"])
+    assert any("code refs" in note for note in result["notes"])
 
 
 def test_probe_falls_back_to_padding_when_pdata_is_unavailable():
@@ -116,6 +143,7 @@ def test_probe_falls_back_to_padding_when_pdata_is_unavailable():
     assert xref["candidateFunctionEndRva"] is None
     assert xref["candidateFunctionSource"] == "padding-heuristic"
     assert xref["candidateFunctionUnwindInfoRva"] is None
+    assert xref["candidateFunctionCodeRefs"] is None
     assert xref["candidateFunctionBytes"]["byteCount"] == 64
 
 
