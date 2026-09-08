@@ -13,12 +13,17 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 from typing import Any
 
-from .storage import load_package
+from .storage import load_package, save_edits
 from .text_storage import resident_text_map
 
 
 ECONOMY_TABLE_NAMES = frozenset({"item", "equipment", "materia"})
 ECONOMY_FIELDS = ("BuyValue", "SaleValue", "CanSale")
+ECONOMY_EDIT_FIELDS = {
+    "buy": "BuyValue",
+    "sell": "SaleValue",
+    "canSell": "CanSale",
+}
 LOOT_TABLE_NAME = "battleitempossession"
 LOOT_FIELD_PAIRS = (
     ("normal", "NormalItemName_Array", "NormalItemPercent_Array", None),
@@ -167,6 +172,19 @@ def _array(values: dict[str, Any], name: str | None) -> list[Any]:
     return list(value) if isinstance(value, list) else []
 
 
+def _loot_specs(props: dict[str, Any]) -> dict[str, dict[str, str | None]]:
+    specs: dict[str, dict[str, str | None]] = {}
+    for kind, item_prop, percent_prop, quantity_prop in LOOT_FIELD_PAIRS:
+        if item_prop not in props:
+            continue
+        specs[kind] = {
+            "item": item_prop,
+            "chance": percent_prop if percent_prop in props else None,
+            "quantity": quantity_prop if quantity_prop in props else None,
+        }
+    return specs
+
+
 def loot_payload(game_root, data_root, project_root, index: dict,
                  *, language: str = "US", vanilla: bool = False) -> dict:
     row = _loot_asset(index)
@@ -185,14 +203,13 @@ def loot_payload(game_root, data_root, project_root, index: dict,
         language=language, vanilla=vanilla)
 
     discovered = []
-    for kind, item_prop, percent_prop, quantity_prop in LOOT_FIELD_PAIRS:
-        if item_prop in props:
-            discovered.append({
-                "kind": kind,
-                "itemProperty": item_prop,
-                "percentProperty": percent_prop if percent_prop in props else None,
-                "quantityProperty": quantity_prop if quantity_prop in props else None,
-            })
+    for kind, fields in _loot_specs(props).items():
+        discovered.append({
+            "kind": kind,
+            "itemProperty": fields["item"],
+            "percentProperty": fields["chance"],
+            "quantityProperty": fields["quantity"],
+        })
     if not discovered:
         return {
             "available": False,
@@ -256,3 +273,95 @@ def loot_payload(game_root, data_root, project_root, index: dict,
             "Chance controls use the installed raw percent field; semantic UI constrains percent-like fields to 0..100.",
         ],
     }
+
+
+def save_economy_edits(game_root, data_root, project_root, index: dict, asset: str,
+                       *, source_sha256: str, active_sha256: str,
+                       edits: list[dict[str, Any]]) -> dict:
+    """Validate price semantics, then delegate to the fixed-size DataObject writer."""
+    if _basename(asset) not in ECONOMY_TABLE_NAMES:
+        raise ValueError("Economy saves are limited to Item, Equipment, and Materia DataObjects")
+    if not isinstance(edits, list):
+        raise TypeError("Economy edits must be a list")
+
+    package, _source_sha, _using_project = load_package(
+        game_root, data_root, project_root, index, asset, vanilla=False)
+    props = _property_map(package)
+    generic_edits: list[dict[str, Any]] = []
+    for edit in edits:
+        if not isinstance(edit, dict):
+            raise TypeError("Each economy edit must be an object")
+        field = str(edit.get("field", ""))
+        prop_name = ECONOMY_EDIT_FIELDS.get(field)
+        if prop_name is None:
+            raise ValueError(f"Unknown economy field: {field}")
+        if prop_name not in props:
+            raise ValueError(f"{prop_name} is not present in this installed FF7R DataObject")
+        if props[prop_name].array:
+            raise ValueError(f"{prop_name} unexpectedly uses an array in this installed FF7R DataObject")
+        if "index" in edit:
+            raise ValueError("Economy fields are scalar and do not accept an array index")
+        generic_edits.append({
+            "entry": int(edit.get("entry", -1)),
+            "property": prop_name,
+            "value": edit.get("value"),
+        })
+
+    result = save_edits(
+        game_root, data_root, project_root, index, asset,
+        source_sha256=source_sha256,
+        active_sha256=active_sha256,
+        edits=generic_edits,
+    )
+    return {**result, "surface": "economy"}
+
+
+def save_loot_edits(game_root, data_root, project_root, index: dict, asset: str,
+                    *, source_sha256: str, active_sha256: str,
+                    edits: list[dict[str, Any]]) -> dict:
+    """Validate drop/steal semantics, then delegate to the fixed-size DataObject writer."""
+    if _basename(asset) != LOOT_TABLE_NAME:
+        raise ValueError("Enemy-loot saves are limited to the BattleItemPossession DataObject")
+    if not isinstance(edits, list):
+        raise TypeError("Enemy-loot edits must be a list")
+
+    package, _source_sha, _using_project = load_package(
+        game_root, data_root, project_root, index, asset, vanilla=False)
+    specs = _loot_specs(_property_map(package))
+    if not specs:
+        raise ValueError("This BattleItemPossession DataObject has no recognized drop/steal fields")
+
+    generic_edits: list[dict[str, Any]] = []
+    for edit in edits:
+        if not isinstance(edit, dict):
+            raise TypeError("Each enemy-loot edit must be an object")
+        kind = str(edit.get("kind", ""))
+        field = str(edit.get("field", ""))
+        if kind not in specs:
+            raise ValueError(f"Unknown or unavailable enemy-loot group: {kind}")
+        if field not in {"item", "chance", "quantity"}:
+            raise ValueError(f"Unknown enemy-loot field: {field}")
+        prop_name = specs[kind].get(field)
+        if prop_name is None:
+            raise ValueError(f"{kind} loot does not expose a {field} field in this installed FF7R DataObject")
+        slot = int(edit.get("index", -1))
+        if slot < 0:
+            raise ValueError("Enemy-loot slot index must be zero or greater")
+        value = edit.get("value")
+        if field == "chance":
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 100:
+                raise ValueError("Enemy-loot chance must be an integer from 0 to 100")
+        generic_edits.append({
+            "entry": int(edit.get("entry", -1)),
+            "property": prop_name,
+            "index": slot,
+            "value": value,
+        })
+
+    result = save_edits(
+        game_root, data_root, project_root, index, asset,
+        source_sha256=source_sha256,
+        active_sha256=active_sha256,
+        edits=generic_edits,
+    )
+    return {**result, "surface": "enemy-loot"}
