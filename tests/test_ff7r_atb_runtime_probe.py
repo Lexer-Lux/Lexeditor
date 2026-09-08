@@ -10,21 +10,44 @@ def _native(**counts):
     }
 
 
-def _function_row(needle, function_rva, *next_hops, source="pdata"):
+def _inbound(*callers):
+    return {
+        "refs": [
+            {"sourceFunctionRva": caller, "kind": "call-rel32"}
+            for caller in callers
+        ]
+    }
+
+
+def _function_row(
+    needle,
+    function_rva,
+    *next_hops,
+    source="pdata",
+    callers=(),
+    next_hop_callers=(),
+):
+    xref = {
+        "candidateFunctionRva": function_rva,
+        "candidateFunctionSource": source,
+        "candidateFunctionCodeRefs": {
+            "refs": [
+                {
+                    "targetFunctionRva": target,
+                    **(
+                        {"targetFunctionInboundCodeRefs": _inbound(*next_hop_callers)}
+                        if next_hop_callers else {}
+                    ),
+                }
+                for target in next_hops
+            ],
+        },
+    }
+    if callers:
+        xref["candidateFunctionInboundCodeRefs"] = _inbound(*callers)
     return {
         "needle": needle,
-        "hits": [{
-            "leaRipXrefs": [{
-                "candidateFunctionRva": function_rva,
-                "candidateFunctionSource": source,
-                "candidateFunctionCodeRefs": {
-                    "refs": [
-                        {"targetFunctionRva": target}
-                        for target in next_hops
-                    ],
-                },
-            }],
-        }],
+        "hits": [{"leaRipXrefs": [xref]}],
     }
 
 
@@ -178,6 +201,39 @@ def test_exact_pdata_atb_accessor_targets_correlate_without_validating_semantics
     assert result["implementationReady"] is False
 
 
+def test_shared_atb_inbound_callers_are_reported_without_clearing_function_link_blockers():
+    result = assess_atb_runtime_evidence(
+        _function_native(
+            _function_row("SetATB", 0x1000, callers=(0x9000,)),
+            _function_row("GetATB", 0x2000, callers=(0x9000,)),
+            _function_row("GetATBMax", 0x3000, callers=(0x9000,)),
+            _function_row("ATBValue", 0x4000, callers=(0x9100,)),
+            _function_row("BPGetPlayerDexterity", 0x5000, callers=(0x9100,)),
+            _function_row("HitBonusATBRecoverAdd", 0x6000, callers=(0x9200,)),
+            _function_row("NormalAttackHitSuccess", 0x6100, callers=(0x9200,)),
+            _function_row("NormalAttackPerHitSuccess", 0x6200, callers=(0x9300,)),
+            _function_row("IsDodge", 0x7000, callers=(0x9000,)),
+        ),
+        guard_rows=1,
+        ability_rows=1,
+    )
+
+    runtime = result["runtimeResearch"]
+    correlations = runtime["nativeFunctionCorrelations"]
+    assert correlations["setToGet"] == []
+    assert correlations["setToGetCallers"] == [0x9000]
+    assert correlations["setToMaxCallers"] == [0x9000]
+    assert correlations["speedToAccumulatorCallers"] == [0x9100]
+    assert correlations["hitModifierToAttackLevelEventsCallers"] == [0x9200]
+    assert correlations["hitModifierToPerHitEventsCallers"] == []
+    assert correlations["dodgeToSetATBCallers"] == [0x9000]
+    assert runtime["nativeFunctionEvidence"]["SetATB"]["directInboundCallerFunctions"] == [0x9000]
+    assert "direct-atb-read-write-function-link-unvalidated" in result["blockers"]
+    assert "speed-to-accumulator-link-unvalidated" in result["blockers"]
+    assert "dodge-transition-edge-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
 def test_hit_function_correlation_distinguishes_attack_level_from_per_hit_lead():
     result = assess_atb_runtime_evidence(
         _function_native(
@@ -216,10 +272,13 @@ def test_dodge_to_set_atb_function_correlation_remains_transition_blocked():
     assert result["implementationReady"] is False
 
 
-def test_atb_function_correlations_ignore_padding_heuristic_owners():
+def test_atb_function_correlations_ignore_padding_heuristic_owners_and_callers():
     result = assess_atb_runtime_evidence(
         _function_native(
-            _function_row("SetATB", 0x1000, 0x5000, source="padding-heuristic"),
+            _function_row(
+                "SetATB", 0x1000, 0x5000,
+                source="padding-heuristic", callers=(0x9000,),
+            ),
             _function_row("GetATB", 0x2000, 0x5000),
         ),
         guard_rows=1,
@@ -228,7 +287,9 @@ def test_atb_function_correlations_ignore_padding_heuristic_owners():
 
     runtime = result["runtimeResearch"]
     assert runtime["nativeFunctionEvidence"]["SetATB"]["expandedPdataFunctions"] == []
+    assert runtime["nativeFunctionEvidence"]["SetATB"]["expandedInboundCallerFunctions"] == []
     assert runtime["nativeFunctionCorrelations"]["setToGet"] == []
+    assert runtime["nativeFunctionCorrelations"]["setToGetCallers"] == []
     assert runtime["directATBApiFunctionCandidatePresent"] is False
     assert "direct-atb-read-write-function-path-unresolved" in result["blockers"]
 
