@@ -167,13 +167,17 @@ def assess_lock_state_evidence(native: dict[str, Any]) -> dict[str, Any]:
 
 
 def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Rank cooked reticle candidates; serialized dedicated tags outrank strings."""
+    """Rank cooked reticle candidates; trusted serialized tags outrank strings."""
     ranked: list[dict[str, Any]] = []
     for asset in assets:
         strings = _flatten_strings(asset)
         objects = _flatten_objects(asset)
         serial = dict(asset.get("serializedExportEvidence") or {})
-        serialized_refs = list(serial.get("refs", ()))
+        mapping_trusted = bool(serial.get("mappingTrusted", False))
+        # Never allow an inconsistent/synthetic evidence object to bypass the
+        # split-package boundary proof. The installed scanner itself emits no refs
+        # for an untrusted mapping, but ranking remains fail-closed independently.
+        serialized_refs = list(serial.get("refs", ())) if mapping_trusted else []
         serialized_dedicated_refs = [
             row for row in serialized_refs
             if row.get("propertyTagLike") and _serialized_ref_is_dedicated(row)
@@ -181,6 +185,10 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
         serialized_tint_refs = [
             row for row in serialized_dedicated_refs
             if _contains_any(str(row.get("name", "")), TINT_SERIAL_TERMS)
+        ]
+        serialized_plausible_tint_refs = [
+            row for row in serialized_tint_refs
+            if row.get("propertyTagHeaderPlausible")
         ]
 
         widget_hits = [row for row in strings if _contains_any(str(row.get("text", "")), WIDGET_ANCHORS)]
@@ -226,8 +234,9 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             continue
 
         score = (
-            len(serialized_tint_refs) * 9000
-            + len(serialized_dedicated_refs) * 3500
+            len(serialized_plausible_tint_refs) * 9000
+            + len(serialized_tint_refs) * 3000
+            + len(serialized_dedicated_refs) * 1500
             + len(resolved_owners) * 6000
             + len(resolved_label_children) * 800
             + len(resolved_reticle_children) * 1800
@@ -252,10 +261,11 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             "resolvedDedicatedOwners": resolved_owners,
             "resolvedLabelChildren": resolved_label_children,
             "resolvedReticleChildren": resolved_reticle_children,
-            "serializedExportMappingTrusted": bool(serial.get("mappingTrusted", False)),
+            "serializedExportMappingTrusted": mapping_trusted,
             "serializedExportMappingReason": str(serial.get("mappingReason", "")),
             "serializedDedicatedPropertyRefs": serialized_dedicated_refs,
             "serializedTintPropertyRefs": serialized_tint_refs,
+            "serializedPlausibleTintTagRefs": serialized_plausible_tint_refs,
             "objectTableErrors": object_table_errors,
             "containsDedicatedWidgetAnchor": bool(widget_hits or resolved_owners or serialized_dedicated_refs),
             "containsLiteralLockOnLabel": bool(label_hits),
@@ -263,8 +273,9 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             "resolvedLabelChildEvidence": bool(resolved_label_children),
             "resolvedReticleChildEvidence": bool(resolved_reticle_children),
             "serializedTintPropertyEvidence": bool(serialized_tint_refs),
+            "serializedPlausibleTintTagEvidence": bool(serialized_plausible_tint_refs),
             "strongPresentationCandidate": bool(
-                serialized_tint_refs
+                serialized_plausible_tint_refs
                 or ((widget_hits or resolved_owners) and (
                     presentation_hits or resolved_reticle_children
                 ))
@@ -312,6 +323,8 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         1 for row in ranked if row.get("resolvedDedicatedOwnerEvidence"))
     serialized_tint_count = sum(
         1 for row in ranked if row.get("serializedTintPropertyEvidence"))
+    plausible_tint_count = sum(
+        1 for row in ranked if row.get("serializedPlausibleTintTagEvidence"))
     object_errors = [
         error
         for row in ranked
@@ -323,8 +336,10 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
     ]
 
     blockers = ["single-cooked-reticle-owner-unvalidated"]
-    if serialized_tint_count:
-        blockers.append("serialized-lockon-tint-property-semantics-unvalidated")
+    if plausible_tint_count:
+        blockers.append("serialized-lockon-tint-value-layout-unvalidated")
+    elif serialized_tint_count:
+        blockers.append("serialized-lockon-tint-property-header-unvalidated")
     else:
         blockers.append("exact-lockon-tint-property-unresolved")
     if lock_state["reflectedContractPresent"]:
@@ -345,6 +360,7 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         "objectTableErrors": object_errors,
         "resolvedOwnerCandidateCount": resolved_owner_count,
         "serializedTintCandidateCount": serialized_tint_count,
+        "serializedPlausibleTintTagCandidateCount": plausible_tint_count,
         "implementationReady": False,
         "blockers": blockers,
         "knownContracts": {
@@ -360,7 +376,8 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         "notes": [
             "The localized LOCK ON prompt is no longer a blocker in this probe; it is an independent staging-only text tweak once its cross-language text ID is proven.",
             "The dedicated battle lock-on marker widget is the preferred reticle owner; generic battle target widgets are not assumed equivalent.",
-            "Serialized property-tag-like references are accepted only when split-package export mapping is proven and the immediately following FName is a known UE *Property serializer type. They still do not identify the encoded color value layout.",
+            "Serialized evidence is accepted only when split-package export mapping is proven. A tint property becomes a strong serialized lead only when its immediate *Property type and bounded generic Size/ArrayIndex tag header are both plausible.",
+            "Even a plausible generic property tag does not identify type-specific tag metadata, the encoded color value start/layout, or the correct replacement bytes.",
             "ShowBattleTargetIcon's explicit locked target states remain a separate predicate lead. If installed behavior proves UEndBattleLockonMarkerIcon exists only while locked, the dedicated widget lifecycle may remove the need for a second state hook.",
             "No cooked UI export is rewritten by this probe. Exact serialized value semantics and installed visual ownership must be validated before reticle tinting is implemented.",
         ],
