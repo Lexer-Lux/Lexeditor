@@ -1,4 +1,4 @@
-from games.ff7r.lockon_probe import rank_lockon_assets
+from games.ff7r.lockon_probe import assess_lock_state_evidence, rank_lockon_assets
 
 
 def _asset(name, *strings):
@@ -12,6 +12,15 @@ def _asset(name, *strings):
                 for index, value in enumerate(strings)
             ],
         }],
+    }
+
+
+def _native(**counts):
+    return {
+        "needles": [
+            {"needle": needle, "hits": [{}] * count}
+            for needle, count in counts.items()
+        ]
     }
 
 
@@ -72,6 +81,17 @@ def test_unrelated_target_ui_is_not_promoted():
     assert ranked == []
 
 
+def test_target_state_asset_is_research_evidence_but_not_dedicated_lockon_owner():
+    ranked = rank_lockon_assets([
+        _asset("UI/BattleTarget", "ShowBattleTargetIcon", "EEndMenuBattleTargetState", "LockedEnabled"),
+    ])
+
+    assert len(ranked) == 1
+    assert ranked[0]["lockStateAnchorHits"]
+    assert ranked[0]["containsDedicatedWidgetAnchor"] is False
+    assert ranked[0]["strongPresentationCandidate"] is False
+
+
 def test_ranking_is_deterministic_for_equal_evidence():
     ranked = rank_lockon_assets([
         _asset("UI/Zed", "BattleLockonMarker"),
@@ -102,3 +122,25 @@ def test_literal_label_without_resolved_owner_does_not_invent_object_ownership()
     assert ranked[0]["containsLiteralLockOnLabel"] is True
     assert ranked[0]["resolvedDedicatedOwnerEvidence"] is False
     assert ranked[0]["resolvedLabelChildEvidence"] is False
+
+
+def test_show_target_icon_plus_state_enum_is_strong_lead_but_still_unvalidated():
+    result = assess_lock_state_evidence(_native(
+        ShowBattleTargetIcon=1,
+        EEndMenuBattleTargetState=1,
+        LockedEnabled=1,
+        LockedDisabled=1,
+        OutLockedEnabled=1,
+    ))
+
+    assert result["reflectedContractPresent"] is True
+    assert result["lockedEnumeratorEvidence"] is True
+    assert result["lockedStateNeedleHits"]["LockedEnabled"] == 1
+    assert result["validatedAsIssuePredicate"] is False
+
+
+def test_partial_target_state_evidence_never_claims_contract():
+    result = assess_lock_state_evidence(_native(ShowBattleTargetIcon=1))
+
+    assert result["reflectedContractPresent"] is False
+    assert result["validatedAsIssuePredicate"] is False
