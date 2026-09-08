@@ -16,6 +16,8 @@ jobs:
         with:
           ref: fix/global-349-rdr-semantic-help
           fetch-depth: 0
+      - name: Install test runner
+        run: python -m pip install pytest
       - name: Apply exact reviewed repair
         run: python maintenance/global-349/apply.py
       - name: Run semantic-help regression
