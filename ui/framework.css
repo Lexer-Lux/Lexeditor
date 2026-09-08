@@ -382,7 +382,9 @@ body.lex-save-busy .lex-save-icon.saving {
   border-radius: 50%;
   background: var(--lex-highlight);
   cursor: help;
-  font-family: inherit;
+  /* The info-bubble glyph is shared chrome, not game typography.  A fixed
+     symbol stack keeps the ? metrics identical across plugin themes. */
+  font-family: var(--lex-symbol-font);
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
@@ -405,7 +407,13 @@ button.lex-info-help { cursor: pointer; }
 }
 
 .lex-info-help > span {
-  display: block;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  line-height: 1;
+  /* Punctuation sits optically low in the font's line box. */
+  transform: translateY(-0.5px);
 }
 
 .lex-help-popover {
