@@ -87,6 +87,87 @@ def test_cli_builder_can_emit_control_subtracted_bit_signatures(tmp_path):
     }]
 
 
+def test_cli_builder_can_validate_bit_signatures_against_held_out_runs(tmp_path):
+    a1 = _write_pair(tmp_path, "a1", {12: 0x05, 80: 1})
+    a2 = _write_pair(tmp_path, "a2", {12: 0x05, 81: 2})
+    b1 = _write_pair(tmp_path, "b1", {12: 0x06, 82: 3})
+    b2 = _write_pair(tmp_path, "b2", {12: 0x06, 83: 4})
+    ha1 = _write_pair(tmp_path, "ha1", {12: 0x05, 86: 7})
+    ha2 = _write_pair(tmp_path, "ha2", {12: 0x05, 87: 8})
+    hb1 = _write_pair(tmp_path, "hb1", {12: 0x06, 88: 9})
+    hb2 = _write_pair(tmp_path, "hb2", {12: 0x06, 89: 10})
+    noop1 = _write_pair(tmp_path, "noop1", {12: 0x04, 84: 5})
+    noop2 = _write_pair(tmp_path, "noop2", {12: 0x04, 85: 6})
+
+    report = MODULE.build_report(
+        group_specs=[
+            ("enemy-a", *a1), ("enemy-a", *a2),
+            ("enemy-b", *b1), ("enemy-b", *b2),
+        ],
+        holdout_group_specs=[
+            ("enemy-a", *ha1), ("enemy-a", *ha2),
+            ("enemy-b", *hb1), ("enemy-b", *hb2),
+        ],
+        control_specs=[("noop-1", *noop1), ("noop-2", *noop2)],
+        bit_signatures=True,
+    )
+
+    assert report["mode"] == "cross-enemy-bit-signatures-with-holdout-validation"
+    analysis = report["analysis"]
+    assert analysis["confirmedCandidateCount"] == 2
+    assert analysis["allDiscoveryCandidatesConfirmed"] is True
+    assert analysis["exactHoldoutAgreement"] is True
+    assert analysis["implementationReady"] is False
+
+
+def test_cli_builder_holdout_reports_changed_candidate_instead_of_promoting_it(tmp_path):
+    a1 = _write_pair(tmp_path, "a1", {12: 0x01})
+    a2 = _write_pair(tmp_path, "a2", {12: 0x01})
+    ha1 = _write_pair(tmp_path, "ha1", {12: 0x04})
+    ha2 = _write_pair(tmp_path, "ha2", {12: 0x04})
+    noop1 = _write_pair(tmp_path, "noop1", {70: 0x80})
+    noop2 = _write_pair(tmp_path, "noop2", {70: 0x80})
+
+    report = MODULE.build_report(
+        group_specs=[("enemy-a", *a1), ("enemy-a", *a2)],
+        holdout_group_specs=[("enemy-a", *ha1), ("enemy-a", *ha2)],
+        control_specs=[("noop-1", *noop1), ("noop-2", *noop2)],
+        bit_signatures=True,
+    )
+
+    analysis = report["analysis"]
+    assert analysis["confirmedCandidateCount"] == 0
+    assert analysis["missingCandidateCount"] == 1
+    assert analysis["unexpectedCandidateCount"] == 1
+    assert analysis["exactHoldoutAgreement"] is False
+
+
+def test_cli_builder_rejects_holdout_without_full_validation_mode(tmp_path):
+    discovery = _write_pair(tmp_path, "discovery", {12: 1})
+    holdout = _write_pair(tmp_path, "holdout", {12: 1})
+    control = _write_pair(tmp_path, "control", {70: 0x80})
+
+    invalid_cases = [
+        {
+            "group_specs": [("enemy-a", *discovery)],
+            "holdout_group_specs": [("enemy-a", *holdout)],
+            "bit_signatures": True,
+        },
+        {
+            "group_specs": [("enemy-a", *discovery)],
+            "holdout_group_specs": [("enemy-a", *holdout)],
+            "control_specs": [("noop", *control)],
+        },
+    ]
+    for kwargs in invalid_cases:
+        try:
+            MODULE.build_report(**kwargs)
+        except ValueError as error:
+            assert "--holdout-group" in str(error)
+        else:
+            raise AssertionError("expected --holdout-group mode ValueError")
+
+
 def test_cli_builder_rejects_bit_signatures_without_grouped_controls(tmp_path):
     assess = _write_pair(tmp_path, "assess", {10: 1})
 
