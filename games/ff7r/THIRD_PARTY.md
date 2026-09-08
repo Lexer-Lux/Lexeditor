@@ -41,3 +41,17 @@ repak reads the installed Unreal Engine PAK indexes/files on demand and packs th
 separate Lexeditor project tree into a mod PAK. FF7R's `../../../` mount point is
 passed explicitly when listing, extracting and packing. repak is not committed
 into this repository.
+
+## Improved Keyboard and Mouse Controls / Native Mod Loader research
+
+The FF7R native-runtime probe uses independently implemented compatibility checks
+informed by TheUnlocked's maintained, MIT-licensed **ff7r-kbm-hook**:
+
+- https://github.com/TheUnlocked/ff7r-kbm-hook
+- License: MIT
+
+That project provides public evidence for the Native Mod Loader `Init()` export
+contract and current FF7R byte signatures around map control and raw-input
+initialization. Lexeditor uses those signatures only as compatibility probes. It
+does not copy the hook implementation and does not treat those known addresses as
+the cutscene-speed or minimap-toggle hook sites required by #413/#414.
