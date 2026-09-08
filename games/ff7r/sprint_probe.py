@@ -1,6 +1,6 @@
 """Fail-closed installed-build research for FF7R Better Sprint (#430).
 
-The issue requires actual player sprint velocity, not merely faster animation.  This
+The issue requires actual player sprint velocity, not merely faster animation. This
 probe therefore keeps several superficially relevant root-motion/animation fields
 separate and never promotes them into an implementation until their runtime scope
 is demonstrated on the installed Remake build.
@@ -33,7 +33,7 @@ SPRINT_DATA_FIELDS = frozenset({
 SPRINT_DATA_ASSET_TOKENS = ("indoorvolume", "charaspec")
 MAX_DATA_CANDIDATES = 128
 
-# Generated Remake SDK evidence used only to classify candidate semantics.  These
+# Generated Remake SDK evidence used only to classify candidate semantics. These
 # declarations do not prove which installed native callsite controls movement.
 KNOWN_CONTRACTS = (
     {
@@ -56,14 +56,50 @@ KNOWN_CONTRACTS = (
     },
     {
         "symbol": "UAnimNotify_EndModifyRootMotionScale.RootMotionScale",
-        "meaning": "per-animation root-motion modifier",
+        "meaning": "per-animation root-motion modifier whose generated default is 1.0",
         "sprintAuthority": "unproven",
         "risk": "candidate animation-local mechanism; authoritative sprint animation/callsite is unknown",
     },
 )
 
 
+def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, list[int]]]:
+    """Collect exact .pdata-bounded direct and one-hop function candidates.
+
+    Padding-heuristic function guesses are excluded from correlation. A direct
+    candidate is a .pdata-described function containing the reflected-string LEA;
+    a next-hop candidate is a .pdata-described function reached through one of the
+    probe's conservative direct CALL/JMP/RIP-relative code references.
+    """
+    result: dict[str, dict[str, list[int]]] = {}
+    for row in native.get("needles", ()):
+        needle = str(row.get("needle", ""))
+        if not needle:
+            continue
+        direct: set[int] = set()
+        next_hops: set[int] = set()
+        for hit in row.get("hits", ()):
+            for xref in hit.get("leaRipXrefs", ()):
+                if xref.get("candidateFunctionSource") != "pdata":
+                    continue
+                function_rva = xref.get("candidateFunctionRva")
+                if function_rva is not None:
+                    direct.add(int(function_rva))
+                code_refs = xref.get("candidateFunctionCodeRefs") or {}
+                for code_ref in code_refs.get("refs", ()):
+                    target_rva = code_ref.get("targetFunctionRva")
+                    if target_rva is not None:
+                        next_hops.add(int(target_rva))
+        result[needle] = {
+            "directPdataFunctions": sorted(direct),
+            "nextHopPdataFunctions": sorted(next_hops),
+            "expandedPdataFunctions": sorted(direct | next_hops),
+        }
+    return result
+
+
 def _needle_rows(native: dict[str, Any]) -> dict[str, dict[str, int]]:
+    function_evidence = _native_function_evidence(native)
     result: dict[str, dict[str, int]] = {}
     for row in native.get("needles", ()):
         needle = str(row.get("needle", ""))
@@ -76,12 +112,22 @@ def _needle_rows(native: dict[str, Any]) -> dict[str, dict[str, int]]:
             for xref in xrefs
             if xref.get("candidateFunctionRva") is not None
         }
+        exact = function_evidence.get(needle, {})
         result[needle] = {
             "stringHits": len(hits),
             "leaXrefs": len(xrefs),
             "candidateFunctions": len(functions),
+            "pdataFunctions": len(exact.get("directPdataFunctions", ())),
+            "nextHopPdataFunctions": len(exact.get("nextHopPdataFunctions", ())),
         }
     return result
+
+
+def _expanded_functions(function_evidence: dict[str, dict[str, list[int]]], *needles: str) -> set[int]:
+    functions: set[int] = set()
+    for needle in needles:
+        functions.update(function_evidence.get(needle, {}).get("expandedPdataFunctions", ()))
+    return functions
 
 
 def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[str, Any]],
@@ -89,7 +135,23 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
                            data_scan_truncated: bool = False) -> dict[str, Any]:
     """Classify evidence without confusing animation/root motion with sprint velocity."""
     native_rows = _needle_rows(native)
+    function_evidence = _native_function_evidence(native)
     field_counts = Counter(str(row.get("field", "")) for row in data_candidates)
+
+    dash_functions = _expanded_functions(function_evidence, "DashRootMotionTranslationScale")
+    transition_functions = _expanded_functions(function_evidence, "RunToDashBlendInputThreshold")
+    animation_root_motion_functions = _expanded_functions(
+        function_evidence,
+        "AnimNotify_EndModifyRootMotionScale",
+        "RootMotionScale",
+    )
+    general_root_motion_functions = _expanded_functions(function_evidence, "RootMotionTranslationScale")
+    correlations = {
+        "dashToAnimationRootMotion": sorted(dash_functions & animation_root_motion_functions),
+        "runToDashToAnimationRootMotion": sorted(transition_functions & animation_root_motion_functions),
+        "dashToGeneralRootMotion": sorted(dash_functions & general_root_motion_functions),
+    }
+
     blockers = [
         "authoritative-player-sprint-speed-path-unvalidated",
         "walk-jog-scripted-movement-isolation-unvalidated",
@@ -100,10 +162,20 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
     if data_scan_truncated:
         blockers.append("installed-data-candidate-scan-truncated")
 
+    correlation_note = (
+        "Exact .pdata candidate correlation: "
+        f"dash↔animation-root-motion={len(correlations['dashToAnimationRootMotion'])}, "
+        f"run-to-dash↔animation-root-motion={len(correlations['runToDashToAnimationRootMotion'])}, "
+        f"dash↔general-root-motion={len(correlations['dashToGeneralRootMotion'])}. "
+        "These overlaps are research leads only; reflected registration glue can share functions without proving runtime sprint authority."
+    )
+
     return {
         "implementationReady": False,
         "blockers": blockers,
         "nativeNeedleStats": native_rows,
+        "nativeFunctionEvidence": function_evidence,
+        "nativeFunctionCorrelations": correlations,
         "fieldCandidateCounts": dict(sorted(field_counts.items())),
         "dataCandidates": data_candidates,
         "knownContracts": [dict(row) for row in KNOWN_CONTRACTS],
@@ -113,7 +185,8 @@ def assess_sprint_evidence(native: dict[str, Any], data_candidates: list[dict[st
             "RunToDashBlendInputThreshold is a transition/input threshold and is not treated as movement speed.",
             "DashRootMotionTranslationScale is kept as an indoor-volume authored candidate, not promoted to a global sprint multiplier.",
             "CharaSpec RootMotionTranslationScale is intentionally rejected as a safe tweak until sprint-only scope is proved.",
-            "AnimNotify_EndModifyRootMotionScale is a per-animation lead; the installed sprint animation/callsite still needs validation.",
+            "AnimNotify_EndModifyRootMotionScale is a per-animation lead with a generated 1.0 RootMotionScale default; the installed sprint animation/callsite still needs validation.",
+            correlation_note,
             "A valid implementation must multiply actual player sprint displacement/velocity while leaving walking, jogging, scripted movement, cutscenes and non-player actors unchanged.",
         ],
     }
