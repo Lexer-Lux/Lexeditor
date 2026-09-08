@@ -204,8 +204,8 @@ class ShopExecutable:
 
     def records(self, category):
         if category == 'limitBreaks':
-            return [{'id':i, 'name':f'Limit break {i}',
-                     'description':'Executable Limit attack data. Names/descriptions remain in the game text tables.',
+            return [{'id':i, 'gameId':128 + i, 'name':f'Limit break {i}',
+                     'description':'Executable Limit attack data. Stored game IDs are 128–198; names/descriptions remain in the game text tables.',
                      'values':read_values(self.data[0x51DCD4+self.shift+i*28:0x51DCD4+self.shift+(i+1)*28], LIMIT_FIELDS)}
                     for i in range(71)]
         if category == 'materiaEquipEffects':
