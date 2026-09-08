@@ -6,6 +6,12 @@ def _report(
     whistle_rows=(),
     unused_names=("Whistle",),
     templates=(),
+    linked_templates=(),
+    unresolved_templates=(),
+    ability_rows=(),
+    ability_names=("WhistleAbility",),
+    unused_ability_names=("WhistleAbility",),
+    ability_properties=("CommandType", "CommandTargetType"),
     key_items=(),
     chapter4=(),
     canine=(),
@@ -18,7 +24,15 @@ def _report(
             "whistleNameMapCandidates": ["Whistle"],
             "unusedWhistleNameMapCandidates": list(unused_names),
             "abilityBackedTemplateCandidates": list(templates),
+            "linkedBattleAbilityTemplateCandidates": list(linked_templates),
+            "unresolvedAbilityTemplateCandidates": list(unresolved_templates),
             "itemProperties": ["AbilityID", "NameID", "DescriptionID"],
+        },
+        "battleAbility": {
+            "rowCandidates": list(ability_rows),
+            "whistleNameMapCandidates": list(ability_names),
+            "unusedWhistleNameMapCandidates": list(unused_ability_names),
+            "properties": list(ability_properties),
         },
         "chapterProgression": {
             "addKeyItemPropertyPresent": True,
@@ -117,14 +131,44 @@ def test_ambiguous_chapter4_candidates_fail_closed():
     assert "chapter-reward-contract-unproved" in result["blockers"]
 
 
-def test_set_target_plus_ai_lookup_marks_anchors_but_not_runtime_semantics_validated():
+def test_set_target_plus_ai_lookup_is_not_enough_without_enemy_enumeration_and_id_lookup():
     result = assess_dog_whistle_probe(_report(
         templates=[_template()],
         native_hits=[("SetTarget", 2), ("GetBattleAI", 1)],
     ))
 
-    assert result["runtimeRetarget"]["retargetAnchorsPresent"] is True
-    assert "runtime-retarget-anchors-unproved" not in result["blockers"]
+    runtime = result["runtimeRetarget"]
+    assert runtime["setTargetCandidatePresent"] is True
+    assert runtime["aiLookupCandidatePresent"] is True
+    assert runtime["activeEnemyEnumerationCandidatePresent"] is False
+    assert runtime["battleCharaIdLookupCandidatePresent"] is False
+    assert runtime["retargetPipelinePresent"] is False
+    assert runtime["retargetAnchorsPresent"] is False
+    assert "runtime-enemy-enumeration-unresolved" in result["blockers"]
+    assert "runtime-battlechara-id-lookup-unresolved" in result["blockers"]
+    assert "runtime-retarget-pipeline-unproved" in result["blockers"]
+    assert "runtime-retarget-semantics-unvalidated" not in result["blockers"]
+
+
+def test_full_reflected_retarget_pipeline_is_still_semantically_unvalidated():
+    result = assess_dog_whistle_probe(_report(
+        templates=[_template()],
+        native_hits=[
+            ("GetEnemyMembersRef", 1),
+            ("GetBattleCharaSpec_DataTableID", 1),
+            ("GetBattleAIControllerFromID", 1),
+            ("SetTarget", 2),
+        ],
+    ))
+
+    runtime = result["runtimeRetarget"]
+    assert runtime["activeEnemyEnumerationCandidatePresent"] is True
+    assert runtime["battleCharaIdLookupCandidatePresent"] is True
+    assert runtime["aiLookupCandidatePresent"] is True
+    assert runtime["setTargetCandidatePresent"] is True
+    assert runtime["retargetPipelinePresent"] is True
+    assert runtime["retargetAnchorsPresent"] is True
+    assert "runtime-retarget-pipeline-unproved" not in result["blockers"]
     assert "runtime-retarget-semantics-unvalidated" in result["blockers"]
 
 
@@ -151,7 +195,12 @@ def test_scan_error_blocks_even_otherwise_good_research_evidence():
         key_items=["Whistle"],
         chapter4=[_chapter4()],
         canine=[{"battleCharaRows": ["dog"]}],
-        native_hits=[("SetTarget", 1), ("GetBattleAIControllerFromID", 1)],
+        native_hits=[
+            ("GetEnemyMembersRef", 1),
+            ("GetBattleCharaSpec_DataTableID", 1),
+            ("GetBattleAIControllerFromID", 1),
+            ("SetTarget", 1),
+        ],
         errors=["EnemyBook: unsupported"],
     ))
 
