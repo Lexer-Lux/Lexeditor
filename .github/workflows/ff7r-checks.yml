@@ -1,0 +1,50 @@
+name: FF7R checks
+
+on:
+  push:
+    branches: [master, feature/ff7-remake-plugin]
+    paths:
+      - 'games/ff7r/**'
+      - 'tests/test_ff7r_dataobject.py'
+      - 'runtime_bootstrap.py'
+      - 'plugin_api.py'
+      - 'service_session.py'
+      - '.github/workflows/ff7r-checks.yml'
+  pull_request:
+    paths:
+      - 'games/ff7r/**'
+      - 'tests/test_ff7r_dataobject.py'
+      - 'runtime_bootstrap.py'
+      - 'plugin_api.py'
+      - 'service_session.py'
+      - '.github/workflows/ff7r-checks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ff7r-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install pytest
+      - name: Python syntax
+        run: python -m compileall -q games/ff7r
+      - name: Plugin descriptor
+        run: python -c "from games.ff7r.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ff7r.server' in SERVICE_MODULES; print(PLUGIN.name)"
+      - name: DataObject parser and writer
+        run: python -m pytest -q tests/test_ff7r_dataobject.py
+      - name: Managed service smoke
+        run: python -c "from games.ff7r.plugin import smoke; [print('PASS:', line) for line in smoke()]"
