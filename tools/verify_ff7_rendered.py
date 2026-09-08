@@ -120,7 +120,12 @@ class RenderedTests(unittest.TestCase):
                 # Regression: shared el() sets attributes, not textarea.value.
                 original=self.page.evaluate('([g,k])=>state.records[g].find(r=>r.id===state.selected[g]).values[k]',[group,key])
                 self.assertEqual(control.input_value(),str(original))
-                control.fill(value);self.save()
+                tag=control.evaluate('e=>e.tagName')
+                if tag=='SELECT':control.select_option(value)
+                elif control.get_attribute('type')=='checkbox':
+                    (control.check() if value not in ('0','false','False') else control.uncheck())
+                else:control.fill(value)
+                self.save()
                 selected=self.page.evaluate('(g)=>state.selected[g]',group)
                 status,data=self.backend.request('/api/data');self.assertEqual(status,200)
                 actual=next(row for row in data['records'][group] if row['id']==selected)['values'][key]

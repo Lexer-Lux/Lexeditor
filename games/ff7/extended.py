@@ -19,6 +19,7 @@ from .storage import target_path, replace_project, records_match
 from .datasets import INITIAL_FIELDS
 from .battle import SceneArchive, SCENE_CATEGORIES, number, text, read_values, write_values, validate_rows
 from .format_codec import bounds, digest, lzs_decode, lzs_encode, string_table, pack_strings, read_int
+from . import semantics
 
 TEXT_SECTIONS = (
     'Command help', 'Magic help', 'Item help', 'Weapon help', 'Armor help',
@@ -225,7 +226,10 @@ def _target(game_root, project_root, source, relative):
 def load_extended(game_root, project_root):
     result = {'categories':[], 'records':{}, 'vanilla':{}, 'errors':{}, 'families':{}}
     for family, info in FAMILIES.items():
-        result['categories'] += [dict(value, id=key, family=family) for key,value in info['categories'].items()]
+        for key, value in info['categories'].items():
+            category = dict(value, id=key, family=family)
+            category['fields'] = semantics.apply(key, value['fields'])
+            result['categories'].append(category)
         report = {'categories':list(info['categories']), 'note':info['note'], 'sourceRelativePath':None}
         result['families'][family] = report
         try:

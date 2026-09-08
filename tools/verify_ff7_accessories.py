@@ -5,6 +5,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from verify_ff7_semantic_surface import SemanticSurfaceTests
+
 import verify_ff7_datasets as fixtures
 from games.ff7 import kernel as base
 from games.ff7.datasets import Kernel, load_datasets, save_datasets

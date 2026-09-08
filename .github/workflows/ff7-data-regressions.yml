@@ -64,6 +64,7 @@ jobs:
         run: |
           python tools/verify_ff7_datasets.py
           python tools/verify_ff7_accessories.py
+          python tools/verify_ff7_semantic_surface.py
           python tools/verify_ff7_extended.py
           python tools/verify_ff7_completion.py
           python tools/verify_ff7_edition_parity.py
