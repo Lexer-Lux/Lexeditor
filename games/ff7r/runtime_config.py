@@ -28,6 +28,9 @@ REQUIRED_HOOKS = (
     "minimapTapHold",
     "minimapState",
 )
+OPTIONAL_HOOKS = (
+    "hpRebalance",
+)
 
 DEFAULT_RUNTIME_CONFIG = {
     "schemaVersion": RUNTIME_SCHEMA_VERSION,
@@ -44,6 +47,13 @@ DEFAULT_RUNTIME_CONFIG = {
         "persistChosenState": True,
         "tapBehavior": "open-map",
         "holdBehavior": "toggle-minimap",
+    },
+    "hpRebalance": {
+        "enabled": False,
+        # Scale the final playable-party maximum HP.  This must not be
+        # implemented by merely scaling PlayerParameter.HPMax because equipment
+        # and materia can add/scale max HP through separate data paths.
+        "hpMultiplier": 0.5,
     },
 }
 
@@ -79,7 +89,7 @@ def _clone_default() -> dict:
 def validate_runtime_config(value: dict) -> dict:
     if not isinstance(value, dict):
         raise ValueError("runtime config must be an object")
-    if set(value) - {"schemaVersion", "cutsceneSpeed", "minimap"}:
+    if set(value) - {"schemaVersion", "cutsceneSpeed", "minimap", "hpRebalance"}:
         raise ValueError("runtime config contains unsupported top-level fields")
     if value.get("schemaVersion", RUNTIME_SCHEMA_VERSION) != RUNTIME_SCHEMA_VERSION:
         raise ValueError(f"unsupported FF7R runtime config schema: {value.get('schemaVersion')}")
@@ -122,6 +132,21 @@ def validate_runtime_config(value: dict) -> dict:
     if minimap.get("holdBehavior", "toggle-minimap") != "toggle-minimap":
         raise ValueError("minimap.holdBehavior must be toggle-minimap")
 
+    hp_rebalance = value.get("hpRebalance", {})
+    if not isinstance(hp_rebalance, dict):
+        raise ValueError("hpRebalance must be an object")
+    if set(hp_rebalance) - {"enabled", "hpMultiplier"}:
+        raise ValueError("hpRebalance contains unsupported fields")
+    hp_enabled = hp_rebalance.get("enabled", False)
+    if not isinstance(hp_enabled, bool):
+        raise ValueError("hpRebalance.enabled must be boolean")
+    hp_multiplier = hp_rebalance.get("hpMultiplier", DEFAULT_RUNTIME_CONFIG["hpRebalance"]["hpMultiplier"])
+    if isinstance(hp_multiplier, bool) or not isinstance(hp_multiplier, (int, float)):
+        raise ValueError("hpRebalance.hpMultiplier must be numeric")
+    hp_multiplier = float(hp_multiplier)
+    if not math.isfinite(hp_multiplier) or hp_multiplier <= 0.0:
+        raise ValueError("hpRebalance.hpMultiplier must be greater than 0")
+
     return {
         "schemaVersion": RUNTIME_SCHEMA_VERSION,
         "cutsceneSpeed": {
@@ -135,6 +160,10 @@ def validate_runtime_config(value: dict) -> dict:
             "persistChosenState": persist,
             "tapBehavior": "open-map",
             "holdBehavior": "toggle-minimap",
+        },
+        "hpRebalance": {
+            "enabled": hp_enabled,
+            "hpMultiplier": hp_multiplier,
         },
     }
 
@@ -165,9 +194,14 @@ def validate_runtime_manifest(value: dict) -> dict:
     if value.get("manifestVersion") != RUNTIME_MANIFEST_VERSION:
         raise ValueError("unsupported FF7R runtime manifest version")
     hooks = value.get("hooks")
-    if not isinstance(hooks, dict) or set(hooks) != set(REQUIRED_HOOKS):
-        raise ValueError("runtime manifest must declare exactly the required hook validation flags")
-    if any(not isinstance(hooks[name], bool) for name in REQUIRED_HOOKS):
+    required = set(REQUIRED_HOOKS)
+    optional = set(OPTIONAL_HOOKS)
+    if (not isinstance(hooks, dict) or not required.issubset(hooks)
+            or set(hooks) - required - optional):
+        raise ValueError(
+            "runtime manifest must declare exactly the required hook validation flags plus supported optional hooks"
+        )
+    if any(not isinstance(flag, bool) for flag in hooks.values()):
         raise ValueError("runtime manifest hook validation flags must be boolean")
     raw_timestamps = value.get("supportedExeTimestamps")
     if not isinstance(raw_timestamps, list) or not raw_timestamps:
@@ -178,7 +212,7 @@ def validate_runtime_manifest(value: dict) -> dict:
         raise ValueError("runtime manifest notes must be a string")
     return {
         "manifestVersion": RUNTIME_MANIFEST_VERSION,
-        "hooks": {name: hooks[name] for name in REQUIRED_HOOKS},
+        "hooks": {name: hooks[name] for name in (*REQUIRED_HOOKS, *OPTIONAL_HOOKS) if name in hooks},
         "supportedExeTimestamps": timestamps,
         "notes": notes,
     }
@@ -256,7 +290,7 @@ def _installed_exe_timestamp(game_root: Path) -> int | None:
 def _manifest_state(game_root: Path, project_root: Path) -> tuple[dict | None, int | None, bool, bool]:
     manifest = load_runtime_manifest(project_root)
     timestamp = _installed_exe_timestamp(game_root)
-    hooks_validated = bool(manifest) and all(manifest["hooks"].values())
+    hooks_validated = bool(manifest) and all(manifest["hooks"][name] for name in REQUIRED_HOOKS)
     build_supported = bool(manifest) and timestamp is not None and timestamp in manifest["supportedExeTimestamps"]
     return manifest, timestamp, hooks_validated, build_supported
 
@@ -268,8 +302,11 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
     native_mods = Path(game_root) / NATIVE_MODS_DIR
     config = load_runtime_config(project_root)
     manifest, timestamp, hooks_validated, build_supported = _manifest_state(game_root, project_root)
-    ready = project_dll.is_file() and bool(loaders) and hooks_validated and build_supported
-    active = deployed_dll.is_file() and bool(loaders) and hooks_validated and build_supported
+    hp_requested = config["hpRebalance"]["enabled"]
+    hp_hook_validated = bool(manifest) and manifest["hooks"].get("hpRebalance", False)
+    requested_hooks_validated = hooks_validated and (not hp_requested or hp_hook_validated)
+    ready = project_dll.is_file() and bool(loaders) and requested_hooks_validated and build_supported
+    active = deployed_dll.is_file() and bool(loaders) and requested_hooks_validated and build_supported
     return {
         "schemaVersion": RUNTIME_SCHEMA_VERSION,
         "config": config,
@@ -284,6 +321,9 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
         "manifestPresent": manifest is not None,
         "manifest": manifest,
         "hooksValidated": hooks_validated,
+        "requestedHooksValidated": requested_hooks_validated,
+        "hpRebalanceRequested": hp_requested,
+        "hpRebalanceHookValidated": hp_hook_validated,
         "installedExeTimestamp": timestamp,
         "installedExeTimestampHex": f"0x{timestamp:08X}" if timestamp is not None else None,
         "buildSupported": build_supported,
@@ -295,8 +335,8 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
         "runtimeReady": ready,
         "active": active,
         "notes": (
-            "Runtime behavior patches require a native DLL, a compatible loader, a fully validated "
-            "hook manifest, and an installed executable timestamp covered by that manifest."
+            "Runtime behavior patches require a native DLL, a compatible loader, validation for every enabled "
+            "runtime hook, and an installed executable timestamp covered by that manifest."
         ),
     }
 
@@ -318,6 +358,8 @@ def deploy_runtime(game_root: Path, project_root: Path) -> dict:
         raise RuntimeError("FF7R runtime hook-validation manifest is missing; runtime was not deployed")
     if not status["hooksValidated"]:
         raise RuntimeError("FF7R runtime hooks are not all validated; runtime was not deployed")
+    if status["hpRebalanceRequested"] and not status["hpRebalanceHookValidated"]:
+        raise RuntimeError("FF7R HP Rebalance hook is enabled but not validated; runtime was not deployed")
     if status["installedExeTimestamp"] is None:
         raise RuntimeError("Installed ff7remake_.exe timestamp could not be read; runtime was not deployed")
     if not status["buildSupported"]:
