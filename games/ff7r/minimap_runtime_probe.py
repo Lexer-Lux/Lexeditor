@@ -17,6 +17,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Iterable
 
+from .map_input_signature_probe import probe_public_map_input_signatures
 from .native_probe import probe_installed_exe
 
 
@@ -288,7 +289,7 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
         "notes": [
             "EndFieldOnOffTable_HideNaviMap is a Remake-native central state anchor and is distinct from authored EnemyTerritory.HideNavimap rows.",
             "BPShowNavimap/BPHideNavimap are presentation APIs; their presence alone does not prove the automatic visibility writer.",
-            "Generated EOptionCategory distinguishes KeyboardMapMenu from KeyboardToggleMap. The classifier now requires KeyboardMapMenu itself for the native full-map action; MapJournal/TouchPad/OptionsButton gates cannot satisfy that requirement.",
+            "Generated EOptionCategory distinguishes KeyboardMapMenu from KeyboardToggleMap. The classifier requires KeyboardMapMenu itself for the native full-map action; MapJournal/TouchPad/OptionsButton gates cannot satisfy that requirement.",
             "MapJournal/TouchPad/OptionsButton anchors remain input/full-map navigation leads only; no controller binding or callable action is assumed from their names.",
             "Prefer routing a hold into the game's native KeyboardToggleMap action if installed callsite evidence proves it, rather than inventing toggle semantics from presentation calls.",
             "Bounded .pdata next hops are navigation evidence only; heuristic function bounds cannot strengthen the result.",
@@ -300,8 +301,29 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
 
 def probe_minimap_runtime(game_root: Path) -> dict[str, Any]:
     native = probe_installed_exe(Path(game_root), needles=MINIMAP_NATIVE_NEEDLES)
+    public_signatures = (
+        probe_public_map_input_signatures(Path(str(native["path"])))
+        if native.get("path")
+        else {
+            "path": "",
+            "scanError": "installed executable path was not resolved",
+            "mapControl": {
+                "matchCount": 0,
+                "matches": [],
+                "classification": "full-screen-map-controller",
+                "mapButtonAuthority": False,
+            },
+            "rawInputRegistration": {
+                "matchCount": 0,
+                "matches": [],
+                "classification": "raw-input-device-registration",
+                "mapButtonAuthority": False,
+            },
+        }
+    )
     return {
         "path": native.get("path"),
         "native": native,
+        "publicSignatureResearch": public_signatures,
         **assess_minimap_runtime_evidence(native),
     }
