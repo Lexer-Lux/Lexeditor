@@ -24,8 +24,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify casing transactions, cache invalidation, and alcohol saves
-        run: python tests/test_rdr2_issue_repairs.py
+      - name: Verify RDR2 repair and inventory-artwork regressions
+        run: |
+          python tests/test_rdr2_issue_repairs.py
+          python tests/test_rdr2_inventory_icons.py
       - name: Execute production boot, dataset-switch and global-save regressions
         run: |
           node tests/test_rdr2_boot.js
