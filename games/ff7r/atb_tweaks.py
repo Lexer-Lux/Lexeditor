@@ -150,6 +150,22 @@ def save_atb_config(project_root: Path, value: dict) -> dict:
     return reread
 
 
+def _unvalidated_runtime_requests_from_config(config: dict) -> list[str]:
+    if not config["enabled"]:
+        return []
+    requests: list[str] = []
+    if config["movementMultiplier"] != DEFAULT_ATB_CONFIG["movementMultiplier"]:
+        requests.append("MovementMultiplier")
+    if config["rollReduction"] != DEFAULT_ATB_CONFIG["rollReduction"]:
+        requests.append("RollReduction")
+    return requests
+
+
+def unvalidated_runtime_requests(project_root: Path) -> list[str]:
+    """Return enabled runtime-only ATB settings that cannot yet be materialized."""
+    return _unvalidated_runtime_requests_from_config(load_atb_config(project_root))
+
+
 def _basename(asset: str) -> str:
     return PurePosixPath(asset).name.casefold()
 
@@ -480,6 +496,12 @@ def materialize_atb_overrides(game_root: Path, data_root: Path, project_root: Pa
     config = load_atb_config(project_root)
     if not config["enabled"]:
         return []
+    runtime_requests = _unvalidated_runtime_requests_from_config(config)
+    if runtime_requests:
+        raise RuntimeError(
+            "FF7R ATB runtime settings cannot be built until their native accumulator hooks are validated: "
+            + ", ".join(runtime_requests)
+        )
     discovery = discover_atb_sources(game_root, data_root, index)
     by_key = {
         "resident": {row["key"]: row for row in discovery["resident"]},
