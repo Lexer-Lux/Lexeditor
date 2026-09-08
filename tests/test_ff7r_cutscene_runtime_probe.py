@@ -1,15 +1,33 @@
 from games.ff7r.cutscene_runtime_probe import assess_cutscene_runtime_evidence
 
 
-def _hit(function_rva, *next_hops):
+def _inbound(*callers):
+    return {
+        "refs": [
+            {"sourceFunctionRva": caller, "kind": "call-rel32"}
+            for caller in callers
+        ]
+    }
+
+
+def _hit(function_rva, *next_hops, callers=(), next_hop_callers=()):
     xref = {
         "candidateFunctionRva": function_rva,
         "candidateFunctionSource": "pdata",
     }
+    if callers:
+        xref["candidateFunctionInboundCodeRefs"] = _inbound(*callers)
     if next_hops:
         xref["candidateFunctionCodeRefs"] = {
             "refs": [
-                {"targetFunctionRva": target, "kind": "call-rel32"}
+                {
+                    "targetFunctionRva": target,
+                    "kind": "call-rel32",
+                    **(
+                        {"targetFunctionInboundCodeRefs": _inbound(*next_hop_callers)}
+                        if next_hop_callers else {}
+                    ),
+                }
                 for target in next_hops
             ]
         }
@@ -87,6 +105,30 @@ def test_bounded_next_hops_are_navigation_evidence_not_direct_hook_validation():
     assert "cut-game-speed-channel-next-hop-unvalidated" in result["blockers"]
     assert "cutscene-lifecycle-next-hop-to-speed-unvalidated" in result["blockers"]
     assert "native-fast-forward-next-hop-semantics-unvalidated" in result["blockers"]
+    assert "base-times-native-fast-forward-formula-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_shared_exact_inbound_callers_are_reported_without_clearing_semantics_blockers():
+    result = assess_cutscene_runtime_evidence(_native(
+        SetGameSpeed=_hit(0x1000, callers=(0x9000,)),
+        GetGameSpeed=_hit(0x1100, callers=(0x9000,)),
+        EGameSpeed_CUT=_hit(0x2000, callers=(0x9000,)),
+        PlayCutScene=_hit(0x3000, callers=(0x9000,)),
+        SkipCinema=_hit(0x4000, callers=(0x9000,)),
+        EGameSpeed_SYSTEM=_hit(0x5000, callers=(0xA000,)),
+    ))
+
+    functions = result["candidateFunctions"]
+    assert functions["cutSpeedDirectOverlap"] == []
+    assert functions["cutSpeedCallerOverlap"] == [0x9000]
+    assert functions["lifecycleSpeedCallerOverlap"] == [0x9000]
+    assert functions["fastForwardSpeedCallerOverlap"] == [0x9000]
+    assert functions["nonCutSpeedCallerOverlap"] == []
+    assert functions["setGameSpeed"]["directCallers"] == [0x9000]
+    assert "cut-game-speed-channel-function-unvalidated" in result["blockers"]
+    assert "cutscene-lifecycle-to-speed-link-unvalidated" in result["blockers"]
+    assert "native-fast-forward-to-speed-link-unvalidated" in result["blockers"]
     assert "base-times-native-fast-forward-formula-unvalidated" in result["blockers"]
     assert result["implementationReady"] is False
 
@@ -201,13 +243,14 @@ def test_function_clusters_preserve_direct_registration_collision_risk():
     assert result["implementationReady"] is False
 
 
-def test_padding_heuristic_function_never_contributes_direct_or_next_hop_evidence():
+def test_padding_heuristic_function_never_contributes_direct_next_hop_or_caller_evidence():
     native = _native(
         SetGameSpeed={
             "hits": [{
                 "leaRipXrefs": [{
                     "candidateFunctionRva": 0x1000,
                     "candidateFunctionSource": "padding-heuristic",
+                    "candidateFunctionInboundCodeRefs": _inbound(0x9000),
                     "candidateFunctionCodeRefs": {
                         "refs": [{"targetFunctionRva": 0x5000}],
                     },
@@ -221,6 +264,8 @@ def test_padding_heuristic_function_never_contributes_direct_or_next_hop_evidenc
 
     assert result["candidateFunctions"]["setGameSpeed"]["direct"] == []
     assert result["candidateFunctions"]["setGameSpeed"]["nextHops"] == []
+    assert result["candidateFunctions"]["setGameSpeed"]["directCallers"] == []
     assert result["candidateFunctions"]["cutSpeedDirectOverlap"] == []
     assert result["candidateFunctions"]["cutSpeedReachableOverlap"] == []
+    assert result["candidateFunctions"]["cutSpeedCallerOverlap"] == []
     assert result["implementationReady"] is False
