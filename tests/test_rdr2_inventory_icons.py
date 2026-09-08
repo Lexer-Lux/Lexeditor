@@ -1,4 +1,4 @@
-"""Hermetic tests for RDR2 installed-game inventory artwork fallback."""
+"""Hermetic tests for RDR2 inventory-artwork coverage and DLC fallback."""
 
 from pathlib import Path
 import struct
@@ -10,6 +10,10 @@ import zlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from games.rdr2 import inventory_icons as icons
+
+
+ROOT = Path(__file__).resolve().parents[1]
+ASSETS = ROOT / "games" / "rdr2" / "assets"
 
 
 class InstalledItemviewerTests(unittest.TestCase):
@@ -24,6 +28,41 @@ class InstalledItemviewerTests(unittest.TestCase):
         self.assertIsNone(icons.resolve_inventory_icon("UI_NOTE_DINO_01"))
         self.assertIsNone(icons.resolve_inventory_icon("../treasure_map_c5_m1"))
         self.assertIsNone(icons.resolve_inventory_icon("treasure_map_c5_m1/../../x"))
+
+    def test_historical_static_atlas_import_is_complete(self):
+        item_textures = list((ASSETS / "dictionary_icons" / "item_textures").glob("*.png"))
+        itemviewer = list((ASSETS / "dictionary_icons" / "ui_itemviewer").glob("*.png"))
+        self.assertEqual(len(item_textures), 347)
+        self.assertEqual(len(itemviewer), 235)
+        self.assertEqual(
+            icons.classify_ui_itemviewer_reference("UI_LETTER_ABIGAIL", ASSETS),
+            "bundled",
+        )
+
+    def test_all_residual_raw_values_are_source_classified(self):
+        # 41 raw catalog values remain after the 235 static atlas images and the
+        # seven C5/C6 installed-game fallbacks. Two values contain alternatives,
+        # producing 42 unique attempted texture IDs.
+        self.assertEqual(len(icons.NON_STATIC_UI_ITEMVIEWER_RAW_VALUES), 41)
+        self.assertEqual(len(icons.NON_STATIC_UI_ITEMVIEWER_IDS), 42)
+        self.assertEqual(
+            {icons.classify_ui_itemviewer_reference(raw, ASSETS)
+             for raw in icons.NON_STATIC_UI_ITEMVIEWER_RAW_VALUES},
+            {"non-static"},
+        )
+        for texture_id in icons.DLC_TREASURE_MAP_IDS:
+            self.assertEqual(
+                icons.classify_ui_itemviewer_reference(texture_id, ASSETS),
+                "installed-game",
+            )
+        self.assertEqual(
+            icons.classify_ui_itemviewer_reference("UI_DOES_NOT_EXIST", ASSETS),
+            "missing",
+        )
+        # Historical UI_ITEMVIEWER accounting: 235 static raw values + seven
+        # installed-DLC raw values + 41 source-proven non-static raw values.
+        self.assertEqual(235 + len(icons.DLC_TREASURE_MAP_IDS)
+                         + len(icons.NON_STATIC_UI_ITEMVIEWER_RAW_VALUES), 283)
 
     def test_existing_private_cache_does_not_run_extractor(self):
         with tempfile.TemporaryDirectory() as td:
@@ -59,7 +98,7 @@ class InstalledItemviewerTests(unittest.TestCase):
         )
 
     def test_server_falls_back_only_after_a_local_ui_itemviewer_miss(self):
-        source = (Path(__file__).resolve().parents[1] / "games/rdr2/server.py").read_text(encoding="utf-8")
+        source = (ROOT / "games/rdr2/server.py").read_text(encoding="utf-8")
         self.assertIn("_resolve_inventory_icon(relative.stem)", source)
         self.assertIn('relative.parts[:2] == ("dictionary_icons", "ui_itemviewer")', source)
         self.assertIn("if not asset.is_file():", source)
