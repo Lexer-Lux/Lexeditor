@@ -39,12 +39,18 @@ def test_existing_candidate_never_authorizes_repurposing():
     assert "existing-whistle-row-not-proved-safe-to-repurpose" in result["blockers"]
 
 
-def test_chapter_reward_correlation_is_plausible_but_append_remains_blocked():
+def test_chapter_reward_correlation_can_use_fixed_width_append_helper():
     result = assess_dog_whistle_probe(_report(key_items=["key_item_01"]))
 
     assert result["chapterAward"]["dataAwardPathPlausible"] is True
-    assert result["chapterAward"]["writerSupportsArrayAppend"] is False
-    assert "writer-cannot-append-chapter-reward" in result["blockers"]
+    assert result["chapterAward"]["writerSupportsArrayAppend"] is True
+    assert "writer-cannot-append-chapter-reward" not in result["blockers"]
+
+
+def test_unproved_chapter_identifier_contract_still_blocks_reward_path():
+    result = assess_dog_whistle_probe(_report())
+
+    assert "chapter-reward-contract-unproved" in result["blockers"]
 
 
 def test_set_target_plus_ai_lookup_marks_runtime_retarget_anchors_present():

@@ -2,14 +2,15 @@
 
 The installed-data probe deliberately discovers evidence without inventing a new
 item row or repurposing an existing consumable. This module records which parts
-of the requested feature have a plausible authoritative path and, importantly,
-which parts remain impossible with Lexeditor's current conservative DataObject
-writer.
+of the requested feature have a plausible authoritative path and which parts
+still require structural/runtime work.
 """
 
 from __future__ import annotations
 
 from typing import Any
+
+from .dataobject_structural import FIXED_WIDTH_ARRAY_INSERT_SUPPORTED
 
 
 REQUIRED_RETARGET_NEEDLE = "SetTarget"
@@ -46,12 +47,12 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         and any(native_hits[needle] for needle in AI_LOOKUP_NEEDLES)
     )
 
-    # Current DataObjectPackage supports in-place scalar/array-element edits and
-    # deletion from fixed-width arrays. It does not add a new row/name-map entry
-    # or append an array element. Those capabilities are required to author a
-    # genuinely new whistle item/reward without hijacking existing content.
+    # A dedicated structural helper can now append existing FNames to declared
+    # fixed-width arrays such as Chapter.AddKeyItem_Array without replacing an
+    # existing reward. Creating a genuinely new Item row/name-map entry remains
+    # deliberately unsupported.
     writer_supports_new_item_row = False
-    writer_supports_array_append = False
+    writer_supports_array_append = FIXED_WIDTH_ARRAY_INSERT_SUPPORTED
     data_award_path_plausible = bool(add_key_item_present and correlated_key_items)
 
     blockers: list[str] = []
@@ -99,7 +100,7 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
         },
         "notes": [
             "An existing whistle-like FName is not permission to hijack an unrelated Item row.",
-            "Chapter.AddKeyItem_Array is useful evidence only after installed rows prove its identifiers and the writer can append without replacing an existing reward.",
+            "Fixed-width array insertion can append an existing FName reward without replacing another Chapter.AddKeyItem_Array entry; the installed identifier contract still must be proved first.",
             "SetTarget is the narrow retarget primitive; canine candidates still require validation for scripted/boss exceptions such as Darkstar.",
             "The assessment is read-only and cannot make the Dog Whistle implementation ready by itself.",
         ],
