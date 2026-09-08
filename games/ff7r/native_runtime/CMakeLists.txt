@@ -39,6 +39,11 @@ lexeditor_ff7r_test(
     runtime_cutscene_test.cpp
     ff7r_runtime_cutscene
 )
+lexeditor_ff7r_test(
+    ff7r_runtime_minimap_test
+    runtime_minimap_test.cpp
+    ff7r_runtime_minimap
+)
 
 if(WIN32)
     add_library(LexeditorFF7RRuntime SHARED RuntimeMain.cpp)
