@@ -24,6 +24,7 @@ DEFAULT_NEEDLES = (
     "HideNavimap",
     "trgCmn_NaviMap_Update_On",
     "trgCmn_NaviMap_Update_Off",
+    "BPSetPlayerHPMax",
 )
 MAX_HITS_PER_ENCODING = 64
 MAX_XREFS_PER_STRING = 64
