@@ -56,9 +56,10 @@ extra_details = r'''  function materiaDetail(row){
     if(!Number.isInteger(selected)||selected<0||selected>=fields.length){const firstUsed=fields.findIndex(field=>String(row.values[field.key]||"").trim());selected=firstUsed>=0?firstUsed:0;state.aiEvent[eventKey]=selected}
     const selector=el("select",{"aria-label":`AI event for ${row.name}`,disabled:readonly(),onchange:event=>{state.aiEvent[eventKey]=Number(event.target.value);render()}},...fields.map((field,index)=>{const source=String(row.values[field.key]||""),lines=source.trim()?source.split(/\r?\n/).filter(line=>line.trim()).length:0;return el("option",{value:index},`${field.label} — ${lines?`${lines} line${lines===1?"":"s"}`:"Empty"}`)}));selector.value=String(selected);
     const field=fields[selected],editor=semanticControl(row,field);editor.style.width="100%";
+    const eventHelp=field.help||"Edit this FF7 battle-AI event as FF7 game-VM assembly. Invalid opcodes, bad jumps, and missing END instructions are rejected on save.";
     return conceptPanel(row,[
       detailSection({title:"AI EVENT",attrs:{"data-concept":"ai-event-editor"},help:infoHelp("Choose one of FF7's sixteen battle-AI event hooks. Empty events are valid and can be filled here; saving an empty event removes that script."),body:[detailField({label:"EVENT",control:selector,dataType:"SELECT"}),detailField({label:"USED",control:readonlyField(`${aiUsedCount(row)} / ${fields.length}`),dataType:"VALUE"})]}),
-      detailSection({title:field.label.toUpperCase(),help:infoHelp(semanticHelp(field)),body:el("div",{style:"padding:10px;min-width:0"},editor)}),
+      detailSection({title:field.label.toUpperCase(),help:infoHelp(eventHelp),body:el("div",{style:"padding:10px;min-width:0"},editor)}),
     ]);
   }
 '''
