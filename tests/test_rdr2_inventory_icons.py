@@ -34,9 +34,17 @@ class InstalledItemviewerTests(unittest.TestCase):
         itemviewer = list((ASSETS / "dictionary_icons" / "ui_itemviewer").glob("*.png"))
         self.assertEqual(len(item_textures), 347)
         self.assertEqual(len(itemviewer), 235)
+        # Abigail's letters are script-driven narrative documents, not a proven
+        # UI_ITEMVIEWER texture. Keep unknown aliases missing rather than
+        # fabricating static art; exercise non-static classification with a
+        # catalog-backed document handle instead.
         self.assertEqual(
             icons.classify_ui_itemviewer_reference("UI_LETTER_ABIGAIL", ASSETS),
-            "bundled",
+            "missing",
+        )
+        self.assertEqual(
+            icons.classify_ui_itemviewer_reference("UI_LETTER_MAYOR_PERM", ASSETS),
+            "non-static",
         )
 
     def test_all_residual_raw_values_are_source_classified(self):
