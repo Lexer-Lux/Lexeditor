@@ -19,6 +19,7 @@ on:
       - 'tests/test_ff7r_raw_asset_probe.py'
       - 'tests/test_ff7r_package_probe.py'
       - 'tests/test_ff7r_lockon_probe.py'
+      - 'tests/test_ff7r_unscanned_name_probe.py'
       - 'tests/test_ff7r_dog_whistle_probe.py'
       - 'tests/test_ff7r_dog_whistle_safety.py'
       - 'runtime_bootstrap.py'
@@ -42,6 +43,7 @@ on:
       - 'tests/test_ff7r_raw_asset_probe.py'
       - 'tests/test_ff7r_package_probe.py'
       - 'tests/test_ff7r_lockon_probe.py'
+      - 'tests/test_ff7r_unscanned_name_probe.py'
       - 'tests/test_ff7r_dog_whistle_probe.py'
       - 'tests/test_ff7r_dog_whistle_safety.py'
       - 'runtime_bootstrap.py'
@@ -79,6 +81,6 @@ jobs:
       - name: Plugin descriptor
         run: python -c "from games.ff7r.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ff7r.server' in SERVICE_MODULES; print(PLUGIN.name)"
       - name: Gameplay, text, semantic and runtime regressions
-        run: python -m pytest -q tests/test_ff7r_dataobject.py tests/test_ff7r_dataobject_structural.py tests/test_ff7r_textresource.py tests/test_ff7r_textresource_structural.py tests/test_ff7r_semantics.py tests/test_ff7r_editor_semantics.py tests/test_ff7r_runtime_config.py tests/test_ff7r_minimap_semantics.py tests/test_ff7r_native_probe.py tests/test_ff7r_research_dataobject.py tests/test_ff7r_no_more_cheats_tweaks.py tests/test_ff7r_raw_asset_probe.py tests/test_ff7r_package_probe.py tests/test_ff7r_lockon_probe.py tests/test_ff7r_dog_whistle_probe.py tests/test_ff7r_dog_whistle_safety.py
+        run: python -m pytest -q tests/test_ff7r_dataobject.py tests/test_ff7r_dataobject_structural.py tests/test_ff7r_textresource.py tests/test_ff7r_textresource_structural.py tests/test_ff7r_semantics.py tests/test_ff7r_editor_semantics.py tests/test_ff7r_runtime_config.py tests/test_ff7r_minimap_semantics.py tests/test_ff7r_native_probe.py tests/test_ff7r_research_dataobject.py tests/test_ff7r_no_more_cheats_tweaks.py tests/test_ff7r_raw_asset_probe.py tests/test_ff7r_package_probe.py tests/test_ff7r_lockon_probe.py tests/test_ff7r_unscanned_name_probe.py tests/test_ff7r_dog_whistle_probe.py tests/test_ff7r_dog_whistle_safety.py
       - name: Managed service smoke
         run: python -c "from games.ff7r.plugin import smoke; [print('PASS:', line) for line in smoke()]"
