@@ -26,11 +26,13 @@ jobs:
         run: cmake --build out/ff7r-native-runtime --config Release --parallel
       - name: Runtime contract test
         run: ctest --test-dir out/ff7r-native-runtime -C Release --output-on-failure
-      - name: Verify NativeMods Init export
+      - name: Verify NativeMods Init exports
         shell: pwsh
         run: |
-          $dll = Get-ChildItem out/ff7r-native-runtime -Recurse -Filter LexeditorFF7RRuntimeProbe.dll | Select-Object -First 1
-          if (-not $dll) { throw 'Native runtime probe DLL was not built' }
+          $runtime = Get-ChildItem out/ff7r-native-runtime -Recurse -Filter LexeditorFF7RRuntime.dll | Select-Object -First 1
+          $probe = Get-ChildItem out/ff7r-native-runtime -Recurse -Filter LexeditorFF7RRuntimeProbe.dll | Select-Object -First 1
+          if (-not $runtime) { throw 'Native runtime DLL was not built' }
+          if (-not $probe) { throw 'Native runtime probe DLL was not built' }
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           if (-not $vs) { throw 'Visual Studio C++ toolchain was not found' }
@@ -39,11 +41,15 @@ jobs:
             Sort-Object FullName -Descending |
             Select-Object -First 1
           if (-not $dumpbin) { throw 'dumpbin.exe was not found' }
-          $exports = (& $dumpbin.FullName /exports $dll.FullName) -join "`n"
-          if ($exports -notmatch '\bInit\b') { throw 'Native runtime probe does not export Init' }
-          Write-Host $dll.FullName
+          foreach ($dll in @($runtime, $probe)) {
+            $exports = (& $dumpbin.FullName /exports $dll.FullName) -join "`n"
+            if ($exports -notmatch '\bInit\b') { throw "$($dll.Name) does not export Init" }
+            Write-Host $dll.FullName
+          }
       - uses: actions/upload-artifact@v4
         with:
-          name: LexeditorFF7RRuntimeProbe
-          path: out/ff7r-native-runtime/**/LexeditorFF7RRuntimeProbe.dll
+          name: LexeditorFF7RNativeRuntime
+          path: |
+            out/ff7r-native-runtime/**/LexeditorFF7RRuntime.dll
+            out/ff7r-native-runtime/**/LexeditorFF7RRuntimeProbe.dll
           if-no-files-found: error
