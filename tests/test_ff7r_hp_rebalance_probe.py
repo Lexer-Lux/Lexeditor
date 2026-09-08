@@ -15,6 +15,24 @@ def _package(asset, properties, entries):
     )
 
 
+def _native_hit(needle, function_rva, *next_hops, source="pdata"):
+    return {
+        "needle": needle,
+        "hits": [{
+            "leaRipXrefs": [{
+                "candidateFunctionRva": function_rva,
+                "candidateFunctionSource": source,
+                "candidateFunctionCodeRefs": {
+                    "refs": [
+                        {"targetFunctionRva": target}
+                        for target in next_hops
+                    ],
+                },
+            }],
+        }],
+    }
+
+
 def test_hp_probe_correlates_base_flat_percent_skill_and_weapon_upgrade_sources(monkeypatch):
     packages = {
         probe.PLAYER_PARAMETER: _package(
@@ -79,6 +97,7 @@ def test_hp_probe_correlates_base_flat_percent_skill_and_weapon_upgrade_sources(
     }]
     assert result["knownContracts"]["equipmentSkillFlatEffect"].endswith("HPMaxAdd(1)")
     assert result["knownContracts"]["finalStatusType"] == "FEndPlayerStatus.HPMax"
+    assert result["nativeAssessment"]["implementationReady"] is False
 
 
 def test_hp_probe_does_not_treat_percent_scale_as_flat_or_include_enemy_hp(monkeypatch):
@@ -102,7 +121,7 @@ def test_hp_probe_does_not_treat_percent_scale_as_flat_or_include_enemy_hp(monke
     assert any("EnemyParameter.HPMax" in note for note in result["notes"])
 
 
-def test_hp_probe_native_needles_cover_final_status_current_and_max_accessors():
+def test_hp_probe_native_needles_cover_exact_player_current_and_max_accessors():
     expected = {
         "BPGetPlayerStatus",
         "BPGetPlayerStatusWithEquipment",
@@ -110,7 +129,84 @@ def test_hp_probe_native_needles_cover_final_status_current_and_max_accessors():
         "BPGetPlayerHPMax",
         "BPGetPlayerHP",
         "BPSetPlayerHPMax",
+        "BPSetPlayerHP",
+        "GetCharaHPMax",
+        "GetCharaHP",
         "GetHPMax",
         "GetHP",
     }
     assert expected.issubset(set(probe.NATIVE_NEEDLES))
+
+
+def test_hp_native_assessment_correlates_exact_max_and_current_hp_paths():
+    native = {
+        "needles": [
+            _native_hit("BPSetPlayerHPMax", 0x1000, 0x5000),
+            _native_hit("BPGetPlayerHPMax", 0x2000, 0x5000),
+            _native_hit("BPGetPlayerStatus", 0x3000, 0x5000),
+            _native_hit("BPSetPlayerHP", 0x4000, 0x6000),
+            _native_hit("BPGetPlayerHP", 0x4100, 0x6000),
+            _native_hit("GetHPMax", 0x7000),
+            _native_hit("GetHP", 0x7100),
+        ]
+    }
+
+    result = probe.assess_hp_native_evidence(native)
+
+    assert result["functionCorrelations"]["maxWriteToMaxRead"] == [0x5000]
+    assert result["functionCorrelations"]["maxWriteToStatus"] == [0x5000]
+    assert result["functionCorrelations"]["statusToMaxRead"] == [0x5000]
+    assert result["functionCorrelations"]["currentWriteToCurrentRead"] == [0x6000]
+    assert result["genericAnchorFunctions"] == [0x7000, 0x7100]
+    assert "player-max-hp-setter-function-unresolved" not in result["blockers"]
+    assert "player-current-hp-clamp-setter-function-unresolved" not in result["blockers"]
+    assert result["implementationReady"] is False
+    assert "authoritative-max-hp-recalculation-interception-unvalidated" in result["blockers"]
+
+
+def test_generic_hp_names_cannot_satisfy_exact_player_api_roles():
+    result = probe.assess_hp_native_evidence({
+        "needles": [
+            _native_hit("GetHPMax", 0x1000),
+            _native_hit("GetHP", 0x1000),
+        ]
+    })
+
+    assert result["genericAnchorFunctions"] == [0x1000]
+    assert "player-max-hp-setter-function-unresolved" in result["blockers"]
+    assert "player-current-hp-clamp-setter-function-unresolved" in result["blockers"]
+    assert "player-max-hp-read-function-unresolved" in result["blockers"]
+    assert "player-current-hp-read-function-unresolved" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_hp_native_assessment_marks_multi_api_direct_owner_as_registration_collision():
+    result = probe.assess_hp_native_evidence({
+        "needles": [
+            _native_hit("BPSetPlayerHPMax", 0x2000),
+            _native_hit("BPGetPlayerHPMax", 0x2000),
+        ]
+    })
+    cluster = next(
+        row for row in result["functionClusters"]
+        if row["functionRva"] == 0x2000
+    )
+
+    assert cluster["roles"] == ["max-read", "max-write"]
+    assert cluster["directNeedles"] == ["BPGetPlayerHPMax", "BPSetPlayerHPMax"]
+    assert cluster["crossRole"] is True
+    assert cluster["registrationCollisionRisk"] is True
+    assert result["implementationReady"] is False
+
+
+def test_hp_native_assessment_ignores_padding_heuristic_function_owners():
+    result = probe.assess_hp_native_evidence({
+        "needles": [
+            _native_hit("BPSetPlayerHPMax", 0x2000, 0x5000, source="padding-heuristic"),
+            _native_hit("GetHPMax", 0x3000, source="padding-heuristic"),
+        ]
+    })
+
+    assert result["functionEvidence"]["BPSetPlayerHPMax"]["expandedPdataFunctions"] == []
+    assert result["genericAnchorFunctions"] == []
+    assert "player-max-hp-setter-function-unresolved" in result["blockers"]
