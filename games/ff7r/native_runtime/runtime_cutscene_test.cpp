@@ -124,7 +124,7 @@ int main() {
 
     // The inclusive 64x safety ceiling remains representable: ownership tagging
     // falls one ULP below the boundary rather than exceeding it.
-    const float taggedMax = tagOwnedGameSpeed(kMaxPlausibleAppliedGameSpeed);
+    [[maybe_unused]] const float taggedMax = tagOwnedGameSpeed(kMaxPlausibleAppliedGameSpeed);
     assert(taggedMax > 0.0F);
     assert(taggedMax < kMaxPlausibleAppliedGameSpeed);
 
