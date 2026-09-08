@@ -332,7 +332,7 @@ SCENE = {
         "modifier": _field(label="Additional-behavior modifier", group="Extra behavior", help="Parameter used by additional behaviors that require one."),
         "statuses": _field(label="Statuses affected", dataType="flags", flags=flags(*STATUSES), group="Status / condition", help="Statuses affected according to Status change."),
         "elements": _field(label="Elements", dataType="flags", flags=flags(*ELEMENTS), group="Damage", help="Elemental tags carried by this attack."),
-        "specialFlags": _field(label="Special attack properties", dataType="flags", flags=flags(*SPECIAL_ATTACK_FLAGS), invertBits=True, bitWidth=16, group="Extra behavior", help="Named special properties. scene.bin stores these bits inverted; the editor presents the logical meaning."),
+        "specialFlags": _field(label="Special attack properties", dataType="flags", flags=flags(*SPECIAL_ATTACK_FLAGS), invertBits=True, bitWidth=16, group="Extra behavior", help="Named special properties. scene.bin stores these bits inverted; the editor presents their logical meaning."),
         "singleCamera": advanced("Single-target camera ID", "Raw battle camera program ID; no authoritative camera-name table is available here."),
         "multiCamera": advanced("Multi-target camera ID", "Raw battle camera program ID; no authoritative camera-name table is available here."),
         "impact": advanced("Impact effect ID", "Raw impact visual-effect ID."),
@@ -437,7 +437,7 @@ for slot in range(6):
     for suffix, label in (("cover","Cover flags"),("flags","Initial condition flags")):
         SCENE["encounters"][f"slot{slot}_{suffix}"] = advanced(f"Enemy slot {slot+1} {label}", "Packed formation-engine flags; retained under Advanced until every bit is authoritatively named.")
 for level in ("11","12","21","22","31","32","4"):
-    CHARACTERS[f"limitAttack{level}"] = reference("playerAttacks", label=f"Limit {level} attack", help="Player-attack record used by this Limit Break slot.")
+    CHARACTERS[f"limitAttack{level}"] = reference("limitBreaks", label=f"Limit {level} attack", value_key="gameId", help="Executable Limit Break attack record used by this slot; stored Limit attack IDs begin at 128.")
 CHARACTERS["levelProgress"] = _field(label="Starting level progress", group="Starting progression", help="Progress within the current level at initialization (0–255 gauge).")
 for i in range(1,5):
     CHARACTERS[f"limitHpDivisor{i}"] = _field(label=f"Limit level {i} HP divisor", group="Limit gain", help="HP-loss divisor used by FF7's Limit gauge gain calculation for this Limit level.")
