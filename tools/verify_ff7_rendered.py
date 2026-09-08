@@ -96,6 +96,10 @@ class RenderedTests(unittest.TestCase):
         self.assertTrue(self.page.locator('.ff7-detail').count()>0,group)
     def control(self,group,key):
         self.navigate(group)
+        row_name=self.page.evaluate('(group)=>state.records[group].find(r=>r.id===state.selected[group]).name',group)
+        if group in ("characterAI","enemyAI","formationAI") and key.startswith("script"):
+            self.page.get_by_label(f"AI event for {row_name}",exact=True).select_option(key[6:])
+            self.page.wait_for_timeout(20)
         name=self.page.evaluate('([group,key])=>{const row=state.records[group].find(r=>r.id===state.selected[group]);return state.data.categories.find(c=>c.id===group).fields.find(f=>f.key===key).label+" for "+row.name}',[group,key])
         return self.page.get_by_label(name,exact=True).first
     def save(self):

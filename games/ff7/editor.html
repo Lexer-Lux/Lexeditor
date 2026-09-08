@@ -23,7 +23,7 @@
   const parentTab=id=>Object.keys(groups).find(key=>groups[key].includes(id))||id;
   const tabs=[...new Set([...integrated,...unresolved].map(parentTab))].map(id=>({id,label:labels[id]}));
   const api=async(path,options={})=>{const response=await fetch(path,options),body=await response.json();if(!response.ok)throw new Error(body.error||response.statusText);return body};
-  const state={loaded:false,tab:"items",dashboard:null,dataMap:null,data:null,records:{},saved:{},invalid:{},platformConfig:null,savedPlatformConfig:null,platformQuery:"",platformError:"",platformRevision:0,platformLoading:false,activeSource:"mine",selected:{},page:{},pageSize:{},query:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],saving:false};
+  const state={loaded:false,tab:"items",dashboard:null,dataMap:null,data:null,records:{},saved:{},invalid:{},platformConfig:null,savedPlatformConfig:null,platformQuery:"",platformError:"",platformRevision:0,platformLoading:false,activeSource:"mine",selected:{},page:{},pageSize:{},query:{},sort:{},aiEvent:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],saving:false};
   const main=document.querySelector("#main");
   const category=()=>state.data.categories.find(value=>value.id===state.tab);
   const rowById=(group,id,source=state.records)=>(source?.[group]||[]).find(row=>row.id===id);
@@ -235,7 +235,10 @@
   function fieldDetail(row,field){const help=semanticHelp(field);return detailField({className:"ff7-field",label:field.label,help:help?infoHelp(help):null,control:semanticControl(row,field),dataType:semanticType(field),min:field.minimum,max:field.maximum})}
   function ordinarySections(row,omit=new Set()){
     const metadata=category(),fields=metadata.fields.filter(field=>!omit.has(field.key)),groups=[...new Set(fields.map(field=>field.group||"Kernel data"))],body=[];
-    if(metadata.descriptionEditable)body.push(detailSection({title:"TEXT",body:detailField({label:"DESCRIPTION",help:infoHelp("The in-game description stored in this FF7 KERNEL.BIN. Byte escapes are preserved for game control codes."),control:descriptionControl(row),dataType:"TEXT"})}));
+    if(metadata.descriptionEditable){
+      const help="The in-game description stored in this FF7 KERNEL.BIN. Byte escapes are preserved for game control codes.",control=descriptionControl(row);control.style.width="100%";
+      body.push(detailSection({title:"DESCRIPTION",attrs:{"data-concept":"editable-description"},help:infoHelp(help),body:el("div",{style:"padding:10px;min-width:0"},control)}));
+    }
     body.push(...groups.map(group=>detailSection({title:group.toUpperCase(),body:fields.filter(field=>(field.group||"Kernel data")===group).map(field=>fieldDetail(row,field))})));
     return body;
   }
@@ -283,9 +286,33 @@
   }
   function shopDetail(row){const omit=new Set();for(let i=0;i<10;i++){omit.add(`type${i}`);omit.add(`item${i}`)}const body=ordinarySections(row,omit),entries=Array.from({length:10},(_,i)=>({key:i+1,index:i,kind:fieldByKey(`type${i}`),product:fieldByKey(`item${i}`)}));body.push(detailSection({title:"INVENTORY",attrs:{"data-concept":"shop-inventory"},body:conceptTable(entries,"44px 62px minmax(130px,.8fr) minmax(180px,1.3fr)",[{key:"slot",label:"#",numberedId:true,render:e=>e.key},{key:"active",label:"Active",render:e=>e.index<Number(row.values.count)?"Yes":"No"},{key:"kind",label:"Kind",render:e=>semanticControl(row,{...e.kind,rerenderOnChange:true})},{key:"product",label:"Product",render:e=>semanticControl(row,e.product)}],"Shop inventory slots")}));return conceptPanel(row,body)}
   function weightedEncounterDetail(row){const count=state.tab==="worldEncounters"?14:10,omit=new Set();for(let i=0;i<count;i++){omit.add(`battle${i}`);omit.add(`chance${i}`)}const body=ordinarySections(row,omit),entries=Array.from({length:count},(_,i)=>({key:i+1,battle:fieldByKey(`battle${i}`),chance:fieldByKey(`chance${i}`)}));body.push(detailSection({title:"WEIGHTED ENCOUNTERS",attrs:{"data-concept":"weighted-encounters"},body:conceptTable(entries,"44px minmax(160px,1.4fr) minmax(90px,.7fr) 72px",[{key:"slot",label:"#",numberedId:true,render:e=>e.key},{key:"battle",label:"Battle",render:e=>semanticControl(row,e.battle)},{key:"weight",label:"Weight / 64",render:e=>semanticControl(row,e.chance)},{key:"percent",label:"Share",render:e=>`${Math.round(Number(row.values[e.chance.key])*1000/64)/10}%`}],"Weighted encounter table")}));return conceptPanel(row,body)}
+  function materiaDetail(row){
+    const apKeys=["level2Ap","level3Ap","level4Ap","level5Ap"],body=ordinarySections(row,new Set(apKeys)),entries=apKeys.map((key,index)=>({key:index+2,level:index+2,field:fieldByKey(key)}));
+    const progression=detailSection({title:"LEVEL PROGRESSION",attrs:{"data-concept":"materia-level-progression"},help:infoHelp("AP thresholds are cumulative. The final column shows the additional AP required after the preceding level threshold."),body:conceptTable(entries,"62px minmax(110px,1fr) minmax(110px,.8fr)",[
+      {key:"level",label:"Level",render:entry=>entry.level},
+      {key:"total",label:"Total AP",render:entry=>semanticControl(row,{...entry.field,rerenderOnChange:true})},
+      {key:"increment",label:"From prior",render:entry=>{const previous=entry.level===2?0:Number(row.values[`level${entry.level-1}Ap`]);return Number(row.values[entry.field.key])-previous}},
+    ],"Materia AP level progression")});
+    body.splice(category().descriptionEditable?1:0,0,progression);return conceptPanel(row,body);
+  }
+  function aiEventFields(){return category().fields.filter(field=>/^script\d+$/.test(field.key)).sort((a,b)=>Number(a.key.slice(6))-Number(b.key.slice(6)))}
+  function aiUsedCount(row){return aiEventFields().filter(field=>String(row.values[field.key]||"").trim()).length}
+  function aiDetail(row){
+    const fields=aiEventFields(),eventKey=`${state.tab}/${row.id}`;let selected=Number(state.aiEvent[eventKey]);
+    if(!Number.isInteger(selected)||selected<0||selected>=fields.length){const firstUsed=fields.findIndex(field=>String(row.values[field.key]||"").trim());selected=firstUsed>=0?firstUsed:0;state.aiEvent[eventKey]=selected}
+    const selector=el("select",{"aria-label":`AI event for ${row.name}`,disabled:readonly(),onchange:event=>{state.aiEvent[eventKey]=Number(event.target.value);render()}},...fields.map((field,index)=>{const source=String(row.values[field.key]||""),lines=source.trim()?source.split(/\r?\n/).filter(line=>line.trim()).length:0;return el("option",{value:index},`${field.label} — ${lines?`${lines} line${lines===1?"":"s"}`:"Empty"}`)}));selector.value=String(selected);
+    const field=fields[selected],editor=semanticControl(row,field);editor.style.width="100%";
+    const eventHelp=field.help||"Edit this FF7 battle-AI event as FF7 game-VM assembly. Invalid opcodes, bad jumps, and missing END instructions are rejected on save.";
+    return conceptPanel(row,[
+      detailSection({title:"AI EVENT",attrs:{"data-concept":"ai-event-editor"},help:infoHelp("Choose one of FF7's sixteen battle-AI event hooks. Empty events are valid and can be filled here; saving an empty event removes that script."),body:[detailField({label:"EVENT",control:selector,dataType:"SELECT"}),detailField({label:"USED",control:readonlyField(`${aiUsedCount(row)} / ${fields.length}`),dataType:"VALUE"})]}),
+      detailSection({title:field.label.toUpperCase(),help:infoHelp(eventHelp),body:el("div",{style:"padding:10px;min-width:0"},editor)}),
+    ]);
+  }
   function recordDetail(row){
     if(state.tab==="growthCurves")return growthCurveDetail(row);
     if(state.tab==="growthBonuses")return growthBonusDetail(row);
+    if(state.tab==="materia")return materiaDetail(row);
+    if(["characterAI","enemyAI","formationAI"].includes(state.tab))return aiDetail(row);
     if(state.tab==="characters")return characterDetail(row);
     if(["weapons","armor","accessories"].includes(state.tab))return equipmentDetail(row);
     if(state.tab==="enemies")return enemyDetail(row);
@@ -362,16 +389,32 @@
     const full=String(value),head=full.includes(" — ")?full.split(" — ")[0]:full;
     return head.length>26?head.slice(0,25)+"…":head;
   }
+  function derivedListValue(row,key){
+    if(key==="derived:aiScripts")return aiUsedCount(row);
+    if(key==="derived:growthKind")return {primary:0,hp:1,mp:2,exp:3}[growthCurveKind(row)]??9;
+    if(key==="derived:encounterEnemies")return Array.from({length:6},(_,i)=>Number(row.values[`slot${i}_enemy`])!==0xFFFF).filter(Boolean).length;
+    if(key==="derived:textLength")return String(row.values?.text||"").length;
+    return undefined;
+  }
+  function derivedSummaryColumns(){
+    if(["characterAI","enemyAI","formationAI"].includes(state.tab))return[{key:"derived:aiScripts",label:"Scripts",sortable:true,grow:.55,pinned:false,render:row=>`${aiUsedCount(row)}/16`}];
+    if(state.tab==="growthCurves")return[{key:"derived:growthKind",label:"Type",sortable:true,grow:.65,pinned:false,render:row=>({primary:"Primary",hp:"HP",mp:"MP",exp:"EXP"}[growthCurveKind(row)])}];
+    if(state.tab==="encounters")return[{key:"derived:encounterEnemies",label:"Enemies",sortable:true,grow:.55,pinned:false,render:row=>derivedListValue(row,"derived:encounterEnemies")}];
+    if(["texts","exeText"].includes(state.tab))return[{key:"derived:textLength",label:"Chars",sortable:true,grow:.5,pinned:false,render:row=>derivedListValue(row,"derived:textLength")}];
+    return[];
+  }
   function summaryColumns(){
-    return (MASTER_SUMMARY_FIELDS[state.tab]||[]).flatMap(([fieldKey,label])=>{
+    const fields=(MASTER_SUMMARY_FIELDS[state.tab]||[]).flatMap(([fieldKey,label])=>{
       const field=fieldByKey(fieldKey);if(!field)return[];
       return[{key:`value:${fieldKey}`,label,sortable:true,grow:.65,pinned:false,render:row=>{const full=semanticListValue(row,field);return el("span",{title:full},compactListValue(full))}}];
     });
+    return[...fields,...derivedSummaryColumns()];
   }
   function listSortValue(row,key){
     if(key==="name")return displayRowName(row);
     if(key==="description")return row.description||"";
     if(String(key).startsWith("value:"))return row.values?.[String(key).slice(6)];
+    if(String(key).startsWith("derived:"))return derivedListValue(row,key);
     return row[key];
   }
   function compareListValues(left,right){
@@ -392,7 +435,7 @@
       ...(category()?.descriptionEditable&&!summaries.length?[{key:"description",label:"Description",sortable:true,grow:3,pinned:false,render:row=>el("span",{title:row.description},row.description)}]:[]),
     ];
     const prefs=columnPreferences(`ff7-${state.tab}`,columns,()=>render());
-    const sort=state.sort[state.tab]||{key:"name",dir:1};
+    const sort=state.sort[state.tab]||{key:"id",dir:1};
     return columnList({rows,key:row=>row.id,selected,select:row=>{const id=typeof row==="object"?row.id:row;if(id!==state.selected[state.tab])LexeditorUI.playThemeSound?.("move");select(row)},sortState:sort,sort:key=>{state.sort[state.tab]=sort.key===key?{key,dir:-sort.dir}:{key,dir:1};render()},columnPreferences:prefs,columns,class:"ff7-table","aria-label":`${labels[state.tab]} records`});
   }
   function unavailableView(){
@@ -408,7 +451,7 @@
     ]});
   }
   function integratedView(){
-    const group=state.tab,query=state.query[group]||"",sort=state.sort[group]||{key:"name",dir:1};
+    const group=state.tab,query=state.query[group]||"",sort=state.sort[group]||{key:"id",dir:1};
     if(!state.records[group]?.length)return unavailableView();
     const needle=query.trim().toLocaleLowerCase();
     const rows=[...state.records[group]].filter(row=>!needle||recordSearchText(row).includes(needle)).sort((a,b)=>compareListValues(listSortValue(a,sort.key),listSortValue(b,sort.key))*sort.dir);
