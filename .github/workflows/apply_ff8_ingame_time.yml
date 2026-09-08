@@ -17,6 +17,8 @@ jobs:
         with:
           ref: master
           fetch-depth: 1
+      - name: Install FF8 test dependency
+        run: python -m pip install pillow
       - name: Apply guarded clock migration
         run: python tools/apply_ff8_ingame_time.py
       - name: Validate source contracts
