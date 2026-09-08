@@ -59,6 +59,7 @@ def _test_package() -> tuple[bytes, bytes]:
     names = ["Fixture", "Power", "Enabled", "Mode", "ModeA", "ModeB", "Description", "Values_Array", "RowA"]
     header = bytearray()
     header += struct.pack("<Iii", 0x9E2A83C1, -4, 0)
+    header += struct.pack("<i", 0)  # licensee version
     header += struct.pack("<i", 0)  # custom versions
     header += struct.pack("<i", 0)  # header size placeholder
     header += struct.pack("<i", 0)  # empty FString
@@ -74,7 +75,7 @@ def _test_package() -> tuple[bytes, bytes]:
     header += struct.pack("<iI", 0, 0)  # Fixture FName
     header += struct.pack("<Iqq", 0, 0, 0)
     header += b"\0\0\0" + (b"\0" * 16) + struct.pack("<i", 0) + b"\0\1"
-    struct.pack_into("<i", header, 16, len(header))
+    struct.pack_into("<i", header, 20, len(header))
     struct.pack_into("<iiiiii", header, counts_offset,
                      len(names), names_offset, 0, 0, 1, exports_offset)
 
@@ -178,6 +179,7 @@ PLUGIN = GamePlugin(
         root_env="LEXEDITOR_FF7R_PROJECT",
         default_root=DEFAULT_PROJECT,
         required_paths=(),
+        template_root=PLUGIN_ROOT / "_no_project_template",
     ),
     installation=GameInstallSpec(
         root_env="LEXEDITOR_FF7R_ROOT",
