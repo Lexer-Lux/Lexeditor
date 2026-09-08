@@ -13,6 +13,11 @@ from .atb_dataobject import (
     save_atb_virtual_package,
 )
 from .dataobject import DataObjectPackage, sha256_bytes
+from .encounter_dataobject import (
+    load_encounter_virtual_package,
+    save_encounter_virtual_package,
+)
+from .encounter_tweaks import ENCOUNTER_TWEAKS_ASSET
 from .runtime_dataobject import (
     NO_MORE_CHEATS_PROBE_ASSET,
     RUNTIME_PROBE_ASSET,
@@ -44,6 +49,9 @@ def load_package(game_root: Path, data_root: Path, project_root: Path,
         # ATB semantic views always compare against installed vanilla source;
         # project state lives in the separate reversible ATB config.
         return load_atb_virtual_package(game_root, data_root, project_root, index, asset)
+    if asset == ENCOUNTER_TWEAKS_ASSET:
+        return load_encounter_virtual_package(
+            game_root, data_root, project_root, index, vanilla=vanilla)
 
     source_uasset, source_uexp = extract_pair(game_root, data_root, index, asset)
     source_sha = sha256_bytes(source_uexp.read_bytes())
@@ -75,6 +83,13 @@ def save_edits(game_root: Path, data_root: Path, project_root: Path,
     if is_atb_virtual_asset(asset):
         return save_atb_virtual_package(
             game_root, data_root, project_root, index, asset,
+            source_sha256=source_sha256,
+            active_sha256=active_sha256,
+            edits=edits,
+        )
+    if asset == ENCOUNTER_TWEAKS_ASSET:
+        return save_encounter_virtual_package(
+            game_root, data_root, project_root, index,
             source_sha256=source_sha256,
             active_sha256=active_sha256,
             edits=edits,
