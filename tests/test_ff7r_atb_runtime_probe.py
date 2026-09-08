@@ -10,6 +10,28 @@ def _native(**counts):
     }
 
 
+def _function_row(needle, function_rva, *next_hops, source="pdata"):
+    return {
+        "needle": needle,
+        "hits": [{
+            "leaRipXrefs": [{
+                "candidateFunctionRva": function_rva,
+                "candidateFunctionSource": source,
+                "candidateFunctionCodeRefs": {
+                    "refs": [
+                        {"targetFunctionRva": target}
+                        for target in next_hops
+                    ],
+                },
+            }],
+        }],
+    }
+
+
+def _function_native(*rows):
+    return {"needles": list(rows)}
+
+
 def test_guard_and_ability_data_can_be_ready_while_runtime_is_not():
     result = assess_atb_runtime_evidence(
         _native(), resident_rows=4, guard_rows=12, ability_rows=300)
@@ -52,9 +74,11 @@ def test_direct_atb_get_set_api_is_reported_without_guessing_units():
 
     runtime = result["runtimeResearch"]
     assert runtime["directATBApiCandidatePresent"] is True
+    assert runtime["directATBApiFunctionCandidatePresent"] is False
     assert runtime["atbMaxApiCandidatePresent"] is True
     assert runtime["accessorNeedleHits"]["SetATB"] == 1
     assert "direct-atb-read-write-api-semantics-unvalidated" in result["blockers"]
+    assert "direct-atb-read-write-function-path-unresolved" in result["blockers"]
     assert "atb-max-unit-contract-unvalidated" in result["blockers"]
     assert result["dataBacked"]["unitsValidated"] is False
 
@@ -128,3 +152,102 @@ def test_discovery_error_disables_data_editability():
     assert result["dataBacked"]["guardEditableNow"] is False
     assert result["dataBacked"]["abilityCostsEditableNow"] is False
     assert "data-discovery-errors" in result["blockers"]
+
+
+def test_exact_pdata_atb_accessor_targets_correlate_without_validating_semantics():
+    result = assess_atb_runtime_evidence(
+        _function_native(
+            _function_row("SetATB", 0x1000, 0x5000),
+            _function_row("GetATB", 0x2000, 0x5000),
+            _function_row("GetATBMax", 0x3000, 0x5000),
+        ),
+        guard_rows=1,
+        ability_rows=1,
+    )
+
+    runtime = result["runtimeResearch"]
+    correlations = runtime["nativeFunctionCorrelations"]
+    assert runtime["directATBApiCandidatePresent"] is True
+    assert runtime["directATBApiFunctionCandidatePresent"] is True
+    assert runtime["atbMaxFunctionCandidatePresent"] is True
+    assert correlations["setToGet"] == [0x5000]
+    assert correlations["setToMax"] == [0x5000]
+    assert "direct-atb-read-write-function-path-unresolved" not in result["blockers"]
+    assert "direct-atb-read-write-api-semantics-unvalidated" in result["blockers"]
+    assert "atb-max-unit-contract-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_hit_function_correlation_distinguishes_attack_level_from_per_hit_lead():
+    result = assess_atb_runtime_evidence(
+        _function_native(
+            _function_row("HitBonusATBRecoverAdd", 0x1000, 0x7000),
+            _function_row("NormalAttackHitSuccess", 0x1100, 0x7000),
+            _function_row("NormalAttackPerHitSuccess", 0x1200, 0x8000),
+            _function_row("ATBValue", 0x1300, 0x7000),
+        ),
+        guard_rows=1,
+        ability_rows=1,
+    )
+
+    correlations = result["runtimeResearch"]["nativeFunctionCorrelations"]
+    assert correlations["hitModifierToAttackLevelEvents"] == [0x7000]
+    assert correlations["hitModifierToPerHitEvents"] == []
+    assert correlations["hitModifierToAccumulator"] == [0x7000]
+    assert correlations["attackLevelEventsToAccumulator"] == [0x7000]
+    assert correlations["perHitEventsToAccumulator"] == []
+    assert "hit-atb-event-granularity-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_dodge_to_set_atb_function_correlation_remains_transition_blocked():
+    result = assess_atb_runtime_evidence(
+        _function_native(
+            _function_row("IsDodge", 0x1000, 0x6000),
+            _function_row("SetATB", 0x2000, 0x6000),
+        ),
+        guard_rows=1,
+        ability_rows=1,
+    )
+
+    correlations = result["runtimeResearch"]["nativeFunctionCorrelations"]
+    assert correlations["dodgeToSetATB"] == [0x6000]
+    assert "dodge-transition-edge-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_atb_function_correlations_ignore_padding_heuristic_owners():
+    result = assess_atb_runtime_evidence(
+        _function_native(
+            _function_row("SetATB", 0x1000, 0x5000, source="padding-heuristic"),
+            _function_row("GetATB", 0x2000, 0x5000),
+        ),
+        guard_rows=1,
+        ability_rows=1,
+    )
+
+    runtime = result["runtimeResearch"]
+    assert runtime["nativeFunctionEvidence"]["SetATB"]["expandedPdataFunctions"] == []
+    assert runtime["nativeFunctionCorrelations"]["setToGet"] == []
+    assert runtime["directATBApiFunctionCandidatePresent"] is False
+    assert "direct-atb-read-write-function-path-unresolved" in result["blockers"]
+
+
+def test_atb_function_cluster_marks_multi_family_direct_owner_as_registration_risk():
+    result = assess_atb_runtime_evidence(
+        _function_native(
+            _function_row("HitBonusATBRecoverAdd", 0x9000),
+            _function_row("NormalAttackHitSuccess", 0x9000),
+        ),
+        guard_rows=1,
+        ability_rows=1,
+    )
+    cluster = next(
+        row for row in result["runtimeResearch"]["nativeFunctionClusters"]
+        if row["functionRva"] == 0x9000
+    )
+
+    assert cluster["families"] == ["attack-event", "hit-modifier"]
+    assert cluster["crossFamily"] is True
+    assert cluster["registrationCollisionRisk"] is True
+    assert result["implementationReady"] is False
