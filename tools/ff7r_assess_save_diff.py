@@ -13,7 +13,9 @@ Examples:
     --group SecurityOfficer before-officer-2.sav after-officer-2.sav \
     --control noop1 before-c1.sav after-c1.sav \
     --control noop2 before-c2.sav after-c2.sav \
-    --bit-signatures
+    --bit-signatures \
+    --enemy-index GuardDog 6 \
+    --enemy-index SecurityOfficer 7
 
   python tools/ff7r_assess_save_diff.py \
     --group GuardDog discovery-dog-1-before.sav discovery-dog-1-after.sav \
@@ -22,9 +24,12 @@ Examples:
     --holdout-group GuardDog holdout-dog-2-before.sav holdout-dog-2-after.sav \
     --control noop1 before-c1.sav after-c1.sav \
     --control noop2 before-c2.sav after-c2.sav \
-    --bit-signatures
+    --bit-signatures \
+    --enemy-index GuardDog 6
 
 The tool is read-only and format-agnostic. It never modifies a save file.
+EnemyBookIDs supplied with --enemy-index are independent evidence used only to
+test whether reproduced candidate bits fit one contiguous indexed bitset.
 """
 
 from __future__ import annotations
@@ -41,6 +46,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from games.ff7r.save_bit_signature_probe import (  # noqa: E402
     analyze_controlled_bit_signatures,
+    assess_indexed_bitset_layout,
     validate_controlled_bit_signatures,
 )
 from games.ff7r.save_control_probe import (  # noqa: E402
@@ -70,12 +76,40 @@ def _read_groups(specs: Sequence[Sequence[str]]) -> dict[str, list[SavePair]]:
     return groups
 
 
+def _read_enemy_indices(specs: Sequence[Sequence[str]]) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for raw_name, raw_index in specs:
+        name = str(raw_name).strip()
+        if not name:
+            raise ValueError("enemy/group names cannot be empty")
+        if name in result:
+            raise ValueError(f"duplicate --enemy-index mapping for {name}")
+        try:
+            index = int(str(raw_index), 0)
+        except ValueError as error:
+            raise ValueError(f"EnemyBookID for {name} must be an integer") from error
+        if index < 0:
+            raise ValueError(f"EnemyBookID for {name} must be non-negative")
+        result[name] = index
+    return result
+
+
+def _with_indexed_layout(analysis: dict, enemy_indices: dict[str, int]) -> dict:
+    if not enemy_indices:
+        return analysis
+    return {
+        **analysis,
+        "indexedBitsetLayout": assess_indexed_bitset_layout(analysis, enemy_indices),
+    }
+
+
 def build_report(
     *,
     pair_specs: Sequence[Sequence[str]] = (),
     group_specs: Sequence[Sequence[str]] = (),
     control_specs: Sequence[Sequence[str]] = (),
     holdout_group_specs: Sequence[Sequence[str]] = (),
+    enemy_index_specs: Sequence[Sequence[str]] = (),
     bit_signatures: bool = False,
 ) -> dict:
     if pair_specs and group_specs:
@@ -91,8 +125,12 @@ def build_report(
         raise ValueError("--holdout-group requires --control")
     if holdout_group_specs and not bit_signatures:
         raise ValueError("--holdout-group requires --bit-signatures")
+    if enemy_index_specs and not bit_signatures:
+        raise ValueError("--enemy-index requires --bit-signatures")
     if bit_signatures and not (group_specs and control_specs):
         raise ValueError("--bit-signatures requires --group experiments with --control")
+
+    enemy_indices = _read_enemy_indices(enemy_index_specs)
 
     if pair_specs:
         pairs = [
@@ -123,17 +161,19 @@ def build_report(
             if bit_signatures:
                 if holdout_group_specs:
                     holdout_groups = _read_groups(holdout_group_specs)
+                    analysis = validate_controlled_bit_signatures(
+                        groups,
+                        controls,
+                        holdout_groups,
+                    )
                     return {
                         "mode": "cross-enemy-bit-signatures-with-holdout-validation",
-                        "analysis": validate_controlled_bit_signatures(
-                            groups,
-                            controls,
-                            holdout_groups,
-                        ),
+                        "analysis": _with_indexed_layout(analysis, enemy_indices),
                     }
+                analysis = analyze_controlled_bit_signatures(groups, controls)
                 return {
                     "mode": "cross-enemy-bit-signatures-with-noop-control",
-                    "analysis": analyze_controlled_bit_signatures(groups, controls),
+                    "analysis": _with_indexed_layout(analysis, enemy_indices),
                 }
             return {
                 "mode": "cross-enemy-experiments-with-noop-control",
@@ -174,6 +214,14 @@ def _parser() -> argparse.ArgumentParser:
             "and --bit-signatures"
         ),
     )
+    experiments.add_argument(
+        "--enemy-index", action="append", nargs=2,
+        metavar=("ENEMY", "ENEMYBOOK_ID"), default=[],
+        help=(
+            "independently known EnemyBookID for a named --group; repeat to test "
+            "whether reproduced bits fit one contiguous indexed bitset"
+        ),
+    )
     parser.add_argument(
         "--bit-signatures", action="store_true",
         help=(
@@ -196,6 +244,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             group_specs=args.group,
             control_specs=args.control,
             holdout_group_specs=args.holdout_group,
+            enemy_index_specs=args.enemy_index,
             bit_signatures=args.bit_signatures,
         )
     except (OSError, ValueError, TypeError) as error:
