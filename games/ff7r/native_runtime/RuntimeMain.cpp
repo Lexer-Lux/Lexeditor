@@ -1,6 +1,7 @@
 #include <windows.h>
 
 #include "RuntimeConfig.hpp"
+#include "RuntimeCutscene.hpp"
 #include "RuntimeHP.hpp"
 #include "RuntimeSignatures.hpp"
 
@@ -19,6 +20,7 @@
 
 namespace {
 
+using lexeditor::ff7r::CutsceneSpeedTrack;
 using lexeditor::ff7r::HPTrackState;
 using lexeditor::ff7r::HPWritePlan;
 using lexeditor::ff7r::PlayerStatsPrefix;
@@ -28,10 +30,27 @@ HMODULE g_module = nullptr;
 constexpr wchar_t kStatusFileName[] = L"LexeditorFF7RRuntime.status.json";
 constexpr wchar_t kConfigFileName[] = L"LexeditorFF7RRuntime.json";
 constexpr DWORD kPathBufferSize = 32768;
+constexpr DWORD kCutsceneWorkerIntervalMs = 25;
 constexpr DWORD kHPWorkerIntervalMs = 100;
 
+std::atomic_bool g_cutsceneSpeedActive{false};
+std::atomic<double> g_cutsceneBaseMultiplier{1.25};
 std::atomic_bool g_hpRebalanceActive{false};
 std::atomic<double> g_hpMultiplier{0.5};
+
+enum class CutsceneWorkerState : int {
+    disabled = 0,
+    signatureMissing,
+    signatureAmbiguous,
+    signatureInvalid,
+    blockMissing,
+    blockAmbiguous,
+    blockUnreadable,
+    startFailed,
+    armed,
+    active,
+};
+std::atomic<CutsceneWorkerState> g_cutsceneWorkerState{CutsceneWorkerState::disabled};
 
 enum class HPWorkerState : int {
     disabled = 0,
@@ -241,6 +260,22 @@ SignatureDiagnostics scan_signatures() {
     };
 }
 
+const char* cutscene_worker_state_name(CutsceneWorkerState state) noexcept {
+    switch (state) {
+        case CutsceneWorkerState::disabled: return "disabled";
+        case CutsceneWorkerState::signatureMissing: return "signature-missing";
+        case CutsceneWorkerState::signatureAmbiguous: return "signature-ambiguous";
+        case CutsceneWorkerState::signatureInvalid: return "signature-invalid";
+        case CutsceneWorkerState::blockMissing: return "game-speed-block-missing";
+        case CutsceneWorkerState::blockAmbiguous: return "game-speed-block-ambiguous";
+        case CutsceneWorkerState::blockUnreadable: return "game-speed-block-unreadable";
+        case CutsceneWorkerState::startFailed: return "start-failed";
+        case CutsceneWorkerState::armed: return "armed";
+        case CutsceneWorkerState::active: return "active";
+    }
+    return "unknown";
+}
+
 const char* hp_worker_state_name(HPWorkerState state) noexcept {
     switch (state) {
         case HPWorkerState::disabled: return "disabled";
@@ -274,9 +309,10 @@ std::string diagnostic_notes(const ConfigLoadResult& loaded,
         << "signatureMatches.rawInputRegistration=" << signatures.rawInputRegistration << "; "
         << "signatureMatches.joystickMovement=" << signatures.joystickMovement << "; "
         << "signatureMatches.gameStateLoad=" << signatures.gameStateLoad << "; "
+        << "cutsceneSpeed.worker=" << cutscene_worker_state_name(g_cutsceneWorkerState.load()) << "; "
         << "hpRebalance.worker=" << hp_worker_state_name(g_hpWorkerState.load()) << "; "
         << "signatureProvenance=" << lexeditor::ff7r::kSignatureProvenance << "; "
-        << "unimplemented gameplay hooks remain inactive.";
+        << "remaining unimplemented gameplay hooks stay inactive.";
     return notes.str();
 }
 
@@ -304,7 +340,7 @@ void write_status(const ConfigLoadResult& loaded, const SignatureDiagnostics& si
             << "  \"exeTimestamp\": " << timestamp << ",\n"
             << "  \"loaded\": true,\n"
             << "  \"features\": {\n"
-            << "    \"cutsceneSpeed\": false,\n"
+            << "    \"cutsceneSpeed\": " << (g_cutsceneSpeedActive.load() ? "true" : "false") << ",\n"
             << "    \"minimapTapHold\": false,\n"
             << "    \"minimapState\": false,\n"
             << "    \"hpRebalance\": " << (g_hpRebalanceActive.load() ? "true" : "false") << ",\n"
@@ -321,6 +357,165 @@ void write_status(const ConfigLoadResult& loaded, const SignatureDiagnostics& si
         }
     }
     MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+}
+
+enum class GameSpeedBlockResolveState : int {
+    unique = 0,
+    missing,
+    ambiguous,
+    unreadable,
+};
+
+struct GameSpeedBlockResolveResult {
+    GameSpeedBlockResolveState state = GameSpeedBlockResolveState::unreadable;
+    std::uintptr_t address = 0;
+};
+
+GameSpeedBlockResolveResult resolve_game_speed_block(std::uintptr_t gameState) noexcept {
+    std::array<std::uint8_t, lexeditor::ff7r::kGameSpeedDiscoveryBytes> prefix{};
+    SIZE_T bytesRead = 0;
+    if (ReadProcessMemory(
+            GetCurrentProcess(),
+            reinterpret_cast<LPCVOID>(gameState),
+            prefix.data(),
+            prefix.size(),
+            &bytesRead) == FALSE
+            || bytesRead != prefix.size()) {
+        return {GameSpeedBlockResolveState::unreadable, 0};
+    }
+
+    const auto matches = lexeditor::ff7r::findInitialGameSpeedBlocks(
+        std::span<const std::uint8_t>(prefix));
+    if (matches.empty()) {
+        return {GameSpeedBlockResolveState::missing, 0};
+    }
+    if (matches.size() != 1) {
+        return {GameSpeedBlockResolveState::ambiguous, 0};
+    }
+    return {GameSpeedBlockResolveState::unique, gameState + matches[0].offset};
+}
+
+bool apply_cutscene_speed_tick(
+    std::uintptr_t gameSpeedBlock,
+    double multiplier,
+    CutsceneSpeedTrack& track) noexcept {
+    const std::uintptr_t address = gameSpeedBlock
+        + lexeditor::ff7r::kCutsceneGameSpeedIndex * sizeof(float);
+    float snapshot = 0.0F;
+    if (!read_process_value(address, snapshot)) {
+        return false;
+    }
+    const auto plan = lexeditor::ff7r::makeCutsceneSpeedWritePlan(track, snapshot, multiplier);
+    if (!plan.valid) {
+        return false;
+    }
+
+    if (plan.write) {
+        float current = 0.0F;
+        if (!read_process_value(address, current) || current != snapshot) {
+            return false;
+        }
+        if (!write_process_value(address, plan.appliedSpeed)) {
+            return false;
+        }
+    }
+    lexeditor::ff7r::commitCutsceneSpeedWritePlan(track, plan);
+    return true;
+}
+
+DWORD WINAPI cutscene_worker(LPVOID) noexcept {
+    const auto gameStateGlobal = resolve_game_state_global();
+    if (!gameStateGlobal.has_value()) {
+        g_cutsceneWorkerState.store(CutsceneWorkerState::signatureInvalid);
+        return 0;
+    }
+
+    std::uintptr_t previousGameState = 0;
+    std::uintptr_t gameSpeedBlock = 0;
+    CutsceneSpeedTrack track{};
+    for (;;) {
+        std::uintptr_t gameState = 0;
+        if (!read_process_value(*gameStateGlobal, gameState) || gameState == 0) {
+            Sleep(kCutsceneWorkerIntervalMs);
+            continue;
+        }
+        if (gameState != previousGameState) {
+            previousGameState = gameState;
+            gameSpeedBlock = 0;
+            track = {};
+            g_cutsceneWorkerState.store(CutsceneWorkerState::armed);
+        }
+
+        if (gameSpeedBlock == 0) {
+            const auto resolved = resolve_game_speed_block(gameState);
+            switch (resolved.state) {
+                case GameSpeedBlockResolveState::unique:
+                    gameSpeedBlock = resolved.address;
+                    g_cutsceneWorkerState.store(CutsceneWorkerState::armed);
+                    break;
+                case GameSpeedBlockResolveState::missing:
+                    g_cutsceneWorkerState.store(CutsceneWorkerState::blockMissing);
+                    Sleep(kCutsceneWorkerIntervalMs);
+                    continue;
+                case GameSpeedBlockResolveState::ambiguous:
+                    g_cutsceneWorkerState.store(CutsceneWorkerState::blockAmbiguous);
+                    Sleep(kCutsceneWorkerIntervalMs);
+                    continue;
+                case GameSpeedBlockResolveState::unreadable:
+                    g_cutsceneWorkerState.store(CutsceneWorkerState::blockUnreadable);
+                    Sleep(kCutsceneWorkerIntervalMs);
+                    continue;
+            }
+        }
+
+        if (apply_cutscene_speed_tick(gameSpeedBlock, g_cutsceneBaseMultiplier.load(), track)) {
+            g_cutsceneWorkerState.store(CutsceneWorkerState::active);
+            const bool wasActive = g_cutsceneSpeedActive.exchange(true);
+            if (!wasActive) {
+                write_status(load_config(), scan_signatures());
+            }
+        }
+        Sleep(kCutsceneWorkerIntervalMs);
+    }
+}
+
+void start_cutscene_worker(
+    const ConfigLoadResult& loaded,
+    const SignatureDiagnostics& signatures) noexcept {
+    if (!loaded.config.has_value() || !loaded.config->cutsceneSpeed.enabled) {
+        g_cutsceneWorkerState.store(CutsceneWorkerState::disabled);
+        return;
+    }
+    if (signatures.gameStateLoad == 0) {
+        g_cutsceneWorkerState.store(CutsceneWorkerState::signatureMissing);
+        return;
+    }
+    if (signatures.gameStateLoad != 1) {
+        g_cutsceneWorkerState.store(CutsceneWorkerState::signatureAmbiguous);
+        return;
+    }
+    if (!resolve_game_state_global().has_value()) {
+        g_cutsceneWorkerState.store(CutsceneWorkerState::signatureInvalid);
+        return;
+    }
+
+    g_cutsceneBaseMultiplier.store(loaded.config->cutsceneSpeed.baseMultiplier);
+    g_cutsceneWorkerState.store(CutsceneWorkerState::armed);
+
+    HMODULE pinned = nullptr;
+    if (!GetModuleHandleExW(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+            reinterpret_cast<LPCWSTR>(&g_module),
+            &pinned)) {
+        g_cutsceneWorkerState.store(CutsceneWorkerState::startFailed);
+        return;
+    }
+    HANDLE thread = CreateThread(nullptr, 0, cutscene_worker, nullptr, 0, nullptr);
+    if (thread == nullptr) {
+        g_cutsceneWorkerState.store(CutsceneWorkerState::startFailed);
+        return;
+    }
+    CloseHandle(thread);
 }
 
 bool read_player_stats(std::uintptr_t statsAddress, PlayerStatsPrefix& stats) noexcept {
@@ -477,6 +672,7 @@ extern "C" __declspec(dllexport) void Init() noexcept {
         // safe to do filesystem work and scan the mapped executable here.
         const ConfigLoadResult loaded = load_config();
         const SignatureDiagnostics signatures = scan_signatures();
+        start_cutscene_worker(loaded, signatures);
         start_hp_worker(loaded, signatures);
         write_status(loaded, signatures);
     } catch (...) {
