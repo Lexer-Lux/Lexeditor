@@ -256,7 +256,7 @@ def extract_pair(game_root: Path, data_root: Path, index: dict, asset: str,
         data = get_file(pak, source["path"])
         temporary = target.with_suffix(target.suffix + ".tmp")
         temporary.write_bytes(data)
-        temporary.replace(cache_path)
+        temporary.replace(target)
     return uasset_target, uexp_target
 
 
