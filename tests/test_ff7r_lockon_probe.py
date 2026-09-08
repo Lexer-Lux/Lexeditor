@@ -55,7 +55,8 @@ def _resolved_lockon_asset(name="UI/ResolvedLockon"):
 
 def _serialized_lockon_asset(
     name="UI/SerializedLockon", *, property_name="ColorAndOpacity", dedicated=True,
-    mapping_trusted=True, header_plausible=True,
+    mapping_trusted=True, header_plausible=True, layout_plausible=False,
+    linear_color=False,
 ):
     asset = _asset(name)
     object_name = "BattleLockonMarker" if dedicated else "GenericTargetImage"
@@ -76,8 +77,17 @@ def _serialized_lockon_asset(
             "propertyType": "StructProperty",
             "propertyTagLike": True,
             "propertyTagHeaderPlausible": header_plausible,
+            "propertyTagLayoutPlausible": layout_plausible,
             "declaredValueSize": 16 if header_plausible else None,
             "arrayIndex": 0 if header_plausible else None,
+            "typeMetadata": {"structName": "LinearColor"} if layout_plausible else {},
+            "valueOffset": 49 if layout_plausible else None,
+            "valueEndOffset": 65 if layout_plausible else None,
+            "linearColorValuePlausible": linear_color,
+            "linearColorValue": (
+                {"r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0}
+                if linear_color else None
+            ),
         }],
     }
     return asset
@@ -169,7 +179,32 @@ def test_serialized_dedicated_tint_property_outranks_string_only_candidate():
     assert ranked[0]["serializedDedicatedPropertyRefs"]
     assert ranked[0]["serializedTintPropertyEvidence"] is True
     assert ranked[0]["serializedPlausibleTintTagEvidence"] is True
+    assert ranked[0]["serializedTintValueLayoutEvidence"] is False
+    assert ranked[0]["serializedLinearColorTintValueEvidence"] is False
     assert ranked[0]["strongPresentationCandidate"] is True
+
+
+def test_versioned_layout_and_linear_color_value_are_stronger_serialized_tint_evidence():
+    ranked = rank_lockon_assets([
+        _serialized_lockon_asset("UI/HeaderOnly"),
+        _serialized_lockon_asset(
+            "UI/Layout", layout_plausible=True,
+        ),
+        _serialized_lockon_asset(
+            "UI/LinearColor", layout_plausible=True, linear_color=True,
+        ),
+    ])
+
+    assert [row["asset"] for row in ranked] == [
+        "UI/LinearColor", "UI/Layout", "UI/HeaderOnly",
+    ]
+    linear = ranked[0]
+    assert linear["serializedTintValueLayoutEvidence"] is True
+    assert linear["serializedLinearColorTintValueEvidence"] is True
+    assert linear["serializedLayoutTintTagRefs"][0]["valueOffset"] == 49
+    assert linear["serializedLinearColorTintRefs"][0]["linearColorValue"] == {
+        "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0,
+    }
 
 
 def test_untrusted_serialized_mapping_cannot_promote_injected_refs():
@@ -196,12 +231,14 @@ def test_serialized_tint_without_plausible_generic_header_stays_weak():
     assert len(ranked) == 1
     assert ranked[0]["serializedTintPropertyEvidence"] is True
     assert ranked[0]["serializedPlausibleTintTagEvidence"] is False
+    assert ranked[0]["serializedTintValueLayoutEvidence"] is False
+    assert ranked[0]["serializedLinearColorTintValueEvidence"] is False
     assert ranked[0]["strongPresentationCandidate"] is False
 
 
 def test_serialized_dedicated_non_tint_property_does_not_claim_tint_semantics():
     ranked = rank_lockon_assets([
-        _serialized_lockon_asset(property_name="Visibility"),
+        _serialized_lockon_asset(property_name="Visibility", layout_plausible=True, linear_color=True),
     ])
 
     assert len(ranked) == 1
@@ -209,6 +246,8 @@ def test_serialized_dedicated_non_tint_property_does_not_claim_tint_semantics():
     assert ranked[0]["serializedTintPropertyRefs"] == []
     assert ranked[0]["serializedTintPropertyEvidence"] is False
     assert ranked[0]["serializedPlausibleTintTagEvidence"] is False
+    assert ranked[0]["serializedTintValueLayoutEvidence"] is False
+    assert ranked[0]["serializedLinearColorTintValueEvidence"] is False
     assert ranked[0]["strongPresentationCandidate"] is False
 
 
