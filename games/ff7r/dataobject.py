@@ -1,8 +1,10 @@
-"""FF7 Remake DataObject .uasset/.uexp reader and same-size writer.
+"""FF7 Remake DataObject .uasset/.uexp reader and conservative writer.
 
 The format contract is intentionally narrow: it implements the DataObject table
-shape used by FINAL FANTASY VII REMAKE INTERGRADE. Unknown bytes are never
-rebuilt; editable values are patched in place in the .uexp payload.
+shape used by FINAL FANTASY VII REMAKE INTERGRADE. Ordinary value edits are
+patched in place. The only supported structural edit is deleting one element
+from an existing fixed-width array; that operation also patches the single
+export's serialized size in the companion .uasset and reparses the result.
 """
 
 from __future__ import annotations
@@ -173,6 +175,7 @@ class UAsset:
     export_name: str
     serial_size: int
     serial_offset: int
+    serial_size_offset: int
 
 
 def humanize(value: str) -> str:
@@ -194,7 +197,7 @@ def _read_fname(reader: Reader, names: tuple[str, ...] | list[str]) -> str:
     return names[index]
 
 
-def parse_uasset(data: bytes, label: str = "uasset") -> UAsset:
+def parse_uasset(data: bytes | bytearray, label: str = "uasset") -> UAsset:
     reader = Reader(data, label)
     if reader.uint32() != PACKAGE_TAG:
         raise FormatError(f"{label}: invalid Unreal package tag")
@@ -240,6 +243,7 @@ def parse_uasset(data: bytes, label: str = "uasset") -> UAsset:
     reader.int32()  # package index
     export_name = _read_fname(reader, names)
     reader.uint32()  # object flags
+    serial_size_offset = reader.pos
     serial_size = reader.int64()
     serial_offset = reader.int64()
     reader.boolean()
@@ -251,7 +255,7 @@ def parse_uasset(data: bytes, label: str = "uasset") -> UAsset:
     reader.boolean()
     if serial_size < 0 or serial_offset < 0:
         raise FormatError(f"{label}: invalid export size/offset")
-    return UAsset(tuple(names), export_name, serial_size, serial_offset)
+    return UAsset(tuple(names), export_name, serial_size, serial_offset, serial_size_offset)
 
 
 class DataObjectPackage:
@@ -261,7 +265,7 @@ class DataObjectPackage:
         self.uasset_path = Path(uasset_path)
         self.uexp_path = Path(uexp_path)
         self.asset = asset or self.uasset_path.with_suffix("").as_posix()
-        self.uasset_bytes = self.uasset_path.read_bytes()
+        self.uasset_bytes = bytearray(self.uasset_path.read_bytes())
         self.uexp_bytes = bytearray(self.uexp_path.read_bytes())
         self.uasset = parse_uasset(self.uasset_bytes, self.uasset_path.name)
         self.properties, self.entries = self._parse_uexp()
@@ -273,7 +277,7 @@ class DataObjectPackage:
         obj.uasset_path = Path(f"{asset}.uasset")
         obj.uexp_path = Path(f"{asset}.uexp")
         obj.asset = asset
-        obj.uasset_bytes = bytes(uasset)
+        obj.uasset_bytes = bytearray(uasset)
         obj.uexp_bytes = bytearray(uexp)
         obj.uasset = parse_uasset(obj.uasset_bytes, obj.uasset_path.name)
         obj.properties, obj.entries = obj._parse_uexp()
@@ -385,6 +389,47 @@ class DataObjectPackage:
                 self._write_value(field.offset, prop.type_code, value, array=False)
                 entry.values[prop_name] = self._normalize(prop.type_code, value)
 
+    def delete_array_element(self, entry_index: int, prop_name: str, array_index: int) -> None:
+        """Delete one existing element from a fixed-width array and reparse.
+
+        This deliberately does not support insertion, entry-count changes, name
+        map edits, FString arrays, or arbitrary package reconstruction.
+        """
+        if entry_index < 0 or entry_index >= len(self.entries):
+            raise IndexError(f"Entry index out of range: {entry_index}")
+        prop = self._property(prop_name)
+        if not prop.is_array:
+            raise ValueError(f"{prop_name} is not an array")
+        if prop.type_code == STRING:
+            raise ValueError(f"{prop_name} is variable-width and cannot be structurally edited")
+        entry = self.entries[entry_index]
+        field = entry.offsets[prop_name]
+        if field.length is None or array_index < 0 or array_index >= field.length:
+            raise IndexError(f"Array index out of range for {prop_name}: {array_index}")
+
+        width = self._width(prop.type_code, array=True)
+        element_offset = field.offset + 4 + array_index * width
+        element_end = element_offset + width
+        if element_end > len(self.uexp_bytes):
+            raise FormatError(f"Deletion for {prop_name} is outside {self.uexp_path.name}")
+
+        del self.uexp_bytes[element_offset:element_end]
+        struct.pack_into("<i", self.uexp_bytes, field.offset, field.length - 1)
+        self._adjust_export_serial_size(-width)
+        self.properties, self.entries = self._parse_uexp()
+
+    def _adjust_export_serial_size(self, delta: int) -> None:
+        if delta == 0 or self.uasset.serial_size == 0:
+            return
+        new_size = self.uasset.serial_size + delta
+        if new_size < 0:
+            raise FormatError(f"{self.uasset_path.name}: export size would become negative")
+        try:
+            struct.pack_into("<q", self.uasset_bytes, self.uasset.serial_size_offset, new_size)
+        except struct.error as error:
+            raise FormatError(f"{self.uasset_path.name}: export size field is outside the file") from error
+        self.uasset = parse_uasset(self.uasset_bytes, self.uasset_path.name)
+
     @staticmethod
     def _width(type_code: int, *, array: bool) -> int:
         if type_code == BOOLEAN:
@@ -463,13 +508,29 @@ class DataObjectPackage:
         except struct.error as error:
             raise FormatError(f"Edit for type {type_code} writes outside {self.uexp_path.name}") from error
 
-    def write_uexp(self, target: Path) -> Path:
+    @staticmethod
+    def _atomic_write(target: Path, data: bytes) -> Path:
         target = Path(target)
         target.parent.mkdir(parents=True, exist_ok=True)
-        data = bytes(self.uexp_bytes)
         temporary = target.with_suffix(target.suffix + ".tmp")
         temporary.write_bytes(data)
         temporary.replace(target)
         if target.stat().st_size != len(data):
             raise OSError(f"Short write: {target}")
         return target
+
+    def write_uasset(self, target: Path) -> Path:
+        return self._atomic_write(Path(target), bytes(self.uasset_bytes))
+
+    def write_uexp(self, target: Path) -> Path:
+        return self._atomic_write(Path(target), bytes(self.uexp_bytes))
+
+    def write_pair(self, uasset_target: Path, uexp_target: Path) -> tuple[Path, Path]:
+        uasset_target = self.write_uasset(uasset_target)
+        uexp_target = self.write_uexp(uexp_target)
+        verified = DataObjectPackage(uasset_target, uexp_target, asset=self.asset)
+        if bytes(verified.uasset_bytes) != bytes(self.uasset_bytes):
+            raise RuntimeError("FF7R structural write failed .uasset readback verification")
+        if bytes(verified.uexp_bytes) != bytes(self.uexp_bytes):
+            raise RuntimeError("FF7R structural write failed .uexp readback verification")
+        return uasset_target, uexp_target
