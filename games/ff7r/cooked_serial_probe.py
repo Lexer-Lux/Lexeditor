@@ -101,6 +101,35 @@ def _read_required_fname(
     return name, cursor + 8
 
 
+def _read_exact_fstring(data: bytes, offset: int) -> tuple[str, int] | None:
+    """Read one FString only when its length prefix and terminator fully fit."""
+    if offset < 0 or offset + 4 > len(data):
+        return None
+    length = struct.unpack_from("<i", data, offset)[0]
+    cursor = offset + 4
+    if length == 0:
+        return "", cursor
+    if length > 0:
+        end = cursor + length
+        if end > len(data) or data[end - 1] != 0:
+            return None
+        try:
+            value = data[cursor:end - 1].decode("utf-8")
+        except UnicodeDecodeError:
+            return None
+        return value, end
+    units = -length
+    byte_count = units * 2
+    end = cursor + byte_count
+    if units <= 0 or end > len(data) or data[end - 2:end] != b"\0\0":
+        return None
+    try:
+        value = data[cursor:end - 2].decode("utf-16-le")
+    except UnicodeDecodeError:
+        return None
+    return value, end
+
+
 def _property_tag_layout_fields(
     data: bytes,
     offset: int,
@@ -121,6 +150,8 @@ def _property_tag_layout_fields(
         "linearColorValue": None,
         "vectorValuePlausible": False,
         "vectorValue": None,
+        "softObjectPathValuePlausible": False,
+        "softObjectPathValue": None,
     }
     if not header_plausible or declared_size is None:
         return result
@@ -230,9 +261,6 @@ def _property_tag_layout_fields(
                 "a": alpha,
             }
 
-    # FVector's archive representation is exactly three float32 components for
-    # the UE4-era packages this old-format tag parser targets. Keep this narrow:
-    # do not infer FVector_NetQuantize, FTransform or arbitrary 12-byte structs.
     if (
         property_type == "StructProperty"
         and struct_name.casefold() == "vector"
@@ -243,6 +271,21 @@ def _property_tag_layout_fields(
         if all(math.isfinite(component) and abs(component) <= 100_000_000 for component in components):
             result["vectorValuePlausible"] = True
             result["vectorValue"] = {"x": x, "y": y, "z": z}
+
+    # UE4-era FSoftObjectPath values serialize an FName asset path followed by
+    # an FString subpath. Require the value bytes to be consumed exactly so an
+    # arbitrary SoftClass/SoftObject payload cannot be promoted from a prefix.
+    if property_type in {"SoftClassProperty", "SoftObjectProperty"} and declared_size >= 12:
+        path_ref = _fname_at(value, 0, table)
+        sub_path = _read_exact_fstring(value, 8)
+        if path_ref is not None and sub_path is not None and sub_path[1] == len(value):
+            asset_path = path_ref[0]
+            if asset_path and ("/" in asset_path or "." in asset_path):
+                result["softObjectPathValuePlausible"] = True
+                result["softObjectPathValue"] = {
+                    "assetPath": asset_path,
+                    "subPath": sub_path[0],
+                }
     return result
 
 
@@ -374,6 +417,9 @@ def extract_serialized_name_refs(
         "vectorValueCandidateCount": sum(
             bool(row["vectorValuePlausible"]) for row in reported
         ),
+        "softObjectPathValueCandidateCount": sum(
+            bool(row["softObjectPathValuePlausible"]) for row in reported
+        ),
         "unmappedExports": unmapped,
         "notes": [
             "FName-shaped hits are candidate serialized references, not semantic ownership proof.",
@@ -381,7 +427,8 @@ def extract_serialized_name_refs(
             "propertyTagHeaderPlausible additionally requires non-negative bounded generic Size and ArrayIndex fields after the two FNames.",
             "propertyTagLayoutPlausible parses old-format UE4 type metadata and optional PropertyGuid using the package FileVersionUE4, then proves the declared value range stays inside the export.",
             "Type-metadata FNames that resolve to package/script paths are rejected rather than treated as struct/enum/container type names.",
-            "LinearColor is decoded only for an exact 16-byte LinearColor StructProperty; Vector is decoded only for an exact 12-byte Vector StructProperty.",
+            "LinearColor is decoded only for an exact 16-byte LinearColor StructProperty; Vector only for an exact 12-byte Vector StructProperty.",
+            "SoftClassProperty/SoftObjectProperty paths are decoded only when an FName asset path plus FString subpath consume the declared value exactly.",
             "Decoded values remain read-only structural evidence; semantic ownership and mutation safety are separate requirements.",
             "No export bytes are modified by this probe.",
         ],
