@@ -49,6 +49,29 @@ def _resolved_lockon_asset(name="UI/ResolvedLockon"):
     return asset
 
 
+def _serialized_lockon_asset(
+    name="UI/SerializedLockon", *, property_name="ColorAndOpacity", dedicated=True,
+):
+    asset = _asset(name)
+    object_name = "BattleLockonMarker" if dedicated else "GenericTargetImage"
+    class_name = "EndBattleLockonMarkerIcon" if dedicated else "Image"
+    asset["serializedExportEvidence"] = {
+        "mappingTrusted": True,
+        "mappingReason": "serial-offset-minus-total-header-size",
+        "refs": [{
+            "objectName": object_name,
+            "objectPath": f"WidgetTree.{object_name}",
+            "outerPath": "WidgetTree",
+            "className": class_name,
+            "classPath": f"/Script/EndGame.{class_name}",
+            "name": property_name,
+            "propertyType": "StructProperty",
+            "propertyTagLike": True,
+        }],
+    }
+    return asset
+
+
 def test_dedicated_widget_with_presentation_fields_ranks_above_generic_anchor():
     ranked = rank_lockon_assets([
         _asset("UI/Generic", "BPShowBattleLockonMarkerIcon"),
@@ -111,6 +134,39 @@ def test_resolved_widget_owner_outranks_printable_string_only_candidate():
     assert ranked[0]["resolvedDedicatedOwnerEvidence"] is True
     assert ranked[0]["resolvedLabelChildEvidence"] is True
     assert ranked[0]["strongPresentationCandidate"] is True
+
+
+def test_serialized_dedicated_tint_property_outranks_string_only_candidate():
+    ranked = rank_lockon_assets([
+        _asset("UI/StringOnly", "EndBattleLockonMarkerIcon", "ColorAndOpacity"),
+        _serialized_lockon_asset(),
+    ])
+
+    assert ranked[0]["asset"] == "UI/SerializedLockon"
+    assert ranked[0]["serializedExportMappingTrusted"] is True
+    assert ranked[0]["serializedDedicatedPropertyRefs"]
+    assert ranked[0]["serializedTintPropertyEvidence"] is True
+    assert ranked[0]["strongPresentationCandidate"] is True
+
+
+def test_serialized_property_on_unrelated_widget_is_not_promoted():
+    ranked = rank_lockon_assets([
+        _serialized_lockon_asset("UI/GenericSerialized", dedicated=False),
+    ])
+
+    assert ranked == []
+
+
+def test_serialized_dedicated_non_tint_property_does_not_claim_tint_semantics():
+    ranked = rank_lockon_assets([
+        _serialized_lockon_asset(property_name="Visibility"),
+    ])
+
+    assert len(ranked) == 1
+    assert ranked[0]["serializedDedicatedPropertyRefs"]
+    assert ranked[0]["serializedTintPropertyRefs"] == []
+    assert ranked[0]["serializedTintPropertyEvidence"] is False
+    assert ranked[0]["strongPresentationCandidate"] is False
 
 
 def test_literal_label_without_resolved_owner_does_not_invent_object_ownership():
