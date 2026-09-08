@@ -50,6 +50,8 @@ DEFAULT_NEEDLES = (
 MAX_HITS_PER_ENCODING = 64
 MAX_XREFS_PER_STRING = 64
 FUNCTION_WINDOW_BYTES = 64
+FUNCTION_CODE_SCAN_MAX_BYTES = 2048
+MAX_CODE_REFS_PER_FUNCTION = 64
 XREF_CONTEXT_BEFORE = 16
 XREF_CONTEXT_AFTER = 32
 IMAGE_FILE_MACHINE_AMD64 = 0x8664
@@ -327,6 +329,92 @@ def _string_hits(image: PEImage, needle: str) -> list[dict]:
     return hits
 
 
+def _pdata_code_target(image: PEImage, target_rva: int) -> dict | None:
+    text = image.section(".text")
+    if text is None or not (
+        text.virtual_address <= target_rva < text.virtual_address + text.mapped_size
+    ):
+        return None
+    target_function = image.runtime_function_for_rva(target_rva)
+    if target_function is None:
+        return None
+    return {
+        "targetRva": target_rva,
+        "targetVa": image.image_base + target_rva,
+        "targetFunctionRva": target_function.begin_rva,
+        "targetFunctionVa": image.image_base + target_function.begin_rva,
+        "targetFunctionEndRva": target_function.end_rva,
+        "targetFunctionEndVa": image.image_base + target_function.end_rva,
+        "targetFunctionUnwindInfoRva": target_function.unwind_info_rva,
+        "targetFunctionUnwindInfoVa": image.image_base + target_function.unwind_info_rva,
+    }
+
+
+def _bounded_function_code_refs(image: PEImage, function: RuntimeFunction) -> dict | None:
+    """Heuristically expose next-hop code refs, but only inside exact .pdata bounds."""
+    text = image.section(".text")
+    if text is None or not (
+        text.virtual_address <= function.begin_rva < function.end_rva
+        <= text.virtual_address + text.mapped_size
+    ):
+        return None
+    start_relative = function.begin_rva - text.virtual_address
+    if start_relative >= text.raw_size:
+        return None
+    requested_end = min(function.end_rva, function.begin_rva + FUNCTION_CODE_SCAN_MAX_BYTES)
+    end_relative = min(text.raw_size, requested_end - text.virtual_address)
+    if end_relative <= start_relative:
+        return None
+    raw = image.data[
+        text.raw_offset + start_relative:
+        text.raw_offset + end_relative
+    ]
+    refs = []
+    refs_truncated = False
+
+    def append_ref(kind: str, index: int, target_rva: int) -> bool:
+        nonlocal refs_truncated
+        target = _pdata_code_target(image, target_rva)
+        if target is None:
+            return False
+        refs.append({
+            "kind": kind,
+            "instructionRva": function.begin_rva + index,
+            "instructionVa": image.image_base + function.begin_rva + index,
+            **target,
+        })
+        if len(refs) >= MAX_CODE_REFS_PER_FUNCTION:
+            refs_truncated = True
+            return True
+        return False
+
+    for index in range(len(raw)):
+        if index + 5 <= len(raw) and raw[index] in (0xE8, 0xE9):
+            displacement = struct.unpack_from("<i", raw, index + 1)[0]
+            target_rva = function.begin_rva + index + 5 + displacement
+            kind = "call-rel32" if raw[index] == 0xE8 else "jump-rel32"
+            if append_ref(kind, index, target_rva):
+                break
+        if index + 7 <= len(raw):
+            rex = raw[index]
+            if 0x48 <= rex <= 0x4F and raw[index + 1] == 0x8D:
+                modrm = raw[index + 2]
+                if modrm & 0xC7 == 0x05:
+                    displacement = struct.unpack_from("<i", raw, index + 3)[0]
+                    target_rva = function.begin_rva + index + 7 + displacement
+                    if append_ref("lea-rip-code", index, target_rva):
+                        break
+
+    return {
+        "scanStartRva": function.begin_rva,
+        "scanEndRva": function.begin_rva + len(raw),
+        "byteCount": len(raw),
+        "rangeTruncated": function.begin_rva + len(raw) < function.end_rva,
+        "refsTruncated": refs_truncated,
+        "refs": refs,
+    }
+
+
 def _xref_candidate(image: PEImage, text: Section, raw: bytes, index: int) -> dict:
     instruction_rva = text.virtual_address + index
     runtime_function = image.runtime_function_for_rva(instruction_rva)
@@ -335,11 +423,13 @@ def _xref_candidate(image: PEImage, text: Section, raw: bytes, index: int) -> di
         function_end_rva = runtime_function.end_rva
         function_source = "pdata"
         unwind_info_rva = runtime_function.unwind_info_rva
+        code_refs = _bounded_function_code_refs(image, runtime_function)
     else:
         function_rva = _nearest_padded_function_start(raw, index, text.virtual_address)
         function_end_rva = None
         function_source = "padding-heuristic" if function_rva is not None else None
         unwind_info_rva = None
+        code_refs = None
 
     function_window = FUNCTION_WINDOW_BYTES
     if function_rva is not None and function_end_rva is not None:
@@ -359,6 +449,7 @@ def _xref_candidate(image: PEImage, text: Section, raw: bytes, index: int) -> di
         "candidateFunctionUnwindInfoVa": (
             image.image_base + unwind_info_rva if unwind_info_rva is not None else None
         ),
+        "candidateFunctionCodeRefs": code_refs,
         "xrefContext": _byte_window(
             image,
             instruction_rva,
@@ -467,6 +558,7 @@ def probe_bytes(data: bytes, *, needles: Iterable[str] = DEFAULT_NEEDLES) -> dic
             "AMD64 candidate function ranges prefer PE exception-directory (.pdata) unwind metadata when available.",
             "When unwind metadata is unavailable, candidate starts fall back to compiler-padding heuristics.",
             "Candidate byte windows are raw executable evidence for signature research; they are not instruction-decoded or stability-validated.",
+            "Candidate function code refs are opcode-shape heuristics restricted to .pdata-described .text targets; they are not a full disassembly.",
             "The probe is read-only and does not modify the installed executable.",
         ],
     }
