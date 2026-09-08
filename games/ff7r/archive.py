@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import Iterable
 
+from .runtime_dataobject import VIRTUAL_ASSET_ROWS
 from .tooling import REPAK_TAG, get_file, list_pak, pak_info
 
 
@@ -68,12 +69,22 @@ def _pair_rows(by_asset: dict[str, dict], prefix: str, *, text: bool = False) ->
     return rows
 
 
+def _with_virtual_assets(payload: dict) -> dict:
+    """Decorate an index in memory without persisting Lexeditor-only rows to cache."""
+    rows = [dict(row) for row in payload.get("assets", [])]
+    existing = {row.get("asset") for row in rows}
+    rows.extend(dict(row) for row in VIRTUAL_ASSET_ROWS if row["asset"] not in existing)
+    return {**payload, "assets": rows}
+
+
 def build_index(game_root: Path, data_root: Path) -> dict:
     game_root = Path(game_root).resolve()
     data_root = Path(data_root).resolve()
     data_root.mkdir(parents=True, exist_ok=True)
     fixture_root = os.environ.get("LEXEDITOR_FF7R_TEST_DATAOBJECTS")
     if fixture_root:
+        # Smoke fixtures are deliberately archive-only so existing service tests
+        # keep selecting their one generated gameplay resource deterministically.
         return _fixture_index(Path(fixture_root).resolve())
 
     paks = installed_paks(game_root)
@@ -89,7 +100,7 @@ def build_index(game_root: Path, data_root: Path) -> dict:
     if (cached.get("schema") == INDEX_SCHEMA and cached.get("signature") == signature
             and isinstance(cached.get("assets"), list)
             and isinstance(cached.get("textAssets"), list)):
-        return cached
+        return _with_virtual_assets(cached)
 
     by_data: dict[str, dict] = {}
     by_text: dict[str, dict] = {}
@@ -134,7 +145,7 @@ def build_index(game_root: Path, data_root: Path) -> dict:
     temporary = cache_path.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     temporary.replace(cache_path)
-    return payload
+    return _with_virtual_assets(payload)
 
 
 def _fixture_index(root: Path) -> dict:
@@ -180,6 +191,8 @@ def _find(index: dict, asset: str, collection: str = "assets") -> dict:
 def extract_pair(game_root: Path, data_root: Path, index: dict, asset: str,
                  *, collection: str = "assets") -> tuple[Path, Path]:
     row = _find(index, asset, collection)
+    if row.get("synthetic"):
+        raise ValueError(f"Synthetic FF7R resource has no archive pair: {asset}")
     if "fixture" in row["uasset"]:
         return Path(row["uasset"]["fixture"]), Path(row["uexp"]["fixture"])
     source_root = Path(data_root).resolve() / "sources" / str(index["signatureId"])

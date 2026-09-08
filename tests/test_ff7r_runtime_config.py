@@ -4,6 +4,7 @@ import struct
 
 import pytest
 
+from games.ff7r.archive import _with_virtual_assets
 from games.ff7r.runtime_config import (
     DEFAULT_RUNTIME_CONFIG,
     RUNTIME_CONFIG_NAME,
@@ -16,6 +17,13 @@ from games.ff7r.runtime_config import (
     validate_runtime_config,
     validate_runtime_manifest,
 )
+from games.ff7r.runtime_dataobject import (
+    RUNTIME_PROBE_ASSET,
+    RUNTIME_TWEAKS_ASSET,
+    runtime_settings_package,
+    save_runtime_edits,
+)
+from games.ff7r.storage import save_edits
 
 
 FIXTURE_TIMESTAMP = 0x12345678
@@ -189,3 +197,91 @@ def test_runtime_deploy_copies_dll_config_and_manifest_only_for_validated_build(
     assert status["buildSupported"] is True
     assert status["runtimeReady"] is True
     assert status["active"] is True
+
+
+def test_virtual_runtime_resources_are_catalogued_without_polluting_cached_assets():
+    base = {
+        "schema": 2,
+        "assets": [{"asset": "End/Content/GameContents/DataObject/Item", "name": "Item", "group": "DataObject"}],
+        "textAssets": [],
+    }
+    decorated = _with_virtual_assets(base)
+    assert [row["asset"] for row in decorated["assets"]][-2:] == [RUNTIME_TWEAKS_ASSET, RUNTIME_PROBE_ASSET]
+    assert len(base["assets"]) == 1
+    assert len(_with_virtual_assets(decorated)["assets"]) == len(decorated["assets"])
+
+
+def test_runtime_tweaks_are_editable_through_standard_game_data_contract(tmp_path):
+    game = tmp_path / "game"
+    project = tmp_path / "project"
+    package, source_sha, using_project = runtime_settings_package(game, project)
+    payload = package.api_payload(source_sha256=source_sha, using_project=using_project)
+    properties = {prop["name"]: prop for prop in payload["properties"]}
+    assert properties["CutsceneEnabled"]["editable"] is True
+    assert properties["CutsceneBaseMultiplier"]["type"] == "FLOAT"
+    assert properties["MinimapHoldMilliseconds"]["min"] == 150
+    assert properties["MinimapHoldMilliseconds"]["max"] == 1500
+    assert properties["RuntimeReady"]["editable"] is False
+    assert payload["records"][0]["values"]["HooksValidated"] is False
+
+    result = save_runtime_edits(
+        project,
+        source_sha256=payload["sourceSha256"],
+        active_sha256=payload["activeSha256"],
+        edits=[
+            {"entry": 0, "property": "CutsceneEnabled", "value": True},
+            {"entry": 0, "property": "CutsceneBaseMultiplier", "value": 1.75},
+            {"entry": 0, "property": "MinimapEnabled", "value": True},
+            {"entry": 0, "property": "MinimapHoldMilliseconds", "value": 420},
+        ],
+    )
+    saved = load_runtime_config(project)
+    assert result["saved"] == 4
+    assert saved["cutsceneSpeed"] == {
+        "enabled": True,
+        "baseMultiplier": 1.75,
+        "r2Behavior": "multiply-native",
+    }
+    assert saved["minimap"]["enabled"] is True
+    assert saved["minimap"]["holdMilliseconds"] == 420
+
+
+def test_runtime_tweaks_reject_stale_or_read_only_generic_edits(tmp_path):
+    game = tmp_path / "game"
+    project = tmp_path / "project"
+    package, source_sha, using_project = runtime_settings_package(game, project)
+    payload = package.api_payload(source_sha256=source_sha, using_project=using_project)
+
+    with pytest.raises(ValueError, match="read-only or unknown"):
+        save_runtime_edits(
+            project,
+            source_sha256=source_sha,
+            active_sha256=payload["activeSha256"],
+            edits=[{"entry": 0, "property": "RuntimeReady", "value": True}],
+        )
+
+    save_runtime_config(project, {
+        **DEFAULT_RUNTIME_CONFIG,
+        "cutsceneSpeed": {**DEFAULT_RUNTIME_CONFIG["cutsceneSpeed"], "baseMultiplier": 1.5},
+    })
+    with pytest.raises(RuntimeError, match="changed on disk"):
+        save_runtime_edits(
+            project,
+            source_sha256=source_sha,
+            active_sha256=payload["activeSha256"],
+            edits=[{"entry": 0, "property": "CutsceneEnabled", "value": True}],
+        )
+
+
+def test_native_hook_probe_virtual_resource_is_read_only(tmp_path):
+    with pytest.raises(ValueError, match="read-only"):
+        save_edits(
+            tmp_path / "game",
+            tmp_path / "data",
+            tmp_path / "project",
+            {},
+            RUNTIME_PROBE_ASSET,
+            source_sha256="unused",
+            active_sha256="unused",
+            edits=[{"entry": 0, "property": "HitCount", "value": 1}],
+        )
