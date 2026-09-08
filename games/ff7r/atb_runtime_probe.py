@@ -2,9 +2,9 @@
 
 The data-backed part of issue #425 is intentionally separate: installed
 BattlePlayerParameter guard arrays and BattleAbility.ATB costs can already be
-edited reversibly.  This probe concentrates on the unresolved accumulator
+edited reversibly. This probe concentrates on the unresolved accumulator
 semantics needed for passive/Speed/hit generation and the new movement/dodge
-modifiers.  Reflected names are evidence only, never validated hooks.
+modifiers. Reflected names are evidence only, never validated hooks.
 """
 
 from __future__ import annotations
@@ -15,18 +15,39 @@ from typing import Any
 from .native_probe import probe_installed_exe
 
 
+ATB_ACCESSOR_NEEDLES = (
+    "SetATB",
+    "SetATBAll",
+    "GetATB",
+    "GetATBMax",
+    "ResetATB",
+)
+HIT_EVENT_NEEDLES = (
+    "NormalAttackHitSuccess",
+    "NormalAttackPerHitSuccess",
+    "WeaponAbilityHitSuccess",
+    "WeaponAbilityPerHitSuccess",
+    "MagicHitSuccess",
+    "MagicPerHitSuccess",
+    "LimitHitSuccess",
+    "LimitPerHitSuccess",
+)
 ATB_NATIVE_NEEDLES = (
     "ATBValue",
     "ATBUsedValue",
     "EndAnimNotifyBattleEnableForceUpdateATB",
     "EnableForceUpdateATB",
     "BPGetPlayerDexterity",
+    "GetResidentParameterFloatBP",
     "HitBonusATBRecoverAdd",
     "StartATBAdd",
     "IsDodge",
+    "IsDodgeInvincible",
     "GuardReactionNoneAddATB_Array",
     "GuardReactionMediumAddATB_Array",
     "GuardReactionLargeAddATB_Array",
+    *ATB_ACCESSOR_NEEDLES,
+    *HIT_EVENT_NEEDLES,
 )
 
 
@@ -35,6 +56,10 @@ def _hit_count(native: dict[str, Any], needle: str) -> int:
         if str(row.get("needle", "")) == needle:
             return len(row.get("hits", ()))
     return 0
+
+
+def _counts(native: dict[str, Any], needles: tuple[str, ...]) -> dict[str, int]:
+    return {needle: _hit_count(native, needle) for needle in needles}
 
 
 def assess_atb_runtime_evidence(
@@ -47,16 +72,29 @@ def assess_atb_runtime_evidence(
 ) -> dict[str, Any]:
     """Report known data contracts and unresolved runtime-hook requirements."""
     hits = {needle: _hit_count(native, needle) for needle in ATB_NATIVE_NEEDLES}
+    accessor_hits = _counts(native, ATB_ACCESSOR_NEEDLES)
+    hit_event_hits = _counts(native, HIT_EVENT_NEEDLES)
 
     accumulator_candidates = bool(
         hits["ATBValue"]
         or hits["ATBUsedValue"]
         or hits["EndAnimNotifyBattleEnableForceUpdateATB"]
         or hits["EnableForceUpdateATB"]
+        or accessor_hits["SetATB"]
+        or accessor_hits["GetATB"]
     )
     speed_candidate = bool(hits["BPGetPlayerDexterity"])
+    resident_reader_candidate = bool(hits["GetResidentParameterFloatBP"])
     hit_gain_candidate = bool(hits["HitBonusATBRecoverAdd"])
     dodge_state_candidate = bool(hits["IsDodge"])
+    direct_atb_api_candidate = bool(
+        accessor_hits["SetATB"] and accessor_hits["GetATB"]
+    )
+    atb_max_api_candidate = bool(accessor_hits["GetATBMax"])
+    hit_event_granularity_present = bool(
+        any(hit_event_hits[name] for name in HIT_EVENT_NEEDLES if "PerHitSuccess" in name)
+        and any(hit_event_hits[name] for name in HIT_EVENT_NEEDLES if "PerHitSuccess" not in name)
+    )
 
     blockers: list[str] = []
     if discovery_errors:
@@ -67,6 +105,14 @@ def assess_atb_runtime_evidence(
         # A reflected string/xref is not enough to establish accumulator units or
         # whether a function is the central update path rather than debug/UI glue.
         blockers.append("atb-accumulator-semantics-unvalidated")
+    if not direct_atb_api_candidate:
+        blockers.append("direct-atb-read-write-api-unresolved")
+    else:
+        blockers.append("direct-atb-read-write-api-semantics-unvalidated")
+    if not atb_max_api_candidate:
+        blockers.append("atb-max-unit-contract-unresolved")
+    else:
+        blockers.append("atb-max-unit-contract-unvalidated")
     if not speed_candidate:
         blockers.append("speed-input-path-unresolved")
     else:
@@ -75,8 +121,14 @@ def assess_atb_runtime_evidence(
         blockers.append("hit-atb-source-unresolved")
     else:
         blockers.append("hit-atb-formula-unvalidated")
+    if hit_gain_candidate and not hit_event_granularity_present:
+        blockers.append("hit-atb-event-granularity-unresolved")
+    elif hit_gain_candidate and hit_event_granularity_present:
+        blockers.append("hit-atb-event-granularity-unvalidated")
     if not dodge_state_candidate:
         blockers.append("dodge-state-path-unresolved")
+    else:
+        blockers.append("dodge-transition-edge-unvalidated")
     if guard_rows <= 0:
         blockers.append("guard-atb-data-unresolved")
     if ability_rows <= 0:
@@ -90,29 +142,53 @@ def assess_atb_runtime_evidence(
             "residentCandidateRows": int(resident_rows),
             "guardSlots": int(guard_rows),
             "abilityCostRows": int(ability_rows),
-            "guardContract": "BattlePlayerParameter.GuardReaction*AddATB_Array",
-            "abilityCostContract": "BattleAbility.ATB",
+            "residentContract": "FEndDataTableResidentParameter.ParamInt/ParamFloat keyed by row FName",
+            "guardContract": "FEndDataTableBattlePlayerParameter.GuardReaction*AddATB_Array (float arrays)",
+            "abilityCostContract": "FEndDataTableBattleAbility.ATB (int32)",
+            "battleCharaCandidates": "FEndDataTableBattleCharaSpec.ATB / StartATB (int32; semantics not yet validated)",
             "guardEditableNow": guard_rows > 0 and not discovery_errors,
             "abilityCostsEditableNow": ability_rows > 0 and not discovery_errors,
             "residentSemanticsValidated": False,
+            "unitsValidated": False,
         },
         "runtimeResearch": {
             "accumulatorCandidatePresent": accumulator_candidates,
             "accumulatorSemanticsValidated": False,
+            "directATBApiCandidatePresent": direct_atb_api_candidate,
+            "atbMaxApiCandidatePresent": atb_max_api_candidate,
+            "accessorNeedleHits": accessor_hits,
             "speedCandidatePresent": speed_candidate,
+            "residentReaderCandidatePresent": resident_reader_candidate,
             "speedFormulaValidated": False,
             "hitGainCandidatePresent": hit_gain_candidate,
             "hitFormulaValidated": False,
+            "hitEventGranularityCandidatePresent": hit_event_granularity_present,
+            "hitEventNeedleHits": hit_event_hits,
             "dodgeStateCandidatePresent": dodge_state_candidate,
+            "dodgeTransitionValidated": False,
             "movementStateStrategy": "derive from authoritative character movement/velocity only after the ATB accumulator hook is validated",
         },
+        "knownContracts": {
+            "setATB": "UEndBattleAPI::SetATB(EPlayerType, float)",
+            "setATBAll": "UEndBattleAPI::SetATBAll(float)",
+            "getATB": "AEndBattleAIController::GetATB() -> int32",
+            "getATBMax": "AEndBattleAIController::GetATBMax() -> int32",
+            "resetATB": "AEndBattleAIController::ResetATB()",
+            "speedStat": "FEndPlayerStatus.Dexterity / UEndMenuBPAPI::BPGetPlayerDexterity(EPlayerType)",
+            "dodgeQuery": "UEndBattleAPI::IsDodge(AEndCharacter*)",
+            "hitModifier": "EEndEquipmentSkillEffectType::HitBonusATBRecoverAdd (0x6E)",
+            "hitEventEnum": "EEndBattleCountLogType exposes HitSuccess and PerHitSuccess variants separately",
+            "startModifier": "EEndEquipmentSkillEffectType::StartATBAdd",
+        },
         "notes": [
-            "BattleAbility.ATB is an authored action-cost field; it is not evidence about ATB generation.",
-            "GuardReaction*AddATB_Array explicitly identifies guard-generated ATB and can be edited as data.",
-            "ResidentParameter rows containing ATB remain candidates until each requested baseline/Speed/hit term is semantically identified on the installed build.",
-            "BPGetPlayerDexterity identifies the runtime stat source corresponding to the player's Speed stat, but not the coefficient used by ATB generation.",
-            "HitBonusATBRecoverAdd proves a hit-recovery modifier exists, but not whether vanilla base gain is per hit, per move, damage-scaled, or another formula.",
-            "IsDodge is a narrow reflected dodge-state query candidate for applying the new roll reduction; it does not itself mutate ATB.",
+            "BattleAbility.ATB is an authored int32 action-cost field; it is not evidence about ATB generation and its mapping to displayed ATB bars must be verified before labeling units.",
+            "GuardReaction*AddATB_Array explicitly identifies guard-generated ATB as authored float values and can be edited as data; their conversion to displayed bars is still unvalidated.",
+            "ResidentParameter rows containing ATB remain candidates until each requested baseline/Speed/hit term is semantically identified on the installed build. GetResidentParameterFloatBP is a useful native reader anchor when present.",
+            "BattleCharaSpec declares int32 ATB and StartATB fields; they are retained as explicit research candidates rather than assumed to be player passive generation coefficients.",
+            "BPGetPlayerDexterity identifies the runtime stat source corresponding to the player's Speed/Dexterity stat, but not the coefficient used by ATB generation.",
+            "HitBonusATBRecoverAdd proves a hit-recovery modifier exists. Remake also distinguishes attack-level HitSuccess from PerHitSuccess events for normals, abilities, magic and limits, giving installed xref research a concrete way to decide per-hit versus per-action semantics.",
+            "SetATB/GetATB/GetATBMax provide promising bounded read/write/unit probes for the new dodge reduction, but their numeric conversion and safe call context must be validated before runtime mutation.",
+            "IsDodge is a narrow reflected dodge-state query; the implementation must trigger on the dodge transition rather than subtracting ATB every frame while dodge state remains true.",
         ],
     }
 
