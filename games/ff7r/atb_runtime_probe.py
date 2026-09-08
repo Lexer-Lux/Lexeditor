@@ -59,10 +59,6 @@ ATB_NATIVE_NEEDLES = (
     *HIT_EVENT_NEEDLES,
 )
 
-# Public Remake combat measurements plus independent ResidentParameter mods give
-# useful vanilla fingerprints for the installed table. They are deliberately
-# not mapped to a row solely by value: many unrelated ResidentParameter rows can
-# share 0.0/1.0/0.1, so the installed tag and behavior still have to agree.
 DOCUMENTED_VANILLA_ATB_REFERENCES = {
     "internalUnitsPerDisplayedBar": 1000.0,
     "normalGaugeInternalUnits": 2000.0,
@@ -91,8 +87,17 @@ def _counts(native: dict[str, Any], needles: tuple[str, ...]) -> dict[str, int]:
     return {needle: _hit_count(native, needle) for needle in needles}
 
 
+def _caller_rvas(inbound: dict[str, Any] | None) -> set[int]:
+    callers: set[int] = set()
+    for ref in (inbound or {}).get("refs", ()):
+        value = ref.get("sourceFunctionRva")
+        if value is not None:
+            callers.add(int(value))
+    return callers
+
+
 def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, list[int]]]:
-    """Collect only exact .pdata string owners and their bounded one-hop targets."""
+    """Collect exact .pdata owners, bounded one-hop targets, and inbound callers."""
     evidence: dict[str, dict[str, list[int]]] = {}
     for row in native.get("needles", ()):
         needle = str(row.get("needle", ""))
@@ -100,6 +105,8 @@ def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, lis
             continue
         direct: set[int] = set()
         next_hops: set[int] = set()
+        direct_callers: set[int] = set()
+        next_hop_callers: set[int] = set()
         for hit in row.get("hits", ()):
             for xref in hit.get("leaRipXrefs", ()):
                 if xref.get("candidateFunctionSource") != "pdata":
@@ -107,14 +114,23 @@ def _native_function_evidence(native: dict[str, Any]) -> dict[str, dict[str, lis
                 function_rva = xref.get("candidateFunctionRva")
                 if function_rva is not None:
                     direct.add(int(function_rva))
+                direct_callers.update(
+                    _caller_rvas(xref.get("candidateFunctionInboundCodeRefs"))
+                )
                 for ref in (xref.get("candidateFunctionCodeRefs") or {}).get("refs", ()):
                     target = ref.get("targetFunctionRva")
                     if target is not None:
                         next_hops.add(int(target))
+                    next_hop_callers.update(
+                        _caller_rvas(ref.get("targetFunctionInboundCodeRefs"))
+                    )
         evidence[needle] = {
             "directPdataFunctions": sorted(direct),
             "nextHopPdataFunctions": sorted(next_hops),
             "expandedPdataFunctions": sorted(direct | next_hops),
+            "directInboundCallerFunctions": sorted(direct_callers),
+            "nextHopInboundCallerFunctions": sorted(next_hop_callers),
+            "expandedInboundCallerFunctions": sorted(direct_callers | next_hop_callers),
         }
     return evidence
 
@@ -124,6 +140,13 @@ def _functions(evidence: dict[str, dict[str, list[int]]], needles: Iterable[str]
     for needle in needles:
         functions.update(evidence.get(needle, {}).get("expandedPdataFunctions", ()))
     return functions
+
+
+def _callers(evidence: dict[str, dict[str, list[int]]], needles: Iterable[str]) -> set[int]:
+    callers: set[int] = set()
+    for needle in needles:
+        callers.update(evidence.get(needle, {}).get("expandedInboundCallerFunctions", ()))
+    return callers
 
 
 def _function_correlations(evidence: dict[str, dict[str, list[int]]]) -> dict[str, list[int]]:
@@ -139,6 +162,18 @@ def _function_correlations(evidence: dict[str, dict[str, list[int]]]) -> dict[st
     per_hit_events = _functions(evidence, PER_HIT_EVENT_NEEDLES)
     dodge = _functions(evidence, ("IsDodge", "IsDodgeInvincible"))
 
+    set_atb_callers = _callers(evidence, ("SetATB",))
+    get_atb_callers = _callers(evidence, ("GetATB",))
+    get_atb_max_callers = _callers(evidence, ("GetATBMax",))
+    reset_atb_callers = _callers(evidence, ("ResetATB",))
+    accumulator_callers = _callers(evidence, ACCUMULATOR_NEEDLES)
+    speed_callers = _callers(evidence, ("BPGetPlayerDexterity",))
+    resident_callers = _callers(evidence, ("GetResidentParameterFloatBP",))
+    hit_modifier_callers = _callers(evidence, ("HitBonusATBRecoverAdd",))
+    attack_event_callers = _callers(evidence, ATTACK_LEVEL_HIT_EVENT_NEEDLES)
+    per_hit_event_callers = _callers(evidence, PER_HIT_EVENT_NEEDLES)
+    dodge_callers = _callers(evidence, ("IsDodge", "IsDodgeInvincible"))
+
     return {
         "setToGet": sorted(set_atb & get_atb),
         "setToMax": sorted(set_atb & get_atb_max),
@@ -152,6 +187,18 @@ def _function_correlations(evidence: dict[str, dict[str, list[int]]]) -> dict[st
         "perHitEventsToAccumulator": sorted(per_hit_events & accumulators),
         "dodgeToAccumulator": sorted(dodge & accumulators),
         "dodgeToSetATB": sorted(dodge & set_atb),
+        "setToGetCallers": sorted(set_atb_callers & get_atb_callers),
+        "setToMaxCallers": sorted(set_atb_callers & get_atb_max_callers),
+        "setToResetCallers": sorted(set_atb_callers & reset_atb_callers),
+        "speedToAccumulatorCallers": sorted(speed_callers & accumulator_callers),
+        "residentReaderToAccumulatorCallers": sorted(resident_callers & accumulator_callers),
+        "hitModifierToAccumulatorCallers": sorted(hit_modifier_callers & accumulator_callers),
+        "hitModifierToAttackLevelEventsCallers": sorted(hit_modifier_callers & attack_event_callers),
+        "hitModifierToPerHitEventsCallers": sorted(hit_modifier_callers & per_hit_event_callers),
+        "attackLevelEventsToAccumulatorCallers": sorted(attack_event_callers & accumulator_callers),
+        "perHitEventsToAccumulatorCallers": sorted(per_hit_event_callers & accumulator_callers),
+        "dodgeToAccumulatorCallers": sorted(dodge_callers & accumulator_callers),
+        "dodgeToSetATBCallers": sorted(dodge_callers & set_atb_callers),
     }
 
 
@@ -262,8 +309,6 @@ def assess_atb_runtime_evidence(
     if not accumulator_candidates:
         blockers.append("atb-accumulator-path-unresolved")
     else:
-        # A reflected string/xref is not enough to establish accumulator units or
-        # whether a function is the central update path rather than debug/UI glue.
         blockers.append("atb-accumulator-semantics-unvalidated")
     if not direct_atb_api_candidate:
         blockers.append("direct-atb-read-write-api-unresolved")
@@ -373,7 +418,8 @@ def assess_atb_runtime_evidence(
             "HitBonusATBRecoverAdd proves a hit-recovery modifier exists. Exact .pdata/one-hop correlations against attack-level HitSuccess versus PerHitSuccess are now reported separately so installed evidence can discriminate per-action from per-hit paths without guessing.",
             "SetATB/GetATB/GetATBMax provide promising bounded read/write/unit probes for the new dodge reduction, but their numeric conversion and safe call context must be validated before runtime mutation.",
             "IsDodge is a narrow reflected dodge-state query; dodgeToSetATB/dodgeToAccumulator correlations are research leads only, and the implementation must trigger on the dodge transition rather than subtracting ATB every frame while dodge state remains true.",
-            "Only exact .pdata function owners and their bounded one-hop targets participate in function correlations. Multi-name direct owners can be reflection registration glue and remain unvalidated.",
+            "Only exact .pdata function owners, bounded one-hop targets, and exact inbound callers participate in stronger correlations. Shared callers can expose dispatcher neighborhoods but never replace unit/formula/event/transition validation.",
+            "Multi-name direct owners can be reflection registration glue and remain unvalidated.",
         ],
     }
 
