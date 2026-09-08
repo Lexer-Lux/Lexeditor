@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import struct
+
 import pytest
 
 from games.ff7r.dataobject import DataObjectPackage, FormatError, parse_uasset
@@ -43,6 +45,54 @@ def test_same_size_edits_round_trip_and_preserve_string():
     assert row["Mode"] == "ModeB"
     assert row["Values_Array"] == [10, 20, -32768]
     assert row["Description"] == "$Item_Test"
+
+
+def test_fixed_width_array_delete_rebuilds_offsets_and_patches_export_size():
+    uasset, uexp = _test_package()
+    header = parse_uasset(uasset)
+    realistic_uasset = bytearray(uasset)
+    struct.pack_into("<q", realistic_uasset, header.serial_size_offset, len(uexp))
+    package = DataObjectPackage.from_bytes(bytes(realistic_uasset), uexp)
+
+    original_power = package.entries[0].values["Power"]
+    original_mode = package.entries[0].values["Mode"]
+    original_description = package.entries[0].values["Description"]
+    package.delete_array_element(0, "Values_Array", 1)
+
+    assert len(package.uexp_bytes) == len(uexp) - 2
+    assert package.uasset.serial_size == len(uexp) - 2
+    assert package.entries[0].values["Values_Array"] == [10, 30]
+    assert package.entries[0].values["Power"] == original_power
+    assert package.entries[0].values["Mode"] == original_mode
+    assert package.entries[0].values["Description"] == original_description
+
+    reread = DataObjectPackage.from_bytes(bytes(package.uasset_bytes), bytes(package.uexp_bytes))
+    assert reread.entries[0].values["Values_Array"] == [10, 30]
+    assert reread.uasset.serial_size == len(uexp) - 2
+
+
+def test_structural_delete_rejects_non_array_and_out_of_range_index():
+    _uasset, _uexp, package = fixture_package()
+    with pytest.raises(ValueError, match="not an array"):
+        package.delete_array_element(0, "Power", 0)
+    with pytest.raises(IndexError, match="Array index"):
+        package.delete_array_element(0, "Values_Array", 3)
+
+
+def test_write_pair_round_trips_structural_edits(tmp_path):
+    uasset, uexp = _test_package()
+    header = parse_uasset(uasset)
+    realistic_uasset = bytearray(uasset)
+    struct.pack_into("<q", realistic_uasset, header.serial_size_offset, len(uexp))
+    package = DataObjectPackage.from_bytes(bytes(realistic_uasset), uexp, asset="Fixture")
+    package.delete_array_element(0, "Values_Array", 0)
+
+    uasset_target = tmp_path / "Fixture.uasset"
+    uexp_target = tmp_path / "Fixture.uexp"
+    package.write_pair(uasset_target, uexp_target)
+    reread = DataObjectPackage(uasset_target, uexp_target, asset="Fixture")
+    assert reread.entries[0].values["Values_Array"] == [20, 30]
+    assert reread.uasset.serial_size == len(uexp) - 2
 
 
 def test_rejects_size_changing_or_out_of_domain_edits():
