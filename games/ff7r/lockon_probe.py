@@ -202,7 +202,7 @@ def assess_marker_slot_evidence(native: dict[str, Any]) -> dict[str, Any]:
 
 
 def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Rank cooked reticle candidates; trusted serialized tags outrank strings."""
+    """Rank cooked reticle candidates; versioned serialized tags outrank strings."""
     ranked: list[dict[str, Any]] = []
     for asset in assets:
         strings = _flatten_strings(asset)
@@ -224,6 +224,14 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
         serialized_plausible_tint_refs = [
             row for row in serialized_tint_refs
             if row.get("propertyTagHeaderPlausible")
+        ]
+        serialized_layout_tint_refs = [
+            row for row in serialized_tint_refs
+            if row.get("propertyTagLayoutPlausible")
+        ]
+        serialized_linear_color_tint_refs = [
+            row for row in serialized_layout_tint_refs
+            if row.get("linearColorValuePlausible")
         ]
 
         widget_hits = [row for row in strings if _contains_any(str(row.get("text", "")), WIDGET_ANCHORS)]
@@ -273,7 +281,9 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             continue
 
         score = (
-            len(serialized_plausible_tint_refs) * 9000
+            len(serialized_linear_color_tint_refs) * 20000
+            + len(serialized_layout_tint_refs) * 12000
+            + len(serialized_plausible_tint_refs) * 9000
             + len(serialized_tint_refs) * 3000
             + len(serialized_dedicated_refs) * 1500
             + len(resolved_owners) * 6000
@@ -309,6 +319,8 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             "serializedDedicatedPropertyRefs": serialized_dedicated_refs,
             "serializedTintPropertyRefs": serialized_tint_refs,
             "serializedPlausibleTintTagRefs": serialized_plausible_tint_refs,
+            "serializedLayoutTintTagRefs": serialized_layout_tint_refs,
+            "serializedLinearColorTintRefs": serialized_linear_color_tint_refs,
             "objectTableErrors": object_table_errors,
             "containsDedicatedWidgetAnchor": bool(widget_hits or resolved_owners or serialized_dedicated_refs),
             "containsMarkerSlotAnchor": bool(marker_slot_hits),
@@ -318,6 +330,8 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             "resolvedReticleChildEvidence": bool(resolved_reticle_children),
             "serializedTintPropertyEvidence": bool(serialized_tint_refs),
             "serializedPlausibleTintTagEvidence": bool(serialized_plausible_tint_refs),
+            "serializedTintValueLayoutEvidence": bool(serialized_layout_tint_refs),
+            "serializedLinearColorTintValueEvidence": bool(serialized_linear_color_tint_refs),
             "strongPresentationCandidate": bool(
                 serialized_plausible_tint_refs
                 or ((widget_hits or resolved_owners) and (
@@ -370,6 +384,10 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         1 for row in ranked if row.get("serializedTintPropertyEvidence"))
     plausible_tint_count = sum(
         1 for row in ranked if row.get("serializedPlausibleTintTagEvidence"))
+    layout_tint_count = sum(
+        1 for row in ranked if row.get("serializedTintValueLayoutEvidence"))
+    linear_color_tint_count = sum(
+        1 for row in ranked if row.get("serializedLinearColorTintValueEvidence"))
     object_errors = [
         error
         for row in ranked
@@ -381,7 +399,11 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
     ]
 
     blockers = ["single-cooked-reticle-owner-unvalidated"]
-    if plausible_tint_count:
+    if linear_color_tint_count:
+        blockers.append("serialized-lockon-linearcolor-ownership-and-rewrite-unvalidated")
+    elif layout_tint_count:
+        blockers.append("serialized-lockon-tint-value-semantics-unvalidated")
+    elif plausible_tint_count:
         blockers.append("serialized-lockon-tint-value-layout-unvalidated")
     elif serialized_tint_count:
         blockers.append("serialized-lockon-tint-property-header-unvalidated")
@@ -411,6 +433,8 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
         "resolvedOwnerCandidateCount": resolved_owner_count,
         "serializedTintCandidateCount": serialized_tint_count,
         "serializedPlausibleTintTagCandidateCount": plausible_tint_count,
+        "serializedTintValueLayoutCandidateCount": layout_tint_count,
+        "serializedLinearColorTintValueCandidateCount": linear_color_tint_count,
         "implementationReady": False,
         "blockers": blockers,
         "knownContracts": {
@@ -433,9 +457,9 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
             "The localized LOCK ON prompt is no longer a blocker in this probe; it is an independent staging-only text tweak once its cross-language text ID is proven.",
             "The dedicated battle lock-on marker widget is the preferred reticle owner; generic battle target widgets are not assumed equivalent.",
             "UEndMenuSettings exposes three dedicated numbered lock-on marker widget settings. Their resolved FSoftClassPath values are first-class ownership targets, but 00/01/02 -> Default/Wimp/Libra remains unvalidated until installed class-path data confirms it.",
-            "Serialized evidence is accepted only when split-package export mapping is proven. A tint property becomes a strong serialized lead only when its immediate *Property type and bounded generic Size/ArrayIndex tag header are both plausible.",
-            "Even a plausible generic property tag does not identify type-specific tag metadata, the encoded color value start/layout, or the correct replacement bytes.",
+            "Serialized evidence is accepted only when split-package export mapping is proven. A tint property becomes progressively stronger only when its immediate *Property type, generic Size/ArrayIndex header, version-gated UE4 tag metadata, and bounded value range are each independently plausible.",
+            "For exact LinearColor StructProperty candidates the read-only probe can now expose the four serialized float components. That identifies a value encoding candidate, not reticle ownership, lock-state scope, or safe replacement bytes.",
             "ShowBattleTargetIcon's explicit locked target states remain a separate predicate lead. If installed behavior proves UEndBattleLockonMarkerIcon exists only while locked, the dedicated widget lifecycle may remove the need for a second state hook.",
-            "No cooked UI export is rewritten by this probe. Exact marker-slot mapping, serialized value semantics and installed visual ownership must be validated before reticle tinting is implemented.",
+            "No cooked UI export is rewritten by this probe. Exact marker-slot mapping, installed visual ownership and reversible cooked-property rewriting must be validated before reticle tinting is implemented.",
         ],
     }
