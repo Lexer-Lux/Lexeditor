@@ -1,0 +1,44 @@
+name: FF7 PR 434 holistic backend
+
+on:
+  push:
+    branches:
+      - work/ff7-complete-kernel-surface
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/ff7-complete-kernel-surface
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Apply holistic backend audit fixes
+        run: python tools/_ff7_holistic_backend_patch.py
+      - name: Compile changed Python
+        run: python -m py_compile games/ff7/kernel_extra.py games/ff7/datasets.py games/ff7/semantics.py tools/verify_ff7_datasets.py tools/verify_ff7_semantic_surface.py
+      - name: Verify source-backed FF7 data and semantics
+        run: |
+          python tools/verify_ff7_datasets.py
+          python tools/verify_ff7_kernel_layout_contract.py
+          python tools/verify_ff7_accessories.py
+          python tools/verify_ff7_semantic_surface.py
+      - name: Commit verified backend audit work
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo 'No generated changes.'
+            exit 0
+          fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add games/ff7/datasets.py games/ff7/semantics.py tools/verify_ff7_datasets.py tools/verify_ff7_semantic_surface.py
+          git commit -m 'Expose remaining FF7 initial and menu data semantically'
+          git push origin HEAD:work/ff7-complete-kernel-surface
