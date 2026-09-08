@@ -1,4 +1,8 @@
-from games.ff7r.lockon_probe import assess_lock_state_evidence, rank_lockon_assets
+from games.ff7r.lockon_probe import (
+    assess_lock_state_evidence,
+    assess_marker_slot_evidence,
+    rank_lockon_assets,
+)
 
 
 def _asset(name, *strings):
@@ -122,6 +126,17 @@ def test_target_state_asset_is_research_evidence_but_not_dedicated_lockon_owner(
     assert ranked[0]["strongPresentationCandidate"] is False
 
 
+def test_marker_slot_string_is_research_evidence_not_reticle_ownership():
+    ranked = rank_lockon_assets([
+        _asset("UI/Settings", "BattleLockonMarker01Widget"),
+    ])
+
+    assert len(ranked) == 1
+    assert ranked[0]["containsMarkerSlotAnchor"] is True
+    assert ranked[0]["containsDedicatedWidgetAnchor"] is False
+    assert ranked[0]["strongPresentationCandidate"] is False
+
+
 def test_ranking_is_deterministic_for_equal_evidence():
     ranked = rank_lockon_assets([
         _asset("UI/Zed", "BattleLockonMarker"),
@@ -228,3 +243,27 @@ def test_partial_target_state_evidence_never_claims_contract():
 
     assert result["reflectedContractPresent"] is False
     assert result["validatedAsIssuePredicate"] is False
+
+
+def test_marker_slots_preserve_order_without_claiming_type_mapping():
+    result = assess_marker_slot_evidence(_native(
+        BattleLockonMarker00Widget=1,
+        BattleLockonMarker01Widget=2,
+        BattleLockonMarker02Widget=1,
+    ))
+
+    assert result["allSlotAnchorsPresent"] is True
+    assert result["slotOrder"] == [
+        "BattleLockonMarker00Widget",
+        "BattleLockonMarker01Widget",
+        "BattleLockonMarker02Widget",
+    ]
+    assert result["markerTypeOrder"] == ["Default", "Wimp", "Libra"]
+    assert result["slotToMarkerTypeMappingValidated"] is False
+
+
+def test_partial_marker_slots_never_claim_mapping():
+    result = assess_marker_slot_evidence(_native(BattleLockonMarker00Widget=1))
+
+    assert result["allSlotAnchorsPresent"] is False
+    assert result["slotToMarkerTypeMappingValidated"] is False
