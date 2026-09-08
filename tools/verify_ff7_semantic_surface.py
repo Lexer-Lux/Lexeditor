@@ -29,7 +29,8 @@ class SemanticSurfaceTests(unittest.TestCase):
         for category, fields in expected.items():
             for key, kind in fields.items(): self.assertEqual(meta[category][key]["dataType"],kind,(category,key))
         self.assertEqual(next(c for c in meta["characters"]["rowByte"]["choices"] if c["label"]=="Front row")["value"],0xFF)
-        self.assertEqual(meta["characters"]["limitAttack11"]["referenceCategory"],"playerAttacks")
+        self.assertEqual(meta["characters"]["limitAttack11"]["referenceCategory"],"limitBreaks")
+        self.assertEqual(meta["characters"]["limitAttack11"]["referenceValueKey"],"gameId")
         self.assertTrue(meta["playerAttacks"]["specialAttackFlags"]["invertBits"])
         for category in ("items","weapons","armor","accessories"):
             self.assertTrue(meta[category]["restrictions"]["invertBits"],category)
@@ -41,6 +42,14 @@ class SemanticSurfaceTests(unittest.TestCase):
         self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
         self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
         self.assertEqual([c["value"] for c in meta["weapons"]["materiaSlot1"]["choices"]],[0,1,2,3,5,6,7])
+
+    def test_limit_break_records_expose_stored_game_ids(self):
+        obj=object.__new__(extended.ShopExecutable)
+        obj.shift=0
+        obj.data=bytearray(0x51DCD4 + 71 * 28)
+        rows=obj.records("limitBreaks")
+        self.assertEqual((rows[0]["id"],rows[0]["gameId"]),(0,128))
+        self.assertEqual((rows[-1]["id"],rows[-1]["gameId"]),(70,198))
 
     def test_extended_categories_are_humanized(self):
         categories={}
