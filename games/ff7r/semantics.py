@@ -1,11 +1,11 @@
 """Semantic FF7R views layered over the generic DataObject reader.
 
 These adapters deliberately validate the installed game's property names before
-exposing controls. Public Remake evidence identifies Equipment.BuyValue and
-BattleItemPossession as authoritative data surfaces; Rebirth's generated schema
-provides useful candidate names for closely related fields, but a candidate is
-never treated as present until the installed FF7R DataObject actually contains
-it.
+exposing controls. Public Remake evidence identifies Item/Equipment BuyValue and
+MaxCount plus BattleItemPossession as authoritative data surfaces; generated
+schemas provide useful candidate names for closely related fields, but a
+candidate is never treated as present until the installed FF7R DataObject
+actually contains it.
 """
 
 from __future__ import annotations
@@ -18,11 +18,12 @@ from .text_storage import resident_text_map
 
 
 ECONOMY_TABLE_NAMES = frozenset({"item", "equipment", "materia"})
-ECONOMY_FIELDS = ("BuyValue", "SaleValue", "CanSale")
+ECONOMY_FIELDS = ("BuyValue", "SaleValue", "CanSale", "MaxCount")
 ECONOMY_EDIT_FIELDS = {
     "buy": "BuyValue",
     "sell": "SaleValue",
     "canSell": "CanSale",
+    "maxCount": "MaxCount",
 }
 LOOT_TABLE_NAME = "battleitempossession"
 LOOT_FIELD_PAIRS = (
@@ -144,7 +145,7 @@ def economy_payload(game_root, data_root, project_root, index: dict,
         "tables": tables,
         "evidence": {
             "requiredAtRuntime": ["BuyValue"],
-            "optionalAtRuntime": ["SaleValue", "CanSale"],
+            "optionalAtRuntime": ["SaleValue", "CanSale", "MaxCount"],
             "candidateTables": sorted(ECONOMY_TABLE_NAMES),
         },
     }
@@ -278,7 +279,7 @@ def loot_payload(game_root, data_root, project_root, index: dict,
 def save_economy_edits(game_root, data_root, project_root, index: dict, asset: str,
                        *, source_sha256: str, active_sha256: str,
                        edits: list[dict[str, Any]]) -> dict:
-    """Validate price semantics, then delegate to the fixed-size DataObject writer."""
+    """Validate item-setting semantics, then delegate to the fixed-size DataObject writer."""
     if _basename(asset) not in ECONOMY_TABLE_NAMES:
         raise ValueError("Economy saves are limited to Item, Equipment, and Materia DataObjects")
     if not isinstance(edits, list):

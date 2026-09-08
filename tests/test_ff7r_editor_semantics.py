@@ -13,6 +13,8 @@ def test_item_and_enemy_loot_tabs_are_first_class_surfaces():
     assert 'BuyValue' in html
     assert 'SaleValue' in html
     assert 'CanSale' in html
+    assert 'MaxCount' in html
+    assert 'MAX CARRY' in html
     assert 'BattleItemPossession' in html
 
 
