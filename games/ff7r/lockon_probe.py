@@ -16,7 +16,11 @@ from .native_probe import probe_installed_exe
 from .raw_asset_probe import probe_installed_assets
 
 
-ASSET_TERMS = ("lockon", "lock_on", "battlelock", "battletarget")
+# Resident_TxtRes is included deliberately even though its path is not named for
+# lock-on. A historical FF7R lock-on prompt mod identifies that text resource as
+# the label source. It is label evidence only: it can never satisfy dedicated
+# widget/reticle ownership by itself.
+ASSET_TERMS = ("lockon", "lock_on", "battlelock", "battletarget", "resident_txtres")
 WIDGET_ANCHORS = (
     "EndBattleLockonMarkerIcon",
     "BattleLockonMarker",
@@ -293,9 +297,11 @@ def probe_better_lockon_sources(game_root: Path) -> dict[str, Any]:
             "targetIconFunction": "UEndMenuAPI::ShowBattleTargetIcon(UObject*, FVector, EEndMenuBattleTargetState)",
             "targetState": "EEndMenuBattleTargetState",
             "lockedTargetStates": list(LOCKED_STATES),
+            "knownLabelResourceLead": "Resident_TxtRes",
         },
         "notes": [
             "The dedicated battle lock-on marker widget is the preferred presentation owner; generic battle target widgets are not assumed equivalent.",
+            "Resident_TxtRes is scanned as an explicit LOCK ON label-source lead, but a text-resource hit cannot establish widget or reticle ownership.",
             "A standalone LOCK ON string is label evidence only when tied to the same cooked presentation asset; class names containing Lockon do not count as label evidence.",
             "Resolved import/export paths strengthen class/outer ownership beyond printable strings, but still do not prove the exact TextBlock or tint field serialized in the widget payload.",
             "ShowBattleTargetIcon's explicit locked target states provide a separate candidate predicate for active lock state; it is not assumed to drive the same reticle until installed-game behavior validates the relation.",
