@@ -25,6 +25,7 @@ def _fixture():
         "ColorAndOpacity",
         "BrushTintColor",
         "StructProperty",
+        "LinearColor",
         "RandomTintWord",
         "NotAPropertyType",
     ]
@@ -33,7 +34,9 @@ def _fixture():
     header = bytearray()
     header += struct.pack("<I", 0x9E2A83C1)
     header += struct.pack("<i", -4)
-    header += struct.pack("<i", 0)
+    # Use a modern UE4 file version so StructGuid and HasPropertyGuid metadata
+    # are both present in the synthetic tag exactly as they are in late UE4.
+    header += struct.pack("<i", 522)
     header += struct.pack("<i", 0)
     header += struct.pack("<i", 0)
     total_header_offset = len(header)
@@ -61,14 +64,22 @@ def _fixture():
     header += imported("/Script/CoreUObject", "Package", 0, "/Script/EndGame")
     header += imported("/Script/CoreUObject", "Class", -1, "EndBattleLockonMarkerIcon")
 
+    def linear_color_tag(name: str, rgba: tuple[float, float, float, float]) -> bytes:
+        tag = bytearray()
+        tag += _fname(ni[name])
+        tag += _fname(ni["StructProperty"])
+        tag += struct.pack("<ii", 16, 0)
+        tag += _fname(ni["LinearColor"])
+        tag += b"\0" * 16  # StructGuid for FileVersionUE4 >= 336.
+        tag += b"\0"  # HasPropertyGuid for FileVersionUE4 >= 365.
+        tag += struct.pack("<ffff", *rgba)
+        return bytes(tag)
+
     payload = bytearray()
-    payload += _fname(ni["ColorAndOpacity"])
-    payload += _fname(ni["StructProperty"])
-    payload += struct.pack("<ii", 16, 0)
-    payload += b"\xAA" * 8
-    payload += _fname(ni["BrushTintColor"])
-    payload += _fname(ni["StructProperty"])
-    payload += struct.pack("<ii", 4, 0)
+    payload += linear_color_tag("ColorAndOpacity", (0.0, 0.5, 1.0, 1.0))
+    # The first tag is 65 bytes, deliberately making this second valid tag
+    # unaligned. Bytewise scanning is required for old-format UE4 tags.
+    payload += linear_color_tag("BrushTintColor", (1.0, 1.0, 1.0, 1.0))
     # FName-shaped but followed by a non-property type: useful weaker evidence,
     # never a parsed/property-tag claim.
     payload += _fname(ni["RandomTintWord"])
@@ -102,7 +113,7 @@ def _fixture():
     return bytes(header), bytes(payload)
 
 
-def test_serialized_export_probe_maps_split_payload_and_property_tag_like_refs():
+def test_serialized_export_probe_maps_split_payload_and_versioned_property_layouts():
     uasset, uexp = _fixture()
     result = extract_serialized_name_refs(
         uasset,
@@ -113,22 +124,40 @@ def test_serialized_export_probe_maps_split_payload_and_property_tag_like_refs()
 
     assert result["mappingTrusted"] is True
     assert result["mappingReason"] == "serial-offset-minus-total-header-size"
+    assert result["fileVersion"] == 522
     refs = {row["name"]: row for row in result["refs"]}
-    assert refs["ColorAndOpacity"]["propertyTagLike"] is True
-    assert refs["ColorAndOpacity"]["propertyType"] == "StructProperty"
-    assert refs["ColorAndOpacity"]["propertyTagHeaderPlausible"] is True
-    assert refs["ColorAndOpacity"]["declaredValueSize"] == 16
-    assert refs["ColorAndOpacity"]["arrayIndex"] == 0
-    assert refs["BrushTintColor"]["propertyTagLike"] is True
-    assert refs["BrushTintColor"]["propertyTagHeaderPlausible"] is True
-    assert refs["BrushTintColor"]["declaredValueSize"] == 4
-    assert refs["BrushTintColor"]["exportRelativeOffset"] == 32
+    color = refs["ColorAndOpacity"]
+    brush = refs["BrushTintColor"]
+    assert color["propertyTagLike"] is True
+    assert color["propertyType"] == "StructProperty"
+    assert color["propertyTagHeaderPlausible"] is True
+    assert color["propertyTagLayoutPlausible"] is True
+    assert color["declaredValueSize"] == 16
+    assert color["arrayIndex"] == 0
+    assert color["typeMetadata"]["structName"] == "LinearColor"
+    assert color["typeMetadata"]["structGuidHex"] == "00" * 16
+    assert color["typeMetadata"]["hasPropertyGuid"] is False
+    assert color["valueOffset"] == 49
+    assert color["valueEndOffset"] == 65
+    assert color["linearColorValuePlausible"] is True
+    assert color["linearColorValue"] == {"r": 0.0, "g": 0.5, "b": 1.0, "a": 1.0}
+
+    assert brush["propertyTagLike"] is True
+    assert brush["propertyTagHeaderPlausible"] is True
+    assert brush["propertyTagLayoutPlausible"] is True
+    assert brush["declaredValueSize"] == 16
+    assert brush["exportRelativeOffset"] == 65
+    assert brush["valueOffset"] == 114
+    assert brush["linearColorValue"] == {"r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0}
     assert refs["RandomTintWord"]["propertyTagLike"] is False
     assert refs["RandomTintWord"]["propertyTagHeaderPlausible"] is False
-    assert refs["ColorAndOpacity"]["className"] == "EndBattleLockonMarkerIcon"
-    assert refs["ColorAndOpacity"]["objectName"] == "LockonWidget"
+    assert refs["RandomTintWord"]["propertyTagLayoutPlausible"] is False
+    assert color["className"] == "EndBattleLockonMarkerIcon"
+    assert color["objectName"] == "LockonWidget"
     assert result["propertyTagLikeCount"] == 2
     assert result["propertyTagHeaderPlausibleCount"] == 2
+    assert result["propertyTagLayoutPlausibleCount"] == 2
+    assert result["linearColorValueCandidateCount"] == 2
 
 
 def test_property_type_match_with_invalid_generic_header_remains_weaker_evidence():
@@ -144,9 +173,47 @@ def test_property_type_match_with_invalid_generic_header_remains_weaker_evidence
     ref = result["refs"][0]
     assert ref["propertyTagLike"] is True
     assert ref["propertyTagHeaderPlausible"] is False
+    assert ref["propertyTagLayoutPlausible"] is False
     assert ref["declaredValueSize"] is None
     assert ref["arrayIndex"] is None
+    assert ref["valueOffset"] is None
     assert result["propertyTagHeaderPlausibleCount"] == 0
+    assert result["propertyTagLayoutPlausibleCount"] == 0
+
+
+def test_invalid_property_guid_marker_rejects_layout_without_rejecting_generic_header():
+    uasset, uexp = _fixture()
+    data = bytearray(uexp)
+    # Name/type/header (24) + StructName (8) + StructGuid (16) = flag at 48.
+    data[48] = 2
+
+    result = extract_serialized_name_refs(
+        uasset,
+        bytes(data),
+        tokens=["ColorAndOpacity"],
+    )
+    ref = result["refs"][0]
+    assert ref["propertyTagHeaderPlausible"] is True
+    assert ref["propertyTagLayoutPlausible"] is False
+    assert ref["valueOffset"] is None
+    assert ref["linearColorValuePlausible"] is False
+
+
+def test_declared_value_must_fit_inside_export_before_layout_is_plausible():
+    uasset, uexp = _fixture()
+    data = bytearray(uexp)
+    struct.pack_into("<i", data, 16, 1000)
+
+    result = extract_serialized_name_refs(
+        uasset,
+        bytes(data),
+        tokens=["ColorAndOpacity"],
+    )
+    ref = result["refs"][0]
+    assert ref["propertyTagHeaderPlausible"] is True
+    assert ref["declaredValueSize"] == 1000
+    assert ref["propertyTagLayoutPlausible"] is False
+    assert ref["valueOffset"] is None
 
 
 def test_serialized_export_probe_fails_closed_when_physical_header_boundary_disagrees():
@@ -174,13 +241,21 @@ def test_serialized_export_probe_reports_unmapped_export_range_without_scanning_
     assert len(result["unmappedExports"]) == 1
 
 
-def test_serialized_export_probe_does_not_scan_unaligned_fname_lookalike():
+def test_unaligned_fname_lookalike_needs_full_type_metadata_before_becoming_strong_layout():
     uasset, uexp = _fixture()
-    # Prepend two bytes, keeping the export's declared size/range internally
-    # valid by replacing its payload with an unaligned-only name sequence.
     data = bytearray(uexp)
     color_ref = data[:8]
     struct_ref = data[8:16]
-    unaligned = b"\x00\x00" + color_ref + struct_ref + b"\x00" * (len(data) - 18)
-    result = extract_serialized_name_refs(uasset, unaligned, tokens=["ColorAndOpacity"])
-    assert not any(row["propertyTagLike"] for row in result["refs"])
+    # Put a name/type/header sequence at offset 2 with no valid LinearColor
+    # StructName/StructGuid/property-GUID metadata after it.
+    unaligned = bytearray(len(data))
+    unaligned[2:10] = color_ref
+    unaligned[10:18] = struct_ref
+    struct.pack_into("<ii", unaligned, 18, 16, 0)
+
+    result = extract_serialized_name_refs(uasset, bytes(unaligned), tokens=["ColorAndOpacity"])
+    ref = next(row for row in result["refs"] if row["exportRelativeOffset"] == 2)
+    assert ref["propertyTagLike"] is True
+    assert ref["propertyTagHeaderPlausible"] is True
+    assert ref["propertyTagLayoutPlausible"] is False
+    assert ref["linearColorValuePlausible"] is False
