@@ -136,7 +136,7 @@ def test_better_sprint_enabled_blocks_runtime_until_optional_hook_is_validated(t
     assert status["betterSprintHookValidated"] is False
     assert status["requestedHooksValidated"] is False
     assert status["runtimeReady"] is False
-    with pytest.raises(RuntimeError, match="Better Sprint hook is enabled but not validated"):
+    with pytest.raises(RuntimeError, match="requested runtime hooks are not validated: betterSprint"):
         deploy_runtime(game, project)
 
     _write_manifest(project, better_sprint=True)
