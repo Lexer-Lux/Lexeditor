@@ -202,10 +202,12 @@ def parse_uasset(data: bytes, label: str = "uasset") -> UAsset:
     if legacy_version != -4:
         reader.int32()  # legacy UE3 version
     version = reader.int32()
-    licensee_version = version & 0xFFFF
+    licensee_version = reader.int32() & 0xFFFF
     file_version = version & 0xFFFF
     if licensee_version != 0 or file_version != 0:
-        raise FormatError(f"{label}: unsupported package version {version}")
+        raise FormatError(
+            f"{label}: unsupported package version {version} / licensee {licensee_version}"
+        )
     if legacy_version <= -2:
         custom_versions = reader.int32()
         if custom_versions != 0:
