@@ -2,20 +2,17 @@
 
 Object-table ownership proves *which* exports/classes exist, but not which
 serialized property names occur inside one export payload. This module adds a
-narrow layer for research probes: when a split `.uasset` header size matches the
-actual `.uasset` byte length, map each export's absolute SerialOffset into the
+narrow layer for research probes: when a split package header size matches the
+actual header byte length, map each export's absolute SerialOffset into the
 paired `.uexp` and scan only for FName-shaped references to requested names.
 
 A candidate becomes stronger `propertyTagLike` evidence only when the following
 FName resolves to a known `*Property` serializer name. Generic Size/ArrayIndex
 fields are then checked, and the old UE4 FPropertyTag type-specific prefix is
-parsed conservatively from the package's own file version. For StructProperty
-this can identify StructName/StructGuid, the optional PropertyGuid flag, and the
-bounded value start without guessing fixed FF7R offsets.
+parsed conservatively from the package's own file version.
 
 This remains read-only research evidence. A structurally valid property tag does
-not prove that a candidate property owns the visible lock-on reticle, that its
-value is active-state-only, or that rewriting it is safe.
+not prove semantic ownership or that rewriting it is safe.
 """
 
 from __future__ import annotations
@@ -46,9 +43,6 @@ KNOWN_PROPERTY_TYPES = frozenset({
     "UInt16Property", "UInt32Property", "UInt64Property", "WeakObjectProperty",
 })
 
-# UE4 object-version gates used by FPropertyTag's old-format serializer. FF7R's
-# package parser already exposes FileVersionUE4, so the serialized probe can use
-# the package's own value instead of assuming one engine minor globally.
 VER_UE4_ARRAY_PROPERTY_INNER_TAGS = 228
 VER_UE4_PROPERTY_TAG_SET_MAP_SUPPORT = 322
 VER_UE4_STRUCT_GUID_IN_PROPERTY_TAG = 336
@@ -75,7 +69,6 @@ def _fname_at(data: bytes, offset: int, table: PackageObjectTable) -> tuple[str,
 
 
 def _property_tag_header_fields(data: bytes, offset: int, property_type: str) -> dict[str, Any]:
-    """Return the generic Size/ArrayIndex prefix after name+type FNames."""
     if property_type not in KNOWN_PROPERTY_TYPES or offset < 0 or offset + 24 > len(data):
         return {
             "propertyTagHeaderPlausible": False,
@@ -102,10 +95,6 @@ def _read_required_fname(
     row = _fname_at(data, cursor, table)
     if row is None:
         return None
-    # FPropertyTag type metadata stores type/member names, not package paths.
-    # Rejecting path-shaped names prevents arbitrary zero-filled bytes from
-    # accidentally resolving to name-table entry 0 (commonly /Script/...) and
-    # being promoted to a strong serialized-layout candidate.
     name = row[0]
     if not name or "/" in name or "\\" in name:
         return None
@@ -121,12 +110,7 @@ def _property_tag_layout_fields(
     declared_size: int | None,
     header_plausible: bool,
 ) -> dict[str, Any]:
-    """Conservatively parse old-format UE4 type metadata and bound the value.
-
-    This is intentionally not a general property-value deserializer. It parses
-    only FPropertyTag metadata whose field order is version-gated by the package's
-    FileVersionUE4, then proves that the declared value fits inside this export.
-    """
+    """Conservatively parse old-format UE4 type metadata and bound the value."""
     result: dict[str, Any] = {
         "propertyTagLayoutPlausible": False,
         "typeMetadata": {},
@@ -135,6 +119,8 @@ def _property_tag_layout_fields(
         "valueHex": "",
         "linearColorValuePlausible": False,
         "linearColorValue": None,
+        "vectorValuePlausible": False,
+        "vectorValue": None,
     }
     if not header_plausible or declared_size is None:
         return result
@@ -227,12 +213,12 @@ def _property_tag_layout_fields(
         "valueHex": value.hex(),
     })
 
-    # FLinearColor is a particularly useful read-only lock-on tint lead: its
-    # tagged StructProperty payload is four float32 components. Report it only
-    # when the struct type and exact declared size agree and all components are
-    # finite/bounded; do not infer SlateColor or other structs from raw bytes.
     struct_name = str(metadata.get("structName", ""))
-    if property_type == "StructProperty" and struct_name.casefold() == "linearcolor" and declared_size == 16:
+    if (
+        property_type == "StructProperty"
+        and struct_name.casefold() == "linearcolor"
+        and declared_size == 16
+    ):
         red, green, blue, alpha = struct.unpack_from("<ffff", value, 0)
         components = (red, green, blue, alpha)
         if all(math.isfinite(component) and abs(component) <= 1_000_000 for component in components):
@@ -243,6 +229,20 @@ def _property_tag_layout_fields(
                 "b": blue,
                 "a": alpha,
             }
+
+    # FVector's archive representation is exactly three float32 components for
+    # the UE4-era packages this old-format tag parser targets. Keep this narrow:
+    # do not infer FVector_NetQuantize, FTransform or arbitrary 12-byte structs.
+    if (
+        property_type == "StructProperty"
+        and struct_name.casefold() == "vector"
+        and declared_size == 12
+    ):
+        x, y, z = struct.unpack_from("<fff", value, 0)
+        components = (x, y, z)
+        if all(math.isfinite(component) and abs(component) <= 100_000_000 for component in components):
+            result["vectorValuePlausible"] = True
+            result["vectorValue"] = {"x": x, "y": y, "z": z}
     return result
 
 
@@ -277,9 +277,6 @@ def extract_serialized_name_refs(
             "unmappedExports": [],
         }
     table = parse_object_table(uasset, label=label)
-    # FF7R split packages observed by Lexeditor serialize export offsets as if
-    # `.uasset + .uexp` were one package. Only trust that mapping when the
-    # package-declared header boundary exactly equals the physical .uasset size.
     if table.total_header_size != len(uasset):
         return {
             "mappingTrusted": False,
@@ -309,11 +306,6 @@ def extract_serialized_name_refs(
             })
             continue
         payload = uexp[start:end]
-        # Property tags are not guaranteed to remain 4-byte aligned: old-format
-        # BoolVal and HasPropertyGuid metadata are byte-sized. Scan bytewise, but
-        # require the name index, bounded FName number, known property type, generic
-        # header, and type-specific versioned layout independently so stronger
-        # evidence stays highly constrained.
         for relative in range(0, max(0, len(payload) - 7)):
             name_index, number = struct.unpack_from("<iI", payload, relative)
             if name_index not in matched or number > MAX_FNAME_NUMBER:
@@ -379,6 +371,9 @@ def extract_serialized_name_refs(
         "linearColorValueCandidateCount": sum(
             bool(row["linearColorValuePlausible"]) for row in reported
         ),
+        "vectorValueCandidateCount": sum(
+            bool(row["vectorValuePlausible"]) for row in reported
+        ),
         "unmappedExports": unmapped,
         "notes": [
             "FName-shaped hits are candidate serialized references, not semantic ownership proof.",
@@ -386,8 +381,8 @@ def extract_serialized_name_refs(
             "propertyTagHeaderPlausible additionally requires non-negative bounded generic Size and ArrayIndex fields after the two FNames.",
             "propertyTagLayoutPlausible parses old-format UE4 type metadata and optional PropertyGuid using the package FileVersionUE4, then proves the declared value range stays inside the export.",
             "Type-metadata FNames that resolve to package/script paths are rejected rather than treated as struct/enum/container type names.",
-            "For StructProperty, typeMetadata records StructName and version-gated StructGuid. A LinearColor value is decoded only when StructName is exactly LinearColor and declared size is exactly 16 bytes.",
-            "A valid LinearColor payload is still read-only evidence; this probe does not prove reticle ownership, active-state scope, or authorize replacement bytes.",
+            "LinearColor is decoded only for an exact 16-byte LinearColor StructProperty; Vector is decoded only for an exact 12-byte Vector StructProperty.",
+            "Decoded values remain read-only structural evidence; semantic ownership and mutation safety are separate requirements.",
             "No export bytes are modified by this probe.",
         ],
     }
@@ -399,7 +394,7 @@ def probe_installed_serialized_exports(
     terms: Iterable[str],
     tokens: Iterable[str],
 ) -> dict[str, Any]:
-    """Find matching installed asset pairs and scan serialized export evidence."""
+    """Find matching installed .uasset/.uexp pairs and scan export evidence."""
     game_root = Path(game_root).resolve()
     listings: list[tuple[str, list[str]]] = []
     paks: dict[str, Path] = {}
@@ -444,6 +439,6 @@ def probe_installed_serialized_exports(
         "assets": results,
         "scanErrors": errors,
         "notes": [
-            "Serialized export evidence is read-only and is not sufficient by itself to authorize arbitrary UMG mutation.",
+            "Serialized export evidence is read-only and is not sufficient by itself to authorize arbitrary cooked-asset mutation.",
         ],
     }
