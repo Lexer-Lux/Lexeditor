@@ -7,6 +7,7 @@ import pytest
 from games.ff7r.native_probe import DEFAULT_NEEDLES
 from games.ff7r.runtime_config import (
     DEFAULT_RUNTIME_CONFIG,
+    LEGACY_MINIMAP_CONFIG,
     RUNTIME_DLL_NAME,
     RUNTIME_MANIFEST_NAME,
     deploy_runtime,
@@ -38,8 +39,6 @@ def _write_fixture_exe(game: Path):
 def _write_manifest(project: Path, *, better_sprint=None):
     hooks = {
         "cutsceneSpeed": True,
-        "minimapTapHold": True,
-        "minimapState": True,
     }
     if better_sprint is not None:
         hooks["betterSprint"] = better_sprint
@@ -109,11 +108,12 @@ def test_better_sprint_defaults_to_vanilla_one_x_and_old_configs_upgrade_in_memo
     old_config = {
         "schemaVersion": 1,
         "cutsceneSpeed": dict(DEFAULT_RUNTIME_CONFIG["cutsceneSpeed"]),
-        "minimap": dict(DEFAULT_RUNTIME_CONFIG["minimap"]),
+        "minimap": dict(LEGACY_MINIMAP_CONFIG),
         "hpRebalance": dict(DEFAULT_RUNTIME_CONFIG["hpRebalance"]),
     }
     validated = validate_runtime_config(old_config)
     assert validated["betterSprint"] == {"enabled": False, "speedMultiplier": 1.0}
+    assert "minimap" not in validated
 
 
 def test_sprint_multiplier_accepts_above_and_below_vanilla_but_rejects_nonpositive_or_nonfinite():
@@ -189,8 +189,6 @@ def test_manifest_accepts_better_sprint_as_supported_optional_hook_and_rejects_u
         "manifestVersion": 1,
         "hooks": {
             "cutsceneSpeed": True,
-            "minimapTapHold": True,
-            "minimapState": True,
             "betterSprint": True,
         },
         "supportedExeTimestamps": [FIXTURE_TIMESTAMP],
@@ -200,7 +198,7 @@ def test_manifest_accepts_better_sprint_as_supported_optional_hook_and_rejects_u
     assert validated["hooks"]["betterSprint"] is True
 
     payload["hooks"]["notARealHook"] = True
-    with pytest.raises(ValueError, match="supported optional hooks"):
+    with pytest.raises(ValueError, match="supported optional or legacy hooks"):
         validate_runtime_manifest(payload)
 
 
