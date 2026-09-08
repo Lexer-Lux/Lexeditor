@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'games/ff8/**'
+      - 'tests/test_ff8_field_assets.py'
       - 'tools/verify_ff8_*'
       - 'tools/package_ff8_native_driver.py'
       - 'tools/prepare_ff8_native_build.py'
@@ -13,6 +14,7 @@ on:
     branches: [master, fix/ff8-native-battle-batch]
     paths:
       - 'games/ff8/**'
+      - 'tests/test_ff8_field_assets.py'
       - 'tools/verify_ff8_*'
       - 'tools/package_ff8_native_driver.py'
       - 'tools/prepare_ff8_native_build.py'
@@ -45,6 +47,7 @@ jobs:
           python tools/verify_ff8_native_package.py
           python tools/verify_ff8_native_compiled.py
           python tools/verify_ff8_gf_bar_settings.py
+          python -m unittest tests.test_ff8_field_assets -v
           python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py
           python - <<'PY'
           import pathlib, re, subprocess
