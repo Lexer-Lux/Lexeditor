@@ -5,20 +5,24 @@ import pytest
 from games.ff7r.native_probe import PEFormatError, probe_bytes
 
 
-def fixture_pe():
-    data = bytearray(0x500)
+def fixture_pe(*, with_pdata=True):
+    data = bytearray(0x600)
     data[:2] = b"MZ"
     pe = 0x80
     struct.pack_into("<I", data, 0x3C, pe)
     data[pe:pe + 4] = b"PE\0\0"
     coff = pe + 4
     struct.pack_into("<H", data, coff + 0, 0x8664)  # AMD64
-    struct.pack_into("<H", data, coff + 2, 2)
+    struct.pack_into("<H", data, coff + 2, 3 if with_pdata else 2)
     struct.pack_into("<I", data, coff + 4, 0x12345678)
     struct.pack_into("<H", data, coff + 16, 0xF0)
     optional = coff + 20
     struct.pack_into("<H", data, optional, 0x20B)
     struct.pack_into("<Q", data, optional + 24, 0x140000000)
+    struct.pack_into("<I", data, optional + 108, 16)  # NumberOfRvaAndSizes
+    if with_pdata:
+        exception = optional + 112 + 3 * 8
+        struct.pack_into("<II", data, exception, 0x3000, 12)
 
     sections = optional + 0xF0
 
@@ -32,6 +36,9 @@ def fixture_pe():
 
     section(0, ".text", 0x1000, 0x200, 0x100)
     section(1, ".rdata", 0x2000, 0x400, 0x100)
+    if with_pdata:
+        section(2, ".pdata", 0x3000, 0x500, 0x40)
+        struct.pack_into("<III", data, 0x500, 0x1010, 0x1020, 0x3030)
 
     # String at .rdata+0x20 => RVA 0x2020.
     data[0x420:0x420 + len(b"NaviMap\0")] = b"NaviMap\0"
@@ -48,10 +55,18 @@ def fixture_pe():
     return bytes(data)
 
 
-def test_probe_maps_current_pe_timestamp_strings_xrefs_and_byte_windows():
+def test_probe_maps_pdata_function_ranges_and_byte_windows():
     result = probe_bytes(fixture_pe(), needles=["NaviMap", "FastForward"])
+    assert result["machine"] == 0x8664
+    assert result["machineHex"] == "0x8664"
     assert result["timestamp"] == 0x12345678
     assert result["timestampHex"] == "0x12345678"
+    assert result["exceptionDirectory"] == {
+        "rva": 0x3000,
+        "size": 12,
+        "runtimeFunctionCount": 1,
+    }
+
     navimap = result["needles"][0]
     assert navimap["needle"] == "NaviMap"
     ascii_hit = next(hit for hit in navimap["hits"] if hit["encoding"] == "ascii")
@@ -63,6 +78,11 @@ def test_probe_maps_current_pe_timestamp_strings_xrefs_and_byte_windows():
     assert xref["instructionVa"] == 0x140001010
     assert xref["candidateFunctionRva"] == 0x1010
     assert xref["candidateFunctionVa"] == 0x140001010
+    assert xref["candidateFunctionEndRva"] == 0x1020
+    assert xref["candidateFunctionEndVa"] == 0x140001020
+    assert xref["candidateFunctionSource"] == "pdata"
+    assert xref["candidateFunctionUnwindInfoRva"] == 0x3030
+    assert xref["candidateFunctionUnwindInfoVa"] == 0x140003030
 
     context = xref["xrefContext"]
     assert context["section"] == ".text"
@@ -77,13 +97,26 @@ def test_probe_maps_current_pe_timestamp_strings_xrefs_and_byte_windows():
     function = xref["candidateFunctionBytes"]
     assert function["startRva"] == 0x1010
     assert function["focusOffset"] == 0
-    assert function["byteCount"] == 64
+    assert function["byteCount"] == 16
     function_bytes = bytes.fromhex(function["hex"])
     assert function_bytes[:7] == b"\x48\x8D\x0D" + struct.pack("<i", 0x2020 - 0x1017)
     assert function_bytes[7:11] == b"\x48\x83\xEC\x28"
 
     assert result["needles"][1]["hits"] == []
-    assert any("byte windows" in note for note in result["notes"])
+    assert any(".pdata" in note for note in result["notes"])
+
+
+def test_probe_falls_back_to_padding_when_pdata_is_unavailable():
+    result = probe_bytes(fixture_pe(with_pdata=False), needles=["NaviMap"])
+    assert result["exceptionDirectory"]["runtimeFunctionCount"] == 0
+    xref = next(
+        hit for hit in result["needles"][0]["hits"] if hit["encoding"] == "ascii"
+    )["leaRipXrefs"][0]
+    assert xref["candidateFunctionRva"] == 0x1010
+    assert xref["candidateFunctionEndRva"] is None
+    assert xref["candidateFunctionSource"] == "padding-heuristic"
+    assert xref["candidateFunctionUnwindInfoRva"] is None
+    assert xref["candidateFunctionBytes"]["byteCount"] == 64
 
 
 def test_probe_rejects_non_pe_and_truncated_images():
