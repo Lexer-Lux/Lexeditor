@@ -10,8 +10,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import paths
-from .extended import FAMILIES, load_extended, save_extended
+from .extended import FAMILIES, ERRORS as EXTENDED_ERRORS, load_extended, save_extended, resolve_source, model
 from .datasets import CATEGORIES, UNRESOLVED, READ_ERRORS, load_datasets, save_datasets
+from .storage import target_path
 from platform_config import load_config, save_config
 from theme_sounds import ensure_theme_sounds, sound_file
 
@@ -44,6 +45,19 @@ def _link_limit_rows(rows, texts) -> None:
             row["description"] = descriptions[game_id]
 
 
+def _synchronize_limit_text(records: dict, counterpart: dict) -> None:
+    """Synchronize the cross-file Limit records/text view after either family saves."""
+    texts = records.get("texts") or counterpart.get("texts", [])
+    limits = records.get("limitBreaks") or counterpart.get("limitBreaks", [])
+    if not texts or not limits:
+        return
+    _link_limit_rows(limits, texts)
+    # A KERNEL2 text save normally returns only the text family. Include the
+    # unchanged Limit rows too so the browser refreshes their names/help now.
+    if "limitBreaks" not in records:
+        records["limitBreaks"] = limits
+
+
 def _link_limit_text(data: dict) -> None:
     """Decorate loaded EXE Limit records with the matching KERNEL2 text.
 
@@ -56,12 +70,20 @@ def _link_limit_text(data: dict) -> None:
         _link_limit_rows(groups.get("limitBreaks", []), groups.get("texts", []))
 
 
-def _link_saved_limit_text(result: dict, extra: dict) -> dict:
-    """Keep canonical save responses as human-readable as normal API loads."""
-    rows = result.get("records", {}).get("limitBreaks")
-    if rows is not None:
-        _link_limit_rows(rows, extra.get("records", {}).get("texts", []))
-    return result
+def _load_family_records(family: str) -> dict:
+    """Read one extended family without reparsing unrelated FF7 archives."""
+    source, relative = resolve_source(GAME_ROOT, family)
+    target = target_path(GAME_ROOT, PROJECT_ROOT, source, relative)
+    original = source.read_bytes()
+    active = target.read_bytes() if target.exists() else original
+    current = model(family, active, original)
+    rows = {}
+    for key in FAMILIES[family]["categories"]:
+        try:
+            rows[key] = current.records(key)
+        except EXTENDED_ERRORS:
+            pass
+    return rows
 
 
 def editor_data() -> dict:
@@ -79,8 +101,14 @@ def editor_data() -> dict:
 
 def save_extended_data(payload: object) -> dict:
     result = save_extended(GAME_ROOT, PROJECT_ROOT, payload)
-    if "limitBreaks" in result.get("records", {}):
-        _link_saved_limit_text(result, load_extended(GAME_ROOT, PROJECT_ROOT))
+    family = payload.get("family") if isinstance(payload, dict) else None
+    if family in ("shop", "text"):
+        counterpart_family = "text" if family == "shop" else "shop"
+        try:
+            counterpart = _load_family_records(counterpart_family)
+        except EXTENDED_ERRORS:
+            counterpart = {}
+        _synchronize_limit_text(result.setdefault("records", {}), counterpart)
     return result
 
 
