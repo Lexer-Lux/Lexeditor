@@ -391,6 +391,15 @@ def materialize_encounter_tweaks(game_root: Path, data_root: Path, project_root:
 
     enemy_count = len(candidate["battleCharaSpecIds"])
     remove_index = candidate["removeIndex"]
+    if not 0 <= remove_index < enemy_count or candidate["kinds"][remove_index] != "turret":
+        raise RuntimeError("Chapter 5 encounter discovery produced an invalid turret removal slot")
+    expected_ids = list(candidate["battleCharaSpecIds"])
+    expected_ids.pop(remove_index)
+    expected_kinds = list(candidate["kinds"])
+    expected_kinds.pop(remove_index)
+    if expected_kinds.count("flametrooper") != 2 or expected_kinds.count("turret") != 1:
+        raise RuntimeError("Chapter 5 encounter removal slot would not leave 2 Flametroopers + 1 turret")
+
     deleted_fields = []
     for field in PER_ENEMY_ARRAYS:
         entry = package.entries[entry.index]
@@ -408,12 +417,21 @@ def materialize_encounter_tweaks(game_root: Path, data_root: Path, project_root:
         raise RuntimeError("Target Chapter 5 encounter did not delete its enemy composition slot")
     package.write_pair(target_uasset, target_uexp)
     verified = DataObjectPackage(target_uasset, target_uexp, asset=asset)
-    verified_entry = next(row for row in verified.entries if row.tag == candidate["sceneTag"])
-    result_ids = verified_entry.values["BattleCharaSpecID_Array"]
-    if len(result_ids) != 3:
-        raise RuntimeError("Chapter 5 encounter structural write did not produce three enemies")
-    if result_ids.count(candidate["battleCharaSpecIds"][remove_index]) != 1:
-        raise RuntimeError("Chapter 5 encounter did not reduce the duplicated turret to one instance")
+    try:
+        verified_entry = next(row for row in verified.entries if row.tag == candidate["sceneTag"])
+    except StopIteration as error:
+        raise RuntimeError("Target Chapter 5 BattleScene disappeared after structural write") from error
+    result_ids = list(verified_entry.values.get("BattleCharaSpecID_Array", []))
+    if result_ids != expected_ids:
+        raise RuntimeError(
+            "Chapter 5 encounter structural write did not preserve the exact three expected enemy slots"
+        )
+    for field in deleted_fields:
+        value = verified_entry.values.get(field)
+        if not isinstance(value, list) or len(value) != enemy_count - 1:
+            raise RuntimeError(
+                f"Chapter 5 encounter field {field} did not preserve parallel 3-entry alignment"
+            )
 
     return [{
         "asset": asset,
@@ -421,5 +439,5 @@ def materialize_encounter_tweaks(game_root: Path, data_root: Path, project_root:
         "removedIndex": remove_index,
         "removedBattleCharaSpecId": candidate["battleCharaSpecIds"][remove_index],
         "deletedFields": deleted_fields,
-        "resultBattleCharaSpecIds": list(result_ids),
+        "resultBattleCharaSpecIds": result_ids,
     }]
