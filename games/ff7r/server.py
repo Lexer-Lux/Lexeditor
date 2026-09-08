@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 from .archive import build_index, preferred_pak_version
 from .storage import load_package, save_edits
+from .text_storage import load_text_package, resident_text_map, save_text_edits
 from .tooling import helper_status, pack_directory
 
 
@@ -35,10 +36,47 @@ def catalog(*, refresh: bool = False) -> dict:
         return _catalog_cache
 
 
-def data_payload(asset: str, *, vanilla: bool = False) -> dict:
+def _walk_strings(value):
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for child in value.values():
+            yield from _walk_strings(child)
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            yield from _walk_strings(child)
+
+
+def data_payload(asset: str, *, vanilla: bool = False, language: str = "US") -> dict:
     package, source_sha, using_project = load_package(
         GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset, vanilla=vanilla)
-    return package.api_payload(source_sha256=source_sha, using_project=using_project)
+    payload = package.api_payload(source_sha256=source_sha, using_project=using_project)
+    # Resolve only text IDs referenced by this table, from the user's installed
+    # Resident_TxtRes. Failure to load localization must never make gameplay data
+    # itself unusable.
+    referenced = {value for entry in package.entries for value in _walk_strings(entry.values)
+                  if value.startswith("$")}
+    lookup: dict[str, str] = {}
+    if referenced:
+        try:
+            resident = resident_text_map(
+                GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), language=language)
+            lookup = {key: resident[key] for key in referenced if key in resident}
+        except Exception:
+            lookup = {}
+    payload["textLookup"] = lookup
+    payload["textLanguage"] = language.upper()
+    return payload
+
+
+def text_payload(asset: str, *, vanilla: bool = False) -> dict:
+    package, source_uasset_sha, source_uexp_sha, using_project = load_text_package(
+        GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset, vanilla=vanilla)
+    return package.api_payload(
+        source_uasset_sha256=source_uasset_sha,
+        source_uexp_sha256=source_uexp_sha,
+        using_project=using_project,
+    )
 
 
 def data_map_payload() -> dict:
@@ -48,8 +86,17 @@ def data_map_payload() -> dict:
             "filename": item["asset"] + ".uasset / .uexp",
             "target": item["asset"],
             "controls": "Structured DataObject records; booleans, fixed-width numbers, floats and existing FNames are editable.",
-            "notes": "FString text and size-changing edits are read-only; unknown bytes are preserved in the project overlay.",
-            "coverage": "partial",
+            "notes": "FString and structural/size-changing edits remain read-only; unknown bytes are preserved in the project overlay.",
+            "coverage": "structured",
+            "status": "partial",
+        })
+    for item in catalog().get("textAssets", []):
+        rows.append({
+            "filename": item["asset"] + ".uasset / .uexp",
+            "target": item["asset"],
+            "controls": "Localized menu, item, dialogue, subtitle and other text-resource strings, including existing sub-entry text.",
+            "notes": "Text can change length and encoding. IDs, entry counts and sub-entry structure remain fixed.",
+            "coverage": "structured",
             "status": "partial",
         })
     return {"rows": rows}
@@ -57,13 +104,18 @@ def data_map_payload() -> dict:
 
 def info_payload() -> dict:
     current = catalog()
+    languages = sorted({str(row.get("language", "")) for row in current.get("textAssets", [])
+                        if row.get("language")})
     return {
         "gameRoot": str(GAME_ROOT),
         "dataRoot": str(DATA_ROOT),
         "projectRoot": str(PROJECT_ROOT),
         "dataObjects": len(current.get("assets", [])),
+        "textResources": len(current.get("textAssets", [])),
+        "textLanguages": languages,
         "helper": helper_status(),
         "pakVersion": preferred_pak_version(current),
+        "pakMountPoint": "../../../",
         "buildPath": str(PROJECT_ROOT / "build" / "Lexeditor-FF7R_P.pak"),
         "deployPath": str(GAME_ROOT / "End" / "Content" / "Paks" / "~mods" / "Lexeditor-FF7R_P.pak"),
     }
@@ -72,7 +124,7 @@ def info_payload() -> dict:
 def build_mod() -> dict:
     content = PROJECT_ROOT / "content"
     if not content.is_dir() or not any(path.is_file() for path in content.rglob("*")):
-        raise RuntimeError("The FF7R project has no saved DataObject edits to build")
+        raise RuntimeError("The FF7R project has no saved edits to build")
     target = PROJECT_ROOT / "build" / "Lexeditor-FF7R_P.pak"
     pack_directory(content, target, version=preferred_pak_version(catalog()))
     return {"path": str(target), "size": target.stat().st_size}
@@ -143,7 +195,10 @@ class Handler(BaseHTTPRequestHandler):
                     "name": "FINAL FANTASY VII REMAKE INTERGRADE",
                     "hosted": True,
                     "windowHost": "webview2",
-                    "capabilities": ["data-map", "dataobject", "save", "build", "deploy"],
+                    "capabilities": [
+                        "data-map", "dataobject", "text-resource", "save",
+                        "text-save", "build", "deploy",
+                    ],
                 })
             if path == "/api/catalog":
                 return self.send_json(catalog(refresh=query.get("refresh") == ["1"]))
@@ -156,7 +211,14 @@ class Handler(BaseHTTPRequestHandler):
                 if not asset:
                     raise ValueError("asset is required")
                 vanilla = (query.get("source") or [""])[0] == "vanilla"
-                return self.send_json(data_payload(asset, vanilla=vanilla))
+                language = (query.get("language") or ["US"])[0]
+                return self.send_json(data_payload(asset, vanilla=vanilla, language=language))
+            if path == "/api/text":
+                asset = (query.get("asset") or [""])[0]
+                if not asset:
+                    raise ValueError("asset is required")
+                vanilla = (query.get("source") or [""])[0] == "vanilla"
+                return self.send_json(text_payload(asset, vanilla=vanilla))
             return self.send_json({"error": "Not found"}, 404)
         except (ValueError, KeyError, IndexError) as error:
             return self.send_json({"error": str(error)}, 400)
@@ -176,6 +238,19 @@ class Handler(BaseHTTPRequestHandler):
                     GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
                     source_sha256=str(payload.get("sourceSha256", "")),
                     active_sha256=str(payload.get("activeSha256", "")),
+                    edits=edits,
+                ))
+            if path == "/api/text/save":
+                asset = str(payload.get("asset", ""))
+                edits = payload.get("edits", [])
+                if not asset or not isinstance(edits, list):
+                    raise ValueError("asset and edits are required")
+                return self.send_json(save_text_edits(
+                    GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
+                    source_uasset_sha256=str(payload.get("sourceUassetSha256", "")),
+                    source_uexp_sha256=str(payload.get("sourceUexpSha256", "")),
+                    active_uasset_sha256=str(payload.get("activeUassetSha256", "")),
+                    active_uexp_sha256=str(payload.get("activeUexpSha256", "")),
                     edits=edits,
                 ))
             if path == "/api/build":
