@@ -2,6 +2,7 @@
 
 #include "RuntimeConfig.hpp"
 #include "RuntimeCutscene.hpp"
+#include "RuntimeFeatureHealth.hpp"
 #include "RuntimeHP.hpp"
 #include "RuntimeSignatures.hpp"
 
@@ -13,6 +14,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <mutex>
 #include <optional>
 #include <span>
 #include <sstream>
@@ -21,6 +23,7 @@
 namespace {
 
 using lexeditor::ff7r::CutsceneSpeedTrack;
+using lexeditor::ff7r::FeatureHealth;
 using lexeditor::ff7r::HPTrackState;
 using lexeditor::ff7r::HPWritePlan;
 using lexeditor::ff7r::PlayerStatsPrefix;
@@ -37,6 +40,7 @@ std::atomic_bool g_cutsceneSpeedActive{false};
 std::atomic<double> g_cutsceneBaseMultiplier{1.25};
 std::atomic_bool g_hpRebalanceActive{false};
 std::atomic<double> g_hpMultiplier{0.5};
+std::mutex g_statusWriteMutex;
 
 enum class CutsceneWorkerState : int {
     disabled = 0,
@@ -317,6 +321,10 @@ std::string diagnostic_notes(const ConfigLoadResult& loaded,
 }
 
 void write_status(const ConfigLoadResult& loaded, const SignatureDiagnostics& signatures) {
+    // Both native workers can change live-state concurrently. Serialize the
+    // fixed .tmp -> status replacement so they cannot truncate or rename each
+    // other's heartbeat writes.
+    const std::lock_guard<std::mutex> lock(g_statusWriteMutex);
     const auto path = status_path();
     if (path.empty()) {
         return;
@@ -357,6 +365,28 @@ void write_status(const ConfigLoadResult& loaded, const SignatureDiagnostics& si
         }
     }
     MoveFileExW(temporary.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+}
+
+void publish_feature_state(std::atomic_bool& feature, bool active) noexcept {
+    const bool previous = feature.exchange(active);
+    if (previous == active) {
+        return;
+    }
+    try {
+        write_status(load_config(), scan_signatures());
+    } catch (...) {
+        // Worker health reporting must never terminate a Native Mod Loader
+        // thread because status-file I/O or diagnostics failed.
+    }
+}
+
+void observe_feature_health(
+    std::atomic_bool& feature,
+    FeatureHealth& health,
+    bool successful) noexcept {
+    if (health.observe(successful)) {
+        publish_feature_state(feature, health.active);
+    }
 }
 
 enum class GameSpeedBlockResolveState : int {
@@ -430,12 +460,15 @@ DWORD WINAPI cutscene_worker(LPVOID) noexcept {
         return 0;
     }
 
+    FeatureHealth health{};
     std::uintptr_t previousGameState = 0;
     std::uintptr_t gameSpeedBlock = 0;
     CutsceneSpeedTrack track{};
     for (;;) {
         std::uintptr_t gameState = 0;
         if (!read_process_value(*gameStateGlobal, gameState) || gameState == 0) {
+            g_cutsceneWorkerState.store(CutsceneWorkerState::armed);
+            observe_feature_health(g_cutsceneSpeedActive, health, false);
             Sleep(kCutsceneWorkerIntervalMs);
             continue;
         }
@@ -455,26 +488,27 @@ DWORD WINAPI cutscene_worker(LPVOID) noexcept {
                     break;
                 case GameSpeedBlockResolveState::missing:
                     g_cutsceneWorkerState.store(CutsceneWorkerState::blockMissing);
+                    observe_feature_health(g_cutsceneSpeedActive, health, false);
                     Sleep(kCutsceneWorkerIntervalMs);
                     continue;
                 case GameSpeedBlockResolveState::ambiguous:
                     g_cutsceneWorkerState.store(CutsceneWorkerState::blockAmbiguous);
+                    observe_feature_health(g_cutsceneSpeedActive, health, false);
                     Sleep(kCutsceneWorkerIntervalMs);
                     continue;
                 case GameSpeedBlockResolveState::unreadable:
                     g_cutsceneWorkerState.store(CutsceneWorkerState::blockUnreadable);
+                    observe_feature_health(g_cutsceneSpeedActive, health, false);
                     Sleep(kCutsceneWorkerIntervalMs);
                     continue;
             }
         }
 
-        if (apply_cutscene_speed_tick(gameSpeedBlock, g_cutsceneBaseMultiplier.load(), track)) {
-            g_cutsceneWorkerState.store(CutsceneWorkerState::active);
-            const bool wasActive = g_cutsceneSpeedActive.exchange(true);
-            if (!wasActive) {
-                write_status(load_config(), scan_signatures());
-            }
-        }
+        const bool applied = apply_cutscene_speed_tick(
+            gameSpeedBlock, g_cutsceneBaseMultiplier.load(), track);
+        g_cutsceneWorkerState.store(
+            applied ? CutsceneWorkerState::active : CutsceneWorkerState::armed);
+        observe_feature_health(g_cutsceneSpeedActive, health, applied);
         Sleep(kCutsceneWorkerIntervalMs);
     }
 }
@@ -600,11 +634,14 @@ DWORD WINAPI hp_worker(LPVOID) noexcept {
         return 0;
     }
 
+    FeatureHealth health{};
     std::array<HPTrackState, 1 + lexeditor::ff7r::kGameStatePartyStatsCount> tracks{};
     std::uintptr_t previousGameState = 0;
     for (;;) {
         std::uintptr_t gameState = 0;
         if (!read_process_value(*gameStateGlobal, gameState) || gameState == 0) {
+            g_hpWorkerState.store(HPWorkerState::armed);
+            observe_feature_health(g_hpRebalanceActive, health, false);
             Sleep(kHPWorkerIntervalMs);
             continue;
         }
@@ -612,13 +649,9 @@ DWORD WINAPI hp_worker(LPVOID) noexcept {
             tracks = {};
             previousGameState = gameState;
         }
-        if (apply_hp_rebalance_tick(gameState, g_hpMultiplier.load(), tracks)) {
-            g_hpWorkerState.store(HPWorkerState::active);
-            const bool wasActive = g_hpRebalanceActive.exchange(true);
-            if (!wasActive) {
-                write_status(load_config(), scan_signatures());
-            }
-        }
+        const bool applied = apply_hp_rebalance_tick(gameState, g_hpMultiplier.load(), tracks);
+        g_hpWorkerState.store(applied ? HPWorkerState::active : HPWorkerState::armed);
+        observe_feature_health(g_hpRebalanceActive, health, applied);
         Sleep(kHPWorkerIntervalMs);
     }
 }
