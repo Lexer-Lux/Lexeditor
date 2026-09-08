@@ -5,10 +5,14 @@ on:
     branches: [work/ff7r-native-runtime]
     paths:
       - 'games/ff7r/native/**'
+      - 'games/ff7r/runtime_config.py'
+      - 'tests/test_ff7r_runtime_config.py'
       - '.github/workflows/ff7r-native-runtime.yml'
   pull_request:
     paths:
       - 'games/ff7r/native/**'
+      - 'games/ff7r/runtime_config.py'
+      - 'tests/test_ff7r_runtime_config.py'
       - '.github/workflows/ff7r-native-runtime.yml'
 
 permissions:
@@ -20,6 +24,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Runtime probe status tests
+        run: python -m pytest -q tests/test_ff7r_runtime_config.py
       - name: Configure
         run: cmake -S games/ff7r/native -B out/ff7r-native -A x64
       - name: Build
@@ -33,11 +42,11 @@ jobs:
           $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
           if (-not $vs) { throw 'Visual Studio C++ toolchain was not found' }
           $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe |
-            Where-Object { $_.FullName -match '\\bin\\Hostx64\\x64\\dumpbin\.exe$' } |
+            Where-Object { $_.FullName -match '\bin\Hostx64\x64\dumpbin\.exe$' } |
             Sort-Object FullName -Descending |
             Select-Object -First 1
           if (-not $dumpbin) { throw 'dumpbin.exe was not found in the Visual Studio toolchain' }
-          $exports = & $dumpbin.FullName /exports $dll.FullName
+          $exports = (& $dumpbin.FullName /exports $dll.FullName) -join "`n"
           if ($exports -notmatch '\bInit\b') { throw 'Probe DLL does not export Init' }
           Write-Host $dll.FullName
       - uses: actions/upload-artifact@v4
