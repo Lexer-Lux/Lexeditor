@@ -21,7 +21,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: Apply holistic backend audit fixes
-        run: python tools/_ff7_holistic_backend_patch.py
+        run: |
+          python tools/_ff7_holistic_backend_patch.py
+          python tools/_ff7_holistic_backend_fix.py
       - name: Compile changed Python
         run: python -m py_compile games/ff7/kernel_extra.py games/ff7/datasets.py games/ff7/semantics.py tools/verify_ff7_datasets.py tools/verify_ff7_semantic_surface.py
       - name: Verify source-backed FF7 data and semantics
