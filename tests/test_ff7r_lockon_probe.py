@@ -1,6 +1,7 @@
 from games.ff7r.lockon_probe import (
     assess_lock_state_evidence,
     assess_marker_slot_evidence,
+    assess_serialized_marker_slots,
     rank_lockon_assets,
 )
 
@@ -93,12 +94,51 @@ def _serialized_lockon_asset(
     return asset
 
 
+def _serialized_marker_settings(name="UI/EndMenuSettings", *, duplicate_slot=None):
+    asset = _asset(name)
+    refs = []
+    for index, slot in enumerate((
+        "BattleLockonMarker00Widget",
+        "BattleLockonMarker01Widget",
+        "BattleLockonMarker02Widget",
+    )):
+        refs.append({
+            "objectName": "Default__EndMenuSettings",
+            "objectPath": "Default__EndMenuSettings",
+            "outerPath": "",
+            "className": "EndMenuSettings",
+            "classPath": "/Script/EndGame.EndMenuSettings",
+            "name": slot,
+            "propertyType": "SoftClassProperty",
+            "propertyTagLike": True,
+            "propertyTagHeaderPlausible": True,
+            "propertyTagLayoutPlausible": True,
+            "softObjectPathValuePlausible": True,
+            "softObjectPathValue": {
+                "assetPath": f"/Game/UI/WBP_Marker{index}.WBP_Marker{index}_C",
+                "subPath": "",
+            },
+        })
+    if duplicate_slot is not None:
+        row = dict(refs[duplicate_slot])
+        row["softObjectPathValue"] = {
+            "assetPath": "/Game/UI/WBP_Other.WBP_Other_C",
+            "subPath": "",
+        }
+        refs.append(row)
+    asset["serializedExportEvidence"] = {
+        "mappingTrusted": True,
+        "mappingReason": "serial-offset-minus-total-header-size",
+        "refs": refs,
+    }
+    return asset
+
+
 def test_dedicated_widget_with_presentation_fields_ranks_above_generic_anchor():
     ranked = rank_lockon_assets([
         _asset("UI/Generic", "BPShowBattleLockonMarkerIcon"),
         _asset("UI/Lockon", "EndBattleLockonMarkerIcon", "ColorAndOpacity", "Visibility"),
     ])
-
     assert [row["asset"] for row in ranked] == ["UI/Lockon", "UI/Generic"]
     assert ranked[0]["strongPresentationCandidate"] is True
     assert ranked[0]["containsDedicatedWidgetAnchor"] is True
@@ -109,7 +149,6 @@ def test_literal_label_is_not_inferred_from_class_name():
         _asset("UI/ClassOnly", "EndBattleLockonMarkerIcon", "Tint"),
         _asset("UI/Label", "BattleLockonMarker", "LOCK ON", "Brush"),
     ])
-
     class_only = next(row for row in ranked if row["asset"] == "UI/ClassOnly")
     label = next(row for row in ranked if row["asset"] == "UI/Label")
     assert class_only["containsLiteralLockOnLabel"] is False
@@ -118,18 +157,15 @@ def test_literal_label_is_not_inferred_from_class_name():
 
 
 def test_unrelated_target_ui_is_not_promoted():
-    ranked = rank_lockon_assets([
+    assert rank_lockon_assets([
         _asset("UI/Target", "BattleTargetWidget", "Color", "Text", "Visibility"),
-    ])
-
-    assert ranked == []
+    ]) == []
 
 
 def test_target_state_asset_is_research_evidence_but_not_dedicated_lockon_owner():
     ranked = rank_lockon_assets([
         _asset("UI/BattleTarget", "ShowBattleTargetIcon", "EEndMenuBattleTargetState", "LockedEnabled"),
     ])
-
     assert len(ranked) == 1
     assert ranked[0]["lockStateAnchorHits"]
     assert ranked[0]["containsDedicatedWidgetAnchor"] is False
@@ -140,11 +176,36 @@ def test_marker_slot_string_is_research_evidence_not_reticle_ownership():
     ranked = rank_lockon_assets([
         _asset("UI/Settings", "BattleLockonMarker01Widget"),
     ])
-
     assert len(ranked) == 1
     assert ranked[0]["containsMarkerSlotAnchor"] is True
     assert ranked[0]["containsDedicatedWidgetAnchor"] is False
     assert ranked[0]["strongPresentationCandidate"] is False
+
+
+def test_serialized_marker_slots_resolve_class_paths_without_claiming_enum_mapping():
+    ranked = rank_lockon_assets([_serialized_marker_settings()])
+    assert len(ranked) == 1
+    assert ranked[0]["containsMarkerSlotAnchor"] is True
+    assert ranked[0]["containsDedicatedWidgetAnchor"] is False
+    assert ranked[0]["serializedMarkerSlotValueEvidence"] is True
+    assert len(ranked[0]["serializedMarkerSlotRefs"]) == 3
+
+    result = assess_serialized_marker_slots(ranked)
+    assert result["allSlotValuesResolved"] is True
+    assert result["allResolvedPathsDistinct"] is True
+    assert result["uniqueSlotValues"]["BattleLockonMarker00Widget"]["assetPath"].endswith(
+        "WBP_Marker0.WBP_Marker0_C"
+    )
+    assert result["markerTypeOrder"] == ["Default", "Wimp", "Libra"]
+    assert result["slotToMarkerTypeMappingValidated"] is False
+
+
+def test_duplicate_serialized_value_for_one_marker_slot_fails_unique_resolution():
+    ranked = rank_lockon_assets([_serialized_marker_settings(duplicate_slot=1)])
+    result = assess_serialized_marker_slots(ranked)
+    assert result["uniqueSlotValues"]["BattleLockonMarker01Widget"] is None
+    assert result["allSlotValuesResolved"] is False
+    assert result["slotToMarkerTypeMappingValidated"] is False
 
 
 def test_ranking_is_deterministic_for_equal_evidence():
@@ -152,7 +213,6 @@ def test_ranking_is_deterministic_for_equal_evidence():
         _asset("UI/Zed", "BattleLockonMarker"),
         _asset("UI/Alpha", "BattleLockonMarker"),
     ])
-
     assert [row["asset"] for row in ranked] == ["UI/Alpha", "UI/Zed"]
 
 
@@ -161,7 +221,6 @@ def test_resolved_widget_owner_outranks_printable_string_only_candidate():
         _asset("UI/StringOnly", "EndBattleLockonMarkerIcon", "ColorAndOpacity", "Visibility"),
         _resolved_lockon_asset(),
     ])
-
     assert ranked[0]["asset"] == "UI/ResolvedLockon"
     assert ranked[0]["resolvedDedicatedOwnerEvidence"] is True
     assert ranked[0]["resolvedLabelChildEvidence"] is True
@@ -173,7 +232,6 @@ def test_serialized_dedicated_tint_property_outranks_string_only_candidate():
         _asset("UI/StringOnly", "EndBattleLockonMarkerIcon", "ColorAndOpacity"),
         _serialized_lockon_asset(),
     ])
-
     assert ranked[0]["asset"] == "UI/SerializedLockon"
     assert ranked[0]["serializedExportMappingTrusted"] is True
     assert ranked[0]["serializedDedicatedPropertyRefs"]
@@ -187,14 +245,9 @@ def test_serialized_dedicated_tint_property_outranks_string_only_candidate():
 def test_versioned_layout_and_linear_color_value_are_stronger_serialized_tint_evidence():
     ranked = rank_lockon_assets([
         _serialized_lockon_asset("UI/HeaderOnly"),
-        _serialized_lockon_asset(
-            "UI/Layout", layout_plausible=True,
-        ),
-        _serialized_lockon_asset(
-            "UI/LinearColor", layout_plausible=True, linear_color=True,
-        ),
+        _serialized_lockon_asset("UI/Layout", layout_plausible=True),
+        _serialized_lockon_asset("UI/LinearColor", layout_plausible=True, linear_color=True),
     ])
-
     assert [row["asset"] for row in ranked] == [
         "UI/LinearColor", "UI/Layout", "UI/HeaderOnly",
     ]
@@ -208,26 +261,17 @@ def test_versioned_layout_and_linear_color_value_are_stronger_serialized_tint_ev
 
 
 def test_untrusted_serialized_mapping_cannot_promote_injected_refs():
-    ranked = rank_lockon_assets([
-        _serialized_lockon_asset(mapping_trusted=False),
-    ])
-
-    assert ranked == []
+    assert rank_lockon_assets([_serialized_lockon_asset(mapping_trusted=False)]) == []
 
 
 def test_serialized_property_on_unrelated_widget_is_not_promoted():
-    ranked = rank_lockon_assets([
+    assert rank_lockon_assets([
         _serialized_lockon_asset("UI/GenericSerialized", dedicated=False),
-    ])
-
-    assert ranked == []
+    ]) == []
 
 
 def test_serialized_tint_without_plausible_generic_header_stays_weak():
-    ranked = rank_lockon_assets([
-        _serialized_lockon_asset(header_plausible=False),
-    ])
-
+    ranked = rank_lockon_assets([_serialized_lockon_asset(header_plausible=False)])
     assert len(ranked) == 1
     assert ranked[0]["serializedTintPropertyEvidence"] is True
     assert ranked[0]["serializedPlausibleTintTagEvidence"] is False
@@ -240,7 +284,6 @@ def test_serialized_dedicated_non_tint_property_does_not_claim_tint_semantics():
     ranked = rank_lockon_assets([
         _serialized_lockon_asset(property_name="Visibility", layout_plausible=True, linear_color=True),
     ])
-
     assert len(ranked) == 1
     assert ranked[0]["serializedDedicatedPropertyRefs"]
     assert ranked[0]["serializedTintPropertyRefs"] == []
@@ -255,7 +298,6 @@ def test_literal_label_without_resolved_owner_does_not_invent_object_ownership()
     ranked = rank_lockon_assets([
         _asset("UI/LabelOnly", "BattleLockonMarker", "LOCK ON", "ColorAndOpacity"),
     ])
-
     assert len(ranked) == 1
     assert ranked[0]["containsLiteralLockOnLabel"] is True
     assert ranked[0]["resolvedDedicatedOwnerEvidence"] is False
@@ -270,7 +312,6 @@ def test_show_target_icon_plus_state_enum_is_strong_lead_but_still_unvalidated()
         LockedDisabled=1,
         OutLockedEnabled=1,
     ))
-
     assert result["reflectedContractPresent"] is True
     assert result["lockedEnumeratorEvidence"] is True
     assert result["lockedStateNeedleHits"]["LockedEnabled"] == 1
@@ -279,7 +320,6 @@ def test_show_target_icon_plus_state_enum_is_strong_lead_but_still_unvalidated()
 
 def test_partial_target_state_evidence_never_claims_contract():
     result = assess_lock_state_evidence(_native(ShowBattleTargetIcon=1))
-
     assert result["reflectedContractPresent"] is False
     assert result["validatedAsIssuePredicate"] is False
 
@@ -290,7 +330,6 @@ def test_marker_slots_preserve_order_without_claiming_type_mapping():
         BattleLockonMarker01Widget=2,
         BattleLockonMarker02Widget=1,
     ))
-
     assert result["allSlotAnchorsPresent"] is True
     assert result["slotOrder"] == [
         "BattleLockonMarker00Widget",
@@ -303,6 +342,5 @@ def test_marker_slots_preserve_order_without_claiming_type_mapping():
 
 def test_partial_marker_slots_never_claim_mapping():
     result = assess_marker_slot_evidence(_native(BattleLockonMarker00Widget=1))
-
     assert result["allSlotAnchorsPresent"] is False
     assert result["slotToMarkerTypeMappingValidated"] is False
