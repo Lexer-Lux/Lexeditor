@@ -1,6 +1,6 @@
 """Read-only DataObject-shaped surfaces for unresolved FF7R follow-up research.
 
-The underlying probes intentionally do not mutate game data.  These adapters make
+The underlying probes intentionally do not mutate game data. These adapters make
 that installed-build evidence available through Lexeditor's existing Game Data UI
 without promoting string/xref/cooked-asset candidates into validated hooks.
 """
@@ -21,6 +21,7 @@ UNSCANNED_NAME_PROBE_ASSET = "Lexeditor/UnscannedNameProbe"
 CHAPTER3_BENCH_PROBE_ASSET = "Lexeditor/Chapter3BenchProbe"
 DOG_WHISTLE_PROBE_ASSET = "Lexeditor/DogWhistleProbe"
 BETTER_LOCKON_PROBE_ASSET = "Lexeditor/BetterLockonProbe"
+BETTER_SPRINT_PROBE_ASSET = "Lexeditor/BetterSprintProbe"
 
 READ_ONLY_RESEARCH_ASSETS = frozenset({
     ATB_RUNTIME_PROBE_ASSET,
@@ -28,6 +29,7 @@ READ_ONLY_RESEARCH_ASSETS = frozenset({
     CHAPTER3_BENCH_PROBE_ASSET,
     DOG_WHISTLE_PROBE_ASSET,
     BETTER_LOCKON_PROBE_ASSET,
+    BETTER_SPRINT_PROBE_ASSET,
 })
 
 RESEARCH_VIRTUAL_ASSET_ROWS = (
@@ -60,6 +62,12 @@ RESEARCH_VIRTUAL_ASSET_ROWS = (
         "name": "Better Lock-on Research",
         "group": "Lexeditor Research",
         "synthetic": "better-lockon-probe",
+    },
+    {
+        "asset": BETTER_SPRINT_PROBE_ASSET,
+        "name": "Better Sprint Research",
+        "group": "Lexeditor Research",
+        "synthetic": "better-sprint-probe",
     },
 )
 
@@ -316,6 +324,60 @@ def better_lockon_result_package(result: dict[str, Any]):
     )
 
 
+def better_sprint_result_package(result: dict[str, Any]):
+    candidates = list(result.get("dataCandidates", ()))
+    field_counts = dict(result.get("fieldCandidateCounts", {}))
+    native_stats = dict(result.get("nativeNeedleStats", {}))
+    contracts = list(result.get("knownContracts", ()))
+    top = [
+        f"{row.get('asset', '—')} :: {row.get('record', '—')} :: "
+        f"{row.get('field', '—')}={row.get('value', '—')}"
+        for row in candidates[:24]
+    ]
+    native_text = [
+        f"{needle}: strings={stats.get('stringHits', 0)}, xrefs={stats.get('leaXrefs', 0)}, "
+        f"functions={stats.get('candidateFunctions', 0)}"
+        for needle, stats in sorted(native_stats.items())
+    ]
+    contract_text = [
+        f"{row.get('symbol', '—')} | authority={row.get('sprintAuthority', 'unproven')} | "
+        f"{row.get('meaning', '—')} | risk={row.get('risk', '—')}"
+        for row in contracts
+    ]
+    properties = [
+        VirtualProperty("ImplementationReady", "Implementation Ready", "BOOL"),
+        VirtualProperty("Blockers", "Implementation Blockers", "STRING"),
+        VirtualProperty("DataCandidateCount", "Likely Authored Data Candidates", "INT32"),
+        VirtualProperty("DashRootMotionRows", "Dash Root-Motion Data Rows", "INT32"),
+        VirtualProperty("CharaRootMotionRows", "Character Root-Motion Data Rows", "INT32"),
+        VirtualProperty("AnimationPlayRateRows", "Animation Play-Rate Data Rows", "INT32"),
+        VirtualProperty("DataScanTruncated", "Data Candidate Scan Truncated", "BOOL"),
+        VirtualProperty("NativeEvidence", "Native Sprint/Root-Motion Evidence", "STRING"),
+        VirtualProperty("TopDataCandidates", "Top Authored Data Candidates", "STRING"),
+        VirtualProperty("KnownContracts", "Known SDK Contract Classification", "STRING"),
+        VirtualProperty("ScanErrors", "Scan Errors", "STRING"),
+        VirtualProperty("ResearchNotes", "Research Notes", "STRING"),
+    ]
+    values = {
+        "ImplementationReady": bool(result.get("implementationReady", False)),
+        "Blockers": _joined(result.get("blockers", ())),
+        "DataCandidateCount": len(candidates),
+        "DashRootMotionRows": int(field_counts.get("DashRootMotionTranslationScale", 0)),
+        "CharaRootMotionRows": int(field_counts.get("RootMotionTranslationScale", 0)),
+        "AnimationPlayRateRows": int(field_counts.get("AnimationPlayRate", 0)),
+        "DataScanTruncated": bool(result.get("dataScanTruncated", False)),
+        "NativeEvidence": _joined(native_text, limit=32),
+        "TopDataCandidates": _joined(top, limit=24),
+        "KnownContracts": _joined(contract_text, limit=16),
+        "ScanErrors": _joined(result.get("scanErrors", ())),
+        "ResearchNotes": _notes(result),
+    }
+    return _readonly_package(
+        BETTER_SPRINT_PROBE_ASSET, "LexeditorBetterSprintProbe", properties, values, result,
+        tag="Better Sprint Research",
+    )
+
+
 def load_research_virtual_package(game_root: Path, data_root: Path, project_root: Path,
                                   index: dict, asset: str):
     """Run one installed-build research probe and expose a bounded read-only view."""
@@ -347,5 +409,11 @@ def load_research_virtual_package(game_root: Path, data_root: Path, project_root
         from .lockon_probe import probe_better_lockon_sources
 
         return better_lockon_result_package(probe_better_lockon_sources(game_root))
+
+    if asset == BETTER_SPRINT_PROBE_ASSET:
+        from .sprint_probe import probe_better_sprint_sources
+
+        return better_sprint_result_package(
+            probe_better_sprint_sources(game_root, data_root, index))
 
     raise KeyError(f"Unknown FF7R research probe: {asset}")
