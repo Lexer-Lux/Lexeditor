@@ -13,6 +13,11 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
 from .archive import extract_pair
+from .bench_coordinate_probe import (
+    correlate_layout_with_coordinate_evidence,
+    probe_chapter3_bench_coordinate_space,
+)
+from .bench_mutation_probe import analyze_object_layout_mutation_surface
 from .bench_probe import probe_chapter3_bench
 from .dataobject import DataObjectPackage
 
@@ -188,12 +193,40 @@ def correlate_object_layout_rows(
     return correlations
 
 
+def _empty_mutation_research(asset: str = "", error: str = "") -> dict[str, Any]:
+    return {
+        "implementationReady": False,
+        "suppressionAuthorized": False,
+        "asset": asset,
+        "propertyCount": 0,
+        "properties": [],
+        "sector7BenchRowCount": 0,
+        "benchRows": [],
+        "rankedPropertyCandidateCount": 0,
+        "rankedPropertyCandidates": [],
+        "error": error,
+    }
+
+
+def _empty_coordinate_research(error: str = "") -> dict[str, Any]:
+    return {
+        "implementationReady": False,
+        "pairCount": 0,
+        "relativeCoordinateComparablePairCount": 0,
+        "pairs": [],
+        "scanErrors": [],
+        "worldSpaceAdjacencyValidated": False,
+        "suppressionAuthorized": False,
+        "error": error,
+    }
+
+
 def probe_chapter3_bench_with_layout(
     game_root: Path,
     data_root: Path,
     index: dict[str, Any],
 ) -> dict[str, Any]:
-    """Combine map/object evidence with installed ObjectLayout identity evidence."""
+    """Combine map, ObjectLayout, coordinate-parent and mutation-surface evidence."""
     bench_report = probe_chapter3_bench(game_root)
     row = _find_object_layout(index)
     if row is None:
@@ -208,14 +241,25 @@ def probe_chapter3_bench_with_layout(
                 "truncated": False,
                 "error": "ObjectLayout DataObject was not found in the installed catalog",
             },
+            "objectLayoutMutationResearch": _empty_mutation_research(
+                error="ObjectLayout DataObject was not found in the installed catalog"
+            ),
+            "benchCoordinateResearch": _empty_coordinate_research(
+                error="ObjectLayout identity unavailable; coordinate results were not joined"
+            ),
             "objectLayoutCorrelations": [],
             "objectLayoutCorrelationCount": 0,
+            "relativeCoordinateCorrelationCount": 0,
         }
+
+    mutation = _empty_mutation_research(asset=str(row.get("asset", "")))
     try:
         uasset, uexp = extract_pair(game_root, data_root, index, row["asset"])
         package = DataObjectPackage(uasset, uexp, asset=row["asset"])
         layout = classify_object_layout_rows(package)
         layout["error"] = ""
+        mutation = analyze_object_layout_mutation_surface(package, layout)
+        mutation["error"] = ""
     except Exception as error:
         layout = {
             "asset": str(row.get("asset", "")),
@@ -226,17 +270,40 @@ def probe_chapter3_bench_with_layout(
             "truncated": False,
             "error": str(error),
         }
+        mutation = _empty_mutation_research(
+            asset=str(row.get("asset", "")), error=str(error)
+        )
+
     correlations = correlate_object_layout_rows(layout, bench_report)
+    try:
+        coordinate = probe_chapter3_bench_coordinate_space(game_root)
+        coordinate["error"] = ""
+    except Exception as error:
+        coordinate = _empty_coordinate_research(error=str(error))
+    correlations = correlate_layout_with_coordinate_evidence(
+        correlations,
+        coordinate.get("pairs", ()),
+    )
+    relative_coordinate_correlations = sum(
+        bool(row.get("relativeCoordinateDistanceValidated"))
+        for row in correlations
+    )
+
     notes = list(bench_report.get("notes", ()))
     notes.extend([
         "ObjectLayout LevelName + BGActorName provides an independent installed identity bridge from a Sector 7 layout row to a specific cooked actor export.",
         "A layout correlation is accepted only when BGActorName exactly matches the resolved export object and LevelName matches a package path component/stem boundary; fuzzy actor/level matching is not used.",
-        "Even a unique ObjectLayout + export + Vector correlation remains read-only evidence. Suppression requires a proven per-instance mutation path that removes both visible bench and interaction/navigation behavior while preserving the vending actor.",
+        "RootComponent/AttachParent correlation can now prove when the exact bench and vending RelativeLocation vectors share an explicitly serialized coordinate parent; missing AttachParent remains unknown rather than being assumed null.",
+        "The exact installed ObjectLayout bench row is also inventoried for visibility/enable/interaction/action/collision/navigation/state-style property-name leads and observed alternative values, but those names/values do not establish suppression semantics.",
+        "Even a unique ObjectLayout + export + common-parent Vector correlation remains read-only evidence. Suppression requires a proven per-instance mutation path that removes both visible bench and interaction/navigation behavior while preserving the vending actor.",
     ])
     return {
         **bench_report,
         "objectLayoutResearch": layout,
+        "objectLayoutMutationResearch": mutation,
+        "benchCoordinateResearch": coordinate,
         "objectLayoutCorrelations": correlations,
         "objectLayoutCorrelationCount": len(correlations),
+        "relativeCoordinateCorrelationCount": relative_coordinate_correlations,
         "notes": notes,
     }
