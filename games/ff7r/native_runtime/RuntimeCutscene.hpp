@@ -63,21 +63,30 @@ inline bool plausibleNativeGameSpeed(float speed) noexcept {
         && speed <= kMaxPlausibleNativeGameSpeed;
 }
 
+inline bool plausibleOwnedGameSpeed(float speed) noexcept {
+    return std::isfinite(speed)
+        && speed > 0.0F
+        && speed <= kMaxPlausibleAppliedGameSpeed;
+}
+
 // The polling worker has no write notification from AEndGameState::SetGameSpeed.
 // If Lexeditor wrote exactly 1.5 and the game later independently wrote native
 // R2=1.5, value-only polling could not tell those writes apart. Store our applied
-// value one representable float above the logical product instead. The one-ULP
-// delta is negligible for playback but provides an ownership marker: an exact
+// value one representable float away from the logical product instead. The one-
+// ULP delta is negligible for playback but provides an ownership marker: an exact
 // native write becomes observably different even when its logical value equals
 // Lexeditor's previous product.
 inline float tagOwnedGameSpeed(float logicalSpeed) noexcept {
-    if (!std::isfinite(logicalSpeed) || logicalSpeed <= 0.0F) {
+    if (!plausibleOwnedGameSpeed(logicalSpeed)) {
         return 0.0F;
     }
-    const float tagged = std::nextafter(logicalSpeed, std::numeric_limits<float>::infinity());
-    if (!std::isfinite(tagged)
-            || tagged <= 0.0F
-            || tagged > kMaxPlausibleAppliedGameSpeed) {
+    float tagged = std::nextafter(logicalSpeed, std::numeric_limits<float>::infinity());
+    if (!plausibleOwnedGameSpeed(tagged)) {
+        // Preserve the inclusive 64x safety ceiling by tagging downward only at
+        // the upper boundary. It remains distinct from the exact native value.
+        tagged = std::nextafter(logicalSpeed, 0.0F);
+    }
+    if (!plausibleOwnedGameSpeed(tagged) || tagged == logicalSpeed) {
         return 0.0F;
     }
     return tagged;
@@ -101,9 +110,18 @@ inline CutsceneSpeedWritePlan makeCutsceneSpeedWritePlan(
     const CutsceneSpeedTrack& state,
     float currentSpeed,
     double baseMultiplier) noexcept {
-    if (!plausibleNativeGameSpeed(currentSpeed)
-            || !std::isfinite(baseMultiplier)
-            || baseMultiplier <= 1.0) {
+    if (!std::isfinite(baseMultiplier) || baseMultiplier <= 1.0) {
+        return {};
+    }
+
+    const bool currentIsOwned = state.initialized
+        && currentSpeed == state.lastAppliedSpeed;
+    if (currentIsOwned) {
+        if (!plausibleOwnedGameSpeed(currentSpeed)
+                || !plausibleNativeGameSpeed(state.nativeSpeed)) {
+            return {};
+        }
+    } else if (!plausibleNativeGameSpeed(currentSpeed)) {
         return {};
     }
 
@@ -112,10 +130,7 @@ inline CutsceneSpeedWritePlan makeCutsceneSpeedWritePlan(
     // Any exact game write differs from the one-ULP ownership tag, so even a
     // native transition whose scalar equals our previous logical product is
     // detected and composed rather than mistaken for our own write.
-    float nativeSpeed = currentSpeed;
-    if (state.initialized && currentSpeed == state.lastAppliedSpeed) {
-        nativeSpeed = state.nativeSpeed;
-    }
+    const float nativeSpeed = currentIsOwned ? state.nativeSpeed : currentSpeed;
     if (!plausibleNativeGameSpeed(nativeSpeed)) {
         return {};
     }
@@ -127,7 +142,7 @@ inline CutsceneSpeedWritePlan makeCutsceneSpeedWritePlan(
         return {};
     }
     const float logicalApplied = static_cast<float>(desired);
-    if (!std::isfinite(logicalApplied) || logicalApplied <= 0.0F) {
+    if (!plausibleOwnedGameSpeed(logicalApplied)) {
         return {};
     }
     const float taggedApplied = tagOwnedGameSpeed(logicalApplied);
