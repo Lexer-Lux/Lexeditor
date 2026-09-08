@@ -123,7 +123,7 @@ with sync_playwright() as p:
                 text:{left:tb.left,right:tb.right,width:tb.width},
                 help:hb?{left:hb.left,right:hb.right,top:hb.top,bottom:hb.bottom,width:hb.width,height:hb.height,center:hb.left+hb.width/2}:null,
                 glyph:gb?{left:gb.left,right:gb.right,top:gb.top,bottom:gb.bottom,width:gb.width,height:gb.height,
-                  centerX:gb.left+gb.width/2,centerY:gb.top+gb.height/2,fontFamily:hs.fontFamily,transform:gs.transform}:null};
+                  centerX:gb.left+gb.width/2,centerY:gb.top+gb.height/2,fontFamily:hs.fontFamily,top:gs.top}:null};
             }""")
             assert first_geom['label']['scrollWidth'] <= first_geom['label']['clientWidth'] + 1, (width, 'property label overflows horizontally', first_geom)
             assert first_geom['label']['scrollHeight'] <= first_geom['label']['clientHeight'] + 1, (width, 'property label changes row height/overflows vertically', first_geom)
@@ -138,7 +138,7 @@ with sync_playwright() as p:
                 assert abs(glyph['centerX'] - bubble_cx) <= 0.75, (width, 'info bubble ? is not horizontally centered', first_geom)
                 assert abs(glyph['centerY'] - bubble_cy) <= 1.0, (width, 'info bubble ? is not vertically centered', first_geom)
                 assert 'Segoe UI Symbol' in glyph['fontFamily'], (width, 'info bubble inherited game typography', glyph)
-                assert glyph['transform'] != 'none', (width, 'info bubble lost its optical punctuation adjustment', glyph)
+                assert glyph['top'] == '-0.5px', (width, 'info bubble lost its optical punctuation adjustment', glyph)
 
             enabled = page.locator('.lex-boolean-field').first
             bool_ref = enabled.evaluate("""e=>{

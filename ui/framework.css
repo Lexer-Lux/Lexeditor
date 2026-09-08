@@ -412,8 +412,11 @@ button.lex-info-help { cursor: pointer; }
   height: 100%;
   place-items: center;
   line-height: 1;
-  /* Punctuation sits optically low in the font's line box. */
-  transform: translateY(-0.5px);
+  /* Punctuation sits optically low in the font's line box.  Use relative
+     positioning rather than transform: label-fitting code may legitimately
+     own transforms on descendants. */
+  position: relative;
+  top: -0.5px;
 }
 
 .lex-help-popover {
