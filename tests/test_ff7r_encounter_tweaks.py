@@ -183,8 +183,8 @@ def test_discovers_unique_tnnl4_two_flame_two_turret_encounter(monkeypatch, tmp_
     assert candidate["unexpectedParallelArrayLengths"] == []
 
 
-def _discovery_fixture(asset: str) -> dict:
-    ids = ["EN_Flame_A", "EN_Turret", "EN_Flame_B", "EN_Turret"]
+def _discovery_fixture(asset: str, ids=None) -> dict:
+    ids = list(ids or ["EN_Flame_A", "EN_Turret", "EN_Flame_B", "EN_Turret"])
     return {
         "language": "US",
         "battleSceneAsset": asset,
@@ -212,6 +212,13 @@ def _discovery_fixture(asset: str) -> dict:
         "errors": [],
         "notes": [],
     }
+
+
+def _enable_tweak(project):
+    encounters.save_encounter_config(
+        project,
+        {"schemaVersion": encounters.ENCOUNTER_SCHEMA_VERSION, "chapter5SubwayReducedTurret": True},
+    )
 
 
 def test_materializer_removes_same_turret_slot_from_all_parallel_arrays(monkeypatch, tmp_path):
@@ -249,10 +256,7 @@ def test_materializer_removes_same_turret_slot_from_all_parallel_arrays(monkeypa
     original_uexp = source_uexp.read_bytes()
 
     project = tmp_path / "project"
-    encounters.save_encounter_config(
-        project,
-        {"schemaVersion": encounters.ENCOUNTER_SCHEMA_VERSION, "chapter5SubwayReducedTurret": True},
-    )
+    _enable_tweak(project)
     discovery = _discovery_fixture(asset)
     monkeypatch.setattr(
         encounters, "discover_chapter5_subway_encounter", lambda *_args, **_kwargs: discovery
@@ -293,6 +297,55 @@ def test_materializer_removes_same_turret_slot_from_all_parallel_arrays(monkeypa
     assert len(source_package.entries[0].values["BattleCharaSpecID_Array"]) == 4
 
 
+def test_materializer_supports_two_distinct_turret_specs(monkeypatch, tmp_path):
+    asset = "End/Content/GameContents/DataObject/BattleScene"
+    ids = ["EN_Flame_A", "EN_Turret_A", "EN_Flame_B", "EN_Turret_B"]
+    uasset, uexp = _fixture_dataobject(
+        [
+            ("BattleCharaSpecID_Array", NAME),
+            ("Level_Array", BYTE),
+            ("RoleType_Array", INT32),
+        ],
+        [
+            (
+                "btsc_tnnl4_305",
+                {
+                    "BattleCharaSpecID_Array": ids,
+                    "Level_Array": [11, 12, 13, 14],
+                    "RoleType_Array": [101, 102, 103, 104],
+                },
+            )
+        ],
+        export_name="BattleScene",
+    )
+    source = tmp_path / "source-distinct"
+    source.mkdir()
+    source_uasset = source / "BattleScene.uasset"
+    source_uexp = source / "BattleScene.uexp"
+    source_uasset.write_bytes(uasset)
+    source_uexp.write_bytes(uexp)
+
+    project = tmp_path / "project-distinct"
+    _enable_tweak(project)
+    discovery = _discovery_fixture(asset, ids)
+    monkeypatch.setattr(
+        encounters, "discover_chapter5_subway_encounter", lambda *_args, **_kwargs: discovery
+    )
+    monkeypatch.setattr(
+        encounters, "extract_pair", lambda *_args, **_kwargs: (source_uasset, source_uexp)
+    )
+
+    result = encounters.materialize_encounter_tweaks(
+        tmp_path / "game", tmp_path / "data", project, {}, tmp_path / "staging-distinct"
+    )
+    assert result[0]["removedBattleCharaSpecId"] == "EN_Turret_B"
+    assert result[0]["resultBattleCharaSpecIds"] == [
+        "EN_Flame_A",
+        "EN_Turret_A",
+        "EN_Flame_B",
+    ]
+
+
 def test_disabled_encounter_tweak_does_not_materialize(monkeypatch, tmp_path):
     called = False
 
@@ -311,10 +364,7 @@ def test_disabled_encounter_tweak_does_not_materialize(monkeypatch, tmp_path):
 
 def test_materializer_fails_closed_on_ambiguous_or_misaligned_encounter(monkeypatch, tmp_path):
     project = tmp_path / "project"
-    encounters.save_encounter_config(
-        project,
-        {"schemaVersion": encounters.ENCOUNTER_SCHEMA_VERSION, "chapter5SubwayReducedTurret": True},
-    )
+    _enable_tweak(project)
 
     ambiguous = _discovery_fixture("End/Content/GameContents/DataObject/BattleScene")
     ambiguous["candidateCount"] = 2
