@@ -164,3 +164,105 @@ def analyze_controlled_save_pairs(
             "No save file is parsed or modified.",
         ],
     }
+
+
+def analyze_controlled_experiment_groups(
+    groups: dict[str, Sequence[SavePair]],
+    control_pairs: Sequence[SavePair],
+) -> dict[str, Any]:
+    """Subtract stable no-op-save offsets from cross-enemy Assess experiments."""
+    if not groups:
+        raise ValueError("at least one named Assess experiment group is required")
+    if not control_pairs:
+        raise ValueError("at least one no-op control before/after pair is required")
+    if any(not isinstance(pair, SavePair) for pair in control_pairs):
+        raise TypeError("control_pairs must contain SavePair values")
+
+    normalized: dict[str, tuple[SavePair, ...]] = {}
+    for raw_name, raw_pairs in groups.items():
+        name = str(raw_name).strip()
+        if not name:
+            raise ValueError("Assess experiment group names must be non-empty")
+        pairs = tuple(raw_pairs)
+        if not pairs:
+            raise ValueError(f"Assess experiment group {name!r} has no pairs")
+        if any(not isinstance(pair, SavePair) for pair in pairs):
+            raise TypeError(f"Assess experiment group {name!r} must contain SavePair values")
+        normalized[name] = pairs
+
+    # Reuse the base analyzer so all existing cross-enemy hypotheses and safety
+    # notes remain visible alongside the stricter no-op subtraction layer.
+    from .save_diff_probe import analyze_experiment_groups
+
+    group_analysis = analyze_experiment_groups(normalized)
+    control = analyze_save_pairs(control_pairs)
+    control_stable = _stable_offsets(control_pairs)
+    stable_by_group = {
+        name: _stable_offsets(pairs)
+        for name, pairs in normalized.items()
+    }
+    candidates_by_group = {
+        name: stable - control_stable
+        for name, stable in stable_by_group.items()
+    }
+    candidate_union = set.union(*candidates_by_group.values()) if candidates_by_group else set()
+    shared_candidates = set.intersection(*candidates_by_group.values()) if candidates_by_group else set()
+    discriminating_candidates = candidate_union - shared_candidates
+
+    rows = []
+    for name, pairs in normalized.items():
+        candidates = candidates_by_group[name]
+        others = set.union(*(
+            offsets for other_name, offsets in candidates_by_group.items()
+            if other_name != name
+        )) if len(candidates_by_group) > 1 else set()
+        exclusive = candidates - others
+        transforms = _candidate_transforms(pairs, candidates)
+        rows.append({
+            "name": name,
+            "rawStableByteCount": len(stable_by_group[name]),
+            "controlSubtractedByteCount": len(candidates),
+            "controlSubtractedOffsets": sorted(candidates)[:MAX_REPORTED_OFFSETS],
+            "controlSubtractedOffsetsTruncated": len(candidates) > MAX_REPORTED_OFFSETS,
+            "exclusiveCandidateByteCount": len(exclusive),
+            "exclusiveCandidateOffsets": sorted(exclusive)[:MAX_REPORTED_OFFSETS],
+            "exclusiveCandidateOffsetsTruncated": len(exclusive) > MAX_REPORTED_OFFSETS,
+            "candidateTransforms": transforms[:MAX_REPORTED_OFFSETS],
+            "candidateTransformsTruncated": len(transforms) > MAX_REPORTED_OFFSETS,
+        })
+
+    bitset_leads = [
+        row for row in group_analysis.get("sameOffsetDifferentXorCandidates", ())
+        if int(row.get("offset", -1)) not in control_stable
+    ]
+    all_experiment_pairs = tuple(
+        pair
+        for pairs in normalized.values()
+        for pair in pairs
+    )
+    baseline = _baseline_report(all_experiment_pairs, control_pairs)
+
+    return {
+        "groupAnalysis": group_analysis,
+        "control": control,
+        "baseline": baseline,
+        "controlStableByteCount": len(control_stable),
+        "controlStableOffsets": sorted(control_stable)[:MAX_REPORTED_OFFSETS],
+        "controlStableOffsetsTruncated": len(control_stable) > MAX_REPORTED_OFFSETS,
+        "groups": rows,
+        "sharedCandidateByteCount": len(shared_candidates),
+        "sharedCandidateOffsets": sorted(shared_candidates)[:MAX_REPORTED_OFFSETS],
+        "sharedCandidateOffsetsTruncated": len(shared_candidates) > MAX_REPORTED_OFFSETS,
+        "discriminatingCandidateByteCount": len(discriminating_candidates),
+        "discriminatingCandidateOffsets": sorted(discriminating_candidates)[:MAX_REPORTED_OFFSETS],
+        "discriminatingCandidateOffsetsTruncated": len(discriminating_candidates) > MAX_REPORTED_OFFSETS,
+        "sameOffsetDifferentXorCandidates": bitset_leads[:MAX_REPORTED_OFFSETS],
+        "sameOffsetDifferentXorCandidatesTruncated": len(bitset_leads) > MAX_REPORTED_OFFSETS,
+        "notes": [
+            "Cross-enemy candidate offsets are stable inside an enemy's repeated Assess runs after removing offsets stable in the no-op save controls.",
+            "Offsets shared by every enemy after control subtraction can still be Assess-action metadata rather than the per-enemy state; enemy-exclusive or different-XOR candidates remain stronger leads.",
+            "sameOffsetDifferentXorCandidates excludes any byte that is itself stable in the no-op controls, but still does not prove a packed EnemyBook bitset.",
+            "Use byte-identical duplicated pre-Assessment baselines whenever possible; baseline.byteIdentical reports whether that condition actually held.",
+            "No save file is parsed or modified.",
+        ],
+    }
