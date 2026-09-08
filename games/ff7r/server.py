@@ -8,10 +8,12 @@ import mimetypes
 import os
 from pathlib import Path
 import shutil
+from tempfile import TemporaryDirectory
 import threading
 from urllib.parse import parse_qs, urlparse
 
 from .archive import build_index, preferred_pak_version
+from .atb_tweaks import has_enabled_data_overrides, materialize_atb_overrides
 from .minimap_semantics import (
     ENEMY_TERRITORY_TABLE_NAME,
     HIDE_NAVIMAP_FIELD,
@@ -123,6 +125,8 @@ def data_map_payload() -> dict:
             semantic.append("enemy normal/rare drops, chances and steal data")
         if asset_name == ENEMY_TERRITORY_TABLE_NAME:
             semantic.append("authored minimap forced-hide flags when HideNavimap is a scalar boolean")
+        if str(item.get("group", "")) == "Lexeditor ATB":
+            semantic.append("reversible ATB tweak config materialized only when the ATB tweak is enabled")
         controls = (
             "Structured DataObject records; booleans, fixed-width numbers, floats "
             "and existing FNames are editable."
@@ -197,11 +201,34 @@ def info_payload() -> dict:
 
 def build_mod() -> dict:
     content = PROJECT_ROOT / "content"
-    if not content.is_dir() or not any(path.is_file() for path in content.rglob("*")):
+    has_content = content.is_dir() and any(path.is_file() for path in content.rglob("*"))
+    has_atb = has_enabled_data_overrides(PROJECT_ROOT)
+    if not has_content and not has_atb:
         raise RuntimeError("The FF7R project has no saved edits to build")
+
     target = PROJECT_ROOT / "build" / "Lexeditor-FF7R_P.pak"
-    pack_directory(content, target, version=preferred_pak_version(catalog()))
-    return {"path": str(target), "size": target.stat().st_size}
+    if not has_atb:
+        pack_directory(content, target, version=preferred_pak_version(catalog()))
+        return {"path": str(target), "size": target.stat().st_size, "atbMaterialized": []}
+
+    # ATB semantic overrides never live permanently in project/content. Compose
+    # them over any existing project edits in a temporary staging tree, pack the
+    # result, and then discard the generated DataObjects.
+    with TemporaryDirectory(prefix="lexeditor-ff7r-build-") as temp_name:
+        staging = Path(temp_name) / "content"
+        staging.mkdir(parents=True, exist_ok=True)
+        if has_content:
+            shutil.copytree(content, staging, dirs_exist_ok=True)
+        materialized = materialize_atb_overrides(
+            GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), staging)
+        if not any(path.is_file() for path in staging.rglob("*")):
+            raise RuntimeError("Enabled FF7R ATB tweaks produced no buildable DataObject edits")
+        pack_directory(staging, target, version=preferred_pak_version(catalog()))
+    return {
+        "path": str(target),
+        "size": target.stat().st_size,
+        "atbMaterialized": materialized,
+    }
 
 
 def deploy_mod() -> dict:
