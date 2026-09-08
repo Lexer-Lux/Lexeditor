@@ -1,0 +1,226 @@
+name: FF7 equipment KERNEL bootstrap
+
+on:
+  push:
+    branches:
+      - work/ff7-complete-kernel-surface
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/ff7-complete-kernel-surface
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Expose documented item and equipment fields
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('games/ff7/kernel.py')
+          s=p.read_text()
+          replacements={
+          '''        Category("items", "Items", 5, 20, 12, 28, (
+            Field("cameraMovementId", "Camera movement ID", 0x08, "H", maximum=65535),
+            Field("targetData", "Target flags", 0x0C),
+            Field("attackEffectId", "Attack effect ID", 0x0D),
+            Field("damageCalculationId", "Damage calculation ID", 0x0E),
+            Field("attackPower", "Attack power", 0x0F),
+            Field("conditionSubmenu", "Condition submenu", 0x10),
+            Field("statusChange", "Status change", 0x11),
+            Field("additionalEffects", "Additional effects", 0x12),
+            Field("additionalEffectsModifier", "Effect modifier", 0x13),
+            Field("statusFlags", "Status flags", 0x14, "I", maximum=0xFFFFFFFF),
+            Field("elementFlags", "Element flags", 0x18, "H", maximum=0xFFFF),
+        )),''':
+          '''        Category("items", "Items", 5, 20, 12, 28, (
+            Field("cameraMovementId", "Camera movement ID", 0x08, "H", maximum=65535),
+            Field("restrictions", "Usage restrictions", 0x0A, "H", maximum=0xFFFF),
+            Field("targetData", "Target flags", 0x0C),
+            Field("attackEffectId", "Attack effect ID", 0x0D),
+            Field("damageCalculationId", "Damage calculation ID", 0x0E),
+            Field("attackPower", "Attack power", 0x0F),
+            Field("conditionSubmenu", "Condition submenu", 0x10),
+            Field("statusChange", "Status change", 0x11),
+            Field("additionalEffects", "Additional effects", 0x12),
+            Field("additionalEffectsModifier", "Effect modifier", 0x13),
+            Field("statusFlags", "Status flags", 0x14, "I", maximum=0xFFFFFFFF),
+            Field("elementFlags", "Element flags", 0x18, "H", maximum=0xFFFF),
+            Field("specialAttackFlags", "Special attack flags", 0x1A, "H", maximum=0xFFFF),
+        )),''',
+          '''        Category("weapons", "Weapons", 6, 21, 13, 44, (
+            Field("targetData", "Target flags", 0x00),
+            Field("damageCalculationId", "Damage calculation ID", 0x02),
+            Field("attackStrength", "Attack strength", 0x04),
+            Field("status", "Equipment status", 0x05),
+            Field("growthRate", "Materia growth rate", 0x06),
+            Field("criticalRate", "Critical rate", 0x07),
+            Field("accuracyRate", "Accuracy rate", 0x08),
+            Field("weaponModelId", "Weapon model ID", 0x09),
+            Field("equipableBy", "Equipable-by flags", 0x0E, "H", maximum=0xFFFF),
+            Field("attackElements", "Attack element flags", 0x10, "H", maximum=0xFFFF),
+        )),''':
+          '''        Category("weapons", "Weapons", 6, 21, 13, 44, (
+            Field("targetData", "Target flags", 0x00),
+            Field("damageCalculationId", "Damage calculation ID", 0x02),
+            Field("attackStrength", "Attack strength", 0x04),
+            Field("status", "Equipment status", 0x05),
+            Field("growthRate", "Materia growth rate", 0x06),
+            Field("criticalRate", "Critical rate", 0x07),
+            Field("accuracyRate", "Accuracy rate", 0x08),
+            Field("weaponModelId", "Weapon model ID", 0x09),
+            Field("highSoundIdMask", "High sound ID mask", 0x0B),
+            Field("equipableBy", "Equipable-by flags", 0x0E, "H", maximum=0xFFFF),
+            Field("attackElements", "Attack element flags", 0x10, "H", maximum=0xFFFF),
+            *(Field(f"boostedStat{i}", f"Boosted stat {i}", 0x13 + i) for i in range(1, 5)),
+            *(Field(f"boostedStat{i}Bonus", f"Stat {i} bonus", 0x17 + i) for i in range(1, 5)),
+            *(Field(f"materiaSlot{i}", f"Materia slot {i}", 0x1B + i) for i in range(1, 9)),
+            Field("normalHitSoundId", "Normal hit sound ID", 0x24),
+            Field("criticalHitSoundId", "Critical hit sound ID", 0x25),
+            Field("missedAttackSoundId", "Missed attack sound ID", 0x26),
+            Field("impactEffectId", "Impact effect ID", 0x27),
+            Field("restrictions", "Usage restrictions", 0x2A, "H", maximum=0xFFFF),
+        )),''',
+          '''        Category("armor", "Armor", 7, 22, 14, 36, (
+            Field("elementDamageModifier", "Element damage modifier", 0x01),
+            Field("defense", "Defense", 0x02),
+            Field("magicDefense", "Magic defense", 0x03),
+            Field("evade", "Evade", 0x04),
+            Field("magicEvade", "Magic evade", 0x05),
+            Field("status", "Equipment status", 0x06),
+            Field("growthRate", "Materia growth rate", 0x11),
+            Field("equipableBy", "Equipable-by flags", 0x12, "H", maximum=0xFFFF),
+            Field("elementalDefense", "Element defense flags", 0x14, "H", maximum=0xFFFF),
+        )),''':
+          '''        Category("armor", "Armor", 7, 22, 14, 36, (
+            Field("elementDamageModifier", "Element damage modifier", 0x01),
+            Field("defense", "Defense", 0x02),
+            Field("magicDefense", "Magic defense", 0x03),
+            Field("evade", "Evade", 0x04),
+            Field("magicEvade", "Magic evade", 0x05),
+            Field("status", "Equipment status", 0x06),
+            *(Field(f"materiaSlot{i}", f"Materia slot {i}", 0x08 + i) for i in range(1, 9)),
+            Field("growthRate", "Materia growth rate", 0x11),
+            Field("equipableBy", "Equipable-by flags", 0x12, "H", maximum=0xFFFF),
+            Field("elementalDefense", "Element defense flags", 0x14, "H", maximum=0xFFFF),
+            *(Field(f"boostedStat{i}", f"Boosted stat {i}", 0x17 + i) for i in range(1, 5)),
+            *(Field(f"boostedStat{i}Bonus", f"Stat {i} bonus", 0x1B + i) for i in range(1, 5)),
+            Field("restrictions", "Usage restrictions", 0x20, "H", maximum=0xFFFF),
+        )),''',
+          '''            Field("statusDefense", "Status defense flags", 0x08, "I", maximum=0xFFFFFFFF),
+            Field("equipableBy", "Equipable-by flags", 0x0C, "H", maximum=0xFFFF),
+        )),''':
+          '''            Field("statusDefense", "Status defense flags", 0x08, "I", maximum=0xFFFFFFFF),
+            Field("equipableBy", "Equipable-by flags", 0x0C, "H", maximum=0xFFFF),
+            Field("restrictions", "Usage restrictions", 0x0E, "H", maximum=0xFFFF),
+        )),''',
+          }
+          for old,new in replacements.items():
+              if old not in s: raise SystemExit('kernel equipment insertion point changed')
+              s=s.replace(old,new,1)
+          p.write_text(s)
+
+          p=Path('games/ff7/semantics.py')
+          s=p.read_text()
+          marker='''COMMAND_ACTIONS = (
+    (0x00, "Perform command using target data"), (0x01, "Magic menu"),
+    (0x02, "Summon menu"), (0x03, "Item menu"), (0x04, "Enemy Skill menu"),
+    (0x05, "Throw menu"), (0x06, "Limit menu"),
+    (0x07, "Enable target selection via cursor"), (0x08, "W-Magic menu"),
+    (0x09, "W-Summon menu"), (0x0A, "W-Item menu"), (0x0B, "Coin menu"),
+    (0xFF, "No initial cursor action"),
+)
+'''
+          addition=marker+'''RESTRICTION_FLAGS = (
+    (0x0001, "Can be sold"), (0x0002, "Can be used in battle"),
+    (0x0004, "Can be used from the menu"), (0x0008, "Can be thrown"),
+)
+MATERIA_SLOTS = (
+    (0, "No slot"), (1, "Unlinked — no AP growth"),
+    (2, "Linked left — no AP growth"), (3, "Linked right — no AP growth"),
+    (5, "Unlinked"), (6, "Linked left"), (7, "Linked right"),
+)
+'''
+          if marker not in s: raise SystemExit('semantic constants insertion point changed')
+          s=s.replace(marker,addition,1)
+          s=s.replace('''        "elementFlags": _field(label="Elements", dataType="flags", flags=flags(*ELEMENTS), group="Effect", help="Elemental tags used by the battle engine."),
+        "cameraMovementId": advanced''','''        "elementFlags": _field(label="Elements", dataType="flags", flags=flags(*ELEMENTS), group="Effect", help="Elemental tags used by the battle engine."),
+        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Where this item is allowed to be sold or used. KERNEL.BIN stores these permission bits inverted."),
+        "specialAttackFlags": _field(label="Special attack properties", dataType="flags", flags=flags(*SPECIAL_ATTACK_FLAGS), invertBits=True, bitWidth=16, group="Effect", help="Special battle properties such as reflection, defense bypass or MP damage. KERNEL.BIN stores these bits inverted."),
+        "cameraMovementId": advanced''',1)
+          s=s.replace('''        "attackElements": _field(label="Attack elements", dataType="flags", flags=flags(*ELEMENTS), group="Combat", help="Elements applied by the weapon's basic attack."),
+        "weaponModelId": advanced("Weapon model ID", "Raw model index used by the battle renderer; no authoritative model-name table is currently exposed."),
+    },''','''        "attackElements": _field(label="Attack elements", dataType="flags", flags=flags(*ELEMENTS), group="Combat", help="Elements applied by the weapon's basic attack."),
+        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Whether this weapon may be sold, used in battle/menu contexts, or thrown. KERNEL.BIN stores these permission bits inverted."),
+        "weaponModelId": advanced("Weapon model ID", "Raw model index used by the battle renderer; no authoritative model-name table is currently exposed."),
+        "highSoundIdMask": advanced("Sound ID high-bit mask", "Raw high-bit selector used with this weapon's hit/miss sound IDs."),
+        "normalHitSoundId": advanced("Normal hit sound ID", "Raw sound-effect selector for a normal weapon hit."),
+        "criticalHitSoundId": advanced("Critical hit sound ID", "Raw sound-effect selector for a critical weapon hit."),
+        "missedAttackSoundId": advanced("Miss sound ID", "Raw sound-effect selector for a missed weapon attack."),
+        "impactEffectId": advanced("Impact effect ID", "Raw impact visual-effect selector for this weapon."),
+        **{f"boostedStat{i}": _field(label=f"Stat bonus {i}", dataType="enum", choices=choices(*CHARACTER_STATS), group="Stat bonuses", help=f"Character stat modified by equipment bonus slot {i}.") for i in range(1,5)},
+        **{f"boostedStat{i}Bonus": _field(label=f"Stat bonus {i} amount", group="Stat bonuses", help=f"Amount added to equipment stat bonus slot {i}.") for i in range(1,5)},
+        **{f"materiaSlot{i}": _field(label=f"Materia slot {i}", dataType="enum", choices=choices(*MATERIA_SLOTS), group="Materia slots", help="Whether this position exists, links to its neighbor, and supports AP growth.") for i in range(1,9)},
+    },''',1)
+          s=s.replace('''        "elementalDefense": _field(label="Affected elements", dataType="flags", flags=flags(*ELEMENTS), group="Elemental defense", help="Elements affected by Elemental response."),
+    },
+    "accessories": {''','''        "elementalDefense": _field(label="Affected elements", dataType="flags", flags=flags(*ELEMENTS), group="Elemental defense", help="Elements affected by Elemental response."),
+        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Whether this armor may be sold, used in battle/menu contexts, or thrown. KERNEL.BIN stores these permission bits inverted."),
+        **{f"boostedStat{i}": _field(label=f"Stat bonus {i}", dataType="enum", choices=choices(*CHARACTER_STATS), group="Stat bonuses", help=f"Character stat modified by equipment bonus slot {i}.") for i in range(1,5)},
+        **{f"boostedStat{i}Bonus": _field(label=f"Stat bonus {i} amount", group="Stat bonuses", help=f"Amount added to equipment stat bonus slot {i}.") for i in range(1,5)},
+        **{f"materiaSlot{i}": _field(label=f"Materia slot {i}", dataType="enum", choices=choices(*MATERIA_SLOTS), group="Materia slots", help="Whether this position exists, links to its neighbor, and supports AP growth.") for i in range(1,9)},
+    },
+    "accessories": {''',1)
+          s=s.replace('''        "equipableBy": _field(label="Usable by", dataType="flags", flags=flags(*EQUIPABLE), group="Equipment", help="Characters allowed to equip this accessory."),
+    },''','''        "equipableBy": _field(label="Usable by", dataType="flags", flags=flags(*EQUIPABLE), group="Equipment", help="Characters allowed to equip this accessory."),
+        "restrictions": _field(label="Availability / permissions", dataType="flags", flags=flags(*RESTRICTION_FLAGS), invertBits=True, bitWidth=16, group="Availability", help="Whether this accessory may be sold, used in battle/menu contexts, or thrown. KERNEL.BIN stores these permission bits inverted."),
+    },''',1)
+          p.write_text(s)
+
+          p=Path('tools/verify_ff7_semantic_surface.py')
+          s=p.read_text()
+          s=s.replace('''            "items":{"targetData":"flags","damageCalculationId":"enum","statusChange":"statusChange","statusFlags":"flags","elementFlags":"flags"},
+            "weapons":{"targetData":"flags","damageCalculationId":"enum","growthRate":"enum","equipableBy":"flags","attackElements":"flags"},
+            "armor":{"elementDamageModifier":"enum","status":"enum","growthRate":"enum","equipableBy":"flags","elementalDefense":"flags"},
+            "accessories":{"boostedStat1":"enum","specialEffect":"enum","elementalDefense":"flags","statusDefense":"flags","equipableBy":"flags"},''','''            "items":{"targetData":"flags","damageCalculationId":"enum","statusChange":"statusChange","statusFlags":"flags","elementFlags":"flags","restrictions":"flags","specialAttackFlags":"flags"},
+            "weapons":{"targetData":"flags","damageCalculationId":"enum","growthRate":"enum","equipableBy":"flags","attackElements":"flags","boostedStat1":"enum","materiaSlot1":"enum","restrictions":"flags"},
+            "armor":{"elementDamageModifier":"enum","status":"enum","growthRate":"enum","equipableBy":"flags","elementalDefense":"flags","boostedStat1":"enum","materiaSlot1":"enum","restrictions":"flags"},
+            "accessories":{"boostedStat1":"enum","specialEffect":"enum","elementalDefense":"flags","statusDefense":"flags","equipableBy":"flags","restrictions":"flags"},''',1)
+          marker='''        self.assertTrue(meta["playerAttacks"]["specialAttackFlags"]["invertBits"])
+'''
+          addition=marker+'''        for category in ("items","weapons","armor","accessories"):
+            self.assertTrue(meta[category]["restrictions"]["invertBits"],category)
+            self.assertEqual(meta[category]["restrictions"]["bitWidth"],16,category)
+        self.assertTrue(meta["items"]["specialAttackFlags"]["invertBits"])
+        self.assertEqual([c["value"] for c in meta["weapons"]["materiaSlot1"]["choices"]],[0,1,2,3,5,6,7])
+'''
+          if marker not in s: raise SystemExit('semantic test insertion point changed')
+          s=s.replace(marker,addition,1)
+          p.write_text(s)
+          PY
+      - name: Run FF7 binary and semantic regressions
+        run: |
+          python tools/verify_ff7_datasets.py
+          python tools/verify_ff7_accessories.py
+          python tools/verify_ff7_semantic_surface.py
+          python tools/verify_ff7_extended.py
+          python tools/verify_ff7_completion.py
+          python tools/verify_ff7_materia_semantics.py
+      - name: Commit equipment surface
+        shell: bash
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add games/ff7/kernel.py games/ff7/semantics.py tools/verify_ff7_semantic_surface.py
+          git commit -m "Expose documented FF7 item and equipment fields"
+          git push origin HEAD:work/ff7-complete-kernel-surface
