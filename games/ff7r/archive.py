@@ -38,6 +38,14 @@ GRAPHICS_VIRTUAL_ASSET_ROWS = (
         "synthetic": "graphics-tweaks",
     },
 )
+TWEAK_VIRTUAL_ASSET_ROWS = (
+    {
+        "asset": "Lexeditor/NoMoreCheats",
+        "name": "No More Cheats",
+        "group": "Lexeditor Tweaks",
+        "synthetic": "no-more-cheats",
+    },
+)
 
 
 def _normalize(path: str) -> str:
@@ -102,6 +110,7 @@ def _with_virtual_assets(payload: dict) -> dict:
         *ATB_VIRTUAL_ASSET_ROWS,
         *ENCOUNTER_VIRTUAL_ASSET_ROWS,
         *GRAPHICS_VIRTUAL_ASSET_ROWS,
+        *TWEAK_VIRTUAL_ASSET_ROWS,
         *RESEARCH_VIRTUAL_ASSET_ROWS,
         *VIRTUAL_ASSET_ROWS,
     ):
