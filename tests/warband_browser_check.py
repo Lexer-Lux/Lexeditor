@@ -112,7 +112,7 @@ def main():
                     assert page.locator('.warband-item-detail [data-lex-property="name"] input').is_enabled()
                     assert page.locator('.warband-item-detail [data-lex-property="stats"] textarea').is_enabled()
                     assert page.get_by_role('button',name='Open model preview',exact=True).count()==0
-                    results.append({'width':width,'height':height,'dataMap':metrics,'webglAvailable':webgl,'status':'passed'})
+                    results.append({'width':width,'height':height,'dataMap':metrics,'status':'passed'})
                     page.close()
             finally:browser.close()
         (ARTIFACTS/'results.json').write_text(json.dumps({'fixtureOnly':True,'results':results,'errors':errors},indent=2))
