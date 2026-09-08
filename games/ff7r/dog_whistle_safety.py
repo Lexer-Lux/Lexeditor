@@ -72,9 +72,12 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
     correlated_key_items = list(chapter.get("referencedKeyItemsThatAreItemRows", ()))
     add_key_item_present = bool(chapter.get("addKeyItemPropertyPresent", False))
     chapter4_candidates = list(chapter.get("chapter4Candidates", ()))
+    # A missing field is not equivalent to a proved empty AddKeyItem array. The
+    # table-level property flag can be true even when a candidate row was emitted
+    # without row-level array evidence, so require the key itself plus list shape.
     chapter4_with_award_field = [
         row for row in chapter4_candidates
-        if isinstance(row.get("addKeyItems", []), list)
+        if "addKeyItems" in row and isinstance(row["addKeyItems"], list)
     ]
 
     native_needles = (
@@ -173,6 +176,8 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
     elif not data_award_path_plausible:
         if len(chapter4_candidates) != 1:
             blockers.append("chapter4-row-unresolved-or-ambiguous")
+        if len(chapter4_with_award_field) != 1:
+            blockers.append("chapter4-award-array-unresolved")
         blockers.append("chapter-reward-contract-unproved")
     else:
         blockers.append("chapter4-once-only-award-semantics-unvalidated")
@@ -245,6 +250,7 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             "addKeyItemPropertyPresent": add_key_item_present,
             "ordinaryItemRowCorrelationCount": len(correlated_key_items),
             "chapter4CandidateCount": len(chapter4_candidates),
+            "chapter4AwardArrayCandidateCount": len(chapter4_with_award_field),
             "dataAwardPathPlausible": data_award_path_plausible,
             "writerSupportsArrayAppend": writer_supports_array_append,
         },
@@ -275,6 +281,7 @@ def assess_dog_whistle_probe(report: dict[str, Any]) -> dict[str, Any]:
             "Item.AbilityID must resolve to an installed BattleAbility row before that template contributes executable-path evidence; unresolved IDs remain explicit blockers.",
             "Only linked BattleAbility rows classified as the generated Item command category count as battle-usable item template evidence; arbitrary AbilityID links do not.",
             "The writer can clone proved Item/BattleAbility templates, resize scalar FString IDs, and append localized top-level text IDs without expanding package name maps. Exact template behavior and item-use interception still require installed evidence.",
+            "A Chapter 4 candidate counts as reward evidence only when that row explicitly exposes an addKeyItems list; a missing row field is not treated as an empty award array.",
             "Fixed-width array insertion can append the eventual new Item row tag to a proved Chapter 4 AddKeyItem_Array without replacing another reward; exact once-only semantics still require validation.",
             "The reflected retarget route is explicit: GetEnemyMembersRef -> GetBattleCharaSpec_DataTableID -> canine set filter -> AI lookup -> SetTarget(user). Every callsite/ABI and user-character mapping still requires installed validation before native mutation.",
             "IsItem plus the reflected ability execution helpers establishes a narrower item/AbilityID bridge, but AI/script execution is not permission to hook the human Items-menu commit path.",
