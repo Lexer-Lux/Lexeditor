@@ -168,10 +168,34 @@ def test_full_ff7_surface_uses_human_controls(self):
     self.assertTrue(data['records']['enemyAttacks'][0]['values']['specialFlags'] & 0x2000)
     self.originals_unchanged()
 
+
+
+def test_holistic_ff7_concept_views_and_new_game_data(self):
+    self.install(); self.open()
+    self.navigate("initialState")
+    self.assertEqual(self.page.get_by_label("Party member 1 for New game defaults", exact=True).evaluate("e=>e.tagName"), "SELECT")
+    self.navigate("initialInventory")
+    self.assertEqual(self.page.get_by_label("Item / equipment for Slot 1 — Unknown item 421", exact=True).evaluate("e=>e.tagName"), "SELECT")
+    self.navigate("magicOrder")
+    self.assertEqual(self.page.get_by_label("Magic-menu section for Record0", exact=True).evaluate("e=>e.tagName"), "SELECT")
+
+    for tab, concept in (("growthCurves","growth-curve"),("growthBonuses","growth-bonuses"),("characters","character-growth-curves"),("weapons","equipment-materia-slots"),("enemies","enemy-loot"),("encounters","formation-slots"),("shops","shop-inventory"),("fieldEncounters","weighted-encounters")):
+        self.navigate(tab)
+        self.assertEqual(self.page.locator(f'[data-concept="{concept}"]').count(),1,(tab,concept))
+
+    self.navigate("growthCurves")
+    self.assertEqual(self.page.get_by_role("img", name="Primary stat curve 0 curve preview").count(),1)
+    self.assertEqual(self.page.get_by_label("Growth curve brackets").locator("input").count(),16)
+    self.navigate("enemies")
+    self.assertEqual(self.page.get_by_label("Loot slot 1 method / chance method for Enemy0", exact=True).evaluate("e=>e.tagName"),"SELECT")
+    self.assertEqual(self.page.get_by_label("Back-attack damage multiplier for Enemy0", exact=True).get_attribute("step"),"0.125")
+    self.originals_unchanged()
+
 target.RenderedTests.open = open_with_neutral
 target.RenderedTests.test_materia_uses_human_semantic_controls = test_materia_uses_human_semantic_controls
 target.RenderedTests.test_full_ff7_surface_uses_human_controls = test_full_ff7_surface_uses_human_controls
 target.RenderedTests.test_accessory_description_is_editable_game_text = test_accessory_description_is_editable_game_text
+target.RenderedTests.test_holistic_ff7_concept_views_and_new_game_data = test_holistic_ff7_concept_views_and_new_game_data
 
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)

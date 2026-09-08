@@ -36,6 +36,7 @@ class SemanticSurfaceTests(unittest.TestCase):
             self.assertEqual(meta[category]["restrictions"]["bitWidth"],16,category)
         self.assertTrue(meta["items"]["specialAttackFlags"]["invertBits"])
         self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
+        self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
         self.assertEqual([c["value"] for c in meta["weapons"]["materiaSlot1"]["choices"]],[0,1,2,3,5,6,7])
 
     def test_extended_categories_are_humanized(self):
