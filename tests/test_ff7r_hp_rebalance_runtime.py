@@ -7,6 +7,7 @@ import pytest
 from games.ff7r.native_probe import DEFAULT_NEEDLES
 from games.ff7r.runtime_config import (
     DEFAULT_RUNTIME_CONFIG,
+    LEGACY_MINIMAP_CONFIG,
     RUNTIME_DLL_NAME,
     RUNTIME_MANIFEST_NAME,
     deploy_runtime,
@@ -37,8 +38,6 @@ def _write_fixture_exe(game: Path):
 def _write_manifest(project: Path, *, hp_rebalance=None):
     hooks = {
         "cutsceneSpeed": True,
-        "minimapTapHold": True,
-        "minimapState": True,
     }
     if hp_rebalance is not None:
         hooks["hpRebalance"] = hp_rebalance
@@ -71,10 +70,11 @@ def test_hp_rebalance_defaults_to_half_party_hp_and_old_configs_upgrade_in_memor
     old_config = {
         "schemaVersion": 1,
         "cutsceneSpeed": dict(DEFAULT_RUNTIME_CONFIG["cutsceneSpeed"]),
-        "minimap": dict(DEFAULT_RUNTIME_CONFIG["minimap"]),
+        "minimap": dict(LEGACY_MINIMAP_CONFIG),
     }
     validated = validate_runtime_config(old_config)
     assert validated["hpRebalance"] == {"enabled": False, "hpMultiplier": 0.5}
+    assert "minimap" not in validated
 
 
 def test_hp_multiplier_accepts_one_as_vanilla_and_rejects_nonpositive_or_nonfinite():
@@ -148,8 +148,6 @@ def test_runtime_manifest_accepts_hp_rebalance_only_as_supported_optional_hook()
         "manifestVersion": 1,
         "hooks": {
             "cutsceneSpeed": True,
-            "minimapTapHold": True,
-            "minimapState": True,
             "hpRebalance": True,
         },
         "supportedExeTimestamps": [FIXTURE_TIMESTAMP],
@@ -159,7 +157,7 @@ def test_runtime_manifest_accepts_hp_rebalance_only_as_supported_optional_hook()
     assert validated["hooks"]["hpRebalance"] is True
 
     payload["hooks"]["madeUpHook"] = True
-    with pytest.raises(ValueError, match="supported optional hooks"):
+    with pytest.raises(ValueError, match="supported optional or legacy hooks"):
         validate_runtime_manifest(payload)
 
 
