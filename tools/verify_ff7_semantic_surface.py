@@ -24,11 +24,13 @@ class SemanticSurfaceTests(unittest.TestCase):
             "weapons":{"targetData":"flags","damageCalculationId":"enum","growthRate":"enum","equipableBy":"flags","attackElements":"flags","boostedStat1":"enum","materiaSlot1":"enum","restrictions":"flags"},
             "armor":{"elementDamageModifier":"enum","status":"enum","growthRate":"enum","equipableBy":"flags","elementalDefense":"flags","boostedStat1":"enum","materiaSlot1":"enum","restrictions":"flags"},
             "accessories":{"boostedStat1":"enum","specialEffect":"enum","elementalDefense":"flags","statusDefense":"flags","equipableBy":"flags","restrictions":"flags"},
-            "characters":{"weaponId":"reference","armorId":"reference","accessoryId":"reference","characterFlags":"flags","rowByte":"enum","learnedLimits":"flags","weaponMateria0":"reference","strengthCurve":"reference","recruitOffsetRaw":"scaled"},
+            "characters":{"weaponId":"reference","armorId":"reference","accessoryId":"reference","characterFlags":"enum","rowByte":"enum","learnedLimits":"flags","weaponMateria0":"reference","strengthCurve":"reference","recruitOffsetRaw":"scaled"},
         }
         for category, fields in expected.items():
             for key, kind in fields.items(): self.assertEqual(meta[category][key]["dataType"],kind,(category,key))
         self.assertEqual(next(c for c in meta["characters"]["rowByte"]["choices"] if c["label"]=="Front row")["value"],0xFF)
+        self.assertEqual([c["value"] for c in meta["characters"]["characterFlags"]["choices"]],[0x00,0x10,0x20])
+        self.assertNotIn("flags",meta["characters"]["characterFlags"])
         self.assertEqual(meta["characters"]["limitAttack11"]["referenceCategory"],"limitBreaks")
         self.assertEqual(meta["characters"]["limitAttack11"]["referenceValueKey"],"gameId")
         self.assertTrue(meta["playerAttacks"]["specialAttackFlags"]["invertBits"])
@@ -36,10 +38,6 @@ class SemanticSurfaceTests(unittest.TestCase):
             self.assertTrue(meta[category]["restrictions"]["invertBits"],category)
             self.assertEqual(meta[category]["restrictions"]["bitWidth"],16,category)
         self.assertTrue(meta["items"]["specialAttackFlags"]["invertBits"])
-        self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
-        self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
-        self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
-        self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
         self.assertFalse(meta["initialInventory"]["item"]["includeMateria"])
         self.assertEqual([c["value"] for c in meta["weapons"]["materiaSlot1"]["choices"]],[0,1,2,3,5,6,7])
 
