@@ -11,8 +11,22 @@ Jordan Tucker's **FF7 Remake Data Editor**:
 
 That project established the FF7R DataObject `.uasset` name/export-table shape,
 the `.uexp` property type codes and fixed-row layout, and the safe same-size
-editing rule used here. Lexeditor does not bundle its application or proprietary
+editing model used here. Lexeditor does not bundle its application or proprietary
 game data.
+
+## FF7R Text Tool
+
+The `GameContents/Text/<language>/*_TxtRes` reader/writer is a clean Python
+implementation based on the documented behavior and MIT-licensed source of
+MatyaModding's **ff7r-text-tool**:
+
+- https://github.com/matyamod/ff7r-text-tool
+- License: MIT
+
+That project documents the FF7R text-resource entry/sub-entry layout, Unreal
+FString encoding, name-map references and the paired `.uasset` serialized-size
+field required when variable-length text changes. Lexeditor does not bundle the
+tool or any extracted game text.
 
 ## repak
 
@@ -24,5 +38,6 @@ install the FF7R archive helper:
 - Pinned release: v0.2.3
 
 repak reads the installed Unreal Engine PAK indexes/files on demand and packs the
-separate Lexeditor project tree into a mod PAK. It is not committed into this
-repository.
+separate Lexeditor project tree into a mod PAK. FF7R's `../../../` mount point is
+passed explicitly when listing, extracting and packing. repak is not committed
+into this repository.
