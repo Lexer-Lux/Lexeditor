@@ -11,12 +11,17 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 
 
 RUNTIME_SCHEMA_VERSION = 1
 RUNTIME_DLL_NAME = "LexeditorFF7RRuntime.dll"
 RUNTIME_CONFIG_NAME = "LexeditorFF7RRuntime.json"
+RUNTIME_PROBE_DLL_NAME = "LexeditorFF7RRuntimeProbe.dll"
+RUNTIME_PROBE_REPORT_NAME = "LexeditorFF7RRuntimeProbe.json"
+RUNTIME_PROBE_SCHEMA_VERSION = 1
+MAX_PROBE_REPORT_BYTES = 1024 * 1024
 NATIVE_MODS_DIR = "NativeMods"
 
 DEFAULT_RUNTIME_CONFIG = {
@@ -52,6 +57,10 @@ def deployed_dll_path(game_root: Path) -> Path:
 
 def deployed_config_path(game_root: Path) -> Path:
     return Path(game_root) / NATIVE_MODS_DIR / RUNTIME_CONFIG_NAME
+
+
+def probe_report_path(game_root: Path) -> Path:
+    return Path(game_root) / NATIVE_MODS_DIR / RUNTIME_PROBE_REPORT_NAME
 
 
 def _clone_default() -> dict:
@@ -155,6 +164,110 @@ def _loader_candidates(game_root: Path) -> list[Path]:
     ]
 
 
+def _validate_probe_address(value: object) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"0x[0-9A-Fa-f]+", value):
+        raise ValueError("probe match address is malformed")
+    return value
+
+
+def validate_probe_report(value: dict) -> dict:
+    if not isinstance(value, dict):
+        raise ValueError("runtime probe report must be an object")
+    if value.get("schemaVersion") != RUNTIME_PROBE_SCHEMA_VERSION:
+        raise ValueError(f"unsupported FF7R runtime probe schema: {value.get('schemaVersion')}")
+    if value.get("probeOnly") is not True:
+        raise ValueError("runtime probe report is missing probeOnly=true")
+    process = value.get("process")
+    process_size = value.get("processSize")
+    text_base = value.get("textBase")
+    text_size = value.get("textSize")
+    probes = value.get("probes")
+    if not isinstance(process, str) or not process:
+        raise ValueError("runtime probe process path is missing")
+    if isinstance(process_size, bool) or not isinstance(process_size, int) or process_size < 0:
+        raise ValueError("runtime probe process size is invalid")
+    _validate_probe_address(text_base)
+    if isinstance(text_size, bool) or not isinstance(text_size, int) or text_size <= 0:
+        raise ValueError("runtime probe text size is invalid")
+    if not isinstance(probes, list) or len(probes) > 1000:
+        raise ValueError("runtime probe list is invalid")
+
+    normalized = []
+    seen = set()
+    for probe in probes:
+        if not isinstance(probe, dict) or set(probe) != {"name", "matches"}:
+            raise ValueError("runtime probe entry is malformed")
+        name = probe.get("name")
+        matches = probe.get("matches")
+        if not isinstance(name, str) or not name or len(name) > 128 or name in seen:
+            raise ValueError("runtime probe name is invalid or duplicated")
+        if not isinstance(matches, list) or len(matches) > 10000:
+            raise ValueError("runtime probe match list is invalid")
+        seen.add(name)
+        normalized.append({"name": name, "matches": [_validate_probe_address(item) for item in matches]})
+
+    return {
+        "schemaVersion": RUNTIME_PROBE_SCHEMA_VERSION,
+        "probeOnly": True,
+        "process": process,
+        "processSize": process_size,
+        "textBase": text_base,
+        "textSize": text_size,
+        "probes": normalized,
+    }
+
+
+def runtime_probe_status(game_root: Path) -> dict:
+    target = probe_report_path(game_root)
+    if not target.is_file():
+        return {
+            "reportPresent": False,
+            "reportPath": str(target),
+            "valid": False,
+            "baselineCompatible": False,
+            "reason": "No FF7R native runtime probe report has been collected.",
+        }
+    try:
+        if target.stat().st_size > MAX_PROBE_REPORT_BYTES:
+            raise ValueError("runtime probe report exceeds the 1 MiB safety limit")
+        payload = validate_probe_report(json.loads(target.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError, ValueError) as error:
+        return {
+            "reportPresent": True,
+            "reportPath": str(target),
+            "valid": False,
+            "baselineCompatible": False,
+            "reason": str(error),
+        }
+
+    by_name = {probe["name"]: probe["matches"] for probe in payload["probes"]}
+    map_matches = by_name.get("knownMapControl", [])
+    input_matches = by_name.get("knownRawInputRegistration", [])
+    baseline = len(map_matches) == 1 and len(input_matches) == 1
+    return {
+        "reportPresent": True,
+        "reportPath": str(target),
+        "valid": True,
+        "baselineCompatible": baseline,
+        "process": payload["process"],
+        "processSize": payload["processSize"],
+        "textBase": payload["textBase"],
+        "textSize": payload["textSize"],
+        "knownMapControlMatches": map_matches,
+        "knownRawInputRegistrationMatches": input_matches,
+        "candidateRuntimeStrings": {
+            name.removeprefix("ascii:"): matches
+            for name, matches in by_name.items()
+            if name.startswith("ascii:")
+        },
+        "reason": (
+            "Known current-build native signatures each matched exactly once."
+            if baseline else
+            "Known current-build native signatures did not each match exactly once; do not apply runtime patches."
+        ),
+    }
+
+
 def runtime_status(game_root: Path, project_root: Path) -> dict:
     project_dll = project_dll_path(project_root)
     deployed_dll = deployed_dll_path(game_root)
@@ -177,6 +290,7 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
         "loaderCandidatePresent": bool(loaders),
         "runtimeReady": project_dll.is_file() and bool(loaders),
         "active": deployed_dll.is_file() and bool(loaders),
+        "probe": runtime_probe_status(game_root),
         "notes": (
             "Runtime behavior patches require a native DLL and compatible DLL loader. "
             "PAK deployment alone cannot implement cutscene timing or tap/hold minimap input."
