@@ -4,6 +4,7 @@ on:
     branches: [master]
     paths:
       - 'tools/apply_ff8_ingame_time.py'
+      - 'tests/test_ff8_ingame_time.py'
       - '.github/workflows/apply_ff8_ingame_time.yml'
 permissions:
   contents: write
