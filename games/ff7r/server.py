@@ -30,6 +30,10 @@ from .minimap_semantics import (
     save_minimap_visibility_edits,
 )
 from .native_probe import probe_installed_exe
+from .no_more_cheats_tweaks import (
+    has_enabled_no_more_cheats,
+    materialize_no_more_cheats,
+)
 from .runtime_config import load_runtime_config, save_runtime_config
 from .runtime_state import deploy_runtime, runtime_status
 from .semantics import (
@@ -137,6 +141,8 @@ def data_map_payload() -> dict:
             semantic.append("reversible authored encounter edits materialized only when their tweak is enabled")
         if group == "Lexeditor Graphics":
             semantic.append("reversible Engine.ini graphics overrides applied only by explicit deployment")
+        if group == "Lexeditor Tweaks":
+            semantic.append("reversible structural menu edits materialized only after installed-source ownership validation")
         controls = (
             "Structured DataObject records; booleans, fixed-width numbers, floats "
             "and existing FNames are editable."
@@ -219,6 +225,7 @@ def _has_pak_edits() -> bool:
         has_content
         or has_enabled_data_overrides(PROJECT_ROOT)
         or has_enabled_encounter_tweaks(PROJECT_ROOT)
+        or has_enabled_no_more_cheats(PROJECT_ROOT)
     )
 
 
@@ -227,7 +234,8 @@ def build_mod() -> dict:
     has_content = content.is_dir() and any(path.is_file() for path in content.rglob("*"))
     has_atb = has_enabled_data_overrides(PROJECT_ROOT)
     has_encounter = has_enabled_encounter_tweaks(PROJECT_ROOT)
-    has_semantic_materialization = has_atb or has_encounter
+    has_no_more_cheats = has_enabled_no_more_cheats(PROJECT_ROOT)
+    has_semantic_materialization = has_atb or has_encounter or has_no_more_cheats
     if not has_content and not has_semantic_materialization:
         raise RuntimeError("The FF7R project has no saved edits to build")
 
@@ -239,6 +247,7 @@ def build_mod() -> dict:
             "size": target.stat().st_size,
             "atbMaterialized": [],
             "encounterMaterialized": [],
+            "noMoreCheatsMaterialized": [],
         }
 
     # Semantic overrides never live permanently in project/content. Compose
@@ -253,6 +262,8 @@ def build_mod() -> dict:
             GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), staging)
         encounter_materialized = materialize_encounter_tweaks(
             GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), staging)
+        no_more_cheats_materialized = materialize_no_more_cheats(
+            GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), staging)
         if not any(path.is_file() for path in staging.rglob("*")):
             raise RuntimeError("Enabled FF7R semantic tweaks produced no buildable DataObject edits")
         pack_directory(staging, target, version=preferred_pak_version(catalog()))
@@ -261,6 +272,7 @@ def build_mod() -> dict:
         "size": target.stat().st_size,
         "atbMaterialized": atb_materialized,
         "encounterMaterialized": encounter_materialized,
+        "noMoreCheatsMaterialized": no_more_cheats_materialized,
     }
 
 
@@ -422,7 +434,7 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": [
                         "data-map", "dataobject", "text-resource", "economy",
                         "enemy-loot", "minimap-visibility", "runtime-config", "native-probe",
-                        "encounter-tweaks", "graphics-tweaks", "save", "economy-save",
+                        "encounter-tweaks", "graphics-tweaks", "no-more-cheats", "save", "economy-save",
                         "enemy-loot-save", "minimap-visibility-save", "text-save", "build",
                         "deploy", "runtime-deploy", "graphics-deploy",
                     ],

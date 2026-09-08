@@ -5,7 +5,8 @@ parse safely. Researching UMG/Blueprint assets still needs a narrow way to find
 and inspect the installed cooked package without pretending the generic binary
 is editable. This module enumerates matching PAK entries, honors later-PAK
 shadowing, extracts only matched .uasset/.uexp files, and reports relevant
-printable strings as research evidence.
+printable strings plus bounded resolved object-table ownership as research
+evidence.
 """
 
 from __future__ import annotations
@@ -13,9 +14,10 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import re
-from typing import Iterable
+from typing import Any, Iterable
 
 from .archive import installed_paks
+from .package_probe import parse_object_table
 from .tooling import get_file, list_pak
 
 
@@ -40,9 +42,12 @@ DEFAULT_INTERESTING_TOKENS = (
     "widget",
 )
 MAX_STRINGS_PER_FILE = 192
+MAX_OBJECT_ROWS_PER_FILE = 48
 MAX_SCAN_ERRORS = 128
 _ASCII_RE = re.compile(rb"[\x20-\x7e]{4,}")
-_UTF16_RE = re.compile(rb"(?:[\x20-\x7e]\x00){4,}")
+# Do not let the final printable byte of an adjacent ASCII string become the
+# first UTF-16LE code unit merely because the ASCII terminator is NUL.
+_UTF16_RE = re.compile(rb"(?<![\x20-\x7e])(?:[\x20-\x7e]\x00){4,}")
 
 
 def _normalize(path: str) -> str:
@@ -136,6 +141,85 @@ def _lock_on_text_hits(strings: list[dict]) -> list[dict]:
     return hits
 
 
+def _matched_object_tokens(row: dict[str, Any], tokens: Iterable[str]) -> list[str]:
+    searchable = " ".join(
+        str(row.get(key) or "")
+        for key in ("objectName", "objectPath", "outerPath", "className", "classPath", "classPackage")
+    ).casefold()
+    return [
+        str(token)
+        for token in tokens
+        if str(token).strip() and str(token).casefold() in searchable
+    ]
+
+
+def extract_object_evidence(
+    data: bytes,
+    *,
+    tokens: Iterable[str] = DEFAULT_INTERESTING_TOKENS,
+    limit: int = MAX_OBJECT_ROWS_PER_FILE,
+    label: str = "cooked asset",
+) -> dict[str, Any]:
+    """Resolve a bounded set of matching import/export owners from one .uasset.
+
+    Object-table metadata can establish class/outer ownership more strongly than
+    printable strings. It still does not identify or authorize a serialized UMG
+    child-property edit, so callers must treat these rows as research evidence.
+    """
+    if limit <= 0:
+        return {
+            "objectTableParsed": True,
+            "objectTableSummary": {},
+            "resolvedImports": [],
+            "resolvedExports": [],
+        }
+    token_list = tuple(str(token) for token in tokens if str(token).strip())
+    table = parse_object_table(data, label=label)
+
+    import_rows = []
+    for row in table.imports:
+        package_index = -(row.index + 1)
+        candidate = {
+            "index": row.index,
+            "packageIndex": package_index,
+            "objectName": row.object_name.display,
+            "objectPath": table.resolve_path(package_index),
+            "outerIndex": row.outer_index,
+            "outerPath": table.resolve_path(row.outer_index),
+            "classPackage": row.class_package.display,
+            "className": row.class_name.display,
+        }
+        matched = _matched_object_tokens(candidate, token_list)
+        if matched:
+            candidate["matchedTokens"] = matched
+            import_rows.append(candidate)
+
+    export_rows = []
+    for candidate in table.export_rows():
+        matched = _matched_object_tokens(candidate, token_list)
+        if matched:
+            export_rows.append({**candidate, "matchedTokens": matched})
+
+    def rank(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        # Longer matched anchors carry more ownership information than generic
+        # tokens such as Text or Color, so retain them first when bounding output.
+        return sorted(
+            rows,
+            key=lambda row: (
+                -sum(len(str(token)) for token in row.get("matchedTokens", ())),
+                -len(row.get("matchedTokens", ())),
+                str(row.get("objectPath") or row.get("objectName") or "").casefold(),
+            ),
+        )[:limit]
+
+    return {
+        "objectTableParsed": True,
+        "objectTableSummary": table.summary(),
+        "resolvedImports": rank(import_rows),
+        "resolvedExports": rank(export_rows),
+    }
+
+
 def probe_installed_assets(
     game_root: Path,
     *,
@@ -174,7 +258,7 @@ def probe_installed_assets(
                     errors.append(f"{source['pak']} :: {source['path']}: {error}")
                 continue
             strings = extract_interesting_strings(data, tokens=interesting_tokens)
-            files.append({
+            file_row = {
                 "suffix": suffix,
                 "pak": source["pak"],
                 "path": source["path"],
@@ -182,7 +266,25 @@ def probe_installed_assets(
                 "sha256": hashlib.sha256(data).hexdigest(),
                 "interestingStrings": strings,
                 "lockOnTextHits": _lock_on_text_hits(strings),
-            })
+            }
+            if suffix == ".uasset":
+                try:
+                    file_row.update(extract_object_evidence(
+                        data,
+                        tokens=interesting_tokens,
+                        label=source["path"],
+                    ))
+                except Exception as error:
+                    # Object metadata is a stronger optional research layer. A
+                    # package layout we cannot parse remains explicitly unresolved
+                    # instead of aborting the printable-string scan or guessing.
+                    file_row.update({
+                        "objectTableParsed": False,
+                        "objectTableError": str(error),
+                        "resolvedImports": [],
+                        "resolvedExports": [],
+                    })
+            files.append(file_row)
         results.append({"asset": candidate["asset"], "files": files})
 
     return {
@@ -194,5 +296,6 @@ def probe_installed_assets(
             "Matches are read-only research evidence; cooked UMG/Blueprint packages are not treated as DataObjects.",
             "Later installed PAK definitions shadow earlier files before candidates are reported.",
             "Printable-string hits can identify widget/property/text names but do not by themselves prove a safe edit offset.",
+            "Resolved object-table rows can strengthen class/outer ownership, but still do not prove an exact serialized child-property edit.",
         ],
     }

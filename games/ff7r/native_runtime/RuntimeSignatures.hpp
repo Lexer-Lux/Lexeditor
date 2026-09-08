@@ -44,6 +44,43 @@ std::vector<SignatureMatch> findExactSignature(
     return matches;
 }
 
+template <std::size_t N>
+std::vector<SignatureMatch> findMaskedSignature(
+    std::span<const std::uint8_t> bytes,
+    const std::array<std::uint8_t, N>& signature,
+    std::string_view mask,
+    std::size_t maxMatches = 16) {
+    std::vector<SignatureMatch> matches;
+    if constexpr (N == 0) {
+        return matches;
+    }
+    if (mask.size() != N || bytes.size() < N || maxMatches == 0) {
+        return matches;
+    }
+    for (const char token : mask) {
+        if (token != 'x' && token != '?') {
+            return {};
+        }
+    }
+    for (std::size_t offset = 0; offset <= bytes.size() - N; ++offset) {
+        bool equal = true;
+        for (std::size_t index = 0; index < N; ++index) {
+            if (mask[index] == 'x' && bytes[offset + index] != signature[index]) {
+                equal = false;
+                break;
+            }
+        }
+        if (!equal) {
+            continue;
+        }
+        matches.push_back({offset});
+        if (matches.size() >= maxMatches) {
+            break;
+        }
+    }
+    return matches;
+}
+
 struct KnownSignature {
     std::string_view name;
     std::span<const std::uint8_t> bytes;
@@ -68,6 +105,17 @@ inline constexpr std::array<std::uint8_t, 14> kJoystickMovementSignature{
     0xF3, 0x0F, 0x10, 0x8B, 0x18, 0x07, 0x00, 0x00,
 };
 
+// `48 8B 05 disp32` loads the process-global AGameState* slot. The following
+// instructions make the signature selective while stack-frame displacements
+// remain wildcarded. The RIP-relative target is resolved only when this pattern
+// has exactly one match in the installed executable.
+inline constexpr std::array<std::uint8_t, 19> kGameStateLoadSignature{
+    0x48, 0x8B, 0x05, 0x00, 0x00, 0x00, 0x00,
+    0x4C, 0x89, 0xB4, 0x24, 0x00, 0x00, 0x00, 0x00,
+    0x44, 0x0F, 0xB6, 0x76,
+};
+inline constexpr std::string_view kGameStateLoadMask = "xxx????xxxx????xxxx";
+
 inline std::vector<SignatureMatch> findMapControl(std::span<const std::uint8_t> text) {
     return findExactSignature(text, kMapControlSignature);
 }
@@ -80,10 +128,16 @@ inline std::vector<SignatureMatch> findJoystickMovement(std::span<const std::uin
     return findExactSignature(text, kJoystickMovementSignature);
 }
 
+inline std::vector<SignatureMatch> findGameStateLoad(std::span<const std::uint8_t> text) {
+    return findMaskedSignature(text, kGameStateLoadSignature, kGameStateLoadMask);
+}
+
 // Provenance notes are intentionally part of the source contract so these
 // byte patterns are never mistaken for signatures reverse-engineered from the
-// user's installed executable. They originate in TheUnlocked/ff7r-kbm-hook.
+// user's installed executable. The first three originate in TheUnlocked's MIT
+// project; the game-state load shape is independently implemented from public
+// xCENTx/FinalFantasy7Remake-Menu interoperability documentation.
 inline constexpr std::string_view kSignatureProvenance =
-    "TheUnlocked/ff7r-kbm-hook public source (MIT); candidate signatures require installed-build validation";
+    "TheUnlocked/ff7r-kbm-hook (MIT) and xCENTx/FinalFantasy7Remake-Menu public interoperability references; candidate signatures require installed-build validation";
 
 } // namespace lexeditor::ff7r

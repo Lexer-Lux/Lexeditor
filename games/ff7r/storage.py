@@ -23,6 +23,15 @@ from .graphics_dataobject import (
     save_graphics_virtual_package,
 )
 from .graphics_tweaks import GRAPHICS_TWEAKS_ASSET
+from .no_more_cheats_tweaks import (
+    NO_MORE_CHEATS_ASSET,
+    load_virtual_package as load_no_more_cheats_virtual_package,
+    save_virtual_edits as save_no_more_cheats_virtual_edits,
+)
+from .research_dataobject import (
+    is_research_virtual_asset,
+    load_research_virtual_package,
+)
 from .runtime_dataobject import (
     NO_MORE_CHEATS_PROBE_ASSET,
     RUNTIME_PROBE_ASSET,
@@ -50,6 +59,11 @@ def load_package(game_root: Path, data_root: Path, project_root: Path,
         return runtime_probe_package(game_root)
     if asset == NO_MORE_CHEATS_PROBE_ASSET:
         return no_more_cheats_probe_package(game_root, data_root, project_root, index)
+    if asset == NO_MORE_CHEATS_ASSET:
+        return load_no_more_cheats_virtual_package(
+            game_root, data_root, project_root, index, vanilla=vanilla)
+    if is_research_virtual_asset(asset):
+        return load_research_virtual_package(game_root, data_root, project_root, index, asset)
     if is_atb_virtual_asset(asset):
         # ATB semantic views always compare against installed vanilla source;
         # project state lives in the separate reversible ATB config.
@@ -88,6 +102,15 @@ def save_edits(game_root: Path, data_root: Path, project_root: Path,
         raise ValueError("FF7R Native Hook Probe is read-only")
     if asset == NO_MORE_CHEATS_PROBE_ASSET:
         raise ValueError("FF7R No More Cheats Probe is read-only")
+    if asset == NO_MORE_CHEATS_ASSET:
+        return save_no_more_cheats_virtual_edits(
+            game_root, data_root, project_root, index,
+            source_sha256=source_sha256,
+            active_sha256=active_sha256,
+            edits=edits,
+        )
+    if is_research_virtual_asset(asset):
+        raise ValueError("FF7R follow-up research probes are read-only")
     if is_atb_virtual_asset(asset):
         return save_atb_virtual_package(
             game_root, data_root, project_root, index, asset,

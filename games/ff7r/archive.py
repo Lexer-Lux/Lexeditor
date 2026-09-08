@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import Iterable
 
+from .research_dataobject import RESEARCH_VIRTUAL_ASSET_ROWS
 from .runtime_dataobject import VIRTUAL_ASSET_ROWS
 from .tooling import REPAK_TAG, get_file, list_pak, pak_info
 
@@ -35,6 +36,14 @@ GRAPHICS_VIRTUAL_ASSET_ROWS = (
         "name": "Graphics Tweaks",
         "group": "Lexeditor Graphics",
         "synthetic": "graphics-tweaks",
+    },
+)
+TWEAK_VIRTUAL_ASSET_ROWS = (
+    {
+        "asset": "Lexeditor/NoMoreCheats",
+        "name": "No More Cheats",
+        "group": "Lexeditor Tweaks",
+        "synthetic": "no-more-cheats",
     },
 )
 
@@ -101,6 +110,8 @@ def _with_virtual_assets(payload: dict) -> dict:
         *ATB_VIRTUAL_ASSET_ROWS,
         *ENCOUNTER_VIRTUAL_ASSET_ROWS,
         *GRAPHICS_VIRTUAL_ASSET_ROWS,
+        *TWEAK_VIRTUAL_ASSET_ROWS,
+        *RESEARCH_VIRTUAL_ASSET_ROWS,
         *VIRTUAL_ASSET_ROWS,
     ):
         if row["asset"] not in existing:

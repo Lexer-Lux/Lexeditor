@@ -31,6 +31,7 @@ REQUIRED_HOOKS = (
 OPTIONAL_HOOKS = (
     "hpRebalance",
     "betterSprint",
+    "atbTweaks",
 )
 
 DEFAULT_RUNTIME_CONFIG = {
@@ -323,6 +324,19 @@ def _manifest_state(game_root: Path, project_root: Path) -> tuple[dict | None, i
     return manifest, timestamp, hooks_validated, build_supported
 
 
+def _requested_hook_names(config: dict) -> tuple[str, ...]:
+    requested: list[str] = []
+    if config["cutsceneSpeed"]["enabled"]:
+        requested.append("cutsceneSpeed")
+    if config["minimap"]["enabled"]:
+        requested.extend(("minimapTapHold", "minimapState"))
+    if config["hpRebalance"]["enabled"]:
+        requested.append("hpRebalance")
+    if config["betterSprint"]["enabled"]:
+        requested.append("betterSprint")
+    return tuple(requested)
+
+
 def runtime_status(game_root: Path, project_root: Path) -> dict:
     project_dll = project_dll_path(project_root)
     deployed_dll = deployed_dll_path(game_root)
@@ -335,11 +349,13 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
     hp_hook_validated = bool(manifest) and manifest["hooks"].get("hpRebalance", False)
     sprint_requested = config["betterSprint"]["enabled"]
     sprint_hook_validated = bool(manifest) and manifest["hooks"].get("betterSprint", False)
-    requested_hooks_validated = (
-        hooks_validated
-        and (not hp_requested or hp_hook_validated)
-        and (not sprint_requested or sprint_hook_validated)
-    )
+    requested_hooks = _requested_hook_names(config)
+    missing_requested_hooks = [
+        name
+        for name in requested_hooks
+        if not (manifest and manifest["hooks"].get(name, False))
+    ]
+    requested_hooks_validated = manifest is not None and not missing_requested_hooks
     ready = project_dll.is_file() and bool(loaders) and requested_hooks_validated and build_supported
     active = deployed_dll.is_file() and bool(loaders) and requested_hooks_validated and build_supported
     return {
@@ -356,6 +372,8 @@ def runtime_status(game_root: Path, project_root: Path) -> dict:
         "manifestPresent": manifest is not None,
         "manifest": manifest,
         "hooksValidated": hooks_validated,
+        "requestedHooks": list(requested_hooks),
+        "missingRequestedHooks": missing_requested_hooks,
         "requestedHooksValidated": requested_hooks_validated,
         "hpRebalanceRequested": hp_requested,
         "hpRebalanceHookValidated": hp_hook_validated,
@@ -393,12 +411,11 @@ def deploy_runtime(game_root: Path, project_root: Path) -> dict:
         )
     if not status["manifestPresent"]:
         raise RuntimeError("FF7R runtime hook-validation manifest is missing; runtime was not deployed")
-    if not status["hooksValidated"]:
-        raise RuntimeError("FF7R runtime hooks are not all validated; runtime was not deployed")
-    if status["hpRebalanceRequested"] and not status["hpRebalanceHookValidated"]:
-        raise RuntimeError("FF7R HP Rebalance hook is enabled but not validated; runtime was not deployed")
-    if status["betterSprintRequested"] and not status["betterSprintHookValidated"]:
-        raise RuntimeError("FF7R Better Sprint hook is enabled but not validated; runtime was not deployed")
+    if not status["requestedHooksValidated"]:
+        missing = ", ".join(status["missingRequestedHooks"]) or "unknown"
+        raise RuntimeError(
+            f"FF7R requested runtime hooks are not validated: {missing}; runtime was not deployed"
+        )
     if status["installedExeTimestamp"] is None:
         raise RuntimeError("Installed ff7remake_.exe timestamp could not be read; runtime was not deployed")
     if not status["buildSupported"]:

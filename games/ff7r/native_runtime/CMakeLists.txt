@@ -29,6 +29,16 @@ lexeditor_ff7r_test(
     runtime_signatures_test.cpp
     ff7r_runtime_signatures
 )
+lexeditor_ff7r_test(
+    ff7r_runtime_hp_test
+    runtime_hp_test.cpp
+    ff7r_runtime_hp
+)
+lexeditor_ff7r_test(
+    ff7r_runtime_cutscene_test
+    runtime_cutscene_test.cpp
+    ff7r_runtime_cutscene
+)
 
 if(WIN32)
     add_library(LexeditorFF7RRuntime SHARED RuntimeMain.cpp)
