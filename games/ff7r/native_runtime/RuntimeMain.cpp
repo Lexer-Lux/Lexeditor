@@ -419,7 +419,10 @@ DWORD WINAPI hp_worker(LPVOID) noexcept {
         }
         if (apply_hp_rebalance_tick(gameState, g_hpMultiplier.load(), tracks)) {
             g_hpWorkerState.store(HPWorkerState::active);
-            g_hpRebalanceActive.store(true);
+            const bool wasActive = g_hpRebalanceActive.exchange(true);
+            if (!wasActive) {
+                write_status(load_config(), scan_signatures());
+            }
         }
         Sleep(kHPWorkerIntervalMs);
     }
