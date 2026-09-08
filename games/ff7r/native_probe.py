@@ -29,6 +29,8 @@ DEFAULT_NEEDLES = (
     "HideNavimap",
     "BPShowNavimap",
     "BPHideNavimap",
+    "SendStateTrigger",
+    "SendStateTriggerDirect",
     "trgCmn_NaviMap_Update_On",
     "trgCmn_NaviMap_Update_Off",
     "BPSetPlayerHPMax",
