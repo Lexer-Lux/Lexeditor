@@ -113,6 +113,18 @@ def test_runtime_manifest_requires_every_hook_and_supported_build():
             "supportedExeTimestamps": [],
         })
 
+    manifest = validate_runtime_manifest({
+        "manifestVersion": 1,
+        "hooks": {
+            "cutsceneSpeed": False,
+            "minimapTapHold": False,
+            "minimapState": False,
+            "atbTweaks": True,
+        },
+        "supportedExeTimestamps": [FIXTURE_TIMESTAMP],
+    })
+    assert manifest["hooks"]["atbTweaks"] is True
+
 
 def test_runtime_status_never_claims_active_without_dll_loader_manifest_and_supported_exe(tmp_path):
     game = tmp_path / "game"
@@ -147,7 +159,7 @@ def test_runtime_deploy_fails_closed_without_dll_loader_or_manifest(tmp_path):
         deploy_runtime(game, project)
 
 
-def test_runtime_deploy_rejects_unvalidated_hook_and_wrong_exe_timestamp(tmp_path):
+def test_runtime_deploy_rejects_unvalidated_requested_hook_and_wrong_exe_timestamp(tmp_path):
     game = tmp_path / "game"
     project = tmp_path / "project"
     runtime = project / "runtime"
@@ -158,17 +170,53 @@ def test_runtime_deploy_rejects_unvalidated_hook_and_wrong_exe_timestamp(tmp_pat
     (binaries / "dxgi.dll").write_bytes(b"fixture-proxy")
     write_fixture_exe(game)
 
+    config = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
+    config["cutsceneSpeed"]["enabled"] = True
+    save_runtime_config(project, config)
     write_manifest(project, hooks={
         "cutsceneSpeed": False,
         "minimapTapHold": True,
         "minimapState": True,
     })
-    with pytest.raises(RuntimeError, match="not all validated"):
+    with pytest.raises(RuntimeError, match="requested runtime hooks are not validated: cutsceneSpeed"):
         deploy_runtime(game, project)
 
     write_manifest(project, timestamp=0xDEADBEEF)
     with pytest.raises(RuntimeError, match="not validated for installed executable timestamp"):
         deploy_runtime(game, project)
+
+
+def test_runtime_deploy_allows_validated_hp_without_unrequested_core_hooks(tmp_path):
+    game = tmp_path / "game"
+    project = tmp_path / "project"
+    runtime = project / "runtime"
+    runtime.mkdir(parents=True)
+    (runtime / RUNTIME_DLL_NAME).write_bytes(b"fixture-runtime")
+    binaries = game / "End" / "Binaries" / "Win64"
+    binaries.mkdir(parents=True)
+    (binaries / "dxgi.dll").write_bytes(b"fixture-proxy")
+    write_fixture_exe(game)
+
+    config = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG))
+    config["hpRebalance"]["enabled"] = True
+    save_runtime_config(project, config)
+    write_manifest(project, hooks={
+        "cutsceneSpeed": False,
+        "minimapTapHold": False,
+        "minimapState": False,
+        "hpRebalance": True,
+    })
+
+    status = runtime_status(game, project)
+    assert status["hooksValidated"] is False
+    assert status["requestedHooks"] == ["hpRebalance"]
+    assert status["missingRequestedHooks"] == []
+    assert status["requestedHooksValidated"] is True
+    assert status["runtimeReady"] is True
+
+    result = deploy_runtime(game, project)
+    assert Path(result["dll"]).read_bytes() == b"fixture-runtime"
+    assert result["validation"]["hooks"]["hpRebalance"] is True
 
 
 def test_runtime_deploy_copies_dll_config_and_manifest_only_for_validated_build(tmp_path):
