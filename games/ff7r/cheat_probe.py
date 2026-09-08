@@ -2,7 +2,7 @@
 
 The public generated SDK predates several 2026 menu additions, so this module
 starts from the installed localized labels, resolves their text IDs, and then
-finds exact DataObject references plus identifier-like candidates.  Results are
+finds exact DataObject references plus identifier-like candidates. Results are
 research evidence only; no row is removed until its ownership/semantics are
 validated.
 """
@@ -38,8 +38,6 @@ MAX_MATCHES_PER_TARGET = 128
 
 
 def _plain(value: str) -> str:
-    # Text resources may contain simple markup/control syntax.  Preserve the
-    # original in output but normalize aggressively enough to find menu labels.
     value = re.sub(r"<[^>]*>", " ", value)
     return " ".join(value.casefold().split())
 
@@ -93,12 +91,15 @@ def scan_installed_menu_candidates(
         text_hits: list[dict] = []
         text_ids: set[str] = set()
         for asset, package in text_sources:
-            for entry in getattr(package, "entries", ()):  # TextEntry
+            for entry in getattr(package, "entries", ()):
                 candidates = [("TEXT", getattr(entry, "text", ""))]
-                candidates.extend((getattr(sub, "id", "SUB"), getattr(sub, "text", "")) for sub in getattr(entry, "subentries", ()))
+                candidates.extend(
+                    (getattr(sub, "id", "SUB"), getattr(sub, "text", ""))
+                    for sub in getattr(entry, "subentries", ())
+                )
                 for field, text in candidates:
                     if isinstance(text, str) and _text_matches(target, text):
-                        text_id = str(getattr(entry, "key", ""))
+                        text_id = str(getattr(entry, "id", getattr(entry, "key", "")))
                         if text_id:
                             text_ids.add(text_id)
                         if len(text_hits) < MAX_MATCHES_PER_TARGET:
