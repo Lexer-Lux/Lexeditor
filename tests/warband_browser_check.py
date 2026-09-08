@@ -27,8 +27,12 @@ MODEL={'cacheKey':'a'*64,'mesh':'fixture_sword','material':'fixture_steel','reso
 TROOPS=[{'id':id,'name':name,'faction':faction,'level':level,'flags':'tf_guarantee_armor','line':i+1,'status':'active','plural':name+'s'} for i,(id,name,faction,level) in enumerate([
     ('recruit','Recruit','fac_north',1),('footman','Footman','fac_north',10),('archer','Archer','fac_north',10),('knight','Knight','fac_north',20),('guard','Guard','fac_north',20),('militia','Militia','fac_north',2),('elite_militia','Elite militia','fac_north',12),('horseman','Horseman','fac_south',10),('rider','Rider','fac_south',20)])]
 UPGRADES=[{'fromId':a,'toId':b} for a,b in [('recruit','footman'),('recruit','archer'),('footman','knight'),('footman','guard'),('militia','elite_militia'),('horseman','rider')]]
-ITEMS=[{'id':f'fixture_{i:03}','name':f'Fixture sword {i:03}','type':'one_handed_wpn','meshes':['fixture_sword'],'inventoryMesh':'fixture_sword','line':i+1} for i in range(65)]
-ITEMS.append({'id':'broken','name':'Missing texture fixture','type':'goods','meshes':['broken'],'inventoryMesh':'broken','line':100})
+def fixture_item(i,mesh='fixture_sword'):
+    item_id=f'fixture_{i:03}';name=f'Fixture sword {i:03}'
+    fields={'id':item_id,'name':name,'meshes':f'[(\"{mesh}\", 0)]','flags':'itp_type_one_handed_wpn|itp_merchandise','capabilities':'itc_longsword','value':'120','stats':'weight(1.5)|spd_rtng(97)|weapon_length(90)','modifierBits':'imodbits_sword'}
+    return {'recordIndex':i,'id':item_id,'name':name,'type':'one_handed_wpn','value':'120','weight':'1.5','meshes':[mesh],'inventoryMesh':mesh,'line':i+1,'fields':fields,'fieldOrder':list(fields)}
+ITEMS=[fixture_item(i) for i in range(65)]
+broken=fixture_item(100,'broken');broken.update({'id':'broken','name':'Missing texture fixture','type':'goods'});broken['fields'].update({'id':'broken','name':'Missing texture fixture','flags':'itp_type_goods','capabilities':'0'});ITEMS.append(broken)
 
 
 def main():
@@ -58,23 +62,18 @@ def main():
                     html=html.replace('<script src="/warband/troop_trees.js"></script>','<script>'+(ROOT/'games/warband/troop_trees.js').read_text()+'</script>')
                     page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('!state.booting')
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
-                    assert page.locator('.warband-item-thumbnail canvas').count()==0
-                    assert page.locator('.warband-preview-stage canvas').count()==0
-                    assert page.locator('.lex-model-preview-drawer').is_hidden()
-                    assert not page.evaluate('window.__warbandPreview?.length')
-                    page.get_by_role('button',name='Open model preview',exact=True).click()
-                    page.wait_for_function('window.__warbandPreview?.length===1 || document.querySelector(".warband-preview-message")?.textContent.includes("cannot start the WebGL")')
-                    assert page.locator('.warband-preview-stage canvas').count()==1
-                    webgl=page.evaluate('window.__warbandPreview?.length===1')
-                    if os.environ.get('WARBAND_REQUIRE_WEBGL')=='1':assert webgl,'WebGL fixture rendering required by CI'
-                    if webgl:
-                        page.get_by_role('button',name='Close model preview',exact=True).click()
-                        assert page.locator('.lex-model-preview-drawer').is_hidden()
-                        assert not page.evaluate('window.__warbandPreview?.length')
-                        page.get_by_role('button',name='Open model preview',exact=True).click()
-                        page.wait_for_function('window.__warbandPreview?.length===1')
-                    else:
-                        assert page.locator('.warband-preview-message').is_visible()
+                    assert page.locator('.warband-item-detail [data-lex-property="id"] input').count()==1
+                    assert page.locator('.warband-item-detail [data-lex-property="name"] input').count()==1
+                    assert page.locator('.warband-item-detail [data-lex-property="flags"] textarea').count()==1
+                    assert page.locator('.warband-item-detail [data-lex-property="stats"] textarea').count()==1
+                    assert page.get_by_role('button',name='Open model preview',exact=True).count()==0
+                    assert page.locator('.lex-model-preview-drawer').count()==0
+                    name_field=page.locator('.warband-item-detail [data-lex-property="name"] input')
+                    name_field.fill('Edited fixture name')
+                    assert page.evaluate('itemDirtyCount()')==1
+                    assert page.evaluate('Object.values(state.itemEdits)[0].fields.name')=='Edited fixture name'
+                    name_field.fill('Fixture sword 000')
+                    assert page.evaluate('itemDirtyCount()')==0
                     page.screenshot(path=str(ARTIFACTS/f'items-{width}.png'),full_page=True)
                     page.evaluate('navigate("datamap")');page.wait_for_timeout(600)
                     assert page.locator('.lex-paged-list-detail').count()==1
@@ -107,13 +106,13 @@ def main():
                     page.get_by_role('combobox',name='Troop tree faction',exact=True).select_option('fac_south')
                     assert page.locator('[data-troop="horseman"]').count()==1
                     assert page.locator('[data-troop="recruit"]').count()==0
-                    # Missing dependencies never enable the preview action.
+                    # A missing render dependency affects only the thumbnail; the actual item editor remains usable.
                     page.evaluate('state.filters.items="Missing texture fixture";navigate("items")')
-                    page.get_by_role('button',name='Open model preview',exact=True).click()
-                    page.wait_for_function('document.querySelector(".warband-preview-message")?.textContent.includes("Missing diffuse")')
-                    assert page.locator('.lex-model-preview-drawer').is_visible()
-                    assert page.evaluate('!window.__warbandPreview')
-                    results.append({'width':width,'height':height,'dataMap':metrics,'webglAvailable':webgl,'status':'passed'})
+                    page.wait_for_function('document.querySelector(".warband-icon-message")?.textContent.includes("Icon unavailable")')
+                    assert page.locator('.warband-item-detail [data-lex-property="name"] input').is_enabled()
+                    assert page.locator('.warband-item-detail [data-lex-property="stats"] textarea').is_enabled()
+                    assert page.get_by_role('button',name='Open model preview',exact=True).count()==0
+                    results.append({'width':width,'height':height,'dataMap':metrics,'status':'passed'})
                     page.close()
             finally:browser.close()
         (ARTIFACTS/'results.json').write_text(json.dumps({'fixtureOnly':True,'results':results,'errors':errors},indent=2))
