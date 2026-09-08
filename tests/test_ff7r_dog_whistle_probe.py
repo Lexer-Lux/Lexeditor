@@ -16,6 +16,18 @@ def _package(asset, properties, entries, names=()):
     )
 
 
+def _text_fixture():
+    lookup = {
+        "$DogWhistle": "Dog Whistle",
+        "$Chapter4": "Mad Dash",
+        "$GuardDog": "Guard Dog",
+        "$Soldier": "Security Officer",
+        "$Potion": "Potion",
+    }
+    owners = {key: "End/Text/US/Resident_TxtRes" for key in lookup}
+    return lookup, owners, []
+
+
 def test_dog_whistle_probe_correlates_item_names_chapter_awards_canines_and_runtime(monkeypatch):
     item = _package(
         "End/DataObject/Item",
@@ -61,13 +73,7 @@ def test_dog_whistle_probe_correlates_item_names_chapter_awards_canines_and_runt
         probe.BATTLE_CHARA_TABLE: battle,
     }
     monkeypatch.setattr(probe, "_load_data", lambda _g, _d, _i, name: packages.get(name))
-    monkeypatch.setattr(probe, "_all_text_map", lambda *_args, **_kwargs: ({
-        "$DogWhistle": "Dog Whistle",
-        "$Chapter4": "Mad Dash",
-        "$GuardDog": "Guard Dog",
-        "$Soldier": "Security Officer",
-        "$Potion": "Potion",
-    }, []))
+    monkeypatch.setattr(probe, "_all_text_map", lambda *_args, **_kwargs: _text_fixture())
     monkeypatch.setattr(probe, "probe_installed_exe", lambda _root, *, needles: {
         "needles": [{"needle": name, "hits": []} for name in needles],
         "timestampHex": "0x12345678",
@@ -75,9 +81,18 @@ def test_dog_whistle_probe_correlates_item_names_chapter_awards_canines_and_runt
 
     result = probe.probe_dog_whistle_sources("game", "data", "project", {})
     assert result["item"]["whistleNameMapCandidates"] == ["DogWhistle"]
+    assert result["item"]["unusedWhistleNameMapCandidates"] == ["DogWhistle"]
     assert result["item"]["rowCandidates"][0]["tag"] == "KEY_WEDGE_WHISTLE"
-    assert result["chapterProgression"]["referencedKeyItemsThatAreItemRows"] == ["KEY_WEDGE_WHISTLE"]
-    assert result["chapterProgression"]["chaptersWithKeyItemAdds"][0]["chapterName"] == "Mad Dash"
+    assert result["item"]["abilityBackedTemplateCandidates"][0]["tag"] == "POTION"
+    template_text = result["item"]["abilityBackedTemplateCandidates"][0]["resolvedText"][0]
+    assert template_text["textAsset"] == "End/Text/US/Resident_TxtRes"
+
+    chapter_result = result["chapterProgression"]
+    assert chapter_result["referencedKeyItemsThatAreItemRows"] == ["KEY_WEDGE_WHISTLE"]
+    assert chapter_result["chaptersWithKeyItemAdds"][0]["chapterName"] == "Mad Dash"
+    assert chapter_result["chapter4Candidates"][0]["tag"] == "Chapter04"
+    assert set(chapter_result["chapter4Candidates"][0]["chapter4Signals"]) == {"row-tag", "unique-id"}
+
     canine = result["canineEnemies"][0]
     assert canine["enemyBookId"] == "EB_GUARD_DOG"
     assert canine["battleCharaRows"] == ["EN_GUARD_DOG"]
@@ -91,6 +106,18 @@ def test_whistle_term_matching_handles_underscores_and_compact_identifiers():
     assert not probe._contains_term("DOG_TAG", probe.WHISTLE_TERMS)
 
 
+def test_chapter4_detection_uses_evidence_not_row_order():
+    lookup = {"$C1": "The Destruction of Mako Reactor 1", "$C4": "Chapter 4: Mad Dash"}
+    owners = {key: "Resident" for key in lookup}
+    first = _entry("Chapter01", {"UniqueID": 1, "ChapterNameID": "$C1"})
+    fourth = _entry("OpaqueRowName", {"UniqueID": 99, "ChapterNameID": "$C4"})
+
+    assert probe._chapter4_signals(first, probe._resolved_entry_text(first, lookup, owners)) == []
+    assert probe._chapter4_signals(fourth, probe._resolved_entry_text(fourth, lookup, owners)) == [
+        "resolved-text:ChapterNameID"
+    ]
+
+
 def test_probe_does_not_claim_keyitem_award_targets_item_table_when_ids_do_not_correlate(monkeypatch):
     item = _package("Item", ["AbilityID"], [_entry("POTION", {"AbilityID": "Potion"})])
     chapter = _package("Chapter", ["AddKeyItem_Array"], [
@@ -98,7 +125,7 @@ def test_probe_does_not_claim_keyitem_award_targets_item_table_when_ids_do_not_c
     ])
     packages = {probe.ITEM_TABLE: item, probe.CHAPTER_TABLE: chapter}
     monkeypatch.setattr(probe, "_load_data", lambda _g, _d, _i, name: packages.get(name))
-    monkeypatch.setattr(probe, "_all_text_map", lambda *_args, **_kwargs: ({}, []))
+    monkeypatch.setattr(probe, "_all_text_map", lambda *_args, **_kwargs: ({}, {}, []))
     monkeypatch.setattr(probe, "probe_installed_exe", lambda _root, *, needles: {"needles": []})
     result = probe.probe_dog_whistle_sources("g", "d", "p", {})
     assert result["chapterProgression"]["referencedKeyItemsThatAreItemRows"] == []
