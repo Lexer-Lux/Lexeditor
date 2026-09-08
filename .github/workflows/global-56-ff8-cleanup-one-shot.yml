@@ -1,0 +1,31 @@
+name: Global 56 FF8 cleanup one-shot
+
+on:
+  push:
+    branches:
+      - fix/global-56-info-bubble-centering
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/global-56-info-bubble-centering
+          fetch-depth: 0
+      - name: Remove remaining FF8 glyph overrides
+        run: python maintenance/global-56/remove-ff8-glyph-overrides.py
+      - name: Commit cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Remove remaining FF8 info-bubble glyph overrides (#56)"
+          git push origin HEAD:fix/global-56-info-bubble-centering
