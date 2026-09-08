@@ -12,6 +12,18 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from .archive import build_index, preferred_pak_version
+from .minimap_semantics import (
+    ENEMY_TERRITORY_TABLE_NAME,
+    HIDE_NAVIMAP_FIELD,
+    minimap_visibility_payload,
+    save_minimap_visibility_edits,
+)
+from .runtime_config import (
+    deploy_runtime,
+    load_runtime_config,
+    runtime_status,
+    save_runtime_config,
+)
 from .semantics import (
     ECONOMY_EDIT_FIELDS,
     ECONOMY_TABLE_NAMES,
@@ -108,6 +120,8 @@ def data_map_payload() -> dict:
             semantic.append("economy / prices when BuyValue/SaleValue fields exist")
         if asset_name == LOOT_TABLE_NAME:
             semantic.append("enemy normal/rare drops, chances and steal data")
+        if asset_name == ENEMY_TERRITORY_TABLE_NAME:
+            semantic.append("authored minimap forced-hide flags when HideNavimap is a scalar boolean")
         controls = (
             "Structured DataObject records; booleans, fixed-width numbers, floats "
             "and existing FNames are editable."
@@ -140,6 +154,17 @@ def data_map_payload() -> dict:
             "coverage": "structured",
             "status": "partial",
         })
+    rows.append({
+        "filename": "runtime/LexeditorFF7RRuntime.json + LexeditorFF7RRuntime.dll",
+        "target": "NativeMods runtime behavior",
+        "controls": "Cutscene base-speed multiplier and tap/hold minimap behavior.",
+        "notes": (
+            "Native runtime behavior is separate from PAK edits and is reported active only when "
+            "the native DLL is deployed with a detected loader candidate."
+        ),
+        "coverage": "runtime-contract",
+        "status": "partial",
+    })
     return {"rows": rows}
 
 
@@ -150,6 +175,7 @@ def info_payload() -> dict:
         for row in current.get("textAssets", [])
         if row.get("language")
     })
+    runtime = runtime_status(GAME_ROOT, PROJECT_ROOT)
     return {
         "gameRoot": str(GAME_ROOT),
         "dataRoot": str(DATA_ROOT),
@@ -158,6 +184,7 @@ def info_payload() -> dict:
         "textResources": len(current.get("textAssets", [])),
         "textLanguages": languages,
         "helper": helper_status(),
+        "runtime": runtime,
         "pakVersion": preferred_pak_version(current),
         "pakMountPoint": FF7R_MOUNT_POINT,
         "buildPath": str(PROJECT_ROOT / "build" / "Lexeditor-FF7R_P.pak"),
@@ -233,6 +260,23 @@ def _semantic_save_from_generic(asset: str, *, source_sha256: str,
             active_sha256=active_sha256,
             edits=semantic_edits,
         )
+
+    if asset_name == ENEMY_TERRITORY_TABLE_NAME and edits and all(
+        isinstance(edit, dict)
+        and edit.get("property") == HIDE_NAVIMAP_FIELD
+        and "index" not in edit
+        for edit in edits
+    ):
+        semantic_edits = [
+            {"entry": edit.get("entry"), "hideNavimap": edit.get("value")}
+            for edit in edits
+        ]
+        return save_minimap_visibility_edits(
+            GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
+            source_sha256=source_sha256,
+            active_sha256=active_sha256,
+            edits=semantic_edits,
+        )
     return None
 
 
@@ -293,8 +337,9 @@ class Handler(BaseHTTPRequestHandler):
                     "windowHost": "webview2",
                     "capabilities": [
                         "data-map", "dataobject", "text-resource", "economy",
-                        "enemy-loot", "save", "economy-save", "enemy-loot-save",
-                        "text-save", "build", "deploy",
+                        "enemy-loot", "minimap-visibility", "runtime-config",
+                        "save", "economy-save", "enemy-loot-save", "minimap-visibility-save",
+                        "text-save", "build", "deploy", "runtime-deploy",
                     ],
                 })
             if path == "/api/catalog":
@@ -303,6 +348,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(data_map_payload())
             if path == "/api/info":
                 return self.send_json(info_payload())
+            if path == "/api/runtime":
+                status = runtime_status(GAME_ROOT, PROJECT_ROOT)
+                status["config"] = load_runtime_config(PROJECT_ROOT)
+                return self.send_json(status)
             if path == "/api/data":
                 asset = (query.get("asset") or [""])[0]
                 if not asset:
@@ -323,6 +372,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(loot_payload(
                     GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(),
                     language=language, vanilla=vanilla,
+                ))
+            if path == "/api/minimap-visibility":
+                vanilla = (query.get("source") or [""])[0] == "vanilla"
+                return self.send_json(minimap_visibility_payload(
+                    GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), vanilla=vanilla,
                 ))
             if path == "/api/text":
                 asset = (query.get("asset") or [""])[0]
@@ -383,6 +437,24 @@ class Handler(BaseHTTPRequestHandler):
                     active_sha256=str(payload.get("activeSha256", "")),
                     edits=edits,
                 ))
+            if path == "/api/minimap-visibility/save":
+                asset = str(payload.get("asset", ""))
+                edits = payload.get("edits", [])
+                if not asset or not isinstance(edits, list):
+                    raise ValueError("asset and edits are required")
+                return self.send_json(save_minimap_visibility_edits(
+                    GAME_ROOT, DATA_ROOT, PROJECT_ROOT, catalog(), asset,
+                    source_sha256=str(payload.get("sourceSha256", "")),
+                    active_sha256=str(payload.get("activeSha256", "")),
+                    edits=edits,
+                ))
+            if path == "/api/runtime/save":
+                config = payload.get("config")
+                if not isinstance(config, dict):
+                    raise ValueError("config is required")
+                return self.send_json({"config": save_runtime_config(PROJECT_ROOT, config)})
+            if path == "/api/runtime/deploy":
+                return self.send_json(deploy_runtime(GAME_ROOT, PROJECT_ROOT))
             if path == "/api/text/save":
                 asset = str(payload.get("asset", ""))
                 edits = payload.get("edits", [])
