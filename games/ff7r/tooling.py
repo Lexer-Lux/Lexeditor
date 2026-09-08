@@ -18,6 +18,7 @@ from runtime_bootstrap import user_data_dir
 
 REPAK_VERSION = "0.2.3"
 REPAK_TAG = f"v{REPAK_VERSION}"
+FF7R_MOUNT_POINT = "../../../"
 # Public FF7R asset archive key, documented by the FF7R Data Editor project.
 FF7R_AES_KEY = "0x23989837645C9D28BA58072B2076E895B853A7C9E1C5591B814C4FD2A2D7B782"
 RELEASE_BASE = f"https://github.com/trumank/repak/releases/download/{REPAK_TAG}"
@@ -123,12 +124,13 @@ def _command(*args: str, binary: bool = False) -> subprocess.CompletedProcess:
 
 
 def list_pak(pak: Path) -> list[str]:
-    result = _command("list", str(Path(pak)))
+    result = _command("list", "--strip-prefix", FF7R_MOUNT_POINT, str(Path(pak)))
     return [line.strip().replace("\\", "/") for line in result.stdout.splitlines() if line.strip()]
 
 
 def get_file(pak: Path, internal_path: str) -> bytes:
-    result = _command("get", str(Path(pak)), internal_path, binary=True)
+    result = _command("get", "--strip-prefix", FF7R_MOUNT_POINT,
+                      str(Path(pak)), internal_path, binary=True)
     return bytes(result.stdout)
 
 
@@ -148,7 +150,10 @@ def pack_directory(source: Path, output: Path, *, version: str = "") -> Path:
     if not source.is_dir():
         raise FileNotFoundError(f"FF7R project content directory does not exist: {source}")
     output.parent.mkdir(parents=True, exist_ok=True)
-    command = [str(repak_path()), "pack", "--quiet"]
+    command = [
+        str(repak_path()), "pack", "--quiet",
+        "--mount-point", FF7R_MOUNT_POINT,
+    ]
     if version:
         command.extend(["--version", version])
     command.extend([str(source), str(output)])
