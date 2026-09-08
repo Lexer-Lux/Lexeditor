@@ -83,7 +83,9 @@ def build_index(game_root: Path, data_root: Path) -> dict:
     data_root.mkdir(parents=True, exist_ok=True)
     fixture_root = os.environ.get("LEXEDITOR_FF7R_TEST_DATAOBJECTS")
     if fixture_root:
-        return _with_virtual_assets(_fixture_index(Path(fixture_root).resolve()))
+        # Smoke fixtures are deliberately archive-only so existing service tests
+        # keep selecting their one generated gameplay resource deterministically.
+        return _fixture_index(Path(fixture_root).resolve())
 
     paks = installed_paks(game_root)
     if not paks:
