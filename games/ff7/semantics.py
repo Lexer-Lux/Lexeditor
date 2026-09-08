@@ -376,6 +376,7 @@ SPECIAL = {
 
 
 def metadata_for(category: str, key: str) -> dict:
+    if category == 'limitBreaks' and key in CORE['playerAttacks']: return dict(CORE['playerAttacks'][key])
     if category in CORE and key in CORE[category]: return dict(CORE[category][key])
     if category in SCENE and key in SCENE[category]: return dict(SCENE[category][key])
     if category in ("characters", "recruits") and key in CHARACTERS: return dict(CHARACTERS[key])
@@ -390,7 +391,9 @@ DEFAULT_GROUPS = {
     "items": "Effect", "weapons": "Combat", "armor": "Defense", "accessories": "Equipment",
     "characters": "Starting stats", "recruits": "Starting data", "enemies": "Stats / rewards",
     "enemyAttacks": "Attack", "encounters": "Battle setup", "shops": "Shop",
-    "prices": "Price", "fieldEncounters": "Encounter settings", "worldEncounters": "Encounter settings",
+    "prices": "Price", "limitBreaks": "Attack", "materiaEquipEffects": "Stat changes",
+    "itemSortOrder": "Menu ordering", "materiaPriority": "Menu ordering", "audioMixing": "Audio mixing",
+    "apMultiplier": "Economy", "fieldEncounters": "Encounter settings", "worldEncounters": "Encounter settings",
 }
 RAW_HINTS = (" id", " flags", " mask", " byte", "camera", "animation", "layout", "arena", "cover flags")
 
