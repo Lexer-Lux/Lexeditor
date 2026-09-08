@@ -1,21 +1,44 @@
 from games.ff7r.dog_whistle_safety import assess_dog_whistle_probe
 
 
-def _native_function_row(needle, function_rva, *next_hops, source="pdata"):
+def _inbound(*callers):
+    return {
+        "refs": [
+            {"sourceFunctionRva": caller, "kind": "call-rel32"}
+            for caller in callers
+        ]
+    }
+
+
+def _native_function_row(
+    needle,
+    function_rva,
+    *next_hops,
+    source="pdata",
+    callers=(),
+    next_hop_callers=(),
+):
+    xref = {
+        "candidateFunctionRva": function_rva,
+        "candidateFunctionSource": source,
+        "candidateFunctionCodeRefs": {
+            "refs": [
+                {
+                    "targetFunctionRva": target,
+                    **(
+                        {"targetFunctionInboundCodeRefs": _inbound(*next_hop_callers)}
+                        if next_hop_callers else {}
+                    ),
+                }
+                for target in next_hops
+            ],
+        },
+    }
+    if callers:
+        xref["candidateFunctionInboundCodeRefs"] = _inbound(*callers)
     return {
         "needle": needle,
-        "hits": [{
-            "leaRipXrefs": [{
-                "candidateFunctionRva": function_rva,
-                "candidateFunctionSource": source,
-                "candidateFunctionCodeRefs": {
-                    "refs": [
-                        {"targetFunctionRva": target}
-                        for target in next_hops
-                    ],
-                },
-            }],
-        }],
+        "hits": [{"leaRipXrefs": [xref]}],
     }
 
 
@@ -261,6 +284,30 @@ def test_exact_pdata_evidence_for_each_retarget_anchor_still_does_not_prove_call
     assert result["implementationReady"] is False
 
 
+def test_shared_retarget_inbound_caller_is_reported_without_proving_call_order():
+    result = assess_dog_whistle_probe(_report(
+        native_rows=[
+            _native_function_row("GetEnemyMembersRef", 0x1000, callers=(0x9000,)),
+            _native_function_row("GetBattleCharaSpec_DataTableID", 0x1100, callers=(0x9000,)),
+            _native_function_row("GetBattleAIControllerFromID", 0x1200, callers=(0x9000,)),
+            _native_function_row("SetTarget", 0x1300, callers=(0x9000,)),
+        ],
+    ))
+
+    runtime = result["runtimeRetarget"]
+    correlations = runtime["nativeCallerCorrelations"]
+    assert correlations["enumerationToBattleCharaId"] == [0x9000]
+    assert correlations["battleCharaIdToAiLookup"] == [0x9000]
+    assert correlations["aiLookupToSetTarget"] == [0x9000]
+    assert correlations["retargetStageCommonCallers"] == [0x9000]
+    assert runtime["nativeFunctionEvidence"]["SetTarget"]["directInboundCallerFunctions"] == [0x9000]
+    assert runtime["retargetFunctionEvidenceComplete"] is True
+    assert "runtime-retarget-function-path-unvalidated" in result["blockers"]
+    assert "runtime-retarget-semantics-unvalidated" in result["blockers"]
+    assert "whistle-user-character-mapping-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
 def test_item_classifier_and_ability_execution_bridge_still_do_not_prove_player_menu_commit():
     result = assess_dog_whistle_probe(_report(
         native_hits=[
@@ -300,12 +347,29 @@ def test_exact_item_and_ai_execution_functions_still_cannot_stand_in_for_player_
     assert runtime["playerItemCommandCommitValidated"] is False
 
 
-def test_padding_heuristic_runtime_owners_cannot_strengthen_function_evidence():
+def test_shared_item_execution_caller_still_cannot_stand_in_for_player_commit():
+    result = assess_dog_whistle_probe(_report(
+        native_rows=[
+            _native_function_row("IsItem", 0x2000, callers=(0x9100,)),
+            _native_function_row("RequestAIPCExecuteAbility", 0x2100, callers=(0x9100,)),
+        ],
+    ))
+
+    runtime = result["runtimeRetarget"]
+    assert runtime["nativeCallerCorrelations"]["itemClassifierToAbilityExecution"] == [0x9100]
+    assert runtime["itemAbilityFunctionEvidenceComplete"] is True
+    assert "runtime-item-ability-function-path-unvalidated" in result["blockers"]
+    assert "player-item-command-commit-hook-unresolved" in result["blockers"]
+    assert runtime["playerItemCommandCommitValidated"] is False
+    assert result["implementationReady"] is False
+
+
+def test_padding_heuristic_runtime_owners_cannot_strengthen_function_or_caller_evidence():
     result = assess_dog_whistle_probe(_report(
         native_rows=[
             _native_function_row(
                 "GetEnemyMembersRef", 0x1000, 0x5000,
-                source="padding-heuristic",
+                source="padding-heuristic", callers=(0x9000,),
             ),
             _native_function_row("GetBattleCharaSpec_DataTableID", 0x1100),
             _native_function_row("GetBattleAIControllerFromID", 0x1200),
@@ -317,6 +381,8 @@ def test_padding_heuristic_runtime_owners_cannot_strengthen_function_evidence():
     assert runtime["retargetPipelinePresent"] is True
     assert runtime["activeEnemyEnumerationFunctionCandidatePresent"] is False
     assert runtime["nativeFunctionEvidence"]["GetEnemyMembersRef"]["expandedPdataFunctions"] == []
+    assert runtime["nativeFunctionEvidence"]["GetEnemyMembersRef"]["expandedInboundCallerFunctions"] == []
+    assert runtime["nativeCallerCorrelations"]["retargetStageCommonCallers"] == []
     assert runtime["retargetFunctionEvidenceComplete"] is False
     assert "runtime-retarget-function-evidence-incomplete" in result["blockers"]
 
