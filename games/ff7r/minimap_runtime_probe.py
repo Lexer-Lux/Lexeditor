@@ -8,7 +8,8 @@ without mistaking generic NaviMap UI strings for callable hooks.
 Generated Remake data distinguishes the full-map menu action from a native map
 toggle action. Reflected names commonly point at Unreal registration glue, so
 exact PE ``.pdata`` function owners may also contribute conservative bounded
-next hops. Direct owners and next hops remain separate, unvalidated evidence.
+next hops. Direct owners, next hops, and exact inbound callers remain separate,
+unvalidated evidence.
 """
 
 from __future__ import annotations
@@ -66,9 +67,20 @@ def _needle_row(native: dict[str, Any], needle: str) -> dict[str, Any]:
     return {}
 
 
+def _caller_rvas(inbound: dict[str, Any] | None) -> set[int]:
+    callers: set[int] = set()
+    for ref in (inbound or {}).get("refs", ()):
+        value = ref.get("sourceFunctionRva")
+        if value is not None:
+            callers.add(int(value))
+    return callers
+
+
 def _function_evidence(native: dict[str, Any], needles: Iterable[str]) -> dict[str, set[int]]:
     direct: set[int] = set()
     next_hops: set[int] = set()
+    direct_callers: set[int] = set()
+    next_hop_callers: set[int] = set()
     for needle in needles:
         row = _needle_row(native, needle)
         for hit in row.get("hits", ()):
@@ -79,16 +91,31 @@ def _function_evidence(native: dict[str, Any], needles: Iterable[str]) -> dict[s
                     direct.add(int(value))
                 if source != "pdata":
                     continue
+                direct_callers.update(
+                    _caller_rvas(xref.get("candidateFunctionInboundCodeRefs"))
+                )
                 code_refs = xref.get("candidateFunctionCodeRefs") or {}
                 for ref in code_refs.get("refs", ()):
                     target = ref.get("targetFunctionRva")
                     if target is not None:
                         next_hops.add(int(target))
-    return {"direct": direct, "nextHops": next_hops}
+                    next_hop_callers.update(
+                        _caller_rvas(ref.get("targetFunctionInboundCodeRefs"))
+                    )
+    return {
+        "direct": direct,
+        "nextHops": next_hops,
+        "directCallers": direct_callers,
+        "nextHopCallers": next_hop_callers,
+    }
 
 
 def _all_functions(evidence: dict[str, set[int]]) -> set[int]:
     return set(evidence["direct"]) | set(evidence["nextHops"])
+
+
+def _all_callers(evidence: dict[str, set[int]]) -> set[int]:
+    return set(evidence["directCallers"]) | set(evidence["nextHopCallers"])
 
 
 def _hit_counts(native: dict[str, Any], needles: Iterable[str]) -> dict[str, int]:
@@ -121,12 +148,14 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
 
     state_direct_set = hide_gate["direct"] | show_hide["direct"] | triggers["direct"]
     state_all_set = _all_functions(hide_gate) | _all_functions(show_hide) | _all_functions(triggers)
+    state_caller_set = _all_callers(hide_gate) | _all_callers(show_hide) | _all_callers(triggers)
 
     # Only the two generated native action concepts may satisfy the input-path
     # classifier. MapJournal/TouchPad/OptionsButton rows remain useful navigation
     # evidence but cannot stand in for KeyboardMapMenu itself.
     action_direct_set = map_menu_action["direct"] | native_toggle["direct"]
     action_all_set = _all_functions(map_menu_action) | _all_functions(native_toggle)
+    action_caller_set = _all_callers(map_menu_action) | _all_callers(native_toggle)
 
     state_direct = hide_gate["direct"] & (show_hide["direct"] | triggers["direct"])
     state_reachable = _all_functions(hide_gate) & (_all_functions(show_hide) | _all_functions(triggers))
@@ -136,6 +165,15 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
     map_menu_reachable = _all_functions(map_menu_action) & state_all_set
     toggle_direct = native_toggle["direct"] & state_direct_set
     toggle_reachable = _all_functions(native_toggle) & state_all_set
+
+    # Common exact .pdata callers can expose a dispatcher/controller neighborhood
+    # even when the reflected-string owners are distinct. This is directional
+    # research evidence only and never substitutes for input-phase or state-write
+    # semantics.
+    input_state_caller_overlap = action_caller_set & state_caller_set
+    map_menu_state_caller_overlap = _all_callers(map_menu_action) & state_caller_set
+    toggle_state_caller_overlap = _all_callers(native_toggle) & state_caller_set
+    map_menu_toggle_caller_overlap = _all_callers(map_menu_action) & _all_callers(native_toggle)
 
     blockers: list[str] = []
     if not any(state_counts.values()):
@@ -187,6 +225,9 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
             "direct": sorted(evidence["direct"]),
             "nextHops": sorted(evidence["nextHops"]),
             "all": sorted(_all_functions(evidence)),
+            "directCallers": sorted(evidence["directCallers"]),
+            "nextHopCallers": sorted(evidence["nextHopCallers"]),
+            "allCallers": sorted(_all_callers(evidence)),
         }
 
     state_direct_rows = sorted(state_direct)
@@ -211,6 +252,7 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
                 "direct": sorted(action_direct_set),
                 "nextHops": sorted((map_menu_action["nextHops"] | native_toggle["nextHops"])),
                 "all": sorted(action_all_set),
+                "allCallers": sorted(action_caller_set),
             },
             "mapMenuInput": serialize(map_menu),
             "mapMenuSupport": serialize(map_menu_support),
@@ -224,6 +266,10 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
             "mapMenuStateReachableOverlap": sorted(map_menu_reachable),
             "toggleStateDirectOverlap": toggle_direct_rows,
             "toggleStateReachableOverlap": sorted(toggle_reachable),
+            "inputStateCallerOverlap": sorted(input_state_caller_overlap),
+            "mapMenuStateCallerOverlap": sorted(map_menu_state_caller_overlap),
+            "toggleStateCallerOverlap": sorted(toggle_state_caller_overlap),
+            "mapMenuToggleCallerOverlap": sorted(map_menu_toggle_caller_overlap),
             # Backward-compatible aliases for the direct-only classifier shape.
             "stateOverlap": state_direct_rows,
             "inputStateOverlap": input_direct_rows,
@@ -246,6 +292,7 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
             "MapJournal/TouchPad/OptionsButton anchors remain input/full-map navigation leads only; no controller binding or callable action is assumed from their names.",
             "Prefer routing a hold into the game's native KeyboardToggleMap action if installed callsite evidence proves it, rather than inventing toggle semantics from presentation calls.",
             "Bounded .pdata next hops are navigation evidence only; heuristic function bounds cannot strengthen the result.",
+            "Exact .pdata inbound-caller overlaps are directional dispatcher/controller leads only; they do not validate press/release phase, ABI, state ownership, or a safe hook site.",
             "The runtime tap/hold state machine is independently tested, but the installed input hook must still delay the vanilla tap action until release, consume it on a hold, toggle exactly once, and reassert the chosen state after automatic transitions.",
         ],
     }
