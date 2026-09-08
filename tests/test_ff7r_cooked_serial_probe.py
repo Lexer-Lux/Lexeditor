@@ -25,9 +25,12 @@ def _fixture():
         "ColorAndOpacity",
         "BrushTintColor",
         "RelativeLocation",
+        "BattleLockonMarker00Widget",
         "StructProperty",
+        "SoftClassProperty",
         "LinearColor",
         "Vector",
+        "/Game/UI/WBP_LockonDefault.WBP_LockonDefault_C",
         "RandomTintWord",
         "NotAPropertyType",
     ]
@@ -75,12 +78,24 @@ def _fixture():
         tag += struct.pack("<" + "f" * len(values), *values)
         return bytes(tag)
 
+    def soft_class_tag(name: str, asset_path: str) -> bytes:
+        value = _fname(ni[asset_path]) + struct.pack("<i", 0)
+        tag = bytearray()
+        tag += _fname(ni[name])
+        tag += _fname(ni["SoftClassProperty"])
+        tag += struct.pack("<ii", len(value), 0)
+        tag += b"\0"  # HasPropertyGuid for FileVersionUE4 >= 365.
+        tag += value
+        return bytes(tag)
+
     payload = bytearray()
     payload += struct_tag("ColorAndOpacity", "LinearColor", (0.0, 0.5, 1.0, 1.0))
-    # The first tag is 65 bytes, deliberately making this second valid tag
-    # unaligned. Bytewise scanning is required for old-format UE4 tags.
     payload += struct_tag("BrushTintColor", "LinearColor", (1.0, 1.0, 1.0, 1.0))
     payload += struct_tag("RelativeLocation", "Vector", (100.0, -25.5, 12.25))
+    payload += soft_class_tag(
+        "BattleLockonMarker00Widget",
+        "/Game/UI/WBP_LockonDefault.WBP_LockonDefault_C",
+    )
     payload += _fname(ni["RandomTintWord"])
     payload += _fname(ni["NotAPropertyType"])
 
@@ -140,6 +155,7 @@ def test_serialized_export_probe_maps_split_payload_and_versioned_property_layou
     assert color["linearColorValuePlausible"] is True
     assert color["linearColorValue"] == {"r": 0.0, "g": 0.5, "b": 1.0, "a": 1.0}
     assert color["vectorValuePlausible"] is False
+    assert color["softObjectPathValuePlausible"] is False
 
     assert brush["propertyTagLike"] is True
     assert brush["propertyTagHeaderPlausible"] is True
@@ -158,15 +174,12 @@ def test_serialized_export_probe_maps_split_payload_and_versioned_property_layou
     assert result["propertyTagLayoutPlausibleCount"] == 2
     assert result["linearColorValueCandidateCount"] == 2
     assert result["vectorValueCandidateCount"] == 0
+    assert result["softObjectPathValueCandidateCount"] == 0
 
 
 def test_exact_vector_struct_property_decodes_three_finite_float_components():
     uasset, uexp = _fixture()
-    result = extract_serialized_name_refs(
-        uasset,
-        uexp,
-        tokens=["RelativeLocation"],
-    )
+    result = extract_serialized_name_refs(uasset, uexp, tokens=["RelativeLocation"])
 
     assert result["vectorValueCandidateCount"] == 1
     ref = result["refs"][0]
@@ -176,6 +189,29 @@ def test_exact_vector_struct_property_decodes_three_finite_float_components():
     assert ref["vectorValuePlausible"] is True
     assert ref["vectorValue"] == {"x": 100.0, "y": -25.5, "z": 12.25}
     assert ref["linearColorValuePlausible"] is False
+    assert ref["softObjectPathValuePlausible"] is False
+
+
+def test_exact_soft_class_property_decodes_asset_path_and_empty_subpath():
+    uasset, uexp = _fixture()
+    result = extract_serialized_name_refs(
+        uasset,
+        uexp,
+        tokens=["BattleLockonMarker00Widget"],
+    )
+
+    assert result["softObjectPathValueCandidateCount"] == 1
+    ref = result["refs"][0]
+    assert ref["propertyType"] == "SoftClassProperty"
+    assert ref["propertyTagLayoutPlausible"] is True
+    assert ref["declaredValueSize"] == 12
+    assert ref["softObjectPathValuePlausible"] is True
+    assert ref["softObjectPathValue"] == {
+        "assetPath": "/Game/UI/WBP_LockonDefault.WBP_LockonDefault_C",
+        "subPath": "",
+    }
+    assert ref["linearColorValuePlausible"] is False
+    assert ref["vectorValuePlausible"] is False
 
 
 def test_property_type_match_with_invalid_generic_header_remains_weaker_evidence():
@@ -183,11 +219,7 @@ def test_property_type_match_with_invalid_generic_header_remains_weaker_evidence
     data = bytearray(uexp)
     struct.pack_into("<i", data, 16, -1)
 
-    result = extract_serialized_name_refs(
-        uasset,
-        bytes(data),
-        tokens=["ColorAndOpacity"],
-    )
+    result = extract_serialized_name_refs(uasset, bytes(data), tokens=["ColorAndOpacity"])
     ref = result["refs"][0]
     assert ref["propertyTagLike"] is True
     assert ref["propertyTagHeaderPlausible"] is False
@@ -204,17 +236,14 @@ def test_invalid_property_guid_marker_rejects_layout_without_rejecting_generic_h
     data = bytearray(uexp)
     data[48] = 2
 
-    result = extract_serialized_name_refs(
-        uasset,
-        bytes(data),
-        tokens=["ColorAndOpacity"],
-    )
+    result = extract_serialized_name_refs(uasset, bytes(data), tokens=["ColorAndOpacity"])
     ref = result["refs"][0]
     assert ref["propertyTagHeaderPlausible"] is True
     assert ref["propertyTagLayoutPlausible"] is False
     assert ref["valueOffset"] is None
     assert ref["linearColorValuePlausible"] is False
     assert ref["vectorValuePlausible"] is False
+    assert ref["softObjectPathValuePlausible"] is False
 
 
 def test_declared_value_must_fit_inside_export_before_layout_is_plausible():
@@ -222,11 +251,7 @@ def test_declared_value_must_fit_inside_export_before_layout_is_plausible():
     data = bytearray(uexp)
     struct.pack_into("<i", data, 16, 1000)
 
-    result = extract_serialized_name_refs(
-        uasset,
-        bytes(data),
-        tokens=["ColorAndOpacity"],
-    )
+    result = extract_serialized_name_refs(uasset, bytes(data), tokens=["ColorAndOpacity"])
     ref = result["refs"][0]
     assert ref["propertyTagHeaderPlausible"] is True
     assert ref["declaredValueSize"] == 1000
@@ -274,3 +299,4 @@ def test_unaligned_fname_lookalike_needs_full_type_metadata_before_becoming_stro
     assert ref["propertyTagLayoutPlausible"] is False
     assert ref["linearColorValuePlausible"] is False
     assert ref["vectorValuePlausible"] is False
+    assert ref["softObjectPathValuePlausible"] is False
