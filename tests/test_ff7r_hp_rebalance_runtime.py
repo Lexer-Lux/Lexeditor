@@ -133,7 +133,7 @@ def test_hp_rebalance_enabled_blocks_runtime_until_optional_hook_is_validated(tm
     assert status["hpRebalanceHookValidated"] is False
     assert status["requestedHooksValidated"] is False
     assert status["runtimeReady"] is False
-    with pytest.raises(RuntimeError, match="HP Rebalance hook is enabled but not validated"):
+    with pytest.raises(RuntimeError, match="requested runtime hooks are not validated: hpRebalance"):
         deploy_runtime(game, project)
 
     _write_manifest(project, hp_rebalance=True)
@@ -144,7 +144,7 @@ def test_hp_rebalance_enabled_blocks_runtime_until_optional_hook_is_validated(tm
 
 
 def test_runtime_manifest_accepts_hp_rebalance_only_as_supported_optional_hook():
-    payload = _write_manifest_payload = {
+    payload = {
         "manifestVersion": 1,
         "hooks": {
             "cutsceneSpeed": True,
