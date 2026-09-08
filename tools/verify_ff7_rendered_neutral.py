@@ -191,11 +191,40 @@ def test_holistic_ff7_concept_views_and_new_game_data(self):
     self.assertEqual(self.page.get_by_label("Back-attack damage multiplier for Enemy0", exact=True).get_attribute("step"),"0.125")
     self.originals_unchanged()
 
+
+def test_refined_master_and_detail_ux(self):
+    self.install(); self.open()
+
+    self.navigate("materia")
+    progression = self.page.get_by_label("Materia AP level progression", exact=True)
+    self.assertEqual(progression.count(), 1)
+    self.assertEqual(progression.locator('input[type="number"]').count(), 4)
+    self.assertEqual(self.page.locator('[data-concept="editable-description"] textarea').count(), 1)
+
+    self.navigate("characterAI")
+    row_name = self.page.evaluate("state.records.characterAI.find(r=>r.id===state.selected.characterAI).name")
+    event = self.page.get_by_label(f"AI event for {row_name}", exact=True)
+    self.assertEqual(event.evaluate("e=>e.tagName"), "SELECT")
+    self.assertEqual(event.locator("option").count(), 16)
+    self.assertEqual(self.page.locator(".ff7-detail textarea").count(), 1)
+    event.select_option("1")
+    main_label = self.page.evaluate("state.data.categories.find(c=>c.id==='characterAI').fields.find(f=>f.key==='script1').label")
+    self.assertEqual(self.page.get_by_label(f"{main_label} for {row_name}", exact=True).count(), 1)
+    self.assertEqual(self.page.locator(".ff7-detail textarea").count(), 1)
+
+    self.navigate("encounters")
+    self.assertEqual(self.page.evaluate("state.sort.encounters || null"), None)
+    main_text = self.page.locator("main").inner_text()
+    self.assertIn("Battle 2", main_text)
+    self.assertLess(main_text.find("Battle 2"), main_text.find("Battle 10"))
+    self.originals_unchanged()
+
 target.RenderedTests.open = open_with_neutral
 target.RenderedTests.test_materia_uses_human_semantic_controls = test_materia_uses_human_semantic_controls
 target.RenderedTests.test_full_ff7_surface_uses_human_controls = test_full_ff7_surface_uses_human_controls
 target.RenderedTests.test_accessory_description_is_editable_game_text = test_accessory_description_is_editable_game_text
 target.RenderedTests.test_holistic_ff7_concept_views_and_new_game_data = test_holistic_ff7_concept_views_and_new_game_data
+target.RenderedTests.test_refined_master_and_detail_ux = test_refined_master_and_detail_ux
 
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)
