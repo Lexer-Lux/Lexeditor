@@ -8,6 +8,13 @@ from typing import Any
 
 from .archive import extract_pair
 from .dataobject import DataObjectPackage, sha256_bytes
+from .runtime_dataobject import (
+    RUNTIME_PROBE_ASSET,
+    RUNTIME_TWEAKS_ASSET,
+    runtime_probe_package,
+    runtime_settings_package,
+    save_runtime_edits,
+)
 
 
 def _project_target(project_root: Path, asset: str, suffix: str) -> Path:
@@ -19,7 +26,12 @@ def _project_target(project_root: Path, asset: str, suffix: str) -> Path:
 
 
 def load_package(game_root: Path, data_root: Path, project_root: Path,
-                 index: dict, asset: str, *, vanilla: bool = False) -> tuple[DataObjectPackage, str, bool]:
+                 index: dict, asset: str, *, vanilla: bool = False):
+    if asset == RUNTIME_TWEAKS_ASSET:
+        return runtime_settings_package(game_root, project_root, vanilla=vanilla)
+    if asset == RUNTIME_PROBE_ASSET:
+        return runtime_probe_package(game_root)
+
     source_uasset, source_uexp = extract_pair(game_root, data_root, index, asset)
     source_sha = sha256_bytes(source_uexp.read_bytes())
     project_uasset = _project_target(project_root, asset, ".uasset")
@@ -36,6 +48,16 @@ def load_package(game_root: Path, data_root: Path, project_root: Path,
 def save_edits(game_root: Path, data_root: Path, project_root: Path,
                index: dict, asset: str, *, source_sha256: str,
                active_sha256: str, edits: list[dict[str, Any]]) -> dict:
+    if asset == RUNTIME_TWEAKS_ASSET:
+        return save_runtime_edits(
+            project_root,
+            source_sha256=source_sha256,
+            active_sha256=active_sha256,
+            edits=edits,
+        )
+    if asset == RUNTIME_PROBE_ASSET:
+        raise ValueError("FF7R Native Hook Probe is read-only")
+
     package, actual_source_sha, using_project = load_package(
         game_root, data_root, project_root, index, asset, vanilla=False)
     if actual_source_sha != source_sha256:
