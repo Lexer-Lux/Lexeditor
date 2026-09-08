@@ -17,6 +17,7 @@ from games.ff7r.runtime_config import (
     validate_runtime_manifest,
 )
 from games.ff7r.runtime_dataobject import runtime_settings_package, save_runtime_edits
+from games.ff7r.sprint_probe import assess_sprint_evidence
 
 
 FIXTURE_TIMESTAMP = 0x12345678
@@ -62,6 +63,24 @@ def _ready_runtime_files(game: Path, project: Path):
     binaries.mkdir(parents=True, exist_ok=True)
     (binaries / "dxgi.dll").write_bytes(b"fixture-proxy")
     _write_fixture_exe(game)
+
+
+def _native_function_needle(needle, function_rva, *targets, source="pdata"):
+    return {
+        "needle": needle,
+        "hits": [{
+            "leaRipXrefs": [{
+                "candidateFunctionRva": function_rva,
+                "candidateFunctionSource": source,
+                "candidateFunctionCodeRefs": {
+                    "refs": [
+                        {"targetFunctionRva": target}
+                        for target in targets
+                    ],
+                },
+            }],
+        }],
+    }
 
 
 def test_better_sprint_defaults_to_vanilla_one_x_and_old_configs_upgrade_in_memory(tmp_path):
@@ -169,3 +188,26 @@ def test_manifest_accepts_better_sprint_as_supported_optional_hook_and_rejects_u
 def test_native_probe_includes_sprint_research_needles():
     assert "DashRootMotionTranslationScale" in DEFAULT_NEEDLES
     assert "RunToDashBlendInputThreshold" in DEFAULT_NEEDLES
+
+
+def test_sprint_probe_correlates_only_exact_pdata_function_evidence():
+    native = {
+        "needles": [
+            _native_function_needle("DashRootMotionTranslationScale", 0x1000, 0x1500),
+            _native_function_needle("RunToDashBlendInputThreshold", 0x1100, 0x1600),
+            _native_function_needle("AnimNotify_EndModifyRootMotionScale", 0x1200, 0x1500, 0x1600),
+            _native_function_needle("RootMotionScale", 0x1300, 0x1700),
+            _native_function_needle("RootMotionTranslationScale", 0x1400, 0x1500),
+            _native_function_needle("PaddingOnly", 0x1500, source="padding-heuristic"),
+        ]
+    }
+
+    result = assess_sprint_evidence(native, [])
+    correlations = result["nativeFunctionCorrelations"]
+    assert correlations["dashToAnimationRootMotion"] == [0x1500]
+    assert correlations["runToDashToAnimationRootMotion"] == [0x1600]
+    assert correlations["dashToGeneralRootMotion"] == [0x1500]
+    assert result["nativeNeedleStats"]["DashRootMotionTranslationScale"]["pdataFunctions"] == 1
+    assert result["nativeFunctionEvidence"]["PaddingOnly"]["expandedPdataFunctions"] == []
+    assert result["implementationReady"] is False
+    assert "authoritative-player-sprint-speed-path-unvalidated" in result["blockers"]
