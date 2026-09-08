@@ -3,10 +3,17 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
+import pytest
+
 from games.ff7r.dataobject import (
     BOOLEAN_BYTE, BYTE, INT32, NAME, STRING,
 )
-from games.ff7r.semantics import economy_payload, loot_payload
+from games.ff7r.semantics import (
+    economy_payload,
+    loot_payload,
+    save_economy_edits,
+    save_loot_edits,
+)
 
 
 def _fstring(value: str) -> bytes:
@@ -198,3 +205,80 @@ def test_semantics_fail_closed_when_known_schema_is_absent(tmp_path):
     assert economy["available"] is False
     loot = loot_payload(tmp_path, tmp_path / "cache", tmp_path / "project", index)
     assert loot["available"] is False
+
+
+def test_economy_semantic_save_maps_to_authoritative_fields(tmp_path):
+    index = _fixture_index(tmp_path)
+    project = tmp_path / "project"
+    before = economy_payload(tmp_path, tmp_path / "cache", project, index)
+    table = before["tables"][0]
+
+    result = save_economy_edits(
+        tmp_path, tmp_path / "cache", project, index, table["asset"],
+        source_sha256=table["sourceSha256"],
+        active_sha256=table["activeSha256"],
+        edits=[
+            {"entry": 0, "field": "buy", "value": 1250},
+            {"entry": 1, "field": "canSell", "value": False},
+        ],
+    )
+    assert result["surface"] == "economy"
+    assert result["saved"] == 2
+
+    after = economy_payload(tmp_path, tmp_path / "cache", project, index)
+    rows = after["tables"][0]["rows"]
+    assert rows[0]["fields"]["BuyValue"]["value"] == 1250
+    assert rows[1]["fields"]["CanSale"]["value"] is False
+
+    with pytest.raises(ValueError, match="Unknown economy field"):
+        save_economy_edits(
+            tmp_path, tmp_path / "cache", project, index, table["asset"],
+            source_sha256=after["tables"][0]["sourceSha256"],
+            active_sha256=after["tables"][0]["activeSha256"],
+            edits=[{"entry": 0, "field": "BuyValue", "value": 1}],
+        )
+
+
+def test_loot_semantic_save_preserves_group_meaning_and_validates_chance(tmp_path):
+    index = _fixture_index(tmp_path)
+    project = tmp_path / "project"
+    before = loot_payload(tmp_path, tmp_path / "cache", project, index)
+
+    result = save_loot_edits(
+        tmp_path, tmp_path / "cache", project, index, before["asset"],
+        source_sha256=before["sourceSha256"],
+        active_sha256=before["activeSha256"],
+        edits=[
+            {"entry": 0, "kind": "normal", "index": 0,
+             "field": "item", "value": "WEP_CLOUD_01"},
+            {"entry": 0, "kind": "normal", "index": 0,
+             "field": "chance", "value": 75},
+            {"entry": 0, "kind": "steal", "index": 0,
+             "field": "quantity", "value": 3},
+        ],
+    )
+    assert result["surface"] == "enemy-loot"
+    assert result["saved"] == 3
+
+    after = loot_payload(tmp_path, tmp_path / "cache", project, index)
+    groups = {group["kind"]: group for group in after["rows"][0]["groups"]}
+    assert groups["normal"]["slots"][0]["item"] == "WEP_CLOUD_01"
+    assert groups["normal"]["slots"][0]["chance"] == 75
+    assert groups["steal"]["slots"][0]["quantity"] == 3
+
+    with pytest.raises(ValueError, match="integer from 0 to 100"):
+        save_loot_edits(
+            tmp_path, tmp_path / "cache", project, index, after["asset"],
+            source_sha256=after["sourceSha256"],
+            active_sha256=after["activeSha256"],
+            edits=[{"entry": 0, "kind": "normal", "index": 0,
+                    "field": "chance", "value": 101}],
+        )
+    with pytest.raises(ValueError, match="does not expose a chance"):
+        save_loot_edits(
+            tmp_path, tmp_path / "cache", project, index, after["asset"],
+            source_sha256=after["sourceSha256"],
+            active_sha256=after["activeSha256"],
+            edits=[{"entry": 0, "kind": "steal", "index": 0,
+                    "field": "chance", "value": 50}],
+        )
