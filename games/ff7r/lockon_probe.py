@@ -14,6 +14,7 @@ split-package export mapping can be proven from the installed package header.
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any, Iterable
 
 from .cooked_serial_probe import probe_installed_serialized_exports
@@ -130,6 +131,17 @@ def _contains_any(value: str, terms: Iterable[str]) -> bool:
     return any(str(term).casefold() in folded for term in terms)
 
 
+def _contains_dedicated_widget_anchor(value: str) -> bool:
+    """Match the dedicated class/setting without swallowing numbered slot names."""
+    folded = value.casefold()
+    if "endbattlelockonmarkericon" in folded:
+        return True
+    return re.search(
+        r"(?<![a-z0-9_])battlelockonmarker(?![a-z0-9_])",
+        folded,
+    ) is not None
+
+
 def _literal_lock_on_label(value: str) -> bool:
     normalized = " ".join(value.strip().casefold().replace("-", " ").split())
     return normalized in {"lock on", "lockon"}
@@ -147,11 +159,11 @@ def _is_child_of_dedicated_owner(row: dict[str, Any]) -> bool:
         str(row.get("outerPath") or ""),
         str(row.get("objectPath") or ""),
     ))
-    return _contains_any(ownership, WIDGET_ANCHORS)
+    return _contains_dedicated_widget_anchor(ownership)
 
 
 def _serialized_ref_is_dedicated(row: dict[str, Any]) -> bool:
-    return _contains_any(_object_searchable(row), WIDGET_ANCHORS)
+    return _contains_dedicated_widget_anchor(_object_searchable(row))
 
 
 def _needle_counts(native: dict[str, Any]) -> dict[str, int]:
@@ -234,7 +246,10 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
             if row.get("linearColorValuePlausible")
         ]
 
-        widget_hits = [row for row in strings if _contains_any(str(row.get("text", "")), WIDGET_ANCHORS)]
+        widget_hits = [
+            row for row in strings
+            if _contains_dedicated_widget_anchor(str(row.get("text", "")))
+        ]
         marker_slot_hits = [
             row for row in strings
             if _contains_any(str(row.get("text", "")), MARKER_SLOT_ANCHORS)
@@ -251,7 +266,7 @@ def rank_lockon_assets(assets: Iterable[dict[str, Any]]) -> list[dict[str, Any]]
         ]
         resolved_owners = [
             row for row in objects
-            if _contains_any(_object_searchable(row), WIDGET_ANCHORS)
+            if _contains_dedicated_widget_anchor(_object_searchable(row))
         ]
         resolved_label_children = [
             row for row in objects
