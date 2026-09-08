@@ -15,21 +15,44 @@ def _package(asset, properties, entries):
     )
 
 
-def _native_hit(needle, function_rva, *next_hops, source="pdata"):
+def _inbound(*callers):
+    return {
+        "refs": [
+            {"sourceFunctionRva": caller, "kind": "call-rel32"}
+            for caller in callers
+        ]
+    }
+
+
+def _native_hit(
+    needle,
+    function_rva,
+    *next_hops,
+    source="pdata",
+    callers=(),
+    next_hop_callers=(),
+):
+    xref = {
+        "candidateFunctionRva": function_rva,
+        "candidateFunctionSource": source,
+        "candidateFunctionCodeRefs": {
+            "refs": [
+                {
+                    "targetFunctionRva": target,
+                    **(
+                        {"targetFunctionInboundCodeRefs": _inbound(*next_hop_callers)}
+                        if next_hop_callers else {}
+                    ),
+                }
+                for target in next_hops
+            ],
+        },
+    }
+    if callers:
+        xref["candidateFunctionInboundCodeRefs"] = _inbound(*callers)
     return {
         "needle": needle,
-        "hits": [{
-            "leaRipXrefs": [{
-                "candidateFunctionRva": function_rva,
-                "candidateFunctionSource": source,
-                "candidateFunctionCodeRefs": {
-                    "refs": [
-                        {"targetFunctionRva": target}
-                        for target in next_hops
-                    ],
-                },
-            }],
-        }],
+        "hits": [{"leaRipXrefs": [xref]}],
     }
 
 
@@ -164,6 +187,34 @@ def test_hp_native_assessment_correlates_exact_max_and_current_hp_paths():
     assert "authoritative-max-hp-recalculation-interception-unvalidated" in result["blockers"]
 
 
+def test_hp_native_assessment_reports_shared_inbound_callers_without_clearing_role_links():
+    native = {
+        "needles": [
+            _native_hit("BPSetPlayerHPMax", 0x1000, callers=(0x9000,)),
+            _native_hit("BPGetPlayerHPMax", 0x2000, callers=(0x9000,)),
+            _native_hit("BPGetPlayerStatus", 0x3000, callers=(0x9000,)),
+            _native_hit("BPSetPlayerHP", 0x4000, callers=(0x9100,)),
+            _native_hit("BPGetPlayerHP", 0x4100, callers=(0x9100,)),
+            _native_hit("GetHPMax", 0x7000, callers=(0x9000,)),
+        ]
+    }
+
+    result = probe.assess_hp_native_evidence(native)
+    correlations = result["functionCorrelations"]
+    assert correlations["maxWriteToMaxRead"] == []
+    assert correlations["maxWriteToMaxReadCallers"] == [0x9000]
+    assert correlations["maxWriteToStatusCallers"] == [0x9000]
+    assert correlations["statusToMaxReadCallers"] == [0x9000]
+    assert correlations["currentWriteToCurrentReadCallers"] == [0x9100]
+    assert correlations["genericToExactCallers"] == [0x9000]
+    assert result["functionEvidence"]["BPSetPlayerHPMax"]["directInboundCallerFunctions"] == [0x9000]
+    assert result["genericAnchorCallerFunctions"] == [0x9000]
+    assert "max-hp-setter-reader-link-unvalidated" in result["blockers"]
+    assert "current-hp-clamp-reader-writer-link-unvalidated" in result["blockers"]
+    assert "authoritative-max-hp-recalculation-interception-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
 def test_generic_hp_names_cannot_satisfy_exact_player_api_roles():
     result = probe.assess_hp_native_evidence({
         "needles": [
@@ -199,14 +250,19 @@ def test_hp_native_assessment_marks_multi_api_direct_owner_as_registration_colli
     assert result["implementationReady"] is False
 
 
-def test_hp_native_assessment_ignores_padding_heuristic_function_owners():
+def test_hp_native_assessment_ignores_padding_heuristic_function_owners_and_callers():
     result = probe.assess_hp_native_evidence({
         "needles": [
-            _native_hit("BPSetPlayerHPMax", 0x2000, 0x5000, source="padding-heuristic"),
-            _native_hit("GetHPMax", 0x3000, source="padding-heuristic"),
+            _native_hit(
+                "BPSetPlayerHPMax", 0x2000, 0x5000,
+                source="padding-heuristic", callers=(0x9000,),
+            ),
+            _native_hit("GetHPMax", 0x3000, source="padding-heuristic", callers=(0x9000,)),
         ]
     })
 
     assert result["functionEvidence"]["BPSetPlayerHPMax"]["expandedPdataFunctions"] == []
+    assert result["functionEvidence"]["BPSetPlayerHPMax"]["expandedInboundCallerFunctions"] == []
     assert result["genericAnchorFunctions"] == []
+    assert result["genericAnchorCallerFunctions"] == []
     assert "player-max-hp-setter-function-unresolved" in result["blockers"]
