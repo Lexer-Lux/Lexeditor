@@ -50,6 +50,26 @@ ATB_NATIVE_NEEDLES = (
     *HIT_EVENT_NEEDLES,
 )
 
+# Public Remake combat measurements plus independent ResidentParameter mods give
+# useful vanilla fingerprints for the installed table. They are deliberately
+# not mapped to a row solely by value: many unrelated ResidentParameter rows can
+# share 0.0/1.0/0.1, so the installed tag and behavior still have to agree.
+DOCUMENTED_VANILLA_ATB_REFERENCES = {
+    "internalUnitsPerDisplayedBar": 1000.0,
+    "normalGaugeInternalUnits": 2000.0,
+    "playerPassiveMultiplier": 1.0,
+    "aiPassiveMultiplier": 0.35,
+    "cautionMultiplier": 0.0,
+    "actionMultiplier": 0.0,
+    "aiActionMultiplier": 0.25,
+    "guardMultiplier": 0.1,
+    "damageMultiplier": 0.0,
+    "dodgeMultiplier": 0.0,
+    "suspendActionMultiplier": 0.0,
+    "hasteMultiplier": 1.4,
+    "slowMultiplier": 0.6,
+}
+
 
 def _hit_count(native: dict[str, Any], needle: str) -> int:
     for row in native.get("needles", ()):
@@ -150,6 +170,8 @@ def assess_atb_runtime_evidence(
             "abilityCostsEditableNow": ability_rows > 0 and not discovery_errors,
             "residentSemanticsValidated": False,
             "unitsValidated": False,
+            "documentedVanillaReference": dict(DOCUMENTED_VANILLA_ATB_REFERENCES),
+            "documentedReferenceValidatedAgainstInstalledRows": False,
         },
         "runtimeResearch": {
             "accumulatorCandidatePresent": accumulator_candidates,
@@ -179,10 +201,12 @@ def assess_atb_runtime_evidence(
             "hitModifier": "EEndEquipmentSkillEffectType::HitBonusATBRecoverAdd (0x6E)",
             "hitEventEnum": "EEndBattleCountLogType exposes HitSuccess and PerHitSuccess variants separately",
             "startModifier": "EEndEquipmentSkillEffectType::StartATBAdd",
+            "displayedBarReference": "community measurement: 1000 internal ATB units per displayed bar; 2000-unit normal gauge",
         },
         "notes": [
             "BattleAbility.ATB is an authored int32 action-cost field; it is not evidence about ATB generation and its mapping to displayed ATB bars must be verified before labeling units.",
             "GuardReaction*AddATB_Array explicitly identifies guard-generated ATB as authored float values and can be edited as data; their conversion to displayed bars is still unvalidated.",
+            "Public Remake measurements and ResidentParameter mods independently document 1.0 player passive, 0.35 AI passive, 0.1 guard, 0.0 dodge/action, 1.4 Haste and 0.6 Slow behavior. These are validation fingerprints only until exact installed row tags are correlated.",
             "ResidentParameter rows containing ATB remain candidates until each requested baseline/Speed/hit term is semantically identified on the installed build. GetResidentParameterFloatBP is a useful native reader anchor when present.",
             "BattleCharaSpec declares int32 ATB and StartATB fields; they are retained as explicit research candidates rather than assumed to be player passive generation coefficients.",
             "BPGetPlayerDexterity identifies the runtime stat source corresponding to the player's Speed/Dexterity stat, but not the coefficient used by ATB generation.",
