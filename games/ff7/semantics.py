@@ -444,3 +444,23 @@ for level in ("11","12","21","22","31","32","4"):
 CHARACTERS["levelProgress"] = _field(label="Starting level progress", group="Starting progression", help="Progress within the current level at initialization (0–255 gauge).")
 for i in range(1,5):
     CHARACTERS[f"limitHpDivisor{i}"] = _field(label=f"Limit level {i} HP divisor", group="Limit gain", help="HP-loss divisor used by FF7's Limit gauge gain calculation for this Limit level.")
+
+# The KERNEL has nine physical character-data slots, but FF7's character ID
+# namespace has eleven identities because slots 6/7 are reused for Young Cloud
+# and Sephiroth. Party bytes store the identity, not the physical KERNEL slot.
+CHARACTER_IDENTITIES = (
+    (0, "Cloud"), (1, "Barret"), (2, "Tifa"), (3, "Aerith"), (4, "Red XIII"),
+    (5, "Yuffie"), (6, "Cait Sith"), (7, "Vincent"), (8, "Cid"),
+    (9, "Young Cloud"), (10, "Sephiroth"),
+)
+CHARACTERS["storedId"] = _field(
+    label="Character identity", dataType="enum", choices=choices(*CHARACTER_IDENTITIES),
+    group="Identity",
+    help="Stored FF7 character ID. The KERNEL still has only nine physical initialization slots; IDs 9/10 identify Young Cloud/Sephiroth when the shared slots are reused.",
+)
+for index, key in enumerate(("party1", "party2", "party3"), 1):
+    CORE["initialState"][key] = _field(
+        label=f"Party member {index}", dataType="enum",
+        choices=choices((0xFF, "None"), *CHARACTER_IDENTITIES), group="Starting party",
+        help="Character identity placed in this new-game party slot. FF7 supports IDs 0–10; 255 means none.",
+    )
