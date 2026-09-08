@@ -32,12 +32,18 @@ MINIMAP_TRIGGER_NEEDLES = (
     "trgCmn_NaviMap_Update_On",
     "trgCmn_NaviMap_Update_Off",
 )
-MAP_MENU_INPUT_NEEDLES = (
+MAP_MENU_SUPPORT_NEEDLES = (
     "EndFieldOnOffTable_DisableTouchPad",
     "EndFieldOnOffTable_DisableOptionsButton",
     "EndFieldOnOffTable_ShowMapJournal",
     "MapJournal",
+)
+MAP_MENU_ACTION_NEEDLES = (
     "KeyboardMapMenu",
+)
+MAP_MENU_INPUT_NEEDLES = (
+    *MAP_MENU_SUPPORT_NEEDLES,
+    *MAP_MENU_ACTION_NEEDLES,
 )
 MINIMAP_TOGGLE_INPUT_NEEDLES = (
     "KeyboardToggleMap",
@@ -98,6 +104,8 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
     trigger_counts = _hit_counts(native, MINIMAP_TRIGGER_NEEDLES)
     input_counts = _hit_counts(native, MAP_INPUT_NEEDLES)
     map_menu_counts = _hit_counts(native, MAP_MENU_INPUT_NEEDLES)
+    map_menu_support_counts = _hit_counts(native, MAP_MENU_SUPPORT_NEEDLES)
+    map_menu_action_counts = _hit_counts(native, MAP_MENU_ACTION_NEEDLES)
     toggle_input_counts = _hit_counts(native, MINIMAP_TOGGLE_INPUT_NEEDLES)
 
     hide_gate = _function_evidence(
@@ -106,18 +114,26 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
     )
     show_hide = _function_evidence(native, ("BPShowNavimap", "BPHideNavimap"))
     triggers = _function_evidence(native, MINIMAP_TRIGGER_NEEDLES)
+    map_menu_support = _function_evidence(native, MAP_MENU_SUPPORT_NEEDLES)
+    map_menu_action = _function_evidence(native, MAP_MENU_ACTION_NEEDLES)
     map_menu = _function_evidence(native, MAP_MENU_INPUT_NEEDLES)
     native_toggle = _function_evidence(native, MINIMAP_TOGGLE_INPUT_NEEDLES)
 
     state_direct_set = hide_gate["direct"] | show_hide["direct"] | triggers["direct"]
     state_all_set = _all_functions(hide_gate) | _all_functions(show_hide) | _all_functions(triggers)
-    input_direct_set = map_menu["direct"] | native_toggle["direct"]
-    input_all_set = _all_functions(map_menu) | _all_functions(native_toggle)
+
+    # Only the two generated native action concepts may satisfy the input-path
+    # classifier. MapJournal/TouchPad/OptionsButton rows remain useful navigation
+    # evidence but cannot stand in for KeyboardMapMenu itself.
+    action_direct_set = map_menu_action["direct"] | native_toggle["direct"]
+    action_all_set = _all_functions(map_menu_action) | _all_functions(native_toggle)
 
     state_direct = hide_gate["direct"] & (show_hide["direct"] | triggers["direct"])
     state_reachable = _all_functions(hide_gate) & (_all_functions(show_hide) | _all_functions(triggers))
-    input_direct = input_direct_set & state_direct_set
-    input_reachable = input_all_set & state_all_set
+    input_direct = action_direct_set & state_direct_set
+    input_reachable = action_all_set & state_all_set
+    map_menu_direct = map_menu_action["direct"] & state_direct_set
+    map_menu_reachable = _all_functions(map_menu_action) & state_all_set
     toggle_direct = native_toggle["direct"] & state_direct_set
     toggle_reachable = _all_functions(native_toggle) & state_all_set
 
@@ -128,8 +144,14 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
         blockers.append("hide-state-writer-function-unresolved")
     if not _all_functions(show_hide) and not _all_functions(triggers):
         blockers.append("show-hide-state-function-unresolved")
-    if not _all_functions(map_menu):
+
+    if not any(map_menu_action_counts.values()):
+        blockers.append("native-map-menu-input-anchor-unresolved")
         blockers.append("map-button-full-map-function-unresolved")
+    elif not _all_functions(map_menu_action):
+        blockers.append("native-map-menu-input-function-unresolved")
+        blockers.append("map-button-full-map-function-unresolved")
+
     if not any(toggle_input_counts.values()):
         blockers.append("native-minimap-toggle-input-anchor-unresolved")
     elif not _all_functions(native_toggle):
@@ -144,6 +166,11 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
             blockers.append("tap-hold-input-next-hop-to-minimap-unvalidated")
         else:
             blockers.append("tap-hold-input-to-minimap-link-unvalidated")
+    if _all_functions(map_menu_action) and not map_menu_direct:
+        if map_menu_reachable:
+            blockers.append("native-map-menu-input-next-hop-to-state-unvalidated")
+        else:
+            blockers.append("native-map-menu-input-to-state-link-unvalidated")
     if _all_functions(native_toggle) and not toggle_direct:
         if toggle_reachable:
             blockers.append("native-toggle-input-next-hop-to-state-unvalidated")
@@ -164,6 +191,7 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
 
     state_direct_rows = sorted(state_direct)
     input_direct_rows = sorted(input_direct)
+    map_menu_direct_rows = sorted(map_menu_direct)
     toggle_direct_rows = sorted(toggle_direct)
     return {
         "implementationReady": False,
@@ -172,22 +200,28 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
         "triggerNeedleHits": trigger_counts,
         "inputNeedleHits": input_counts,
         "mapMenuNeedleHits": map_menu_counts,
+        "mapMenuSupportNeedleHits": map_menu_support_counts,
+        "mapMenuActionNeedleHits": map_menu_action_counts,
         "toggleInputNeedleHits": toggle_input_counts,
         "candidateFunctions": {
             "hideGate": serialize(hide_gate),
             "showHide": serialize(show_hide),
             "stateTrigger": serialize(triggers),
             "mapInput": {
-                "direct": sorted(input_direct_set),
-                "nextHops": sorted((map_menu["nextHops"] | native_toggle["nextHops"])),
-                "all": sorted(input_all_set),
+                "direct": sorted(action_direct_set),
+                "nextHops": sorted((map_menu_action["nextHops"] | native_toggle["nextHops"])),
+                "all": sorted(action_all_set),
             },
             "mapMenuInput": serialize(map_menu),
+            "mapMenuSupport": serialize(map_menu_support),
+            "mapMenuAction": serialize(map_menu_action),
             "nativeToggleInput": serialize(native_toggle),
             "stateDirectOverlap": state_direct_rows,
             "stateReachableOverlap": sorted(state_reachable),
             "inputStateDirectOverlap": input_direct_rows,
             "inputStateReachableOverlap": sorted(input_reachable),
+            "mapMenuStateDirectOverlap": map_menu_direct_rows,
+            "mapMenuStateReachableOverlap": sorted(map_menu_reachable),
             "toggleStateDirectOverlap": toggle_direct_rows,
             "toggleStateReachableOverlap": sorted(toggle_reachable),
             # Backward-compatible aliases for the direct-only classifier shape.
@@ -208,8 +242,9 @@ def assess_minimap_runtime_evidence(native: dict[str, Any]) -> dict[str, Any]:
         "notes": [
             "EndFieldOnOffTable_HideNaviMap is a Remake-native central state anchor and is distinct from authored EnemyTerritory.HideNavimap rows.",
             "BPShowNavimap/BPHideNavimap are presentation APIs; their presence alone does not prove the automatic visibility writer.",
-            "Generated EOptionCategory distinguishes KeyboardMapMenu from KeyboardToggleMap. Prefer routing a hold into the game's native toggle action if installed callsite evidence proves it, rather than inventing toggle semantics from presentation calls.",
-            "MapJournal/TouchPad/OptionsButton anchors are input/full-map research leads only; no controller binding is assumed from their names.",
+            "Generated EOptionCategory distinguishes KeyboardMapMenu from KeyboardToggleMap. The classifier now requires KeyboardMapMenu itself for the native full-map action; MapJournal/TouchPad/OptionsButton gates cannot satisfy that requirement.",
+            "MapJournal/TouchPad/OptionsButton anchors remain input/full-map navigation leads only; no controller binding or callable action is assumed from their names.",
+            "Prefer routing a hold into the game's native KeyboardToggleMap action if installed callsite evidence proves it, rather than inventing toggle semantics from presentation calls.",
             "Bounded .pdata next hops are navigation evidence only; heuristic function bounds cannot strengthen the result.",
             "The runtime tap/hold state machine is independently tested, but the installed input hook must still delay the vanilla tap action until release, consume it on a hold, toggle exactly once, and reassert the chosen state after automatic transitions.",
         ],
