@@ -41,7 +41,7 @@ VIRTUAL_ASSET_ROWS = (
     },
 )
 
-_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v1").hexdigest()
+_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v2").hexdigest()
 
 
 @dataclass(frozen=True)
@@ -112,10 +112,14 @@ def _runtime_properties() -> list[VirtualProperty]:
         VirtualProperty("MinimapPersistChosenState", "Persist Chosen Minimap State", "BOOL", True, 0, 1),
         VirtualProperty("MinimapTapBehavior", "Map Button Tap", "STRING"),
         VirtualProperty("MinimapHoldBehavior", "Map Button Hold", "STRING"),
+        VirtualProperty("HPRebalanceEnabled", "HP Rebalance Enabled", "BOOL", True, 0, 1),
+        VirtualProperty("HPMultiplier", "HP Multiplier", "FLOAT", True, 0.000001, None),
+        VirtualProperty("HPRebalanceHookValidated", "HP Rebalance Hook Validated", "BOOL"),
         VirtualProperty("LoaderCandidatePresent", "Native Loader Detected", "BOOL"),
         VirtualProperty("ProjectDllPresent", "Runtime DLL Built", "BOOL"),
         VirtualProperty("ManifestPresent", "Validation Manifest Present", "BOOL"),
-        VirtualProperty("HooksValidated", "All Runtime Hooks Validated", "BOOL"),
+        VirtualProperty("HooksValidated", "Core Runtime Hooks Validated", "BOOL"),
+        VirtualProperty("RequestedHooksValidated", "All Enabled Runtime Hooks Validated", "BOOL"),
         VirtualProperty("BuildSupported", "Installed EXE Build Supported", "BOOL"),
         VirtualProperty("RuntimeReady", "Runtime Ready To Deploy", "BOOL"),
         VirtualProperty("RuntimeActive", "Runtime Active", "BOOL"),
@@ -131,6 +135,7 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
     status = runtime_status(game_root, project_root)
     cutscene = config["cutsceneSpeed"]
     minimap = config["minimap"]
+    hp_rebalance = config["hpRebalance"]
     values = {
         "CutsceneEnabled": cutscene["enabled"],
         "CutsceneBaseMultiplier": cutscene["baseMultiplier"],
@@ -140,10 +145,14 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
         "MinimapPersistChosenState": minimap["persistChosenState"],
         "MinimapTapBehavior": minimap["tapBehavior"],
         "MinimapHoldBehavior": minimap["holdBehavior"],
+        "HPRebalanceEnabled": hp_rebalance["enabled"],
+        "HPMultiplier": hp_rebalance["hpMultiplier"],
+        "HPRebalanceHookValidated": status["hpRebalanceHookValidated"],
         "LoaderCandidatePresent": status["loaderCandidatePresent"],
         "ProjectDllPresent": status["projectDllPresent"],
         "ManifestPresent": status["manifestPresent"],
         "HooksValidated": status["hooksValidated"],
+        "RequestedHooksValidated": status["requestedHooksValidated"],
         "BuildSupported": status["buildSupported"],
         "RuntimeReady": status["runtimeReady"],
         "RuntimeActive": status["active"],
@@ -222,6 +231,8 @@ _EDIT_PATHS = {
     "MinimapEnabled": ("minimap", "enabled"),
     "MinimapHoldMilliseconds": ("minimap", "holdMilliseconds"),
     "MinimapPersistChosenState": ("minimap", "persistChosenState"),
+    "HPRebalanceEnabled": ("hpRebalance", "enabled"),
+    "HPMultiplier": ("hpRebalance", "hpMultiplier"),
 }
 
 
