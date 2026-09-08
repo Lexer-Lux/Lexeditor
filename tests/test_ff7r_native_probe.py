@@ -41,10 +41,14 @@ def fixture_pe():
     data[0x208:0x210] = b"\xCC" * 8
     displacement = 0x2020 - 0x1017
     data[0x210:0x217] = b"\x48\x8D\x0D" + struct.pack("<i", displacement)
+    # Give the candidate function a recognizable trailing byte sequence so the
+    # raw function window proves it is reading the executable bytes, not merely
+    # echoing the string/xref metadata.
+    data[0x217:0x21B] = b"\x48\x83\xEC\x28"
     return bytes(data)
 
 
-def test_probe_maps_current_pe_timestamp_strings_and_lea_xrefs():
+def test_probe_maps_current_pe_timestamp_strings_xrefs_and_byte_windows():
     result = probe_bytes(fixture_pe(), needles=["NaviMap", "FastForward"])
     assert result["timestamp"] == 0x12345678
     assert result["timestampHex"] == "0x12345678"
@@ -53,13 +57,33 @@ def test_probe_maps_current_pe_timestamp_strings_and_lea_xrefs():
     ascii_hit = next(hit for hit in navimap["hits"] if hit["encoding"] == "ascii")
     assert ascii_hit["rva"] == 0x2020
     assert ascii_hit["va"] == 0x140002020
-    assert ascii_hit["leaRipXrefs"] == [{
-        "instructionRva": 0x1010,
-        "instructionVa": 0x140001010,
-        "candidateFunctionRva": 0x1010,
-        "candidateFunctionVa": 0x140001010,
-    }]
+    assert len(ascii_hit["leaRipXrefs"]) == 1
+    xref = ascii_hit["leaRipXrefs"][0]
+    assert xref["instructionRva"] == 0x1010
+    assert xref["instructionVa"] == 0x140001010
+    assert xref["candidateFunctionRva"] == 0x1010
+    assert xref["candidateFunctionVa"] == 0x140001010
+
+    context = xref["xrefContext"]
+    assert context["section"] == ".text"
+    assert context["startRva"] == 0x1000
+    assert context["focusRva"] == 0x1010
+    assert context["focusOffset"] == 16
+    assert context["byteCount"] == 48
+    context_bytes = bytes.fromhex(context["hex"])
+    assert context_bytes[8:16] == b"\xCC" * 8
+    assert context_bytes[16:23] == b"\x48\x8D\x0D" + struct.pack("<i", 0x2020 - 0x1017)
+
+    function = xref["candidateFunctionBytes"]
+    assert function["startRva"] == 0x1010
+    assert function["focusOffset"] == 0
+    assert function["byteCount"] == 64
+    function_bytes = bytes.fromhex(function["hex"])
+    assert function_bytes[:7] == b"\x48\x8D\x0D" + struct.pack("<i", 0x2020 - 0x1017)
+    assert function_bytes[7:11] == b"\x48\x83\xEC\x28"
+
     assert result["needles"][1]["hits"] == []
+    assert any("byte windows" in note for note in result["notes"])
 
 
 def test_probe_rejects_non_pe_and_truncated_images():
