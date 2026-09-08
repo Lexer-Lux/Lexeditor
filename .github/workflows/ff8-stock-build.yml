@@ -1,7 +1,7 @@
 name: Build FF8 shared stock compatibility
 on:
   push:
-    branches: [fix/ff8-backlog-runtime]
+    branches: [master]
     paths: [.github/workflows/ff8-stock-build.yml]
   workflow_dispatch:
 permissions:
