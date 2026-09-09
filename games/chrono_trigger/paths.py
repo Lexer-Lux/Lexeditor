@@ -25,9 +25,10 @@ def check() -> list[str]:
     problems: list[str] = []
     for relative in (
         "editor.html", "plugin.py", "server.py", "paths.py", "resources.py", "resource_view.py",
-        "coverage.py", "data.py", "labels.py", "events.py", "field_commands.py", "semantic.py",
-        "scene_tables.py", "scene_maps.py", "worlds.py", "world_tables.py", "world_scripts.py",
-        "changes.py", "ctp.py", "ctext_manager.py", "deployment.py", "integrity.py",
+        "inventory.py", "coverage.py", "data.py", "labels.py", "events.py", "field_commands.py",
+        "semantic.py", "scene_tables.py", "scene_maps.py", "scene_render.py", "worlds.py",
+        "world_tables.py", "world_scripts.py", "changes.py", "ctp.py", "ctext_manager.py",
+        "deployment.py", "integrity.py",
     ):
         target = PLUGIN_ROOT / relative
         if not target.is_file():
