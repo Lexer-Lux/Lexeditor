@@ -190,6 +190,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     page.get_by_role("button", name="Refresh", exact=True).click()
                     page.wait_for_function("palBuildState?.ready === true && palWorkshopState?.ready === true && palLoaderState?.readOnly === true && !palBuildLoading")
                     loader = page.evaluate("palLoaderState")
+                    assert loader["readOnly"] is True
                     assert loader["active"] is True
                     assert loader["listed"] is True
                     assert loader["packageName"] == "BrowserFixture"
@@ -209,7 +210,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert (local_target / "PalSchema" / "Balance" / "raw" / "balance.json").is_file()
                     assert not (local_target / ".workshop.json").exists()
                     assert not (local_target / "PalSchema" / "Balance" / "raw" / "balance.json.lexeditor.bak").exists()
-                    assert "Mod Management" in page.locator(".pal-detail").inner_text()
+                    loader_after_deploy = page.evaluate("palLoaderState")
+                    assert loader_after_deploy["readOnly"] is True
+                    assert loader_after_deploy["active"] is True
+                    assert loader_after_deploy["listed"] is True
                     page.get_by_role("button", name="Remove local deployment", exact=True).click()
                     page.wait_for_function("palWorkshopState?.deployed === false && !palBuildLoading")
                     assert not local_target.exists()
