@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import threading
 
+from .community_metadata import read_community_dependencies
 from .module_data import is_singleplayer_module, read_submodule
 
 
@@ -89,10 +90,11 @@ def selected_module(game_root: Path, project: Path) -> tuple[str, Path]:
 def module_load_order(game_root: Path, project: Path) -> list[str]:
     """Resolve the enabled module set and topologically sort Bannerlord relations.
 
-    Non-optional ``DependedModule`` entries are enabled recursively. Optional
-    dependencies constrain order only when the dependency is already in the
-    enabled set, matching Bannerlord launcher semantics. ``ModulesToLoadAfterThis``
-    adds the inverse edge without enabling its target.
+    Native non-optional ``DependedModule`` entries and BLSE/BUTR community
+    dependency metadata are enabled recursively. Optional dependencies constrain
+    order only when the dependency is already in the enabled set. Native
+    ``ModulesToLoadAfterThis`` and community ``LoadAfterThis`` rows add inverse
+    ordering edges without changing that optional-module rule.
     """
     modules = installed_modules(game_root)
     selected_id, installed = _selected_module_from_index(project, modules)
@@ -104,6 +106,7 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
         )
 
     metadata_cache: dict[str, dict] = {selected_id: selected_metadata}
+    community_cache: dict[str, list[dict]] = {}
 
     def metadata(module_id: str) -> dict:
         if module_id not in metadata_cache:
@@ -112,6 +115,14 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
                 raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
             metadata_cache[module_id] = read_submodule(folder / "SubModule.xml")
         return metadata_cache[module_id]
+
+    def community(module_id: str) -> list[dict]:
+        if module_id not in community_cache:
+            folder = modules.get(module_id)
+            if folder is None:
+                raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
+            community_cache[module_id] = read_community_dependencies(folder / "SubModule.xml")
+        return community_cache[module_id]
 
     included: set[str] = set()
     preference: list[str] = []
@@ -128,6 +139,11 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
         for dependency in metadata(module_id).get("dependencies", []):
             dependency_id = str(dependency.get("id") or "").strip()
             if not dependency_id or dependency.get("optional"):
+                continue
+            include_required(dependency_id)
+        for dependency in community(module_id):
+            dependency_id = str(dependency.get("id") or "").strip()
+            if not dependency_id or dependency.get("optional") or dependency.get("incompatible"):
                 continue
             include_required(dependency_id)
         visiting.remove(module_id)
@@ -170,6 +186,24 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
             incompatible_id = str(relation.get("id") or "").strip()
             if incompatible_id in included:
                 conflicts.append((module_id, incompatible_id))
+
+        for relation in community(module_id):
+            related_id = str(relation.get("id") or "").strip()
+            if not related_id:
+                continue
+            if relation.get("incompatible"):
+                if related_id in included:
+                    conflicts.append((module_id, related_id))
+                continue
+            if related_id not in included:
+                if not relation.get("optional"):
+                    raise RuntimeError(f"Required Bannerlord dependency is not enabled: {related_id}")
+                continue
+            order = relation.get("order")
+            if order == "LoadBeforeThis":
+                add_edge(related_id, module_id)
+            elif order == "LoadAfterThis":
+                add_edge(module_id, related_id)
 
     if conflicts:
         rows = ", ".join(f"{left} ↔ {right}" for left, right in conflicts)
