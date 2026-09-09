@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from . import server as base
 from .bitmap_font import bitmap_font_asset_file, ensure_installed_bitmap_font
+from .bitmap_font_sources import discover_documented_bitmap_font_paths
 from .theme import theme_asset_file, theme_payload
 
 
@@ -32,11 +33,23 @@ def themed_editor_html() -> str:
 def themed_payload(*, scan: bool) -> dict:
     payload = theme_payload(base.GAME_ROOT, base.DATA_ROOT, scan=scan)
     cooked_fonts = payload.get("cookedSources", {}).get("fonts", []) if scan else []
-    payload["bitmapFont"] = ensure_installed_bitmap_font(
+    bitmap_font = ensure_installed_bitmap_font(
         base.GAME_ROOT,
         base.DATA_ROOT,
         cooked_fonts,
     )
+    # The general cooked report is intentionally a bounded diagnostic sample.
+    # If that sample omitted the known font pair, do one narrow exact-suffix
+    # manifest scan rather than broadening the heuristic source classifier.
+    if scan and not bitmap_font.get("sourceFound"):
+        exact_sources = discover_documented_bitmap_font_paths(base.GAME_ROOT)
+        if exact_sources:
+            bitmap_font = ensure_installed_bitmap_font(
+                base.GAME_ROOT,
+                base.DATA_ROOT,
+                exact_sources,
+            )
+    payload["bitmapFont"] = bitmap_font
     return payload
 
 
