@@ -9,6 +9,7 @@ on:
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
+      - 'ui/ffx-x2-accessories.js'
       - 'ui/credits-sources.json'
       - 'ui/credits.json'
       - 'ui/mod-loading.json'
@@ -20,6 +21,7 @@ on:
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
+      - 'ui/ffx-x2-accessories.js'
       - 'ui/credits-sources.json'
       - 'ui/credits.json'
       - 'ui/mod-loading.json'
@@ -54,6 +56,7 @@ jobs:
         run: >-
           python -c "from pathlib import Path; import re; s=Path('games/ffx_x2/editor.html').read_text(encoding='utf-8'); Path('ffx-x2-inline.js').write_text('\n'.join(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)), encoding='utf-8')"
           && node --check ffx-x2-inline.js
+          && node --check ui/ffx-x2-accessories.js
       - name: Plugin and metadata contracts
         run: >-
           python -c "from games.ffx_x2.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ffx_x2.server' in SERVICE_MODULES; print(PLUGIN.name)"
