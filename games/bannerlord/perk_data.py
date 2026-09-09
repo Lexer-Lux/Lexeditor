@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import shutil
 
-from .paths import contained_project_path
+from .paths import clear_write_helper, contained_project_path
 
 
 _STRING = r'"(?:\\.|[^"\\])*"'
@@ -160,8 +160,10 @@ def save_perk_definitions(project: Path, edits: list[dict]) -> dict:
 
     backup = path.with_name(path.name + ".lexeditor.bak")
     if changed_records:
+        clear_write_helper(backup)
         shutil.copy2(path, backup)
         temporary = path.with_name(path.name + ".lexeditor.tmp")
+        clear_write_helper(temporary)
         temporary.write_text(candidate, encoding="utf-8")
         temporary.replace(path)
     result = read_perk_definitions(project)
@@ -242,8 +244,10 @@ def save_xp_source_definitions(project: Path, edits: list[dict]) -> dict:
 
     backup = path.with_name(path.name + ".lexeditor.bak")
     if changed_records:
+        clear_write_helper(backup)
         shutil.copy2(path, backup)
         temporary = path.with_name(path.name + ".lexeditor.tmp")
+        clear_write_helper(temporary)
         temporary.write_text(candidate, encoding="utf-8")
         temporary.replace(path)
     result = read_xp_source_definitions(project)
