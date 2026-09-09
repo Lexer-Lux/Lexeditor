@@ -42,6 +42,10 @@ class PackageNameCollisionError(RuntimeError):
     pass
 
 
+class LoaderRefreshError(RuntimeError):
+    """Raised when Palworld would not recopy a changed package on next launch."""
+
+
 def _project_paths(project: Path) -> tuple[Path, Path]:
     project = Path(project).resolve()
     build_root = project / package_build.BUILD_DIRNAME
@@ -112,21 +116,43 @@ def _atomic_write(path: Path, payload: bytes) -> None:
         Path(temp_name).unlink(missing_ok=True)
 
 
-def _read_package_name(info_path: Path) -> str:
+def _read_info(info_path: Path) -> dict[str, Any]:
     try:
         raw = info_path.read_bytes()
-    except OSError:
-        return ""
+    except OSError as error:
+        raise RuntimeError(f"Could not read Palworld package Info.json: {error}") from error
     if len(raw) > MAX_INFO_BYTES:
-        return ""
+        raise RuntimeError("Palworld package Info.json exceeds the local-deployment safety limit")
     try:
         value = json.loads(raw.decode("utf-8-sig"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return ""
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RuntimeError(f"Could not parse Palworld package Info.json: {error}") from error
     if not isinstance(value, dict):
+        raise RuntimeError("Palworld package Info.json root must be an object")
+    return value
+
+
+def _read_package_name(info_path: Path) -> str:
+    try:
+        value = _read_info(info_path)
+    except RuntimeError:
         return ""
     package_name = value.get("PackageName")
     return package_name if isinstance(package_name, str) else ""
+
+
+def _loader_identity(package_root: Path) -> tuple[str, str, bool]:
+    info = _read_info(Path(package_root) / "Info.json")
+    package_name = info.get("PackageName")
+    version = info.get("Version", "")
+    debug_mode = info.get("DebugMode", False)
+    if not isinstance(package_name, str) or not package_name:
+        raise RuntimeError("Clean Palworld build has no PackageName")
+    if not isinstance(version, str):
+        raise RuntimeError("Clean Palworld build Version must be a string")
+    if not isinstance(debug_mode, bool):
+        raise RuntimeError("Clean Palworld build DebugMode must be true or false")
+    return package_name, version, debug_mode
 
 
 def package_name_collisions(root: Path, package_name: str, *, exclude: Path | None = None) -> list[str]:
@@ -150,7 +176,6 @@ def package_name_collisions(root: Path, package_name: str, *, exclude: Path | No
 
 def _new_local_folder(root: Path) -> str:
     for _attempt in range(100):
-        # Exactly ten decimal digits, matching Pocketpair's local-test uploader pattern.
         value = str(secrets.randbelow(9_000_000_000) + 1_000_000_000)
         candidate = root / value
         if not candidate.exists() and not candidate.is_symlink():
@@ -166,7 +191,6 @@ def _current_root(game_root: Path | None, *, create: bool) -> Path:
 
 
 def _owned_target(manifest: dict[str, Any], root: Path) -> Path:
-    """Resolve ownership from the *current* root, never by following manifest paths."""
     root = Path(root).resolve()
     recorded_root = Path(manifest["workshopRoot"]).expanduser().resolve()
     if recorded_root != root:
@@ -174,8 +198,6 @@ def _owned_target(manifest: dict[str, Any], root: Path) -> Path:
             "This project owns a local deployment in a different Workshop root; remove it there before changing roots."
         )
     target = root / manifest["folder"]
-    # The manifest folder was validated as exactly ten digits. Do not call
-    # target.resolve(): the target itself could have been replaced by a symlink.
     if target.parent.resolve() != root:
         raise WorkshopOwnershipError("Owned local deployment path escapes the current Workshop root")
     return target
@@ -212,10 +234,17 @@ def status(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
         "targetPath": "",
         "packageName": build_status.get("packageName", ""),
         "buildCurrent": bool(build_status.get("current")),
+        "deployedVersion": "",
+        "deployedDebugMode": False,
     }
     if manifest is None:
         return payload
-    payload.update({"owned": True, "folder": manifest["folder"]})
+    payload.update({
+        "owned": True,
+        "folder": manifest["folder"],
+        "deployedVersion": str(manifest.get("version", "")),
+        "deployedDebugMode": manifest.get("debugMode") is True,
+    })
     if root is None:
         payload["rootMismatch"] = True
         return payload
@@ -251,7 +280,7 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
         raise RuntimeError("Build a current clean Palworld package snapshot before local deployment")
     source = Path(build_status["packagePath"]).resolve()
     package_digest = str(build_status["currentDigest"])
-    package_name = str(build_status.get("packageName", ""))
+    package_name, version, debug_mode = _loader_identity(source)
 
     root = _current_root(game_root, create=True)
     _build_root, manifest_path = _project_paths(project)
@@ -268,6 +297,11 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
     else:
         target = _owned_target(manifest, root)
         folder = manifest["folder"]
+        deployed_name = str(manifest.get("packageName", ""))
+        if deployed_name and package_name != deployed_name:
+            raise WorkshopOwnershipError(
+                "PackageName changed after local deployment; remove the old local deployment before creating a new loader identity."
+            )
         if target.is_symlink():
             raise WorkshopChangedError(
                 "The owned Palworld local deployment was replaced by a link; refusing to follow or overwrite it."
@@ -285,6 +319,11 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
                 )
             if current_digest == package_digest:
                 return status(project, game_root=game_root)
+            deployed_version = str(manifest.get("version", ""))
+            if not debug_mode and deployed_version and version == deployed_version:
+                raise LoaderRefreshError(
+                    "The clean package changed but Version is unchanged and DebugMode is false; Palworld would keep the old installed copy. Change Version or enable DebugMode before updating the local test deployment."
+                )
         else:
             raise WorkshopOwnershipError("Local deployment manifest exists but its owned Workshop folder is missing")
 
@@ -315,6 +354,8 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
             "folder": folder,
             "packageName": package_name,
             "packageDigest": package_digest,
+            "version": version,
+            "debugMode": debug_mode,
         }
         _atomic_write(
             manifest_path,
