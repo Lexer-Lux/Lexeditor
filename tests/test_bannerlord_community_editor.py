@@ -53,14 +53,14 @@ class BannerlordCommunityEditorTests(unittest.TestCase):
             self.assertEqual(saved["version"], "v2.1.0-v2.9.*")
             self.assertTrue(saved["optional"])
 
-    def test_new_blse_row_uses_current_lowercase_attribute_shape(self):
+    def test_new_blse_incompatible_row_uses_current_lowercase_attribute_shape(self):
         with tempfile.TemporaryDirectory() as name:
             path = Path(name) / "SubModule.xml"
             path.write_text('<Module><Id value="Example" /></Module>', encoding="utf-8")
             result = save_module(path, {"communityDependencies": [{
                 "index": None,
                 "id": "New.Library",
-                "order": "LoadBeforeThis",
+                "order": "",
                 "version": "v1.2.*",
                 "optional": False,
                 "incompatible": True,
@@ -69,7 +69,8 @@ class BannerlordCommunityEditorTests(unittest.TestCase):
             row = result["module"]["communityDependencies"][0]
             self.assertEqual(row["id"], "New.Library")
             rewritten = path.read_text(encoding="utf-8")
-            self.assertIn('<DependedModuleMetadata id="New.Library" order="LoadBeforeThis" version="v1.2.*" incompatible="true"', rewritten)
+            self.assertIn('<DependedModuleMetadata id="New.Library" version="v1.2.*" incompatible="true"', rewritten)
+            self.assertNotIn('order=', rewritten)
             self.assertNotIn('optional="false"', rewritten)
 
     def test_invalid_blse_order_and_empty_id_are_rejected(self):
