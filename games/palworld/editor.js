@@ -4,7 +4,7 @@ const {el,detailPanel,detailSection,detailField,panelLayout,readonlyField,infoHe
 const TYPES=["Paks","Lua","LogicMods","UE4SS","PalSchema"];
 const OFFICIAL_TAGS=["PalSchema","UE4SS","Model Replacement","Utilities","Gameplay","User Interface"];
 let tab="package",info=null,model=null,savedModel=null,mapRows=[],shell=null;
-let palCatalog=[],palPath="",palPatch=null,palSaved=null,palSelected="";
+let palCatalog=[],palPath="",palPatch=null,palSaved=null,palSelected="",palError="";
 const clone=value=>JSON.parse(JSON.stringify(value));
 const packageDirty=()=>model&&savedModel&&JSON.stringify(model)!==JSON.stringify(savedModel);
 const patchDirty=()=>palPatch&&palSaved&&JSON.stringify(palPatch.records)!==JSON.stringify(palSaved.records);
@@ -98,7 +98,7 @@ function scalarControl(record){
 }
 function patchList(){
   const rows=palPatch?.records||[];
-  if(!rows.length)return el("div",{class:"pal-empty"},"No raw-table properties found in this patch.");
+  if(!rows.length)return el("div",{class:"pal-empty"},"No readable raw-table properties in this patch.");
   return el("div",{class:"pal-patch-list"},...rows.map(row=>{
     const key=recordKey(row);
     return el("button",{type:"button",class:`pal-patch-row${key===palSelected?" selected":""}`,onclick:()=>{palSelected=key;render()}},
@@ -111,7 +111,7 @@ function patchList(){
 }
 function patchDetail(){
   const record=selectedPatchRecord();
-  if(!record)return detailPanel({className:"pal-detail",title:"PalSchema",identity:"RAW",meta:"No selected property",body:[detailSection({title:"PATCH",body:[detailField({label:"STATUS",control:readonlyField("No patch property selected")})]})]});
+  if(!record)return detailPanel({className:"pal-detail",title:"PalSchema",identity:"RAW",meta:"No selected property",body:[detailSection({title:"PATCH",body:[detailField({label:"STATUS",control:readonlyField(palError||"No patch property selected")})]})]});
   const reason=record.writable?"Existing scalar property; Lexeditor preserves its JSON type.":(record.reason||"Read-only.");
   return detailPanel({className:"pal-detail",title:record.field,identity:record.row,meta:record.table,body:[
     detailSection({title:"TARGET",body:[
@@ -128,8 +128,11 @@ function patchDetail(){
   ]});
 }
 function patchSelector(){
-  const select=el("select",{disabled:patchDirty(),onchange:async event=>{await selectPatch(event.target.value)}},...palCatalog.map(row=>{const option=el("option",{value:row.path},`${row.mod} / ${row.name}${row.writable?"":" (read only)"}`);option.selected=row.path===palPath;return option}));
-  return el("div",{class:"pal-patch-toolbar"},el("span",{class:"pal-patch-label"},"RAW PATCH"),select,patchDirty()?el("span",{class:"pal-issue"},"Save or discard current patch edits before switching files."):null);
+  const select=el("select",{disabled:patchDirty(),onchange:async event=>{await selectPatch(event.target.value)}},...palCatalog.map(row=>{
+    const suffix=row.errors?` (${row.errors} error${row.errors===1?"":"s"})`:row.writable?"":" (read only)";
+    const option=el("option",{value:row.path},`${row.mod} / ${row.name}${suffix}`);option.selected=row.path===palPath;return option;
+  }));
+  return el("div",{class:"pal-patch-toolbar"},el("span",{class:"pal-patch-label"},"RAW PATCH"),select,patchDirty()?el("span",{class:"pal-issue"},"Save or discard current patch edits before switching files."):null,palError?el("span",{class:"pal-issue error"},palError):null);
 }
 function palschemaPanel(){
   if(!palCatalog.length)return detailPanel({className:"pal-detail",title:"PalSchema",identity:"RAW",meta:"No raw patches discovered",body:[detailSection({title:"DISCOVERY",body:[detailField({label:"STATUS",control:readonlyField("No direct <PalSchema target>/<mod>/raw/*.json[c] files found")}),detailField({label:"BOUNDARY",control:readonlyField("Only official Type=PalSchema InstallRule Targets are scanned")})]})]});
@@ -151,7 +154,11 @@ function render(){
 }
 async function selectPatch(path){
   if(patchDirty())return;
-  palPath=path;palPatch=path?await api(`/api/palschema/patch?path=${encodeURIComponent(path)}`):null;palSaved=palPatch?clone(palPatch):null;palSelected=palPatch?.records?.length?recordKey(palPatch.records[0]):"";render();
+  palPath=path;palError="";
+  try{
+    palPatch=path?await api(`/api/palschema/patch?path=${encodeURIComponent(path)}`):null;palSaved=palPatch?clone(palPatch):null;palSelected=palPatch?.records?.length?recordKey(palPatch.records[0]):"";
+  }catch(error){palPatch=null;palSaved=null;palSelected="";palError=error.message}
+  render();
 }
 function patchEdits(){
   if(!palPatch||!palSaved)return[];const before=new Map(palSaved.records.map(row=>[recordKey(row),row]));
@@ -170,7 +177,11 @@ function navigate(value){tab=value;render()}
 async function init(){
   try{
     const results=await Promise.all([api("/api/info"),api("/api/data-map"),api("/api/palschema/catalog")]);info=results[0];mapRows=results[1].rows||[];palCatalog=results[2].patches||[];model=clone(info.data);savedModel=clone(model);
-    if(palCatalog.length){palPath=palCatalog[0].path;palPatch=await api(`/api/palschema/patch?path=${encodeURIComponent(palPath)}`);palSaved=clone(palPatch);palSelected=palPatch.records.length?recordKey(palPatch.records[0]):""}
+    if(palCatalog.length){
+      const candidate=palCatalog.find(row=>!row.errors);
+      if(candidate){palPath=candidate.path;try{palPatch=await api(`/api/palschema/patch?path=${encodeURIComponent(palPath)}`);palSaved=clone(palPatch);palSelected=palPatch.records.length?recordKey(palPatch.records[0]):""}catch(error){palPatch=null;palSaved=null;palSelected="";palError=error.message}}
+      else{palPath=palCatalog[0].path;palError="No readable PalSchema raw patches; malformed files remain listed for repair."}
+    }
     shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"palworld",name:"Palworld",themeName:"palworld",theme:{accent:"#55c7d9","accent-text":"#08262c"}},tabs:[{id:"package",label:"Package"},{id:"palschema",label:"PalSchema"}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Palworld Data Map",dirtyCount,save,discard,projectSnapshot:()=>({canCreate:true,projects:[{name:model?.ModName||model?.PackageName||"Palworld package",path:info?.project||"",valid:true,current:true}]}),info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Palworld setup and runtime information"});
     render();LexeditorUI.finishPluginLoading();
   }catch(error){document.querySelector("#main").replaceChildren(el("div",{class:"pal-issue error"},`Palworld project could not open: ${error.message}`));LexeditorUI.finishPluginLoading()}
