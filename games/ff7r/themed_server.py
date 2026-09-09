@@ -6,6 +6,7 @@ from http.server import ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
 from . import server as base
+from .bitmap_font import bitmap_font_asset_file, ensure_installed_bitmap_font
 from .theme import theme_asset_file, theme_payload
 
 
@@ -26,6 +27,17 @@ def themed_editor_html() -> str:
     # palette instead of being partially overwritten during mountShell().
     source = source.replace(_BODY_CLOSE, _THEME_JS + "\n" + _BODY_CLOSE, 1)
     return source
+
+
+def themed_payload(*, scan: bool) -> dict:
+    payload = theme_payload(base.GAME_ROOT, base.DATA_ROOT, scan=scan)
+    cooked_fonts = payload.get("cookedSources", {}).get("fonts", []) if scan else []
+    payload["bitmapFont"] = ensure_installed_bitmap_font(
+        base.GAME_ROOT,
+        base.DATA_ROOT,
+        cooked_fonts,
+    )
+    return payload
 
 
 class Handler(base.Handler):
@@ -50,11 +62,12 @@ class Handler(base.Handler):
             if path == "/theme/ff7r.js":
                 return self.send_file(base.PLUGIN_ROOT / "theme.js")
             if path == "/api/theme":
-                return self.send_json(theme_payload(
-                    base.GAME_ROOT,
-                    base.DATA_ROOT,
-                    scan=query.get("scan") == ["1"],
-                ))
+                return self.send_json(themed_payload(scan=query.get("scan") == ["1"]))
+            if path == "/theme-assets/font-atlas.png":
+                target = bitmap_font_asset_file(base.DATA_ROOT)
+                if target is None:
+                    return self.send_json({"error": "FF7R bitmap font atlas not found"}, 404)
+                return self.send_file(target)
             if path.startswith("/theme-assets/"):
                 relative = unquote(path.removeprefix("/theme-assets/"))
                 target = theme_asset_file(base.DATA_ROOT, relative)
