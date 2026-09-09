@@ -12,11 +12,10 @@ U8 = 0xFF
 SCRIPT_MEM_START = 0x7F0200
 SCRIPT_MEM_LAST = SCRIPT_MEM_START + U8 * 2
 MOVEMENT_OPCODES = frozenset({
-    0x8F, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A,
+    0x8F, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0x9D,
     0xA0, 0xA1, 0xB5, 0xB6,
 })
 _PC_TARGET_OPCODES = frozenset({0x8F, 0x95, 0x99, 0xB6})
-_OBJECT_TARGET_OPCODES = frozenset({0x94, 0x98, 0xB5})
 _DIRECT_COORD_OPCODES = frozenset({0x96, 0xA0})
 _MEMORY_COORD_OPCODES = frozenset({0x97, 0xA1})
 
@@ -59,7 +58,7 @@ def _layout(command: dict) -> tuple[int, bytearray] | None:
         0x94: 1, 0x95: 1,
         0x96: 2, 0x97: 2,
         0x98: 2, 0x99: 2,
-        0x9A: 3,
+        0x9A: 3, 0x9D: 2,
         0xA0: 2, 0xA1: 2,
         0xB5: 1, 0xB6: 1,
     }[opcode]
@@ -90,6 +89,8 @@ def movement_field_specs(command: dict) -> list[dict] | None:
         return [number("x", "X coordinate byte"), number("y", "Y coordinate byte")]
     if opcode in _MEMORY_COORD_OPCODES:
         return [address("xAddress", "X coordinate source"), address("yAddress", "Y coordinate source")]
+    if opcode == 0x9D:
+        return [address("directionAddress", "Direction source"), address("magnitudeAddress", "Magnitude source")]
     if opcode == 0x98:
         return [number("objectId", "Object ID"), number("distance", "Distance")]
     if opcode == 0x99:
@@ -110,6 +111,8 @@ def movement_values(command: dict) -> dict | None:
         return {"x": args[0], "y": args[1]}
     if opcode in _MEMORY_COORD_OPCODES:
         return {"xAddress": _script_address(args[0]), "yAddress": _script_address(args[1])}
+    if opcode == 0x9D:
+        return {"directionAddress": _script_address(args[0]), "magnitudeAddress": _script_address(args[1])}
     if opcode == 0x98:
         return {"objectId": args[0], "distance": args[1]}
     if opcode == 0x99:
@@ -144,6 +147,11 @@ def apply_movement_op(command: dict, values: dict) -> bytes | None:
             args[0] = _script_offset(values["xAddress"], "X coordinate source")
         if "yAddress" in values:
             args[1] = _script_offset(values["yAddress"], "Y coordinate source")
+    elif opcode == 0x9D:
+        if "directionAddress" in values:
+            args[0] = _script_offset(values["directionAddress"], "Direction source")
+        if "magnitudeAddress" in values:
+            args[1] = _script_offset(values["magnitudeAddress"], "Magnitude source")
     elif opcode == 0x98:
         if "objectId" in values:
             args[0] = _int(values["objectId"], 0, U8, "Object ID")
@@ -184,6 +192,14 @@ def movement_semantics(command: dict) -> dict | None:
         animated = opcode == 0xA1
         prefix = "Animated move" if animated else "NPC move"
         return {"summary": f"{prefix} from X 0x{x_address:06X} · Y 0x{y_address:06X}", "xAddress": x_address, "yAddress": y_address, "animated": animated}
+    if opcode == 0x9D:
+        direction, magnitude = _script_address(args[0]), _script_address(args[1])
+        return {
+            "summary": f"Vector move from direction 0x{direction:06X} · magnitude 0x{magnitude:06X}",
+            "directionAddress": direction,
+            "magnitudeAddress": magnitude,
+            "operation": "vector-move-from-memory",
+        }
     if opcode == 0x98:
         return {"summary": f"Move toward object {args[0]} · distance {args[1]}", "objectId": args[0], "distance": args[1]}
     if opcode == 0x99:
