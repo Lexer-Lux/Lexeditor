@@ -230,6 +230,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
             finally:
                 browser.close()
 
+        session.stop()
         if not session.wait_closed():
             raise AssertionError("Palworld browser child service did not close")
 
