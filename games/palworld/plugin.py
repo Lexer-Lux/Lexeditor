@@ -66,6 +66,10 @@ def smoke() -> list[str]:
                             "type": "integer",
                             "description": "IntProperty",
                         },
+                        "NewSchemaValue": {
+                            "type": "integer",
+                            "description": "IntProperty",
+                        },
                         "FutureNested": {
                             "type": "object",
                             "description": "StructProperty",
@@ -124,9 +128,14 @@ def smoke() -> list[str]:
             identity = request_json(session.url + "api/plugin")
             if identity.get("pluginId") != "palworld" or identity.get("hosted") is not True:
                 raise RuntimeError("Palworld service returned the wrong managed identity")
-            capabilities = identity.get("capabilities", [])
-            required = {"official-package-info", "palschema-raw-patches", "palschema-generated-schemas"}
-            if not required.issubset(set(capabilities)):
+            capabilities = set(identity.get("capabilities", []))
+            required = {
+                "official-package-info",
+                "palschema-raw-patches",
+                "palschema-generated-schemas",
+                "palschema-add-existing-row-fields",
+            }
+            if not required.issubset(capabilities):
                 raise RuntimeError("Palworld service did not advertise package + schema-aware PalSchema editing")
 
             info = request_json(session.url + "api/info")
@@ -171,6 +180,14 @@ def smoke() -> list[str]:
             ):
                 raise RuntimeError("PalSchema service did not apply generated schema metadata to the scalar field")
 
+            fields = request_json(
+                session.url + "api/palschema/fields?path=" + quote(relative, safe="")
+                + "&table=DT_PalMonsterParameter&row=Kitsunebi"
+            )
+            new_field = next((row for row in fields.get("fields", []) if row.get("name") == "NewSchemaValue"), None)
+            if not new_field or new_field.get("writable") is not True or new_field.get("default") != 0:
+                raise RuntimeError("PalSchema service did not expose a safe schema-backed addable field")
+
             saved_patch = request_json(session.url + "api/palschema/patch/save", {
                 "path": relative,
                 "sourceSha256": patch["sourceSha256"],
@@ -180,16 +197,29 @@ def smoke() -> list[str]:
                     "field": "WorkSuitability_EmitFlame",
                     "value": 4,
                 }],
+                "adds": [{
+                    "table": "DT_PalMonsterParameter",
+                    "row": "Kitsunebi",
+                    "field": "NewSchemaValue",
+                    "value": 7,
+                }],
             })
             updated = next(
                 row for row in saved_patch.get("records", [])
                 if row.get("field") == "WorkSuitability_EmitFlame"
             )
-            if updated.get("value") != 4:
-                raise RuntimeError("PalSchema service schema-backed scalar edit did not survive readback")
+            added = next(
+                row for row in saved_patch.get("records", [])
+                if row.get("field") == "NewSchemaValue"
+            )
+            if updated.get("value") != 4 or added.get("value") != 7:
+                raise RuntimeError("PalSchema service schema-backed edit/add did not survive readback")
             disk = json.loads(json_patch.read_text("utf-8"))
-            if disk["DT_PalMonsterParameter"]["Kitsunebi"]["FutureNested"] != {"preserve": [1, 2, 3]}:
+            disk_row = disk["DT_PalMonsterParameter"]["Kitsunebi"]
+            if disk_row["FutureNested"] != {"preserve": [1, 2, 3]}:
                 raise RuntimeError("PalSchema edit did not preserve an unmodeled nested property")
+            if disk_row["NewSchemaValue"] != 7:
+                raise RuntimeError("PalSchema added property did not survive disk readback")
             if not (raw_root / "balance.json.lexeditor.bak").is_file():
                 raise RuntimeError("PalSchema changed write did not create a backup")
 
@@ -200,8 +230,9 @@ def smoke() -> list[str]:
         "managed Palworld service identified the selected official package project",
         "official Info.json edit survived save/readback with unknown metadata preserved",
         "PalSchema catalog mirrored official target and non-recursive raw discovery",
-        "installed-style generated PalSchema schema supplied the scalar field type",
-        "schema-backed PalSchema scalar edit survived save/readback while nested data was preserved",
+        "installed-style generated PalSchema schema supplied scalar field types",
+        "generated schema exposed a safe addable property on an already-targeted row",
+        "schema-backed PalSchema scalar edit and property addition survived save/readback",
         "Info.json and PalSchema changed writes created recovery backups",
         "PalSchema JSONC patches stayed readable but changed-write disabled",
         "host-owned Palworld child service stopped cleanly",
