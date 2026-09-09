@@ -25,13 +25,17 @@ def build_parser() -> argparse.ArgumentParser:
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument("--scene", type=int, help="Scene ID to render")
     target.add_argument("--world", type=int, help="Overworld ID to render")
-    parser.add_argument("--layer", required=True, type=int, choices=(1, 2))
+    parser.add_argument("--layer", required=True, type=int, choices=(1, 2, 3),
+                        help="Scene layer 1/2/3 or overworld layer 1/2")
     parser.add_argument("--output", required=True, type=Path)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.world is not None and args.layer == 3:
+        print(json.dumps({"error": "Overworld raster preview supports layer 1 or 2; layer 3 is scene-only."}))
+        return 2
     game = args.game.expanduser().resolve()
     archive = game / "resources.bin"
     if not archive.is_file():
