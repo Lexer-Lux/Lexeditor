@@ -10,7 +10,7 @@ Perk("Athletics", 25, "Anti-Cavalry", "Headshots dismount.")};'''
 XP = r'''private static readonly List<XpSourceDefinition> Definitions = new List<XpSourceDefinition>{
 Source("Tailoring", "Light armor damage mitigated", 1f),
 Source("Riding", "Mounted movement second", 0.25f)};'''
-MODULE = '''<Module><Name value="Mod"/><Id value="Mod"/><Version value="v1"/>
+MODULE = '''<Module><Name value="Mod"/><Id value="Mod"/><Version value="v1"/><SingleplayerModule value="true"/>
 <DependedModules><DependedModule Id="Native"/><DependedModule Id="Harmony"/></DependedModules>
 <SubModules><SubModule><Name value="Mod"/><DLLName value="Mod.dll"/><SubModuleClassType value="Mod.SubModule"/></SubModule></SubModules></Module>'''
 
