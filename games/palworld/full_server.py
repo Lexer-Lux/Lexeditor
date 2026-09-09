@@ -8,7 +8,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import dedicated_server, loader_state
+from . import dedicated_server, loader_state, palserver_process
 from .build_server import Handler as BuildHandler
 from .palschema import (
     PatchValidationError,
@@ -38,7 +38,7 @@ from .server import (
 
 
 def _utility_safe_patch_payload(relative: str, info: dict, schema_root: Path | None) -> dict:
-    payload = safe_patch_payload(relative, info, schema_root)
+    payload = safe_patch_payload(project_root() and relative, info, schema_root)
     return apply_existing_utility_policy(payload, schema_root)
 
 
@@ -133,6 +133,7 @@ class Handler(BuildHandler):
         if path == "/api/dedicated-server":
             try:
                 payload = dedicated_server.status(project_root())
+                payload["serverRunning"] = palserver_process.running()
                 payload["ready"] = True
                 self.send_json(payload)
             except Exception as error:
@@ -140,6 +141,7 @@ class Handler(BuildHandler):
                     "ready": False,
                     "error": str(error),
                     "serverRoot": "",
+                    "serverRunning": None,
                     "platformSupported": os.name == "nt",
                 })
             return
@@ -181,6 +183,7 @@ class Handler(BuildHandler):
             return
         try:
             self._action_payload()
+            palserver_process.require_stopped()
             if path == "/api/dedicated-server/deploy":
                 result = dedicated_server.deploy(project_root())
             elif path == "/api/dedicated-server/remove":
@@ -189,12 +192,14 @@ class Handler(BuildHandler):
                 result = dedicated_server.enable(project_root())
             else:
                 result = dedicated_server.revert_activation(project_root())
+            result["serverRunning"] = False
             result["ready"] = True
             self.send_json(result)
         except (
             dedicated_server.DedicatedServerOwnershipError,
             dedicated_server.DedicatedServerChangedError,
             dedicated_server.DedicatedServerRefreshError,
+            palserver_process.PalServerProcessError,
         ) as error:
             self.send_json({"error": str(error)}, 409)
         except dedicated_server.DedicatedServerUnavailableError as error:
