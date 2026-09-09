@@ -1,0 +1,51 @@
+name: Temporary Bannerlord dependency declaration validation v2
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-declaration-validation-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - name: Reuse validated declaration patch
+        shell: python
+        run: |
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/temp-bannerlord-declaration-validation.yml').read_text(encoding='utf-8')
+          first = workflow.split('      - name: Add declaration conflict validation\n', 1)[1]
+          first = first.split('      - name: Update precedence expectations and add declaration regressions\n', 1)[0]
+          exec(compile(textwrap.dedent(first.split('        run: |\n', 1)[1]), 'declaration-source-patch.py', 'exec'))
+
+          second = workflow.split('      - name: Update precedence expectations and add declaration regressions\n', 1)[1]
+          second = second.split('      - name: Validate declaration semantics\n', 1)[0]
+          exec(compile(textwrap.dedent(second.split('        run: |\n', 1)[1]), 'declaration-test-patch.py', 'exec'))
+
+          launch_test = Path('tests/test_bannerlord_launch.py')
+          text = launch_test.read_text(encoding='utf-8')
+          old = '            with self.assertRaisesRegex(RuntimeError, "load-order constraints form a cycle"):\n                module_load_order(game, workspace)\n'
+          new = '            with self.assertRaisesRegex(RuntimeError, "circular LoadBeforeThis dependency declarations"):\n                module_load_order(game, workspace)\n'
+          if text.count(old) != 1:
+              raise SystemExit(f'cycle assertion match count: {text.count(old)}')
+          launch_test.write_text(text.replace(old, new, 1), encoding='utf-8')
+      - name: Validate declaration semantics
+        run: |
+          python -m compileall -q games/bannerlord
+          python -m unittest tests.test_bannerlord_dependency_declarations tests.test_bannerlord_dependency_relations tests.test_bannerlord_dependency_precedence tests.test_bannerlord_launch tests.test_bannerlord_community_metadata tests.test_bannerlord_dependency_diagnostics tests.test_bannerlord_shadowed_dependency_diagnostics -v
+      - name: Commit declaration validation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/bannerlord/dependency_relations.py games/bannerlord/game_launch.py games/bannerlord/runtime_data.py tests/test_bannerlord_dependency_precedence.py tests/test_bannerlord_dependency_declarations.py tests/test_bannerlord_launch.py
+          git commit -m "Validate Bannerlord dependency declarations"
+          git push origin HEAD:feature/bannerlord-plugin
