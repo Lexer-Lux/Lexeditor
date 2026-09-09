@@ -4,12 +4,14 @@ import unittest
 
 from games.bannerlord.community_metadata import community_version_matches, read_community_dependencies
 from games.bannerlord.game_launch import module_load_order
+from games.bannerlord.runtime_data import deployment_status
 
 
 def write_module(
     game: Path,
     module_id: str,
     *,
+    version="v1.0.0",
     native_dependencies=(),
     community=(),
 ) -> Path:
@@ -43,7 +45,7 @@ def write_module(
         f'''<Module>
   <Name value="{module_id}" />
   <Id value="{module_id}" />
-  <Version value="v1.0.0" />
+  <Version value="{version}" />
   <SingleplayerModule value="true" />
   <DependedModules>
 {native_xml}
@@ -186,6 +188,37 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
             workspace = write_workspace(root, "Selected")
             with self.assertRaisesRegex(RuntimeError, "Missing.Library"):
                 module_load_order(game, workspace)
+
+    def test_deployment_reports_community_version_warning_without_blocking_play(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            executable = game / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
+            executable.parent.mkdir(parents=True)
+            executable.write_bytes(b"")
+            write_module(game, "Library", version="v1.5.0")
+            deployed = write_module(
+                game,
+                "Selected",
+                community=[{
+                    "id": "Library",
+                    "order": "LoadBeforeThis",
+                    "version": "v2.*",
+                }],
+            )
+            workspace = root / "workspace"
+            workspace.mkdir()
+            (workspace / "SubModule.xml").write_text(
+                (deployed / "SubModule.xml").read_text(encoding="utf-8"), encoding="utf-8"
+            )
+
+            status = deployment_status(workspace, game)
+            community_row = next(row for row in status["dependencies"] if row["source"] == "community")
+            self.assertFalse(community_row["versionMatch"])
+            self.assertEqual(community_row["order"], "LoadBeforeThis")
+            self.assertTrue(any("BLSE community dependency version warning" in issue for issue in status["issues"]))
+            self.assertEqual(status["loadOrder"], ["Library", "Selected"])
+            self.assertTrue(status["runnable"])
 
 
 if __name__ == "__main__":
