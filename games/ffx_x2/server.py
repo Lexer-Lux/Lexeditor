@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import deployment, item_shops, paths, treasures
+from . import deployment, item_shops, paths, theme, treasures
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
 
@@ -23,6 +23,7 @@ POST_ROUTES = {
     "/api/deployment/deploy", "/api/deployment/revert",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
+_META_CACHE: tuple[tuple[int, int], VBFIndex] | None = None
 
 
 def _game_key(value: str) -> str:
@@ -45,10 +46,35 @@ def _index(game: str) -> VBFIndex:
     return parsed
 
 
+def _meta_index() -> VBFIndex | None:
+    global _META_CACHE
+    target = paths.META_ARCHIVE
+    if not target.is_file():
+        return None
+    stat = target.stat()
+    signature = (stat.st_size, stat.st_mtime_ns)
+    if _META_CACHE is not None and _META_CACHE[0] == signature and _META_CACHE[1].path == target:
+        return _META_CACHE[1]
+    parsed = read_index(target)
+    _META_CACHE = (signature, parsed)
+    return parsed
+
+
+def _find_entry(index: VBFIndex, game: str, archive_path: str):
+    """Resolve either the game-facing or raw VBF spelling of one entry."""
+    for candidate in paths.source_archive_candidates(game, archive_path):
+        try:
+            return index.find(candidate)
+        except FileNotFoundError:
+            continue
+    raise FileNotFoundError(archive_path)
+
+
 def _project_target(game: str, archive_path: str) -> Path:
     key = _game_key(game)
     root = paths.PROJECT_ROOT.resolve()
-    target = (root / "efl" / key / Path(*archive_path.split("/"))).resolve()
+    virtual_path = paths.efl_archive_path(key, archive_path)
+    target = (root / "efl" / key / Path(*virtual_path.split("/"))).resolve()
     if root != target and root not in target.parents:
         raise ValueError("Project target escaped the selected project root")
     return target
@@ -71,9 +97,39 @@ def _archive_status(game: str) -> dict:
                 "ready": False, "error": str(error), "fileCount": 0}
 
 
+def theme_status() -> dict:
+    """Build cosmetic assets when possible without making them a readiness gate."""
+    indexes: dict[str, VBFIndex] = {}
+    for key, target in paths.ARCHIVES.items():
+        if not target.is_file():
+            continue
+        try:
+            indexes[key] = _index(key)
+        except (OSError, VBFError):
+            continue
+    if not indexes:
+        return {
+            "source": "fallback",
+            "background": {"ready": False, "note": "Installed VBFs are unavailable."},
+            "font": {"webReady": False, "atlasRecognized": 0, "atlasCached": 0},
+            "textures": {"recognized": 0, "cached": 0, "browserPngCached": 0},
+            "sfx": {"webReady": False, "recognizedBanks": 0, "cachedBanks": 0},
+        }
+    try:
+        return theme.build(paths.THEME_CACHE_ROOT, indexes, _meta_index())
+    except (OSError, VBFError, ValueError) as error:
+        return {
+            "source": "fallback", "error": str(error),
+            "background": {"ready": False, "note": "Installed-game theme extraction failed; fallback styling remains active."},
+            "font": {"webReady": False, "atlasRecognized": 0, "atlasCached": 0},
+            "textures": {"recognized": 0, "cached": 0, "browserPngCached": 0},
+            "sfx": {"webReady": False, "recognizedBanks": 0, "cachedBanks": 0},
+        }
+
+
 def _structured_current(archive_path: str) -> tuple[VBFIndex, Path, bytes, str]:
     index = _index("x")
-    entry = index.find(archive_path)
+    entry = _find_entry(index, "x", archive_path)
     target = _project_target("x", entry.path)
     if target.is_file():
         return index, target, target.read_bytes(), "project"
@@ -178,7 +234,24 @@ def data_map() -> dict:
     )
     shop_row["target"] = "item-shops"
     rows.append(shop_row)
+    themed = theme_status()
+    theme_parts = []
+    if themed.get("background", {}).get("ready"):
+        theme_parts.append("title/menu PNG active")
+    if themed.get("font", {}).get("atlasRecognized"):
+        theme_parts.append(f"{themed['font']['atlasRecognized']} font atlas source(s) recognized")
+    if themed.get("textures", {}).get("recognized"):
+        theme_parts.append(f"{themed['textures']['recognized']} menu texture source(s) recognized")
+    if themed.get("sfx", {}).get("recognizedBanks"):
+        theme_parts.append(f"{themed['sfx']['recognizedBanks']} UI-audio bank(s) recognized")
     rows.extend([
+        {
+            "filename": "data/metamenu.vbf + menu/font/sound resources",
+            "controls": "Private installed-game theme cache",
+            "notes": "; ".join(theme_parts) or "Theme extraction falls back safely when cosmetic source assets are unavailable.",
+            "status": "partial" if themed.get("source") == "installed-game" else "not-integrated",
+            "coverage": "game-derived-theme", "openable": False,
+        },
         {
             "filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*",
             "controls": "Remaining gameplay/kernel family",
@@ -213,7 +286,7 @@ def dashboard() -> dict:
         },
         "archives": archives,
         "project": {"root": str(paths.PROJECT_ROOT), "fileCount": deploy["projectFileCount"]},
-        "deployment": deploy, "problems": paths.game_problems(),
+        "deployment": deploy, "theme": theme_status(), "problems": paths.game_problems(),
     }
 
 
@@ -230,7 +303,8 @@ def archive_catalog(game: str, query: str, offset: int, limit: int) -> dict:
         "game": key, "headerMd5": index.header_md5,
         "total": len(rows), "offset": offset, "limit": limit,
         "entries": [{
-            "path": entry.path, "bytes": entry.size, "blocks": entry.block_count,
+            "path": entry.path, "eflPath": paths.efl_archive_path(key, entry.path),
+            "bytes": entry.size, "blocks": entry.block_count,
             "staged": _project_target(key, entry.path).is_file(),
         } for entry in page],
         "projectRoot": str(project_root),
@@ -274,6 +348,8 @@ class Handler(BaseHTTPRequestHandler):
                     self.json_response({"error": "Shared UI asset not found"}, 404)
                 else:
                     self.file_response(target)
+            elif route.startswith("/theme/"):
+                self.file_response(theme.asset_path(paths.THEME_CACHE_ROOT, route.removeprefix("/theme/")))
             elif route == "/api/plugin":
                 self.json_response({
                     "apiVersion": 1, "pluginId": "ffx-x2", "name": "Final Fantasy X/X-2 HD Remaster",
@@ -282,13 +358,15 @@ class Handler(BaseHTTPRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": [
                         "data-map", "vbf-index", "vbf-extract", "project-overlay",
-                        "ffx-treasure-editor", "ffx-item-shop-editor", "fahrenheit-deploy",
+                        "ffx-treasure-editor", "ffx-item-shop-editor", "installed-game-theme", "fahrenheit-deploy",
                     ],
                 })
             elif route == "/api/dashboard":
                 self.json_response(dashboard())
             elif route == "/api/datamap":
                 self.json_response(data_map())
+            elif route == "/api/theme":
+                self.json_response(theme_status())
             elif route == "/api/treasures":
                 self.json_response(treasure_catalog())
             elif route == "/api/item-shops":
@@ -335,10 +413,13 @@ class Handler(BaseHTTPRequestHandler):
                 expected = str(request.get("headerMd5", ""))
                 if expected != index.header_md5:
                     raise RuntimeError("The VBF index changed; refresh the archive browser before extracting")
-                entry = index.find(str(request.get("path", "")))
+                entry = _find_entry(index, key, str(request.get("path", "")))
                 paths.ensure_project()
                 result = extract_to(index, entry, _project_target(key, entry.path))
-                result.update({"game": key, "archivePath": entry.path, "headerMd5": index.header_md5})
+                result.update({
+                    "game": key, "archivePath": entry.path,
+                    "eflPath": paths.efl_archive_path(key, entry.path), "headerMd5": index.header_md5,
+                })
             elif route == "/api/treasures/save":
                 result = save_treasures(request)
             elif route == "/api/item-shops/save":
