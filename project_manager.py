@@ -14,6 +14,30 @@ from plugin_api import GamePlugin
 ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parent / "out")) / "Lexeditor"
 DEFAULT_PATH = ROOT / "projects.json"
 IGNORED_NAMES = {".git", ".pytest_cache", "__pycache__", "out"}
+_INVALID_FOLDER_CHARS = '<>:"/\\|?*'
+_WINDOWS_RESERVED_STEMS = {
+    "con", "prn", "aux", "nul", "clock$", "conin$", "conout$",
+    *(f"com{index}" for index in range(1, 10)),
+    *(f"lpt{index}" for index in range(1, 10)),
+    "com¹", "com²", "com³", "lpt¹", "lpt²", "lpt³",
+}
+
+
+def _project_folder_name(name: str) -> str:
+    """Return a portable Windows-safe project folder name or reject it."""
+    clean_name = str(name).strip()
+    stem = clean_name.split(".", 1)[0].rstrip(" .").casefold()
+    invalid = (
+        not clean_name
+        or clean_name in {".", ".."}
+        or clean_name.endswith(".")
+        or any(char in clean_name for char in _INVALID_FOLDER_CHARS)
+        or any(ord(char) < 32 for char in clean_name)
+        or stem in _WINDOWS_RESERVED_STEMS
+    )
+    if invalid:
+        raise ValueError("Enter a valid folder name")
+    return clean_name
 
 
 class ProjectManager:
@@ -119,9 +143,7 @@ class ProjectManager:
 
     def create(self, plugin_id: str, parent_value: str, name: str) -> dict:
         _plugin, spec = self._spec(plugin_id)
-        clean_name = name.strip()
-        if not clean_name or clean_name in {".", ".."} or any(char in clean_name for char in '<>:"/\\|?*'):
-            raise ValueError("Enter a valid folder name")
+        clean_name = _project_folder_name(name)
         parent = Path(parent_value).expanduser().resolve()
         if not parent.is_dir():
             raise ValueError(f"Parent folder does not exist: {parent}")
@@ -153,9 +175,7 @@ class ProjectManager:
         problems = self._problems(root, spec.required_paths, spec.required_any)
         if problems:
             raise ValueError("\n".join(problems))
-        clean_name = name.strip()
-        if not clean_name or clean_name in {".", ".."} or any(char in clean_name for char in '<>:"/\\|?*'):
-            raise ValueError("Enter a valid folder name")
+        clean_name = _project_folder_name(name)
         target = root.with_name(clean_name)
         if target.exists():
             raise ValueError(f"A file or folder already exists: {target}")
