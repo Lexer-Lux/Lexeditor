@@ -38,7 +38,7 @@ class BannerlordModernMetadataTests(unittest.TestCase):
             self.assertFalse(is_singleplayer_module(saved["module"]))
             self.assertTrue(Path(saved["backup"]).is_file())
 
-    def test_modern_category_is_authoritative_over_legacy_flags(self):
+    def test_modern_category_and_legacy_flags_are_additive(self):
         with tempfile.TemporaryDirectory() as name:
             path = Path(name) / "SubModule.xml"
             path.write_text(
@@ -51,7 +51,7 @@ class BannerlordModernMetadataTests(unittest.TestCase):
             module = read_submodule(path)
             self.assertTrue(module["singleplayer"])
             self.assertEqual(module["moduleCategory"], "Multiplayer")
-            self.assertFalse(is_singleplayer_module(module))
+            self.assertTrue(is_singleplayer_module(module))
 
     def test_legacy_flags_and_modern_default_remain_compatible(self):
         self.assertTrue(is_singleplayer_module({"moduleCategory": "", "singleplayer": True, "multiplayer": False}))
