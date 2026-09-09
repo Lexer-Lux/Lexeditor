@@ -5,7 +5,7 @@ import unittest
 from games.bannerlord.game_launch import launch_command, module_load_order, selected_module
 
 
-def write_module(root: Path, folder: str, module_id: str, dependencies=()) -> Path:
+def write_module(root: Path, folder: str, module_id: str, dependencies=(), *, singleplayer=True) -> Path:
     module = root / "Modules" / folder
     module.mkdir(parents=True, exist_ok=True)
     dependency_lines = []
@@ -15,13 +15,15 @@ def write_module(root: Path, folder: str, module_id: str, dependencies=()) -> Pa
             f'    <DependedModule Id="{dependency_id}"{optional_attribute} />'
         )
     dependency_xml = "\n".join(dependency_lines)
+    singleplayer_value = "true" if singleplayer else "false"
     (module / "SubModule.xml").write_text(
         f'''<?xml version="1.0" encoding="utf-8"?>
 <Module>
   <Name value="{module_id}" />
   <Id value="{module_id}" />
   <Version value="v1.0.0" />
-  <SingleplayerModule value="true" />
+  <SingleplayerModule value="{singleplayer_value}" />
+  <MultiplayerModule value="{'false' if singleplayer else 'true'}" />
   <DependedModules>
 {dependency_xml}
   </DependedModules>
@@ -109,6 +111,27 @@ class BannerlordLaunchTests(unittest.TestCase):
                 '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
             )
             self.assertEqual(module_load_order(game, workspace), ["LexerSkillTweaks"])
+
+    def test_multiplayer_only_module_refuses_singleplayer_direct_launch(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            bin_dir = game / "bin" / "Win64_Shipping_Client"
+            bin_dir.mkdir(parents=True)
+            (bin_dir / "Bannerlord.exe").write_bytes(b"")
+            write_module(
+                game,
+                "MultiplayerOnly",
+                "MultiplayerOnly",
+                singleplayer=False,
+            )
+            (workspace / "SubModule.xml").write_text(
+                '<Module><Id value="MultiplayerOnly" /></Module>', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(RuntimeError, "single-player modules only"):
+                launch_command(game, workspace)
 
 
 if __name__ == "__main__":
