@@ -1,11 +1,31 @@
-"""Safe semantic annotations for read-only Steam field-event disassembly.
+"""Semantic annotations for proven Chrono Trigger Steam field-event commands.
 
 Only argument meanings directly established by the PC command definitions are
-annotated here. The raw command bytes remain authoritative and command writing
-is deliberately out of scope.
+annotated here. Raw bytes remain authoritative. A separate fixed-width editor
+layer may write a subset of these fields without changing command boundaries.
 """
 
 from __future__ import annotations
+
+
+BATTLE_FLAGS = (
+    (0, 0x01, "no win pose"),
+    (0, 0x02, "bottom menu"),
+    (0, 0x04, "small PC solidity"),
+    (0, 0x08, "unknown 1:08"),
+    (0, 0x10, "static enemies"),
+    (0, 0x20, "special event"),
+    (0, 0x40, "unknown 1:40"),
+    (0, 0x80, "no run"),
+    (1, 0x01, "unknown 2:01"),
+    (1, 0x02, "unknown 2:02"),
+    (1, 0x04, "unknown 2:04"),
+    (1, 0x08, "unknown 2:08"),
+    (1, 0x10, "unknown 2:10"),
+    (1, 0x20, "no game over"),
+    (1, 0x40, "map music"),
+    (1, 0x80, "regroup"),
+)
 
 
 def _u16(data: bytes, offset: int = 0) -> int:
@@ -28,7 +48,11 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
 
     if opcode == 0x83 and len(args) == 3:
         enemy = _u16(args)
-        return {"summary": f"Enemy {enemy} · slot/flags 0x{args[2]:02X}", "enemyId": enemy, "slotFlags": args[2]}
+        return {
+            "summary": f"Enemy {enemy} · slot {args[2] & 0x7F} · {'static' if args[2] & 0x80 else 'dynamic'}",
+            "enemyId": enemy, "slot": args[2] & 0x7F, "static": bool(args[2] & 0x80),
+            "slotFlags": args[2],
+        }
     if opcode == 0xB8 and len(args) == 1:
         return {"summary": f"Message table {args[0]}", "messageTable": args[0]}
     if opcode in {0xBB, 0xC1, 0xC2} and len(args) >= 2:
@@ -36,19 +60,43 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
         return {"summary": f"String {index}", "stringIndex": index}
     if opcode in {0xC0, 0xC3, 0xC4} and len(args) >= 3:
         index = _u16(args)
-        return {"summary": f"String {index} · option/flags 0x{args[2]:02X}", "stringIndex": index, "optionFlags": args[2]}
+        return {
+            "summary": f"String {index} · option/flags 0x{args[2]:02X}",
+            "stringIndex": index, "optionFlags": args[2],
+        }
     if opcode == 0xC9 and len(args) == 3:
         item = _u16(args)
-        return {"summary": f"Has {_lookup(items, item, 'Item')} ({item}) → jump +{args[2]}", "itemId": item, "jumpOffset": args[2]}
+        return {
+            "summary": f"Has {_lookup(items, item, 'Item')} ({item}) → jump +{args[2]}",
+            "itemId": item, "itemName": _lookup(items, item, "Item"), "jumpOffset": args[2],
+        }
+    if opcode == 0xCC and len(args) == 3:
+        gold = _u16(args)
+        return {"summary": f"Has {gold} G → jump +{args[2]}", "gold": gold, "jumpOffset": args[2]}
+    if opcode == 0xCD and len(args) == 2:
+        gold = _u16(args)
+        return {"summary": f"Add {gold} G", "gold": gold, "operation": "add"}
+    if opcode == 0xCE and len(args) == 2:
+        gold = _u16(args)
+        return {"summary": f"Remove {gold} G", "gold": gold, "operation": "remove"}
     if opcode in {0x80, 0x81} and len(args) == 1:
         pc = args[0]
         return {"summary": f"{_lookup(players, pc, 'PC')} ({pc})", "playerId": pc}
     if opcode in {0xCF, 0xD2} and len(args) == 2:
         pc = args[0]
-        return {"summary": f"{_lookup(players, pc, 'PC')} ({pc}) → jump +{args[1]}", "playerId": pc, "jumpOffset": args[1]}
+        return {
+            "summary": f"{_lookup(players, pc, 'PC')} ({pc}) → jump +{args[1]}",
+            "playerId": pc, "jumpOffset": args[1],
+        }
     if opcode in {0xD0, 0xD1, 0xD3, 0xD4, 0xD6} and len(args) == 1:
         pc = args[0]
         return {"summary": f"{_lookup(players, pc, 'PC')} ({pc})", "playerId": pc}
+    if opcode == 0xD8 and len(args) == 2:
+        enabled = [name for byte_index, bit, name in BATTLE_FLAGS if args[byte_index] & bit]
+        return {
+            "summary": "Battle" + (" · " + ", ".join(enabled) if enabled else " · default flags"),
+            "flags1": args[0], "flags2": args[1], "enabledFlags": enabled,
+        }
     if 0xDC <= opcode <= 0xE1 and len(args) == 5:
         scene = _u16(args)
         facing, x, y = args[2], args[3], args[4]
