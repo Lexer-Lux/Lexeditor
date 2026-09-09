@@ -17,6 +17,8 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
   - Scene-referenced `Game/field/BGAnime/bganimeinfo_*.dat` records are decoded read-only: declared animation count, four-chip destination/source ranges, source/destination offset `/32`, and frame duration upper-nibble values (`0x10/0x20/0x40/0x80` = 16/12/8/4 ticks). Unknown duration nibbles and the lower nibble are preserved rather than guessed.
   - Animation runtime phase and initial-frame behavior are not inferred, so Lexeditor does not claim animation playback yet.
 - Atel parsing, PC disassembly, semantics and control-flow diagnostics, with named fixed-width argument editing in both the desktop Events UI and CLI. Unsupported, variable-width and unresolved commands remain read-only.
+  - Proven Steam item-command editors now include `0xC7` Add Item from Memory, `0xCA` Add Item, `0xCB` Remove Item, `0xD5` Equip Item and `0xD7` Get Item Quantity.
+  - Their PC-only extra category byte is exposed as a raw numeric value rather than an invented enum/global item ID. C7/D7 local-memory slots are shown as even `0x7F0200`–`0x7F03FE` script-memory addresses and round-trip back to the one-byte PC slot without resizing commands.
 - Eight overworld headers plus existing world exits/triggers/script-address editing.
 - Fail-closed read-only world script disassembly.
 - Localized labels where Steam message resources exist.
