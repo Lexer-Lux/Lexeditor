@@ -1,10 +1,12 @@
 """Read-only raster previews for Chrono Trigger Steam scene layers.
 
-The renderer follows CTViewer's documented PC data path: ``mapinfo`` selects a
-BGSetTable, ChipTable, palette and MapTable; each referenced ``cg*.bin`` is a
-128-pixel-wide packed 4bpp sheet after a four-byte header; PC ChipTable corners
-are three bytes each.  L1 and L2 are rendered separately so Lexeditor does not
-pretend to emulate the game's main/sub-screen blending or priority rules.
+The renderer follows CTViewer's documented PC data paths. L1/L2 use
+BGSetTable + ``map_bin/cg*.bin`` + ``ChipTable_*.dat``. L3 uses its separate
+``weather_bin/cg*.bin`` graphics and the scene-indexed ``ChipTableBg3_*.dat``
+assembly. PC chip graphics skip a four-byte file header before nibble
+unpacking; PC assembly corners are three bytes each. Layers are rendered
+separately so Lexeditor does not pretend to emulate the game's main/sub-screen
+blending or priority rules.
 """
 
 from __future__ import annotations
@@ -57,6 +59,7 @@ def _decode_palette(raw: bytes) -> list[tuple[int, int, int, int]]:
 
 
 def _unpack_sheet(raw: bytes) -> bytes:
+    """Match CTViewer's PC cg reader: skip four bytes, then unpack nibbles."""
     if len(raw) < 4:
         raise ValueError("Chrono Trigger cg sheet is shorter than its four-byte header")
     packed = raw[4:]
@@ -69,6 +72,26 @@ def _unpack_sheet(raw: bytes) -> bytes:
     if len(pixels) % 128:
         raise ValueError("Chrono Trigger cg sheet does not decode to 128-pixel scanlines")
     return bytes(pixels)
+
+
+def _split_chips(bitmap: bytes) -> list[bytes]:
+    if len(bitmap) % 128:
+        raise ValueError("Chrono Trigger chip bitmap is not 128 pixels wide")
+    height = len(bitmap) // 128
+    if height % 8:
+        raise ValueError("Chrono Trigger chip bitmap height is not divisible by 8")
+    chips = []
+    for chip_index in range(len(bitmap) // 64):
+        x0 = (chip_index % 16) * 8
+        y0 = (chip_index // 16) * 8
+        chip = bytearray(64)
+        pos = 0
+        for y in range(8):
+            start = (y0 + y) * 128 + x0
+            chip[pos:pos + 8] = bitmap[start:start + 8]
+            pos += 8
+        chips.append(bytes(chip))
+    return chips
 
 
 def _static_chips(store: OverlayStore, tileset_index: int, source: str) -> tuple[list[bytes], dict]:
@@ -95,31 +118,33 @@ def _static_chips(store: OverlayStore, tileset_index: int, source: str) -> tuple
         bitmap[destination:destination + len(pixels)] = pixels
         used.append({"slot": slot, "chipset": chipset, "path": cg_path, "pixelBytes": len(pixels)})
 
-    # CTViewer treats the assembled bitmap as a 128-pixel-wide sheet, 16 chips per row.
-    chip_count = len(bitmap) // 64
-    chips = []
-    for chip_index in range(chip_count):
-        x0 = (chip_index % 16) * 8
-        y0 = (chip_index // 16) * 8
-        chip = bytearray(64)
-        pos = 0
-        for y in range(8):
-            start = (y0 + y) * 128 + x0
-            chip[pos:pos + 8] = bitmap[start:start + 8]
-            pos += 8
-        chips.append(bytes(chip))
-    return chips, {"bgSetPath": path, "chipsets": chipsets, "staticSheets": used, "animatedSheet": animated}
+    return _split_chips(bytes(bitmap)), {
+        "bgSetPath": path,
+        "chipsets": chipsets,
+        "staticSheets": used,
+        "animatedSheet": animated,
+    }
 
 
-def _assembly(store: OverlayStore, assembly_index: int, source: str) -> tuple[list[tuple[Corner, ...]], str]:
-    path = f"Game/field/ChipTable/ChipTable_{assembly_index:04d}.dat"
+def _layer3_chips(store: OverlayStore, tileset_index: int, source: str) -> tuple[list[bytes], dict]:
+    """Read the dedicated Steam L3/weather chip sheet documented by CTViewer."""
+    path = f"Game/field/weather_bin/cg{tileset_index}.bin"
     raw, _origin = store.read(path, source)
-    required = 512 * 4 * 3
+    pixels = _unpack_sheet(raw)
+    return _split_chips(pixels), {
+        "graphicsPath": path,
+        "graphicsPixelBytes": len(pixels),
+        "logicalBitsPerPixel": 2,
+    }
+
+
+def _parse_assembly(raw: bytes, path: str, tile_count: int, palette_size: int) -> list[tuple[Corner, ...]]:
+    required = tile_count * 4 * 3
     if len(raw) < required:
         raise ValueError(f"Chrono Trigger PC ChipTable is truncated: {path}")
     tiles = []
     cursor = 0
-    for _tile_index in range(512):
+    for _tile_index in range(tile_count):
         corners = []
         for _corner in range(4):
             value = struct.unpack_from("<H", raw, cursor)[0]
@@ -127,13 +152,26 @@ def _assembly(store: OverlayStore, assembly_index: int, source: str) -> tuple[li
             cursor += 3
             corners.append(Corner(
                 chip=value & 0x03FF,
-                palette=((value >> 12) & 0x0F) * 16,
+                palette=((value >> 12) & 0x0F) * palette_size,
                 flip_x=bool(value & 0x0400),
                 flip_y=bool(value & 0x0800),
                 priority=bool(flags & 0x01),
             ))
         tiles.append(tuple(corners))
-    return tiles, path
+    return tiles
+
+
+def _assembly_l12(store: OverlayStore, assembly_index: int, source: str) -> tuple[list[tuple[Corner, ...]], str]:
+    path = f"Game/field/ChipTable/ChipTable_{assembly_index:04d}.dat"
+    raw, _origin = store.read(path, source)
+    return _parse_assembly(raw, path, 512, 16), path
+
+
+def _assembly_l3(store: OverlayStore, scene_id: int, source: str) -> tuple[list[tuple[Corner, ...]], str]:
+    # CTViewer's PC loader explicitly uses the scene index as the L3 assembly index.
+    path = f"Game/field/ChipTable/ChipTableBg3_{scene_id:04d}.dat"
+    raw, _origin = store.read(path, source)
+    return _parse_assembly(raw, path, 256, 4), path
 
 
 def _draw_chip(output: bytearray, width: int, x0: int, y0: int, chip: bytes,
@@ -151,10 +189,10 @@ def _draw_chip(output: bytearray, width: int, x0: int, y0: int, chip: bytes,
 
 def render_scene_layer(store: OverlayStore, scene_id: int, layer: int,
                        source: str = "mine") -> tuple[bytes, dict]:
-    """Render L1 or L2 as an independent RGBA PNG and return provenance metadata."""
+    """Render one Steam scene background layer as an independent RGBA PNG."""
     layer = int(layer)
-    if layer not in {1, 2}:
-        raise ValueError("Scene raster preview currently supports layer 1 or 2")
+    if layer not in {1, 2, 3}:
+        raise ValueError("Scene raster preview supports layer 1, 2, or 3")
     entries = {number: path for number, path in store.scene_entries()}
     scene_id = int(scene_id)
     if scene_id not in entries:
@@ -163,6 +201,9 @@ def render_scene_layer(store: OverlayStore, scene_id: int, layer: int,
     values = scene["values"]
     map_payload = load_scene_map(store, scene_id, source)
     layer_payload = map_payload["layers"][f"layer{layer}"]
+    if layer == 3 and not layer_payload["enabled"]:
+        raise ValueError(f"Chrono Trigger scene {scene_id} does not enable layer 3")
+
     tile_width = int(layer_payload["width"])
     tile_height = int(layer_payload["height"])
     width, height = tile_width * 16, tile_height * 16
@@ -172,8 +213,19 @@ def render_scene_layer(store: OverlayStore, scene_id: int, layer: int,
     palette_path = f"Game/field/palette_bin/plt{int(values['palette'])}.bin"
     palette_raw, _palette_origin = store.read(palette_path, source)
     palette = _decode_palette(palette_raw)
-    chips, chip_meta = _static_chips(store, int(values["tilesetL12"]), source)
-    assembly, assembly_path = _assembly(store, int(values["tilesetL12Assembly"]), source)
+
+    if layer == 3:
+        tileset_index = int(values["tilesetL3"])
+        chips, chip_meta = _layer3_chips(store, tileset_index, source)
+        assembly, assembly_path = _assembly_l3(store, scene_id, source)
+        assembly_index = scene_id
+        palette_group_size = 4
+    else:
+        tileset_index = int(values["tilesetL12"])
+        chips, chip_meta = _static_chips(store, tileset_index, source)
+        assembly_index = int(values["tilesetL12Assembly"])
+        assembly, assembly_path = _assembly_l12(store, assembly_index, source)
+        palette_group_size = 16
 
     output = bytearray(width * height * 4)
     for tile_y in range(tile_height):
@@ -202,8 +254,9 @@ def render_scene_layer(store: OverlayStore, scene_id: int, layer: int,
         "mapPath": map_payload["path"],
         "palette": int(values["palette"]),
         "palettePath": palette_path,
-        "tileset": int(values["tilesetL12"]),
-        "assembly": int(values["tilesetL12Assembly"]),
+        "paletteGroupSize": palette_group_size,
+        "tileset": tileset_index,
+        "assembly": assembly_index,
         "assemblyPath": assembly_path,
         "transparentColorZero": True,
         "animatedChipsRendered": False,
