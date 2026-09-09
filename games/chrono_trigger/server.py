@@ -25,6 +25,14 @@ from .data import (
 )
 from .deployment import deploy_audited_project, deployment_status
 from .events import event_entries, get_event, load_events
+from .labels import (
+    decorate_scene_exits,
+    decorate_scenes,
+    decorate_treasure,
+    decorate_world_table,
+    decorate_worlds,
+    label_bundle,
+)
 from .resources import ResourceArchiveError
 from .scene_tables import load_exits, load_treasure, save_exit, save_treasure
 from .worlds import load_worlds, save_world
@@ -61,6 +69,10 @@ def _source(params: dict[str, list[str]]) -> str:
     if value not in {"mine", "vanilla"}:
         raise ValueError("source must be mine or vanilla")
     return value
+
+
+def _labels(source: str) -> dict:
+    return label_bundle(_store(), source)
 
 
 def _archive_payload(query: str = "", offset: int = 0, limit: int = 250) -> dict:
@@ -111,7 +123,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/10"
+    server_version = "LexeditorChronoTrigger/11"
 
     def log_message(self, _format, *_args):
         return
@@ -153,11 +165,11 @@ class Handler(BaseHTTPRequestHandler):
                     "edition": "Steam / resources.bin / CTExt loose-file projects",
                     "hosted": HOSTED, "windowHost": WINDOW_HOST, "projectRoot": str(paths.PROJECT_ROOT),
                     "capabilities": [
-                        "data-map", "resource-index", "localization-text", "scene-headers",
-                        "scene-exits", "scene-treasure", "field-events", "field-event-disassembly",
-                        "world-headers", "world-exits", "world-triggers", "world-script-addresses",
-                        "world-script-disassembly", "project-overlay", "project-changes",
-                        "ctext-deploy", "ctp-export", "read", "save",
+                        "data-map", "resource-index", "localization-text", "localized-labels",
+                        "scene-headers", "scene-exits", "scene-treasure", "field-events",
+                        "field-event-disassembly", "world-headers", "world-exits", "world-triggers",
+                        "world-script-addresses", "world-script-disassembly", "project-overlay",
+                        "project-changes", "ctext-deploy", "ctp-export", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
@@ -166,6 +178,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(deployment_status(_store(), paths.GAME_ROOT))
             elif path == "/api/changes":
                 self.send_json(list_changes(_store()))
+            elif path == "/api/labels":
+                self.send_json(_labels(_source(params)))
             elif path == "/api/datamap":
                 self.send_json(augment_data_map(_store(), data_map(_store())))
             elif path == "/api/archive":
@@ -174,14 +188,20 @@ class Handler(BaseHTTPRequestHandler):
                     int(params.get("limit", ["250"])[0]),
                 ))
             elif path == "/api/scenes":
-                self.send_json(load_scenes(
-                    _store(), _source(params), params.get("q", [""])[0],
+                source = _source(params)
+                payload = load_scenes(
+                    _store(), source, params.get("q", [""])[0],
                     int(params.get("offset", ["0"])[0]), int(params.get("limit", ["100"])[0]),
-                ))
+                )
+                self.send_json(decorate_scenes(payload, _labels(source)))
             elif path == "/api/exits":
-                self.send_json(load_exits(_store(), int(params.get("scene", ["-1"])[0]), _source(params)))
+                source = _source(params)
+                payload = load_exits(_store(), int(params.get("scene", ["-1"])[0]), source)
+                self.send_json(decorate_scene_exits(payload, _labels(source)))
             elif path == "/api/treasure":
-                self.send_json(load_treasure(_store(), int(params.get("scene", ["-1"])[0]), _source(params)))
+                source = _source(params)
+                payload = load_treasure(_store(), int(params.get("scene", ["-1"])[0]), source)
+                self.send_json(decorate_treasure(payload, _labels(source)))
             elif path == "/api/events":
                 if "id" in params:
                     self.send_json(get_event(_store(), int(params["id"][0]), _source(params)))
@@ -191,9 +211,12 @@ class Handler(BaseHTTPRequestHandler):
                         int(params.get("offset", ["0"])[0]), int(params.get("limit", ["100"])[0]),
                     ))
             elif path == "/api/worlds":
-                self.send_json(load_worlds(_store(), _source(params)))
+                source = _source(params)
+                self.send_json(decorate_worlds(load_worlds(_store(), source), _labels(source)))
             elif path == "/api/world-table":
-                self.send_json(load_world_table(_store(), int(params.get("world", ["-1"])[0]), _source(params)))
+                source = _source(params)
+                payload = load_world_table(_store(), int(params.get("world", ["-1"])[0]), source)
+                self.send_json(decorate_world_table(payload, _labels(source)))
             elif path == "/api/world-script":
                 self.send_json(load_world_script(_store(), int(params.get("world", ["-1"])[0]), _source(params)))
             elif path == "/api/messages/catalog":
