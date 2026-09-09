@@ -36,6 +36,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: feature/palworld-plugin
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -58,11 +60,10 @@ jobs:
           }
           if not any(row.get('name') == contribution['name'] for row in pal.get('contributions', [])):
               pal.setdefault('contributions', []).append(contribution)
-          notice = {
+          pal['licenses'] = [{
               'name': 'Palworld / PalSchema references — source and license notes',
               'sourcePath': 'games/palworld/THIRD_PARTY.md',
-          }
-          pal['licenses'] = [notice]
+          }]
           credits_path.write_text(json.dumps(credits, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
           loading_path = Path('ui/mod-loading.json')
