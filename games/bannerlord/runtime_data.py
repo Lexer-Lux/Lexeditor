@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from . import paths
-from .module_data import read_submodule
+from .module_data import is_singleplayer_module, read_submodule
 
 
 _RUNTIME_STATE_FILES = {
@@ -225,7 +225,7 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
     elif deployed_descriptor.is_file() and not descriptor_match:
         issues.append("Deployed SubModule.xml differs from the project copy")
 
-    direct_play_compatible = bool(deployed_module and deployed_module.get("singleplayer"))
+    direct_play_compatible = bool(deployed_module and is_singleplayer_module(deployed_module))
     if installed_module and deployed_module is not None and not direct_play_compatible:
         issues.append(
             "Deployed module is not declared as a single-player module; "

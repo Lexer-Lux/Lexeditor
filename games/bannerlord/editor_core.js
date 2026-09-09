@@ -23,7 +23,7 @@
   const post=(path,payload)=>api(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
   const refresh=()=>shell?.refresh?.();
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-  const metadata=m=>({name:m.name,id:m.id,version:m.version,defaultModule:!!m.defaultModule,singleplayer:!!m.singleplayer,multiplayer:!!m.multiplayer});
+  const metadata=m=>({name:m.name,id:m.id,version:m.version,moduleCategory:m.moduleCategory||"",moduleType:m.moduleType||"",defaultModule:!!m.defaultModule,singleplayer:!!m.singleplayer,multiplayer:!!m.multiplayer});
   const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;
   const moduleDirty=()=>state.module&&state.savedModule&&!same(moduleEditable(state.module),moduleEditable(state.savedModule));
   const projectDirty=()=>state.project?.projectFile&&state.savedProject?.projectFile&&!same(state.project.projectFile.properties,state.savedProject.projectFile.properties);
@@ -67,6 +67,8 @@
         ...fieldRow("Name",textInput(m.name,value=>setModuleField("name",value))),
         ...fieldRow("ID",textInput(m.id,value=>setModuleField("id",value))),
         ...fieldRow("Version",textInput(m.version,value=>setModuleField("version",value))),
+        ...fieldRow("Module category",select(m.moduleCategory||"",[["","Legacy / not set"],["Singleplayer","Singleplayer"],["Multiplayer","Multiplayer"],["MultiplayerOptional","Multiplayer optional"],["Server","Server"]],value=>setModuleField("moduleCategory",value))),
+        ...fieldRow("Module type",select(m.moduleType||"",[["","Default / not set"],["Community","Community"],["Official","Official"],["OfficialOptional","Official optional"]],value=>setModuleField("moduleType",value))),
         ...fieldRow("Default module",checkbox(m.defaultModule,value=>setModuleField("defaultModule",value))),
         ...fieldRow("Single-player",checkbox(m.singleplayer,value=>setModuleField("singleplayer",value))),
         ...fieldRow("Multi-player",checkbox(m.multiplayer,value=>setModuleField("multiplayer",value))),

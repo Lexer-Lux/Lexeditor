@@ -124,6 +124,8 @@ def read_submodule(path: Path) -> dict:
         "name": _value(root, "Name"),
         "id": _value(root, "Id"),
         "version": _value(root, "Version"),
+        "moduleCategory": _value(root, "ModuleCategory"),
+        "moduleType": _value(root, "ModuleType"),
         "defaultModule": _truth(_value(root, "DefaultModule")),
         "singleplayer": _truth(_value(root, "SingleplayerModule")),
         "multiplayer": _truth(_value(root, "MultiplayerModule")),
@@ -134,15 +136,27 @@ def read_submodule(path: Path) -> dict:
     }
 
 
+def is_singleplayer_module(module: dict) -> bool:
+    """Accept both legacy SingleplayerModule and modern ModuleCategory metadata."""
+    return bool(module.get("singleplayer")) or str(module.get("moduleCategory") or "").strip().casefold() == "singleplayer"
+
+
 _EDITABLE_METADATA = {
     "name": "Name",
     "id": "Id",
     "version": "Version",
+    "moduleCategory": "ModuleCategory",
+    "moduleType": "ModuleType",
     "defaultModule": "DefaultModule",
     "singleplayer": "SingleplayerModule",
     "multiplayer": "MultiplayerModule",
 }
 _BOOLEAN_METADATA = {"defaultModule", "singleplayer", "multiplayer"}
+_ENUM_METADATA = {
+    "moduleCategory": {"Singleplayer", "Multiplayer", "MultiplayerOptional", "Server"},
+    "moduleType": {"Community", "Official", "OfficialOptional"},
+}
+_OPTIONAL_METADATA = set(_ENUM_METADATA)
 
 
 def _set_value(parent: ET.Element, tag: str, value: str) -> bool:
@@ -158,6 +172,16 @@ def _set_value(parent: ET.Element, tag: str, value: str) -> bool:
     return True
 
 
+def _set_optional_value(parent: ET.Element, tag: str, value: str) -> bool:
+    if value:
+        return _set_value(parent, tag, value)
+    element = parent.find(tag)
+    if element is None:
+        return False
+    parent.remove(element)
+    return True
+
+
 def _normalize_metadata(edits: dict) -> dict:
     unknown = set(edits) - set(_EDITABLE_METADATA)
     if unknown:
@@ -166,6 +190,11 @@ def _normalize_metadata(edits: dict) -> dict:
     for field, raw in edits.items():
         if field in _BOOLEAN_METADATA:
             normalized[field] = "true" if bool(raw) else "false"
+        elif field in _ENUM_METADATA:
+            value = str(raw).strip()
+            if value and value not in _ENUM_METADATA[field]:
+                raise ValueError(f"{field} must be one of: {', '.join(sorted(_ENUM_METADATA[field]))}")
+            normalized[field] = value
         else:
             value = str(raw).strip()
             if not value:
@@ -398,7 +427,8 @@ def save_module(path: Path, payload: dict) -> dict:
     changes = 0
     metadata = _normalize_metadata(dict(payload.get("metadata") or {}))
     for field, value in metadata.items():
-        changes += int(_set_value(root, _EDITABLE_METADATA[field], value))
+        setter = _set_optional_value if field in _OPTIONAL_METADATA else _set_value
+        changes += int(setter(root, _EDITABLE_METADATA[field], value))
     if "dependencies" in payload:
         changes += _edit_dependencies(root, list(payload.get("dependencies") or []))
     if "incompatibleModules" in payload:

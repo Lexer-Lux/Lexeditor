@@ -10,7 +10,7 @@ from pathlib import Path
 import subprocess
 import threading
 
-from .module_data import read_submodule
+from .module_data import is_singleplayer_module, read_submodule
 
 
 CORE_SINGLEPLAYER_MODULES = (
@@ -20,6 +20,7 @@ CORE_SINGLEPLAYER_MODULES = (
     "CustomBattle",
     "Sandbox",
     "StoryMode",
+    "NavalDLC",
 )
 
 
@@ -111,7 +112,7 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
     # Refuse a module that explicitly is not a single-player module rather than
     # constructing a /singleplayer command that cannot represent its declared mode.
     selected_metadata = read_submodule(installed / "SubModule.xml")
-    if not selected_metadata.get("singleplayer"):
+    if not is_singleplayer_module(selected_metadata):
         raise RuntimeError(
             f"Bannerlord module {selected_id} is not declared as a single-player module; "
             "Lexeditor Play currently supports single-player modules only."
