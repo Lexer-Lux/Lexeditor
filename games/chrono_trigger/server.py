@@ -25,6 +25,7 @@ from .events import event_entries, get_event, load_events
 from .resources import ResourceArchiveError
 from .scene_tables import load_exits, load_treasure, save_exit, save_treasure
 from .worlds import load_worlds, save_world
+from .world_scripts import load_world_script
 from .world_tables import (
     load_world_table,
     save_world_exit,
@@ -108,7 +109,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/7"
+    server_version = "LexeditorChronoTrigger/8"
 
     def log_message(self, _format, *_args):
         return
@@ -153,7 +154,7 @@ class Handler(BaseHTTPRequestHandler):
                         "data-map", "resource-index", "localization-text", "scene-headers",
                         "scene-exits", "scene-treasure", "field-events", "world-headers",
                         "world-exits", "world-triggers", "world-script-addresses",
-                        "project-overlay", "read", "save",
+                        "world-script-disassembly", "project-overlay", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
@@ -186,6 +187,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(load_worlds(_store(), _source(params)))
             elif path == "/api/world-table":
                 self.send_json(load_world_table(_store(), int(params.get("world", ["-1"])[0]), _source(params)))
+            elif path == "/api/world-script":
+                self.send_json(load_world_script(_store(), int(params.get("world", ["-1"])[0]), _source(params)))
             elif path == "/api/messages/catalog":
                 self.send_json({"files": _store().localization_files()})
             elif path == "/api/messages":
