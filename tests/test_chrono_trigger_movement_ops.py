@@ -54,6 +54,7 @@ def command(opcode: int, arguments: bytes) -> dict:
 class MovementOpTests(unittest.TestCase):
     def test_selected_opcodes_have_named_schemas(self):
         fixtures = {
+            0x7A: b"\x10\x20\x08",
             0x8F: b"\x02",
             0x94: b"\x20",
             0x95: b"\x03",
@@ -74,6 +75,22 @@ class MovementOpTests(unittest.TestCase):
                 schema = editor_schema(command(opcode, args))
                 self.assertIsNotNone(schema)
                 self.assertTrue(schema["fixedWidth"])
+
+    def test_npc_jump_keeps_all_three_operands_literal(self):
+        cmd = command(0x7A, b"\x10\x20\x08")
+        schema = editor_schema(cmd)
+        self.assertEqual(schema["values"], {"x": 16, "y": 32, "jumpHeightSpeed": 8})
+        summary = movement_semantics(cmd)["summary"]
+        self.assertEqual(summary, "NPC jump · coordinate bytes (16, 32) · height/speed byte 8")
+        self.assertNotIn("pixel", summary.casefold())
+        self.assertNotIn("tile", summary.casefold())
+
+        original = event(bytes((0x7A, 0x10, 0x20, 0x08, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original),
+                          {"y": 0x44, "jumpHeightSpeed": 0x0C})
+        self.assertEqual(store.overlay[34:37], bytes((0x10, 0x44, 0x0C)))
+        self.assertEqual(len(store.overlay), len(original))
 
     def test_follow_targets_keep_object_and_pc_ranges_distinct(self):
         self.assertEqual(editor_schema(command(0x8F, b"\x02"))["values"], {"playerId": 2})
@@ -152,6 +169,7 @@ class MovementOpTests(unittest.TestCase):
 
     def test_malformed_or_ambiguous_neighbors_remain_unregistered(self):
         for opcode, args in (
+            (0x7B, b"\x01\x02\x03\x04"),
             (0x92, b"\x01\x02"),
             (0x9C, b"\x01\x02"),
             (0x9E, b"\x01"),
