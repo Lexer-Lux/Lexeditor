@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import struct
 
-from .ffx_table import FFXTableError, parse_table
+from .ffx_table import parse_table
 from .treasures import sha256_bytes
+from .u32_prices import apply_price_edits, parse_prices
 
 
 ARCHIVE_PATH = "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/item_rate.bin"
@@ -26,62 +26,22 @@ class ItemPriceRecord:
 
 
 def parse_item_prices(data: bytes) -> tuple[ItemPriceRecord, ...]:
-    try:
-        table = parse_table(data)
-    except FFXTableError as error:
-        raise ItemPriceError(str(error)) from error
-    if table.record_size != RECORD_SIZE:
-        raise ItemPriceError(
-            f"item_rate.bin record size does not match the proved {RECORD_SIZE}-byte layout: {table.record_size}"
-        )
-    rows = []
-    for ordinal, record_id in enumerate(range(table.min_index, table.max_index + 1)):
-        rows.append(ItemPriceRecord(
-            record_id=record_id,
-            ordinal=ordinal,
-            command_id=ITEM_COMMAND_BASE + ordinal,
-            gil_price=struct.unpack_from("<I", table.record(record_id), 0)[0],
-        ))
-    return tuple(rows)
-
-
-def _bounded(value, minimum: int, maximum: int, label: str) -> int:
-    if isinstance(value, bool):
-        raise ItemPriceError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise ItemPriceError(f"{label} must be an integer") from error
-    if not minimum <= parsed <= maximum:
-        raise ItemPriceError(f"{label} must be between {minimum} and {maximum}")
-    return parsed
+    rows = parse_prices(
+        data, filename="item_rate.bin", target_base=ITEM_COMMAND_BASE, error_type=ItemPriceError,
+    )
+    return tuple(ItemPriceRecord(
+        record_id=row.record_id,
+        ordinal=row.ordinal,
+        command_id=row.target_id,
+        gil_price=row.gil_price,
+    ) for row in rows)
 
 
 def apply_edits(data: bytes, edits: list[dict]) -> bytes:
     """Patch only selected 32-bit gil-price records."""
-    if not isinstance(edits, list) or not edits:
-        raise ItemPriceError("At least one item-price edit is required")
-    try:
-        table = parse_table(data)
-    except FFXTableError as error:
-        raise ItemPriceError(str(error)) from error
-    if table.record_size != RECORD_SIZE:
-        raise ItemPriceError(
-            f"item_rate.bin record size does not match the proved {RECORD_SIZE}-byte layout: {table.record_size}"
-        )
-
-    output = bytearray(table.data)
-    seen: set[int] = set()
-    for edit in edits:
-        if not isinstance(edit, dict):
-            raise ItemPriceError("Each item-price edit must be an object")
-        record_id = _bounded(edit.get("id"), table.min_index, table.max_index, "Price record ID")
-        if record_id in seen:
-            raise ItemPriceError(f"Duplicate item-price edit: {record_id}")
-        seen.add(record_id)
-        gil_price = _bounded(edit.get("gilPrice"), 0, 0xFFFFFFFF, "Gil price")
-        struct.pack_into("<I", output, table.record_offset(record_id), gil_price)
-    return bytes(output)
+    return apply_price_edits(
+        data, edits, filename="item_rate.bin", edit_label="item-price", error_type=ItemPriceError,
+    )
 
 
 def payload(data: bytes) -> dict:
