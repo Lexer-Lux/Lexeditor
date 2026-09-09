@@ -1,4 +1,5 @@
 import io
+import os
 import struct
 
 import pytest
@@ -81,6 +82,10 @@ def test_atlas_layout_matches_documented_2048_bc5_mip_chain():
         bitmap_font.decode_font_atlas_png(b"too small")
 
 
+@pytest.mark.skipif(
+    os.name != "nt",
+    reason="FF7R is Windows-only and pinned texfury 1.6.2 ships its native BC decoder as a Windows DLL",
+)
 def test_pinned_texfury_decodes_documented_bc5_atlas_shape_to_png():
     # Zero BC5 blocks are valid compressed blocks. This exercises the pinned
     # texfury/Pillow production path without committing a proprietary atlas.
