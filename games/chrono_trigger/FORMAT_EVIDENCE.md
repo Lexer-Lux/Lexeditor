@@ -23,7 +23,7 @@ Each ARC1 resource block also has a decoded four-byte big-endian uncompressed-si
 
 **Status: PC structural parser + growing proven fixed-width operand set.**
 
-Temporal Redux has explicit `Platform.PC` command-width overrides and command constructors/menu models. Lexeditor only exposes named writes where the PC command width and operand meaning are explicit and the existing command can be rewritten without moving boundaries.
+Temporal Redux has explicit `Platform.PC` command-width overrides, command-table descriptions and constructors/menu models. Lexeditor only exposes named writes where the PC command width and operand meaning are explicit and the existing command can be rewritten without moving boundaries.
 
 Current notable PC-specific layouts include:
 
@@ -32,6 +32,16 @@ Current notable PC-specific layouts include:
 - `0x14`/`0x15` memory-to-memory comparison — two script-memory `/2` slots, operation 0–7, forward jump byte when false; opcode selects 8/16-bit width.
 - `0x18` Check Storyline — storyline threshold + forward jump byte.
 - Button/action checks `0x2D`, `0x30`/`0x31`, `0x34`–`0x39`, `0x3B`/`0x3C`, `0x3F`–`0x44` — check/mode is encoded in the immutable opcode; the sole argument is the number of bytes to jump if the check fails.
+- `0x02`–`0x07` function calls — one doubled object/PC target byte plus one packed `priority<<4 | functionId` byte. The opcode itself fixes continue/sync/halt mode. Lexeditor exposes the logical target only when the stored target byte is even.
+- `0x0A`, `0x7C`, `0x7D` object controls — constructors store `objectId*2`; odd stored targets remain read-only. Processing commands `0x0B`/`0x0C` are not assumed to share this encoding because no matching constructor evidence establishes it.
+- `0x19`, `0x1A`, `0x4F`/`0x50`, `0x51`/`0x52`, `0x5B`, `0x5D`/`0x5E`, `0x5F`, `0x71`/`0x72`/`0x73` — explicit local script-memory result/store/copy/add/subtract/increment/decrement layouts.
+- `0x63`/`0x64` Set/Reset Bit — bit index 0–7 plus `/2` script-memory slot.
+- `0x69` Set Bits and `0x6B` Toggle Bits — raw u8 bitmask plus `/2` script-memory slot.
+- `0x6F` Shift Bits — right-shift count 0–7 plus `/2` script-memory slot.
+- `0x8F`, `0x94`/`0x95`, `0x96`/`0x97`, `0x98`/`0x99`, `0x9A`, `0xA0`/`0xA1`, `0xB5`/`0xB6` — follow/move constructors whose operand order matches the command table. Direct X/Y operands are exposed as **coordinate bytes**, not as tile/pixel units, because those units are not independently established for these opcodes.
+- `0xD9` Move Party — six raw coordinate bytes (PC1 X/Y, PC2 X/Y, PC3 X/Y).
+- `0xE7` Scroll Screen — raw X/Y coordinate bytes.
+- `0xF4` Shake Screen — constructor writes canonical 0/1; Lexeditor exposes a boolean only for those stored values and leaves noncanonical nonzero bytes read-only.
 - `0x83` Load Enemy — enemy ID is PC u16 + slot/static byte.
 - `0xC9` Check Inventory — PC item ID is u16 + jump byte.
 - `0xC7` Add Item from Memory — local-memory slot + raw category.
@@ -47,15 +57,21 @@ Comparison operation values come directly from Temporal Redux's command model: 0
 
 All local script-memory UI addresses are even `0x7F0200`–`0x7F03FE` and round-trip to the one-byte PC slot. Invalid/odd values fail closed.
 
+For doubled object/PC target encodings, Lexeditor likewise fails closed on odd stored bytes rather than rounding. Logical target IDs are limited by the one-byte doubled representation (`0–127`) unless a stricter constructor range is independently explicit (for example follow-PC commands that document `1–6`).
+
 Relative jump writes have an additional invariant: if the jump byte itself changes, the proposed target must be one of the decoded command boundaries (or function end). An unchanged pre-existing invalid jump does not block changing another fixed-width operand. This avoids silently creating new mid-command control-flow edges while preserving unusual existing data.
 
 Still intentionally excluded from named editing:
 
 - `0x16` comparison: bank-7F addressing/operator packing is a distinct layout and is not normalized from the plain script-memory comparison model.
+- `0x65`/`0x66` bank-7F bit commands: their address/bit packing differs from the plain script-memory bit commands.
+- `0x67` Reset Bits: Temporal Redux's constructor names the operand a reset bitmask while the command table describes it as “bits to keep”; Lexeditor does not choose a polarity without better evidence.
 - `0x6E` PC-only extended-memory comparison: width is known, but public semantic/address evidence is not strong enough yet for a named editor.
 - `0x8D` pixel-position: upstream code itself notes coordinate/shift mismatch.
 - `0x8E` sprite priority: upstream description leaves non-mode bits unresolved.
+- `0x9E`/`0x9F`: Temporal Redux's table definitions are internally inconsistent with their constructors; Lexeditor therefore records these PC widths as unresolved (`-1`) and does not expose editors.
 - `0x27`/`0x28`: target encoding evidence is inconsistent enough that Lexeditor does not normalize it.
+- `0xE4`/`0xE5`/`0xE6`: tile-copy/scroll-layer behavior includes unresolved flags or unknown fields, so these remain read-only despite fixed byte counts.
 - variable/dynamic or unresolved widths generally remain read-only until a relocation-capable assembler exists.
 
 ## Scene maps / tiles / palettes
