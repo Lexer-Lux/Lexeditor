@@ -66,6 +66,13 @@ class ProjectManager:
     def _write(self, payload: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
+        try:
+            # Detach stale regular files, symlinks, and hard-link aliases before
+            # writing predictable helper names. Never follow an attacker-created
+            # helper entry into another file.
+            temporary.unlink(missing_ok=True)
+        except OSError as error:
+            raise RuntimeError(f"Cannot safely clear project registry helper: {temporary}") from error
         temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         temporary.replace(self.path)
 
@@ -180,14 +187,24 @@ class ProjectManager:
         if target.exists():
             raise ValueError(f"A file or folder already exists: {target}")
         root.rename(target)
-        with self._lock:
-            payload = self._read()
-            entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
-            current = Path(entry.get("current") or spec.default_root).expanduser().resolve()
-            known = [str(target) if os.path.normcase(str(Path(value).expanduser().resolve())) == os.path.normcase(str(root)) else value
-                     for value in entry.get("known", []) if isinstance(value, str)]
-            if os.path.normcase(str(current)) == os.path.normcase(str(root)):
-                current = target
-            payload[plugin_id] = {"current": str(current), "known": known}
-            self._write(payload)
+        try:
+            with self._lock:
+                payload = self._read()
+                entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
+                current = Path(entry.get("current") or spec.default_root).expanduser().resolve()
+                known = [str(target) if os.path.normcase(str(Path(value).expanduser().resolve())) == os.path.normcase(str(root)) else value
+                         for value in entry.get("known", []) if isinstance(value, str)]
+                if os.path.normcase(str(current)) == os.path.normcase(str(root)):
+                    current = target
+                payload[plugin_id] = {"current": str(current), "known": known}
+                self._write(payload)
+        except Exception as error:
+            try:
+                if target.exists() and not root.exists():
+                    target.rename(root)
+            except Exception as rollback_error:
+                raise RuntimeError(
+                    f"Project rename failed and the original folder could not be restored: {rollback_error}"
+                ) from error
+            raise
         return self.snapshot(plugin_id)
