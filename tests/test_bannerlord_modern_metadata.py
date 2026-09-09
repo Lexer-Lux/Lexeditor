@@ -56,7 +56,7 @@ class BannerlordModernMetadataTests(unittest.TestCase):
     def test_legacy_flags_and_modern_default_remain_compatible(self):
         self.assertTrue(is_singleplayer_module({"moduleCategory": "", "singleplayer": True, "multiplayer": False}))
         self.assertFalse(is_singleplayer_module({"moduleCategory": "", "singleplayer": False, "multiplayer": True}))
-        self.assertTrue(is_singleplayer_module({"moduleCategory": "", "singleplayer": False, "multiplayer": False}))
+        self.assertFalse(is_singleplayer_module({"moduleCategory": "", "singleplayer": False, "multiplayer": False}))
 
     def test_optional_modern_metadata_can_be_removed_without_creating_legacy_nodes(self):
         with tempfile.TemporaryDirectory() as name:

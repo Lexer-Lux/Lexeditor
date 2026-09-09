@@ -182,12 +182,10 @@ def read_submodule(path: Path) -> dict:
 def is_singleplayer_module(module: dict) -> bool:
     """Mirror ModuleManager's additive modern/legacy single-player flags."""
     category = str(module.get("moduleCategory") or "").strip().casefold()
-    if module.get("singleplayer") or category in {"singleplayer", "singleplayeroptional"}:
-        return True
-    if category or module.get("multiplayer"):
-        return False
-    # Descriptors predating both category and legacy flags default to SP.
-    return True
+    return bool(module.get("singleplayer")) or category in {
+        "singleplayer",
+        "singleplayeroptional",
+    }
 
 
 _EDITABLE_METADATA = {
