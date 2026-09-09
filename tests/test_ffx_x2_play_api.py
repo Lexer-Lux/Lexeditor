@@ -10,12 +10,13 @@ import urllib.request
 import pytest
 
 from games.ffx_x2 import server
+from games.ffx_x2.plugin import FFXX2Session
 
 
 def _installation(tmp_path: Path) -> Path:
     root = tmp_path / "FINAL FANTASY FFX&FFX-2 HD Remaster"
     for relative in (
-        "FFX.exe", "FFX-2.exe",
+        "FFX&X-2_LAUNCHER.exe", "FFX.exe", "FFX-2.exe",
         "fahrenheit/bin/fhstage0.exe", "fahrenheit/bin/fhstage1.dll",
     ):
         target = root / relative
@@ -120,3 +121,31 @@ def test_play_route_rejects_every_shape_except_exact_collection_keys(
     assert status_code == 400
     assert "error" in result
     assert calls == []
+
+
+def test_managed_service_advertises_launch_and_rejects_generic_play_input(tmp_path: Path):
+    root = _installation(tmp_path)
+    project = tmp_path / "managed-project"
+    theme_cache = tmp_path / "managed-theme"
+    with FFXX2Session({
+        "LEXEDITOR_FFX_X2_ROOT": str(root),
+        "LEXEDITOR_FFX_X2_PROJECT": str(project),
+        "LEXEDITOR_FFX_X2_THEME_CACHE": str(theme_cache),
+    }) as session:
+        base_url = session.url.rstrip("/")
+        status_code, identity = _request_json(base_url, "/api/plugin")
+        assert status_code == 200
+        assert "fahrenheit-launch" in identity["capabilities"]
+
+        status_code, launch_state = _request_json(base_url, "/api/launch")
+        assert status_code == 200
+        assert launch_state["stage0Ready"] is True
+        assert launch_state["stage1Ready"] is True
+        assert launch_state["games"]["x"]["ready"] is True
+        assert launch_state["games"]["x2"]["ready"] is True
+
+        status_code, rejected = _request_json(
+            base_url, "/api/play", {"game": "x", "args": ["--not-allowed"]},
+        )
+        assert status_code == 400
+        assert "exactly" in rejected["error"]
