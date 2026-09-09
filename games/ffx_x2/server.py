@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import (
-    auto_ability_prices, ctb_base, deployment, ffx2_accessories, ffx2_abilities,
+    auto_ability_prices, ctb_base, deployment, ffx_commands, ffx2_accessories, ffx2_abilities,
     gear_shops, item_prices, item_shops, launch as fahrenheit_launch, mix_table,
     paths, theme, treasures,
 )
@@ -25,9 +25,9 @@ MAX_REQUEST_BYTES = 256 * 1024
 POST_ROUTES = {
     "/api/project/extract", "/api/treasures/save", "/api/item-prices/save",
     "/api/auto-ability-prices/save", "/api/ctb-base/save", "/api/mix-table/save",
-    "/api/item-shops/save", "/api/gear-shops/save", "/api/ffx2-abilities/save",
-    "/api/ffx2-accessories/save", "/api/deployment/deploy", "/api/deployment/revert",
-    "/api/play",
+    "/api/item-shops/save", "/api/gear-shops/save", "/api/ffx-commands/save",
+    "/api/ffx2-abilities/save", "/api/ffx2-accessories/save",
+    "/api/deployment/deploy", "/api/deployment/revert", "/api/play",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
 _META_CACHE: tuple[tuple[int, int], VBFIndex] | None = None
@@ -273,6 +273,17 @@ def save_gear_shops(request: dict) -> dict:
     return _structured_save(request, gear_shops.ARCHIVE_PATH, gear_shops.apply_edits, gear_shops.payload, "Gear Shops")
 
 
+def ffx_command_catalog() -> dict:
+    return _structured_payload(ffx_commands.ARCHIVE_PATH, ffx_commands.payload)
+
+
+def save_ffx_commands(request: dict) -> dict:
+    return _structured_save(
+        request, ffx_commands.ARCHIVE_PATH, ffx_commands.apply_edits,
+        ffx_commands.payload, "FFX Commands",
+    )
+
+
 def ffx2_ability_catalog() -> dict:
     return _structured_payload_for("x2", ffx2_abilities.ARCHIVE_PATH, ffx2_abilities.payload)
 
@@ -337,6 +348,8 @@ def data_map() -> dict:
          lambda s: f"{len(s['rows'])} shops with {s['slotCount']} item/command ID slots; leading legacy rate is read-only.", "item-shops"),
         (gear_shops.ARCHIVE_PATH, "Structured 16-slot gear shop editor", gear_shops.payload,
          lambda s: f"{len(s['rows'])} shops with {s['slotCount']} gear-index slots; leading legacy rate is read-only.", "gear-shops"),
+        (ffx_commands.ARCHIVE_PATH, "Conservative FFX command animation-ID editor", ffx_commands.payload,
+         lambda s: f"{len(s['rows'])} English/US command records; edits only animation IDs at +0x10/+0x12 and preserves every other byte and trailing strings.", "ffx-commands"),
     ]
     for archive_path, controls, builder, notes, target in structured_x:
         row = _map_structured_row("x", archive_path, controls, builder, notes)
@@ -377,8 +390,8 @@ def data_map() -> dict:
          "notes": "; ".join(theme_parts) or "Theme extraction falls back safely when cosmetic source assets are unavailable.",
          "status": "partial" if themed.get("source") == "installed-game" else "not-integrated", "coverage": "game-derived-theme", "openable": False},
         {"filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*", "controls": "Remaining FFX gameplay/kernel family",
-         "notes": "Seven FFX kernel families are structured; other kernel tables remain available through the VBF browser.",
-         "status": "partial", "coverage": "seven-structured-families", "openable": False},
+         "notes": "Eight FFX kernel families are structured; other kernel tables remain available through the VBF browser.",
+         "status": "partial", "coverage": "eight-structured-families", "openable": False},
         {"filename": "FFX2_Data/ffx_ps2/ffx2/**", "controls": "Remaining FFX-2 game-data families",
          "notes": "English/US command animations and accessory base ability/price fields are structured; other FFX-2 formats remain read/extract-only until proved.",
          "status": "partial", "coverage": "two-structured-families", "openable": False},
@@ -444,8 +457,9 @@ class Handler(BaseHTTPRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": ["data-map", "vbf-index", "vbf-extract", "project-overlay", "ffx-treasure-editor",
                         "ffx-item-price-editor", "ffx-auto-ability-price-editor", "ffx-ctb-base-editor", "ffx-mix-editor",
-                        "ffx-item-shop-editor", "ffx-gear-shop-editor", "ffx2-ability-animation-editor",
-                        "ffx2-accessory-editor", "installed-game-theme", "fahrenheit-deploy", "fahrenheit-launch"]})
+                        "ffx-item-shop-editor", "ffx-gear-shop-editor", "ffx-command-animation-editor",
+                        "ffx2-ability-animation-editor", "ffx2-accessory-editor", "installed-game-theme",
+                        "fahrenheit-deploy", "fahrenheit-launch"]})
             elif route == "/api/dashboard": self.json_response(dashboard())
             elif route == "/api/datamap": self.json_response(data_map())
             elif route == "/api/launch": self.json_response(launch_status())
@@ -457,6 +471,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/mix-table": self.json_response(mix_catalog())
             elif route == "/api/item-shops": self.json_response(item_shop_catalog())
             elif route == "/api/gear-shops": self.json_response(gear_shop_catalog())
+            elif route == "/api/ffx-commands": self.json_response(ffx_command_catalog())
             elif route == "/api/ffx2-abilities": self.json_response(ffx2_ability_catalog())
             elif route == "/api/ffx2-accessories": self.json_response(ffx2_accessory_catalog())
             elif route == "/api/archive":
@@ -489,6 +504,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/mix-table/save": result = save_mix(request)
             elif route == "/api/item-shops/save": result = save_item_shops(request)
             elif route == "/api/gear-shops/save": result = save_gear_shops(request)
+            elif route == "/api/ffx-commands/save": result = save_ffx_commands(request)
             elif route == "/api/ffx2-abilities/save": result = save_ffx2_abilities(request)
             elif route == "/api/ffx2-accessories/save": result = save_ffx2_accessories(request)
             elif route == "/api/deployment/deploy": result = deployment.deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
