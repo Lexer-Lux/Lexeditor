@@ -152,20 +152,51 @@ def _new_local_folder(root: Path) -> str:
     for _attempt in range(100):
         # Exactly ten decimal digits, matching Pocketpair's local-test uploader pattern.
         value = str(secrets.randbelow(9_000_000_000) + 1_000_000_000)
-        if not (root / value).exists():
+        candidate = root / value
+        if not candidate.exists() and not candidate.is_symlink():
             return value
     raise RuntimeError("Could not allocate a unique Palworld local Workshop folder")
 
 
-def _owned_target(manifest: dict[str, Any]) -> Path:
-    return (Path(manifest["workshopRoot"]).expanduser().resolve() / manifest["folder"]).resolve()
+def _current_root(game_root: Path | None, *, create: bool) -> Path:
+    candidate = workshop_root(game_root)
+    if candidate is None:
+        raise WorkshopUnavailableError("Could not determine Palworld's Steam Workshop content root")
+    return _ensure_workshop_root(candidate) if create else Path(candidate).resolve()
+
+
+def _owned_target(manifest: dict[str, Any], root: Path) -> Path:
+    """Resolve ownership from the *current* root, never by following manifest paths."""
+    root = Path(root).resolve()
+    recorded_root = Path(manifest["workshopRoot"]).expanduser().resolve()
+    if recorded_root != root:
+        raise WorkshopOwnershipError(
+            "This project owns a local deployment in a different Workshop root; remove it there before changing roots."
+        )
+    target = root / manifest["folder"]
+    # The manifest folder was validated as exactly ten digits. Do not call
+    # target.resolve(): the target itself could have been replaced by a symlink.
+    if target.parent.resolve() != root:
+        raise WorkshopOwnershipError("Owned local deployment path escapes the current Workshop root")
+    return target
+
+
+def _target_digest(target: Path) -> str:
+    if target.is_symlink():
+        raise WorkshopChangedError(
+            "The owned Palworld local deployment was replaced by a link; refusing to follow or modify it."
+        )
+    if not target.is_dir():
+        raise WorkshopOwnershipError(f"Owned local deployment path is not a directory: {target}")
+    return package_build._package_digest(package_build._file_records_from_directory(target))
 
 
 def status(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
     project = Path(project).resolve()
     _build_root, manifest_path = _project_paths(project)
     manifest = _load_manifest(manifest_path)
-    root = workshop_root(game_root)
+    root_candidate = workshop_root(game_root)
+    root = Path(root_candidate).resolve() if root_candidate is not None else None
     root_ready = bool(root is not None and root.is_dir())
     build_status = package_build.status(project)
     payload: dict[str, Any] = {
@@ -175,6 +206,8 @@ def status(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
         "owned": False,
         "current": False,
         "externallyChanged": False,
+        "linkedTarget": False,
+        "rootMismatch": False,
         "folder": "",
         "targetPath": "",
         "packageName": build_status.get("packageName", ""),
@@ -182,13 +215,23 @@ def status(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
     }
     if manifest is None:
         return payload
-    target = _owned_target(manifest)
-    payload.update({
-        "owned": True,
-        "folder": manifest["folder"],
-        "targetPath": str(target),
-    })
+    payload.update({"owned": True, "folder": manifest["folder"]})
+    if root is None:
+        payload["rootMismatch"] = True
+        return payload
+    recorded_root = Path(manifest["workshopRoot"]).expanduser().resolve()
+    if recorded_root != root:
+        payload["rootMismatch"] = True
+        return payload
+    target = root / manifest["folder"]
+    payload["targetPath"] = str(target)
+    if target.is_symlink():
+        payload.update({"externallyChanged": True, "linkedTarget": True})
+        return payload
+    if not target.exists():
+        return payload
     if not target.is_dir():
+        payload["externallyChanged"] = True
         return payload
     current_digest = package_build._package_digest(package_build._file_records_from_directory(target))
     matches = current_digest == manifest["packageDigest"]
@@ -210,11 +253,8 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
     package_digest = str(build_status["currentDigest"])
     package_name = str(build_status.get("packageName", ""))
 
-    root_candidate = workshop_root(game_root)
-    if root_candidate is None:
-        raise WorkshopUnavailableError("Could not determine Palworld's Steam Workshop content root")
-    root = _ensure_workshop_root(root_candidate)
-    build_root, manifest_path = _project_paths(project)
+    root = _current_root(game_root, create=True)
+    _build_root, manifest_path = _project_paths(project)
     manifest = _load_manifest(manifest_path)
 
     if manifest is None:
@@ -226,17 +266,14 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
         folder = _new_local_folder(root)
         target = root / folder
     else:
-        recorded_root = Path(manifest["workshopRoot"]).expanduser().resolve()
-        if recorded_root != root:
-            raise WorkshopOwnershipError(
-                "This project already owns a local deployment in a different Workshop root; remove it before changing roots."
-            )
+        target = _owned_target(manifest, root)
         folder = manifest["folder"]
-        target = root / folder
+        if target.is_symlink():
+            raise WorkshopChangedError(
+                "The owned Palworld local deployment was replaced by a link; refusing to follow or overwrite it."
+            )
         if target.exists():
-            if not target.is_dir():
-                raise WorkshopOwnershipError(f"Owned local deployment path is not a directory: {target}")
-            current_digest = package_build._package_digest(package_build._file_records_from_directory(target))
+            current_digest = _target_digest(target)
             if current_digest != manifest["packageDigest"]:
                 raise WorkshopChangedError(
                     "The local Palworld deployment changed outside Lexeditor; refusing to overwrite external changes."
@@ -248,7 +285,7 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
                 )
             if current_digest == package_digest:
                 return status(project, game_root=game_root)
-        elif manifest.get("packageDigest"):
+        else:
             raise WorkshopOwnershipError("Local deployment manifest exists but its owned Workshop folder is missing")
 
     staging = Path(tempfile.mkdtemp(prefix=".lexeditor-palworld-local-", dir=root))
@@ -286,7 +323,7 @@ def deploy(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
         if backup is not None and backup.exists():
             shutil.rmtree(backup)
     except BaseException:
-        if target.exists() and not staging.exists():
+        if target.exists() and not target.is_symlink() and not staging.exists():
             shutil.rmtree(target, ignore_errors=True)
         if backup is not None and backup.exists():
             os.replace(backup, target)
@@ -306,18 +343,23 @@ def remove(project: Path, *, game_root: Path | None = None) -> dict[str, Any]:
     manifest = _load_manifest(manifest_path)
     if manifest is None:
         return status(project, game_root=game_root)
-    target = _owned_target(manifest)
+    root = _current_root(game_root, create=False)
+    if not root.is_dir():
+        raise WorkshopUnavailableError(f"Palworld Workshop content root is unavailable: {root}")
+    target = _owned_target(manifest, root)
+    if target.is_symlink():
+        raise WorkshopChangedError(
+            "The owned Palworld local deployment was replaced by a link; refusing to follow or delete it."
+        )
     if not target.exists():
         raise WorkshopOwnershipError("Local deployment manifest exists but its owned Workshop folder is missing")
-    if not target.is_dir():
-        raise WorkshopOwnershipError(f"Owned local deployment path is not a directory: {target}")
-    current_digest = package_build._package_digest(package_build._file_records_from_directory(target))
+    current_digest = _target_digest(target)
     if current_digest != manifest["packageDigest"]:
         raise WorkshopChangedError(
             "The local Palworld deployment changed outside Lexeditor; refusing to delete external changes."
         )
 
-    quarantine = Path(tempfile.mkdtemp(prefix=".lexeditor-palworld-remove-", dir=target.parent))
+    quarantine = Path(tempfile.mkdtemp(prefix=".lexeditor-palworld-remove-", dir=root))
     quarantine.rmdir()
     os.replace(target, quarantine)
     try:
