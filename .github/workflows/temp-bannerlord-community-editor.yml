@@ -1,0 +1,140 @@
+name: Temporary Bannerlord BLSE structured editor patch
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-community-editor.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - name: Apply guarded Bannerlord structured-editor patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
+
+          module_path = Path("games/bannerlord/module_data.py")
+          text = module_path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              "from . import paths\n",
+              "from . import paths\nfrom .community_metadata import read_community_dependencies\n",
+              "module import",
+          )
+          text = replace_once(
+              text,
+              "\n    return {\n        \"path\": str(path),\n",
+              "\n    community_dependencies = [\n        row for row in read_community_dependencies(path)\n        if row.get(\"origin\") == \"DependedModuleMetadatas\"\n    ]\n\n    return {\n        \"path\": str(path),\n",
+              "module read community rows",
+          )
+          text = replace_once(
+              text,
+              "        \"dependencies\": dependencies,\n        \"modulesToLoadAfterThis\": modules_to_load_after_this,\n",
+              "        \"dependencies\": dependencies,\n        \"communityDependencies\": community_dependencies,\n        \"modulesToLoadAfterThis\": modules_to_load_after_this,\n",
+              "module return community rows",
+          )
+          community_editor = '''\n\ndef _edit_community_dependencies(root: ET.Element, rows: list[dict]) -> int:\n    parent = root.find("DependedModuleMetadatas")\n    if parent is None and not rows:\n        return 0\n    parent = parent if parent is not None else ET.SubElement(root, "DependedModuleMetadatas")\n    existing = _element_children(parent, "DependedModuleMetadata")\n    changes = 0\n    reused: set[int] = set()\n    output = []\n    valid_orders = {"", "LoadBeforeThis", "LoadAfterThis"}\n    for position, row in enumerate(rows):\n        module_id = str(row.get("id", "")).strip()\n        if not module_id:\n            raise ValueError(f"BLSE dependency metadata {position + 1} needs an ID")\n        order = str(row.get("order", "")).strip()\n        if order not in valid_orders:\n            raise ValueError("BLSE dependency order must be LoadBeforeThis, LoadAfterThis, or empty")\n        element, created = _reuse(existing, row.get("index"), reused, "DependedModuleMetadata")\n        changes += int(created)\n        before = dict(element.attrib)\n        element.set("id", module_id)\n        if order:\n            element.set("order", order)\n        else:\n            element.attrib.pop("order", None)\n        version = str(row.get("version", "")).strip()\n        if version:\n            element.set("version", version)\n        else:\n            element.attrib.pop("version", None)\n        if bool(row.get("optional", False)):\n            element.set("optional", "true")\n        else:\n            element.attrib.pop("optional", None)\n        if bool(row.get("incompatible", False)):\n            element.set("incompatible", "true")\n        else:\n            element.attrib.pop("incompatible", None)\n        changes += int(before != element.attrib)\n        output.append(element)\n    if len(existing) != len(output) or any(a is not b for a, b in zip(existing, output)):\n        changes += 1\n    _remove_tagged_children(parent, "DependedModuleMetadata")\n    for element in output:\n        parent.append(element)\n    return changes\n'''
+          text = replace_once(
+              text,
+              "\n\ndef _edit_module_id_rows(\n",
+              community_editor + "\n\ndef _edit_module_id_rows(\n",
+              "community writer insertion",
+          )
+          text = replace_once(
+              text,
+              '    allowed = {"metadata", "dependencies", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}\n',
+              '    allowed = {"metadata", "dependencies", "communityDependencies", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}\n',
+              "save allowed sections",
+          )
+          text = replace_once(
+              text,
+              '    if "dependencies" in payload:\n        changes += _edit_dependencies(root, list(payload.get("dependencies") or []))\n    if "modulesToLoadAfterThis" in payload:\n',
+              '    if "dependencies" in payload:\n        changes += _edit_dependencies(root, list(payload.get("dependencies") or []))\n    if "communityDependencies" in payload:\n        changes += _edit_community_dependencies(root, list(payload.get("communityDependencies") or []))\n    if "modulesToLoadAfterThis" in payload:\n',
+              "save community section",
+          )
+          text = replace_once(
+              text,
+              '            "controls": "Module identity/category, dependency and inverse-load relations, incompatibilities, submodule DLL/class/assemblies/tags, and XML registrations",\n',
+              '            "controls": "Module identity/category, native and BLSE dependency/load-order relations, incompatibilities, submodule DLL/class/assemblies/tags, and XML registrations",\n',
+              "data map controls",
+          )
+          module_path.write_text(text, encoding="utf-8")
+
+          editor_path = Path("games/bannerlord/editor_core.js")
+          text = editor_path.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              '  const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],modulesToLoadAfterThis:m.modulesToLoadAfterThis||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;\n',
+              '  const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],communityDependencies:m.communityDependencies||[],modulesToLoadAfterThis:m.modulesToLoadAfterThis||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;\n',
+              "editor editable payload",
+          )
+          text = replace_once(
+              text,
+              '        ...fieldRow("Dependencies",String((m.dependencies||[]).length)),\n        ...fieldRow("Modules forced after this",String((m.modulesToLoadAfterThis||[]).length)),\n',
+              '        ...fieldRow("Native dependencies",String((m.dependencies||[]).length)),\n        ...fieldRow("BLSE dependency metadata",String((m.communityDependencies||[]).length)),\n        ...fieldRow("Modules forced after this",String((m.modulesToLoadAfterThis||[]).length)),\n',
+              "editor module counts",
+          )
+          text = replace_once(
+              text,
+              '  function relationList(kind){\n    if(kind==="incompatible")return state.module.incompatibleModules||[];\n    if(kind==="loadAfter")return state.module.modulesToLoadAfterThis||[];\n    return state.module.dependencies||[];\n  }\n',
+              '  function relationList(kind){\n    if(kind==="community")return state.module.communityDependencies||[];\n    if(kind==="incompatible")return state.module.incompatibleModules||[];\n    if(kind==="loadAfter")return state.module.modulesToLoadAfterThis||[];\n    return state.module.dependencies||[];\n  }\n',
+              "editor relation list",
+          )
+          text = replace_once(
+              text,
+              '      ...(state.module.dependencies||[]).map((row,index)=>({kind:"dependency",index,row})),\n      ...(state.module.modulesToLoadAfterThis||[]).map((row,index)=>({kind:"loadAfter",index,row})),\n',
+              '      ...(state.module.dependencies||[]).map((row,index)=>({kind:"dependency",index,row})),\n      ...(state.module.communityDependencies||[]).map((row,index)=>({kind:"community",index,row})),\n      ...(state.module.modulesToLoadAfterThis||[]).map((row,index)=>({kind:"loadAfter",index,row})),\n',
+              "editor dependency rows",
+          )
+          old_add = '''  function addDependency(kind){\n    if(kind==="dependency"){\n      state.module.dependencies.push({index:null,id:"",dependentVersion:"",optional:false,attributes:{}});\n    }else if(kind==="loadAfter"){\n      state.module.modulesToLoadAfterThis=state.module.modulesToLoadAfterThis||[];\n      state.module.modulesToLoadAfterThis.push({index:null,id:"",attributes:{}});\n    }else{\n      state.module.incompatibleModules.push({index:null,id:"",elementTag:"Module",attributes:{}});\n    }\n    const list=relationList(kind);\n    state.dependencySelection={kind,index:list.length-1};\n    render();refresh();\n  }\n'''
+          new_add = '''  function addDependency(kind){\n    if(kind==="dependency"){\n      state.module.dependencies.push({index:null,id:"",dependentVersion:"",optional:false,attributes:{}});\n    }else if(kind==="community"){\n      state.module.communityDependencies=state.module.communityDependencies||[];\n      state.module.communityDependencies.push({index:null,id:"",order:"LoadBeforeThis",optional:false,incompatible:false,version:"",attributes:{}});\n    }else if(kind==="loadAfter"){\n      state.module.modulesToLoadAfterThis=state.module.modulesToLoadAfterThis||[];\n      state.module.modulesToLoadAfterThis.push({index:null,id:"",attributes:{}});\n    }else{\n      state.module.incompatibleModules.push({index:null,id:"",elementTag:"Module",attributes:{}});\n    }\n    const list=relationList(kind);\n    state.dependencySelection={kind,index:list.length-1};\n    render();refresh();\n  }\n'''
+          text = replace_once(text, old_add, new_add, "editor add relation")
+          text = replace_once(
+              text,
+              '        el("button",{type:"button",onclick:()=>addDependency("dependency"),title:"Add dependency"},"+ Dep"),\n        el("button",{type:"button",onclick:()=>addDependency("loadAfter"),title:"Force another module to load after this module"},"+ After"),\n',
+              '        el("button",{type:"button",onclick:()=>addDependency("dependency"),title:"Add native dependency"},"+ Dep"),\n        el("button",{type:"button",onclick:()=>addDependency("community"),title:"Add BLSE/BUTR dependency metadata"},"+ BLSE"),\n        el("button",{type:"button",onclick:()=>addDependency("loadAfter"),title:"Force another module to load after this module"},"+ After"),\n',
+              "editor add buttons",
+          )
+          text = replace_once(
+              text,
+              '        const label=item.kind==="dependency"?"Depends on":item.kind==="loadAfter"?"Loads after this":"Incompatible";\n        return el("button",{type:"button",class:`bl-item${active?" active":""}`,onclick:()=>{state.dependencySelection={kind:item.kind,index:item.index};render()}},\n          item.row.id||"(new module)",el("small",{},label+(item.row.dependentVersion?` · ${item.row.dependentVersion}`:"")));\n',
+              '        const label=item.kind==="dependency"?"Native dependency":item.kind==="community"?`BLSE ${item.row.order||"metadata"}`:item.kind==="loadAfter"?"Loads after this":"Incompatible";\n        const version=item.row.dependentVersion||item.row.version||"";\n        const flags=item.kind==="community"?[item.row.optional?"optional":"",item.row.incompatible?"incompatible":""].filter(Boolean).join(" · "):"";\n        return el("button",{type:"button",class:`bl-item${active?" active":""}`,onclick:()=>{state.dependencySelection={kind:item.kind,index:item.index};render()}},\n          item.row.id||"(new module)",el("small",{},label+(version?` · ${version}`:"")+(flags?` · ${flags}`:"")));\n',
+              "editor relation labels",
+          )
+          community_detail = '''    else if(selection.kind==="community")detail=el("div",{class:"bl-detail"},\n      el("section",{class:"bl-panel"},el("h2",{},record.id||"New BLSE dependency metadata"),\n        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),\n        el("div",{class:"bl-grid"},\n          ...fieldRow("Module ID",textInput(record.id,value=>record.id=value)),\n          ...fieldRow("Order",select(record.order||"",[["","No ordering edge"],["LoadBeforeThis","Dependency loads before this module"],["LoadAfterThis","Dependency loads after this module"]],value=>record.order=value)),\n          ...fieldRow("Version / range",textInput(record.version,value=>record.version=value,{placeholder:"v2.0.* or v2.0.0-v2.3.*"})),\n          ...fieldRow("Optional",checkbox(record.optional,value=>record.optional=value)),\n          ...fieldRow("Incompatible",checkbox(record.incompatible,value=>record.incompatible=value))\n        ),\n        el("div",{class:"bl-note"},"BLSE/BUTR community metadata is evaluated before duplicate native dependency rows. Required rows can load either before or after this module; optional rows constrain order only when otherwise enabled. Unknown attributes on existing rows are preserved.")));\n'''
+          text = replace_once(
+              text,
+              '    else if(selection.kind==="incompatible")detail=el("div",{class:"bl-detail"},\n',
+              community_detail + '    else if(selection.kind==="incompatible")detail=el("div",{class:"bl-detail"},\n',
+              "editor community detail",
+          )
+          editor_path.write_text(text, encoding="utf-8")
+
+          test_path = Path("tests/test_bannerlord_community_editor.py")
+          test_path.write_text(r'''from pathlib import Path\nimport tempfile\nimport unittest\n\nfrom games.bannerlord.module_data import read_submodule, save_module\n\n\nDESCRIPTOR = ''' + '"""' + r'''<Module>\n  <Name value="Community Editor" />\n  <Id value="Community.Editor" />\n  <Version value="v1.0.0" />\n  <SingleplayerModule value="true" />\n  <DependedModuleMetadatas>\n    <!-- keep this comment -->\n    <DependedModuleMetadata id="Library" order="LoadBeforeThis" version="v2.0.*" Mystery="keep" />\n    <FutureMetadata value="preserve" />\n  </DependedModuleMetadatas>\n  <LoadAfterModules><LoadAfterModule Id="Legacy.After" /></LoadAfterModules>\n  <OptionalDependModules><DependModule Id="Legacy.Optional" /></OptionalDependModules>\n</Module>\n''' + '"""' + r'''\n\n\nclass BannerlordCommunityEditorTests(unittest.TestCase):\n    def test_read_and_save_blse_rows_preserve_unknown_and_legacy_data(self):\n        with tempfile.TemporaryDirectory() as name:\n            path = Path(name) / "SubModule.xml"\n            path.write_text(DESCRIPTOR, encoding="utf-8")\n            module = read_submodule(path)\n            self.assertEqual(len(module["communityDependencies"]), 1)\n            row = module["communityDependencies"][0]\n            self.assertEqual(row["id"], "Library")\n            self.assertEqual(row["order"], "LoadBeforeThis")\n            self.assertEqual(row["version"], "v2.0.*")\n            self.assertEqual(row["attributes"]["Mystery"], "keep")\n\n            result = save_module(path, {"communityDependencies": [{\n                **row,\n                "order": "LoadAfterThis",\n                "version": "v2.1.0-v2.9.*",\n                "optional": True,\n                "incompatible": False,\n            }]})\n            self.assertEqual(result["saved"], 1)\n            self.assertTrue(Path(result["backup"]).is_file())\n            rewritten = path.read_text(encoding="utf-8")\n            self.assertIn('Mystery="keep"', rewritten)\n            self.assertIn('FutureMetadata value="preserve"', rewritten)\n            self.assertIn('LoadAfterModule Id="Legacy.After"', rewritten)\n            self.assertIn('DependModule Id="Legacy.Optional"', rewritten)\n            saved = result["module"]["communityDependencies"][0]\n            self.assertEqual(saved["order"], "LoadAfterThis")\n            self.assertEqual(saved["version"], "v2.1.0-v2.9.*")\n            self.assertTrue(saved["optional"])\n\n    def test_new_blse_row_uses_current_lowercase_attribute_shape(self):\n        with tempfile.TemporaryDirectory() as name:\n            path = Path(name) / "SubModule.xml"\n            path.write_text('<Module><Id value="Example" /></Module>', encoding="utf-8")\n            result = save_module(path, {"communityDependencies": [{\n                "index": None,\n                "id": "New.Library",\n                "order": "LoadBeforeThis",\n                "version": "v1.2.*",\n                "optional": False,\n                "incompatible": True,\n                "attributes": {},\n            }]})\n            row = result["module"]["communityDependencies"][0]\n            self.assertEqual(row["id"], "New.Library")\n            rewritten = path.read_text(encoding="utf-8")\n            self.assertIn('<DependedModuleMetadata id="New.Library" order="LoadBeforeThis" version="v1.2.*" incompatible="true"', rewritten)\n            self.assertNotIn('optional="false"', rewritten)\n\n    def test_invalid_blse_order_and_empty_id_are_rejected(self):\n        with tempfile.TemporaryDirectory() as name:\n            path = Path(name) / "SubModule.xml"\n            path.write_text('<Module><Id value="Example" /></Module>', encoding="utf-8")\n            with self.assertRaisesRegex(ValueError, "order must be"):\n                save_module(path, {"communityDependencies": [{"id": "Library", "order": "Sideways"}]})\n            with self.assertRaisesRegex(ValueError, "needs an ID"):\n                save_module(path, {"communityDependencies": [{"id": "", "order": ""}]})\n\n\nif __name__ == "__main__":\n    unittest.main()\n''', encoding="utf-8")
+      - name: Validate patch before commit
+        run: |
+          python -m compileall -q games/bannerlord
+          python -m unittest tests.test_bannerlord_community_editor tests.test_bannerlord_community_metadata -v
+          node --check games/bannerlord/editor_core.js
+      - name: Commit structured editor changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/bannerlord/module_data.py games/bannerlord/editor_core.js tests/test_bannerlord_community_editor.py
+          git commit -m "Add structured BLSE dependency editor"
+          git push origin HEAD:feature/bannerlord-plugin
