@@ -19,7 +19,7 @@ _WORLD_PALETTE_RE = re.compile(r"^Game/world/plt_bin/plt\d+\.bin$", re.IGNORECAS
 def resource_override(path: str) -> dict | None:
     """Return classifications for integrations implemented outside data.py."""
     if path.casefold() == WORLD_BANK.casefold():
-        return {"kind": "world-headers", "coverage": "structured", "status": "integrated", "target": "worlds"}
+        return {"kind": "world-headers", "coverage": "structured + raster", "status": "integrated", "target": "worlds"}
     if _WORLD_TABLE_RE.match(path):
         return {"kind": "world-navigation", "coverage": "structured", "status": "integrated", "target": "worlds"}
     if _WORLD_SCRIPT_RE.match(path):
@@ -27,7 +27,7 @@ def resource_override(path: str) -> dict | None:
     if _FIELD_SCRIPT_RE.match(path):
         return {"kind": "field-event-script", "coverage": "structural + fixed-write", "status": "partial", "target": "events"}
     if _SCENE_MAP_RE.match(path):
-        return {"kind": "scene-map-layout", "coverage": "structural", "status": "integrated", "target": "scenes"}
+        return {"kind": "scene-map-layout", "coverage": "structural + raster", "status": "integrated", "target": "scenes"}
     if _SCENE_PALETTE_RE.match(path) or _WORLD_PALETTE_RE.match(path):
         return {"kind": "bgr555-palette", "coverage": "structured", "status": "integrated", "target": "resources"}
     return None
@@ -75,8 +75,8 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
     additions = [
         {
             "filename": "Game/field/MapTable/MapTable_*.dat + referenced PC tilesets",
-            "controls": f"{scene_maps} scene map layouts: dimensions/tile IDs, scroll/blend header, RLE collision grid and L1/L2 PNG raster export",
-            "notes": "Structural map/collision view is integrated. tools/chrono_trigger_map.py renders actual PC L1/L2 artwork from BGSetTable + cg + ChipTable + BGR555 palette. Animated-chip playback, L3 artwork and main/sub-screen blend emulation remain future work.",
+            "controls": f"{scene_maps} scene map layouts: structural tiles/collision plus desktop and CLI L1/L2 PC raster previews",
+            "notes": "The desktop Map view and tools/chrono_trigger_map.py render actual PC L1/L2 artwork from BGSetTable + cg + ChipTable + BGR555 palette. Animated-chip playback, L3 artwork and main/sub-screen blend/priority composition remain explicitly unsupported.",
             "status": "integrated" if scene_maps else "partial", "coverage": "structural + raster",
             "openable": bool(scene_maps), "target": "scenes",
         },
@@ -89,8 +89,8 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
         },
         {
             "filename": WORLD_BANK,
-            "controls": "8 fixed 23-byte overworld headers: chips, palettes, sprite sets, map/music/exit/script indices and assemblies",
-            "notes": "CTViewer documents the PC headers at 0xFD10 + worldIndex*23. Lexeditor edits those bytes in the loose project overlay only. tools/chrono_trigger_map.py can render world L1/L2 from the referenced map/chip/palette resources.",
+            "controls": "8 fixed 23-byte overworld headers plus desktop and CLI L1/L2 PC raster previews",
+            "notes": "CTViewer documents the PC headers at 0xFD10 + worldIndex*23. Header edits stay in the loose project overlay. The desktop Worlds Map tab and tools/chrono_trigger_map.py render isolated L1/L2 from referenced map/chip/palette resources without claiming blend/animation emulation.",
             "status": "integrated" if has_bank else "partial", "coverage": "structured + raster",
             "openable": has_bank, "target": "worlds",
         },
