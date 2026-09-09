@@ -126,11 +126,12 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
             outside = deployed.parent.parent / "outside-runtime"
             outside.mkdir()
             deployed_resolved = deployed.resolve()
+            module_data_path = deployed_resolved / "ModuleData"
             outside_resolved = outside.resolve()
             real_resolve = Path.resolve
 
             def fake_resolve(path, *args, **kwargs):
-                if path == deployed / "ModuleData":
+                if path == module_data_path:
                     return outside_resolved
                 return real_resolve(path, *args, **kwargs)
 
