@@ -5,13 +5,16 @@ The main probe can decode UEndMenuSettings' three BattleLockonMarkerXXWidget
 SoftClass paths and can separately rank cooked assets with exact serialized tint
 properties. This module joins those two evidence sets by *full package path*.
 
-No filename-only, suffix-only or fuzzy matching is permitted. A successful join
-still does not establish 00/01/02 -> Default/Wimp/Libra semantics, identify the
-blue active-lock state, or authorize rewriting a cooked LinearColor.
+The red-reticle planner at the end of this module is still fail-closed: it only
+produces a write plan when all three numbered lock-on marker widgets resolve
+uniquely, each is a dedicated lock-on owner, and each has exactly one blue-
+dominant serialized LinearColor candidate. The planner patches all three marker
+slots, so it does not need to guess the Default/Wimp/Libra slot mapping.
 """
 
 from __future__ import annotations
 
+import math
 from typing import Any, Iterable, Mapping
 
 
@@ -20,6 +23,8 @@ MARKER_SLOTS = (
     "BattleLockonMarker01Widget",
     "BattleLockonMarker02Widget",
 )
+BLUE_MIN_COMPONENT = 0.20
+BLUE_MIN_DOMINANCE = 0.08
 
 
 def canonical_cooked_package_path(value: object) -> str:
@@ -40,8 +45,6 @@ def canonical_cooked_package_path(value: object) -> str:
     if not text:
         return ""
 
-    # Accept the common textual wrappers without treating their type prefix as
-    # part of the package identity (e.g. BlueprintGeneratedClass'/Game/...').
     if "'" in text:
         first = text.find("'")
         last = text.rfind("'")
@@ -193,8 +196,133 @@ def correlate_marker_slots_to_assets(
         "notes": [
             "SoftClass paths and cooked candidates are joined only by normalized full Unreal package path; leaf-name and fuzzy matches are intentionally rejected.",
             "A unique exact package match proves which cooked candidate a numbered UEndMenuSettings marker slot names, provided the upstream decoded SoftClass value is itself unique.",
-            "Exact serialized LinearColor evidence on that cooked candidate narrows the presentation owner but does not identify the requested blue active-lock state or prove that changing the value is state-scoped.",
+            "Exact serialized LinearColor evidence on that cooked candidate narrows the presentation owner but does not by itself identify a blue marker value.",
             "00/01/02 -> Default/Wimp/Libra remains unvalidated even when all three slots resolve to distinct cooked assets.",
-            "This stage is read-only and never rewrites a cooked asset.",
+            "This correlation stage is read-only and never rewrites a cooked asset.",
+        ],
+    }
+
+
+def _decoded_rgba(ref: Mapping[str, Any]) -> tuple[float, float, float, float] | None:
+    value = ref.get("linearColorValue")
+    if not isinstance(value, Mapping):
+        return None
+    try:
+        rgba = tuple(float(value[key]) for key in ("r", "g", "b", "a"))
+    except (KeyError, TypeError, ValueError):
+        return None
+    if any(not math.isfinite(component) for component in rgba):
+        return None
+    return rgba
+
+
+def _blue_dominant(rgba: tuple[float, float, float, float]) -> bool:
+    red, green, blue, alpha = rgba
+    return (
+        alpha > 0.0
+        and blue >= BLUE_MIN_COMPONENT
+        and blue - red >= BLUE_MIN_DOMINANCE
+        and blue - green >= BLUE_MIN_DOMINANCE
+    )
+
+
+def plan_red_reticle_rewrites(correlation: Mapping[str, Any]) -> dict[str, Any]:
+    """Produce exact cooked LinearColor rewrites for all numbered lock-on markers.
+
+    Patching all three UEndMenuSettings BattleLockonMarkerXXWidget slots avoids
+    guessing their Default/Wimp/Libra mapping. Ordinary unlocked targeting UI is
+    outside these dedicated lock-on marker widget slots, so the planner never
+    targets generic BattleTarget assets. A plan is emitted only when every slot
+    uniquely resolves to a distinct dedicated lock-on asset and exactly one
+    serialized LinearColor in that asset is visibly blue-dominant.
+    """
+    if not isinstance(correlation, Mapping):
+        raise TypeError("lock-on slot correlation must be a mapping")
+    rows = correlation.get("slotCorrelations")
+    if not isinstance(rows, Mapping):
+        raise ValueError("lock-on slot correlation is missing slotCorrelations")
+
+    blockers: list[str] = []
+    plan: list[dict[str, Any]] = []
+    seen_assets: set[str] = set()
+
+    if not correlation.get("allSlotsUniquelyCorrelated"):
+        blockers.append("all-numbered-lockon-marker-assets-not-unique")
+
+    for slot in MARKER_SLOTS:
+        row = rows.get(slot)
+        if not isinstance(row, Mapping):
+            blockers.append(f"{slot}:correlation-missing")
+            continue
+        candidate = row.get("uniqueCookedAsset")
+        if not isinstance(candidate, Mapping):
+            blockers.append(f"{slot}:cooked-asset-unresolved")
+            continue
+        asset = str(candidate.get("asset") or "")
+        if not asset:
+            blockers.append(f"{slot}:asset-path-missing")
+            continue
+        canonical = canonical_cooked_package_path(asset)
+        if canonical in seen_assets:
+            blockers.append(f"{slot}:duplicate-marker-asset")
+            continue
+        seen_assets.add(canonical)
+
+        if not candidate.get("containsDedicatedWidgetAnchor"):
+            blockers.append(f"{slot}:dedicated-lockon-anchor-unproven")
+            continue
+        if not candidate.get("resolvedDedicatedOwnerEvidence"):
+            blockers.append(f"{slot}:dedicated-lockon-owner-unproven")
+            continue
+        if not candidate.get("serializedLinearColorTintValueEvidence"):
+            blockers.append(f"{slot}:linearcolor-unproven")
+            continue
+
+        refs = candidate.get("serializedLinearColorTintRefs", ())
+        blue_refs: list[tuple[Mapping[str, Any], tuple[float, float, float, float]]] = []
+        for ref in refs if isinstance(refs, Iterable) else ():
+            if not isinstance(ref, Mapping):
+                continue
+            rgba = _decoded_rgba(ref)
+            if rgba is not None and _blue_dominant(rgba):
+                blue_refs.append((ref, rgba))
+        if len(blue_refs) != 1:
+            blockers.append(f"{slot}:expected-one-blue-linearcolor-found-{len(blue_refs)}")
+            continue
+
+        ref, rgba = blue_refs[0]
+        property_name = str(ref.get("property") or "")
+        object_name = str(ref.get("ownerObjectName") or "")
+        class_name = str(ref.get("ownerClassName") or "")
+        if not property_name or not object_name or not class_name:
+            blockers.append(f"{slot}:linearcolor-owner-identity-incomplete")
+            continue
+
+        intensity = max(rgba[0], rgba[1], rgba[2])
+        replacement = (intensity, 0.0, 0.0, rgba[3])
+        plan.append({
+            "slot": slot,
+            "asset": asset,
+            "canonicalPackagePath": canonical,
+            "property": property_name,
+            "objectName": object_name,
+            "className": class_name,
+            "expectedRgba": list(rgba),
+            "replacementRgba": list(replacement),
+        })
+
+    ready = not blockers and len(plan) == len(MARKER_SLOTS)
+    return {
+        "implementationReady": ready,
+        "redReticleOwnerValidated": ready,
+        "rewriteAllNumberedMarkerSlots": ready,
+        "slotToMarkerTypeMappingRequired": False,
+        "rewritePlan": plan if ready else [],
+        "blockers": blockers,
+        "notes": [
+            "All three numbered BattleLockonMarker widget slots are rewritten together, so their Default/Wimp/Libra ordering is irrelevant to the color change.",
+            "The write gate rejects generic target UI, duplicate package matches, shared marker assets, missing dedicated lock-on ownership, and ambiguous/non-blue LinearColor candidates.",
+            "Replacement preserves the installed marker's strongest RGB intensity and alpha while rotating the color to red.",
+            "The actual writer must still re-probe class/object/property identity and exact expected float32 bytes immediately before mutation.",
         ],
     }
