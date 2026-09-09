@@ -31,6 +31,11 @@
       "structure": "Edit one Lexeditor project with overlays under StreamingAssets/ (especially StreamingAssets/Data/). Deploy Project copies those overlays into <FF9>\\Lexeditor\\ while preserving other Memoria mods and unrelated Memoria.ini settings.",
       "overriding": "Lexeditor does not stack or semantically merge multiple FFIX projects. Other Memoria mods may coexist and Memoria resolves them according to its FolderNames ordering; conflicts with the same underlying content therefore follow Memoria's own resolution rules."
     },
+    "warband": {
+      "loader": "Warband's native module system. WSE2 is Lexeditor's optional enhanced runtime helper, not a multi-mod overlay loader.",
+      "structure": "Each installed mod is its own folder under <Warband>\\Modules\\ with module.ini. Lexeditor can also edit and build a Module System source project before it becomes an installed module.",
+      "overriding": "Warband selects one module at launch. Lexeditor does not stack several modules or apply a cross-module priority order; resources and dependencies declared by the selected module follow Warband's own module rules."
+    },
     "rdr": {
       "loader": "De novo Lexeditor deployment through RedHook / Ultimate ASI Loader's update-folder override mechanism.",
       "structure": "Lexeditor edits one project (C:\\RDRMod by default); game-data replacements live under <project>\\mod\\ in archive-relative trees. Deploy Project rebuilds affected RPF6 archive copies under <RDR>\\update\\... while leaving the installed source archives untouched.",
@@ -41,10 +46,10 @@
       "structure": "Lexeditor edits one EasyInstall folder (C:\\RDR2Mod\\MyOverhaul by default) whose install.xml maps each GamePath to a package FilePath. To run it with LML, place or copy the whole install.xml mod folder under <RDR2>\\lml\\<mod>\\.",
       "overriding": "LML owns enabled state and load order. If separate LML packages replace the same GamePath, the later/higher-priority replacement wins as a complete file; Lexeditor does not semantically merge records across separate LML mods."
     },
-    "warband": {
-      "loader": "Warband's native module system. WSE2 is Lexeditor's optional enhanced runtime helper, not a multi-mod overlay loader.",
-      "structure": "Each installed mod is its own folder under <Warband>\\Modules\\ with module.ini. Lexeditor can also edit and build a Module System source project before it becomes an installed module.",
-      "overriding": "Warband selects one module at launch. Lexeditor does not stack several modules or apply a cross-module priority order; resources and dependencies declared by the selected module follow Warband's own module rules."
+    "ffx-x2": {
+      "loader": "Fahrenheit's External File Loader. Lexeditor creates one file-only Fahrenheit mod and does not patch or rebuild the installed FFX_Data.vbf or FFX2_Data.vbf archives.",
+      "structure": "The selected project mirrors Fahrenheit EFL roots under <project>/efl/x/ for FFX and <project>/efl/x2/ for FFX-2. Deploy Project copies those replacements into <game>/fahrenheit/mods/lexeditor-ffx-x2/ with a Fahrenheit manifest and one managed loadorder entry.",
+      "overriding": "Fahrenheit indexes enabled mods in loadorder order and later replacements supersede earlier same-path files. Lexeditor owns only its lexeditor-ffx-x2 mod folder and exact loadorder line; it preserves other mods and refuses to overwrite its deployment if those files changed externally."
     }
   }
 }
