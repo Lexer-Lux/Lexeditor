@@ -62,6 +62,7 @@ class MovementOpTests(unittest.TestCase):
             0x98: b"\x20\x08",
             0x99: b"\x04\x08",
             0x9A: b"\x10\x20\x08",
+            0x9D: b"\x14\x15",
             0xA0: b"\x30\x40",
             0xA1: b"\x12\x13",
             0xB5: b"\x21",
@@ -89,11 +90,20 @@ class MovementOpTests(unittest.TestCase):
         self.assertNotIn("tile", normal["summary"].casefold())
         self.assertNotIn("pixel", normal["summary"].casefold())
 
-    def test_memory_coordinate_sources_decode_script_addresses(self):
+    def test_memory_coordinate_and_vector_sources_decode_script_addresses(self):
         normal = editor_schema(command(0x97, b"\x10\x11"))["values"]
         animated = editor_schema(command(0xA1, b"\x12\x13"))["values"]
+        vector = editor_schema(command(0x9D, b"\x14\x15"))["values"]
         self.assertEqual(normal, {"xAddress": 0x7F0220, "yAddress": 0x7F0222})
         self.assertEqual(animated, {"xAddress": 0x7F0224, "yAddress": 0x7F0226})
+        self.assertEqual(vector, {
+            "directionAddress": 0x7F0228,
+            "magnitudeAddress": 0x7F022A,
+        })
+        self.assertEqual(
+            movement_semantics(command(0x9D, b"\x14\x15"))["summary"],
+            "Vector move from direction 0x7F0228 · magnitude 0x7F022A",
+        )
 
     def test_move_toward_semantics_preserve_target_kind(self):
         self.assertEqual(movement_semantics(command(0x98, b"\x20\x08"))["summary"],
@@ -109,6 +119,13 @@ class MovementOpTests(unittest.TestCase):
         save_event_fields(store, 1, 0, 0, 0, sha256(original), {"xAddress": 0x7F0240})
         self.assertEqual(store.overlay[34:36], bytes((0x20, 0x11)))
         self.assertEqual(len(store.overlay), len(original))
+
+        vector_original = event(bytes((0x9D, 0x14, 0x15, 0x00)))
+        vector_store = FakeStore(vector_original)
+        save_event_fields(vector_store, 1, 0, 0, 0, sha256(vector_original),
+                          {"magnitudeAddress": 0x7F0244})
+        self.assertEqual(vector_store.overlay[34:36], bytes((0x14, 0x22)))
+        self.assertEqual(len(vector_store.overlay), len(vector_original))
 
     def test_pc_range_and_even_memory_address_fail_closed(self):
         self.assertIsNone(editor_schema(command(0x95, b"\x00")))
@@ -126,8 +143,17 @@ class MovementOpTests(unittest.TestCase):
             save_event_fields(mem_store, 1, 0, 0, 0, sha256(mem_original), {"xAddress": 0x7F0201})
         self.assertIsNone(mem_store.overlay)
 
+        vector_original = event(bytes((0x9D, 0x10, 0x11, 0x00)))
+        vector_store = FakeStore(vector_original)
+        with self.assertRaisesRegex(ValueError, "even script-memory address"):
+            save_event_fields(vector_store, 1, 0, 0, 0, sha256(vector_original),
+                              {"directionAddress": 0x7F0201})
+        self.assertIsNone(vector_store.overlay)
+
     def test_malformed_or_ambiguous_neighbors_remain_unregistered(self):
         for opcode, args in (
+            (0x92, b"\x01\x02"),
+            (0x9C, b"\x01\x02"),
             (0x9E, b"\x01"),
             (0x9F, b"\x01"),
             (0x8D, b"\x00\x00\x00\x00"),
