@@ -40,6 +40,12 @@ from .object_ops import (
     object_field_specs,
     object_values,
 )
+from .pc_extended_ops import (
+    apply_pc_extended_op,
+    decorate_pc_extended_semantics,
+    pc_extended_field_specs,
+    pc_extended_values,
+)
 from .property_ops import (
     apply_property_op,
     decorate_property_semantics,
@@ -116,6 +122,10 @@ def misc_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, misc_field_specs(command), misc_values(command))
 
 
+def pc_extended_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, pc_extended_field_specs(command), pc_extended_values(command))
+
+
 def jump_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
 
@@ -131,6 +141,7 @@ _REGISTRY_BUILDERS = (
     scene_event_editor_schema,
     audio_editor_schema,
     misc_editor_schema,
+    pc_extended_editor_schema,
     jump_editor_schema,
 )
 _REGISTRY_APPLIERS = (
@@ -144,6 +155,7 @@ _REGISTRY_APPLIERS = (
     apply_scene_event_op,
     apply_audio_op,
     apply_misc_op,
+    apply_pc_extended_op,
     apply_jump,
 )
 
@@ -167,6 +179,7 @@ def decorate_event_editors(payload: dict) -> dict:
     decorate_scene_event_semantics(payload)
     decorate_audio_semantics(payload)
     decorate_misc_semantics(payload)
+    decorate_pc_extended_semantics(payload)
     decorate_jump_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
