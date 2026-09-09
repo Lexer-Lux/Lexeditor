@@ -279,7 +279,8 @@
           ...fieldRow("ID",textInput(record.id,value=>record.id=value)),
           ...fieldRow("Path",textInput(record.path,value=>record.path=value))
         ),
-        el("h2",{},"Included game types"),renderGameTypes(record)
+        el("h2",{},"Included game types"),renderGameTypes(record),
+        el("div",{class:"bl-note"},"New XML registrations require at least one IncludedGameTypes/GameType entry; Lexeditor will not guess Campaign or another game type for you.")
       ));
     main.replaceChildren(el("div",{class:"bl-split"},master,detail));
   }

@@ -680,8 +680,11 @@ def _edit_xmls(root: ET.Element, rows: list[dict]) -> int:
             raise ValueError(f"XML registration {position + 1} needs an ID")
         if not xml_path:
             raise ValueError(f"XML registration {position + 1} needs a path")
+        game_types = list(row.get("includedGameTypes") or [])
+        if created and not game_types:
+            raise ValueError(f"New XML registration {position + 1} needs at least one included game type")
         changes += _set_xml_registration_identity(element, xml_id, xml_path)
-        changes += _edit_game_types(element, list(row.get("includedGameTypes") or []))
+        changes += _edit_game_types(element, game_types)
         output.append(element)
     if len(existing) != len(output) or any(a is not b for a, b in zip(existing, output)):
         changes += 1
