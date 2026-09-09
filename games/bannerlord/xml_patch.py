@@ -30,7 +30,7 @@ def infer_kind(name: str, value: str, enums: dict[str, tuple[str, ...]] | None =
 
 
 def scan_xml_start_tags(text: str, enums: dict[str, tuple[str, ...]] | None = None) -> list[dict]:
-    """Scan start tags while retaining exact attribute-value spans in original source."""
+    """Scan start tags while retaining exact attribute-value and insertion spans."""
     elements: list[dict] = []
     stack: list[dict] = []
     root_counts: dict[str, int] = {}
@@ -83,7 +83,13 @@ def scan_xml_start_tags(text: str, enums: dict[str, tuple[str, ...]] | None = No
             offset = right + 1
             continue
         tag = tag_match.group(1)
-        self_closing = inner.rstrip().endswith("/")
+        stripped = inner.rstrip()
+        self_closing = stripped.endswith("/")
+        insert_local = len(stripped) - 1 if self_closing else len(inner)
+        while insert_local > 0 and inner[insert_local - 1].isspace():
+            insert_local -= 1
+        insert_position = left + 1 + insert_local
+
         siblings = stack[-1]["children"] if stack else root_counts
         sibling_index = siblings.get(tag, 0)
         siblings[tag] = sibling_index + 1
@@ -130,6 +136,7 @@ def scan_xml_start_tags(text: str, enums: dict[str, tuple[str, ...]] | None = No
                 "hint": hint,
                 "attributes": public_attributes,
                 "_attributes": attributes,
+                "_attributeInsert": insert_position,
             }
         )
         if not self_closing:
@@ -180,3 +187,18 @@ def serialize_attribute(attribute: dict, incoming) -> str:
     if attribute["_quote"] == '"':
         return escape(value, {'"': "&quot;"})
     return escape(value, {"'": "&apos;"})
+
+
+def serialize_new_attribute(name: str, metadata: dict, incoming) -> str:
+    """Validate a newly inserted XSD-declared attribute with double-quote escaping."""
+    attribute = {
+        "name": name,
+        "value": "",
+        "kind": metadata.get("kind", "text"),
+        "choices": list(metadata.get("choices") or []),
+        "_quote": '"',
+    }
+    for key in ("integer", "min", "max", "fixed"):
+        if key in metadata:
+            attribute[key] = metadata[key]
+    return serialize_attribute(attribute, incoming)
