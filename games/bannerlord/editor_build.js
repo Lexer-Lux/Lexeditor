@@ -84,7 +84,8 @@
       el("div",{class:"bl-grid"},...editable.flatMap(name=>fieldRow(name,projectControl(name,props[name]??"")))),
       el("div",{class:"bl-note"},`SDK: ${project.sdk||"(classic MSBuild)"} · ${project.references.length} assembly references · ${project.packages.length} packages`),
       Object.keys(project.ambiguousProperties||{}).length?el("div",{class:"bl-note"},`Read-only ambiguous MSBuild properties: ${Object.entries(project.ambiguousProperties).map(([name,reason])=>`${name} (${reason})`).join("; ")}. Lexeditor does not evaluate MSBuild conditions.`):null,
-      el("div",{class:"bl-note"},"Lexeditor-hosted builds pin BannerlordDir, GameBin, ModuleDir, and OutputPath to the selected Bannerlord installation. Project-local values remain editable for external builds but cannot redirect Lexeditor Build / Build + deploy.")
+      el("div",{class:"bl-note"},"Lexeditor-hosted builds pin BannerlordDir, GameBin, ModuleDir, and OutputPath to the selected Bannerlord installation. Project-local values remain editable for external builds but cannot redirect Lexeditor Build / Build + deploy."),
+      el("div",{class:"bl-note"},"Trust boundary: dotnet build executes the selected project's MSBuild targets and tasks with your user permissions. Path pinning protects Lexeditor's standard Bannerlord output roots; it is not a sandbox. Build only projects you trust.")
     );
     const referenceLines=project.references.map(row=>`${row.include}${row.metadata?.HintPath?` — ${row.metadata.HintPath}`:""}`);
     const packageLines=project.packages.map(row=>`${row.include}${row.metadata?.Version?` ${row.metadata.Version}`:""}`);
