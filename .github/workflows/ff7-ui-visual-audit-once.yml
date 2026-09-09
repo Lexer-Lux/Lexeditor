@@ -1,0 +1,46 @@
+name: FF7 UI visual audit one-shot
+
+on:
+  push:
+    branches:
+      - work/ff7-complete-kernel-surface
+    paths:
+      - 'tools/_ff7_ui_visual_audit.py'
+
+permissions:
+  contents: write
+
+jobs:
+  audit-clean:
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: work/ff7-complete-kernel-surface
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Chromium
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Capture FF7 visual audit
+        run: python tools/_ff7_ui_visual_audit.py
+      - name: Retain audit screenshots and metrics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff7-ui-visual-audit
+          retention-days: 7
+          path: out/ff7-ui-audit/
+      - name: Remove audit scaffold
+        if: success()
+        shell: bash
+        run: |
+          git rm tools/_ff7_ui_visual_audit.py .github/workflows/ff7-ui-visual-audit-once.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git commit -m 'Remove completed FF7 visual audit scaffold'
+          git push origin HEAD:work/ff7-complete-kernel-surface
