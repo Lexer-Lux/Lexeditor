@@ -70,7 +70,7 @@ def check() -> list[str]:
     problems: list[str] = []
     for relative in (
         "editor.html", "server.py", "plugin.py", "paths.py", "vbf.py", "deployment.py", "theme.py",
-        "ffx_table.py", "shop_table.py", "treasures.py", "item_prices.py", "ctb_base.py",
+        "ffx_table.py", "shop_table.py", "treasures.py", "item_prices.py", "ctb_base.py", "mix_table.py",
         "item_shops.py", "gear_shops.py", "project-template/README.md",
     ):
         target = PLUGIN_ROOT / relative
