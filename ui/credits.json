@@ -63,6 +63,17 @@
       "thanks": [],
       "licenses": []
     },
+    "bannerlord": {
+      "contributions": [
+        {
+          "name": "Lexer / Lexers Mod for Bannerlord",
+          "role": "Source project, module fixtures, and compatibility behavior used to develop and validate the Bannerlord integration.",
+          "url": "https://github.com/Lexer-Lux/Lexers-Mod-For-Bannerlord"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
     "ff7": {
       "contributions": [
         {
