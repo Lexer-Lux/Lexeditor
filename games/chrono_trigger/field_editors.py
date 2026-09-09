@@ -120,7 +120,14 @@ def editor_schema(command: dict) -> dict | None:
     opcode = int(command["opcode"])
     fields: list[Field] = []
     editor = "fixed-fields"
-    if opcode == 0x83:
+    if opcode in {0x20, 0x55, 0x7F}:
+        label = {
+            0x20: "Store PC1 ID at",
+            0x55: "Store storyline counter at",
+            0x7F: "Store random value at",
+        }[opcode]
+        fields = [Field("storeAddress", label, SCRIPT_MEM_START, SCRIPT_MEM_LAST)]
+    elif opcode == 0x83:
         fields = [Field("enemyId", "Enemy ID", 0, U16), Field("slot", "Enemy slot", 0, 0x7F),
                   Field("static", "Static enemy", 0, 1, "boolean")]
     elif opcode == 0x87:
@@ -134,6 +141,16 @@ def editor_schema(command: dict) -> dict | None:
         fields = [Field("speedAddress", "Speed source address", SCRIPT_MEM_START, SCRIPT_MEM_LAST)]
     elif opcode == 0x8B:
         fields = [Field("tileX", "Tile X", 0, U8), Field("tileY", "Tile Y", 0, U8)]
+    elif opcode == 0x8C:
+        fields = [Field("xAddress", "X coordinate source", SCRIPT_MEM_START, SCRIPT_MEM_LAST),
+                  Field("yAddress", "Y coordinate source", SCRIPT_MEM_START, SCRIPT_MEM_LAST)]
+    elif opcode == 0xA6:
+        args = _base_args(command)
+        if len(args) != 1 or args[0] > 3:
+            return None
+        fields = [Field("facing", "Facing (0 up, 1 down, 2 left, 3 right)", 0, 3)]
+    elif opcode == 0xA7:
+        fields = [Field("facingAddress", "Facing source address", SCRIPT_MEM_START, SCRIPT_MEM_LAST)]
     elif 0xDC <= opcode <= 0xE1:
         fields = [Field("sceneId", "Destination scene", 0, U16), Field("facing", "Facing", 0, 3),
                   Field("tileX", "Destination X", 0, U8), Field("tileY", "Destination Y", 0, U8)]
@@ -196,6 +213,8 @@ def editor_schema(command: dict) -> dict | None:
 def editor_values(command: dict) -> dict:
     opcode = int(command["opcode"])
     args = _base_args(command)
+    if opcode in {0x20, 0x55, 0x7F} and len(args) == 1:
+        return {"storeAddress": _script_address(args[0])}
     if opcode == 0x83 and len(args) == 3:
         return {"enemyId": _u16(args), "slot": args[2] & 0x7F, "static": bool(args[2] & 0x80)}
     if opcode == 0x87 and len(args) == 1 and args[0] <= 0x80:
@@ -206,6 +225,12 @@ def editor_values(command: dict) -> dict:
         return {"speedAddress": _script_address(args[0])}
     if opcode == 0x8B and len(args) == 2:
         return {"tileX": args[0], "tileY": args[1]}
+    if opcode == 0x8C and len(args) == 2:
+        return {"xAddress": _script_address(args[0]), "yAddress": _script_address(args[1])}
+    if opcode == 0xA6 and len(args) == 1 and args[0] <= 3:
+        return {"facing": args[0]}
+    if opcode == 0xA7 and len(args) == 1:
+        return {"facingAddress": _script_address(args[0])}
     if 0xDC <= opcode <= 0xE1 and len(args) == 5:
         return {"sceneId": _u16(args), "facing": args[2], "tileX": args[3], "tileY": args[4]}
     if opcode == 0xB8 and len(args) == 1:
@@ -254,7 +279,10 @@ def _apply(command: dict, values: dict) -> bytes:
     if unknown:
         raise ValueError(f"Unknown fields for opcode 0x{opcode:02X}: {', '.join(sorted(unknown))}")
 
-    if opcode == 0x83:
+    if opcode in {0x20, 0x55, 0x7F}:
+        if "storeAddress" in values:
+            args[0] = _script_offset(values["storeAddress"], "Store address")
+    elif opcode == 0x83:
         if "enemyId" in values:
             _put_u16(args, 0, _int(values["enemyId"], 0, U16, "Enemy ID"))
         slot = _int(values.get("slot", args[2] & 0x7F), 0, 0x7F, "Enemy slot")
@@ -274,6 +302,17 @@ def _apply(command: dict, values: dict) -> bytes:
             args[0] = _int(values["tileX"], 0, U8, "Tile X")
         if "tileY" in values:
             args[1] = _int(values["tileY"], 0, U8, "Tile Y")
+    elif opcode == 0x8C:
+        if "xAddress" in values:
+            args[0] = _script_offset(values["xAddress"], "X coordinate source")
+        if "yAddress" in values:
+            args[1] = _script_offset(values["yAddress"], "Y coordinate source")
+    elif opcode == 0xA6:
+        if "facing" in values:
+            args[0] = _int(values["facing"], 0, 3, "Facing")
+    elif opcode == 0xA7:
+        if "facingAddress" in values:
+            args[0] = _script_offset(values["facingAddress"], "Facing source address")
     elif 0xDC <= opcode <= 0xE1:
         if "sceneId" in values:
             _put_u16(args, 0, _int(values["sceneId"], 0, U16, "Destination scene"))
