@@ -290,7 +290,7 @@ class BannerlordLaunchTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "SubModule.xml path escaped"):
                     selected_module(game, workspace)
 
-    def test_installed_module_folder_redirection_is_rejected(self):
+    def test_read_only_installed_module_junctions_remain_compatible(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
             game = root / "game"
@@ -300,7 +300,7 @@ class BannerlordLaunchTests(unittest.TestCase):
                 '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
             )
             deployed = write_module(game, "LexerSkillTweaks", "LexerSkillTweaks")
-            outside = root / "outside-module"
+            outside = root / "junction-target"
             outside.mkdir()
             deployed_resolved = deployed.resolve()
             outside_resolved = outside.resolve()
@@ -312,8 +312,9 @@ class BannerlordLaunchTests(unittest.TestCase):
                 return real_resolve(path, *args, **kwargs)
 
             with patch.object(Path, "resolve", new=fake_resolve):
-                with self.assertRaisesRegex(RuntimeError, "module path escaped the Modules folder"):
-                    selected_module(game, workspace)
+                module_id, installed = selected_module(game, workspace)
+            self.assertEqual(module_id, "LexerSkillTweaks")
+            self.assertEqual(installed, deployed)
 
 
 if __name__ == "__main__":
