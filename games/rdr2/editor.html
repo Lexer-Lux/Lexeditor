@@ -4434,6 +4434,18 @@ function discardSettings(){
 async function renderSettings(){
   const tb=$("#toolbar");tb.innerHTML="";
   if(!state.settings)state.settings=await api("/api/settings");
+  // The tab used to clear its toolbar and leave nothing, so an edited setting
+  // had no visible way to be saved or put back from the page it was edited on.
+  // Same control, same place, as RDR and Warband.
+  tb.replaceChildren(
+    el("span",{},state.settings?.available
+      ? "GameplayTweaks.ini — project settings for the RDR2 runtime"
+      : "GameplayTweaks.ini is not available"),
+    el("span",{class:"count"},state.settings?.file||""),
+    LexeditorUI.settingsSaveControl({
+      dirtyCount:()=>Object.keys(state.settingEdits).length,
+      save:saveSettings,discard:discardSettings,
+      readonly:()=>!state.settings?.available}));
   const m=$("#main");m.querySelector(".settings-layout")?.__settingsColumnsObserver?.disconnect();m.innerHTML="";
   if(!state.settings.available){m.append(el("div",{class:"loading"},"GameplayTweaks.ini is not installed for this editor profile. Catalog, loot, crafting, and other data editing remain available."));installTabContext();return;}
   const layout=el("div",{class:"settings-layout"});

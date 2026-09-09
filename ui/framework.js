@@ -4803,7 +4803,10 @@ ${row.path}`,
         event.preventDefault();
         setSizes(defaults, true);
       };
-      divider.addEventListener("dblclick", reset);
+      // Right-click resets a split; double-click does not. A divider is
+      // dragged, and a drag that starts with two quick presses would otherwise
+      // throw the layout away instead of moving it. Two separate contracts
+      // record this decision.
       divider.addEventListener("contextmenu", reset);
     });
 

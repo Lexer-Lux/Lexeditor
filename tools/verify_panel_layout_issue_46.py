@@ -33,7 +33,9 @@ require('panelLayout([buys,picker,sells],"shop-workspace"' in rdr2,
 for required in (
     'panelLayout([galleryPanel()],"blank-layout"',
     'pagedListDetail({rows:records',
-    'panelLayout([tablePanel(),recordPanel(),inspectorPanel()],"blank-layout"',
+    # No closing quote: a layout is allowed to carry extra classes after the
+    # shared one, and the three-panel example does.
+    'panelLayout([tablePanel(),recordPanel(),inspectorPanel()],"blank-layout',
     'panelLayout([subtabPanel()],"blank-layout"',
 ):
     require(required in blank, "Blank Game must demonstrate every shared panel count")

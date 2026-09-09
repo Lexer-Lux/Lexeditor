@@ -8,8 +8,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _flat(value: str) -> str:
+    """Collapse runs of whitespace, and drop a comma before a closing bracket.
+
+    Every token below names a piece of code that must still be there. Matching
+    them literally meant reflowing a call across two lines, or dropping a
+    trailing comma, failed a contract whose subject had not changed at all -
+    which is how this file came to be red for reasons no reader could act on.
+    """
+    collapsed = " ".join(value.split())
+    for bracket in (")", "}", "]"):
+        collapsed = collapsed.replace(f", {bracket}", bracket).replace(f",{bracket}", bracket)
+    # A token quoted from the middle of an argument list keeps the comma that
+    # separated it from the next argument; the same code reflowed may not.
+    return collapsed.rstrip(",")
+
+
 def require(text: str, token: str, source: Path) -> None:
-    if token not in text:
+    if _flat(token) not in _flat(text):
         raise AssertionError(f"{source.relative_to(ROOT)} is missing {token!r}")
 
 
@@ -22,7 +38,11 @@ def main() -> int:
         "dirtyCount: settingsDirtyCount",
         "confirmDiscardChanges({",
         "if (event.target === backdrop && !settingsDirtyCount()) close();",
-        'callWindow("save_lexeditor_settings", {...values, })',
+        # The saved payload is now built from every supported ordinary
+        # definition rather than spread over a literal, which is the same
+        # requirement stated once instead of twice.
+        'supportedOrdinaryDefinitions.map(definition =>',
+        'callWindow("save_lexeditor_settings", values)',
         "const supportsDefault = definition =>",
         "supportedDefaultDefinitions.map(definition =>",
         "Restart LEXEDITOR to enable newly added settings.",
