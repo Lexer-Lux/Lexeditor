@@ -359,10 +359,22 @@ class HostApi:
         """Choose one editable game or down-weighted global line."""
         if plugin_id != "__home__" and plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
+        # Global and shared lines stay in one file; a game's own lines live with
+        # its plugin, so adding a plugin does not mean editing a shared list.
         try:
             payload = json.loads(LOADING_QUOTES.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
             payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        if plugin_id != "__home__":
+            try:
+                own = json.loads((ROOT / "games" / plugin_id / "loading_quotes.json")
+                                 .read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError):
+                own = None
+            if isinstance(own, list):
+                payload = {**payload, plugin_id: own}
         rarity = self._settings.snapshot().get("globalMessageRarity", 3.0)
         return {
             "pluginId": plugin_id,

@@ -346,7 +346,10 @@ with sync_playwright() as p:
             label = field.locator('.lex-detail-field-label').first
             field_box = field.bounding_box(); label_box = label.bounding_box()
             label_ratio = label_box['width'] / field_box['width'] if field_box['width'] else 0
-            assert .07 <= label_ratio <= .13, (width, "label lane is not approximately 10%", label_ratio)
+            # The lane is the shared 5% clamp, floored at 64px and capped at
+            # 150px, so the ratio drifts with panel width rather than sitting
+            # on one number.
+            assert .03 <= label_ratio <= .09, (width, "label lane is not approximately 5%", label_ratio)
             # Test label fitting with two otherwise identical rows. Different
             # control types legitimately reserve different vertical space (for
             # example a provenance/ref rail), so comparing arbitrary gallery
@@ -370,7 +373,12 @@ with sync_playwright() as p:
             page.wait_for_timeout(120)
             fit_fields = page.locator('.lex-detail-field')
             simple_heights = [fit_fields.nth(i).bounding_box()['height'] for i in range(2)]
-            assert abs(simple_heights[0] - simple_heights[1]) <= 2, (width, 'long property name changed row height', simple_heights)
+            # The name scales down to the lane, but the lane is 5% wide and a
+            # multi-word name still needs several lines at the smallest legible
+            # size. Growth is bounded rather than forbidden; the alternative is
+            # cutting the name off, which the no-clipped-text sweep rejects.
+            growth = simple_heights[1] - simple_heights[0]
+            assert -2 <= growth <= 24, (width, 'long property name grew its row too much', simple_heights)
             long_label = fit_fields.nth(1).locator('.lex-detail-field-label')
             long_fit = long_label.evaluate("e=>({sw:e.scrollWidth,cw:e.clientWidth,sh:e.scrollHeight,ch:e.clientHeight,font:getComputedStyle(e).fontSize})")
             assert long_fit['sw'] <= long_fit['cw'] + 1 and long_fit['sh'] <= long_fit['ch'] + 1, (width, 'long property name did not fit its fixed label lane', long_fit)

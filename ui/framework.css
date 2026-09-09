@@ -843,6 +843,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   display:inline-grid;
   place-items:center;
   min-width:1.2em;
+  /* Larger and heavier: at the previous weight the mark read as lighter than
+     the row it belongs to. */
+  font-size:1.25em;
+  font-weight:900;
   line-height:1;
 }
 .lex-project-source-status.enabled { color:#59d66f; }
@@ -1141,11 +1145,12 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-boolean-field > .lex-detail-field-label { padding-right:0; }
 .lex-boolean-field > .lex-detail-field-control { padding-left:0; }
 .lex-boolean-field .lex-detail-field-label { min-width:0; }
+/* The arrow spans whatever gap the row leaves between the property name and
+   the box it points at. A 48px cap left it stranded mid-row on wide panels. */
 .lex-field-boolean-arrow {
   position:relative;
-  flex:0 1 48px;
+  flex:1 1 auto;
   min-width:12px;
-  max-width:48px;
   height:1px;
   margin-left:4px;
   margin-right:-6px;
@@ -3053,6 +3058,9 @@ html[data-lex-project-readonly="true"] :is(.lex-detail,.lex-detail-panel,.lex-co
      reference stack in the editor. */
   font-family:var(--lex-symbol-font);
   font-weight:700;
+  /* The glyph sits flush at the box edge and an ancestor clips, so the V lost
+     its left arm. One pixel of lead keeps the side bearing inside the clip. */
+  padding-inline-start:1px;
 }
 .lex-reference-value[data-reference-index="0"] .lex-reference-tag { color:#62b74f !important; }
 .lex-reference-value[data-reference-index="1"] .lex-reference-tag { color:#d64b4b !important; }
@@ -4339,10 +4347,13 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
 .lex-curve-plot > .lex-curve-svg {
   position:absolute;
   top:var(--lex-curve-margin-top);
-  left:var(--lex-curve-margin);
+  /* --lex-curve-margin does not exist; the defined name is -left. The invalid
+     calc fell back to the SVG's intrinsic 2:1 size, so the graph never filled
+     its box and the right axis sat far from the plot edge. */
+  left:var(--lex-curve-margin-left);
   /* An SVG is a replaced element, so width:auto would take its intrinsic
      size and leave the inset over-constrained. The box is stated outright. */
-  width:calc(100% - var(--lex-curve-margin) - var(--lex-curve-margin-right));
+  width:calc(100% - var(--lex-curve-margin-left) - var(--lex-curve-margin-right));
   height:calc(100% - var(--lex-curve-margin-top) - var(--lex-curve-margin-bottom));
   z-index:1;
 }
@@ -4502,9 +4513,14 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    so edits to the :root value silently did nothing. */
 :root { --lex-detail-label-width:clamp(64px, 5%, 150px); --lex-copy-gutter:19px; }
 .lex-detail-field { grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr); }
+/* Break between words, and inside a word only when a single word cannot fit.
+   overflow-wrap:anywhere broke every long name character by character in the
+   narrow lane, turning one row into six lines. The name also scales down with
+   the lane so it stays on one or two lines instead of growing the row. */
 .lex-detail-field-label {
   min-width:0; min-height:0; height:100%; overflow:hidden;
-  white-space:normal; overflow-wrap:anywhere; line-height:1.05;
+  white-space:normal; overflow-wrap:break-word; word-break:normal;
+  hyphens:auto; font-size:var(--lex-label-size,.9em); line-height:1.05;
   align-content:center; text-align:center;
 }
 .lex-info-help {
@@ -4635,8 +4651,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-curve-axis-start,.lex-curve-axis-end,.lex-curve-axis-name-x {
   top:auto !important; bottom:4px !important;
 }
+/* Four columns of differing text sizes stretched by default, so the mod name,
+   its location and the status mark all sat on different centre lines. */
 .lex-project-menu-item-select {
   grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;
+  align-items:center;
 }
 .lex-project-menu-item:has(.lex-project-source-status.disabled),
 .lex-project-reference:has(.lex-project-source-status.disabled) {
@@ -4661,13 +4680,20 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 /* Boolean references deliberately sit below their checkbox.  Keep that small
    second line inside the row's visual rhythm and do not give a one-character
    source tag the full generic 22px reference-label column. */
-.lex-boolean-field:has(.lex-source-control > .lex-reference-values) {
-  padding-bottom:8px;
-}
+/* The reference row sits in the space the row already has under the checkbox,
+   centred on it, and adds no height of its own. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control { position:relative; }
 .lex-boolean-field .lex-source-control > .lex-reference-values {
+  position:absolute;
+  top:100%;
+  right:0;
+  left:0;
   width:max-content;
   min-width:0;
-  transform:translateX(-50%);
+  margin-inline:auto;
+  font-size:.62em;
+  line-height:1;
+  transform:none;
   justify-items:center;
 }
 .lex-boolean-field .lex-reference-values .lex-reference-value {
@@ -4855,3 +4881,51 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   .lex-shell-command-row { grid-template-columns:140px minmax(0,1fr) auto auto auto; }
   .lex-shell-command-row .lex-brand { font-size:20px; }
 }
+
+/* The graph title is a watermark: centred, large, and behind the plot so it
+   reads as a darkening of the card rather than a label competing for space. */
+.lex-curve-editor { position:relative; }
+.lex-curve-heading-title {
+  position:absolute;
+  z-index:0;
+  top:50%;
+  left:50%;
+  width:max-content;
+  max-width:92%;
+  color:color-mix(in srgb,var(--lex-text) 14%,transparent);
+  font-size:clamp(38px,7cqw,96px);
+  letter-spacing:.04em;
+  line-height:1;
+  pointer-events:none;
+  text-align:center;
+  transform:translate(-50%,-50%);
+}
+.lex-curve-editor > * { position:relative; z-index:1; }
+
+/* Detail-panel inputs had no shared chrome, so a text box kept the browser's
+   default inset border and white fill while a bounded number box was
+   transparent with its value fill behind it. They read as two different
+   controls in one panel. Both use the number box's chrome now; only the
+   value fill stays specific to bounded numbers. */
+.lex-detail-field-control :is(input:not([type="checkbox"]),select,textarea) {
+  min-height:0;
+  padding:.28em .42em;
+  color:inherit;
+  border:1px solid var(--lex-border);
+  border-radius:0;
+  outline:0;
+  background:transparent;
+  box-shadow:none;
+  font:inherit;
+  text-shadow:inherit;
+}
+.lex-detail-field-control :is(input:not([type="checkbox"]),select,textarea):hover {
+  border-color:color-mix(in srgb,var(--lex-highlight) 42%,transparent);
+}
+.lex-detail-field-control :is(input:not([type="checkbox"]),select,textarea):focus {
+  border-color:var(--lex-highlight);
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--lex-highlight) 35%,transparent);
+}
+
+.lex-detail-field-label-text { display:block; min-width:0; max-width:100%; }
+

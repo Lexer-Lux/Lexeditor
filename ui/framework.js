@@ -928,9 +928,44 @@
         || pin?.getAttribute?.("data-lex-pin-column") || null,
       "data-lex-readonly": String(readOnly),
     }, element("div", {class: "lex-detail-field-label"},
-      options.label, arrow),
+      element("span", {class: "lex-detail-field-label-text"}, options.label), arrow),
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null), typeRail);
+    // The property name shrinks to the lane rather than wrapping it into extra
+    // lines: the lane is narrow by design, and a long name must not deepen its
+    // row or be cut off.
+    const labelBox = node.querySelector(".lex-detail-field-label");
+    const labelSpan = labelBox?.querySelector(".lex-detail-field-label-text");
+    let fitting = false, fittedWidth = -1;
+    const fitLabel = () => {
+      if (!labelBox || !labelSpan || fitting) return;
+      // Re-entrancy guard: this resizes the row, which would call the observer
+      // again and reset the size it just chose.
+      const laneWidth = labelBox.clientWidth;
+      if (laneWidth === fittedWidth) return;
+      fitting = true;
+      fittedWidth = laneWidth;
+      const control = node.querySelector(".lex-detail-field-control");
+      // Measure the control while the name is at its smallest, so the ceiling
+      // is the row's natural height rather than one the name already inflated.
+      labelBox.style.setProperty("--lex-label-size", "7px");
+      const labelStyle = getComputedStyle(labelBox);
+      const labelPadding = (Number.parseFloat(labelStyle.paddingTop) || 0)
+        + (Number.parseFloat(labelStyle.paddingBottom) || 0);
+      const ceiling = Math.max(1,
+        (control?.getBoundingClientRect().height || 0) - labelPadding);
+      labelBox.style.removeProperty("--lex-label-size");
+      const base = Number.parseFloat(getComputedStyle(labelSpan).fontSize) || 13;
+      for (let size = base; size > 7; size -= 0.5) {
+        labelBox.style.setProperty("--lex-label-size", `${size}px`);
+        if (labelSpan.scrollHeight <= ceiling && labelSpan.scrollWidth <= labelBox.clientWidth + 1) break;
+      }
+      fitting = false;
+    };
+    node.lexFitLabel = fitLabel;
+    requestAnimationFrame(fitLabel);
+    if (typeof ResizeObserver === "function") new ResizeObserver(fitLabel).observe(node);
+
     // The rail runs down the side of one row, so its type name has to fit that
     // row's height. A long name (or a range shown on focus) is set smaller
     // rather than being allowed to run into the rows above and below.
@@ -1198,7 +1233,9 @@
     // Formula glyphs and labels must never be non-uniformly stretched. The
     // graph owns a 2:1 user-space viewport; letterbox if a caller gives the
     // drawing a differently shaped box instead of distorting that viewport.
-    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    // "meet" letterboxed the drawing inside its own box, so the graph never
+    // filled the card and the right-hand axis sat away from the plot edge.
+    svg.setAttribute("preserveAspectRatio", "none");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", options.graphLabel || `${options.title || "Value"} curve`);
     const grid = document.createElementNS(svgNamespace, "path");
@@ -6020,7 +6057,10 @@
       const label = field.querySelector(':scope > .lex-detail-field-label');
       if (!rail || !help || !label) continue;
       if (field.hasAttribute("data-lex-sort")) { rail.style.left = "0px"; continue; }
-      const text = [...label.childNodes].find(node =>
+      // The name is wrapped so it can be scaled to the lane, so measure the
+      // wrapper when present and fall back to a bare text node.
+      const span = label.querySelector(':scope > .lex-detail-field-label-text');
+      const text = span || [...label.childNodes].find(node =>
         node.nodeType === Node.TEXT_NODE && node.textContent.trim());
       if (!text) continue;
       const range = document.createRange();

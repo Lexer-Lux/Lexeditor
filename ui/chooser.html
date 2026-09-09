@@ -95,7 +95,7 @@
     .chooser-window-controls>.lex-window-actions>.lex-window-close:hover{border-color:#c42b1c;background:#c42b1c}
     .resident-handle::before { position:absolute; inset:-10px; background:inherit; background-position:center; background-size:cover; filter:blur(8px) brightness(.42); content:""; }
     .resident-handle::after { position:absolute; inset:0; background:#080a0d6e; content:""; }
-    .resident-arrow { position:absolute; z-index:1; top:38%; left:50%; display:grid; place-items:center; transform:translate(-50%,-50%); }
+    .resident-arrow { position:absolute; z-index:1; top:50%; left:50%; display:grid; place-items:center; transform:translate(-50%,-50%); }
     .resident-arrow svg { width:auto; height:var(--lex-resident-arrow-height,33vh); fill:none; stroke:currentColor; stroke-width:4.25; stroke-linecap:butt; stroke-linejoin:miter; }
     .resident-save { position:absolute; z-index:2; top:var(--lex-resident-safe-inset,15%); left:50%; display:grid; width:var(--lex-resident-save-size,30px); height:var(--lex-resident-save-size,30px); place-items:center; transform:translateX(-50%); }
     .resident-save>svg { width:100%; height:100%; }
@@ -258,7 +258,31 @@
       "not-added":'<span aria-hidden="true">🔍</span>',
     };
     function button(label,action,secondary=false){const control=document.createElement("button");control.textContent=label;control.classList.toggle("secondary",secondary);control.onclick=action;return control;}
-    function sizeResidentHandle(){if(residentHandle.hidden)return;const box=residentHandle.getBoundingClientRect(),safe=box.height*.15,saveSize=Math.max(18,Math.min(48,box.width*.58,box.height*.09)),nameHeight=Math.max(48,box.height*.26),nameSize=Math.max(8,Math.min(20,box.width*.28,nameHeight/(Math.max(4,residentName.textContent.length)*.62)));residentHandle.style.setProperty("--lex-resident-arrow-height",`${box.height*.33}px`);residentHandle.style.setProperty("--lex-resident-safe-inset",`${safe}px`);residentHandle.style.setProperty("--lex-resident-save-size",`${saveSize}px`);residentHandle.style.setProperty("--lex-resident-name-height",`${nameHeight}px`);residentHandle.style.setProperty("--lex-resident-name-size",`${nameSize}px`);}
+    function sizeResidentHandle(){if(residentHandle.hidden)return;
+      const box=residentHandle.getBoundingClientRect(),safe=box.height*.12,
+        saveSize=Math.max(18,Math.min(48,box.width*.58,box.height*.09)),
+        arrowHeight=box.height*.24;
+      residentHandle.style.setProperty("--lex-resident-arrow-height",`${arrowHeight}px`);
+      residentHandle.style.setProperty("--lex-resident-safe-inset",`${safe}px`);
+      residentHandle.style.setProperty("--lex-resident-save-size",`${saveSize}px`);
+      // The arrow is centred, so the name owns everything between its lower
+      // edge and the bottom inset. A fixed 26% left a third of the handle
+      // empty while still cutting the name off.
+      const nameHeight=Math.max(48,box.height/2-arrowHeight/2-safe-10);
+      residentHandle.style.setProperty("--lex-resident-name-height",`${nameHeight}px`);
+      // Resolved here rather than through the module const: this runs during
+      // boot before that binding initializes, which threw and left the handle
+      // unsized.
+      const nameNode=residentHandle.querySelector(".resident-game-name");
+      if(!nameNode)return;
+      // Measure back from layout rather than guessing from character count,
+      // which mis-sized every name that was not average width.
+      let nameSize=Math.min(20,box.width*.28);
+      residentHandle.style.setProperty("--lex-resident-name-size",`${nameSize}px`);
+      for(;nameSize>7;nameSize-=0.5){
+        residentHandle.style.setProperty("--lex-resident-name-size",`${nameSize}px`);
+        if(nameNode.scrollHeight<=nameNode.clientHeight)break;
+      }}
     function applySharedSettings(settings){const width=Math.max(2.5,Math.min(12,Number(settings?.residentHandleWidthPercent)||5)),height=Math.max(3,Math.min(20,Number(settings?.mainMenuHeightPercent)||9)),rawDesaturation=Number(settings?.absentGameDesaturationPercent),desaturation=Math.max(0,Math.min(100,Number.isFinite(rawDesaturation)?rawDesaturation:75));document.documentElement.style.setProperty("--lex-resident-handle-width",`${width}vw`);document.documentElement.style.setProperty("--lex-chooser-menu-height",`${height}vh`);document.documentElement.style.setProperty("--lex-absent-desaturation",`${desaturation}%`);const resolved=settings&&typeof settings==="object"?settings:chooser.settings||{};chooser.settings=resolved;restartButton.hidden=!resolved.developerMode;lexerButton.hidden=!resolved.developerMode;if(lexerButton.hidden&&!lexerPanel.hidden)setLexerPanel(false);requestAnimationFrame(sizeResidentHandle);}
     async function loadSharedSettings(){if(chooser.settingsLoaded)return;try{applySharedSettings(await window.pywebview.api.lexeditor_settings());chooser.settingsLoaded=true;}catch(_error){applySharedSettings(chooser.settings||null);}}
     addEventListener("lexeditor-settings-changed",event=>applySharedSettings(event.detail));
