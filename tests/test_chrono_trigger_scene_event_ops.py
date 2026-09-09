@@ -51,6 +51,7 @@ class SceneEventOpTests(unittest.TestCase):
     def test_selected_opcodes_have_named_schemas(self):
         fixtures = {
             0xD9: b"\x01\x02\x03\x04\x05\x06",
+            0xE2: b"\x10\x11\x12\x13",
             0xE7: b"\x10\x20",
             0xF4: b"\x01",
         }
@@ -68,6 +69,42 @@ class SceneEventOpTests(unittest.TestCase):
         self.assertIn("coordinate bytes", summary)
         self.assertNotIn("tile", summary.casefold())
         self.assertNotIn("pixel", summary.casefold())
+
+    def test_change_location_from_memory_decodes_four_script_addresses(self):
+        cmd = command(0xE2, b"\x10\x11\x12\x13")
+        values = editor_schema(cmd)["values"]
+        self.assertEqual(values, {
+            "locationAddress": 0x7F0220,
+            "xAddress": 0x7F0222,
+            "yAddress": 0x7F0224,
+            "facingAddress": 0x7F0226,
+        })
+        summary = scene_event_semantics(cmd)["summary"]
+        self.assertIn("location 0x7F0220", summary)
+        self.assertIn("X 0x7F0222", summary)
+        self.assertIn("Y 0x7F0224", summary)
+        self.assertIn("facing 0x7F0226", summary)
+
+    def test_change_location_from_memory_partial_write_uses_even_local_encoding(self):
+        original = event(bytes((0xE2, 0x10, 0x11, 0x12, 0x13, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {
+            "locationAddress": 0x7F0240,
+            "facingAddress": 0x7F0250,
+        })
+        self.assertEqual(store.overlay[34:38], bytes((0x20, 0x11, 0x12, 0x28)))
+        self.assertEqual(len(store.overlay), len(original))
+
+    def test_change_location_from_memory_rejects_odd_or_unrepresentable_address(self):
+        original = event(bytes((0xE2, 0x10, 0x11, 0x12, 0x13, 0x00)))
+        store = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "even script-memory address"):
+            save_event_fields(store, 1, 0, 0, 0, sha256(original), {"xAddress": 0x7F0201})
+        self.assertIsNone(store.overlay)
+
+        with self.assertRaisesRegex(ValueError, "between"):
+            save_event_fields(store, 1, 0, 0, 0, sha256(original), {"xAddress": 0x7F0400})
+        self.assertIsNone(store.overlay)
 
     def test_scroll_coordinates_stay_literal_and_partial_write_preserves_y(self):
         cmd = command(0xE7, b"\x10\x20")
