@@ -38,7 +38,7 @@ from .server import (
 
 
 def _utility_safe_patch_payload(relative: str, info: dict, schema_root: Path | None) -> dict:
-    payload = safe_patch_payload(project_root() and relative, info, schema_root)
+    payload = safe_patch_payload(relative, info, schema_root)
     return apply_existing_utility_policy(payload, schema_root)
 
 
