@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 import shutil
 
-from .paths import contained_project_path
+from .paths import clear_write_helper, contained_project_path
 
 
 _STRING = r'"(?:\\.|[^"\\])*"'
@@ -234,8 +234,10 @@ def save_skill_definitions(project: Path, payload: dict) -> dict:
     changed = attribute_changes + skill_changes
     backup = path.with_name(path.name + ".lexeditor.bak")
     if changed:
+        clear_write_helper(backup)
         shutil.copy2(path, backup)
         temporary = path.with_name(path.name + ".lexeditor.tmp")
+        clear_write_helper(temporary)
         temporary.write_text(candidate, encoding="utf-8")
         temporary.replace(path)
     result = read_skill_definitions(project)
@@ -324,8 +326,10 @@ def save_effect_definitions(project: Path, edits: list[dict]) -> dict:
 
     backup = path.with_name(path.name + ".lexeditor.bak")
     if changed_records:
+        clear_write_helper(backup)
         shutil.copy2(path, backup)
         temporary = path.with_name(path.name + ".lexeditor.tmp")
+        clear_write_helper(temporary)
         temporary.write_text(candidate, encoding="utf-8")
         temporary.replace(path)
     result = read_effect_definitions(project)
