@@ -9,6 +9,12 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from .gauntlet_data import (
+    augment_data_map as augment_gauntlet_data_map,
+    list_prefabs,
+    read_prefab,
+    save_prefab,
+)
 from .module_data import data_map, read_submodule, save_module
 from .skill_data import (
     read_effect_definitions,
@@ -90,6 +96,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path
         query = parse_qs(parsed.query)
+
         if path == "/":
             self.send_file(PLUGIN_ROOT / "editor.html")
             return
@@ -108,6 +115,7 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.send_json({"error": "Bannerlord plugin asset not found"}, 404)
             return
+
         if path == "/api/plugin":
             self.send_json(
                 {
@@ -132,6 +140,7 @@ class Handler(BaseHTTPRequestHandler):
                         "custom-skill-xp-sources",
                         "mcm-default-settings",
                         "runtime-overrides",
+                        "gauntlet-prefabs",
                         "deployment-diagnostics",
                         "data-map",
                     ],
@@ -204,6 +213,24 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
+        if path == "/api/gauntlet-files":
+            try:
+                self.send_json({"files": list_prefabs(PROJECT)})
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/gauntlet":
+            requested = (query.get("path") or [""])[0]
+            if not requested:
+                self.send_json({"error": "Missing Gauntlet prefab path"}, 400)
+                return
+            try:
+                self.send_json(read_prefab(PROJECT, requested))
+            except (ValueError, FileNotFoundError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
         if path == "/api/deployment":
             try:
                 self.send_json(deployment_status(PROJECT))
@@ -211,25 +238,24 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(error)}, 500)
             return
         if path == "/api/datamap":
+            base = augment_gauntlet_data_map(augment_data_map(data_map(PROJECT)))
             try:
-                base = augment_data_map(data_map(PROJECT))
-                runtime = read_runtime_overrides(PROJECT)
-                self.send_json(augment_runtime_data_map(base, runtime))
+                self.send_json(augment_runtime_data_map(base, read_runtime_overrides(PROJECT)))
             except Exception:
-                self.send_json(augment_data_map(data_map(PROJECT)))
+                self.send_json(base)
             return
         self.send_json({"error": "Not found"}, 404)
 
     def do_POST(self):
         path = urlparse(self.path).path
+
         if path == "/api/module/save":
             source = PROJECT / "SubModule.xml"
             if not source.is_file():
                 self.send_json({"error": f"SubModule.xml not found: {source}"}, 404)
                 return
             try:
-                payload = self.read_json()
-                self.send_json(save_module(source, payload))
+                self.send_json(save_module(source, self.read_json()))
             except (ValueError, TypeError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -237,8 +263,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/skills/save":
             try:
-                payload = self.read_json()
-                self.send_json(save_skill_definitions(PROJECT, payload))
+                self.send_json(save_skill_definitions(PROJECT, self.read_json()))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -283,7 +308,28 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/runtime-overrides/save":
             try:
                 self.send_json(save_runtime_overrides(PROJECT, self.read_json()))
-            except (ValueError, TypeError, RuntimeError, FileNotFoundError, json.JSONDecodeError) as error:
+            except (
+                ValueError,
+                TypeError,
+                RuntimeError,
+                FileNotFoundError,
+                json.JSONDecodeError,
+            ) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/gauntlet/save":
+            try:
+                payload = self.read_json()
+                self.send_json(
+                    save_prefab(
+                        PROJECT,
+                        str(payload.get("path") or ""),
+                        list(payload.get("edits") or []),
+                    )
+                )
+            except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
@@ -295,8 +341,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 payload = self.read_json()
-                edits = dict(payload.get("edits") or {})
-                self.send_json(save_project_properties(project_file, edits))
+                self.send_json(
+                    save_project_properties(project_file, dict(payload.get("edits") or {}))
+                )
             except (ValueError, TypeError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
