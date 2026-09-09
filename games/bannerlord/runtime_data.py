@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from . import paths
+from .community_metadata import community_version_matches, read_community_dependencies
 from .game_launch import module_load_order
 from .module_data import is_singleplayer_module, read_submodule
 
@@ -165,6 +166,7 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
         }
 
     module = read_submodule(descriptor)
+    community_dependencies = read_community_dependencies(descriptor)
     module_id = str(module.get("id") or "").strip()
     installed = _installed_index(game)
     installed_module = installed.get(module_id.casefold()) if module_id else None
@@ -183,16 +185,23 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
     dependency_rows = []
     missing_required = []
     version_mismatches = []
+    community_version_mismatches = []
+    community_dependency_ids = {
+        str(row.get("id") or "").strip().casefold()
+        for row in community_dependencies
+        if not row.get("incompatible") and str(row.get("id") or "").strip()
+    }
     for dependency in module.get("dependencies", []):
         dep_id = str(dependency.get("id") or "")
         found = installed.get(dep_id.casefold())
         optional = bool(dependency.get("optional"))
+        overridden = dep_id.casefold() in community_dependency_ids
         required_version = str(dependency.get("dependentVersion") or "").strip()
         installed_version = str(found.get("version", "") or "").strip() if found else ""
         version_match = None
-        if not found and not optional:
+        if not found and not optional and not overridden:
             missing_required.append(dep_id)
-        if found and required_version:
+        if found and required_version and not overridden:
             version_match = _dependency_version_matches(required_version, installed_version)
             if not version_match:
                 version_mismatches.append(
@@ -208,14 +217,58 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
                 "installedVersion": installed_version,
                 "versionMatch": version_match,
                 "path": found.get("path", "") if found else "",
+                "source": "native",
+                "order": "LoadBeforeThis",
+                "incompatible": False,
+                "overriddenByCommunityMetadata": overridden,
             }
         )
+
+    for dependency in community_dependencies:
+        dep_id = str(dependency.get("id") or "")
+        found = installed.get(dep_id.casefold())
+        optional = bool(dependency.get("optional"))
+        incompatible = bool(dependency.get("incompatible"))
+        required_version = str(dependency.get("version") or "").strip()
+        installed_version = str(found.get("version", "") or "").strip() if found else ""
+        version_match = None
+        if not incompatible and not found and not optional:
+            missing_required.append(dep_id)
+        if not incompatible and found and required_version and not optional:
+            version_match = community_version_matches(required_version, installed_version)
+            if version_match is False:
+                community_version_mismatches.append(
+                    f"{dep_id} requires {required_version}, installed "
+                    f"{installed_version or '(no version declared)'}"
+                )
+        dependency_rows.append(
+            {
+                "id": dep_id,
+                "requiredVersion": required_version,
+                "optional": optional,
+                "installed": bool(found),
+                "installedVersion": installed_version,
+                "versionMatch": version_match,
+                "path": found.get("path", "") if found else "",
+                "source": "community",
+                "order": dependency.get("order") or "",
+                "incompatible": incompatible,
+                "overriddenByCommunityMetadata": False,
+            }
+        )
+
+    missing_required = list(dict.fromkeys(value for value in missing_required if value))
     if missing_required:
         issues.append("Missing required dependencies: " + ", ".join(missing_required))
     if version_mismatches:
         issues.append(
             "Dependency version warning (Bannerlord launcher would warn before start): "
             + "; ".join(version_mismatches)
+        )
+    if community_version_mismatches:
+        issues.append(
+            "BLSE community dependency version warning: "
+            + "; ".join(community_version_mismatches)
         )
 
     binaries = []
