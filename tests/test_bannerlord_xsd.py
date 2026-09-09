@@ -231,6 +231,40 @@ class BannerlordXsdTests(unittest.TestCase):
         finally:
             temporary.cleanup()
 
+    def test_xml_schema_numeric_boolean_forms_round_trip(self):
+        temporary, project, game, source, _schema_path = self.fixture()
+        try:
+            source.write_text(
+                '<Items>\n'
+                '  <Item id="test_item" enabled="1" weight="0.5" Type="Weapon" tier="2" fixedValue="locked" />\n'
+                '</Items>\n',
+                encoding="utf-8",
+            )
+            document = read_document(project, "ModuleData/items.xml", game)
+            self.assertEqual(document["schemaIssueCount"], 0)
+            item = next(row for row in document["elements"] if row["tag"] == "Item")
+            enabled = next(row for row in item["attributes"] if row["name"] == "enabled")
+            self.assertEqual(enabled["kind"], "bool")
+            self.assertEqual(enabled["value"], "1")
+
+            saved = save_document(
+                project,
+                document["relativePath"],
+                [{
+                    "elementPath": item["path"],
+                    "tag": "Item",
+                    "attribute": "enabled",
+                    "originalValue": "1",
+                    "value": "0",
+                }],
+                game,
+            )
+            self.assertEqual(saved["saved"], 1)
+            self.assertEqual(saved["schemaIssueCount"], 0)
+            self.assertIn('enabled="0"', source.read_text(encoding="utf-8"))
+        finally:
+            temporary.cleanup()
+
     def test_without_schema_document_remains_conservative(self):
         temporary, project, _game, _source, _schema_path = self.fixture()
         try:
