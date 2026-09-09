@@ -7,7 +7,8 @@
 - Integrate localized `GameContents/Text` resources without bundling proprietary text dumps.
 - Preserve installed archives and unknown bytes; save to a project overlay only.
 - Build and explicitly deploy a loadable mod PAK.
-- Verify parser/write behavior without committing proprietary fixtures.
+- Theme the editor as an FF7R surface, using installed-game UI assets where they can be decoded safely and a proprietary-data-free fallback otherwise.
+- Verify parser/write/theme behavior without committing proprietary fixtures.
 
 ## Implementation state
 
@@ -21,17 +22,25 @@ Candidate implementation lives on `feature/ff7-remake-plugin`.
 - Installed `Resident_TxtRes` data resolves `$...` text IDs to readable local names without committing Square Enix text data.
 - Saves use source/project SHA-256 conflict checks, atomic project writes and binary readback verification under `<project>/content`.
 - Build creates `<project>/build/Lexeditor-FF7R_P.pak`; Deploy separately copies it to `End/Content/Paks/~mods`.
-- Synthetic fixtures exercise gameplay parsing/writes, text-ID resolution, variable-length Unicode text writes, malformed input and managed-service save/readback without storing game binaries.
+- Semantic item-price/carry-cap, enemy-loot, encounter, graphics, No More Cheats and Better Lock-on surfaces now sit on top of the installed-data layer; their issue-specific installed-game acceptance remains tracked on the child issues.
+- Native runtime infrastructure and fail-closed installed-build probes exist for runtime-only features; unresolved authoritative hooks/state semantics remain child-issue blockers rather than guessed mutations.
+- The FF7R editor has a plugin-local dark blue/cyan glass-HUD fallback theme and a private installed-theme asset pipeline. Browser-ready local fonts/images/audio can be copied only into Lexeditor's user-data cache; arbitrary files and cooked Unreal blobs are never exposed as web assets.
+- The documented installed `SystemFontNormal4K` glyph UEXP plus `U_Com_JP_SystemFontNormal4K-01` 2048x2048 BC5 atlas can be validated and decoded locally. The resulting PNG + glyph metrics render shell tabs and detail titles with the game's actual bitmap font when those exact assets are present. No Square Enix font data is committed.
+- Shared semantic UI sound slots (`confirm`, `back`, `move`, `launch`, `exit`, `save`) are wired into the theme contract. Direct browser-ready installed audio is supported; ordinary cooked FF7R menu audio is still discovery-only until a validated SoundWave decoder/source mapping is implemented.
+- Synthetic fixtures exercise gameplay parsing/writes, text-ID resolution, variable-length Unicode text writes, malformed input, theme fallback/asset confinement, documented bitmap-font parsing/cache behavior and managed-service routes without storing game binaries.
 
 ## Tracked FF7R follow-ups
 
-- #413 — configurable cutscene speed multiplier. Base cutscene playback must be >1x; held-R2 fast-forward multiplies that configured base speed. Requires runtime/native investigation and installed-game timing verification.
-- #414 — player-controlled minimap. Tap map button opens the map; hold toggles minimap state, overriding automatic combat/location visibility changes. Requires runtime/input/UI investigation and installed-game state-transition verification.
-- #415 — editable item prices. **Core semantic-editor priority:** expose authoritative buy/sell price data with readable installed-game item names rather than leaving it as raw DataObject fields.
-- #416 — editable enemy drops and drop chances. **Core semantic-editor priority:** expose authoritative enemy loot item/chance/quantity fields with readable enemy/item names, keeping ordinary drops distinct from steal/reward tables unless the game data proves they are shared.
+- #413 — configurable cutscene speed multiplier. Source runtime logic exists; installed-build hook/timing validation remains required.
+- #414 — player-controlled minimap. Runtime/input/UI evidence exists; installed state-transition validation remains required.
+- #415 — editable item prices. Semantic editor exists; installed-game shop acceptance remains required.
+- #416 — editable enemy drops and drop chances. Semantic editor exists; installed-game drop/steal acceptance remains required.
+- #424/#425/#427/#428/#430 and the other open FF7R child issues retain their own source/runtime blockers and acceptance state.
 
 ## Evidence / next work
 
-FF7R-specific CI covers Python syntax, plugin descriptor validation, gameplay/text parser tests and managed-service smoke on Windows and Linux. The next core-editor work is locating the authoritative FF7R item-price and enemy-loot DataObject schemas for #415/#416 and mapping them to semantic controls.
+FF7R-specific CI covers Python syntax, editor/theme JavaScript syntax, plugin/service descriptor validation, all `test_ff7r_*.py` regressions and managed-service smoke on Windows and Linux.
 
-Live game acceptance remains separate: actual installed PAK indexing, representative real DataObject/text parsing, semantic price/drop effects, game load and deployed-value effects must be checked on an installed copy before #406 or its follow-ups are considered complete.
+The theme implementation is source-verifiable but not visually accepted from CI. Installed acceptance must confirm the FF7R palette/layout in the real desktop WebView, successful `SystemFontNormal` discovery/decode on a current installed build, readable atlas-rendered labels at normal/high DPI, and any menu SFX/texture overrides that are actually decoded from the user's copy. Cooked menu textures and SoundWave assets remain an explicit next theming frontier rather than being misrepresented as already usable browser files.
+
+Live game acceptance remains separate: actual installed PAK indexing, representative real DataObject/text parsing, semantic gameplay effects, game load, deployed-value effects and theme appearance must be checked on an installed copy before #406 or its follow-ups are considered complete.
