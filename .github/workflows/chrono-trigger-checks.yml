@@ -6,12 +6,14 @@ on:
       - 'games/chrono_trigger/**'
       - 'tests/test_chrono_trigger_*.py'
       - 'tools/chrono_trigger_*.py'
+      - 'runtime_bootstrap.py'
       - '.github/workflows/chrono-trigger-checks.yml'
   pull_request:
     paths:
       - 'games/chrono_trigger/**'
       - 'tests/test_chrono_trigger_*.py'
       - 'tools/chrono_trigger_*.py'
+      - 'runtime_bootstrap.py'
       - '.github/workflows/chrono-trigger-checks.yml'
 
 permissions:
@@ -27,6 +29,7 @@ jobs:
       - name: Python syntax
         run: >-
           python -m py_compile
+          runtime_bootstrap.py
           games/chrono_trigger/plugin.py
           games/chrono_trigger/paths.py
           games/chrono_trigger/resources.py
