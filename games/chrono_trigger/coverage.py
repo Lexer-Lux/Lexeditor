@@ -12,6 +12,8 @@ _WORLD_TABLE_RE = re.compile(r"^Game/world/EventTable/EventTable_\d+\.dat$", re.
 _WORLD_SCRIPT_RE = re.compile(r"^Game/world/esl/Event_\d+\.dat$", re.IGNORECASE)
 _FIELD_SCRIPT_RE = re.compile(r"^Game/field/atel/Atel_\d+\.dat$", re.IGNORECASE)
 _SCENE_MAP_RE = re.compile(r"^Game/field/MapTable/MapTable_\d+\.dat$", re.IGNORECASE)
+_SCENE_L3_GFX_RE = re.compile(r"^Game/field/weather_bin/cg\d+\.bin$", re.IGNORECASE)
+_SCENE_L3_ASSEMBLY_RE = re.compile(r"^Game/field/ChipTable/ChipTableBg3_\d+\.dat$", re.IGNORECASE)
 _SCENE_PALETTE_RE = re.compile(r"^Game/field/palette_bin/plt\d+\.bin$", re.IGNORECASE)
 _WORLD_PALETTE_RE = re.compile(r"^Game/world/plt_bin/plt\d+\.bin$", re.IGNORECASE)
 
@@ -28,6 +30,10 @@ def resource_override(path: str) -> dict | None:
         return {"kind": "field-event-script", "coverage": "structural + fixed-write", "status": "partial", "target": "events"}
     if _SCENE_MAP_RE.match(path):
         return {"kind": "scene-map-layout", "coverage": "structural + raster", "status": "integrated", "target": "scenes"}
+    if _SCENE_L3_GFX_RE.match(path):
+        return {"kind": "scene-l3-graphics", "coverage": "raster", "status": "integrated", "target": "scenes"}
+    if _SCENE_L3_ASSEMBLY_RE.match(path):
+        return {"kind": "scene-l3-assembly", "coverage": "raster", "status": "integrated", "target": "scenes"}
     if _SCENE_PALETTE_RE.match(path) or _WORLD_PALETTE_RE.match(path):
         return {"kind": "bgr555-palette", "coverage": "structured", "status": "integrated", "target": "resources"}
     return None
@@ -42,6 +48,8 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
     world_scripts = sum(bool(_WORLD_SCRIPT_RE.match(path)) for path in paths)
     field_scripts = sum(bool(_FIELD_SCRIPT_RE.match(path)) for path in paths)
     scene_maps = sum(bool(_SCENE_MAP_RE.match(path)) for path in paths)
+    scene_l3_graphics = sum(bool(_SCENE_L3_GFX_RE.match(path)) for path in paths)
+    scene_l3_assemblies = sum(bool(_SCENE_L3_ASSEMBLY_RE.match(path)) for path in paths)
     scene_palettes = sum(bool(_SCENE_PALETTE_RE.match(path)) for path in paths)
     world_palettes = sum(bool(_WORLD_PALETTE_RE.match(path)) for path in paths)
     has_bank = any(path.casefold() == WORLD_BANK.casefold() for path in paths)
@@ -74,11 +82,18 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
                       if str(row.get("filename", "")).startswith("Game/world/esl/")), len(rows))
     additions = [
         {
-            "filename": "Game/field/MapTable/MapTable_*.dat + referenced PC tilesets",
-            "controls": f"{scene_maps} scene map layouts: structural tiles/collision plus desktop and CLI L1/L2 PC raster previews",
-            "notes": "The desktop Map view and tools/chrono_trigger_map.py render actual PC L1/L2 artwork from BGSetTable + cg + ChipTable + BGR555 palette. Animated-chip playback, L3 artwork and main/sub-screen blend/priority composition remain explicitly unsupported.",
+            "filename": "Game/field/MapTable/MapTable_*.dat + referenced PC L1/L2/L3 tilesets",
+            "controls": f"{scene_maps} scene map layouts: structural tiles/collision plus desktop and CLI L1/L2/L3 PC raster previews",
+            "notes": "L1/L2 render from BGSetTable + map_bin/cg + ChipTable; L3 follows CTViewer's PC-only weather_bin/cg + scene-indexed ChipTableBg3 path with 4-color palette groups. Animated L1/L2 chip playback and main/sub-screen blend/priority composition remain explicitly unsupported; PrioMap semantics are exposed raw but not claimed.",
             "status": "integrated" if scene_maps else "partial", "coverage": "structural + raster",
             "openable": bool(scene_maps), "target": "scenes",
+        },
+        {
+            "filename": "Game/field/weather_bin/cg*.bin + Game/field/ChipTable/ChipTableBg3_*.dat",
+            "controls": f"{scene_l3_graphics} L3 graphics sets and {scene_l3_assemblies} scene-indexed L3 assemblies used by isolated raster preview",
+            "notes": "Current Steam/PC L3 rendering follows CTViewer's PC backend: a four-byte cg header is skipped before nibble unpacking, L3 assemblies contain 256 four-corner tiles with three-byte PC corner records, and palette indices select 4-color groups.",
+            "status": "integrated" if scene_l3_graphics and scene_l3_assemblies else "partial",
+            "coverage": "raster", "openable": bool(scene_l3_graphics or scene_l3_assemblies), "target": "scenes",
         },
         {
             "filename": "Game/field/palette_bin/plt*.bin + Game/world/plt_bin/plt*.bin",
@@ -135,6 +150,8 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
         "worldScripts": world_scripts,
         "fieldScripts": field_scripts,
         "sceneMaps": scene_maps,
+        "sceneL3Graphics": scene_l3_graphics,
+        "sceneL3Assemblies": scene_l3_assemblies,
         "scenePalettes": scene_palettes,
         "worldPalettes": world_palettes,
     })
