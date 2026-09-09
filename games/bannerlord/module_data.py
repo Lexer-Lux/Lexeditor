@@ -642,7 +642,24 @@ def _set_xml_registration_identity(element: ET.Element, xml_id: str, xml_path: s
         xml_name.set("id", xml_id)
         xml_name.set("path", xml_path)
         return created + int(before != xml_name.attrib)
-    return int(_set_value(element, "Id", xml_id)) + int(_set_value(element, "Path", xml_path))
+    def set_legacy_value(tag: str, value: str) -> int:
+        child = element.find(tag)
+        if child is None:
+            child = ET.Element(tag)
+            included = element.find("IncludedGameTypes")
+            if included is None:
+                element.append(child)
+            else:
+                element.insert(list(element).index(included), child)
+            child.set("value", value)
+            return 1
+        before = child.attrib.get("value", (child.text or "").strip())
+        if before == value:
+            return 0
+        child.set("value", value)
+        return 1
+
+    return set_legacy_value("Id", xml_id) + set_legacy_value("Path", xml_path)
 
 
 def _edit_xmls(root: ET.Element, rows: list[dict]) -> int:
