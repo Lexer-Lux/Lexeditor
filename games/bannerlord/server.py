@@ -24,6 +24,11 @@ from .perk_data import (
     save_xp_source_definitions,
 )
 from .runtime_data import deployment_status
+from .runtime_overrides import (
+    augment_data_map as augment_runtime_data_map,
+    read_runtime_overrides,
+    save_runtime_overrides,
+)
 from .settings_data import read_mcm_defaults, save_mcm_defaults
 from .project_data import (
     primary_project_file,
@@ -126,6 +131,7 @@ class Handler(BaseHTTPRequestHandler):
                         "custom-skill-perks",
                         "custom-skill-xp-sources",
                         "mcm-default-settings",
+                        "runtime-overrides",
                         "deployment-diagnostics",
                         "data-map",
                     ],
@@ -190,6 +196,14 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
+        if path == "/api/runtime-overrides":
+            try:
+                self.send_json(read_runtime_overrides(PROJECT))
+            except (ValueError, RuntimeError, FileNotFoundError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
         if path == "/api/deployment":
             try:
                 self.send_json(deployment_status(PROJECT))
@@ -197,7 +211,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(error)}, 500)
             return
         if path == "/api/datamap":
-            self.send_json(augment_data_map(data_map(PROJECT)))
+            try:
+                base = augment_data_map(data_map(PROJECT))
+                runtime = read_runtime_overrides(PROJECT)
+                self.send_json(augment_runtime_data_map(base, runtime))
+            except Exception:
+                self.send_json(augment_data_map(data_map(PROJECT)))
             return
         self.send_json({"error": "Not found"}, 404)
 
@@ -257,6 +276,14 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self.read_json()
                 self.send_json(save_mcm_defaults(PROJECT, list(payload.get("edits") or [])))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/runtime-overrides/save":
+            try:
+                self.send_json(save_runtime_overrides(PROJECT, self.read_json()))
+            except (ValueError, TypeError, RuntimeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
