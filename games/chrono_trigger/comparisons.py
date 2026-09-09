@@ -98,20 +98,17 @@ def comparison_values(command: dict) -> dict | None:
     if parsed is None:
         return None
     opcode, args, operation_offset = parsed
-    width = 2 if opcode in {0x13, 0x15} else 1
     if opcode == 0x12:
-        value = args[1]
         return {
             "memoryAddress": _script_address(args[0]),
-            "value": value,
+            "value": args[1],
             "operation": args[operation_offset],
             "jumpOffset": args[3],
         }
     if opcode == 0x13:
-        value = int.from_bytes(args[1:3], "little")
         return {
             "memoryAddress": _script_address(args[0]),
-            "value": value,
+            "value": int.from_bytes(args[1:3], "little"),
             "operation": args[operation_offset],
             "jumpOffset": args[4],
         }
@@ -120,7 +117,6 @@ def comparison_values(command: dict) -> dict | None:
         "rightAddress": _script_address(args[1]),
         "operation": args[operation_offset],
         "jumpOffset": args[3],
-        "widthBytes": width,
     }
 
 
