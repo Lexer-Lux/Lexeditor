@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from pathlib import Path
 import struct
 
 import pytest
 
-from games.ffx_x2.gear_shops import GearShopError, apply_edits, parse_gear_shops, payload
+from games.ffx_x2.gear_shops import (
+    ARCHIVE_PATH, GearShopError, apply_edits, parse_gear_shops, payload,
+)
+from games.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
+from service_session import request_json
 
 
 def _record(rate: int, gear: list[int]) -> bytes:
@@ -66,3 +71,41 @@ def test_gear_shop_rejects_duplicate_slots():
         apply_edits(data, [{"id": 6, "slots": [
             {"slot": 1, "gearId": 3}, {"slot": 1, "gearId": 4},
         ]}])
+
+
+def test_gear_shop_managed_service_resolves_raw_vbf_and_saves_canonical_project(tmp_path: Path):
+    source = _table([
+        _record(90, [0x0101, 0x0102] + [0] * 14),
+        _record(100, [0x0201] + [0] * 15),
+    ], min_index=0x30, trailing=b"opaque-service-tail")
+    raw_archive_path = ARCHIVE_PATH.removeprefix("FFX_Data/")
+    game_root = tmp_path / "game"
+    project_root = tmp_path / "project"
+    theme_cache = tmp_path / "theme"
+    _write_fixture_vbf(game_root / "data" / "FFX_Data.vbf", [(raw_archive_path, source)])
+
+    with FFXX2Session({
+        "LEXEDITOR_FFX_X2_ROOT": str(game_root),
+        "LEXEDITOR_FFX_X2_PROJECT": str(project_root),
+        "LEXEDITOR_FFX_X2_THEME_CACHE": str(theme_cache),
+    }) as session:
+        state = request_json(session.url + "api/gear-shops")
+        assert state["source"] == "archive"
+        assert state["archivePath"] == ARCHIVE_PATH
+        assert state["rows"][0]["gearIds"][1] == 0x0102
+
+        edit = {"id": 0x30, "slots": [{"slot": 1, "gearId": 0xCAFE}]}
+        saved = request_json(session.url + "api/gear-shops/save", {
+            "headerMd5": state["headerMd5"],
+            "baselineSha256": state["baselineSha256"],
+            "edits": [edit],
+        })
+        assert saved["saved"] == 1
+        assert saved["source"] == "project"
+        assert saved["rows"][0]["gearIds"][1] == 0xCAFE
+
+        target = project_root / "efl" / "x" / Path(*ARCHIVE_PATH.split("/"))
+        assert target.read_bytes() == apply_edits(source, [edit])
+        assert not (project_root / "efl" / "x" / Path(*raw_archive_path.split("/"))).exists()
+
+    assert session.wait_closed()
