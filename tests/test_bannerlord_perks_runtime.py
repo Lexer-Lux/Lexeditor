@@ -11,7 +11,7 @@ XP = r'''private static readonly List<XpSourceDefinition> Definitions = new List
 Source("Tailoring", "Light armor damage mitigated", 1f),
 Source("Riding", "Mounted movement second", 0.25f)};'''
 MODULE = '''<Module><Name value="Mod"/><Id value="Mod"/><Version value="v1"/><SingleplayerModule value="true"/>
-<DependedModules><DependedModule Id="Native"/><DependedModule Id="Harmony"/></DependedModules>
+<DependedModules><DependedModule Id="Native"/><DependedModule Id="Harmony" DependentVersion="v2"/></DependedModules>
 <SubModules><SubModule><Name value="Mod"/><DLLName value="Mod.dll"/><SubModuleClassType value="Mod.SubModule"/></SubModule></SubModules></Module>'''
 
 class BannerlordPerksRuntimeTests(unittest.TestCase):
@@ -36,7 +36,7 @@ class BannerlordPerksRuntimeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 save_xp_source_definitions(project,[{'index':0,'originalId':sources[0]['id'],'fields':{'defaultAmount':-1}}])
 
-    def test_deployment_status_runnable_and_missing_dependency(self):
+    def test_deployment_status_runnable_warns_on_version_mismatch_and_blocks_missing_dependency(self):
         from games.bannerlord.runtime_data import deployment_status
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);project=root/'project';game=root/'game';project.mkdir()
@@ -56,6 +56,11 @@ class BannerlordPerksRuntimeTests(unittest.TestCase):
             status=deployment_status(project,game)
             self.assertTrue(status['runnable']);self.assertTrue(status['inSync'])
             self.assertTrue(all(row['installed'] for row in status['dependencies']))
+            harmony=next(row for row in status['dependencies'] if row['id']=='Harmony')
+            self.assertEqual(harmony['requiredVersion'],'v2')
+            self.assertEqual(harmony['installedVersion'],'v1')
+            self.assertFalse(harmony['versionMatch'])
+            self.assertTrue(any('launcher would warn' in issue and 'Harmony' in issue for issue in status['issues']))
             self.assertEqual(status['runtimeOverrides']['effects']['keys'],1)
             (game/'Modules/Harmony/SubModule.xml').unlink()
             broken=deployment_status(project,game)
