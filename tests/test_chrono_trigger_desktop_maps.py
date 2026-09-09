@@ -31,12 +31,19 @@ class DesktopMapPreviewContractTests(unittest.TestCase):
         self.assertIn("main/sub-screen", module)
         self.assertNotIn("/api/save/", module)
 
+    def test_scene_view_exposes_proven_l3_raster(self):
+        module = MAP_PREVIEWS.read_text(encoding="utf-8")
+        self.assertIn('["raster3", "Rendered L3"]', module)
+        self.assertIn('["layer3", "L3 tile IDs"]', module)
+        self.assertIn('data.layers.layer3.enabled', module)
+
     def test_worlds_view_exposes_map_tab_without_claiming_l3(self):
         module = MAP_PREVIEWS.read_text(encoding="utf-8")
+        world_panel = module.split("function worldMapPanel", 1)[1].split("worldsView =", 1)[0]
         self.assertIn('["map", "Map"]', module)
-        self.assertIn('"Rendered L1"', module)
-        self.assertIn('"Rendered L2"', module)
-        self.assertNotIn('"Rendered L3"', module)
+        self.assertIn('"Rendered L1"', world_panel)
+        self.assertIn('"Rendered L2"', world_panel)
+        self.assertNotIn('"Rendered L3"', world_panel)
 
 
 if __name__ == "__main__":
