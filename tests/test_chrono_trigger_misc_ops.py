@@ -49,8 +49,9 @@ def command(opcode: int, argument: int) -> dict:
 
 class MiscOpTests(unittest.TestCase):
     def test_selected_misc_commands_have_named_schemas(self):
-        self.assertEqual(MISC_OPCODES, frozenset({0x29, 0x82, 0xC8}))
+        self.assertEqual(MISC_OPCODES, frozenset({0x29, 0x81, 0x82, 0xC8}))
         self.assertEqual(editor_schema(command(0x29, 0x85))["values"], {"asciiIndex": 5})
+        self.assertEqual(editor_schema(command(0x81, 0x03))["values"], {"pcId": 3})
         self.assertEqual(editor_schema(command(0x82, 0x44))["values"], {"npcId": 0x44})
         self.assertEqual(editor_schema(command(0xC8, 0xC2))["values"], {"dialogId": 0xC2})
 
@@ -72,9 +73,15 @@ class MiscOpTests(unittest.TestCase):
             save_event_fields(store, 1, 0, 0, 0, sha256(original), {"asciiIndex": 128})
         self.assertIsNone(store.overlay)
 
-    def test_npc_and_special_dialog_are_raw_one_byte_operands(self):
+    def test_pc_npc_and_special_dialog_are_raw_one_byte_operands(self):
+        self.assertEqual(misc_semantics(command(0x81, 0x03))["summary"], "Load PC 3 (always)")
         self.assertEqual(misc_semantics(command(0x82, 0x44))["summary"], "Load NPC 68")
         self.assertEqual(misc_semantics(command(0xC8, 0xC2))["summary"], "Special dialog 0xC2 (raw)")
+
+        pc_original = event(bytes((0x81, 0x02, 0x00)))
+        pc_store = FakeStore(pc_original)
+        save_event_fields(pc_store, 1, 0, 0, 0, sha256(pc_original), {"pcId": 0x06})
+        self.assertEqual(pc_store.overlay[34], 0x06)
 
         npc_original = event(bytes((0x82, 0x11, 0x00)))
         npc_store = FakeStore(npc_original)
@@ -86,9 +93,8 @@ class MiscOpTests(unittest.TestCase):
         save_event_fields(dialog_store, 1, 0, 0, 0, sha256(dialog_original), {"dialogId": 0xC5})
         self.assertEqual(dialog_store.overlay[34], 0xC5)
 
-    def test_ambiguous_facing_result_neighbors_stay_unregistered(self):
-        self.assertIsNone(editor_schema({"opcode": 0x23, "argumentsHex": "08 10", "argumentBytes": 2}))
-        self.assertIsNone(editor_schema({"opcode": 0x24, "argumentsHex": "08 10", "argumentBytes": 2}))
+    def test_unproven_load_pc_party_opcode_stays_unregistered(self):
+        self.assertIsNone(editor_schema(command(0x80, 0x03)))
 
 
 if __name__ == "__main__":
