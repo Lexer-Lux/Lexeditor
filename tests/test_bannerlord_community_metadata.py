@@ -14,6 +14,9 @@ def write_module(
     version="v1.0.0",
     native_dependencies=(),
     community=(),
+    load_after=(),
+    optional_dependencies=(),
+    nested_optional_dependencies=(),
 ) -> Path:
     folder = game / "Modules" / module_id
     folder.mkdir(parents=True, exist_ok=True)
@@ -23,6 +26,8 @@ def write_module(
         dependency_lines.append(
             f'    <DependedModule Id="{dependency_id}"{optional_attribute} />'
         )
+    for dependency_id in nested_optional_dependencies:
+        dependency_lines.append(f'    <OptionalDependModule Id="{dependency_id}" />')
     native_xml = "\n".join(dependency_lines)
     community_xml = "\n".join(
         "    <DependedModuleMetadata "
@@ -41,6 +46,12 @@ def write_module(
         + " />"
         for row in community
     )
+    load_after_xml = "\n".join(
+        f'    <LoadAfterModule Id="{dependency_id}" />' for dependency_id in load_after
+    )
+    optional_xml = "\n".join(
+        f'    <{tag} Id="{dependency_id}" />' for tag, dependency_id in optional_dependencies
+    )
     (folder / "SubModule.xml").write_text(
         f'''<Module>
   <Name value="{module_id}" />
@@ -53,6 +64,12 @@ def write_module(
   <DependedModuleMetadatas>
 {community_xml}
   </DependedModuleMetadatas>
+  <LoadAfterModules>
+{load_after_xml}
+  </LoadAfterModules>
+  <OptionalDependModules>
+{optional_xml}
+  </OptionalDependModules>
 </Module>
 ''',
         encoding="utf-8",
@@ -91,7 +108,34 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
             self.assertTrue(rows[0]["optional"])
             self.assertFalse(rows[0]["incompatible"])
             self.assertEqual(rows[0]["version"], "v2.0.*")
+            self.assertEqual(rows[0]["origin"], "DependedModuleMetadatas")
             self.assertEqual(rows[0]["attributes"]["Future"], "keep")
+
+    def test_parser_normalizes_load_after_and_optional_launcher_tags_in_precedence_order(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            module = write_module(
+                root,
+                "Example",
+                community=[{"id": "Community", "order": "LoadBeforeThis"}],
+                load_after=("After",),
+                nested_optional_dependencies=("NestedOptional",),
+                optional_dependencies=(
+                    ("OptionalDependModule", "OptionalOne"),
+                    ("DependModule", "OptionalTwo"),
+                ),
+            )
+            rows = read_community_dependencies(module / "SubModule.xml")
+            self.assertEqual(
+                [(row["id"], row["order"], row["optional"], row["origin"]) for row in rows],
+                [
+                    ("Community", "LoadBeforeThis", False, "DependedModuleMetadatas"),
+                    ("After", "LoadAfterThis", False, "LoadAfterModules"),
+                    ("NestedOptional", "", True, "DependedModules/OptionalDependModule"),
+                    ("OptionalOne", "", True, "OptionalDependModules/OptionalDependModule"),
+                    ("OptionalTwo", "", True, "OptionalDependModules/DependModule"),
+                ],
+            )
 
     def test_community_version_rules_use_minimums_wildcards_and_ranges(self):
         self.assertTrue(community_version_matches("v2.1.*", "v2.1.9.4"))
@@ -127,6 +171,15 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
             workspace = write_workspace(root, "Selected")
             self.assertEqual(module_load_order(game, workspace), ["Selected", "AfterLibrary"])
 
+    def test_legacy_load_after_modules_is_required_and_orders_dependency_after(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            write_module(game, "AfterLibrary")
+            write_module(game, "Selected", load_after=("AfterLibrary",))
+            workspace = write_workspace(root, "Selected")
+            self.assertEqual(module_load_order(game, workspace), ["Selected", "AfterLibrary"])
+
     def test_optional_community_dependency_is_not_auto_enabled(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
@@ -140,6 +193,20 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
                     "order": "LoadBeforeThis",
                     "optional": True,
                 }],
+            )
+            workspace = write_workspace(root, "Selected")
+            self.assertEqual(module_load_order(game, workspace), ["Selected"])
+
+    def test_optional_launcher_tag_is_not_auto_enabled_and_overrides_duplicate_native_requiredness(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            write_module(game, "OptionalLibrary")
+            write_module(
+                game,
+                "Selected",
+                native_dependencies=(("OptionalLibrary", False),),
+                optional_dependencies=(("DependModule", "OptionalLibrary"),),
             )
             workspace = write_workspace(root, "Selected")
             self.assertEqual(module_load_order(game, workspace), ["Selected"])
