@@ -8,15 +8,25 @@ from games.chrono_trigger.inventory import inventory_archive
 
 
 class IndexOnlyArchive:
-    def __init__(self, paths: list[str] | list[tuple[str, int]]):
+    def __init__(self, paths: list[str] | list[tuple[str, int]] | list[tuple[str, int, int]]):
         self.path = Path("resources.bin")
         self.entries = []
+        self._declared_sizes: dict[str, int] = {}
+        self.peeked: list[str] = []
         for value in paths:
             if isinstance(value, tuple):
-                path, stored_size = value
+                if len(value) == 3:
+                    path, stored_size, declared_size = value
+                    self._declared_sizes[path] = declared_size
+                else:
+                    path, stored_size = value
                 self.entries.append(SimpleNamespace(path=path, stored_size=stored_size))
             else:
                 self.entries.append(SimpleNamespace(path=value))
+
+    def declared_payload_size(self, entry) -> int:
+        self.peeked.append(entry.path)
+        return self._declared_sizes[entry.path]
 
     def read(self, _path: str):
         raise AssertionError("inventory must not decompress resource payloads")
@@ -36,12 +46,15 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(payload["resourceCount"], 6)
         self.assertEqual(payload["topLevel"]["Game"], 5)
         self.assertEqual(payload["extensions"][".dat"], 3)
+        self.assertFalse(payload["peekDeclaredSizes"])
+        self.assertEqual(archive.peeked, [])
         enemy = payload["candidates"]["enemy"]
         self.assertEqual(enemy["samples"][0]["path"], "Game/battle/enemy/Enemy_0001.dat")
         self.assertGreaterEqual(enemy["samples"][0]["score"], 4)
         self.assertEqual(enemy["directoryClusters"][0], {"path": "Game/battle/enemy", "count": 1})
         self.assertEqual(enemy["extensionClusters"][0], {"extension": ".dat", "count": 1})
         self.assertEqual(enemy["storedSizeClusters"], [])
+        self.assertEqual(enemy["declaredSizeClusters"], [])
         self.assertGreaterEqual(payload["candidates"]["item"]["matchCount"], 2)
         self.assertIn("ARC1-index-only", payload["method"])
         self.assertIn("stored sizes", payload["method"])
@@ -71,6 +84,41 @@ class InventoryTests(unittest.TestCase):
         ])
         self.assertEqual(enemy["samples"][0]["storedSize"], 80)
         self.assertEqual(enemy["directoryClusters"][0], {"path": "Game/enemy", "count": 3})
+        self.assertEqual(archive.peeked, [])
+
+    def test_declared_size_peek_clusters_four_byte_header_metadata(self):
+        archive = IndexOnlyArchive([
+            ("Game/enemy/Enemy_0001.dat", 40, 128),
+            ("Game/enemy/Enemy_0002.dat", 42, 128),
+            ("Game/enemy/Enemy_0003.dat", 50, 160),
+            ("Game/common/not_related.dat", 20, 999),
+        ])
+        payload = inventory_archive(archive, sample_limit=10, peek_declared_sizes=True)
+        enemy = payload["candidates"]["enemy"]
+        self.assertTrue(payload["peekDeclaredSizes"])
+        self.assertEqual(enemy["declaredSizeClusters"], [
+            {"declaredSize": 128, "count": 2},
+            {"declaredSize": 160, "count": 1},
+        ])
+        self.assertEqual(enemy["samples"][0]["declaredSize"], 128)
+        self.assertEqual(set(archive.peeked), {
+            "Game/enemy/Enemy_0001.dat",
+            "Game/enemy/Enemy_0002.dat",
+            "Game/enemy/Enemy_0003.dat",
+        })
+        self.assertIn("four-byte decoded entry-size prefixes", payload["method"])
+        self.assertIn("no candidate gzip payloads were decompressed", payload["method"])
+
+    def test_declared_size_peek_records_per_entry_errors_without_aborting(self):
+        archive = IndexOnlyArchive([
+            ("Game/enemy/Enemy_0001.dat", 40, 128),
+            ("Game/enemy/Enemy_0002.dat", 42),
+        ])
+        payload = inventory_archive(archive, peek_declared_sizes=True)
+        enemy = payload["candidates"]["enemy"]
+        bad = next(row for row in enemy["samples"] if row["path"].endswith("0002.dat"))
+        self.assertIn("declaredSizeError", bad)
+        self.assertEqual(enemy["declaredSizeClusters"], [{"declaredSize": 128, "count": 1}])
 
     def test_cluster_order_is_deterministic_on_ties(self):
         archive = IndexOnlyArchive([
