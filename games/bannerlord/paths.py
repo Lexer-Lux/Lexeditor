@@ -43,6 +43,24 @@ def contained_project_path(
     return target
 
 
+def clear_write_helper(path: Path) -> None:
+    """Remove a stale backup/temp entry without following file redirections.
+
+    Bannerlord editors intentionally reuse predictable ``.lexeditor.bak`` and
+    ``.lexeditor.tmp`` sibling names. A stale symlink or hard link at one of
+    those names must be detached before writing so the helper write cannot
+    mutate a file outside the contained destination. Directory-like entries
+    are rejected rather than traversed or recursively removed.
+    """
+    path = Path(path)
+    if path.is_dir():
+        raise ValueError(f"Bannerlord write helper path is a directory: {path}")
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as error:
+        raise ValueError(f"Could not safely clear Bannerlord write helper path: {path}") from error
+
+
 def modules_root(root: Path | None = None) -> Path:
     return (root or game_root()) / "Modules"
 
