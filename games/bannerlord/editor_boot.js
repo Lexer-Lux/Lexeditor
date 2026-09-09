@@ -68,6 +68,18 @@
         const result=await post("/api/settings-defaults/save",{edits});
         state.mcmDefaults=result;state.savedMcmDefaults=clone(result);
       }
+      if(runtimeDirty()){
+        const beforeEffects=Object.fromEntries((state.savedRuntimeOverrides.effects||[]).map(row=>[row.id,row]));
+        const beforeXp=Object.fromEntries((state.savedRuntimeOverrides.xpSources||[]).map(row=>[row.id,row]));
+        const effectEdits=(state.runtimeOverrides.effects||[]).filter(row=>{
+          const old=beforeEffects[row.id];return !old||row.overridden!==old.overridden||Number(row.low)!==Number(old.low)||Number(row.high)!==Number(old.high);
+        }).map(row=>({id:row.id,overridden:!!row.overridden,low:Number(row.low),high:Number(row.high)}));
+        const xpEdits=(state.runtimeOverrides.xpSources||[]).filter(row=>{
+          const old=beforeXp[row.id];return !old||row.overridden!==old.overridden||Number(row.amount)!==Number(old.amount);
+        }).map(row=>({id:row.id,overridden:!!row.overridden,amount:Number(row.amount)}));
+        const result=await post("/api/runtime-overrides/save",{effects:effectEdits,xpSources:xpEdits});
+        state.runtimeOverrides=result;state.savedRuntimeOverrides=clone(result);
+      }
       if(sourceDirty()){
         const result=await post("/api/source/save",{path:state.source.path,text:state.source.text});
         state.source=result;state.savedSourceText=result.text;
@@ -89,14 +101,14 @@
       {id:"submodules",label:"Submodules"},{id:"xmls",label:"XML"},
       {id:"skills",label:"Skills"},{id:"effects",label:"Effects"},
       {id:"perks",label:"Perks"},{id:"xp",label:"XP"},{id:"settings",label:"Settings"},
-      {id:"build",label:"Build"},{id:"deployment",label:"Deployment"}
+      {id:"runtime",label:"Runtime"},{id:"build",label:"Build"},{id:"deployment",label:"Deployment"}
     ],
     activeTab:()=>state.tab,navigate,
     help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the Bannerlord Data Map",
     dirtyCount,readonly:()=>false,save
   });
 
-  Promise.all([api("/api/module"),api("/api/project"),api("/api/skills"),api("/api/effects"),api("/api/perks"),api("/api/xp-sources"),api("/api/settings-defaults"),api("/api/deployment"),api("/api/datamap")]).then(([module,project,skills,effects,perks,xpSources,mcmDefaults,deployment,datamap])=>{
+  Promise.all([api("/api/module"),api("/api/project"),api("/api/skills"),api("/api/effects"),api("/api/perks"),api("/api/xp-sources"),api("/api/settings-defaults"),api("/api/runtime-overrides"),api("/api/deployment"),api("/api/datamap")]).then(([module,project,skills,effects,perks,xpSources,mcmDefaults,runtimeOverrides,deployment,datamap])=>{
     state.module=module;state.savedModule=clone(module);
     state.project=project;state.savedProject=clone(project);
     state.skills=skills;state.savedSkills=clone(skills);
@@ -104,6 +116,7 @@
     state.perks=perks;state.savedPerks=clone(perks);
     state.xpSources=xpSources;state.savedXpSources=clone(xpSources);
     state.mcmDefaults=mcmDefaults;state.savedMcmDefaults=clone(mcmDefaults);
+    state.runtimeOverrides=runtimeOverrides;state.savedRuntimeOverrides=clone(runtimeOverrides);
     state.deployment=deployment;
     state.datamap=datamap;render();
   }).catch(error=>{
