@@ -11,8 +11,7 @@
     :root{--lex-accent:#55c7d9;--lex-accent-text:#08262c}
     body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
     main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
-    .pal-layout{height:100%;min-height:0}
-    .pal-detail{height:100%;min-height:0}
+    .pal-layout,.pal-detail,.pal-schema-root{height:100%;min-height:0}
     .pal-rules{display:grid;gap:10px}
     .pal-rule{padding:10px;border:1px solid var(--lex-border);background:var(--lex-panel)}
     .pal-rule-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-weight:700}
@@ -22,6 +21,19 @@
     .pal-actions button.primary{border-color:var(--lex-accent);background:var(--lex-accent);color:var(--lex-accent-text)}
     .pal-issue{padding:7px 9px;border:1px solid var(--lex-border);background:var(--lex-panel)}
     .pal-issue.error{font-weight:700}
+    .pal-schema-root{display:flex;flex-direction:column;gap:var(--lex-panel-gap)}
+    .pal-patch-toolbar{display:flex;align-items:center;gap:10px;min-height:38px;padding:6px 10px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .pal-patch-toolbar select{min-width:260px;max-width:60%;flex:0 1 auto}
+    .pal-patch-label{font-weight:800;letter-spacing:.04em}
+    .pal-schema-columns{display:grid;grid-template-columns:minmax(340px,44%) minmax(360px,1fr);gap:var(--lex-panel-gap);min-height:0;flex:1}
+    .pal-patch-list{min-height:0;overflow:auto;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .pal-patch-row{display:grid;grid-template-columns:minmax(120px,1.2fr) minmax(90px,1fr) minmax(120px,1.2fr) minmax(80px,.8fr);gap:8px;width:100%;padding:7px 9px;text-align:left;color:var(--lex-text);border:0;border-bottom:1px solid var(--lex-border);background:transparent;cursor:pointer;font:inherit}
+    .pal-patch-row:hover,.pal-patch-row.selected{background:var(--lex-hover)}
+    .pal-patch-row.selected{box-shadow:inset 3px 0 var(--lex-accent)}
+    .pal-patch-table-name,.pal-patch-field-name{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .pal-patch-row-name,.pal-patch-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .pal-empty{padding:16px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    @media(max-width:900px){.pal-schema-columns{grid-template-columns:1fr;grid-template-rows:minmax(220px,42%) minmax(300px,1fr)}}
   </style>
 </head>
 <body>
