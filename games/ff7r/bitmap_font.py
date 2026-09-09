@@ -53,10 +53,8 @@ def _glyph(stream: io.BytesIO) -> dict:
     if len(raw) != 18:
         raise ValueError("Truncated FF7R font glyph record")
     codepoint, page, x, y, width, height, x_offset, y_offset, x_advance = struct.unpack(
-        "<7H2hH", raw
+        "<6H2hH", raw
     )
-    if codepoint > 0x10FFFF:
-        raise ValueError("Invalid FF7R font codepoint")
     if x + width > ATLAS_WIDTH or y + height > ATLAS_HEIGHT:
         raise ValueError("FF7R font glyph falls outside the 2048x2048 atlas")
     return {
@@ -151,7 +149,7 @@ def decode_font_atlas_png(payload: bytes) -> bytes:
 
     # Imported lazily: normal FF7R parsing/smoke remains usable in minimal test
     # environments, while packaged Lexeditor already depends on texfury+Pillow.
-    from PIL import Image
+    from PIL import Image, ImageChops
     from texfury import BCFormat, Texture
 
     texture = Texture.from_raw(
@@ -170,10 +168,9 @@ def decode_font_atlas_png(payload: bytes) -> bytes:
 
     image = Image.frombytes("RGBA", (width, height), rgba)
     red, green, _blue, _alpha = image.split()
-    # The source is BC5: the font mask lives in the two stored channels.  Taking
-    # the stronger component preserves the game's fill/outline mask without
-    # inventing color; CSS/canvas supplies the editor's text color.
-    from PIL import ImageChops
+    # The source is BC5: the font mask lives in the two stored channels. Taking
+    # the stronger component preserves fill/outline coverage without inventing
+    # color; canvas supplies the editor's current text color.
     mask = ImageChops.lighter(red, green)
     white = Image.new("RGBA", image.size, (255, 255, 255, 0))
     white.putalpha(mask)
@@ -282,7 +279,12 @@ def ensure_installed_bitmap_font(game_root: Path, data_root: Path, cooked_paths:
     signature = _signature(game_root, glyph_path, atlas_path)
     cached = _cached_manifest(root, signature)
     if cached is not None:
-        return {**cached, "available": True, "atlasUrl": "/theme-assets/font-atlas.png", "message": "Decoded from the installed FF7R SystemFontNormal atlas."}
+        return {
+            **cached,
+            "available": True,
+            "atlasUrl": "/theme-assets/font-atlas.png",
+            "message": "Decoded from the installed FF7R SystemFontNormal atlas.",
+        }
 
     try:
         glyph = parse_glyph_uexp(_latest_payload(game_root, glyph_path))
