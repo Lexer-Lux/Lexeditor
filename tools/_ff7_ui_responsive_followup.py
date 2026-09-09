@@ -13,5 +13,5 @@ rendered=root/'tools/verify_ff7_rendered.py'
 tests=rendered.read_text(encoding='utf-8')
 old="get_by_role('tab',name='Growth curves',exact=True)"
 new="get_by_role('tab',name='Curves',exact=True)"
-if tests.count(old)!=2: raise SystemExit(f'Growth curves rendered assertion count {tests.count(old)}')
+if tests.count(old)!=3: raise SystemExit(f'Growth curves rendered assertion count {tests.count(old)}')
 rendered.write_text(tests.replace(old,new),encoding='utf-8')
