@@ -6,6 +6,7 @@ import struct
 
 import pytest
 
+from games.ffx_x2 import paths
 from games.ffx_x2.plugin import _write_fixture_vbf
 from games.ffx_x2.vbf import VBFError, extract_to, normalize_archive_path, read_entry, read_index
 
@@ -58,6 +59,17 @@ def test_extract_refuses_to_overwrite_project_edits(tmp_path: Path):
     target.write_bytes(b"edited")
     with pytest.raises(FileExistsError, match="contains edits"):
         extract_to(index, entry, target)
+
+
+def test_raw_vbf_names_map_to_fahrenheit_virtual_roots():
+    raw_x = "ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin"
+    raw_x2 = "ffx_ps2/ffx2/master/test.bin"
+    assert paths.efl_archive_path("x", raw_x) == f"FFX_Data/{raw_x}"
+    assert paths.efl_archive_path("x2", raw_x2) == f"FFX2_Data/{raw_x2}"
+    assert paths.efl_archive_path("x", f"FFX_Data/{raw_x}") == f"FFX_Data/{raw_x}"
+    assert paths.source_archive_candidates("x", f"FFX_Data/{raw_x}") == (
+        f"FFX_Data/{raw_x}", raw_x,
+    )
 
 
 @pytest.mark.parametrize("value", ["../escape.bin", "/absolute.bin", "C:/drive.bin", "a/../../b"])
