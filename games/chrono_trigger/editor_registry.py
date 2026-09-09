@@ -17,6 +17,7 @@ from .field_editors import (
     editor_schema as base_editor_schema,
     save_event_fields as save_base_event_fields,
 )
+from .jump_ops import apply_jump, decorate_jump_semantics, jump_field_specs, jump_values
 from .memory_ops import (
     apply_memory_op,
     decorate_memory_semantics,
@@ -55,8 +56,16 @@ def memory_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, memory_field_specs(command), memory_values(command))
 
 
+def jump_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
+
+
+_REGISTRY_BUILDERS = (comparison_editor_schema, memory_editor_schema, jump_editor_schema)
+_REGISTRY_APPLIERS = (apply_comparison, apply_memory_op, apply_jump)
+
+
 def editor_schema(command: dict) -> dict | None:
-    for builder in (comparison_editor_schema, memory_editor_schema):
+    for builder in _REGISTRY_BUILDERS:
         schema = builder(command)
         if schema is not None:
             return schema
@@ -66,11 +75,12 @@ def editor_schema(command: dict) -> dict | None:
 def decorate_event_editors(payload: dict) -> dict:
     decorate_comparison_semantics(payload)
     decorate_memory_semantics(payload)
+    decorate_jump_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
         for function in obj.get("functions", []):
             for command in function.get("commands", []):
-                for builder in (comparison_editor_schema, memory_editor_schema):
+                for builder in _REGISTRY_BUILDERS:
                     schema = builder(command)
                     if schema is not None:
                         command["editor"] = schema
@@ -95,7 +105,7 @@ def save_event_fields(store: OverlayStore, event_id: int, object_id: int, functi
     if not isinstance(values, dict):
         raise ValueError("Event field changes must be an object")
     command = _command(store, event_id, object_id, function_id, command_index)
-    for apply in (apply_comparison, apply_memory_op):
+    for apply in _REGISTRY_APPLIERS:
         replacement = apply(command, values)
         if replacement is not None:
             return save_event_arguments(
