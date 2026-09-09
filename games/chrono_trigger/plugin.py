@@ -193,9 +193,12 @@ def smoke() -> list[str]:
                     raise RuntimeError("Chrono Trigger CTP members do not match project resources")
 
             mapped = request_json(session.url + "api/datamap")
-            map_rows = {row["filename"]: row for row in mapped.get("rows", [])}
-            if map_rows.get("Game/field/MapTable/MapTable_*.dat", {}).get("status") != "integrated":
-                raise RuntimeError("Chrono Trigger Data Map did not report structural map coverage")
+            map_row = next((
+                row for row in mapped.get("rows", [])
+                if str(row.get("filename", "")).startswith("Game/field/MapTable/MapTable_*.dat")
+            ), None)
+            if not map_row or map_row.get("status") != "integrated" or "raster" not in str(map_row.get("coverage", "")):
+                raise RuntimeError("Chrono Trigger Data Map did not report current scene-map coverage")
 
             deployment = request_json(session.url + "api/deployment")
             if not deployment["ctext"]["installed"] or not deployment["ctext"]["configValid"]:
@@ -223,7 +226,7 @@ def smoke() -> list[str]:
         "localized labels, bounded resource preview, scene MapTable and field-event commands decoded",
         "message and scene edits saved to loose overlays while Vanilla stayed unchanged",
         "project change inventory and deterministic CTP export verified",
-        "Data Map reflected structural map coverage",
+        "Data Map reflected current scene-map structural/raster coverage",
         "CTExt preflight/deployment, config backup and load-order activation verified",
         "host-owned child service stopped cleanly",
     ]
