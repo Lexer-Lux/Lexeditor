@@ -2,8 +2,10 @@
 """Run the FF7R #429 marker-slot -> cooked-widget correlation on an install.
 
 This command is read-only. It scans existing cooked/native evidence through the
-main Better Lock-on probe, then joins decoded BattleLockonMarkerXXWidget
-SoftClass package paths to ranked cooked assets by exact normalized package path.
+main Better Lock-on probe, joins decoded BattleLockonMarkerXXWidget SoftClass
+package paths to ranked cooked assets by exact normalized package path, and
+reports whether the fail-closed red-reticle write gate can produce three exact
+LinearColor rewrites. It never performs those writes itself.
 """
 
 from __future__ import annotations
@@ -19,7 +21,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from games.ff7r.lockon_probe import probe_better_lockon_sources  # noqa: E402
-from games.ff7r.lockon_slot_asset_probe import correlate_marker_slots_to_assets  # noqa: E402
+from games.ff7r.lockon_slot_asset_probe import (  # noqa: E402
+    correlate_marker_slots_to_assets,
+    plan_red_reticle_rewrites,
+)
 
 
 def build_report(game_root: str | Path) -> dict:
@@ -28,16 +33,19 @@ def build_report(game_root: str | Path) -> dict:
         source.get("serializedMarkerSlotResearch", {}),
         source.get("candidates", ()),
     )
+    red_plan = plan_red_reticle_rewrites(correlation)
     return {
-        "implementationReady": False,
+        "implementationReady": bool(red_plan.get("implementationReady", False)),
         "gameRoot": str(Path(game_root).expanduser().resolve()),
         "markerSlotResearch": source.get("serializedMarkerSlotResearch", {}),
         "slotAssetCorrelation": correlation,
+        "redReticleWritePlan": red_plan,
         "sourceBlockers": source.get("blockers", []),
         "scanErrors": source.get("scanErrors", []),
         "notes": [
             "The command performs no writes to the game installation.",
-            "A unique exact package-path correlation narrows a numbered marker slot to a cooked widget asset but does not establish marker-type or active-blue-state semantics.",
+            "A red-reticle write plan is emitted only when all three numbered dedicated lock-on marker widgets resolve uniquely and each has exactly one blue-dominant serialized LinearColor owner.",
+            "All three numbered marker widgets are targeted together, so Default/Wimp/Libra slot ordering is not guessed or required for the color change.",
         ],
     }
 
@@ -45,8 +53,9 @@ def build_report(game_root: str | Path) -> dict:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Read-only FF7R #429 research: correlate decoded numbered lock-on marker "
-            "SoftClass paths with cooked widget candidates."
+            "Read-only FF7R #429 validation: correlate numbered lock-on marker "
+            "SoftClass paths with cooked widget candidates and report the exact "
+            "red-reticle write plan when the installed evidence is sufficient."
         )
     )
     parser.add_argument("game_root", type=Path, help="FF7 Remake Intergrade installation root")

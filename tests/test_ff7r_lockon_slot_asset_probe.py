@@ -1,6 +1,7 @@
 from games.ff7r.lockon_slot_asset_probe import (
     canonical_cooked_package_path,
     correlate_marker_slots_to_assets,
+    plan_red_reticle_rewrites,
 )
 
 
@@ -23,10 +24,13 @@ def _slot_research(*paths):
     }
 
 
-def _candidate(asset, *, linear=False, value=None):
-    refs = []
-    if linear:
-        refs.append({
+def _candidate(asset, *, linear=False, value=None, refs=None, dedicated=True):
+    linear_refs = []
+    if refs is not None:
+        linear_refs = list(refs)
+        linear = bool(linear_refs)
+    elif linear:
+        linear_refs.append({
             "name": "ColorAndOpacity",
             "objectName": "BattleLockonMarker",
             "className": "EndBattleLockonMarkerIcon",
@@ -39,12 +43,23 @@ def _candidate(asset, *, linear=False, value=None):
     return {
         "asset": asset,
         "score": 100,
-        "containsDedicatedWidgetAnchor": True,
-        "resolvedDedicatedOwnerEvidence": True,
+        "containsDedicatedWidgetAnchor": dedicated,
+        "resolvedDedicatedOwnerEvidence": dedicated,
         "serializedTintPropertyEvidence": linear,
         "serializedTintValueLayoutEvidence": linear,
         "serializedLinearColorTintValueEvidence": linear,
-        "serializedLinearColorTintRefs": refs,
+        "serializedLinearColorTintRefs": linear_refs,
+    }
+
+
+def _blue(value, *, name="ColorAndOpacity"):
+    return {
+        "name": name,
+        "objectName": "BattleLockonMarker",
+        "className": "EndBattleLockonMarkerIcon",
+        "valueOffset": 49,
+        "valueEndOffset": 65,
+        "linearColorValue": value,
     }
 
 
@@ -161,3 +176,73 @@ def test_nonunique_upstream_slot_value_cannot_be_recovered_by_candidate_guessing
     assert result["correlatedSlotCount"] == 2
     assert result["unresolvedSlotCount"] == 1
     assert result["allSlotsUniquelyCorrelated"] is False
+
+
+def test_red_reticle_plan_rewrites_all_three_unique_blue_dedicated_markers_without_slot_type_guessing():
+    research = _slot_research(
+        "/Game/UI/WBP_Marker0.WBP_Marker0_C",
+        "/Game/UI/WBP_Marker1.WBP_Marker1_C",
+        "/Game/UI/WBP_Marker2.WBP_Marker2_C",
+    )
+    candidates = [
+        _candidate("UI/WBP_Marker0", refs=[_blue({"r": 0.05, "g": 0.25, "b": 1.0, "a": 1.0})]),
+        _candidate("UI/WBP_Marker1", refs=[_blue({"r": 0.10, "g": 0.40, "b": 1.25, "a": 0.8})]),
+        _candidate("UI/WBP_Marker2", refs=[_blue({"r": 0.00, "g": 0.10, "b": 0.75, "a": 0.5})]),
+    ]
+    correlation = correlate_marker_slots_to_assets(research, candidates)
+
+    plan = plan_red_reticle_rewrites(correlation)
+
+    assert plan["implementationReady"] is True
+    assert plan["redReticleOwnerValidated"] is True
+    assert plan["rewriteAllNumberedMarkerSlots"] is True
+    assert plan["slotToMarkerTypeMappingRequired"] is False
+    assert len(plan["rewritePlan"]) == 3
+    assert [row["slot"] for row in plan["rewritePlan"]] == list(SLOTS)
+    assert plan["rewritePlan"][0]["replacementRgba"] == [1.0, 0.0, 0.0, 1.0]
+    assert plan["rewritePlan"][1]["replacementRgba"] == [1.25, 0.0, 0.0, 0.8]
+    assert plan["rewritePlan"][2]["replacementRgba"] == [0.75, 0.0, 0.0, 0.5]
+
+
+def test_red_reticle_plan_rejects_white_or_ambiguous_blue_colors():
+    research = _slot_research(
+        "/Game/UI/WBP_Marker0.WBP_Marker0_C",
+        "/Game/UI/WBP_Marker1.WBP_Marker1_C",
+        "/Game/UI/WBP_Marker2.WBP_Marker2_C",
+    )
+    candidates = [
+        _candidate("UI/WBP_Marker0", refs=[_blue({"r": 0.05, "g": 0.25, "b": 1.0, "a": 1.0})]),
+        _candidate("UI/WBP_Marker1", refs=[_blue({"r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0})]),
+        _candidate("UI/WBP_Marker2", refs=[
+            _blue({"r": 0.0, "g": 0.1, "b": 0.8, "a": 1.0}),
+            _blue({"r": 0.1, "g": 0.2, "b": 0.9, "a": 1.0}, name="TintColor"),
+        ]),
+    ]
+    correlation = correlate_marker_slots_to_assets(research, candidates)
+
+    plan = plan_red_reticle_rewrites(correlation)
+
+    assert plan["implementationReady"] is False
+    assert plan["rewritePlan"] == []
+    assert "BattleLockonMarker01Widget:expected-one-blue-linearcolor-found-0" in plan["blockers"]
+    assert "BattleLockonMarker02Widget:expected-one-blue-linearcolor-found-2" in plan["blockers"]
+
+
+def test_red_reticle_plan_rejects_generic_or_shared_assets_even_if_blue():
+    research = _slot_research(
+        "/Game/UI/WBP_Marker0.WBP_Marker0_C",
+        "/Game/UI/WBP_Marker0.WBP_Marker0_C",
+        "/Game/UI/WBP_Marker2.WBP_Marker2_C",
+    )
+    candidates = [
+        _candidate("UI/WBP_Marker0", refs=[_blue({"r": 0.0, "g": 0.1, "b": 1.0, "a": 1.0})]),
+        _candidate("UI/WBP_Marker2", refs=[_blue({"r": 0.0, "g": 0.1, "b": 1.0, "a": 1.0})], dedicated=False),
+    ]
+    correlation = correlate_marker_slots_to_assets(research, candidates)
+
+    plan = plan_red_reticle_rewrites(correlation)
+
+    assert plan["implementationReady"] is False
+    assert plan["rewritePlan"] == []
+    assert any("duplicate-marker-asset" in blocker for blocker in plan["blockers"])
+    assert any("dedicated-lockon-anchor-unproven" in blocker for blocker in plan["blockers"])

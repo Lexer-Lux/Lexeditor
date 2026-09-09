@@ -85,6 +85,10 @@ def _image(*, collision=False):
     _call(data, text, 0x140C, max_write_target)
     _call(data, text, 0x1414, 0x1300)
 
+    # PE .pdata entries are sorted by function RVA. PEImage.runtime_function_for_rva
+    # intentionally uses binary search, so the synthetic fixture must preserve that
+    # real-format invariant too.
+    functions.sort(key=lambda row: row.begin_rva)
     return PEImage(
         data=bytes(data),
         machine=0x8664,
