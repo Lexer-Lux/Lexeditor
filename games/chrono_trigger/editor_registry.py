@@ -32,6 +32,12 @@ from .movement_ops import (
     movement_field_specs,
     movement_values,
 )
+from .object_ops import (
+    apply_object_op,
+    decorate_object_semantics,
+    object_field_specs,
+    object_values,
+)
 
 
 def _schema_from_specs(command: dict, specs: list[dict] | None, values: dict | None) -> dict | None:
@@ -76,6 +82,10 @@ def call_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, call_field_specs(command), call_values(command))
 
 
+def object_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, object_field_specs(command), object_values(command))
+
+
 def jump_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
 
@@ -86,6 +96,7 @@ _REGISTRY_BUILDERS = (
     bit_editor_schema,
     movement_editor_schema,
     call_editor_schema,
+    object_editor_schema,
     jump_editor_schema,
 )
 _REGISTRY_APPLIERS = (
@@ -94,6 +105,7 @@ _REGISTRY_APPLIERS = (
     apply_bit_op,
     apply_movement_op,
     apply_call_op,
+    apply_object_op,
     apply_jump,
 )
 
@@ -112,6 +124,7 @@ def decorate_event_editors(payload: dict) -> dict:
     decorate_bit_semantics(payload)
     decorate_movement_semantics(payload)
     decorate_call_semantics(payload)
+    decorate_object_semantics(payload)
     decorate_jump_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
