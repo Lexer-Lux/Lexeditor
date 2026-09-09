@@ -72,7 +72,20 @@ The proved record length is `0x22` bytes:
 
 Lexeditor writes only explicitly changed inventory slots and preserves the leading rate field byte-for-byte.
 
-Both structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
+### `arms_shop.bin` gear inventories
+
+Integrated path:
+
+`FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/arms_shop.bin`
+
+This table uses the same proved `0x22`-byte shop record shape:
+
+- `+0x00..+0x01`: legacy/unused rate field (`u16`), displayed read-only.
+- `+0x02..+0x21`: sixteen gear indices (`u16`, little-endian), one per shop slot.
+
+Item and gear shops share one validated binary implementation; their public APIs remain semantic (`itemIds` versus `gearIds`). Lexeditor writes only explicitly changed slots and preserves the leading rate field byte-for-byte.
+
+All three structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
 
 ## Project and loader boundary
 
@@ -106,7 +119,8 @@ Integrated:
 - Safe extraction to a project overlay without overwriting edited project data.
 - Common FFX fixed-record table validation.
 - Structured FFX `takara.bin` treasure reward editing.
-- Structured FFX `item_shop.bin` 16-slot inventory editing.
+- Structured FFX `item_shop.bin` 16-slot item/command inventory editing.
+- Structured FFX `arms_shop.bin` 16-slot gear inventory editing.
 - Reversible file-only Fahrenheit deployment mechanics.
 - Private installed-game cosmetic theme extraction/cache with safe fallback.
 - Evidence-based Data Map.
