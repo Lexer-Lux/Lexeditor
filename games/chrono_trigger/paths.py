@@ -24,7 +24,7 @@ def check() -> list[str]:
     """Check the plugin-owned implementation files, not the user's install."""
     problems: list[str] = []
     for relative in (
-        "editor.html", "plugin.py", "server.py", "paths.py", "resources.py",
+        "editor.html", "plugin.py", "server.py", "paths.py", "resources.py", "coverage.py",
         "data.py", "events.py", "scene_tables.py", "worlds.py", "world_tables.py",
     ):
         target = PLUGIN_ROOT / relative
