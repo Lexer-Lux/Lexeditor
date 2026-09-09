@@ -11,6 +11,7 @@ import subprocess
 import threading
 
 from .community_metadata import read_community_dependencies
+from .dependency_relations import effective_incompatible_relations, effective_load_relations
 from .module_data import is_singleplayer_module, read_submodule
 
 
@@ -125,61 +126,13 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
         return community_cache[module_id]
 
     def dependencies_to_load(module_id: str) -> list[dict]:
-        """Mirror ModuleManager DependenciesToLoadDistinct first-ID-wins precedence."""
-        result: list[dict] = []
-        seen: set[str] = set()
-
-        for row in community(module_id):
-            dependency_id = str(row.get("id") or "").strip()
-            if not dependency_id or row.get("incompatible") or dependency_id in seen:
-                continue
-            seen.add(dependency_id)
-            result.append(row)
-
-        for row in metadata(module_id).get("dependencies", []):
-            dependency_id = str(row.get("id") or "").strip()
-            if not dependency_id or dependency_id in seen:
-                continue
-            seen.add(dependency_id)
-            result.append({
-                "id": dependency_id,
-                "order": "LoadBeforeThis",
-                "optional": bool(row.get("optional")),
-                "incompatible": False,
-                "source": "native",
-            })
-
-        for row in metadata(module_id).get("modulesToLoadAfterThis", []):
-            dependency_id = str(row.get("id") or "").strip()
-            if not dependency_id or dependency_id in seen:
-                continue
-            seen.add(dependency_id)
-            result.append({
-                "id": dependency_id,
-                "order": "LoadAfterThis",
-                "optional": True,
-                "incompatible": False,
-                "source": "native-load-after",
-            })
-        return result
+        return effective_load_relations(metadata(module_id), community(module_id))
 
     def incompatible_relations(module_id: str) -> list[str]:
-        """Mirror DependenciesIncompatiblesDistinct first-ID-wins precedence."""
-        result: list[str] = []
-        seen: set[str] = set()
-        for row in community(module_id):
-            dependency_id = str(row.get("id") or "").strip()
-            if not dependency_id or not row.get("incompatible") or dependency_id in seen:
-                continue
-            seen.add(dependency_id)
-            result.append(dependency_id)
-        for row in metadata(module_id).get("incompatibleModules", []):
-            dependency_id = str(row.get("id") or "").strip()
-            if not dependency_id or dependency_id in seen:
-                continue
-            seen.add(dependency_id)
-            result.append(dependency_id)
-        return result
+        return [
+            row["id"]
+            for row in effective_incompatible_relations(metadata(module_id), community(module_id))
+        ]
 
     included: set[str] = set()
     preference: list[str] = []

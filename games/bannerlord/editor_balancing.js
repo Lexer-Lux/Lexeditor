@@ -149,12 +149,14 @@
     else if(row.order==="LoadAfterThis")details.push("loads after this");
     if(row.optional)details.push("optional");
     if(row.incompatible)details.push("incompatible");
+    if(row.effective===false)details.push(`SHADOWED by ${row.shadowedByOrigin||"earlier relation"}`);
     if(row.overriddenByCommunityMetadata)details.push("native row overridden by extended metadata");
     if(row.requiredVersion)details.push(`requires ${row.requiredVersion}`);
     if(row.installedVersion)details.push(`installed ${row.installedVersion}`);
     if(row.versionMatch===true)details.push("version OK");
     else if(row.versionMatch===false)details.push("VERSION MISMATCH");
-    return `${row.installed?"✓":"✗"} ${row.id} — ${details.join(" · ")}`;
+    const marker=row.effective===false?"↳":(row.installed?"✓":"✗");
+    return `${marker} ${row.id} — ${details.join(" · ")}`;
   }
 
   function renderDeployment(){

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import paths
 from .community_metadata import community_version_matches, read_community_dependencies
+from .dependency_relations import incompatible_relation_rows, load_relation_rows
 from .game_launch import module_load_order
 from .module_data import is_singleplayer_module, read_submodule
 
@@ -186,28 +187,33 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
     missing_required = []
     version_mismatches = []
     community_version_mismatches = []
-    community_dependency_ids = {
-        str(row.get("id") or "").strip().casefold()
-        for row in community_dependencies
-        if not row.get("incompatible") and str(row.get("id") or "").strip()
-    }
-    for dependency in module.get("dependencies", []):
-        dep_id = str(dependency.get("id") or "")
+
+    for relation in load_relation_rows(module, community_dependencies):
+        dep_id = str(relation.get("id") or "")
         found = installed.get(dep_id.casefold())
-        optional = bool(dependency.get("optional"))
-        overridden = dep_id.casefold() in community_dependency_ids
-        required_version = str(dependency.get("dependentVersion") or "").strip()
+        optional = bool(relation.get("optional"))
+        effective = bool(relation.get("effective"))
+        required_version = str(relation.get("version") or "").strip()
         installed_version = str(found.get("version", "") or "").strip() if found else ""
         version_match = None
-        if not found and not optional and not overridden:
+        if effective and not found and not optional:
             missing_required.append(dep_id)
-        if found and required_version and not overridden:
-            version_match = _dependency_version_matches(required_version, installed_version)
-            if not version_match:
-                version_mismatches.append(
-                    f"{dep_id} requires {required_version}, installed "
-                    f"{installed_version or '(no version declared)'}"
-                )
+        if effective and found and required_version and not optional:
+            if relation.get("origin") == "DependedModules":
+                version_match = _dependency_version_matches(required_version, installed_version)
+                if not version_match:
+                    version_mismatches.append(
+                        f"{dep_id} requires {required_version}, installed "
+                        f"{installed_version or '(no version declared)'}"
+                    )
+            else:
+                version_match = community_version_matches(required_version, installed_version)
+                if version_match is False:
+                    community_version_mismatches.append(
+                        f"{dep_id} requires {required_version}, installed "
+                        f"{installed_version or '(no version declared)'}"
+                    )
+        shadowed_by = str(relation.get("shadowedByOrigin") or "")
         dependency_rows.append(
             {
                 "id": dep_id,
@@ -217,48 +223,41 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
                 "installedVersion": installed_version,
                 "versionMatch": version_match,
                 "path": found.get("path", "") if found else "",
-                "source": "native",
-                "origin": "DependedModules",
-                "order": "LoadBeforeThis",
+                "source": relation.get("source") or "extended",
+                "origin": relation.get("origin") or "metadata",
+                "order": relation.get("order") or "",
                 "incompatible": False,
-                "overriddenByCommunityMetadata": overridden,
+                "effective": effective,
+                "shadowedByOrigin": shadowed_by,
+                "overriddenByCommunityMetadata": bool(
+                    not effective
+                    and relation.get("origin") == "DependedModules"
+                    and shadowed_by != "DependedModules"
+                ),
             }
         )
 
-    for dependency in community_dependencies:
-        dep_id = str(dependency.get("id") or "")
+    for relation in incompatible_relation_rows(module, community_dependencies):
+        dep_id = str(relation.get("id") or "")
         found = installed.get(dep_id.casefold())
-        optional = bool(dependency.get("optional"))
-        incompatible = bool(dependency.get("incompatible"))
-        required_version = str(dependency.get("version") or "").strip()
-        installed_version = str(found.get("version", "") or "").strip() if found else ""
-        version_match = None
-        if not incompatible and not found and not optional:
-            missing_required.append(dep_id)
-        if not incompatible and found and required_version and not optional:
-            version_match = community_version_matches(required_version, installed_version)
-            if version_match is False:
-                community_version_mismatches.append(
-                    f"{dep_id} requires {required_version}, installed "
-                    f"{installed_version or '(no version declared)'}"
-                )
         dependency_rows.append(
             {
                 "id": dep_id,
-                "requiredVersion": required_version,
-                "optional": optional,
+                "requiredVersion": str(relation.get("version") or "").strip(),
+                "optional": bool(relation.get("optional")),
                 "installed": bool(found),
-                "installedVersion": installed_version,
-                "versionMatch": version_match,
+                "installedVersion": str(found.get("version", "") or "").strip() if found else "",
+                "versionMatch": None,
                 "path": found.get("path", "") if found else "",
-                "source": "community" if dependency.get("origin") == "DependedModuleMetadatas" else "extended",
-                "origin": dependency.get("origin") or "DependedModuleMetadatas",
-                "order": dependency.get("order") or "",
-                "incompatible": incompatible,
+                "source": relation.get("source") or "extended",
+                "origin": relation.get("origin") or "metadata",
+                "order": relation.get("order") or "",
+                "incompatible": True,
+                "effective": bool(relation.get("effective")),
+                "shadowedByOrigin": str(relation.get("shadowedByOrigin") or ""),
                 "overriddenByCommunityMetadata": False,
             }
         )
-
     missing_required = list(dict.fromkeys(value for value in missing_required if value))
     if missing_required:
         issues.append("Missing required dependencies: " + ", ".join(missing_required))
