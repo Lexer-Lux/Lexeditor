@@ -20,11 +20,16 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(script["coverage"], "structural")
         self.assertEqual(script["target"], "worlds")
 
-    def test_scene_map_reports_desktop_raster_coverage(self):
+    def test_scene_map_reports_desktop_raster_and_animation_diagnostics(self):
         scene_map = resource_override("Game/field/MapTable/MapTable_0020.dat")
         self.assertEqual(scene_map["status"], "integrated")
         self.assertEqual(scene_map["coverage"], "structural + raster")
         self.assertEqual(scene_map["target"], "scenes")
+        animation = resource_override("Game/field/BGAnime/bganimeinfo_9.dat")
+        self.assertEqual(animation["kind"], "scene-chip-animation")
+        self.assertEqual(animation["coverage"], "structural")
+        self.assertEqual(animation["status"], "partial")
+        self.assertEqual(animation["target"], "scenes")
         l3_graphics = resource_override("Game/field/weather_bin/cg9.bin")
         self.assertEqual(l3_graphics["kind"], "scene-l3-graphics")
         self.assertEqual(l3_graphics["coverage"], "raster")
@@ -81,21 +86,34 @@ class CoverageTests(unittest.TestCase):
         self.assertIn("named fixed-width editing", event_row["controls"])
         self.assertIn("desktop Events view", event_row["notes"])
 
-    def test_data_map_describes_desktop_scene_raster_without_overclaiming_composition(self):
+    def test_data_map_describes_scene_render_diagnostics_without_playback_claim(self):
         store = SimpleNamespace(archive=SimpleNamespace(entries=[
             SimpleNamespace(path="Game/field/MapTable/MapTable_0000.dat"),
+            SimpleNamespace(path="Game/field/BGAnime/bganimeinfo_4.dat"),
             SimpleNamespace(path="Game/field/weather_bin/cg9.bin"),
             SimpleNamespace(path="Game/field/ChipTable/ChipTableBg3_0000.dat"),
         ]))
-        mapped = augment_data_map(store, {"rows": [], "counts": {"resources": 3}})
+        mapped = augment_data_map(store, {"rows": [], "counts": {"resources": 4}})
         row = next(item for item in mapped["rows"] if str(item["filename"]).startswith("Game/field/MapTable/"))
         self.assertEqual(row["coverage"], "structural + raster")
         self.assertIn("L1/L2/L3", row["controls"])
+        self.assertIn("render diagnostics", row["controls"])
         self.assertIn("weather_bin", row["notes"])
         self.assertIn("ChipTableBg3", row["notes"])
-        self.assertIn("main/sub-screen", row["notes"])
-        self.assertIn("unsupported", row["notes"])
+        self.assertIn("MapTable main/sub/effect", row["notes"])
         self.assertIn("PrioMap", row["notes"])
+        self.assertIn("BGAnime", row["notes"])
+        self.assertIn("unsupported", row["notes"])
+
+        animation_row = next(item for item in mapped["rows"] if str(item["filename"]).startswith("Game/field/BGAnime/"))
+        self.assertEqual(animation_row["coverage"], "structural")
+        self.assertEqual(animation_row["status"], "partial")
+        self.assertIn("offset/32", animation_row["notes"])
+        self.assertIn("upper nibble", animation_row["notes"])
+        self.assertIn("initial-frame", animation_row["notes"])
+        self.assertIn("unsupported", animation_row["notes"])
+
+        self.assertEqual(mapped["counts"]["sceneChipAnimations"], 1)
         self.assertEqual(mapped["counts"]["sceneL3Graphics"], 1)
         self.assertEqual(mapped["counts"]["sceneL3Assemblies"], 1)
 
