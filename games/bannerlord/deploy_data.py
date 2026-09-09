@@ -56,7 +56,10 @@ def deploy_target(project: Path, game_root: Path | None = None) -> tuple[str, Pa
     existing = installed_modules(game)
     target = existing.get(module_id)
     if target is not None:
-        return module_id, target.resolve(), True
+        target = target.resolve()
+        if modules_root not in target.parents:
+            raise ValueError("Resolved existing Bannerlord module deployment path escaped the Modules folder")
+        return module_id, target, True
     target = (modules_root / module_id).resolve()
     if modules_root not in target.parents:
         raise ValueError("Resolved Bannerlord module deployment path escaped the Modules folder")
