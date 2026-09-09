@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - Chrono Trigger</title>
+  <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    *{box-sizing:border-box}
+    :root{--lex-accent:#d3a348;--lex-highlight:#4c4537}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
+    main{display:flex;flex:1;min-height:0;flex-direction:column;gap:10px;padding:var(--lex-panel-gap)}
+    .ct-toolbar,.ct-summary{display:flex;align-items:center;gap:12px;padding:9px 11px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .ct-toolbar input{min-width:280px;flex:1;padding:7px 9px;border:1px solid var(--lex-border);background:var(--lex-input-bg,#fff);color:var(--lex-text)}
+    .ct-summary{flex-wrap:wrap;font-size:.92em}
+    .ct-summary strong{font-weight:600}
+    .ct-table-wrap{flex:1;min-height:0;overflow:auto;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+    thead{position:sticky;top:0;z-index:1;background:var(--lex-panel)}
+    th,td{padding:7px 10px;border-bottom:1px solid var(--lex-border);text-align:left}
+    th{font-size:.8em;letter-spacing:.04em;text-transform:uppercase}
+    td:nth-child(2),td:nth-child(3){width:130px;text-align:right;white-space:nowrap}
+    .ct-path{font-family:var(--lex-mono,monospace);font-size:.92em}
+    .ct-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .ct-footer button{padding:5px 12px}
+    .ct-error{padding:12px;border:1px solid #9f4c4c;background:#401f1f;color:#ffd9d9;white-space:pre-wrap}
+    .ct-empty{padding:30px;text-align:center;color:var(--lex-muted)}
+  </style>
+</head>
+<body>
+  <header id="lexeditor-shell"></header>
+  <main id="main"></main>
+  <script src="/shared/framework.js"></script>
+  <script>
+  "use strict";
+  const {el}=LexeditorUI;
+  const state={query:"",offset:0,limit:250,data:null,error:""};
+  let searchTimer=0;
+  const formatBytes=value=>{const n=Number(value)||0;if(n<1024)return `${n} B`;const units=["KiB","MiB","GiB"];let size=n/1024,index=0;while(size>=1024&&index<units.length-1){size/=1024;index++}return `${size.toFixed(size>=100?0:size>=10?1:2)} ${units[index]}`};
+  async function load(){
+    state.error="";
+    try{
+      const params=new URLSearchParams({q:state.query,offset:String(state.offset),limit:String(state.limit)});
+      const response=await fetch(`/api/archive?${params}`);
+      const payload=await response.json();
+      if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
+      state.data=payload;
+    }catch(error){state.data=null;state.error=String(error?.message||error)}
+    render();
+  }
+  function searchInput(){
+    return el("input",{type:"search",value:state.query,placeholder:"Filter resource paths…","aria-label":"Filter resource paths",
+      oninput:event=>{state.query=event.target.value;state.offset=0;clearTimeout(searchTimer);searchTimer=setTimeout(load,180)}});
+  }
+  function render(){
+    const main=document.querySelector("#main");
+    const toolbar=el("div",{class:"ct-toolbar"},searchInput());
+    if(state.error){main.replaceChildren(toolbar,el("div",{class:"ct-error"},state.error));return}
+    if(!state.data){main.replaceChildren(toolbar,el("div",{class:"ct-empty"},"Loading resources.bin index…"));return}
+    const data=state.data;
+    const summary=el("div",{class:"ct-summary"},
+      el("span",{},el("strong",{},String(data.entryCount))," resources"),
+      el("span",{},"Archive ",el("strong",{},formatBytes(data.fileSize))),
+      el("span",{},"Index ",el("strong",{},formatBytes(data.indexStoredSize))),
+      el("span",{},"Read-only"));
+    const tbody=el("tbody");
+    for(const row of data.entries){tbody.append(el("tr",{},el("td",{class:"ct-path"},row.path),el("td",{},`0x${Number(row.offset).toString(16).toUpperCase()}`),el("td",{},formatBytes(row.storedSize))))}
+    const table=data.entries.length?el("table",{},el("thead",{},el("tr",{},el("th",{},"Resource path"),el("th",{},"Offset"),el("th",{},"Stored size"))),tbody):el("div",{class:"ct-empty"},"No resources match this filter.");
+    const previous=el("button",{type:"button",disabled:data.offset<=0,onclick:()=>{state.offset=Math.max(0,state.offset-state.limit);load()}},"Previous");
+    const next=el("button",{type:"button",disabled:data.offset+data.entries.length>=data.matchCount,onclick:()=>{state.offset+=state.limit;load()}},"Next");
+    const start=data.matchCount?data.offset+1:0,end=data.offset+data.entries.length;
+    const footer=el("div",{class:"ct-footer"},el("span",{},`Showing ${start}–${end} of ${data.matchCount}`),el("div",{},previous," ",next));
+    main.replaceChildren(toolbar,summary,el("div",{class:"ct-table-wrap"},table),footer);
+  }
+  const shell=LexeditorUI.mountShell({
+    host:"#lexeditor-shell",brand:"LEXEDITOR",
+    plugin:{id:"chrono-trigger",name:"Chrono Trigger",themeName:"chrono-trigger",theme:{accent:"#d3a348"}},
+    tabs:[{id:"resources",label:"Resources"}],activeTab:()=>"resources",navigate:()=>{},
+    dirtyCount:()=>0,readonly:()=>true,
+  });
+  render();
+  load().finally(()=>LexeditorUI.finishPluginLoading());
+  </script>
+</body>
+</html>
