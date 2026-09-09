@@ -19,7 +19,8 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - Atel parsing, PC disassembly, semantics and control-flow diagnostics, with named fixed-width argument editing in both the desktop Events UI and CLI. Unsupported, variable-width and unresolved commands remain read-only.
   - Proven Steam item-command editors include `0xC7` Add Item from Memory, `0xCA` Add Item, `0xCB` Remove Item, `0xD5` Equip Item and `0xD7` Get Item Quantity.
   - Their PC-only extra category byte is exposed as a raw numeric value rather than an invented enum/global item ID. C7/D7 local-memory slots are shown as even `0x7F0200`–`0x7F03FE` script-memory addresses and round-trip back to the one-byte PC slot without resizing commands.
-  - Additional proven fixed-width controls include script-memory outputs `0x20`/`0x55`/`0x7F`, coordinate reads `0x21`/`0x22`, Script/NPC movement controls `0x87`/`0x89`/`0x8A`/`0x8B`/`0x8C`, facing `0xA6`/`0xA7`, animation IDs `0xAA`/`0xAB`/`0xAC`/`0xB7`, pause ticks `0xAD`, message-table selection `0xB8`, Explore Mode `0xE3`, and raw darken duration `0xF0`.
+  - Additional proven fixed-width controls include script-memory outputs `0x20`/`0x55`/`0x7F`, coordinate reads `0x21`/`0x22`, palette `0x33`, storyline `0x5A`, LoadEnemy/solidity `0x83`/`0x84`, Script/NPC movement `0x87`/`0x89`/`0x8A`/`0x8B`/`0x8C`, facing `0xA6`/`0xA7`, animation IDs `0xAA`/`0xAB`/`0xAC`/`0xB7`, pause ticks `0xAD`, message-table selection `0xB8`, Explore Mode `0xE3`, and raw darken duration `0xF0`.
+  - `0x84` is deliberately exposed only as a raw solidity-properties byte; its bit assignments are not invented.
   - Script-memory operands use the same validated even `0x7F0200`–`0x7F03FE` address model. `0x21`/`0x22` decode the documented doubled target byte only when it is even; malformed odd encodings remain read-only. Direct facing is editable only for documented values 0–3.
   - Ambiguous commands stay out of the named editor layer: current evidence is insufficient for `0x8D` pixel-position shift behavior, `0x8E` priority flags, and the inconsistent target encoding around `0x27`/`0x28`.
 - Eight overworld headers plus existing world exits/triggers/script-address editing.
@@ -48,12 +49,14 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 ## Validation
 
 - Dedicated `Chrono Trigger checks` workflow compiles the plugin/tools, validates the descriptor, auto-discovers all `test_chrono_trigger_*.py` suites, runs the managed ARC1/CTExt smoke, checks editor JavaScript, and runs Playwright desktop regressions.
-- Event-editor regressions cover PC item/category layouts, script-memory `/2` address round-trips, doubled coordinate-read target IDs, movement/facing/animation/pause controls, fixed-size preservation, partial edits, and fail-closed invalid encodings.
+- Event-editor regressions cover PC item/category layouts, script-memory `/2` address round-trips, doubled coordinate-read target IDs, palette/storyline/raw-solidity, movement/facing/animation/pause controls, fixed-size preservation, partial edits, and fail-closed invalid encodings.
 - Playwright covers scene/world raster views and render diagnostics plus the real Events UI named-editor workflow: it changes an `NPC Facing` field, verifies the `/api/save/event-fields` stale-hash POST coordinates/payload, and confirms the rerendered semantic summary and argument byte.
 
 ## Evidence
 
-- ChronoMod: <https://github.com/jimzrt/ChronoMod>
+See [`FORMAT_EVIDENCE.md`](FORMAT_EVIDENCE.md) for the PC-format evidence ledger and explicit proven/read-only/unresolved boundaries.
+
+- ChronoMod: <https://github.com/jimzrt/ChronoMod> — ARC1 container/replacement evidence, not gameplay-stat layouts.
 - CTViewer: <https://github.com/GitExl/CTViewer>
 - Temporal Redux: <https://github.com/OnemusCT/temporal-redux>
 - CTExt: <https://github.com/TheRealBiggs/ctext>
