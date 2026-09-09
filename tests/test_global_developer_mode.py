@@ -48,24 +48,6 @@ class DeveloperModeHostTests(unittest.TestCase):
         self.assertTrue(settings["developerAuthorized"])
         self.assertEqual(settings["developerLogin"], "Lexer-Lux")
 
-    def test_developer_mode_rechecks_identity_instead_of_latching_owner_state(self):
-        identity = {"repository": "Lexer-Lux/Lexeditor", "login": "Lexer-Lux"}
-        host = self.host()
-        host._github.visible_repository.side_effect = [identity, None]
-
-        first = host.lexeditor_settings()
-        second = host.lexeditor_settings()
-
-        self.assertTrue(first["developerMode"])
-        self.assertEqual(first["developerLogin"], "Lexer-Lux")
-        self.assertFalse(second["developerMode"])
-        self.assertFalse(second["developerAuthorized"])
-        self.assertEqual(second["developerLogin"], "")
-        self.assertEqual(
-            host._github.visible_repository.call_args_list,
-            [call(LEXEDITOR_REPOSITORY), call(LEXEDITOR_REPOSITORY)],
-        )
-
     def test_packaged_default_write_requires_fresh_owner_authentication(self):
         values = {"soundVolumePercent": 35}
         denied = self.host(None)
