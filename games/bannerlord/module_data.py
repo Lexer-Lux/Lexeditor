@@ -8,6 +8,7 @@ import xml.etree.ElementTree as ET
 
 from . import paths
 from .community_metadata import read_community_dependencies
+from .dependency_relations import dependency_declaration_conflicts
 
 
 def _value(parent: ET.Element, tag: str) -> str:
@@ -635,6 +636,55 @@ def _edit_xmls(root: ET.Element, rows: list[dict]) -> int:
     return changes
 
 
+def _validate_relation_payload(path: Path, payload: dict) -> None:
+    relation_keys = {
+        "dependencies",
+        "communityDependencies",
+        "modulesToLoadAfterThis",
+        "incompatibleModules",
+    }
+    if not relation_keys.intersection(payload):
+        return
+
+    current = read_submodule(path)
+    current_extended = read_community_dependencies(path)
+    proposed = {
+        "dependencies": list(
+            payload.get("dependencies")
+            if "dependencies" in payload
+            else current.get("dependencies", [])
+        ),
+        "modulesToLoadAfterThis": list(
+            payload.get("modulesToLoadAfterThis")
+            if "modulesToLoadAfterThis" in payload
+            else current.get("modulesToLoadAfterThis", [])
+        ),
+        "incompatibleModules": list(
+            payload.get("incompatibleModules")
+            if "incompatibleModules" in payload
+            else current.get("incompatibleModules", [])
+        ),
+    }
+    if "communityDependencies" in payload:
+        structured = [dict(row) for row in list(payload.get("communityDependencies") or [])]
+        for row in structured:
+            row.setdefault("origin", "DependedModuleMetadatas")
+        legacy = [
+            row
+            for row in current_extended
+            if row.get("origin") != "DependedModuleMetadatas"
+        ]
+        extended = structured + legacy
+    else:
+        extended = current_extended
+
+    issues = dependency_declaration_conflicts(proposed, extended)
+    if issues:
+        raise ValueError(
+            "Invalid Bannerlord dependency declarations: " + "; ".join(issues)
+        )
+
+
 def save_module(path: Path, payload: dict) -> dict:
     path = Path(path)
     path = paths.contained_project_path(path.parent, path.name, require_file=True)
@@ -642,6 +692,7 @@ def save_module(path: Path, payload: dict) -> dict:
     unknown = set(payload) - allowed
     if unknown:
         raise ValueError(f"Unsupported SubModule.xml sections: {', '.join(sorted(unknown))}")
+    _validate_relation_payload(path, payload)
     tree = _parse_tree(path)
     root = tree.getroot()
     changes = 0
