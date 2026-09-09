@@ -28,6 +28,21 @@ def project_root() -> Path:
     )
 
 
+def contained_project_path(
+    project: Path,
+    *parts: str | Path,
+    require_file: bool = False,
+) -> Path:
+    """Resolve a project path without allowing symlinks/junctions to escape the project."""
+    root = Path(project).resolve()
+    target = root.joinpath(*parts).resolve()
+    if target != root and root not in target.parents:
+        raise ValueError("Resolved Bannerlord project path escaped the selected project")
+    if require_file and not target.is_file():
+        raise FileNotFoundError(target)
+    return target
+
+
 def modules_root(root: Path | None = None) -> Path:
     return (root or game_root()) / "Modules"
 
