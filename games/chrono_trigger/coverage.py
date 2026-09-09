@@ -70,8 +70,8 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
         elif filename.startswith("Game/field/atel/"):
             rows[index] = {
                 **row,
-                "controls": f"{field_scripts} field event scripts: object/function layout, PC command disassembly, semantics, control-flow diagnostics and named fixed-width editing",
-                "notes": "The desktop Events view and tools/chrono_trigger_event.py can edit proven named fixed-width argument fields through stale-hash-protected project overlays. Opcode changes, insertion/deletion, pointer relocation and variable/unresolved commands remain read-only.",
+                "controls": f"{field_scripts} field event scripts: object/function layout, PC command disassembly, semantics, control-flow diagnostics and named fixed-width editing including Steam item/category commands",
+                "notes": "The desktop Events view and tools/chrono_trigger_event.py edit only proven fixed-width argument bytes through stale-hash-protected project overlays. Steam C7/CA/CB/D5/D7 item commands expose their evidenced item index or script-memory operand plus the extra PC category byte as a raw value; Lexeditor does not invent category enums or reinterpret those pairs as one global item ID. Opcode changes, insertion/deletion, pointer relocation and variable/unresolved commands remain read-only.",
                 "status": "partial", "coverage": "structural + fixed-write", "openable": bool(field_scripts), "target": "events",
             }
         elif filename.startswith("CTExt mods/"):
