@@ -6,6 +6,10 @@ on:
       - 'games/palworld/**'
       - 'codex/palworld/**'
       - 'tests/test_palworld_*.py'
+      - 'runtime_bootstrap.py'
+      - 'ui/mod-loading.json'
+      - 'ui/credits-sources.json'
+      - 'ui/credits.json'
       - '.github/workflows/palworld-checks.yml'
   workflow_dispatch:
 
@@ -27,3 +31,31 @@ jobs:
         run: python -m compileall -q games/palworld
       - name: Run Palworld package regressions
         run: python -m unittest discover -s tests -p 'test_palworld_*.py' -v
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regenerate offline credits for this head
+        run: python tools/generate_credits.py
+      - name: Verify plugin metadata and shared UI contracts
+        run: |
+          python plugin_metadata.py
+          python tools/verify_shared_ui_contract.py
+      - name: Verify discovery and managed service
+        run: |
+          python app.py --list
+          python app.py --game palworld --check
+          python app.py --game palworld --smoke
+      - name: Check editor JavaScript syntax
+        run: node --check games/palworld/editor.js
+      - name: Preserve generated credits for branch update
+        uses: actions/upload-artifact@v4
+        with:
+          name: palworld-generated-credits
+          path: ui/credits.json
+          if-no-files-found: error
+          retention-days: 1

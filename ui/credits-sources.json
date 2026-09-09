@@ -146,6 +146,17 @@
       "thanks": [],
       "licenses": []
     },
+    "palworld": {
+      "contributions": [
+        {
+          "name": "Pocketpair / Palworld Mod Uploader",
+          "role": "Official interoperability reference for Palworld v0.7+ mod packages, Info.json fields and loader InstallRule behavior.",
+          "url": "https://github.com/pocketpairjp/PalworldModUploader"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
     "warband": {
       "contributions": [
         {

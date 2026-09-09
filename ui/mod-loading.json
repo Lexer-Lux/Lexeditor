@@ -31,6 +31,11 @@
       "structure": "Edit one Lexeditor project with overlays under StreamingAssets/ (especially StreamingAssets/Data/). Deploy Project copies those overlays into <FF9>\\Lexeditor\\ while preserving other Memoria mods and unrelated Memoria.ini settings.",
       "overriding": "Lexeditor does not stack or semantically merge multiple FFIX projects. Other Memoria mods may coexist and Memoria resolves them according to its FolderNames ordering; conflicts with the same underlying content therefore follow Memoria's own resolution rules."
     },
+    "palworld": {
+      "loader": "Pocketpair's official Palworld v0.7+ mod loader and Steam Workshop package model. Lexeditor currently authors the official package metadata and leaves activation/deployment to the loader boundary.",
+      "structure": "One selected Lexeditor project is an official package rooted at Info.json. InstallRule Targets point to package-local Paks, Lua/UE4SS, LogicMods, or PalSchema payloads; installed Palworld game data stays read-only.",
+      "overriding": "The official loader enables packages by PackageName. Duplicate PackageName ownership is unsafe and file conflicts follow the destination runtime's behavior; Lexeditor does not yet semantically merge separate external Palworld packages."
+    },
     "rdr": {
       "loader": "De novo Lexeditor deployment through RedHook / Ultimate ASI Loader's update-folder override mechanism.",
       "structure": "Lexeditor edits one project (C:\\RDRMod by default); game-data replacements live under <project>\\mod\\ in archive-relative trees. Deploy Project rebuilds affected RPF6 archive copies under <RDR>\\update\\... while leaving the installed source archives untouched.",

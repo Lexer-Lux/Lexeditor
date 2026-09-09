@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - Palworld</title>
+  <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    *{box-sizing:border-box}
+    :root{--lex-accent:#55c7d9;--lex-accent-text:#08262c}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
+    .pal-layout{height:100%;min-height:0}
+    .pal-detail{height:100%;min-height:0}
+    .pal-rules{display:grid;gap:10px}
+    .pal-rule{padding:10px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .pal-rule-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px;font-weight:700}
+    .pal-rule-fields{display:grid;gap:5px}
+    .pal-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .pal-actions button{padding:7px 12px;border:1px solid var(--lex-border);background:var(--lex-panel);color:var(--lex-text);cursor:pointer}
+    .pal-actions button.primary{border-color:var(--lex-accent);background:var(--lex-accent);color:var(--lex-accent-text)}
+    .pal-issue{padding:7px 9px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .pal-issue.error{font-weight:700}
+  </style>
+</head>
+<body>
+  <header id="lexeditor-shell"></header>
+  <main id="main"></main>
+  <script src="/shared/framework.js"></script>
+  <script src="/editor.js"></script>
+</body>
+</html>
