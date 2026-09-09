@@ -31,6 +31,12 @@ class BannerlordUiContractTests(unittest.TestCase):
             + ", ".join(offenders),
         )
 
+    def test_build_ui_exposes_msbuild_execution_trust_boundary(self) -> None:
+        text = (BANNERLORD_ROOT / "editor_build.js").read_text(encoding="utf-8")
+        self.assertIn("MSBuild targets and tasks with your user permissions", text)
+        self.assertIn("it is not a sandbox", text)
+        self.assertIn("Build only projects you trust", text)
+
 
 if __name__ == "__main__":
     unittest.main()
