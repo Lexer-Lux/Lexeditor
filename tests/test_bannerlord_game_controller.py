@@ -1,8 +1,9 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from games.bannerlord.game_launch import BannerlordGameController
+from games.bannerlord.game_launch import BannerlordGameController, module_load_order
 
 
 def write_module(root: Path, module_id: str) -> Path:
@@ -67,12 +68,18 @@ class BannerlordGameControllerTests(unittest.TestCase):
                 return process
 
             controller = BannerlordGameController(process_factory=factory)
-            launched = controller.launch(game, workspace)
+            with patch("games.bannerlord.game_launch.module_load_order", wraps=module_load_order) as resolver:
+                launched = controller.launch(game, workspace)
+            self.assertEqual(resolver.call_count, 1)
             self.assertTrue(launched["running"])
             self.assertFalse(launched["alreadyRunning"])
             self.assertEqual(launched["module"], "LexerSkillTweaks")
             self.assertEqual(launched["pid"], 4242)
             self.assertIn("LexerSkillTweaks", launched["loadOrder"])
+            self.assertEqual(
+                created[0].command[2],
+                "_MODULES_*" + "*".join(launched["loadOrder"]) + "*_MODULES_",
+            )
             again = controller.launch(game, workspace)
             self.assertTrue(again["alreadyRunning"])
             self.assertEqual(len(created), 1)
