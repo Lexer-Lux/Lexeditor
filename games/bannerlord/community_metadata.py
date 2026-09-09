@@ -1,9 +1,10 @@
-"""Read BLSE/BUTR community dependency metadata from Bannerlord SubModule.xml.
+"""Read extended Bannerlord dependency metadata from SubModule.xml.
 
-The community metadata is additive to TaleWorlds' native DependedModules,
-ModulesToLoadAfterThis, and IncompatibleModules sections.  Keep this parser
-small and read-only so unsupported attributes remain untouched by Lexeditor's
-structured SubModule.xml writer until they are explicitly edited there.
+This module normalizes the community metadata used by BLSE/BUTR plus the
+legacy/optional dependency tags that Bannerlord.ModuleManager folds into the
+same dependency model.  It is deliberately read-only: unknown XML attributes
+and structures remain untouched by Lexeditor until a structured writer has an
+explicit schema for them.
 """
 from __future__ import annotations
 
@@ -82,30 +83,102 @@ def community_version_matches(required: str, installed: str) -> bool | None:
     return minimum <= installed_version
 
 
-def read_community_dependencies(path: Path) -> list[dict]:
-    """Return BLSE ``DependedModuleMetadata`` rows in document order."""
-    root = ET.parse(Path(path)).getroot()
-    parent = root.find("DependedModuleMetadatas")
-    if parent is None:
-        return []
+def _row(
+    element: ET.Element,
+    *,
+    index: int,
+    origin: str,
+    id_attribute: str,
+    order: str = "",
+    optional: bool = False,
+    incompatible: bool = False,
+    version: str = "",
+) -> dict | None:
+    module_id = str(element.attrib.get(id_attribute) or "").strip()
+    if not module_id:
+        return None
+    return {
+        "index": index,
+        "id": module_id,
+        "order": order if order in _VALID_ORDERS else "",
+        "optional": optional,
+        "incompatible": incompatible,
+        "version": version,
+        "origin": origin,
+        "attributes": dict(element.attrib),
+    }
 
-    rows = []
-    for index, element in enumerate(child for child in list(parent) if child.tag == "DependedModuleMetadata"):
-        module_id = str(element.attrib.get("id") or "").strip()
-        if not module_id:
-            continue
-        order = str(element.attrib.get("order") or "").strip()
-        if order not in _VALID_ORDERS:
-            order = ""
-        rows.append(
-            {
-                "index": index,
-                "id": module_id,
-                "order": order,
-                "optional": _truth(element.attrib.get("optional")),
-                "incompatible": _truth(element.attrib.get("incompatible")),
-                "version": str(element.attrib.get("version") or "").strip(),
-                "attributes": dict(element.attrib),
-            }
+
+def read_community_dependencies(path: Path) -> list[dict]:
+    """Return ModuleManager-normalized extended dependency rows in precedence order.
+
+    ``ModuleInfoExtended.FromXml`` appends rows in this order before native
+    ``DependedModule`` rows are considered: BLSE ``DependedModuleMetadatas``,
+    ``LoadAfterModules``, then launcher optional-dependency tags.  Matching that
+    order matters because ModuleManager de-duplicates dependencies by ID with
+    the first row winning.
+    """
+    root = ET.parse(Path(path)).getroot()
+    rows: list[dict] = []
+
+    parent = root.find("DependedModuleMetadatas")
+    if parent is not None:
+        for index, element in enumerate(
+            child for child in list(parent) if child.tag == "DependedModuleMetadata"
+        ):
+            order = str(element.attrib.get("order") or "").strip()
+            row = _row(
+                element,
+                index=index,
+                origin="DependedModuleMetadatas",
+                id_attribute="id",
+                order=order,
+                optional=_truth(element.attrib.get("optional")),
+                incompatible=_truth(element.attrib.get("incompatible")),
+                version=str(element.attrib.get("version") or "").strip(),
+            )
+            if row is not None:
+                rows.append(row)
+
+    load_after = root.find("LoadAfterModules")
+    if load_after is not None:
+        for index, element in enumerate(
+            child for child in list(load_after) if child.tag == "LoadAfterModule"
+        ):
+            row = _row(
+                element,
+                index=index,
+                origin="LoadAfterModules",
+                id_attribute="Id",
+                order="LoadAfterThis",
+            )
+            if row is not None:
+                rows.append(row)
+
+    optional_elements: list[tuple[str, ET.Element]] = []
+    depended_modules = root.find("DependedModules")
+    if depended_modules is not None:
+        optional_elements.extend(
+            ("DependedModules/OptionalDependModule", child)
+            for child in list(depended_modules)
+            if child.tag == "OptionalDependModule"
         )
+    optional_root = root.find("OptionalDependModules")
+    if optional_root is not None:
+        optional_elements.extend(
+            (f"OptionalDependModules/{child.tag}", child)
+            for child in list(optional_root)
+            if child.tag in {"OptionalDependModule", "DependModule"}
+        )
+    for index, (origin, element) in enumerate(optional_elements):
+        row = _row(
+            element,
+            index=index,
+            origin=origin,
+            id_attribute="Id",
+            optional=True,
+        )
+        if row is not None:
+            rows.append(row)
+
     return rows
