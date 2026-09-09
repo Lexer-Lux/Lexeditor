@@ -14,12 +14,50 @@ PROJECT_ROOT = Path(os.environ.get(
     "LEXEDITOR_FFX_X2_PROJECT",
     str(_LOCAL / "Lexeditor" / "projects" / "ffx-x2"),
 ))
+THEME_CACHE_ROOT = Path(os.environ.get(
+    "LEXEDITOR_FFX_X2_THEME_CACHE",
+    str(_LOCAL / "Lexeditor" / "cache" / "ffx-x2-theme"),
+))
 
 ARCHIVES = {
     "x": GAME_ROOT / "data" / "FFX_Data.vbf",
     "x2": GAME_ROOT / "data" / "FFX2_Data.vbf",
 }
+META_ARCHIVE = GAME_ROOT / "data" / "metamenu.vbf"
 GAME_LABELS = {"x": "Final Fantasy X", "x2": "Final Fantasy X-2"}
+VIRTUAL_ARCHIVE_ROOTS = {"x": "FFX_Data", "x2": "FFX2_Data"}
+
+
+def efl_archive_path(game: str, archive_path: str) -> str:
+    """Map a raw VBF name to the game-facing path Fahrenheit indexes.
+
+    Community extractors commonly expose raw names such as ``ffx_ps2/...`` while
+    Fahrenheit's External File Loader addresses the same file through the game's
+    virtual ``FFX_Data/...`` or ``FFX2_Data/...`` root. Accept either spelling so
+    real archives and older fixtures both resolve to one canonical EFL path.
+    """
+    key = str(game).casefold()
+    if key not in VIRTUAL_ARCHIVE_ROOTS:
+        raise ValueError("game must be 'x' or 'x2'")
+    raw = str(archive_path).replace("\\", "/").strip("/")
+    if not raw:
+        raise ValueError("archive path is empty")
+    root = VIRTUAL_ARCHIVE_ROOTS[key]
+    if raw.casefold() == root.casefold() or raw.casefold().startswith(root.casefold() + "/"):
+        return raw
+    return f"{root}/{raw}"
+
+
+def source_archive_candidates(game: str, archive_path: str) -> tuple[str, ...]:
+    """Return virtual and raw spellings that may identify one VBF entry."""
+    key = str(game).casefold()
+    canonical = efl_archive_path(key, archive_path)
+    root = VIRTUAL_ARCHIVE_ROOTS[key]
+    raw = canonical[len(root):].lstrip("/")
+    values = [str(archive_path).replace("\\", "/").strip("/"), canonical]
+    if raw:
+        values.append(raw)
+    return tuple(dict.fromkeys(value for value in values if value))
 
 
 def ensure_project(root: Path = PROJECT_ROOT) -> None:
@@ -31,7 +69,7 @@ def ensure_project(root: Path = PROJECT_ROOT) -> None:
 def check() -> list[str]:
     problems: list[str] = []
     for relative in (
-        "editor.html", "server.py", "plugin.py", "paths.py", "vbf.py", "deployment.py",
+        "editor.html", "server.py", "plugin.py", "paths.py", "vbf.py", "deployment.py", "theme.py",
         "project-template/README.md",
     ):
         target = PLUGIN_ROOT / relative
