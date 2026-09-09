@@ -87,12 +87,17 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
         finally:
             temporary.cleanup()
 
-    def test_unknown_edit_id_is_rejected(self):
+    def test_unknown_edit_id_and_negative_xp_are_rejected(self):
         temporary, project, game, _deployed = self.fixture()
         try:
             with self.assertRaisesRegex(ValueError, "Unknown runtime effect ID"):
                 save_runtime_overrides(project, {
                     "effects": [{"id": "Nope", "overridden": True, "low": 1, "high": 2}]
+                }, game)
+            source = read_runtime_overrides(project, game)["xpSources"][0]
+            with self.assertRaisesRegex(ValueError, "cannot be negative"):
+                save_runtime_overrides(project, {
+                    "xpSources": [{"id": source["id"], "overridden": True, "amount": -1}]
                 }, game)
         finally:
             temporary.cleanup()
