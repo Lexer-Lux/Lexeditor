@@ -36,6 +36,8 @@ jobs:
           games/chrono_trigger/worlds.py
           games/chrono_trigger/world_tables.py
           games/chrono_trigger/world_scripts.py
+          games/chrono_trigger/changes.py
+          games/chrono_trigger/ctp.py
           games/chrono_trigger/ctext_manager.py
           games/chrono_trigger/deployment.py
           games/chrono_trigger/integrity.py
