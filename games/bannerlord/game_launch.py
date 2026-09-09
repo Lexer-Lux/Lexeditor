@@ -51,15 +51,13 @@ def installed_modules(game_root: Path) -> dict[str, Path]:
     return modules
 
 
-def selected_module(game_root: Path, project: Path) -> tuple[str, Path]:
-    """Match a source workspace or installed folder to exactly one installed module."""
+def _selected_module_from_index(project: Path, modules: dict[str, Path]) -> tuple[str, Path]:
     descriptor = project.resolve() / "SubModule.xml"
     if not descriptor.is_file():
         raise RuntimeError("The selected Bannerlord project has no SubModule.xml.")
     project_id = str(read_submodule(descriptor).get("id") or "").strip()
     if not project_id:
         raise RuntimeError("The selected Bannerlord project has no module Id.")
-    modules = installed_modules(game_root)
     installed = modules.get(project_id)
     if installed is None:
         raise RuntimeError(
@@ -69,10 +67,15 @@ def selected_module(game_root: Path, project: Path) -> tuple[str, Path]:
     return project_id, installed
 
 
+def selected_module(game_root: Path, project: Path) -> tuple[str, Path]:
+    """Match a source workspace or installed folder to exactly one installed module."""
+    return _selected_module_from_index(project, installed_modules(game_root))
+
+
 def module_load_order(game_root: Path, project: Path) -> list[str]:
     """Resolve core SP modules, required dependency closure, then the selected mod."""
-    selected_id, installed = selected_module(game_root, project)
     modules = installed_modules(game_root)
+    selected_id, installed = _selected_module_from_index(project, modules)
     metadata_cache: dict[str, dict] = {}
     visiting: set[str] = set()
     added: set[str] = set()
@@ -136,14 +139,17 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
     return order
 
 
-def launch_command(game_root: Path, project: Path) -> list[str]:
+def _launch_command(game_root: Path, modules: list[str]) -> list[str]:
     game_root = game_root.resolve()
     executable = game_root / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
     if not executable.is_file():
         raise RuntimeError(f"Bannerlord.exe not found: {executable}")
-    modules = module_load_order(game_root, project)
     module_argument = "_MODULES_*" + "*".join(modules) + "*_MODULES_"
     return [str(executable), "/singleplayer", module_argument]
+
+
+def launch_command(game_root: Path, project: Path) -> list[str]:
+    return _launch_command(game_root, module_load_order(game_root, project))
 
 
 class BannerlordGameController:
@@ -175,9 +181,9 @@ class BannerlordGameController:
             current = self.status()
             if current["running"]:
                 return {**current, "alreadyRunning": True}
-            module_id, _installed = selected_module(game_root, project)
-            command = launch_command(game_root, project)
             load_order = module_load_order(game_root, project)
+            module_id = _module_id(project.resolve())
+            command = _launch_command(game_root, load_order)
             cwd = game_root.resolve() / "bin" / "Win64_Shipping_Client"
             process = self._process_factory(command, cwd=str(cwd))
             if process.poll() is not None:
