@@ -14,6 +14,7 @@ from games.chrono_trigger.scene_render import png_rgba
 
 ARTIFACTS = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "out" / "chrono-trigger-browser"
 ARTIFACTS.mkdir(parents=True, exist_ok=True)
+ORIGIN = "http://chrono-fixture.local"
 
 PNG = png_rgba(32, 32, bytes((255, 0, 0, 255)) * 32 * 32)
 SCENE_MAP = {
@@ -59,9 +60,27 @@ DASHBOARD = {
 }
 
 
+def _editor_html() -> str:
+    html = (ROOT / "games/chrono_trigger/editor.html").read_text(encoding="utf-8")
+    html = html.replace(
+        '<link rel="stylesheet" href="/shared/framework.css">',
+        "<style>" + (ROOT / "ui/framework.css").read_text(encoding="utf-8") + "</style>",
+    )
+    html = html.replace(
+        '<script src="/shared/framework.js"></script>',
+        "<script>" + (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
+    )
+    modules = (
+        "<script>" + (ROOT / "games/chrono_trigger/event_editor.js").read_text(encoding="utf-8") + "</script>"
+        "<script>" + (ROOT / "games/chrono_trigger/map_previews.js").read_text(encoding="utf-8") + "</script>"
+    )
+    return html.replace("</body>", modules + "</body>", 1)
+
+
 def main() -> None:
     errors: list[str] = []
     results = []
+    html = _editor_html()
     with sync_playwright() as playwright:
         import shutil
         browser = playwright.chromium.launch(
@@ -75,7 +94,9 @@ def main() -> None:
 
             def handle(route):
                 path = urlparse(route.request.url).path
-                if path == "/api/dashboard":
+                if path in {"/", "/blank"}:
+                    route.fulfill(status=200, content_type="text/html", body=html)
+                elif path == "/api/dashboard":
                     route.fulfill(status=200, content_type="application/json", body=json.dumps(DASHBOARD))
                 elif path == "/api/scenes":
                     route.fulfill(status=200, content_type="application/json", body=json.dumps(SCENES))
@@ -88,23 +109,8 @@ def main() -> None:
                 else:
                     route.fulfill(status=404, content_type="application/json", body=json.dumps({"error": path}))
 
-            page.route("**/api/**", handle)
-            html = (ROOT / "games/chrono_trigger/editor.html").read_text(encoding="utf-8")
-            html = html.replace("<head>", '<head><base href="http://chrono-fixture.local/">', 1)
-            html = html.replace(
-                '<link rel="stylesheet" href="/shared/framework.css">',
-                "<style>" + (ROOT / "ui/framework.css").read_text(encoding="utf-8") + "</style>",
-            )
-            html = html.replace(
-                '<script src="/shared/framework.js"></script>',
-                "<script>" + (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
-            )
-            modules = (
-                "<script>" + (ROOT / "games/chrono_trigger/event_editor.js").read_text(encoding="utf-8") + "</script>"
-                "<script>" + (ROOT / "games/chrono_trigger/map_previews.js").read_text(encoding="utf-8") + "</script>"
-            )
-            html = html.replace("</body>", modules + "</body>", 1)
-            page.set_content(html, wait_until="domcontentloaded")
+            page.route(f"{ORIGIN}/**", handle)
+            page.goto(ORIGIN + "/", wait_until="domcontentloaded")
             page.wait_for_function('state.scenes.data?.rows?.length === 1')
 
             page.locator(".ct-section-tabs").get_by_role("button", name="Map", exact=True).click()
