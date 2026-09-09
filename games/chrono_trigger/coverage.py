@@ -70,8 +70,8 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
         elif filename.startswith("Game/field/atel/"):
             rows[index] = {
                 **row,
-                "controls": f"{field_scripts} field event scripts: object/function layout, PC command disassembly, semantics, control-flow diagnostics and named fixed-width editing including Steam item/category commands",
-                "notes": "The desktop Events view and tools/chrono_trigger_event.py edit only proven fixed-width argument bytes through stale-hash-protected project overlays. Steam C7/CA/CB/D5/D7 item commands expose their evidenced item index or script-memory operand plus the extra PC category byte as a raw value; Lexeditor does not invent category enums or reinterpret those pairs as one global item ID. Opcode changes, insertion/deletion, pointer relocation and variable/unresolved commands remain read-only.",
+                "controls": f"{field_scripts} field event scripts: object/function layout, PC command disassembly, semantics, control-flow diagnostics and named fixed-width editing including Steam item/category commands, storyline/button checks and 0x12–0x15 memory comparisons",
+                "notes": "The desktop Events view and tools/chrono_trigger_event.py edit only proven fixed-width argument bytes through stale-hash-protected project overlays. PC 0x12–0x15 comparisons expose the evidenced script-memory /2 operands, u8/u16 or memory RHS, operation 0–7 and jump-if-false byte; 0x16 remains excluded. When a relative jump byte is changed, the new target must land on a decoded command boundary, while an unchanged pre-existing invalid jump does not block an unrelated operand edit. Steam C7/CA/CB/D5/D7 item commands keep their extra category byte raw. Opcode changes, insertion/deletion, pointer relocation and variable/unresolved commands remain read-only.",
                 "status": "partial", "coverage": "structural + fixed-write", "openable": bool(field_scripts), "target": "events",
             }
         elif filename.startswith("CTExt mods/"):
@@ -140,8 +140,8 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
         },
         {
             "filename": "Actual resources.bin path families",
-            "controls": "Index-only gameplay candidate inventory for battle/enemy/tech/item/shop/party reverse engineering",
-            "notes": "tools/chrono_trigger_inventory.py derives candidates from the installed ARC1 index without decompressing payloads. Steam gameplay-stat editors are intentionally not claimed until current-format record layouts are independently evidenced.",
+            "controls": "Read-only gameplay family inventory plus bounded selected-family/path payload probe for battle/enemy/tech/item/shop/party reverse engineering",
+            "notes": "tools/chrono_trigger_inventory.py defaults to ARC1 index metadata only and can optionally peek the decoded four-byte declared payload-size prefixes without inflating candidate data; repeated directory/size groups become probe-ready recommendations. tools/chrono_trigger_probe.py then requires an explicit family (optionally a path prefix), enforces resource/stored/declared-size caps before decompression, and reports only structural same-size byte differences. No gameplay-stat editor is claimed from these diagnostics alone.",
             "status": "integrated", "coverage": "research", "openable": False,
         },
         {
