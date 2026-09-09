@@ -24,9 +24,9 @@ class BannerlordPluginTests(unittest.TestCase):
     def test_submodule_save_rejects_redirected_descriptor(self):
         from games.bannerlord.module_data import save_module
         with tempfile.TemporaryDirectory() as name:
-            root=Path(name);project=root/"project";project.mkdir();source=project/"SubModule.xml";source.write_text(SUBMODULE,encoding="utf-8");outside=root/"outside.xml";outside.write_text(SUBMODULE,encoding="utf-8");outside_resolved=outside.resolve();real_resolve=Path.resolve
+            root=Path(name);project=root/"project";project.mkdir();source=project/"SubModule.xml";source.write_text(SUBMODULE,encoding="utf-8");outside=root/"outside.xml";outside.write_text(SUBMODULE,encoding="utf-8");redirected_source=project.resolve()/"SubModule.xml";outside_resolved=outside.resolve();real_resolve=Path.resolve
             def fake_resolve(path,*args,**kwargs):
-                if path==source:return outside_resolved
+                if path==redirected_source:return outside_resolved
                 return real_resolve(path,*args,**kwargs)
             with patch.object(Path,"resolve",new=fake_resolve):
                 with self.assertRaisesRegex(ValueError,"escaped the selected project"):
