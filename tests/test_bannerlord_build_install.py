@@ -43,9 +43,9 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             selected = selected_game.resolve()
             expected = {
                 "BannerlordDir": str(selected),
-                "GameBin": str(selected / "bin" / "Win64_Shipping_Client"),
-                "ModuleDir": str(selected / "Modules" / "SafeModule"),
-                "OutputPath": str(selected / "Modules" / "SafeModule" / "bin" / "Win64_Shipping_Client") + os.sep,
+                "GameBin": str((selected / "bin" / "Win64_Shipping_Client").resolve()),
+                "ModuleDir": str((selected / "Modules" / "SafeModule").resolve()),
+                "OutputPath": str((selected / "Modules" / "SafeModule" / "bin" / "Win64_Shipping_Client").resolve()) + os.sep,
             }
             for property_name, value in expected.items():
                 argument = f"-p:{property_name}={value}"
@@ -71,8 +71,8 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             selected = selected_game.resolve()
             command = runner.call_args.args[0]
             self.assertIn(f"-p:BannerlordDir={selected}", command)
-            self.assertIn(f"-p:GameBin={selected / 'bin' / 'Win64_Shipping_Client'}", command)
-            self.assertIn(f"-p:ModuleDir={selected / 'Modules' / 'SafeModule'}", command)
+            self.assertIn(f"-p:GameBin={(selected / 'bin' / 'Win64_Shipping_Client').resolve()}", command)
+            self.assertIn(f"-p:ModuleDir={(selected / 'Modules' / 'SafeModule').resolve()}", command)
             self.assertEqual(result["gameRootOverride"], str(selected))
 
     def test_selected_install_build_rejects_unsafe_module_id_before_dotnet(self):
@@ -87,6 +87,59 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             with patch("games.bannerlord.project_data.subprocess.run") as runner:
                 with self.assertRaisesRegex(ValueError, "unsafe module Id"):
                     run_build(project, game_root=root / "game")
+            runner.assert_not_called()
+
+    def test_selected_install_build_rejects_redirected_module_path_before_dotnet(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            project = root / "project"
+            project.mkdir()
+            write_project(project)
+            selected_game = root / "game"
+            selected_game.mkdir()
+            outside = root / "outside-module"
+            outside.mkdir()
+            selected = selected_game.resolve()
+            modules_root = selected / "Modules"
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == modules_root / "SafeModule":
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve), \
+                 patch("games.bannerlord.project_data.subprocess.run") as runner:
+                with self.assertRaisesRegex(ValueError, "build module path escaped"):
+                    run_build(project, game_root=selected_game)
+            runner.assert_not_called()
+
+    def test_selected_install_build_rejects_redirected_output_path_before_dotnet(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            project = root / "project"
+            project.mkdir()
+            write_project(project)
+            selected_game = root / "game"
+            selected_game.mkdir()
+            outside = root / "outside-output"
+            outside.mkdir()
+            selected = selected_game.resolve()
+            module_dir = selected / "Modules" / "SafeModule"
+            output_path = module_dir / "bin" / "Win64_Shipping_Client"
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == output_path:
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve), \
+                 patch("games.bannerlord.project_data.subprocess.run") as runner:
+                with self.assertRaisesRegex(ValueError, "build output path escaped"):
+                    run_build(project, game_root=selected_game)
             runner.assert_not_called()
 
     def test_primary_project_file_cannot_escape_selected_project(self):
