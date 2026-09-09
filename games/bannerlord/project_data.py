@@ -47,17 +47,18 @@ def primary_project_file(project: Path) -> Path | None:
 
 
 def _resolve_project_file(project: Path, requested: str | None = None) -> Path:
+    root = project.resolve()
     if requested:
-        target = (project / requested).resolve()
-        root = project.resolve()
-        if target != root and root not in target.parents:
-            raise ValueError("Project file must stay inside the selected Bannerlord project")
-        if target.suffix.casefold() != ".csproj" or not target.is_file():
-            raise FileNotFoundError(target)
-        return target
-    target = primary_project_file(project)
-    if target is None:
-        raise FileNotFoundError(f"No .csproj found in {project}")
+        target = (root / requested).resolve()
+    else:
+        candidate = primary_project_file(project)
+        if candidate is None:
+            raise FileNotFoundError(f"No .csproj found in {project}")
+        target = candidate.resolve()
+    if target != root and root not in target.parents:
+        raise ValueError("Project file must stay inside the selected Bannerlord project")
+    if target.suffix.casefold() != ".csproj" or not target.is_file():
+        raise FileNotFoundError(target)
     return target
 
 
