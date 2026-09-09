@@ -3,6 +3,7 @@ Open-source, plugin-based mod editor with the goal of making it fun and easy for
 Currently supports:
 * Final Fantasy VII
 * Final Fantasy VII Remaster
+* Final Fantasy VII Remake Intergrade
 * Final Fantasy VIII
 * Final Fantasy IX
 * Mount & Blade: Warband
@@ -25,7 +26,10 @@ Start Menu shortcuts:
 Then start `Lexeditor.cmd`. You can also select a game directly:
 
 
-## Contribute a game
+## Make a game plugin
 
-[Add a game plugin](docs/ADDING_A_GAME.md) explains registration, safe project writes,
-shared controls, Data Map coverage and verification.
+[Make a game plugin](docs/ADDING_A_GAME.md) is the research-first development
+playbook: find and reuse existing open-source knowledge before reverse-engineering,
+define loader/project/conflict boundaries, prove one end-to-end edit, preserve
+unknown data, fill Credits and Mod Loading, verify each acceptance level, and keep
+a new plugin in one implementation PR by default.
