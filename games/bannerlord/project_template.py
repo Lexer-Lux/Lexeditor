@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import html
 import re
 
 
@@ -30,15 +31,16 @@ def initialize_project(target: Path) -> None:
     target = Path(target).resolve()
     module_name = target.name.strip() or "Bannerlord Mod"
     module_id = module_id_from_name(module_name)
-    replacements = {
-        "{{MODULE_NAME}}": module_name,
-        "{{MODULE_ID}}": module_id,
-    }
     for relative in _TEMPLATE_FILES:
         path = target / relative
         if not path.is_file():
             raise FileNotFoundError(f"Bannerlord project template is missing {relative}")
         text = path.read_text(encoding="utf-8")
+        xml_context = path.suffix.casefold() in {".xml", ".csproj", ".props", ".targets"}
+        replacements = {
+            "{{MODULE_NAME}}": html.escape(module_name, quote=True) if xml_context else module_name,
+            "{{MODULE_ID}}": module_id,
+        }
         for token, value in replacements.items():
             text = text.replace(token, value)
         unresolved = sorted(token for token in _PLACEHOLDERS if token in text)
