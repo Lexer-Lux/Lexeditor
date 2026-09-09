@@ -8,6 +8,7 @@ from plugin_api import GameInstallSpec, GamePlugin, GitHubRepository, ModProject
 from service_session import LocalPluginSession
 
 from . import paths
+from .game_launch import BannerlordGameController
 
 
 def check() -> list[str]:
@@ -45,6 +46,7 @@ PLUGIN = GamePlugin(
     check=check,
     launch=launch,
     session_factory=BannerlordSession,
+    game_process_factory=BannerlordGameController,
     github=GitHubRepository(
         full_name="Lexer-Lux/Lexers-Mod-For-Bannerlord",
         authorized_logins=("Lexer-Lux",),
