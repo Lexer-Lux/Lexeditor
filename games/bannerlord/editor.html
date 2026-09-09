@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - Bannerlord</title>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    :root{--lex-accent:#8d2f25;--lex-highlight:#a56b34}
+    *{box-sizing:border-box}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:14px/1.4 var(--lex-font)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:auto}
+    .bannerlord-card{max-width:1100px;margin:0 auto;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bannerlord-card h2{margin:0;padding:14px 18px;border-bottom:1px solid var(--lex-border)}
+    .bannerlord-grid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:0}
+    .bannerlord-grid>*{padding:9px 14px;border-bottom:1px solid var(--lex-border)}
+    .bannerlord-label{font-weight:700;color:var(--lex-muted)}
+    .bannerlord-list{margin:0;padding:10px 28px}
+    .bannerlord-note{padding:12px 18px;color:var(--lex-muted)}
+    code{overflow-wrap:anywhere}
+  </style>
+</head>
+<body>
+  <header id="lexeditor-shell"></header>
+  <main id="main"><div>Loading Bannerlord module…</div></main>
+  <script src="/shared/framework.js"></script>
+  <script>
+  "use strict";
+  const {el}=LexeditorUI;
+  const state={tab:"module",module:null,datamap:{rows:[]},query:"",mapStatus:"",page:0,sort:["filename",1]};
+  const main=document.querySelector("#main");
+
+  async function api(path){
+    const response=await fetch(path);
+    const value=await response.json();
+    if(value.error)throw new Error(value.error);
+    return value;
+  }
+
+  function row(label,value){
+    return [el("div",{class:"bannerlord-label"},label),el("div",{},value||"—")];
+  }
+
+  function renderModule(){
+    const module=state.module;
+    if(!module){main.replaceChildren(el("div",{},"No module metadata loaded."));return;}
+    const dependencies=(module.dependencies||[]).map(dep=>dep.Id||dep.id||JSON.stringify(dep));
+    const submodules=(module.submodules||[]).map(entry=>`${entry.name||"(unnamed)"} — ${entry.dllName||"no DLL"} — ${entry.classType||"no class"}`);
+    main.replaceChildren(
+      el("section",{class:"bannerlord-card"},
+        el("h2",{},module.name||module.id||"Bannerlord Module"),
+        el("div",{class:"bannerlord-grid"},
+          ...row("ID",el("code",{},module.id||"—")),
+          ...row("Version",module.version),
+          ...row("Single-player",module.singleplayer?"Yes":"No"),
+          ...row("Multi-player",module.multiplayer?"Yes":"No"),
+          ...row("SubModule.xml",el("code",{},module.path))
+        ),
+        el("h2",{},"Dependencies"),
+        dependencies.length?el("ul",{class:"bannerlord-list"},...dependencies.map(value=>el("li",{},value))):el("div",{class:"bannerlord-note"},"No dependencies declared."),
+        el("h2",{},"Submodules"),
+        submodules.length?el("ul",{class:"bannerlord-list"},...submodules.map(value=>el("li",{},value))):el("div",{class:"bannerlord-note"},"No SubModule entries declared."),
+        el("div",{class:"bannerlord-note"},"Initial slice is deliberately read-only while format-specific editors are added.")
+      )
+    );
+  }
+
+  function renderDataMap(){
+    const view=LexeditorUI.dataMap({
+      rows:state.datamap.rows,
+      query:state.query,
+      status:state.mapStatus,
+      page:state.page,
+      sort:state.sort,
+      tableClass:"bannerlord-data-map",
+      open:row=>{if(row.target==="module")navigate("module")},
+      openSource:()=>{},
+      changeQuery:value=>{state.query=value;state.page=0;renderDataMap()},
+      changeStatus:value=>{state.mapStatus=value;state.page=0;renderDataMap()},
+      changePage:value=>{state.page=value;renderDataMap()},
+      changeSort:value=>{state.sort=value;renderDataMap()}
+    });
+    main.replaceChildren(view);
+  }
+
+  function navigate(tab){
+    state.tab=tab;
+    render();
+  }
+
+  function render(){
+    if(state.tab==="datamap")renderDataMap();
+    else renderModule();
+    shell.refresh();
+  }
+
+  const shell=LexeditorUI.mountShell({
+    host:"#lexeditor-shell",
+    brand:"LEXEDITOR",
+    plugin:{id:"bannerlord",themeName:"bannerlord",theme:{accent:"#8d2f25",highlight:"#a56b34"}},
+    tabs:[{id:"module",label:"Module"}],
+    activeTab:()=>state.tab,
+    navigate,
+    help:()=>navigate("datamap"),
+    helpActive:()=>state.tab==="datamap",
+    helpTitle:"Open the Bannerlord Data Map",
+    dirtyCount:()=>0,
+    readonly:()=>true
+  });
+
+  Promise.all([api("/api/module"),api("/api/datamap")]).then(([module,datamap])=>{
+    state.module=module;
+    state.datamap=datamap;
+    render();
+  }).catch(error=>{
+    main.replaceChildren(el("section",{class:"bannerlord-card"},el("h2",{},"Bannerlord plugin error"),el("div",{class:"bannerlord-note"},String(error.message||error))));
+    shell.refresh();
+  });
+  </script>
+</body>
+</html>
