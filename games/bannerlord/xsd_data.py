@@ -32,7 +32,6 @@ _NUMERIC_TYPES = _INTEGER_TYPES | {"decimal", "double", "float"}
 
 
 def schema_roots(game_root: Path) -> list[Path]:
-    """Return known Modding Kit schema locations without requiring the Kit."""
     candidates = [game_root / "XmlSchemas", game_root / "XMLEditor" / "XmlSchemas"]
     return [path for path in candidates if path.is_dir()]
 
@@ -109,7 +108,6 @@ def _complex_type_rules(root: ET.Element, simple_types: dict[str, dict]) -> dict
 
 
 def _element_types(root: ET.Element) -> dict[str, str]:
-    """Map unambiguous named elements to their declared complex/simple type."""
     found: dict[str, set[str]] = {}
     for element in root.findall(f".//{XS}element"):
         name = element.attrib.get("name", "")
@@ -120,7 +118,6 @@ def _element_types(root: ET.Element) -> dict[str, str]:
 
 
 def _inline_element_rules(root: ET.Element, simple_types: dict[str, dict]) -> dict[str, dict[str, dict]]:
-    """Capture attributes for elements whose complexType is declared inline."""
     found: dict[str, list[dict[str, dict]]] = {}
     for element in root.findall(f".//{XS}element"):
         name = element.attrib.get("name", "")
@@ -144,12 +141,10 @@ def _parse_schema_cached(path_text: str, mtime_ns: int) -> dict:
     complex_types = _complex_type_rules(root, simple_types)
     element_types = _element_types(root)
     inline = _inline_element_rules(root, simple_types)
-
     elements: dict[str, dict[str, dict]] = dict(inline)
     for element_name, type_name in element_types.items():
         if type_name in complex_types:
             elements[element_name] = complex_types[type_name]
-
     global_elements = [
         node.attrib.get("name", "")
         for node in root.findall(f"{XS}element")
@@ -177,7 +172,6 @@ def _schema_files(game_root: Path) -> list[Path]:
 
 
 def find_schema(game_root: Path, schema_id: str, root_tag: str) -> dict | None:
-    """Return a schema only when the best score is unique enough to trust."""
     wanted_id = schema_id.casefold().strip()
     wanted_root = root_tag.casefold().strip()
     candidates = []
@@ -257,7 +251,6 @@ def _current_issue(name: str, value: str, rule: dict) -> str:
 
 
 def enrich_elements(elements: list[dict], schema: dict | None) -> list[dict]:
-    """Attach schema controls plus non-destructive validation diagnostics."""
     if not schema:
         return elements
     rules_by_element = schema.get("elements") or {}
@@ -272,7 +265,11 @@ def enrich_elements(elements: list[dict], schema: dict | None) -> list[dict]:
         for name, rule in rules.items():
             if name not in public:
                 if rule.get("required"):
-                    missing_required.append({"name": name, **_metadata(rule)})
+                    metadata = _metadata(rule)
+                    kind, choices = _control(rule, "text")
+                    metadata["kind"] = kind
+                    metadata["choices"] = choices
+                    missing_required.append({"name": name, **metadata})
                     issues.append(f"Missing required attribute: {name}")
                 continue
             metadata = _metadata(rule)
