@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 
 from . import build as package_build
 from .package import PackageValidationError
-from .server import Handler as EditorHandler, PORT, project_root
+from .server import Handler as EditorHandler, PLUGIN_ROOT, PORT, project_root
 
 
 class Handler(EditorHandler):
@@ -20,6 +20,12 @@ class Handler(EditorHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
+        if path == "/build-ui-pre.js":
+            self.send_file(PLUGIN_ROOT / "build-ui-pre.js")
+            return
+        if path == "/build-ui.js":
+            self.send_file(PLUGIN_ROOT / "build-ui.js")
+            return
         if path == "/api/plugin":
             self.send_json({
                 "apiVersion": 1,
