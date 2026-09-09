@@ -36,6 +36,7 @@ jobs:
           games/chrono_trigger/events.py
           games/chrono_trigger/field_commands.py
           games/chrono_trigger/field_semantics.py
+          games/chrono_trigger/event_flow.py
           games/chrono_trigger/event_edit.py
           games/chrono_trigger/field_editors.py
           games/chrono_trigger/palettes.py
