@@ -1,6 +1,7 @@
-"""Fixture-only browser check for Chrono Trigger desktop raster map surfaces."""
+"""Fixture-only browser check for Chrono Trigger desktop map and event surfaces."""
 from __future__ import annotations
 
+import copy
 import json
 from pathlib import Path
 import sys
@@ -83,6 +84,40 @@ WORLDS = {
         "derived": {"effectivePaletteAnimations": 0},
     }],
 }
+EVENT_LIST = {
+    "kind": "field-events", "matchCount": 1, "offset": 0, "limit": 100,
+    "rows": [{
+        "id": 20, "name": "Atel 0020", "path": "Game/field/atel/Atel_0020.dat",
+        "source": "archive", "sha256": "b" * 64, "objectCount": 1, "decodedCommandCount": 2,
+    }],
+}
+EVENT_DETAIL = {
+    "kind": "field-event", "id": 20, "name": "Atel 0020", "path": "Game/field/atel/Atel_0020.dat",
+    "source": "archive", "sha256": "b" * 64, "objectCount": 1, "uniqueFunctionBounds": 1,
+    "decodedCommandCount": 2, "completeFunctionBounds": 1, "problemFunctionBounds": 0,
+    "objects": [{
+        "id": 0, "start": 32, "end": 35,
+        "functions": [{
+            "id": 0, "name": "Startup", "start": 32, "end": 35, "length": 3, "complete": True,
+            "commands": [
+                {
+                    "offset": 32, "opcode": 0xA6, "name": "NPC Facing", "size": 2,
+                    "argumentsHex": "01", "argumentBytes": 1,
+                    "semantic": {"summary": "NPC facing down", "facing": 1, "facingName": "down"},
+                    "editor": {
+                        "editor": "fixed-fields", "opcode": 0xA6, "opcodeHex": "0xA6", "fixedWidth": True,
+                        "fields": [{
+                            "key": "facing", "label": "Facing (0 up, 1 down, 2 left, 3 right)",
+                            "kind": "integer", "min": 0, "max": 3,
+                        }],
+                        "values": {"facing": 1},
+                    },
+                },
+                {"offset": 34, "opcode": 0x00, "name": "Return", "size": 1, "argumentsHex": ""},
+            ],
+        }],
+    }],
+}
 DASHBOARD = {
     "game": {"archive": "resources.bin", "ready": True},
     "project": {"writable": True, "root": "FixtureMod", "overlayResources": 0},
@@ -111,6 +146,8 @@ def _editor_html() -> str:
 def main() -> None:
     errors: list[str] = []
     results = []
+    saved_event_requests: list[dict] = []
+    event_detail = copy.deepcopy(EVENT_DETAIL)
     html = _editor_html()
     with sync_playwright() as playwright:
         import shutil
@@ -135,6 +172,26 @@ def main() -> None:
                     route.fulfill(status=200, content_type="application/json", body=json.dumps(SCENE_MAP))
                 elif path == "/api/worlds":
                     route.fulfill(status=200, content_type="application/json", body=json.dumps(WORLDS))
+                elif path == "/api/events":
+                    if "id=" in route.request.url:
+                        route.fulfill(status=200, content_type="application/json", body=json.dumps(event_detail))
+                    else:
+                        route.fulfill(status=200, content_type="application/json", body=json.dumps(EVENT_LIST))
+                elif path == "/api/save/event-fields":
+                    request = json.loads(route.request.post_data or "{}")
+                    saved_event_requests.append(request)
+                    facing = int(request.get("values", {}).get("facing", 1))
+                    command = event_detail["objects"][0]["functions"][0]["commands"][0]
+                    command["argumentsHex"] = f"{facing:02X}"
+                    command["semantic"] = {
+                        "summary": ("NPC facing up", "NPC facing down", "NPC facing left", "NPC facing right")[facing],
+                        "facing": facing,
+                        "facingName": ("up", "down", "left", "right")[facing],
+                    }
+                    command["editor"]["values"]["facing"] = facing
+                    event_detail["source"] = "project"
+                    event_detail["sha256"] = "c" * 64
+                    route.fulfill(status=200, content_type="application/json", body=json.dumps(event_detail))
                 elif path in {"/api/scene-raster", "/api/world-raster"}:
                     route.fulfill(status=200, content_type="image/png", body=PNG)
                 else:
@@ -189,8 +246,31 @@ def main() -> None:
             assert page.locator(".ct-warning").count() == 0
             page.screenshot(path=str(ARTIFACTS / "world-raster.png"), full_page=True)
 
+            page.evaluate('navigate("events")')
+            page.wait_for_function('state.events.detail?.id === 20')
+            editor = page.locator(".ct-command-editor")
+            assert editor.count() == 1
+            assert "Facing (0 up, 1 down, 2 left, 3 right)" in editor.inner_text()
+            facing_input = editor.locator('input[type="number"]')
+            assert facing_input.input_value() == "1"
+            facing_input.fill("3")
+            editor.get_by_role("button", name="Apply command", exact=True).click()
+            page.wait_for_function('state.events.detail?.objects?.[0]?.functions?.[0]?.commands?.[0]?.editor?.values?.facing === 3')
+            assert saved_event_requests
+            saved_request = saved_event_requests[-1]
+            assert saved_request["eventId"] == 20
+            assert saved_request["objectId"] == 0
+            assert saved_request["functionId"] == 0
+            assert saved_request["commandIndex"] == 0
+            assert saved_request["sha256"] == "b" * 64
+            assert saved_request["values"] == {"facing": 3}
+            assert page.locator(".ct-command-summary").first.inner_text() == "NPC facing right"
+            assert page.locator(".ct-hex").first.inner_text() == "03"
+            assert page.locator(".ct-warning").count() == 0
+            page.screenshot(path=str(ARTIFACTS / "event-editor.png"), full_page=True)
+
             results.append({"sceneRaster": True, "sceneL3Raster": True, "sceneRenderDiagnostics": True,
-                            "worldRaster": True, "errors": len(errors)})
+                            "worldRaster": True, "eventEditor": True, "errors": len(errors)})
             page.close()
         finally:
             browser.close()
