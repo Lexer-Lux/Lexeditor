@@ -10,7 +10,8 @@ from urllib.parse import parse_qs, urlparse
 
 from . import (
     auto_ability_prices, ctb_base, deployment, ffx2_accessories, ffx2_abilities,
-    gear_shops, item_prices, item_shops, mix_table, paths, theme, treasures,
+    gear_shops, item_prices, item_shops, launch as fahrenheit_launch, mix_table,
+    paths, theme, treasures,
 )
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
@@ -26,6 +27,7 @@ POST_ROUTES = {
     "/api/auto-ability-prices/save", "/api/ctb-base/save", "/api/mix-table/save",
     "/api/item-shops/save", "/api/gear-shops/save", "/api/ffx2-abilities/save",
     "/api/ffx2-accessories/save", "/api/deployment/deploy", "/api/deployment/revert",
+    "/api/play",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
 _META_CACHE: tuple[tuple[int, int], VBFIndex] | None = None
@@ -36,6 +38,34 @@ def _game_key(value: str) -> str:
     if key not in paths.ARCHIVES:
         raise ValueError("game must be 'x' or 'x2'")
     return key
+
+
+def launch_status() -> dict:
+    """Report the fixed Fahrenheit Stage 0 launch contract for both collection games."""
+    state = fahrenheit_launch.status(paths.GAME_ROOT)
+    platform_supported = os.name == "nt"
+    state["platform"] = os.name
+    state["platformSupported"] = platform_supported
+    for game in state["games"].values():
+        game["launchReady"] = bool(platform_supported and state["ready"] and game["ready"])
+        if game["launchReady"]:
+            game["reason"] = "Ready for Fahrenheit Stage 0"
+        elif not platform_supported:
+            game["reason"] = "Fahrenheit game launch is available only on Windows"
+        elif not state["stage0Ready"]:
+            game["reason"] = "Fahrenheit Stage 0 is missing"
+        elif not state["stage1Ready"]:
+            game["reason"] = "Fahrenheit Stage 1 is missing"
+        else:
+            game["reason"] = "Game executable is missing"
+    return state
+
+
+def play_game(request: dict) -> dict:
+    """Launch only one fixed collection title; paths, commands and arguments are never accepted."""
+    if set(request) != {"game"} or request.get("game") not in {"x", "x2"}:
+        raise ValueError("Play request must be exactly {'game':'x'} or {'game':'x2'}")
+    return fahrenheit_launch.launch(paths.GAME_ROOT, request["game"])
 
 
 def _index(game: str) -> VBFIndex:
@@ -340,6 +370,8 @@ def data_map() -> dict:
     if themed.get("font", {}).get("atlasRecognized"): theme_parts.append(f"{themed['font']['atlasRecognized']} font atlas source(s) recognized")
     if themed.get("textures", {}).get("recognized"): theme_parts.append(f"{themed['textures']['recognized']} menu texture source(s) recognized")
     if themed.get("sfx", {}).get("recognizedBanks"): theme_parts.append(f"{themed['sfx']['recognizedBanks']} UI-audio bank(s) recognized")
+    launch_state = launch_status()
+    launch_install_ready = launch_state["ready"] and any(game["ready"] for game in launch_state["games"].values())
     rows.extend([
         {"filename": "data/metamenu.vbf + menu/font/sound resources", "controls": "Private installed-game theme cache",
          "notes": "; ".join(theme_parts) or "Theme extraction falls back safely when cosmetic source assets are unavailable.",
@@ -350,6 +382,9 @@ def data_map() -> dict:
         {"filename": "FFX2_Data/ffx_ps2/ffx2/**", "controls": "Remaining FFX-2 game-data families",
          "notes": "English/US command animations and accessory base ability/price fields are structured; other FFX-2 formats remain read/extract-only until proved.",
          "status": "partial", "coverage": "two-structured-families", "openable": False},
+        {"filename": "fahrenheit/bin/fhstage0.exe + fhstage1.dll", "controls": "Explicit collection-aware Fahrenheit launch",
+         "notes": "Runs Stage 0 from fahrenheit/bin with only fixed ..\\..\\FFX.exe or ..\\..\\FFX-2.exe targets; the Square Enix launcher and arbitrary arguments are never accepted.",
+         "status": "integrated" if launch_install_ready else "partial", "coverage": "fahrenheit-launch", "openable": True, "target": "launch"},
         {"filename": "fahrenheit/mods/lexeditor-ffx-x2/efl/{x,x2}/**", "controls": "Reversible file-only Fahrenheit deployment",
          "notes": "Deploy copies only the selected Lexeditor project into its owned Fahrenheit mod folder and preserves unrelated loadorder entries.",
          "status": "integrated" if deployment.status(paths.GAME_ROOT, paths.PROJECT_ROOT)["fahrenheitReady"] else "partial",
@@ -366,7 +401,7 @@ def dashboard() -> dict:
                  "launcher": str(paths.GAME_ROOT / "FFX&X-2_LAUNCHER.exe"),
                  "executables": [str(paths.GAME_ROOT / "FFX.exe"), str(paths.GAME_ROOT / "FFX-2.exe")]},
         "archives": archives, "project": {"root": str(paths.PROJECT_ROOT), "fileCount": deploy["projectFileCount"]},
-        "deployment": deploy, "theme": theme_status(), "problems": paths.game_problems(),
+        "deployment": deploy, "launch": launch_status(), "theme": theme_status(), "problems": paths.game_problems(),
     }
 
 
@@ -410,9 +445,10 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": ["data-map", "vbf-index", "vbf-extract", "project-overlay", "ffx-treasure-editor",
                         "ffx-item-price-editor", "ffx-auto-ability-price-editor", "ffx-ctb-base-editor", "ffx-mix-editor",
                         "ffx-item-shop-editor", "ffx-gear-shop-editor", "ffx2-ability-animation-editor",
-                        "ffx2-accessory-editor", "installed-game-theme", "fahrenheit-deploy"]})
+                        "ffx2-accessory-editor", "installed-game-theme", "fahrenheit-deploy", "fahrenheit-launch"]})
             elif route == "/api/dashboard": self.json_response(dashboard())
             elif route == "/api/datamap": self.json_response(data_map())
+            elif route == "/api/launch": self.json_response(launch_status())
             elif route == "/api/theme": self.json_response(theme_status())
             elif route == "/api/treasures": self.json_response(treasure_catalog())
             elif route == "/api/item-prices": self.json_response(item_price_catalog())
@@ -456,7 +492,8 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/ffx2-abilities/save": result = save_ffx2_abilities(request)
             elif route == "/api/ffx2-accessories/save": result = save_ffx2_accessories(request)
             elif route == "/api/deployment/deploy": result = deployment.deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
-            else: result = deployment.revert(paths.GAME_ROOT, paths.PROJECT_ROOT)
+            elif route == "/api/deployment/revert": result = deployment.revert(paths.GAME_ROOT, paths.PROJECT_ROOT)
+            else: result = play_game(request)
             self.json_response(result)
         except FileExistsError as error: self.json_response({"error": str(error)}, 409)
         except FileNotFoundError as error: self.json_response({"error": str(error)}, 409)
