@@ -2,13 +2,12 @@
 
 The schemas here sit on top of :mod:`event_edit`: they only rewrite argument
 bytes of an existing command and never change opcode, command size, function
-pointers or object counts. Unspecified bit flags are preserved.
+pointers or object counts. Unspecified bit flags and bytes are preserved.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable
 
 from .data import OverlayStore
 from .event_edit import save_event_arguments
@@ -35,6 +34,8 @@ class Field:
 
 U8 = 0xFF
 U16 = 0xFFFF
+SCRIPT_MEM_START = 0x7F0200
+SCRIPT_MEM_LAST = SCRIPT_MEM_START + U8 * 2
 
 BATTLE_BITS = {
     "noWinPose": (0, 0x01, "No win pose"),
@@ -82,6 +83,17 @@ def _bool(value, label: str) -> bool:
     raise ValueError(f"{label} must be true or false")
 
 
+def _script_address(offset: int) -> int:
+    return SCRIPT_MEM_START + int(offset) * 2
+
+
+def _script_offset(value, label: str) -> int:
+    address = _int(value, SCRIPT_MEM_START, SCRIPT_MEM_LAST, label)
+    if (address - SCRIPT_MEM_START) % 2:
+        raise ValueError(f"{label} must be an even script-memory address")
+    return (address - SCRIPT_MEM_START) // 2
+
+
 def _command(store: OverlayStore, event_id: int, object_id: int,
              function_id: int, command_index: int) -> tuple[dict, dict]:
     event = get_event(store, int(event_id), "mine")
@@ -119,12 +131,26 @@ def editor_schema(command: dict) -> dict | None:
     elif opcode in {0xC0, 0xC3, 0xC4}:
         fields = [Field("stringIndex", "String index", 0, U16),
                   Field("optionFlags", "Option/line flags", 0, U8)]
+    elif opcode == 0xC7:
+        fields = [Field("sourceAddress", "Item ID address", SCRIPT_MEM_START, SCRIPT_MEM_LAST),
+                  Field("category", "Item category (raw)", 0, U8)]
     elif opcode == 0xC9:
         fields = [Field("itemId", "Item ID", 0, U16), Field("jumpOffset", "Jump bytes", 0, U8)]
+    elif opcode in {0xCA, 0xCB}:
+        fields = [Field("itemIndex", "Item index (within category)", 0, U8),
+                  Field("category", "Item category (raw)", 0, U8)]
     elif opcode == 0xCC:
         fields = [Field("gold", "Gold", 0, U16), Field("jumpOffset", "Jump bytes", 0, U8)]
     elif opcode in {0xCD, 0xCE}:
         fields = [Field("gold", "Gold", 0, U16)]
+    elif opcode == 0xD5:
+        fields = [Field("playerId", "Player character", 0, U8),
+                  Field("itemIndex", "Item index (within category)", 0, U8),
+                  Field("category", "Item category (raw)", 0, U8)]
+    elif opcode == 0xD7:
+        fields = [Field("itemIndex", "Item index (within category)", 0, U8),
+                  Field("category", "Item category (raw)", 0, U8),
+                  Field("storeAddress", "Store quantity at", SCRIPT_MEM_START, SCRIPT_MEM_LAST)]
     elif opcode in {0x80, 0x81, 0xD0, 0xD1, 0xD3, 0xD4, 0xD6}:
         fields = [Field("playerId", "Player character", 0, U8)]
     elif opcode in {0xCF, 0xD2}:
@@ -158,12 +184,20 @@ def editor_values(command: dict) -> dict:
         return {"stringIndex": _u16(args)}
     if opcode in {0xC0, 0xC3, 0xC4} and len(args) == 3:
         return {"stringIndex": _u16(args), "optionFlags": args[2]}
+    if opcode == 0xC7 and len(args) == 2:
+        return {"sourceAddress": _script_address(args[0]), "category": args[1]}
     if opcode == 0xC9 and len(args) == 3:
         return {"itemId": _u16(args), "jumpOffset": args[2]}
+    if opcode in {0xCA, 0xCB} and len(args) == 2:
+        return {"itemIndex": args[0], "category": args[1]}
     if opcode == 0xCC and len(args) == 3:
         return {"gold": _u16(args), "jumpOffset": args[2]}
     if opcode in {0xCD, 0xCE} and len(args) == 2:
         return {"gold": _u16(args)}
+    if opcode == 0xD5 and len(args) == 3:
+        return {"playerId": args[0], "itemIndex": args[1], "category": args[2]}
+    if opcode == 0xD7 and len(args) == 3:
+        return {"itemIndex": args[0], "category": args[1], "storeAddress": _script_address(args[2])}
     if opcode in {0x80, 0x81, 0xD0, 0xD1, 0xD3, 0xD4, 0xD6} and len(args) == 1:
         return {"playerId": args[0]}
     if opcode in {0xCF, 0xD2} and len(args) == 2:
@@ -208,11 +242,21 @@ def _apply(command: dict, values: dict) -> bytes:
             _put_u16(args, 0, _int(values["stringIndex"], 0, U16, "String index"))
         if "optionFlags" in values:
             args[2] = _int(values["optionFlags"], 0, U8, "Option/line flags")
+    elif opcode == 0xC7:
+        if "sourceAddress" in values:
+            args[0] = _script_offset(values["sourceAddress"], "Item ID address")
+        if "category" in values:
+            args[1] = _int(values["category"], 0, U8, "Item category")
     elif opcode == 0xC9:
         if "itemId" in values:
             _put_u16(args, 0, _int(values["itemId"], 0, U16, "Item ID"))
         if "jumpOffset" in values:
             args[2] = _int(values["jumpOffset"], 0, U8, "Jump bytes")
+    elif opcode in {0xCA, 0xCB}:
+        if "itemIndex" in values:
+            args[0] = _int(values["itemIndex"], 0, U8, "Item index")
+        if "category" in values:
+            args[1] = _int(values["category"], 0, U8, "Item category")
     elif opcode == 0xCC:
         if "gold" in values:
             _put_u16(args, 0, _int(values["gold"], 0, U16, "Gold"))
@@ -221,6 +265,20 @@ def _apply(command: dict, values: dict) -> bytes:
     elif opcode in {0xCD, 0xCE}:
         if "gold" in values:
             _put_u16(args, 0, _int(values["gold"], 0, U16, "Gold"))
+    elif opcode == 0xD5:
+        if "playerId" in values:
+            args[0] = _int(values["playerId"], 0, U8, "Player character")
+        if "itemIndex" in values:
+            args[1] = _int(values["itemIndex"], 0, U8, "Item index")
+        if "category" in values:
+            args[2] = _int(values["category"], 0, U8, "Item category")
+    elif opcode == 0xD7:
+        if "itemIndex" in values:
+            args[0] = _int(values["itemIndex"], 0, U8, "Item index")
+        if "category" in values:
+            args[1] = _int(values["category"], 0, U8, "Item category")
+        if "storeAddress" in values:
+            args[2] = _script_offset(values["storeAddress"], "Store quantity address")
     elif opcode in {0x80, 0x81, 0xD0, 0xD1, 0xD3, 0xD4, 0xD6}:
         if "playerId" in values:
             args[0] = _int(values["playerId"], 0, U8, "Player character")
