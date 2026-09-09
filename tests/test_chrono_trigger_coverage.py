@@ -84,7 +84,22 @@ class CoverageTests(unittest.TestCase):
         event_row = next(row for row in mapped["rows"] if row["filename"] == "Game/field/atel/Atel_*.dat")
         self.assertEqual(event_row["coverage"], "structural + fixed-write")
         self.assertIn("named fixed-width editing", event_row["controls"])
+        self.assertIn("0x12–0x15 memory comparisons", event_row["controls"])
         self.assertIn("desktop Events view", event_row["notes"])
+        self.assertIn("jump-if-false", event_row["notes"])
+        self.assertIn("decoded command boundary", event_row["notes"])
+        self.assertIn("0x16 remains excluded", event_row["notes"])
+
+    def test_data_map_describes_gameplay_research_inventory_and_probe_boundaries(self):
+        store = SimpleNamespace(archive=SimpleNamespace(entries=[]))
+        mapped = augment_data_map(store, {"rows": [], "counts": {"resources": 0}})
+        row = next(item for item in mapped["rows"] if item["filename"] == "Actual resources.bin path families")
+        self.assertEqual(row["coverage"], "research")
+        self.assertIn("bounded", row["controls"])
+        self.assertIn("selected-family/path", row["controls"])
+        self.assertIn("four-byte declared payload-size", row["notes"])
+        self.assertIn("before decompression", row["notes"])
+        self.assertIn("No gameplay-stat editor", row["notes"])
 
     def test_data_map_describes_scene_render_diagnostics_without_playback_claim(self):
         store = SimpleNamespace(archive=SimpleNamespace(entries=[
