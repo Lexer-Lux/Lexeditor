@@ -5,7 +5,8 @@ import struct
 import unittest
 
 from games.chrono_trigger.data import sha256
-from games.chrono_trigger.editor_registry import editor_schema, save_event_fields
+from games.chrono_trigger.editor_registry import decorate_event_editors, editor_schema
+from games.chrono_trigger.event_edit import save_event_arguments
 from games.chrono_trigger.mode7_ops import mode7_semantics
 
 
@@ -52,51 +53,29 @@ def command(arguments: bytes) -> dict:
 
 
 class Mode7OpTests(unittest.TestCase):
-    def test_scene_mode_exposes_only_width_stable_scene_id(self):
-        schema = editor_schema(command(b"\x42"))
-        self.assertIsNotNone(schema)
-        self.assertEqual(schema["values"], {"sceneId": 0x42})
-        self.assertEqual(schema["fields"], [{
-            "key": "sceneId", "label": "Mode 7 scene", "kind": "integer",
-            "min": 0, "max": 0x89,
-        }])
-        self.assertEqual(mode7_semantics(command(b"\x42"))["summary"], "Mode 7 scene 66")
+    def test_scene_mode_has_read_only_semantics_and_no_editor(self):
+        cmd = command(b"\x42")
+        self.assertIsNone(editor_schema(cmd))
+        semantic = mode7_semantics(cmd)
+        self.assertEqual(semantic["summary"], "Mode 7 scene 66")
+        self.assertEqual(semantic["sceneId"], 0x42)
+        self.assertTrue(semantic["readOnlyMode"])
 
-    def test_scene_edit_preserves_one_argument_byte(self):
-        original = event(bytes((0xFF, 0x42, 0x00)))
-        store = FakeStore(original)
-        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"sceneId": 0x89})
-        self.assertEqual(store.overlay[33:35], bytes((0xFF, 0x89)))
-        self.assertEqual(len(store.overlay), len(original))
-
-        rejected = FakeStore(original)
-        with self.assertRaisesRegex(ValueError, "Mode 7 scene must be between 0 and 137"):
-            save_event_fields(rejected, 1, 0, 0, 0, sha256(original), {"sceneId": 0x90})
-        self.assertIsNone(rejected.overlay)
-
-    def test_parameter_specials_expose_payload_but_not_mode_byte(self):
+    def test_parameter_specials_have_read_only_payload_semantics(self):
         for code, name in ((0x90, "Black Circle"), (0x97, "Mode 97")):
             with self.subTest(code=code):
                 cmd = command(bytes((code, 1, 2, 3)))
-                schema = editor_schema(cmd)
-                self.assertEqual(schema["values"], {"param1": 1, "param2": 2, "param3": 3})
-                self.assertEqual([field["key"] for field in schema["fields"]], ["param1", "param2", "param3"])
+                self.assertIsNone(editor_schema(cmd))
                 semantic = mode7_semantics(cmd)
                 self.assertEqual(semantic["specialCode"], code)
+                self.assertEqual(
+                    (semantic["param1"], semantic["param2"], semantic["param3"]),
+                    (1, 2, 3),
+                )
+                self.assertTrue(semantic["readOnlyMode"])
                 self.assertIn(name, semantic["summary"])
 
-    def test_parameter_special_partial_write_keeps_code_and_other_params(self):
-        original = event(bytes((0xFF, 0x90, 0x11, 0x22, 0x33, 0x00)))
-        store = FakeStore(original)
-        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"param2": 0xAA})
-        self.assertEqual(store.overlay[34:38], bytes((0x90, 0x11, 0xAA, 0x33)))
-        self.assertEqual(len(store.overlay), len(original))
-
-        with self.assertRaisesRegex(ValueError, "Unknown fields"):
-            second = FakeStore(original)
-            save_event_fields(second, 1, 0, 0, 0, sha256(original), {"specialCode": 0x97})
-
-    def test_simple_specials_are_semantic_only_and_not_writable(self):
+    def test_simple_specials_are_semantic_only(self):
         expected = {
             0x91: "Mode 91",
             0x92: "Left-Right Swipe Open",
@@ -114,7 +93,34 @@ class Mode7OpTests(unittest.TestCase):
                 self.assertTrue(semantic["readOnlyMode"])
                 self.assertIn(name, semantic["summary"])
 
-    def test_wrong_width_or_unknown_special_stays_unregistered(self):
+    def test_semantic_decorator_does_not_attach_writer(self):
+        payload = {
+            "objects": [{
+                "functions": [{
+                    "commands": [command(b"\x42"), command(b"\x90\x01\x02\x03")],
+                }],
+            }],
+        }
+        decorate_event_editors(payload)
+        for cmd in payload["objects"][0]["functions"][0]["commands"]:
+            self.assertIn("semantic", cmd)
+            self.assertNotIn("editor", cmd)
+
+    def test_shared_writer_guard_rejects_dynamic_mode7_scene(self):
+        original = event(bytes((0xFF, 0x42, 0x00)))
+        store = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "variable or unresolved PC width"):
+            save_event_arguments(store, 1, 0, 0, 0, sha256(original), b"\x43")
+        self.assertIsNone(store.overlay)
+
+    def test_shared_writer_guard_rejects_dynamic_mode7_parameter_special(self):
+        original = event(bytes((0xFF, 0x90, 0x11, 0x22, 0x33, 0x00)))
+        store = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "variable or unresolved PC width"):
+            save_event_arguments(store, 1, 0, 0, 0, sha256(original), b"\x90\x11\xAA\x33")
+        self.assertIsNone(store.overlay)
+
+    def test_wrong_width_or_unknown_special_has_no_semantics_or_editor(self):
         for args in (
             b"\x42\x01",
             b"\x90",
@@ -123,7 +129,9 @@ class Mode7OpTests(unittest.TestCase):
             b"\x99",
         ):
             with self.subTest(args=args.hex()):
-                self.assertIsNone(editor_schema(command(args)))
+                cmd = command(args)
+                self.assertIsNone(editor_schema(cmd))
+                self.assertIsNone(mode7_semantics(cmd))
 
 
 if __name__ == "__main__":
