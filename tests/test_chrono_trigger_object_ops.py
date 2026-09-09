@@ -49,7 +49,7 @@ def command(opcode: int, argument: int) -> dict:
 
 class ObjectOpTests(unittest.TestCase):
     def test_all_selected_object_ops_decode_doubled_target(self):
-        self.assertEqual(OBJECT_OPCODES, frozenset({0x0A, 0x7C, 0x7D}))
+        self.assertEqual(OBJECT_OPCODES, frozenset({0x0A, 0x0B, 0x0C, 0x7C, 0x7D}))
         for opcode in sorted(OBJECT_OPCODES):
             with self.subTest(opcode=opcode):
                 schema = editor_schema(command(opcode, 0x08))
@@ -58,6 +58,10 @@ class ObjectOpTests(unittest.TestCase):
 
     def test_semantics_match_constructor_operations(self):
         self.assertEqual(object_semantics(command(0x0A, 0x08))["summary"], "Remove object 4")
+        self.assertEqual(object_semantics(command(0x0B, 0x08))["summary"],
+                         "Disable script processing for object 4")
+        self.assertEqual(object_semantics(command(0x0C, 0x08))["summary"],
+                         "Enable script processing for object 4")
         self.assertEqual(object_semantics(command(0x7C, 0x08))["summary"], "Turn drawing on for object 4")
         self.assertEqual(object_semantics(command(0x7D, 0x08))["summary"], "Turn drawing off for object 4")
 
@@ -68,18 +72,23 @@ class ObjectOpTests(unittest.TestCase):
         self.assertEqual(store.overlay[34], 22)
         self.assertEqual(len(store.overlay), len(original))
 
+    def test_processing_target_write_keeps_opcode_and_only_changes_target(self):
+        original = event(bytes((0x0B, 0x08, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"objectId": 9})
+        self.assertEqual(store.overlay[33:35], bytes((0x0B, 18)))
+        self.assertEqual(len(store.overlay), len(original))
+
     def test_odd_stored_target_and_out_of_range_logical_target_fail_closed(self):
-        self.assertIsNone(editor_schema(command(0x0A, 0x09)))
+        for opcode in OBJECT_OPCODES:
+            with self.subTest(opcode=opcode):
+                self.assertIsNone(editor_schema(command(opcode, 0x09)))
 
         original = event(bytes((0x0A, 0x08, 0x00)))
         store = FakeStore(original)
         with self.assertRaisesRegex(ValueError, "Object ID must be between 0 and 127"):
             save_event_fields(store, 1, 0, 0, 0, sha256(original), {"objectId": 128})
         self.assertIsNone(store.overlay)
-
-    def test_processing_neighbors_are_not_assumed_to_use_same_target_encoding(self):
-        self.assertIsNone(editor_schema(command(0x0B, 0x08)))
-        self.assertIsNone(editor_schema(command(0x0C, 0x08)))
 
 
 if __name__ == "__main__":
