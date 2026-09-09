@@ -141,6 +141,18 @@ class ResourceArchive:
         except KeyError as error:
             raise KeyError(f"resource not found: {path}") from error
 
+    def declared_payload_size(self, entry: ResourceEntry | str) -> int:
+        """Read only an entry's decoded 4-byte uncompressed-size prefix.
+
+        This does not read or inflate the gzip payload. It is intended for
+        lightweight archive-family clustering/reverse-engineering diagnostics.
+        """
+        record = self.get(entry) if isinstance(entry, str) else entry
+        if record.stored_size < 4:
+            raise ResourceArchiveError(f"{record.path} block is shorter than its size prefix")
+        prefix = self._read_decoded(record.offset, 4)
+        return int.from_bytes(prefix, "big")
+
     def read(self, entry: ResourceEntry | str) -> bytes:
         """Decode and decompress one resource without modifying the archive."""
         record = self.get(entry) if isinstance(entry, str) else entry
