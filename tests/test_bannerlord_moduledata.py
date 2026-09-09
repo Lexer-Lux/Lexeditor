@@ -68,20 +68,8 @@ class BannerlordModuleDataTests(unittest.TestCase):
                 project,
                 value["relativePath"],
                 [
-                    {
-                        "elementPath": weapon["path"],
-                        "tag": "Weapon",
-                        "attribute": "swing_damage",
-                        "originalValue": "6",
-                        "value": 8,
-                    },
-                    {
-                        "elementPath": flag["path"],
-                        "tag": "WeaponFlags",
-                        "attribute": "MeleeWeapon",
-                        "originalValue": "true",
-                        "value": False,
-                    },
+                    {"elementPath": weapon["path"], "tag": "Weapon", "attribute": "swing_damage", "originalValue": "6", "value": 8},
+                    {"elementPath": flag["path"], "tag": "WeaponFlags", "attribute": "MeleeWeapon", "originalValue": "true", "value": False},
                 ],
             )
             self.assertEqual(result["saved"], 2)
@@ -96,6 +84,67 @@ class BannerlordModuleDataTests(unittest.TestCase):
         finally:
             temporary.cleanup()
 
+    def test_duplicate_and_delete_preserve_complete_nested_record_body(self):
+        temporary, project, source = self.fixture()
+        try:
+            value = read_document(project, "ModuleData/items.xml")
+            record = value["records"][0]
+            duplicated = save_document(
+                project,
+                value["relativePath"],
+                [{"recordAction": "duplicate", "elementPath": record["path"], "tag": record["tag"], "originalId": "torch", "newId": "torch_copy"}],
+            )
+            self.assertEqual(duplicated["saved"], 1)
+            self.assertEqual(duplicated["recordCount"], 3)
+            self.assertEqual([row["id"] for row in duplicated["records"]], ["torch", "torch_copy", "peasant_maul_t1"])
+            rewritten = source.read_text(encoding="utf-8")
+            self.assertEqual(rewritten.count('CustomAttribute="keep"'), 2)
+            self.assertEqual(rewritten.count('UnknownFlag="keep"'), 2)
+            self.assertEqual(rewritten.count("<!-- preserve module-specific data -->"), 1)
+            self.assertIn('id="torch_copy" name="{=TorchKey}Torch"', rewritten)
+            self.assertTrue(Path(duplicated["backup"]).is_file())
+
+            copy_record = next(row for row in duplicated["records"] if row["id"] == "torch_copy")
+            with self.assertRaisesRegex(ValueError, "already uses ID"):
+                save_document(
+                    project,
+                    duplicated["relativePath"],
+                    [{"recordAction": "duplicate", "elementPath": copy_record["path"], "tag": copy_record["tag"], "originalId": "torch_copy", "newId": "torch"}],
+                )
+
+            deleted = save_document(
+                project,
+                duplicated["relativePath"],
+                [{"recordAction": "delete", "elementPath": copy_record["path"], "tag": copy_record["tag"], "originalId": "torch_copy"}],
+            )
+            self.assertEqual(deleted["saved"], 1)
+            self.assertEqual(deleted["recordCount"], 2)
+            self.assertEqual(source.read_text(encoding="utf-8"), ITEMS)
+        finally:
+            temporary.cleanup()
+
+    def test_record_actions_reject_nested_nodes_stale_ids_and_mixed_edits(self):
+        temporary, project, _source = self.fixture()
+        try:
+            value = read_document(project, "ModuleData/items.xml")
+            item = next(row for row in value["elements"] if row["tag"] == "Item")
+            weapon = next(row for row in value["elements"] if row["tag"] == "Weapon")
+            with self.assertRaisesRegex(ValueError, "top-level"):
+                save_document(project, value["relativePath"], [{"recordAction": "delete", "elementPath": weapon["path"], "tag": "Weapon"}])
+            with self.assertRaisesRegex(ValueError, "ID changed on disk"):
+                save_document(project, value["relativePath"], [{"recordAction": "delete", "elementPath": item["path"], "tag": "Item", "originalId": "wrong"}])
+            with self.assertRaisesRegex(ValueError, "cannot be combined"):
+                save_document(
+                    project,
+                    value["relativePath"],
+                    [
+                        {"recordAction": "duplicate", "elementPath": item["path"], "tag": "Item", "originalId": "torch", "newId": "torch_copy"},
+                        {"elementPath": item["path"], "tag": "Item", "attribute": "weight", "originalValue": "0.2", "value": 0.4},
+                    ],
+                )
+        finally:
+            temporary.cleanup()
+
     def test_stale_write_and_path_escape_are_rejected(self):
         temporary, project, source = self.fixture()
         try:
@@ -106,13 +155,7 @@ class BannerlordModuleDataTests(unittest.TestCase):
                 save_document(
                     project,
                     value["relativePath"],
-                    [{
-                        "elementPath": item["path"],
-                        "tag": "Item",
-                        "attribute": "weight",
-                        "originalValue": "0.2",
-                        "value": 0.4,
-                    }],
+                    [{"elementPath": item["path"], "tag": "Item", "attribute": "weight", "originalValue": "0.2", "value": 0.4}],
                 )
             with self.assertRaisesRegex(ValueError, "only opens XML files under ModuleData"):
                 read_document(project, "../outside.xml")
