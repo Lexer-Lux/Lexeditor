@@ -92,6 +92,18 @@ def _scene_map() -> bytes:
     return bytes([0, 0, 0, 0, 3, 0x11]) + bytes([1]) * 256 + bytes([2]) * 256 + bytes([0x84, 0, 0, 0])
 
 
+def _smoke_palette() -> bytes:
+    palette = bytearray(2 + 256 * 2)
+    struct.pack_into("<H", palette, 2 + 2, 0x001F)  # palette index 1 = red
+    return bytes(palette)
+
+
+def _png_dimensions(payload: bytes) -> tuple[int, int]:
+    if not payload.startswith(b"\x89PNG\r\n\x1a\n") or payload[12:16] != b"IHDR":
+        raise RuntimeError("Chrono Trigger raster endpoint did not return a PNG")
+    return struct.unpack_from(">II", payload, 16)
+
+
 def smoke() -> list[str]:
     """Exercise the managed service, overlays, inspection/export and deployment."""
     with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-trigger-plugin-") as temp_name:
@@ -106,11 +118,25 @@ def smoke() -> list[str]:
         }), encoding="utf-8")
 
         scene = bytearray(24)
-        struct.pack_into("<H", scene, 0, 10)
-        struct.pack_into("<H", scene, 12, 0)
-        struct.pack_into("<H", scene, 16, 20)
+        struct.pack_into("<H", scene, 0, 10)  # music
+        struct.pack_into("<H", scene, 2, 1)   # L1/L2 BGSetTable
+        struct.pack_into("<H", scene, 4, 2)   # L1/L2 ChipTable
+        struct.pack_into("<H", scene, 8, 3)   # palette
+        struct.pack_into("<H", scene, 12, 0)  # MapTable
+        struct.pack_into("<H", scene, 16, 20) # Atel event
+
         bank = bytearray(WORLD_HEADER_OFFSET + 8 * WORLD_HEADER_SIZE + 16)
+        world_start = WORLD_HEADER_OFFSET
+        bank[world_start + 0] = 5
+        for index in range(1, 8):
+            bank[world_start + index] = 0x80
+        bank[world_start + 10] = 3  # palette
+        bank[world_start + 16] = 2  # L1/L2 assembly
+        bank[world_start + 17] = 4  # map
+
         event = _field_event(bytes([0x83, 0x34, 0x12, 0x80, 0x00]))
+        cg = b"CG00" + bytes([0x11]) * (128 * 64 // 2)
+        palette = _smoke_palette()
         _build_smoke_archive(game / "resources.bin", [
             ("Localize/en/msg/item.txt", b"0000,Potion\r\n0001,Ether\r\n"),
             ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\n0001,Guardia Forest\n"),
@@ -118,8 +144,16 @@ def smoke() -> list[str]:
             ("Localize/en/msg/player.txt", b"0000,Crono\n0001,Marle\n"),
             ("Game/field/Mapinfo/mapinfo_0.dat", bytes(scene)),
             ("Game/field/MapTable/MapTable_0000.dat", _scene_map()),
+            ("Game/field/BGSetTable/bgsettable_1.dat", bytes([5, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])),
+            ("Game/field/map_bin/cg5.bin", cg),
+            ("Game/field/ChipTable/ChipTable_0002.dat", bytes(512 * 4 * 3)),
+            ("Game/field/palette_bin/plt3.bin", palette),
             ("Game/field/atel/Atel_0020.dat", event),
             (WORLD_BANK, bytes(bank)),
+            ("Game/world/Map/Map_0004.dat", bytes(96 * 64 * 2)),
+            ("Game/world/map_bin/cg5.bin", cg),
+            ("Game/world/Chip/Chip_0002.dat", bytes(512 * 4 * 2)),
+            ("Game/world/plt_bin/plt3.bin", palette),
             ("Game/world/EventTable/EventTable_0000.dat", b"\x00\x00\x00\x00"),
             ("Game/world/esl/Event_0000.dat", b"\x00\x52"),
         ])
@@ -135,17 +169,23 @@ def smoke() -> list[str]:
                 editor_html = response.read().decode("utf-8")
             if '<script src="/event_editor.js"></script>' not in editor_html:
                 raise RuntimeError("Chrono Trigger desktop event editor module was not attached")
+            if '<script src="/map_previews.js"></script>' not in editor_html:
+                raise RuntimeError("Chrono Trigger desktop map preview module was not attached")
             with urlopen(session.url + "event_editor.js", timeout=5) as response:
                 event_editor_js = response.read().decode("utf-8")
             if "/api/save/event-fields" not in event_editor_js or "Apply command" not in event_editor_js:
                 raise RuntimeError("Chrono Trigger desktop event editor module did not expose the named fixed-width workflow")
+            with urlopen(session.url + "map_previews.js", timeout=5) as response:
+                map_preview_js = response.read().decode("utf-8")
+            if "/api/scene-raster" not in map_preview_js or "/api/world-raster" not in map_preview_js:
+                raise RuntimeError("Chrono Trigger desktop map preview module did not expose scene/world rasters")
 
             identity = request_json(session.url + "api/plugin")
             required = {
                 "resource-index", "resource-preview", "localized-labels", "scene-map-layout",
-                "localization-text", "scene-headers", "field-event-disassembly",
-                "field-event-fixed-edit", "project-overlay", "project-changes", "ctp-export",
-                "ctext-deploy", "world-script-disassembly",
+                "scene-raster-preview", "world-raster-preview", "localization-text", "scene-headers",
+                "field-event-disassembly", "field-event-fixed-edit", "project-overlay", "project-changes",
+                "ctp-export", "ctext-deploy", "world-script-disassembly",
             }
             if identity.get("pluginId") != "chrono-trigger" or not required.issubset(identity.get("capabilities", [])):
                 raise RuntimeError("Chrono Trigger service returned the wrong managed capabilities")
@@ -173,6 +213,18 @@ def smoke() -> list[str]:
             map_data = request_json(session.url + "api/scene-map?scene=0&source=mine")
             if map_data["sceneWidth"] != 16 or map_data["collisionCounts"] != {"Full": 256}:
                 raise RuntimeError("Chrono Trigger smoke structural scene map did not decode")
+            with urlopen(session.url + "api/scene-raster?scene=0&layer=1&source=mine", timeout=5) as response:
+                scene_png = response.read()
+                if response.headers.get_content_type() != "image/png":
+                    raise RuntimeError("Chrono Trigger scene raster endpoint returned the wrong content type")
+            if _png_dimensions(scene_png) != (256, 256):
+                raise RuntimeError("Chrono Trigger scene raster endpoint returned the wrong dimensions")
+            with urlopen(session.url + "api/world-raster?world=0&layer=1&source=mine", timeout=5) as response:
+                world_png = response.read()
+                if response.headers.get_content_type() != "image/png":
+                    raise RuntimeError("Chrono Trigger world raster endpoint returned the wrong content type")
+            if _png_dimensions(world_png) != (1536, 1024):
+                raise RuntimeError("Chrono Trigger world raster endpoint returned the wrong dimensions")
 
             event_data = request_json(session.url + "api/events?id=20&source=mine")
             if event_data["decodedCommandCount"] != 2 or event_data["problemFunctionBounds"]:
@@ -262,8 +314,9 @@ def smoke() -> list[str]:
             raise RuntimeError("Chrono Trigger deployment did not create the CTExt config backup")
 
     return [
-        "managed service, desktop event editor asset and expanded capability contract confirmed",
-        "localized labels, bounded resource preview, scene MapTable and field-event commands decoded",
+        "managed service and desktop event/map assets with expanded capability contract confirmed",
+        "localized labels, bounded resource preview, structural MapTable and field-event commands decoded",
+        "actual PC scene/world L1 raster endpoints rendered at expected dimensions",
         "named fixed-width event command edited through the managed desktop API with Vanilla unchanged",
         "message, event and scene edits saved to loose overlays while Vanilla stayed unchanged",
         "project change inventory and deterministic CTP export verified",
