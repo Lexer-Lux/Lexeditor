@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -101,6 +102,29 @@ class BannerlordDeployTests(unittest.TestCase):
             self.assertIn("ModuleData/items.xml", second["copied"])
             self.assertIn("SubModule.xml", second["unchanged"])
             self.assertTrue(deployment_status(project, game)["inSync"])
+        finally:
+            temporary.cleanup()
+
+    def test_asset_sync_helper_files_do_not_follow_existing_hardlinks(self):
+        temporary, project, game, deployed = self.fixture(installed=True)
+        try:
+            destination = deployed / "GUI" / "Prefabs" / "Test.xml"
+            backup_path = destination.with_name(destination.name + ".lexeditor.bak")
+            temporary_path = destination.with_name(destination.name + ".lexeditor.tmp")
+            outside_backup = project.parent / "outside-deploy-backup.txt"
+            outside_temporary = project.parent / "outside-deploy-temporary.txt"
+            outside_backup.write_text("backup sentinel", encoding="utf-8")
+            outside_temporary.write_text("temporary sentinel", encoding="utf-8")
+            os.link(outside_backup, backup_path)
+            os.link(outside_temporary, temporary_path)
+
+            result = sync_project_assets(project, game)
+
+            self.assertIn("GUI/Prefabs/Test.xml", result["copied"])
+            self.assertEqual(outside_backup.read_text(encoding="utf-8"), "backup sentinel")
+            self.assertEqual(outside_temporary.read_text(encoding="utf-8"), "temporary sentinel")
+            self.assertEqual(backup_path.read_text(encoding="utf-8"), "<Prefab><Old /></Prefab>\n")
+            self.assertEqual(destination.read_text(encoding="utf-8"), "<Prefab><Window /></Prefab>\n")
         finally:
             temporary.cleanup()
 
