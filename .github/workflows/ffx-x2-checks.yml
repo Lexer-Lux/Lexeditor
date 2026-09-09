@@ -68,6 +68,7 @@ jobs:
           tests/test_ffx_x2_treasures.py
           tests/test_ffx_x2_item_prices.py
           tests/test_ffx_x2_ctb_base.py
+          tests/test_ffx_x2_mix_table.py
           tests/test_ffx_x2_item_shops.py
           tests/test_ffx_x2_gear_shops.py
       - name: Managed service smoke
