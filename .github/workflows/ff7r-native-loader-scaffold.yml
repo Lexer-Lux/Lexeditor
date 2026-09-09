@@ -2,7 +2,7 @@ name: FF7R native loader scaffold
 
 on:
   push:
-    branches: [work/ff7r-native-loader-scaffold]
+    branches: [work/ff7r-native-loader-scaffold, 'work/ff7r-*']
     paths:
       - 'games/ff7r/native_runtime/**'
       - '.github/workflows/ff7r-native-loader-scaffold.yml'

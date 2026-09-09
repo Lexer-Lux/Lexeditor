@@ -5,7 +5,7 @@ import pytest
 from games.ff7r.native_probe import PEFormatError, probe_bytes
 
 
-def fixture_pe(*, with_pdata=True):
+def fixture_pe(*, with_pdata=True, with_inbound_caller=False):
     data = bytearray(0x600)
     data[:2] = b"MZ"
     pe = 0x80
@@ -22,7 +22,8 @@ def fixture_pe(*, with_pdata=True):
     struct.pack_into("<I", data, optional + 108, 16)  # NumberOfRvaAndSizes
     if with_pdata:
         exception = optional + 112 + 3 * 8
-        struct.pack_into("<II", data, exception, 0x3000, 24)
+        exception_size = 36 if with_inbound_caller else 24
+        struct.pack_into("<II", data, exception, 0x3000, exception_size)
 
     sections = optional + 0xF0
 
@@ -40,6 +41,8 @@ def fixture_pe(*, with_pdata=True):
         section(2, ".pdata", 0x3000, 0x500, 0x40)
         struct.pack_into("<III", data, 0x500, 0x1010, 0x1020, 0x3030)
         struct.pack_into("<III", data, 0x50C, 0x1040, 0x1050, 0x3040)
+        if with_inbound_caller:
+            struct.pack_into("<III", data, 0x518, 0x1060, 0x1070, 0x3050)
 
     # String at .rdata+0x20 => RVA 0x2020.
     data[0x420:0x420 + len(b"NaviMap\0")] = b"NaviMap\0"
@@ -58,6 +61,10 @@ def fixture_pe(*, with_pdata=True):
     # next-hop code reference.
     call_rva = 0x101B
     data[0x21B:0x220] = b"\xE8" + struct.pack("<i", 0x1040 - (call_rva + 5))
+    if with_inbound_caller:
+        # A third exact .pdata function directly calls the reflected-string owner.
+        caller_rva = 0x1060
+        data[0x260:0x265] = b"\xE8" + struct.pack("<i", 0x1010 - (caller_rva + 5))
     return bytes(data)
 
 
@@ -114,7 +121,18 @@ def test_probe_maps_pdata_function_ranges_and_byte_windows():
     assert code_refs["byteCount"] == 16
     assert code_refs["rangeTruncated"] is False
     assert code_refs["refsTruncated"] is False
-    assert code_refs["refs"] == [{
+    refs = code_refs["refs"]
+    assert len(refs) == 1
+    ref = refs[0]
+    assert {
+        key: ref[key]
+        for key in (
+            "kind", "instructionRva", "instructionVa", "targetRva", "targetVa",
+            "targetFunctionRva", "targetFunctionVa", "targetFunctionEndRva",
+            "targetFunctionEndVa", "targetFunctionUnwindInfoRva",
+            "targetFunctionUnwindInfoVa",
+        )
+    } == {
         "kind": "call-rel32",
         "instructionRva": 0x101B,
         "instructionVa": 0x14000101B,
@@ -126,11 +144,42 @@ def test_probe_maps_pdata_function_ranges_and_byte_windows():
         "targetFunctionEndVa": 0x140001050,
         "targetFunctionUnwindInfoRva": 0x3040,
         "targetFunctionUnwindInfoVa": 0x140003040,
-    }]
+    }
+    assert ref["targetFunctionInboundCodeRefs"]["targetFunctionRva"] == 0x1040
+    assert ref["targetFunctionInboundCodeRefs"]["refs"][0]["sourceFunctionRva"] == 0x1010
 
     assert result["needles"][1]["hits"] == []
     assert any(".pdata" in note for note in result["notes"])
     assert any("code refs" in note for note in result["notes"])
+    assert any("Inbound" in note for note in result["notes"])
+
+
+def test_probe_reports_exact_pdata_inbound_callers_for_string_owner_and_next_hop():
+    result = probe_bytes(fixture_pe(with_inbound_caller=True), needles=["NaviMap"])
+    assert result["exceptionDirectory"]["runtimeFunctionCount"] == 3
+    ascii_hit = next(hit for hit in result["needles"][0]["hits"] if hit["encoding"] == "ascii")
+    xref = ascii_hit["leaRipXrefs"][0]
+
+    inbound = xref["candidateFunctionInboundCodeRefs"]
+    assert inbound["targetFunctionRva"] == 0x1010
+    assert inbound["refsTruncated"] is False
+    assert len(inbound["refs"]) == 1
+    caller = inbound["refs"][0]
+    assert caller["kind"] == "call-rel32"
+    assert caller["instructionRva"] == 0x1060
+    assert caller["sourceFunctionRva"] == 0x1060
+    assert caller["sourceFunctionEndRva"] == 0x1070
+    assert caller["sourceFunctionUnwindInfoRva"] == 0x3050
+    assert caller["targetRva"] == 0x1010
+    assert caller["targetFunctionRva"] == 0x1010
+
+    next_hop = xref["candidateFunctionCodeRefs"]["refs"][0]
+    next_hop_inbound = next_hop["targetFunctionInboundCodeRefs"]
+    assert next_hop_inbound["targetFunctionRva"] == 0x1040
+    assert any(
+        ref["sourceFunctionRva"] == 0x1010 and ref["instructionRva"] == 0x101B
+        for ref in next_hop_inbound["refs"]
+    )
 
 
 def test_probe_falls_back_to_padding_when_pdata_is_unavailable():
@@ -144,6 +193,7 @@ def test_probe_falls_back_to_padding_when_pdata_is_unavailable():
     assert xref["candidateFunctionSource"] == "padding-heuristic"
     assert xref["candidateFunctionUnwindInfoRva"] is None
     assert xref["candidateFunctionCodeRefs"] is None
+    assert xref["candidateFunctionInboundCodeRefs"] is None
     assert xref["candidateFunctionBytes"]["byteCount"] == 64
 
 

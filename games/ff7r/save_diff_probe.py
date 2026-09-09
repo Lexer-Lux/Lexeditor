@@ -4,19 +4,22 @@ This module intentionally does not parse or reproduce any third-party FF7R save
 format implementation.  It treats save files as opaque bytes and compares
 controlled before/after pairs.  Repeating the same experiment from duplicated
 pre-Assessment saves lets us distinguish stable state transitions from ordinary
-save noise such as timers or position.
+save noise such as timers or position.  Comparing those repeated experiments
+across *different* enemies then helps separate shared save metadata from an
+enemy-specific byte/bit transition.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 
 MAX_REPORTED_RUNS = 512
 MAX_REPORTED_OFFSETS = 4096
 MAX_INTEGER_CANDIDATES = 1024
+MAX_GROUPS = 128
 INTEGER_WIDTHS = (1, 2, 4, 8)
 
 
@@ -82,6 +85,11 @@ def _pair_report(pair: SavePair) -> dict[str, Any]:
         "runs": run_rows,
         "runsTruncated": len(runs) > MAX_REPORTED_RUNS,
     }
+
+
+def _stable_offset_set(pairs: Sequence[SavePair]) -> set[int]:
+    changed_sets = [set(_changed_offsets(pair.before, pair.after)) for pair in pairs]
+    return set.intersection(*changed_sets) if changed_sets else set()
 
 
 def _stable_transform_rows(pairs: Sequence[SavePair], stable_offsets: Iterable[int]) -> list[dict[str, Any]]:
@@ -204,6 +212,129 @@ def analyze_save_pairs(pairs: Sequence[SavePair]) -> dict[str, Any]:
             "Timer, position, autosave metadata and unrelated progression can remain in stable changes if the experiment is not controlled.",
             "A convincing Assessed-state candidate should survive repetitions and later correlate with the same EnemyBookID across different enemies or controlled state transitions.",
             "This probe is intentionally format-agnostic and performs no save mutation.",
+        ],
+    }
+
+
+def analyze_experiment_groups(groups: Mapping[str, Sequence[SavePair]]) -> dict[str, Any]:
+    """Compare repeated controlled Assess experiments for different enemies.
+
+    Each mapping value should contain repeated before/after pairs for *one*
+    enemy/EnemyBookID. Offsets stable within every repetition of one group but
+    absent from the other groups are especially useful discriminators. If two
+    enemies change the same byte with different stable XOR masks, that is a
+    useful bitset lead but still not proof of the save format or Assessed state.
+    """
+    if not isinstance(groups, Mapping) or not groups:
+        raise ValueError("at least one named save experiment group is required")
+    if len(groups) > MAX_GROUPS:
+        raise ValueError(f"save experiment group count exceeds {MAX_GROUPS}")
+
+    normalized: dict[str, tuple[SavePair, ...]] = {}
+    for raw_name, raw_pairs in groups.items():
+        name = str(raw_name).strip()
+        if not name:
+            raise ValueError("save experiment group names must be non-empty")
+        pairs = tuple(raw_pairs)
+        if not pairs:
+            raise ValueError(f"save experiment group {name!r} has no pairs")
+        if any(not isinstance(pair, SavePair) for pair in pairs):
+            raise TypeError(f"save experiment group {name!r} must contain SavePair values")
+        if name in normalized:
+            raise ValueError(f"duplicate save experiment group name: {name}")
+        normalized[name] = pairs
+
+    stable_by_group = {
+        name: _stable_offset_set(pairs)
+        for name, pairs in normalized.items()
+    }
+    stable_union = set.union(*stable_by_group.values()) if stable_by_group else set()
+    shared_stable = set.intersection(*stable_by_group.values()) if stable_by_group else set()
+    discriminating = stable_union - shared_stable
+
+    transform_maps: dict[str, dict[int, dict[str, Any]]] = {}
+    group_rows = []
+    for name, pairs in normalized.items():
+        stable = stable_by_group[name]
+        transforms = _stable_transform_rows(pairs, stable)
+        transform_map = {int(row["offset"]): row for row in transforms}
+        transform_maps[name] = transform_map
+        others = set.union(*(
+            offsets for other_name, offsets in stable_by_group.items()
+            if other_name != name
+        )) if len(stable_by_group) > 1 else set()
+        exclusive = stable - others
+        group_rows.append({
+            "name": name,
+            "pairCount": len(pairs),
+            "stableChangedByteCount": len(stable),
+            "stableChangedOffsets": sorted(stable)[:MAX_REPORTED_OFFSETS],
+            "stableOffsetsTruncated": len(stable) > MAX_REPORTED_OFFSETS,
+            "exclusiveStableByteCount": len(exclusive),
+            "exclusiveStableOffsets": sorted(exclusive)[:MAX_REPORTED_OFFSETS],
+            "exclusiveOffsetsTruncated": len(exclusive) > MAX_REPORTED_OFFSETS,
+            "exclusiveStableRuns": [
+                {"start": start, "end": end, "length": end - start}
+                for start, end in _runs(exclusive)[:MAX_REPORTED_RUNS]
+            ],
+            "stableTransforms": transforms[:MAX_REPORTED_OFFSETS],
+        })
+
+    same_offset_different_xor = []
+    for offset in sorted(shared_stable):
+        masks: dict[str, int] = {}
+        complete = True
+        for name in normalized:
+            row = transform_maps[name].get(offset)
+            if not row or not row.get("sameXorMask") or row.get("xorMask") in (None, 0):
+                complete = False
+                break
+            masks[name] = int(row["xorMask"])
+        if complete and len(set(masks.values())) > 1:
+            same_offset_different_xor.append({
+                "offset": offset,
+                "groupXorMasks": masks,
+                "singleBitMasks": all(mask & (mask - 1) == 0 for mask in masks.values()),
+            })
+
+    shared_transform_rows = []
+    for offset in sorted(shared_stable):
+        per_group = {
+            name: transform_maps[name].get(offset)
+            for name in normalized
+            if transform_maps[name].get(offset)
+        }
+        shared_transform_rows.append({
+            "offset": offset,
+            "groups": per_group,
+            "sameXorAcrossGroups": bool(per_group) and len({
+                row.get("xorMask") for row in per_group.values()
+                if row.get("sameXorMask")
+            }) == 1 and all(row.get("sameXorMask") for row in per_group.values()),
+        })
+
+    return {
+        "groupCount": len(normalized),
+        "groups": group_rows,
+        "sharedStableByteCount": len(shared_stable),
+        "sharedStableOffsets": sorted(shared_stable)[:MAX_REPORTED_OFFSETS],
+        "sharedStableOffsetsTruncated": len(shared_stable) > MAX_REPORTED_OFFSETS,
+        "sharedStableRuns": [
+            {"start": start, "end": end, "length": end - start}
+            for start, end in _runs(shared_stable)[:MAX_REPORTED_RUNS]
+        ],
+        "discriminatingStableByteCount": len(discriminating),
+        "discriminatingStableOffsets": sorted(discriminating)[:MAX_REPORTED_OFFSETS],
+        "discriminatingOffsetsTruncated": len(discriminating) > MAX_REPORTED_OFFSETS,
+        "sameOffsetDifferentXorCandidates": same_offset_different_xor[:MAX_REPORTED_OFFSETS],
+        "sameOffsetDifferentXorCandidatesTruncated": len(same_offset_different_xor) > MAX_REPORTED_OFFSETS,
+        "sharedStableTransforms": shared_transform_rows[:MAX_REPORTED_OFFSETS],
+        "notes": [
+            "Shared stable offsets changed for every enemy experiment and are more likely to include save metadata/noise; enemy-specific or mask-specific differences are stronger discriminators, not proof.",
+            "Exclusive stable offsets changed reliably for one experiment group and not the others. Repeat with additional EnemyBookIDs before treating them as enemy-state candidates.",
+            "A same-byte/different-single-bit XOR pattern across enemies is consistent with a packed bitset hypothesis, but the probe does not infer indexing, bit order, encryption, compression, or field meaning.",
+            "Use duplicated pre-Assessment saves, perform exactly one Assess action, save immediately, and keep location/time/inventory/progression as constant as practical.",
+            "No save mutation is performed.",
         ],
     }
 

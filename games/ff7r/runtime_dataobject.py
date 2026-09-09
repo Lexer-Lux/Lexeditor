@@ -48,7 +48,7 @@ VIRTUAL_ASSET_ROWS = (
     },
 )
 
-_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v4").hexdigest()
+_RUNTIME_SOURCE_SHA = hashlib.sha256(b"lexeditor-ff7r-runtime-config-schema-v5").hexdigest()
 
 
 @dataclass(frozen=True)
@@ -114,11 +114,6 @@ def _runtime_properties() -> list[VirtualProperty]:
         VirtualProperty("CutsceneEnabled", "Cutscene Speed Enabled", "BOOL", True, 0, 1),
         VirtualProperty("CutsceneBaseMultiplier", "Cutscene Base Multiplier", "FLOAT", True, 1.000001, None),
         VirtualProperty("CutsceneR2Behavior", "R2 Fast-Forward Behavior", "STRING"),
-        VirtualProperty("MinimapEnabled", "Minimap Tap/Hold Enabled", "BOOL", True, 0, 1),
-        VirtualProperty("MinimapHoldMilliseconds", "Minimap Hold Threshold (ms)", "INT32", True, 150, 1500),
-        VirtualProperty("MinimapPersistChosenState", "Persist Chosen Minimap State", "BOOL", True, 0, 1),
-        VirtualProperty("MinimapTapBehavior", "Map Button Tap", "STRING"),
-        VirtualProperty("MinimapHoldBehavior", "Map Button Hold", "STRING"),
         VirtualProperty("HPRebalanceEnabled", "HP Rebalance Enabled", "BOOL", True, 0, 1),
         VirtualProperty("HPMultiplier", "HP Multiplier", "FLOAT", True, 0.000001, None),
         VirtualProperty("HPRebalanceHookValidated", "HP Rebalance Hook Validated", "BOOL"),
@@ -151,18 +146,12 @@ def runtime_settings_package(game_root: Path, project_root: Path, *, vanilla: bo
     config = json.loads(json.dumps(DEFAULT_RUNTIME_CONFIG)) if vanilla else load_runtime_config(project_root)
     status = runtime_status(game_root, project_root)
     cutscene = config["cutsceneSpeed"]
-    minimap = config["minimap"]
     hp_rebalance = config["hpRebalance"]
     better_sprint = config["betterSprint"]
     values = {
         "CutsceneEnabled": cutscene["enabled"],
         "CutsceneBaseMultiplier": cutscene["baseMultiplier"],
         "CutsceneR2Behavior": cutscene["r2Behavior"],
-        "MinimapEnabled": minimap["enabled"],
-        "MinimapHoldMilliseconds": minimap["holdMilliseconds"],
-        "MinimapPersistChosenState": minimap["persistChosenState"],
-        "MinimapTapBehavior": minimap["tapBehavior"],
-        "MinimapHoldBehavior": minimap["holdBehavior"],
         "HPRebalanceEnabled": hp_rebalance["enabled"],
         "HPMultiplier": hp_rebalance["hpMultiplier"],
         "HPRebalanceHookValidated": status["hpRebalanceHookValidated"],
@@ -347,9 +336,6 @@ def no_more_cheats_probe_package(game_root: Path, data_root: Path, project_root:
 _EDIT_PATHS = {
     "CutsceneEnabled": ("cutsceneSpeed", "enabled"),
     "CutsceneBaseMultiplier": ("cutsceneSpeed", "baseMultiplier"),
-    "MinimapEnabled": ("minimap", "enabled"),
-    "MinimapHoldMilliseconds": ("minimap", "holdMilliseconds"),
-    "MinimapPersistChosenState": ("minimap", "persistChosenState"),
     "HPRebalanceEnabled": ("hpRebalance", "enabled"),
     "HPMultiplier": ("hpRebalance", "hpMultiplier"),
     "BetterSprintEnabled": ("betterSprint", "enabled"),

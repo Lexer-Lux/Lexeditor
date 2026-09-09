@@ -7,6 +7,7 @@ import pytest
 from games.ff7r.native_probe import DEFAULT_NEEDLES
 from games.ff7r.runtime_config import (
     DEFAULT_RUNTIME_CONFIG,
+    LEGACY_MINIMAP_CONFIG,
     RUNTIME_DLL_NAME,
     RUNTIME_MANIFEST_NAME,
     deploy_runtime,
@@ -38,8 +39,6 @@ def _write_fixture_exe(game: Path):
 def _write_manifest(project: Path, *, better_sprint=None):
     hooks = {
         "cutsceneSpeed": True,
-        "minimapTapHold": True,
-        "minimapState": True,
     }
     if better_sprint is not None:
         hooks["betterSprint"] = better_sprint
@@ -83,6 +82,25 @@ def _native_function_needle(needle, function_rva, *targets, source="pdata"):
     }
 
 
+def _native_function_needle_with_callers(needle, function_rva, *callers):
+    return {
+        "needle": needle,
+        "hits": [{
+            "leaRipXrefs": [{
+                "candidateFunctionRva": function_rva,
+                "candidateFunctionSource": "pdata",
+                "candidateFunctionInboundCodeRefs": {
+                    "refs": [
+                        {"sourceFunctionRva": caller, "kind": "call-rel32"}
+                        for caller in callers
+                    ],
+                },
+                "candidateFunctionCodeRefs": {"refs": []},
+            }],
+        }],
+    }
+
+
 def test_better_sprint_defaults_to_vanilla_one_x_and_old_configs_upgrade_in_memory(tmp_path):
     defaults = load_runtime_config(tmp_path)
     assert defaults["betterSprint"] == {"enabled": False, "speedMultiplier": 1.0}
@@ -90,11 +108,12 @@ def test_better_sprint_defaults_to_vanilla_one_x_and_old_configs_upgrade_in_memo
     old_config = {
         "schemaVersion": 1,
         "cutsceneSpeed": dict(DEFAULT_RUNTIME_CONFIG["cutsceneSpeed"]),
-        "minimap": dict(DEFAULT_RUNTIME_CONFIG["minimap"]),
+        "minimap": dict(LEGACY_MINIMAP_CONFIG),
         "hpRebalance": dict(DEFAULT_RUNTIME_CONFIG["hpRebalance"]),
     }
     validated = validate_runtime_config(old_config)
     assert validated["betterSprint"] == {"enabled": False, "speedMultiplier": 1.0}
+    assert "minimap" not in validated
 
 
 def test_sprint_multiplier_accepts_above_and_below_vanilla_but_rejects_nonpositive_or_nonfinite():
@@ -170,8 +189,6 @@ def test_manifest_accepts_better_sprint_as_supported_optional_hook_and_rejects_u
         "manifestVersion": 1,
         "hooks": {
             "cutsceneSpeed": True,
-            "minimapTapHold": True,
-            "minimapState": True,
             "betterSprint": True,
         },
         "supportedExeTimestamps": [FIXTURE_TIMESTAMP],
@@ -181,7 +198,7 @@ def test_manifest_accepts_better_sprint_as_supported_optional_hook_and_rejects_u
     assert validated["hooks"]["betterSprint"] is True
 
     payload["hooks"]["notARealHook"] = True
-    with pytest.raises(ValueError, match="supported optional hooks"):
+    with pytest.raises(ValueError, match="supported optional or legacy hooks"):
         validate_runtime_manifest(payload)
 
 
@@ -207,7 +224,94 @@ def test_sprint_probe_correlates_only_exact_pdata_function_evidence():
     assert correlations["dashToAnimationRootMotion"] == [0x1500]
     assert correlations["runToDashToAnimationRootMotion"] == [0x1600]
     assert correlations["dashToGeneralRootMotion"] == [0x1500]
+    assert correlations["dashScaleToBehaviorState"] == []
+    assert correlations["dashBehaviorToAnimationRootMotion"] == []
     assert result["nativeNeedleStats"]["DashRootMotionTranslationScale"]["pdataFunctions"] == 1
     assert result["nativeFunctionEvidence"]["PaddingOnly"]["expandedPdataFunctions"] == []
+    assert result["crossFamilyFunctionCount"] == 2
     assert result["implementationReady"] is False
     assert "authoritative-player-sprint-speed-path-unvalidated" in result["blockers"]
+
+
+def test_sprint_probe_clusters_dash_state_scale_and_root_motion_with_provenance():
+    native = {
+        "needles": [
+            _native_function_needle("DashRootMotionTranslationScale", 0x1000, 0x1800),
+            _native_function_needle("RunSwitchBehaviorDashInputBlockTime", 0x1100, 0x1800),
+            _native_function_needle("RootMotionScale", 0x1200, 0x1800),
+        ]
+    }
+
+    result = assess_sprint_evidence(native, [])
+    cluster = next(
+        row for row in result["nativeFunctionClusters"]
+        if row["functionRva"] == 0x1800
+    )
+
+    assert cluster == {
+        "functionRva": 0x1800,
+        "families": ["dash-scale", "dash-state", "root-motion"],
+        "familyCount": 3,
+        "directNeedles": [],
+        "nextHopNeedles": [
+            "DashRootMotionTranslationScale",
+            "RootMotionScale",
+            "RunSwitchBehaviorDashInputBlockTime",
+        ],
+        "crossFamily": True,
+        "allThreeFamilies": True,
+        "hasNextHopEvidence": True,
+        "registrationCollisionRisk": False,
+        "classification": "three-family-research-lead",
+    }
+    assert result["nativeFunctionCorrelations"]["dashScaleToBehaviorState"] == [0x1800]
+    assert result["nativeFunctionCorrelations"]["dashBehaviorToAnimationRootMotion"] == [0x1800]
+    assert result["threeFamilyFunctionCount"] == 1
+    assert result["implementationReady"] is False
+
+
+def test_sprint_probe_reports_shared_inbound_dispatcher_without_promoting_sprint_authority():
+    native = {
+        "needles": [
+            _native_function_needle_with_callers("DashRootMotionTranslationScale", 0x1000, 0x9000),
+            _native_function_needle_with_callers("RunSwitchBehaviorDashInputBlockTime", 0x1100, 0x9000),
+            _native_function_needle_with_callers("RootMotionScale", 0x1200, 0x9000),
+        ]
+    }
+
+    result = assess_sprint_evidence(native, [])
+    correlations = result["nativeFunctionCorrelations"]
+    assert correlations["dashToAnimationRootMotion"] == []
+    assert correlations["dashScaleToBehaviorState"] == []
+    assert correlations["dashToAnimationRootMotionCallers"] == [0x9000]
+    assert correlations["dashScaleToBehaviorStateCallers"] == [0x9000]
+    assert correlations["dashBehaviorToAnimationRootMotionCallers"] == [0x9000]
+    assert result["nativeFunctionEvidence"]["DashRootMotionTranslationScale"]["directInboundCallerFunctions"] == [0x9000]
+    assert result["nativeNeedleStats"]["DashRootMotionTranslationScale"]["inboundCallerFunctions"] == 1
+    assert "authoritative-player-sprint-speed-path-unvalidated" in result["blockers"]
+    assert result["implementationReady"] is False
+
+
+def test_sprint_probe_marks_multi_name_direct_owner_as_registration_collision_risk():
+    native = {
+        "needles": [
+            _native_function_needle("DashRootMotionTranslationScale", 0x2000),
+            _native_function_needle("RunToDashBlendInputThreshold", 0x2000),
+        ]
+    }
+
+    result = assess_sprint_evidence(native, [])
+    cluster = next(
+        row for row in result["nativeFunctionClusters"]
+        if row["functionRva"] == 0x2000
+    )
+
+    assert cluster["families"] == ["dash-scale", "dash-state"]
+    assert cluster["directNeedles"] == [
+        "DashRootMotionTranslationScale",
+        "RunToDashBlendInputThreshold",
+    ]
+    assert cluster["nextHopNeedles"] == []
+    assert cluster["registrationCollisionRisk"] is True
+    assert cluster["classification"] == "cross-family-research-lead"
+    assert result["implementationReady"] is False

@@ -1,0 +1,266 @@
+#!/usr/bin/env python3
+"""Compare controlled FF7R before/after saves for Assessed-state research.
+
+Examples:
+  python tools/ff7r_assess_save_diff.py \
+    --pair run1 before1.sav after1.sav \
+    --pair run2 before2.sav after2.sav
+
+  python tools/ff7r_assess_save_diff.py \
+    --group GuardDog before-dog-1.sav after-dog-1.sav \
+    --group GuardDog before-dog-2.sav after-dog-2.sav \
+    --group SecurityOfficer before-officer-1.sav after-officer-1.sav \
+    --group SecurityOfficer before-officer-2.sav after-officer-2.sav \
+    --control noop1 before-c1.sav after-c1.sav \
+    --control noop2 before-c2.sav after-c2.sav \
+    --bit-signatures \
+    --enemy-index GuardDog 6 \
+    --enemy-index SecurityOfficer 7
+
+  python tools/ff7r_assess_save_diff.py \
+    --group GuardDog discovery-dog-1-before.sav discovery-dog-1-after.sav \
+    --group GuardDog discovery-dog-2-before.sav discovery-dog-2-after.sav \
+    --holdout-group GuardDog holdout-dog-1-before.sav holdout-dog-1-after.sav \
+    --holdout-group GuardDog holdout-dog-2-before.sav holdout-dog-2-after.sav \
+    --control noop1 before-c1.sav after-c1.sav \
+    --control noop2 before-c2.sav after-c2.sav \
+    --bit-signatures \
+    --enemy-index GuardDog 6
+
+The tool is read-only and format-agnostic. It never modifies a save file.
+EnemyBookIDs supplied with --enemy-index are independent evidence used only to
+test whether reproduced candidate bits fit one contiguous indexed bitset.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+import sys
+from typing import Sequence
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from games.ff7r.save_bit_signature_probe import (  # noqa: E402
+    analyze_controlled_bit_signatures,
+    assess_indexed_bitset_layout,
+    validate_controlled_bit_signatures,
+)
+from games.ff7r.save_control_probe import (  # noqa: E402
+    analyze_controlled_experiment_groups,
+    analyze_controlled_save_pairs,
+)
+from games.ff7r.save_diff_probe import (  # noqa: E402
+    SavePair,
+    analyze_experiment_groups,
+    analyze_save_pairs,
+)
+
+
+def _read_pair(label: str, before: str | Path, after: str | Path) -> SavePair:
+    before_path = Path(before).expanduser().resolve()
+    after_path = Path(after).expanduser().resolve()
+    return SavePair(before_path.read_bytes(), after_path.read_bytes(), label)
+
+
+def _read_groups(specs: Sequence[Sequence[str]]) -> dict[str, list[SavePair]]:
+    groups: dict[str, list[SavePair]] = {}
+    for name, before, after in specs:
+        key = str(name).strip()
+        if not key:
+            raise ValueError("enemy/group names cannot be empty")
+        groups.setdefault(key, []).append(_read_pair(key, before, after))
+    return groups
+
+
+def _read_enemy_indices(specs: Sequence[Sequence[str]]) -> dict[str, int]:
+    result: dict[str, int] = {}
+    for raw_name, raw_index in specs:
+        name = str(raw_name).strip()
+        if not name:
+            raise ValueError("enemy/group names cannot be empty")
+        if name in result:
+            raise ValueError(f"duplicate --enemy-index mapping for {name}")
+        try:
+            index = int(str(raw_index), 0)
+        except ValueError as error:
+            raise ValueError(f"EnemyBookID for {name} must be an integer") from error
+        if index < 0:
+            raise ValueError(f"EnemyBookID for {name} must be non-negative")
+        result[name] = index
+    return result
+
+
+def _with_indexed_layout(analysis: dict, enemy_indices: dict[str, int]) -> dict:
+    if not enemy_indices:
+        return analysis
+    return {
+        **analysis,
+        "indexedBitsetLayout": assess_indexed_bitset_layout(analysis, enemy_indices),
+    }
+
+
+def build_report(
+    *,
+    pair_specs: Sequence[Sequence[str]] = (),
+    group_specs: Sequence[Sequence[str]] = (),
+    control_specs: Sequence[Sequence[str]] = (),
+    holdout_group_specs: Sequence[Sequence[str]] = (),
+    enemy_index_specs: Sequence[Sequence[str]] = (),
+    bit_signatures: bool = False,
+) -> dict:
+    if pair_specs and group_specs:
+        raise ValueError("use either --pair or --group experiments, not both")
+    if control_specs and not (pair_specs or group_specs):
+        raise ValueError("--control requires --pair or --group Assess experiments")
+    # Holdout mode is the more specific contract. Validate it before the generic
+    # bit-signature precondition so malformed holdout invocations report the
+    # option that actually made the request invalid.
+    if holdout_group_specs and not group_specs:
+        raise ValueError("--holdout-group requires --group discovery experiments")
+    if holdout_group_specs and not control_specs:
+        raise ValueError("--holdout-group requires --control")
+    if holdout_group_specs and not bit_signatures:
+        raise ValueError("--holdout-group requires --bit-signatures")
+    if enemy_index_specs and not bit_signatures:
+        raise ValueError("--enemy-index requires --bit-signatures")
+    if bit_signatures and not (group_specs and control_specs):
+        raise ValueError("--bit-signatures requires --group experiments with --control")
+
+    enemy_indices = _read_enemy_indices(enemy_index_specs)
+
+    if pair_specs:
+        pairs = [
+            _read_pair(str(label), before, after)
+            for label, before, after in pair_specs
+        ]
+        if control_specs:
+            controls = [
+                _read_pair(str(label), before, after)
+                for label, before, after in control_specs
+            ]
+            return {
+                "mode": "repeated-single-experiment-with-noop-control",
+                "analysis": analyze_controlled_save_pairs(pairs, controls),
+            }
+        return {
+            "mode": "repeated-single-experiment",
+            "analysis": analyze_save_pairs(pairs),
+        }
+
+    if group_specs:
+        groups = _read_groups(group_specs)
+        if control_specs:
+            controls = [
+                _read_pair(str(label), before, after)
+                for label, before, after in control_specs
+            ]
+            if bit_signatures:
+                if holdout_group_specs:
+                    holdout_groups = _read_groups(holdout_group_specs)
+                    analysis = validate_controlled_bit_signatures(
+                        groups,
+                        controls,
+                        holdout_groups,
+                    )
+                    return {
+                        "mode": "cross-enemy-bit-signatures-with-holdout-validation",
+                        "analysis": _with_indexed_layout(analysis, enemy_indices),
+                    }
+                analysis = analyze_controlled_bit_signatures(groups, controls)
+                return {
+                    "mode": "cross-enemy-bit-signatures-with-noop-control",
+                    "analysis": _with_indexed_layout(analysis, enemy_indices),
+                }
+            return {
+                "mode": "cross-enemy-experiments-with-noop-control",
+                "analysis": analyze_controlled_experiment_groups(groups, controls),
+            }
+        return {
+            "mode": "cross-enemy-experiments",
+            "analysis": analyze_experiment_groups(groups),
+        }
+    raise ValueError("at least one --pair or --group experiment is required")
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Read-only FF7R save differential research for locating the per-save "
+            "Assessed-enemy state used by issue #424."
+        )
+    )
+    experiments = parser.add_argument_group("experiments")
+    experiments.add_argument(
+        "--pair", action="append", nargs=3, metavar=("LABEL", "BEFORE", "AFTER"),
+        default=[], help="repeat one controlled enemy Assess experiment",
+    )
+    experiments.add_argument(
+        "--control", action="append", nargs=3, metavar=("LABEL", "BEFORE", "AFTER"),
+        default=[], help="repeat a no-op save from the same duplicated pre-Assessment baseline",
+    )
+    experiments.add_argument(
+        "--group", action="append", nargs=3, metavar=("ENEMY", "BEFORE", "AFTER"),
+        default=[], help="repeat discovery experiments for multiple named enemies",
+    )
+    experiments.add_argument(
+        "--holdout-group", action="append", nargs=3,
+        metavar=("ENEMY", "BEFORE", "AFTER"), default=[],
+        help=(
+            "independent held-out Assess experiments; requires --group, --control "
+            "and --bit-signatures"
+        ),
+    )
+    experiments.add_argument(
+        "--enemy-index", action="append", nargs=2,
+        metavar=("ENEMY", "ENEMYBOOK_ID"), default=[],
+        help=(
+            "independently known EnemyBookID for a named --group; repeat to test "
+            "whether reproduced bits fit one contiguous indexed bitset"
+        ),
+    )
+    parser.add_argument(
+        "--bit-signatures", action="store_true",
+        help=(
+            "with --group and --control, resolve stable residual XOR masks into "
+            "per-enemy bit signatures and packed-flag-byte candidates"
+        ),
+    )
+    parser.add_argument(
+        "--output", type=Path,
+        help="optional JSON output path; stdout is used when omitted",
+    )
+    return parser
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        report = build_report(
+            pair_specs=args.pair,
+            group_specs=args.group,
+            control_specs=args.control,
+            holdout_group_specs=args.holdout_group,
+            enemy_index_specs=args.enemy_index,
+            bit_signatures=args.bit_signatures,
+        )
+    except (OSError, ValueError, TypeError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return 2
+
+    rendered = json.dumps(report, indent=2, sort_keys=True) + "\n"
+    if args.output is None:
+        sys.stdout.write(rendered)
+    else:
+        target = args.output.expanduser().resolve()
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(rendered, encoding="utf-8")
+        print(target)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

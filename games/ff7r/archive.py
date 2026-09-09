@@ -45,6 +45,12 @@ TWEAK_VIRTUAL_ASSET_ROWS = (
         "group": "Lexeditor Tweaks",
         "synthetic": "no-more-cheats",
     },
+    {
+        "asset": "Lexeditor/BetterLockon",
+        "name": "Better Lock-on",
+        "group": "Lexeditor Tweaks",
+        "synthetic": "better-lockon",
+    },
 )
 
 

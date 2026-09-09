@@ -27,8 +27,6 @@ def requested_runtime_features(project_root: Path) -> list[str]:
     requested: list[str] = []
     if config["cutsceneSpeed"]["enabled"]:
         requested.append("cutsceneSpeed")
-    if config["minimap"]["enabled"]:
-        requested.extend(("minimapTapHold", "minimapState"))
     if config["hpRebalance"]["enabled"]:
         requested.append("hpRebalance")
     if config["betterSprint"]["enabled"]:
