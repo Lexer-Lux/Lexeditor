@@ -152,7 +152,10 @@ def read_index(path: Path) -> VBFIndex:
         nul = name_table.find(b"\0", name_offset)
         if nul < 0:
             raise VBFError(f"Entry {index} path is not NUL terminated")
-        archive_path = normalize_archive_path(name_table[name_offset:nul].decode("utf-8", errors="replace"))
+        raw_name = name_table[name_offset:nul]
+        if hashlib.md5(raw_name).digest() != path_hash:
+            raise VBFError(f"Entry {index} path MD5 does not match its VBF hash table entry")
+        archive_path = normalize_archive_path(raw_name.decode("utf-8", errors="replace"))
         folded = archive_path.casefold()
         if folded in seen_paths:
             raise VBFError(f"Duplicate VBF path: {archive_path}")
