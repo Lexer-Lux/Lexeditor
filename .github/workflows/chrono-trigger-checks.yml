@@ -21,11 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Python syntax
-        run: python -m py_compile games/chrono_trigger/plugin.py games/chrono_trigger/paths.py games/chrono_trigger/resources.py games/chrono_trigger/data.py games/chrono_trigger/events.py games/chrono_trigger/scene_tables.py games/chrono_trigger/worlds.py games/chrono_trigger/world_tables.py games/chrono_trigger/server.py
+        run: python -m py_compile games/chrono_trigger/plugin.py games/chrono_trigger/paths.py games/chrono_trigger/resources.py games/chrono_trigger/coverage.py games/chrono_trigger/data.py games/chrono_trigger/events.py games/chrono_trigger/scene_tables.py games/chrono_trigger/worlds.py games/chrono_trigger/world_tables.py games/chrono_trigger/server.py
       - name: Plugin descriptor
         run: python -c "from plugin_api import validate_plugin; from games.chrono_trigger.plugin import PLUGIN; validate_plugin(PLUGIN); assert PLUGIN.plugin_id == 'chrono-trigger'"
       - name: Chrono Trigger regressions
         run: python -m unittest discover -s tests -p 'test_chrono_trigger_*.py'
+      - name: Managed plugin smoke
+        run: python app.py --game chrono-trigger --smoke
       - name: Editor JavaScript syntax
         shell: bash
         run: |
