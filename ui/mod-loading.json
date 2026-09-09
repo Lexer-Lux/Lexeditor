@@ -16,6 +16,11 @@
       "structure": "One selected Lexeditor project mirrors supported game-relative paths, including data/lang-en/kernel/KERNEL.BIN, outside the installed game.",
       "overriding": "No runtime mod stack exists yet. Lexeditor edits one project at a time; multiple FFVII 2013 mods are not composed or resolved by priority."
     },
+    "ff7r": {
+      "loader": "Lexeditor builds one FF7R Unreal PAK with the pinned repak helper and explicitly deploys it to End/Content/Paks/~mods/Lexeditor-FF7R_P.pak. Runtime-only features use the plugin's separate NativeMods deployment path.",
+      "structure": "Lexeditor keeps installed FF7R PAKs read-only, saves edited game-relative assets under the selected project's content/ tree, builds Lexeditor-FF7R_P.pak under <project>/build/, and keeps runtime/config state separate from the source game archives.",
+      "overriding": "Lexeditor composes its own saved content and enabled semantic overrides into one Lexeditor-owned PAK. It does not semantically merge separate external FF7R mods; collisions with another PAK that replaces the same game asset are resolved by FF7R/Unreal PAK load order."
+    },
     "ff8": {
       "loader": "De novo Lexeditor pre-launch compositor targeting FFNx. It reads Junction VIII-compatible mod.xml folder metadata and imports .iroj packages, but does not adopt Junction's live load model.",
       "structure": "Managed mods go in %LOCALAPPDATA%\\Lexeditor\\mods\\ff8\\<mod>\\ or can be imported as .iroj packages. Folder mods use mod.json for Lexeditor metadata and may contain direct/, hext/, textures/, sfx/, voice/, ambient/, override/, and save/ roots; optional mod.xml supplies Junction-style folder options.",

@@ -85,6 +85,52 @@
     "ff7-2013": {
       "sameAs": "ff7"
     },
+    "ff7r": {
+      "contributions": [
+        {
+          "name": "Jordan Tucker / FF7 Remake Data Editor",
+          "role": "Reference for FF7R DataObject package layouts and safe fixed-layout editing.",
+          "url": "https://github.com/jordanbtucker/ff7r-data-editor"
+        },
+        {
+          "name": "MatyaModding / ff7r-text-tool",
+          "role": "Reference for FF7R text-resource layout, FString encoding and serialized-size handling.",
+          "url": "https://github.com/matyamod/ff7r-text-tool"
+        },
+        {
+          "name": "MatyaModding / FF7R-font-mod-tools",
+          "role": "Reference for FF7R menu bitmap-font glyph records and BC5 atlas layout.",
+          "url": "https://github.com/matyamod/FF7R-font-mod-tools"
+        },
+        {
+          "name": "trumank / repak",
+          "role": "Pinned external helper for reading and building Unreal Engine PAK files.",
+          "url": "https://github.com/trumank/repak"
+        },
+        {
+          "name": "TheUnlocked / ff7r-kbm-hook",
+          "role": "Reference for FF7R Native Mod Loader interoperability and installed-build compatibility signatures.",
+          "url": "https://github.com/TheUnlocked/ff7r-kbm-hook"
+        },
+        {
+          "name": "xCENTx / FinalFantasy7Remake-Menu",
+          "role": "Public interoperability reference for FF7R runtime process and game-state layout.",
+          "url": "https://github.com/xCENTx/FinalFantasy7Remake-Menu"
+        },
+        {
+          "name": "narknon / EndGameProj",
+          "role": "Generated Remake API research reference for reflected FF7R types, properties, enums and functions.",
+          "url": "https://github.com/narknon/EndGameProj"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "FF7R references and tools — source/license notices",
+          "sourcePath": "games/ff7r/THIRD_PARTY.md"
+        }
+      ]
+    },
     "ff8": {
       "source": "games/ff8/credits.json",
       "licenseRoot": "games/ff8"

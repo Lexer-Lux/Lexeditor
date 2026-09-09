@@ -1,0 +1,55 @@
+name: FF7R native loader scaffold
+
+on:
+  push:
+    branches: [work/ff7r-native-loader-scaffold, 'work/ff7r-*']
+    paths:
+      - 'games/ff7r/native_runtime/**'
+      - '.github/workflows/ff7r-native-loader-scaffold.yml'
+  pull_request:
+    paths:
+      - 'games/ff7r/native_runtime/**'
+      - '.github/workflows/ff7r-native-loader-scaffold.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S games/ff7r/native_runtime -B out/ff7r-native-runtime -A x64
+      - name: Build
+        run: cmake --build out/ff7r-native-runtime --config Release --parallel
+      - name: Runtime contract test
+        run: ctest --test-dir out/ff7r-native-runtime -C Release --output-on-failure
+      - name: Verify NativeMods Init exports
+        shell: pwsh
+        run: |
+          $runtime = Get-ChildItem out/ff7r-native-runtime -Recurse -Filter LexeditorFF7RRuntime.dll | Select-Object -First 1
+          $probe = Get-ChildItem out/ff7r-native-runtime -Recurse -Filter LexeditorFF7RRuntimeProbe.dll | Select-Object -First 1
+          if (-not $runtime) { throw 'Native runtime DLL was not built' }
+          if (-not $probe) { throw 'Native runtime probe DLL was not built' }
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          if (-not $vs) { throw 'Visual Studio C++ toolchain was not found' }
+          $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC" -Recurse -Filter dumpbin.exe |
+            Where-Object { $_.FullName -like '*\bin\Hostx64\x64\dumpbin.exe' } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $dumpbin) { throw 'dumpbin.exe was not found' }
+          foreach ($dll in @($runtime, $probe)) {
+            $exports = (& $dumpbin.FullName /exports $dll.FullName) -join "`n"
+            if ($exports -notmatch '\bInit\b') { throw "$($dll.Name) does not export Init" }
+            Write-Host $dll.FullName
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LexeditorFF7RNativeRuntime
+          path: |
+            out/ff7r-native-runtime/**/LexeditorFF7RRuntime.dll
+            out/ff7r-native-runtime/**/LexeditorFF7RRuntimeProbe.dll
+          if-no-files-found: error

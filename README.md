@@ -3,6 +3,7 @@ Open-source, plugin-based mod editor with the goal of making it fun and easy for
 Currently supports:
 * Final Fantasy VII
 * Final Fantasy VII Remaster
+* Final Fantasy VII Remake Intergrade
 * Final Fantasy VIII
 * Final Fantasy IX
 * Mount & Blade: Warband

@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - FINAL FANTASY VII REMAKE INTERGRADE</title>
+  <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    *{box-sizing:border-box}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
+    .ff7r-view{display:flex;flex-direction:column;height:100%;min-height:0;gap:var(--lex-panel-gap)}
+    .ff7r-toolbar{display:flex;gap:8px;align-items:center;min-height:38px;flex-wrap:wrap}
+    .ff7r-toolbar label{font-weight:700}.ff7r-toolbar select{min-width:180px;max-width:min(720px,70vw)}
+    .ff7r-toolbar input[type=search]{min-width:220px;flex:1}
+    .ff7r-layout{height:100%;min-height:0}.ff7r-table,.ff7r-detail{height:100%;min-height:0}
+    .ff7r-array{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;width:100%}
+    .ff7r-array label{display:flex;gap:5px;align-items:center;min-width:0}.ff7r-array label>span{min-width:2.5em;color:var(--lex-muted);font-size:.86em}
+    .ff7r-array input,.ff7r-array select{min-width:0;width:100%}
+    .ff7r-loot-slot{display:grid;grid-template-columns:minmax(180px,2fr) minmax(90px,1fr);gap:8px;width:100%;align-items:end}
+    .ff7r-loot-slot label{display:flex;flex-direction:column;gap:3px;min-width:0}.ff7r-loot-slot label>span{font-size:.8em;color:var(--lex-muted);font-weight:700}
+    .ff7r-loot-slot select,.ff7r-loot-slot input{width:100%;min-width:0}
+    .ff7r-textarea{display:block;width:100%;min-height:110px;resize:vertical;font:inherit;line-height:1.35}
+    .ff7r-subtext{min-height:72px}
+    .ff7r-resolved{display:flex;flex-direction:column;gap:2px;min-width:0}
+    .ff7r-resolved small{color:var(--lex-muted);overflow-wrap:anywhere}
+    .ff7r-actions{display:flex;flex-wrap:wrap;gap:8px}.ff7r-actions button{padding:7px 12px}
+    .ff7r-message{white-space:pre-wrap;overflow-wrap:anywhere}.ff7r-error{color:var(--lex-danger,#b42318)}
+    @media(max-width:700px){.ff7r-loot-slot{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header id="lexeditor-shell"></header>
+  <main id="main"></main>
+  <script src="/shared/framework.js"></script>
+  <script>
+  "use strict";
+  const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,readonlyField,recordId,infoHelp,infoIcon,panelLayout,clone,EditHistory}=LexeditorUI;
+  const $=selector=>document.querySelector(selector);
+  async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
+
+  const state={
+    tab:"data",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
+    asset:"",data:null,dataBaseline:null,selected:0,query:"",sort:{key:"tag",dir:1},
+    economy:null,economyKey:"",economyError:"",economyTable:"",economyQuery:"",economySort:{key:"name",dir:1},
+    loot:null,lootKey:"",lootError:"",lootQuery:"",lootSort:{key:"tag",dir:1},
+    textLanguage:"US",textAsset:"",textData:null,textBaseline:null,textSelected:0,textQuery:"",textSort:{key:"key",dir:1},
+    mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]
+  };
+  const dataColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
+  const economyColumns=[{key:"tag",label:"ID",sortable:true,width:"minmax(10em,.8fr)"},{key:"name",label:"Item",sortable:true,width:"minmax(14em,1.2fr)"},{key:"buy",label:"Buy",numeric:true,sortable:true},{key:"sale",label:"Sell",numeric:true,sortable:true},{key:"maxCount",label:"Carry Cap",numeric:true,sortable:true}];
+  const lootColumns=[{key:"tag",label:"Enemy / Battle ID",sortable:true,width:"minmax(12em,.9fr)"},{key:"normal",label:"Normal",sortable:true,width:"minmax(14em,1fr)"},{key:"rare",label:"Rare",sortable:true,width:"minmax(14em,1fr)"},{key:"steal",label:"Steal",sortable:true,width:"minmax(14em,1fr)"}];
+  const textColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
+  const dataPrefs=columnPreferences("ff7r-records",dataColumns,()=>render());
+  const economyPrefs=columnPreferences("ff7r-economy",economyColumns,()=>render());
+  const lootPrefs=columnPreferences("ff7r-loot",lootColumns,()=>render());
+  const textPrefs=columnPreferences("ff7r-text-records",textColumns,()=>render());
+  const assets=()=>state.catalog?.assets||[];
+  const textAssets=()=>state.catalog?.textAssets||[];
+  const currentAsset=()=>assets().find(row=>row.asset===state.asset)||assets()[0]||null;
+  const currentTextAsset=()=>textAssets().find(row=>row.asset===state.textAsset)||null;
+  const records=()=>state.data?.records||[];
+  const textRecords=()=>state.textData?.records||[];
+  const selectedRecord=()=>records().find(row=>row.id===state.selected)||records()[0]||null;
+  const selectedTextRecord=()=>textRecords().find(row=>row.id===state.textSelected)||textRecords()[0]||null;
+  const comparable=value=>JSON.stringify(value);
+  const refreshShell=()=>shell?.refresh?.();
+  const sourceSuffix=()=>state.activeSource==="vanilla"?"&source=vanilla":"";
+  const semanticKey=()=>`${state.activeSource}:${state.textLanguage||"US"}`;
+  const property=name=>state.data?.properties?.find(prop=>prop.name===name)||null;
+
+  function dataEdits(){
+    if(state.activeSource!=="mine"||!state.data||!state.dataBaseline)return[];
+    const out=[];
+    for(let i=0;i<state.data.records.length;i++){
+      const row=state.data.records[i],base=state.dataBaseline.records[i];if(!base)continue;
+      for(const prop of state.data.properties){
+        if(!prop.editable)continue;
+        const value=row.values[prop.name],old=base.values[prop.name];
+        if(prop.array){const count=Math.min(value.length,old.length);for(let j=0;j<count;j++)if(comparable(value[j])!==comparable(old[j]))out.push({entry:i,property:prop.name,index:j,value:value[j]})}
+        else if(comparable(value)!==comparable(old))out.push({entry:i,property:prop.name,value});
+      }
+    }
+    return out;
+  }
+  function textEdits(){
+    if(state.activeSource!=="mine"||!state.textData||!state.textBaseline)return[];
+    const out=[];
+    for(let i=0;i<state.textData.records.length;i++){
+      const row=state.textData.records[i],base=state.textBaseline.records[i];if(!base)continue;
+      if(row.text!==base.text)out.push({entry:i,text:row.text});
+      const baseSubs=new Map((base.subentries||[]).map(sub=>[sub.id,sub.text]));
+      for(const sub of row.subentries||[])if(baseSubs.has(sub.id)&&sub.text!==baseSubs.get(sub.id))out.push({entry:i,subId:sub.id,text:sub.text});
+    }
+    return out;
+  }
+  const dirtyCount=()=>dataEdits().length+textEdits().length;
+
+  function flattenStrings(value,out=[]){if(typeof value==="string")out.push(value);else if(Array.isArray(value))for(const child of value)flattenStrings(child,out);else if(value&&typeof value==="object")for(const child of Object.values(value))flattenStrings(child,out);return out}
+  function resolvedText(value){return typeof value==="string"?state.data?.textLookup?.[value]||"":""}
+  function compareValues(a,b){if(a===b)return 0;if(a===undefined||a===null||a==="—")return 1;if(b===undefined||b===null||b==="—")return-1;if(typeof a==="number"&&typeof b==="number")return a-b;return String(a).localeCompare(String(b),undefined,{numeric:true,sensitivity:"base"})}
+  function sortedRows(){
+    const q=state.query.toLocaleLowerCase();
+    return [...records()].filter(row=>{
+      if(!q)return true;
+      const values=flattenStrings(row.values);
+      const resolved=values.map(value=>state.data?.textLookup?.[value]||"");
+      return `${row.id} ${row.tag} ${values.join(" ")} ${resolved.join(" ")}`.toLocaleLowerCase().includes(q);
+    }).sort((a,b)=>compareValues(a[state.sort.key],b[state.sort.key])*state.sort.dir);
+  }
+  function sortedTextRows(){
+    const q=state.textQuery.toLocaleLowerCase();
+    return [...textRecords()].filter(row=>!q||`${row.id} ${row.key} ${row.text} ${(row.subentries||[]).map(sub=>`${sub.id} ${sub.text}`).join(" ")}`.toLocaleLowerCase().includes(q))
+      .sort((a,b)=>compareValues(a[state.textSort.key],b[state.textSort.key])*state.textSort.dir);
+  }
+
+  async function confirmReplace(kind){
+    const count=kind==="text"?textEdits().length:dataEdits().length;
+    if(!count)return true;
+    return window.confirm(`Discard ${count} unsaved ${kind==="text"?"text":"game-data"} change${count===1?"":"s"} and open another resource?`);
+  }
+  async function loadAsset(asset=state.asset){
+    if(!asset)return;
+    state.busy=true;state.error="";render();
+    try{state.data=await api(`/api/data?asset=${encodeURIComponent(asset)}${sourceSuffix()}&language=${encodeURIComponent(state.textLanguage||"US")}`);state.dataBaseline=clone(state.data);state.selected=state.data.records[0]?.id??0;state.asset=asset;state.query=""}
+    catch(error){state.data=null;state.dataBaseline=null;state.error=error.message}
+    finally{state.busy=false;render();refreshShell()}
+  }
+  async function selectAsset(asset){if(asset===state.asset)return true;if(!await confirmReplace("data"))return false;state.asset=asset;await loadAsset(asset);return !!state.data}
+
+  async function loadEconomy(){
+    const key=semanticKey();
+    if(state.economyKey!==key){
+      state.busy=true;state.economyError="";render();
+      try{state.economy=await api(`/api/economy?language=${encodeURIComponent(state.textLanguage||"US")}${sourceSuffix()}`);state.economyKey=key}
+      catch(error){state.economy=null;state.economyError=error.message}
+      finally{state.busy=false;render()}
+    }
+    const tables=(state.economy?.tables||[]).filter(table=>table.available);
+    if(!tables.length)return true;
+    if(!tables.some(table=>table.asset===state.economyTable))state.economyTable=tables[0].asset;
+    if(state.data?.asset!==state.economyTable){if(!await selectAsset(state.economyTable))return false}
+    return true;
+  }
+  async function selectEconomyTable(asset){if(asset===state.economyTable)return;const previous=state.economyTable;state.economyTable=asset;if(!await selectAsset(asset))state.economyTable=previous;render()}
+  async function loadLoot(){
+    const key=semanticKey();
+    if(state.lootKey!==key){
+      state.busy=true;state.lootError="";render();
+      try{state.loot=await api(`/api/loot?language=${encodeURIComponent(state.textLanguage||"US")}${sourceSuffix()}`);state.lootKey=key}
+      catch(error){state.loot=null;state.lootError=error.message}
+      finally{state.busy=false;render()}
+    }
+    if(!state.loot?.available||!state.loot.asset)return true;
+    if(state.data?.asset!==state.loot.asset){if(!await selectAsset(state.loot.asset))return false}
+    return true;
+  }
+
+  async function loadTextAsset(asset=state.textAsset){
+    if(!asset)return;
+    state.busy=true;state.error="";render();
+    try{state.textData=await api(`/api/text?asset=${encodeURIComponent(asset)}${sourceSuffix()}`);state.textBaseline=clone(state.textData);state.textSelected=state.textData.records[0]?.id??0;state.textAsset=asset;state.textQuery="";if(state.textData.language)state.textLanguage=state.textData.language}
+    catch(error){state.textData=null;state.textBaseline=null;state.error=error.message}
+    finally{state.busy=false;render();refreshShell()}
+  }
+  async function selectTextAsset(asset){if(asset===state.textAsset)return;if(!await confirmReplace("text"))return;state.textAsset=asset;await loadTextAsset(asset)}
+  async function selectTextLanguage(language){
+    if(language===state.textLanguage)return;
+    if(!await confirmReplace("text"))return;
+    state.textLanguage=language;state.economyKey="";state.lootKey="";
+    const next=textAssets().find(row=>row.language===language);
+    state.textAsset=next?.asset||"";state.textData=null;state.textBaseline=null;
+    if(state.data)await loadAsset(state.asset);
+    if(state.textAsset)await loadTextAsset(state.textAsset);else render();
+    if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot();
+  }
+
+  function setScalar(row,prop,value){row.values[prop.name]=value;refreshShell()}
+  function setArrayValue(row,prop,index,value){if(!Array.isArray(row.values[prop.name]))return;row.values[prop.name][index]=value;refreshShell()}
+  function numericInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const attrs={type:"number",value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=prop.type==="FLOAT"?Number(event.target.value):Number.parseInt(event.target.value,10);if(index===null)setScalar(row,prop,value);else setArrayValue(row,prop,index,value)}};if(prop.min!==null&&prop.min!==undefined)attrs.min=prop.min;if(prop.max!==null&&prop.max!==undefined)attrs.max=prop.max;attrs.step=prop.type==="FLOAT"?"any":1;return el("input",attrs)}
+  function percentInput(row,prop,index){const current=row.values[prop.name]?.[index]??0;return el("input",{type:"number",min:0,max:100,step:1,value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=Number.parseInt(event.target.value,10);if(Number.isFinite(value)&&value>=0&&value<=100)setArrayValue(row,prop,index,value)},onchange:event=>{let value=Number.parseInt(event.target.value,10);if(!Number.isFinite(value))value=current;value=Math.max(0,Math.min(100,value));event.target.value=String(value);setArrayValue(row,prop,index,value)}})}
+  function boolInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];return el("input",{type:"checkbox",checked:!!current,disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.checked);else setArrayValue(row,prop,index,event.target.checked)}})}
+  function nameInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.value);else setArrayValue(row,prop,index,event.target.value)}});for(const name of state.data.names){const option=el("option",{value:name},name);option.selected=name===current;select.append(option)}return select}
+  function semanticItemInput(row,prop,index){const current=row.values[prop.name]?.[index]??"";const choices=[...(state.loot?.itemChoices||[])];if(current&&!choices.some(choice=>choice.id===current))choices.unshift({id:current,name:current});const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>setArrayValue(row,prop,index,event.target.value)});for(const choice of choices){const option=el("option",{value:choice.id},choice.name&&choice.name!==choice.id?`${choice.name} (${choice.id})`:choice.id);option.selected=choice.id===current;select.append(option)}return select}
+  function readonlyResolved(value){const resolved=resolvedText(value);return resolved?el("div",{class:"ff7r-resolved"},readonlyField(resolved),el("small",{},value)):readonlyField(String(value??""))}
+  function scalarControl(row,prop,index=null){if(prop.type==="BOOL")return boolInput(row,prop,index);if(prop.type==="ENUM")return nameInput(row,prop,index);if(["BYTE","INT16","UINT16","INT32","FLOAT"].includes(prop.type))return numericInput(row,prop,index);const value=index===null?row.values[prop.name]:row.values[prop.name][index];return readonlyResolved(value)}
+  function propertyControl(row,prop){if(!prop.array)return scalarControl(row,prop);const values=row.values[prop.name]||[];return el("div",{class:"ff7r-array"},...values.map((_value,index)=>el("label",{},el("span",{},`#${index+1}`),scalarControl(row,prop,index))))}
+  function propertyHelp(prop){if(!prop.editable)return infoHelp("This DataObject stores this value in a form Lexeditor cannot safely rewrite in place.");if(prop.type==="ENUM")return infoHelp("This value is an Unreal FName. A same-size edit can choose only a name already present in this .uasset's name table.");if(prop.array)return infoHelp("Existing array elements are editable. Resizing the array would move later row data and is not yet supported.");return null}
+
+  function recordPanel(row=selectedRecord()){
+    if(!row)return detailPanel({className:"ff7r-detail",title:"No record",body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField("This DataObject has no rows.")})]})]});
+    const fields=state.data.properties.map(prop=>detailField({label:prop.label,control:propertyControl(row,prop),dataType:prop.array?`${prop.type}[]`:prop.type,min:prop.min,max:prop.max,help:propertyHelp(prop)}));
+    return detailPanel({className:"ff7r-detail",title:row.tag||`Record ${row.id}`,identity:recordId(row.id),meta:currentAsset()?.name||state.asset,body:[detailSection({title:"PROPERTIES",body:fields})]});
+  }
+  function tablePanel(){const rows=sortedRows();return columnList({rows,key:row=>row.id,selected:state.selected,select:row=>{state.selected=row.id;render()},sortState:state.sort,sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};render()},columnPreferences:dataPrefs,columns:dataColumns,class:"ff7r-table","aria-label":"FF7 Remake DataObject records"})}
+  function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake DataObject",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of assets()){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}const search=el("input",{type:"search",placeholder:"Search IDs, values, and resolved names",value:state.query,"aria-label":"Search FF7 Remake records",oninput:event=>{state.query=event.target.value;render()}});return el("div",{class:"ff7r-toolbar"},el("label",{},"DataObject"),select,search)}
+  function dataPanel(){if(state.busy&&state.tab==="data")return loadingPanel("Loading DataObject","Reading the selected gameplay .uasset/.uexp pair…");if(state.error&&!state.data)return errorPanel(state.error);return el("div",{class:"ff7r-view"},assetToolbar(),panelLayout([tablePanel(),recordPanel()],"ff7r-layout",{layoutKey:"ff7r-data",defaultSizes:[36,64],minSizes:[320,420],stackAt:850}))}
+
+  function economyTables(){return(state.economy?.tables||[]).filter(table=>table.available)}
+  function currentEconomyTable(){return economyTables().find(table=>table.asset===state.economyTable)||economyTables()[0]||null}
+  function economySemanticRow(tag){return currentEconomyTable()?.rows?.find(row=>row.id===tag)||null}
+  function economyViewRows(){const q=state.economyQuery.toLocaleLowerCase(),buy=property("BuyValue"),sale=property("SaleValue"),maxCount=property("MaxCount");return records().map(record=>{const semantic=economySemanticRow(record.tag);return{record,tag:record.tag,name:semantic?.name||record.tag,buy:buy?record.values[buy.name]:"—",sale:sale?record.values[sale.name]:"—",maxCount:maxCount?record.values[maxCount.name]:"—"}}).filter(row=>!q||`${row.tag} ${row.name} ${row.buy} ${row.sale} ${row.maxCount}`.toLocaleLowerCase().includes(q)).sort((a,b)=>compareValues(a[state.economySort.key],b[state.economySort.key])*state.economySort.dir)}
+  function economyToolbar(){const select=el("select",{"aria-label":"FF7 Remake item-settings table",onchange:event=>selectEconomyTable(event.target.value),disabled:state.busy});for(const table of economyTables()){const option=el("option",{value:table.asset},table.name||table.asset.split("/").pop());option.selected=table.asset===state.economyTable;select.append(option)}const search=el("input",{type:"search",placeholder:"Search items and IDs",value:state.economyQuery,"aria-label":"Search FF7 Remake items",oninput:event=>{state.economyQuery=event.target.value;render()}});return el("div",{class:"ff7r-toolbar"},el("label",{},"Item table"),select,search)}
+  function economyTablePanel(){const rows=economyViewRows();return columnList({rows,key:row=>row.record.id,selected:state.selected,select:row=>{state.selected=row.record.id;render()},sortState:state.economySort,sort:key=>{state.economySort=state.economySort.key===key?{key,dir:-state.economySort.dir}:{key,dir:1};render()},columnPreferences:economyPrefs,columns:economyColumns,class:"ff7r-table","aria-label":"FF7 Remake item prices and carry capacity"})}
+  function economyRecordPanel(row=selectedRecord()){
+    const table=currentEconomyTable();if(!row||!table)return loadingPanel("Item settings","No editable item-setting rows were found.");const semantic=economySemanticRow(row.tag);const fields=[detailField({label:"DATA ID",control:readonlyField(row.tag)})];
+    const specs=[["BuyValue","BUY PRICE"],["SaleValue","SELL PRICE"],["CanSale","CAN SELL"],["MaxCount","MAX CARRY"]];for(const[name,label]of specs){const prop=property(name);if(prop){let help=null;if(name==="BuyValue")help=infoHelp("The installed FF7R table exposes BuyValue directly; this control writes that same DataObject field.");else if(name==="MaxCount")help=infoHelp("FF7R's Item/Equipment schema exposes MaxCount as the inventory carry/stack cap; this control writes that authoritative DataObject field.");fields.push(detailField({label,control:propertyControl(row,prop),dataType:prop.type,min:name==="CanSale"?undefined:prop.min,max:name==="CanSale"?undefined:prop.max,help}))}}
+    if(semantic?.textId)fields.splice(1,0,detailField({label:"TEXT ID",control:readonlyField(semantic.textId)}));
+    return detailPanel({className:"ff7r-detail",title:semantic?.name||row.tag,identity:recordId(row.id),meta:table.name||"Item settings",body:[detailSection({title:"ITEM SETTINGS",body:fields})]});
+  }
+  function economyPanel(){if(state.busy&&state.tab==="economy")return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return loadingPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return loadingPanel("Item settings","Open this tab to discover installed FF7R item tables.");if(state.data?.asset!==table.asset)return loadingPanel("Loading item table","Reading the selected item DataObject…");return el("div",{class:"ff7r-view"},economyToolbar(),panelLayout([economyTablePanel(),economyRecordPanel()],"ff7r-layout",{layoutKey:"ff7r-economy",defaultSizes:[45,55],minSizes:[380,420],stackAt:900}))}
+
+  function lootChoiceName(id){return state.loot?.itemChoices?.find(choice=>choice.id===id)?.name||id}
+  function lootSpec(kind){return state.loot?.groups?.find(group=>group.kind===kind)||null}
+  function lootSummary(record,spec){if(!spec)return"—";const items=record.values[spec.itemProperty]||[],chances=spec.percentProperty?(record.values[spec.percentProperty]||[]):[],quantities=spec.quantityProperty?(record.values[spec.quantityProperty]||[]):[];if(!items.length)return"—";return items.map((item,index)=>{let suffix="";if(index<chances.length)suffix=` ${chances[index]}%`;else if(index<quantities.length)suffix=` ×${quantities[index]}`;return`${lootChoiceName(item)}${suffix}`}).join(", ")}
+  function lootViewRows(){const q=state.lootQuery.toLocaleLowerCase();return records().map(record=>({record,tag:record.tag,normal:lootSummary(record,lootSpec("normal")),rare:lootSummary(record,lootSpec("rare")),steal:lootSummary(record,lootSpec("steal"))})).filter(row=>!q||`${row.tag} ${row.normal} ${row.rare} ${row.steal}`.toLocaleLowerCase().includes(q)).sort((a,b)=>compareValues(a[state.lootSort.key],b[state.lootSort.key])*state.lootSort.dir)}
+  function lootToolbar(){const search=el("input",{type:"search",placeholder:"Search enemies, battle IDs, items, and chances",value:state.lootQuery,"aria-label":"Search FF7 Remake enemy loot",oninput:event=>{state.lootQuery=event.target.value;render()}});return el("div",{class:"ff7r-toolbar"},el("label",{},"BattleItemPossession"),search)}
+  function lootTablePanel(){const rows=lootViewRows();return columnList({rows,key:row=>row.record.id,selected:state.selected,select:row=>{state.selected=row.record.id;render()},sortState:state.lootSort,sort:key=>{state.lootSort=state.lootSort.key===key?{key,dir:-state.lootSort.dir}:{key,dir:1};render()},columnPreferences:lootPrefs,columns:lootColumns,class:"ff7r-table","aria-label":"FF7 Remake enemy drops and steals"})}
+  function lootSlotControl(row,spec,index){const itemProp=property(spec.itemProperty);if(!itemProp)return readonlyField("Installed schema no longer matches this semantic slot.");const slot=el("div",{class:"ff7r-loot-slot"},el("label",{},el("span",{},"ITEM"),semanticItemInput(row,itemProp,index)));if(spec.percentProperty){const chanceProp=property(spec.percentProperty);if(chanceProp)slot.append(el("label",{},el("span",{},"CHANCE %"),percentInput(row,chanceProp,index)))}if(spec.quantityProperty){const quantityProp=property(spec.quantityProperty);if(quantityProp)slot.append(el("label",{},el("span",{},"QUANTITY"),numericInput(row,quantityProp,index)))}return slot}
+  function lootRecordPanel(row=selectedRecord()){
+    if(!row)return loadingPanel("Enemy loot","No BattleItemPossession rows were found.");const sections=[detailSection({title:"BATTLE",body:[detailField({label:"DATA ID",control:readonlyField(row.tag)})]})];
+    const labels={normal:"NORMAL DROPS",rare:"RARE DROPS",steal:"STEAL"};for(const spec of state.loot?.groups||[]){const itemProp=property(spec.itemProperty),items=itemProp?(row.values[itemProp.name]||[]):[];const body=items.length?items.map((_item,index)=>detailField({label:`SLOT ${index+1}`,control:lootSlotControl(row,spec,index),help:spec.percentProperty?infoHelp("Chance is the installed raw percent field, constrained by this semantic editor to 0–100."):null})): [detailField({label:"STATE",control:readonlyField("No fixed slots in this array.")})];sections.push(detailSection({title:labels[spec.kind]||spec.kind.toUpperCase(),body}))}
+    return detailPanel({className:"ff7r-detail",title:row.tag||`Battle ${row.id}`,identity:recordId(row.id),meta:"BattleItemPossession",body:sections});
+  }
+  function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return loadingPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return loadingPanel("Enemy loot","Open this tab to discover the installed FF7R loot table.");if(state.data?.asset!==state.loot.asset)return loadingPanel("Loading enemy loot","Reading BattleItemPossession…");return el("div",{class:"ff7r-view"},lootToolbar(),panelLayout([lootTablePanel(),lootRecordPanel()],"ff7r-layout",{layoutKey:"ff7r-loot",defaultSizes:[48,52],minSizes:[420,440],stackAt:950}))}
+
+  function languages(){return [...new Set(textAssets().map(row=>row.language).filter(Boolean))].sort()}
+  function textAssetsForLanguage(){return textAssets().filter(row=>row.language===state.textLanguage)}
+  function textToolbar(){
+    const language=el("select",{"aria-label":"Text language",onchange:event=>selectTextLanguage(event.target.value),disabled:state.busy});
+    for(const code of languages()){const option=el("option",{value:code},code);option.selected=code===state.textLanguage;language.append(option)}
+    const select=el("select",{"aria-label":"FF7 Remake text resource",onchange:event=>selectTextAsset(event.target.value),disabled:state.busy});
+    for(const item of textAssetsForLanguage()){const label=item.group&&item.group!=="Text"?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.textAsset;select.append(option)}
+    const search=el("input",{type:"search",placeholder:"Search text IDs and contents",value:state.textQuery,"aria-label":"Search FF7 Remake text",oninput:event=>{state.textQuery=event.target.value;render()}});
+    return el("div",{class:"ff7r-toolbar"},el("label",{},"Language"),language,el("label",{},"Resource"),select,search);
+  }
+  function textArea(value,oninput,sub=false){const area=el("textarea",{class:`ff7r-textarea${sub?" ff7r-subtext":""}`,value:value??"",disabled:state.activeSource!=="mine",oninput:event=>oninput(event.target.value)});area.value=value??"";return area}
+  function textRecordPanel(row=selectedTextRecord()){
+    if(!row)return detailPanel({className:"ff7r-detail",title:"No text entry",body:[detailSection({title:"TEXT",body:[detailField({label:"STATE",control:readonlyField("This text resource has no entries.")})]})]});
+    const main=detailField({label:"TEXT",dataType:"STRING",control:textArea(row.text,value=>{row.text=value;refreshShell()})});
+    const subs=(row.subentries||[]).map(sub=>detailField({label:sub.id,dataType:"STRING",control:textArea(sub.text,value=>{sub.text=value;refreshShell()},true),help:sub.id==="ACTOR"?infoHelp("Actor/speaker metadata stored as an existing text-resource sub-entry."):null}));
+    const sections=[detailSection({title:"ENTRY",body:[detailField({label:"TEXT ID",dataType:"STRING",control:readonlyField(row.key)}),main]})];
+    if(subs.length)sections.push(detailSection({title:"SUB-ENTRIES",body:subs}));
+    return detailPanel({className:"ff7r-detail",title:row.key||`Text ${row.id}`,identity:recordId(row.id),meta:`${state.textData?.language||state.textLanguage} · ${currentTextAsset()?.name||"Text resource"}`,body:sections});
+  }
+  function textTablePanel(){const rows=sortedTextRows();return columnList({rows,key:row=>row.id,selected:state.textSelected,select:row=>{state.textSelected=row.id;render()},sortState:state.textSort,sort:key=>{state.textSort=state.textSort.key===key?{key,dir:-state.textSort.dir}:{key,dir:1};render()},columnPreferences:textPrefs,columns:textColumns,class:"ff7r-table","aria-label":"FF7 Remake localized text entries"})}
+  function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.busy&&state.tab==="text")return loadingPanel("Loading text resource","Reading localized FF7R text…");if(state.error&&!state.textData)return errorPanel(state.error);if(!state.textData)return loadingPanel("Text resource","Choose a language/resource to load localized text.");return el("div",{class:"ff7r-view"},textToolbar(),panelLayout([textTablePanel(),textRecordPanel()],"ff7r-layout",{layoutKey:"ff7r-text",defaultSizes:[40,60],minSizes:[360,420],stackAt:850}))}
+
+  function loadingPanel(title,message){return detailPanel({className:"ff7r-detail",title,body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField(message)})]})]})}
+  function errorPanel(message){return detailPanel({className:"ff7r-detail",title:"Resource unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:el("div",{class:"ff7r-message ff7r-error"},message)})]})]})}
+  function dataMapPanel(){const rows=state.dataMap?.rows||[];return LexeditorUI.dataMap({rows,page:state.mapPage,query:state.mapQuery,status:state.mapStatus,sort:state.mapSort,changePage:value=>{state.mapPage=value;render()},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changeSort:key=>{state.mapSort=state.mapSort[0]===key?[key,-state.mapSort[1]]:[key,1];render()}}).content}
+  async function projectAction(kind){if(dirtyCount()){state.projectMessage="Save or discard all current gameplay/text changes before building or deploying.";render();return}state.busy=true;state.projectMessage=`${kind==="deploy"?"Building and deploying":"Building"}…`;render();try{const result=await api(`/api/${kind}`,{});state.projectMessage=`${kind==="deploy"?"Deployed":"Built"}: ${result.path}`;state.info=await api("/api/info")}catch(error){state.projectMessage=`Error: ${error.message}`}finally{state.busy=false;render()}}
+  function projectPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Mod Project",meta:"Gameplay and text edits share one project; installed base PAKs are never overwritten",body:[detailSection({title:"PROJECT",body:[detailField({label:"ROOT",control:readonlyField(info.projectRoot||"—")}),detailField({label:"BUILD",control:readonlyField(info.buildPath||"—")}),detailField({label:"DEPLOY",control:readonlyField(info.deployPath||"—")}),detailField({label:"MOUNT",control:readonlyField(info.pakMountPoint||"../../../")})]}),detailSection({title:"ACTIONS",body:[detailField({label:"MOD PAK",control:el("div",{class:"ff7r-actions"},el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("build")},"Build Mod PAK"),el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("deploy")},"Build & Deploy to ~mods"))}),detailField({label:"STATUS",control:el("div",{class:"ff7r-message"},state.projectMessage||"Save edits, then build a separate _P.pak or explicitly deploy it to FF7R's ~mods folder.")})]})]})}
+  function infoPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Information",icon:infoIcon(),meta:"FINAL FANTASY VII REMAKE INTERGRADE",body:[detailSection({title:"GAME",body:[detailField({label:"ROOT",control:readonlyField(info.gameRoot||"—")}),detailField({label:"DATAOBJECTS",control:readonlyField(String(info.dataObjects??"—"))}),detailField({label:"TEXT RESOURCES",control:readonlyField(String(info.textResources??"—"))}),detailField({label:"LANGUAGES",control:readonlyField((info.textLanguages||[]).join(", ")||"—")}),detailField({label:"PAK VERSION",control:readonlyField(info.pakVersion||"Detected when archives are indexed")})]}),detailSection({title:"SEMANTIC EDITORS",body:[detailField({label:"ITEMS",control:readonlyField("Validated BuyValue / SaleValue / CanSale / MaxCount fields from installed Item, Equipment, and Materia DataObjects")}),detailField({label:"ENEMY LOOT",control:readonlyField("BattleItemPossession normal/rare drop item arrays, raw percent chances, and steal item/quantity arrays")})]}),detailSection({title:"HELPER",body:[detailField({label:"REPAK",control:readonlyField(info.helper?.installed?`${info.helper.version} installed`:"Not installed")}),detailField({label:"MOUNT POINT",control:readonlyField(info.pakMountPoint||"../../../")})]}),detailSection({title:"EDITOR COVERAGE",body:[detailField({label:"GAMEPLAY",control:readonlyField("DataObject booleans, bytes, 16/32-bit numbers, floats, existing FNames and fixed array elements")}),detailField({label:"TEXT",control:readonlyField("Variable-length localized text and existing text sub-entry contents")}),detailField({label:"READ ONLY",control:readonlyField("DataObject structural row/property changes, array resizing, text IDs and text entry structure")})]})]})}
+
+  function render(){let content;if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="project")content=projectPanel();else if(state.tab==="info")content=infoPanel();else if(state.tab==="text")content=textPanel();else if(state.tab==="economy")content=economyPanel();else if(state.tab==="loot")content=lootPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
+  async function navigate(tab){const previous=state.tab;state.tab=tab;render();if(tab==="text"&&state.textAsset&&!state.textData)await loadTextAsset(state.textAsset);else if(tab==="economy"){if(!await loadEconomy()){state.tab=previous;render()}}else if(tab==="loot"){if(!await loadLoot()){state.tab=previous;render()}}}
+
+  async function save(){
+    if(state.activeSource!=="mine")return;
+    const gameplay=dataEdits(),text=textEdits();if(!gameplay.length&&!text.length)return;
+    state.busy=true;state.error="";render();
+    try{
+      if(gameplay.length){const result=await api("/api/save",{asset:state.data.asset,sourceSha256:state.data.sourceSha256,activeSha256:state.data.activeSha256,edits:gameplay});state.data.activeSha256=result.activeSha256;state.data.usingProject=true;state.dataBaseline=clone(state.data);state.projectMessage=`Saved ${result.saved} gameplay value${result.saved===1?"":"s"}.`}
+      if(text.length){const result=await api("/api/text/save",{asset:state.textData.asset,sourceUassetSha256:state.textData.sourceUassetSha256,sourceUexpSha256:state.textData.sourceUexpSha256,activeUassetSha256:state.textData.activeUassetSha256,activeUexpSha256:state.textData.activeUexpSha256,edits:text});state.textData.activeUassetSha256=result.activeUassetSha256;state.textData.activeUexpSha256=result.activeUexpSha256;state.textData.usingProject=true;state.textBaseline=clone(state.textData);state.projectMessage=`${state.projectMessage?state.projectMessage+" ":""}Saved ${result.saved} text value${result.saved===1?"":"s"}.`}
+      editHistory.clear();
+    }catch(error){state.error=error.message;throw error}
+    finally{state.busy=false;render();refreshShell()}
+  }
+  async function discard(){if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
+  const editHistory=new EditHistory({capture:()=>({data:state.data?clone(state.data.records):null,text:state.textData?clone(state.textData.records):null}),restore:snapshot=>{if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);if(state.textData&&snapshot?.text)state.textData.records=clone(snapshot.text)},render:async()=>render(),enabled:()=>state.activeSource==="mine"&&["data","economy","loot","text"].includes(state.tab),changed:()=>refreshShell()});
+
+  async function selectProjectSource(value){if(dirtyCount()&&!window.confirm("Discard all unsaved FF7R changes and switch source?"))return;state.activeSource=String(value||"mine");state.economyKey="";state.lootKey="";if(state.data)await loadAsset(state.asset);if(state.textData)await loadTextAsset(state.textAsset);if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot()}
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"economy",label:"Items"},{id:"loot",label:"Enemy Loot"},{id:"data",label:"Game Data"},{id:"text",label:"Text"},{id:"project",label:"Project"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK resources"}],projectActiveSource:()=>state.activeSource,selectProjectSource,info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
+  editHistory.observe(document);
+
+  (async()=>{try{
+    [state.catalog,state.dataMap,state.info]=await Promise.all([api("/api/catalog"),api("/api/datamap"),api("/api/info")]);
+    state.asset=assets()[0]?.asset||"";
+    const availableLanguages=languages();state.textLanguage=availableLanguages.includes("US")?"US":availableLanguages[0]||"US";
+    state.textAsset=textAssets().find(row=>row.language===state.textLanguage)?.asset||"";
+    if(state.asset)await loadAsset(state.asset);else state.error="No FF7 Remake DataObject pairs were found in the installed PAKs.";
+  }catch(error){state.error=error.message;render()}finally{LexeditorUI.finishPluginLoading();render()}})();
+  </script>
+</body>
+</html>
