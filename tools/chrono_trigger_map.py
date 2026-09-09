@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render one Chrono Trigger Steam scene layer from resources.bin/project overlays."""
+"""Render Chrono Trigger Steam scene or overworld layers from ARC1/project data."""
 
 from __future__ import annotations
 
@@ -8,16 +8,23 @@ import json
 from pathlib import Path
 import sys
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from games.chrono_trigger.data import OverlayStore
 from games.chrono_trigger.scene_render import render_scene_layer
+from games.chrono_trigger.world_render import render_world_layer
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Render a Chrono Trigger Steam scene layer to PNG")
+    parser = argparse.ArgumentParser(description="Render a Chrono Trigger Steam map layer to PNG")
     parser.add_argument("--game", required=True, type=Path, help="Chrono Trigger Steam install directory")
     parser.add_argument("--project", type=Path, help="Optional Lexeditor/CTExt loose-file project")
     parser.add_argument("--source", choices=("mine", "vanilla"), default="mine")
-    parser.add_argument("--scene", required=True, type=int)
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument("--scene", type=int, help="Scene ID to render")
+    target.add_argument("--world", type=int, help="Overworld ID to render")
     parser.add_argument("--layer", required=True, type=int, choices=(1, 2))
     parser.add_argument("--output", required=True, type=Path)
     return parser
@@ -41,7 +48,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         store = OverlayStore(archive, project)
-        png, metadata = render_scene_layer(store, args.scene, args.layer, args.source)
+        if args.scene is not None:
+            png, metadata = render_scene_layer(store, args.scene, args.layer, args.source)
+            metadata["renderKind"] = "scene"
+        else:
+            png, metadata = render_world_layer(store, args.world, args.layer, args.source)
+            metadata["renderKind"] = "world"
         output.parent.mkdir(parents=True, exist_ok=True)
         temporary = output.with_suffix(output.suffix + ".tmp")
         temporary.write_bytes(png)
