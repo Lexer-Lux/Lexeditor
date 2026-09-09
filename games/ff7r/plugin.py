@@ -35,7 +35,7 @@ class FF7RSession(LocalPluginSession):
         }
         environment.update(extra_env or {})
         super().__init__(
-            module="games.ff7r.server",
+            module="games.ff7r.themed_server",
             plugin_id="ff7r",
             app_root=ROOT,
             check=check,
