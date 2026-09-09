@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 import sys
 import tempfile
@@ -43,7 +44,11 @@ assert "def save_developer_setting_defaults" in desktop
 assert 'payload["developerMode"] = authorized' in desktop
 assert 'payload["developerLogin"]' in desktop
 assert 'id="chooser-restart"' in chooser and "restart_lexeditor()" in chooser
-assert "restartButton.hidden=!settings?.developerMode" in chooser
+# The restart button is developer-only. Pinning the exact expression meant
+# resolving the settings object into a local - which fixed a real bug where the
+# chooser dropped its own cached settings - failed a check it still satisfied.
+assert re.search(r"restartButton\.hidden\s*=\s*!\w+(\?)?\.developerMode", chooser), (
+    "the chooser restart button is no longer hidden outside developer mode")
 assert 'lexerButton.textContent="DEV"' in chooser
 assert "const restartIcon = () =>" in framework and "M16.59 5.45" in framework
 assert "M16.59 5.45" in chooser and "M20 11a8" not in chooser

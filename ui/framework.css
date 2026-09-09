@@ -1416,6 +1416,8 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   --lex-curve-margin-right:22px;
 }
 .lex-curve-axis { position:absolute;color:var(--lex-muted);font-size:.72em;line-height:1;white-space:nowrap; }
+/* Base placement only. A later block moves the scale numbers to the right-hand
+   margin in vertical writing mode, which is the layout that ships. */
 .lex-curve-axis-top {
   top:var(--lex-curve-margin-top);left:7px;transform:translateY(-50%);
 }
@@ -2516,7 +2518,12 @@ body.lex-panel-layout-dragging * {
 /* Editable table controls occupy the complete cell. Their compact provenance
    lane overlays the right edge instead of shortening the input or select. */
 .lex-column-list .lex-source-control {
-  --lex-reference-rail-width:clamp(1.8em,20%,3.2em) !important;
+  /* The rail overlays the right edge of the control, and the control reserves
+     that much padding for it. A clamp whose MINIMUM is 1.8em reserved more
+     than a narrow cell has, so the value itself was pushed out of its own box:
+     a 44px cell kept 37px of padding and showed no digits. min() lets the
+     reservation shrink with the cell and still caps it in a wide one. */
+  --lex-reference-rail-width:min(3.2em, 34%) !important;
   position:relative;
   display:block;
   width:100%;
@@ -4448,10 +4455,14 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
 .lex-curve-plot > .lex-curve-svg {
   position:absolute;
   top:var(--lex-curve-margin-top);
-  left:var(--lex-curve-margin);
+  /* --lex-curve-margin-left, not --lex-curve-margin: the shorter name is not
+     defined anywhere, so `left` fell back to auto and the width calc was
+     invalid. The SVG then started at the plot's left edge and drew straight
+     over the Y-axis scale numbers that live in that margin. */
+  left:var(--lex-curve-margin-left);
   /* An SVG is a replaced element, so width:auto would take its intrinsic
      size and leave the inset over-constrained. The box is stated outright. */
-  width:calc(100% - var(--lex-curve-margin) - var(--lex-curve-margin-right));
+  width:calc(100% - var(--lex-curve-margin-left) - var(--lex-curve-margin-right));
   height:calc(100% - var(--lex-curve-margin-top) - var(--lex-curve-margin-bottom));
   z-index:1;
 }
@@ -4546,8 +4557,16 @@ nav button.active:focus-visible .lex-tab-shortcut,
      inside a short command row. */
   --lex-tab-badge-size:min(1.6em,calc(min(46px,var(--lex-command-row-height)) - 12px));
   --lex-tab-badge-gap:.4em;
-  padding-inline:var(--lex-tab-badge-gap)
-                 calc(var(--lex-tab-badge-size) + var(--lex-tab-badge-gap) * 2);
+  /* Reserved on BOTH sides. Two things have to be true at once: the label is
+     centred in its button, and the badge never covers it. Reserving only the
+     badge's own side satisfies the second and breaks the first, because the
+     label then centres inside an off-centre content box. The symmetric
+     reservation is the only arrangement that holds both.
+     It is !important because this is what keeps the badge off the label, and a
+     plugin's blanket nav-button padding must not quietly remove it - FF8 set
+     six pixels on both sides and the badge sat on top of "Abilities". */
+  padding-inline:calc(var(--lex-tab-badge-size) + var(--lex-tab-badge-gap) * 2)
+                 !important;
 }
 .lex-shell-header nav button[data-tab] > .lex-tab-label,
 .lex-subtab-button > .lex-tab-label {

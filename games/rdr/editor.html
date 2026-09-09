@@ -37,7 +37,7 @@
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
-  const {el,list,pagedListDetail,pager,provenanceControl,clone,showAlert}=LexeditorUI;
+  const {el,list,pagedListDetail,pager,provenanceControl,clone,showAlert,infoHelp}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
   const state={booting:true,tab:"items",activeSource:"mine",files:{rows:[],counts:{}},dashboard:null,status:"Ready",items:null,itemSelected:"",itemQuery:"",itemSource:"",itemPage:0,itemPageSize:20,itemEdits:{},shops:null,shopSelected:"",shopQuery:"",shopName:"",shopCategory:"",shopPage:0,shopPageSize:20,shopEdits:{},missions:null,missionSelected:"",missionQuery:"",missionArea:"",missionPage:0,missionPageSize:20,missionEdits:{},vanilla:{items:null,shops:null,missions:null},settings:null,settingEdits:{},loot:null,lootDocument:null,lootDirty:false,dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,dataMapSort:["filename",1]};
   const PAGE_SIZE=250;
@@ -55,7 +55,10 @@
   function editItem(item,field,value){const key=`${item.id}|${field.field}`;if(value===field.value)delete state.itemEdits[key];else state.itemEdits[key]=value;shell.refresh();}
   function selectItem(item){state.itemSelected=item.id;renderItems();}
   function recordCell(className,value,title=value){return el("span",{class:`rdr-record-cell ${className}`,title:String(title||"")},String(value||"—"));}
-  function detailField(label,value,help=""){const control=value instanceof Node?value:el("span",{},String(value??"—"));return LexeditorUI.detailField({label,control,description:help||""});}
+  // `description` is prose under the row; `help` is the shared info bubble that
+  // every other plugin's fields carry. RDR's rows had neither, so nothing on
+  // the page explained what any of it edits.
+  function detailField(label,value,help="",bubble=""){const control=value instanceof Node?value:el("span",{},String(value??"—"));return LexeditorUI.detailField({label,control,description:help||"",help:bubble?LexeditorUI.infoHelp(bubble):null});}
   function applyControlValue(control,value){if(control.type==="checkbox")control.checked=String(value).toLowerCase()==="true";else control.value=String(value);control.dispatchEvent(new Event(control.type==="checkbox"||control.tagName==="SELECT"?"change":"input",{bubbles:true}));}
   function sourceControl(control,current,vanilla,apply,format){if(state.activeSource!=="mine"||vanilla===undefined)return control;return provenanceControl({control,current,vanilla,internal:true,format,apply:value=>{apply(value);applyControlValue(control,value);shell.refresh()}})}
   function itemRow(item){return el("div",{class:"rdr-record-row"},recordCell("rdr-record-name",item.friendlyName||item.name||`Item ${item.index}`),recordCell("rdr-record-id",item.name||`#${item.index}`),recordCell("rdr-record-type",item.type),recordCell("rdr-record-source",item.sourceLabel));}
@@ -73,10 +76,12 @@
     if(!item)return el("div",{class:"lex-detail empty"},el("div",{},el("h2",{},"Select an inventory item"),el("p",{},"Edits become full XML overrides in C:\\RDRMod. The installed content.rpf stays unchanged.")));
     return el("div",{class:"lex-detail record-detail item-detail"},
       el("div",{class:"detail-head"},el("h2",{},item.name||`Item ${item.index}`),el("span",{class:`badge${item.project?" project":""}`},item.project?"Project":"Vanilla")),
-      detailField("Record type",item.type),detailField("Dataset",item.sourceLabel),
-      detailField("Vanilla source",el("code",{title:item.sourcePath},item.sourcePath)),
-      detailField("Project override",el("code",{title:item.projectPath},item.projectPath)),
-      ...item.fields.map(field=>detailField(field.field,scalarControl(item,field))));
+      detailField("Record type",item.type,"","The XML element this record comes from. It decides which fields the game reads."),
+      detailField("Dataset",item.sourceLabel,"","Which shipped data file this item was defined in: the base game or one of its DLC."),
+      detailField("Vanilla source",el("code",{title:item.sourcePath},item.sourcePath),"","The untouched file inside the installed content.rpf. Lexeditor never writes here."),
+      detailField("Project override",el("code",{title:item.projectPath},item.projectPath),"","Where your edit is written, as a full XML override. The game loads this instead of the vanilla file."),
+      ...item.fields.map(field=>detailField(field.field,scalarControl(item,field),"",
+        `${field.field} on this item's XML record. Editing it writes a complete override of the record into your project; the installed content.rpf stays unchanged.`)));
   }
   function renderItems(){
     const rows=matchingItems();
