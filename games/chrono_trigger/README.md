@@ -11,7 +11,11 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - ARC1 decoding/search/classification and bounded resource previews.
 - Localization/message editing.
 - Scene headers, existing exits and treasure editing.
-- Scene MapTable/collision inspection.
+- Scene MapTable/collision inspection plus read-only PC render diagnostics.
+  - MapTable main/sub-screen target bits and effect bits are decoded using CTViewer's PC labels, but are not used to claim full composition behavior.
+  - PC `PrioMap` bytes are displayed raw; their semantics remain explicitly unknown.
+  - Scene-referenced `Game/field/BGAnime/bganimeinfo_*.dat` records are decoded read-only: declared animation count, four-chip destination/source ranges, source/destination offset `/32`, and frame duration upper-nibble values (`0x10/0x20/0x40/0x80` = 16/12/8/4 ticks). Unknown duration nibbles and the lower nibble are preserved rather than guessed.
+  - Animation runtime phase and initial-frame behavior are not inferred, so Lexeditor does not claim animation playback yet.
 - Atel parsing, PC disassembly, semantics and control-flow diagnostics, with named fixed-width argument editing in both the desktop Events UI and CLI. Unsupported, variable-width and unresolved commands remain read-only.
 - Eight overworld headers plus existing world exits/triggers/script-address editing.
 - Fail-closed read-only world script disassembly.
@@ -20,7 +24,7 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
   - Scene Map can switch between structural collision/tile-ID views and isolated rendered L1/L2/L3.
   - Scene L3 follows CTViewer's current PC path: `weather_bin/cg*.bin`, scene-indexed `ChipTableBg3_*.dat`, 256 four-corner tiles, PC 3-byte corner records, and 4-color palette groups.
   - Worlds has a Map tab for isolated rendered L1/L2 only.
-  - Animated L1/L2 chip playback and main/sub-screen blend/priority composition remain explicitly unsupported. PC `PrioMap` bytes are exposed but their semantics are not claimed.
+  - Animated L1/L2 chip playback and main/sub-screen blend/priority composition remain explicitly unsupported.
 - Fixed 256-color BGR555 scene/world palette editing.
 - Project change inventory/revert and deterministic CTP export.
 - CTExt audit/deploy/deactivate/manifest-owned undeploy.
@@ -45,7 +49,7 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 
 ## Remaining high-value work
 
-1. Add animated L1/L2 chip playback and correct main/sub-screen composition only where current PC evidence is sufficient; keep PC `PrioMap` semantics unclaimed until independently evidenced.
+1. Determine exact current-PC initial-frame/phase behavior for scene chip animations before enabling playback, and independently evidence main/sub-screen composition and `PrioMap` semantics before implementing composed rendering.
 2. Run the inventory against a current real Steam install and reverse-engineer actual PC battle/enemy/item/tech stat families before implementing stat editors.
 3. Keep improving event editing without moving command boundaries unless a tested assembler/relocation model is developed.
 4. Expand browser-level regression coverage for the integrated Chrono desktop surfaces.
