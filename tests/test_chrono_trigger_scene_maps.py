@@ -31,6 +31,22 @@ class SceneMapTests(unittest.TestCase):
         self.assertTrue(parsed["header"]["layer3Enabled"])
         self.assertEqual(parsed["layers"]["layer3"]["tiles"], [3] * 256)
 
+    def test_exposes_pc_screen_and_effect_bit_labels_without_composition_claim(self):
+        parsed = parse_scene_map(_map(bytes([0x80, 0x00, 0x00])))
+        screen = parsed["compositionBits"]["screen"]
+        effects = parsed["compositionBits"]["effects"]
+        self.assertEqual(screen["raw"], 0x03)
+        self.assertTrue(screen["main"]["layer1"])
+        self.assertTrue(screen["main"]["layer2"])
+        self.assertFalse(screen["main"]["layer3"])
+        self.assertFalse(any(screen["sub"].values()))
+        self.assertEqual(effects["raw"], 0x11)
+        self.assertTrue(effects["targets"]["layer1"])
+        self.assertTrue(effects["targets"]["sprites"])
+        self.assertFalse(effects["halfIntensity"])
+        self.assertFalse(effects["subtract"])
+        self.assertIn("does not emulate", parsed["compositionBits"]["semantics"])
+
     def test_tile_add_flags_promote_effective_tile_bank(self):
         parsed = parse_scene_map(_map(bytes([0x83, 0x00, 0x00])))
         self.assertEqual(parsed["layers"]["layer1"]["tiles"][0], 257)
