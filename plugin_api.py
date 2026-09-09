@@ -138,6 +138,10 @@ class GamePlugin:
     helper_pinned: str = ""
 
 
+def _absolute_for_host_or_windows(path: Path) -> bool:
+    """Accept native absolute paths plus Windows drive/UNC paths on non-Windows CI."""
+    return path.is_absolute() or (os.name != "nt" and PureWindowsPath(str(path)).is_absolute())
+
 
 def validate_plugin(plugin: GamePlugin) -> None:
     """Reject incomplete or unsafe descriptors at discovery time."""
@@ -160,7 +164,7 @@ def validate_plugin(plugin: GamePlugin) -> None:
             path = Path(relative)
             if path.is_absolute() or ".." in path.parts:
                 raise ValueError(f"{plugin.plugin_id} has an unsafe required path: {relative}")
-        if any(not path.is_absolute() and not (os.name != "nt" and PureWindowsPath(str(path)).is_absolute()) for path in spec.default_roots):
+        if any(not _absolute_for_host_or_windows(path) for path in spec.default_roots):
             raise ValueError(f"{plugin.plugin_id} has a relative default game path")
     font_ids: set[str] = set()
     destinations: set[Path] = set()
@@ -197,11 +201,18 @@ def validate_plugin(plugin: GamePlugin) -> None:
             raise ValueError(f"{plugin.plugin_id} has invalid authorized GitHub logins")
     if plugin.projects is not None:
         projects = plugin.projects
-        if not projects.root_env or not projects.default_root.is_absolute():
+        if not projects.root_env or not _absolute_for_host_or_windows(projects.default_root):
             raise ValueError(f"{plugin.plugin_id} has an invalid project descriptor")
-        if projects.template_root and not projects.template_root.is_absolute():
+        if projects.template_root and not _absolute_for_host_or_windows(projects.template_root):
             raise ValueError(f"{plugin.plugin_id} has a relative project template")
         for relative in projects.required_paths:
             path = Path(relative)
             if path.is_absolute() or ".." in path.parts:
                 raise ValueError(f"{plugin.plugin_id} has an unsafe required project path: {relative}")
+        for group in projects.required_any:
+            if not group:
+                raise ValueError(f"{plugin.plugin_id} has an empty project requirement group")
+            for relative in group:
+                path = Path(relative)
+                if path.is_absolute() or ".." in path.parts:
+                    raise ValueError(f"{plugin.plugin_id} has an unsafe alternate project path: {relative}")
