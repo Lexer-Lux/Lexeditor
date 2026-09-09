@@ -61,6 +61,11 @@ class MemoryOpTests(unittest.TestCase):
             0x50: b"\x34\x12\x10",
             0x51: b"\x10\x11",
             0x52: b"\x10\x11",
+            0x53: b"\x34\x01\x10",
+            0x54: b"\x34\x01\x10",
+            0x56: b"\x7F\x34\x12",
+            0x58: b"\x10\x34\x01",
+            0x59: b"\x10\x34\x01",
             0x5B: b"\x04\x10",
             0x5D: b"\x10\x11",
             0x5E: b"\x10\x11",
@@ -112,6 +117,85 @@ class MemoryOpTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "Bank-7F result address must be between"):
                     save_event_fields(store, 1, 0, 0, 0, sha256(original), {"storeAddress": address})
                 self.assertIsNone(store.overlay)
+
+    def test_bank7f_local_copy_layouts_preserve_direction_and_width(self):
+        to_script8 = command(0x53, b"\x34\x01\x10")
+        to_script16 = command(0x54, b"\x34\x01\x10")
+        to_bank8 = command(0x58, b"\x10\x34\x01")
+        to_bank16 = command(0x59, b"\x10\x34\x01")
+
+        self.assertEqual(editor_schema(to_script8)["values"], {
+            "sourceAddress": 0x7F0134, "storeAddress": 0x7F0220,
+        })
+        self.assertEqual(editor_schema(to_bank8)["values"], {
+            "sourceAddress": 0x7F0220, "storeAddress": 0x7F0134,
+        })
+        self.assertEqual(memory_semantics(to_script8)["summary"],
+                         "Copy 8-bit bank-7F 0x7F0134 → script 0x7F0220")
+        self.assertEqual(memory_semantics(to_script16)["widthBytes"], 2)
+        self.assertEqual(memory_semantics(to_bank8)["summary"],
+                         "Copy 8-bit script 0x7F0220 → bank-7F 0x7F0134")
+        self.assertEqual(memory_semantics(to_bank16)["widthBytes"], 2)
+
+    def test_bank7f_immediate_store_uses_full_u16_offset(self):
+        cmd = command(0x56, b"\x7F\x34\x12")
+        schema = editor_schema(cmd)
+        self.assertEqual(schema["values"], {"value": 0x7F, "storeAddress": 0x7F1234})
+        self.assertEqual(schema["fields"][1]["min"], 0x7F0000)
+        self.assertEqual(schema["fields"][1]["max"], 0x7FFFFF)
+        self.assertEqual(memory_semantics(cmd)["summary"], "Store 8-bit 127 → bank-7F 0x7F1234")
+
+    def test_bank7f_assignment_partial_writes_preserve_other_operands_and_size(self):
+        to_script_original = event(bytes((0x53, 0x34, 0x01, 0x10, 0x00)))
+        to_script = FakeStore(to_script_original)
+        save_event_fields(to_script, 1, 0, 0, 0, sha256(to_script_original),
+                          {"sourceAddress": 0x7F01FE})
+        self.assertEqual(to_script.overlay[34:37], bytes((0xFE, 0x01, 0x10)))
+        self.assertEqual(len(to_script.overlay), len(to_script_original))
+
+        immediate_original = event(bytes((0x56, 0x01, 0x34, 0x12, 0x00)))
+        immediate = FakeStore(immediate_original)
+        save_event_fields(immediate, 1, 0, 0, 0, sha256(immediate_original),
+                          {"storeAddress": 0x7FABCD})
+        self.assertEqual(immediate.overlay[34:37], bytes((0x01, 0xCD, 0xAB)))
+        self.assertEqual(len(immediate.overlay), len(immediate_original))
+
+        to_bank_original = event(bytes((0x58, 0x10, 0x34, 0x01, 0x00)))
+        to_bank = FakeStore(to_bank_original)
+        save_event_fields(to_bank, 1, 0, 0, 0, sha256(to_bank_original),
+                          {"storeAddress": 0x7F01AA})
+        self.assertEqual(to_bank.overlay[34:37], bytes((0x10, 0xAA, 0x01)))
+        self.assertEqual(len(to_bank.overlay), len(to_bank_original))
+
+    def test_bank7f_local_copy_ranges_fail_closed(self):
+        to_script_original = event(bytes((0x53, 0x34, 0x01, 0x10, 0x00)))
+        to_script = FakeStore(to_script_original)
+        with self.assertRaisesRegex(ValueError, "Bank-7F source must be between"):
+            save_event_fields(to_script, 1, 0, 0, 0, sha256(to_script_original),
+                              {"sourceAddress": 0x7F0200})
+        self.assertIsNone(to_script.overlay)
+
+        to_bank_original = event(bytes((0x58, 0x10, 0x34, 0x01, 0x00)))
+        to_bank = FakeStore(to_bank_original)
+        with self.assertRaisesRegex(ValueError, "Bank-7F destination must be between"):
+            save_event_fields(to_bank, 1, 0, 0, 0, sha256(to_bank_original),
+                              {"storeAddress": 0x7F0200})
+        self.assertIsNone(to_bank.overlay)
+
+        immediate_original = event(bytes((0x56, 0x01, 0x34, 0x12, 0x00)))
+        immediate = FakeStore(immediate_original)
+        with self.assertRaisesRegex(ValueError, "Bank-7F destination must be between"):
+            save_event_fields(immediate, 1, 0, 0, 0, sha256(immediate_original),
+                              {"storeAddress": 0x800000})
+        self.assertIsNone(immediate.overlay)
+
+    def test_out_of_constructor_range_bank_local_encodings_are_read_only(self):
+        # The two-byte field could hold wider offsets, but Temporal Redux's
+        # constructors choose 0x53/54/58/59 only for [0x7F0000, 0x7F0200).
+        self.assertIsNone(editor_schema(command(0x53, b"\x00\x02\x10")))
+        self.assertIsNone(editor_schema(command(0x54, b"\x00\x02\x10")))
+        self.assertIsNone(editor_schema(command(0x58, b"\x10\x00\x02")))
+        self.assertIsNone(editor_schema(command(0x59, b"\x10\x00\x02")))
 
     def test_immediate_assignments_use_u8_and_little_endian_u16(self):
         one = command(0x4F, b"\x7F\x10")
@@ -187,6 +271,12 @@ class MemoryOpTests(unittest.TestCase):
 
     def test_ambiguous_neighbors_are_not_registered(self):
         for opcode, args in (
+            (0x48, b"\x00\x20\x10"),
+            (0x49, b"\x00\x20\x10"),
+            (0x4A, b"\x00\x20\x01"),
+            (0x4B, b"\x00\x20\x01\x00"),
+            (0x4C, b"\x00\x20\x10"),
+            (0x4D, b"\x00\x20\x10"),
             (0x60, b"\x01\x02"),
             (0x61, b"\x01\x02"),
             (0x75, b"\x01"),
