@@ -227,12 +227,46 @@ def test_refined_master_and_detail_ux(self):
     self.assertLess(main_text.find("Battle 2"), main_text.find("Battle 10"))
     self.originals_unchanged()
 
+def test_finished_high_value_detail_views(self):
+    self.install(); self.open()
+
+    self.navigate("initialState")
+    self.assertEqual(self.page.locator('[data-concept="new-game-setup"]').count(),1)
+    self.assertEqual(self.page.get_by_label("New-game party", exact=True).locator("select").count(),3)
+
+    for group in ("playerAttacks","limitBreaks","enemyAttacks"):
+        with self.subTest(group=group):
+            self.navigate(group)
+            self.assertEqual(self.page.locator('[data-concept="attack-core"]').count(),1)
+            self.assertEqual(self.page.locator('[data-concept="attack-effects"]').count(),1)
+
+    self.navigate("materiaEquipEffects")
+    self.assertEqual(self.page.locator('[data-concept="materia-equip-effect"]').count(),1)
+    self.assertEqual(self.page.get_by_label("Materia equip-effect stat changes", exact=True).locator('input[type="number"]').count(),6)
+
+    self.navigate("recruits")
+    self.assertEqual(self.page.locator('[data-concept="recruit-loadout"]').count(),1)
+    self.assertEqual(self.page.locator('[data-concept="recruit-stats"]').count(),1)
+    self.assertEqual(self.page.get_by_label("Recruit core stats", exact=True).locator('input[type="number"]').count(),12)
+
+    for group in ("texts","exeText"):
+        with self.subTest(group=group):
+            self.navigate(group)
+            self.assertEqual(self.page.locator('[data-concept="text-editor"]').count(),1)
+            area=self.page.locator('[data-concept="text-editor"] textarea')
+            self.assertEqual(area.count(),1)
+            self.assertGreaterEqual(int(area.get_attribute("rows")),10)
+
+    self.originals_unchanged()
+
+
 target.RenderedTests.open = open_with_neutral
 target.RenderedTests.test_materia_uses_human_semantic_controls = test_materia_uses_human_semantic_controls
 target.RenderedTests.test_full_ff7_surface_uses_human_controls = test_full_ff7_surface_uses_human_controls
 target.RenderedTests.test_accessory_description_is_editable_game_text = test_accessory_description_is_editable_game_text
 target.RenderedTests.test_holistic_ff7_concept_views_and_new_game_data = test_holistic_ff7_concept_views_and_new_game_data
 target.RenderedTests.test_refined_master_and_detail_ux = test_refined_master_and_detail_ux
+target.RenderedTests.test_finished_high_value_detail_views = test_finished_high_value_detail_views
 
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)
