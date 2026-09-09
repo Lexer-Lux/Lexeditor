@@ -113,20 +113,15 @@ def test_installed_font_pipeline_caches_only_decoded_private_assets(tmp_path, mo
     assert cached["glyphCount"] == 2
 
 
-def test_installed_font_pipeline_does_not_guess_when_pair_is_ambiguous(tmp_path):
-    result = bitmap_font.ensure_installed_bitmap_font(
-        tmp_path / "game",
-        tmp_path / "data",
-        [bitmap_font.GLYPH_SUFFIXES[0], bitmap_font.GLYPH_SUFFIXES[0], bitmap_font.ATLAS_SUFFIX],
-    )
-    # Duplicate identical paths collapse to one normalized owner; this is safe.
-    assert result["sourceFound"] is True
+def test_font_source_selection_prefers_documented_path_and_fails_on_ambiguous_ownership():
+    exact = bitmap_font.GLYPH_SUFFIXES[0]
+    assert bitmap_font._choose_suffix([exact, exact], (exact,)) == exact
 
     ambiguous = bitmap_font._choose_suffix(
         [
-            "A/" + bitmap_font.GLYPH_SUFFIXES[0],
-            "B/" + bitmap_font.GLYPH_SUFFIXES[0],
+            "A/" + exact,
+            "B/" + exact,
         ],
-        (bitmap_font.GLYPH_SUFFIXES[0],),
+        (exact,),
     )
     assert ambiguous is None
