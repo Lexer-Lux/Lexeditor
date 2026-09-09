@@ -145,24 +145,41 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
 
     dependency_rows = []
     missing_required = []
+    version_mismatches = []
     for dependency in module.get("dependencies", []):
         dep_id = str(dependency.get("id") or "")
         found = installed.get(dep_id.casefold())
         optional = bool(dependency.get("optional"))
+        required_version = str(dependency.get("dependentVersion") or "").strip()
+        installed_version = str(found.get("version", "") or "").strip() if found else ""
+        version_match = None
         if not found and not optional:
             missing_required.append(dep_id)
+        if found and required_version:
+            version_match = required_version.casefold() == installed_version.casefold()
+            if not version_match:
+                version_mismatches.append(
+                    f"{dep_id} requires {required_version}, installed "
+                    f"{installed_version or '(no version declared)'}"
+                )
         dependency_rows.append(
             {
                 "id": dep_id,
-                "requiredVersion": dependency.get("dependentVersion") or "",
+                "requiredVersion": required_version,
                 "optional": optional,
                 "installed": bool(found),
-                "installedVersion": found.get("version", "") if found else "",
+                "installedVersion": installed_version,
+                "versionMatch": version_match,
                 "path": found.get("path", "") if found else "",
             }
         )
     if missing_required:
         issues.append("Missing required dependencies: " + ", ".join(missing_required))
+    if version_mismatches:
+        issues.append(
+            "Dependency version warning (Bannerlord launcher would warn before start): "
+            + "; ".join(version_mismatches)
+        )
 
     binaries = []
     missing_binaries = []
