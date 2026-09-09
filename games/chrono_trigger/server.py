@@ -22,6 +22,7 @@ from .data import (
 )
 from .events import event_entries, get_event, load_events
 from .resources import ResourceArchiveError
+from .scene_tables import load_exits, load_treasure, save_exit, save_treasure
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -30,7 +31,7 @@ PORT = int(os.environ.get("LEXEDITOR_CHRONO_TRIGGER_PORT", os.environ.get("LEXED
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
-POST_ROUTES = {"/api/save/message", "/api/save/scene"}
+POST_ROUTES = {"/api/save/message", "/api/save/scene", "/api/save/exit", "/api/save/treasure"}
 
 
 @lru_cache(maxsize=1)
@@ -111,7 +112,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/3"
+    server_version = "LexeditorChronoTrigger/4"
 
     def log_message(self, _format, *_args):
         return
@@ -159,7 +160,7 @@ class Handler(BaseHTTPRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT),
                     "capabilities": [
                         "data-map", "resource-index", "localization-text", "scene-headers",
-                        "field-events", "project-overlay", "read", "save",
+                        "scene-exits", "scene-treasure", "field-events", "project-overlay", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
@@ -178,6 +179,10 @@ class Handler(BaseHTTPRequestHandler):
                     int(params.get("offset", ["0"])[0]),
                     int(params.get("limit", ["100"])[0]),
                 ))
+            elif path == "/api/exits":
+                self.send_json(load_exits(_store(), int(params.get("scene", ["-1"])[0]), _source(params)))
+            elif path == "/api/treasure":
+                self.send_json(load_treasure(_store(), int(params.get("scene", ["-1"])[0]), _source(params)))
             elif path == "/api/events":
                 if "id" in params:
                     self.send_json(get_event(_store(), int(params["id"][0]), _source(params)))
@@ -232,9 +237,21 @@ class Handler(BaseHTTPRequestHandler):
                     _store(), str(payload.get("path", "")), str(payload.get("sha256", "")),
                     payload.get("changes", []),
                 )
-            else:
+            elif path == "/api/save/scene":
                 result = save_scene(
                     _store(), int(payload.get("id", -1)), str(payload.get("sha256", "")),
+                    payload.get("values", {}),
+                )
+            elif path == "/api/save/exit":
+                result = save_exit(
+                    _store(), int(payload.get("sceneId", -1)), int(payload.get("index", -1)),
+                    str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")),
+                    payload.get("values", {}),
+                )
+            else:
+                result = save_treasure(
+                    _store(), int(payload.get("sceneId", -1)), int(payload.get("index", -1)),
+                    str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")),
                     payload.get("values", {}),
                 )
             self.send_json(result)
