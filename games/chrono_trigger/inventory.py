@@ -70,6 +70,36 @@ def _selected_families(families) -> list[str]:
     return selected
 
 
+def _probe_clusters(family: str, scored: list[dict], *, use_declared_size: bool) -> list[dict]:
+    """Recommend repeated path/size clusters for the bounded payload probe.
+
+    These rows are triage hints only. Equal sizes and directories do not imply
+    equal record semantics.
+    """
+    groups: dict[tuple[str, int], list[str]] = {}
+    size_key = "declaredSize" if use_declared_size else "storedSize"
+    for row in scored:
+        size = row.get(size_key)
+        if not isinstance(size, int):
+            continue
+        parent = PurePosixPath(row["path"]).parent.as_posix()
+        groups.setdefault((parent, size), []).append(row["path"])
+    recommendations = []
+    for (parent, size), paths in groups.items():
+        if len(paths) < 2:
+            continue
+        recommendations.append({
+            "pathPrefix": parent,
+            "sizeBasis": size_key,
+            size_key: size,
+            "count": len(paths),
+            "samplePaths": sorted(paths, key=str.casefold)[:5],
+            "probeArgs": {"family": family, "pathPrefix": parent},
+        })
+    recommendations.sort(key=lambda row: (-row["count"], row["pathPrefix"].casefold(), row[size_key]))
+    return recommendations[:40]
+
+
 def inventory_archive(
     archive: ResourceArchive, *, sample_limit: int = 40, peek_declared_sizes: bool = False,
     families=None,
@@ -148,6 +178,7 @@ def inventory_archive(
             "extensionClusters": _counter_rows(family_extensions, key="extension"),
             "storedSizeClusters": _counter_rows(family_sizes, key="storedSize"),
             "declaredSizeClusters": _counter_rows(family_declared_sizes, key="declaredSize"),
+            "probeClusters": _probe_clusters(family, scored, use_declared_size=peek_declared_sizes),
         }
 
     directory_rows = [
@@ -157,12 +188,13 @@ def inventory_archive(
     if peek_declared_sizes:
         method = (
             "ARC1 index + four-byte decoded entry-size prefixes only; candidate directory/extension/stored-size/"
-            "declared-size clusters; repeated candidate paths are peeked once; no candidate gzip payloads were decompressed"
+            "declared-size clusters and probe-ready repeated path/size groups; repeated candidate paths are peeked "
+            "once; no candidate gzip payloads were decompressed"
         )
     else:
         method = (
-            "ARC1-index-only; candidate directories/extensions/stored sizes use index metadata only; "
-            "no candidate resource payloads were decompressed"
+            "ARC1-index-only; candidate directories/extensions/stored sizes and probe-ready repeated path/size groups "
+            "use index metadata only; no candidate resource payloads were decompressed"
         )
     return {
         "kind": "chrono-trigger-resource-inventory",
