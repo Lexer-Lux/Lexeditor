@@ -7,7 +7,18 @@ from urllib.parse import urlparse
 
 from . import build as package_build
 from .package import PackageValidationError
-from .server import Handler as EditorHandler, PLUGIN_ROOT, PORT, project_root
+from .server import Handler as EditorHandler, PLUGIN_ROOT, PORT, palschema_catalog_payload, project_root
+
+
+def _validate_known_payloads() -> None:
+    """Block packaging when an integrated payload family is already known invalid."""
+    catalog = palschema_catalog_payload()
+    broken = [row.get("path", row.get("name", "unknown")) for row in catalog.get("patches", []) if row.get("errors")]
+    if broken:
+        raise RuntimeError(
+            "PalSchema raw patch validation failed; repair these files before building: "
+            + ", ".join(str(value) for value in broken)
+        )
 
 
 class Handler(EditorHandler):
@@ -45,6 +56,7 @@ class Handler(EditorHandler):
             return
         if path == "/api/build":
             try:
+                _validate_known_payloads()
                 payload = package_build.status(project_root())
                 payload["ready"] = True
                 self.send_json(payload)
@@ -70,6 +82,7 @@ class Handler(EditorHandler):
             if payload:
                 raise ValueError("Palworld build actions do not accept parameters")
             if path == "/api/build/create":
+                _validate_known_payloads()
                 result = package_build.build(project_root())
             else:
                 result = package_build.revert(project_root())
