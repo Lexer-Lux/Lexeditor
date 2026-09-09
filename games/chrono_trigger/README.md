@@ -33,7 +33,7 @@ The managed Chrono Trigger editor currently provides:
 - Localized labels for scenes, items, player characters, world names and world exits where the corresponding Steam message resource exists.
 - Project Changes view: added/modified/redundant overrides plus stale-hash-protected revert of only the loose project copy.
 - Deterministic `.ctp` project export.
-- CTExt status + project integrity audit + explicit deployment/activation. DLL installation remains manual.
+- CTExt status + project integrity audit + explicit deployment/activation. DLL installation remains manual; deactivate/undeploy are currently CLI operations.
 - Evidence-based Data Map reflecting structured, structural, raw, deployment and research coverage.
 
 ## Fixed-width field-event writes
@@ -97,12 +97,13 @@ CTExt deployment validates the documented `mods.enabled` / `mods.load_order` con
 
 ## Integrity audit
 
-Deployment preflight now scans every scene header, not the UI's paged 250-row window. It checks scene→Atel and world→EventTable/script references, decodes each unique referenced field event, reports partial disassembly, validates documented relative jump destinations against decoded command boundaries, rejects symlinked project content, and blocks deployment on malformed structured resources.
+Deployment preflight scans every scene header, not the UI's paged 250-row window. It checks scene→Atel and world→EventTable/script references, decodes each unique referenced field event, reports partial disassembly, validates documented relative jump destinations against decoded command boundaries, rejects symlinked project content, and blocks deployment on malformed structured resources.
 
 ## Validation
 
 `.github/workflows/chrono-trigger-checks.yml`:
 
+- installs the host smoke's Pillow/fonttools import dependencies;
 - compiles every plugin/CLI module;
 - validates the plugin descriptor;
 - auto-discovers every `test_chrono_trigger_*.py` suite;
