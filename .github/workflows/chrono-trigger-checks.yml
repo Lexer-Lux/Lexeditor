@@ -48,6 +48,7 @@ jobs:
           games/chrono_trigger/field_editors.py
           games/chrono_trigger/palettes.py
           games/chrono_trigger/scene_tables.py
+          games/chrono_trigger/scene_animations.py
           games/chrono_trigger/scene_maps.py
           games/chrono_trigger/scene_render.py
           games/chrono_trigger/worlds.py
