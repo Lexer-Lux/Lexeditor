@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+from urllib.request import urlopen
 import zipfile
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
@@ -130,6 +131,15 @@ def smoke() -> list[str]:
             "LEXEDITOR_CHRONO_TRIGGER_PROJECT": str(project),
         })
         with session:
+            with urlopen(session.url, timeout=5) as response:
+                editor_html = response.read().decode("utf-8")
+            if '<script src="/event_editor.js"></script>' not in editor_html:
+                raise RuntimeError("Chrono Trigger desktop event editor module was not attached")
+            with urlopen(session.url + "event_editor.js", timeout=5) as response:
+                event_editor_js = response.read().decode("utf-8")
+            if "/api/save/event-fields" not in event_editor_js or "Apply command" not in event_editor_js:
+                raise RuntimeError("Chrono Trigger desktop event editor module did not expose the named fixed-width workflow")
+
             identity = request_json(session.url + "api/plugin")
             required = {
                 "resource-index", "resource-preview", "localized-labels", "scene-map-layout",
@@ -252,7 +262,7 @@ def smoke() -> list[str]:
             raise RuntimeError("Chrono Trigger deployment did not create the CTExt config backup")
 
     return [
-        "managed service and expanded capability contract confirmed",
+        "managed service, desktop event editor asset and expanded capability contract confirmed",
         "localized labels, bounded resource preview, scene MapTable and field-event commands decoded",
         "named fixed-width event command edited through the managed desktop API with Vanilla unchanged",
         "message, event and scene edits saved to loose overlays while Vanilla stayed unchanged",
