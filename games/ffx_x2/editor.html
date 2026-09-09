@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lexeditor - Final Fantasy X / X-2</title>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    .ffxx2-page{max-width:1180px;margin:0 auto;padding:20px}.ffxx2-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+    .ffxx2-card{border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px;padding:16px;background:var(--panel,rgba(20,25,35,.72))}
+    .ffxx2-toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.ffxx2-toolbar label{display:grid;gap:5px}.ffxx2-grow{flex:1;min-width:240px}
+    .ffxx2-table{width:100%;border-collapse:collapse}.ffxx2-table th,.ffxx2-table td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line,rgba(255,255,255,.12));vertical-align:top}
+    .ffxx2-table td:nth-child(2){white-space:nowrap}.ffxx2-muted{opacity:.72}.ffxx2-status{font-weight:700}.ffxx2-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .ffxx2-path{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9em;word-break:break-all}.ffxx2-error{color:#ff9f9f;white-space:pre-wrap}
+  </style>
+</head>
+<body>
+<div id="lexeditor-shell" class="ffxx2-page">
+  <header>
+    <p class="ffxx2-muted">LEXEDITOR · STEAM COLLECTION</p>
+    <h1>Final Fantasy X / X-2 HD Remaster</h1>
+    <p>Read-only VBF source archives → safe project overlays → Fahrenheit External File Loader.</p>
+  </header>
+
+  <section class="ffxx2-grid" id="overview"></section>
+
+  <section class="ffxx2-card" style="margin-top:14px">
+    <h2>Data Map</h2>
+    <p class="ffxx2-muted">Coverage is explicit: archive browsing is not presented as structured game-data editing.</p>
+    <div style="overflow:auto"><table class="ffxx2-table"><thead><tr><th>Area</th><th>Status</th><th>Controls</th><th>Notes</th></tr></thead><tbody id="datamap"></tbody></table></div>
+  </section>
+
+  <section class="ffxx2-card" style="margin-top:14px" id="archives">
+    <h2>VBF Archive Browser</h2>
+    <div class="ffxx2-toolbar">
+      <label>Game<select id="game"><option value="x">Final Fantasy X</option><option value="x2">Final Fantasy X-2</option></select></label>
+      <label class="ffxx2-grow">Path search<input id="query" type="search" placeholder="battle/kernel, dialogue, .bin …"></label>
+      <button id="search" type="button">Search</button>
+    </div>
+    <p id="archive-summary" class="ffxx2-muted"></p>
+    <div style="overflow:auto"><table class="ffxx2-table"><thead><tr><th>Archive path</th><th>Size</th><th>Project</th><th></th></tr></thead><tbody id="entries"></tbody></table></div>
+  </section>
+
+  <section class="ffxx2-card" style="margin-top:14px" id="deployment">
+    <h2>Fahrenheit Deployment</h2>
+    <p id="deployment-text"></p>
+    <div class="ffxx2-actions"><button id="deploy" type="button">Deploy Project</button><button id="revert" type="button">Revert Lexeditor Mod</button></div>
+    <p class="ffxx2-muted">Lexeditor owns only <span class="ffxx2-path">fahrenheit/mods/lexeditor-ffx-x2</span> and its exact <span class="ffxx2-path">loadorder</span> entry. Other mods are preserved.</p>
+  </section>
+
+  <p id="error" class="ffxx2-error"></p>
+</div>
+<script src="/shared/framework.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let catalog = null;
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(url, options){ const r=await fetch(url, options); const j=await r.json(); if(!r.ok) throw new Error(j.error||`${r.status}`); return j; }
+function bytes(n){ if(n==null)return '—'; const u=['B','KiB','MiB','GiB']; let i=0,v=Number(n); while(v>=1024&&i<u.length-1){v/=1024;i++} return `${v.toFixed(i?1:0)} ${u[i]}`; }
+function showError(error){ $('error').textContent=error ? String(error.message||error) : ''; }
+async function refreshOverview(){
+  const d=await api('/api/dashboard');
+  $('overview').innerHTML = `<article class="ffxx2-card"><h2>Steam install</h2><p class="ffxx2-status">${d.game.ready?'Ready':'Incomplete'}</p><p class="ffxx2-path">${esc(d.game.root)}</p></article>`+
+    d.archives.map(a=>`<article class="ffxx2-card"><h2>${esc(a.label)}</h2><p class="ffxx2-status">${a.ready?`${a.fileCount.toLocaleString()} files`:'Unavailable'}</p><p>${a.ready?bytes(a.bytes):esc(a.error)}</p></article>`).join('')+
+    `<article class="ffxx2-card"><h2>Project</h2><p class="ffxx2-status">${d.project.fileCount} replacement file(s)</p><p class="ffxx2-path">${esc(d.project.root)}</p></article>`;
+  renderDeployment(d.deployment);
+}
+async function refreshMap(){
+  const d=await api('/api/datamap');
+  $('datamap').innerHTML=d.rows.map(r=>`<tr><td class="ffxx2-path">${esc(r.filename)}</td><td>${esc(r.status)}</td><td>${esc(r.controls)}</td><td>${esc(r.notes)}</td></tr>`).join('');
+}
+async function searchArchive(){
+  showError(); const game=$('game').value, q=$('query').value;
+  catalog=await api(`/api/archive?game=${encodeURIComponent(game)}&q=${encodeURIComponent(q)}&limit=150`);
+  $('archive-summary').textContent=`${catalog.total.toLocaleString()} match(es) · source header ${catalog.headerMd5}`;
+  $('entries').innerHTML=catalog.entries.map((e,i)=>`<tr><td class="ffxx2-path">${esc(e.path)}</td><td>${bytes(e.bytes)}</td><td>${e.staged?'Staged':'Source only'}</td><td><button type="button" data-extract="${i}" ${e.staged?'disabled':''}>${e.staged?'Extracted':'Extract to Project'}</button></td></tr>`).join('') || '<tr><td colspan="4">No matching archive entries.</td></tr>';
+}
+async function extractIndex(i){
+  const entry=catalog.entries[i];
+  await api('/api/project/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:catalog.game,path:entry.path,headerMd5:catalog.headerMd5})});
+  await Promise.all([searchArchive(),refreshOverview()]);
+}
+function renderDeployment(d){
+  $('deployment-text').innerHTML = d.fahrenheitReady
+    ? `Fahrenheit found. ${d.deployed?'Lexeditor mod is deployed.':'No Lexeditor mod is deployed.'}${d.deployedChangedExternally?' <strong>Deployed files changed externally; Lexeditor will refuse to overwrite them.</strong>':''}`
+    : `Fahrenheit is not installed at <span class="ffxx2-path">${esc(d.fahrenheitRoot)}</span>. You can still build the project now; deployment will remain disabled.`;
+  $('deploy').disabled=!d.fahrenheitReady||d.projectFileCount===0||d.deployedChangedExternally;
+  $('revert').disabled=!d.deployed||d.deployedChangedExternally;
+}
+async function deploymentAction(route){ showError(); const d=await api(route,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); renderDeployment(d); await refreshOverview(); }
+$('search').addEventListener('click',()=>searchArchive().catch(showError));
+$('query').addEventListener('keydown',e=>{if(e.key==='Enter')searchArchive().catch(showError)});
+$('game').addEventListener('change',()=>searchArchive().catch(showError));
+$('entries').addEventListener('click',e=>{const b=e.target.closest('[data-extract]'); if(b) extractIndex(Number(b.dataset.extract)).catch(showError)});
+$('deploy').addEventListener('click',()=>deploymentAction('/api/deployment/deploy').catch(showError));
+$('revert').addEventListener('click',()=>deploymentAction('/api/deployment/revert').catch(showError));
+Promise.all([refreshOverview(),refreshMap(),searchArchive()]).catch(showError);
+</script>
+</body>
+</html>
