@@ -153,7 +153,23 @@ The proved fixed record length is `0x8C` bytes. The research model identifies:
 
 Lexeditor deliberately does **not** decode or rewrite FFX-2 strings yet. A save patches only `+0x08..+0x0B` in selected records and preserves every other byte, including all unknown record fields and the trailing localized strings.
 
-All eight structured editors are guarded by the relevant source VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
+### `accessory.bin` base abilities and prices
+
+Integrated English/US path:
+
+`FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/accessory.bin`
+
+The independent `HeartlessSeph/FFX2-010-Templates` accessory template establishes a `0x54`-byte accessory record and explicitly enumerates accessory records from zero. Lexeditor therefore fails closed if this table does not start at record zero. The currently exposed fields are:
+
+- `+0x00..+0x07`: name/help string offsets and keys (`u16` pairs), read-only;
+- `+0x0B`: icon byte, read-only;
+- `+0x18..+0x1F`: four base ability IDs (`u16` each), editable;
+- `+0x20..+0x23`: base price (`u32`), editable;
+- `+0x24..+0x53`: creature-extension data, completely opaque/read-only in Lexeditor.
+
+The template also confirms that the bytes after the fixed-record region contain string data. Lexeditor writes only selected base ability slots and/or the price. Regression coverage compares every byte outside those writable fields to the original and preserves the creature-extension region and trailing strings byte-for-byte. The public template is used only as a format cross-check; its source is not copied into Lexeditor.
+
+All nine structured editors are guarded by the relevant source VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
 
 ## Project and loader boundary
 
@@ -197,6 +213,7 @@ Integrated:
 - Structured FFX `arms_shop.bin` 16-slot gear inventory editing.
 - FFX-2 `u32` fixed-record table validation.
 - Conservative FFX-2 `command.bin` animation-ID editing for the `new_uspc` table.
+- Conservative FFX-2 `accessory.bin` base ability/price editing for the `new_uspc` table.
 - Reversible file-only Fahrenheit deployment mechanics for both `efl/x` and `efl/x2` project trees.
 - Private installed-game cosmetic theme extraction/cache with safe fallback.
 - Evidence-based Data Map.
@@ -205,7 +222,7 @@ Not yet integrated:
 
 - Other FFX gameplay/kernel record editors.
 - FFX dialogue/text editing.
-- Other FFX-2 structured tables, localized string editing, or non-US command-table variants.
+- Other FFX-2 structured tables, localized string editing, creature-extension accessory fields, or non-US table variants.
 - Conversion of recognized proprietary font/texture/audio formats that are not already browser-ready.
 - Installing/updating Fahrenheit itself.
 - Choosing FFX vs FFX-2 when launching through Fahrenheit from Lexeditor.
