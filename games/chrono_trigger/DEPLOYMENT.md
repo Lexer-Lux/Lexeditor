@@ -11,7 +11,7 @@ Lexeditor does **not** automatically install or replace CTExt runtime DLLs. An e
 - a readable `ctext.json`
 - a documented `mods.enabled` boolean and `mods.load_order` string array
 
-If that shape is not present, deployment fails closed.
+If that shape is not present, deployment fails closed. Deployment is always explicit; Save, Play, plugin startup and project selection do not deploy automatically.
 
 The deployment manager:
 
@@ -37,7 +37,7 @@ The Chrono Trigger **Deployment** tab shows:
 - whether deployment preflight is currently allowed;
 - explicit Deploy & Activate.
 
-Deployment is never a Save/Play/startup side effect. Deactivate/undeploy are currently exposed through the CLI while their desktop buttons remain a follow-up UI task.
+Deactivate/undeploy are currently exposed through the CLI while their desktop buttons remain a follow-up UI task.
 
 ## Command line
 
