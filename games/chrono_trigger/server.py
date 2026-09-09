@@ -20,6 +20,7 @@ from .data import (
     save_message_table,
     save_scene,
 )
+from .events import event_entries, get_event, load_events
 from .resources import ResourceArchiveError
 
 
@@ -81,6 +82,7 @@ def dashboard() -> dict:
     store = _store()
     messages = store.localization_files()
     scenes = store.scene_entries()
+    events = event_entries(store)
     return {
         "game": {
             "root": str(paths.GAME_ROOT),
@@ -98,6 +100,7 @@ def dashboard() -> dict:
             "resources": len(store.archive.entries),
             "localizationFiles": len(messages),
             "sceneHeaders": len(scenes),
+            "fieldEvents": len(events),
         },
         "deployment": {
             "format": "ctext-loose-files",
@@ -108,7 +111,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/2"
+    server_version = "LexeditorChronoTrigger/3"
 
     def log_message(self, _format, *_args):
         return
@@ -155,8 +158,8 @@ class Handler(BaseHTTPRequestHandler):
                     "windowHost": WINDOW_HOST,
                     "projectRoot": str(paths.PROJECT_ROOT),
                     "capabilities": [
-                        "data-map", "resource-index", "localization-text",
-                        "scene-headers", "project-overlay", "read", "save",
+                        "data-map", "resource-index", "localization-text", "scene-headers",
+                        "field-events", "project-overlay", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
@@ -175,6 +178,15 @@ class Handler(BaseHTTPRequestHandler):
                     int(params.get("offset", ["0"])[0]),
                     int(params.get("limit", ["100"])[0]),
                 ))
+            elif path == "/api/events":
+                if "id" in params:
+                    self.send_json(get_event(_store(), int(params["id"][0]), _source(params)))
+                else:
+                    self.send_json(load_events(
+                        _store(), _source(params), params.get("q", [""])[0],
+                        int(params.get("offset", ["0"])[0]),
+                        int(params.get("limit", ["100"])[0]),
+                    ))
             elif path == "/api/messages/catalog":
                 self.send_json({"files": _store().localization_files()})
             elif path == "/api/messages":
