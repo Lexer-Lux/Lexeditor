@@ -12,6 +12,7 @@ PROJECT_SUBMODULE = '''<Module>
   <Name value="Lexer Skill Tweaks" />
   <Id value="LexerSkillTweaks" />
   <Version value="v2.0.0" />
+  <SingleplayerModule value="true" />
 </Module>
 '''
 
@@ -19,6 +20,7 @@ OLD_SUBMODULE = '''<Module>
   <Name value="Lexer Skill Tweaks" />
   <Id value="LexerSkillTweaks" />
   <Version value="v1.0.0" />
+  <SingleplayerModule value="true" />
 </Module>
 '''
 
@@ -79,6 +81,7 @@ class BannerlordDeployTests(unittest.TestCase):
             )
 
             status = deployment_status(project, game)
+            self.assertTrue(status["runnable"])
             self.assertTrue(status["inSync"])
             self.assertTrue(status["assets"]["gui"]["inSync"])
             self.assertTrue(status["assets"]["moduleData"]["inSync"])
@@ -150,6 +153,26 @@ class BannerlordDeployTests(unittest.TestCase):
             ):
                 with self.assertRaisesRegex(ValueError, "escaped the Modules folder"):
                     deploy_target(project, game)
+        finally:
+            temporary.cleanup()
+
+    def test_multiplayer_only_deployed_module_is_not_reported_runnable(self):
+        temporary, project, game, deployed = self.fixture(installed=True)
+        try:
+            (deployed / "SubModule.xml").write_text(
+                '''<Module>
+  <Name value="Lexer Skill Tweaks" />
+  <Id value="LexerSkillTweaks" />
+  <Version value="v2.0.0" />
+  <SingleplayerModule value="false" />
+  <MultiplayerModule value="true" />
+</Module>
+''',
+                encoding="utf-8",
+            )
+            status = deployment_status(project, game)
+            self.assertFalse(status["runnable"])
+            self.assertTrue(any("single-player modules only" in issue for issue in status["issues"]))
         finally:
             temporary.cleanup()
 
