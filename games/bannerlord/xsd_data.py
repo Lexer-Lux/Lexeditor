@@ -1,6 +1,6 @@
 """Optional Bannerlord XSD discovery and attribute-control enrichment.
 
-The Modding Kit ships schema files under XmlSchemas.  Lexeditor uses them only
+The Modding Kit ships schema files under XmlSchemas. Lexeditor uses them only
 when a unique matching schema can be identified; otherwise ModuleData stays on
 its conservative syntax-derived controls.
 """
@@ -12,11 +12,8 @@ import xml.etree.ElementTree as ET
 
 
 XS = "{http://www.w3.org/2001/XMLSchema}"
-_NUMERIC_TYPES = {
+_INTEGER_TYPES = {
     "byte",
-    "decimal",
-    "double",
-    "float",
     "int",
     "integer",
     "long",
@@ -30,6 +27,7 @@ _NUMERIC_TYPES = {
     "unsignedLong",
     "unsignedShort",
 }
+_NUMERIC_TYPES = _INTEGER_TYPES | {"decimal", "double", "float"}
 
 
 def schema_roots(game_root: Path) -> list[Path]:
@@ -101,8 +99,6 @@ def _complex_type_rules(root: ET.Element, simple_types: dict[str, dict]) -> dict
         if not name:
             continue
         attributes: dict[str, dict] = {}
-        # Attribute declarations can live directly on the complex type or on an
-        # extension/restriction nested under complexContent/simpleContent.
         for attribute in complex_type.findall(f".//{XS}attribute"):
             attribute_name = attribute.attrib.get("name", "")
             if attribute_name:
@@ -136,11 +132,7 @@ def _inline_element_rules(root: ET.Element, simple_types: dict[str, dict]) -> di
             if attribute_name:
                 attributes[attribute_name] = _attribute_rule(attribute, simple_types)
         found.setdefault(name, []).append(attributes)
-    result = {}
-    for name, variants in found.items():
-        if len(variants) == 1:
-            result[name] = variants[0]
-    return result
+    return {name: variants[0] for name, variants in found.items() if len(variants) == 1}
 
 
 @lru_cache(maxsize=256)
@@ -235,6 +227,7 @@ def enrich_elements(elements: list[dict], schema: dict | None) -> list[dict]:
         private = {attribute["name"]: attribute for attribute in element.get("_attributes", [])}
         public = {attribute["name"]: attribute for attribute in element.get("attributes", [])}
         for name, rule in rules.items():
+            type_name = _local_type(rule.get("type", ""))
             for target in (private.get(name), public.get(name)):
                 if target is None:
                     continue
@@ -242,7 +235,9 @@ def enrich_elements(elements: list[dict], schema: dict | None) -> list[dict]:
                 target["kind"] = kind
                 target["choices"] = choices
                 target["required"] = bool(rule.get("required"))
-                target["schemaType"] = rule.get("type", "")
+                target["schemaType"] = type_name
+                if type_name in _INTEGER_TYPES:
+                    target["integer"] = True
                 if "min" in rule:
                     target["min"] = rule["min"]
                 if "max" in rule:
