@@ -1,8 +1,10 @@
 """Archive-family inventory for Chrono Trigger Steam reverse-engineering work.
 
-The inventory intentionally derives candidates from the user's actual ARC1 index
-instead of assuming SNES tables survived at fixed offsets or guessing Steam
-filenames. It is read-only and does not decompress candidate resources.
+The inventory derives candidates from the user's actual ARC1 metadata instead
+of assuming SNES tables survived at fixed offsets or guessing Steam filenames.
+By default it is index-only. An explicit size-peek mode may additionally read
+only each candidate block's decoded four-byte uncompressed-size prefix; it
+still never inflates candidate payloads.
 """
 
 from __future__ import annotations
@@ -51,7 +53,9 @@ def _counter_rows(counter: Counter, *, key: str, limit: int = 40) -> list[dict]:
     ]
 
 
-def inventory_archive(archive: ResourceArchive, *, sample_limit: int = 40) -> dict:
+def inventory_archive(
+    archive: ResourceArchive, *, sample_limit: int = 40, peek_declared_sizes: bool = False,
+) -> dict:
     entries = list(archive.entries)
     paths = [entry.path for entry in entries]
     by_path = {entry.path: entry for entry in entries}
@@ -62,12 +66,17 @@ def inventory_archive(archive: ResourceArchive, *, sample_limit: int = 40) -> di
         parent = PurePosixPath(path).parent.as_posix()
         directories[parent] += 1
 
+    size_peeker = getattr(archive, "declared_payload_size", None)
+    if peek_declared_sizes and not callable(size_peeker):
+        raise ValueError("archive does not support declared payload-size peeking")
+
     candidates: dict[str, dict] = {}
     for family, words in CANDIDATE_KEYWORDS.items():
         scored = []
         family_directories = Counter()
         family_extensions = Counter()
         family_sizes = Counter()
+        family_declared_sizes = Counter()
         for path in paths:
             score = _candidate_score(path, words)
             if not score:
@@ -85,6 +94,14 @@ def inventory_archive(archive: ResourceArchive, *, sample_limit: int = 40) -> di
             if isinstance(stored_size, int) and stored_size >= 0:
                 row["storedSize"] = stored_size
                 family_sizes[stored_size] += 1
+            if peek_declared_sizes:
+                try:
+                    declared_size = int(size_peeker(entry))
+                except Exception as error:
+                    row["declaredSizeError"] = str(error)
+                else:
+                    row["declaredSize"] = declared_size
+                    family_declared_sizes[declared_size] += 1
             scored.append(row)
             family_directories[PurePosixPath(path).parent.as_posix()] += 1
             family_extensions[PurePosixPath(path).suffix.casefold() or "<none>"] += 1
@@ -95,21 +112,31 @@ def inventory_archive(archive: ResourceArchive, *, sample_limit: int = 40) -> di
             "directoryClusters": _counter_rows(family_directories, key="path"),
             "extensionClusters": _counter_rows(family_extensions, key="extension"),
             "storedSizeClusters": _counter_rows(family_sizes, key="storedSize"),
+            "declaredSizeClusters": _counter_rows(family_declared_sizes, key="declaredSize"),
         }
 
-    # Directory clusters are particularly useful for anonymous/generated file
-    # names where keyword search only matches the parent folder.
     directory_rows = [
         {"path": directory, "count": count}
         for directory, count in directories.most_common()
     ]
+    if peek_declared_sizes:
+        method = (
+            "ARC1 index + four-byte decoded entry-size prefixes only; candidate directory/extension/stored-size/"
+            "declared-size clusters; no candidate gzip payloads were decompressed"
+        )
+    else:
+        method = (
+            "ARC1-index-only; candidate directories/extensions/stored sizes use index metadata only; "
+            "no candidate resource payloads were decompressed"
+        )
     return {
         "kind": "chrono-trigger-resource-inventory",
         "archive": str(archive.path),
         "resourceCount": len(paths),
+        "peekDeclaredSizes": bool(peek_declared_sizes),
         "extensions": dict(sorted(extensions.items(), key=lambda row: (-row[1], row[0]))),
         "topLevel": dict(sorted(top.items(), key=lambda row: (-row[1], row[0].casefold()))),
         "directories": directory_rows,
         "candidates": candidates,
-        "method": "ARC1-index-only; candidate directories/extensions/stored sizes use index metadata only; no candidate resource payloads were decompressed",
+        "method": method,
     }
