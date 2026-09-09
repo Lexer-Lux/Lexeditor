@@ -23,7 +23,7 @@ DEFAULT_PROJECT_ROOT = (
 def check() -> list[str]:
     """Check the plugin-owned implementation files, not the user's install."""
     problems: list[str] = []
-    for relative in ("editor.html", "plugin.py", "server.py", "paths.py", "resources.py", "data.py"):
+    for relative in ("editor.html", "plugin.py", "server.py", "paths.py", "resources.py", "data.py", "events.py"):
         target = PLUGIN_ROOT / relative
         if not target.is_file():
             problems.append(f"Chrono Trigger plugin file is missing: {target}")
