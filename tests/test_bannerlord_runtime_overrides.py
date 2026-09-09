@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -88,6 +89,35 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
             self.assertEqual(reverted["xpSources"][0]["amount"], 12)
             self.assertIn("Future.Effect", json.loads(effects_path.read_text()))
             self.assertIn("Future.XP", json.loads(xp_path.read_text()))
+        finally:
+            temporary.cleanup()
+
+    def test_runtime_write_helpers_do_not_follow_existing_hardlinks(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            backup_path = effects_path.with_name(effects_path.name + ".lexeditor.bak")
+            temporary_path = effects_path.with_name(effects_path.name + ".lexeditor.tmp")
+            outside_backup = project.parent / "outside-backup.txt"
+            outside_temporary = project.parent / "outside-temporary.txt"
+            outside_backup.write_text("backup sentinel", encoding="utf-8")
+            outside_temporary.write_text("temporary sentinel", encoding="utf-8")
+            os.link(outside_backup, backup_path)
+            os.link(outside_temporary, temporary_path)
+
+            effect = read_runtime_overrides(project, game)["effects"][0]
+            saved = save_runtime_overrides(project, {
+                "effects": [{"id": effect["id"], "overridden": True, "low": 125, "high": 75}],
+            }, game)
+
+            self.assertEqual(saved["saved"], 1)
+            self.assertEqual(outside_backup.read_text(encoding="utf-8"), "backup sentinel")
+            self.assertEqual(outside_temporary.read_text(encoding="utf-8"), "temporary sentinel")
+            self.assertEqual(json.loads(backup_path.read_text(encoding="utf-8")), {})
+            self.assertEqual(json.loads(effects_path.read_text(encoding="utf-8"))[effect["id"]], {"low": 125.0, "high": 75.0})
         finally:
             temporary.cleanup()
 
