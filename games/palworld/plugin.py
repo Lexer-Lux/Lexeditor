@@ -31,7 +31,7 @@ class PalworldSession(LocalPluginSession):
         environment = {"LEXEDITOR_PALWORLD_PROJECT": str(DEFAULT_PROJECT)}
         environment.update(extra_env or {})
         super().__init__(
-            module="games.palworld.server",
+            module="games.palworld.build_server",
             plugin_id="palworld",
             app_root=ROOT,
             check=check,
@@ -46,7 +46,7 @@ def launch() -> int:
 
 
 def smoke() -> list[str]:
-    """Exercise package + PalSchema service paths without installed game data."""
+    """Exercise package + PalSchema + clean build paths without installed game data."""
     with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-") as temp_name:
         temp = Path(temp_name)
         game = temp / "Palworld"
@@ -134,9 +134,10 @@ def smoke() -> list[str]:
                 "palschema-raw-patches",
                 "palschema-generated-schemas",
                 "palschema-add-existing-row-fields",
+                "official-package-build",
             }
             if not required.issubset(capabilities):
-                raise RuntimeError("Palworld service did not advertise package + schema-aware PalSchema editing")
+                raise RuntimeError("Palworld service did not advertise package, PalSchema and build support")
 
             info = request_json(session.url + "api/info")
             if info.get("data", {}).get("PackageName") != "LexeditorSmoke":
@@ -223,6 +224,22 @@ def smoke() -> list[str]:
             if not (raw_root / "balance.json.lexeditor.bak").is_file():
                 raise RuntimeError("PalSchema changed write did not create a backup")
 
+            build_status = request_json(session.url + "api/build")
+            if build_status.get("ready") is not True or build_status.get("built") is not False:
+                raise RuntimeError("Palworld clean package build reported the wrong initial state")
+            built = request_json(session.url + "api/build/create", {})
+            if built.get("built") is not True or built.get("current") is not True:
+                raise RuntimeError("Palworld clean official-package snapshot was not built")
+            build_root = Path(built["packagePath"])
+            built_patch = build_root / "PalSchema" / "LexeditorSmokeBalance" / "raw" / "balance.json"
+            if not built_patch.is_file():
+                raise RuntimeError("Palworld build did not include the declared PalSchema target")
+            if (build_root / "PalSchema" / "LexeditorSmokeBalance" / "raw" / "balance.json.lexeditor.bak").exists():
+                raise RuntimeError("Palworld build leaked a Lexeditor recovery backup into the official package")
+            reverted = request_json(session.url + "api/build/revert", {})
+            if reverted.get("built") is not False or build_root.exists():
+                raise RuntimeError("Palworld clean package build did not revert cleanly")
+
         if not session.wait_closed():
             raise RuntimeError("Palworld child port is still open after host shutdown")
 
@@ -233,6 +250,8 @@ def smoke() -> list[str]:
         "installed-style generated PalSchema schema supplied scalar field types",
         "generated schema exposed a safe addable property on an already-targeted row",
         "schema-backed PalSchema scalar edit and property addition survived save/readback",
+        "clean official-package build included declared targets and excluded Lexeditor backups",
+        "owned package build reverted without touching project sources",
         "Info.json and PalSchema changed writes created recovery backups",
         "PalSchema JSONC patches stayed readable but changed-write disabled",
         "host-owned Palworld child service stopped cleanly",
@@ -243,7 +262,7 @@ PLUGIN = GamePlugin(
     plugin_id="palworld",
     name=DISPLAY_NAME,
     subtitle="Official mod packages",
-    description="Create Palworld v0.7+ packages and schema-aware PalSchema raw DataTable patches while installed game data stays read-only.",
+    description="Author and build Palworld v0.7+ packages with schema-aware PalSchema raw DataTable patches while installed game data stays read-only.",
     accent="#55c7d9",
     check=check,
     launch=launch,
