@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .bit_ops import apply_bit_op, bit_field_specs, bit_values, decorate_bit_semantics
+from .call_ops import apply_call_op, call_field_specs, call_values, decorate_call_semantics
 from .comparisons import (
     apply_comparison,
     comparison_field_specs,
@@ -71,6 +72,10 @@ def movement_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, movement_field_specs(command), movement_values(command))
 
 
+def call_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, call_field_specs(command), call_values(command))
+
+
 def jump_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
 
@@ -80,9 +85,17 @@ _REGISTRY_BUILDERS = (
     memory_editor_schema,
     bit_editor_schema,
     movement_editor_schema,
+    call_editor_schema,
     jump_editor_schema,
 )
-_REGISTRY_APPLIERS = (apply_comparison, apply_memory_op, apply_bit_op, apply_movement_op, apply_jump)
+_REGISTRY_APPLIERS = (
+    apply_comparison,
+    apply_memory_op,
+    apply_bit_op,
+    apply_movement_op,
+    apply_call_op,
+    apply_jump,
+)
 
 
 def editor_schema(command: dict) -> dict | None:
@@ -98,6 +111,7 @@ def decorate_event_editors(payload: dict) -> dict:
     decorate_memory_semantics(payload)
     decorate_bit_semantics(payload)
     decorate_movement_semantics(payload)
+    decorate_call_semantics(payload)
     decorate_jump_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
