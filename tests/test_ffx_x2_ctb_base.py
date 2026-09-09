@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 import struct
 
 import pytest
 
-from games.ffx_x2.ctb_base import CtbBaseError, apply_edits, parse_ctb_base, payload
+from games.ffx_x2.ctb_base import ARCHIVE_PATH, CtbBaseError, apply_edits, parse_ctb_base, payload
+from games.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
+from service_session import request_json
 
 
 def _table(rows: list[tuple[int, int]], min_index: int = 0, trailing: bytes = b"TAIL") -> bytes:
@@ -56,3 +59,44 @@ def test_ctb_base_rejects_duplicate_and_out_of_range_edits():
         ])
     with pytest.raises(CtbBaseError, match="Tick speed"):
         apply_edits(data, [{"id": 0, "tickSpeed": 256, "icvBonus": 3}])
+
+
+def test_ctb_managed_service_resolves_raw_vbf_and_saves_canonical_project(tmp_path: Path):
+    source = _table([(10, 3), (20, 7)], min_index=4, trailing=b"opaque-service-tail")
+    raw_archive_path = ARCHIVE_PATH.removeprefix("FFX_Data/")
+    game_root = tmp_path / "game"
+    project_root = tmp_path / "project"
+    theme_cache = tmp_path / "theme"
+    _write_fixture_vbf(game_root / "data" / "FFX_Data.vbf", [(raw_archive_path, source)])
+
+    with FFXX2Session({
+        "LEXEDITOR_FFX_X2_ROOT": str(game_root),
+        "LEXEDITOR_FFX_X2_PROJECT": str(project_root),
+        "LEXEDITOR_FFX_X2_THEME_CACHE": str(theme_cache),
+    }) as session:
+        state = request_json(session.url + "api/ctb-base")
+        assert state["source"] == "archive"
+        assert state["archivePath"] == ARCHIVE_PATH
+        assert state["rows"][0] == {
+            "id": 4, "agility": 5, "tickSpeed": 10, "icvBonus": 3,
+            "minIcv": 27, "maxIcv": 30,
+        }
+
+        edit = {"id": 4, "tickSpeed": 12, "icvBonus": 5}
+        saved = request_json(session.url + "api/ctb-base/save", {
+            "headerMd5": state["headerMd5"],
+            "baselineSha256": state["baselineSha256"],
+            "edits": [edit],
+        })
+        assert saved["saved"] == 1
+        assert saved["source"] == "project"
+        assert saved["rows"][0]["tickSpeed"] == 12
+        assert saved["rows"][0]["icvBonus"] == 5
+        assert saved["rows"][0]["minIcv"] == 31
+        assert saved["rows"][0]["maxIcv"] == 36
+
+        target = project_root / "efl" / "x" / Path(*ARCHIVE_PATH.split("/"))
+        assert target.read_bytes() == apply_edits(source, [edit])
+        assert not (project_root / "efl" / "x" / Path(*raw_archive_path.split("/"))).exists()
+
+    assert session.wait_closed()
