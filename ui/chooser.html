@@ -47,7 +47,10 @@
     .state-not-added { --state-color:#b74a42; }
     .game-cover { position:absolute; inset:0; z-index:-3; width:100%; height:100%; object-fit:cover; }
     .cover-fallback { position:absolute; inset:0; z-index:-4; display:grid; place-items:center; padding:18px; color:#727984; background:radial-gradient(circle at 50% 28%,#303641,#171a20 62%,#0e1014); font:900 54px/1 var(--lex-heading-font); text-align:center; }
-    .game-name { position:absolute; z-index:7; right:0; bottom:calc(100% + 3px); left:0; display:grid; height:var(--lex-game-row-gap); overflow:hidden; padding:0 7px; place-items:center; color:#fff; background:transparent; box-shadow:none; font:800 clamp(13px,1.2vw,18px)/1.15 var(--lex-heading-font); text-align:center; text-overflow:ellipsis; text-shadow:0 1px 3px #000; transform:translateY(12px); opacity:0; pointer-events:none; transition:transform .18s cubic-bezier(.2,.8,.2,1),opacity .1s ease; }
+    .game-name { position:absolute; z-index:7; right:0; bottom:calc(100% + 3px); left:0; display:grid; height:var(--lex-game-row-gap); overflow:hidden; padding:0 7px; place-items:center; color:#fff; background:transparent; box-shadow:none; font:800 clamp(13px,1.2vw,18px)/1.15 var(--lex-heading-font); font-size:var(--game-name-size,clamp(13px,1.2vw,18px)); text-align:center; text-shadow:0 1px 3px #000; transform:translateY(12px); opacity:0; pointer-events:none; transition:transform .18s cubic-bezier(.2,.8,.2,1),opacity .1s ease; }
+    /* fitGameName() shrinks the name to the row gap. Past its floor the
+       clamp ellipsizes whole lines instead of cutting one in half. */
+    .game-name-text { display:-webkit-box; max-width:100%; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:var(--game-name-lines,2); overflow-wrap:anywhere; }
     .game:hover .game-name,.game:focus-visible .game-name,.game:focus-within .game-name { transform:translateY(0); opacity:1; }
     .state-indicator { position:absolute; z-index:8; right:9px; bottom:9px; display:flex; height:25px; align-items:center; box-sizing:border-box; overflow:hidden; padding:0 7px; border:0; border-radius:13px; color:#fff; background:color-mix(in srgb,var(--state-color) 88%,#111); box-shadow:0 2px 8px #0009; font:900 13px/1 var(--lex-font); }
     .state-symbol { display:grid; width:12px; min-width:12px; place-items:center; }
@@ -343,9 +346,26 @@
       if(plugin.status==="added"&&plugin.canOpen&&!plugin.scanInProgress){openGame(plugin);return;}
       statusDialog(plugin);
     }
+    // The name sits in the fixed row gap above its card, so a long name must
+    // shrink to fit rather than be clipped mid-line. Sizes are read back from
+    // layout, so this follows the font wherever the clamp lands.
+    function fitGameName(name){
+      if(!name)return;
+      const text=name.querySelector(".game-name-text");if(!text)return;
+      name.style.removeProperty("--game-name-size");
+      const base=parseFloat(getComputedStyle(name).fontSize)||16,floor=10;
+      let size=base;
+      name.style.setProperty("--game-name-lines","99");
+      for(;size>floor;size-=0.5){
+        name.style.setProperty("--game-name-size",size+"px");
+        if(text.scrollHeight<=name.clientHeight)break;
+      }
+      const line=size*1.15;
+      name.style.setProperty("--game-name-lines",String(Math.max(1,Math.floor(name.clientHeight/line))));
+    }
     function createCard(){
       const card=document.createElement("section");card.tabIndex=0;card.setAttribute("role","button");
-      card.innerHTML=`<div class="cover-fallback" aria-hidden="true"></div><div class="game-name"></div><div class="state-indicator" aria-hidden="true"><span class="state-label"></span><span class="state-symbol"></span></div><div class="game-hover"><button class="game-folder-button" type="button" title="Open game folder" aria-label="Open game folder"></button><div class="game-version"></div><div class="game-action-icon"></div><div class="hover-detail"></div></div>`;
+      card.innerHTML=`<div class="cover-fallback" aria-hidden="true"></div><div class="game-name"><span class="game-name-text"></span></div><div class="state-indicator" aria-hidden="true"><span class="state-label"></span><span class="state-symbol"></span></div><div class="game-hover"><button class="game-folder-button" type="button" title="Open game folder" aria-label="Open game folder"></button><div class="game-version"></div><div class="game-action-icon"></div><div class="hover-detail"></div></div>`;
       const folder=card.querySelector(".game-folder-button");folder.append(LexeditorUI.folderIcon());folder.onclick=async event=>{event.stopPropagation();try{await LexeditorUI.openGameFolder(card._plugin.id);}catch(error){setDialog(card._plugin.name,String(error),[button("CLOSE",closeDialog,true)]);}};folder.onkeydown=event=>event.stopPropagation();
       card.onclick=()=>activate(card._plugin);
       card.onkeydown=event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();activate(card._plugin);}};
@@ -353,7 +373,7 @@
     }
     function updateCard(card,plugin){
       card._plugin=plugin;card.className=`game state-${plugin.status}`;card.dataset.plugin=plugin.id;card.dataset.status=plugin.status;
-      card.querySelector(".game-name").textContent=plugin.name;
+      card.querySelector(".game-name-text").textContent=plugin.name;fitGameName(card.querySelector(".game-name"));
       card.querySelector(".cover-fallback").textContent=plugin.name.split(/\s+/).map(word=>word[0]).join("").slice(0,3).toUpperCase();
       const art=plugin.coverArt||{};let image=card.querySelector(".game-cover");
       if(art.state==="ready"&&art.uri){if(!image||image.dataset.uri!==art.uri){image?.remove();image=document.createElement("img");image.className="game-cover";image.alt=`${plugin.name} cover art`;image.dataset.uri=art.uri;image.src=art.uri;image.onerror=()=>image.remove();card.prepend(image);}}else if(art.state!=="loading") image?.remove();
@@ -377,7 +397,7 @@
     }
     modal.onclick=event=>{if(event.target===modal)closeDialog();};
     residentHandle.onclick=()=>residentHandle._plugin&&resumeResident(residentHandle._plugin);
-    addEventListener("resize",()=>requestAnimationFrame(sizeResidentHandle));
+    addEventListener("resize",()=>requestAnimationFrame(()=>{sizeResidentHandle();games.querySelectorAll(".game-name").forEach(fitGameName);}));
     window.__lexChooser={load,render,activate,statusDialog,windowFrame};
     LexeditorHost.installCallbacks();
     window.addEventListener("pywebviewready",load,{once:true});
