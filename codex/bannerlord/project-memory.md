@@ -104,3 +104,42 @@ Prefer implementing changes as a normal Bannerlord module with C#, XML/data file
 - Use `dotnet build` for verification when code changes are made.
 - Be careful around deployed files in the Bannerlord install; do not delete user/game files unless explicitly asked.
 - Do not invent perk mechanics or XP-gain values without the user asking; those parts of the design are still open.
+
+## Lexeditor Bannerlord Integration Invariants
+
+As of 2026-09-09, the Bannerlord plugin uses these conservative rules. Keep them unless new game/upstream evidence establishes different behavior.
+
+### Module metadata and dependency resolution
+
+- Treat current BUTR `Bannerlord.ModuleManager` behavior as the interoperability reference for extended dependency metadata.
+- Normalize BLSE `DependedModuleMetadatas`, legacy `LoadAfterModules`, and optional dependency blocks before native dependency rows. For duplicate load relations, the first row for a module ID wins; incompatibility relations use a separate first-ID-wins set.
+- Required extended dependencies may express `LoadBeforeThis` or `LoadAfterThis`; optional dependencies constrain ordering only when otherwise enabled and are not auto-enabled by Lexeditor Play.
+- Reject contradictory declarations before graph resolution: loadable + incompatible for the same ID, both before + after for the same ID, BLSE incompatible rows carrying an ordering edge, and direct circular declarations.
+- Native `DependentVersion` comparison follows TaleWorlds launcher semantics and ignores the changeset component. BLSE/BUTR community versions use minimum/wildcard/inclusive-range semantics.
+- `RequiredGameVersion` is deliberately not modeled yet. Current ModuleManager compatibility code contains a legacy `SandBox` versus modern `Sandbox` ID ambiguity; do not let it affect Play until modern-game evidence resolves that ambiguity.
+
+### Structured `SubModule.xml` writes
+
+- Preserve unknown attributes, comments, unrelated XML nodes, and already-existing unusual order whenever a structured edit does not require changing them.
+- When Lexeditor creates known structural sections, insert them in canonical relative order rather than appending after later sections.
+- Newly-created `SubModule` records must contain required `Assemblies` and `Tags` containers even when empty.
+- New modern `XmlNode` registrations require at least one `IncludedGameTypes/GameType`; never invent `Campaign` or another game type.
+- Relation edits are preflighted as one proposed set before XML mutation. Invalid saves create no backup/temp file and make no partial edit.
+- All structured writers remain contained to the selected project/module roots and detach predictable `.lexeditor.bak` / `.lexeditor.tmp` aliases before writing.
+
+### Build and project handling
+
+- Lexeditor-hosted builds pin `BannerlordDir`, `GameBin`, `ModuleDir`, and `OutputPath` to the selected Bannerlord installation/module so project-local values cannot redirect the standard hosted output paths.
+- This path pinning is not a sandbox. `dotnet build` executes project-defined/imported MSBuild targets and tasks with the user's permissions. Build only trusted projects.
+- Structured `.csproj` property editing is intentionally non-evaluating: only a uniquely-defined, unconditional property is editable. Duplicate or conditional definitions remain visible but read-only, and backend saves reject them.
+- Text-preserving `.csproj` edits ignore XML comments and CDATA when locating live property/`PropertyGroup` spans.
+- If a workspace contains multiple top-level `.csproj` files, do not pick alphabetically. Require an explicit project selection and pass that exact filename through Build/property-save APIs.
+- New Project creation is transactional across template copy, plugin initialization, and final project selection/validation. On failure, remove only the newly-created target directory and leave the registry/parent/siblings unchanged.
+- Bannerlord template display names must be escaped for XML contexts independently from the sanitized module/C# identifier.
+
+### Deploy and runtime boundaries
+
+- Asset deployment is additive and never deletes deployed files. Overwrites get backups.
+- Runtime balancing files managed by the Runtime Overrides editor are excluded from ordinary build/deploy asset synchronization.
+- Write-capable project/deploy paths reject resolved symlink/junction escapes. Read-only installed-module discovery remains compatible with legitimate mod-manager junctions where no write occurs.
+- CI and isolated smoke tests establish editor/build/deploy behavior only; they do not establish real in-game runtime or visual acceptance. A local Bannerlord launch remains required for that final acceptance step.
