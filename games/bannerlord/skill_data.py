@@ -8,6 +8,8 @@ from pathlib import Path
 import re
 import shutil
 
+from .paths import contained_project_path
+
 
 _STRING = r'"(?:\\.|[^"\\])*"'
 _NUMBER = r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?[fFdDmM]?'
@@ -40,6 +42,10 @@ _EFFECT_CALL = re.compile(
     rf"(?P<suffix>{_STRING})\s*\)",
     re.MULTILINE,
 )
+
+
+def _source_path(project: Path, filename: str, *, require_file: bool = False) -> Path:
+    return contained_project_path(project, "src", filename, require_file=require_file)
 
 
 def _decode_string(token: str) -> str:
@@ -96,7 +102,7 @@ def _public(row: dict) -> dict:
 
 
 def read_skill_definitions(project: Path) -> dict:
-    path = project / "src" / "CustomSkillDefinitions.cs"
+    path = _source_path(project, "CustomSkillDefinitions.cs")
     if not path.is_file():
         return {
             "available": False,
@@ -171,9 +177,7 @@ def _apply_string_edits(
 
 
 def save_skill_definitions(project: Path, payload: dict) -> dict:
-    path = project / "src" / "CustomSkillDefinitions.cs"
-    if not path.is_file():
-        raise FileNotFoundError(path)
+    path = _source_path(project, "CustomSkillDefinitions.cs", require_file=True)
     unknown = set(payload) - {"attributes", "skills"}
     if unknown:
         raise ValueError(f"Unsupported skill sections: {', '.join(sorted(unknown))}")
@@ -263,7 +267,7 @@ def _effect_records(text: str) -> list[dict]:
 
 
 def read_effect_definitions(project: Path) -> dict:
-    path = project / "src" / "CustomSkillEffectRanges.cs"
+    path = _source_path(project, "CustomSkillEffectRanges.cs")
     if not path.is_file():
         return {"available": False, "path": str(path), "effects": []}
     text = path.read_text(encoding="utf-8-sig")
@@ -280,9 +284,7 @@ def read_effect_definitions(project: Path) -> dict:
 
 
 def save_effect_definitions(project: Path, edits: list[dict]) -> dict:
-    path = project / "src" / "CustomSkillEffectRanges.cs"
-    if not path.is_file():
-        raise FileNotFoundError(path)
+    path = _source_path(project, "CustomSkillEffectRanges.cs", require_file=True)
     text = path.read_text(encoding="utf-8-sig")
     rows = _effect_records(text)
     by_index = {row["index"]: row for row in rows}
