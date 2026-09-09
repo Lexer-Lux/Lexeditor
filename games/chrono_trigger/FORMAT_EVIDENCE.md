@@ -27,6 +27,11 @@ Temporal Redux has explicit `Platform.PC` command-width overrides and command co
 
 Current notable PC-specific layouts include:
 
+- `0x12` immediate 8-bit comparison — script-memory `/2` slot, u8 value, operation 0–7, forward jump byte when false.
+- `0x13` immediate 16-bit comparison — script-memory `/2` slot, little-endian u16 value, operation 0–7, forward jump byte when false.
+- `0x14`/`0x15` memory-to-memory comparison — two script-memory `/2` slots, operation 0–7, forward jump byte when false; opcode selects 8/16-bit width.
+- `0x18` Check Storyline — storyline threshold + forward jump byte.
+- Button/action checks `0x2D`, `0x30`/`0x31`, `0x34`–`0x39`, `0x3B`/`0x3C`, `0x3F`–`0x44` — check/mode is encoded in the immutable opcode; the sole argument is the number of bytes to jump if the check fails.
 - `0x83` Load Enemy — enemy ID is PC u16 + slot/static byte.
 - `0xC9` Check Inventory — PC item ID is u16 + jump byte.
 - `0xC7` Add Item from Memory — local-memory slot + raw category.
@@ -38,10 +43,16 @@ Current notable PC-specific layouts include:
 - `0x20`/`0x55`/`0x7F` local-memory outputs and `0x8A`/`0x8C`/`0xA7` local-memory sources use the proven `/2` script-memory encoding.
 - `0x33` palette ID, `0x5A` storyline value, `0x84` raw solidity-properties byte, `0x87` script speed, `0x89` NPC speed, `0x8B` tile position, `0xA6` facing, `0xAA`/`0xAB`/`0xAC`/`0xB7` animation IDs/count and `0xAD` pause ticks are fixed-width explicit operands.
 
+Comparison operation values come directly from Temporal Redux's command model: 0 equals, 1 not-equals, 2 greater-than, 3 less-than, 4 greater-or-equal, 5 less-or-equal, 6 bitwise-AND-nonzero and 7 bitwise-OR-nonzero. Invalid stored operation bytes fail closed rather than being normalized.
+
 All local script-memory UI addresses are even `0x7F0200`–`0x7F03FE` and round-trip to the one-byte PC slot. Invalid/odd values fail closed.
+
+Relative jump writes have an additional invariant: if the jump byte itself changes, the proposed target must be one of the decoded command boundaries (or function end). An unchanged pre-existing invalid jump does not block changing another fixed-width operand. This avoids silently creating new mid-command control-flow edges while preserving unusual existing data.
 
 Still intentionally excluded from named editing:
 
+- `0x16` comparison: bank-7F addressing/operator packing is a distinct layout and is not normalized from the plain script-memory comparison model.
+- `0x6E` PC-only extended-memory comparison: width is known, but public semantic/address evidence is not strong enough yet for a named editor.
 - `0x8D` pixel-position: upstream code itself notes coordinate/shift mismatch.
 - `0x8E` sprite priority: upstream description leaves non-mode bits unresolved.
 - `0x27`/`0x28`: target encoding evidence is inconsistent enough that Lexeditor does not normalize it.
