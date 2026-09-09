@@ -52,7 +52,7 @@ renderDataMap=function(){
     changePage:value=>{state.page=value;renderDataMap()},
     changeSort:key=>{const [active,direction]=state.sort;state.sort=[key,active===key?-direction:1];renderDataMap()}
   });
-  main.replaceChildren(view);
+  main.replaceChildren(view.content);
 };
 
 render=function(){
