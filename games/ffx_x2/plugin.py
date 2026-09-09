@@ -13,7 +13,7 @@ import zlib
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession, request_json
 
-from . import paths
+from . import paths, treasures
 from .vbf import BLOCK_SIZE
 
 
@@ -107,10 +107,26 @@ def _write_fixture_vbf(target: Path, files: list[tuple[str, bytes]]) -> None:
         stream.write(hashlib.md5(header).digest())
 
 
+def _fixture_takara() -> bytes:
+    """Build a synthetic FFX fixed-record table with opaque trailing bytes."""
+    records = bytes([
+        0x00, 50, 0x00, 0x00,  # 5000 gil
+        0x02, 3, 0x34, 0x12,   # 3x item/command 0x1234
+        0x0A, 1, 0x2A, 0x00,   # key item 0x002A
+    ])
+    header = bytearray(0x14)
+    header[:8] = b"TREASURE"
+    struct.pack_into("<HHHH", header, 0x08, 0x20, 0x22, 4, len(records))
+    header[0x10:0x14] = b"KEEP"
+    # Repeated opaque bytes make this fixture exercise compressed VBF blocks
+    # while the fixed-record parser still treats the tail as uninterpreted data.
+    return bytes(header) + records + (b"LEXEDITOR-OPAQUE-TAIL" * 5000)
+
+
 def smoke() -> list[str]:
-    """Exercise the VBF -> project -> Fahrenheit path on synthetic data only."""
-    fixture_path = "FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin"
-    fixture_data = (b"LEXEDITOR-FFX-" * 6000) + b"tail"
+    """Exercise VBF -> structured edit -> project -> Fahrenheit on synthetic data."""
+    fixture_path = treasures.ARCHIVE_PATH
+    fixture_data = _fixture_takara()
     with tempfile.TemporaryDirectory(prefix="lexeditor-ffx-x2-plugin-") as temp_name:
         root = Path(temp_name)
         game = root / "game"
@@ -121,21 +137,24 @@ def smoke() -> list[str]:
             target.write_bytes(b"fixture")
         (game / "fahrenheit" / "mods").mkdir(parents=True, exist_ok=True)
         (game / "fahrenheit" / "mods" / "loadorder").write_text("other-mod\n", encoding="utf-8")
-        _write_fixture_vbf(game / "data" / "FFX_Data.vbf", [(fixture_path, fixture_data)])
+        ffx_archive = game / "data" / "FFX_Data.vbf"
+        _write_fixture_vbf(ffx_archive, [(fixture_path, fixture_data)])
         _write_fixture_vbf(game / "data" / "FFX2_Data.vbf", [
             ("FFX2_Data/ffx_ps2/ffx2/master/test.bin", b"X2 fixture")
         ])
+        archive_hash = hashlib.sha256(ffx_archive.read_bytes()).hexdigest()
 
         with FFXX2Session({
             "LEXEDITOR_FFX_X2_ROOT": str(game),
             "LEXEDITOR_FFX_X2_PROJECT": str(project),
         }) as session:
             identity = request_json(session.url + "api/plugin")
-            if identity.get("pluginId") != "ffx-x2" or "vbf-index" not in identity.get("capabilities", []):
+            capabilities = identity.get("capabilities", [])
+            if identity.get("pluginId") != "ffx-x2" or "vbf-index" not in capabilities or "ffx-treasure-editor" not in capabilities:
                 raise RuntimeError("FFX/X-2 plugin returned the wrong managed identity")
             data_map = request_json(session.url + "api/datamap")
-            if sum(row.get("status") == "integrated" for row in data_map.get("rows", [])) < 3:
-                raise RuntimeError("FFX/X-2 Data Map did not expose both VBFs and deployment")
+            if sum(row.get("status") == "integrated" for row in data_map.get("rows", [])) < 4:
+                raise RuntimeError("FFX/X-2 Data Map did not expose VBFs, treasures and deployment")
             catalog = request_json(session.url + "api/archive?game=x&q=takara&limit=10")
             if catalog.get("total") != 1 or catalog["entries"][0]["path"] != fixture_path:
                 raise RuntimeError("FFX VBF catalog did not return the fixture entry")
@@ -145,16 +164,37 @@ def smoke() -> list[str]:
             project_file = project / "efl" / "x" / Path(*fixture_path.split("/"))
             if not extracted.get("created") or project_file.read_bytes() != fixture_data:
                 raise RuntimeError("FFX VBF entry did not extract byte-exactly to the project overlay")
+
+            treasure_state = request_json(session.url + "api/treasures")
+            if treasure_state.get("source") != "project" or len(treasure_state.get("rows", [])) != 3:
+                raise RuntimeError("FFX treasure API did not parse the staged takara fixture")
+            saved = request_json(session.url + "api/treasures/save", {
+                "headerMd5": treasure_state["headerMd5"],
+                "baselineSha256": treasure_state["baselineSha256"],
+                "edits": [{"id": 0x21, "kind": 0x00, "quantity": 99, "typeId": 0x4321}],
+            })
+            edited_row = next(row for row in saved["rows"] if row["id"] == 0x21)
+            if saved.get("saved") != 1 or edited_row["summary"] != "9900 gil":
+                raise RuntimeError("FFX treasure edit did not save and read back")
+            expected_project = treasures.apply_edits(
+                fixture_data,
+                [{"id": 0x21, "kind": 0x00, "quantity": 99, "typeId": 0x4321}],
+            )
+            if project_file.read_bytes() != expected_project:
+                raise RuntimeError("FFX treasure save changed bytes outside the proved record patch")
+
             deployed = request_json(session.url + "api/deployment/deploy", {})
             deployed_file = game / "fahrenheit" / "mods" / "lexeditor-ffx-x2" / "efl" / "x" / Path(*fixture_path.split("/"))
             loadorder = game / "fahrenheit" / "mods" / "loadorder"
-            if not deployed.get("deployed") or deployed_file.read_bytes() != fixture_data:
-                raise RuntimeError("Lexeditor project did not deploy to the Fahrenheit EFL mod")
+            if not deployed.get("deployed") or deployed_file.read_bytes() != expected_project:
+                raise RuntimeError("Structured FFX project did not deploy to the Fahrenheit EFL mod")
             if loadorder.read_text(encoding="utf-8").splitlines() != ["other-mod", "lexeditor-ffx-x2"]:
                 raise RuntimeError("Fahrenheit loadorder was not preserved and extended correctly")
             reverted = request_json(session.url + "api/deployment/revert", {})
             if reverted.get("deployed") or deployed_file.exists() or loadorder.read_text(encoding="utf-8").splitlines() != ["other-mod"]:
                 raise RuntimeError("Fahrenheit deployment did not revert cleanly")
+            if hashlib.sha256(ffx_archive.read_bytes()).hexdigest() != archive_hash:
+                raise RuntimeError("Structured FFX editing modified the installed VBF source archive")
 
             deadline = time.monotonic() + 30
             while True:
@@ -167,14 +207,15 @@ def smoke() -> list[str]:
                         raise
                     time.sleep(0.25)
             if ('id="lexeditor-shell"' not in html or '/shared/framework.js' not in html
-                    or "Final Fantasy X / X-2" not in html):
-                raise RuntimeError("FFX/X-2 plugin did not serve the shared editor shell")
+                    or "FFX Treasure Rewards" not in html):
+                raise RuntimeError("FFX/X-2 plugin did not serve the structured editor shell")
         if not session.wait_closed():
             raise RuntimeError("FFX/X-2 child port is still open after host shutdown")
     return [
         "FFX and FFX-2 Steam collection identity confirmed on synthetic layout",
-        "VBF header validation, search and compressed extraction passed",
-        "byte-exact project overlay extraction passed",
+        "VBF header/path validation, search and compressed extraction passed",
+        "FFX takara fixed-record parsing and surgical treasure edit/save/readback passed",
+        "installed VBF stayed byte-identical while the project override changed",
         "file-only Fahrenheit EFL deploy/loadorder/revert path passed",
         "shared editor shell served and child service stopped cleanly",
     ]
@@ -185,7 +226,7 @@ PLUGIN = GamePlugin(
     name="Final Fantasy X/X-2 HD Remaster",
     process_names=("FFX.exe", "FFX-2.exe", "FFX&X-2_LAUNCHER.exe"),
     subtitle="FFX / FFX-2 Steam collection",
-    description="Reads both VBF archives, stages safe project overlays, and deploys file replacements through Fahrenheit.",
+    description="Reads both VBF archives, edits proved FFX tables in safe project overlays, and deploys through Fahrenheit.",
     accent="#5f8fd3",
     check=check,
     launch=launch,
