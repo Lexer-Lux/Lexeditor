@@ -11,7 +11,15 @@ editor.write_text(text.replace(old,new),encoding='utf-8')
 
 rendered=root/'tools/verify_ff7_rendered.py'
 tests=rendered.read_text(encoding='utf-8')
-old="get_by_role('tab',name='Growth curves',exact=True)"
-new="get_by_role('tab',name='Curves',exact=True)"
-if tests.count(old)!=3: raise SystemExit(f'Growth curves rendered assertion count {tests.count(old)}')
-rendered.write_text(tests.replace(old,new),encoding='utf-8')
+renames={
+    "get_by_role('tab',name='Growth curves',exact=True)":"get_by_role('tab',name='Curves',exact=True)",
+    "get_by_role('tab',name='Growth bonuses',exact=True)":"get_by_role('tab',name='Bonuses',exact=True)",
+    "get_by_role('tab',name='Field encounters',exact=True)":"get_by_role('tab',name='Field',exact=True)",
+}
+expected={"Growth curves":3,"Growth bonuses":1,"Field encounters":1}
+for old,new in renames.items():
+    label=old.split("name='")[1].split("'")[0]
+    count=tests.count(old)
+    if count!=expected[label]: raise SystemExit(f'{label} rendered assertion count {count}')
+    tests=tests.replace(old,new)
+rendered.write_text(tests,encoding='utf-8')
