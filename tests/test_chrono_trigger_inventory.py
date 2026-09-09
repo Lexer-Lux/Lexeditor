@@ -4,7 +4,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 
-from games.chrono_trigger.inventory import inventory_archive
+from games.chrono_trigger.inventory import CANDIDATE_KEYWORDS, inventory_archive
 
 
 class IndexOnlyArchive:
@@ -46,7 +46,9 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(payload["resourceCount"], 6)
         self.assertEqual(payload["topLevel"]["Game"], 5)
         self.assertEqual(payload["extensions"][".dat"], 3)
+        self.assertEqual(payload["selectedFamilies"], list(CANDIDATE_KEYWORDS))
         self.assertFalse(payload["peekDeclaredSizes"])
+        self.assertEqual(payload["peekedResourceCount"], 0)
         self.assertEqual(archive.peeked, [])
         enemy = payload["candidates"]["enemy"]
         self.assertEqual(enemy["samples"][0]["path"], "Game/battle/enemy/Enemy_0001.dat")
@@ -93,9 +95,14 @@ class InventoryTests(unittest.TestCase):
             ("Game/enemy/Enemy_0003.dat", 50, 160),
             ("Game/common/not_related.dat", 20, 999),
         ])
-        payload = inventory_archive(archive, sample_limit=10, peek_declared_sizes=True)
+        payload = inventory_archive(
+            archive, sample_limit=10, peek_declared_sizes=True, families=["enemy"],
+        )
         enemy = payload["candidates"]["enemy"]
+        self.assertEqual(payload["selectedFamilies"], ["enemy"])
+        self.assertEqual(list(payload["candidates"]), ["enemy"])
         self.assertTrue(payload["peekDeclaredSizes"])
+        self.assertEqual(payload["peekedResourceCount"], 3)
         self.assertEqual(enemy["declaredSizeClusters"], [
             {"declaredSize": 128, "count": 2},
             {"declaredSize": 160, "count": 1},
@@ -109,16 +116,63 @@ class InventoryTests(unittest.TestCase):
         self.assertIn("four-byte decoded entry-size prefixes", payload["method"])
         self.assertIn("no candidate gzip payloads were decompressed", payload["method"])
 
+    def test_family_filter_limits_candidate_analysis_and_peeks(self):
+        archive = IndexOnlyArchive([
+            ("Game/enemy/Enemy_0001.dat", 40, 128),
+            ("Game/item/Item_0001.dat", 40, 256),
+            ("Game/tech/Tech_0001.dat", 40, 512),
+        ])
+        payload = inventory_archive(
+            archive, families=["enemy"], peek_declared_sizes=True,
+        )
+        self.assertEqual(payload["selectedFamilies"], ["enemy"])
+        self.assertEqual(list(payload["candidates"]), ["enemy"])
+        self.assertEqual(archive.peeked, ["Game/enemy/Enemy_0001.dat"])
+        self.assertEqual(payload["peekedResourceCount"], 1)
+
+    def test_overlapping_families_peek_each_resource_once(self):
+        shared = "Game/battle/enemy/Enemy_0001.dat"
+        archive = IndexOnlyArchive([(shared, 40, 128)])
+        payload = inventory_archive(
+            archive, families=["battle", "enemy"], peek_declared_sizes=True,
+        )
+        self.assertEqual(payload["selectedFamilies"], ["battle", "enemy"])
+        self.assertEqual(archive.peeked, [shared])
+        self.assertEqual(payload["peekedResourceCount"], 1)
+        self.assertEqual(payload["candidates"]["battle"]["declaredSizeClusters"], [
+            {"declaredSize": 128, "count": 1},
+        ])
+        self.assertEqual(payload["candidates"]["enemy"]["declaredSizeClusters"], [
+            {"declaredSize": 128, "count": 1},
+        ])
+        self.assertIn("repeated candidate paths are peeked once", payload["method"])
+
     def test_declared_size_peek_records_per_entry_errors_without_aborting(self):
         archive = IndexOnlyArchive([
             ("Game/enemy/Enemy_0001.dat", 40, 128),
             ("Game/enemy/Enemy_0002.dat", 42),
         ])
-        payload = inventory_archive(archive, peek_declared_sizes=True)
+        payload = inventory_archive(
+            archive, peek_declared_sizes=True, families=["enemy"],
+        )
         enemy = payload["candidates"]["enemy"]
         bad = next(row for row in enemy["samples"] if row["path"].endswith("0002.dat"))
         self.assertIn("declaredSizeError", bad)
         self.assertEqual(enemy["declaredSizeClusters"], [{"declaredSize": 128, "count": 1}])
+        self.assertEqual(payload["peekedResourceCount"], 2)
+
+    def test_invalid_or_empty_family_selection_fails_closed(self):
+        archive = IndexOnlyArchive([])
+        with self.assertRaisesRegex(ValueError, "unknown candidate family"):
+            inventory_archive(archive, families=["enemy", "not-a-family"])
+        with self.assertRaisesRegex(ValueError, "at least one candidate family"):
+            inventory_archive(archive, families=[])
+
+    def test_duplicate_family_selection_is_deduplicated_in_order(self):
+        archive = IndexOnlyArchive([])
+        payload = inventory_archive(archive, families=["enemy", "enemy", "item"])
+        self.assertEqual(payload["selectedFamilies"], ["enemy", "item"])
+        self.assertEqual(list(payload["candidates"]), ["enemy", "item"])
 
     def test_cluster_order_is_deterministic_on_ties(self):
         archive = IndexOnlyArchive([
