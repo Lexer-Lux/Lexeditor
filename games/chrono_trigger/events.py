@@ -15,6 +15,8 @@ import struct
 
 from .data import OverlayStore, sha256
 from .field_commands import disassemble_function
+from .field_semantics import decorate_event
+from .labels import label_bundle
 
 
 _FIELD_EVENT_RE = re.compile(r"^Game/field/atel/Atel_(\d+)\.dat$", re.IGNORECASE)
@@ -94,18 +96,12 @@ def parse_event(raw: bytes) -> dict:
         object_start = starts[object_id * 16] if functions else pointer_table_bytes
         object_end = (starts[(object_id + 1) * 16]
                       if object_id + 1 < object_count else len(data))
-        objects.append({
-            "id": object_id,
-            "start": object_start,
-            "end": object_end,
-            "functions": functions,
-        })
+        objects.append({"id": object_id, "start": object_start, "end": object_end, "functions": functions})
 
-    unique_bounds = len(set(zip(starts, ends)))
     return {
         "objectCount": object_count,
         "functionSlots": slot_count,
-        "uniqueFunctionBounds": unique_bounds,
+        "uniqueFunctionBounds": len(set(zip(starts, ends))),
         "completeFunctionBounds": complete_functions,
         "problemFunctionBounds": problem_count,
         "decodedCommandCount": decoded_command_count,
@@ -118,17 +114,14 @@ def parse_event(raw: bytes) -> dict:
 def load_event(store: OverlayStore, event_id: int, virtual_path: str,
                source: str = "mine", include_objects: bool = True) -> dict:
     raw, origin = store.read(virtual_path, source)
-    parsed = parse_event(raw)
     result = {
-        "id": int(event_id),
-        "name": f"Field Event {int(event_id):04d}",
-        "path": PurePosixPath(virtual_path).as_posix(),
-        "source": origin,
-        "readOnly": True,
-        "sha256": sha256(raw),
-        **parsed,
+        "id": int(event_id), "name": f"Field Event {int(event_id):04d}",
+        "path": PurePosixPath(virtual_path).as_posix(), "source": origin,
+        "readOnly": True, "sha256": sha256(raw), **parse_event(raw),
     }
-    if not include_objects:
+    if include_objects:
+        result = decorate_event(result, label_bundle(store, source))
+    else:
         result.pop("objects", None)
     return result
 
@@ -142,14 +135,8 @@ def load_events(store: OverlayStore, source: str = "mine", query: str = "",
     limit = max(1, min(int(limit), 250))
     rows = [load_event(store, event_id, path, source, include_objects=False)
             for event_id, path in entries[offset:offset + limit]]
-    return {
-        "kind": "field-events",
-        "readOnly": True,
-        "matchCount": len(entries),
-        "offset": offset,
-        "limit": limit,
-        "rows": rows,
-    }
+    return {"kind": "field-events", "readOnly": True, "matchCount": len(entries),
+            "offset": offset, "limit": limit, "rows": rows}
 
 
 def get_event(store: OverlayStore, event_id: int, source: str = "mine") -> dict:
