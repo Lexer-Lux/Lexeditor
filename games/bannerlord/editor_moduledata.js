@@ -62,6 +62,7 @@ function moduleDataAttributeLabel(attribute){
   const suffix=[];
   if(attribute.required)suffix.push("required");
   if(attribute.schemaType)suffix.push(attribute.schemaType);
+  if(attribute.schemaIssue)suffix.push("⚠ invalid");
   return suffix.length?`${attribute.name} · ${suffix.join(" · ")}`:attribute.name;
 }
 
@@ -99,17 +100,21 @@ function renderModuleData(){
 
   const fileSelect=select(state.moduleData.relativePath,state.moduleDataFiles.map(path=>[path,path]),value=>loadModuleData(value));
   const schema=state.moduleData.schema;
+  const issueCount=state.moduleData.schemaIssueCount||0;
   const master=el("div",{class:"bl-master"},
     el("div",{class:"bl-master-head"},el("strong",{},`${state.moduleData.rootTag} (${state.moduleData.recordCount||0})`)),
     el("div",{class:"bl-list-block"},fileSelect),
     el("div",{class:"bl-list-block"},
-      schema?el("div",{},el("strong",{},`XSD: ${schema.id||"matched schema"}`),el("small",{},` · ${schema.path||""}`)):
+      schema?el("div",{},
+        el("strong",{},`XSD: ${schema.id||"matched schema"}`),
+        el("small",{},` · ${schema.path||""}`),
+        el("div",{class:"bl-note"},issueCount?`⚠ ${issueCount} schema issue(s) detected in this document.`:"No XSD attribute issues detected.")):
         el("div",{class:"bl-note"},"No unique installed Bannerlord XSD matched; using conservative literal typing.")),
     el("div",{class:"bl-list-block"},textInput(state.moduleDataFilter,value=>{state.moduleDataFilter=value;render()},{placeholder:"Filter records"})),
     el("div",{class:"bl-list"},...records.map(row=>el("button",{
       type:"button",class:`bl-item${row.path===state.moduleDataRecordPath?" active":""}`,
       onclick:()=>selectModuleDataRecord(row.path)
-    },moduleDataRecordLabel(row),el("small",{},`${row.id||"no id"} · line ${row.line}`))))
+    },moduleDataRecordLabel(row),el("small",{},`${row.schemaIssueCount?`⚠ ${row.schemaIssueCount} issue(s) · `:""}${row.id||"no id"} · line ${row.line}`))))
   );
 
   let detail;
@@ -117,7 +122,7 @@ function renderModuleData(){
   else{
     const nodeChoices=nodes.map(element=>[
       element.path,
-      `${"· ".repeat(Math.max(0,element.depth-1))}${element.tag}${element.hint?` · ${element.hint}`:""}`
+      `${element.schemaIssues?.length?"⚠ ":""}${"· ".repeat(Math.max(0,element.depth-1))}${element.tag}${element.hint?` · ${element.hint}`:""}`
     ]);
     const attributeRows=node?(node.attributes||[]).flatMap(attribute=>fieldRow(moduleDataAttributeLabel(attribute),moduleDataControl(attribute))):[];
     const boundNotes=node?(node.attributes||[]).flatMap(attribute=>{
@@ -126,14 +131,23 @@ function renderModuleData(){
       if(attribute.max!==undefined)constraints.push(`max ${attribute.max}`);
       if(attribute.fixed!==undefined)constraints.push(`fixed ${attribute.fixed}`);
       if(attribute.default!==undefined)constraints.push(`default ${attribute.default}`);
+      if(attribute.schemaIssue)constraints.push(`⚠ ${attribute.schemaIssue}`);
       return constraints.length?[el("div",{class:"bl-note"},`${attribute.name}: ${constraints.join(" · ")}`)]:[];
     }):[];
+    const missing=node?.missingRequired||[];
+    const issuePanel=node?.schemaIssues?.length?el("div",{class:"bl-list-block"},
+      el("h3",{},"XSD issues"),el("ul",{},...node.schemaIssues.map(value=>el("li",{},value)))):null;
+    const missingPanel=missing.length?el("div",{class:"bl-list-block"},
+      el("h3",{},"Missing required attributes"),
+      el("ul",{},...missing.map(value=>el("li",{},`${value.name}${value.schemaType?` (${value.schemaType})`:""}`))),
+      el("div",{class:"bl-note"},"Missing required attributes are diagnosed but not auto-created in this slice; use Source for structural XML changes.")):null;
     detail=el("div",{class:"bl-detail"},el("section",{class:"bl-panel"},
       el("h2",{},moduleDataRecordLabel(record)),
       el("div",{class:"bl-grid"},
         ...fieldRow("Record path",el("code",{},record.path)),
         ...fieldRow("Record ID",record.id||"—"),
         ...fieldRow("Record name",record.name||"—"),
+        ...fieldRow("Record XSD issues",String(record.schemaIssueCount||0)),
         ...fieldRow("Nested node",select(state.moduleDataElementPath,nodeChoices,value=>{state.moduleDataElementPath=value;render()})),
         ...(node?[
           ...fieldRow("XML tag",node.tag),
@@ -141,9 +155,9 @@ function renderModuleData(){
           ...attributeRows
         ]:[])
       ),
-      ...boundNotes,
+      issuePanel,missingPanel,...boundNotes,
       el("div",{class:"bl-note"},schema?
-        "Bannerlord XSD metadata is active for this document: enumerations become selects, schema booleans become checkboxes, numeric bounds are enforced, integer types reject fractions, and fixed values are read-only. Required attributes are marked in their labels.":
+        "Bannerlord XSD metadata is active: enums become selects, booleans checkboxes, numeric bounds are enforced, integer types reject fractions, fixed values are read-only, and malformed existing values/missing required attributes are flagged.":
         "Without a unique installed XSD match, Lexeditor only infers literal booleans and numbers; references, localization strings, IDs, enums, and other values remain text."),
       el("div",{class:"bl-note"},"This slice edits existing attributes only. Unknown child elements and attributes are deliberately preserved, and saves patch only changed value spans instead of reserializing the document.")
     ));
