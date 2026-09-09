@@ -52,7 +52,7 @@ Deploy is a separate explicit action that copies that built PAK to the game's
   supported.
 - Source/API/synthetic-fixture checks do not establish live in-game acceptance.
 
-## Installed-PAK extraction is currently broken (found 2026-09-09)
+## Installed-PAK extraction defect and its fix (2026-09-09)
 
 The plugin cannot read any asset from a real FF7R install. `build_index`
 succeeds and lists 1128 DataObjects, but extracting even the first one fails,
@@ -95,3 +95,24 @@ Battle HUD assets, located for issue research but not yet readable:
 `Menu/Resident/Battle/Status` is the party member panel, alongside `ATBGauge`,
 `Gauge_Cell`, `Status_BtnGuide`, `Status_LimitEffect_00`/`_01`, `EnemyStatus`,
 and the textures `U_CharaStatus_Base_02` and `U_CharaStatus_ATB_03`.
+
+### Fixed by reading PAK entries directly
+
+`games/ff7r/pak_reader.py` now parses the version 4 index and entry payloads
+itself, so the plugin no longer depends on the repak defect being fixed
+upstream. repak remains responsible for listing, packing and archive info,
+which it performs correctly, and stays the fallback if the reader rejects an
+archive shape.
+
+Parsing the index confirmed the cause directly rather than inferring it from the
+panic: of 72,214 entries in `pakchunk0_s22`, 65,909 store compression 4 and
+6,305 store 0, matching the share that extracted before. Value 4 is the legacy
+Custom bitflag, not a slot index.
+
+Oodle payloads decode through the library the game already ships; no decoder is
+bundled. `Menu/Resident/Battle/Status.uasset` now decodes to its full 349,289
+bytes with valid cooked-package magic, and `DataObject/Resident/BattleStatusChange`
+parses to its five real properties.
+
+`cryptography` is now a runtime requirement, for the encrypted index.
+
