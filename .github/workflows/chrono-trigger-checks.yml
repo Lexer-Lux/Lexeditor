@@ -5,6 +5,7 @@ on:
     paths:
       - 'games/chrono_trigger/**'
       - 'tests/test_chrono_trigger_*.py'
+      - 'tests/chrono_trigger_browser_check.py'
       - 'tools/chrono_trigger_*.py'
       - 'runtime_bootstrap.py'
       - '.github/workflows/chrono-trigger-checks.yml'
@@ -12,6 +13,7 @@ on:
     paths:
       - 'games/chrono_trigger/**'
       - 'tests/test_chrono_trigger_*.py'
+      - 'tests/chrono_trigger_browser_check.py'
       - 'tools/chrono_trigger_*.py'
       - 'runtime_bootstrap.py'
       - '.github/workflows/chrono-trigger-checks.yml'
@@ -25,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Host smoke import dependencies
-        run: python -m pip install 'Pillow==12.3.0' 'fonttools>=4.59,<5'
+        run: python -m pip install 'Pillow==12.3.0' 'fonttools>=4.59,<5' playwright
       - name: Python syntax
         run: >-
           python -m py_compile
@@ -64,6 +66,7 @@ jobs:
           tools/chrono_trigger_inventory.py
           tools/chrono_trigger_event.py
           tools/chrono_trigger_palette.py
+          tests/chrono_trigger_browser_check.py
       - name: Plugin descriptor
         run: python -c "from plugin_api import validate_plugin; from games.chrono_trigger.plugin import PLUGIN; validate_plugin(PLUGIN); assert PLUGIN.plugin_id == 'chrono-trigger'"
       - name: Chrono Trigger regressions
@@ -85,3 +88,14 @@ jobs:
           node --check /tmp/chrono-trigger-editor.js
           node --check games/chrono_trigger/event_editor.js
           node --check games/chrono_trigger/map_previews.js
+      - name: Browser dependencies
+        run: python -m playwright install --with-deps chromium
+      - name: Desktop map browser regression
+        run: python tests/chrono_trigger_browser_check.py out/chrono-trigger-browser
+      - name: Upload browser artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrono-trigger-browser
+          path: out/chrono-trigger-browser
+          if-no-files-found: ignore
