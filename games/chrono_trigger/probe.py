@@ -92,18 +92,22 @@ def probe_family(
     byte_window: int = 128,
     max_payload_bytes: int = 1024 * 1024,
     max_stored_bytes: int = 1024 * 1024,
+    path_prefix: str | None = None,
 ) -> dict:
     """Probe a bounded set of one candidate family without writing anything.
 
-    Candidate ranking is filename/path evidence only. Each selected entry's
-    four-byte declared uncompressed size is read first. Entries exceeding either
-    configured cap are skipped before gzip decompression.
+    Candidate ranking is filename/path evidence only. ``path_prefix`` may narrow
+    a family to a directory cluster discovered by the index-only inventory. Each
+    selected entry's four-byte declared uncompressed size is read first. Entries
+    exceeding either configured cap are skipped before gzip decompression.
     """
     family = _family_name(family)
     limit = _bounded(limit, 1, MAX_LIMIT, "Probe limit")
     byte_window = _bounded(byte_window, 1, MAX_WINDOW, "Byte window")
     max_payload_bytes = _bounded(max_payload_bytes, 1, 64 * 1024 * 1024, "Maximum payload bytes")
     max_stored_bytes = _bounded(max_stored_bytes, 4, 64 * 1024 * 1024, "Maximum stored bytes")
+    prefix = str(path_prefix or "").strip().replace("\\", "/").strip("/")
+    prefix_folded = prefix.casefold()
 
     words = CANDIDATE_KEYWORDS[family]
     ranked = []
@@ -112,10 +116,15 @@ def probe_family(
         if score:
             ranked.append((score, entry))
     ranked.sort(key=lambda value: (-value[0], value[1].path.casefold()))
+    filtered = [
+        value for value in ranked
+        if not prefix_folded or value[1].path.casefold().lstrip("/").startswith(prefix_folded + "/")
+        or value[1].path.casefold().lstrip("/") == prefix_folded
+    ]
 
     rows = []
     loaded_payloads: list[tuple[dict, bytes]] = []
-    for score, entry in ranked[:limit]:
+    for score, entry in filtered[:limit]:
         row = {
             "path": entry.path,
             "score": score,
@@ -167,7 +176,9 @@ def probe_family(
         "kind": "chrono-trigger-family-probe",
         "archive": str(archive.path),
         "family": family,
+        "pathPrefix": prefix or None,
         "candidateCount": len(ranked),
+        "filteredCandidateCount": len(filtered),
         "attemptedCount": len(rows),
         "loadedCount": len(loaded_payloads),
         "limits": {
@@ -183,7 +194,8 @@ def probe_family(
         "resources": rows,
         "sameSizeComparisons": comparisons,
         "method": (
-            "read-only selected-family probe; declared-size and stored-size caps are checked before candidate gzip "
-            "decompression; byte differences are structural diagnostics only and do not assign gameplay semantics"
+            "read-only selected-family probe; optional path-prefix filtering is applied before payload reads; "
+            "declared-size and stored-size caps are checked before candidate gzip decompression; byte differences are "
+            "structural diagnostics only and do not assign gameplay semantics"
         ),
     }
