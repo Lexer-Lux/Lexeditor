@@ -1,0 +1,65 @@
+name: FFX-X2 checks
+
+on:
+  push:
+    branches: [master, feature/ffx-x2-plugin, 'work/ffx-x2-*']
+    paths:
+      - 'games/ffx_x2/**'
+      - 'tests/test_ffx_x2_*.py'
+      - 'runtime_bootstrap.py'
+      - 'plugin_api.py'
+      - 'service_session.py'
+      - 'ui/credits-sources.json'
+      - 'ui/credits.json'
+      - 'ui/mod-loading.json'
+      - '.github/workflows/ffx-x2-checks.yml'
+  pull_request:
+    paths:
+      - 'games/ffx_x2/**'
+      - 'tests/test_ffx_x2_*.py'
+      - 'runtime_bootstrap.py'
+      - 'plugin_api.py'
+      - 'service_session.py'
+      - 'ui/credits-sources.json'
+      - 'ui/credits.json'
+      - 'ui/mod-loading.json'
+      - '.github/workflows/ffx-x2-checks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ffx-x2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tests
+        run: python -m pip install pytest
+      - name: Python syntax
+        run: python -m compileall -q games/ffx_x2
+      - name: Editor JavaScript syntax
+        shell: bash
+        run: >-
+          python -c "from pathlib import Path; import re; s=Path('games/ffx_x2/editor.html').read_text(encoding='utf-8'); Path('ffx-x2-inline.js').write_text('\n'.join(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)), encoding='utf-8')"
+          && node --check ffx-x2-inline.js
+      - name: Plugin and metadata contracts
+        run: >-
+          python -c "from games.ffx_x2.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ffx_x2.server' in SERVICE_MODULES; print(PLUGIN.name)"
+          && python tools/generate_credits.py --check
+          && python plugin_metadata.py
+      - name: FFX-X2 regressions
+        run: python -m pytest -q tests/test_ffx_x2_vbf.py tests/test_ffx_x2_deployment.py
+      - name: Managed service smoke
+        run: python -c "from games.ffx_x2.plugin import smoke; [print('PASS:', line) for line in smoke()]"
