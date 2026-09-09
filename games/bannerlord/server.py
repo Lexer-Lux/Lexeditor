@@ -16,6 +16,12 @@ from .gauntlet_data import (
     save_prefab,
 )
 from .module_data import data_map, read_submodule, save_module
+from .module_xml_data import (
+    augment_data_map as augment_module_xml_data_map,
+    list_documents,
+    read_document,
+    save_document,
+)
 from .skill_data import (
     read_effect_definitions,
     read_skill_definitions,
@@ -141,6 +147,7 @@ class Handler(BaseHTTPRequestHandler):
                         "mcm-default-settings",
                         "runtime-overrides",
                         "gauntlet-prefabs",
+                        "moduledata-records",
                         "deployment-diagnostics",
                         "data-map",
                     ],
@@ -213,6 +220,24 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
+        if path == "/api/module-data-files":
+            try:
+                self.send_json({"files": list_documents(PROJECT)})
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/module-data":
+            requested = (query.get("path") or [""])[0]
+            if not requested:
+                self.send_json({"error": "Missing ModuleData XML path"}, 400)
+                return
+            try:
+                self.send_json(read_document(PROJECT, requested))
+            except (ValueError, FileNotFoundError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
         if path == "/api/gauntlet-files":
             try:
                 self.send_json({"files": list_prefabs(PROJECT)})
@@ -238,7 +263,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(error)}, 500)
             return
         if path == "/api/datamap":
-            base = augment_gauntlet_data_map(augment_data_map(data_map(PROJECT)))
+            base = augment_module_xml_data_map(
+                PROJECT,
+                augment_gauntlet_data_map(augment_data_map(data_map(PROJECT))),
+            )
             try:
                 self.send_json(augment_runtime_data_map(base, read_runtime_overrides(PROJECT)))
             except Exception:
@@ -315,6 +343,21 @@ class Handler(BaseHTTPRequestHandler):
                 FileNotFoundError,
                 json.JSONDecodeError,
             ) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/module-data/save":
+            try:
+                payload = self.read_json()
+                self.send_json(
+                    save_document(
+                        PROJECT,
+                        str(payload.get("path") or ""),
+                        list(payload.get("edits") or []),
+                    )
+                )
+            except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
