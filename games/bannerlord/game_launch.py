@@ -70,7 +70,7 @@ def selected_module(game_root: Path, project: Path) -> tuple[str, Path]:
 
 
 def module_load_order(game_root: Path, project: Path) -> list[str]:
-    """Resolve required dependency closure, core SP modules, then the selected mod."""
+    """Resolve core SP modules, required dependency closure, then the selected mod."""
     selected_id, installed = selected_module(game_root, project)
     modules = installed_modules(game_root)
     metadata_cache: dict[str, dict] = {}
@@ -114,9 +114,17 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
             "Lexeditor Play currently supports single-player modules only."
         )
 
-    # Respect the selected module's declared dependency order first.  Then add
-    # any standard single-player modules that are installed but were not already
-    # reached through dependency metadata.  Finally add the selected module.
+    # Establish the official single-player prefix first. A selected module often
+    # declares Native/SandBoxCore/Sandbox itself; resolving those declarations
+    # first would otherwise allow Sandbox to jump ahead of newer official modules
+    # such as BirthAndDeath. Recursive dependency resolution still prevents an
+    # official module from being placed before something it actually requires.
+    for module_id in CORE_SINGLEPLAYER_MODULES:
+        if module_id in modules:
+            add(module_id)
+
+    # Then preserve the selected module's external dependency order and closure.
+    # Core dependencies already reached above are naturally de-duplicated.
     for dependency in selected_metadata.get("dependencies", []):
         dependency_id = str(dependency.get("id") or "").strip()
         if not dependency_id:
@@ -124,9 +132,6 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
         if dependency.get("optional") and dependency_id not in modules:
             continue
         add(dependency_id)
-    for module_id in CORE_SINGLEPLAYER_MODULES:
-        if module_id in modules:
-            add(module_id)
     add(selected_id)
     return order
 
