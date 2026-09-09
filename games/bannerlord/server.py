@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from .deploy_data import sync_project_assets
 from .gauntlet_data import (
     augment_data_map as augment_gauntlet_data_map,
     list_prefabs,
@@ -139,6 +140,7 @@ class Handler(BaseHTTPRequestHandler):
                         "module-xml-registrations",
                         "msbuild-project",
                         "dotnet-build",
+                        "asset-deployment",
                         "source-only-editor",
                         "custom-skills",
                         "custom-skill-effects",
@@ -407,15 +409,42 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
-        if path == "/api/build":
+        if path == "/api/deploy-assets":
+            try:
+                assets = sync_project_assets(PROJECT)
+                self.send_json({"assets": assets, "deployment": deployment_status(PROJECT)})
+            except (ValueError, FileNotFoundError, TypeError, json.JSONDecodeError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path in {"/api/build", "/api/build-deploy"}:
             try:
                 payload = self.read_json()
-                self.send_json(
-                    run_build(
-                        PROJECT,
-                        requested=payload.get("project"),
-                        configuration=payload.get("configuration", "Debug"),
+                build = run_build(
+                    PROJECT,
+                    requested=payload.get("project"),
+                    configuration=payload.get("configuration", "Debug"),
+                )
+                if path == "/api/build":
+                    self.send_json(build)
+                    return
+                if not build.get("succeeded"):
+                    self.send_json(
+                        {
+                            "build": build,
+                            "assets": None,
+                            "deployment": deployment_status(PROJECT),
+                        }
                     )
+                    return
+                assets = sync_project_assets(PROJECT)
+                self.send_json(
+                    {
+                        "build": build,
+                        "assets": assets,
+                        "deployment": deployment_status(PROJECT),
+                    }
                 )
             except (ValueError, FileNotFoundError, TypeError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
