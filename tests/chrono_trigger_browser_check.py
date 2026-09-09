@@ -24,7 +24,37 @@ SCENE_MAP = {
     "sceneWidth": 16,
     "sceneHeight": 16,
     "header": {"scrollLayer2": {"xPixelsPerSecond": 0, "yPixelsPerSecond": 0}},
-    "layerPriorities": [0, 1, 2],
+    "layerPriorities": [3, 1, 2, 2],
+    "priorityPath": "Game/field/PrioMap/PrioMap0.dat",
+    "prioritySemanticsKnown": False,
+    "compositionBits": {
+        "screen": {
+            "raw": 0x4B,
+            "main": {"layer1": True, "layer2": True, "layer3": False, "sprites": True},
+            "sub": {"layer1": False, "layer2": False, "layer3": True, "sprites": False},
+        },
+        "effects": {
+            "raw": 0x53,
+            "targets": {"layer1": True, "layer2": True, "layer3": False, "sprites": True},
+            "unknown08": False, "defaultColor": False, "halfIntensity": True, "subtract": False,
+        },
+        "semantics": "CTViewer PC MapTable bit labels only; Lexeditor does not emulate render order or blending from these flags.",
+    },
+    "chipAnimations": {
+        "present": True,
+        "valid": True,
+        "path": "Game/field/BGAnime/bganimeinfo_4.dat",
+        "declaredAnimationCount": 1,
+        "decodedAnimationCount": 1,
+        "playbackEmulated": False,
+        "animations": [{
+            "index": 0, "destinationChipRange": [12, 15],
+            "frames": [
+                {"sourceChipRange": [0, 3], "durationTicks": 16, "durationRaw": 0x10},
+                {"sourceChipRange": [4, 7], "durationTicks": 4, "durationRaw": 0x80},
+            ],
+        }],
+    },
     "layers": {
         "layer1": {"width": 16, "height": 16, "tiles": [1] * 256},
         "layer2": {"width": 16, "height": 16, "tiles": [2] * 256},
@@ -116,6 +146,18 @@ def main() -> None:
 
             page.locator(".ct-section-tabs").get_by_role("button", name="Map", exact=True).click()
             page.wait_for_function('state.scenes.map?.sceneWidth === 16')
+            diagnostics = page.locator(".ct-render-diagnostics")
+            assert "1/1 BGAnime records" in diagnostics.locator("summary").inner_text()
+            diagnostics.locator("summary").click()
+            diagnostic_text = diagnostics.inner_text()
+            assert "main: L1, L2, sprites" in diagnostic_text
+            assert "sub: L3" in diagnostic_text
+            assert "3 / 1 / 2 / 2" in diagnostic_text
+            assert "semantics unknown" in diagnostic_text
+            assert "chips 12–15" in diagnostic_text
+            assert "16 ticks" in diagnostic_text
+            assert "does not emulate animation playback" in diagnostic_text
+
             scene_select = page.locator(".ct-map-panel select")
             scene_select.select_option("raster1")
             page.wait_for_function('document.querySelector(".ct-raster-image")?.naturalWidth > 0')
@@ -147,7 +189,8 @@ def main() -> None:
             assert page.locator(".ct-warning").count() == 0
             page.screenshot(path=str(ARTIFACTS / "world-raster.png"), full_page=True)
 
-            results.append({"sceneRaster": True, "sceneL3Raster": True, "worldRaster": True, "errors": len(errors)})
+            results.append({"sceneRaster": True, "sceneL3Raster": True, "sceneRenderDiagnostics": True,
+                            "worldRaster": True, "errors": len(errors)})
             page.close()
         finally:
             browser.close()
