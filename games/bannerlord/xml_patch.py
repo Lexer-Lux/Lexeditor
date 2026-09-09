@@ -139,7 +139,7 @@ def scan_xml_start_tags(text: str, enums: dict[str, tuple[str, ...]] | None = No
 
 
 def serialize_attribute(attribute: dict, incoming) -> str:
-    """Validate and XML-escape one replacement according to its inferred control kind."""
+    """Validate and XML-escape one replacement according to inferred/schema metadata."""
     kind = attribute["kind"]
     original = attribute["value"]
     if kind == "bool":
@@ -155,7 +155,13 @@ def serialize_attribute(attribute: dict, incoming) -> str:
             raise ValueError(f"{attribute['name']} must be finite")
         if abs(number) > 1_000_000_000:
             raise ValueError(f"{attribute['name']} magnitude is too large")
-        if "." not in original and number.is_integer():
+        if attribute.get("integer") and not number.is_integer():
+            raise ValueError(f"{attribute['name']} must be an integer")
+        if "min" in attribute and number < float(attribute["min"]):
+            raise ValueError(f"{attribute['name']} must be at least {attribute['min']}")
+        if "max" in attribute and number > float(attribute["max"]):
+            raise ValueError(f"{attribute['name']} must be at most {attribute['max']}")
+        if (attribute.get("integer") or "." not in original) and number.is_integer():
             value = str(int(number))
         else:
             value = format(number, ".12g")
@@ -167,6 +173,10 @@ def serialize_attribute(attribute: dict, incoming) -> str:
             )
     else:
         value = str(incoming)
+
+    fixed = attribute.get("fixed")
+    if fixed is not None and value != str(fixed):
+        raise ValueError(f"{attribute['name']} is fixed by the XML schema to {fixed}")
     if attribute["_quote"] == '"':
         return escape(value, {'"': "&quot;"})
     return escape(value, {"'": "&apos;"})
