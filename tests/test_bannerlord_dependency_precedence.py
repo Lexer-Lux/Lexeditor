@@ -50,7 +50,8 @@ class BannerlordDependencyPrecedenceTests(unittest.TestCase):
             root = Path(name); game = root / "game"
             write_module(game, "Library")
             write_module(game, "Selected", native=("Library",), community=[{"id":"Library","order":"LoadAfterThis"}])
-            self.assertEqual(module_load_order(game, workspace(root)), ["Selected", "Library"])
+            with self.assertRaisesRegex(RuntimeError, "both LoadBeforeThis and LoadAfterThis"):
+                module_load_order(game, workspace(root))
 
     def test_first_community_duplicate_optional_row_wins_requiredness(self):
         with tempfile.TemporaryDirectory() as name:
@@ -58,7 +59,7 @@ class BannerlordDependencyPrecedenceTests(unittest.TestCase):
             write_module(game, "Library")
             write_module(game, "Selected", community=[
                 {"id":"Library","order":"LoadBeforeThis","optional":True},
-                {"id":"Library","order":"LoadAfterThis"},
+                {"id":"Library","order":"LoadBeforeThis"},
             ])
             self.assertEqual(module_load_order(game, workspace(root)), ["Selected"])
 
@@ -68,7 +69,7 @@ class BannerlordDependencyPrecedenceTests(unittest.TestCase):
             write_module(game, "Library")
             write_module(game, "Selected", community=[
                 {"id":"Library","order":"LoadBeforeThis"},
-                {"id":"Library","order":"LoadAfterThis"},
+                {"id":"Library","order":"LoadBeforeThis","optional":True},
             ])
             self.assertEqual(module_load_order(game, workspace(root)), ["Library", "Selected"])
 
@@ -77,7 +78,8 @@ class BannerlordDependencyPrecedenceTests(unittest.TestCase):
             root = Path(name); game = root / "game"
             write_module(game, "Library")
             write_module(game, "Selected", native=("Library",), native_after=("Library",))
-            self.assertEqual(module_load_order(game, workspace(root)), ["Library", "Selected"])
+            with self.assertRaisesRegex(RuntimeError, "both LoadBeforeThis and LoadAfterThis"):
+                module_load_order(game, workspace(root))
 
 
 if __name__ == "__main__":

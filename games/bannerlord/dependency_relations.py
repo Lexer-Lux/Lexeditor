@@ -140,5 +140,53 @@ def incompatible_relation_rows(module: dict, extended_rows: list[dict]) -> list[
     return _mark_precedence(candidates)
 
 
+def dependency_declaration_conflicts(module: dict, extended_rows: list[dict]) -> list[str]:
+    """Return ModuleManager-style contradictions in one module's declarations.
+
+    These checks intentionally inspect direction-specific/raw declaration sets,
+    not only the first-ID-wins effective load set. ModuleManager validates these
+    contradictions separately from sorting.
+    """
+    issues: list[str] = []
+
+    load_ids = {row["id"] for row in effective_load_relations(module, extended_rows)}
+    incompatible_ids = {
+        row["id"] for row in effective_incompatible_relations(module, extended_rows)
+    }
+    for module_id in sorted(load_ids & incompatible_ids, key=str.casefold):
+        issues.append(f"{module_id} is declared both loadable and incompatible")
+
+    before_ids = {
+        _module_id(row)
+        for row in extended_rows
+        if row.get("order") == "LoadBeforeThis" and _module_id(row)
+    }
+    before_ids.update(
+        _module_id(row)
+        for row in module.get("dependencies", [])
+        if _module_id(row)
+    )
+    after_ids = {
+        _module_id(row)
+        for row in extended_rows
+        if row.get("order") == "LoadAfterThis" and _module_id(row)
+    }
+    after_ids.update(
+        _module_id(row)
+        for row in module.get("modulesToLoadAfterThis", [])
+        if _module_id(row)
+    )
+    for module_id in sorted(before_ids & after_ids, key=str.casefold):
+        issues.append(f"{module_id} is declared both LoadBeforeThis and LoadAfterThis")
+
+    for row in extended_rows:
+        module_id = _module_id(row)
+        order = str(row.get("order") or "")
+        if module_id and row.get("incompatible") and order in {"LoadBeforeThis", "LoadAfterThis"}:
+            issues.append(f"{module_id} is marked incompatible but also declares {order}")
+
+    return list(dict.fromkeys(issues))
+
+
 def effective_incompatible_relations(module: dict, extended_rows: list[dict]) -> list[dict]:
     return [row for row in incompatible_relation_rows(module, extended_rows) if row["effective"]]

@@ -225,7 +225,7 @@ class BannerlordLaunchTests(unittest.TestCase):
             (workspace / "SubModule.xml").write_text(
                 '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
             )
-            with self.assertRaisesRegex(RuntimeError, "load-order constraints form a cycle"):
+            with self.assertRaisesRegex(RuntimeError, "circular LoadBeforeThis dependency declarations"):
                 module_load_order(game, workspace)
     def test_incompatible_enabled_module_is_rejected(self):
         with tempfile.TemporaryDirectory() as name:

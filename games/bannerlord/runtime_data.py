@@ -8,7 +8,11 @@ from pathlib import Path
 
 from . import paths
 from .community_metadata import community_version_matches, read_community_dependencies
-from .dependency_relations import incompatible_relation_rows, load_relation_rows
+from .dependency_relations import (
+    dependency_declaration_conflicts,
+    incompatible_relation_rows,
+    load_relation_rows,
+)
 from .game_launch import module_load_order
 from .module_data import is_singleplayer_module, read_submodule
 
@@ -182,6 +186,10 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
         issues.append("Project SubModule.xml has no module ID")
     if not installed_module:
         issues.append(f"Module {module_id or '(no ID)'} is not installed under {paths.modules_root(game)}")
+
+    declaration_issues = dependency_declaration_conflicts(module, community_dependencies)
+    for issue in declaration_issues:
+        issues.append(f"Dependency declaration conflict: {issue}")
 
     dependency_rows = []
     missing_required = []
@@ -362,6 +370,7 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
         game_exe.is_file()
         and installed_module
         and direct_play_compatible
+        and not declaration_issues
         and not missing_required
         and not missing_binaries
         and not play_error
@@ -387,6 +396,7 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
         "inSync": in_sync,
         "issues": issues,
         "dependencies": dependency_rows,
+        "dependencyDeclarationIssues": declaration_issues,
         "binaries": binaries,
         "assets": assets,
         "runtimeOverrides": overrides,

@@ -11,7 +11,11 @@ import subprocess
 import threading
 
 from .community_metadata import read_community_dependencies
-from .dependency_relations import effective_incompatible_relations, effective_load_relations
+from .dependency_relations import (
+    dependency_declaration_conflicts,
+    effective_incompatible_relations,
+    effective_load_relations,
+)
 from .module_data import is_singleplayer_module, read_submodule
 
 
@@ -134,6 +138,33 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
             for row in effective_incompatible_relations(metadata(module_id), community(module_id))
         ]
 
+    declaration_cache: dict[str, list[str]] = {}
+
+    def declaration_issues(module_id: str) -> list[str]:
+        if module_id in declaration_cache:
+            return declaration_cache[module_id]
+        issues = dependency_declaration_conflicts(metadata(module_id), community(module_id))
+        for relation in dependencies_to_load(module_id):
+            related_id = str(relation.get("id") or "").strip()
+            order = str(relation.get("order") or "")
+            if not related_id or order not in {"LoadBeforeThis", "LoadAfterThis"} or related_id not in modules:
+                continue
+            reverse = next(
+                (
+                    row
+                    for row in dependencies_to_load(related_id)
+                    if str(row.get("id") or "").strip() == module_id
+                    and str(row.get("order") or "") in {"LoadBeforeThis", "LoadAfterThis"}
+                ),
+                None,
+            )
+            if reverse is not None and str(reverse.get("order") or "") == order:
+                issues.append(
+                    f"{module_id} and {related_id} have circular {order} dependency declarations"
+                )
+        declaration_cache[module_id] = list(dict.fromkeys(issues))
+        return declaration_cache[module_id]
+
     included: set[str] = set()
     preference: list[str] = []
     visiting: set[str] = set()
@@ -146,6 +177,11 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
         if module_id not in modules:
             raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
         visiting.add(module_id)
+        invalid = declaration_issues(module_id)
+        if invalid:
+            raise RuntimeError(
+                f"Invalid Bannerlord dependency declarations in {module_id}: " + "; ".join(invalid)
+            )
         for dependency in dependencies_to_load(module_id):
             dependency_id = str(dependency.get("id") or "").strip()
             if not dependency_id or dependency.get("optional"):
