@@ -37,7 +37,9 @@ from .labels import (
 from .resource_view import read_resource, resource_info
 from .resources import ResourceArchiveError
 from .scene_maps import load_scene_map
+from .scene_render import render_scene_layer
 from .scene_tables import load_exits, load_treasure, save_exit, save_treasure
+from .world_render import render_world_layer
 from .worlds import load_worlds, save_world
 from .world_scripts import load_world_script
 from .world_tables import (
@@ -126,7 +128,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/14"
+    server_version = "LexeditorChronoTrigger/15"
 
     def log_message(self, _format, *_args):
         return
@@ -148,7 +150,8 @@ class Handler(BaseHTTPRequestHandler):
         marker = "</body>"
         if marker not in html:
             raise RuntimeError("Chrono Trigger editor document is missing its body terminator")
-        html = html.replace(marker, '<script src="/event_editor.js"></script></body>', 1)
+        modules = '<script src="/event_editor.js"></script><script src="/map_previews.js"></script>'
+        html = html.replace(marker, modules + marker, 1)
         self.send_bytes(html.encode("utf-8"), "text/html; charset=utf-8")
 
     def send_bytes(self, data: bytes, content_type: str, *, attachment: bool = False):
@@ -169,6 +172,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_editor()
             elif path == "/event_editor.js":
                 self.send_file(PLUGIN_ROOT / "event_editor.js")
+            elif path == "/map_previews.js":
+                self.send_file(PLUGIN_ROOT / "map_previews.js")
             elif path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()
@@ -184,10 +189,10 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": [
                         "data-map", "resource-index", "resource-preview", "localization-text",
                         "localized-labels", "scene-headers", "scene-exits", "scene-treasure",
-                        "scene-map-layout", "field-events", "field-event-disassembly",
+                        "scene-map-layout", "scene-raster-preview", "field-events", "field-event-disassembly",
                         "field-event-fixed-edit", "world-headers", "world-exits", "world-triggers",
-                        "world-script-addresses", "world-script-disassembly", "project-overlay",
-                        "project-changes", "ctext-deploy", "ctp-export", "read", "save",
+                        "world-raster-preview", "world-script-addresses", "world-script-disassembly",
+                        "project-overlay", "project-changes", "ctext-deploy", "ctp-export", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
@@ -229,6 +234,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(load_scene_map(
                     _store(), int(params.get("scene", ["-1"])[0]), _source(params)
                 ))
+            elif path == "/api/scene-raster":
+                png, _meta = render_scene_layer(
+                    _store(), int(params.get("scene", ["-1"])[0]),
+                    int(params.get("layer", ["0"])[0]), _source(params),
+                )
+                self.send_bytes(png, "image/png")
             elif path == "/api/exits":
                 source = _source(params)
                 payload = load_exits(_store(), int(params.get("scene", ["-1"])[0]), source)
@@ -249,6 +260,12 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/worlds":
                 source = _source(params)
                 self.send_json(decorate_worlds(load_worlds(_store(), source), _labels(source)))
+            elif path == "/api/world-raster":
+                png, _meta = render_world_layer(
+                    _store(), int(params.get("world", ["-1"])[0]),
+                    int(params.get("layer", ["0"])[0]), _source(params),
+                )
+                self.send_bytes(png, "image/png")
             elif path == "/api/world-table":
                 source = _source(params)
                 payload = load_world_table(_store(), int(params.get("world", ["-1"])[0]), source)
