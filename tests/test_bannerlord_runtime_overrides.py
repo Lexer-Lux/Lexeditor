@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from games.bannerlord.runtime_overrides import read_runtime_overrides, save_runtime_overrides
 
@@ -32,6 +33,9 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
         )
         (project / "src" / "CustomSkillEffectRanges.cs").write_text(EFFECTS, encoding="utf-8")
         (project / "src" / "CustomSkillXpSourcesConfig.cs").write_text(XP, encoding="utf-8")
+        executable = game / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"")
         deployed = write_module(game, "LexerSkillTweaks")
         return temporary, project, game, deployed
 
@@ -99,6 +103,43 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
                 save_runtime_overrides(project, {
                     "xpSources": [{"id": source["id"], "overridden": True, "amount": -1}]
                 }, game)
+        finally:
+            temporary.cleanup()
+
+    def test_runtime_overrides_require_an_existing_deployed_module(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            for path in sorted(deployed.rglob("*"), reverse=True):
+                if path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    path.rmdir()
+            deployed.rmdir()
+            with self.assertRaisesRegex(RuntimeError, "not deployed"):
+                read_runtime_overrides(project, game)
+        finally:
+            temporary.cleanup()
+
+    def test_runtime_moduledata_resolution_cannot_escape_deployed_module(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            outside = deployed.parent.parent / "outside-runtime"
+            outside.mkdir()
+            deployed_resolved = deployed.resolve()
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == deployed / "ModuleData":
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            with patch(
+                "games.bannerlord.runtime_overrides._deployed_module",
+                return_value=("LexerSkillTweaks", deployed_resolved),
+            ), patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(ValueError, "ModuleData path escaped"):
+                    read_runtime_overrides(project, game)
         finally:
             temporary.cleanup()
 
