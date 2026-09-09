@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from . import paths
+from .game_launch import module_load_order
 from .module_data import is_singleplayer_module, read_submodule
 
 
@@ -125,6 +126,8 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
             "binaries": [],
             "assets": {},
             "runtimeOverrides": {},
+            "loadOrder": [],
+            "playError": "Missing project SubModule.xml",
         }
 
     module = read_submodule(descriptor)
@@ -249,6 +252,15 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
             "Lexeditor Play currently supports single-player modules only"
         )
 
+    load_order: list[str] = []
+    play_error = ""
+    if game_exe.is_file() and installed_module and direct_play_compatible:
+        try:
+            load_order = module_load_order(game, project)
+        except Exception as error:
+            play_error = str(error)
+            issues.append(f"Play load-order validation failed: {play_error}")
+
     module_data = deployed_root / "ModuleData"
     overrides = {
         "effects": _json_override(module_data / "custom_skill_effects.json", nested=True),
@@ -264,6 +276,7 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
         and direct_play_compatible
         and not missing_required
         and not missing_binaries
+        and not play_error
     )
     in_sync = bool(
         installed_module
@@ -289,4 +302,6 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
         "binaries": binaries,
         "assets": assets,
         "runtimeOverrides": overrides,
+        "loadOrder": load_order,
+        "playError": play_error,
     }
