@@ -18,6 +18,13 @@ project discussion. Agents may summarize implementation state in an internal
 handoff, but must not mirror or archive complete issue bodies, comments, attachment
 files, screenshots, or GitHub API metadata into this repository.
 
+- Game-specific issues must carry the appropriate game label. Apply the game
+  label when the issue is created rather than encoding game identity in its title.
+- Do not prefix or suffix issue titles with a game name or abbreviation (for
+  example `FF7R:` or `FF8:`). The game label identifies the plugin; the title
+  describes only the requested work.
+- If a required game label is missing, add/apply it before treating the issue as
+  correctly filed. Do not substitute a game-name title prefix for a missing label.
 - Keep one current implementation handoff at `worklog/issues/github-<number>.md`
   when an issue needs internal continuity. It should contain current requirements,
   implementation state, evidence, and next work; it is not a verbatim issue archive.
