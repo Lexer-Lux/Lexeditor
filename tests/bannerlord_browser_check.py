@@ -59,6 +59,7 @@ MODULE_DATA_BAD = {
     "elements": [
         {"index": 0, "path": "Items[0]", "tag": "Items", "depth": 0, "line": 1, "hint": "", "attributes": [], "missingRequired": [], "schemaIssues": []},
         {"index": 1, "path": "Items[0]/Item[0]", "tag": "Item", "depth": 1, "line": 2, "hint": "", "attributes": [
+            {"name": "enabled", "value": "1", "kind": "bool", "choices": [], "schemaType": "boolean"},
             {"name": "Type", "value": "Weapon", "kind": "enum", "choices": ["Weapon", "Armor"], "schemaType": "string"},
             {"name": "tier", "value": "2", "kind": "number", "choices": [], "schemaType": "int", "integer": True, "min": 0, "max": 6},
         ], "missingRequired": [{"name": "id", "required": True, "schemaType": "string", "choices": [], "kind": "text"}],
@@ -72,6 +73,7 @@ MODULE_DATA_FIXED = {
     "elements": [MODULE_DATA_BAD["elements"][0], {
         "index": 1, "path": "Items[0]/Item[0]", "tag": "Item", "depth": 1, "line": 2, "hint": "browser_fixture",
         "attributes": [
+            {"name": "enabled", "value": "1", "kind": "bool", "choices": [], "schemaType": "boolean"},
             {"name": "Type", "value": "Weapon", "kind": "enum", "choices": ["Weapon", "Armor"], "schemaType": "string"},
             {"name": "tier", "value": "2", "kind": "number", "choices": [], "schemaType": "int", "integer": True, "min": 0, "max": 6},
             {"name": "id", "value": "browser_fixture", "kind": "text", "choices": [], "required": True, "schemaType": "string"},
@@ -155,6 +157,7 @@ def main() -> None:
 
             page.evaluate('navigate("moduledata")')
             page.wait_for_function("state.moduleData && state.moduleData.schemaIssueCount===1")
+            assert page.locator('.bl-detail input[type="checkbox"]').first.is_checked()
             assert page.get_by_role("button", name="Validate all", exact=True).is_enabled()
             page.get_by_role("button", name="Validate all", exact=True).click()
             page.wait_for_function("state.moduleDataValidation && !state.moduleDataValidating && state.moduleDataValidation.scanned===1")
