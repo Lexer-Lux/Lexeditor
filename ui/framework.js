@@ -928,44 +928,9 @@
         || pin?.getAttribute?.("data-lex-pin-column") || null,
       "data-lex-readonly": String(readOnly),
     }, element("div", {class: "lex-detail-field-label"},
-      element("span", {class: "lex-detail-field-label-text"}, options.label), arrow),
+      options.label, arrow),
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null), typeRail);
-    // The property name shrinks to the lane rather than wrapping it into extra
-    // lines: the lane is narrow by design, and a long name must not deepen its
-    // row or be cut off.
-    const labelBox = node.querySelector(".lex-detail-field-label");
-    const labelSpan = labelBox?.querySelector(".lex-detail-field-label-text");
-    let fitting = false, fittedWidth = -1;
-    const fitLabel = () => {
-      if (!labelBox || !labelSpan || fitting) return;
-      // Re-entrancy guard: this resizes the row, which would call the observer
-      // again and reset the size it just chose.
-      const laneWidth = labelBox.clientWidth;
-      if (laneWidth === fittedWidth) return;
-      fitting = true;
-      fittedWidth = laneWidth;
-      const control = node.querySelector(".lex-detail-field-control");
-      // Measure the control while the name is at its smallest, so the ceiling
-      // is the row's natural height rather than one the name already inflated.
-      labelBox.style.setProperty("--lex-label-size", "7px");
-      const labelStyle = getComputedStyle(labelBox);
-      const labelPadding = (Number.parseFloat(labelStyle.paddingTop) || 0)
-        + (Number.parseFloat(labelStyle.paddingBottom) || 0);
-      const ceiling = Math.max(1,
-        (control?.getBoundingClientRect().height || 0) - labelPadding);
-      labelBox.style.removeProperty("--lex-label-size");
-      const base = Number.parseFloat(getComputedStyle(labelSpan).fontSize) || 13;
-      for (let size = base; size > 7; size -= 0.5) {
-        labelBox.style.setProperty("--lex-label-size", `${size}px`);
-        if (labelSpan.scrollHeight <= ceiling && labelSpan.scrollWidth <= labelBox.clientWidth + 1) break;
-      }
-      fitting = false;
-    };
-    node.lexFitLabel = fitLabel;
-    requestAnimationFrame(fitLabel);
-    if (typeof ResizeObserver === "function") new ResizeObserver(fitLabel).observe(node);
-
     // The rail runs down the side of one row, so its type name has to fit that
     // row's height. A long name (or a range shown on focus) is set smaller
     // rather than being allowed to run into the rows above and below.
@@ -998,18 +963,13 @@
       host.append(lock);
     }
     node.lexRejectValue = rejectValue;
+
     // A bounded number draws its own value as a fill behind the box, and on
     // hover the fill slides out into a slider for rough adjustment.
-    // Applied to every bounded numeric input in the control: a multi-number
-    // property holds several, and only the first one used to get a slider.
-    const installValueFill = input => {
-      if (!input || readOnly) return;
-      if (String(input.type || "").toLocaleLowerCase() !== "number" && !numericLike) return;
-      const rawLow = input.getAttribute?.("min") ?? input.dataset?.min ?? min;
-      const rawHigh = input.getAttribute?.("max") ?? input.dataset?.max ?? max;
-      const lowBound = rawLow === null || rawLow === undefined || rawLow === "" ? null : Number(rawLow);
-      const highBound = rawHigh === null || rawHigh === undefined || rawHigh === "" ? null : Number(rawHigh);
-      if (!Number.isFinite(lowBound) || !Number.isFinite(highBound) || highBound <= lowBound) return;
+    const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
+    const highBound = max === null || max === undefined || max === "" ? null : Number(max);
+    if (input && !readOnly && numericLike &&
+        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
       fill.append(handle);
@@ -1084,12 +1044,7 @@
       (control instanceof Element && control.matches(".lex-unit-field") ? control : input.parentElement)
         ?.prepend(fill);
       requestAnimationFrame(paint);
-    };
-    const boundedInputs = control instanceof Element
-      ? [...control.querySelectorAll('input[type="number"]')] : [];
-    if (boundedInputs.length > 1) boundedInputs.forEach(installValueFill);
-    else installValueFill(input);
-
+    }
 
     if (input && !readOnly && inputType !== "checkbox") {
       // Selecting the whole value on focus keeps a drag inside the field from
@@ -1152,10 +1107,10 @@
         "aria-label": toggle.label,
         onchange: event => toggle.change?.(event.target.checked, event),
       });
-      // The property's own type rail already declares BOOL once. Repeating it
-      // on every switch was noise, so the rail carries only that flag's help
-      // marker, which appears when the switch is pointed at.
-      const rail = element("span", {class: "lex-toggle-rail"});
+      // Each switch carries its own type rail, matching every other property:
+      // BOOL until pointed at, then the help marker for that flag.
+      const rail = element("span", {class: "lex-toggle-rail"},
+        element("span", {class: "lex-toggle-type"}, "BOOL"));
       const label = element("label", {
         class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),
         "data-lex-toggle": toggle.key || toggle.label || "",
@@ -1233,9 +1188,7 @@
     // Formula glyphs and labels must never be non-uniformly stretched. The
     // graph owns a 2:1 user-space viewport; letterbox if a caller gives the
     // drawing a differently shaped box instead of distorting that viewport.
-    // "meet" letterboxed the drawing inside its own box, so the graph never
-    // filled the card and the right-hand axis sat away from the plot edge.
-    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", options.graphLabel || `${options.title || "Value"} curve`);
     const grid = document.createElementNS(svgNamespace, "path");
@@ -4430,14 +4383,7 @@
             typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || ""].filter(Boolean).join(" "),
           role: "cell",
           "data-column-key": column.key,
-          // Plain text goes in its own block. As a bare text node inside the
-          // inline-flex content box, text-overflow had nothing to act on, so a
-          // long value was centred and clipped at BOTH ends rather than
-          // ellipsised at one.
-        }, element("span", {class: "lex-column-cell-content"},
-          content === null || content === undefined || content instanceof Node
-            ? content
-            : element("span", {class: "lex-column-cell-text"}, content)));
+        }, element("span", {class: "lex-column-cell-content"}, content));
         if (column.edit) {
           cell.addEventListener("dblclick", event => {
             event.preventDefault();
@@ -5689,6 +5635,25 @@
 
   // One fitted Table + Detail map for every plugin. Coverage is an explicit
   // user-interface claim, never inferred from a parser or a legacy green badge.
+  // Every plugin states the same five things about its mod loader, in the same
+  // order, in the same words. Left to each plugin these went missing entirely:
+  // five of eight editors said nothing at all about how their output is loaded.
+  const MOD_LOADER_FIELDS = [
+    ["LOADER", "loader", "Which loader or mechanism the game uses to read this plugin's output."],
+    ["OUTPUT", "output", "Where Lexeditor writes, and what the game reads."],
+    ["LOAD ORDER", "order", "How this output orders against other mods."],
+    ["SAFETY", "safety", "What Lexeditor never modifies in the installed game."],
+    ["REMOVING", "removal", "How to take the changes back out."],
+  ];
+  const modLoaderSection = (spec = {}) => detailSection({
+    title: "MOD LOADER",
+    body: MOD_LOADER_FIELDS.map(([label, key, fallback]) => detailField({
+      label,
+      control: readonlyField(String(spec[key] || "").trim() || fallback),
+      help: infoHelp(fallback),
+    })),
+  });
+
   const dataMapState = new Map();
   const dataMap = options => {
     const plugin = document.body.dataset.lexPlugin || "plugin";
@@ -5822,7 +5787,7 @@
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {element, el: element, newButton, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {element, el: element, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
@@ -6064,10 +6029,7 @@
       const label = field.querySelector(':scope > .lex-detail-field-label');
       if (!rail || !help || !label) continue;
       if (field.hasAttribute("data-lex-sort")) { rail.style.left = "0px"; continue; }
-      // The name is wrapped so it can be scaled to the lane, so measure the
-      // wrapper when present and fall back to a bare text node.
-      const span = label.querySelector(':scope > .lex-detail-field-label-text');
-      const text = span || [...label.childNodes].find(node =>
+      const text = [...label.childNodes].find(node =>
         node.nodeType === Node.TEXT_NODE && node.textContent.trim());
       if (!text) continue;
       const range = document.createRange();

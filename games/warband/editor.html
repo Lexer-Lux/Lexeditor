@@ -315,6 +315,13 @@
     const health=el("section",{class:"card"},el("h2",{},"Status"),state.dashboard.problems.length?el("div",{class:"error"},...state.dashboard.problems.map(problem=>el("div",{},problem))):el("div",{class:"ok"},"All configured paths found."));
     const log=el("section",{class:"card"},el("h2",{},"Log"),el("pre",{class:"build-log"},state.build.lines.join("")||"No save or build has run in this session."));
     const manuals=el("section",{class:"card"},el("h2",{},"Mod manuals"),el("button",{type:"button",onclick:()=>navigate("manuals")},"Read installed mod manuals"));$("#main").replaceChildren(el("div",{class:"cards"},health,manuals,log));
+    $("#main").append(LexeditorUI.modLoaderSection({
+      loader:"Warband loads a module folder chosen in its own launcher. There is no separate mod loader.",
+      output:"Lexeditor builds a saved module folder under the game's Modules directory; the launcher lists it as its own entry.",
+      order:"Only one module runs at a time, so modules do not stack or conflict. Combining changes means building them into one module.",
+      safety:"The Native module and the installed game files are never written. A build only ever creates or updates its own module folder.",
+      removal:"Pick a different module in the launcher, and delete the generated module folder to remove it entirely.",
+    }));
   }
 
   async function buildSavedModule(){

@@ -1592,7 +1592,14 @@ function renderInfo(){
   $("#main").replaceChildren(el("div",{class:"hint"},
     el("h2",{},"Ready"),
     el("p",{},"Installed game files and extracted reference data stay read-only. The mod selector in the top bar controls the editable mod."),
-    el("p",{},`${Object.keys(state.config?.datasets||{}).length} source datasets are available to comparison controls.`)));
+    el("p",{},`${Object.keys(state.config?.datasets||{}).length} source datasets are available to comparison controls.`)),
+    LexeditorUI.modLoaderSection({
+      loader:"Lenny's Mod Loader (LML) for data and assets, plus ScriptHookRDR2 for the ASI runtime.",
+      output:"Edits are written into the mod folder LML loads. Generated ASI builds are installed beside the game executable only when you deploy them.",
+      order:"LML applies mods in the order listed in its own configuration; a later mod editing the same file wins. ASI plugins load independently of that order.",
+      safety:"Installed game archives and extracted reference data are read only. Nothing is written into the base RPF files.",
+      removal:"Remove the mod folder from LML, and delete the ASI from the game folder if one was installed.",
+    }));
 }
 
 function navigationState() {

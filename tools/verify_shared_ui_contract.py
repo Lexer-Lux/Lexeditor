@@ -116,6 +116,21 @@ require("warband-item-preview-action" not in warband,
 for phrase in ("most human-friendly semantic control", "checkless toggle", "Bitflags", "info bubble", "ref rail"):
     require(phrase.casefold() in manual.casefold(), f"UI manual is missing: {phrase}")
 
+# Every plugin explains its mod loader, in the same five fields, in the same
+# words. Five of the eight editors previously said nothing about how their
+# output is loaded, which is the first thing anyone installing a mod needs.
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not (plugin / "editor.html").is_file():
+        continue
+    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    require("modLoaderSection(" in editor,
+            f"{plugin.name} does not render the shared MOD LOADER section")
+    for field in ("loader:", "output:", "order:", "safety:", "removal:"):
+        require(field in editor,
+                f"{plugin.name} mod loader section is missing {field.rstrip(':')}")
+require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
+        "the shared mod loader section is not defined in the framework")
+
 # Property geometry / labels / metadata.
 # Pin the single definition, not the number. Three separate declarations of
 # this width existed at once and only the last one was live, so edits to the

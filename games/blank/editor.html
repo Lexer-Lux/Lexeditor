@@ -35,7 +35,9 @@
     .blank-tweaks{height:100%}
     .blank-graphs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,600px),1fr));align-content:start;gap:16px;height:100%;overflow:auto}
     .blank-graphs .lex-curve-editor{display:block;min-width:0}
-    .blank-graphs .lex-curve-plot{height:330px;aspect-ratio:auto}
+    /* The drawing is 2:1; a fixed height gave it a differently shaped box, which
+       letterboxed the graph and stranded the right-hand axis. */
+    .blank-graphs .lex-curve-plot{height:auto}
     .blank-graphs .lex-curve-path-formula{display:block;filter:drop-shadow(1px 1px 1px var(--lex-panel))}
     .blank-graphs .lex-curve-formula{display:none}
   </style>
@@ -106,6 +108,13 @@
         detailField({label:"MOD",control:row("My Mod")}),
         detailField({label:"RECORDS",control:row(String(rows.length))}),
       ]}),
+      LexeditorUI.modLoaderSection({
+        loader:"None. Blank is the reference plugin and has no game behind it, so nothing loads its output.",
+        output:"Saved sample projects live under Lexeditor's own project folder. Nothing is written to any game.",
+        order:"Not applicable; there is no game to order against.",
+        safety:"Blank never touches an installed game, because it is not attached to one.",
+        removal:"Delete the sample project from the project folder.",
+      }),
     ]});
   }
   function galleryPanel(title="Shared Control Gallery"){

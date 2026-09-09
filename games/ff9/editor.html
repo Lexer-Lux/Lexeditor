@@ -206,6 +206,13 @@
         ...(runtime.recoveryRequired?[detailField({label:"RECOVERY COPY",control:value(runtime.recoveryBackup)})]:[]),
         ...(state.runtimeError?[el("p",{role:"alert"},state.runtimeError)]:[]),
       ]}),
+      LexeditorUI.modLoaderSection({
+        loader:"Memoria, the FF9 runtime. It reads Lexeditor's exported data when the game starts through Memoria's launcher.",
+        output:"Edited data is written into the selected project folder, which Memoria reads. The installed StreamingAssets stay as shipped.",
+        order:"Memoria applies its own configuration first, then project data. Two mods editing the same table conflict; the later one wins.",
+        safety:"Installed game data is read only. Memoria installation keeps a recovery copy, surfaced above when one exists.",
+        removal:"Remove the project from Memoria's configuration, or uninstall Memoria to return to the stock launcher.",
+      }),
     ]}));
   }
   let runtimeRefresh=null;

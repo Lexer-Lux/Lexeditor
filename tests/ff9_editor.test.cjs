@@ -24,7 +24,7 @@ async function editor() {
   let confirm = true;
   const ui = {el: node, clone: structuredClone, finishPluginLoading: finish,
     mountShell: () => ({refresh(){}})};
-  for (const name of ['columnList','columnPreferences','detailPanel','detailSection','detailField','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon'])
+  for (const name of ['columnList','columnPreferences','detailPanel','detailSection','detailField','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection'])
     ui[name] = (...args) => node(name, args[0]);
   const context = vm.createContext({LexeditorUI: ui, structuredClone,
     document: {querySelector: selector => targets[selector] ||= node('target', {})},

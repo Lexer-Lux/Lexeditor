@@ -281,7 +281,14 @@
       el("div",{class:"path-row"},el("b",{},"Update-folder target"),el("code",{title:deployment.updateRoot||""},deployment.updateRoot||"Unavailable")),
       ...deploymentRows,
       ...Object.entries(state.dashboard.paths).filter(([name])=>["Editable overrides","Inventory overrides","Shop overrides","Settings","Loot ASI override","Mission ASI override"].includes(name)).map(([name,path])=>el("div",{class:"path-row"},el("b",{},name),el("code",{title:path},path))));
-    $("#main").replaceChildren(el("div",{class:"cards"},statusCard,redHookCard,shopTestCard,missionTestCard,deliveryCard));shell.refresh();
+    $("#main").replaceChildren(el("div",{class:"cards"},statusCard,redHookCard,shopTestCard,missionTestCard,deliveryCard),
+      LexeditorUI.modLoaderSection({
+        loader:"RedHook, the community runtime for the PC release. It loads the plugin's overrides when the game starts.",
+        output:"Edits are written as Git-backed override files in the project folder, which RedHook reads over the stock data.",
+        order:"RedHook applies overrides after the base data. Two mods overriding the same file conflict; the later one wins.",
+        safety:"Installed game source data is read only. Every edit is stored as a separate override rather than a rewrite.",
+        removal:"Remove the override files, or uninstall RedHook to return the game to stock.",
+      }));shell.refresh();
   }
 
   async function openRedHook(){try{await api("/api/redhook/open",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});setStatus("Opened the official RedHook page");}catch(error){setStatus(`Could not open RedHook: ${error.message}`);alert(state.status);}}

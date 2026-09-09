@@ -100,7 +100,7 @@
         shellRefresh();
       }
     }))});
-    group.style.setProperty("--lex-toggle-minimum","85px");group.style.minWidth="0";group.style.maxWidth="100%";group.style.width="100%";
+    group.style.setProperty("--lex-toggle-minimum","132px");group.style.minWidth="0";group.style.maxWidth="100%";group.style.width="100%";
     return provenanceControl({control:group,current:raw,vanilla,internal:true,format:value=>flagsSummary(field,value),
       apply:value=>{if(readonly())return;row.values[field.key]=Number(value);render()}});
   }
@@ -627,8 +627,12 @@
     return columnList({rows,key:row=>row.id,selected,select:row=>{const id=typeof row==="object"?row.id:row;if(id!==state.selected[state.tab])LexeditorUI.playThemeSound?.("move");select(row)},sortState:sort,sort:key=>{state.sort[state.tab]=sort.key===key?{key,dir:-sort.dir}:{key,dir:1};render()},columnPreferences:prefs,columns,class:"ff7-table","aria-label":`${labels[state.tab]} records`});
   }
   function unavailableView(){
-    const error=state.data.errors?.[state.tab];
-    const source=state.data.families?.[category()?.family]?.sourceRelativePath||category()?.family||state.data.sourceRelativePath||"English KERNEL.BIN in the selected installation";
+    // state.data is null until the first successful load. Reading through it
+    // threw here, the render aborted, and the tab was left completely blank
+    // with no message at all.
+    const data=state.data||{};
+    const error=data.errors?.[state.tab];
+    const source=data.families?.[category()?.family]?.sourceRelativePath||category()?.family||data.sourceRelativePath||"English KERNEL.BIN in the selected installation";
     return detailPanel({className:"ff7-detail",title:labels[state.tab],identity:null,meta:"Data unavailable",body:[
       detailSection({title:"STATUS",body:[
         detailField({label:"STATE",control:integrationStatus("not-integrated")}),
@@ -718,6 +722,13 @@
       ]}),
       ...((state.dashboard.problems||[]).length?[detailSection({title:"PROBLEMS",body:(state.dashboard.problems||[]).map((problem,index)=>detailField({label:`Problem ${index+1}`,control:readonlyField(problem)}))})]:[]),
       ...(sounds?[detailSection({title:"THEME SOUNDS",body:[sounds]})]:[]),
+      LexeditorUI.modLoaderSection({
+        loader:"FFNx, the community runtime for the PC releases. It loads from the game folder and applies Lexeditor's data alongside its own patches.",
+        output:"Edited kernel, scene, text and executable data are written into the selected project folder, not over the installed files.",
+        order:"FFNx applies its own configuration first, then mod data. Two mods editing the same kernel section conflict; the later one wins.",
+        safety:"Installed kernel, scene and executable files are read only. Every write goes to the project copy.",
+        removal:"Point FFNx away from the project folder, or delete it. The install is already untouched.",
+      }),
     ]});
   }
   function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,open:row=>{const target=row.target||row.category;if(target)navigate(target)},query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return view.content}

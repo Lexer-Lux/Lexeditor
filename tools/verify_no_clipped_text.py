@@ -43,11 +43,23 @@ PROBE = r"""
     // hover-only surface measures exactly as it will when revealed. Skipping it
     // was the gap that let the hover drawers go unchecked.
     if(cs.display==='none'||cs.visibility==='hidden') continue;
+    // SVG elements have no CSS box: clientWidth/scrollWidth read 0 and the
+    // whole text width then looks like overflow. SVG clipping is governed by
+    // the viewBox, which this sweep does not model.
+    if(node.ownerSVGElement || node.tagName==='svg') continue;
     const r=node.getBoundingClientRect();
     if(r.width<2||r.height<2) continue;
     if(scrollable(node)) continue;
-    // Deliberate single-line truncation is a designed affordance, not a bug.
-    if(cs.textOverflow==='ellipsis') continue;
+    // Deliberate single-line truncation is a designed affordance, not a bug -
+    // but only where the property can actually take effect. text-overflow does
+    // nothing on a flex or grid container, and nothing without nowrap, so a box
+    // that merely DECLARES ellipsis can still hard-clip its text at both ends.
+    // Trusting the declaration is what let centred table cells lose the start
+    // of every long identifier while this sweep reported zero clipping.
+    const ellipsisApplies = cs.textOverflow==='ellipsis'
+      && !/(flex|grid)/.test(cs.display)
+      && cs.whiteSpace!=='normal';
+    if(ellipsisApplies) continue;
     // Text under overflow:visible SPILLS; it is still fully readable. Only a
     // box that actually clips can cut a glyph off, so that is what we flag.
     const clips=/(hidden|clip)/.test(cs.overflowX+' '+cs.overflowY);
@@ -67,6 +79,52 @@ PROBE = r"""
     }
   }
   return JSON.stringify(bad.slice(0,25));
+})()
+"""
+
+
+# A list of records without a pager is a list the user cannot page or search.
+# Plugins kept hand-rolling a private search box above a bare column list, which
+# looks fine on screen and silently caps the view at one page of data.
+PAGER_PROBE = r"""
+(()=>{
+  const bad=[];
+  for(const list of document.querySelectorAll('.lex-column-list')){
+    const rows=list.querySelectorAll('.lex-column-list-row').length;
+    if(!rows) continue;
+    // Only a record list needs paging. columnList marks rows aria-selected
+    // only when it drives a selection, so an editable reference grid (GF
+    // compatibility, new-game party) has none and is skipped.
+    if(!list.querySelector('[aria-selected]')) continue;
+    const host=list.closest('.lex-paged-list-detail');
+    if(host&&host.querySelector('.lex-pager')) continue;
+    bad.push({cls:String(list.className).slice(0,60),rows,
+              label:list.getAttribute('aria-label')||''});
+  }
+  return JSON.stringify(bad.slice(0,10));
+})()
+"""
+
+
+# A tab that renders nothing looks like a styling problem and is not one. Every
+# FF7R tab went blank at once because a helper read .content off a function that
+# returns the element itself, and no check noticed.
+EMPTY_PROBE = r"""
+(()=>{
+  const main=document.querySelector('#main,.lex-shell-main,main');
+  if(!main) return JSON.stringify([{reason:'no main region'}]);
+  const box=main.getBoundingClientRect();
+  if(box.height<40) return JSON.stringify([]);
+  const meaningful=[...main.querySelectorAll('*')].some(node=>{
+    if(!(node.textContent||'').trim()) return false;
+    const cs=getComputedStyle(node);
+    if(cs.display==='none'||cs.visibility==='hidden') return false;
+    const r=node.getBoundingClientRect();
+    return r.width>2&&r.height>2;
+  });
+  if(meaningful) return JSON.stringify([]);
+  return JSON.stringify([{reason:'tab renders no visible content',
+                          height:Math.round(box.height)}]);
 })()
 """
 
@@ -112,6 +170,24 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                     entry["tab"] = tab
                     entry["size"] = f"{width}x{height}"
                     found.append(entry)
+                # Data arrives asynchronously; a tab measured mid-load looks
+                # empty. Only a tab still empty after a second wait counts.
+                empty_hits = json.loads(cdp.eval(EMPTY_PROBE))
+                if empty_hits:
+                    time.sleep(2.5)
+                    empty_hits = json.loads(cdp.eval(EMPTY_PROBE))
+                for entry in empty_hits:
+                    entry["plugin"] = plugin
+                    entry["tab"] = tab
+                    entry["size"] = f"{width}x{height}"
+                    entry["defect"] = "empty-tab"
+                    found.append(entry)
+                for entry in json.loads(cdp.eval(PAGER_PROBE)):
+                    entry["plugin"] = plugin
+                    entry["tab"] = tab
+                    entry["size"] = f"{width}x{height}"
+                    entry["defect"] = "table-without-pager"
+                    found.append(entry)
     finally:
         browser_guard.kill_tree(browser)
     return found
@@ -120,22 +196,30 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
 def main() -> int:
     plugins = [p.name for p in sorted((ROOT / "games").iterdir())
                if (p / "editor.html").is_file()]
-    clipped: list[dict] = []
+    findings: list[dict] = []
     for plugin in plugins:
         for width, height in ((1600, 950), (1280, 720)):
-            clipped.extend(sweep(plugin, width, height))
+            findings.extend(sweep(plugin, width, height))
+    pagerless = [row for row in findings if row.get("defect") == "table-without-pager"]
+    empty = [row for row in findings if row.get("defect") == "empty-tab"]
+    clipped = [row for row in findings
+               if row.get("defect") not in ("table-without-pager", "empty-tab")]
     # Twenty printed lines hid most of a failure, so every entry is also
     # written out; grouping there is what makes a shared cause obvious.
     report = ROOT / "out" / "no-clipped-text.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(
-        {"plugins": plugins, "clipped": clipped}, indent=1), encoding="utf-8")
+        {"plugins": plugins, "clipped": clipped, "pagerless": pagerless,
+         "empty": empty}, indent=1), encoding="utf-8")
     print(json.dumps({"plugins": plugins, "clipped": len(clipped),
+                      "pagerless": len(pagerless), "emptyTabs": len(empty),
                       "report": str(report)}))
-    if clipped:
-        for entry in clipped[:20]:
-            print(json.dumps(entry, ensure_ascii=True))
-        raise AssertionError(f"{len(clipped)} clipped text boxes")
+    for entry in (clipped + pagerless + empty)[:20]:
+        print(json.dumps(entry, ensure_ascii=True))
+    if clipped or pagerless or empty:
+        raise AssertionError(
+            f"{len(clipped)} clipped text boxes, {len(pagerless)} tables without "
+            f"a pager, {len(empty)} tabs rendering nothing")
     return 0
 
 

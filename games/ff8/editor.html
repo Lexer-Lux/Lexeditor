@@ -1854,6 +1854,13 @@
         detailField({label:"VERSION",control:value(runtime.version||"—")}),
       ]}),
     ];
+    body.push(LexeditorUI.modLoaderSection({
+      loader:"FFNx, the community runtime for the PC release. It loads from the game folder and applies Lexeditor's data with its own patches.",
+      output:"Edited kernel, field, battle and executable data is written into the selected project folder, which FFNx reads.",
+      order:"FFNx applies its configuration first, then mod data. Two mods editing the same kernel section conflict; the later one wins.",
+      safety:"Installed game archives are read only. Every write goes to the project copy, and extracted source data is kept separately.",
+      removal:"Point FFNx away from the project folder, or delete it. The install is already untouched.",
+    }));
     body.push(LexeditorUI.creditsPanel("ff8"));
     if(LexeditorUI.sharedSettings()?.developerMode){
       body.push(detailSection({title:"PLUGIN SFX",body:[LexeditorUI.soundCoverageTable(dashboard.themeSounds?.rows||[])]}));

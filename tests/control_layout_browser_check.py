@@ -52,8 +52,23 @@ def main():
                     assert data['size']>=20 and min(data['top'],data['bottom'],data['right'])>=3 and data['gap']>=4,data
                 for field in page.locator('.lex-detail-field:has(.lex-copy-value)').all():
                     if not field.is_visible():continue
-                    data=field.evaluate('''e=>{const l=e.querySelector('.lex-detail-field-label').getBoundingClientRect(),c=e.querySelector('.lex-copy-value').getBoundingClientRect(),v=e.querySelector('.lex-copy-value').nextElementSibling.getBoundingClientRect();return {gap:c.left-l.right,inputGap:v.left-c.right}}''')
-                    assert data['gap']>=0 and data['inputGap']>=4,data
+                    # A multi-number property gives each value its own copy
+                    # button inside its item, so only the field-level button
+                    # sits before the control and can be measured that way.
+                    data=field.evaluate('''e=>{
+                      const c=e.querySelector(':scope > .lex-detail-field-control > .lex-copy-value');
+                      if(!c) return null;
+                      const l=e.querySelector('.lex-detail-field-label').getBoundingClientRect();
+                      const cb=c.getBoundingClientRect();
+                      const v=c.nextElementSibling?.getBoundingClientRect();
+                      return v?{gap:cb.left-l.right,inputGap:v.left-cb.right}:null;}''')
+                    if data is not None:
+                        assert data['gap']>=0 and data['inputGap']>=4,data
+                    for item in field.locator('.lex-multi-number-item:has(.lex-copy-value)').all():
+                        inside=item.evaluate('''e=>{const c=e.querySelector('.lex-copy-value').getBoundingClientRect();
+                          const b=e.getBoundingClientRect();
+                          return {left:c.left-b.left,right:b.right-c.right};}''')
+                        assert inside['left']>=0 and inside['right']>=0,inside
                 for arrow in page.locator('.lex-field-boolean-arrow').all():
                     assert arrow.evaluate('(e)=>getComputedStyle(e).position')=='relative'
                 for tag in page.locator('.lex-reference-tag').all():
@@ -87,12 +102,14 @@ def main():
             a=page.locator('[data-lex-toggle=a]');b=page.locator('[data-lex-toggle=b]')
             assert not a.locator('.lex-info-help').is_visible()
             a.hover()
-            # The property's own type rail declares BOOL once. Switches no
-            # longer repeat it, so a switch shows only its own help on hover.
+            # Each switch shows its type at rest; pointing at THAT text swaps it
+            # for the help marker. Hovering the switch elsewhere changes nothing.
+            assert a.locator('.lex-toggle-type').is_visible()
+            a.locator('.lex-toggle-rail').hover()
             assert a.locator('.lex-info-help').is_visible()
-            assert a.locator('.lex-toggle-type').count()==0
+            assert not a.locator('.lex-toggle-type').is_visible()
             assert not b.locator('.lex-info-help').is_visible()
-            assert b.locator('.lex-toggle-type').count()==0
+            assert b.locator('.lex-toggle-type').is_visible()
             a.locator('input').check()
             assert a.locator('input').is_checked()
             page.screenshot(path=str(OUT/'boolean-hover.png'))

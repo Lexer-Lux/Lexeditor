@@ -116,7 +116,10 @@ with sync_playwright() as p:
               const gb=glyph?.getBoundingClientRect();
               const hs=help?getComputedStyle(help):null, gs=glyph?getComputedStyle(glyph):null;
               const range=document.createRange();
-              const text=[...label.childNodes].find(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());
+              // The name is wrapped so it can be scaled to the lane; measure
+              // that wrapper, falling back to a bare text node.
+              const span=label.querySelector(':scope > .lex-detail-field-label-text');
+              const text=span||[...label.childNodes].find(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());
               if(text) range.selectNodeContents(text);
               const tb=text?range.getBoundingClientRect():lb;
               return {field:{left:field.left,right:field.right,width:field.width,height:field.height},
@@ -129,8 +132,12 @@ with sync_playwright() as p:
             assert first_geom['label']['scrollWidth'] <= first_geom['label']['clientWidth'] + 1, (width, 'property label overflows horizontally', first_geom)
             assert first_geom['label']['scrollHeight'] <= first_geom['label']['clientHeight'] + 1, (width, 'property label changes row height/overflows vertically', first_geom)
             if first_geom['help']:
-                desired = (first_geom['field']['left'] + first_geom['text']['right']) / 2
-                assert abs(first_geom['help']['center'] - desired) <= 6, (width, 'info bubble is not centred between panel edge and property text', desired, first_geom)
+                # The rail sits immediately left of where the name starts.
+                # Centring it between the row edge and the END of the label made
+                # its position depend on the name's length, so the marker landed
+                # somewhere different on every row.
+                gap = first_geom['text']['left'] - first_geom['help']['right']
+                assert 4 <= gap <= 14, (width, 'info bubble is not just left of the property name', gap, first_geom)
                 assert abs(first_geom['help']['width'] - first_geom['help']['height']) <= 0.5, (width, 'info bubble is not circular', first_geom)
                 glyph = first_geom['glyph']
                 assert glyph, (width, 'info bubble ? glyph is missing', first_geom)
