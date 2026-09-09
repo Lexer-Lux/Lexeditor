@@ -30,6 +30,25 @@ BATTLE_FLAGS = (
 )
 
 FACING_NAMES = ("up", "down", "left", "right")
+BUTTON_CHECK_LABELS = {
+    0x2D: "Any button · current",
+    0x30: "Dash action · current",
+    0x31: "Confirm action · current",
+    0x34: "A button · current",
+    0x35: "B button · current",
+    0x36: "X button · current",
+    0x37: "Y button · current",
+    0x38: "L button · current",
+    0x39: "R button · current",
+    0x3B: "Dash action · since last check",
+    0x3C: "Confirm action · since last check",
+    0x3F: "A button · since last check",
+    0x40: "B button · since last check",
+    0x41: "X button · since last check",
+    0x42: "Y button · since last check",
+    0x43: "L button · since last check",
+    0x44: "R button · since last check",
+}
 
 
 def _u16(data: bytes, offset: int = 0) -> int:
@@ -58,6 +77,11 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
         return {
             "summary": f"Storyline < {args[0]} → jump +{args[1]}",
             "storylineValue": args[0], "jumpOffset": args[1],
+        }
+    if opcode in BUTTON_CHECK_LABELS and len(args) == 1:
+        return {
+            "summary": f"{BUTTON_CHECK_LABELS[opcode]} check · jump +{args[0]}",
+            "check": BUTTON_CHECK_LABELS[opcode], "jumpOffset": args[0],
         }
     if opcode in {0x20, 0x55, 0x7F} and len(args) == 1:
         address = _script_address(args[0])
