@@ -54,6 +54,11 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
     items = labels.get("itemNames", [])
     players = labels.get("playerNames", [])
 
+    if opcode == 0x18 and len(args) == 2:
+        return {
+            "summary": f"Storyline < {args[0]} → jump +{args[1]}",
+            "storylineValue": args[0], "jumpOffset": args[1],
+        }
     if opcode in {0x20, 0x55, 0x7F} and len(args) == 1:
         address = _script_address(args[0])
         label = {
