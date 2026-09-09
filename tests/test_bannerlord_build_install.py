@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from games.bannerlord.project_data import run_build
+from games.bannerlord.project_data import primary_project_file, run_build
 
 
 CSPROJ = '''<Project Sdk="Microsoft.NET.Sdk">
@@ -51,6 +51,17 @@ class BannerlordBuildInstallTests(unittest.TestCase):
                 result = run_build(project)
             self.assertIn(f"-p:BannerlordDir={selected_game.resolve()}", runner.call_args.args[0])
             self.assertEqual(result["gameRootOverride"], str(selected_game.resolve()))
+
+    def test_primary_project_file_cannot_escape_selected_project(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            project = root / "project"
+            project.mkdir()
+            outside = root / "Outside.csproj"
+            outside.write_text(CSPROJ, encoding="utf-8")
+            with patch("games.bannerlord.project_data._project_files", return_value=[outside]):
+                with self.assertRaisesRegex(ValueError, "stay inside"):
+                    primary_project_file(project)
 
     def test_auto_selected_project_file_cannot_escape_selected_project(self):
         with tempfile.TemporaryDirectory() as name:
