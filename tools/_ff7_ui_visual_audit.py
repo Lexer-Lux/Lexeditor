@@ -35,26 +35,35 @@ def test_dense_views_fit_and_capture(self):
                     label:table.getAttribute('aria-label')||'', clientWidth:table.clientWidth,
                     scrollWidth:table.scrollWidth, left:rect(table)?.left, right:rect(table)?.right
                   }));
-                  let overlaps=0, clippedControls=0;
+                  let overlaps=0;
                   for(const row of document.querySelectorAll('.ff7-concept-table .lex-column-list-row')){
                     const cells=[...row.querySelectorAll(':scope > .lex-column-list-cell')].map(rect).filter(Boolean);
                     for(let i=0;i+1<cells.length;i++)if(cells[i].right>cells[i+1].left+1)overlaps++;
                   }
+                  const clipped=[];
                   for(const control of document.querySelectorAll('.ff7-detail input,.ff7-detail select,.ff7-detail textarea,.ff7-detail button')){
-                    const r=rect(control);if(r&&r.width>0&&(r.right>innerWidth+2||r.left<-2))clippedControls++;
+                    const r=rect(control);
+                    if(r&&r.width>0&&(r.right>innerWidth+2||r.left<-2))clipped.push({
+                      tag:control.tagName, type:control.getAttribute('type')||'',
+                      aria:control.getAttribute('aria-label')||'', name:control.getAttribute('name')||'',
+                      cls:control.className||'', left:r.left,right:r.right,width:r.width,
+                      parentClass:control.parentElement?.className||'',
+                      parentLeft:rect(control.parentElement)?.left,parentRight:rect(control.parentElement)?.right
+                    });
                   }
                   return {viewportWidth:innerWidth,viewportHeight:innerHeight,
                     documentWidth:document.documentElement.scrollWidth,documentHeight:document.documentElement.scrollHeight,
-                    bodyWidth:document.body.scrollWidth,main:rect(main),detail:rect(detail),tables,overlaps,clippedControls};
+                    bodyWidth:document.body.scrollWidth,main:rect(main),detail:rect(detail),tables,overlaps,
+                    clippedControls:clipped.length,clipped};
                 }""")
                 metrics["group"] = group
                 report.append(metrics)
+                self.page.screenshot(path=str(OUT / f"{width}x{height}-{group}.png"))
                 self.assertLessEqual(metrics["documentWidth"], width + 2, metrics)
                 self.assertLessEqual(metrics["bodyWidth"], width + 2, metrics)
                 self.assertLessEqual(metrics["detail"]["right"], width + 2, metrics)
                 self.assertEqual(metrics["overlaps"], 0, metrics)
                 self.assertEqual(metrics["clippedControls"], 0, metrics)
-                self.page.screenshot(path=str(OUT / f"{width}x{height}-{group}.png"))
     (OUT / "metrics.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
     self.originals_unchanged()
 
