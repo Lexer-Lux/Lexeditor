@@ -99,12 +99,12 @@ editor.write_text(text,encoding='utf-8')
 
 test=root/'tools/verify_ff7_rendered_neutral.py'
 tests=test.read_text(encoding='utf-8')
-# This old assertion was intentionally checking the master summary header, not
-# the detail label. Keep the contract but expect the compact scan label.
-old_formula='self.assertGreaterEqual(self.page.get_by_text("Formula", exact=True).count(), 1)'
-new_formula='self.assertGreaterEqual(self.page.get_by_text("CALC", exact=True).count(), 1)'
-if tests.count(old_formula)!=1: raise SystemExit(f'old Formula assertion count {tests.count(old_formula)}')
-tests=tests.replace(old_formula,new_formula)
+# These assertions intentionally inspect master summary headers.
+for old_label,new_label in (("Formula","CALC"),("Scripts","AI")):
+    old_assert=f'self.assertGreaterEqual(self.page.get_by_text("{old_label}", exact=True).count(), 1)'
+    new_assert=f'self.assertGreaterEqual(self.page.get_by_text("{new_label}", exact=True).count(), 1)'
+    if tests.count(old_assert)!=1: raise SystemExit(f'old {old_label} assertion count {tests.count(old_assert)}')
+    tests=tests.replace(old_assert,new_assert)
 marker='target.RenderedTests.open = open_with_neutral\n'
 if tests.count(marker)!=1: raise SystemExit('rendered insertion marker missing')
 addition='''def test_master_summary_headers_stay_single_line_at_narrow_width(self):
