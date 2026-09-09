@@ -10,6 +10,12 @@ from . import paths
 from .module_data import read_submodule
 
 
+_RUNTIME_STATE_FILES = {
+    "custom_skill_effects.json",
+    "custom_skill_xp_sources.json",
+}
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -64,6 +70,43 @@ def _json_override(path: Path, nested: bool) -> dict:
         return {"path": str(path), "exists": True, "valid": True, "keys": len(value), "error": ""}
     except Exception as error:
         return {"path": str(path), "exists": True, "valid": False, "keys": 0, "error": str(error)}
+
+
+def _asset_files(root: Path, *, runtime_state: bool = False) -> list[Path]:
+    if not root.is_dir():
+        return []
+    result = []
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root)
+        if path.name.endswith(".lexeditor.bak") or path.name.endswith(".lexeditor.tmp"):
+            continue
+        if runtime_state and relative.as_posix() in _RUNTIME_STATE_FILES:
+            continue
+        result.append(path)
+    return sorted(result, key=lambda value: value.as_posix().casefold())
+
+
+def _asset_status(project_root: Path, deployed_root: Path, *, runtime_state: bool = False) -> dict:
+    sources = _asset_files(project_root, runtime_state=runtime_state)
+    deployed = _asset_files(deployed_root, runtime_state=runtime_state)
+    missing = []
+    different = []
+    for source in sources:
+        relative = source.relative_to(project_root)
+        target = deployed_root / relative
+        if not target.is_file():
+            missing.append(relative.as_posix())
+        elif _sha256(source) != _sha256(target):
+            different.append(relative.as_posix())
+    return {
+        "source": len(sources),
+        "deployed": len(deployed),
+        "missing": missing,
+        "different": different,
+        "inSync": not missing and not different,
+    }
 
 
 def deployment_status(project: Path, game_root: Path | None = None) -> dict:
@@ -145,19 +188,29 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
     if missing_binaries:
         issues.append("Missing deployed module binaries: " + ", ".join(missing_binaries))
 
-    project_gui = sorted(path for path in (project / "GUI").rglob("*.xml") if path.is_file()) if (project / "GUI").is_dir() else []
-    missing_gui = []
-    for source in project_gui:
-        relative = source.relative_to(project / "GUI")
-        if not (deployed_root / "GUI" / relative).is_file():
-            missing_gui.append(relative.as_posix())
+    gui_status = _asset_status(project / "GUI", deployed_root / "GUI")
+    module_data_status = _asset_status(
+        project / "ModuleData",
+        deployed_root / "ModuleData",
+        runtime_state=True,
+    )
+    for label, status in (("GUI assets", gui_status), ("ModuleData assets", module_data_status)):
+        if status["missing"]:
+            issues.append(f"{len(status['missing'])} {label} file(s) are not deployed")
+        if status["different"]:
+            issues.append(f"{len(status['different'])} deployed {label} file(s) differ from the project")
+
+    project_gui_xml = [path for path in _asset_files(project / "GUI") if path.suffix.casefold() == ".xml"]
+    deployed_gui_xml = [path for path in _asset_files(deployed_root / "GUI") if path.suffix.casefold() == ".xml"]
     assets = {
-        "sourceGuiXml": len(project_gui),
-        "missingGuiXml": missing_gui,
-        "deployedGuiXml": len(list((deployed_root / "GUI").rglob("*.xml"))) if (deployed_root / "GUI").is_dir() else 0,
+        "gui": gui_status,
+        "moduleData": module_data_status,
+        # Backward-compatible summary fields used by the first deployment UI.
+        "sourceGuiXml": len(project_gui_xml),
+        "missingGuiXml": [value for value in gui_status["missing"] if value.casefold().endswith(".xml")],
+        "differentGuiXml": [value for value in gui_status["different"] if value.casefold().endswith(".xml")],
+        "deployedGuiXml": len(deployed_gui_xml),
     }
-    if missing_gui:
-        issues.append(f"{len(missing_gui)} GUI XML file(s) are not deployed")
 
     descriptor_match = False
     deployed_module = None
@@ -182,7 +235,12 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
             issues.append(f"Invalid deployed {label} override JSON: {row['error']}")
 
     runnable = bool(game_exe.is_file() and installed_module and not missing_required and not missing_binaries)
-    in_sync = bool(installed_module and descriptor_match and not missing_gui)
+    in_sync = bool(
+        installed_module
+        and descriptor_match
+        and gui_status["inSync"]
+        and module_data_status["inSync"]
+    )
     return {
         "gameRoot": str(game),
         "gameExecutable": str(game_exe),
