@@ -1,28 +1,29 @@
 "use strict";
 
-let palBuildState=null,palWorkshopState=null,palBuildLoading=false,palBuildError="";
+let palBuildState=null,palWorkshopState=null,palLoaderState=null,palBuildLoading=false,palBuildError="";
 
 async function refreshPalBuild(){
   palBuildLoading=true;palBuildError="";render();
   try{
-    const results=await Promise.all([api("/api/build"),api("/api/workshop")]);
-    palBuildState=results[0];palWorkshopState=results[1];
+    const results=await Promise.all([api("/api/build"),api("/api/workshop"),api("/api/loader-state")]);
+    palBuildState=results[0];palWorkshopState=results[1];palLoaderState=results[2];
     const errors=[];
     if(palBuildState?.ready===false)errors.push(palBuildState.error||"Package build is not ready.");
     if(palWorkshopState?.ready===false)errors.push(palWorkshopState.error||"Local Workshop deployment is not ready.");
+    if(palLoaderState?.error)errors.push(palLoaderState.error);
     palBuildError=errors.join(" ");
   }catch(error){palBuildError=error.message}
   finally{palBuildLoading=false;render()}
 }
 async function runPalBuild(action){
   palBuildLoading=true;palBuildError="";render();
-  try{palBuildState=await api(`/api/build/${action}`,{method:"POST",body:"{}"});palWorkshopState=await api("/api/workshop")}
+  try{palBuildState=await api(`/api/build/${action}`,{method:"POST",body:"{}"});palWorkshopState=await api("/api/workshop");palLoaderState=await api("/api/loader-state")}
   catch(error){palBuildError=error.message}
   finally{palBuildLoading=false;render()}
 }
 async function runPalWorkshop(action){
   palBuildLoading=true;palBuildError="";render();
-  try{palWorkshopState=await api(`/api/workshop/${action}`,{method:"POST",body:"{}"});palBuildState=await api("/api/build")}
+  try{palWorkshopState=await api(`/api/workshop/${action}`,{method:"POST",body:"{}"});palBuildState=await api("/api/build");palLoaderState=await api("/api/loader-state")}
   catch(error){palBuildError=error.message}
   finally{palBuildLoading=false;render()}
 }
@@ -48,6 +49,15 @@ function palWorkshopStatusText(){
   if(state.current)return "Current local test deployment";
   if(state.deployed)return state.buildCurrent?"Local deployment differs from current clean build":"Local deployment is stale; rebuild then update it";
   return "No local test deployment";
+}
+function palLoaderStatusText(){
+  const state=palLoaderState;
+  if(!state)return "Not checked";
+  if(state.error)return state.error;
+  if(!state.available)return state.reason||"PalModSettings.ini not available";
+  if(state.active)return "Active";
+  if(state.listed)return "Listed, but mods are globally disabled";
+  return "Not active — enable through Palworld Mod Management";
 }
 function palBuildPanel(){
   const state=palBuildState||{},workshop=palWorkshopState||{};
@@ -85,7 +95,13 @@ function palBuildPanel(){
         el("button",{type:"button",class:"primary",disabled:!canDeploy,onclick:()=>runPalWorkshop("deploy")},workshop.deployed?"Update local test":"Deploy local test"),
         el("button",{type:"button",disabled:!canRemove,onclick:()=>runPalWorkshop("remove")},"Remove local deployment")
       )}),
-      detailField({label:"ACTIVATION",control:readonlyField("Not changed by Lexeditor. Enable the local package through Palworld Options → Mod Management."),help:infoHelp("Lexeditor does not edit Mods/PalModSettings.ini for the Windows client and does not publish or overwrite subscribed Workshop items.")}),
+    ]}),
+    detailSection({title:"LOADER STATE — READ ONLY",body:[
+      detailField({label:"GLOBAL MODS",control:readonlyField(palLoaderState?.globalEnabled===true?"Enabled":palLoaderState?.globalEnabled===false?"Disabled":"Unknown")}),
+      detailField({label:"PACKAGE",control:readonlyField(palLoaderStatusText()),help:infoHelp("Read-only view of Mods/PalModSettings.ini. Lexeditor never changes ActiveModList or the global enable flag for the Windows client.")}),
+      detailField({label:"WORKSHOP ROOT",control:readonlyField(palLoaderState?.workshopRootDir||"Not available")}),
+      detailField({label:"CONFIG",control:readonlyField(palLoaderState?.path||"Not available")}),
+      detailField({label:"ACTIVATION",control:readonlyField("Enable/disable through Palworld Options → Mod Management. Lexeditor does not write activation settings.")}),
     ]}),
     detailSection({title:"PUBLISHING",body:[
       detailField({label:"STEAM",control:readonlyField("Not implemented. Use Pocketpair's official Palworld Mod Uploader to register/upload a Workshop item.")}),
