@@ -6,6 +6,7 @@ import shutil
 import xml.etree.ElementTree as ET
 
 from . import paths
+from .community_metadata import read_community_dependencies
 
 
 def _value(parent: ET.Element, tag: str) -> str:
@@ -150,6 +151,11 @@ def read_submodule(path: Path) -> dict:
                 }
             )
 
+    community_dependencies = [
+        row for row in read_community_dependencies(path)
+        if row.get("origin") == "DependedModuleMetadatas"
+    ]
+
     return {
         "path": str(path),
         "name": _value(root, "Name"),
@@ -161,6 +167,7 @@ def read_submodule(path: Path) -> dict:
         "singleplayer": _truth(_value(root, "SingleplayerModule")),
         "multiplayer": _truth(_value(root, "MultiplayerModule")),
         "dependencies": dependencies,
+        "communityDependencies": community_dependencies,
         "modulesToLoadAfterThis": modules_to_load_after_this,
         "incompatibleModules": incompatible_modules,
         "submodules": submodules,
@@ -291,6 +298,54 @@ def _edit_dependencies(root: ET.Element, rows: list[dict]) -> int:
     if len(existing) != len(output) or any(a is not b for a, b in zip(existing, output)):
         changes += 1
     _remove_tagged_children(parent, "DependedModule")
+    for element in output:
+        parent.append(element)
+    return changes
+
+
+def _edit_community_dependencies(root: ET.Element, rows: list[dict]) -> int:
+    parent = root.find("DependedModuleMetadatas")
+    if parent is None and not rows:
+        return 0
+    parent = parent if parent is not None else ET.SubElement(root, "DependedModuleMetadatas")
+    existing = _element_children(parent, "DependedModuleMetadata")
+    changes = 0
+    reused: set[int] = set()
+    output = []
+    valid_orders = {"", "LoadBeforeThis", "LoadAfterThis"}
+    for position, row in enumerate(rows):
+        module_id = str(row.get("id", "")).strip()
+        if not module_id:
+            raise ValueError(f"BLSE dependency metadata {position + 1} needs an ID")
+        order = str(row.get("order", "")).strip()
+        if order not in valid_orders:
+            raise ValueError("BLSE dependency order must be LoadBeforeThis, LoadAfterThis, or empty")
+        element, created = _reuse(existing, row.get("index"), reused, "DependedModuleMetadata")
+        changes += int(created)
+        before = dict(element.attrib)
+        element.set("id", module_id)
+        if order:
+            element.set("order", order)
+        else:
+            element.attrib.pop("order", None)
+        version = str(row.get("version", "")).strip()
+        if version:
+            element.set("version", version)
+        else:
+            element.attrib.pop("version", None)
+        if bool(row.get("optional", False)):
+            element.set("optional", "true")
+        else:
+            element.attrib.pop("optional", None)
+        if bool(row.get("incompatible", False)):
+            element.set("incompatible", "true")
+        else:
+            element.attrib.pop("incompatible", None)
+        changes += int(before != element.attrib)
+        output.append(element)
+    if len(existing) != len(output) or any(a is not b for a, b in zip(existing, output)):
+        changes += 1
+    _remove_tagged_children(parent, "DependedModuleMetadata")
     for element in output:
         parent.append(element)
     return changes
@@ -518,7 +573,7 @@ def _edit_xmls(root: ET.Element, rows: list[dict]) -> int:
 def save_module(path: Path, payload: dict) -> dict:
     path = Path(path)
     path = paths.contained_project_path(path.parent, path.name, require_file=True)
-    allowed = {"metadata", "dependencies", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}
+    allowed = {"metadata", "dependencies", "communityDependencies", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}
     unknown = set(payload) - allowed
     if unknown:
         raise ValueError(f"Unsupported SubModule.xml sections: {', '.join(sorted(unknown))}")
@@ -531,6 +586,8 @@ def save_module(path: Path, payload: dict) -> dict:
         changes += int(setter(root, _EDITABLE_METADATA[field], value))
     if "dependencies" in payload:
         changes += _edit_dependencies(root, list(payload.get("dependencies") or []))
+    if "communityDependencies" in payload:
+        changes += _edit_community_dependencies(root, list(payload.get("communityDependencies") or []))
     if "modulesToLoadAfterThis" in payload:
         changes += _edit_modules_to_load_after_this(root, list(payload.get("modulesToLoadAfterThis") or []))
     if "incompatibleModules" in payload:
@@ -607,7 +664,7 @@ def data_map(project: Path) -> dict:
             "id": "bannerlord-submodule",
             "filename": "SubModule.xml",
             "area": "Module",
-            "controls": "Module identity/category, dependency and inverse-load relations, incompatibilities, submodule DLL/class/assemblies/tags, and XML registrations",
+            "controls": "Module identity/category, native and BLSE dependency/load-order relations, incompatibilities, submodule DLL/class/assemblies/tags, and XML registrations",
             "coverage": "structured" if submodule.is_file() else "unavailable",
             "status": "integrated" if submodule.is_file() else "not-integrated",
             "target": "module" if submodule.is_file() else "",

@@ -24,7 +24,7 @@
   const refresh=()=>shell?.refresh?.();
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   const metadata=m=>({name:m.name,id:m.id,version:m.version,moduleCategory:m.moduleCategory||"",moduleType:m.moduleType||"",defaultModule:!!m.defaultModule,singleplayer:!!m.singleplayer,multiplayer:!!m.multiplayer});
-  const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],modulesToLoadAfterThis:m.modulesToLoadAfterThis||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;
+  const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],communityDependencies:m.communityDependencies||[],modulesToLoadAfterThis:m.modulesToLoadAfterThis||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;
   const moduleDirty=()=>state.module&&state.savedModule&&!same(moduleEditable(state.module),moduleEditable(state.savedModule));
   const projectDirty=()=>state.project?.projectFile&&state.savedProject?.projectFile&&!same(state.project.projectFile.properties,state.savedProject.projectFile.properties);
   const skillsEditable=value=>value?{attributes:value.attributes||[],skills:value.skills||[]}:null;
@@ -73,7 +73,8 @@
         ...fieldRow("Single-player",checkbox(m.singleplayer,value=>setModuleField("singleplayer",value))),
         ...fieldRow("Multi-player",checkbox(m.multiplayer,value=>setModuleField("multiplayer",value))),
         ...fieldRow("SubModule.xml",el("code",{},m.path)),
-        ...fieldRow("Dependencies",String((m.dependencies||[]).length)),
+        ...fieldRow("Native dependencies",String((m.dependencies||[]).length)),
+        ...fieldRow("BLSE dependency metadata",String((m.communityDependencies||[]).length)),
         ...fieldRow("Modules forced after this",String((m.modulesToLoadAfterThis||[]).length)),
         ...fieldRow("Incompatible modules",String((m.incompatibleModules||[]).length)),
         ...fieldRow("Submodules",String((m.submodules||[]).length)),
@@ -84,6 +85,7 @@
   }
 
   function relationList(kind){
+    if(kind==="community")return state.module.communityDependencies||[];
     if(kind==="incompatible")return state.module.incompatibleModules||[];
     if(kind==="loadAfter")return state.module.modulesToLoadAfterThis||[];
     return state.module.dependencies||[];
@@ -91,6 +93,7 @@
   function dependencyRows(){
     return [
       ...(state.module.dependencies||[]).map((row,index)=>({kind:"dependency",index,row})),
+      ...(state.module.communityDependencies||[]).map((row,index)=>({kind:"community",index,row})),
       ...(state.module.modulesToLoadAfterThis||[]).map((row,index)=>({kind:"loadAfter",index,row})),
       ...(state.module.incompatibleModules||[]).map((row,index)=>({kind:"incompatible",index,row}))
     ];
@@ -98,6 +101,9 @@
   function addDependency(kind){
     if(kind==="dependency"){
       state.module.dependencies.push({index:null,id:"",dependentVersion:"",optional:false,attributes:{}});
+    }else if(kind==="community"){
+      state.module.communityDependencies=state.module.communityDependencies||[];
+      state.module.communityDependencies.push({index:null,id:"",order:"LoadBeforeThis",optional:false,incompatible:false,version:"",attributes:{}});
     }else if(kind==="loadAfter"){
       state.module.modulesToLoadAfterThis=state.module.modulesToLoadAfterThis||[];
       state.module.modulesToLoadAfterThis.push({index:null,id:"",attributes:{}});
@@ -123,18 +129,32 @@
     const record=list[selection.index];
     const master=el("div",{class:"bl-master"},
       el("div",{class:"bl-master-head"},el("strong",{},"Module relations"),
-        el("button",{type:"button",onclick:()=>addDependency("dependency"),title:"Add dependency"},"+ Dep"),
+        el("button",{type:"button",onclick:()=>addDependency("dependency"),title:"Add native dependency"},"+ Dep"),
+        el("button",{type:"button",onclick:()=>addDependency("community"),title:"Add BLSE/BUTR dependency metadata"},"+ BLSE"),
         el("button",{type:"button",onclick:()=>addDependency("loadAfter"),title:"Force another module to load after this module"},"+ After"),
         el("button",{type:"button",onclick:()=>addDependency("incompatible"),title:"Add incompatible module"},"+ Inc")),
       el("div",{class:"bl-list"},...rows.map(item=>{
         const active=item.kind===selection.kind&&item.index===selection.index;
-        const label=item.kind==="dependency"?"Depends on":item.kind==="loadAfter"?"Loads after this":"Incompatible";
+        const label=item.kind==="dependency"?"Native dependency":item.kind==="community"?`BLSE ${item.row.order||"metadata"}`:item.kind==="loadAfter"?"Loads after this":"Incompatible";
+        const version=item.row.dependentVersion||item.row.version||"";
+        const flags=item.kind==="community"?[item.row.optional?"optional":"",item.row.incompatible?"incompatible":""].filter(Boolean).join(" · "):"";
         return el("button",{type:"button",class:`bl-item${active?" active":""}`,onclick:()=>{state.dependencySelection={kind:item.kind,index:item.index};render()}},
-          item.row.id||"(new module)",el("small",{},label+(item.row.dependentVersion?` · ${item.row.dependentVersion}`:"")));
+          item.row.id||"(new module)",el("small",{},label+(version?` · ${version}`:"")+(flags?` · ${flags}`:"")));
       }))
     );
     let detail;
     if(!record)detail=el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"Select or add a module relation."));
+    else if(selection.kind==="community")detail=el("div",{class:"bl-detail"},
+      el("section",{class:"bl-panel"},el("h2",{},record.id||"New BLSE dependency metadata"),
+        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
+        el("div",{class:"bl-grid"},
+          ...fieldRow("Module ID",textInput(record.id,value=>record.id=value)),
+          ...fieldRow("Order",select(record.order||"",[["","No ordering edge"],["LoadBeforeThis","Dependency loads before this module"],["LoadAfterThis","Dependency loads after this module"]],value=>record.order=value)),
+          ...fieldRow("Version / range",textInput(record.version,value=>record.version=value,{placeholder:"v2.0.* or v2.0.0-v2.3.*"})),
+          ...fieldRow("Optional",checkbox(record.optional,value=>record.optional=value)),
+          ...fieldRow("Incompatible",checkbox(record.incompatible,value=>record.incompatible=value))
+        ),
+        el("div",{class:"bl-note"},"BLSE/BUTR community metadata is evaluated before duplicate native dependency rows. Required rows can load either before or after this module; optional rows constrain order only when otherwise enabled. Unknown attributes on existing rows are preserved.")));
     else if(selection.kind==="incompatible")detail=el("div",{class:"bl-detail"},
       el("section",{class:"bl-panel"},el("h2",{},record.id||"New incompatible module"),
         el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
