@@ -48,8 +48,10 @@ jobs:
         run: >-
           python -c "from pathlib import Path; import re; s=Path('games/ff7r/editor.html').read_text(encoding='utf-8'); Path('ff7r-inline.js').write_text('\n'.join(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)), encoding='utf-8')"
           && node --check ff7r-inline.js
+      - name: Theme JavaScript syntax
+        run: node --check games/ff7r/theme.js
       - name: Plugin descriptor
-        run: python -c "from games.ff7r.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ff7r.server' in SERVICE_MODULES; print(PLUGIN.name)"
+        run: python -c "from games.ff7r.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ff7r.server' in SERVICE_MODULES; assert 'games.ff7r.themed_server' in SERVICE_MODULES; print(PLUGIN.name)"
       - name: Gameplay, text, semantic and runtime regressions
         run: >-
           python -c "from pathlib import Path; import pytest; files=[str(path) for path in sorted(Path('tests').glob('test_ff7r_*.py'))]; print(f'Running {len(files)} FF7R test files'); raise SystemExit(pytest.main(['-q', *files]))"
