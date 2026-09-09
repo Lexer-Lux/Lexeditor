@@ -11,7 +11,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 from .module_data import read_submodule
-from .paths import clear_write_helper, contained_project_path
+from .paths import clear_write_helper, contained_game_path, contained_project_path
 
 
 EDITABLE_PROJECT_PROPERTIES = (
@@ -364,8 +364,8 @@ def _build_path_overrides(project: Path, selected_game: Path) -> dict[str, str]:
         raise ValueError(f"Bannerlord project has an unsafe module Id: {module_id or '(missing)'}")
 
     selected_game = selected_game.resolve()
-    game_bin = (selected_game / "bin" / "Win64_Shipping_Client").resolve()
-    modules_root = (selected_game / "Modules").resolve()
+    game_bin = contained_game_path(selected_game, "bin", "Win64_Shipping_Client")
+    modules_root = contained_game_path(selected_game, "Modules")
     module_dir = (modules_root / module_id).resolve()
     if modules_root not in module_dir.parents:
         raise ValueError("Resolved Bannerlord build module path escaped the Modules folder")

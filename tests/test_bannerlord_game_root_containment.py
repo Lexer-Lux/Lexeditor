@@ -1,0 +1,158 @@
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from games.bannerlord import paths
+from games.bannerlord.deploy_data import sync_project_assets
+from games.bannerlord.game_launch import _launch_command, installed_modules
+from games.bannerlord.project_data import run_build
+
+
+CSPROJ = '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><TargetFramework>net472</TargetFramework></PropertyGroup></Project>'
+SUBMODULE = '<Module><Id value="SafeModule"/><SingleplayerModule value="true"/></Module>'
+
+
+def fixtures(root: Path):
+    project = root / "project"
+    project.mkdir()
+    (project / "Mod.csproj").write_text(CSPROJ, encoding="utf-8")
+    (project / "SubModule.xml").write_text(SUBMODULE, encoding="utf-8")
+    game = root / "game"
+    executable = game / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(b"")
+    (game / "Modules").mkdir()
+    return project, game
+
+
+class BannerlordGameRootContainmentTests(unittest.TestCase):
+    def test_hosted_build_rejects_modules_root_redirection_before_dotnet(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            project, game = fixtures(root)
+            outside = root / "outside-modules"
+            outside.mkdir()
+            real_resolve = Path.resolve
+            game_root = real_resolve(game)
+            logical = game_root / "Modules"
+            outside_root = real_resolve(outside)
+
+            def fake_resolve(path, *args, **kwargs):
+                if Path(path) == logical:
+                    return outside_root
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve), \
+                 patch("games.bannerlord.project_data.subprocess.run") as runner:
+                with self.assertRaisesRegex(ValueError, "game path escaped"):
+                    run_build(project, game_root=game)
+            runner.assert_not_called()
+
+    def test_hosted_build_rejects_game_bin_redirection_before_dotnet(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            project, game = fixtures(root)
+            outside = root / "outside-bin"
+            outside.mkdir()
+            real_resolve = Path.resolve
+            game_root = real_resolve(game)
+            logical = game_root / "bin" / "Win64_Shipping_Client"
+            outside_root = real_resolve(outside)
+
+            def fake_resolve(path, *args, **kwargs):
+                if Path(path) == logical:
+                    return outside_root
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve), \
+                 patch("games.bannerlord.project_data.subprocess.run") as runner:
+                with self.assertRaisesRegex(ValueError, "game path escaped"):
+                    run_build(project, game_root=game)
+            runner.assert_not_called()
+
+    def test_deploy_rejects_modules_root_redirection_before_writes(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            project, game = fixtures(root)
+            outside = root / "outside-modules"
+            outside.mkdir()
+            real_resolve = Path.resolve
+            game_root = real_resolve(game)
+            logical = game_root / "Modules"
+            outside_root = real_resolve(outside)
+
+            def fake_resolve(path, *args, **kwargs):
+                if Path(path) == logical:
+                    return outside_root
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(ValueError, "game path escaped"):
+                    sync_project_assets(project, game)
+            self.assertEqual(list(outside.iterdir()), [])
+
+    def test_play_rejects_modules_root_redirection(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            _project, game = fixtures(root)
+            outside = root / "outside-modules"
+            outside.mkdir()
+            real_resolve = Path.resolve
+            game_root = real_resolve(game)
+            logical = game_root / "Modules"
+            outside_root = real_resolve(outside)
+
+            def fake_resolve(path, *args, **kwargs):
+                if Path(path) == logical:
+                    return outside_root
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(RuntimeError, "game path escaped"):
+                    installed_modules(game)
+
+    def test_launch_command_rejects_executable_redirection(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            _project, game = fixtures(root)
+            outside = root / "outside.exe"
+            outside.write_bytes(b"")
+            real_resolve = Path.resolve
+            game_root = real_resolve(game)
+            logical = game_root / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
+            outside_file = real_resolve(outside)
+
+            def fake_resolve(path, *args, **kwargs):
+                if Path(path) == logical:
+                    return outside_file
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(RuntimeError, "game path escaped"):
+                    _launch_command(game, ["Native"])
+
+    def test_session_preflight_reports_nested_game_root_escape(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            project, game = fixtures(root)
+            outside = root / "outside-modules"
+            outside.mkdir()
+            real_resolve = Path.resolve
+            game_root = real_resolve(game)
+            logical = game_root / "Modules"
+            outside_root = real_resolve(outside)
+
+            def fake_resolve(path, *args, **kwargs):
+                if Path(path) == logical:
+                    return outside_root
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve):
+                problems = paths.check(project=project, game=game)
+            self.assertTrue(any("game path escaped" in problem for problem in problems))
+
+
+if __name__ == "__main__":
+    unittest.main()

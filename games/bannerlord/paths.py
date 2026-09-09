@@ -43,6 +43,21 @@ def contained_project_path(
     return target
 
 
+def contained_game_path(
+    game: Path,
+    *parts: str | Path,
+    require_file: bool = False,
+) -> Path:
+    """Resolve a game path without allowing a nested junction/symlink to escape."""
+    root = Path(game).resolve()
+    target = root.joinpath(*parts).resolve()
+    if target != root and root not in target.parents:
+        raise ValueError("Resolved Bannerlord game path escaped the selected game root")
+    if require_file and not target.is_file():
+        raise FileNotFoundError(target)
+    return target
+
+
 def clear_write_helper(path: Path) -> None:
     """Remove a stale backup/temp entry without following file redirections.
 
@@ -79,12 +94,17 @@ def installed_modules(root: Path | None = None) -> list[Path]:
 def check(project: Path | None = None, game: Path | None = None) -> list[str]:
     """Validate an explicit session root when supplied, otherwise current defaults."""
     problems: list[str] = []
-    game = Path(game or game_root())
-    executable = game / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
-    if not executable.is_file():
-        problems.append(f"Missing Bannerlord executable: {executable}")
-    if not modules_root(game).is_dir():
-        problems.append(f"Missing Bannerlord Modules directory: {modules_root(game)}")
+    game = Path(game or game_root()).resolve()
+    try:
+        executable = contained_game_path(game, "bin", "Win64_Shipping_Client", "Bannerlord.exe")
+        modules = contained_game_path(game, "Modules")
+    except ValueError as error:
+        problems.append(str(error))
+    else:
+        if not executable.is_file():
+            problems.append(f"Missing Bannerlord executable: {executable}")
+        if not modules.is_dir():
+            problems.append(f"Missing Bannerlord Modules directory: {modules}")
 
     project = Path(project or project_root())
     try:

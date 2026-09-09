@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import threading
 
+from . import paths
 from .community_metadata import read_community_dependencies
 from .dependency_relations import (
     dependency_declaration_conflicts,
@@ -58,7 +59,11 @@ def _selected_project_id(project: Path) -> str:
 
 def installed_modules(game_root: Path) -> dict[str, Path]:
     """Installed Bannerlord modules keyed by their SubModule.xml Id."""
-    modules_root = game_root.resolve() / "Modules"
+    game_root = game_root.resolve()
+    try:
+        modules_root = paths.contained_game_path(game_root, "Modules")
+    except ValueError as error:
+        raise RuntimeError(str(error)) from error
     if not modules_root.is_dir():
         raise RuntimeError(f"Bannerlord Modules folder not found: {modules_root}")
     modules: dict[str, Path] = {}
@@ -256,7 +261,12 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
 
 def _launch_command(game_root: Path, modules: list[str]) -> list[str]:
     game_root = game_root.resolve()
-    executable = game_root / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
+    try:
+        executable = paths.contained_game_path(
+            game_root, "bin", "Win64_Shipping_Client", "Bannerlord.exe"
+        )
+    except ValueError as error:
+        raise RuntimeError(str(error)) from error
     if not executable.is_file():
         raise RuntimeError(f"Bannerlord.exe not found: {executable}")
     module_argument = "_MODULES_*" + "*".join(modules) + "*_MODULES_"
@@ -299,7 +309,7 @@ class BannerlordGameController:
             load_order = module_load_order(game_root, project)
             module_id = _selected_project_id(project)
             command = _launch_command(game_root, load_order)
-            cwd = game_root.resolve() / "bin" / "Win64_Shipping_Client"
+            cwd = Path(command[0]).parent
             process = self._process_factory(command, cwd=str(cwd))
             if process.poll() is not None:
                 raise RuntimeError("Bannerlord exited immediately after launch.")
