@@ -1,19 +1,19 @@
 # FF7 data editors and verification
 
-Updated 2026-09-06 for the completion pass on PR #359. This is the current scope reference; the earlier `ff7-recovery-20260906.md` is a historical session record, not the current list of missing editors. Both `ff7` and `ff7-2013` use `games.ff7.server` and the same page. No other game's implementation is changed by this pass.
+Updated 2026-09-08 for the completion pass on PR #434. This is the current scope reference; the earlier `ff7-recovery-20260906.md` is a historical session record, not the current list of missing editors. Both `ff7` and `ff7-2013` use `games.ff7.server` and the same page. No other game's implementation is changed by this pass.
 
 ## Connected editors
 
-There are 24 dataset categories, grouped into ordinary tabs and related subtabs, plus Tweaks / FFNx. Missing or unsupported installed data is reported explicitly, independently of other readable categories.
+There are 38 dataset categories, grouped into ordinary tabs and related subtabs, plus Tweaks / FFNx. Missing or unsupported installed data is reported explicitly, independently of other readable categories.
 
-- Kernel: items, weapons, armor, accessories, materia; nine initial character slots with 93 numeric fields; nine inline names; 64 growth curves; three growth-bonus tables; twelve character AI owners.
+- Kernel: items, weapons, armor, accessories, materia; commands and player attacks; new-game state/inventory/Materia and Yuffie's temporary Materia; magic-menu ordering; nine initial character slots with 93 numeric fields; nine inline names; 64 growth curves; three growth-bonus tables; twelve character AI owners.
 - Battle scenes: enemy stats, names, rewards, resistances, loot and action references; enemy attacks; all 1,024 formations and cameras; enemy and formation AI scripts.
 - Field encounters: both random-encounter tables of each readable PC field in flevel.lgp. Normal and special battle IDs, probabilities, activation and rate are writable. Malformed members are reported and left unchanged.
 - World encounters: 64 region/terrain tables, eight Yuffie level thresholds and 32 Chocobo ratings in enc_w.bin inside world_us.lgp.
-- Recognized English executables: 80 shops, 416 purchase prices, ten default names, and Cait Sith/Vincent's separate initial records including equipment and materia/AP.
-- Text: all 18 English kernel2 sections, with reversible game-byte escapes and an encoded-buffer limit.
+- Recognized English executables: 80 shops, 416 purchase prices, ten default names, Cait Sith/Vincent's separate initial records, 71 Limit attack records, 21 Materia equip-effect templates, 476 fixed text fields, 320 item-name sort positions, 96 Materia priority bytes, 128 audio volume/pan entries, and the mastered-Materia sale AP multiplier.
+- Text: all 18 English kernel2 sections, with reversible game-byte escapes and an encoded-buffer limit, plus the separately bounded fixed strings stored in the executable (menus, statuses, Limit messages, Battle Arena/Bizarro text, shop text, Chocobo names/prizes and Teioh).
 
-Characters, Enemies, Encounters and Shops use subtabs instead of placing every dataset in the main navigation. Real shared-control tests cover textarea initialization, save/reopen, list sizing, both edition identities and three window sizes. Text values must be assigned to textarea.value: setting only the value attribute leaves a real shared textarea blank. Name/description cells use fitted wrappers, avoiding max-content overflow. Selection and subtab sounds are emitted once; muting stops and suppresses playback.
+Characters, New game, Commands, Items, Materia, Enemies, Encounters, Shops and Text use subtabs instead of placing every dataset in the main navigation. Real shared-control tests cover textarea initialization, save/reopen, list sizing, both edition identities and three window sizes. Text values must be assigned to textarea.value: setting only the value attribute leaves a real shared textarea blank. Name/description cells use fitted wrappers, avoiding max-content overflow. Selection and subtab sounds are emitted once; muting stops and suppresses playback.
 
 ## Binary contracts
 
@@ -25,7 +25,9 @@ Scenes remain 256 English 7808-byte records in 8192-byte blocks. Original scene-
 
 LGP editing retains lookup/conflict tables, other members and inactive bytes. A resized/aliased member is appended before the footer and its TOC pointer updated, as allowed by the documented format. Field editing touches only section 7's two 24-byte encounter tables. World enc_w.bin remains 2208 bytes. IDs and weights are separated from their packed representation. An enabled zero encounter rate and invalid normal probability totals are refused.
 
-This is encounter-table editing, not a general field-script, world-geometry or executable terrain-assignment editor. Shop-opening scripts and scene enemy IDs remain separate, preserved data. Unknown executable hashes are not accepted at guessed offsets; the production allowlist has no synthetic-fixture bypass.
+Executable editing is restricted to the five recognized English SHA-1 profiles also accepted by Scarlet 10a2283. The raw 0x200/0x400 build shift is applied to Scarlet's named offsets; no per-build offsets are guessed. A project executable may differ from its installed source only inside the explicitly modeled ranges. Fixed text retains original padding/control bytes when unchanged and refuses oversized encoded strings. The AP multiplier's two executable copies are written together. Opaque world-model walk/disembark instruction bitmasks remain outside the ordinary first-class surface rather than being presented as unexplained settings.
+
+This is encounter-table editing, not a general field-script or world-geometry editor. Shop-opening scripts and scene enemy IDs remain separate, preserved data. Unknown executable hashes are not accepted at guessed offsets; the production allowlist has no synthetic-fixture bypass.
 
 ## Save contract
 
@@ -37,7 +39,7 @@ Binary saves do not deploy mods or alter installed sources. FFNx retains its sep
 
 ## Repeatable tests
 
-Local results before publication: 57 binary/HTTP tests (19 kernel, 15 extended, 23 completion), seven component-contract browser scenarios, and three real-shared-UI scenarios. The character sweep includes 837 field/slot combinations. New tests cover AI relocation/aliases, LGP append preservation, field/world tables, names/recruits/curves, malformed data, typed no-op validation, snapshots, backups, template guards and diagnostic source preservation. The workflow repeats binary tests on Windows and Linux and browser tests in Chromium. Check the PR's actual current CI conclusions rather than treating this local record as a CI result.
+The synthetic suite now includes 58 binary/HTTP tests in the recorded completion set (19 kernel, 16 extended, 23 completion), plus the component-contract and real-shared-UI browser scenarios. The executable tests cover both raw offset shifts, no-op byte identity, one-field isolation, rejection of edits outside proved ranges, fixed-text capacity, duplicate AP-multiplier writes, and reopen equality for every newly exposed EXE family. The dedicated EXE audit workflow ran the full FF7 contract suite and rendered Chromium suite successfully before its temporary writer/scaffold was removed. Check the PR's actual current CI conclusions rather than treating this record as installed-game acceptance.
 
 ## Installed-data check and remaining acceptance
 
@@ -48,7 +50,7 @@ Actual installed-build compatibility, native desktop behavior, gameplay acceptan
 ## Primary format references
 
 - https://github.com/Shojy/Elena/tree/d85e02678670763c663cd058463f7578b957912e/Shojy.FF7.Elena — CharacterData, BattleAndGrowthData and StatCurve.
-- https://github.com/petfriendamy/ff7-scarlet/tree/10a228378c0cab4925cbf6f1237a92146a9a719c — AIContainer, Script, ExeData, ShopInventory and compression container layouts.
+- https://github.com/petfriendamy/ff7-scarlet/tree/10a228378c0cab4925cbf6f1237a92146a9a719c — AIContainer, Script, ExeData, MateriaEquipEffect, ShopInventory and executable/container layouts.
 - https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes.html
 - https://ff7-mods.github.io/ff7-flat-wiki/FF7/Battle/Battle_Scenes/Battle_Script
 - https://ff7-mods.github.io/ff7-flat-wiki/FF7/LGP_format.html — Ficedula's LGP documentation, including appended replacement members.

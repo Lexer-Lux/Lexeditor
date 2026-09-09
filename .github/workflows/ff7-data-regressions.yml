@@ -61,12 +61,16 @@ jobs:
         with:
           python-version: '3.13'
       - name: Verify binary formats, preservation and HTTP behavior
+        shell: bash
         run: |
           python tools/verify_ff7_datasets.py
+          python tools/verify_ff7_kernel_layout_contract.py
           python tools/verify_ff7_accessories.py
           python tools/verify_ff7_semantic_surface.py
           python tools/verify_ff7_extended.py
           python tools/verify_ff7_completion.py
+          # Keep the reviewed 38-dataset installed acceptance contract on both OSes.
+          python tools/verify_ff7_installed_contract.py
           python tools/verify_ff7_edition_parity.py
           python tools/verify_ff7_blank_ui.py
 
@@ -125,7 +129,9 @@ jobs:
           python -m pip install playwright==1.57.0
           python -m playwright install --with-deps chromium
       - name: Exercise actual shared controls and both edition layouts
-        run: python tools/verify_ff7_rendered_neutral.py
+        run: |
+          python tools/verify_ff7_rendered_neutral.py
+          python tools/verify_ff7_exe_rendered.py
       - name: Retain synthetic UI screenshots
         if: always()
         uses: actions/upload-artifact@v4

@@ -10,9 +10,12 @@ from .battle import number, read_values, write_values, validate_rows
 from .format_codec import bounds, read_int, lzs_decode, lzs_encode
 
 
+LGP_TERMINATOR = b'FINAL FANTASY 7'
+
+
 class LGP:
     def __init__(self, data: bytes):
-        if not data.startswith(b'\0\0SQUARESOFT') or not data.endswith(b'FINAL FANTASY 7'):
+        if not data.startswith(b'\0\0SQUARESOFT') or not data.endswith(LGP_TERMINATOR):
             raise ValueError('Not a complete PC SQUARESOFT LGP archive')
         self.original=data;self.entries=[];self.changes={}
         count=read_int(data,12,4)
@@ -28,7 +31,7 @@ class LGP:
             if start<table_end+3602: raise ValueError('LGP member overlaps its index')
             bounds(data,start,24)
             size=read_int(data,start+20,4);bounds(data,start+24,size)
-            if start+24+size>len(data)-14: raise ValueError('LGP member overlaps its terminator')
+            if start+24+size>len(data)-len(LGP_TERMINATOR): raise ValueError('LGP member overlaps its terminator')
             self.entries.append((name,start,size))
         # Exact aliases are permitted, partial data overlaps are not.
         spans=sorted(set((start,start+24+size) for _,start,size in self.entries))
@@ -41,7 +44,7 @@ class LGP:
 
     def to_bytes(self):
         if not self.changes:return self.original
-        result=bytearray(self.original[:-14])
+        result=bytearray(self.original[:-len(LGP_TERMINATOR)])
         refs=Counter(at for _,at,_ in self.entries)
         for index,raw in sorted(self.changes.items()):
             name,old,size=self.entries[index]
@@ -56,7 +59,7 @@ class LGP:
                 result.extend(self.original[old:old+20])
                 result.extend(struct.pack('<I',len(raw)));result.extend(raw)
                 struct.pack_into('<I',result,16+index*27+20,at)
-        result.extend(b'FINAL FANTASY 7')
+        result.extend(LGP_TERMINATOR)
         return bytes(result)
 
 
@@ -183,5 +186,7 @@ class WorldArchive:
         self.data=out
 
     def to_bytes(self):
-        self.lgp.changes[self.index]=bytes(self.data)
+        raw=bytes(self.data);_,at,size=self.lgp.entries[self.index]
+        if raw==self.lgp.original[at+24:at+24+size]:return self.lgp.original
+        self.lgp.changes[self.index]=raw
         return self.lgp.to_bytes()
