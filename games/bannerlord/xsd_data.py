@@ -1,4 +1,4 @@
-"""Optional Bannerlord XSD discovery and attribute-control enrichment.
+"""Optional Bannerlord XSD discovery, controls, and lightweight validation.
 
 The Modding Kit ships schema files under XmlSchemas. Lexeditor uses them only
 when a unique matching schema can be identified; otherwise ModuleData stays on
@@ -7,6 +7,7 @@ its conservative syntax-derived controls.
 from __future__ import annotations
 
 from functools import lru_cache
+import math
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -215,8 +216,48 @@ def _control(rule: dict, current_kind: str) -> tuple[str, list[str]]:
     return current_kind, []
 
 
+def _metadata(rule: dict) -> dict:
+    type_name = _local_type(rule.get("type", ""))
+    result = {
+        "required": bool(rule.get("required")),
+        "schemaType": type_name,
+        "choices": list(rule.get("choices") or []),
+    }
+    if type_name in _INTEGER_TYPES:
+        result["integer"] = True
+    for key in ("min", "max", "default", "fixed"):
+        if key in rule:
+            result[key] = rule[key]
+    return result
+
+
+def _current_issue(name: str, value: str, rule: dict) -> str:
+    choices = list(rule.get("choices") or [])
+    if choices and value not in choices:
+        return f"{name} has value {value!r}; expected one of: {', '.join(choices)}"
+    type_name = _local_type(rule.get("type", ""))
+    if type_name == "boolean" and value.casefold() not in {"true", "false", "0", "1"}:
+        return f"{name} has value {value!r}; expected an XML boolean"
+    if type_name in _NUMERIC_TYPES:
+        try:
+            number = float(value)
+        except ValueError:
+            return f"{name} has value {value!r}; expected {type_name or 'a number'}"
+        if not math.isfinite(number):
+            return f"{name} must be finite"
+        if type_name in _INTEGER_TYPES and not number.is_integer():
+            return f"{name} has value {value!r}; expected an integer"
+        if "min" in rule and number < float(rule["min"]):
+            return f"{name} is below schema minimum {rule['min']}"
+        if "max" in rule and number > float(rule["max"]):
+            return f"{name} is above schema maximum {rule['max']}"
+    if "fixed" in rule and value != str(rule["fixed"]):
+        return f"{name} must equal fixed schema value {rule['fixed']!r}"
+    return ""
+
+
 def enrich_elements(elements: list[dict], schema: dict | None) -> list[dict]:
-    """Attach schema metadata to both public and private attribute records."""
+    """Attach schema controls plus non-destructive validation diagnostics."""
     if not schema:
         return elements
     rules_by_element = schema.get("elements") or {}
@@ -226,24 +267,28 @@ def enrich_elements(elements: list[dict], schema: dict | None) -> list[dict]:
             continue
         private = {attribute["name"]: attribute for attribute in element.get("_attributes", [])}
         public = {attribute["name"]: attribute for attribute in element.get("attributes", [])}
+        missing_required = []
+        issues = []
         for name, rule in rules.items():
-            type_name = _local_type(rule.get("type", ""))
+            if name not in public:
+                if rule.get("required"):
+                    missing_required.append({"name": name, **_metadata(rule)})
+                    issues.append(f"Missing required attribute: {name}")
+                continue
+            metadata = _metadata(rule)
             for target in (private.get(name), public.get(name)):
                 if target is None:
                     continue
                 kind, choices = _control(rule, target.get("kind", "text"))
                 target["kind"] = kind
+                target.update(metadata)
                 target["choices"] = choices
-                target["required"] = bool(rule.get("required"))
-                target["schemaType"] = type_name
-                if type_name in _INTEGER_TYPES:
-                    target["integer"] = True
-                if "min" in rule:
-                    target["min"] = rule["min"]
-                if "max" in rule:
-                    target["max"] = rule["max"]
-                if "default" in rule:
-                    target["default"] = rule["default"]
-                if "fixed" in rule:
-                    target["fixed"] = rule["fixed"]
+            issue = _current_issue(name, public[name]["value"], rule)
+            if issue:
+                public[name]["schemaIssue"] = issue
+                if private.get(name) is not None:
+                    private[name]["schemaIssue"] = issue
+                issues.append(issue)
+        element["missingRequired"] = missing_required
+        element["schemaIssues"] = issues
     return elements
