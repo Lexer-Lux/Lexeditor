@@ -14,6 +14,12 @@ from .comparisons import (
 from .data import OverlayStore
 from .event_edit import save_event_arguments
 from .events import get_event
+from .facing_target_ops import (
+    apply_facing_target_op,
+    decorate_facing_target_semantics,
+    facing_target_field_specs,
+    facing_target_values,
+)
 from .field_editors import (
     Field,
     decorate_event_editors as decorate_base_editors,
@@ -106,6 +112,10 @@ def object_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, object_field_specs(command), object_values(command))
 
 
+def facing_target_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, facing_target_field_specs(command), facing_target_values(command))
+
+
 def property_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, property_field_specs(command), property_values(command))
 
@@ -137,6 +147,7 @@ _REGISTRY_BUILDERS = (
     movement_editor_schema,
     call_editor_schema,
     object_editor_schema,
+    facing_target_editor_schema,
     property_editor_schema,
     scene_event_editor_schema,
     audio_editor_schema,
@@ -151,6 +162,7 @@ _REGISTRY_APPLIERS = (
     apply_movement_op,
     apply_call_op,
     apply_object_op,
+    apply_facing_target_op,
     apply_property_op,
     apply_scene_event_op,
     apply_audio_op,
@@ -175,6 +187,7 @@ def decorate_event_editors(payload: dict) -> dict:
     decorate_movement_semantics(payload)
     decorate_call_semantics(payload)
     decorate_object_semantics(payload)
+    decorate_facing_target_semantics(payload)
     decorate_property_semantics(payload)
     decorate_scene_event_semantics(payload)
     decorate_audio_semantics(payload)
