@@ -40,7 +40,7 @@
   const $=selector=>document.querySelector(selector);
   async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
-  const state={modOnly:false,curatedQuery:"",curatedSort:{key:"id",dir:1},
+  const state={modOnly:false,reshade:null,curatedQuery:"",curatedSort:{key:"id",dir:1},
     tab:"data",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
     asset:"",data:null,dataBaseline:null,selected:0,query:"",sort:{key:"tag",dir:1},
     economy:null,economyKey:"",economyError:"",economyTable:"",economyQuery:"",economySort:{key:"name",dir:1},
@@ -268,6 +268,15 @@
   // bounded values that the player reads top to bottom, so it is one scrolling
   // settings page - the shape games/blank demonstrates - rather than a table
   // with a search box and a pager over five rows.
+  async function loadReshade(){
+    try{const value=await LexeditorUI.callWindow?.("mod_reshade","ff7r");if(value)state.reshade=value}
+    catch(_error){/* browser preview has no desktop host; the section still renders */}
+  }
+  async function saveReshade(manifest){
+    try{const value=await LexeditorUI.callWindow?.("save_mod_reshade","ff7r",manifest);if(value)state.reshade=value}
+    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
+    render();
+  }
   function tweakSettingsPanel(){
     const rows=records(),asset=currentAsset();
     const title=asset?.name||"Tweaks";
@@ -280,6 +289,7 @@
         control:propertyControl(row,prop),
         dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),
         min:prop.min,max:prop.max,help:propertyHelp(prop)}))}));
+    sections.push(LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade}));
     return detailPanel({className:"ff7r-detail ff7r-tweaks",title,
       identity:String(rows.length),meta:asset?.group||"Lexeditor tweaks",body:sections});
   }
@@ -576,6 +586,7 @@
       state.pages[tab]=0;render();
     }
     else if(tab==="data"||tab==="tweaks"){
+      if(tab==="tweaks"&&!state.reshade)await loadReshade();
       // Opening these tabs loaded nothing, so the table sat empty behind the
       // picker until the user changed the dropdown by hand.
       const list=tab==="tweaks"?tweakAssets():gameAssets();

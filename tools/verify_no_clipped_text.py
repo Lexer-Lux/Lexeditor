@@ -310,6 +310,14 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
             page = next(value for value in wait_json(f"http://127.0.0.1:{port}/json/list")
                         if value.get("type") == "page")
             cdp = Cdp(page["webSocketDebuggerUrl"])
+            # Reading a real game's tables takes far longer than an empty
+            # project did, and the shared harness's one-minute socket timeout
+            # killed the whole sweep partway through rather than reporting
+            # anything. Give a live game room to answer.
+            try:
+                cdp.ws.settimeout(240)
+            except Exception:  # pragma: no cover - harness detail
+                pass
             cdp.call("Page.enable")
             cdp.call("Runtime.enable")
             cdp.call("Emulation.setDeviceMetricsOverride", {
@@ -323,6 +331,7 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                 "JSON.stringify([...document.querySelectorAll('nav button[data-tab]')]"
                 ".map(b=>b.dataset.tab))"))
             for tab in tabs or [None]:
+              try:
                 if tab:
                     cdp.eval(
                         "(()=>{const b=[...document.querySelectorAll('nav button[data-tab]')]"
@@ -369,6 +378,11 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                     entry["size"] = f"{width}x{height}"
                     entry["defect"] = "table-without-pager"
                     found.append(entry)
+              except Exception as error:  # one tab must not lose the sweep
+                found.append({"plugin": plugin, "tab": tab,
+                              "size": f"{width}x{height}", "defect": "probe-failed",
+                              "reason": f"{type(error).__name__}: {error}"[:160]})
+                break
     finally:
         browser_guard.kill_tree(browser)
     return found
@@ -388,33 +402,38 @@ def main() -> int:
     boxed = [row for row in findings if row.get("defect") == "boxed-header-control"]
     cropped = [row for row in findings if row.get("defect") == "clipped-container"]
     controls = [row for row in findings if row.get("defect") == "broken-control"]
+    unprobed = [row for row in findings if row.get("defect") == "probe-failed"]
     empty = [row for row in findings if row.get("defect") == "empty-tab"]
     clipped = [row for row in findings
                if row.get("defect") not in ("table-without-pager", "empty-tab",
                                             "boxed-header-control",
-                                            "clipped-container", "broken-control")]
+                                            "clipped-container", "broken-control",
+                                            "probe-failed")]
     # Twenty printed lines hid most of a failure, so every entry is also
     # written out; grouping there is what makes a shared cause obvious.
     report = ROOT / "out" / "no-clipped-text.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(
         {"plugins": plugins, "clipped": clipped, "pagerless": pagerless,
-         "empty": empty, "boxed": boxed, "cropped": cropped, "controls": controls}, indent=1), encoding="utf-8")
+         "empty": empty, "boxed": boxed, "cropped": cropped, "controls": controls,
+         "unprobed": unprobed}, indent=1), encoding="utf-8")
     print(json.dumps({"plugins": plugins, "clipped": len(clipped),
                       "pagerless": len(pagerless), "emptyTabs": len(empty),
                       "boxedHeaderControls": len(boxed),
                       "clippedContainers": len(cropped),
                       "brokenControls": len(controls),
+                      "tabsNotProbed": len(unprobed),
                       "report": str(report)}))
-    for entry in (clipped + pagerless + empty + boxed + cropped + controls)[:20]:
+    for entry in (clipped + pagerless + empty + boxed + cropped + controls + unprobed)[:20]:
         print(json.dumps(entry, ensure_ascii=True))
-    if clipped or pagerless or empty or boxed or cropped or controls:
+    if clipped or pagerless or empty or boxed or cropped or controls or unprobed:
         raise AssertionError(
             f"{len(clipped)} clipped text boxes, {len(pagerless)} tables without "
             f"a pager, {len(empty)} tabs rendering nothing, {len(boxed)} header "
             f"controls painting their own box, {len(cropped)} shared "
             f"containers cutting off what they hold, {len(controls)} controls "
-            f"pointing nowhere or spanning an unusable range")
+            f"pointing nowhere or spanning an unusable range, {len(unprobed)} "
+            f"tabs that could not be measured")
     return 0
 
 

@@ -131,6 +131,23 @@ for plugin in sorted((ROOT / "games").iterdir()):
 require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
         "the shared mod loader section is not defined in the framework")
 
+# One ReShade lives in Lexeditor; a mod carries only its own preset. Every game
+# that offers a Tweaks page offers it the same way, so a player learns the
+# control once. Games without a Tweaks page yet are not held to it.
+require("reshadeSection" in framework,
+        "the shared ReShade section is not defined in the framework")
+require("reshadeSection(" in (ROOT / "games" / "blank" / "editor.html").read_text(encoding="utf-8"),
+        "games/blank does not demonstrate the shared ReShade section")
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not (plugin / "editor.html").is_file():
+        continue
+    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    if 'id:"tweaks"' not in editor and "id: \"tweaks\"" not in editor:
+        continue
+    require("reshadeSection(" in editor,
+            f"{plugin.name} has a Tweaks page but does not offer the shared "
+            "ReShade section")
+
 # Property geometry / labels / metadata.
 # Pin the single definition, not the number. Three separate declarations of
 # this width existed at once and only the last one was live, so edits to the

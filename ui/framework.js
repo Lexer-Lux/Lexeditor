@@ -2057,6 +2057,74 @@
     confirm.focus();
   });
 
+  // One ReShade, managed by Lexeditor; one preset per mod, carried by the mod.
+  // The section is deliberately honest about the three ways this does nothing:
+  // ReShade is not installed, the mod ships no preset, or the manifest names a
+  // preset file that is not there. Each of those used to look identical to a
+  // working setup right up until the game launched unchanged.
+  const reshadeSection = spec => {
+    const data = spec?.snapshot || {};
+    const manifest = data.manifest || {};
+    const presets = data.presets || [];
+    const apply = changes => spec.save?.({...manifest, ...changes});
+    const rows = [];
+    rows.push(detailField({
+      label: "ReShade installed",
+      control: readonlyField(data.reshadeInstalled
+        ? `Yes, loading through ${data.installedRenderer}`
+        : "No. Install ReShade into this game before a preset can do anything."),
+    }));
+    const enable = element("input", {
+      type: "checkbox", checked: manifest.enabled === true,
+      disabled: !presets.length,
+      "aria-label": "Ship a ReShade preset with this mod",
+      onchange: event => apply({enabled: event.target.checked}),
+    });
+    rows.push(detailField({
+      label: "Use a preset", dataType: "BOOL", control: enable,
+      help: infoHelp(presets.length
+        ? "Turns this mod's preset on. The preset file travels with the mod; the ReShade install does not."
+        : "This mod's reshade folder holds no .ini preset yet, so there is nothing to turn on."),
+    }));
+    if (presets.length) {
+      const select = element("select", {
+        disabled: manifest.enabled !== true,
+        "aria-label": "ReShade preset",
+        onchange: event => apply({preset: event.target.value}),
+      });
+      for (const name of presets) {
+        const option = element("option", {value: name}, name);
+        option.selected = name === manifest.preset;
+        select.append(option);
+      }
+      rows.push(detailField({label: "Preset", control: select}));
+    }
+    const repositories = manifest.repositories || [];
+    rows.push(detailField({
+      label: "Needs shaders from",
+      control: readonlyField(repositories.length
+        ? repositories.map(entry =>
+            entry.version ? `${entry.name} ${entry.version}` : entry.name).join(", ")
+        : "No repositories declared."),
+      help: infoHelp("Shader repositories are named here, never copied into the mod: several of them forbid redistribution. Anyone installing this mod by hand installs the repositories named here."),
+    }));
+    rows.push(detailField({
+      label: "Status",
+      control: readonlyField(data.ready
+        ? "Ready. This mod's preset will be applied."
+        : !data.reshadeInstalled ? "ReShade is not installed for this game."
+        : manifest.enabled !== true ? "Turned off for this mod."
+        : !manifest.preset ? "No preset chosen."
+        : !presets.includes(manifest.preset)
+          ? `The manifest names ${manifest.preset}, which is not in the mod's reshade folder.`
+        : "Not ready."),
+    }));
+    rows.push(detailField({
+      label: "Folder", control: readonlyField(data.path || "No mod project selected"),
+    }));
+    return detailSection({title: "RESHADE", body: rows});
+  };
+
   const showAlert = options => {
     const title = String(options?.title || "Lexeditor message");
     const message = String(options?.message || "An important event needs your attention.");
@@ -5992,7 +6060,7 @@ ${row.path}`,
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {element, el: element, confirmAction, pagerToggle, pagerSelect, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {element, el: element, confirmAction, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

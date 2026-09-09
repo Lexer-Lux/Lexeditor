@@ -60,4 +60,22 @@ into a project directory even when the author asks, and say why.
 5. Export: the mod's `reshade/` folder plus a readable note naming the
    repositories a manual installer needs.
 
-Not started. This file records the decision so the format is not invented twice.
+## What is built now
+
+Items 3 and 4 are done. `reshade_projects.py` reads and writes the manifest,
+lists the presets and authored shaders a mod carries, and detects whether a
+ReShade loader is actually installed for the game by looking for its name inside
+the renderer DLL - a game's own `d3d11.dll` is not mistaken for one. The desktop
+host exposes `mod_reshade` and `save_mod_reshade`, and the shared
+`LexeditorUI.reshadeSection()` puts the same section on every game's Tweaks
+page. The shared UI contract now requires it of any plugin that has a Tweaks
+page, so a new game cannot quietly leave it out.
+
+The section is deliberate about the three ways this silently does nothing -
+ReShade not installed, no preset in the mod, or a manifest naming a preset file
+that is not there - because each of those used to be indistinguishable from a
+working setup until the game launched unchanged.
+
+Still to build: installing and removing ReShade itself from inside the editor
+(item 1), the shared repository list with versions (item 2), and the export note
+for someone installing the mod by hand (item 5).

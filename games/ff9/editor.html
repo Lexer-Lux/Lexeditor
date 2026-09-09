@@ -49,7 +49,7 @@
     {id:"characters",label:"Characters"},{id:"enemies",label:"Enemies"},{id:"encounters",label:"Encounters"},{id:"shops",label:"Shops"},{id:"synthesis",label:"Synthesis"},
     {id:"effects",label:"Effects"},{id:"tetra-master",label:"Tetra Master"},{id:"world",label:"World"},{id:"tweaks",label:"Tweaks"}
   ];
-  const state={tab:"items",dashboard:null,dataMap:null,catalog:[],datasets:{},datasetChoice:{},activeSource:"mine",selected:{},query:{},page:{},pageSize:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],busy:false,error:"",runtimeError:"",tweak:"memoria",features:null,savedFeatures:null,deployment:null};
+  const state={tab:"items",reshade:null,dashboard:null,dataMap:null,catalog:[],datasets:{},datasetChoice:{},activeSource:"mine",selected:{},query:{},page:{},pageSize:{},sort:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],busy:false,error:"",runtimeError:"",tweak:"memoria",features:null,savedFeatures:null,deployment:null};
   const prefCache={};
   const catalogRow=key=>state.catalog.find(value=>value.key===key);
   const CHARACTER_NAV_KEYS=["characters","leveling"];
@@ -257,7 +257,14 @@
     const tabs=[{id:"memoria",label:"Memoria"},{id:"improved",label:"Improved Interface"},{id:"eat",label:"Better Eat"},{id:"xp",label:"XP Bars"},{id:"hpmp",label:"HP/MP Bars"},{id:"row",label:"Row Rework"}];
     setToolbar([subtabBar({tabs,active:state.tweak,label:"Tweaks",change:id=>{state.tweak=id;tweaks()}})]);
     if(state.tweak==="memoria"){
-      $("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},"Memoria"),el("p",{},"can't be bothered to make this when the memoria guys already did this themselves. just hit play and you can edit the settings in the launcher that comes up")));
+      $("#main").replaceChildren(detailPanel({className:"ff9-detail ff9-tweaks",
+        title:"Memoria",meta:"Handled by the Memoria launcher",body:[
+          detailSection({title:"WHERE THESE SETTINGS LIVE",body:[
+            detailField({label:"EDITOR",control:readonlyField("Memoria's own launcher. Lexeditor does not duplicate it.")}),
+            detailField({label:"HOW",control:readonlyField("Press Play. The Memoria launcher opens and its settings are edited there.")}),
+          ]}),
+          LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade}),
+        ]}));
       return;
     }
     const defs={
@@ -273,8 +280,33 @@
     const actions=el("div",{class:"ff9-runtime-actions"},
       el("button",{type:"button",disabled:state.busy||dirtyCount()>0||state.activeSource!=="mine",onclick:()=>deploymentAction("deploy")},deployed?"Redeploy Project":"Deploy Project"),
       el("button",{type:"button",disabled:state.busy||!deployed||state.activeSource!=="mine",onclick:()=>deploymentAction("revert")},"Revert Lexeditor Mod"));
-    $("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},title),el("p",{},description),toggle,
-      el("p",{class:"ff9-source"},deployed?(state.deployment.runtimeCurrent?"Deployed runtime is current.":"Deployed runtime needs redeployment."):"Save changes, then Deploy Project to activate them in Memoria."),actions));
+    // The bespoke card is gone: Tweaks is the shared settings page every game
+    // uses, so the switch, the deployment state and the ReShade section all
+    // read the same here as anywhere else.
+    $("#main").replaceChildren(detailPanel({className:"ff9-detail ff9-tweaks",title,
+      identity:enabled?"ON":"OFF",meta:"Memoria runtime tweaks",body:[
+        detailSection({title:"TWEAK",body:[
+          detailField({label:"WHAT IT DOES",control:readonlyField(description)}),
+          detailField({label:"ENABLED",dataType:"BOOL",control:toggle.querySelector("input")}),
+        ]}),
+        detailSection({title:"DEPLOYMENT",body:[
+          detailField({label:"STATE",control:readonlyField(deployed
+            ?(state.deployment.runtimeCurrent?"Deployed runtime is current."
+              :"Deployed runtime needs redeployment.")
+            :"Save changes, then Deploy Project to activate them in Memoria.")}),
+          detailField({label:"ACTIONS",control:actions}),
+        ]}),
+        LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade}),
+      ]}));
+  }
+  async function loadReshade(){
+    try{const value=await LexeditorUI.callWindow?.("mod_reshade","ff9");if(value)state.reshade=value}
+    catch(_error){/* browser preview has no desktop host; the section still renders */}
+  }
+  async function saveReshade(manifest){
+    try{const value=await LexeditorUI.callWindow?.("save_mod_reshade","ff9",manifest);if(value)state.reshade=value}
+    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
+    tweaks();
   }
   async function deploymentAction(action){
     if(state.busy||state.activeSource!=="mine")return;
@@ -287,7 +319,7 @@
   }
   function planned(){const label=tabs.find(tab=>tab.id===state.tab)?.label||"FF9 data";$("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},label),el("p",{},"The installed vanilla source for this area remains inside p0data asset containers. No safe editable CSV source is present."),el("span",{class:"ff9-warning"},"FORMAT NOT INTEGRATED")))}
   function dataMap(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,open:row=>{if(row.target){if(row.datasetKey)state.datasetChoice[row.target]=row.datasetKey;navigate(row.target)}},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;dataMap()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;dataMap()},changePage:page=>{state.mapPage=page;dataMap()},changeSort:key=>{const [active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];dataMap()}});state.mapPage=view.page;setToolbar(view.controls);$("#main").replaceChildren(view.content);shell.refresh()}
-  async function render(){if(!state.dashboard)return;if(state.tab==="info"){setToolbar();info()}else if(state.tab==="datamap")dataMap();else if(state.tab==="tweaks")tweaks();else if(state.activeSource!=="mine"){setToolbar();planned()}else{toolbar();const key=activeKey();if(!key)planned();else if(state.tab==="characters"&&key==="characters")await renderCharacterComposite();else if(["weapons","armor","accessories"].includes(state.tab))await renderEquipmentComposite(state.tab);else renderDataset(await loadDataset(key),key)}shell.refresh()}
+  async function render(){if(!state.dashboard)return;if(state.tab==="info"){setToolbar();info()}else if(state.tab==="datamap")dataMap();else if(state.tab==="tweaks"){if(!state.reshade)await loadReshade();tweaks()}else if(state.activeSource!=="mine"){setToolbar();planned()}else{toolbar();const key=activeKey();if(!key)planned();else if(state.tab==="characters"&&key==="characters")await renderCharacterComposite();else if(["weapons","armor","accessories"].includes(state.tab))await renderEquipmentComposite(state.tab);else renderDataset(await loadDataset(key),key)}shell.refresh()}
   function navigate(tab){state.tab=tab;render();if(tab==="info"&&!state.busy)refreshRuntime().then(()=>{if(state.tab===tab)render()}).catch(error=>{state.runtimeError=error.message;if(state.tab==="info")render()})}
   async function save(){if(state.busy)return;state.busy=true;shell.refresh();try{for(const [key,data] of Object.entries(state.datasets)){if(!data?.rows)continue;const changes=data.rows.map(row=>({line:row.line,scene:row.scene,record:row.record,values:changedFields(data,row)})).filter(change=>Object.keys(change.values).length);if(changes.length)installData(await api("/api/save",{key,sha256:data.sha256,sceneHashes:data.sceneHashes||{},changes}))}if(Object.keys(featureChanges()).length){state.features=await api("/api/features/save",{sha256:state.savedFeatures.sha256,features:state.features.features});state.savedFeatures=clone(state.features)}state.error=""}catch(error){state.error=error.message;throw error}finally{state.busy=false;render()}}
   async function discard(){for(const key of Object.keys(state.datasets))await loadDataset(key,true);state.features=await api("/api/features");state.savedFeatures=clone(state.features);state.deployment=await api("/api/deployment");render()}

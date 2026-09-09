@@ -202,7 +202,22 @@
                 help:`Blank sample flag: ${label}.`,
                 change:value=>{tweaks.flags[key]=value;refreshShell()}}))})}),
         ]}),
+        // Every game's Tweaks page offers the same ReShade section. Lexeditor
+        // keeps one ReShade; the mod carries only its preset and any shaders
+        // its author wrote, so the mod stays installable by hand.
+        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade}),
       ]});
+  }
+  let reshade={manifest:{enabled:false,preset:"",repositories:[]},presets:[],shaders:[],
+    reshadeInstalled:false,installedRenderer:"",path:"",hasFolder:false,ready:false};
+  async function loadReshade(){
+    try{reshade=await LexeditorUI.callWindow?.("mod_reshade","blank")||reshade}
+    catch(_error){/* the browser preview has no desktop host; the section still renders */}
+  }
+  async function saveReshade(manifest){
+    try{reshade=await LexeditorUI.callWindow?.("save_mod_reshade","blank",manifest)||reshade}
+    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
+    render();
   }
 
   function graphsPanel(){
@@ -259,6 +274,7 @@
     dialog.append(el("button",{type:"button",onclick:()=>close({cancelled:true})},"Cancel"));
     document.body.append(dialog);dialog.showModal();
   });
+  void loadReshade().then(()=>render());
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"one",label:"1 Panel"},{id:"two",label:"2 Panels"},{id:"three",label:"3 Panels"},{id:"subtabs",label:"Tabbed Panel"},{id:"tweaks",label:"Tweaks"},{id:"graphs",label:"Graphs"}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{await saveSample();saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot,projectCreatePrompt:{createLabel:"Create Sample",description:"Save a Blank sample project on this computer."},createProject:createSample,browseProject:browseSamples,projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
   async function restoreSample(){
     try{

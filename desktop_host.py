@@ -1018,6 +1018,26 @@ class HostApi:
         return {**self._restart_for_project(plugin_id, project),
                 "contents": self._projects.contents(plugin_id, str(Path(selected) / name))}
 
+    def mod_reshade(self, plugin_id: str) -> dict:
+        """Report the ReShade preset the current mod ships, if it ships one."""
+        import reshade_projects
+
+        snapshot = self._projects.snapshot(plugin_id)
+        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
+        return reshade_projects.snapshot(
+            Path(snapshot["current"]), Path(game_root) if game_root else None)
+
+    def save_mod_reshade(self, plugin_id: str, manifest: dict) -> dict:
+        """Write the mod's ReShade manifest and report the new state."""
+        import reshade_projects
+
+        snapshot = self._projects.snapshot(plugin_id)
+        root = Path(snapshot["current"])
+        reshade_projects.write_manifest(root, manifest or {})
+        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
+        return reshade_projects.snapshot(
+            root, Path(game_root) if game_root else None)
+
     def mod_project_contents(self, plugin_id: str, path: str = "") -> dict:
         """Report what this game's loader recognises inside one mod folder."""
         return self._projects.contents(plugin_id, path)
