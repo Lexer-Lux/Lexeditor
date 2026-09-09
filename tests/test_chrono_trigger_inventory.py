@@ -8,9 +8,15 @@ from games.chrono_trigger.inventory import inventory_archive
 
 
 class IndexOnlyArchive:
-    def __init__(self, paths: list[str]):
+    def __init__(self, paths: list[str] | list[tuple[str, int]]):
         self.path = Path("resources.bin")
-        self.entries = [SimpleNamespace(path=path) for path in paths]
+        self.entries = []
+        for value in paths:
+            if isinstance(value, tuple):
+                path, stored_size = value
+                self.entries.append(SimpleNamespace(path=path, stored_size=stored_size))
+            else:
+                self.entries.append(SimpleNamespace(path=value))
 
     def read(self, _path: str):
         raise AssertionError("inventory must not decompress resource payloads")
@@ -33,8 +39,12 @@ class InventoryTests(unittest.TestCase):
         enemy = payload["candidates"]["enemy"]
         self.assertEqual(enemy["samples"][0]["path"], "Game/battle/enemy/Enemy_0001.dat")
         self.assertGreaterEqual(enemy["samples"][0]["score"], 4)
+        self.assertEqual(enemy["directoryClusters"][0], {"path": "Game/battle/enemy", "count": 1})
+        self.assertEqual(enemy["extensionClusters"][0], {"extension": ".dat", "count": 1})
+        self.assertEqual(enemy["storedSizeClusters"], [])
         self.assertGreaterEqual(payload["candidates"]["item"]["matchCount"], 2)
         self.assertIn("ARC1-index-only", payload["method"])
+        self.assertIn("stored sizes", payload["method"])
 
     def test_sample_limit_is_bounded_without_changing_match_count(self):
         archive = IndexOnlyArchive([f"Game/enemy/Enemy_{index:04d}.dat" for index in range(10)])
@@ -42,6 +52,39 @@ class InventoryTests(unittest.TestCase):
         family = payload["candidates"]["enemy"]
         self.assertEqual(family["matchCount"], 10)
         self.assertEqual(len(family["samples"]), 2)
+        self.assertEqual(family["directoryClusters"], [{"path": "Game/enemy", "count": 10}])
+
+    def test_stored_size_clusters_use_index_metadata_without_reading_payloads(self):
+        archive = IndexOnlyArchive([
+            ("Game/enemy/Enemy_0001.dat", 64),
+            ("Game/enemy/Enemy_0002.dat", 64),
+            ("Game/enemy/Enemy_0003.dat", 80),
+            ("Game/boss/Boss_0001.dat", 80),
+            ("Game/common/not_related.dat", 64),
+        ])
+        payload = inventory_archive(archive, sample_limit=10)
+        enemy = payload["candidates"]["enemy"]
+        self.assertEqual(enemy["matchCount"], 4)
+        self.assertEqual(enemy["storedSizeClusters"], [
+            {"storedSize": 64, "count": 2},
+            {"storedSize": 80, "count": 2},
+        ])
+        self.assertEqual(enemy["samples"][0]["storedSize"], 80)
+        self.assertEqual(enemy["directoryClusters"][0], {"path": "Game/enemy", "count": 3})
+
+    def test_cluster_order_is_deterministic_on_ties(self):
+        archive = IndexOnlyArchive([
+            ("Game/z_enemy/Enemy_0001.dat", 20),
+            ("Game/a_enemy/Enemy_0002.bin", 10),
+        ])
+        family = inventory_archive(archive)["candidates"]["enemy"]
+        self.assertEqual([row["path"] for row in family["directoryClusters"]], [
+            "Game/a_enemy", "Game/z_enemy",
+        ])
+        self.assertEqual(family["storedSizeClusters"], [
+            {"storedSize": 10, "count": 1},
+            {"storedSize": 20, "count": 1},
+        ])
 
 
 if __name__ == "__main__":
