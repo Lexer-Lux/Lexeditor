@@ -60,6 +60,11 @@ jobs:
           && python tools/generate_credits.py --check
           && python plugin_metadata.py
       - name: FFX-X2 regressions
-        run: python -m pytest -q tests/test_ffx_x2_vbf.py tests/test_ffx_x2_deployment.py
+        run: >-
+          python -m pytest -q
+          tests/test_ffx_x2_vbf.py
+          tests/test_ffx_x2_deployment.py
+          tests/test_ffx_x2_treasures.py
+          tests/test_ffx_x2_item_shops.py
       - name: Managed service smoke
         run: python -c "from games.ffx_x2.plugin import smoke; [print('PASS:', line) for line in smoke()]"
