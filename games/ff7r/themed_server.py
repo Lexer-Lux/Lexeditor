@@ -10,18 +10,21 @@ from .theme import theme_asset_file, theme_payload
 
 
 _FRAMEWORK_CSS = '  <link rel="stylesheet" href="/shared/framework.css">'
-_FRAMEWORK_JS = '  <script src="/shared/framework.js"></script>'
 _THEME_CSS = '  <link rel="stylesheet" href="/theme/ff7r.css">'
 _THEME_JS = '  <script src="/theme/ff7r.js"></script>'
+_BODY_CLOSE = "</body>"
 
 
 def themed_editor_html() -> str:
     """Inject FF7R-only theme resources without forking the editor document."""
     source = (base.PLUGIN_ROOT / "editor.html").read_text(encoding="utf-8")
-    if source.count(_FRAMEWORK_CSS) != 1 or source.count(_FRAMEWORK_JS) != 1:
+    if source.count(_FRAMEWORK_CSS) != 1 or source.count(_BODY_CLOSE) != 1:
         raise RuntimeError("FF7R editor theme anchors drifted; refusing ambiguous HTML injection")
     source = source.replace(_FRAMEWORK_CSS, _FRAMEWORK_CSS + "\n" + _THEME_CSS, 1)
-    source = source.replace(_FRAMEWORK_JS, _FRAMEWORK_JS + "\n" + _THEME_JS, 1)
+    # The shared shell's mount call applies the legacy plugin accent. Run the
+    # theme bootstrap after the editor script so the FF7R theme owns the final
+    # palette instead of being partially overwritten during mountShell().
+    source = source.replace(_BODY_CLOSE, _THEME_JS + "\n" + _BODY_CLOSE, 1)
     return source
 
 
