@@ -104,7 +104,10 @@
     return hoverable({targetType:"warband-troop",targetId:troopId,targetLabel:label,label,activate:()=>openTroop(troopId)});
   }
 
-  function itemColumns(){return [{key:"name",label:"Name",render:row=>el("span",{class:"warband-cell-text",title:row.name},row.name)},{key:"id",label:"ID"},{key:"type",label:"Type"},{key:"inventoryMesh",label:"Inventory mesh"}];}
+  // Undeclared columns size to their longest value, and Warband's ids and mesh
+  // names are long enough to push the table past its panel and cut the last
+  // column in half. Bounded widths let the long ones ellipsise instead.
+  function itemColumns(){return [{key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>el("span",{class:"warband-cell-text",title:row.name},row.name)},{key:"id",label:"ID",width:"minmax(6em,.8fr)"},{key:"type",label:"Type",width:"minmax(6em,.7fr)"},{key:"inventoryMesh",label:"Inventory mesh",width:"minmax(7em,1fr)"}];}
   function renderItems(){
     const view="items",columns=itemColumns(),query=state.filters.items||"";
     const filtered=sorted(search(state.items.rows,query,["name","id","type","inventoryMesh"]),view);

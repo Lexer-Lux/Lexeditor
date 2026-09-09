@@ -927,8 +927,12 @@
       "data-lex-property": options.property
         || pin?.getAttribute?.("data-lex-pin-column") || null,
       "data-lex-readonly": String(readOnly),
+      // The property name is wrapped so it is a real flex item. Left as a bare
+      // text node it was an anonymous item the leader arrow could shrink to
+      // nothing, which wrapped "CAN SELL" one letter per line and drove the
+      // label fitter down to its six-pixel floor.
     }, element("div", {class: "lex-detail-field-label"},
-      options.label, arrow),
+      element("span", {class: "lex-detail-field-label-text"}, options.label), arrow),
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null), typeRail);
     // The rail runs down the side of one row, so its type name has to fit that
@@ -4092,7 +4096,13 @@ ${row.path}`,
     return columns.map((column, index) => {
       if (column.width) return column.width;
       const grow = Number(column.grow) || (!declaredGrow && index === automaticGrow ? 1 : 0);
-      return grow > 0 ? `minmax(0, ${grow}fr)` : "max-content";
+      if (grow > 0) return `minmax(0, ${grow}fr)`;
+      // A max-content track is still squeezed when the wider columns beside it
+      // want the space, and a squeezed number is not a shortened number - it is
+      // a different one. "5,000" cut to "5,00" reads as five hundred. Text may
+      // truncate; a numeric column is floored at its own content and never
+      // does.
+      return column.numeric === true ? "minmax(min-content, max-content)" : "max-content";
     }).join(" ");
   };
 
@@ -4518,6 +4528,7 @@ ${row.path}`,
             column.edit ? "lex-cell-editable" : "",
             column.key === pointerColumn ? "lex-column-pointer-cell" : "",
             isNumbered ? "lex-numbered-id-cell" : "",
+            column.numeric === true ? "lex-numeric-cell" : "",
             alignmentClass(column),
             typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || ""].filter(Boolean).join(" "),
           role: "cell",

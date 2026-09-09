@@ -26,10 +26,18 @@ ECONOMY_EDIT_FIELDS = {
     "maxCount": "MaxCount",
 }
 LOOT_TABLE_NAME = "battleitempossession"
+# BattleItemPossession names the steal array "Quantity", and it is not one.
+# Measured across every populated steal slot in the installed vanilla table
+# (97 slots), the only values that occur are 5, 10, 12, 15, 25 and 100 - the
+# shape of a success rate, not of an item count, and no enemy in FF7R yields a
+# hundred of anything. The table also carries StealFaildCountArrayIndex, which
+# only means something alongside a steal that can fail. So the array is the
+# steal chance, and Lexeditor presents it as the percent it is rather than
+# repeating Square's field name back at the player as "x25 Bladed Staff".
 LOOT_FIELD_PAIRS = (
     ("normal", "NormalItemName_Array", "NormalItemPercent_Array", None),
     ("rare", "RareItemName_Array", "RareItemPercent_Array", None),
-    ("steal", "StealItemName_Array", None, "StealItemQuantity_Array"),
+    ("steal", "StealItemName_Array", "StealItemQuantity_Array", None),
 )
 NAME_PROPERTY_HINTS = (
     "ItemNameLabel", "NameLabel", "ItemName", "Name", "DisplayName",
@@ -40,7 +48,12 @@ NAME_PROPERTY_HINTS = (
 # the editor showed prices for equipment whose in-game description it never
 # read. As with the name hints, these are candidates: a name absent from the
 # installed table is simply skipped.
+# Verified against the installed FF7R Equipment, Item and Materia tables:
+# Equipment and Materia use DetailLabel, Item uses ItemDetailLabel, and the
+# value is a text id like "$Item_M_MAG_001_help". The other names are kept as
+# fallbacks for tables this build has not been checked against.
 DESCRIPTION_PROPERTY_HINTS = (
+    "ItemDetailLabel", "DetailLabel",
     "ItemHelpLabel", "HelpLabel", "ItemExplanationLabel", "ExplanationLabel",
     "DescriptionLabel", "ItemDescriptionLabel", "Description", "CaptionLabel",
     "MateriaHelpLabel", "EquipmentHelpLabel",

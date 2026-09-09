@@ -25,7 +25,7 @@
     .ff7r-subtext{min-height:72px}
     .ff7r-resolved{display:flex;flex-direction:column;gap:2px;min-width:0}
     .ff7r-resolved small{color:var(--lex-muted);overflow-wrap:anywhere}
-    .ff7r-actions{display:flex;flex-wrap:wrap;gap:8px}.ff7r-actions button{padding:7px 12px}
+    .ff7r-actions{display:flex;flex-wrap:wrap;gap:8px}.ff7r-actions button{padding:7px 12px}.ff7r-description{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0}.ff7r-description-text{min-width:0;overflow-wrap:anywhere}.ff7r-description-edit{padding:4px 10px;white-space:nowrap}
     .ff7r-message{white-space:pre-wrap;overflow-wrap:anywhere}.ff7r-error{color:var(--lex-danger,#b42318)}
     @media(max-width:700px){.ff7r-loot-slot{grid-template-columns:1fr}}
   </style>
@@ -40,7 +40,7 @@
   const $=selector=>document.querySelector(selector);
   async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
-  const state={modOnly:false,
+  const state={modOnly:false,curatedQuery:"",curatedSort:{key:"id",dir:1},
     tab:"data",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
     asset:"",data:null,dataBaseline:null,selected:0,query:"",sort:{key:"tag",dir:1},
     economy:null,economyKey:"",economyError:"",economyTable:"",economyQuery:"",economySort:{key:"name",dir:1},
@@ -50,7 +50,10 @@
   };
   const dataColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
   const economyColumns=[{key:"tag",label:"ID",sortable:true,width:"minmax(10em,.8fr)"},{key:"name",label:"Item",sortable:true,width:"minmax(14em,1.2fr)"},{key:"buy",label:"Buy",numeric:true,sortable:true},{key:"sale",label:"Sell",numeric:true,sortable:true},{key:"maxCount",label:"Carry Cap",numeric:true,sortable:true}];
-  const lootColumns=[{key:"tag",label:"Enemy / Battle ID",sortable:true,width:"minmax(12em,.9fr)"},{key:"normal",label:"Normal",sortable:true,width:"minmax(14em,1fr)"},{key:"rare",label:"Rare",sortable:true,width:"minmax(14em,1fr)"},{key:"steal",label:"Steal",sortable:true,width:"minmax(14em,1fr)"}];
+  // Four columns at fourteen ems each did not fit the list panel, so the Steal
+  // column was cut in half by the panel edge. The minimums are sized so all
+  // four fit the default split; the cells ellipsise if a value is longer.
+  const lootColumns=[{key:"tag",label:"Enemy / Battle ID",sortable:true,width:"minmax(9em,.9fr)"},{key:"normal",label:"Normal",sortable:true,width:"minmax(8em,1fr)"},{key:"rare",label:"Rare",sortable:true,width:"minmax(8em,1fr)"},{key:"steal",label:"Steal",sortable:true,width:"minmax(8em,1fr)"}];
   const textColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
   const dataPrefs=columnPreferences("ff7r-records",dataColumns,()=>render());
   const economyPrefs=columnPreferences("ff7r-economy",economyColumns,()=>render());
@@ -192,6 +195,23 @@
   // is stored as a byte but only ever means yes or no, so it is presented as a
   // switch and written back as 0 or 1. Add a field here when the schema type is
   // wider than the meaning.
+  // The generic Misc tab can open any DataObject, but "open the table called
+  // PlayerParameter" is not an answer to "where do I edit character stats".
+  // These are the tables worth their own tab, with the columns that make the
+  // list readable at a glance; everything else stays one click away in Misc.
+  // Property names are the installed game's own, including Square's spelling
+  // of Spilit for Spirit.
+  const CURATED_TABLES=[
+    {id:"characters",label:"Characters",basename:"playerparameter",
+     noun:"stat rows",columns:["HPMax","MPMax","Strength","Magic","Vitality","Spilit"]},
+    {id:"enemies",label:"Enemies",basename:"enemyparameter",
+     noun:"enemies",columns:["HPMax","BPMax","Strength","Magic","Vitality","Spilit"]},
+    {id:"abilities",label:"Abilities",basename:"battleability",
+     noun:"abilities",columns:["ATB"]},
+  ];
+  const curatedSpec=tab=>CURATED_TABLES.find(entry=>entry.id===tab)||null;
+  const curatedAsset=spec=>assets().find(item=>
+    String(item.asset||"").split("/").pop().toLowerCase().replace(/\.uasset$/,"")===spec.basename)||null;
   const SEMANTIC_TYPES={CanSale:"BOOL"};
   // The storage type is a signed 32-bit integer, so the schema's honest range is
   // plus or minus two billion. A price is not, and a slider handed that range
@@ -318,6 +338,55 @@
       detail:spec.detail,
     });
   }
+  function curatedColumns(spec){
+    const present=(state.data?.properties||[]).filter(prop=>spec.columns.includes(prop.name));
+    return [{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},
+      {key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"},
+      ...present.map(prop=>({key:`p:${prop.name}`,label:prop.label||prop.name,
+        numeric:true,sortable:true}))];
+  }
+  function curatedRows(spec){
+    const q=String(state.curatedQuery||"").toLocaleLowerCase();
+    const present=(state.data?.properties||[]).filter(prop=>spec.columns.includes(prop.name));
+    const rows=records().map(record=>{
+      const row={record,id:record.id,tag:record.tag};
+      for(const prop of present)row[`p:${prop.name}`]=record.values[prop.name];
+      return row;
+    });
+    const filtered=q?rows.filter(row=>`${row.id} ${row.tag}`.toLocaleLowerCase().includes(q)):rows;
+    const key=state.curatedSort.key,dir=state.curatedSort.dir;
+    return filtered.sort((a,b)=>compareValues(a[key],b[key])*dir);
+  }
+  function curatedPanel(spec){
+    if(state.busy)return loadingPanel(spec.label,`Reading ${spec.basename}…`);
+    if(state.error&&!state.data)return errorPanel(state.error);
+    if(!curatedAsset(spec))return loadingPanel(spec.label,
+      `The installed FF7R archives do not contain a ${spec.basename} table.`);
+    if(!state.data)return loadingPanel(spec.label,"Open this tab to read the table.");
+    return el("div",{class:"ff7r-view"},pagedTable({id:spec.id,noun:spec.noun,
+      filters:[modOnlyFilter()],
+      rows:applyModOnly(curatedRows(spec),row=>row.record),key:row=>row.record.id,
+      selected:state.selected,setSelected:row=>{state.selected=row.record.id},
+      query:state.curatedQuery,setQuery:value=>{state.curatedQuery=value},
+      searchLabel:`Search ${spec.label}`,searchPlaceholder:"Search record names and IDs",
+      sortState:state.curatedSort,
+      sort:key=>{state.curatedSort=state.curatedSort.key===key
+        ?{key,dir:-state.curatedSort.dir}:{key,dir:1};render()},
+      prefs:curatedPrefs(spec),columns:curatedColumns(spec),
+      ariaLabel:`FF7 Remake ${spec.label}`,
+      split:52,minLeft:380,minRight:400,detail:()=>recordPanel()}));
+  }
+  const curatedPrefsCache={};
+  function curatedPrefs(spec){
+    const columns=curatedColumns(spec);
+    const signature=columns.map(column=>column.key).join("|");
+    const cached=curatedPrefsCache[spec.id];
+    if(!cached||cached.signature!==signature){
+      curatedPrefsCache[spec.id]={signature,
+        prefs:columnPreferences(`ff7r-${spec.id}`,columns,()=>render())};
+    }
+    return curatedPrefsCache[spec.id].prefs;
+  }
   function pagedDataPanel(){
     const rows=applyModOnly(sortedRows());
     return LexeditorUI.pagedListDetail({
@@ -361,9 +430,32 @@
     // shown here and edited on the Text tab rather than duplicated as a second
     // editable copy that could disagree with the resource.
     if(semantic?.descriptionId)fields.push(detailField({label:"DESCRIPTION",
-      control:readonlyField(semantic.description||"(this language has no text for "+semantic.descriptionId+")"),
-      help:infoHelp("Item descriptions live in the FF7R text resource. Edit the wording on the Text tab; this shows the "+(state.textLanguage||"US")+" entry for "+semantic.descriptionId+".")}));
+      control:descriptionControl(semantic),
+      help:infoHelp("An item's description is one entry in the FF7R text resource, the same place its name comes from. Editing it here would create a second copy that could disagree with the resource, so this opens the Text tab on that entry instead - where the edit is saved into the resource itself, in every language you choose.")}));
     return detailPanel({className:"ff7r-detail",title:semantic?.name||row.tag,identity:recordId(row.id),meta:table.name||"Item settings",body:[detailSection({title:"ITEM SETTINGS",body:fields})]});
+  }
+  // The description is text-resource content, so it is edited on the Text tab.
+  // Showing it read-only and saying nothing was the reason "how come i can't
+  // edit them" was a fair question; this shows it and takes you to the edit.
+  function descriptionControl(semantic){
+    const shown=semantic.description
+      || `(${state.textLanguage||"US"} has no text for ${semantic.descriptionId})`;
+    return el("div",{class:"ff7r-description"},
+      el("div",{class:"ff7r-description-text"},shown),
+      el("button",{type:"button",class:"ff7r-description-edit",
+        title:`Open ${semantic.descriptionId} on the Text tab`,
+        onclick:()=>editDescription(semantic.descriptionId)},"Edit text…"));
+  }
+  async function editDescription(textId){
+    state.textQuery=String(textId||"");
+    state.pages.text=0;
+    await navigate("text");
+    // The entry is in whichever resource holds this language's item text. If
+    // the loaded one does not have it, the search box still says what to look
+    // for rather than leaving the player guessing.
+    const match=(state.textData?.records||[]).find(row=>row.key===textId);
+    if(match)state.textSelected=match.id;
+    render();
   }
   function economyPanel(){if(state.busy&&state.tab==="economy")return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return loadingPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return loadingPanel("Item settings","Open this tab to discover installed FF7R item tables.");if(state.data?.asset!==table.asset)return loadingPanel("Loading item table","Reading the selected item DataObject…");return el("div",{class:"ff7r-view"},economyToolbar(),pagedTable({id:"economy",noun:"items",
       filters:[modOnlyFilter()],
@@ -406,7 +498,7 @@
       searchLabel:"Search FF7 Remake enemy loot",searchPlaceholder:"Search enemies, battle IDs, items, and chances",
       sortState:state.lootSort,sort:key=>{state.lootSort=state.lootSort.key===key?{key,dir:-state.lootSort.dir}:{key,dir:1};render()},
       prefs:lootPrefs,columns:lootColumns,ariaLabel:"FF7 Remake enemy drops and steals",
-      split:48,minLeft:420,minRight:440,detail:()=>lootRecordPanel()}))}
+      split:56,minLeft:420,minRight:400,detail:()=>lootRecordPanel()}))}
 
   function languages(){return [...new Set(textAssets().map(row=>row.language).filter(Boolean))].sort()}
   function textAssetsForLanguage(){return textAssets().filter(row=>row.language===state.textLanguage)}
@@ -473,8 +565,16 @@
         removal:"Delete Lexeditor-FF7R_P.pak from ~mods. The game returns to stock immediately; your project keeps the edits.",
       })]})}
 
-  function render(){let content;if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="tweaks")content=tweaksPanel();else if(state.tab==="info")content=infoPanel();else if(state.tab==="text")content=textPanel();else if(state.tab==="economy")content=economyPanel();else if(state.tab==="loot")content=lootPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
+  function render(){let content;const curated=curatedSpec(state.tab);if(curated)content=curatedPanel(curated);else if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="tweaks")content=tweaksPanel();else if(state.tab==="info")content=infoPanel();else if(state.tab==="text")content=textPanel();else if(state.tab==="economy")content=economyPanel();else if(state.tab==="loot")content=lootPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
   async function navigate(tab){const previous=state.tab;state.tab=tab;render();if(tab==="text"&&state.textAsset&&!state.textData)await loadTextAsset(state.textAsset);else if(tab==="economy"){if(!await loadEconomy()){state.tab=previous;render()}}else if(tab==="loot"){if(!await loadLoot()){state.tab=previous;render()}}
+    else if(curatedSpec(tab)){
+      const spec=curatedSpec(tab);
+      const item=curatedAsset(spec);
+      if(item&&(state.asset!==item.asset||!state.data)){
+        state.asset=item.asset;await loadAsset(item.asset);
+      }
+      state.pages[tab]=0;render();
+    }
     else if(tab==="data"||tab==="tweaks"){
       // Opening these tabs loaded nothing, so the table sat empty behind the
       // picker until the user changed the dropdown by hand.
@@ -498,7 +598,7 @@
   const editHistory=new EditHistory({capture:()=>({data:state.data?clone(state.data.records):null,text:state.textData?clone(state.textData.records):null}),restore:snapshot=>{if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);if(state.textData&&snapshot?.text)state.textData.records=clone(snapshot.text)},render:async()=>render(),enabled:()=>state.activeSource==="mine"&&["data","economy","loot","text"].includes(state.tab),changed:()=>refreshShell()});
 
   async function selectProjectSource(value){if(dirtyCount()&&!window.confirm("Discard all unsaved FF7R changes and switch source?"))return;state.activeSource=String(value||"mine");state.economyKey="";state.lootKey="";if(state.data)await loadAsset(state.asset);if(state.textData)await loadTextAsset(state.textAsset);if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot()}
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"economy",label:"Items"},{id:"loot",label:"Enemy Loot"},{id:"data",label:"Misc"},{id:"tweaks",label:"Tweaks"},{id:"text",label:"Text"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK resources"}],projectActiveSource:()=>state.activeSource,selectProjectSource,info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"economy",label:"Items"},{id:"characters",label:"Characters"},{id:"abilities",label:"Abilities"},{id:"enemies",label:"Enemies"},{id:"loot",label:"Enemy Loot"},{id:"data",label:"Misc"},{id:"tweaks",label:"Tweaks"},{id:"text",label:"Text"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK resources"}],projectActiveSource:()=>state.activeSource,selectProjectSource,info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
   editHistory.observe(document);
 
   (async()=>{try{

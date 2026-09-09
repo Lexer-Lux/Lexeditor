@@ -1189,22 +1189,40 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 
 .lex-detail-field.lex-boolean-field {
   grid-template-columns:minmax(0,1fr) auto;
+  /* A checkbox is shorter than a text box, so a boolean row collapsed to the
+     checkbox's height and the label fitter then shrank "CAN SELL" to a few
+     pixels to fit it. Booleans keep the same row height as every other
+     property, measured in ems so it follows the type. */
+  min-height:2.4em;
 }
 /* The arrow has to reach the box it points at, so the two insets between the
    label column and the checkbox are removed for boolean rows only. */
 .lex-boolean-field > .lex-detail-field-label { padding-right:0; }
-.lex-boolean-field > .lex-detail-field-control { padding-left:0; }
+/* The leader arrow ends where this box begins, so any left padding here is a
+   gap the arrow cannot cross. A plugin stylesheet that pads all its field
+   controls must not reopen it, which is why this one insists. */
+.lex-boolean-field > .lex-detail-field-control { padding-left:0 !important; }
 .lex-boolean-field .lex-detail-field-label { min-width:0; }
+/* The name takes the width it needs; the arrow spans whatever is left. */
+.lex-detail-field-label-text { flex:0 1 auto;min-width:0; }
+.lex-boolean-field > .lex-detail-field-label > .lex-detail-field-label-text {
+  flex:0 0 auto;
+}
+
 .lex-field-boolean-arrow {
   position:relative;
   /* The arrow is a leader line: it has to span whatever gap the row leaves
      between the property name and the checkbox it points at. Capped at 48px it
      stopped in mid-air on any row wider than that, pointing at nothing. */
-  flex:1 1 auto;
+  flex:1 1 0;
   min-width:12px;
   height:1px;
   margin-left:4px;
-  margin-right:-6px;
+  /* No negative margin. Overhanging the label box made the label report seven
+     pixels of overflow at every font size, so the label fitter shrank every
+     boolean property name to its six-pixel floor trying to fix an overflow the
+     font was not causing. The arrow reaches the checkbox by the control column
+     no longer reserving slack instead. */
   background:color-mix(in srgb,var(--lex-border) 72%,transparent);
 }
 .lex-field-boolean-arrow::after {
@@ -1256,9 +1274,11 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   display:flex;
   flex:0 0 auto;
   min-width:0;
-  /* Buttons keep their content width, so a larger font or a longer label
-     scrolls the bar instead of truncating every tab. */
-  overflow-x:auto;
+  /* Buttons keep their content width. Where they no longer fit on one line the
+     bar wraps onto a second, the way the main nav does - scrolling hid whole
+     tabs behind an edge and cut the label of the one straddling it. */
+  flex-wrap:wrap;
+  overflow-x:visible;
   border-bottom:1px solid var(--lex-border);
   background:var(--lex-panel-2);
 }
@@ -2462,6 +2482,13 @@ body.lex-panel-layout-dragging * {
 .lex-column-pointer-cell > .lex-column-cell-content {
   overflow:visible;
 }
+
+/* A number is never abbreviated. The grid track is floored at the cell's own
+   content, so a busy table steals width from the label columns instead of
+   turning 5,000 into 5,00. */
+.lex-numeric-cell { min-width:max-content; }
+.lex-numeric-cell > .lex-column-cell-content { min-width:max-content;overflow:visible; }
+.lex-numeric-cell > .lex-column-cell-content > * { overflow:visible;text-overflow:clip; }
 
 .lex-column-cell-text {
   display:block;

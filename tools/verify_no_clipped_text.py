@@ -23,6 +23,39 @@ sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
+
+
+def use_installed_games() -> list[str]:
+    """Point every plugin at the game the user actually added, when there is one.
+
+    Without this the sweep only ever saw plugins with no data, so every tab
+    that needs the installed game rendered an "unavailable" panel and every
+    defect in the real tables - a clipped Sell column, a header rectangle, a
+    crushed boolean label - went unseen while the sweep reported zero. The
+    roots come from Lexeditor's own saved installations, so this checks what
+    the user has, and quietly does nothing on a machine with no games added.
+    """
+    config = (Path(os.environ.get("LOCALAPPDATA", "")) / "Lexeditor"
+              / "game-installations.json")
+    if not config.is_file():
+        return []
+    try:
+        games = (json.loads(config.read_text(encoding="utf-8")).get("games") or {})
+    except (OSError, ValueError):
+        return []
+    import plugin_api  # noqa: F401  (imported for its side-effect-free specs)
+    from app import discover_plugins
+    plugins = discover_plugins()
+    used = []
+    for plugin_id, info in games.items():
+        plugin = plugins.get(plugin_id)
+        root = (info or {}).get("root")
+        spec = getattr(plugin, "installation", None)
+        if not plugin or not root or spec is None or not Path(root).is_dir():
+            continue
+        os.environ.setdefault(spec.root_env, str(root))
+        used.append(plugin_id)
+    return used
 from shot import EDGE, STUB, session_for  # noqa: E402
 import browser_guard  # noqa: E402
 
@@ -216,6 +249,32 @@ CONTROLS_PROBE = r"""
                 label:(field.querySelector('.lex-detail-field-label')?.textContent||'').trim().slice(0,24)});
     }
   }
+  // Ellipsising a number changes its value rather than shortening its label,
+  // so a numeric cell is never allowed to truncate. This catches it whether the
+  // clip comes from a column width or from a plugin's own stylesheet.
+  for(const cell of document.querySelectorAll('.lex-column-list-cell.lex-column-align-end,'
+      +'.lex-column-list-cell.lex-numbered-id-cell')){
+    const text=cell.querySelector('.lex-column-cell-text');
+    if(!text) continue;
+    if(text.scrollWidth-text.clientWidth>1){
+      bad.push({kind:'numeric-cell-truncated',
+                value:(text.textContent||'').trim().slice(0,16),
+                lost:Math.round(text.scrollWidth-text.clientWidth)});
+    }
+  }
+  // A record table wider than the panel holding it puts its last column half
+  // off the edge. It technically scrolls, but it reads as a cut-off column and
+  // it is always a column-width mistake rather than a deliberate choice.
+  for(const list of document.querySelectorAll('.lex-column-list')){
+    if(!list.querySelector('[aria-selected]')) continue;
+    const host=list.closest('.lex-list');
+    if(!host) continue;
+    const over=list.scrollWidth-host.clientWidth;
+    if(over>2){
+      bad.push({kind:'table-wider-than-panel',over:Math.round(over),
+                label:list.getAttribute('aria-label')||''});
+    }
+  }
   for(const fill of document.querySelectorAll('.lex-has-value-fill')){
     const input=fill.querySelector('input[type="number"]');
     if(!input) continue;
@@ -316,6 +375,9 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
 
 
 def main() -> int:
+    live = use_installed_games()
+    if live:
+        print(json.dumps({"usingInstalledGames": sorted(live)}))
     plugins = [p.name for p in sorted((ROOT / "games").iterdir())
                if (p / "editor.html").is_file()]
     findings: list[dict] = []
