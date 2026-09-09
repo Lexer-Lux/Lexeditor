@@ -80,7 +80,7 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
                     "id": "Library",
                     "order": "LoadBeforeThis",
                     "optional": True,
-                    "version": "v2.*",
+                    "version": "v2.0.*",
                     "extra": 'Future="keep"',
                 }],
             )
@@ -90,7 +90,7 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
             self.assertEqual(rows[0]["order"], "LoadBeforeThis")
             self.assertTrue(rows[0]["optional"])
             self.assertFalse(rows[0]["incompatible"])
-            self.assertEqual(rows[0]["version"], "v2.*")
+            self.assertEqual(rows[0]["version"], "v2.0.*")
             self.assertEqual(rows[0]["attributes"]["Future"], "keep")
 
     def test_community_version_rules_use_minimums_wildcards_and_ranges(self):
@@ -203,7 +203,7 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
                 community=[{
                     "id": "Library",
                     "order": "LoadBeforeThis",
-                    "version": "v2.*",
+                    "version": "v2.0.*",
                 }],
             )
             workspace = root / "workspace"
