@@ -33,6 +33,13 @@ def _finite(value, label: str) -> float:
     return number
 
 
+def _xp_amount(value, label: str) -> float:
+    number = _finite(value, label)
+    if number < 0:
+        raise ValueError(f"{label} cannot be negative")
+    return number
+
+
 def _deployed_module(project: Path, game_root: Path | None = None) -> tuple[str, Path]:
     return selected_module((game_root or paths.game_root()).resolve(), project.resolve())
 
@@ -80,7 +87,7 @@ def read_runtime_overrides(project: Path, game_root: Path | None = None) -> dict
     xp_sources = []
     for row in xp_definitions.get("sources", []):
         overridden = row["id"] in xp_json
-        amount = _finite(xp_json[row["id"]], row["id"]) if overridden else float(row["defaultAmount"])
+        amount = _xp_amount(xp_json[row["id"]], row["id"]) if overridden else float(row["defaultAmount"])
         xp_sources.append({
             "id": row["id"], "skillId": row["skillId"], "label": row["label"],
             "defaultAmount": row["defaultAmount"], "overridden": overridden,
@@ -145,7 +152,7 @@ def save_runtime_overrides(project: Path, payload: dict, game_root: Path | None 
         if source_id not in known_xp:
             raise ValueError(f"Unknown runtime XP source ID: {source_id}")
         if bool(edit.get("overridden")):
-            amount = _finite(edit.get("amount"), source_id)
+            amount = _xp_amount(edit.get("amount"), source_id)
             if xp_values.get(source_id) != amount:
                 xp_values[source_id] = amount
                 changed_xp += 1
