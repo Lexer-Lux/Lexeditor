@@ -225,6 +225,13 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
     elif deployed_descriptor.is_file() and not descriptor_match:
         issues.append("Deployed SubModule.xml differs from the project copy")
 
+    direct_play_compatible = bool(deployed_module and deployed_module.get("singleplayer"))
+    if installed_module and deployed_module is not None and not direct_play_compatible:
+        issues.append(
+            "Deployed module is not declared as a single-player module; "
+            "Lexeditor Play currently supports single-player modules only"
+        )
+
     module_data = deployed_root / "ModuleData"
     overrides = {
         "effects": _json_override(module_data / "custom_skill_effects.json", nested=True),
@@ -234,7 +241,13 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
         if row["exists"] and not row["valid"]:
             issues.append(f"Invalid deployed {label} override JSON: {row['error']}")
 
-    runnable = bool(game_exe.is_file() and installed_module and not missing_required and not missing_binaries)
+    runnable = bool(
+        game_exe.is_file()
+        and installed_module
+        and direct_play_compatible
+        and not missing_required
+        and not missing_binaries
+    )
     in_sync = bool(
         installed_module
         and descriptor_match
