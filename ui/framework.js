@@ -445,7 +445,12 @@
       };
       const escape = event => { if (event.key === "Escape") closeHelpPopup(); };
       const close = () => closeHelpPopup();
-      const onScroll = event => { if (!popup.contains(event.target)) close(); };
+      const onScroll = event => {
+        if (popup.contains(event.target)) return;
+        // Keyboard focus can scroll the marker into view after opening help.
+        if (marker.matches(":focus-within")) position();
+        else close();
+      };
       popup.addEventListener("pointerenter", cancelClose);
       popup.addEventListener("pointerleave", scheduleClose);
       popup.addEventListener("focus", cancelClose);
@@ -1082,7 +1087,7 @@
       });
       // Each switch carries its own type rail, matching every other property:
       // BOOL until pointed at, then the help marker for that flag.
-      const rail = element("span", {class: "lex-toggle-rail", "aria-hidden": "true"},
+      const rail = element("span", {class: "lex-toggle-rail"},
         element("span", {class: "lex-toggle-type"}, "BOOL"));
       const label = element("label", {
         class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),
@@ -2034,7 +2039,10 @@
 
   const confirmUnsavedExit = (options, exit, copy = {}) => {
     const dirty = options.dirtyCount?.() || 0;
-    if (!dirty) return exit();
+    if (!dirty) return Promise.resolve().then(exit).catch(error => {
+      showAlert({title: copy.exitError || "Could not exit", message: error.message || String(error)});
+      return false;
+    });
     const existing = document.querySelector(".lex-exit-dialog");
     if (existing) {
       existing.querySelector(".lex-dialog-action")?.focus();
@@ -2046,21 +2054,26 @@
     const discard = element("button", {class: "lex-dialog-action", text: copy.discardLabel || "Exit Without Saving"});
     const save = element("button", {class: "lex-dialog-action primary", text: copy.saveLabel || "Save and Exit"});
     const buttons = [cancel, discard, save];
-    const setBusy = busy => buttons.forEach(button => { button.disabled = busy; });
-    const dismiss = () => backdrop.remove();
+    let busy = false;
+    const setBusy = value => { busy = value; buttons.forEach(button => { button.disabled = value; }); };
+    const dismiss = () => { if (!busy) backdrop.remove(); };
     cancel.onclick = dismiss;
     discard.onclick = async () => {
       setBusy(true);
+      status.textContent = copy.pendingLabel || "Please wait…";
       try {
-        if (await exit()) dismiss();
+        if (await exit()) backdrop.remove();
+        else status.textContent = "The action did not complete. Try again or cancel.";
       } catch (error) {
         status.textContent = `${copy.exitError || "Could not exit"}: ${error.message || error}`;
+      } finally {
         setBusy(false);
       }
     };
     save.onclick = async () => {
       setBusy(true);
       status.textContent = "Saving changes…";
+      let saved = false;
       try {
         await options.save?.();
         const remaining = options.dirtyCount?.() || 0;
@@ -2069,9 +2082,13 @@
           setBusy(false);
           return;
         }
-        if (await exit()) dismiss();
+        saved = true;
+        status.textContent = copy.pendingLabel || "Please wait…";
+        if (await exit()) backdrop.remove();
+        else status.textContent = "Saved, but the action did not complete. Try again or cancel.";
       } catch (error) {
-        status.textContent = `Save failed: ${error.message || error}`;
+        status.textContent = `${saved ? (copy.exitError || "Could not exit") : "Save failed"}: ${error.message || error}`;
+      } finally {
         setBusy(false);
       }
     };
@@ -2557,7 +2574,7 @@
     const input = element("input", {type: "text", maxlength: "80", value: suggested, placeholder: `${pluginName} mod name`, "aria-label": options.rename ? "Mod name" : "New mod name"});
     const message = element("div", {class: "lex-dialog-status", "aria-live": "polite"});
     const cancel = element("button", {class: "lex-dialog-action"}, "Cancel");
-    const create = element("button", {class: "lex-dialog-action primary"}, options.rename ? "Rename" : "Choose Location…");
+    const create = element("button", {class: "lex-dialog-action primary"}, options.rename ? "Rename" : (options.createLabel || "Choose Location…"));
     const close = value => { backdrop.remove(); resolve(value); };
     cancel.onclick = () => close("");
     create.onclick = () => {
@@ -2571,7 +2588,7 @@
     });
     backdrop.append(element("section", {class: "lex-dialog lex-project-dialog", role: "dialog", "aria-modal": "true"},
       element("h2", {}, options.rename ? "Rename Mod" : "Create New Mod"),
-      element("p", {}, options.rename ? "Change the mod project folder name." : "Lexeditor will create a new editable project from this game's working template."),
+      element("p", {}, options.rename ? "Change the mod project folder name." : (options.description || "Lexeditor will create a new editable project from this game's working template.")),
       input, message, element("div", {class: "lex-dialog-actions"}, cancel, create)));
     document.body.append(backdrop); input.focus(); input.select();
     });
@@ -2604,7 +2621,7 @@
         location.href = result.url;
         return true;
       }
-      snapshot = result; render(snapshot); return false;
+      snapshot = result; render(snapshot); return true;
     };
     const guarded = operation => confirmUnsavedExit(options, async () => {
       try { return openResult(await operation()); }
@@ -2665,7 +2682,7 @@
             catch (error) { showAlert({title: "Could not open the mod folder", message: error.message || String(error)}); }
           },
         }, folderIcon());
-        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`}, select, rename, folder);
+        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`}, select, rename, folder, select.querySelector(".lex-project-source-status"));
       });
       const sourceRows = sources.map(row => element("button", {
         class: `lex-project-menu-item-select lex-project-menu-item lex-project-reference${String(row.key) === activeSource ? " active" : ""}`,
@@ -2685,14 +2702,14 @@
         class: "lex-project-menu-action", type: "button", role: "menuitem",
         hidden: !value.canCreate, onclick: async () => {
           closeMenu();
-          const projectName = await askProjectName(options.plugin.name || options.plugin.id);
-          if (projectName) guarded(() => callWindow("create_mod_project", options.plugin.id, projectName));
+          const projectName = await askProjectName(options.plugin.name || options.plugin.id, options.projectCreatePrompt || {});
+          if (projectName) guarded(() => options.createProject ? options.createProject(projectName) : callWindow("create_mod_project", options.plugin.id, projectName));
         },
-      }, "New Mod");
+      }, "➕ Add a Mod");
       const browse = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
-        onclick: () => { closeMenu(); guarded(() => callWindow("browse_mod_project", options.plugin.id)); },
-      }, "Find a Mod");
+        onclick: () => { closeMenu(); guarded(() => options.browseProject ? options.browseProject() : callWindow("browse_mod_project", options.plugin.id)); },
+      }, "🔍 Find a Mod");
       const manage = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
         hidden: !options.manageProjectSources,
@@ -2724,7 +2741,7 @@
     if (options.projectSnapshot) load();
     else if (window.pywebview?.api) load();
     else window.addEventListener("pywebviewready", load, {once: true});
-    box.refresh = () => { if (snapshot) render(snapshot); };
+    box.refresh = () => { if (options.projectSnapshot) load(); else if (snapshot) render(snapshot); };
     return box;
   };
 
@@ -3647,16 +3664,14 @@
     brand.onclick = () => { playThemeSound("exit"); return returnToMainMenu(options, leaveForMainMenu); };
     const restartPlugin = async () => {
       const opened = await callWindow("restart_plugin", options.plugin.id);
-      if (!opened?.url) return false;
+      if (!opened?.url) throw new Error("The desktop host did not return a restart address. Close and reopen Lexeditor if this continues.");
       window.__lexeditorNavigating = true;
       // A restart is still a load, so it gets a real loading message rather
       // than dropping through to the fallback text.
       const destination = new URL(opened.url, location.href);
-      let quote = "";
-      try { quote = (await callWindow("loading_quote", options.plugin.id))?.quote || ""; }
-      catch (_error) {}
+      // The old service has stopped. Navigate immediately; optional quote
+      // retrieval must never keep the discard dialog waiting on another bridge call.
       destination.searchParams.set("lexTransition", "load");
-      if (quote) destination.searchParams.set("lexQuote", quote);
       destination.searchParams.set("lexLoadStarted", String(Date.now()));
       location.href = destination.href;
       return true;
@@ -3667,6 +3682,7 @@
       discardLabel: "Restart Without Saving",
       saveLabel: "Save and Restart",
       exitError: "Could not restart the plugin",
+      pendingLabel: "Restarting plugin…",
     });
     const closeLexeditor = () => callWindow("window_close");
     const requestWindowClose = () => confirmUnsavedExit(options, closeLexeditor);
@@ -5971,6 +5987,7 @@
       const help = rail?.querySelector('.lex-info-help');
       const label = field.querySelector(':scope > .lex-detail-field-label');
       if (!rail || !help || !label) continue;
+      if (field.hasAttribute("data-lex-sort")) { rail.style.left = "0px"; continue; }
       const text = [...label.childNodes].find(node =>
         node.nodeType === Node.TEXT_NODE && node.textContent.trim());
       if (!text) continue;

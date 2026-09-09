@@ -1713,8 +1713,9 @@
   function refineRow(dataset,table,id){return dataset?.refine?.rows?.find(row=>row.table===table&&Number(row.id)===Number(id))}
   function refineReferences(row,field){return state.references.map(reference=>({name:reference.name,shortName:reference.shortName,value:refineRow(state.referenceData[reference.id],row.table,row.id)?.[field]})).filter(entry=>entry.value!==undefined)}
   function refineChoice(type,value){return state.data.refine.choices[type]?.find(entry=>Number(entry.id)===Number(value))?.name??`${type} ${value}`}
+  function setRefineEntity(row,side,value){row[`${side}Id`]=Number(value);row[`${side}Name`]=refineChoice(row[`${side}Type`],value);row.name=`${row.inputName} → ${row.outputName}`;shell.refresh()}
   function refineEntityControl(row,side){
-    const type=row[`${side}Type`],field=`${side}Id`,set=value=>{row[field]=Number(value);row[`${side}Name`]=refineChoice(type,value);row.name=`${row.inputName} → ${row.outputName}`;shell.refresh()},origin=()=>{state.refineTab=row.table;state.selected.refine=row.id;navigate("refine")},prompt=`Select the ${type} used as this recipe's ${side}.`;
+    const type=row[`${side}Type`],field=`${side}Id`,set=value=>setRefineEntity(row,side,value),origin=()=>{state.refineTab=row.table;state.selected.refine=row.id;navigate("refine")},prompt=`Select the ${type} used as this recipe's ${side}.`;
     if(type==="item")return itemSearchControl(row[field],prompt,set,origin);
     if(type==="magic")return magicSearchControl(row[field],prompt,set,origin);
     return selectControl(row[field],state.data.refine.choices[type]||[],set);
@@ -1723,7 +1724,12 @@
   function refineDetail(row,prefs){
     const text=el("textarea",{rows:7,maxlength:600,"aria-label":`Displayed refine text for ${row.name}`,oninput:event=>{row.text=event.target.value;shell.refresh()}});text.value=row.text;
     const label=`${state.data.refine.tables.find(table=>table.id===row.table)?.name||row.table} ${row.id+1}`;
+    const recipeFields=["input","output"].flatMap(side=>{
+      const field=`${side}Id`,quantity=`${side}Quantity`,apply=value=>setRefineEntity(row,side,value);
+      return [detailField({label:side==="input"?"INPUT":"OUTPUT",control:refineSource(refineEntityControl(row,side),row,field,apply,value=>refineChoice(row[`${side}Type`],value))}),detailField({label:side==="input"?"NEEDED":"RECEIVED",dataType:"INT",min:0,max:255,control:refineSource(numberControl(row[quantity],0,255,1,value=>{row[quantity]=value;shell.refresh()},{"aria-label":`${side} quantity for refine recipe`}),row,quantity,value=>{row[quantity]=Number(value);shell.refresh()})})];
+    });
     return sharedDetail({...row,id:row.id+1,name:label},prefs,[
+      detailSection({title:"RECIPE",body:recipeFields}),
       detailSection({title:"RECIPE TEXT",help:infoHelp("This is the text shown by FF8 for this recipe. Saving rebuilds every linked text offset in this table."),body:el("div",{class:"refine-recipe-text"},sourceControl(text,()=>row.text,refineRow(state.vanilla,row.table,row.id)?.text,refineReferences(row,"text"),value=>row.text=String(value??"")))}),
       detailSection({title:"STORED DATA",body:detailField({label:"UNKNOWN",help:infoHelp("This preserved 16-bit value has no proved gameplay meaning, so it is read-only."),control:readonlyField(row.unknown)})})
     ],"refine-detail");
@@ -1733,12 +1739,9 @@
     const columns=[
       {key:"id",label:"ID",width:"58px",render:row=>row.id+1},
       {key:"groupName",label:"ABILITY",headerTitle:"Refine ability",render:row=>el("span",{title:row.groupDescription},row.groupName)},
-      {key:"inputId",label:"INPUT",sortValue:row=>row.inputName,render:row=>refineSource(refineEntityControl(row,"input"),row,"inputId",value=>{row.inputId=Number(value);row.inputName=refineChoice(row.inputType,value)},value=>refineChoice(row.inputType,value))},
-      {key:"inputQuantity",label:"NEED",render:row=>refineSource(numberControl(row.inputQuantity,0,255,1,value=>row.inputQuantity=value),row,"inputQuantity",value=>row.inputQuantity=Number(value))},
-      {key:"outputId",label:"OUTPUT",sortValue:row=>row.outputName,render:row=>refineSource(refineEntityControl(row,"output"),row,"outputId",value=>{row.outputId=Number(value);row.outputName=refineChoice(row.outputType,value)},value=>refineChoice(row.outputType,value))},
-      {key:"outputQuantity",label:"GET",render:row=>refineSource(numberControl(row.outputQuantity,0,255,1,value=>row.outputQuantity=value),row,"outputQuantity",value=>row.outputQuantity=Number(value))}
+      {key:"name",label:"RECIPE",render:row=>el("span",{title:`${row.inputName} → ${row.outputName}`},`${row.inputName} → ${row.outputName}`)}
     ];
-    delete state.columnPrefs.refine;showPaged("refine",visible,columns,refineDetail,"48px minmax(42px,.65fr) minmax(50px,1fr) minmax(28px,.4fr) minmax(50px,1fr) minmax(28px,.4fr)",{defaultSplit:68,minLeft:210,minRight:330,maxBarrels:5,fixedTemplate:true});
+    delete state.columnPrefs.refine;showPaged("refine",visible,columns,refineDetail,"36px minmax(50px,.65fr) minmax(60px,1fr)",{defaultSplit:55,minLeft:210,minRight:430,maxBarrels:5,fixedTemplate:true});
     const content=$("#main").firstElementChild,tabs=subtabBar({className:"refine-tabs",tabs:state.data.refine.tables.map(table=>({id:table.id,label:table.name})),active:state.refineTab,label:"Refine recipe tables",change:value=>{state.refineTab=value;state.pages.refine=0;state.selected.refine=null;renderRefine()}});$("#main").replaceChildren(el("div",{class:"refine-view"},tabs,content));
   }
 

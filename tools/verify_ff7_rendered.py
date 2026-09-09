@@ -80,12 +80,12 @@ class RenderedTests(unittest.TestCase):
         (game/'FFNx.toml').write_bytes(fixtures.CONFIG)
     def open(self,edition='ff7'):
         self.page.goto('about:blank')
-        html=(ROOT/'games/ff7/editor.html').read_text()
+        html=(ROOT/'games/ff7/editor.html').read_text(encoding='utf-8')
         # framework.js resolves optional shared assets relative to document.baseURI.
         # Synthetic set_content() pages otherwise use the non-hierarchical about:blank URL.
         html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
-        html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
-        code=HOST+'\nwindow.__lexeditorPlugin='+json.dumps({'id':edition,'name':'FF7 fixture','edition':edition})+';\n'+(ROOT/'ui/framework.js').read_text()
+        html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
+        code=HOST+'\nwindow.__lexeditorPlugin='+json.dumps({'id':edition,'name':'FF7 fixture','edition':edition})+';\n'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')
         html=html.replace('<script src="/shared/framework.js"></script>','<script>'+code+'</script>')
         self.page.set_content(html,wait_until='domcontentloaded')
         self.page.wait_for_function('state.loaded === true')

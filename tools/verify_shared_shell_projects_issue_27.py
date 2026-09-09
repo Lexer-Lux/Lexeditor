@@ -21,7 +21,7 @@ ff7_2013_plugin = (ROOT / "games" / "ff7_2013" / "plugin.py").read_text(encoding
 rdr_server = (ROOT / "games" / "rdr" / "server.py").read_text(encoding="utf-8")
 
 for required in ("mapIcon()", 'id: "plugin-info"', "mountProjectControl", "browse_mod_project", "create_mod_project", "rename_mod_project",
-                 'class: "lex-project-menu-actions"', '"New Mod"', '"Find a Mod"',
+                 'class: "lex-project-menu-actions"', '"➕ Add a Mod"', '"🔍 Find a Mod"',
                  'class: "lex-shell-left-actions"', 'class: "lex-shell-center-actions"',
                  'class: "lex-shell-right-actions"', 'class: "lex-brand-slot"'):
     assert required in framework, required

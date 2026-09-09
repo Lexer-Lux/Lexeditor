@@ -1,5 +1,17 @@
 # Lexeditor project rules
 
+## Temporary storage and local checks
+
+- Do not include `_scratch`, build trees, compiler caches, browser profiles,
+  downloaded dependencies, or generated test output in a source backup.
+- Use temporary directories with guaranteed cleanup for disposable build and
+  browser work. Keep final source patches and small reports outside those trees.
+- Before a large build or download, check free space and state the expected disk
+  cost. After the job, remove only its generated files. Preserve source changes,
+  mods, saves, required game data, and diagnostic evidence that is still needed.
+- Do not open visible test windows during a routine check. Native window
+  fixtures require explicit user approval; headless checks are the default.
+
 - Every game plugin must expose a Data Map screen. Do not use a generic Files
   tab as the player-facing editor for data that needs a format-specific view.
 - Always use the most appropriate HTML control for the value. Use checkboxes

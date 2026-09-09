@@ -278,9 +278,20 @@ class HostApi:
     def restart_lexeditor(self) -> dict:
         """Close the current window and replace this desktop-host process."""
         with self._lock:
+            if self._dirty_count:
+                raise RuntimeError("Return to the editor and save or discard its changes before restarting Lexeditor.")
+            if self._restart_requested:
+                return {"restarting": True}
+            previous_close_authorized = self._close_authorized
             self._restart_requested = True
             self._close_authorized = True
-        self._bound_window().destroy()
+        try:
+            self._bound_window().destroy()
+        except Exception:
+            with self._lock:
+                self._restart_requested = False
+                self._close_authorized = previous_close_authorized
+            raise
         return {"restarting": True}
 
     def window_closing(self) -> bool:
@@ -1252,7 +1263,7 @@ def smoke_host_switch(plugins: dict[str, GamePlugin], first: str, second: str) -
                 if (last and last.get("plugin") == plugin_id and last.get("ready")
                         and (not project_required or (
                             last.get("project") and
-                            last.get("projectActions") == ["New Mod", "Find a Mod"]
+                            last.get("projectActions") == ["➕ Add a Mod", "🔍 Find a Mod"]
                         ))):
                     return last
             except Exception:
@@ -1644,7 +1655,7 @@ def smoke_host_switch(plugins: dict[str, GamePlugin], first: str, second: str) -
         expected_with_settings.insert(4, "lexeditor-settings")
         if result["commandOrder"] not in (expected_order, expected_with_settings):
             raise RuntimeError(f"The shared two-row command order is wrong: {result}")
-        if (result["projectActions"] != ["New Mod", "Find a Mod"] or
+        if (result["projectActions"] != ["➕ Add a Mod", "🔍 Find a Mod"] or
                 result["separateProjectActions"]):
             raise RuntimeError(f"The project selector actions are wrong: {result}")
         geometry = result.get("projectGeometry") or {}

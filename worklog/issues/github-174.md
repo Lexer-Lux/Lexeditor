@@ -1,15 +1,9 @@
-# #174: Restore real casing acquisition notifications
+# #174: Casing acquisition notification
 
-[Live GitHub issue and comments](https://github.com/Lexer-Lux/Lexeditor/issues/174)
+[Live issue](https://github.com/Lexer-Lux/Lexeditor/issues/174)
 
-## Requirements and decisions
+The requested card and icon depend on the corrected casing pickup path in #222. A source-only repair now prevents false success cards/sounds and world-prop deletion when inventory acquisition fails. Count increase confirms success. Each casing owns its transaction; cleanup prevents its credit passing to a replacement. Negative counts are rejected defensively, but the native has no documented failure sentinel. The executable harness passes and rejects four bad implementations. The existing 16 collection contracts pass.
 
-Read the live GitHub issue and comments before implementation or status changes. Use the current issue, relevant central Worklog/Codex material, and available chat/file context; do not recreate a local issue archive.
+See worklog/issues/github-222.md for exact files and remaining longarm animation boundary. No runtime installation was performed while the #151 experiment is active. Correct in-game acquisition card/icon acceptance remains unverified.
 
-## Current implementation and evidence
-
-Reconcile live code, PRs and existing topic/session worklogs. Do not infer build, deployment, gameplay success, or acceptance from documentation alone.
-
-## Next agent work
-
-Read the live issue and comments and preserve the latest explicit human corrections in this concise handoff. Do not create source-record, conversation, or attachment archives.
+Combined development build passed: `8AE9385498F96437AFB504381F6B8E34491E3A740D8993C539D89C21B3D7BB2E`. Candidate delivery is held while #151 is active.

@@ -764,7 +764,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 .lex-project-menu-item {
   display: grid;
-  grid-template-columns:minmax(0,1fr) 34px 34px;
+  grid-template-columns:minmax(0,1fr) 34px 34px 26px;
   width: 100%;
   padding:0;
   border: 0;
@@ -1198,13 +1198,17 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   display:flex;
   flex:0 0 auto;
   min-width:0;
+  /* Buttons keep their content width, so a larger font or a longer label
+     scrolls the bar instead of truncating every tab. */
+  overflow-x:auto;
   border-bottom:1px solid var(--lex-border);
   background:var(--lex-panel-2);
 }
 
 .lex-subtab-button {
+  /* Equal widths while they fit, never narrower than the label needs. */
   flex:1 1 0;
-  min-width:0;
+  min-width:max-content;
   box-sizing:border-box;
   height:min(31px, calc(var(--lex-command-row-height) * .6667));
   min-height:min(31px, calc(var(--lex-command-row-height) * .6667));
@@ -3683,10 +3687,10 @@ body:has(.lex-data-map-table) #main {
 
 /* ---- Copy affordance ------------------------------------------------ */
 .lex-copy-value {
-  position:absolute;
+  position:relative;
   z-index:4;
-  top:50%;
-  left:-2px;
+  top:auto;
+  left:auto;
   display:grid;
   width:19px;
   height:19px;
@@ -3697,7 +3701,7 @@ body:has(.lex-data-map-table) #main {
   background:transparent;
   opacity:0;
   cursor:pointer;
-  transform:translate(-100%,-50%);
+  transform:none;
   transition:opacity .12s ease,color .12s ease;
 }
 .lex-copy-value > svg { width:100%;height:100%; }
@@ -4313,14 +4317,13 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
 .lex-detail-field[data-lex-sort] .lex-field-type-rail > :is(.lex-field-type-name,.lex-field-type-range) { opacity:0; }
 .lex-detail-field[data-lex-sort]:hover .lex-field-type-rail::after,
 .lex-detail-field[data-lex-sort]:focus-within .lex-field-type-rail::after { opacity:0; }
-/* Reference markers share one label column, so V, R1, and R2 values start
-   on the same x-coordinate in every stack depth. */
+/* Reference markers use only their text width, with a small gap to the value. */
 .lex-reference-values .lex-reference-value { align-items:center; }
 .lex-reference-values .lex-reference-tag {
-  flex:0 0 22px;
-  width:22px;
-  min-width:22px;
-  max-width:22px;
+  flex:0 0 auto;
+  width:auto;
+  min-width:0;
+  max-width:none;
   margin-right:0;
   text-align:left;
 }
@@ -4385,20 +4388,20 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
      a pixel. The badge rides at the right edge instead of taking flow. */
   position:absolute;
   top:50%;
-  right:1px;
+  right:6px;
   transform:translateY(-50%);
   display:grid;
   place-items:center;
   box-sizing:border-box;
-  min-width:10px;
-  width:10px;
-  height:14px;
+  min-width:20px;
+  width:var(--lex-tab-badge-size,24px);
+  height:var(--lex-tab-badge-size,24px);
   padding:0;
   border:1px solid color-mix(in srgb,var(--lex-border) 70%,transparent);
   border-radius:38% / 30%;
   background:color-mix(in srgb,var(--lex-bg) 55%,transparent);
   color:var(--lex-muted);
-  font-size:8px;
+  font-size:calc(var(--lex-tab-badge-size,24px) * .6);
   font-variant-numeric:tabular-nums;
   line-height:1;
   visibility:hidden;
@@ -4421,12 +4424,22 @@ nav button.active:focus-visible .lex-tab-shortcut,
   color:var(--lex-text);
 }
 
-/* The badge is positioned against its own tab. Reserve the same space on
-   both sides, so the label stays centred and the badge never covers it. */
+/* The badge is positioned against its own tab. It sits at the trailing edge,
+   so only that side reserves its width and the badge never covers the label.
+   Reserving the badge width on both sides costs more than half of a narrow
+   subtab and truncates ordinary labels, so the leading side keeps a plain
+   margin instead. */
 .lex-shell-header nav button[data-tab]:has(> .lex-tab-shortcut),
 .lex-subtab-button:has(> .lex-tab-shortcut) {
   position:relative;
-  padding-inline:12px;
+  /* Sized in em so the reservation tracks the label it must not cover: the
+     tab font is em-based, so fixed padding would clip the text as soon as the
+     font scales up. The px term is only an upper clamp, keeping the badge
+     inside a short command row. */
+  --lex-tab-badge-size:min(1.6em,calc(min(46px,var(--lex-command-row-height)) - 12px));
+  --lex-tab-badge-gap:.4em;
+  padding-inline:var(--lex-tab-badge-gap)
+                 calc(var(--lex-tab-badge-size) + var(--lex-tab-badge-gap) * 2);
 }
 .lex-shell-header nav button[data-tab] > .lex-tab-label,
 .lex-subtab-button > .lex-tab-label {
@@ -4470,6 +4483,12 @@ nav button.active:focus-visible .lex-tab-shortcut,
 .lex-data-map-detail{min-width:0;overflow:auto;overflow-wrap:anywhere}
 .lex-data-map-detail .lex-data-map-notes{white-space:pre-wrap}
 .lex-data-map-actions{display:flex;flex-wrap:wrap;gap:8px}
+.lex-data-map-actions > .lex-data-map-location {
+  display:inline-flex;align-items:center;justify-content:center;gap:.4em;
+  flex:0 0 auto;width:auto;height:auto;min-height:1.6em;
+  white-space:nowrap;padding:.2em .5em;
+}
+.lex-data-map-actions > .lex-data-map-location svg { width:1em;height:1em;flex:0 0 1em; }
 .lex-data-map-coverage{font-weight:bold}
 body:has(.lex-data-map-view){display:flex;flex-direction:column;height:100vh;min-height:0;overflow:hidden}
 body:has(.lex-data-map-view)>#lexeditor-shell,body:has(.lex-data-map-view)>#toolbar{flex:0 0 auto}
@@ -4523,7 +4542,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-unit-field { min-width:0; max-width:100%; box-sizing:border-box; }
 .lex-detail-field-control input[type="range"] { width:100%; }
 .lex-boolean-field .lex-field-boolean-arrow {
-  position:static !important; align-self:center; transform:none !important;
+  position:relative !important; align-self:center; transform:none !important;
 }
 .lex-paged-list-detail,.lex-barrelled-master,.lex-barrel-grid { min-height:0; }
 .lex-paged-list-detail:not(.lex-full-table-page) .lex-barrelled-master,
@@ -4581,12 +4600,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_SHARED_UI_STANDARDIZATION_FOLLOWUP_20260906 */
-.lex-detail-field[data-lex-sort] .lex-field-type-rail > .lex-info-help {
-  display:inline-grid !important; opacity:1 !important;
-}
 .lex-detail-field[data-lex-sort] .lex-field-type-rail::after {
-  top:auto !important; bottom:2px !important; left:50% !important;
-  transform:translateX(-50%) !important;
+  top:50% !important; bottom:auto !important; left:50% !important;
+  transform:translate(-50%,-50%) !important;
 }
 .lex-detail-field[data-lex-sort] > .lex-detail-field-label {
   display:flex !important; visibility:visible !important; opacity:1 !important;
@@ -4788,4 +4804,38 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   contain:size;
   min-block-size:0;
   overflow:hidden;
+}
+
+/* Controls reserve their own space at every panel width. */
+.lex-detail-field-control:has(> .lex-copy-value) {
+  display:grid; grid-template-columns:19px minmax(0,1fr); gap:6px; align-items:center;
+}
+.lex-copy-value:focus-visible { opacity:1; }
+.lex-project-menu-item > .lex-project-menu-item-select {
+  grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);
+}
+.lex-project-menu-item > .lex-project-source-status { align-self:center; }
+.lex-project-rename,.lex-project-folder { border-radius:8px; margin-block:3px; }
+.lex-project-rename:is(:hover,:focus-visible),.lex-project-folder:is(:hover,:focus-visible) {
+  background:color-mix(in srgb,var(--lex-accent) 28%,var(--lex-panel));
+}
+.lex-toggle-rail { position:relative; align-self:stretch; opacity:1; }
+.lex-toggle-type { writing-mode:horizontal-tb; text-orientation:mixed; transform:rotate(-90deg); white-space:nowrap; }
+.lex-toggle-rail > .lex-info-help { display:none !important; }
+.lex-toggle:has(.lex-info-help):is(:hover,:focus-within) > .lex-toggle-rail > .lex-toggle-type { display:none; }
+.lex-toggle:not(:has(.lex-info-help)):hover > .lex-toggle-rail > .lex-toggle-type { display:block; }
+.lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail > .lex-info-help {
+  display:inline-grid !important; width:18px; min-width:18px; height:18px; min-height:18px;
+}
+
+
+.lex-subtab-button:has(> .lex-tab-shortcut) {
+  /* Same em-first rule as the header tabs; the px term only clamps the badge
+     into the shorter subtab row. */
+  --lex-tab-badge-size:min(1.6em,calc(min(31px,var(--lex-command-row-height) * .6667) - 8px));
+}
+.lex-project-name { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width:800px) {
+  .lex-shell-command-row { grid-template-columns:140px minmax(0,1fr) auto auto auto; }
+  .lex-shell-command-row .lex-brand { font-size:20px; }
 }

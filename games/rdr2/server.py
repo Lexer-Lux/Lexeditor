@@ -65,6 +65,11 @@ except ImportError:
     )
 
 try:
+    from .loot_sounds import read as _read_loot_sounds, apply as _apply_loot_sounds
+except ImportError:
+    from loot_sounds import read as _read_loot_sounds, apply as _apply_loot_sounds
+
+try:
     from .bounty_hunters import (read_bounty_hunters as _read_bounty_hunters,
                                  apply_bounty_hunter_edits as _apply_bounty_hunter_edits,
                                  ensure_bounty_hunter_metadata as _ensure_bounty_hunter_metadata)
@@ -451,13 +456,46 @@ def _clamp_displayed_settings(sections, ranges):
     return sections
 
 
+def _recon_radius_compatibility(sections):
+    """Expose the new gun radius in old profiles without writing during a read."""
+    for section in sections:
+        if section["name"].casefold() != "recontagging":
+            continue
+        values = {item["key"].casefold(): item["value"] for item in section["settings"]}
+        if "weaponscreencentertolerancepercent" not in values:
+            section["settings"].append({
+                "key": "WeaponScreenCenterTolerancePercent",
+                "value": values.get("screencentertolerancepercent", "5"),
+                "help": "Gun study-circle radius as a percentage of screen width.",
+            })
+    return sections
+
+
+def _insert_recon_radius_setting(lines, wanted):
+    """Materialize only the supported compatibility field when the user saves it."""
+    identity = ("recontagging", "weaponscreencentertolerancepercent")
+    if identity not in wanted:
+        return False
+    sections = _parse_gameplay_settings("\n".join(lines))
+    if any(s["name"].casefold() == identity[0] and
+           any(row["key"].casefold() == identity[1] for row in s["settings"])
+           for s in sections):
+        return False
+    for index, raw in enumerate(lines):
+        if raw.strip().casefold() == "[recontagging]":
+            lines.insert(index + 1, f"WeaponScreenCenterTolerancePercent={wanted[identity]}")
+            return True
+    return False
+
+
 def get_gameplay_settings():
     if not GAMEPLAY_INI_FILE.exists():
         return {"available": False, "file": str(GAMEPLAY_INI_FILE), "sections": [],
                 "schema": _gameplay_settings_schema()}
     schema = _gameplay_settings_schema()
     sections = _clamp_displayed_settings(
-        _parse_gameplay_settings(GAMEPLAY_INI_FILE.read_text(encoding="utf-8-sig")),
+        _recon_radius_compatibility(_parse_gameplay_settings(
+            GAMEPLAY_INI_FILE.read_text(encoding="utf-8-sig"))),
         schema.get("ranges", {}))
     return {"available": True, "file": str(GAMEPLAY_INI_FILE), "sections": sections,
             "schema": schema}
@@ -486,6 +524,17 @@ def save_gameplay_settings(edits):
     wanted = {(section.casefold(), key.casefold()): value
               for (section, key), value in wanted_authored.items()}
     lines, section, changed = GAMEPLAY_INI_FILE.read_text(encoding="utf-8-sig").splitlines(), "", 0
+    # Changing the old binocular field must not silently change an inherited gun field.
+    radius_id = ("recontagging", "weaponscreencentertolerancepercent")
+    if ("recontagging", "screencentertolerancepercent") in wanted and radius_id not in wanted:
+        parsed = _parse_gameplay_settings("\n".join(lines))
+        for item in parsed:
+            if item["name"].casefold() != "recontagging":
+                continue
+            saved = {row["key"].casefold(): row["value"] for row in item["settings"]}
+            if radius_id[1] not in saved:
+                wanted[radius_id] = saved.get("screencentertolerancepercent", "5")
+
     for index, raw in enumerate(lines):
         stripped = raw.strip()
         if stripped.startswith("[") and stripped.endswith("]"):
@@ -502,6 +551,8 @@ def save_gameplay_settings(edits):
         authored_missing = [(s, k) for s, k in wanted_authored
                             if (s.casefold(), k.casefold()) in missing]
         raise ValueError("Unknown INI setting(s): " + ", ".join(f"{s}/{k}" for s, k in sorted(authored_missing)))
+    if _insert_recon_radius_setting(lines, wanted):
+        changed += 1
     GAMEPLAY_INI_FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
     installed = GAME_ROOT / "GameplayTweaks.ini"
     if (GAME_ROOT / "GameplayTweaks.asi").exists() and not (installed.exists() and os.path.samefile(GAMEPLAY_INI_FILE, installed)):
@@ -725,12 +776,12 @@ def ensure_localization_install():
     tree.write(install_path, encoding="utf-8", xml_declaration=False)
 
 
-def ensure_file_replacement(game_path, file_path):
+def ensure_file_replacement(game_path, file_path, install_path=None):
     """Add one LML replacement mapping without disturbing existing mappings."""
-    install_path = ds_dir("mine") / "install.xml"
+    install_path = install_path or ds_dir("mine") / "install.xml"
     if not install_path.exists():
         raise ValueError(f"Missing install.xml in {ds_dir('mine')}")
-    tree = ET.parse(install_path)
+    tree = ET.parse(install_path, parser=ET.XMLParser(target=ET.TreeBuilder(insert_comments=True)))
     root = tree.getroot()
     if any((node.findtext("GamePath") or "").strip() == game_path
            and (node.findtext("FilePath") or "").strip() == file_path
@@ -4004,6 +4055,87 @@ def get_dispatch(ds="mine"):
     return {"rows": rows}
 
 
+LOOT_SOUNDS_GAME_PATH = "common:/data/ai/looting/loot_sounds.meta"
+
+
+def loot_sounds_path(ds="mine"):
+    if ds == "mine":
+        relative = install_replacements().get(LOOT_SOUNDS_GAME_PATH.casefold(), "loot_sounds.meta")
+        return _safe_mod_path(relative)
+    return ds_dir(ds) / "loot_sounds.meta"
+
+
+def get_loot_sounds(ds="mine"):
+    path = loot_sounds_path(ds)
+    if not path.exists() and ds == "mine":
+        path = EXTRACT_ROOT / "loot_sounds.meta"
+    if not path.exists(): return {"available": False, "rows": [], "categories": [], "soundSets": []}
+    result = _read_loot_sounds(path.read_text(encoding="utf-8-sig"))
+    result["file"] = "loot_sounds.meta"
+    return result
+
+
+def save_loot_sounds(edits):
+    import shutil
+    if not edits: return 0
+    target = loot_sounds_path("mine")
+    # Preserve unresolved recovery from this or an earlier version. No retry may
+    # create another copy or report success from partially installed data.
+    pending = next(target.parent.glob(".loot-sounds-*"), None)
+    if pending is not None:
+        raise OSError(f"Pickup sound save is blocked by an active save or unresolved recovery at {pending}. Resolve it before saving again")
+    source = target if target.exists() else EXTRACT_ROOT / "loot_sounds.meta"
+    original = source.read_bytes()
+    output, changed = _apply_loot_sounds(original.decode("utf-8-sig"), edits)
+    if not changed: return 0
+    relative = target.relative_to(ds_dir("mine").resolve()).as_posix()
+    manifest = ds_dir("mine") / "install.xml"
+    manifest_bytes = manifest.read_bytes()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    # Stage both new files and rollback copies before changing either live file.
+    stage = target.parent / ".loot-sounds-recovery"
+    try:
+        stage.mkdir()  # Atomic ownership: concurrent saves cannot share backups.
+    except FileExistsError as error:
+        raise OSError(f"Pickup sound save is blocked by an active save or unresolved recovery at {stage}. Resolve it before saving again") from error
+    retain_recovery = False
+    try:
+        data_stage = stage / "data"
+        manifest_stage = stage / "manifest"
+        data_backup = stage / "data-before"
+        manifest_backup = stage / "manifest-before"
+        existed = target.exists()
+        if existed:
+            current = target.read_bytes()
+            if current != original:
+                raise ValueError("Pickup sound files changed during save; reload and retry")
+            data_backup.write_bytes(current)
+        manifest_backup.write_bytes(manifest_bytes)
+        data_stage.write_bytes((b"\xef\xbb\xbf" if original.startswith(b"\xef\xbb\xbf") else b"") + output.encode("utf-8"))
+        manifest_stage.write_bytes(manifest_bytes)
+        ensure_file_replacement(LOOT_SOUNDS_GAME_PATH, relative, manifest_stage)
+        # A changed source must be reloaded instead of overwriting another writer.
+        if manifest.read_bytes() != manifest_bytes or (target.exists() != existed) or (existed and target.read_bytes() != data_backup.read_bytes()):
+            raise ValueError("Pickup sound files changed during save; reload and retry")
+        data_installed = False
+        try:
+            os.replace(data_stage, target)
+            data_installed = True
+            os.replace(manifest_stage, manifest)
+        except Exception:
+            if data_installed:
+                try:
+                    if existed: os.replace(data_backup, target)
+                    else: target.unlink(missing_ok=True)
+                except Exception as rollback_error:
+                    retain_recovery = True
+                    raise OSError(f"Pickup sound save failed and recovery failed. Original files are retained at {stage}") from rollback_error
+            raise
+    finally:
+        if not retain_recovery: shutil.rmtree(stage)
+    return changed
+
+
 def get_bounty_hunters(ds="mine"):
     response = ds_dir(ds) / BOUNTY_HUNTERS_FILE
     dispatch = ds_dir(ds) / DISPATCH_FILE
@@ -5072,6 +5204,8 @@ class Handler(BaseHTTPRequestHandler):
                         self._json({"error": "unknown file"}, 404)
                     else:
                         self._json(get_loot(name, ds))
+                elif path == "/api/loot-sounds":
+                    self._json(get_loot_sounds(ds))
                 elif path == "/api/matrix":
                     self._json(get_matrix(ds))
                 elif path == "/api/crime":
@@ -5201,6 +5335,8 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({"saved": apply_crime_edits(body.get("edits", []))})
                 elif path == "/api/dispatch/save":
                     self._json({"saved": apply_dispatch_edits(body.get("edits", []))})
+                elif path == "/api/loot-sounds/save":
+                    self._json({"saved": save_loot_sounds(body.get("edits", []))})
                 elif path == "/api/bounty-hunters/save":
                     self._json({"saved": apply_bounty_hunter_edits(body.get("edits", []))})
                 elif path == "/api/honor-actions/save":

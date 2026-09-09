@@ -96,6 +96,7 @@ with sync_playwright() as p:
             page = browser.new_page(viewport={"width": width, "height": height})
             errors = []
             page.on("pageerror", lambda error: errors.append(str(error)))
+            page.route("**/api/projects", lambda route: route.fulfill(json={"current": None, "projects": {}}))
             page.set_content(blank_html(), wait_until="domcontentloaded")
             page.wait_for_function("typeof shell==='object' && !!document.querySelector('.lex-detail-panel')")
             page.wait_for_timeout(250)

@@ -986,6 +986,8 @@ const state = {
   bountyHunterEdits: {}, // concrete bountyhunters.meta / cooldown field id -> value
   honorActions: null,
   honorActionEdits: {},
+  lootSoundEdits: {},
+  lootSoundSelected: null,
   effectEdits: {},      // "effKey|field" -> value
   itemEffectEdits: {},  // itemKey -> [effect keys]
   itemTagEdits: {},     // itemKey -> [{key, type}]
@@ -1160,7 +1162,7 @@ function dirtyCount() {
     .reduce((n,key)=>n+Object.keys(state[key]).length,0);
   return catalog + (state.customCraftingDirty?1:0) + Object.keys(state.alcoholEdits).length + Object.keys(state.settingEdits).length + state.shopDirty.size + Object.keys(state.shopBuyerDirty).length + state.matrixDirty.size +
     Object.values(state.lootDirty).reduce((n,s)=>n+s.size,0) +
-    Object.keys(state.crimeEdits).length + Object.keys(state.dispatchEdits).length + Object.keys(state.bountyHunterEdits).length + Object.keys(state.honorActionEdits).length +
+    Object.keys(state.crimeEdits).length + Object.keys(state.dispatchEdits).length + Object.keys(state.bountyHunterEdits).length + Object.keys(state.honorActionEdits).length + Object.keys(state.lootSoundEdits).length +
     Object.keys(state.challengeEdits).length + Object.keys(state.challengeSourceEdits).length + Object.keys(state.challengeConditionEdits).length +
     Object.keys(state.challengeRewardEdits).length + Object.keys(state.challengeUiEdits).length + Object.keys(state.challengeModeEdits).length +
     Object.values(state.aiEdits).reduce((n,edits)=>n+Object.keys(edits).length,0) +
@@ -1176,7 +1178,7 @@ function dirtyCount() {
 const RDR2_HISTORY_KEYS = [
   "priceEdits", "buyabilityEdits", "sellabilityEdits", "yieldEdits", "bundleEdits",
   "craftEdits", "customCraftingDraft", "customCraftingDirty", "crimeEdits",
-  "dispatchEdits", "bountyHunterEdits", "honorActionEdits", "effectEdits",
+  "dispatchEdits", "bountyHunterEdits", "honorActionEdits", "lootSoundEdits", "effectEdits",
   "itemEffectEdits", "itemTagEdits", "quickSelectEdits", "alcoholEdits", "descriptionKeyEdits",
   "settingEdits", "lootDirty", "matrixDirty", "shopDirty", "shopBuyerDirty",
   "challengeEdits", "challengeSourceEdits", "challengeConditionEdits",
@@ -1807,6 +1809,7 @@ async function saveAllChanges() {
     const catalogStores=["priceEdits","buyabilityEdits","sellabilityEdits","yieldEdits","bundleEdits",
       "itemEffectEdits","itemTagEdits","quickSelectEdits","descriptionKeyEdits","carryEdits","craftEdits","effectEdits","localizationEdits","alcoholEdits"];
     if(catalogStores.some(key=>Object.keys(state[key]).length))await saveCatalog();
+    await saveLootSounds();
     await saveLoot();   // saves every dirty loot file itself
     state.lootFile=originalLootFile;
     if(state.matrixDirty.size)await saveMatrix();
@@ -2087,7 +2090,7 @@ function renderToolbarOnly() {
   if (sb) sb.replaceWith(savebar(state.tab === "items" ? saveCatalog :
     state.tab === "crafting" ? saveCustomCrafting :
     state.tab === "effects" ? saveCatalog :
-    state.tab === "loot" ? (state.lootFile === "__matrix" ? saveMatrix : saveLoot) :
+    state.tab === "loot" ? (state.lootFile === "__matrix" ? saveMatrix : state.lootFile === "__sounds" ? saveLootSounds : saveLoot) :
     state.tab === "shops" ? saveShopTab :
     state.tab === "challenges" ? saveChallenges :
     state.tab === "weapons" ? saveWeapons :
@@ -4647,9 +4650,46 @@ function lootSourceCell(t){
 
 function lootTabButtons(){const files=[...dsInfo().lootFiles].sort((a,b)=>(LOOT_TAB_LABELS[a]||a).localeCompare(LOOT_TAB_LABELS[b]||b));return el("div",{class:"subtabs"},
   el("button",{class:state.lootFile==="__all"?"active":"",onclick:async()=>{state.lootFile="__all";state.filters.lootQ="";state.filters.lootPage=0;await ensureAllLoot();renderLoot();}},"All tables"),
+  el("button",{class:state.lootFile==="__sounds"?"active":"",onclick:()=>{state.lootFile="__sounds";renderLoot();}},"Pickup sounds"),
   ...files.map(file=>el("button",{class:file===state.lootFile?"active":"",onclick:async()=>{state.lootFile=file;state.filters.lootQ="";state.filters.lootPage=0;await loadLoot(file);renderLoot();}},LOOT_TAB_LABELS[file]||file)),
   ...(dsInfo().matrix?[el("button",{class:state.lootFile==="__matrix"?"active":"",onclick:()=>{state.lootFile="__matrix";state.filters.lootQ="";state.filters.lootPage=0;renderMatrix();}},"Skinning")]:[]));}
+async function renderLootSounds(){
+  document.body.classList.remove("loot-split-view");
+  $("#toolbar").replaceChildren(lootTabButtons(),savebar(saveLootSounds));
+  const main=$("#main");main.replaceChildren(el("div",{class:"loading"},"Loading sound mappings…"));
+  const data=await api("/api/loot-sounds");
+  if(state.tab!=="loot"||state.lootFile!=="__sounds")return;
+  main.replaceChildren();
+  if(!data.available){main.append(el("p",{},"Pickup sound data is missing. Prepare this game's reference files to edit it."));return;}
+  const query=(state.lootSoundQuery||" ").trim().toLowerCase();
+  const rows=data.rows.filter(row=>`${row.key} ${row.section} ${row.value}`.toLowerCase().includes(query));
+  const selected=rows.find(row=>row.id===state.lootSoundSelected)||rows[0];
+  state.lootSoundSelected=selected?.id;
+  const list=el("select",{size:18,"aria-label":"Pickup sound mappings",style:"width:100%;height:100%;min-width:0",onchange:event=>{state.lootSoundSelected=event.target.value;renderLootSounds();}},
+    ...rows.map(row=>{const option=el("option",{value:row.id},`${row.key} (${row.section}, map ${row.map+1})`);option.selected=row.id===selected?.id;return option;}));
+  const detail=el("section",{style:"padding:12px;min-width:0"},el("h2",{},"Sound routing"));
+  if(selected){
+    const choices=selected.section==="Sounds"?data.categories:data.soundSets;
+    const control=el("select",{"aria-label":selected.section==="Sounds"?"Sound category":"Sound set",disabled:isRO()?"":null,style:"width:100%;min-width:0",onchange:event=>{
+      if(event.target.value===selected.value)delete state.lootSoundEdits[selected.id];else state.lootSoundEdits[selected.id]=event.target.value;refreshGlobalSave();
+    }},...choices.map(value=>{const option=el("option",{value},value);option.selected=value===((isRO()?undefined:state.lootSoundEdits[selected.id])??selected.value);return option;}));
+    detail.append(el("label",{},selected.section==="Sounds"?"Sound category":"Sound set",control));
+  }
+  detail.append(el("p",{},"Choose the sound used when an item is picked up."),
+    el("p",{},"Casing sounds: Tweaks → Spent Casings → Pickup Sound Name and Pickup Sound Set."));
+  const search=el("input",{type:"search",placeholder:"Find an item or sound",value:state.lootSoundQuery||"","aria-label":"Find pickup sound",onchange:event=>{state.lootSoundQuery=event.target.value;renderLootSounds();}});
+  const master=el("div",{style:"display:flex;flex-direction:column;gap:8px;min-height:0"},search,el("span",{},`${rows.length} of ${data.rows.length} mappings`),list);
+  main.append(el("div",{style:"display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr);gap:12px;height:100%;min-height:0;overflow:auto"},master,detail));
+}
+async function saveLootSounds(){
+  if(isRO())return 0;
+  const edits=Object.entries(state.lootSoundEdits).map(([id,value])=>({id,value}));
+  if(!edits.length)return 0;
+  const result=await api("/api/loot-sounds/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});
+  state.lootSoundEdits={};refreshGlobalSave();if(state.tab==="loot"&&state.lootFile==="__sounds")await renderLootSounds();return result.saved;
+}
 async function renderLoot() {
+  if(state.lootFile==="__sounds")return renderLootSounds();
   if(state.lootFile==="__matrix"){
     document.body.classList.remove("loot-split-view");
     return renderMatrix();

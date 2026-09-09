@@ -72,6 +72,15 @@ with sync_playwright() as p:
                 assert 'Structured editable' not in page.locator('.lex-data-map-table').inner_text(),game
                 metrics=page.evaluate('''()=>{const list=document.querySelector('.lex-data-map-table'),box=list.getBoundingClientRect(),rows=[...list.querySelectorAll('.lex-column-list-row')];return{body:document.body.scrollHeight,viewport:innerHeight,scroll:list.scrollHeight,height:list.clientHeight,bottom:box.bottom,last:rows.at(-1)?.getBoundingClientRect().bottom,count:rows.length}}''')
                 page.screenshot(path=str(OUT/f'{game}-{width}.png'),full_page=True)
+                location=page.locator('.lex-data-map-actions .lex-data-map-location')
+                assert location.evaluate('''button=>{
+                  const box=button.getBoundingClientRect();
+                  const text=[...button.childNodes].find(node=>node.nodeType===Node.TEXT_NODE&&node.textContent.trim());
+                  if(!text)return false;
+                  const range=document.createRange();range.selectNodeContents(text);
+                  const bounds=range.getBoundingClientRect();
+                  return range.getClientRects().length===1&&bounds.left>=box.left&&bounds.right<=box.right+1&&bounds.bottom<=box.bottom+1;
+                }'''),(game,width,'File location text must fit inside its button')
                 assert metrics['body']<=height+2,(game,metrics)
                 assert metrics['scroll']<=metrics['height']+2,(game,metrics)
                 if metrics['count']:assert metrics['last']<=metrics['bottom']+1,(game,metrics)

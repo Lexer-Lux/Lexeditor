@@ -121,6 +121,9 @@ def parse_runtime(raw: bytes) -> dict:
     for gf, count in enumerate(page_counts):
         if count > 8:
             raise SpellbookError("Invalid GF spellbook page count")
+        unused = definitions[gf * 64 + count * 8:(gf + 1) * 64]
+        if unused != bytes((0, 255)) * ((8 - count) * 4):
+            raise SpellbookError("Unused runtime spellbook slots must be empty")
         if not count:
             continue
         pages = []

@@ -190,3 +190,22 @@ A dependent that the user turned off manually stays off.
 Hovering either related setting draws a semi-transparent flowing arrow from the
 requirement control to its dependent control. This shows both what the setting
 controls and what it requires without permanent connector clutter.
+
+
+### Shared control spacing and hover behavior
+
+- A boolean box shows its type in one rail. Hover or keyboard focus in that box
+  replaces the type with its authored help marker. Other boxes stay unchanged.
+- Tab shortcut badges fit the tab height with a margin. The title reserves space
+  on both sides, so the badge cannot cover the text.
+- The detail sort marker stays centered in the left gutter. Boolean arrows keep
+  their arrowhead attached to the line in both ordinary and tabbed panels.
+- Copy buttons occupy a grid column between the label and the value control.
+  Reference tags use their text width with a small gap before the value.
+- Mod status is the last item in each project row. Rename and folder buttons show
+  a colored rounded hit area on hover or keyboard focus.
+- Project actions read “➕ Add a Mod” and “🔍 Find a Mod”. Blank stores sample
+  projects in browser storage; game plugins use their existing folder workflow.
+
+Run `tests/control_layout_browser_check.py` for these rendered regressions at
+1600, 1000, and 700 pixels. Routine pytest discovery is limited to `tests/`.

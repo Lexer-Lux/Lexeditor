@@ -63,6 +63,13 @@ class GfSpellbookRuntimeTests(unittest.TestCase):
         self.assertEqual(pages[0][0].reason, "stock")
         self.assertTrue(pages[0][1].usable)
 
+    def test_zero_page_book_cannot_hide_spells_or_prerequisites(self):
+        for index, value in ((8, 1), (9, 0)):
+            raw = bytearray(gf_spellbooks.runtime_bytes({"schemaVersion": 1, "books": []}))
+            raw[index] = value
+            with self.subTest(index=index), self.assertRaises(gf_spellbooks.SpellbookError):
+                gf_spellbooks.parse_runtime(bytes(raw))
+
     def test_duplicate_spell_and_unsafe_ability_fail_closed(self):
         duplicate = self.sample()
         duplicate["books"][0]["pages"][1].append({"magicId": 1, "abilityId": None})
