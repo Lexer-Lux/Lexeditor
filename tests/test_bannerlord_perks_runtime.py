@@ -10,8 +10,8 @@ Perk("Athletics", 25, "Anti-Cavalry", "Headshots dismount.")};'''
 XP = r'''private static readonly List<XpSourceDefinition> Definitions = new List<XpSourceDefinition>{
 Source("Tailoring", "Light armor damage mitigated", 1f),
 Source("Riding", "Mounted movement second", 0.25f)};'''
-MODULE = '''<Module><Name value="Mod"/><Id value="Mod"/><Version value="v1"/><SingleplayerModule value="true"/>
-<DependedModules><DependedModule Id="Native"/><DependedModule Id="Harmony" DependentVersion="v2"/></DependedModules>
+MODULE = '''<Module><Name value="Mod"/><Id value="Mod"/><Version value="v1.0.0"/><SingleplayerModule value="true"/>
+<DependedModules><DependedModule Id="Native"/><DependedModule Id="Harmony" DependentVersion="v2.0.0"/></DependedModules>
 <SubModules><SubModule><Name value="Mod"/><DLLName value="Mod.dll"/><SubModuleClassType value="Mod.SubModule"/></SubModule></SubModules></Module>'''
 
 class BannerlordPerksRuntimeTests(unittest.TestCase):
@@ -36,16 +36,19 @@ class BannerlordPerksRuntimeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 save_xp_source_definitions(project,[{'index':0,'originalId':sources[0]['id'],'fields':{'defaultAmount':-1}}])
 
-    def test_deployment_status_runnable_warns_on_version_mismatch_and_blocks_missing_dependency(self):
+    def test_deployment_status_uses_launcher_version_semantics_and_blocks_missing_dependency(self):
         from games.bannerlord.runtime_data import deployment_status
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);project=root/'project';game=root/'game';project.mkdir()
             (project/'SubModule.xml').write_text(MODULE,encoding='utf-8')
             (game/'bin/Win64_Shipping_Client').mkdir(parents=True)
             (game/'bin/Win64_Shipping_Client/Bannerlord.exe').write_bytes(b'exe')
-            for module_id in ('Native','Harmony'):
+            for module_id, version in (('Native','v1.0.0'),('Harmony','v2.0.0.999')):
                 folder=game/'Modules'/module_id;folder.mkdir(parents=True)
-                (folder/'SubModule.xml').write_text(f'<Module><Name value="{module_id}"/><Id value="{module_id}"/><Version value="v1"/></Module>',encoding='utf-8')
+                (folder/'SubModule.xml').write_text(
+                    f'<Module><Name value="{module_id}"/><Id value="{module_id}"/><Version value="{version}"/></Module>',
+                    encoding='utf-8',
+                )
             deployed=game/'Modules/Mod';deployed.mkdir(parents=True)
             (deployed/'SubModule.xml').write_bytes((project/'SubModule.xml').read_bytes())
             (deployed/'bin/Win64_Shipping_Client').mkdir(parents=True)
@@ -53,15 +56,27 @@ class BannerlordPerksRuntimeTests(unittest.TestCase):
             (deployed/'ModuleData').mkdir()
             (deployed/'ModuleData/custom_skill_effects.json').write_text('{"x":{"low":1,"high":2}}',encoding='utf-8')
             (deployed/'ModuleData/custom_skill_xp_sources.json').write_text('{"x":3}',encoding='utf-8')
+
             status=deployment_status(project,game)
             self.assertTrue(status['runnable']);self.assertTrue(status['inSync'])
             self.assertTrue(all(row['installed'] for row in status['dependencies']))
             harmony=next(row for row in status['dependencies'] if row['id']=='Harmony')
-            self.assertEqual(harmony['requiredVersion'],'v2')
-            self.assertEqual(harmony['installedVersion'],'v1')
-            self.assertFalse(harmony['versionMatch'])
-            self.assertTrue(any('launcher would warn' in issue and 'Harmony' in issue for issue in status['issues']))
+            self.assertEqual(harmony['requiredVersion'],'v2.0.0')
+            self.assertEqual(harmony['installedVersion'],'v2.0.0.999')
+            self.assertTrue(harmony['versionMatch'])
+            self.assertFalse(any('launcher would warn' in issue and 'Harmony' in issue for issue in status['issues']))
             self.assertEqual(status['runtimeOverrides']['effects']['keys'],1)
+
+            (game/'Modules/Harmony/SubModule.xml').write_text(
+                '<Module><Name value="Harmony"/><Id value="Harmony"/><Version value="e2.0.0"/></Module>',
+                encoding='utf-8',
+            )
+            mismatched=deployment_status(project,game)
+            harmony=next(row for row in mismatched['dependencies'] if row['id']=='Harmony')
+            self.assertFalse(harmony['versionMatch'])
+            self.assertTrue(any('launcher would warn' in issue and 'Harmony' in issue for issue in mismatched['issues']))
+            self.assertTrue(mismatched['runnable'])
+
             (game/'Modules/Harmony/SubModule.xml').unlink()
             broken=deployment_status(project,game)
             self.assertFalse(broken['runnable'])
