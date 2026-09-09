@@ -113,6 +113,7 @@ class BannerlordXsdTests(unittest.TestCase):
             self.assertEqual(document["records"][0]["schemaIssueCount"], 6)
             item = next(row for row in document["elements"] if row["tag"] == "Item")
             self.assertEqual([row["name"] for row in item["missingRequired"]], ["id"])
+            self.assertEqual(item["missingRequired"][0]["kind"], "text")
             issues = "\n".join(item["schemaIssues"])
             self.assertIn("Missing required attribute: id", issues)
             self.assertIn("enabled has value 'maybe'; expected an XML boolean", issues)
@@ -126,6 +127,59 @@ class BannerlordXsdTests(unittest.TestCase):
             self.assertIn("schemaIssue", attrs["Type"])
             self.assertIn("schemaIssue", attrs["tier"])
             self.assertIn("schemaIssue", attrs["fixedValue"])
+        finally:
+            temporary.cleanup()
+
+    def test_missing_required_attribute_can_be_repaired_surgically(self):
+        temporary, project, game, source, _schema_path = self.fixture()
+        try:
+            source.write_text(
+                '<Items>\n'
+                '  <Item enabled="true" weight="0.5" Type="Weapon" tier="2" fixedValue="locked" />\n'
+                '</Items>\n',
+                encoding="utf-8",
+            )
+            document = read_document(project, "ModuleData/items.xml", game)
+            item = next(row for row in document["elements"] if row["tag"] == "Item")
+            self.assertEqual(document["schemaIssueCount"], 1)
+            saved = save_document(
+                project,
+                document["relativePath"],
+                [{
+                    "addRequired": True,
+                    "elementPath": item["path"],
+                    "tag": "Item",
+                    "attribute": "id",
+                    "value": "sword & shield",
+                }],
+                game,
+            )
+            self.assertEqual(saved["saved"], 1)
+            self.assertEqual(saved["schemaIssueCount"], 0)
+            self.assertEqual(saved["records"][0]["id"], "sword & shield")
+            rewritten = source.read_text(encoding="utf-8")
+            self.assertEqual(
+                rewritten,
+                '<Items>\n'
+                '  <Item enabled="true" weight="0.5" Type="Weapon" tier="2" fixedValue="locked" id="sword &amp; shield" />\n'
+                '</Items>\n',
+            )
+            self.assertTrue(Path(saved["backup"]).is_file())
+
+            with self.assertRaisesRegex(ValueError, "already has attribute id"):
+                save_document(
+                    project,
+                    document["relativePath"],
+                    [{"addRequired": True, "elementPath": item["path"], "tag": "Item", "attribute": "id", "value": "duplicate"}],
+                    game,
+                )
+            with self.assertRaisesRegex(ValueError, "not a schema-declared missing required attribute"):
+                save_document(
+                    project,
+                    document["relativePath"],
+                    [{"addRequired": True, "elementPath": item["path"], "tag": "Item", "attribute": "madeUp", "value": "nope"}],
+                    game,
+                )
         finally:
             temporary.cleanup()
 
