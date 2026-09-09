@@ -16,7 +16,7 @@ If that shape is not present, deployment fails closed.
 The deployment manager:
 
 1. audits the project against the current Steam archive and integrated cross-resource structures;
-2. scans every scene header (not only the editor's 250-row page), de-duplicates referenced Atel scripts, validates world references, and rejects malformed structured overlays;
+2. scans every scene header (not only the editor's 250-row page), de-duplicates referenced Atel scripts, validates field-event control flow and world references, and rejects malformed structured overlays;
 3. mirrors an external project to `mods/<project-folder-name>` or uses it in-place when the project is already under `mods/`;
 4. refuses to overwrite a pre-existing mod folder unless it carries Lexeditor's own `.lexeditor-deployment.json` ownership manifest for the exact source project;
 5. on redeploy, removes only files recorded in the previous Lexeditor manifest and leaves unrelated/manual files alone;
