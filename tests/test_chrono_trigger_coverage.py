@@ -8,7 +8,9 @@ from games.chrono_trigger.coverage import augment_data_map, resource_override
 
 class CoverageTests(unittest.TestCase):
     def test_world_resources_use_current_structured_classification(self):
-        self.assertEqual(resource_override("Game/common/bankc6.bin")["target"], "worlds")
+        world = resource_override("Game/common/bankc6.bin")
+        self.assertEqual(world["target"], "worlds")
+        self.assertEqual(world["coverage"], "structured + raster")
         self.assertEqual(
             resource_override("Game/world/EventTable/EventTable_0007.dat")["status"],
             "integrated",
@@ -17,6 +19,12 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(script["status"], "partial")
         self.assertEqual(script["coverage"], "structural")
         self.assertEqual(script["target"], "worlds")
+
+    def test_scene_map_reports_desktop_raster_coverage(self):
+        scene_map = resource_override("Game/field/MapTable/MapTable_0020.dat")
+        self.assertEqual(scene_map["status"], "integrated")
+        self.assertEqual(scene_map["coverage"], "structural + raster")
+        self.assertEqual(scene_map["target"], "scenes")
 
     def test_field_events_report_fixed_width_write_coverage(self):
         event = resource_override("Game/field/atel/Atel_0020.dat")
@@ -45,6 +53,10 @@ class CoverageTests(unittest.TestCase):
         script_row = next(row for row in mapped["rows"] if row["filename"] == "Game/world/esl/Event_*.dat")
         self.assertEqual(script_row["coverage"], "structural")
         self.assertEqual(script_row["target"], "worlds")
+        world_row = next(row for row in mapped["rows"] if row["filename"] == "Game/common/bankc6.bin")
+        self.assertEqual(world_row["coverage"], "structured + raster")
+        self.assertIn("desktop", world_row["controls"])
+        self.assertIn("isolated L1/L2", world_row["notes"])
         self.assertEqual(mapped["counts"]["worldHeaders"], 8)
         self.assertEqual(mapped["counts"]["worldEventTables"], 2)
         self.assertEqual(mapped["counts"]["worldScripts"], 1)
@@ -62,6 +74,17 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(event_row["coverage"], "structural + fixed-write")
         self.assertIn("named fixed-width editing", event_row["controls"])
         self.assertIn("desktop Events view", event_row["notes"])
+
+    def test_data_map_describes_desktop_scene_raster_without_overclaiming_composition(self):
+        store = SimpleNamespace(archive=SimpleNamespace(entries=[
+            SimpleNamespace(path="Game/field/MapTable/MapTable_0000.dat"),
+        ]))
+        mapped = augment_data_map(store, {"rows": [], "counts": {"resources": 1}})
+        row = next(item for item in mapped["rows"] if str(item["filename"]).startswith("Game/field/MapTable/"))
+        self.assertEqual(row["coverage"], "structural + raster")
+        self.assertIn("desktop", row["controls"])
+        self.assertIn("main/sub-screen", row["notes"])
+        self.assertIn("unsupported", row["notes"])
 
 
 if __name__ == "__main__":
