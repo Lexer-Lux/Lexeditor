@@ -70,14 +70,24 @@ class SemanticSurfaceTests(unittest.TestCase):
         self.assertEqual((data["vanilla"]["limitBreaks"][0]["name"],data["vanilla"]["limitBreaks"][0]["description"]),("Vanilla Braver","Vanilla help."))
 
     def test_limit_save_response_keeps_linked_text(self):
-        result={"records":{"limitBreaks":[{"id":0,"gameId":128,"name":"Limit break 0","description":"Executable Limit attack data."}]}}
-        extra={"records":{"texts":[
+        texts=[
             {"id":9*65536+128,"values":{"text":"Braver"}},
             {"id":1*65536+128,"values":{"text":"Deal damage."}},
-        ]}}
-        returned=server._link_saved_limit_text(result,extra)
-        self.assertIs(returned,result)
-        self.assertEqual((result["records"]["limitBreaks"][0]["name"],result["records"]["limitBreaks"][0]["description"]),("Braver","Deal damage."))
+        ]
+        limit={"id":0,"gameId":128,"name":"Limit break 0","description":"Executable Limit attack data."}
+
+        # Saving the executable family returns Limit rows; decorate those rows
+        # from the unchanged KERNEL2 text family before sending them to the UI.
+        shop_result={"limitBreaks":[dict(limit)]}
+        server._synchronize_limit_text(shop_result,{"texts":texts})
+        self.assertEqual((shop_result["limitBreaks"][0]["name"],shop_result["limitBreaks"][0]["description"]),("Braver","Deal damage."))
+
+        # Saving KERNEL2 returns only text rows. Include the unchanged Limit rows
+        # so their linked names/help refresh immediately in the browser too.
+        text_result={"texts":texts}
+        server._synchronize_limit_text(text_result,{"limitBreaks":[dict(limit)]})
+        self.assertIn("limitBreaks",text_result)
+        self.assertEqual((text_result["limitBreaks"][0]["name"],text_result["limitBreaks"][0]["description"]),("Braver","Deal damage."))
 
     def test_extended_categories_are_humanized(self):
         categories={}
