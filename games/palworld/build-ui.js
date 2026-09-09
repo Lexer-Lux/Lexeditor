@@ -78,6 +78,7 @@ function palServerStatusText(){
   if(server.ready===false)return server.error||"Dedicated-server state unavailable";
   if(!server.platformSupported)return "Official mod-loader support is Windows dedicated server only";
   if(!server.serverRootReady)return "PalServer.exe not found — set LEXEDITOR_PALWORLD_SERVER_ROOT if needed";
+  if(server.serverRunning)return "PalServer.exe is running — stop it before deployment/config changes";
   if(!server.serverRule)return 'Package needs an InstallRule with IsServer=true';
   if(deployment.externallyChanged)return "Server package changed outside Lexeditor — actions blocked";
   if(deployment.owned&&!deployment.deployed)return "Owned server package folder is missing";
@@ -102,10 +103,11 @@ function palBuildPanel(){
   const workshopOwnershipBroken=!!(workshop.owned&&!workshop.deployed);
   const canDeploy=!palBuildLoading&&state.current&&workshop.ready!==false&&workshop.workshopRootReady&&!workshop.externallyChanged&&!workshopOwnershipBroken;
   const canRemove=!palBuildLoading&&workshop.deployed&&workshop.owned&&!workshop.externallyChanged;
-  const canServerDeploy=!palBuildLoading&&state.current&&server.platformSupported&&server.serverRootReady&&server.serverRule&&!serverDeploy.externallyChanged&&!(serverDeploy.owned&&!serverDeploy.deployed);
-  const canServerEnable=!palBuildLoading&&serverDeploy.current&&serverLoader.available&&!serverLoader.active&&!serverLoader.activationExternallyChanged;
-  const canServerRevert=!palBuildLoading&&serverLoader.activationOwned&&!serverLoader.activationExternallyChanged&&!serverLoader.activationRootMismatch;
-  const canServerRemove=!palBuildLoading&&serverDeploy.deployed&&serverDeploy.owned&&!serverDeploy.externallyChanged&&!serverLoader.activationOwned&&!serverLoader.listed;
+  const serverStopped=server.serverRunning===false;
+  const canServerDeploy=!palBuildLoading&&serverStopped&&state.current&&server.platformSupported&&server.serverRootReady&&server.serverRule&&!serverDeploy.externallyChanged&&!(serverDeploy.owned&&!serverDeploy.deployed);
+  const canServerEnable=!palBuildLoading&&serverStopped&&serverDeploy.current&&serverLoader.available&&!serverLoader.active&&!serverLoader.activationExternallyChanged;
+  const canServerRevert=!palBuildLoading&&serverStopped&&serverLoader.activationOwned&&!serverLoader.activationExternallyChanged&&!serverLoader.activationRootMismatch;
+  const canServerRemove=!palBuildLoading&&serverStopped&&serverDeploy.deployed&&serverDeploy.owned&&!serverDeploy.externallyChanged&&!serverLoader.activationOwned&&!serverLoader.listed;
   return detailPanel({className:"pal-detail",title:"Official Package Build",identity:state.packageName||model?.PackageName||"PACKAGE",meta:"Clean package snapshot + official loader test/deployment paths",body:[
     detailSection({title:"SNAPSHOT",body:[
       detailField({label:"STATUS",control:readonlyField(palBuildStatusText()),help:infoHelp("Build creates a clean package snapshot from Info.json, Thumbnail and declared InstallRule targets. It does not publish to Steam.")}),
@@ -145,6 +147,7 @@ function palBuildPanel(){
     detailSection({title:"WINDOWS DEDICATED SERVER",body:[
       detailField({label:"STATUS",control:readonlyField(palServerStatusText()),help:infoHelp("Pocketpair documents Windows dedicated servers as reading Mods/Workshop/<folder>/Info.json. Lexeditor owns one deterministic package source folder and requires an IsServer=true install rule.")}),
       detailField({label:"SERVER ROOT",control:readonlyField(server.serverRoot||"Not detected")}),
+      detailField({label:"PROCESS",control:readonlyField(server.serverRunning===true?"Running — stop before changes":server.serverRunning===false?"Stopped":"Unknown")}),
       detailField({label:"STEAM APP",control:readonlyField(server.serverAppId||"2394010")}),
       detailField({label:"SOURCE TARGET",control:readonlyField(serverDeploy.targetPath||"Not deployed")}),
       detailField({label:"LOADER",control:readonlyField(palServerLoaderText()),help:infoHelp("Dedicated-server activation is an explicit reversible PalModSettings.ini transaction. The original file is restored byte-for-byte only while its post-edit hash is unchanged.")}),
