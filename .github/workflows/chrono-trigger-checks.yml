@@ -1,0 +1,42 @@
+name: Chrono Trigger checks
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'games/chrono_trigger/**'
+      - 'tests/test_chrono_trigger_resources.py'
+      - '.github/workflows/chrono-trigger-checks.yml'
+  pull_request:
+    paths:
+      - 'games/chrono_trigger/**'
+      - 'tests/test_chrono_trigger_resources.py'
+      - '.github/workflows/chrono-trigger-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax
+        run: python -m py_compile games/chrono_trigger/plugin.py games/chrono_trigger/paths.py games/chrono_trigger/resources.py games/chrono_trigger/data.py games/chrono_trigger/server.py
+      - name: Plugin descriptor
+        run: python -c "from plugin_api import validate_plugin; from games.chrono_trigger.plugin import PLUGIN; validate_plugin(PLUGIN); assert PLUGIN.plugin_id == 'chrono-trigger'"
+      - name: Resource and overlay regressions
+        run: python -m unittest tests.test_chrono_trigger_resources
+      - name: Editor JavaScript syntax
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html = Path('games/chrono_trigger/editor.html').read_text(encoding='utf-8')
+          start = html.rfind('<script>')
+          end = html.find('</script>', start)
+          if start < 0 or end < 0:
+              raise SystemExit('Chrono Trigger editor inline script was not found')
+          Path('/tmp/chrono-trigger-editor.js').write_text(html[start + len('<script>'):end], encoding='utf-8')
+          PY
+          node --check /tmp/chrono-trigger-editor.js
