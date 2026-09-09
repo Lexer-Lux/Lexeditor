@@ -10,22 +10,27 @@
     *{box-sizing:border-box}
     :root{--lex-accent:#d3a348;--lex-highlight:#4c4537}
     body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
-    main{display:flex;flex:1;min-height:0;flex-direction:column;gap:10px;padding:var(--lex-panel-gap)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
+    .ct-view{display:flex;flex-direction:column;gap:10px;height:100%;min-height:0}
     .ct-toolbar,.ct-summary{display:flex;align-items:center;gap:12px;padding:9px 11px;border:1px solid var(--lex-border);background:var(--lex-panel)}
-    .ct-toolbar input{min-width:280px;flex:1;padding:7px 9px;border:1px solid var(--lex-border);background:var(--lex-input-bg,#fff);color:var(--lex-text)}
-    .ct-summary{flex-wrap:wrap;font-size:.92em}
-    .ct-summary strong{font-weight:600}
-    .ct-table-wrap{flex:1;min-height:0;overflow:auto;border:1px solid var(--lex-border);background:var(--lex-panel)}
-    table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-    thead{position:sticky;top:0;z-index:1;background:var(--lex-panel)}
-    th,td{padding:7px 10px;border-bottom:1px solid var(--lex-border);text-align:left}
-    th{font-size:.8em;letter-spacing:.04em;text-transform:uppercase}
-    td:nth-child(2),td:nth-child(3){width:130px;text-align:right;white-space:nowrap}
-    .ct-path{font-family:var(--lex-mono,monospace);font-size:.92em}
-    .ct-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--lex-border);background:var(--lex-panel)}
-    .ct-footer button{padding:5px 12px}
-    .ct-error{padding:12px;border:1px solid #9f4c4c;background:#401f1f;color:#ffd9d9;white-space:pre-wrap}
-    .ct-empty{padding:30px;text-align:center;color:var(--lex-muted)}
+    .ct-toolbar input[type="search"]{min-width:240px;flex:1;padding:7px 9px;border:1px solid var(--lex-border);background:var(--lex-input-bg,#fff);color:var(--lex-text)}
+    .ct-summary{flex-wrap:wrap;font-size:.92em}.ct-summary strong{font-weight:600}
+    .ct-scroll{flex:1;min-height:0;overflow:auto;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}thead{position:sticky;top:0;z-index:1;background:var(--lex-panel)}
+    th,td{padding:7px 10px;border-bottom:1px solid var(--lex-border);text-align:left;vertical-align:middle}th{font-size:.8em;letter-spacing:.04em;text-transform:uppercase}
+    .ct-path{font-family:var(--lex-mono,monospace);font-size:.92em;overflow-wrap:anywhere}.ct-number{text-align:right;white-space:nowrap}
+    .ct-source{display:inline-block;padding:2px 6px;border:1px solid var(--lex-border);font-size:.78em;text-transform:uppercase}.ct-source.project{color:var(--lex-accent)}
+    .ct-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid var(--lex-border);background:var(--lex-panel)}.ct-footer button{padding:5px 12px}
+    .ct-error{padding:12px;border:1px solid #9f4c4c;background:#401f1f;color:#ffd9d9;white-space:pre-wrap}.ct-empty{padding:30px;text-align:center;color:var(--lex-muted)}
+    .ct-split{display:grid;grid-template-columns:minmax(290px,34%) minmax(430px,1fr);gap:10px;flex:1;min-height:0}.ct-list,.ct-detail{min-height:0;overflow:auto;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .ct-list-row{display:grid;width:100%;grid-template-columns:76px 1fr auto;gap:8px;padding:8px 10px;border:0;border-bottom:1px solid var(--lex-border);background:transparent;color:inherit;text-align:left;cursor:pointer}.ct-list-row:hover,.ct-list-row.active{background:var(--lex-highlight)}
+    .ct-list-id{font-variant-numeric:tabular-nums;color:var(--lex-muted)}.ct-detail h2{margin:0;padding:12px 14px;border-bottom:1px solid var(--lex-border);font:600 18px/1.2 var(--lex-heading-font)}
+    .ct-form{display:grid;grid-template-columns:minmax(150px,230px) minmax(160px,1fr);gap:0;padding:6px 14px 18px}.ct-form label,.ct-form .ct-control{padding:7px 4px;border-bottom:1px solid var(--lex-border)}.ct-form label{color:var(--lex-muted)}
+    .ct-form input{width:100%;max-width:240px;padding:5px 7px;border:1px solid var(--lex-border);background:var(--lex-input-bg,#fff);color:var(--lex-text)}
+    .ct-message-table input{width:100%;min-width:260px;padding:5px 7px;border:1px solid var(--lex-border);background:var(--lex-input-bg,#fff);color:var(--lex-text)}.ct-message-key{width:180px;font-family:var(--lex-mono,monospace);color:var(--lex-muted)}
+    .ct-file-select{max-width:520px;min-width:260px;padding:6px 8px;border:1px solid var(--lex-border);background:var(--lex-input-bg,#fff);color:var(--lex-text)}
+    .ct-map-status{font-weight:700;text-transform:uppercase;font-size:.78em}.ct-map-status.integrated{color:#7fd089}.ct-map-status.partial{color:#e4bd62}
+    @media(max-width:900px){.ct-split{grid-template-columns:1fr}.ct-list{max-height:35vh}}
   </style>
 </head>
 <body>
@@ -34,53 +39,41 @@
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
-  const {el}=LexeditorUI;
-  const state={query:"",offset:0,limit:250,data:null,error:""};
+  const {el,clone}=LexeditorUI;
+  const state={tab:"scenes",source:"mine",dashboard:null,dataMap:null,error:"",busy:false,
+    archive:{query:"",offset:0,limit:250,data:null},scenes:{query:"",offset:0,limit:100,data:null,original:null,selected:null},
+    messages:{catalog:[],path:"",data:null,original:null}};
   let searchTimer=0;
+  const tabs=[{id:"scenes",label:"Scenes"},{id:"text",label:"Text"},{id:"resources",label:"Resources"},{id:"datamap",label:"Data Map"}];
   const formatBytes=value=>{const n=Number(value)||0;if(n<1024)return `${n} B`;const units=["KiB","MiB","GiB"];let size=n/1024,index=0;while(size>=1024&&index<units.length-1){size/=1024;index++}return `${size.toFixed(size>=100?0:size>=10?1:2)} ${units[index]}`};
-  async function load(){
-    state.error="";
-    try{
-      const params=new URLSearchParams({q:state.query,offset:String(state.offset),limit:String(state.limit)});
-      const response=await fetch(`/api/archive?${params}`);
-      const payload=await response.json();
-      if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);
-      state.data=payload;
-    }catch(error){state.data=null;state.error=String(error?.message||error)}
-    render();
-  }
-  function searchInput(){
-    return el("input",{type:"search",value:state.query,placeholder:"Filter resource paths…","aria-label":"Filter resource paths",
-      oninput:event=>{state.query=event.target.value;state.offset=0;clearTimeout(searchTimer);searchTimer=setTimeout(load,180)}});
-  }
-  function render(){
-    const main=document.querySelector("#main");
-    const toolbar=el("div",{class:"ct-toolbar"},searchInput());
-    if(state.error){main.replaceChildren(toolbar,el("div",{class:"ct-error"},state.error));return}
-    if(!state.data){main.replaceChildren(toolbar,el("div",{class:"ct-empty"},"Loading resources.bin index…"));return}
-    const data=state.data;
-    const summary=el("div",{class:"ct-summary"},
-      el("span",{},el("strong",{},String(data.entryCount))," resources"),
-      el("span",{},"Archive ",el("strong",{},formatBytes(data.fileSize))),
-      el("span",{},"Index ",el("strong",{},formatBytes(data.indexStoredSize))),
-      el("span",{},"Read-only"));
-    const tbody=el("tbody");
-    for(const row of data.entries){tbody.append(el("tr",{},el("td",{class:"ct-path"},row.path),el("td",{},`0x${Number(row.offset).toString(16).toUpperCase()}`),el("td",{},formatBytes(row.storedSize))))}
-    const table=data.entries.length?el("table",{},el("thead",{},el("tr",{},el("th",{},"Resource path"),el("th",{},"Offset"),el("th",{},"Stored size"))),tbody):el("div",{class:"ct-empty"},"No resources match this filter.");
-    const previous=el("button",{type:"button",disabled:data.offset<=0,onclick:()=>{state.offset=Math.max(0,state.offset-state.limit);load()}},"Previous");
-    const next=el("button",{type:"button",disabled:data.offset+data.entries.length>=data.matchCount,onclick:()=>{state.offset+=state.limit;load()}},"Next");
-    const start=data.matchCount?data.offset+1:0,end=data.offset+data.entries.length;
-    const footer=el("div",{class:"ct-footer"},el("span",{},`Showing ${start}–${end} of ${data.matchCount}`),el("div",{},previous," ",next));
-    main.replaceChildren(toolbar,summary,el("div",{class:"ct-table-wrap"},table),footer);
-  }
-  const shell=LexeditorUI.mountShell({
-    host:"#lexeditor-shell",brand:"LEXEDITOR",
-    plugin:{id:"chrono-trigger",name:"Chrono Trigger",themeName:"chrono-trigger",theme:{accent:"#d3a348"}},
-    tabs:[{id:"resources",label:"Resources"}],activeTab:()=>"resources",navigate:()=>{},
-    dirtyCount:()=>0,readonly:()=>true,
-  });
+  async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const payload=await response.json();if(!response.ok)throw new Error(payload.error||`HTTP ${response.status}`);return payload}
+  const refreshShell=()=>shell?.refresh?.();
+  const sourceParam=()=>`source=${encodeURIComponent(state.source)}`;
+  function sceneDirtyRows(){const current=state.scenes.data?.rows||[],original=state.scenes.original?.rows||[];const byId=Object.fromEntries(original.map(row=>[String(row.id),row]));return current.filter(row=>JSON.stringify(row.values)!==JSON.stringify(byId[String(row.id)]?.values))}
+  function messageChanges(){const current=state.messages.data?.rows||[],original=state.messages.original?.rows||[];const byId=Object.fromEntries(original.map(row=>[String(row.id),row]));return current.filter(row=>row.text!==byId[String(row.id)]?.text).map(row=>({id:row.id,text:row.text}))}
+  function dirtyCount(){if(state.source!=="mine")return 0;return sceneDirtyRows().length+messageChanges().length}
+  async function loadDashboard(){state.dashboard=await api("/api/dashboard")}
+  async function loadDataMap(){state.dataMap=await api("/api/datamap")}
+  async function loadArchive(){const p=new URLSearchParams({q:state.archive.query,offset:String(state.archive.offset),limit:String(state.archive.limit)});state.archive.data=await api(`/api/archive?${p}`)}
+  async function loadScenes(){const p=new URLSearchParams({source:state.source,q:state.scenes.query,offset:String(state.scenes.offset),limit:String(state.scenes.limit)});const data=await api(`/api/scenes?${p}`);state.scenes.data=data;state.scenes.original=clone(data);if(!data.rows.some(row=>row.id===state.scenes.selected))state.scenes.selected=data.rows[0]?.id??null}
+  async function loadMessageCatalog(){const payload=await api("/api/messages/catalog");state.messages.catalog=payload.files;if(!payload.files.some(row=>row.path===state.messages.path))state.messages.path=payload.files[0]?.path||""}
+  async function loadMessage(){if(!state.messages.path){state.messages.data=null;state.messages.original=null;return}const p=new URLSearchParams({path:state.messages.path,source:state.source});const data=await api(`/api/messages?${p}`);state.messages.data=data;state.messages.original=clone(data)}
+  async function loadActive(){state.busy=true;state.error="";try{if(!state.dashboard)await loadDashboard();if(state.tab==="resources")await loadArchive();else if(state.tab==="scenes")await loadScenes();else if(state.tab==="text"){if(!state.messages.catalog.length)await loadMessageCatalog();await loadMessage()}else if(state.tab==="datamap")await loadDataMap()}catch(error){state.error=String(error?.message||error)}finally{state.busy=false;render();refreshShell()}}
+  function abandonAllowed(){return !dirtyCount()||confirm("Discard unsaved Chrono Trigger edits?")}
+  async function navigate(value){if(value===state.tab)return;if(!abandonAllowed())return;state.tab=value;state.scenes.original=clone(state.scenes.data);state.messages.original=clone(state.messages.data);await loadActive()}
+  async function selectSource(value){value=String(value||"mine");if(value===state.source)return;if(!abandonAllowed())return;state.source=value;state.scenes.data=state.scenes.original=null;state.messages.data=state.messages.original=null;await loadActive()}
+  async function save(){if(state.source!=="mine"||state.busy)return;state.busy=true;state.error="";try{if(state.tab==="scenes"){for(const row of sceneDirtyRows()){const original=state.scenes.original.rows.find(value=>value.id===row.id);const changes={};for(const [key,value] of Object.entries(row.values))if(value!==original.values[key])changes[key]=value;const saved=await api("/api/save/scene",{id:row.id,sha256:original.sha256,values:changes});Object.assign(row,saved);Object.assign(original,clone(saved))}}else if(state.tab==="text"){const changes=messageChanges();if(changes.length){const saved=await api("/api/save/message",{path:state.messages.data.path,sha256:state.messages.original.sha256,changes});state.messages.data=saved;state.messages.original=clone(saved)}}await loadDashboard()}catch(error){state.error=String(error?.message||error)}finally{state.busy=false;render();refreshShell()}}
+  async function discard(){if(state.tab==="scenes")await loadScenes();else if(state.tab==="text")await loadMessage();render();refreshShell()}
+  function errorNode(){return state.error?el("div",{class:"ct-error"},state.error):null}
+  function sourceBadge(source){return el("span",{class:`ct-source ${source}`},source)}
+  function resourcesView(){const data=state.archive.data;if(!data)return el("div",{class:"ct-view"},errorNode()||el("div",{class:"ct-empty"},"Loading resources.bin…"));const search=el("input",{type:"search",value:state.archive.query,placeholder:"Filter resource paths…",oninput:event=>{state.archive.query=event.target.value;state.archive.offset=0;clearTimeout(searchTimer);searchTimer=setTimeout(loadActive,180)}});const tbody=el("tbody");for(const row of data.entries)tbody.append(el("tr",{},el("td",{class:"ct-path"},row.path),el("td",{},row.kind),el("td",{},sourceBadge(row.source)),el("td",{class:"ct-number"},`0x${Number(row.offset).toString(16).toUpperCase()}`),el("td",{class:"ct-number"},formatBytes(row.storedSize))));const start=data.matchCount?data.offset+1:0,end=data.offset+data.entries.length;return el("div",{class:"ct-view"},el("div",{class:"ct-toolbar"},search),el("div",{class:"ct-summary"},el("span",{},el("strong",{},String(data.entryCount))," resources"),el("span",{},"Archive ",el("strong",{},formatBytes(data.fileSize))),el("span",{},"Vanilla archive is read-only")),errorNode(),el("div",{class:"ct-scroll"},el("table",{},el("thead",{},el("tr",{},...['Resource path','Type','Source','Offset','Stored size'].map(label=>el("th",{},label)))),tbody)),el("div",{class:"ct-footer"},el("span",{},`Showing ${start}–${end} of ${data.matchCount}`),el("div",{},el("button",{type:"button",disabled:data.offset<=0||dirtyCount()>0,onclick:()=>{state.archive.offset=Math.max(0,state.archive.offset-state.archive.limit);loadActive()}},"Previous")," ",el("button",{type:"button",disabled:data.offset+data.entries.length>=data.matchCount||dirtyCount()>0,onclick:()=>{state.archive.offset+=state.archive.limit;loadActive()}},"Next"))))}
+  function scenesView(){const data=state.scenes.data;if(!data)return el("div",{class:"ct-view"},errorNode()||el("div",{class:"ct-empty"},"Loading scene headers…"));const search=el("input",{type:"search",value:state.scenes.query,placeholder:"Filter scene IDs or paths…",oninput:event=>{if(dirtyCount())return;state.scenes.query=event.target.value;state.scenes.offset=0;clearTimeout(searchTimer);searchTimer=setTimeout(loadActive,180)}});const list=el("div",{class:"ct-list"});for(const row of data.rows)list.append(el("button",{type:"button",class:`ct-list-row${row.id===state.scenes.selected?" active":""}`,onclick:()=>{state.scenes.selected=row.id;render()}},el("span",{class:"ct-list-id"},String(row.id).padStart(4,"0")),el("span",{},row.name),sourceBadge(row.source)));const row=data.rows.find(value=>value.id===state.scenes.selected);let detail=el("div",{class:"ct-detail"},el("div",{class:"ct-empty"},"No scene selected."));if(row){const form=el("div",{class:"ct-form"});for(const field of data.fields){const input=el("input",{type:"number",min:field.min,max:field.max,step:1,value:row.values[field.key],disabled:state.source!=="mine",oninput:event=>{if(event.target.value!==""){row.values[field.key]=Math.max(field.min,Math.min(field.max,Number(event.target.value)||0));refreshShell()}}});form.append(el("label",{},field.label),el("div",{class:"ct-control"},input))}detail=el("div",{class:"ct-detail"},el("h2",{},`${row.name} · ${row.path}`),form)}const start=data.matchCount?data.offset+1:0,end=data.offset+data.rows.length;return el("div",{class:"ct-view"},el("div",{class:"ct-toolbar"},search),el("div",{class:"ct-summary"},el("span",{},el("strong",{},String(data.matchCount))," scene headers"),el("span",{},state.source==="vanilla"?"Vanilla reference":"Project overlay over vanilla"),dirtyCount()?el("span",{},el("strong",{},String(sceneDirtyRows().length))," edited scenes"):null),errorNode(),el("div",{class:"ct-split"},list,detail),el("div",{class:"ct-footer"},el("span",{},`Showing ${start}–${end} of ${data.matchCount}`),el("div",{},el("button",{type:"button",disabled:data.offset<=0||dirtyCount()>0,onclick:()=>{state.scenes.offset=Math.max(0,state.scenes.offset-state.scenes.limit);loadActive()}},"Previous")," ",el("button",{type:"button",disabled:data.offset+data.rows.length>=data.matchCount||dirtyCount()>0,onclick:()=>{state.scenes.offset+=state.scenes.limit;loadActive()}},"Next"))))}
+  function textView(){const data=state.messages.data;const select=el("select",{class:"ct-file-select",value:state.messages.path,onchange:async event=>{if(dirtyCount()&&!confirm("Discard unsaved text edits?")){event.target.value=state.messages.path;return}state.messages.path=event.target.value;await loadMessage();render();refreshShell()}},...state.messages.catalog.map(row=>{const option=el("option",{value:row.path},`${row.language} · ${row.file}`);option.selected=row.path===state.messages.path;return option}));if(!data)return el("div",{class:"ct-view"},el("div",{class:"ct-toolbar"},select),errorNode()||el("div",{class:"ct-empty"},"No localization message files found."));const tbody=el("tbody");for(const row of data.rows){const input=el("input",{type:"text",value:row.text,disabled:state.source!=="mine",oninput:event=>{row.text=event.target.value;refreshShell()}});tbody.append(el("tr",{},el("td",{class:"ct-number"},String(row.id)),el("td",{class:"ct-message-key"},row.key||"—"),el("td",{},input)))}return el("div",{class:"ct-view"},el("div",{class:"ct-toolbar"},select),el("div",{class:"ct-summary"},el("span",{},el("strong",{},String(data.rows.length))," lines"),el("span",{},data.path),sourceBadge(data.source),messageChanges().length?el("span",{},el("strong",{},String(messageChanges().length))," edited lines"):null),errorNode(),el("div",{class:"ct-scroll ct-message-table"},el("table",{},el("thead",{},el("tr",{},el("th",{},"#"),el("th",{},"Key"),el("th",{},"Text"))),tbody)))}
+  function dataMapView(){const payload=state.dataMap;if(!payload)return el("div",{class:"ct-view"},errorNode()||el("div",{class:"ct-empty"},"Loading Data Map…"));const tbody=el("tbody");for(const row of payload.rows)tbody.append(el("tr",{onclick:row.openable&&row.target?()=>navigate(row.target):null},el("td",{class:"ct-path"},row.filename),el("td",{},row.controls),el("td",{},el("span",{class:`ct-map-status ${row.status}`},row.status)),el("td",{},row.coverage||"—"),el("td",{},row.notes)));return el("div",{class:"ct-view"},el("div",{class:"ct-summary"},el("span",{},"Evidence-based Steam coverage"),el("span",{},"Structured areas save to project overlays only")),errorNode(),el("div",{class:"ct-scroll"},el("table",{},el("thead",{},el("tr",{},...['Files','Controls','Status','Coverage','Notes'].map(label=>el("th",{},label)))),tbody)))}
+  function render(){const main=document.querySelector("#main");let view;if(state.busy&&!((state.tab==="scenes"&&state.scenes.data)||(state.tab==="text"&&state.messages.data)||(state.tab==="resources"&&state.archive.data)||(state.tab==="datamap"&&state.dataMap)))view=el("div",{class:"ct-empty"},"Loading Chrono Trigger data…");else if(state.tab==="resources")view=resourcesView();else if(state.tab==="text")view=textView();else if(state.tab==="datamap")view=dataMapView();else view=scenesView();main.replaceChildren(view)}
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"chrono-trigger",name:"Chrono Trigger",themeName:"chrono-trigger",theme:{accent:"#d3a348"}},tabs,activeTab:()=>state.tab,navigate,dirtyCount,readonly:()=>state.source!=="mine",save,discard,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open Chrono Trigger Data Map",projectSources:()=>[{key:"vanilla",label:"Vanilla",path:state.dashboard?.game?.archive||"resources.bin",readOnly:true}],projectActiveSource:()=>state.source,selectProjectSource:selectSource});
   render();
-  load().finally(()=>LexeditorUI.finishPluginLoading());
+  loadActive().finally(()=>LexeditorUI.finishPluginLoading());
   </script>
 </body>
 </html>
