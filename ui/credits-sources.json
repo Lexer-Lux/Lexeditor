@@ -77,6 +77,11 @@
           "name": "BUTR / Bannerlord.ModuleManager",
           "role": "Reference for community dependency normalization, load-order precedence, optional/incompatible handling, and version-range semantics.",
           "url": "https://github.com/BUTR/Bannerlord.ModuleManager"
+        },
+        {
+          "name": "BUTR / Bannerlord.XmlSchemas",
+          "role": "Reference for SubModule.xml community metadata fields and UpdateInfo grammar.",
+          "url": "https://github.com/BUTR/Bannerlord.XmlSchemas"
         }
       ],
       "thanks": [],

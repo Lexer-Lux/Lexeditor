@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import shutil
 import xml.etree.ElementTree as ET
 
@@ -163,6 +164,8 @@ def read_submodule(path: Path) -> dict:
         "version": _value(root, "Version"),
         "moduleCategory": _value(root, "ModuleCategory"),
         "moduleType": _value(root, "ModuleType"),
+        "url": _value(root, "Url"),
+        "updateInfo": _value(root, "UpdateInfo"),
         "defaultModule": _truth(_value(root, "DefaultModule")),
         "singleplayer": _truth(_value(root, "SingleplayerModule")),
         "multiplayer": _truth(_value(root, "MultiplayerModule")),
@@ -194,6 +197,8 @@ _EDITABLE_METADATA = {
     "version": "Version",
     "moduleCategory": "ModuleCategory",
     "moduleType": "ModuleType",
+    "url": "Url",
+    "updateInfo": "UpdateInfo",
     "defaultModule": "DefaultModule",
     "singleplayer": "SingleplayerModule",
     "multiplayer": "MultiplayerModule",
@@ -203,7 +208,23 @@ _ENUM_METADATA = {
     "moduleCategory": {"Singleplayer", "SingleplayerOptional", "Multiplayer", "MultiplayerOptional", "Server", "ServerOptional"},
     "moduleType": {"Community", "Official", "OfficialOptional"},
 }
-_OPTIONAL_METADATA = set(_ENUM_METADATA)
+_OPTIONAL_TEXT_METADATA = {"url", "updateInfo"}
+_OPTIONAL_METADATA = set(_ENUM_METADATA) | _OPTIONAL_TEXT_METADATA
+_UPDATE_INFO_PATTERN = re.compile(
+    r"(?:NexusMods:[0-9]+|GitHub:[A-Za-z0-9._-]+/[A-Za-z0-9._-]+|"
+    r"NexusMods:[0-9]+;GitHub:[A-Za-z0-9._-]+/[A-Za-z0-9._-]+|"
+    r"GitHub:[A-Za-z0-9._-]+/[A-Za-z0-9._-]+;NexusMods:[0-9]+)"
+)
+_MODULE_STRUCTURAL_TAGS = {
+    "DependedModules",
+    "ModulesToLoadAfterThis",
+    "IncompatibleModules",
+    "DependedModuleMetadatas",
+    "LoadAfterModules",
+    "OptionalDependModules",
+    "SubModules",
+    "Xmls",
+}
 
 
 def _set_value(parent: ET.Element, tag: str, value: str) -> bool:
@@ -229,6 +250,43 @@ def _set_optional_value(parent: ET.Element, tag: str, value: str) -> bool:
     return True
 
 
+def _module_child_or_create(parent: ET.Element, tag: str) -> ET.Element:
+    element = parent.find(tag)
+    if element is not None:
+        return element
+    element = ET.Element(tag)
+    children = list(parent)
+    structural_index = next(
+        (index for index, child in enumerate(children) if child.tag in _MODULE_STRUCTURAL_TAGS),
+        len(children),
+    )
+    parent.insert(structural_index, element)
+    return element
+
+
+def _set_module_value(parent: ET.Element, tag: str, value: str) -> bool:
+    element = parent.find(tag)
+    if element is None:
+        element = _module_child_or_create(parent, tag)
+        element.set("value", value)
+        return True
+    old = element.attrib.get("value", (element.text or "").strip())
+    if old == value:
+        return False
+    element.set("value", value)
+    return True
+
+
+def _set_optional_module_value(parent: ET.Element, tag: str, value: str) -> bool:
+    if value:
+        return _set_module_value(parent, tag, value)
+    element = parent.find(tag)
+    if element is None:
+        return False
+    parent.remove(element)
+    return True
+
+
 def _normalize_metadata(edits: dict) -> dict:
     unknown = set(edits) - set(_EDITABLE_METADATA)
     if unknown:
@@ -241,6 +299,13 @@ def _normalize_metadata(edits: dict) -> dict:
             value = str(raw).strip()
             if value and value not in _ENUM_METADATA[field]:
                 raise ValueError(f"{field} must be one of: {', '.join(sorted(_ENUM_METADATA[field]))}")
+            normalized[field] = value
+        elif field in _OPTIONAL_TEXT_METADATA:
+            value = str(raw).strip()
+            if field == "updateInfo" and value and _UPDATE_INFO_PATTERN.fullmatch(value) is None:
+                raise ValueError(
+                    "updateInfo must be NexusMods:<id>, GitHub:<user>/<repo>, or both separated by a semicolon"
+                )
             normalized[field] = value
         else:
             value = str(raw).strip()
@@ -582,7 +647,7 @@ def save_module(path: Path, payload: dict) -> dict:
     changes = 0
     metadata = _normalize_metadata(dict(payload.get("metadata") or {}))
     for field, value in metadata.items():
-        setter = _set_optional_value if field in _OPTIONAL_METADATA else _set_value
+        setter = _set_optional_module_value if field in _OPTIONAL_METADATA else _set_module_value
         changes += int(setter(root, _EDITABLE_METADATA[field], value))
     if "dependencies" in payload:
         changes += _edit_dependencies(root, list(payload.get("dependencies") or []))
