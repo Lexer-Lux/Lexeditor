@@ -54,7 +54,10 @@ jobs:
           python app.py --game palworld --check
           python app.py --game palworld --smoke
       - name: Check editor JavaScript syntax
-        run: node --check games/palworld/editor.js
+        run: |
+          node --check games/palworld/editor.js
+          node --check games/palworld/build-ui-pre.js
+          node --check games/palworld/build-ui.js
 
   browser:
     runs-on: ubuntu-latest
