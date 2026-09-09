@@ -1,16 +1,28 @@
 "use strict";
 
-let palBuildState=null,palBuildLoading=false,palBuildError="";
+let palBuildState=null,palWorkshopState=null,palBuildLoading=false,palBuildError="";
 
 async function refreshPalBuild(){
   palBuildLoading=true;palBuildError="";render();
-  try{palBuildState=await api("/api/build");if(palBuildState?.ready===false)palBuildError=palBuildState.error||"Package build is not ready."}
-  catch(error){palBuildState=null;palBuildError=error.message}
+  try{
+    const results=await Promise.all([api("/api/build"),api("/api/workshop")]);
+    palBuildState=results[0];palWorkshopState=results[1];
+    const errors=[];
+    if(palBuildState?.ready===false)errors.push(palBuildState.error||"Package build is not ready.");
+    if(palWorkshopState?.ready===false)errors.push(palWorkshopState.error||"Local Workshop deployment is not ready.");
+    palBuildError=errors.join(" ");
+  }catch(error){palBuildError=error.message}
   finally{palBuildLoading=false;render()}
 }
 async function runPalBuild(action){
   palBuildLoading=true;palBuildError="";render();
-  try{palBuildState=await api(`/api/build/${action}`,{method:"POST",body:"{}"})}
+  try{palBuildState=await api(`/api/build/${action}`,{method:"POST",body:"{}"});palWorkshopState=await api("/api/workshop")}
+  catch(error){palBuildError=error.message}
+  finally{palBuildLoading=false;render()}
+}
+async function runPalWorkshop(action){
+  palBuildLoading=true;palBuildError="";render();
+  try{palWorkshopState=await api(`/api/workshop/${action}`,{method:"POST",body:"{}"});palBuildState=await api("/api/build")}
   catch(error){palBuildError=error.message}
   finally{palBuildLoading=false;render()}
 }
@@ -18,18 +30,34 @@ function palBuildStatusText(){
   if(palBuildLoading)return "Working…";
   if(palBuildError)return palBuildError;
   if(!palBuildState)return "Not checked";
+  if(palBuildState.ready===false)return palBuildState.error||"Build is not ready";
   if(palBuildState.unownedTarget)return "Build path exists but is not owned by Lexeditor";
   if(palBuildState.built&&!palBuildState.currentMatchesManifest)return "Built package changed outside Lexeditor";
   if(palBuildState.current)return "Current clean package snapshot";
   if(palBuildState.built)return "Owned snapshot is stale; project sources changed";
   return "No package snapshot built";
 }
+function palWorkshopStatusText(){
+  const state=palWorkshopState;
+  if(palBuildLoading)return "Working…";
+  if(!state)return "Not checked";
+  if(state.ready===false)return state.error||"Local Workshop deployment is not ready";
+  if(!state.workshopRootReady)return "Steam Workshop content root not found";
+  if(state.externallyChanged)return "Local deployment changed outside Lexeditor — actions blocked";
+  if(state.owned&&!state.deployed)return "Owned local deployment folder is missing — repair/remove ownership state manually";
+  if(state.current)return "Current local test deployment";
+  if(state.deployed)return state.buildCurrent?"Local deployment differs from current clean build":"Local deployment is stale; rebuild then update it";
+  return "No local test deployment";
+}
 function palBuildPanel(){
-  const state=palBuildState||{};
+  const state=palBuildState||{},workshop=palWorkshopState||{};
   const unsafe=!!(state.unownedTarget||(state.built&&!state.currentMatchesManifest));
   const canBuild=!palBuildLoading&&!unsafe&&state.ready!==false;
   const canRevert=!palBuildLoading&&state.built&&state.currentMatchesManifest;
-  return detailPanel({className:"pal-detail",title:"Official Package Build",identity:state.packageName||model?.PackageName||"PACKAGE",meta:"Clean uploader / Workshop package snapshot",body:[
+  const workshopOwnershipBroken=!!(workshop.owned&&!workshop.deployed);
+  const canDeploy=!palBuildLoading&&state.current&&workshop.ready!==false&&workshop.workshopRootReady&&!workshop.externallyChanged&&!workshopOwnershipBroken;
+  const canRemove=!palBuildLoading&&workshop.deployed&&workshop.owned&&!workshop.externallyChanged;
+  return detailPanel({className:"pal-detail",title:"Official Package Build",identity:state.packageName||model?.PackageName||"PACKAGE",meta:"Clean package snapshot + Pocketpair-style local test deployment",body:[
     detailSection({title:"SNAPSHOT",body:[
       detailField({label:"STATUS",control:readonlyField(palBuildStatusText()),help:infoHelp("Build creates a clean package snapshot from Info.json, Thumbnail and declared InstallRule targets. It does not activate a mod or publish to Steam.")}),
       detailField({label:"OUTPUT",control:readonlyField(state.packagePath||`${info?.project||"project"}/build/official-package`)}),
@@ -41,13 +69,26 @@ function palBuildPanel(){
       detailField({label:"EXTERNAL CHANGES",control:readonlyField(state.built&&!state.currentMatchesManifest?"Detected — actions blocked":"None detected")}),
       detailField({label:"SOURCE PROJECT",control:readonlyField(info?.project||"Unavailable")}),
     ]}),
-    detailSection({title:"ACTIONS",body:[
+    detailSection({title:"BUILD ACTIONS",body:[
       detailField({label:"PACKAGE",control:el("div",{class:"pal-actions"},
         el("button",{type:"button",class:"primary",disabled:!canBuild,onclick:()=>runPalBuild("create")},state.current?"Rebuild package":"Build package"),
         el("button",{type:"button",disabled:!canRevert,onclick:()=>runPalBuild("revert")},"Revert build"),
         el("button",{type:"button",disabled:palBuildLoading,onclick:refreshPalBuild},"Refresh")
       )}),
-      detailField({label:"NEXT STEP",control:readonlyField("Use the clean snapshot with Pocketpair's official uploader / Workshop flow. Activation remains loader-owned.")}),
+    ]}),
+    detailSection({title:"LOCAL WORKSHOP TEST",body:[
+      detailField({label:"STATUS",control:readonlyField(palWorkshopStatusText()),help:infoHelp("Pocketpair's uploader supports Shift+Create New Mod for local testing, using an unregistered random 10-digit Workshop folder. Lexeditor mirrors that local-only pattern and owns only the folder it creates.")}),
+      detailField({label:"WORKSHOP ROOT",control:readonlyField(workshop.workshopRoot||"Not detected")}),
+      detailField({label:"LOCAL FOLDER",control:readonlyField(workshop.folder||"Not deployed")}),
+      detailField({label:"TARGET",control:readonlyField(workshop.targetPath||"Not deployed")}),
+      detailField({label:"ACTIONS",control:el("div",{class:"pal-actions"},
+        el("button",{type:"button",class:"primary",disabled:!canDeploy,onclick:()=>runPalWorkshop("deploy")},workshop.deployed?"Update local test":"Deploy local test"),
+        el("button",{type:"button",disabled:!canRemove,onclick:()=>runPalWorkshop("remove")},"Remove local deployment")
+      )}),
+      detailField({label:"ACTIVATION",control:readonlyField("Not changed by Lexeditor. Enable the local package through Palworld Options → Mod Management."),help:infoHelp("Lexeditor does not edit Mods/PalModSettings.ini for the Windows client and does not publish or overwrite subscribed Workshop items.")}),
+    ]}),
+    detailSection({title:"PUBLISHING",body:[
+      detailField({label:"STEAM",control:readonlyField("Not implemented. Use Pocketpair's official Palworld Mod Uploader to register/upload a Workshop item.")}),
     ]}),
   ]});
 }
