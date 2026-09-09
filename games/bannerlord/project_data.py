@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import html
+import os
 import re
 import shutil
 import subprocess
@@ -243,17 +244,26 @@ def save_source(project: Path, requested: str, text: str) -> dict:
     return result
 
 
+def _selected_game_root(explicit: Path | None) -> Path | None:
+    if explicit is not None:
+        return Path(explicit).resolve()
+    configured = os.environ.get("LEXEDITOR_BANNERLORD_ROOT", "").strip()
+    return Path(configured).resolve() if configured else None
+
+
 def run_build(
     project: Path,
     requested: str | None = None,
     configuration: str = "Debug",
     timeout: int = 300,
+    game_root: Path | None = None,
 ) -> dict:
-    """Run dotnet build directly, never through a shell."""
+    """Run dotnet directly and pin BannerlordDir to Lexeditor's selected install."""
     configuration = str(configuration or "Debug")
     if configuration not in {"Debug", "Release"}:
         raise ValueError("Configuration must be Debug or Release")
     project_file = _resolve_project_file(project, requested)
+    selected_game = _selected_game_root(game_root)
     command = [
         "dotnet",
         "build",
@@ -262,6 +272,11 @@ def run_build(
         configuration,
         "--nologo",
     ]
+    if selected_game is not None:
+        # MSBuild global properties override project-local BannerlordDir values,
+        # so binaries and AfterTargets=Build deployment land in the same game
+        # installation Lexeditor selected. No shell is involved, even with spaces.
+        command.append(f"-p:BannerlordDir={selected_game}")
     try:
         completed = subprocess.run(
             command,
@@ -287,5 +302,6 @@ def run_build(
         "configuration": configuration,
         "project": project_file.name,
         "command": command,
+        "gameRootOverride": str(selected_game) if selected_game is not None else "",
         "output": output,
     }
