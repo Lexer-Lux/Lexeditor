@@ -53,7 +53,10 @@ class PalworldDedicatedServerTests(unittest.TestCase):
             self.assertTrue(state["owned"])
             self.assertTrue(state["current"])
             target = Path(state["targetPath"])
-            self.assertEqual(server / "Mods" / "Workshop" / "Lexeditor-DedicatedFixture", target)
+            self.assertEqual(
+                (server / "Mods" / "Workshop" / "Lexeditor-DedicatedFixture").resolve(),
+                target.resolve(),
+            )
             self.assertEqual(b"pak-v1", (target / "Paks" / "fixture.pak").read_bytes())
             self.assertFalse((target / ".lexeditor-palworld-dedicated-deploy.json").exists())
 
@@ -179,7 +182,7 @@ class PalworldDedicatedServerTests(unittest.TestCase):
             project = Path(temp_name) / "project"
             project.mkdir()
             state = status(project, client_root=client, allow_non_windows=True)
-            self.assertEqual(str(server), state["serverRoot"])
+            self.assertEqual(server.resolve(), Path(state["serverRoot"]).resolve())
             self.assertTrue(state["serverRootReady"])
             self.assertEqual("2394010", state["serverAppId"])
 
