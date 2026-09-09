@@ -23,16 +23,19 @@
   }
 
   function sceneRasterPanel(data, layer) {
-    const width = Number(data.sceneWidth) * 16;
-    const height = Number(data.sceneHeight) * 16;
+    const layerData = data.layers[`layer${layer}`];
+    const width = Number(layerData.width) * 16;
+    const height = Number(layerData.height) * 16;
     const url = `/api/scene-raster?${new URLSearchParams({
       scene: String(state.scenes.selected), layer: String(layer), source: state.source,
     })}`;
+    const limitation = layer === 3
+      ? "Color-zero transparency is preserved; main/sub-screen blend/priority composition is not emulated."
+      : "Color-zero transparency is preserved; animated chips are not played and main/sub-screen blend/priority composition is not emulated.";
     return rasterNode(
       url,
       `Chrono Trigger scene ${state.scenes.selected} rendered layer ${layer}`,
-      `Actual PC L${layer} raster · ${width}×${height}px · isolated layer only. ` +
-      "Color-zero transparency is preserved; animated chips, L3 artwork and main/sub-screen blend/priority composition are not emulated.",
+      `Actual PC L${layer} raster · ${width}×${height}px · isolated layer only. ${limitation}`,
     );
   }
 
@@ -40,10 +43,10 @@
     const data = state.scenes.map;
     if (!data) return el("div", {class: "ct-empty"}, "Loading scene map layout…");
     const modes = [
-      ["raster1", "Rendered L1"], ["raster2", "Rendered L2"],
+      ["raster1", "Rendered L1"], ["raster2", "Rendered L2"], ["raster3", "Rendered L3"],
       ["collision", "Collision"], ["layer1", "L1 tile IDs"], ["layer2", "L2 tile IDs"],
       ["layer3", "L3 tile IDs"],
-    ].filter(([id]) => id !== "layer3" || data.layers.layer3.enabled);
+    ].filter(([id]) => !["raster3", "layer3"].includes(id) || data.layers.layer3.enabled);
     const selected = modes.some(([id]) => id === state.scenes.mapMode) ? state.scenes.mapMode : modes[0][0];
     if (selected !== state.scenes.mapMode) state.scenes.mapMode = selected;
     const select = el("select", {value: selected, onchange: event => {
@@ -59,8 +62,9 @@
       el("span", {}, `MapTable ${data.mapId} · L2 scroll ${data.header.scrollLayer2.xPixelsPerSecond}, ${data.header.scrollLayer2.yPixelsPerSecond} px/s`),
       data.layerPriorities ? el("span", {}, `Priorities ${data.layerPriorities.join("/")}`) : null,
     );
-    if (selected === "raster1" || selected === "raster2") {
-      return el("div", {class: "ct-map-panel"}, controls, sceneRasterPanel(data, selected === "raster1" ? 1 : 2));
+    if (selected.startsWith("raster")) {
+      const layer = Number(selected.slice("raster".length));
+      return el("div", {class: "ct-map-panel"}, controls, sceneRasterPanel(data, layer));
     }
     const collision = el("div", {class: "ct-collision-summary"},
       ...Object.entries(data.collisionCounts).sort((a, b) => b[1] - a[1])
