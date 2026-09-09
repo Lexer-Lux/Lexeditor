@@ -1,10 +1,11 @@
-"""Read-only structural parser for Chrono Trigger Steam field event scripts.
+"""Structural parser for Chrono Trigger Steam field event scripts.
 
 Temporal Redux establishes that PC ``Atel_*.dat`` uses the original event
 layout directly: one object-count byte followed by 16 little-endian function
 pointers per object and then event bytecode. Lexeditor decodes command
-boundaries using independently recorded PC widths but keeps command editing
-read-only until round-trip semantics are proven.
+boundaries using independently recorded PC widths. Existing fixed-width
+argument bytes can be edited elsewhere; opcode/size/pointer changes remain out
+of scope.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import re
 import struct
 
 from .data import OverlayStore, sha256
+from .event_flow import decorate_event_flow
 from .field_commands import disassemble_function
 from .field_semantics import decorate_event
 from .labels import label_bundle
@@ -117,10 +119,13 @@ def load_event(store: OverlayStore, event_id: int, virtual_path: str,
     result = {
         "id": int(event_id), "name": f"Field Event {int(event_id):04d}",
         "path": PurePosixPath(virtual_path).as_posix(), "source": origin,
-        "readOnly": True, "sha256": sha256(raw), **parse_event(raw),
+        "readOnly": source == "vanilla",
+        "writeCoverage": "none" if source == "vanilla" else "fixed-width-arguments",
+        "sha256": sha256(raw), **parse_event(raw),
     }
     if include_objects:
         result = decorate_event(result, label_bundle(store, source))
+        result = decorate_event_flow(result)
     else:
         result.pop("objects", None)
     return result
@@ -135,8 +140,12 @@ def load_events(store: OverlayStore, source: str = "mine", query: str = "",
     limit = max(1, min(int(limit), 250))
     rows = [load_event(store, event_id, path, source, include_objects=False)
             for event_id, path in entries[offset:offset + limit]]
-    return {"kind": "field-events", "readOnly": True, "matchCount": len(entries),
-            "offset": offset, "limit": limit, "rows": rows}
+    return {
+        "kind": "field-events",
+        "readOnly": source == "vanilla",
+        "writeCoverage": "none" if source == "vanilla" else "fixed-width-arguments",
+        "matchCount": len(entries), "offset": offset, "limit": limit, "rows": rows,
+    }
 
 
 def get_event(store: OverlayStore, event_id: int, source: str = "mine") -> dict:
