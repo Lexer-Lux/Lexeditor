@@ -45,7 +45,7 @@ class BannerlordLaunchTests(unittest.TestCase):
             deployed = write_module(game, "LexerSkillTweaks", "LexerSkillTweaks")
             module_id, installed = selected_module(game, workspace)
             self.assertEqual(module_id, "LexerSkillTweaks")
-            self.assertEqual(installed, deployed)
+            self.assertEqual(installed.resolve(), deployed.resolve())
 
     def test_direct_launch_uses_dependencies_core_modules_and_selected_mod(self):
         with tempfile.TemporaryDirectory() as name:
