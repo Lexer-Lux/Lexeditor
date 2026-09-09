@@ -7,6 +7,12 @@
     launchScript.dataset.ffxx2Launch = '1';
     document.head.appendChild(launchScript);
   }
+  if (!document.querySelector('script[data-ffx-commands]')) {
+    const commandScript = document.createElement('script');
+    commandScript.src = '/shared/ffx-commands.js';
+    commandScript.dataset.ffxCommands = '1';
+    document.head.appendChild(commandScript);
+  }
 
   const nav = document.querySelector('.ffxx2-nav');
   const workspace = document.querySelector('.ffxx2-workspace');
