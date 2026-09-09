@@ -69,6 +69,11 @@ def check(project: Path | None = None, game: Path | None = None) -> list[str]:
         problems.append(f"Missing Bannerlord Modules directory: {modules_root(game)}")
 
     project = Path(project or project_root())
-    if not (project / "SubModule.xml").is_file():
-        problems.append(f"Missing Bannerlord project SubModule.xml: {project / 'SubModule.xml'}")
+    try:
+        descriptor = contained_project_path(project, "SubModule.xml")
+    except ValueError as error:
+        problems.append(str(error))
+    else:
+        if not descriptor.is_file():
+            problems.append(f"Missing Bannerlord project SubModule.xml: {descriptor}")
     return problems
