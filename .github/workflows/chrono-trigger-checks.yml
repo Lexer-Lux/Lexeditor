@@ -5,11 +5,13 @@ on:
     paths:
       - 'games/chrono_trigger/**'
       - 'tests/test_chrono_trigger_*.py'
+      - 'tools/chrono_trigger_*.py'
       - '.github/workflows/chrono-trigger-checks.yml'
   pull_request:
     paths:
       - 'games/chrono_trigger/**'
       - 'tests/test_chrono_trigger_*.py'
+      - 'tools/chrono_trigger_*.py'
       - '.github/workflows/chrono-trigger-checks.yml'
 
 permissions:
@@ -21,7 +23,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Python syntax
-        run: python -m py_compile games/chrono_trigger/plugin.py games/chrono_trigger/paths.py games/chrono_trigger/resources.py games/chrono_trigger/coverage.py games/chrono_trigger/data.py games/chrono_trigger/events.py games/chrono_trigger/scene_tables.py games/chrono_trigger/worlds.py games/chrono_trigger/world_tables.py games/chrono_trigger/world_scripts.py games/chrono_trigger/server.py
+        run: >-
+          python -m py_compile
+          games/chrono_trigger/plugin.py
+          games/chrono_trigger/paths.py
+          games/chrono_trigger/resources.py
+          games/chrono_trigger/coverage.py
+          games/chrono_trigger/data.py
+          games/chrono_trigger/events.py
+          games/chrono_trigger/field_commands.py
+          games/chrono_trigger/scene_tables.py
+          games/chrono_trigger/worlds.py
+          games/chrono_trigger/world_tables.py
+          games/chrono_trigger/world_scripts.py
+          games/chrono_trigger/ctext_manager.py
+          games/chrono_trigger/deployment.py
+          games/chrono_trigger/integrity.py
+          games/chrono_trigger/server.py
+          tools/chrono_trigger_ctext.py
       - name: Plugin descriptor
         run: python -c "from plugin_api import validate_plugin; from games.chrono_trigger.plugin import PLUGIN; validate_plugin(PLUGIN); assert PLUGIN.plugin_id == 'chrono-trigger'"
       - name: Chrono Trigger regressions

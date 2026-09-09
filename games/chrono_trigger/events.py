@@ -2,9 +2,9 @@
 
 Temporal Redux establishes that PC ``Atel_*.dat`` uses the original event
 layout directly: one object-count byte followed by 16 little-endian function
-pointers per object and then event bytecode.  Lexeditor uses that proven
-container structure here without pretending to understand commands it has not
-integrated yet.
+pointers per object and then event bytecode. Lexeditor decodes command
+boundaries using independently recorded PC widths but keeps command editing
+read-only until round-trip semantics are proven.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import re
 import struct
 
 from .data import OverlayStore, sha256
+from .field_commands import disassemble_function
 
 
 _FIELD_EVENT_RE = re.compile(r"^Game/field/atel/Atel_(\d+)\.dat$", re.IGNORECASE)
@@ -35,7 +36,7 @@ def event_entries(store: OverlayStore) -> list[tuple[int, str]]:
 
 
 def parse_event(raw: bytes) -> dict:
-    """Decode the object/function pointer table, leaving bytecode opaque."""
+    """Decode object/function pointers and fail-closed PC command boundaries."""
     if not raw:
         raise ValueError("Chrono Trigger field event is empty")
     object_count = raw[0]
@@ -59,6 +60,10 @@ def parse_event(raw: bytes) -> dict:
         ends[index] = starts[index + 1] if starts[index + 1] != starts[index] else ends[index + 1]
 
     objects = []
+    complete_functions = 0
+    unique_function_keys: set[tuple[int, int]] = set()
+    problem_count = 0
+    decoded_command_count = 0
     for object_id in range(object_count):
         functions = []
         for function_id in range(16):
@@ -69,6 +74,13 @@ def parse_event(raw: bytes) -> dict:
                     f"Chrono Trigger event function {object_id}:{function_id} has invalid bounds"
                 )
             payload = data[start:end]
+            decoded = disassemble_function(data, start, end)
+            key = (start, end)
+            if key not in unique_function_keys:
+                unique_function_keys.add(key)
+                complete_functions += int(decoded["complete"])
+                problem_count += int(decoded["problem"] is not None)
+                decoded_command_count += len(decoded["commands"])
             functions.append({
                 "id": function_id,
                 "name": FUNCTION_NAMES[function_id],
@@ -77,6 +89,7 @@ def parse_event(raw: bytes) -> dict:
                 "length": len(payload),
                 "preview": payload[:32].hex(" ").upper(),
                 "truncatedPreview": len(payload) > 32,
+                **decoded,
             })
         object_start = starts[object_id * 16] if functions else pointer_table_bytes
         object_end = (starts[(object_id + 1) * 16]
@@ -93,6 +106,9 @@ def parse_event(raw: bytes) -> dict:
         "objectCount": object_count,
         "functionSlots": slot_count,
         "uniqueFunctionBounds": unique_bounds,
+        "completeFunctionBounds": complete_functions,
+        "problemFunctionBounds": problem_count,
+        "decodedCommandCount": decoded_command_count,
         "pointerTableBytes": pointer_table_bytes,
         "bytecodeBytes": max(0, len(data) - pointer_table_bytes),
         "objects": objects,
