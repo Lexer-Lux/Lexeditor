@@ -1,0 +1,127 @@
+name: Temporary Bannerlord optional module category compatibility
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-module-category-optional.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - name: Add optional modern module categories
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              if text.count(old) != 1:
+                  raise SystemExit(f'{label}: match count {text.count(old)}')
+              return text.replace(old, new, 1)
+
+          module = Path('games/bannerlord/module_data.py')
+          text = module.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              '    if category:\n        return category == "singleplayer"\n',
+              '    if category:\n        return category in {"singleplayer", "singleplayeroptional"}\n',
+              'singleplayer category predicate',
+          )
+          text = replace_once(
+              text,
+              '    "moduleCategory": {"Singleplayer", "Multiplayer", "MultiplayerOptional", "Server"},\n',
+              '    "moduleCategory": {"Singleplayer", "SingleplayerOptional", "Multiplayer", "MultiplayerOptional", "Server", "ServerOptional"},\n',
+              'module category enum',
+          )
+          module.write_text(text, encoding='utf-8')
+
+          editor = Path('games/bannerlord/editor_core.js')
+          text = editor.read_text(encoding='utf-8')
+          text = replace_once(
+              text,
+              '...fieldRow("Module category",select(m.moduleCategory||"",[["","Legacy / not set"],["Singleplayer","Singleplayer"],["Multiplayer","Multiplayer"],["MultiplayerOptional","Multiplayer optional"],["Server","Server"]],value=>setModuleField("moduleCategory",value))),',
+              '...fieldRow("Module category",select(m.moduleCategory||"",[["","Legacy / not set"],["Singleplayer","Singleplayer"],["SingleplayerOptional","Singleplayer optional"],["Multiplayer","Multiplayer"],["MultiplayerOptional","Multiplayer optional"],["Server","Server"],["ServerOptional","Server optional"]],value=>setModuleField("moduleCategory",value))),',
+              'module category UI choices',
+          )
+          editor.write_text(text, encoding='utf-8')
+      - name: Write optional-category regression
+        run: |
+          cat > tests/test_bannerlord_module_categories.py <<'PY'
+          from pathlib import Path
+          import tempfile
+          import unittest
+
+          from games.bannerlord.game_launch import module_load_order
+          from games.bannerlord.module_data import is_singleplayer_module, read_submodule, save_module
+
+
+          class BannerlordModuleCategoryTests(unittest.TestCase):
+              def test_singleplayer_optional_is_singleplayer_and_round_trips(self):
+                  with tempfile.TemporaryDirectory() as name:
+                      path = Path(name) / "SubModule.xml"
+                      path.write_text(
+                          '<Module><Id value="Example" /><ModuleCategory value="SingleplayerOptional" /></Module>',
+                          encoding="utf-8",
+                      )
+                      module = read_submodule(path)
+                      self.assertTrue(is_singleplayer_module(module))
+                      result = save_module(path, {"metadata": {"moduleCategory": "SingleplayerOptional"}})
+                      self.assertEqual(result["module"]["moduleCategory"], "SingleplayerOptional")
+
+              def test_server_optional_is_not_singleplayer_and_round_trips(self):
+                  with tempfile.TemporaryDirectory() as name:
+                      path = Path(name) / "SubModule.xml"
+                      path.write_text(
+                          '<Module><Id value="Example" /><ModuleCategory value="ServerOptional" /></Module>',
+                          encoding="utf-8",
+                      )
+                      module = read_submodule(path)
+                      self.assertFalse(is_singleplayer_module(module))
+                      result = save_module(path, {"metadata": {"moduleCategory": "ServerOptional"}})
+                      self.assertEqual(result["module"]["moduleCategory"], "ServerOptional")
+
+              def test_play_accepts_singleplayer_optional_without_legacy_flag(self):
+                  with tempfile.TemporaryDirectory() as name:
+                      root = Path(name)
+                      game = root / "game"
+                      module = game / "Modules" / "OptionalSingleplayer"
+                      module.mkdir(parents=True)
+                      (module / "SubModule.xml").write_text(
+                          '''<Module>
+            <Name value="Optional Singleplayer" />
+            <Id value="OptionalSingleplayer" />
+            <Version value="v1.0.0" />
+            <ModuleCategory value="SingleplayerOptional" />
+          </Module>''',
+                          encoding="utf-8",
+                      )
+                      workspace = root / "workspace"
+                      workspace.mkdir()
+                      (workspace / "SubModule.xml").write_text(
+                          '<Module><Id value="OptionalSingleplayer" /></Module>', encoding="utf-8"
+                      )
+                      self.assertEqual(module_load_order(game, workspace), ["OptionalSingleplayer"])
+
+
+          if __name__ == "__main__":
+              unittest.main()
+          PY
+      - name: Validate optional categories
+        run: |
+          python -m compileall -q games/bannerlord
+          python -m unittest tests.test_bannerlord_module_categories tests.test_bannerlord_launch -v
+          node --check games/bannerlord/editor_core.js
+      - name: Commit category compatibility
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/bannerlord/module_data.py games/bannerlord/editor_core.js tests/test_bannerlord_module_categories.py
+          git commit -m "Support optional Bannerlord module categories"
+          git push origin HEAD:feature/bannerlord-plugin
