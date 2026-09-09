@@ -1,4 +1,4 @@
-"""Browser acceptance for Palworld package + PalSchema raw patch workspace.
+"""Browser acceptance for Palworld package, PalSchema, and clean build workspace.
 
 Uses only synthetic package/Patch/schema JSON. No installed game or proprietary Palworld data.
 """
@@ -81,6 +81,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
         backup = good.with_name(good.name + ".lexeditor.bak")
         if backup.exists():
             backup.unlink()
+        build_root = project / "build"
+        if build_root.exists():
+            shutil.rmtree(build_root)
 
     errors = []
     with PalworldSession({
@@ -163,6 +166,25 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     page.wait_for_function("palPatch !== null && palPatch.writable === false")
                     assert "keep me" in commented.read_text("utf-8")
                     assert page.locator('.pal-schema-columns .pal-detail input[type="number"]').count() == 0
+
+                    # Known-invalid integrated payloads block clean package builds. Repairing the
+                    # malformed fixture makes Build available; Build/Revert remains separate from activation.
+                    page.evaluate('navigate("build")')
+                    page.wait_for_function("typeof palBuildState === 'object' && palBuildState !== null && !palBuildLoading")
+                    assert palBuildError := page.evaluate("palBuildError")
+                    assert "aaa_bad.json" in palBuildError
+                    bad.unlink()
+                    page.get_by_role("button", name="Refresh", exact=True).click()
+                    page.wait_for_function("palBuildState?.ready === true && !palBuildLoading")
+                    page.get_by_role("button", name="Build package", exact=True).click()
+                    page.wait_for_function("palBuildState?.current === true && !palBuildLoading")
+                    built = project / "build" / "official-package"
+                    assert (built / "Info.json").is_file()
+                    assert (built / "PalSchema" / "Balance" / "raw" / "balance.json").is_file()
+                    assert not (built / "PalSchema" / "Balance" / "raw" / "balance.json.lexeditor.bak").exists()
+                    page.get_by_role("button", name="Revert build", exact=True).click()
+                    page.wait_for_function("palBuildState?.built === false && !palBuildLoading")
+                    assert not built.exists()
 
                     metrics = page.evaluate("""()=>({body:document.body.scrollHeight,viewport:innerHeight,main:document.querySelector('main').scrollHeight,mainHeight:document.querySelector('main').clientHeight})""")
                     assert metrics["body"] <= height + 2, (width, metrics)
