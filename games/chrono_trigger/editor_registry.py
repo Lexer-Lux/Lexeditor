@@ -25,6 +25,12 @@ from .memory_ops import (
     memory_field_specs,
     memory_values,
 )
+from .movement_ops import (
+    apply_movement_op,
+    decorate_movement_semantics,
+    movement_field_specs,
+    movement_values,
+)
 
 
 def _schema_from_specs(command: dict, specs: list[dict] | None, values: dict | None) -> dict | None:
@@ -61,12 +67,22 @@ def bit_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, bit_field_specs(command), bit_values(command))
 
 
+def movement_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, movement_field_specs(command), movement_values(command))
+
+
 def jump_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
 
 
-_REGISTRY_BUILDERS = (comparison_editor_schema, memory_editor_schema, bit_editor_schema, jump_editor_schema)
-_REGISTRY_APPLIERS = (apply_comparison, apply_memory_op, apply_bit_op, apply_jump)
+_REGISTRY_BUILDERS = (
+    comparison_editor_schema,
+    memory_editor_schema,
+    bit_editor_schema,
+    movement_editor_schema,
+    jump_editor_schema,
+)
+_REGISTRY_APPLIERS = (apply_comparison, apply_memory_op, apply_bit_op, apply_movement_op, apply_jump)
 
 
 def editor_schema(command: dict) -> dict | None:
@@ -81,6 +97,7 @@ def decorate_event_editors(payload: dict) -> dict:
     decorate_comparison_semantics(payload)
     decorate_memory_semantics(payload)
     decorate_bit_semantics(payload)
+    decorate_movement_semantics(payload)
     decorate_jump_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
