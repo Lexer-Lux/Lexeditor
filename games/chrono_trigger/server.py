@@ -25,6 +25,7 @@ from .data import (
 )
 from .deployment import deploy_audited_project, deployment_status
 from .events import event_entries, get_event, load_events
+from .field_editors import decorate_event_editors, save_event_fields
 from .labels import (
     decorate_scene_exits,
     decorate_scenes,
@@ -55,7 +56,7 @@ WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
 POST_ROUTES = {
     "/api/save/message", "/api/save/scene", "/api/save/exit", "/api/save/treasure",
-    "/api/save/world", "/api/save/world-exit", "/api/save/world-trigger",
+    "/api/save/event-fields", "/api/save/world", "/api/save/world-exit", "/api/save/world-trigger",
     "/api/save/world-script-address", "/api/deployment/deploy",
     "/api/changes/revert", "/api/export/ctp",
 }
@@ -125,7 +126,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/12"
+    server_version = "LexeditorChronoTrigger/13"
 
     def log_message(self, _format, *_args):
         return
@@ -174,9 +175,9 @@ class Handler(BaseHTTPRequestHandler):
                         "data-map", "resource-index", "resource-preview", "localization-text",
                         "localized-labels", "scene-headers", "scene-exits", "scene-treasure",
                         "scene-map-layout", "field-events", "field-event-disassembly",
-                        "world-headers", "world-exits", "world-triggers", "world-script-addresses",
-                        "world-script-disassembly", "project-overlay", "project-changes",
-                        "ctext-deploy", "ctp-export", "read", "save",
+                        "field-event-fixed-edit", "world-headers", "world-exits", "world-triggers",
+                        "world-script-addresses", "world-script-disassembly", "project-overlay",
+                        "project-changes", "ctext-deploy", "ctp-export", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
@@ -228,7 +229,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(decorate_treasure(payload, _labels(source)))
             elif path == "/api/events":
                 if "id" in params:
-                    self.send_json(get_event(_store(), int(params["id"][0]), _source(params)))
+                    payload = get_event(_store(), int(params["id"][0]), _source(params))
+                    self.send_json(decorate_event_editors(payload))
                 else:
                     self.send_json(load_events(
                         _store(), _source(params), params.get("q", [""])[0],
@@ -296,6 +298,13 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_exit(_store(), int(payload.get("sceneId", -1)), int(payload.get("index", -1)), str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")), payload.get("values", {}))
             elif path == "/api/save/treasure":
                 result = save_treasure(_store(), int(payload.get("sceneId", -1)), int(payload.get("index", -1)), str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")), payload.get("values", {}))
+            elif path == "/api/save/event-fields":
+                result = save_event_fields(
+                    _store(), int(payload.get("eventId", -1)), int(payload.get("objectId", -1)),
+                    int(payload.get("functionId", -1)), int(payload.get("commandIndex", -1)),
+                    str(payload.get("sha256", "")), payload.get("values", {}),
+                )
+                result = decorate_event_editors(result)
             elif path == "/api/save/world":
                 result = save_world(_store(), int(payload.get("id", -1)), str(payload.get("sha256", "")), payload.get("values", {}))
             elif path == "/api/save/world-exit":
