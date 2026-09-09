@@ -1,11 +1,10 @@
 """Browser acceptance for Palworld package + PalSchema raw patch workspace.
 
-Uses only synthetic package/Patch JSON. No installed game or proprietary Palworld data.
+Uses only synthetic package/Patch/schema JSON. No installed game or proprietary Palworld data.
 """
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 import shutil
 import sys
@@ -29,6 +28,28 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
     (game / "Pal" / "Content" / "Paks").mkdir(parents=True)
     (game / "Palworld.exe").write_bytes(b"")
 
+    schema_root = game / "Mods" / "NativeMods" / "UE4SS" / "Mods" / "PalSchema" / "schemas"
+    (schema_root / "raw").mkdir(parents=True)
+    (schema_root / "raw" / "DT_PalMonsterParameter.schema.json").write_text(json.dumps({
+        "type": "object",
+        "additionalProperties": {
+            "type": "object",
+            "properties": {
+                "WorkSuitability_EmitFlame": {"type": "integer", "description": "IntProperty"},
+                "DisplayLabel": {"type": "string", "description": "FString"},
+                "Mode": {
+                    "type": "string",
+                    "description": "EnumProperty",
+                    "$ref": "../enums.schema.json#/definitions/ETestMode",
+                },
+                "NestedPreserved": {"type": "object", "description": "StructProperty", "properties": {}},
+            },
+        },
+    }, indent=2) + "\n", encoding="utf-8")
+    (schema_root / "enums.schema.json").write_text(json.dumps({
+        "definitions": {"ETestMode": {"type": "string", "enum": ["ModeA", "ModeB"]}}
+    }, indent=2) + "\n", encoding="utf-8")
+
     project = temp / "project"
     project.mkdir()
     info = default_info("BrowserFixture")
@@ -46,6 +67,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
             "Kitsunebi": {
                 "WorkSuitability_EmitFlame": 3,
                 "DisplayLabel": "Foxparks",
+                "Mode": "ModeA",
                 "NestedPreserved": {"keep": [1, 2, 3]},
             }
         }
@@ -75,6 +97,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     # A malformed alphabetically-first patch must not prevent the editor from opening.
                     page.evaluate('navigate("palschema")')
                     page.wait_for_selector(".pal-schema-root")
+                    assert page.locator(".pal-schema-state").inner_text() == "SCHEMA-AWARE"
                     selector = page.locator(".pal-patch-toolbar select")
                     assert selector.count() == 1
                     values = selector.locator("option").evaluate_all("nodes=>nodes.map(n=>({value:n.value,text:n.textContent}))")
@@ -82,9 +105,10 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert "1 error" in values[0]["text"], values
                     assert selector.input_value().endswith("balance.json"), selector.input_value()
 
-                    # The valid patch is editable through a semantic numeric control.
-                    numeric = page.locator('.pal-detail input[type="number"]')
+                    # The valid patch uses the generated integer schema and is writable.
+                    numeric = page.locator('.pal-schema-columns .pal-detail input[type="number"]')
                     assert numeric.count() == 1
+                    assert "integer" in page.locator(".pal-detail").inner_text().lower()
                     numeric.fill("4")
                     page.evaluate("save()")
                     page.wait_for_function("!patchDirty()")
@@ -93,6 +117,16 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert row["WorkSuitability_EmitFlame"] == 4, row
                     assert row["NestedPreserved"] == {"keep": [1, 2, 3]}, row
                     assert good.with_name(good.name + ".lexeditor.bak").is_file()
+
+                    # Generated enum definitions become a semantic select and remain schema validated.
+                    page.locator(".pal-patch-row").filter(has_text="Mode").click()
+                    enum_select = page.locator(".pal-schema-columns .pal-detail select")
+                    assert enum_select.count() == 1
+                    assert enum_select.locator("option").all_text_contents() == ["ModeA", "ModeB"]
+                    enum_select.select_option("ModeB")
+                    page.evaluate("save()")
+                    page.wait_for_function("!patchDirty()")
+                    assert json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]["Mode"] == "ModeB"
 
                     # Selecting the malformed patch shows its error locally instead of killing the workspace.
                     selector.select_option(values[0]["value"])
@@ -105,7 +139,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     selector.select_option(jsonc_value)
                     page.wait_for_function("palPatch !== null && palPatch.writable === false")
                     assert "keep me" in commented.read_text("utf-8")
-                    assert page.locator('.pal-detail input[type="number"]').count() == 0
+                    assert page.locator('.pal-schema-columns .pal-detail input[type="number"]').count() == 0
 
                     metrics = page.evaluate("""()=>({body:document.body.scrollHeight,viewport:innerHeight,main:document.querySelector('main').scrollHeight,mainHeight:document.querySelector('main').clientHeight})""")
                     assert metrics["body"] <= height + 2, (width, metrics)
