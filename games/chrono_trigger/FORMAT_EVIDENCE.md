@@ -33,15 +33,20 @@ Current notable PC-specific layouts include:
 - `0x18` Check Storyline — storyline threshold + forward jump byte.
 - Button/action checks `0x2D`, `0x30`/`0x31`, `0x34`–`0x39`, `0x3B`/`0x3C`, `0x3F`–`0x44` — check/mode is encoded in the immutable opcode; the sole argument is the number of bytes to jump if the check fails.
 - `0x02`–`0x07` function calls — one doubled object/PC target byte plus one packed `priority<<4 | functionId` byte. The opcode itself fixes continue/sync/halt mode. Lexeditor exposes the logical target only when the stored target byte is even.
-- `0x0A`, `0x7C`, `0x7D` object controls — constructors store `objectId*2`; odd stored targets remain read-only. Processing commands `0x0B`/`0x0C` are not assumed to share this encoding because no matching constructor evidence establishes it.
+- `0x0A`, `0x0B`, `0x0C`, `0x7C`, `0x7D` object controls — live constructors/menus store `objectId*2`; odd stored targets remain read-only. For `0x0B`/`0x0C`, the opcode itself fixes processing off/on and Lexeditor edits only the target byte.
 - `0x0D`/`0x0E` movement/destination properties — constructors define only bits 0–1 (`through walls`, `through PCs`, `onto tile`, `onto object`). Lexeditor rewrites only those known bits and preserves every higher unknown bit exactly.
-- `0x19`, `0x1A`, `0x4F`/`0x50`, `0x51`/`0x52`, `0x5B`, `0x5D`/`0x5E`, `0x5F`, `0x71`/`0x72`/`0x73` — explicit local script-memory result/store/copy/add/subtract/increment/decrement layouts.
+- `0x19` Get Result to script memory — one `/2` script-memory result slot.
+- `0x1C` Get Result to bank 7F — live `GetResultMenu` decodes the one stored byte as `0x7F0000 + byte`. Because only one byte is encoded, Lexeditor deliberately narrows the writable UI range to `0x7F0000`–`0x7F00FF`; it does not inherit the menu's broader visual address bound.
+- `0x1A`, `0x4F`/`0x50`, `0x51`/`0x52`, `0x5B`, `0x5D`/`0x5E`, `0x5F`, `0x71`/`0x72`/`0x73` — explicit local script-memory result/check/store/copy/add/subtract/increment/decrement layouts.
+- `0x23`/`0x24` Get Facing — live `GetFacingMenu` fixes object vs PC by opcode and writes `targetId*2` plus one `/2` script-memory result destination. Odd target bytes remain read-only.
+- `0xA8`/`0xA9` Face Object/PC — live `FaceObjectMenu` fixes target type by opcode and writes `targetId*2`. Odd stored target bytes remain read-only.
 - `0x63`/`0x64` Set/Reset Bit — bit index 0–7 plus `/2` script-memory slot.
 - `0x69` Set Bits and `0x6B` Toggle Bits — raw u8 bitmask plus `/2` script-memory slot.
 - `0x6F` Shift Bits — right-shift count 0–7 plus `/2` script-memory slot.
 - PC-only `0x3A`, `0x3D`, `0x3E`, `0x45`, `0x46`, `0x70`, `0x74`, `0x78` — explicit PC factories + PC width overrides establish two one-byte operands. These are exposed as **raw local/extended/party slot bytes** because the PC factories take those bytes directly instead of using the ordinary `get_offset(0x7F0200...)` helper. Lexeditor does not fabricate an address mapping for them.
 - `0x8F`, `0x94`/`0x95`, `0x96`/`0x97`, `0x98`/`0x99`, `0x9A`, `0xA0`/`0xA1`, `0xB5`/`0xB6` — follow/move constructors whose operand order matches the command table. Direct X/Y operands are exposed as **coordinate bytes**, not as tile/pixel units, because those units are not independently established for these opcodes.
-- `0xD9` Move Party — six raw coordinate bytes (PC1 X/Y, PC2 X/Y, PC3 X/Y).
+- `0x9D` Vector Move from Memory — live `VectorMoveFromMemMenu` writes two ordinary `/2` script-memory source slots, one for direction and one for magnitude, and decodes them with the inverse mapping.
+- `0xD9` Move Party — six raw coordinate bytes (PC1 X/Y, PC2 X/Y, PC3 Y/X as laid out by the command table; Lexeditor preserves the literal byte order rather than adding unit claims).
 - `0xE2` Change Location from Memory — four one-byte `/2` script-memory offsets for location, X, Y and facing. Lexeditor uses the same validated even `0x7F0200–0x7F03FE` address model instead of accepting the menu's inclusive `0x7F0400` UI bound, which cannot fit in one encoded slot byte.
 - `0xE7` Scroll Screen — raw X/Y coordinate bytes.
 - `0xF4` Shake Screen — constructor writes canonical 0/1; Lexeditor exposes a boolean only for those stored values and leaves noncanonical nonzero bytes read-only.
@@ -62,7 +67,7 @@ Current notable PC-specific layouts include:
 
 Comparison operation values come directly from Temporal Redux's command model: 0 equals, 1 not-equals, 2 greater-than, 3 less-than, 4 greater-or-equal, 5 less-or-equal, 6 bitwise-AND-nonzero and 7 bitwise-OR-nonzero. Invalid stored operation bytes fail closed rather than being normalized.
 
-All ordinary local script-memory UI addresses are even `0x7F0200`–`0x7F03FE` and round-trip to the one-byte `/2` slot. Invalid/odd values fail closed. PC-only extended-memory factories are a separate raw-slot family and are not silently translated through that address model.
+All ordinary local script-memory UI addresses are even `0x7F0200`–`0x7F03FE` and round-trip to the one-byte `/2` slot. Invalid/odd values fail closed. PC-only extended-memory factories are a separate raw-slot family and are not silently translated through that address model. `0x1C` is also separate: its one operand is a literal byte offset from `0x7F0000`, not a `/2` script-memory slot.
 
 For doubled object/PC target encodings, Lexeditor likewise fails closed on odd stored bytes rather than rounding. Logical target IDs are limited by the one-byte doubled representation (`0–127`) unless a stricter constructor range is independently explicit (for example follow-PC commands that document `1–6`).
 
@@ -78,7 +83,7 @@ Temporal Redux's live `SoundMenu.py` contradicts a single fixed-width interpreta
 - subcommands `0x14`, `0x19`: subcommand + one parameter → **2 argument bytes** total.
 - subcommands `0x82`, `0x83`, `0x85`, `0x86`: subcommand + two parameters → **3 argument bytes** total.
 
-Lexeditor therefore treats `0xEC` as dynamic during PC disassembly. Unknown subcommands fail closed and truncated known forms do not consume bytes from the following command. This corrects the previous unsafe assumption that every EC command had three argument bytes. No named EC writer is exposed yet; establishing boundaries does not imply every subcommand's runtime semantics are ready to edit.
+Lexeditor therefore treats `0xEC` as dynamic during PC disassembly. Known forms receive read-only semantic labels using those exact live-menu operations/parameters. Unknown subcommands fail closed and truncated known forms do not consume bytes from the following command. No named EC writer is exposed yet; establishing boundaries and labels does not imply every subcommand's runtime behavior is ready to edit.
 
 Still intentionally excluded from named editing:
 
@@ -88,13 +93,13 @@ Still intentionally excluded from named editing:
 - `0x65`/`0x66` bank-7F bit commands: their address/bit packing differs from the plain script-memory bit commands.
 - `0x67` Reset Bits: Temporal Redux's constructor names the operand a reset bitmask while the command table describes it as “bits to keep”; Lexeditor does not choose a polarity without better evidence.
 - `0x6E` PC-only extended-memory comparison: width/factory order are known, but public extended-memory comparison semantics/address meaning are not strong enough yet for a named editor.
-- `0x23`/`0x24` facing-result commands: target wording in the public table is inconsistent enough that Lexeditor does not pick object-vs-PC normalization from the opcode name alone.
+- `0x27`/`0x28`: their live menus treat the displayed object ID as the stored argument, while the helper constructors divide the supplied ID by two. That internal inconsistency is not normalized away.
 - `0x8D` pixel-position: upstream code itself notes coordinate/shift mismatch.
-- `0x8E` sprite priority: upstream description leaves non-mode bits unresolved.
+- `0x8E` sprite priority: the live menu names bit 6 and bits 2–3 as unknown flags, and the fetched apply path does not establish a complete reversible interpretation of the priority byte.
+- `0x92`/`0x9C` direct vector movement: the constructor doubles magnitude, while the live menu's apply path displays the stored magnitude byte directly without undoing that transform. Lexeditor does not pick one interpretation.
 - `0x9E`/`0x9F`: Temporal Redux's table definitions are internally inconsistent with their constructors; Lexeditor therefore records these PC widths as unresolved (`-1`) and does not expose editors.
-- `0x27`/`0x28`: target encoding evidence is inconsistent enough that Lexeditor does not normalize it.
 - `0xE4`/`0xE5`/`0xE6`: tile-copy/scroll-layer behavior includes unresolved flags or unknown fields, so these remain read-only despite fixed byte counts.
-- `0xEC`: dynamic boundaries are now decoded, but named subcommand writes remain out until each desired subcommand's semantics are promoted independently.
+- `0xEC`: dynamic boundaries and known read-only semantics are decoded, but named subcommand writes remain out until each desired subcommand's runtime semantics are promoted independently.
 - variable/dynamic or unresolved widths generally remain read-only until a relocation-capable assembler exists.
 
 ## Scene maps / tiles / palettes
@@ -107,7 +112,7 @@ CTViewer provides current-PC paths/layouts used by Lexeditor for isolated render
 - L3: `weather_bin/cg*.bin` -> scene-indexed `ChipTableBg3_*.dat` -> 256 four-corner PC tiles -> 4-colour palette groups -> MapTable L3.
 - Scene/world palettes are fixed 256-colour BGR555 resources with preserved header/trailing bytes in Lexeditor's writer.
 
-MapTable main/sub/effect bits are surfaced using CTViewer's PC labels, but Lexeditor does not currently use those labels to claim a complete blend/priority renderer. `PrioMap` remains raw because its semantics are not independently established.
+MapTable main/sub/effect bits are surfaced using CTViewer's PC labels, but Lexeditor does not currently use those labels to claim a complete blend/priority renderer. CTViewer's current `maps.rs` reads exactly four bytes from the PC `PrioMap` file and explicitly comments that they are **unknown layer priority data** which “might” relate to the PC renderer/SNES emulation. That is structural evidence for the bytes, not proof of Steam runtime ordering, so Lexeditor keeps `PrioMap` raw and composition disabled.
 
 ## BGAnime chip animations
 
