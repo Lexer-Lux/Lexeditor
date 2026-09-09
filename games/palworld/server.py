@@ -41,8 +41,15 @@ DATA_MAP = [
     {
         "filename": "PalSchema/<mod>/raw/*.json",
         "controls": "PalSchema DataTable → row → existing scalar property patches",
-        "notes": "Structured/editable. Mirrors PalSchema's direct raw-folder loader; string/bool/int/float values can be changed with stale-hash protection and backups.",
+        "notes": "Structured/editable. Mirrors PalSchema's direct raw-folder loader; generated PalSchema schemas are used as the type/enum authority when available.",
         "coverage": "structured",
+        "status": "integrated",
+    },
+    {
+        "filename": "Mods/NativeMods/UE4SS/Mods/PalSchema/schemas/**",
+        "controls": "Generated PalSchema DataTable/enum JSON schemas",
+        "notes": "Optional read-only validation source. Lexeditor consumes the user's runtime-generated schemas but never generates or rewrites them.",
+        "coverage": "source",
         "status": "integrated",
     },
     {
@@ -102,6 +109,22 @@ def project_root() -> Path:
     return Path(value).expanduser().resolve() if value else (user_data_dir() / "projects" / "palworld").resolve()
 
 
+def palschema_schema_root() -> Path | None:
+    """Locate PalSchema's user-generated schemas without making them mandatory."""
+    override = os.environ.get("LEXEDITOR_PALWORLD_PALSCHEMA_SCHEMAS")
+    if override:
+        candidate = Path(override).expanduser().resolve()
+        return candidate if candidate.is_dir() else None
+    game_value = os.environ.get("LEXEDITOR_PALWORLD_ROOT")
+    if not game_value:
+        return None
+    candidate = (
+        Path(game_value).expanduser().resolve()
+        / "Mods" / "NativeMods" / "UE4SS" / "Mods" / "PalSchema" / "schemas"
+    )
+    return candidate if candidate.is_dir() else None
+
+
 def info_path() -> Path:
     return project_root() / "Info.json"
 
@@ -124,9 +147,12 @@ def info_payload() -> dict:
 
 def palschema_catalog_payload() -> dict:
     info = info_document().data
+    schema_root = palschema_schema_root()
     return {
         "project": str(project_root()),
-        "patches": discover_raw_patches(project_root(), info),
+        "schemaAvailable": schema_root is not None,
+        "schemaRoot": str(schema_root) if schema_root is not None else "",
+        "patches": discover_raw_patches(project_root(), info, schema_root=schema_root),
     }
 
 
@@ -191,7 +217,12 @@ class Handler(BaseHTTPRequestHandler):
                 "name": "Palworld",
                 "hosted": True,
                 "windowHost": "webview2",
-                "capabilities": ["official-package-info", "palschema-raw-patches", "data-map"],
+                "capabilities": [
+                    "official-package-info",
+                    "palschema-raw-patches",
+                    "palschema-generated-schemas",
+                    "data-map",
+                ],
             })
             return
         if path == "/api/info":
@@ -210,7 +241,10 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 values = parse_qs(parsed.query, keep_blank_values=True)
                 relative = values.get("path", [""])[0]
-                self.send_json(patch_payload(project_root(), info_document().data, relative))
+                self.send_json(patch_payload(
+                    project_root(), info_document().data, relative,
+                    schema_root=palschema_schema_root(),
+                ))
             except (OSError, ValueError) as error:
                 self.send_json({"error": str(error)}, 400)
             return
@@ -261,11 +295,12 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(edits, list) or len(edits) > MAX_PATCH_EDITS:
                 raise ValueError(f"edits must be an array of at most {MAX_PATCH_EDITS} scalar edits")
             info = info_document().data
-            target = resolve_discovered_patch(project_root(), info, relative)
-            document = RawPatchDocument.load(target)
+            schema_root = palschema_schema_root()
+            target = resolve_discovered_patch(project_root(), info, relative, schema_root=schema_root)
+            document = RawPatchDocument.load(target, schema_root=schema_root)
             document.apply_edits(edits)
             document.save(expected_sha256=source_sha)
-            self.send_json(patch_payload(project_root(), info, relative))
+            self.send_json(patch_payload(project_root(), info, relative, schema_root=schema_root))
         except PatchValidationError as error:
             self.send_json({"error": str(error), "issues": [asdict(issue) for issue in error.issues]}, 400)
         except ReadOnlyPatchError as error:
