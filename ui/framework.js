@@ -474,6 +474,27 @@
     return marker;
   };
 
+  let modLoadingPromise = null;
+  const modLoadingPanel = pluginId => {
+    const section = element("section", {class: "lex-plugin-mod-loading", "aria-label": "Mod Loading"},
+      element("h2", {}, "Mod Loading"), element("p", {role: "status"}, "Loading mod-loading details…"));
+    modLoadingPromise ||= fetch(new URL("mod-loading.json", sharedAssetBase)).then(response => {
+      if (!response.ok) throw new Error("The packaged mod-loading file is missing.");
+      return response.json();
+    }).catch(error => { modLoadingPromise = null; throw error; });
+    modLoadingPromise.then(data => {
+      const game = data.plugins?.[pluginId];
+      if (!game) throw new Error(`Mod Loading details have not been supplied for ${pluginId}.`);
+      const list = element("ul", {class: "lex-mod-loading-list"});
+      [["Mod Loader", game.loader], ["Mod Structure", game.structure], ["Overriding", game.overriding]].forEach(([label, value]) => {
+        list.append(element("li", {}, element("strong", {}, `${label}:`), ` ${value}`));
+      });
+      section.replaceChildren(element("h2", {}, "Mod Loading"), list);
+    }).catch(error => section.replaceChildren(element("h2", {}, "Mod Loading"),
+      element("p", {role: "alert"}, error.message)));
+    return section;
+  };
+
   let creditsPromise = null;
   const creditsPanel = pluginId => {
     const section = element("section", {class: "lex-plugin-credits", "aria-label": "Credits"},
@@ -515,15 +536,16 @@
     return section;
   };
 
-  const syncInfoCredits = (pluginId, active) => {
+  const syncInfoPanels = (pluginId, active) => {
     const main = document.querySelector("#main");
     if (!main) return;
     main.classList.toggle("lex-showing-info", !!active);
-    if (!active || main.querySelector(".lex-plugin-credits")) return;
+    if (!active) return;
     // Existing Info pages vary, but all use the shared shell. Keep credits inside
     // their scrollable detail body when present, and never create a second header.
     const parent = main.querySelector(".lex-information-panel .lex-detail-panel-body") || main;
-    parent.append(creditsPanel(pluginId));
+    if (!main.querySelector(".lex-plugin-mod-loading")) parent.append(modLoadingPanel(pluginId));
+    if (!main.querySelector(".lex-plugin-credits")) parent.append(creditsPanel(pluginId));
   };
 
   const unitField = (control, unit, attrs = {}) => {
@@ -3794,7 +3816,7 @@
       github.classList.toggle("active", !!githubWorkspace?.state.open);
       help?.classList.toggle("active", !!options.helpActive?.());
       info?.classList.toggle("active", !!options.infoActive?.());
-      syncInfoCredits(options.plugin?.id, !!options.infoActive?.());
+      syncInfoPanels(options.plugin?.id, !!options.infoActive?.());
       if (dirty !== lastReportedDirty) {
         lastReportedDirty = dirty;
         callWindow("set_dirty_count", dirty).catch(() => {});

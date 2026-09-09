@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "plugins": {
+    "blank": {
+      "loader": "Template only — not implemented.",
+      "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
+      "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
+    },
+    "ff7": {
+      "loader": "Not implemented. Lexeditor currently edits safe project copies and does not deploy or load mods into the current Steam FFVII installation.",
+      "structure": "One selected Lexeditor project mirrors the supported FFVII game-data sources outside the installed game. The installed game files are treated as read-only source data.",
+      "overriding": "No runtime mod stack exists yet. Lexeditor edits one project at a time; multiple FFVII mods are not composed or resolved by priority."
+    },
+    "ff7-2013": {
+      "loader": "Not implemented. Lexeditor currently edits safe project copies and does not deploy or load mods into the 2013 PC release.",
+      "structure": "One selected Lexeditor project mirrors supported game-relative paths, including data/lang-en/kernel/KERNEL.BIN, outside the installed game.",
+      "overriding": "No runtime mod stack exists yet. Lexeditor edits one project at a time; multiple FFVII 2013 mods are not composed or resolved by priority."
+    },
+    "ff8": {
+      "loader": "De novo Lexeditor pre-launch compositor targeting FFNx. It reads Junction VIII-compatible mod.xml folder metadata and imports .iroj packages, but does not adopt Junction's live load model.",
+      "structure": "Managed mods go in %LOCALAPPDATA%\\Lexeditor\\mods\\ff8\\<mod>\\ or can be imported as .iroj packages. Folder mods use mod.json for Lexeditor metadata and may contain direct/, hext/, textures/, sfx/, voice/, ambient/, override/, and save/ roots; optional mod.xml supplies Junction-style folder options.",
+      "overriding": "Enabled mods compose from low to high priority. Same-path ordinary files are higher-priority-wins and Hext patches are ordered; supported packed gameplay data such as kernel.bin is semantically merged against vanilla so non-overlapping record or field edits coexist, while overlapping semantic edits conflict and the higher-priority edit wins."
+    },
+    "ff9": {
+      "loader": "Memoria. Lexeditor deploys one Lexeditor-owned Memoria mod folder and manages only that folder's entry in Memoria.ini.",
+      "structure": "Edit one Lexeditor project with overlays under StreamingAssets/ (especially StreamingAssets/Data/). Deploy Project copies those overlays into <FF9>\\Lexeditor\\ while preserving other Memoria mods and unrelated Memoria.ini settings.",
+      "overriding": "Lexeditor does not stack or semantically merge multiple FFIX projects. Other Memoria mods may coexist and Memoria resolves them according to its FolderNames ordering; conflicts with the same underlying content therefore follow Memoria's own resolution rules."
+    },
+    "rdr": {
+      "loader": "De novo Lexeditor deployment through RedHook / Ultimate ASI Loader's update-folder override mechanism.",
+      "structure": "Lexeditor edits one project (C:\\RDRMod by default); game-data replacements live under <project>\\mod\\ in archive-relative trees. Deploy Project rebuilds affected RPF6 archive copies under <RDR>\\update\\... while leaving the installed source archives untouched.",
+      "overriding": "Lexeditor has one active project deployment, not a multi-mod priority stack. Its generated update archive copies override stock data; separate mods replacing the same update archive are not semantically merged, and Lexeditor refuses to overwrite a deployed archive that was changed externally."
+    },
+    "rdr2": {
+      "loader": "Lenny's Mod Loader (LML) EasyInstall package format. Lexeditor edits an LML package but does not fork, bundle, or replace LML's runtime or Mod Manager.",
+      "structure": "Lexeditor edits one EasyInstall folder (C:\\RDR2Mod\\MyOverhaul by default) whose install.xml maps each GamePath to a package FilePath. To run it with LML, place or copy the whole install.xml mod folder under <RDR2>\\lml\\<mod>\\.",
+      "overriding": "LML owns enabled state and load order. If separate LML packages replace the same GamePath, the later/higher-priority replacement wins as a complete file; Lexeditor does not semantically merge records across separate LML mods."
+    },
+    "warband": {
+      "loader": "Warband's native module system. WSE2 is Lexeditor's optional enhanced runtime helper, not a multi-mod overlay loader.",
+      "structure": "Each installed mod is its own folder under <Warband>\\Modules\\ with module.ini. Lexeditor can also edit and build a Module System source project before it becomes an installed module.",
+      "overriding": "Warband selects one module at launch. Lexeditor does not stack several modules or apply a cross-module priority order; resources and dependencies declared by the selected module follow Warband's own module rules."
+    }
+  }
+}

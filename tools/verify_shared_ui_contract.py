@@ -7,6 +7,7 @@ the running desktop app, but these invariants are structural and deterministic.
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +49,33 @@ for editor_path in plugin_editors:
     for block in re.findall(r"\.lex-info-help\s*>\s*span\s*\{([^}]*)\}", source, re.I | re.S):
         require(not re.search(r"(?:transform|translate|top|bottom|left|right|font-family)\s*:", block, re.I),
                 f"{relative} overrides shared info-bubble glyph geometry")
+
+# Every plugin Info page gets the same three Mod Loading bullets from one
+# reviewed registry. The registry and discovered plugin IDs must remain exact so
+# adding a plugin without documenting its loader semantics fails CI.
+mod_loading = json.loads(text("ui/mod-loading.json"))
+mod_loading_plugins = mod_loading.get("plugins", {})
+plugin_ids = set()
+for plugin_path in sorted((ROOT / "games").glob("*/plugin.py")):
+    source = plugin_path.read_text(encoding="utf-8")
+    match = re.search(r"\bplugin_id\s*=\s*['\"]([^'\"]+)['\"]", source)
+    require(match is not None, f"{plugin_path.relative_to(ROOT)} does not declare plugin_id")
+    plugin_ids.add(match.group(1))
+require(set(mod_loading_plugins) == plugin_ids,
+        "mod-loading.json must cover every discovered plugin exactly")
+for plugin_id, details in mod_loading_plugins.items():
+    require(set(details) == {"loader", "structure", "overriding"},
+            f"{plugin_id} Mod Loading entry must have exactly loader/structure/overriding")
+    for field in ("loader", "structure", "overriding"):
+        require(isinstance(details[field], str) and details[field].strip(),
+                f"{plugin_id} Mod Loading {field} is empty")
+require('new URL("mod-loading.json", sharedAssetBase)' in framework and
+        'class: "lex-plugin-mod-loading"' in framework,
+        "shared Info pages do not load the Mod Loading registry")
+for label in ("Mod Loading", "Mod Loader", "Mod Structure", "Overriding"):
+    require(label in framework, f"shared Mod Loading panel is missing label: {label}")
+require("parent.append(modLoadingPanel(pluginId))" in framework,
+        "shared Info pages do not inject the Mod Loading panel")
 
 # One central GitHub workspace, filtered per game.
 require('full_name=LEXEDITOR_REPOSITORY.full_name' in host,
