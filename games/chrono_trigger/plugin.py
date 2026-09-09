@@ -133,8 +133,9 @@ def smoke() -> list[str]:
             identity = request_json(session.url + "api/plugin")
             required = {
                 "resource-index", "resource-preview", "localized-labels", "scene-map-layout",
-                "localization-text", "scene-headers", "field-event-disassembly", "project-overlay",
-                "project-changes", "ctp-export", "ctext-deploy", "world-script-disassembly",
+                "localization-text", "scene-headers", "field-event-disassembly",
+                "field-event-fixed-edit", "project-overlay", "project-changes", "ctp-export",
+                "ctext-deploy", "world-script-disassembly",
             }
             if identity.get("pluginId") != "chrono-trigger" or not required.issubset(identity.get("capabilities", [])):
                 raise RuntimeError("Chrono Trigger service returned the wrong managed capabilities")
@@ -167,8 +168,25 @@ def smoke() -> list[str]:
             if event_data["decodedCommandCount"] != 2 or event_data["problemFunctionBounds"]:
                 raise RuntimeError("Chrono Trigger smoke field event commands did not disassemble")
             first_fn = event_data["objects"][0]["functions"][0]
-            if first_fn["commands"][0]["name"] != "Load Enemy" or not first_fn["complete"]:
+            first_command = first_fn["commands"][0]
+            if first_command["name"] != "Load Enemy" or not first_fn["complete"]:
                 raise RuntimeError("Chrono Trigger smoke field event command metadata is wrong")
+            if first_command.get("editor", {}).get("values") != {"enemyId": 0x1234, "slot": 0, "static": True}:
+                raise RuntimeError("Chrono Trigger smoke field event named editor schema is missing")
+
+            saved_event = request_json(session.url + "api/save/event-fields", {
+                "eventId": 20, "objectId": 0, "functionId": 0, "commandIndex": 0,
+                "sha256": event_data["sha256"], "values": {"enemyId": 0x5678, "slot": 3},
+            })
+            saved_command = saved_event["objects"][0]["functions"][0]["commands"][0]
+            if saved_event["source"] != "project" or saved_command["argumentsHex"] != "78 56 83":
+                raise RuntimeError("Chrono Trigger smoke named event edit did not save to project overlay")
+            if saved_command.get("editor", {}).get("values", {}).get("enemyId") != 0x5678:
+                raise RuntimeError("Chrono Trigger smoke saved event did not refresh named editor values")
+            vanilla_event = request_json(session.url + "api/events?id=20&source=vanilla")
+            vanilla_command = vanilla_event["objects"][0]["functions"][0]["commands"][0]
+            if vanilla_command["argumentsHex"] != "34 12 80":
+                raise RuntimeError("Chrono Trigger smoke named event edit modified Vanilla event bytes")
 
             saved_scene = request_json(session.url + "api/save/scene", {
                 "id": first["id"], "sha256": first["sha256"], "values": {"musicIndex": 42},
@@ -181,12 +199,16 @@ def smoke() -> list[str]:
 
             changes = request_json(session.url + "api/changes")
             changed_paths = {row["path"] for row in changes["rows"]}
-            if {"Localize/en/msg/item.txt", "Game/field/Mapinfo/mapinfo_0.dat"} - changed_paths:
+            expected_changes = {
+                "Localize/en/msg/item.txt", "Game/field/Mapinfo/mapinfo_0.dat",
+                "Game/field/atel/Atel_0020.dat",
+            }
+            if expected_changes - changed_paths:
                 raise RuntimeError("Chrono Trigger project change inventory missed saved overlays")
 
             exported = request_json(session.url + "api/export/ctp", {})
             export_path = Path(exported["path"])
-            if exported["fileCount"] != 2 or not export_path.is_file():
+            if exported["fileCount"] != 3 or not export_path.is_file():
                 raise RuntimeError("Chrono Trigger CTP export did not contain the project overlays")
             with zipfile.ZipFile(export_path) as archive:
                 if set(archive.namelist()) != changed_paths:
@@ -199,6 +221,12 @@ def smoke() -> list[str]:
             ), None)
             if not map_row or map_row.get("status") != "integrated" or "raster" not in str(map_row.get("coverage", "")):
                 raise RuntimeError("Chrono Trigger Data Map did not report current scene-map coverage")
+            event_row = next((
+                row for row in mapped.get("rows", [])
+                if str(row.get("filename", "")).startswith("Game/field/atel/Atel_*.dat")
+            ), None)
+            if not event_row or "fixed" not in str(event_row.get("coverage", "")):
+                raise RuntimeError("Chrono Trigger Data Map did not report current event write coverage")
 
             deployment = request_json(session.url + "api/deployment")
             if not deployment["ctext"]["installed"] or not deployment["ctext"]["configValid"]:
@@ -210,6 +238,8 @@ def smoke() -> list[str]:
                 raise RuntimeError("Chrono Trigger smoke project was not activated in CTExt")
             if not (game / "mods/SmokeMod/Localize/en/msg/item.txt").is_file():
                 raise RuntimeError("Chrono Trigger smoke deployment did not mirror project files")
+            if not (game / "mods/SmokeMod/Game/field/atel/Atel_0020.dat").is_file():
+                raise RuntimeError("Chrono Trigger smoke deployment missed the saved event overlay")
 
         if not session.wait_closed():
             raise RuntimeError("Chrono Trigger child service port is still open after smoke shutdown")
@@ -224,9 +254,10 @@ def smoke() -> list[str]:
     return [
         "managed service and expanded capability contract confirmed",
         "localized labels, bounded resource preview, scene MapTable and field-event commands decoded",
-        "message and scene edits saved to loose overlays while Vanilla stayed unchanged",
+        "named fixed-width event command edited through the managed desktop API with Vanilla unchanged",
+        "message, event and scene edits saved to loose overlays while Vanilla stayed unchanged",
         "project change inventory and deterministic CTP export verified",
-        "Data Map reflected current scene-map structural/raster coverage",
+        "Data Map reflected current scene-map and field-event coverage",
         "CTExt preflight/deployment, config backup and load-order activation verified",
         "host-owned child service stopped cleanly",
     ]
