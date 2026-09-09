@@ -122,7 +122,38 @@ This table uses the same proved `0x22`-byte shop record shape:
 
 Item and gear shops share one validated binary implementation; their public APIs remain semantic (`itemIds` versus `gearIds`). Lexeditor writes only explicitly changed slots and preserves the leading rate field byte-for-byte.
 
-All seven structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
+## FFX-2 fixed-record table contract
+
+FFX-2 uses a different generic fixed-record container. `FFXDataParser.readGenericX2DataFile` establishes the fields Lexeditor currently validates:
+
+- minimum record index: little-endian `u32` at `0x0C`;
+- maximum record index: little-endian `u32` at `0x10`;
+- fixed record size: little-endian `u32` at `0x14`;
+- total fixed-record bytes: little-endian `u32` at `0x18`;
+- bytes `0x1C..0x1F` remain opaque;
+- fixed records begin at `0x20`;
+- bytes after the fixed-record region, including localized string data, are preserved exactly.
+
+Lexeditor validates the index range, record size/count arithmetic and record-region boundary before exposing an X-2 table. It does not reuse the FFX `u16` header parser.
+
+### `command.bin` ability animation IDs
+
+Integrated English/US path:
+
+`FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/command.bin`
+
+The proved fixed record length is `0x8C` bytes. The research model identifies:
+
+- `+0x00..+0x01`: name string offset (`u16`), read-only in Lexeditor;
+- `+0x02..+0x03`: name string key (`u16`), read-only;
+- `+0x04..+0x05`: description string offset (`u16`), read-only;
+- `+0x06..+0x07`: description string key (`u16`), read-only;
+- `+0x08..+0x09`: animation ID 1 (`u16`), editable;
+- `+0x0A..+0x0B`: animation ID 2 (`u16`), editable.
+
+Lexeditor deliberately does **not** decode or rewrite FFX-2 strings yet. A save patches only `+0x08..+0x0B` in selected records and preserves every other byte, including all unknown record fields and the trailing localized strings.
+
+All eight structured editors are guarded by the relevant source VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
 
 ## Project and loader boundary
 
@@ -131,8 +162,10 @@ The project contains only replacement files:
 - `<project>/efl/x/<canonical FFX virtual path>` for FFX.
 - `<project>/efl/x2/<canonical FFX-2 virtual path>` for FFX-2.
 
-For example, a raw VBF entry `ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin` is staged as
+For example, a raw FFX VBF entry `ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin` is staged as
 `<project>/efl/x/FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin`.
+A raw FFX-2 entry `ffx_ps2/ffx2/master/new_uspc/battle/kernel/command.bin` is staged as
+`<project>/efl/x2/FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/command.bin`.
 
 Structured editors read the staged project file when one exists; otherwise they read the installed VBF entry. A save creates or atomically replaces only the project override. Installed VBF bytes remain untouched.
 
@@ -162,15 +195,17 @@ Integrated:
 - Structured FFX `prepare.bin` Rikku Mix result editing.
 - Structured FFX `item_shop.bin` 16-slot item/command inventory editing.
 - Structured FFX `arms_shop.bin` 16-slot gear inventory editing.
-- Reversible file-only Fahrenheit deployment mechanics.
+- FFX-2 `u32` fixed-record table validation.
+- Conservative FFX-2 `command.bin` animation-ID editing for the `new_uspc` table.
+- Reversible file-only Fahrenheit deployment mechanics for both `efl/x` and `efl/x2` project trees.
 - Private installed-game cosmetic theme extraction/cache with safe fallback.
 - Evidence-based Data Map.
 
 Not yet integrated:
 
 - Other FFX gameplay/kernel record editors.
-- Dialogue/text editing.
-- FFX-2 structured tables.
+- FFX dialogue/text editing.
+- Other FFX-2 structured tables, localized string editing, or non-US command-table variants.
 - Conversion of recognized proprietary font/texture/audio formats that are not already browser-ready.
 - Installing/updating Fahrenheit itself.
 - Choosing FFX vs FFX-2 when launching through Fahrenheit from Lexeditor.
