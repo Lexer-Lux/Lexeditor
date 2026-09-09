@@ -142,6 +142,30 @@ class BannerlordDeployTests(unittest.TestCase):
         finally:
             temporary.cleanup()
 
+    def test_project_descriptor_redirection_outside_project_is_rejected(self):
+        temporary, project, game, deployed = self.fixture(installed=False)
+        try:
+            outside = project.parent / "outside-SubModule.xml"
+            outside.write_text(PROJECT_SUBMODULE, encoding="utf-8")
+            project_resolved = project.resolve()
+            descriptor = project_resolved / "SubModule.xml"
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == descriptor:
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(ValueError, "project path escaped"):
+                    deploy_target(project, game)
+            self.assertFalse(deployed.exists())
+        finally:
+            if 'outside' in locals():
+                outside.unlink(missing_ok=True)
+            temporary.cleanup()
+
     def test_existing_module_target_must_stay_inside_modules_root(self):
         temporary, project, game, _deployed = self.fixture(installed=False)
         try:
