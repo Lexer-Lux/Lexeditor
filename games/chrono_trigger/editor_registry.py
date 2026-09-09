@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .audio_ops import apply_audio_op, audio_field_specs, audio_values, decorate_audio_semantics
 from .bit_ops import apply_bit_op, bit_field_specs, bit_values, decorate_bit_semantics
 from .call_ops import apply_call_op, call_field_specs, call_values, decorate_call_semantics
 from .comparisons import (
@@ -96,6 +97,10 @@ def scene_event_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, scene_event_field_specs(command), scene_event_values(command))
 
 
+def audio_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, audio_field_specs(command), audio_values(command))
+
+
 def jump_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
 
@@ -108,6 +113,7 @@ _REGISTRY_BUILDERS = (
     call_editor_schema,
     object_editor_schema,
     scene_event_editor_schema,
+    audio_editor_schema,
     jump_editor_schema,
 )
 _REGISTRY_APPLIERS = (
@@ -118,6 +124,7 @@ _REGISTRY_APPLIERS = (
     apply_call_op,
     apply_object_op,
     apply_scene_event_op,
+    apply_audio_op,
     apply_jump,
 )
 
@@ -138,6 +145,7 @@ def decorate_event_editors(payload: dict) -> dict:
     decorate_call_semantics(payload)
     decorate_object_semantics(payload)
     decorate_scene_event_semantics(payload)
+    decorate_audio_semantics(payload)
     decorate_jump_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
