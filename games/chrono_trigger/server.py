@@ -24,6 +24,12 @@ from .events import event_entries, get_event, load_events
 from .resources import ResourceArchiveError
 from .scene_tables import load_exits, load_treasure, save_exit, save_treasure
 from .worlds import load_worlds, save_world
+from .world_tables import (
+    load_world_table,
+    save_world_exit,
+    save_world_script_address,
+    save_world_trigger,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,18 +39,15 @@ HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
 POST_ROUTES = {
-    "/api/save/message", "/api/save/scene", "/api/save/exit",
-    "/api/save/treasure", "/api/save/world",
+    "/api/save/message", "/api/save/scene", "/api/save/exit", "/api/save/treasure",
+    "/api/save/world", "/api/save/world-exit", "/api/save/world-trigger",
+    "/api/save/world-script-address",
 }
 
 
 @lru_cache(maxsize=1)
 def _store() -> OverlayStore:
-    return OverlayStore(
-        paths.RESOURCE_PATH,
-        paths.PROJECT_ROOT,
-        template_root=paths.PROJECT_TEMPLATE_ROOT,
-    )
+    return OverlayStore(paths.RESOURCE_PATH, paths.PROJECT_ROOT, template_root=paths.PROJECT_TEMPLATE_ROOT)
 
 
 def _source(params: dict[str, list[str]]) -> str:
@@ -59,65 +62,49 @@ def _archive_payload(query: str = "", offset: int = 0, limit: int = 250) -> dict
     matches = archive.matching(query)
     offset = max(0, min(offset, len(matches)))
     limit = max(1, min(limit, 1000))
-    page = matches[offset:offset + limit]
-    entries = []
-    for entry in page:
-        entries.append({
-            "path": entry.path,
-            "offset": entry.offset,
-            "storedSize": entry.stored_size,
-            "source": "project" if _store().overlay_exists(entry.path) else "archive",
-            **classify_resource(entry.path),
-        })
+    entries = [{
+        "path": entry.path,
+        "offset": entry.offset,
+        "storedSize": entry.stored_size,
+        "source": "project" if _store().overlay_exists(entry.path) else "archive",
+        **classify_resource(entry.path),
+    } for entry in matches[offset:offset + limit]]
     return {
-        "archive": str(archive.path),
-        "fileSize": archive.file_size,
-        "declaredSize": archive.declared_size,
-        "indexOffset": archive.index_offset,
-        "indexStoredSize": archive.index_stored_size,
-        "entryCount": len(archive.entries),
-        "matchCount": len(matches),
-        "offset": offset,
-        "limit": limit,
-        "entries": entries,
+        "archive": str(archive.path), "fileSize": archive.file_size,
+        "declaredSize": archive.declared_size, "indexOffset": archive.index_offset,
+        "indexStoredSize": archive.index_stored_size, "entryCount": len(archive.entries),
+        "matchCount": len(matches), "offset": offset, "limit": limit, "entries": entries,
     }
 
 
 def dashboard() -> dict:
     store = _store()
-    messages = store.localization_files()
-    scenes = store.scene_entries()
-    events = event_entries(store)
     return {
         "game": {
-            "root": str(paths.GAME_ROOT),
-            "archive": str(paths.RESOURCE_PATH),
-            "steamAppId": "613830",
-            "ready": not paths.game_problems(),
+            "root": str(paths.GAME_ROOT), "archive": str(paths.RESOURCE_PATH),
+            "steamAppId": "613830", "ready": not paths.game_problems(),
         },
         "project": {
-            "root": str(paths.PROJECT_ROOT),
-            "writable": store.writable,
+            "root": str(paths.PROJECT_ROOT), "writable": store.writable,
             "template": str(paths.PROJECT_TEMPLATE_ROOT),
             "overlayResources": sum(store.overlay_exists(entry.path) for entry in store.archive.entries),
         },
         "datasets": {
             "resources": len(store.archive.entries),
-            "localizationFiles": len(messages),
-            "sceneHeaders": len(scenes),
-            "fieldEvents": len(events),
+            "localizationFiles": len(store.localization_files()),
+            "sceneHeaders": len(store.scene_entries()),
+            "fieldEvents": len(event_entries(store)),
             "worldHeaders": 8 if store.exists("Game/common/bankc6.bin") else 0,
         },
         "deployment": {
-            "format": "ctext-loose-files",
-            "automated": False,
+            "format": "ctext-loose-files", "automated": False,
             "message": "Project paths match CTExt loose-file resource overrides; CTExt installation/load-order setup is not automated yet.",
         },
     }
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/5"
+    server_version = "LexeditorChronoTrigger/6"
 
     def log_message(self, _format, *_args):
         return
@@ -142,8 +129,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        path = parsed.path
-        params = parse_qs(parsed.query)
+        path, params = parsed.path, parse_qs(parsed.query)
         try:
             if path == "/":
                 self.send_file(PLUGIN_ROOT / "editor.html")
@@ -156,16 +142,13 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"error": "Shared UI asset not found"}, 404)
             elif path == "/api/plugin":
                 self.send_json({
-                    "apiVersion": 1,
-                    "pluginId": "chrono-trigger",
-                    "name": "Chrono Trigger",
+                    "apiVersion": 1, "pluginId": "chrono-trigger", "name": "Chrono Trigger",
                     "edition": "Steam / resources.bin / CTExt loose-file projects",
-                    "hosted": HOSTED,
-                    "windowHost": WINDOW_HOST,
-                    "projectRoot": str(paths.PROJECT_ROOT),
+                    "hosted": HOSTED, "windowHost": WINDOW_HOST, "projectRoot": str(paths.PROJECT_ROOT),
                     "capabilities": [
                         "data-map", "resource-index", "localization-text", "scene-headers",
                         "scene-exits", "scene-treasure", "field-events", "world-headers",
+                        "world-exits", "world-triggers", "world-script-addresses",
                         "project-overlay", "read", "save",
                     ],
                 })
@@ -175,15 +158,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(data_map(_store()))
             elif path == "/api/archive":
                 self.send_json(_archive_payload(
-                    params.get("q", [""])[0],
-                    int(params.get("offset", ["0"])[0]),
+                    params.get("q", [""])[0], int(params.get("offset", ["0"])[0]),
                     int(params.get("limit", ["250"])[0]),
                 ))
             elif path == "/api/scenes":
                 self.send_json(load_scenes(
                     _store(), _source(params), params.get("q", [""])[0],
-                    int(params.get("offset", ["0"])[0]),
-                    int(params.get("limit", ["100"])[0]),
+                    int(params.get("offset", ["0"])[0]), int(params.get("limit", ["100"])[0]),
                 ))
             elif path == "/api/exits":
                 self.send_json(load_exits(_store(), int(params.get("scene", ["-1"])[0]), _source(params)))
@@ -195,16 +176,16 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self.send_json(load_events(
                         _store(), _source(params), params.get("q", [""])[0],
-                        int(params.get("offset", ["0"])[0]),
-                        int(params.get("limit", ["100"])[0]),
+                        int(params.get("offset", ["0"])[0]), int(params.get("limit", ["100"])[0]),
                     ))
             elif path == "/api/worlds":
                 self.send_json(load_worlds(_store(), _source(params)))
+            elif path == "/api/world-table":
+                self.send_json(load_world_table(_store(), int(params.get("world", ["-1"])[0]), _source(params)))
             elif path == "/api/messages/catalog":
                 self.send_json({"files": _store().localization_files()})
             elif path == "/api/messages":
-                virtual = params.get("path", [""])[0]
-                self.send_json(load_message_table(_store(), virtual, _source(params)))
+                self.send_json(load_message_table(_store(), params.get("path", [""])[0], _source(params)))
             else:
                 self.send_json({"error": "Not found"}, 404)
         except KeyError as error:
@@ -241,32 +222,21 @@ class Handler(BaseHTTPRequestHandler):
         try:
             payload = self._request_json()
             if path == "/api/save/message":
-                result = save_message_table(
-                    _store(), str(payload.get("path", "")), str(payload.get("sha256", "")),
-                    payload.get("changes", []),
-                )
+                result = save_message_table(_store(), str(payload.get("path", "")), str(payload.get("sha256", "")), payload.get("changes", []))
             elif path == "/api/save/scene":
-                result = save_scene(
-                    _store(), int(payload.get("id", -1)), str(payload.get("sha256", "")),
-                    payload.get("values", {}),
-                )
+                result = save_scene(_store(), int(payload.get("id", -1)), str(payload.get("sha256", "")), payload.get("values", {}))
             elif path == "/api/save/exit":
-                result = save_exit(
-                    _store(), int(payload.get("sceneId", -1)), int(payload.get("index", -1)),
-                    str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")),
-                    payload.get("values", {}),
-                )
+                result = save_exit(_store(), int(payload.get("sceneId", -1)), int(payload.get("index", -1)), str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")), payload.get("values", {}))
             elif path == "/api/save/treasure":
-                result = save_treasure(
-                    _store(), int(payload.get("sceneId", -1)), int(payload.get("index", -1)),
-                    str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")),
-                    payload.get("values", {}),
-                )
+                result = save_treasure(_store(), int(payload.get("sceneId", -1)), int(payload.get("index", -1)), str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")), payload.get("values", {}))
+            elif path == "/api/save/world":
+                result = save_world(_store(), int(payload.get("id", -1)), str(payload.get("sha256", "")), payload.get("values", {}))
+            elif path == "/api/save/world-exit":
+                result = save_world_exit(_store(), int(payload.get("worldId", -1)), int(payload.get("index", -1)), str(payload.get("sha256", "")), payload.get("values", {}))
+            elif path == "/api/save/world-trigger":
+                result = save_world_trigger(_store(), int(payload.get("worldId", -1)), int(payload.get("index", -1)), str(payload.get("sha256", "")), payload.get("values", {}))
             else:
-                result = save_world(
-                    _store(), int(payload.get("id", -1)), str(payload.get("sha256", "")),
-                    payload.get("values", {}),
-                )
+                result = save_world_script_address(_store(), int(payload.get("worldId", -1)), int(payload.get("index", -1)), str(payload.get("sha256", "")), payload.get("values", {}))
             self.send_json(result)
         except PermissionError as error:
             self.send_json({"error": str(error)}, 403)
