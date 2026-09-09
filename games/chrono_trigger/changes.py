@@ -51,8 +51,10 @@ def list_changes(store: OverlayStore) -> dict:
             same = project_data == vanilla
         except KeyError:
             pass
-        status = "redundant" if same else "modified" if vanilla_exists else "added"
-        counts[status] += 1
+        change_status = "redundant" if same else "modified" if vanilla_exists else "added"
+        counts[change_status] += 1
+        classification = dict(classify_resource(virtual))
+        coverage_status = classification.pop("status", None)
         rows.append({
             "path": virtual,
             "size": len(project_data),
@@ -60,8 +62,10 @@ def list_changes(store: OverlayStore) -> dict:
             "vanillaExists": vanilla_exists,
             "vanillaSha256": vanilla_sha,
             "sameAsVanilla": same,
-            "status": status,
-            **classify_resource(virtual),
+            "status": change_status,
+            "changeStatus": change_status,
+            "coverageStatus": coverage_status,
+            **classification,
         })
     return {
         "kind": "project-changes",
