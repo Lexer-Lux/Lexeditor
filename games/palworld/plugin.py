@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import tempfile
 from pathlib import Path
+from urllib.parse import quote
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from runtime_bootstrap import user_data_dir
@@ -20,8 +21,8 @@ DISPLAY_NAME = "Palworld"
 
 
 def check() -> list[str]:
-    # GameInstallSpec validates the selected installation. The first slice has
-    # no mandatory third-party runtime/helper of its own.
+    # GameInstallSpec validates the selected installation. PalSchema support is
+    # package-authoring support and does not silently install UE4SS/PalSchema.
     return []
 
 
@@ -45,7 +46,7 @@ def launch() -> int:
 
 
 def smoke() -> list[str]:
-    """Exercise the real managed service without touching an installed game."""
+    """Exercise package + PalSchema service paths without installed game data."""
     with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-") as temp_name:
         temp = Path(temp_name)
         game = temp / "Palworld"
@@ -56,9 +57,37 @@ def smoke() -> list[str]:
         project.mkdir()
         fixture = default_info("LexeditorSmoke")
         fixture["FuturePocketpairField"] = {"preserve": True}
+        fixture["Dependencies"] = ["PalSchema"]
+        fixture["Tags"] = ["PalSchema"]
+        fixture["InstallRule"] = [{"Type": "PalSchema", "Targets": ["./PalSchema/"]}]
         (project / "Info.json").write_text(
             json.dumps(fixture, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
+        )
+
+        raw_root = project / "PalSchema" / "LexeditorSmokeBalance" / "raw"
+        raw_root.mkdir(parents=True)
+        json_patch = raw_root / "balance.json"
+        json_patch.write_text(
+            json.dumps({
+                "DT_PalMonsterParameter": {
+                    "Kitsunebi": {
+                        "WorkSuitability_EmitFlame": 3,
+                        "FutureNested": {"preserve": [1, 2, 3]},
+                    }
+                }
+            }, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        jsonc_patch = raw_root / "commented.jsonc"
+        jsonc_patch.write_text(
+            '// preserve this comment\n{"DT_Test":{"Row":{"Value":1}}}\n',
+            encoding="utf-8",
+        )
+        nested = raw_root / "nested"
+        nested.mkdir()
+        (nested / "ignored.json").write_text(
+            '{"DT_Test":{"Row":{"Value":9}}}\n', encoding="utf-8"
         )
 
         with PalworldSession({
@@ -68,8 +97,9 @@ def smoke() -> list[str]:
             identity = request_json(session.url + "api/plugin")
             if identity.get("pluginId") != "palworld" or identity.get("hosted") is not True:
                 raise RuntimeError("Palworld service returned the wrong managed identity")
-            if "official-package-info" not in identity.get("capabilities", []):
-                raise RuntimeError("Palworld service did not advertise package metadata editing")
+            capabilities = identity.get("capabilities", [])
+            if "official-package-info" not in capabilities or "palschema-raw-patches" not in capabilities:
+                raise RuntimeError("Palworld service did not advertise package + PalSchema editing")
 
             info = request_json(session.url + "api/info")
             if info.get("data", {}).get("PackageName") != "LexeditorSmoke":
@@ -79,21 +109,65 @@ def smoke() -> list[str]:
                 "changes": {"Version": "0.2.0", "DebugMode": False},
             })
             if result.get("data", {}).get("Version") != "0.2.0":
-                raise RuntimeError("Palworld service edit did not survive readback")
+                raise RuntimeError("Palworld service Info.json edit did not survive readback")
             reread = request_json(session.url + "api/info")
             if reread.get("data", {}).get("FuturePocketpairField") != {"preserve": True}:
-                raise RuntimeError("Palworld service did not preserve an unknown Info.json field")
+                raise RuntimeError("Palworld service did not preserve unknown Info.json metadata")
             if not (project / "Info.json.lexeditor.bak").is_file():
-                raise RuntimeError("Palworld service changed Info.json without creating a backup")
+                raise RuntimeError("Palworld service changed Info.json without a backup")
+
+            catalog = request_json(session.url + "api/palschema/catalog")
+            patches = catalog.get("patches", [])
+            if [row.get("name") for row in patches] != ["balance.json", "commented.jsonc"]:
+                raise RuntimeError("PalSchema catalog did not mirror direct raw-folder discovery")
+            if [row.get("writable") for row in patches] != [True, False]:
+                raise RuntimeError("PalSchema catalog did not keep JSONC writes read-only")
+
+            relative = patches[0]["path"]
+            patch = request_json(
+                session.url + "api/palschema/patch?path=" + quote(relative, safe="")
+            )
+            target = next(
+                row for row in patch.get("records", [])
+                if row.get("table") == "DT_PalMonsterParameter"
+                and row.get("row") == "Kitsunebi"
+                and row.get("field") == "WorkSuitability_EmitFlame"
+            )
+            if target.get("value") != 3 or target.get("writable") is not True:
+                raise RuntimeError("PalSchema service did not expose the scalar patch field")
+
+            saved_patch = request_json(session.url + "api/palschema/patch/save", {
+                "path": relative,
+                "sourceSha256": patch["sourceSha256"],
+                "edits": [{
+                    "table": "DT_PalMonsterParameter",
+                    "row": "Kitsunebi",
+                    "field": "WorkSuitability_EmitFlame",
+                    "value": 4,
+                }],
+            })
+            updated = next(
+                row for row in saved_patch.get("records", [])
+                if row.get("field") == "WorkSuitability_EmitFlame"
+            )
+            if updated.get("value") != 4:
+                raise RuntimeError("PalSchema service scalar edit did not survive readback")
+            disk = json.loads(json_patch.read_text("utf-8"))
+            if disk["DT_PalMonsterParameter"]["Kitsunebi"]["FutureNested"] != {"preserve": [1, 2, 3]}:
+                raise RuntimeError("PalSchema edit did not preserve an unmodeled nested property")
+            if not (raw_root / "balance.json.lexeditor.bak").is_file():
+                raise RuntimeError("PalSchema changed write did not create a backup")
 
         if not session.wait_closed():
             raise RuntimeError("Palworld child port is still open after host shutdown")
 
     return [
-        "managed Palworld service identified the selected package project",
-        "official Info.json edit survived save/readback",
-        "unknown future package metadata survived the structured edit",
-        "changed Info.json write created a backup",
+        "managed Palworld service identified the selected official package project",
+        "official Info.json edit survived save/readback with unknown metadata preserved",
+        "PalSchema catalog mirrored official target and non-recursive raw discovery",
+        "PalSchema JSON scalar edit survived save/readback while nested data was preserved",
+        "Info.json and PalSchema changed writes created recovery backups",
+        "PalSchema JSONC patches stayed readable but changed-write disabled",
         "host-owned Palworld child service stopped cleanly",
     ]
 
@@ -102,7 +176,7 @@ PLUGIN = GamePlugin(
     plugin_id="palworld",
     name=DISPLAY_NAME,
     subtitle="Official mod packages",
-    description="Create and edit Palworld v0.7+ official mod-package metadata while keeping installed game data read-only.",
+    description="Create Palworld v0.7+ packages and edit PalSchema raw DataTable patches while installed game data stays read-only.",
     accent="#55c7d9",
     check=check,
     launch=launch,
