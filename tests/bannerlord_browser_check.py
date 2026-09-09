@@ -193,8 +193,8 @@ def main() -> None:
             assert "Project/deployed sync" in deployment_text
 
             page.evaluate('navigate("datamap")')
-            page.wait_for_timeout(100)
-            assert page.locator(".lex-data-map").count() == 1
+            page.wait_for_selector(".lex-data-map-table")
+            assert page.locator(".lex-paged-list-detail").count() == 1
             filenames = page.evaluate("state.datamap.rows.map(row=>row.filename)")
             assert "ModuleData/items.xml" in filenames
             assert "GUI/Prefabs/Test.xml" in filenames
