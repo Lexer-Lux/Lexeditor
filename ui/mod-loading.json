@@ -40,6 +40,11 @@
       "loader": "Warband's native module system. WSE2 is Lexeditor's optional enhanced runtime helper, not a multi-mod overlay loader.",
       "structure": "Each installed mod is its own folder under <Warband>\\Modules\\ with module.ini. Lexeditor can also edit and build a Module System source project before it becomes an installed module.",
       "overriding": "Warband selects one module at launch. Lexeditor does not stack several modules or apply a cross-module priority order; resources and dependencies declared by the selected module follow Warband's own module rules."
+    },
+    "chrono-trigger": {
+      "loader": "CTExt. Lexeditor uses an already-installed CTExt runtime for explicit loose-file deployment and activation; it never installs or replaces the CTExt DLLs automatically.",
+      "structure": "One selected Lexeditor project is a CTExt-compatible archive-relative overlay containing Game/... and Localize/... paths. External projects can be mirrored into <Chrono Trigger>/mods/<project-name>; a source project already directly under mods/<name> is used in place and is never deleted by Lexeditor.",
+      "overriding": "CTExt owns runtime mod load order through ctext.json. Lexeditor appends or removes only its selected project entry, preserves unrelated entries, and never semantically merges separate projects; within the selected project, loose files replace the corresponding resources.bin resources while the installed archive remains immutable."
     }
   }
 }
