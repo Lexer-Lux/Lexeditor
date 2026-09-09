@@ -1,12 +1,11 @@
 """Structured editing for Bannerlord Gauntlet prefab XML without whole-file reserialization."""
 from __future__ import annotations
 
-import math
 from pathlib import Path
-import re
 import shutil
 import xml.etree.ElementTree as ET
-from xml.sax.saxutils import escape, unescape
+
+from .xml_patch import scan_xml_start_tags, serialize_attribute
 
 
 _ENUMS = {
@@ -17,9 +16,6 @@ _ENUMS = {
     "Brush.TextHorizontalAlignment": ("Left", "Center", "Right"),
     "Brush.TextVerticalAlignment": ("Top", "Center", "Bottom"),
 }
-_ATTRIBUTE = re.compile(r'([A-Za-z_:][\w:.-]*)\s*=\s*(["\'])(.*?)\2', re.DOTALL)
-_TAG = re.compile(r"\s*([A-Za-z_:][\w:.-]*)")
-_NUMBER = re.compile(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)")
 
 
 def list_prefabs(project: Path) -> list[str]:
@@ -45,127 +41,8 @@ def _prefab_path(project: Path, requested: str) -> Path:
     return target
 
 
-def _decode(value: str) -> str:
-    return unescape(value, {"&quot;": '"', "&apos;": "'"})
-
-
-def _kind(name: str, value: str) -> tuple[str, list[str]]:
-    if value.startswith("@") or value.startswith("{"):
-        return "binding", []
-    choices = _ENUMS.get(name)
-    if choices and value in choices:
-        return "enum", list(choices)
-    if value.casefold() in {"true", "false"}:
-        return "bool", []
-    if _NUMBER.fullmatch(value):
-        return "number", []
-    return "text", []
-
-
 def _scan(text: str) -> list[dict]:
-    elements: list[dict] = []
-    stack: list[dict] = []
-    root_counts: dict[str, int] = {}
-    offset = 0
-    while offset < len(text):
-        left = text.find("<", offset)
-        if left < 0:
-            break
-        if text.startswith("<!--", left):
-            right = text.find("-->", left + 4)
-            offset = len(text) if right < 0 else right + 3
-            continue
-        if text.startswith("<![CDATA[", left):
-            right = text.find("]]>", left + 9)
-            offset = len(text) if right < 0 else right + 3
-            continue
-        if text.startswith("<?", left):
-            right = text.find("?>", left + 2)
-            offset = len(text) if right < 0 else right + 2
-            continue
-        if text.startswith("</", left):
-            right = text.find(">", left + 2)
-            if stack:
-                stack.pop()
-            offset = len(text) if right < 0 else right + 1
-            continue
-        if text.startswith("<!", left):
-            right = text.find(">", left + 2)
-            offset = len(text) if right < 0 else right + 1
-            continue
-
-        quote = None
-        right = left + 1
-        while right < len(text):
-            character = text[right]
-            if quote:
-                if character == quote:
-                    quote = None
-            elif character in {'"', "'"}:
-                quote = character
-            elif character == ">":
-                break
-            right += 1
-        if right >= len(text):
-            break
-
-        inner = text[left + 1:right]
-        tag_match = _TAG.match(inner)
-        if not tag_match:
-            offset = right + 1
-            continue
-        tag = tag_match.group(1)
-        self_closing = inner.rstrip().endswith("/")
-        siblings = stack[-1]["children"] if stack else root_counts
-        sibling_index = siblings.get(tag, 0)
-        siblings[tag] = sibling_index + 1
-        prefix = stack[-1]["path"] + "/" if stack else ""
-        element_path = f"{prefix}{tag}[{sibling_index}]"
-
-        attributes = []
-        for match in _ATTRIBUTE.finditer(inner, tag_match.end()):
-            raw = match.group(3)
-            value = _decode(raw)
-            kind, choices = _kind(match.group(1), value)
-            attributes.append(
-                {
-                    "name": match.group(1),
-                    "value": value,
-                    "kind": kind,
-                    "choices": choices,
-                    "_span": (left + 1 + match.start(3), left + 1 + match.end(3)),
-                    "_quote": match.group(2),
-                }
-            )
-        public_attributes = [
-            {key: value for key, value in attribute.items() if not key.startswith("_")}
-            for attribute in attributes
-        ]
-        identity = {row["name"]: row["value"] for row in public_attributes}
-        hint = (
-            identity.get("Id")
-            or identity.get("DataSource")
-            or identity.get("Text")
-            or identity.get("Sprite")
-            or identity.get("Name")
-            or ""
-        )
-        elements.append(
-            {
-                "index": len(elements),
-                "path": element_path,
-                "tag": tag,
-                "depth": len(stack),
-                "line": text.count("\n", 0, left) + 1,
-                "hint": hint,
-                "attributes": public_attributes,
-                "_attributes": attributes,
-            }
-        )
-        if not self_closing:
-            stack.append({"path": element_path, "children": {}})
-        offset = right + 1
-    return elements
+    return scan_xml_start_tags(text, _ENUMS)
 
 
 def _public(element: dict) -> dict:
@@ -186,39 +63,6 @@ def read_prefab(project: Path, requested: str) -> dict:
         "elements": [_public(element) for element in elements],
         "elementCount": len(elements),
     }
-
-
-def _serialize(attribute: dict, incoming) -> str:
-    kind = attribute["kind"]
-    original = attribute["value"]
-    if kind == "bool":
-        if isinstance(incoming, bool):
-            value = "true" if incoming else "false"
-        else:
-            value = str(incoming).strip().casefold()
-            if value not in {"true", "false"}:
-                raise ValueError(f"{attribute['name']} must be true or false")
-    elif kind == "number":
-        number = float(incoming)
-        if not math.isfinite(number):
-            raise ValueError(f"{attribute['name']} must be finite")
-        if abs(number) > 1_000_000_000:
-            raise ValueError(f"{attribute['name']} magnitude is too large")
-        if "." not in original and number.is_integer():
-            value = str(int(number))
-        else:
-            value = format(number, ".12g")
-    elif kind == "enum":
-        value = str(incoming)
-        if value not in attribute["choices"]:
-            raise ValueError(
-                f"{attribute['name']} must be one of: {', '.join(attribute['choices'])}"
-            )
-    else:
-        value = str(incoming)
-    if attribute["_quote"] == '"':
-        return escape(value, {'"': "&quot;"})
-    return escape(value, {"'": "&apos;"})
 
 
 def save_prefab(project: Path, requested: str, edits: list[dict]) -> dict:
@@ -252,7 +96,7 @@ def save_prefab(project: Path, requested: str, edits: list[dict]) -> dict:
             raise ValueError(
                 f"{element_path} {attribute_name} changed on disk; reload before saving"
             )
-        replacement = _serialize(attribute, edit.get("value"))
+        replacement = serialize_attribute(attribute, edit.get("value"))
         left, right = attribute["_span"]
         if text[left:right] != replacement:
             replacements.append((left, right, replacement))
