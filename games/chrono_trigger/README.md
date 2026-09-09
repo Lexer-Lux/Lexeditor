@@ -65,6 +65,14 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 
 Known EC forms receive read-only semantic labels. Unknown subcommands and truncated known forms fail closed so they cannot consume the following opcode. **EC remains unwritable.**
 
+`0xFF` Mode 7 is also dynamic on PC. Live Mode7Menu evidence is used for **read-only semantics only**:
+
+- scenes `00–89`: one scene byte
+- specials `90` and `97`: special byte + three raw parameters
+- specials `91–96` and `98`: special byte only
+
+The shared fixed-width writer still rejects `0xFF` because its PC width is dynamic. Tests pin that guard for both a normal scene and a parameterized special; no Mode 7 writer exception was added.
+
 ### Intentionally read-only / unresolved
 
 - `16` bank-7F comparison packing.
@@ -79,13 +87,14 @@ Known EC forms receive read-only semantic labels. Unknown subcommands and trunca
 - `92/9C` direct vector movement: constructor doubles magnitude but the live menu does not undo that on decode.
 - `9E/9F` movement widths/targets: upstream metadata remains internally inconsistent and Lexeditor marks those widths unresolved.
 - `E4/E5/E6` tile-copy/layer-scroll unknown flags/fields.
+- `FF` Mode 7 writes: decoded forms remain semantic-only because the opcode is dynamically sized.
 - variable/dynamic unresolved command writes generally.
 
 ## Validation
 
 The dedicated `Chrono Trigger checks` workflow compiles plugin/tools, validates the descriptor, auto-discovers all `test_chrono_trigger_*.py` suites, runs the managed ARC1/CTExt smoke, checks editor JavaScript and runs Playwright regressions.
 
-Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, bank-7F range distinctions, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes and fail-closed malformed encodings.
+Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, bank-7F range distinctions, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries, read-only `FF` Mode 7 semantics and fail-closed malformed encodings.
 
 Browser coverage includes:
 - main scene/world/Event surfaces and a sequential NPC Facing -> `0x13` comparison save,
