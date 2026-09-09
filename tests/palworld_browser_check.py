@@ -29,6 +29,15 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
     (game / "Palworld.exe").write_bytes(b"")
     workshop = temp / "steamapps" / "workshop" / "content" / "1623730"
     workshop.mkdir(parents=True)
+    loader_settings = game / "Mods" / "PalModSettings.ini"
+    loader_settings.parent.mkdir(parents=True, exist_ok=True)
+    loader_settings.write_text(
+        "[PalModSettings]\n"
+        "bGlobalEnableMod=True\n"
+        f"WorkshopRootDir={workshop}\n"
+        "ActiveModList=BrowserFixture\n",
+        encoding="utf-8",
+    )
 
     schema_root = game / "Mods" / "NativeMods" / "UE4SS" / "Mods" / "PalSchema" / "schemas"
     (schema_root / "raw").mkdir(parents=True)
@@ -112,7 +121,6 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     page.goto(session.url, wait_until="domcontentloaded")
                     page.wait_for_function("typeof navigate === 'function' && typeof model === 'object' && model !== null && typeof shell === 'object' && shell !== null")
 
-                    # A malformed alphabetically-first patch must not prevent the editor from opening.
                     page.evaluate('navigate("palschema")')
                     page.wait_for_selector(".pal-schema-root")
                     assert page.locator(".pal-schema-state").inner_text() == "SCHEMA-AWARE"
@@ -123,10 +131,12 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert "1 error" in values[0]["text"], values
                     assert selector.input_value().endswith("balance.json"), selector.input_value()
 
-                    # The valid patch uses the generated integer schema and is writable.
                     numeric = page.locator('.pal-schema-columns .pal-detail input[type="number"]')
                     assert numeric.count() >= 1
-                    assert "integer" in page.locator(".pal-detail").inner_text().lower()
+                    schema_record = page.evaluate("selectedPatchRecord()")
+                    assert schema_record["schemaState"] == "matched"
+                    assert schema_record["schemaType"] == "integer"
+                    assert schema_record["writable"] is True
                     numeric.first.fill("4")
                     page.evaluate("save()")
                     page.wait_for_function("!patchDirty()")
@@ -136,7 +146,6 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert row["NestedPreserved"] == {"keep": [1, 2, 3]}, row
                     assert good.with_name(good.name + ".lexeditor.bak").is_file()
 
-                    # Generated enum definitions become a semantic select and remain schema validated.
                     page.locator(".pal-patch-row").filter(has_text="Mode").click()
                     page.wait_for_timeout(100)
                     enum_select = page.locator(".pal-schema-columns .pal-detail select").filter(has_text="ModeA")
@@ -146,7 +155,6 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     page.wait_for_function("!patchDirty()")
                     assert json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]["Mode"] == "ModeB"
 
-                    # Add-property is local/dirty first, then persisted atomically through normal Save.
                     page.locator(".pal-patch-row").filter(has_text="WorkSuitability_EmitFlame").click()
                     page.wait_for_selector(".pal-add-field-select")
                     add_select = page.locator(".pal-add-field-select")
@@ -162,21 +170,17 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     page.wait_for_function("!patchDirty()")
                     assert json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]["AddedCount"] == 11
 
-                    # Selecting the malformed patch shows its error locally instead of killing the workspace.
                     selector.select_option(values[0]["value"])
                     page.wait_for_selector(".pal-patch-toolbar .pal-issue.error")
                     assert "Invalid PalSchema" in page.locator(".pal-patch-toolbar .pal-issue.error").inner_text()
                     assert page.locator(".pal-schema-root").count() == 1
 
-                    # JSONC remains discoverable/read-only and its comment survives untouched.
                     jsonc_value = next(row["value"] for row in values if row["value"].endswith("notes.jsonc"))
                     selector.select_option(jsonc_value)
                     page.wait_for_function("palPatch !== null && palPatch.writable === false")
                     assert "keep me" in commented.read_text("utf-8")
                     assert page.locator('.pal-schema-columns .pal-detail input[type="number"]').count() == 0
 
-                    # Known-invalid integrated payloads block clean package builds. Repairing the
-                    # malformed fixture makes Build available; local deployment stays separate from activation.
                     page.evaluate('navigate("build")')
                     page.wait_for_function("typeof palBuildState === 'object' && palBuildState !== null && !palBuildLoading")
                     build_error = page.evaluate("palBuildError")
@@ -184,7 +188,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert "aaa_bad.json" in build_error
                     bad.unlink()
                     page.get_by_role("button", name="Refresh", exact=True).click()
-                    page.wait_for_function("palBuildState?.ready === true && palWorkshopState?.ready === true && !palBuildLoading")
+                    page.wait_for_function("palBuildState?.ready === true && palWorkshopState?.ready === true && palLoaderState?.readOnly === true && !palBuildLoading")
+                    loader = page.evaluate("palLoaderState")
+                    assert loader["active"] is True
+                    assert loader["listed"] is True
+                    assert loader["packageName"] == "BrowserFixture"
                     page.get_by_role("button", name="Build package", exact=True).click()
                     page.wait_for_function("palBuildState?.current === true && palWorkshopState?.buildCurrent === true && !palBuildLoading")
                     built = project / "build" / "official-package"
@@ -192,8 +200,6 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert (built / "PalSchema" / "Balance" / "raw" / "balance.json").is_file()
                     assert not (built / "PalSchema" / "Balance" / "raw" / "balance.json.lexeditor.bak").exists()
 
-                    # Mirror Pocketpair's Shift-created local test package: owned random 10-digit folder,
-                    # no publishing metadata, and user activation remains outside Lexeditor.
                     page.get_by_role("button", name="Deploy local test", exact=True).click()
                     page.wait_for_function("palWorkshopState?.current === true && palWorkshopState?.deployed === true && !palBuildLoading")
                     local_folder = page.evaluate("palWorkshopState.folder")
