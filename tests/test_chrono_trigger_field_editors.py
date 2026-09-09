@@ -181,10 +181,12 @@ class FieldEditorWriteTests(unittest.TestCase):
         self.assertEqual(store.overlay[34:36], bytes((0xC9, 0x54)))
 
     def test_gold_and_jump_are_little_endian_and_fixed_width(self):
+        # 0xCC at offset 32 is four bytes, so the jump origin is 35. The
+        # following Return begins at 36, making +1 a valid boundary target.
         original = _event(bytes((0xCC, 0x34, 0x12, 0x05, 0x00)))
         store = FakeStore(original)
-        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"gold": 5000, "jumpOffset": 9})
-        self.assertEqual(store.overlay[34:37], bytes((0x88, 0x13, 0x09)))
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"gold": 5000, "jumpOffset": 1})
+        self.assertEqual(store.overlay[34:37], bytes((0x88, 0x13, 0x01)))
         self.assertEqual(len(store.overlay), len(original))
 
     def test_textbox_patch_only_changes_string_index(self):
