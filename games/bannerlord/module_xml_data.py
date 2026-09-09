@@ -12,11 +12,11 @@ from .xsd_data import enrich_elements, find_schema
 
 
 def list_documents(project: Path) -> list[str]:
-    root = project / "ModuleData"
+    root = paths.contained_project_path(project, "ModuleData")
     if not root.is_dir():
         return []
     return [
-        path.relative_to(project).as_posix()
+        path.relative_to(project.resolve()).as_posix()
         for path in sorted(root.rglob("*.xml"), key=lambda value: value.as_posix().casefold())
         if path.is_file()
     ]
@@ -25,8 +25,11 @@ def list_documents(project: Path) -> list[str]:
 def _document_path(project: Path, requested: str) -> Path:
     if not requested:
         raise ValueError("Missing ModuleData XML path")
-    root = (project / "ModuleData").resolve()
-    target = (project / requested).resolve()
+    relative = Path(str(requested).replace("\\", "/"))
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("ModuleData editor only opens XML files under ModuleData")
+    root = paths.contained_project_path(project, "ModuleData")
+    target = paths.contained_project_path(project, relative)
     if root not in target.parents or target.suffix.casefold() != ".xml":
         raise ValueError("ModuleData editor only opens XML files under ModuleData")
     if not target.is_file():
@@ -73,14 +76,18 @@ def _normalized_module_path(value: str) -> str:
 
 
 def _registration_id(project: Path, path: Path) -> str:
-    descriptor = project / "SubModule.xml"
+    try:
+        descriptor = paths.contained_project_path(project, "SubModule.xml")
+    except ValueError:
+        return ""
     if not descriptor.is_file():
         return ""
     try:
         module = read_submodule(descriptor)
     except Exception:
         return ""
-    relative = path.relative_to((project / "ModuleData").resolve()).as_posix()
+    module_data_root = paths.contained_project_path(project, "ModuleData")
+    relative = path.relative_to(module_data_root).as_posix()
     wanted = _normalized_module_path(relative)
     for row in module.get("xmls", []):
         if _normalized_module_path(row.get("path", "")) == wanted:
