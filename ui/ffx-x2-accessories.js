@@ -1,6 +1,13 @@
 "use strict";
 
 (() => {
+  if (!document.querySelector('script[data-ffxx2-launch]')) {
+    const launchScript = document.createElement('script');
+    launchScript.src = '/shared/ffx-x2-launch.js';
+    launchScript.dataset.ffxx2Launch = '1';
+    document.head.appendChild(launchScript);
+  }
+
   const nav = document.querySelector('.ffxx2-nav');
   const workspace = document.querySelector('.ffxx2-workspace');
   const archivesPanel = document.querySelector('[data-panel="archives"]');
