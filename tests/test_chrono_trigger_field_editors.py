@@ -68,6 +68,25 @@ class FieldEditorSchemaTests(unittest.TestCase):
             "sceneId": 0x0123, "facing": 2, "tileX": 0x11, "tileY": 0x22,
         })
 
+    def test_pc_item_schemas_keep_category_raw_and_decode_script_addresses(self):
+        from_mem = editor_schema(_command(0xC7, bytes((0x10, 0x04))))
+        self.assertEqual(from_mem["values"], {"sourceAddress": 0x7F0220, "category": 4})
+        self.assertEqual([field["key"] for field in from_mem["fields"]], ["sourceAddress", "category"])
+        self.assertIn("raw", from_mem["fields"][1]["label"].casefold())
+
+        add = editor_schema(_command(0xCA, bytes((0x23, 0x05))))
+        remove = editor_schema(_command(0xCB, bytes((0x24, 0x06))))
+        self.assertEqual(add["values"], {"itemIndex": 0x23, "category": 5})
+        self.assertEqual(remove["values"], {"itemIndex": 0x24, "category": 6})
+
+        equip = editor_schema(_command(0xD5, bytes((2, 0x19, 3))))
+        self.assertEqual(equip["values"], {"playerId": 2, "itemIndex": 0x19, "category": 3})
+
+        quantity = editor_schema(_command(0xD7, bytes((0x11, 2, 0x18))))
+        self.assertEqual(quantity["values"], {
+            "itemIndex": 0x11, "category": 2, "storeAddress": 0x7F0230,
+        })
+
     def test_battle_schema_exposes_all_two_byte_flags(self):
         command = _command(0xD8, bytes((0x90, 0xA0)))
         values = editor_schema(command)["values"]
@@ -83,12 +102,14 @@ class FieldEditorSchemaTests(unittest.TestCase):
     def test_decorator_only_attaches_supported_editors(self):
         payload = {"objects": [{"functions": [{"commands": [
             _command(0x83, b"\x01\x00\x00"),
+            _command(0xCA, b"\x02\x03"),
             _command(0x92, b"\x01\x02"),
         ]}]}]}
         decorate_event_editors(payload)
         commands = payload["objects"][0]["functions"][0]["commands"]
         self.assertIn("editor", commands[0])
-        self.assertNotIn("editor", commands[1])
+        self.assertIn("editor", commands[1])
+        self.assertNotIn("editor", commands[2])
 
 
 class FieldEditorWriteTests(unittest.TestCase):
@@ -107,6 +128,46 @@ class FieldEditorWriteTests(unittest.TestCase):
         store = FakeStore(original)
         save_event_fields(store, 1, 0, 0, 0, sha256(original), {"sceneId": 0x345, "facing": 3})
         self.assertEqual(store.overlay[34:39], bytes((0x45, 0x03, 0x03, 0x11, 0x22)))
+
+    def test_pc_add_item_partial_patch_preserves_category_and_size(self):
+        original = _event(bytes((0xCA, 0x22, 0x07, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"itemIndex": 0x44})
+        self.assertEqual(store.overlay[34:36], bytes((0x44, 0x07)))
+        self.assertEqual(len(store.overlay), len(original))
+
+    def test_pc_item_from_memory_encodes_even_script_address_and_preserves_category(self):
+        original = _event(bytes((0xC7, 0x03, 0x09, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"sourceAddress": 0x7F0220})
+        self.assertEqual(store.overlay[34:36], bytes((0x10, 0x09)))
+
+    def test_pc_equip_item_can_patch_each_proven_byte(self):
+        original = _event(bytes((0xD5, 0x01, 0x12, 0x02, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {
+            "playerId": 2, "itemIndex": 0x34, "category": 5,
+        })
+        self.assertEqual(store.overlay[34:37], bytes((0x02, 0x34, 0x05)))
+        self.assertEqual(len(store.overlay), len(original))
+
+    def test_pc_get_item_quantity_encodes_store_address(self):
+        original = _event(bytes((0xD7, 0x11, 0x04, 0x02, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"storeAddress": 0x7F0230})
+        self.assertEqual(store.overlay[34:37], bytes((0x11, 0x04, 0x18)))
+        self.assertEqual(len(store.overlay), len(original))
+
+    def test_pc_item_memory_editor_rejects_odd_or_unrepresentable_addresses(self):
+        original = _event(bytes((0xD7, 0x11, 0x04, 0x02, 0x00)))
+        store = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "even script-memory address"):
+            save_event_fields(store, 1, 0, 0, 0, sha256(original), {"storeAddress": 0x7F0201})
+        self.assertIsNone(store.overlay)
+
+        with self.assertRaisesRegex(ValueError, "between"):
+            save_event_fields(store, 1, 0, 0, 0, sha256(original), {"storeAddress": 0x7F0400})
+        self.assertIsNone(store.overlay)
 
     def test_battle_flag_patch_preserves_every_unspecified_bit(self):
         original = _event(bytes((0xD8, 0x49, 0x15, 0x00)))
