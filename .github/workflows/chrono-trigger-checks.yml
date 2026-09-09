@@ -37,6 +37,7 @@ jobs:
           games/chrono_trigger/resources.py
           games/chrono_trigger/resource_view.py
           games/chrono_trigger/inventory.py
+          games/chrono_trigger/probe.py
           games/chrono_trigger/coverage.py
           games/chrono_trigger/data.py
           games/chrono_trigger/labels.py
@@ -65,6 +66,7 @@ jobs:
           tools/chrono_trigger_project.py
           tools/chrono_trigger_map.py
           tools/chrono_trigger_inventory.py
+          tools/chrono_trigger_probe.py
           tools/chrono_trigger_event.py
           tools/chrono_trigger_palette.py
           tests/chrono_trigger_browser_check.py
