@@ -1,5 +1,13 @@
 # Lexeditor project rules
 
+- Before creating a new game plugin, read `docs/ADDING_A_GAME.md` and follow its
+  research-first workflow. Survey existing open-source tools/loaders, documentation
+  and format knowledge before writing new parsers, and record material sources in
+  Credits as they are used rather than reconstructing provenance later.
+- Default to one implementation branch/PR for a new game plugin from initial
+  integration through acceptance. Do not fragment one new plugin into PRs for each
+  parser, screen or subsystem unless genuinely shared infrastructure has an
+  independent reason to land first.
 - Every game plugin must expose a Data Map screen. Do not use a generic Files
   tab as the player-facing editor for data that needs a format-specific view.
 - Always use the most appropriate HTML control for the value. Use checkboxes
