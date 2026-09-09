@@ -1,12 +1,12 @@
 # Chrono Trigger (Steam)
 
-Lexeditor integration for the Windows Steam release (App ID `613830`). The plugin is intentionally PC-format-first: SNES offsets are not promoted to Steam editors unless the corresponding PC resource layout is independently evidenced.
+Lexeditor integration for the Windows Steam release (App ID `613830`). The plugin is PC-format-first: SNES offsets are not promoted to Steam editors unless the corresponding PC resource layout is independently evidenced.
 
 ## Safety model
 
 `resources.bin` is an immutable Vanilla source. Every edit is written to an archive-relative loose project path (`Game/...`, `Localize/...`) compatible with CTExt. Fixed-size shared-table writes use SHA-256 stale-write checks and preserve bytes outside documented fields.
 
-The plugin does **not** rewrite the installed `resources.bin`, insert/delete Atel commands or relocate pointers, install/replace CTExt DLLs, delete direct `mods/` source projects, or invent Steam gameplay-stat layouts from SNES offsets.
+The plugin does **not** rewrite the installed archive, resize/relocate Atel command streams, install/replace CTExt DLLs, delete direct `mods/` source projects, or invent Steam gameplay-stat layouts from SNES offsets.
 
 ## Current coverage
 
