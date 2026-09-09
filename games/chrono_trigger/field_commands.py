@@ -34,7 +34,7 @@ _PC_ARGUMENT_BYTES: tuple[int | None, ...] = (
     0, 0, 0, 0, 0, 1, 1, 2, 1, 0, 0, 2, 0, 0, 0, 0,
     3, 2, 2, 3, 3, 0, 0, 2, 1, 3, 2, 2, 3, 2, 2, 2,
     1, 1, 2, 1, 1, 3, 1, 3, 2, 6, 0, 0, 5, 5, 5, 5,
-    5, 5, 4, 1, 7, 7, 4, 2, 1, 0, 1, 2, 3, 0, 0, 0,
+    5, 5, 4, 1, 7, 7, 4, 2, 1, 0, 1, 2, None, 0, 0, 0,
     1, None, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 17, None,
 )
 
@@ -125,6 +125,16 @@ def _dynamic_argument_bytes(data: bytes, offset: int, opcode: int) -> tuple[int 
         if mode not in widths:
             return None, f"unknown PC multi-mode copy mode {mode}"
         return widths[mode], None
+    if opcode == 0xEC:
+        subcommand = data[offset + 1]
+        widths = {
+            0x88: 1, 0xF0: 1, 0xF2: 1,
+            0x14: 2, 0x19: 2,
+            0x82: 3, 0x83: 3, 0x85: 3, 0x86: 3,
+        }
+        if subcommand not in widths:
+            return None, f"unknown PC all-purpose sound subcommand 0x{subcommand:02X}"
+        return widths[subcommand], None
     if opcode == 0xF1:
         return (1 if data[offset + 1] == 0 else 2), None
     if opcode == 0xFF:
