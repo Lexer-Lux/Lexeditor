@@ -185,5 +185,6 @@ $('x2-ability-filter').addEventListener('input',renderFfx2Abilities);$('x2-abili
 $('search').addEventListener('click',()=>searchArchive().catch(showError));$('query').addEventListener('keydown',event=>{if(event.key==='Enter')searchArchive().catch(showError)});$('game').addEventListener('change',()=>searchArchive().catch(showError));$('entries').addEventListener('click',event=>{const button=event.target.closest('[data-extract]');if(button)extractIndex(Number(button.dataset.extract)).catch(showError)});$('deploy').addEventListener('click',()=>deploymentAction('/api/deployment/deploy').catch(showError));$('revert').addEventListener('click',()=>deploymentAction('/api/deployment/revert').catch(showError));
 Promise.all([refreshOverview(),refreshMap(),searchArchive(),refreshTreasures(),...Object.values(priceEditors).map(editor=>refreshPrices(editor)),refreshCtb(),refreshMix(),...Object.values(slotEditors).map(editor=>refreshSlotShops(editor)),refreshFfx2Abilities()]).catch(showError);
 </script>
+<script src="/shared/ffx-x2-accessories.js"></script>
 </body>
 </html>
