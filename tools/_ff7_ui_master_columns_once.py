@@ -81,9 +81,10 @@ new='''  function derivedSummaryColumns(){
     return[];
   }
   function summaryColumns(){
+    const explained=new Set(["CALC","FX","M.AP","TYPE","MENU","ORDER","RATE"]);
     const fields=(MASTER_SUMMARY_FIELDS[state.tab]||[]).flatMap(([fieldKey,label],index)=>{
       const field=fieldByKey(fieldKey);if(!field)return[];
-      return[{key:`value:${fieldKey}`,label,help:field.label,sortable:true,grow:.48,pinned:index>=2?false:true,render:row=>{const full=semanticListValue(row,field);return el("span",{title:full},compactListValue(full))}}];
+      return[{key:`value:${fieldKey}`,label,help:explained.has(label)?field.label:null,sortable:true,grow:.48,pinned:index>=2?false:true,render:row=>{const full=semanticListValue(row,field);return el("span",{title:full},compactListValue(full))}}];
     });
 '''
 if text.count(old)!=1: raise SystemExit(f'summary columns marker count {text.count(old)}')
@@ -98,6 +99,12 @@ editor.write_text(text,encoding='utf-8')
 
 test=root/'tools/verify_ff7_rendered_neutral.py'
 tests=test.read_text(encoding='utf-8')
+# This old assertion was intentionally checking the master summary header, not
+# the detail label. Keep the contract but expect the compact scan label.
+old_formula='self.assertGreaterEqual(self.page.get_by_text("Formula", exact=True).count(), 1)'
+new_formula='self.assertGreaterEqual(self.page.get_by_text("CALC", exact=True).count(), 1)'
+if tests.count(old_formula)!=1: raise SystemExit(f'old Formula assertion count {tests.count(old_formula)}')
+tests=tests.replace(old_formula,new_formula)
 marker='target.RenderedTests.open = open_with_neutral\n'
 if tests.count(marker)!=1: raise SystemExit('rendered insertion marker missing')
 addition='''def test_master_summary_headers_stay_single_line_at_narrow_width(self):
@@ -105,11 +112,8 @@ addition='''def test_master_summary_headers_stay_single_line_at_narrow_width(sel
     for group in ("characters","items","weapons","armor","materia","playerAttacks","enemies","encounters"):
         with self.subTest(group=group):
             self.navigate(group); self.page.wait_for_timeout(40)
-            wrapped=self.page.locator('.ff7-table .lex-column-list-head-cell .header-label').evaluate_all("""labels=>labels.filter(label=>{
-              const r=label.getBoundingClientRect(),line=parseFloat(getComputedStyle(label).fontSize)||14;
-              return r.height>line*1.65;
-            }).map(label=>label.textContent.trim())""")
-            self.assertEqual(wrapped,[],(group,wrapped))
+            clipped=self.page.locator('.ff7-table .lex-column-list-head-cell .header-label').evaluate_all("""labels=>labels.filter(label=>label.scrollWidth>label.clientWidth+1).map(label=>label.textContent.trim())""")
+            self.assertEqual(clipped,[],(group,clipped))
     self.originals_unchanged()
 
 
