@@ -89,31 +89,72 @@ def _source_files(project: Path) -> list[tuple[str, Path]]:
     return sorted(result, key=lambda item: item[0].casefold())
 
 
+def _deployment_plan(project: Path, target: Path) -> list[dict]:
+    """Validate every semantic deployment destination before the first write."""
+    if target.exists() and not target.is_dir():
+        raise ValueError(f"Bannerlord module deployment target is not a directory: {target}")
+
+    plan = []
+    for relative, source in _source_files(project):
+        destination = (target / relative).resolve()
+        if target != destination and target not in destination.parents:
+            raise ValueError(f"Deployment destination escaped module folder: {relative}")
+        if destination.exists() and not destination.is_file():
+            raise ValueError(f"Deployment destination is not a file: {destination}")
+
+        unchanged = destination.is_file() and _hash(source) == _hash(destination)
+        backup = destination.with_name(destination.name + ".lexeditor.bak")
+        temporary = destination.with_name(destination.name + ".lexeditor.tmp")
+        if not unchanged:
+            # clear_write_helper intentionally rejects directory-like helper
+            # entries. Detect all such semantic failures now, before an earlier
+            # asset in the plan can be modified.
+            for helper in (backup, temporary):
+                if helper.is_dir():
+                    raise ValueError(f"Bannerlord write helper path is a directory: {helper}")
+
+        plan.append(
+            {
+                "relative": relative,
+                "source": source,
+                "destination": destination,
+                "backup": backup,
+                "temporary": temporary,
+                "unchanged": unchanged,
+            }
+        )
+    return plan
+
+
 def sync_project_assets(project: Path, game_root: Path | None = None) -> dict:
     """Copy owned non-binary module assets additively, backing up overwritten files."""
     project = project.resolve()
     module_id, target, existed = deploy_target(project, game_root)
+    plan = _deployment_plan(project, target)
+
+    # No deployment directory or destination is created until all sources,
+    # destinations, and directory-like predictable helper entries have passed
+    # semantic validation.
     target.mkdir(parents=True, exist_ok=True)
     copied = []
     unchanged = []
     backups = []
 
-    for relative, source in _source_files(project):
-        destination = (target / relative).resolve()
-        if target != destination and target not in destination.parents:
-            raise ValueError(f"Deployment destination escaped module folder: {relative}")
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.is_file() and _hash(source) == _hash(destination):
+    for row in plan:
+        relative = row["relative"]
+        if row["unchanged"]:
             unchanged.append(relative)
             continue
-        if destination.exists() and not destination.is_file():
-            raise ValueError(f"Deployment destination is not a file: {destination}")
-        backup = destination.with_name(destination.name + ".lexeditor.bak")
+
+        source = row["source"]
+        destination = row["destination"]
+        backup = row["backup"]
+        temporary = row["temporary"]
+        destination.parent.mkdir(parents=True, exist_ok=True)
         paths.clear_write_helper(backup)
         if destination.is_file():
             shutil.copy2(destination, backup)
             backups.append(backup.relative_to(target).as_posix())
-        temporary = destination.with_name(destination.name + ".lexeditor.tmp")
         paths.clear_write_helper(temporary)
         shutil.copy2(source, temporary)
         temporary.replace(destination)
