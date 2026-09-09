@@ -262,6 +262,12 @@ STRUCTURED_SOURCE_ROWS = {
         "target": "xp",
         "notes": "Structured editor for Source(...) default XP amounts while source identities stay fixed.",
     },
+    "src/LexerSkillTweaksSettings.cs": {
+        "area": "Settings",
+        "controls": "Typed MCM boolean, integer, and floating-point source defaults",
+        "target": "settings",
+        "notes": "Structured editor derives types, bounds, restart requirements, groups, labels, and hints from MCM attributes.",
+    },
 }
 
 

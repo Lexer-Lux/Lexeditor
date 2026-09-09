@@ -60,6 +60,14 @@
         const result=await post("/api/xp-sources/save",{edits});
         state.xpSources=result;state.savedXpSources=clone(result);
       }
+      if(mcmDirty()){
+        const edits=(state.mcmDefaults.settings||[]).flatMap((row,index)=>{
+          const old=state.savedMcmDefaults.settings[index];if(!old)return [];
+          return row.default!==old.default?[{property:row.property,value:row.default}]:[];
+        });
+        const result=await post("/api/settings-defaults/save",{edits});
+        state.mcmDefaults=result;state.savedMcmDefaults=clone(result);
+      }
       if(sourceDirty()){
         const result=await post("/api/source/save",{path:state.source.path,text:state.source.text});
         state.source=result;state.savedSourceText=result.text;
@@ -80,7 +88,7 @@
       {id:"module",label:"Module"},{id:"dependencies",label:"Dependencies"},
       {id:"submodules",label:"Submodules"},{id:"xmls",label:"XML"},
       {id:"skills",label:"Skills"},{id:"effects",label:"Effects"},
-      {id:"perks",label:"Perks"},{id:"xp",label:"XP"},
+      {id:"perks",label:"Perks"},{id:"xp",label:"XP"},{id:"settings",label:"Settings"},
       {id:"build",label:"Build"},{id:"deployment",label:"Deployment"}
     ],
     activeTab:()=>state.tab,navigate,
@@ -88,13 +96,14 @@
     dirtyCount,readonly:()=>false,save
   });
 
-  Promise.all([api("/api/module"),api("/api/project"),api("/api/skills"),api("/api/effects"),api("/api/perks"),api("/api/xp-sources"),api("/api/deployment"),api("/api/datamap")]).then(([module,project,skills,effects,perks,xpSources,deployment,datamap])=>{
+  Promise.all([api("/api/module"),api("/api/project"),api("/api/skills"),api("/api/effects"),api("/api/perks"),api("/api/xp-sources"),api("/api/settings-defaults"),api("/api/deployment"),api("/api/datamap")]).then(([module,project,skills,effects,perks,xpSources,mcmDefaults,deployment,datamap])=>{
     state.module=module;state.savedModule=clone(module);
     state.project=project;state.savedProject=clone(project);
     state.skills=skills;state.savedSkills=clone(skills);
     state.effects=effects;state.savedEffects=clone(effects);
     state.perks=perks;state.savedPerks=clone(perks);
     state.xpSources=xpSources;state.savedXpSources=clone(xpSources);
+    state.mcmDefaults=mcmDefaults;state.savedMcmDefaults=clone(mcmDefaults);
     state.deployment=deployment;
     state.datamap=datamap;render();
   }).catch(error=>{

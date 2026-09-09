@@ -24,6 +24,7 @@ from .perk_data import (
     save_xp_source_definitions,
 )
 from .runtime_data import deployment_status
+from .settings_data import read_mcm_defaults, save_mcm_defaults
 from .project_data import (
     primary_project_file,
     read_project_file,
@@ -124,6 +125,7 @@ class Handler(BaseHTTPRequestHandler):
                         "custom-skill-effects",
                         "custom-skill-perks",
                         "custom-skill-xp-sources",
+                        "mcm-default-settings",
                         "deployment-diagnostics",
                         "data-map",
                     ],
@@ -179,6 +181,12 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/xp-sources":
             try:
                 self.send_json(read_xp_source_definitions(PROJECT))
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/settings-defaults":
+            try:
+                self.send_json(read_mcm_defaults(PROJECT))
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
@@ -239,6 +247,15 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 payload = self.read_json()
                 self.send_json(save_xp_source_definitions(PROJECT, list(payload.get("edits") or [])))
+            except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/settings-defaults/save":
+            try:
+                payload = self.read_json()
+                self.send_json(save_mcm_defaults(PROJECT, list(payload.get("edits") or [])))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
