@@ -46,9 +46,13 @@ def _module_id(project: Path) -> str:
 def deploy_target(project: Path, game_root: Path | None = None) -> tuple[str, Path, bool]:
     """Resolve an existing installed module by Id, or a safe new Modules/Id folder."""
     game = (game_root or paths.game_root()).resolve()
+    executable = game / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
+    if not executable.is_file():
+        raise FileNotFoundError(f"Bannerlord executable not found: {executable}")
     module_id = _module_id(project)
     modules_root = paths.modules_root(game).resolve()
-    modules_root.mkdir(parents=True, exist_ok=True)
+    if not modules_root.is_dir():
+        raise FileNotFoundError(f"Bannerlord Modules directory not found: {modules_root}")
     existing = installed_modules(game)
     target = existing.get(module_id)
     if target is not None:
