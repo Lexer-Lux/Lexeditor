@@ -15,10 +15,13 @@ def write_module(
 ) -> Path:
     folder = game / "Modules" / module_id
     folder.mkdir(parents=True, exist_ok=True)
-    native_xml = "\n".join(
-        f'    <DependedModule Id="{dependency_id}"{(" Optional=\"true\"" if optional else "")} />'
-        for dependency_id, optional in native_dependencies
-    )
+    dependency_lines = []
+    for dependency_id, optional in native_dependencies:
+        optional_attribute = ' Optional="true"' if optional else ""
+        dependency_lines.append(
+            f'    <DependedModule Id="{dependency_id}"{optional_attribute} />'
+        )
+    native_xml = "\n".join(dependency_lines)
     community_xml = "\n".join(
         "    <DependedModuleMetadata "
         + " ".join(
