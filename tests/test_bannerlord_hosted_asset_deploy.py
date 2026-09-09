@@ -20,6 +20,17 @@ class BannerlordHostedAssetDeployTests(unittest.TestCase):
         tasks = [child.tag.rsplit("}", 1)[-1] for child in target]
         self.assertIn("Copy", tasks)
 
+        # The template does not set the hosted-only flag itself. Therefore a
+        # normal external `dotnet build` sees the condition as true and keeps
+        # the template's existing asset-copy behavior.
+        properties = {
+            child.tag.rsplit("}", 1)[-1]
+            for group in root
+            if group.tag.rsplit("}", 1)[-1] == "PropertyGroup"
+            for child in group
+        }
+        self.assertNotIn("LexeditorSkipAssetDeploy", properties)
+
 
 if __name__ == "__main__":
     unittest.main()
