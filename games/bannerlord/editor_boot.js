@@ -89,6 +89,8 @@
       }
       state.datamap=await api("/api/datamap");
       state.deployment=await api("/api/deployment").catch(()=>state.deployment);
+      const runtime=await api("/api/runtime-overrides").catch(()=>null);
+      if(runtime){state.runtimeOverrides=runtime;state.savedRuntimeOverrides=clone(runtime)}
       render();
     }catch(error){showAlert?.(String(error.message||error),"Bannerlord save failed")}
   }
@@ -108,7 +110,8 @@
     dirtyCount,readonly:()=>false,save
   });
 
-  Promise.all([api("/api/module"),api("/api/project"),api("/api/skills"),api("/api/effects"),api("/api/perks"),api("/api/xp-sources"),api("/api/settings-defaults"),api("/api/runtime-overrides"),api("/api/deployment"),api("/api/datamap")]).then(([module,project,skills,effects,perks,xpSources,mcmDefaults,runtimeOverrides,deployment,datamap])=>{
+  const runtimeRequest=api("/api/runtime-overrides").catch(error=>({available:false,error:String(error.message||error),effects:[],xpSources:[]}));
+  Promise.all([api("/api/module"),api("/api/project"),api("/api/skills"),api("/api/effects"),api("/api/perks"),api("/api/xp-sources"),api("/api/settings-defaults"),runtimeRequest,api("/api/deployment"),api("/api/datamap")]).then(([module,project,skills,effects,perks,xpSources,mcmDefaults,runtimeOverrides,deployment,datamap])=>{
     state.module=module;state.savedModule=clone(module);
     state.project=project;state.savedProject=clone(project);
     state.skills=skills;state.savedSkills=clone(skills);
