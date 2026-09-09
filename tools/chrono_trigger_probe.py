@@ -18,6 +18,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--game", required=True, type=Path, help="Chrono Trigger Steam install directory")
     parser.add_argument("--family", required=True, choices=tuple(CANDIDATE_KEYWORDS), help="Candidate family")
+    parser.add_argument(
+        "--path-prefix",
+        help="Restrict the family to an archive path/directory prefix discovered by the inventory tool",
+    )
     parser.add_argument("--limit", type=int, default=12, help="Maximum candidate resources to decompress")
     parser.add_argument("--bytes", dest="byte_window", type=int, default=128, help="Prefix/comparison byte window")
     parser.add_argument(
@@ -43,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
             byte_window=args.byte_window,
             max_payload_bytes=args.max_payload,
             max_stored_bytes=args.max_stored,
+            path_prefix=args.path_prefix,
         )
     except (OSError, ValueError, ResourceArchiveError) as error:
         print(json.dumps({"error": str(error)}, ensure_ascii=False))
