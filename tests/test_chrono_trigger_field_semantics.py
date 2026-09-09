@@ -31,6 +31,39 @@ class FieldSemanticTests(unittest.TestCase):
         self.assertIn("Tonic", semantic["summary"])
         self.assertEqual(semantic["jumpOffset"], 8)
 
+    def test_pc_item_mutations_keep_category_raw(self):
+        from_mem = command_semantics(cmd(0xC7, b"\x10\x04"), LABELS)
+        self.assertEqual(from_mem["sourceAddress"], 0x7F0220)
+        self.assertEqual(from_mem["category"], 4)
+        self.assertIn("0x7F0220", from_mem["summary"])
+        self.assertIn("category 4", from_mem["summary"])
+
+        add = command_semantics(cmd(0xCA, b"\x23\x05"), LABELS)
+        remove = command_semantics(cmd(0xCB, b"\x24\x06"), LABELS)
+        self.assertEqual(add["itemIndex"], 0x23)
+        self.assertEqual(add["category"], 5)
+        self.assertEqual(add["operation"], "add")
+        self.assertNotIn("itemName", add)
+        self.assertEqual(remove["itemIndex"], 0x24)
+        self.assertEqual(remove["category"], 6)
+        self.assertEqual(remove["operation"], "remove")
+        self.assertNotIn("itemName", remove)
+
+    def test_pc_equip_and_quantity_use_proven_byte_roles_only(self):
+        equip = command_semantics(cmd(0xD5, b"\x02\x19\x03"), LABELS)
+        self.assertEqual(equip["playerId"], 2)
+        self.assertEqual(equip["itemIndex"], 0x19)
+        self.assertEqual(equip["category"], 3)
+        self.assertIn("Lucca", equip["summary"])
+        self.assertNotIn("itemName", equip)
+
+        quantity = command_semantics(cmd(0xD7, b"\x11\x02\x18"), LABELS)
+        self.assertEqual(quantity["itemIndex"], 0x11)
+        self.assertEqual(quantity["category"], 2)
+        self.assertEqual(quantity["storeAddress"], 0x7F0230)
+        self.assertIn("0x7F0230", quantity["summary"])
+        self.assertNotIn("itemName", quantity)
+
     def test_pc_and_text_commands_are_annotated(self):
         self.assertEqual(command_semantics(cmd(0x81, b"\x01"), LABELS)["summary"], "Marle (1)")
         self.assertEqual(command_semantics(cmd(0xBB, b"\x34\x12"), LABELS)["stringIndex"], 0x1234)
