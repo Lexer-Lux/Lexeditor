@@ -1,4 +1,4 @@
-"""Browser acceptance for Palworld package, PalSchema, and clean build workspace.
+"""Browser acceptance for Palworld package, PalSchema, build, and local testing.
 
 Uses only synthetic package/Patch/schema JSON. No installed game or proprietary Palworld data.
 """
@@ -27,6 +27,8 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
     game = temp / "Palworld"
     (game / "Pal" / "Content" / "Paks").mkdir(parents=True)
     (game / "Palworld.exe").write_bytes(b"")
+    workshop = temp / "steamapps" / "workshop" / "content" / "1623730"
+    workshop.mkdir(parents=True)
 
     schema_root = game / "Mods" / "NativeMods" / "UE4SS" / "Mods" / "PalSchema" / "schemas"
     (schema_root / "raw").mkdir(parents=True)
@@ -84,11 +86,17 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
         build_root = project / "build"
         if build_root.exists():
             shutil.rmtree(build_root)
+        for child in workshop.iterdir():
+            if child.is_dir():
+                shutil.rmtree(child)
+            else:
+                child.unlink()
 
     errors = []
     with PalworldSession({
         "LEXEDITOR_PALWORLD_ROOT": str(game),
         "LEXEDITOR_PALWORLD_PROJECT": str(project),
+        "LEXEDITOR_PALWORLD_WORKSHOP_ROOT": str(workshop),
     }) as session:
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(
@@ -168,7 +176,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert page.locator('.pal-schema-columns .pal-detail input[type="number"]').count() == 0
 
                     # Known-invalid integrated payloads block clean package builds. Repairing the
-                    # malformed fixture makes Build available; Build/Revert remains separate from activation.
+                    # malformed fixture makes Build available; local deployment stays separate from activation.
                     page.evaluate('navigate("build")')
                     page.wait_for_function("typeof palBuildState === 'object' && palBuildState !== null && !palBuildLoading")
                     build_error = page.evaluate("palBuildError")
@@ -176,13 +184,30 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert "aaa_bad.json" in build_error
                     bad.unlink()
                     page.get_by_role("button", name="Refresh", exact=True).click()
-                    page.wait_for_function("palBuildState?.ready === true && !palBuildLoading")
+                    page.wait_for_function("palBuildState?.ready === true && palWorkshopState?.ready === true && !palBuildLoading")
                     page.get_by_role("button", name="Build package", exact=True).click()
-                    page.wait_for_function("palBuildState?.current === true && !palBuildLoading")
+                    page.wait_for_function("palBuildState?.current === true && palWorkshopState?.buildCurrent === true && !palBuildLoading")
                     built = project / "build" / "official-package"
                     assert (built / "Info.json").is_file()
                     assert (built / "PalSchema" / "Balance" / "raw" / "balance.json").is_file()
                     assert not (built / "PalSchema" / "Balance" / "raw" / "balance.json.lexeditor.bak").exists()
+
+                    # Mirror Pocketpair's Shift-created local test package: owned random 10-digit folder,
+                    # no publishing metadata, and user activation remains outside Lexeditor.
+                    page.get_by_role("button", name="Deploy local test", exact=True).click()
+                    page.wait_for_function("palWorkshopState?.current === true && palWorkshopState?.deployed === true && !palBuildLoading")
+                    local_folder = page.evaluate("palWorkshopState.folder")
+                    assert len(local_folder) == 10 and local_folder.isdigit()
+                    local_target = workshop / local_folder
+                    assert (local_target / "Info.json").is_file()
+                    assert (local_target / "PalSchema" / "Balance" / "raw" / "balance.json").is_file()
+                    assert not (local_target / ".workshop.json").exists()
+                    assert not (local_target / "PalSchema" / "Balance" / "raw" / "balance.json.lexeditor.bak").exists()
+                    assert "Mod Management" in page.locator(".pal-detail").inner_text()
+                    page.get_by_role("button", name="Remove local deployment", exact=True).click()
+                    page.wait_for_function("palWorkshopState?.deployed === false && !palBuildLoading")
+                    assert not local_target.exists()
+
                     page.get_by_role("button", name="Revert build", exact=True).click()
                     page.wait_for_function("palBuildState?.built === false && !palBuildLoading")
                     assert not built.exists()
