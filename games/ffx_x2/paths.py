@@ -30,7 +30,10 @@ def ensure_project(root: Path = PROJECT_ROOT) -> None:
 
 def check() -> list[str]:
     problems: list[str] = []
-    for relative in ("editor.html", "server.py", "plugin.py", "paths.py", "vbf.py", "deployment.py"):
+    for relative in (
+        "editor.html", "server.py", "plugin.py", "paths.py", "vbf.py", "deployment.py",
+        "project-template/README.md",
+    ):
         target = PLUGIN_ROOT / relative
         if not target.is_file():
             problems.append(f"FFX/X-2 plugin file is missing: {target}")
