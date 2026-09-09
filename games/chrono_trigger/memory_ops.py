@@ -1,8 +1,11 @@
-"""Proven fixed-width local script-memory operations for Chrono Trigger Steam.
+"""Proven fixed-width memory operations for Chrono Trigger Steam.
 
 These layouts come from Temporal Redux's event command table and constructors.
 Only commands with explicit operand order/width and semantics are included.
-Ambiguous bank-7F, extended-memory and uncertain-width operations stay out.
+Ordinary script memory uses the even /2 slot model. 0x1C is the one narrow
+bank-7F exception proven by GetResultMenu: a literal one-byte offset from
+0x7F0000, so only 0x7F0000-0x7F00FF is writable here. Other ambiguous bank-7F,
+extended-memory and uncertain-width operations stay out.
 """
 
 from __future__ import annotations
@@ -10,10 +13,12 @@ from __future__ import annotations
 
 U8 = 0xFF
 U16 = 0xFFFF
+BANK7F_RESULT_START = 0x7F0000
+BANK7F_RESULT_LAST = BANK7F_RESULT_START + U8
 SCRIPT_MEM_START = 0x7F0200
 SCRIPT_MEM_LAST = SCRIPT_MEM_START + U8 * 2
 MEMORY_OPCODES = frozenset({
-    0x19, 0x1A,
+    0x19, 0x1A, 0x1C,
     0x4F, 0x50, 0x51, 0x52,
     0x5B, 0x5D, 0x5E, 0x5F,
     0x71, 0x72, 0x73,
@@ -48,13 +53,22 @@ def _script_offset(value, label: str) -> int:
     return (address - SCRIPT_MEM_START) // 2
 
 
+def _bank7f_result_address(offset: int) -> int:
+    return BANK7F_RESULT_START + int(offset)
+
+
+def _bank7f_result_offset(value, label: str) -> int:
+    address = _int(value, BANK7F_RESULT_START, BANK7F_RESULT_LAST, label)
+    return address - BANK7F_RESULT_START
+
+
 def _layout(command: dict) -> tuple[int, bytearray] | None:
     opcode = int(command["opcode"])
     args = _args(command)
     if args is None:
         return None
     expected = {
-        0x19: 1, 0x1A: 2,
+        0x19: 1, 0x1A: 2, 0x1C: 1,
         0x4F: 2, 0x50: 3, 0x51: 2, 0x52: 2,
         0x5B: 2, 0x5D: 2, 0x5E: 2, 0x5F: 2,
         0x71: 1, 0x72: 1, 0x73: 1,
@@ -79,6 +93,11 @@ def memory_field_specs(command: dict) -> list[dict] | None:
 
     if opcode == 0x19:
         return [address("storeAddress", "Store result at")]
+    if opcode == 0x1C:
+        return [{
+            "key": "storeAddress", "label": "Store result at (bank 7F)",
+            "minimum": BANK7F_RESULT_START, "maximum": BANK7F_RESULT_LAST,
+        }]
     if opcode == 0x1A:
         return [number("resultValue", "Expected result"), number("jumpOffset", "Jump bytes if result differs")]
     if opcode in {0x4F, 0x50}:
@@ -104,6 +123,8 @@ def memory_values(command: dict) -> dict | None:
     opcode, args = parsed
     if opcode == 0x19:
         return {"storeAddress": _script_address(args[0])}
+    if opcode == 0x1C:
+        return {"storeAddress": _bank7f_result_address(args[0])}
     if opcode == 0x1A:
         return {"resultValue": args[0], "jumpOffset": args[1]}
     if opcode == 0x4F:
@@ -135,6 +156,9 @@ def apply_memory_op(command: dict, values: dict) -> bytes | None:
     if opcode == 0x19:
         if "storeAddress" in values:
             args[0] = _script_offset(values["storeAddress"], "Store result address")
+    elif opcode == 0x1C:
+        if "storeAddress" in values:
+            args[0] = _bank7f_result_offset(values["storeAddress"], "Bank-7F result address")
     elif opcode == 0x1A:
         if "resultValue" in values:
             args[0] = _int(values["resultValue"], 0, U8, "Expected result")
@@ -179,6 +203,13 @@ def memory_semantics(command: dict) -> dict | None:
     if opcode == 0x19:
         address = _script_address(args[0])
         return {"summary": f"Result → 0x{address:06X}", "storeAddress": address}
+    if opcode == 0x1C:
+        address = _bank7f_result_address(args[0])
+        return {
+            "summary": f"Result → 0x{address:06X} (bank 7F)",
+            "storeAddress": address,
+            "addressMode": "bank7f-byte-offset",
+        }
     if opcode == 0x1A:
         return {
             "summary": f"Result must equal {args[0]} · mismatch → jump +{args[1]}",
