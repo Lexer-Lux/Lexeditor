@@ -102,7 +102,8 @@ def _deployment_plan(project: Path, target: Path) -> list[dict]:
         if destination.exists() and not destination.is_file():
             raise ValueError(f"Deployment destination is not a file: {destination}")
 
-        unchanged = destination.is_file() and _hash(source) == _hash(destination)
+        had_destination = destination.is_file()
+        unchanged = had_destination and _hash(source) == _hash(destination)
         backup = destination.with_name(destination.name + ".lexeditor.bak")
         temporary = destination.with_name(destination.name + ".lexeditor.tmp")
         if not unchanged:
@@ -120,45 +121,110 @@ def _deployment_plan(project: Path, target: Path) -> list[dict]:
                 "destination": destination,
                 "backup": backup,
                 "temporary": temporary,
+                "hadDestination": had_destination,
                 "unchanged": unchanged,
             }
         )
     return plan
 
 
+def _cleanup_staged(rows: list[dict]) -> list[str]:
+    errors = []
+    for row in rows:
+        temporary = row["temporary"]
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError as error:
+            errors.append(f"{temporary}: {error}")
+    return errors
+
+
+def _rollback_committed(rows: list[dict]) -> list[str]:
+    errors = []
+    for row in reversed(rows):
+        destination = row["destination"]
+        try:
+            if row["hadDestination"]:
+                temporary = row["temporary"]
+                paths.clear_write_helper(temporary)
+                shutil.copy2(row["backup"], temporary)
+                temporary.replace(destination)
+            else:
+                destination.unlink(missing_ok=True)
+        except Exception as error:  # best-effort rollback must report every failure
+            errors.append(f"{row['relative']}: {error}")
+    return errors
+
+
 def sync_project_assets(project: Path, game_root: Path | None = None) -> dict:
-    """Copy owned non-binary module assets additively, backing up overwritten files."""
+    """Copy owned non-binary module assets additively with staged commit/rollback."""
     project = project.resolve()
     module_id, target, existed = deploy_target(project, game_root)
     plan = _deployment_plan(project, target)
+    changed = [row for row in plan if not row["unchanged"]]
+    unchanged = [row["relative"] for row in plan if row["unchanged"]]
 
     # No deployment directory or destination is created until all sources,
     # destinations, and directory-like predictable helper entries have passed
     # semantic validation.
     target.mkdir(parents=True, exist_ok=True)
-    copied = []
-    unchanged = []
+
+    # Stage every incoming asset before touching a deployed destination. A read
+    # or copy failure therefore cannot leave an earlier asset committed.
+    staged = []
+    try:
+        for row in changed:
+            destination = row["destination"]
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            paths.clear_write_helper(row["temporary"])
+            shutil.copy2(row["source"], row["temporary"])
+            staged.append(row)
+    except Exception as error:
+        cleanup_errors = _cleanup_staged(staged + [row for row in changed if row not in staged])
+        if cleanup_errors:
+            raise RuntimeError(
+                "Bannerlord asset staging failed and temporary files could not all be cleaned up: "
+                + "; ".join(cleanup_errors)
+            ) from error
+        raise
+
+    # Create all backups before the first destination replacement. If backup
+    # creation fails, deployed content is still untouched and staged temps are
+    # discarded.
     backups = []
+    try:
+        for row in changed:
+            if not row["hadDestination"]:
+                continue
+            paths.clear_write_helper(row["backup"])
+            shutil.copy2(row["destination"], row["backup"])
+            backups.append(row["backup"].relative_to(target).as_posix())
+    except Exception as error:
+        cleanup_errors = _cleanup_staged(changed)
+        if cleanup_errors:
+            raise RuntimeError(
+                "Bannerlord asset backup staging failed and temporary files could not all be cleaned up: "
+                + "; ".join(cleanup_errors)
+            ) from error
+        raise
 
-    for row in plan:
-        relative = row["relative"]
-        if row["unchanged"]:
-            unchanged.append(relative)
-            continue
-
-        source = row["source"]
-        destination = row["destination"]
-        backup = row["backup"]
-        temporary = row["temporary"]
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        paths.clear_write_helper(backup)
-        if destination.is_file():
-            shutil.copy2(destination, backup)
-            backups.append(backup.relative_to(target).as_posix())
-        paths.clear_write_helper(temporary)
-        shutil.copy2(source, temporary)
-        temporary.replace(destination)
-        copied.append(relative)
+    copied = []
+    committed = []
+    try:
+        for row in changed:
+            row["temporary"].replace(row["destination"])
+            committed.append(row)
+            copied.append(row["relative"])
+    except Exception as error:
+        rollback_errors = _rollback_committed(committed)
+        cleanup_errors = _cleanup_staged(changed)
+        problems = rollback_errors + cleanup_errors
+        if problems:
+            raise RuntimeError(
+                "Bannerlord asset commit failed and rollback was incomplete: "
+                + "; ".join(problems)
+            ) from error
+        raise
 
     return {
         "moduleId": module_id,
