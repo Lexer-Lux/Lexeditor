@@ -50,39 +50,51 @@ def _decode_png_rgba(png: bytes) -> tuple[int, int, bytes]:
     return width, height, bytes(pixels)
 
 
-def _fixture() -> FakeStore:
+def _fixture(*, layer3: bool = True) -> FakeStore:
     # mapinfo: music, tileset L1/2, assembly, L3, palette, palette anim,
     # map index, chip anim, event script, unknown, scrolling.
     scene = bytearray(24)
     struct.pack_into("<H", scene, 2, 1)   # BGSetTable 1
     struct.pack_into("<H", scene, 4, 2)   # ChipTable 2
+    struct.pack_into("<H", scene, 6, 9)   # dedicated L3 weather cg9
     struct.pack_into("<H", scene, 8, 3)   # palette 3
     struct.pack_into("<H", scene, 12, 4)  # MapTable 4
 
-    # 16x16 L1, 16x16 L2, no L3; both layers use tile 0.  One RLE property
-    # record with repeat 0 means 256 default properties.
-    map_table = b"\x00\x00\x00\x00\x00\x00" + bytes(256) + bytes(256) + b"\x80\x00\x00\x00"
+    # 16x16 L1/L2 and optionally 16x16 L3. All layers use tile 0.
+    # One RLE property record with repeat 0 means 256 default properties.
+    bits = 0x80 if layer3 else 0x00
+    map_table = bytes((0x00, bits, 0x00, 0x00, 0x00, 0x00))
+    map_table += bytes(256) + bytes(256)
+    if layer3:
+        map_table += bytes(256)
+    map_table += b"\x80\x00\x00\x00"
 
     # Slot 0 uses cg5; all other static/animated slots are absent.
     bgset = bytes([5, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF])
 
-    # A standard 128x64 packed 4bpp sheet filled with palette index 1.
+    # PC cg files skip a four-byte header, then CTViewer nibble-unpacks them.
     cg5 = b"CG00" + bytes([0x11]) * (128 * 64 // 2)
+    # L3 is logically 2bpp, so use only values 0..3 in each nibble.
+    cg9 = b"CG00" + bytes([0x22]) * (128 * 64 // 2)
 
-    # 512 PC tiles × 4 corners × (u16 chip/palette/flip + u8 priority).
-    # Zero means chip 0, palette block 0, no flip, no priority.
+    # PC assembly records: u16 chip/palette/flip + u8 priority per corner.
     chip_table = bytes(512 * 4 * 3)
+    chip_table_l3 = bytes(256 * 4 * 3)
 
-    # Two-byte header plus 256 BGR555 colors. Palette index 1 is pure red.
+    # Two-byte header plus 256 BGR555 colors.
+    # Palette index 1 is pure red; L3 pixel index 2 is pure green.
     palette = bytearray(2 + 256 * 2)
     struct.pack_into("<H", palette, 2 + 1 * 2, 0x001F)
+    struct.pack_into("<H", palette, 2 + 2 * 2, 0x03E0)
 
     return FakeStore({
         "Game/field/Mapinfo/mapinfo_0.dat": bytes(scene),
         "Game/field/MapTable/MapTable_0004.dat": map_table,
         "Game/field/BGSetTable/bgsettable_1.dat": bgset,
         "Game/field/map_bin/cg5.bin": cg5,
+        "Game/field/weather_bin/cg9.bin": cg9,
         "Game/field/ChipTable/ChipTable_0002.dat": chip_table,
+        "Game/field/ChipTable/ChipTableBg3_0000.dat": chip_table_l3,
         "Game/field/palette_bin/plt3.bin": bytes(palette),
     })
 
@@ -102,11 +114,29 @@ class SceneRenderTests(unittest.TestCase):
         self.assertEqual(meta["tileset"], 1)
         self.assertEqual(meta["assembly"], 2)
         self.assertEqual(meta["palette"], 3)
+        self.assertEqual(meta["paletteGroupSize"], 16)
         self.assertFalse(meta["animatedChipsRendered"])
 
-    def test_rejects_layer_three_until_its_separate_tileset_path_is_supported(self):
-        with self.assertRaisesRegex(ValueError, "layer 1 or 2"):
-            render_scene_layer(_fixture(), 0, 3, "mine")
+    def test_renders_pc_scene_layer_three_from_weather_and_scene_indexed_assembly(self):
+        png, meta = render_scene_layer(_fixture(), 0, 3, "mine")
+        width, height, pixels = _decode_png_rgba(png)
+        self.assertEqual((width, height), (256, 256))
+        self.assertEqual(pixels[:4], bytes((0, 255, 0, 255)))
+        self.assertEqual(meta["tileset"], 9)
+        self.assertEqual(meta["assembly"], 0)
+        self.assertEqual(meta["assemblyPath"], "Game/field/ChipTable/ChipTableBg3_0000.dat")
+        self.assertEqual(meta["graphicsPath"], "Game/field/weather_bin/cg9.bin")
+        self.assertEqual(meta["paletteGroupSize"], 4)
+        self.assertEqual(meta["logicalBitsPerPixel"], 2)
+        self.assertEqual(meta["composition"], "isolated-layer")
+
+    def test_rejects_layer_three_when_map_does_not_enable_it(self):
+        with self.assertRaisesRegex(ValueError, "does not enable layer 3"):
+            render_scene_layer(_fixture(layer3=False), 0, 3, "mine")
+
+    def test_rejects_unknown_layer(self):
+        with self.assertRaisesRegex(ValueError, "layer 1, 2, or 3"):
+            render_scene_layer(_fixture(), 0, 4, "mine")
 
 
 if __name__ == "__main__":
