@@ -19,10 +19,11 @@ from .palschema import (
     ReadOnlyPatchError,
     StalePatchError,
     discover_raw_patches,
+    field_schema,
     patch_payload,
     resolve_discovered_patch,
 )
-from .palschema_fields import available_fields, coerce_new_value
+from .palschema_fields import available_fields, coerce_new_value, schema_scalar_writable
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -147,14 +148,68 @@ def info_payload() -> dict:
     }
 
 
+def safe_patch_payload(relative: str, info: dict, schema_root: Path | None) -> dict:
+    """Expose only fields the current generated schema can safely validate."""
+    payload = patch_payload(project_root(), info, relative, schema_root=schema_root)
+    if schema_root is None:
+        return payload
+    for record in payload.get("records", []):
+        if record.get("schemaState") in {"not-applicable", "unavailable"}:
+            continue
+        table = record.get("table")
+        field = record.get("field")
+        if not isinstance(table, str) or not isinstance(field, str) or field.startswith("(") or field == "$Filters":
+            continue
+        spec = field_schema(schema_root, table, field)
+        writable, reason = schema_scalar_writable(spec)
+        if not writable:
+            record["writable"] = False
+            record["reason"] = reason
+            if record.get("schemaState") == "matched":
+                record["schemaState"] = "constraint-unresolved"
+    return payload
+
+
+def validate_schema_edits(edits: list, schema_root: Path | None) -> None:
+    """Fail closed on referenced constraints even if the patch value is scalar JSON."""
+    if schema_root is None:
+        return
+    for index, edit in enumerate(edits):
+        if not isinstance(edit, dict):
+            continue
+        table = edit.get("table")
+        field = edit.get("field")
+        if not isinstance(table, str) or not isinstance(field, str):
+            continue
+        spec = field_schema(schema_root, table, field)
+        writable, reason = schema_scalar_writable(spec)
+        if not writable:
+            raise ValueError(f"edits[{index}] {table}.{field}: {reason}")
+
+
 def palschema_catalog_payload() -> dict:
     info = info_document().data
     schema_root = palschema_schema_root()
+    patches = discover_raw_patches(project_root(), info, schema_root=schema_root)
+    if schema_root is not None:
+        # Re-count fields blocked by unresolved generated constraints so the
+        # file selector reflects the same fail-closed policy as the detail API.
+        for row in patches:
+            if row.get("errors"):
+                continue
+            try:
+                payload = safe_patch_payload(row["path"], info, schema_root)
+                row["schemaBlocked"] = sum(
+                    record.get("schemaState") not in {"matched", "unavailable", "not-applicable"}
+                    for record in payload.get("records", [])
+                )
+            except (OSError, ValueError):
+                row["schemaBlocked"] = max(1, int(row.get("schemaBlocked", 0)))
     return {
         "project": str(project_root()),
         "schemaAvailable": schema_root is not None,
         "schemaRoot": str(schema_root) if schema_root is not None else "",
-        "patches": discover_raw_patches(project_root(), info, schema_root=schema_root),
+        "patches": patches,
     }
 
 
@@ -295,10 +350,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 values = parse_qs(parsed.query, keep_blank_values=True)
                 relative = values.get("path", [""])[0]
-                self.send_json(patch_payload(
-                    project_root(), info_document().data, relative,
-                    schema_root=palschema_schema_root(),
-                ))
+                self.send_json(safe_patch_payload(relative, info_document().data, palschema_schema_root()))
             except (OSError, ValueError) as error:
                 self.send_json({"error": str(error)}, 400)
             return
@@ -366,10 +418,11 @@ class Handler(BaseHTTPRequestHandler):
             schema_root = palschema_schema_root()
             target = resolve_discovered_patch(project_root(), info, relative, schema_root=schema_root)
             document = RawPatchDocument.load(target, schema_root=schema_root)
+            validate_schema_edits(edits, schema_root)
             document.apply_edits(edits)
             apply_additions(document, additions, schema_root)
             document.save(expected_sha256=source_sha)
-            self.send_json(patch_payload(project_root(), info, relative, schema_root=schema_root))
+            self.send_json(safe_patch_payload(relative, info, schema_root))
         except PatchValidationError as error:
             self.send_json({"error": str(error), "issues": [asdict(issue) for issue in error.issues]}, 400)
         except ReadOnlyPatchError as error:
