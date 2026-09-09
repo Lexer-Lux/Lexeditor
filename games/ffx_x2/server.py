@@ -9,8 +9,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import (
-    auto_ability_prices, ctb_base, deployment, gear_shops, item_prices, item_shops,
-    mix_table, paths, theme, treasures,
+    auto_ability_prices, ctb_base, deployment, ffx2_abilities, gear_shops, item_prices,
+    item_shops, mix_table, paths, theme, treasures,
 )
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
@@ -24,7 +24,7 @@ MAX_REQUEST_BYTES = 256 * 1024
 POST_ROUTES = {
     "/api/project/extract", "/api/treasures/save", "/api/item-prices/save",
     "/api/auto-ability-prices/save", "/api/ctb-base/save", "/api/mix-table/save",
-    "/api/item-shops/save", "/api/gear-shops/save",
+    "/api/item-shops/save", "/api/gear-shops/save", "/api/ffx2-abilities/save",
     "/api/deployment/deploy", "/api/deployment/revert",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
@@ -132,29 +132,33 @@ def theme_status() -> dict:
         }
 
 
-def _structured_current(archive_path: str) -> tuple[VBFIndex, Path, bytes, str]:
-    index = _index("x")
-    entry = _find_entry(index, "x", archive_path)
-    target = _project_target("x", entry.path)
+def _structured_current_for(game: str, archive_path: str) -> tuple[VBFIndex, Path, bytes, str]:
+    key = _game_key(game)
+    index = _index(key)
+    entry = _find_entry(index, key, archive_path)
+    target = _project_target(key, entry.path)
     if target.is_file():
         return index, target, target.read_bytes(), "project"
     return index, target, read_entry(index, entry), "archive"
 
 
-def _structured_payload(archive_path: str, builder) -> dict:
-    index, target, data, source = _structured_current(archive_path)
+def _structured_payload_for(game: str, archive_path: str, builder) -> dict:
+    key = _game_key(game)
+    index, target, data, source = _structured_current_for(key, archive_path)
     result = builder(data)
     result.update({
-        "game": "x", "archivePath": archive_path, "headerMd5": index.header_md5,
+        "game": key, "archivePath": archive_path, "headerMd5": index.header_md5,
         "source": source, "staged": target.is_file(), "projectPath": str(target),
     })
     return result
 
 
-def _structured_save(request: dict, archive_path: str, apply, builder, label: str) -> dict:
-    index, target, data, _source = _structured_current(archive_path)
+def _structured_save_for(game: str, request: dict, archive_path: str,
+                         apply, builder, label: str) -> dict:
+    key = _game_key(game)
+    index, target, data, _source = _structured_current_for(key, archive_path)
     if str(request.get("headerMd5", "")) != index.header_md5:
-        raise RuntimeError(f"The FFX VBF changed; refresh {label} before saving")
+        raise RuntimeError(f"The {paths.GAME_LABELS[key]} VBF changed; refresh {label} before saving")
     current_baseline = treasures.sha256_bytes(data)
     if str(request.get("baselineSha256", "")) != current_baseline:
         raise RuntimeError(f"{Path(archive_path).name} changed outside this editor; refresh {label} before saving")
@@ -162,9 +166,17 @@ def _structured_save(request: dict, archive_path: str, apply, builder, label: st
     edited = apply(data, edits)
     paths.ensure_project()
     treasures.atomic_write(target, edited)
-    result = _structured_payload(archive_path, builder)
+    result = _structured_payload_for(key, archive_path, builder)
     result["saved"] = len(edits)
     return result
+
+
+def _structured_payload(archive_path: str, builder) -> dict:
+    return _structured_payload_for("x", archive_path, builder)
+
+
+def _structured_save(request: dict, archive_path: str, apply, builder, label: str) -> dict:
+    return _structured_save_for("x", request, archive_path, apply, builder, label)
 
 
 def treasure_catalog() -> dict:
@@ -226,9 +238,21 @@ def save_gear_shops(request: dict) -> dict:
     return _structured_save(request, gear_shops.ARCHIVE_PATH, gear_shops.apply_edits, gear_shops.payload, "Gear Shops")
 
 
-def _map_structured_row(archive_path: str, controls: str, builder, notes) -> dict:
+def ffx2_ability_catalog() -> dict:
+    return _structured_payload_for("x2", ffx2_abilities.ARCHIVE_PATH, ffx2_abilities.payload)
+
+
+def save_ffx2_abilities(request: dict) -> dict:
+    return _structured_save_for(
+        "x2", request, ffx2_abilities.ARCHIVE_PATH, ffx2_abilities.apply_edits,
+        ffx2_abilities.payload, "FFX-2 Abilities",
+    )
+
+
+def _map_structured_row(game: str, archive_path: str, controls: str, builder, notes) -> dict:
+    key = _game_key(game)
     try:
-        state = _structured_payload(archive_path, builder)
+        state = _structured_payload_for(key, archive_path, builder)
         status = "integrated"
         note = notes(state)
     except (OSError, VBFError, ValueError) as error:
@@ -237,7 +261,7 @@ def _map_structured_row(archive_path: str, controls: str, builder, notes) -> dic
     return {
         "filename": archive_path, "controls": controls, "notes": note,
         "status": status, "coverage": "structured-record-editor",
-        "openable": status == "integrated", "game": "x",
+        "openable": status == "integrated", "game": key,
     }
 
 
@@ -252,7 +276,7 @@ def data_map() -> dict:
             "status": "integrated" if state["ready"] else "partial",
             "coverage": "archive-index-and-extract", "openable": state["ready"], "target": "archives", "game": key,
         })
-    structured = [
+    structured_x = [
         (treasures.ARCHIVE_PATH, "Structured treasure reward editor", treasures.payload,
          lambda s: f"{len(s['rows'])} reward records; edits only kind, quantity and 16-bit type ID.", "treasures"),
         (item_prices.ARCHIVE_PATH, "Structured item/command gil-price editor", item_prices.payload,
@@ -268,10 +292,21 @@ def data_map() -> dict:
         (gear_shops.ARCHIVE_PATH, "Structured 16-slot gear shop editor", gear_shops.payload,
          lambda s: f"{len(s['rows'])} shops with {s['slotCount']} gear-index slots; leading legacy rate is read-only.", "gear-shops"),
     ]
-    for archive_path, controls, builder, notes, target in structured:
-        row = _map_structured_row(archive_path, controls, builder, notes)
+    for archive_path, controls, builder, notes, target in structured_x:
+        row = _map_structured_row("x", archive_path, controls, builder, notes)
         row["target"] = target
         rows.append(row)
+    x2_row = _map_structured_row(
+        "x2", ffx2_abilities.ARCHIVE_PATH,
+        "Conservative FFX-2 ability animation-ID editor",
+        ffx2_abilities.payload,
+        lambda s: (
+            f"{len(s['rows'])} English/US command records. Lexeditor edits only animation IDs "
+            "at +0x08/+0x0A and preserves names, descriptions, unknown bytes and trailing strings."
+        ),
+    )
+    x2_row["target"] = "ffx2-abilities"
+    rows.append(x2_row)
     themed = theme_status()
     theme_parts = []
     if themed.get("background", {}).get("ready"): theme_parts.append("title/menu PNG active")
@@ -282,12 +317,12 @@ def data_map() -> dict:
         {"filename": "data/metamenu.vbf + menu/font/sound resources", "controls": "Private installed-game theme cache",
          "notes": "; ".join(theme_parts) or "Theme extraction falls back safely when cosmetic source assets are unavailable.",
          "status": "partial" if themed.get("source") == "installed-game" else "not-integrated", "coverage": "game-derived-theme", "openable": False},
-        {"filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*", "controls": "Remaining gameplay/kernel family",
-         "notes": "Treasure rewards, item/auto-ability prices, CTB timing, Mix results, item shops and gear shops are structured; other kernel tables remain available through the VBF browser.",
+        {"filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*", "controls": "Remaining FFX gameplay/kernel family",
+         "notes": "Seven FFX kernel families are structured; other kernel tables remain available through the VBF browser.",
          "status": "partial", "coverage": "seven-structured-families", "openable": False},
-        {"filename": "FFX2_Data/ffx_ps2/ffx2/**", "controls": "Recognized FFX-2 game-data families",
-         "notes": "Files can be located and staged through the VBF browser. FFX-2 format-specific editors remain to be implemented.",
-         "status": "not-integrated", "coverage": "recognized", "openable": False},
+        {"filename": "FFX2_Data/ffx_ps2/ffx2/**", "controls": "Remaining FFX-2 game-data families",
+         "notes": "The English/US command animation fields are structured; other FFX-2 formats remain read/extract-only until proved.",
+         "status": "partial", "coverage": "one-structured-family", "openable": False},
         {"filename": "fahrenheit/mods/lexeditor-ffx-x2/efl/{x,x2}/**", "controls": "Reversible file-only Fahrenheit deployment",
          "notes": "Deploy copies only the selected Lexeditor project into its owned Fahrenheit mod folder and preserves unrelated loadorder entries.",
          "status": "integrated" if deployment.status(paths.GAME_ROOT, paths.PROJECT_ROOT)["fahrenheitReady"] else "partial",
@@ -347,7 +382,8 @@ class Handler(BaseHTTPRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": ["data-map", "vbf-index", "vbf-extract", "project-overlay", "ffx-treasure-editor",
                         "ffx-item-price-editor", "ffx-auto-ability-price-editor", "ffx-ctb-base-editor", "ffx-mix-editor",
-                        "ffx-item-shop-editor", "ffx-gear-shop-editor", "installed-game-theme", "fahrenheit-deploy"]})
+                        "ffx-item-shop-editor", "ffx-gear-shop-editor", "ffx2-ability-animation-editor",
+                        "installed-game-theme", "fahrenheit-deploy"]})
             elif route == "/api/dashboard": self.json_response(dashboard())
             elif route == "/api/datamap": self.json_response(data_map())
             elif route == "/api/theme": self.json_response(theme_status())
@@ -358,6 +394,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/mix-table": self.json_response(mix_catalog())
             elif route == "/api/item-shops": self.json_response(item_shop_catalog())
             elif route == "/api/gear-shops": self.json_response(gear_shop_catalog())
+            elif route == "/api/ffx2-abilities": self.json_response(ffx2_ability_catalog())
             elif route == "/api/archive":
                 q = parse_qs(parsed.query); self.json_response(archive_catalog(q.get("game", ["x"])[0], q.get("q", [""])[0], int(q.get("offset", ["0"])[0]), int(q.get("limit", ["100"])[0])))
             elif route == "/api/deployment": self.json_response(deployment.status(paths.GAME_ROOT, paths.PROJECT_ROOT))
@@ -388,6 +425,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/mix-table/save": result = save_mix(request)
             elif route == "/api/item-shops/save": result = save_item_shops(request)
             elif route == "/api/gear-shops/save": result = save_gear_shops(request)
+            elif route == "/api/ffx2-abilities/save": result = save_ffx2_abilities(request)
             elif route == "/api/deployment/deploy": result = deployment.deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
             else: result = deployment.revert(paths.GAME_ROOT, paths.PROJECT_ROOT)
             self.json_response(result)
