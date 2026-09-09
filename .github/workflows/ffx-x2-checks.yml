@@ -9,6 +9,7 @@ on:
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
+      - 'ui/ffx-commands.js'
       - 'ui/ffx-x2-accessories.js'
       - 'ui/ffx-x2-launch.js'
       - 'ui/credits-sources.json'
@@ -22,6 +23,7 @@ on:
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
+      - 'ui/ffx-commands.js'
       - 'ui/ffx-x2-accessories.js'
       - 'ui/ffx-x2-launch.js'
       - 'ui/credits-sources.json'
@@ -58,6 +60,7 @@ jobs:
         run: >-
           python -c "from pathlib import Path; import re; s=Path('games/ffx_x2/editor.html').read_text(encoding='utf-8'); Path('ffx-x2-inline.js').write_text('\n'.join(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)), encoding='utf-8')"
           && node --check ffx-x2-inline.js
+          && node --check ui/ffx-commands.js
           && node --check ui/ffx-x2-accessories.js
           && node --check ui/ffx-x2-launch.js
       - name: Plugin and metadata contracts
@@ -80,6 +83,7 @@ jobs:
           tests/test_ffx_x2_mix_table.py
           tests/test_ffx_x2_item_shops.py
           tests/test_ffx_x2_gear_shops.py
+          tests/test_ffx_x2_ffx_commands.py
           tests/test_ffx_x2_ffx2_abilities.py
           tests/test_ffx_x2_ffx2_accessories.py
       - name: Managed service smoke
