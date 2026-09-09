@@ -4,11 +4,11 @@
 
 - Steam app ID: `359870`.
 - Common install directory: `FINAL FANTASY FFX&FFX-2 HD Remaster`.
-- Launcher: `FFX&X-2_LAUNCHER.exe`.
+- Collection launcher present in the install: `FFX&X-2_LAUNCHER.exe`.
 - Game executables: `FFX.exe` and `FFX-2.exe`.
 - Primary archives: `data/FFX_Data.vbf` and `data/FFX2_Data.vbf`.
 
-Lexeditor treats both games as one plugin because Steam ships them as one collection and Fahrenheit supports both archives from one framework installation.
+Lexeditor treats both games as one plugin because Steam ships them as one collection and Fahrenheit supports both archives from one framework installation. Lexeditor's Play controls intentionally bypass the Square Enix collection launcher and target each game through Fahrenheit Stage 0 directly.
 
 ## VBF read contract
 
@@ -190,6 +190,25 @@ Deploy Project creates one file-only Fahrenheit mod at
 
 Deployment refuses to overwrite a pre-existing foreign directory or a Lexeditor deployment changed outside Lexeditor.
 
+## Collection-aware Play boundary
+
+Fahrenheit's Stage 0 contract is `fhstage0.exe {EXECUTABLE_TO_LAUNCH} {ARGS}`. Its own FFX documentation uses `fhstage0.exe ..\..\FFX.exe`. Stage 0 loads `fhstage1.dll` by relative name, so Lexeditor launches with the working directory fixed to `<game>/fahrenheit/bin`.
+
+Lexeditor exposes two and only two launch choices:
+
+- `x` → argv `[<game>/fahrenheit/bin/fhstage0.exe, "..\\..\\FFX.exe"]`
+- `x2` → argv `[<game>/fahrenheit/bin/fhstage0.exe, "..\\..\\FFX-2.exe"]`
+
+Before launch, the helper requires `fhstage0.exe`, `fhstage1.dll` and the selected game executable to exist. Actual process creation is refused on non-Windows hosts. The UI therefore shows explicit **Play FFX** and **Play FFX-2** buttons and disables either button unless its fixed launch contract is actionable.
+
+The loopback service exposes:
+
+- `GET /api/launch` for Stage 0/Stage 1, Windows-host and per-title readiness;
+- the same launch status inside `GET /api/dashboard`;
+- `POST /api/play`, which accepts exactly `{"game":"x"}` or `{"game":"x2"}`.
+
+`/api/play` does not accept an executable, path, command, launcher selection, arbitrary arguments or additional JSON keys. It never launches through `FFX&X-2_LAUNCHER.exe`. API regressions patch only the process-execution boundary to prove the two allowed keys reach it while rejected shapes cannot trigger launch.
+
 ## Installed-game theme boundary
 
 Lexeditor can derive bounded cosmetic assets from the user's own installed VBFs and optional `data/metamenu.vbf`. The private cache may expose browser-ready title/menu PNGs, web fonts or audio when those formats already exist, while recognizing/caching non-browser-ready font atlases, UI textures and FMOD banks for later conversion work. No proprietary theme asset is committed to Lexeditor, and theme extraction is never a readiness gate for editing or deployment.
@@ -215,8 +234,9 @@ Integrated:
 - Conservative FFX-2 `command.bin` animation-ID editing for the `new_uspc` table.
 - Conservative FFX-2 `accessory.bin` base ability/price editing for the `new_uspc` table.
 - Reversible file-only Fahrenheit deployment mechanics for both `efl/x` and `efl/x2` project trees.
+- Collection-aware Fahrenheit Stage 0 launch status and fixed **Play FFX / Play FFX-2** actions.
 - Private installed-game cosmetic theme extraction/cache with safe fallback.
-- Evidence-based Data Map.
+- Evidence-based Data Map, including `fahrenheit-launch` coverage.
 
 Not yet integrated:
 
@@ -225,7 +245,6 @@ Not yet integrated:
 - Other FFX-2 structured tables, localized string editing, creature-extension accessory fields, or non-US table variants.
 - Conversion of recognized proprietary font/texture/audio formats that are not already browser-ready.
 - Installing/updating Fahrenheit itself.
-- Choosing FFX vs FFX-2 when launching through Fahrenheit from Lexeditor.
-- Live installed-game acceptance for replacement loading.
+- Live installed-game acceptance for replacement loading or Stage 0 startup through Lexeditor.
 
-Synthetic/API tests prove parser, service, project and deployment mechanics. They do not prove that a real Steam build accepts a given replacement file in-game.
+Synthetic/API tests prove parser, service, project, deployment and launch-route mechanics. They do not prove that a real Steam build accepts a given replacement file in-game or that Stage 0 successfully starts both real game executables on the user's installation.
