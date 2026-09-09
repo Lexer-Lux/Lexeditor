@@ -120,8 +120,8 @@ for phrase in ("most human-friendly semantic control", "checkless toggle", "Bitf
 # Pin the single definition, not the number. Three separate declarations of
 # this width existed at once and only the last one was live, so edits to the
 # others silently did nothing.
-require("--lex-detail-label-width:clamp(64px,5%,150px)" in css.replace(" ", ""),
-        "Detail property-name lane is not standardized to the shared 5% lane")
+require("--lex-detail-label-width:10%" in css.replace(" ", ""),
+        "Detail property-name lane is not standardized to the shared 10% lane")
 require("grid-template-columns:10%" not in css.replace(" ", ""),
         "A literal property-name lane width is overriding the shared variable")
 require("lex-info-help" in css and "place-items:center" in css.replace(" ", ""),

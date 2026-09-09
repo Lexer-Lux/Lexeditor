@@ -349,7 +349,7 @@ with sync_playwright() as p:
             # The lane is the shared 5% clamp, floored at 64px and capped at
             # 150px, so the ratio drifts with panel width rather than sitting
             # on one number.
-            assert .03 <= label_ratio <= .09, (width, "label lane is not approximately 5%", label_ratio)
+            assert .07 <= label_ratio <= .16, (width, "label lane is not approximately 10%", label_ratio)
             # Test label fitting with two otherwise identical rows. Different
             # control types legitimately reserve different vertical space (for
             # example a provenance/ref rail), so comparing arbitrary gallery

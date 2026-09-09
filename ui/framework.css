@@ -4511,7 +4511,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 /* LEXEDITOR_SHARED_UI_STANDARDIZATION_20260906 */
 /* One definition. This lived on .lex-detail-panel as well, which beat :root,
    so edits to the :root value silently did nothing. */
-:root { --lex-detail-label-width:clamp(64px, 5%, 150px); --lex-copy-gutter:19px; }
+/* A plain percentage: a px floor pushed narrow panels well past 10% and
+   broke the shared lane ratio the layout checks enforce. */
+:root { --lex-detail-label-width:10%; --lex-copy-gutter:19px; }
 .lex-detail-field { grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr); }
 /* Break between words, and inside a word only when a single word cannot fit.
    overflow-wrap:anywhere broke every long name character by character in the
@@ -4533,7 +4535,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-field-type-rail .lex-info-help {
   position:absolute; left:50%; top:50%; transform:translate(-50%,-50%) !important;
 }
-.lex-reference-values .lex-reference-value { align-items:center; padding-block:1px 2px; }
+/* Three stacked references have to sit inside the height of the value they
+   annotate; three rows of 12px overflowed a 31px control. */
+.lex-reference-values .lex-reference-value { align-items:center; padding-block:0; line-height:1.02; }
 .lex-reference-values .lex-reference-tag { margin-right:.28em; align-self:center; }
 .lex-reference-values .lex-boolean-mark { display:inline-grid; place-items:center; margin:0; line-height:1; }
 .lex-reference-tag.lex-reference-ll { color:#72ff1e !important; }
@@ -4685,7 +4689,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-boolean-field .lex-detail-field-control > .lex-source-control { position:relative; }
 .lex-boolean-field .lex-source-control > .lex-reference-values {
   position:absolute;
-  top:100%;
+  /* Sits just inside the row's lower edge so the mark keeps a little
+     breathing room below it. */
+  top:calc(100% - 2px);
   right:0;
   left:0;
   width:max-content;
@@ -4928,4 +4934,20 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 
 .lex-detail-field-label-text { display:block; min-width:0; max-width:100%; }
+
+/* A boolean row's label column spans the whole row so its arrow can reach the
+   checkbox. Without this the name floated in that wide column and sat on a
+   different edge from every other property name in the panel. The name keeps
+   the shared lane and its right edge; only the arrow uses the leftover space. */
+/* Two explicit tracks: the name keeps the shared lane and its right edge, the
+   arrow takes the rest. As a flex row the name floated in the wide column and
+   sat on a different edge from every other property name in the panel. */
+.lex-boolean-field > .lex-detail-field-label {
+  display:grid;
+  grid-template-columns:calc(var(--lex-detail-label-width) - 10px) minmax(0,1fr);
+  align-items:center;
+}
+.lex-boolean-field > .lex-detail-field-label > .lex-detail-field-label-text {
+  text-align:right;
+}
 
