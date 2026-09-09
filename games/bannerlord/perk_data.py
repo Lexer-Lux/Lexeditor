@@ -8,6 +8,8 @@ from pathlib import Path
 import re
 import shutil
 
+from .paths import contained_project_path
+
 
 _STRING = r'"(?:\\.|[^"\\])*"'
 _NUMBER = r'[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?[fFdDmM]?'
@@ -29,6 +31,10 @@ _XP_SOURCE_CALL = re.compile(
     rf"(?P<defaultAmount>{_NUMBER})\s*\)",
     re.MULTILINE,
 )
+
+
+def _source_path(project: Path, filename: str, *, require_file: bool = False) -> Path:
+    return contained_project_path(project, "src", filename, require_file=require_file)
 
 
 def _decode_string(token: str) -> str:
@@ -94,7 +100,7 @@ def _perk_records(text: str) -> list[dict]:
 
 
 def read_perk_definitions(project: Path) -> dict:
-    path = project / "src" / "CustomSkillPerks.cs"
+    path = _source_path(project, "CustomSkillPerks.cs")
     if not path.is_file():
         return {"available": False, "path": str(path), "perks": []}
     text = path.read_text(encoding="utf-8-sig")
@@ -108,9 +114,7 @@ def read_perk_definitions(project: Path) -> dict:
 
 def save_perk_definitions(project: Path, edits: list[dict]) -> dict:
     """Edit only balance-safe perk fields; lookup identity remains stable."""
-    path = project / "src" / "CustomSkillPerks.cs"
-    if not path.is_file():
-        raise FileNotFoundError(path)
+    path = _source_path(project, "CustomSkillPerks.cs", require_file=True)
     text = path.read_text(encoding="utf-8-sig")
     rows = _perk_records(text)
     by_index = {row["index"]: row for row in rows}
@@ -185,7 +189,7 @@ def _xp_source_records(text: str) -> list[dict]:
 
 
 def read_xp_source_definitions(project: Path) -> dict:
-    path = project / "src" / "CustomSkillXpSourcesConfig.cs"
+    path = _source_path(project, "CustomSkillXpSourcesConfig.cs")
     if not path.is_file():
         return {"available": False, "path": str(path), "sources": []}
     text = path.read_text(encoding="utf-8-sig")
@@ -199,9 +203,7 @@ def read_xp_source_definitions(project: Path) -> dict:
 
 def save_xp_source_definitions(project: Path, edits: list[dict]) -> dict:
     """Edit fallback XP awards while keeping source lookup keys stable."""
-    path = project / "src" / "CustomSkillXpSourcesConfig.cs"
-    if not path.is_file():
-        raise FileNotFoundError(path)
+    path = _source_path(project, "CustomSkillXpSourcesConfig.cs", require_file=True)
     text = path.read_text(encoding="utf-8-sig")
     rows = _xp_source_records(text)
     by_index = {row["index"]: row for row in rows}
