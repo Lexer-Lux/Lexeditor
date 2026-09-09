@@ -9,6 +9,7 @@ also encode their own length/mode remain read-only.
 from __future__ import annotations
 
 from .data import OverlayStore, sha256
+from .event_flow import BACKWARD_JUMPS, FORWARD_JUMPS
 from .events import event_entries, get_event, parse_event
 
 
@@ -36,6 +37,46 @@ def _argument_bytes(value: str | bytes | bytearray, expected: int) -> bytes:
     return data
 
 
+def _validate_changed_jump(function: dict, command: dict, replacement: bytes) -> None:
+    """Reject a newly edited relative jump that would split a command.
+
+    Existing malformed jump bytes are intentionally tolerated when some other
+    operand is edited: this validator only runs when the final jump byte itself
+    changes. That lets Lexeditor preserve pre-existing scripts without silently
+    manufacturing a new invalid control-flow edge.
+    """
+    opcode = int(command["opcode"])
+    if opcode not in FORWARD_JUMPS and opcode not in BACKWARD_JUMPS:
+        return
+    try:
+        original = bytes.fromhex(command.get("argumentsHex", ""))
+    except ValueError as error:
+        raise ValueError("Decoded jump arguments are not valid hexadecimal bytes") from error
+    if not replacement or not original or replacement[-1] == original[-1]:
+        return
+    if not bool(function.get("complete", False)):
+        raise ValueError(
+            f"Cannot change jump offset for opcode 0x{opcode:02X} because the function disassembly is incomplete"
+        )
+
+    boundaries = {int(row["offset"]) for row in function.get("commands", [])}
+    end = int(function.get("end", 0))
+    boundaries.add(end)
+    origin = int(command["offset"]) + int(command["size"]) - 1
+    distance = replacement[-1]
+    if opcode in FORWARD_JUMPS:
+        target = origin + distance
+        direction = "forward"
+    else:
+        target = origin - distance
+        direction = "backward"
+    if target not in boundaries:
+        raise ValueError(
+            f"Changed {direction} jump for opcode 0x{opcode:02X} targets 0x{target:X}, "
+            "which is not a decoded command boundary"
+        )
+
+
 def save_event_arguments(store: OverlayStore, event_id: int, object_id: int, function_id: int,
                          command_index: int, expected_sha256: str,
                          arguments: str | bytes | bytearray) -> dict:
@@ -51,7 +92,8 @@ def save_event_arguments(store: OverlayStore, event_id: int, object_id: int, fun
     functions = parsed["objects"][object_id]["functions"]
     if not 0 <= function_id < len(functions):
         raise ValueError(f"Event function is outside object {object_id}: {function_id}")
-    commands = functions[function_id]["commands"]
+    function = functions[function_id]
+    commands = function["commands"]
     if not 0 <= command_index < len(commands):
         raise ValueError(f"Event command is outside function {object_id}:{function_id}: {command_index}")
     command = commands[command_index]
@@ -64,6 +106,7 @@ def save_event_arguments(store: OverlayStore, event_id: int, object_id: int, fun
     replacement = _argument_bytes(arguments, expected_length)
     if expected_length == 0:
         raise ValueError("This command has no argument bytes to edit")
+    _validate_changed_jump(function, command, replacement)
 
     # parse_event command offsets are relative to raw[1:], because byte zero is
     # the Atel object count. The opcode itself remains untouched.
