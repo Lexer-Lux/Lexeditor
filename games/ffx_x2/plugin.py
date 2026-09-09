@@ -13,7 +13,7 @@ import zlib
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession, request_json
 
-from . import paths, treasures
+from . import item_shops, paths, treasures
 from .vbf import BLOCK_SIZE
 
 
@@ -118,15 +118,35 @@ def _fixture_takara() -> bytes:
     header[:8] = b"TREASURE"
     struct.pack_into("<HHHH", header, 0x08, 0x20, 0x22, 4, len(records))
     header[0x10:0x14] = b"KEEP"
-    # Repeated opaque bytes make this fixture exercise compressed VBF blocks
-    # while the fixed-record parser still treats the tail as uninterpreted data.
     return bytes(header) + records + (b"LEXEDITOR-OPAQUE-TAIL" * 5000)
 
 
+def _fixture_item_shops() -> bytes:
+    """Build two synthetic 0x22-byte FFX item-shop records."""
+    records = bytearray()
+    for legacy_rate, items in (
+        (125, [0x1001, 0x1002, 0, 0] + [0] * 12),
+        (100, [0x2001, 0, 0, 0] + [0] * 12),
+    ):
+        record = bytearray(item_shops.RECORD_SIZE)
+        struct.pack_into("<H", record, 0, legacy_rate)
+        for slot, item_id in enumerate(items):
+            struct.pack_into("<H", record, 2 + slot * 2, item_id)
+        records.extend(record)
+    header = bytearray(0x14)
+    header[:8] = b"SHOPDATA"
+    struct.pack_into(
+        "<HHHH", header, 0x08, 0x10, 0x11,
+        item_shops.RECORD_SIZE, len(records),
+    )
+    header[0x10:0x14] = b"KEEP"
+    return bytes(header) + bytes(records) + b"OPAQUE-SHOP-TAIL"
+
+
 def smoke() -> list[str]:
-    """Exercise VBF -> structured edit -> project -> Fahrenheit on synthetic data."""
-    fixture_path = treasures.ARCHIVE_PATH
-    fixture_data = _fixture_takara()
+    """Exercise VBF -> structured edits -> project -> Fahrenheit on synthetic data."""
+    treasure_fixture = _fixture_takara()
+    shop_fixture = _fixture_item_shops()
     with tempfile.TemporaryDirectory(prefix="lexeditor-ffx-x2-plugin-") as temp_name:
         root = Path(temp_name)
         game = root / "game"
@@ -138,7 +158,10 @@ def smoke() -> list[str]:
         (game / "fahrenheit" / "mods").mkdir(parents=True, exist_ok=True)
         (game / "fahrenheit" / "mods" / "loadorder").write_text("other-mod\n", encoding="utf-8")
         ffx_archive = game / "data" / "FFX_Data.vbf"
-        _write_fixture_vbf(ffx_archive, [(fixture_path, fixture_data)])
+        _write_fixture_vbf(ffx_archive, [
+            (treasures.ARCHIVE_PATH, treasure_fixture),
+            (item_shops.ARCHIVE_PATH, shop_fixture),
+        ])
         _write_fixture_vbf(game / "data" / "FFX2_Data.vbf", [
             ("FFX2_Data/ffx_ps2/ffx2/master/test.bin", b"X2 fixture")
         ])
@@ -150,48 +173,74 @@ def smoke() -> list[str]:
         }) as session:
             identity = request_json(session.url + "api/plugin")
             capabilities = identity.get("capabilities", [])
-            if identity.get("pluginId") != "ffx-x2" or "vbf-index" not in capabilities or "ffx-treasure-editor" not in capabilities:
+            if (identity.get("pluginId") != "ffx-x2" or "vbf-index" not in capabilities
+                    or "ffx-treasure-editor" not in capabilities
+                    or "ffx-item-shop-editor" not in capabilities):
                 raise RuntimeError("FFX/X-2 plugin returned the wrong managed identity")
             data_map = request_json(session.url + "api/datamap")
-            if sum(row.get("status") == "integrated" for row in data_map.get("rows", [])) < 4:
-                raise RuntimeError("FFX/X-2 Data Map did not expose VBFs, treasures and deployment")
+            if sum(row.get("status") == "integrated" for row in data_map.get("rows", [])) < 5:
+                raise RuntimeError("FFX/X-2 Data Map did not expose VBFs, structured tables and deployment")
+
             catalog = request_json(session.url + "api/archive?game=x&q=takara&limit=10")
-            if catalog.get("total") != 1 or catalog["entries"][0]["path"] != fixture_path:
-                raise RuntimeError("FFX VBF catalog did not return the fixture entry")
+            if catalog.get("total") != 1 or catalog["entries"][0]["path"] != treasures.ARCHIVE_PATH:
+                raise RuntimeError("FFX VBF catalog did not return the treasure fixture entry")
             extracted = request_json(session.url + "api/project/extract", {
-                "game": "x", "path": fixture_path, "headerMd5": catalog["headerMd5"],
+                "game": "x", "path": treasures.ARCHIVE_PATH, "headerMd5": catalog["headerMd5"],
             })
-            project_file = project / "efl" / "x" / Path(*fixture_path.split("/"))
-            if not extracted.get("created") or project_file.read_bytes() != fixture_data:
+            treasure_project = project / "efl" / "x" / Path(*treasures.ARCHIVE_PATH.split("/"))
+            if not extracted.get("created") or treasure_project.read_bytes() != treasure_fixture:
                 raise RuntimeError("FFX VBF entry did not extract byte-exactly to the project overlay")
 
             treasure_state = request_json(session.url + "api/treasures")
             if treasure_state.get("source") != "project" or len(treasure_state.get("rows", [])) != 3:
                 raise RuntimeError("FFX treasure API did not parse the staged takara fixture")
-            saved = request_json(session.url + "api/treasures/save", {
+            treasure_saved = request_json(session.url + "api/treasures/save", {
                 "headerMd5": treasure_state["headerMd5"],
                 "baselineSha256": treasure_state["baselineSha256"],
                 "edits": [{"id": 0x21, "kind": 0x00, "quantity": 99, "typeId": 0x4321}],
             })
-            edited_row = next(row for row in saved["rows"] if row["id"] == 0x21)
-            if saved.get("saved") != 1 or edited_row["summary"] != "9900 gil":
+            edited_treasure_row = next(row for row in treasure_saved["rows"] if row["id"] == 0x21)
+            if treasure_saved.get("saved") != 1 or edited_treasure_row["summary"] != "9900 gil":
                 raise RuntimeError("FFX treasure edit did not save and read back")
-            expected_project = treasures.apply_edits(
-                fixture_data,
+            expected_treasure = treasures.apply_edits(
+                treasure_fixture,
                 [{"id": 0x21, "kind": 0x00, "quantity": 99, "typeId": 0x4321}],
             )
-            if project_file.read_bytes() != expected_project:
+            if treasure_project.read_bytes() != expected_treasure:
                 raise RuntimeError("FFX treasure save changed bytes outside the proved record patch")
 
+            shop_state = request_json(session.url + "api/item-shops")
+            if shop_state.get("source") != "archive" or len(shop_state.get("rows", [])) != 2:
+                raise RuntimeError("FFX item-shop API did not parse the archive-only fixture")
+            shop_saved = request_json(session.url + "api/item-shops/save", {
+                "headerMd5": shop_state["headerMd5"],
+                "baselineSha256": shop_state["baselineSha256"],
+                "edits": [{"id": 0x10, "slots": [{"slot": 1, "itemId": 0xBEEF}]}],
+            })
+            edited_shop = next(row for row in shop_saved["rows"] if row["id"] == 0x10)
+            if shop_saved.get("saved") != 1 or edited_shop["itemIds"][1] != 0xBEEF:
+                raise RuntimeError("FFX item-shop edit did not save and read back")
+            shop_project = project / "efl" / "x" / Path(*item_shops.ARCHIVE_PATH.split("/"))
+            expected_shop = item_shops.apply_edits(
+                shop_fixture,
+                [{"id": 0x10, "slots": [{"slot": 1, "itemId": 0xBEEF}]}],
+            )
+            if shop_project.read_bytes() != expected_shop:
+                raise RuntimeError("FFX item-shop save changed bytes outside selected inventory slots")
+
             deployed = request_json(session.url + "api/deployment/deploy", {})
-            deployed_file = game / "fahrenheit" / "mods" / "lexeditor-ffx-x2" / "efl" / "x" / Path(*fixture_path.split("/"))
+            deployed_root = game / "fahrenheit" / "mods" / "lexeditor-ffx-x2" / "efl" / "x"
+            deployed_treasure = deployed_root / Path(*treasures.ARCHIVE_PATH.split("/"))
+            deployed_shop = deployed_root / Path(*item_shops.ARCHIVE_PATH.split("/"))
             loadorder = game / "fahrenheit" / "mods" / "loadorder"
-            if not deployed.get("deployed") or deployed_file.read_bytes() != expected_project:
+            if (not deployed.get("deployed") or deployed_treasure.read_bytes() != expected_treasure
+                    or deployed_shop.read_bytes() != expected_shop):
                 raise RuntimeError("Structured FFX project did not deploy to the Fahrenheit EFL mod")
             if loadorder.read_text(encoding="utf-8").splitlines() != ["other-mod", "lexeditor-ffx-x2"]:
                 raise RuntimeError("Fahrenheit loadorder was not preserved and extended correctly")
             reverted = request_json(session.url + "api/deployment/revert", {})
-            if reverted.get("deployed") or deployed_file.exists() or loadorder.read_text(encoding="utf-8").splitlines() != ["other-mod"]:
+            if (reverted.get("deployed") or deployed_treasure.exists() or deployed_shop.exists()
+                    or loadorder.read_text(encoding="utf-8").splitlines() != ["other-mod"]):
                 raise RuntimeError("Fahrenheit deployment did not revert cleanly")
             if hashlib.sha256(ffx_archive.read_bytes()).hexdigest() != archive_hash:
                 raise RuntimeError("Structured FFX editing modified the installed VBF source archive")
@@ -207,16 +256,17 @@ def smoke() -> list[str]:
                         raise
                     time.sleep(0.25)
             if ('id="lexeditor-shell"' not in html or '/shared/framework.js' not in html
-                    or "FFX Treasure Rewards" not in html):
+                    or "FFX Treasure Rewards" not in html or "FFX Item Shops" not in html):
                 raise RuntimeError("FFX/X-2 plugin did not serve the structured editor shell")
         if not session.wait_closed():
             raise RuntimeError("FFX/X-2 child port is still open after host shutdown")
     return [
         "FFX and FFX-2 Steam collection identity confirmed on synthetic layout",
         "VBF header/path validation, search and compressed extraction passed",
-        "FFX takara fixed-record parsing and surgical treasure edit/save/readback passed",
-        "installed VBF stayed byte-identical while the project override changed",
-        "file-only Fahrenheit EFL deploy/loadorder/revert path passed",
+        "FFX treasure and item-shop structured edit/save/readback paths passed",
+        "staged-baseline and archive-baseline structured saves both passed",
+        "installed VBF stayed byte-identical while project overrides changed",
+        "file-only Fahrenheit EFL deploy/loadorder/revert path passed for both overrides",
         "shared editor shell served and child service stopped cleanly",
     ]
 
