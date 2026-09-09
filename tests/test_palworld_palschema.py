@@ -56,6 +56,70 @@ class PalSchemaRawPatchTests(unittest.TestCase):
             self.assertEqual(raw, (path.parent / "balance.json.lexeditor.bak").read_bytes())
             self.assertEqual(new_sha, RawPatchDocument.load(path).source_sha256)
 
+    def test_generated_schema_controls_types_enums_and_missing_fields(self):
+        with tempfile.TemporaryDirectory() as temp_name:
+            root = Path(temp_name)
+            schema_root = root / "schemas"
+            (schema_root / "raw").mkdir(parents=True)
+            (schema_root / "raw" / "DT_Test.schema.json").write_text(json.dumps({
+                "type": "object",
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "IntValue": {"type": "integer", "description": "IntProperty"},
+                        "FloatValue": {"type": "number", "description": "FloatProperty"},
+                        "Mode": {
+                            "type": "string",
+                            "description": "EnumProperty",
+                            "$ref": "../enums.schema.json#/definitions/ETestMode",
+                        },
+                        "Nested": {"type": "object", "description": "StructProperty", "properties": {}},
+                    },
+                },
+            }), encoding="utf-8")
+            (schema_root / "enums.schema.json").write_text(json.dumps({
+                "definitions": {
+                    "ETestMode": {"type": "string", "enum": ["ModeA", "ModeB"]}
+                }
+            }), encoding="utf-8")
+
+            path = root / "typed.json"
+            path.write_text(json.dumps({
+                "DT_Test": {
+                    "Row": {
+                        "IntValue": 1,
+                        "FloatValue": 2,
+                        "Mode": "ModeA",
+                        "Nested": {"Keep": True},
+                        "UnknownField": 9,
+                    }
+                }
+            }), encoding="utf-8")
+            doc = RawPatchDocument.load(path, schema_root=schema_root)
+            records = {row["field"]: row for row in doc.records()}
+            self.assertEqual("integer", records["IntValue"]["schemaType"])
+            self.assertEqual("int", records["IntValue"]["kind"])
+            self.assertTrue(records["IntValue"]["writable"])
+            self.assertEqual("number", records["FloatValue"]["schemaType"])
+            self.assertEqual("float", records["FloatValue"]["kind"])
+            self.assertEqual(["ModeA", "ModeB"], records["Mode"]["enumValues"])
+            self.assertTrue(records["Mode"]["writable"])
+            self.assertFalse(records["Nested"]["writable"])
+            self.assertEqual("field-missing", records["UnknownField"]["schemaState"])
+            self.assertFalse(records["UnknownField"]["writable"])
+
+            doc.apply_edits([
+                {"table": "DT_Test", "row": "Row", "field": "IntValue", "value": 2},
+                {"table": "DT_Test", "row": "Row", "field": "FloatValue", "value": 2.5},
+                {"table": "DT_Test", "row": "Row", "field": "Mode", "value": "ModeB"},
+            ])
+            self.assertEqual(2.5, doc.data["DT_Test"]["Row"]["FloatValue"])
+            self.assertEqual("ModeB", doc.data["DT_Test"]["Row"]["Mode"])
+            with self.assertRaises(ValueError):
+                doc.apply_edits([{"table": "DT_Test", "row": "Row", "field": "Mode", "value": "ModeC"}])
+            with self.assertRaises(ValueError):
+                doc.apply_edits([{"table": "DT_Test", "row": "Row", "field": "UnknownField", "value": 10}])
+
     def test_noop_json_save_is_byte_exact(self):
         raw = b'{"DT_Test":{"Row":{"Value":1}}}\n'
         with tempfile.TemporaryDirectory() as temp_name:
@@ -105,7 +169,7 @@ class PalSchemaRawPatchTests(unittest.TestCase):
         self.assertEqual({"row.fmodel-wrapper", "filters.array", "table.object"}, errors)
         self.assertIn("row.delete", warnings)
 
-    def test_scalar_type_is_preserved(self):
+    def test_scalar_type_is_preserved_without_generated_schemas(self):
         with tempfile.TemporaryDirectory() as temp_name:
             path = Path(temp_name) / "types.json"
             path.write_text(json.dumps({"DT_Test": {"Row": {"Bool": True, "Int": 1, "Float": 1.5, "Text": "x", "Nested": {}}}}), encoding="utf-8")
@@ -169,6 +233,20 @@ class PalSchemaRawPatchTests(unittest.TestCase):
             self.assertTrue(payload["writable"])
             with self.assertRaises(ValueError):
                 resolve_discovered_patch(project, self.info(), "Outside/Other/raw/ignored.json")
+
+    def test_malformed_patch_stays_catalogued_without_hiding_valid_file(self):
+        with tempfile.TemporaryDirectory() as temp_name:
+            project = Path(temp_name)
+            raw = project / "PalSchema" / "MyBalance" / "raw"
+            raw.mkdir(parents=True)
+            (raw / "aaa_bad.json").write_text('{"DT_Test":', encoding="utf-8")
+            (raw / "good.json").write_text('{"DT_Test":{"Row":{"Value":1}}}\n', encoding="utf-8")
+            rows = discover_raw_patches(project, self.info())
+            self.assertEqual(["aaa_bad.json", "good.json"], [row["name"] for row in rows])
+            self.assertEqual(1, rows[0]["errors"])
+            self.assertFalse(rows[0]["writable"])
+            payload = patch_payload(project, self.info(), rows[1]["path"])
+            self.assertEqual(1, len(payload["records"]))
 
 
 if __name__ == "__main__":
