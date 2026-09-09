@@ -6,6 +6,7 @@ on:
       - 'games/bannerlord/**'
       - 'ui/framework.*'
       - 'tests/test_bannerlord*.py'
+      - 'tests/bannerlord_browser_check.py'
       - 'tests/test_data_map_coverage.py'
       - 'desktop_host.py'
       - 'service_session.py'
@@ -16,6 +17,7 @@ on:
       - 'games/bannerlord/**'
       - 'ui/framework.*'
       - 'tests/test_bannerlord*.py'
+      - 'tests/bannerlord_browser_check.py'
       - 'tests/test_data_map_coverage.py'
       - 'desktop_host.py'
       - 'service_session.py'
@@ -47,3 +49,20 @@ jobs:
       - run: python -m unittest discover -s tests -p 'test_bannerlord*.py' -v
       - run: python -m unittest discover -s tests -p test_data_map_coverage.py -v
       - run: python -c "import glob, subprocess; [subprocess.run(['node','--check',path], check=True) for path in glob.glob('games/bannerlord/*.js')]"
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/bannerlord_browser_check.py out/bannerlord-browser
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bannerlord-browser-fixture
+          path: out/bannerlord-browser
+          retention-days: 7
