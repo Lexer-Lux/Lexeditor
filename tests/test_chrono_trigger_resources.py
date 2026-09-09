@@ -15,6 +15,7 @@ from games.chrono_trigger.data import (
     save_message_table,
     save_scene,
 )
+from games.chrono_trigger.events import get_event, load_events, parse_event
 from games.chrono_trigger.resources import ResourceArchive, ResourceArchiveError
 
 
@@ -60,6 +61,19 @@ def _scene_header() -> bytes:
     return bytes(data)
 
 
+def _field_event() -> bytes:
+    # Two objects, 16 function pointers apiece. Object 0's slots all begin at
+    # byte 64 of Event.data; object 1 begins at 67. This mirrors the pointer
+    # convention used by the Steam Atel files without needing opcode semantics.
+    data = bytearray(64)
+    for index in range(16):
+        struct.pack_into("<H", data, index * 2, 64)
+    for index in range(16, 32):
+        struct.pack_into("<H", data, index * 2, 67)
+    data.extend(b"\xAA\xBB\xCC\x10\x20\x30")
+    return b"\x02" + bytes(data)
+
+
 class ResourceArchiveTests(unittest.TestCase):
     def test_lists_and_extracts_synthetic_archive(self):
         with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-trigger-") as temp_name:
@@ -94,7 +108,7 @@ class StructuredOverlayTests(unittest.TestCase):
         _build_archive(archive_path, [
             ("Localize/en/msg/item.txt", message),
             ("Game/field/Mapinfo/mapinfo_0.dat", _scene_header()),
-            ("Game/field/atel/Atel_0000.dat", b"\x01" + bytes(64)),
+            ("Game/field/atel/Atel_0000.dat", _field_event()),
             ("Game/world/esl/Event_0000.dat", b"event"),
         ])
         return OverlayStore(archive_path, project), archive_path, project
@@ -137,6 +151,42 @@ class StructuredOverlayTests(unittest.TestCase):
             vanilla = load_scenes(store, "vanilla")["rows"][0]
             self.assertEqual(vanilla["values"]["musicIndex"], 10)
             self.assertEqual(vanilla["values"]["scrollBottom"], 23)
+
+    def test_field_event_structure_is_parsed_without_guessing_opcodes(self):
+        parsed = parse_event(_field_event())
+        self.assertEqual(parsed["objectCount"], 2)
+        self.assertEqual(parsed["functionSlots"], 32)
+        self.assertEqual(parsed["pointerTableBytes"], 64)
+        self.assertEqual(parsed["bytecodeBytes"], 6)
+        self.assertEqual(parsed["objects"][0]["functions"][0]["name"], "Startup")
+        self.assertEqual(parsed["objects"][0]["functions"][0]["preview"], "AA BB CC")
+        self.assertEqual(parsed["objects"][1]["functions"][15]["preview"], "10 20 30")
+
+    def test_field_event_dataset_reads_archive_and_project_sources(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-trigger-data-") as temp_name:
+            store, _archive_path, project = self._fixture(Path(temp_name))
+            listing = load_events(store)
+            self.assertEqual(listing["matchCount"], 1)
+            self.assertEqual(listing["rows"][0]["objectCount"], 2)
+            self.assertNotIn("objects", listing["rows"][0])
+            detail = get_event(store, 0)
+            self.assertEqual(len(detail["objects"]), 2)
+            self.assertEqual(detail["source"], "archive")
+
+            override = project / "Game/field/atel/Atel_0000.dat"
+            override.parent.mkdir(parents=True)
+            changed = bytearray(_field_event())
+            changed[-1] = 0x99
+            override.write_bytes(changed)
+            self.assertEqual(get_event(store, 0)["source"], "project")
+            self.assertTrue(get_event(store, 0)["objects"][1]["functions"][0]["preview"].endswith("99"))
+            self.assertEqual(get_event(store, 0, "vanilla")["source"], "archive")
+
+    def test_field_event_rejects_pointer_outside_script(self):
+        broken = bytearray(_field_event())
+        struct.pack_into("<H", broken, 1, 0xFFFF)
+        with self.assertRaises(ValueError):
+            parse_event(bytes(broken))
 
     def test_data_map_and_resource_classification_are_evidence_based(self):
         with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-trigger-data-") as temp_name:
