@@ -146,8 +146,11 @@ def save_document(
     insertions: dict[int, list[str]] = {}
     touched: set[tuple[str, str]] = set()
     changed = 0
+    existing_edits = [row for row in edits if not row.get("addRequired")]
+    required_additions = [row for row in edits if row.get("addRequired")]
+    required_additions.extend(list(additions or []))
 
-    for edit in edits:
+    for edit in existing_edits:
         element_path = str(edit.get("elementPath") or "")
         attribute_name = str(edit.get("attribute") or "")
         identity = (element_path, attribute_name)
@@ -175,7 +178,7 @@ def save_document(
             replacements.append((left, right, replacement))
             changed += 1
 
-    for addition in list(additions or []):
+    for addition in required_additions:
         element_path = str(addition.get("elementPath") or "")
         attribute_name = str(addition.get("attribute") or "")
         identity = (element_path, attribute_name)
