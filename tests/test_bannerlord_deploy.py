@@ -4,6 +4,7 @@ import tempfile
 import unittest
 
 from games.bannerlord.deploy_data import deploy_target, sync_project_assets
+from games.bannerlord.runtime_data import deployment_status
 
 
 PROJECT_SUBMODULE = '''<Module>
@@ -76,11 +77,26 @@ class BannerlordDeployTests(unittest.TestCase):
                 '<Items><Item id="new" /></Items>\n',
             )
 
+            status = deployment_status(project, game)
+            self.assertTrue(status["inSync"])
+            self.assertTrue(status["assets"]["gui"]["inSync"])
+            self.assertTrue(status["assets"]["moduleData"]["inSync"])
+            self.assertNotIn("custom_skill_effects.json", status["assets"]["moduleData"]["different"])
+
+            (deployed / "GUI" / "Prefabs" / "Test.xml").write_text("<Prefab><Changed /></Prefab>\n", encoding="utf-8")
+            (deployed / "ModuleData" / "items.xml").write_text("<Items><Item id=\"stale\" /></Items>\n", encoding="utf-8")
+            stale = deployment_status(project, game)
+            self.assertFalse(stale["inSync"])
+            self.assertIn("Prefabs/Test.xml", stale["assets"]["gui"]["different"])
+            self.assertIn("items.xml", stale["assets"]["moduleData"]["different"])
+            self.assertTrue(any("GUI assets" in issue for issue in stale["issues"]))
+            self.assertTrue(any("ModuleData assets" in issue for issue in stale["issues"]))
+
             second = sync_project_assets(project, game)
-            self.assertEqual(second["copied"], [])
+            self.assertIn("GUI/Prefabs/Test.xml", second["copied"])
+            self.assertIn("ModuleData/items.xml", second["copied"])
             self.assertIn("SubModule.xml", second["unchanged"])
-            self.assertIn("GUI/Prefabs/Test.xml", second["unchanged"])
-            self.assertIn("ModuleData/items.xml", second["unchanged"])
+            self.assertTrue(deployment_status(project, game)["inSync"])
         finally:
             temporary.cleanup()
 
