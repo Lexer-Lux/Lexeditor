@@ -10,6 +10,8 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 
+from .module_data import read_submodule
+
 
 EDITABLE_PROJECT_PROPERTIES = (
     "TargetFramework",
@@ -31,6 +33,7 @@ _TEXT_SUFFIXES = {
     ".cs", ".xml", ".txt", ".csproj", ".json", ".ini", ".config",
     ".md", ".yml", ".yaml", ".props", ".targets",
 }
+_MODULE_ID = re.compile(r"[A-Za-z0-9_.-]+")
 
 
 def _local_name(tag: str) -> str:
@@ -260,6 +263,24 @@ def _selected_game_root(explicit: Path | None) -> Path | None:
     return Path(configured).resolve() if configured else None
 
 
+def _build_path_overrides(project: Path, selected_game: Path) -> dict[str, str]:
+    descriptor = project.resolve() / "SubModule.xml"
+    if not descriptor.is_file():
+        raise FileNotFoundError(f"Bannerlord project has no SubModule.xml: {descriptor}")
+    module_id = str(read_submodule(descriptor).get("id") or "").strip()
+    if not module_id or not _MODULE_ID.fullmatch(module_id):
+        raise ValueError(f"Bannerlord project has an unsafe module Id: {module_id or '(missing)'}")
+    game_bin = selected_game / "bin" / "Win64_Shipping_Client"
+    module_dir = selected_game / "Modules" / module_id
+    output_path = module_dir / "bin" / "Win64_Shipping_Client"
+    return {
+        "BannerlordDir": str(selected_game),
+        "GameBin": str(game_bin),
+        "ModuleDir": str(module_dir),
+        "OutputPath": str(output_path) + os.sep,
+    }
+
+
 def run_build(
     project: Path,
     requested: str | None = None,
@@ -267,7 +288,7 @@ def run_build(
     timeout: int = 300,
     game_root: Path | None = None,
 ) -> dict:
-    """Run dotnet directly and pin BannerlordDir to Lexeditor's selected install."""
+    """Run dotnet directly and pin build/deploy paths to Lexeditor's selected install."""
     configuration = str(configuration or "Debug")
     if configuration not in {"Debug", "Release"}:
         raise ValueError("Configuration must be Debug or Release")
@@ -281,11 +302,14 @@ def run_build(
         configuration,
         "--nologo",
     ]
+    path_overrides: dict[str, str] = {}
     if selected_game is not None:
-        # MSBuild global properties override project-local BannerlordDir values,
-        # so binaries and AfterTargets=Build deployment land in the same game
-        # installation Lexeditor selected. No shell is involved, even with spaces.
-        command.append(f"-p:BannerlordDir={selected_game}")
+        # These global properties override project-local values. Pin all standard
+        # Bannerlord write/reference roots used by Lexeditor projects, not only
+        # BannerlordDir, so a stale or edited ModuleDir/OutputPath cannot redirect
+        # build output or AfterTargets deployment away from the selected install.
+        path_overrides = _build_path_overrides(project, selected_game)
+        command.extend(f"-p:{name}={value}" for name, value in path_overrides.items())
     try:
         completed = subprocess.run(
             command,
@@ -312,5 +336,6 @@ def run_build(
         "project": project_file.name,
         "command": command,
         "gameRootOverride": str(selected_game) if selected_game is not None else "",
+        "pathOverrides": path_overrides,
         "output": output,
     }
