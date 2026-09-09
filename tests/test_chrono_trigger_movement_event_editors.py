@@ -59,7 +59,9 @@ class MovementEventEditorTests(unittest.TestCase):
     def test_npc_speed_and_memory_source_are_named(self):
         direct = editor_schema(command(0x89, b"\x55"))
         self.assertEqual(direct["values"], {"movementSpeed": 0x55})
-        self.assertIn("55", command_semantics(command(0x89, b"\x55"), {})["summary"])
+        semantic = command_semantics(command(0x89, b"\x55"), {})
+        self.assertEqual(semantic["movementSpeed"], 0x55)
+        self.assertIn("85", semantic["summary"])
 
         from_mem = editor_schema(command(0x8A, b"\x10"))
         self.assertEqual(from_mem["values"], {"speedAddress": 0x7F0220})
