@@ -126,6 +126,8 @@ def editor_schema(command: dict) -> dict | None:
     elif 0xDC <= opcode <= 0xE1:
         fields = [Field("sceneId", "Destination scene", 0, U16), Field("facing", "Facing", 0, 3),
                   Field("tileX", "Destination X", 0, U8), Field("tileY", "Destination Y", 0, U8)]
+    elif opcode == 0xB8:
+        fields = [Field("messageTable", "Message table", 0, U8)]
     elif opcode in {0xBB, 0xC1, 0xC2}:
         fields = [Field("stringIndex", "String index", 0, U16)]
     elif opcode in {0xC0, 0xC3, 0xC4}:
@@ -156,8 +158,15 @@ def editor_schema(command: dict) -> dict | None:
     elif opcode in {0xCF, 0xD2}:
         fields = [Field("playerId", "Player character", 0, U8),
                   Field("jumpOffset", "Jump bytes", 0, U8)]
+    elif opcode == 0xE3:
+        args = _base_args(command)
+        if len(args) != 1 or args[0] not in {0, 1}:
+            return None
+        fields = [Field("enabled", "Explore mode", 0, 1, "boolean")]
     elif opcode in {0xE8, 0xEA}:
         fields = [Field("id", "Sound ID" if opcode == 0xE8 else "Music ID", 0, U8)]
+    elif opcode == 0xF0:
+        fields = [Field("duration", "Darken duration (raw)", 0, U8)]
     elif opcode == 0xD8:
         editor = "battle-flags"
         fields = [Field(key, label, 0, 1, "boolean") for key, (_byte, _bit, label) in BATTLE_BITS.items()]
@@ -180,6 +189,8 @@ def editor_values(command: dict) -> dict:
         return {"enemyId": _u16(args), "slot": args[2] & 0x7F, "static": bool(args[2] & 0x80)}
     if 0xDC <= opcode <= 0xE1 and len(args) == 5:
         return {"sceneId": _u16(args), "facing": args[2], "tileX": args[3], "tileY": args[4]}
+    if opcode == 0xB8 and len(args) == 1:
+        return {"messageTable": args[0]}
     if opcode in {0xBB, 0xC1, 0xC2} and len(args) == 2:
         return {"stringIndex": _u16(args)}
     if opcode in {0xC0, 0xC3, 0xC4} and len(args) == 3:
@@ -202,8 +213,12 @@ def editor_values(command: dict) -> dict:
         return {"playerId": args[0]}
     if opcode in {0xCF, 0xD2} and len(args) == 2:
         return {"playerId": args[0], "jumpOffset": args[1]}
+    if opcode == 0xE3 and len(args) == 1 and args[0] in {0, 1}:
+        return {"enabled": bool(args[0])}
     if opcode in {0xE8, 0xEA} and len(args) == 1:
         return {"id": args[0]}
+    if opcode == 0xF0 and len(args) == 1:
+        return {"duration": args[0]}
     if opcode == 0xD8 and len(args) == 2:
         return {key: bool(args[byte_index] & bit) for key, (byte_index, bit, _label) in BATTLE_BITS.items()}
     return {}
@@ -234,6 +249,9 @@ def _apply(command: dict, values: dict) -> bytes:
         for key, offset, minimum, maximum, label in mapping:
             if key in values:
                 args[offset] = _int(values[key], minimum, maximum, label)
+    elif opcode == 0xB8:
+        if "messageTable" in values:
+            args[0] = _int(values["messageTable"], 0, U8, "Message table")
     elif opcode in {0xBB, 0xC1, 0xC2}:
         if "stringIndex" in values:
             _put_u16(args, 0, _int(values["stringIndex"], 0, U16, "String index"))
@@ -287,9 +305,15 @@ def _apply(command: dict, values: dict) -> bytes:
             args[0] = _int(values["playerId"], 0, U8, "Player character")
         if "jumpOffset" in values:
             args[1] = _int(values["jumpOffset"], 0, U8, "Jump bytes")
+    elif opcode == 0xE3:
+        if "enabled" in values:
+            args[0] = 1 if _bool(values["enabled"], "Explore mode") else 0
     elif opcode in {0xE8, 0xEA}:
         if "id" in values:
             args[0] = _int(values["id"], 0, U8, "Sound ID" if opcode == 0xE8 else "Music ID")
+    elif opcode == 0xF0:
+        if "duration" in values:
+            args[0] = _int(values["duration"], 0, U8, "Darken duration")
     elif opcode == 0xD8:
         for key, value in values.items():
             byte_index, bit, label = BATTLE_BITS[key]
