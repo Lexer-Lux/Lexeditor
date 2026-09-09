@@ -37,18 +37,30 @@ def _build_archive(path: Path, resources: list[tuple[str, bytes]]) -> None:
     path.write_bytes(ResourceArchive.decode(header, 0) + b"".join(blocks) + ResourceArchive.decode(encoded_index, index_offset))
 
 
+def _atel(bytecode: bytes) -> bytes:
+    data = bytearray(32)
+    for index in range(16):
+        struct.pack_into("<H", data, index * 2, 32)
+    data.extend(bytecode)
+    return bytes([1]) + bytes(data)
+
+
+def _world_bank(table_id: int = 3, script_id: int = 4) -> bytes:
+    bank = bytearray(WORLD_HEADER_OFFSET + 8 * WORLD_HEADER_SIZE + 16)
+    for world_id in range(8):
+        start = WORLD_HEADER_OFFSET + world_id * WORLD_HEADER_SIZE
+        bank[start + 21] = table_id
+        bank[start + 22] = script_id
+    return bytes(bank)
+
+
 def _fixture(root: Path, *, omit_field=False, omit_world_table=False, omit_world_script=False,
              unknown_world_opcode=False) -> OverlayStore:
     scene = bytearray(24)
     struct.pack_into("<H", scene, 16, 2)
-    bank = bytearray(WORLD_HEADER_OFFSET + 8 * WORLD_HEADER_SIZE + 16)
-    for world_id in range(8):
-        start = WORLD_HEADER_OFFSET + world_id * WORLD_HEADER_SIZE
-        bank[start + 21] = 3
-        bank[start + 22] = 4
     resources = [
         ("Game/field/Mapinfo/mapinfo_0.dat", bytes(scene)),
-        (WORLD_BANK, bytes(bank)),
+        (WORLD_BANK, _world_bank()),
     ]
     if not omit_field:
         resources.append(("Game/field/atel/Atel_0002.dat", b"\x00"))
@@ -56,6 +68,23 @@ def _fixture(root: Path, *, omit_field=False, omit_world_table=False, omit_world
         resources.append(("Game/world/EventTable/EventTable_0003.dat", b"\x00\x00\x00\x00"))
     if not omit_world_script:
         resources.append(("Game/world/esl/Event_0004.dat", b"\x53" if unknown_world_opcode else b"\x00\x52"))
+    archive = root / "resources.bin"
+    _build_archive(archive, resources)
+    return OverlayStore(archive, root / "project")
+
+
+def _many_scenes_fixture(root: Path, count: int = 251) -> OverlayStore:
+    resources: list[tuple[str, bytes]] = [
+        (WORLD_BANK, _world_bank(0, 0)),
+        ("Game/world/EventTable/EventTable_0000.dat", b"\x00\x00\x00\x00"),
+        ("Game/world/esl/Event_0000.dat", b"\x00\x52"),
+        ("Game/field/atel/Atel_0002.dat", b"\x00"),
+    ]
+    for scene_id in range(count):
+        scene = bytearray(24)
+        script_id = 99 if scene_id == count - 1 else 2
+        struct.pack_into("<H", scene, 16, script_id)
+        resources.append((f"Game/field/Mapinfo/mapinfo_{scene_id}.dat", bytes(scene)))
     archive = root / "resources.bin"
     _build_archive(archive, resources)
     return OverlayStore(archive, root / "project")
@@ -69,6 +98,8 @@ class IntegrityAuditTests(unittest.TestCase):
             self.assertEqual(result["counts"]["error"], 0)
             self.assertEqual(result["counts"]["warning"], 0)
             self.assertEqual(result["sceneHeaders"], 1)
+            self.assertEqual(result["referencedFieldEvents"], 1)
+            self.assertEqual(result["auditedFieldEvents"], 1)
             self.assertEqual(result["worldHeaders"], 8)
 
     def test_missing_scene_and_world_references_are_warnings(self):
@@ -82,6 +113,43 @@ class IntegrityAuditTests(unittest.TestCase):
             self.assertIn("missing-world-script", codes)
             self.assertGreaterEqual(result["counts"]["warning"], 3)
             self.assertTrue(result["ok"])
+
+    def test_scene_audit_is_not_limited_to_first_250_ui_rows(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-audit-") as temp_name:
+            result = audit_project(_many_scenes_fixture(Path(temp_name), 251))
+            self.assertEqual(result["sceneHeaders"], 251)
+            issue = next(item for item in result["issues"] if item["code"] == "missing-field-script")
+            self.assertEqual(issue["sceneId"], 250)
+            self.assertEqual(issue["scriptId"], 99)
+
+    def test_referenced_field_events_are_decoded_once(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-audit-") as temp_name:
+            result = audit_project(_many_scenes_fixture(Path(temp_name), 10))
+            # 9 scenes reference event 2; final scene references missing 99.
+            self.assertEqual(result["referencedFieldEvents"], 2)
+            self.assertEqual(result["auditedFieldEvents"], 1)
+
+    def test_malformed_project_atel_is_a_blocking_error(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-audit-") as temp_name:
+            store = _fixture(Path(temp_name))
+            store.write("Game/field/atel/Atel_0002.dat", b"\x01")
+            result = audit_project(store)
+            self.assertFalse(result["ok"])
+            issue = next(item for item in result["issues"] if item["code"] == "field-script-audit-failed")
+            self.assertEqual(issue["level"], "error")
+            self.assertEqual(issue["scriptId"], 2)
+
+    def test_invalid_field_jump_target_is_warning_not_blocking_error(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-audit-") as temp_name:
+            store = _fixture(Path(temp_name))
+            # JumpForward final byte is at offset 33; +0 targets byte 33 itself,
+            # which is not an opcode boundary (only 32 and function end 34 are).
+            store.write("Game/field/atel/Atel_0002.dat", _atel(b"\x10\x00"))
+            result = audit_project(store)
+            self.assertTrue(result["ok"])
+            issue = next(item for item in result["issues"] if item["code"] == "invalid-field-jump-targets")
+            self.assertEqual(issue["level"], "warning")
+            self.assertEqual(issue["invalidJumpCount"], 1)
 
     def test_unknown_pc_world_opcode_is_info_not_error(self):
         with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-audit-") as temp_name:
