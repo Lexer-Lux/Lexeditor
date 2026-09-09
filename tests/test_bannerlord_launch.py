@@ -5,7 +5,16 @@ import unittest
 from games.bannerlord.game_launch import launch_command, module_load_order, selected_module
 
 
-def write_module(root: Path, folder: str, module_id: str, dependencies=(), *, singleplayer=True) -> Path:
+def write_module(
+    root: Path,
+    folder: str,
+    module_id: str,
+    dependencies=(),
+    *,
+    singleplayer=True,
+    load_after=(),
+    incompatible=(),
+) -> Path:
     module = root / "Modules" / folder
     module.mkdir(parents=True, exist_ok=True)
     dependency_lines = []
@@ -16,6 +25,8 @@ def write_module(root: Path, folder: str, module_id: str, dependencies=(), *, si
         )
     dependency_xml = "\n".join(dependency_lines)
     singleplayer_value = "true" if singleplayer else "false"
+    load_after_xml = "\n".join(f'    <Module Id="{value}" />' for value in load_after)
+    incompatible_xml = "\n".join(f'    <Module Id="{value}" />' for value in incompatible)
     (module / "SubModule.xml").write_text(
         f'''<?xml version="1.0" encoding="utf-8"?>
 <Module>
@@ -27,11 +38,44 @@ def write_module(root: Path, folder: str, module_id: str, dependencies=(), *, si
   <DependedModules>
 {dependency_xml}
   </DependedModules>
+  <ModulesToLoadAfterThis>
+{load_after_xml}
+  </ModulesToLoadAfterThis>
+  <IncompatibleModules>
+{incompatible_xml}
+  </IncompatibleModules>
 </Module>
 ''',
         encoding="utf-8",
     )
     return module
+
+
+def write_core_stack(game: Path, *, harmony=False) -> None:
+    if harmony:
+        write_module(
+            game,
+            "Harmony",
+            "Bannerlord.Harmony",
+            load_after=("Native", "SandBoxCore", "Sandbox", "StoryMode", "CustomBattle"),
+        )
+    write_module(game, "Native", "Native")
+    write_module(game, "SandBoxCore", "SandBoxCore", (("Native", False),))
+    write_module(game, "BirthAndDeath", "BirthAndDeath", (("SandBoxCore", False),))
+    write_module(game, "CustomBattle", "CustomBattle", (("Native", False), ("SandBoxCore", False)))
+    write_module(game, "SandBox", "Sandbox", (("Native", False), ("SandBoxCore", False)))
+    write_module(
+        game,
+        "StoryMode",
+        "StoryMode",
+        (("Native", False), ("SandBoxCore", False), ("Sandbox", False)),
+    )
+    write_module(
+        game,
+        "NavalDLC",
+        "NavalDLC",
+        (("Native", False), ("SandBoxCore", False), ("Sandbox", False)),
+    )
 
 
 class BannerlordLaunchTests(unittest.TestCase):
@@ -49,7 +93,7 @@ class BannerlordLaunchTests(unittest.TestCase):
             self.assertEqual(module_id, "LexerSkillTweaks")
             self.assertEqual(installed.resolve(), deployed.resolve())
 
-    def test_direct_launch_uses_dependencies_core_modules_and_selected_mod(self):
+    def test_direct_launch_honors_harmony_inverse_order_and_modern_official_stack(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
             game = root / "game"
@@ -58,14 +102,7 @@ class BannerlordLaunchTests(unittest.TestCase):
             bin_dir = game / "bin" / "Win64_Shipping_Client"
             bin_dir.mkdir(parents=True)
             (bin_dir / "Bannerlord.exe").write_bytes(b"")
-            write_module(game, "Harmony", "Bannerlord.Harmony")
-            write_module(game, "Native", "Native")
-            write_module(game, "SandBoxCore", "SandBoxCore", (("Native", False),))
-            write_module(game, "BirthAndDeath", "BirthAndDeath", (("SandBoxCore", False),))
-            write_module(game, "CustomBattle", "CustomBattle", (("Native", False), ("SandBoxCore", False)))
-            write_module(game, "SandBox", "Sandbox", (("Native", False), ("SandBoxCore", False)))
-            write_module(game, "StoryMode", "StoryMode", (("Native", False), ("SandBoxCore", False), ("Sandbox", False)))
-            write_module(game, "NavalDLC", "NavalDLC", (("Native", False), ("SandBoxCore", False), ("Sandbox", False)))
+            write_core_stack(game, harmony=True)
             write_module(
                 game,
                 "LexerSkillTweaks",
@@ -77,11 +114,19 @@ class BannerlordLaunchTests(unittest.TestCase):
             )
             order = module_load_order(game, workspace)
             self.assertEqual(
-                order[:7],
-                ["Native", "SandBoxCore", "BirthAndDeath", "CustomBattle", "Sandbox", "StoryMode", "NavalDLC"],
+                order,
+                [
+                    "Bannerlord.Harmony",
+                    "Native",
+                    "SandBoxCore",
+                    "BirthAndDeath",
+                    "CustomBattle",
+                    "Sandbox",
+                    "StoryMode",
+                    "NavalDLC",
+                    "LexerSkillTweaks",
+                ],
             )
-            self.assertEqual(order[-1], "LexerSkillTweaks")
-            self.assertLess(order.index("Bannerlord.Harmony"), order.index("LexerSkillTweaks"))
             self.assertEqual(len(order), len(set(order)))
             command = launch_command(game, workspace)
             self.assertEqual(command[1], "/singleplayer")
@@ -128,6 +173,24 @@ class BannerlordLaunchTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Missing.Required.Mod"):
                 module_load_order(game, workspace)
 
+    def test_installed_optional_dependency_is_not_auto_enabled(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            write_module(game, "OptionalLibrary", "Optional.Library")
+            write_module(
+                game,
+                "LexerSkillTweaks",
+                "LexerSkillTweaks",
+                (("Optional.Library", True),),
+            )
+            (workspace / "SubModule.xml").write_text(
+                '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
+            )
+            self.assertEqual(module_load_order(game, workspace), ["LexerSkillTweaks"])
+
     def test_missing_optional_dependency_is_allowed(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
@@ -139,6 +202,45 @@ class BannerlordLaunchTests(unittest.TestCase):
                 '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
             )
             self.assertEqual(module_load_order(game, workspace), ["LexerSkillTweaks"])
+
+    def test_inverse_order_cycle_is_rejected(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            write_module(game, "Library", "Library")
+            write_module(
+                game,
+                "LexerSkillTweaks",
+                "LexerSkillTweaks",
+                (("Library", False),),
+                load_after=("Library",),
+            )
+            (workspace / "SubModule.xml").write_text(
+                '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(RuntimeError, "load-order constraints form a cycle"):
+                module_load_order(game, workspace)
+
+    def test_incompatible_enabled_module_is_rejected(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            write_module(game, "Native", "Native")
+            write_module(
+                game,
+                "LexerSkillTweaks",
+                "LexerSkillTweaks",
+                incompatible=("Native",),
+            )
+            (workspace / "SubModule.xml").write_text(
+                '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
+            )
+            with self.assertRaisesRegex(RuntimeError, "Incompatible Bannerlord modules"):
+                module_load_order(game, workspace)
 
     def test_multiplayer_only_module_refuses_singleplayer_direct_launch(self):
         with tempfile.TemporaryDirectory() as name:
