@@ -1,6 +1,7 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from games.bannerlord.module_xml_data import (
     augment_data_map,
@@ -160,6 +161,29 @@ class BannerlordModuleDataTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "only opens XML files under ModuleData"):
                 read_document(project, "../outside.xml")
         finally:
+            temporary.cleanup()
+
+    def test_moduledata_root_redirection_outside_project_is_rejected(self):
+        temporary, project, _source = self.fixture()
+        try:
+            outside = project.parent / (project.name + "-outside-moduledata")
+            outside.mkdir()
+            project_resolved = project.resolve()
+            module_data_root = project_resolved / "ModuleData"
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == module_data_root:
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(ValueError, "project path escaped"):
+                    read_document(project, "ModuleData/items.xml")
+        finally:
+            if 'outside' in locals() and outside.exists():
+                outside.rmdir()
             temporary.cleanup()
 
     def test_data_map_only_upgrades_record_documents(self):
