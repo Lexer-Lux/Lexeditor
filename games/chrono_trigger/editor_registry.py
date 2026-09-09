@@ -34,7 +34,7 @@ from .memory_ops import (
     memory_values,
 )
 from .misc_ops import apply_misc_op, decorate_misc_semantics, misc_field_specs, misc_values
-from .mode7_ops import apply_mode7_op, decorate_mode7_semantics, mode7_field_specs, mode7_values
+from .mode7_ops import decorate_mode7_semantics
 from .movement_ops import (
     apply_movement_op,
     decorate_movement_semantics,
@@ -137,10 +137,6 @@ def pc_extended_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, pc_extended_field_specs(command), pc_extended_values(command))
 
 
-def mode7_editor_schema(command: dict) -> dict | None:
-    return _schema_from_specs(command, mode7_field_specs(command), mode7_values(command))
-
-
 def jump_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
 
@@ -158,7 +154,6 @@ _REGISTRY_BUILDERS = (
     audio_editor_schema,
     misc_editor_schema,
     pc_extended_editor_schema,
-    mode7_editor_schema,
     jump_editor_schema,
 )
 _REGISTRY_APPLIERS = (
@@ -174,7 +169,6 @@ _REGISTRY_APPLIERS = (
     apply_audio_op,
     apply_misc_op,
     apply_pc_extended_op,
-    apply_mode7_op,
     apply_jump,
 )
 
