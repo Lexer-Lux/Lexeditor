@@ -36,6 +36,7 @@ U8 = 0xFF
 U16 = 0xFFFF
 SCRIPT_MEM_START = 0x7F0200
 SCRIPT_MEM_LAST = SCRIPT_MEM_START + U8 * 2
+ENCODED_TARGET_MAX = U8 // 2
 
 BATTLE_BITS = {
     "noWinPose": (0, 0x01, "No win pose"),
@@ -127,6 +128,15 @@ def editor_schema(command: dict) -> dict | None:
             0x7F: "Store random value at",
         }[opcode]
         fields = [Field("storeAddress", label, SCRIPT_MEM_START, SCRIPT_MEM_LAST)]
+    elif opcode in {0x21, 0x22}:
+        args = _base_args(command)
+        if len(args) != 3 or args[0] & 1:
+            return None
+        fields = [
+            Field("targetId", "Object ID" if opcode == 0x21 else "Player character", 0, ENCODED_TARGET_MAX),
+            Field("xStoreAddress", "Store X coordinate at", SCRIPT_MEM_START, SCRIPT_MEM_LAST),
+            Field("yStoreAddress", "Store Y coordinate at", SCRIPT_MEM_START, SCRIPT_MEM_LAST),
+        ]
     elif opcode == 0x83:
         fields = [Field("enemyId", "Enemy ID", 0, U16), Field("slot", "Enemy slot", 0, 0x7F),
                   Field("static", "Static enemy", 0, 1, "boolean")]
@@ -151,6 +161,13 @@ def editor_schema(command: dict) -> dict | None:
         fields = [Field("facing", "Facing (0 up, 1 down, 2 left, 3 right)", 0, 3)]
     elif opcode == 0xA7:
         fields = [Field("facingAddress", "Facing source address", SCRIPT_MEM_START, SCRIPT_MEM_LAST)]
+    elif opcode in {0xAA, 0xAB, 0xAC}:
+        fields = [Field("animationId", "Animation ID", 0, U8)]
+    elif opcode == 0xAD:
+        fields = [Field("pauseTicks", "Pause ticks (1/16 second)", 0, U8)]
+    elif opcode == 0xB7:
+        fields = [Field("animationId", "Animation ID", 0, U8),
+                  Field("loopCount", "Loop count", 0, U8)]
     elif 0xDC <= opcode <= 0xE1:
         fields = [Field("sceneId", "Destination scene", 0, U16), Field("facing", "Facing", 0, 3),
                   Field("tileX", "Destination X", 0, U8), Field("tileY", "Destination Y", 0, U8)]
@@ -215,6 +232,12 @@ def editor_values(command: dict) -> dict:
     args = _base_args(command)
     if opcode in {0x20, 0x55, 0x7F} and len(args) == 1:
         return {"storeAddress": _script_address(args[0])}
+    if opcode in {0x21, 0x22} and len(args) == 3 and not (args[0] & 1):
+        return {
+            "targetId": args[0] // 2,
+            "xStoreAddress": _script_address(args[1]),
+            "yStoreAddress": _script_address(args[2]),
+        }
     if opcode == 0x83 and len(args) == 3:
         return {"enemyId": _u16(args), "slot": args[2] & 0x7F, "static": bool(args[2] & 0x80)}
     if opcode == 0x87 and len(args) == 1 and args[0] <= 0x80:
@@ -231,6 +254,12 @@ def editor_values(command: dict) -> dict:
         return {"facing": args[0]}
     if opcode == 0xA7 and len(args) == 1:
         return {"facingAddress": _script_address(args[0])}
+    if opcode in {0xAA, 0xAB, 0xAC} and len(args) == 1:
+        return {"animationId": args[0]}
+    if opcode == 0xAD and len(args) == 1:
+        return {"pauseTicks": args[0]}
+    if opcode == 0xB7 and len(args) == 2:
+        return {"animationId": args[0], "loopCount": args[1]}
     if 0xDC <= opcode <= 0xE1 and len(args) == 5:
         return {"sceneId": _u16(args), "facing": args[2], "tileX": args[3], "tileY": args[4]}
     if opcode == 0xB8 and len(args) == 1:
@@ -282,6 +311,14 @@ def _apply(command: dict, values: dict) -> bytes:
     if opcode in {0x20, 0x55, 0x7F}:
         if "storeAddress" in values:
             args[0] = _script_offset(values["storeAddress"], "Store address")
+    elif opcode in {0x21, 0x22}:
+        if "targetId" in values:
+            args[0] = _int(values["targetId"], 0, ENCODED_TARGET_MAX,
+                           "Object ID" if opcode == 0x21 else "Player character") * 2
+        if "xStoreAddress" in values:
+            args[1] = _script_offset(values["xStoreAddress"], "X coordinate store address")
+        if "yStoreAddress" in values:
+            args[2] = _script_offset(values["yStoreAddress"], "Y coordinate store address")
     elif opcode == 0x83:
         if "enemyId" in values:
             _put_u16(args, 0, _int(values["enemyId"], 0, U16, "Enemy ID"))
@@ -313,6 +350,17 @@ def _apply(command: dict, values: dict) -> bytes:
     elif opcode == 0xA7:
         if "facingAddress" in values:
             args[0] = _script_offset(values["facingAddress"], "Facing source address")
+    elif opcode in {0xAA, 0xAB, 0xAC}:
+        if "animationId" in values:
+            args[0] = _int(values["animationId"], 0, U8, "Animation ID")
+    elif opcode == 0xAD:
+        if "pauseTicks" in values:
+            args[0] = _int(values["pauseTicks"], 0, U8, "Pause ticks")
+    elif opcode == 0xB7:
+        if "animationId" in values:
+            args[0] = _int(values["animationId"], 0, U8, "Animation ID")
+        if "loopCount" in values:
+            args[1] = _int(values["loopCount"], 0, U8, "Loop count")
     elif 0xDC <= opcode <= 0xE1:
         if "sceneId" in values:
             _put_u16(args, 0, _int(values["sceneId"], 0, U16, "Destination scene"))
