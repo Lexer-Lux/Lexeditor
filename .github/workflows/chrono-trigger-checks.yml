@@ -91,7 +91,7 @@ jobs:
           node --check games/chrono_trigger/map_previews.js
       - name: Browser dependencies
         run: python -m playwright install --with-deps chromium
-      - name: Desktop map browser regression
+      - name: Desktop browser regression
         run: python tests/chrono_trigger_browser_check.py out/chrono-trigger-browser
       - name: Upload browser artifacts
         if: always()
