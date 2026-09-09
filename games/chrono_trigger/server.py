@@ -24,8 +24,8 @@ from .data import (
     save_scene,
 )
 from .deployment import deploy_audited_project, deployment_status
+from .editor_registry import decorate_event_editors, save_event_fields
 from .events import event_entries, get_event, load_events
-from .field_editors import decorate_event_editors, save_event_fields
 from .labels import (
     decorate_scene_exits,
     decorate_scenes,
