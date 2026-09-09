@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import xml.etree.ElementTree as ET
 
+from .paths import contained_project_path
 from .xml_patch import scan_xml_start_tags, serialize_attribute
 
 
@@ -19,11 +20,11 @@ _ENUMS = {
 
 
 def list_prefabs(project: Path) -> list[str]:
-    root = project / "GUI" / "Prefabs"
+    root = contained_project_path(project, "GUI", "Prefabs")
     if not root.is_dir():
         return []
     return [
-        path.relative_to(project).as_posix()
+        path.relative_to(project.resolve()).as_posix()
         for path in sorted(root.rglob("*.xml"), key=lambda value: value.as_posix().casefold())
         if path.is_file()
     ]
@@ -32,8 +33,11 @@ def list_prefabs(project: Path) -> list[str]:
 def _prefab_path(project: Path, requested: str) -> Path:
     if not requested:
         raise ValueError("Missing Gauntlet prefab path")
-    root = (project / "GUI" / "Prefabs").resolve()
-    target = (project / requested).resolve()
+    relative = Path(str(requested).replace("\\", "/"))
+    if relative.is_absolute() or ".." in relative.parts:
+        raise ValueError("Gauntlet editor only opens XML files under GUI/Prefabs")
+    root = contained_project_path(project, "GUI", "Prefabs")
+    target = contained_project_path(project, relative)
     if root not in target.parents or target.suffix.casefold() != ".xml":
         raise ValueError("Gauntlet editor only opens XML files under GUI/Prefabs")
     if not target.is_file():
