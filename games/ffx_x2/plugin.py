@@ -33,6 +33,7 @@ class FFXX2Session(LocalPluginSession):
         environment = {
             "LEXEDITOR_FFX_X2_ROOT": str(paths.GAME_ROOT),
             "LEXEDITOR_FFX_X2_PROJECT": str(paths.PROJECT_ROOT),
+            "LEXEDITOR_FFX_X2_THEME_CACHE": str(paths.THEME_CACHE_ROOT),
         }
         environment.update(extra_env or {})
         super().__init__(
@@ -144,13 +145,20 @@ def _fixture_item_shops() -> bytes:
 
 
 def smoke() -> list[str]:
-    """Exercise VBF -> structured edits -> project -> Fahrenheit on synthetic data."""
+    """Exercise VBF -> structured edits -> project -> theme -> Fahrenheit on synthetic data."""
     treasure_fixture = _fixture_takara()
     shop_fixture = _fixture_item_shops()
+    title_png = b"\x89PNG\r\n\x1a\n" + b"SYNTHETIC-TITLEMENU"
+    treasure_raw = treasures.ARCHIVE_PATH.removeprefix("FFX_Data/")
+    shop_raw = item_shops.ARCHIVE_PATH.removeprefix("FFX_Data/")
+    font_raw = "ffx_data/gamedata/ps3data/menu_us/base_ftc/d3d11/menu_font.dds.phyre"
+    texture_raw = "ffx_data/gamedata/ps3data/menu_us/d3d11/window.dds.phyre"
+    sfx_raw = "ffx_data/gamedata/ps3data/sound_pc/menu/menu_se.fsb"
     with tempfile.TemporaryDirectory(prefix="lexeditor-ffx-x2-plugin-") as temp_name:
         root = Path(temp_name)
         game = root / "game"
         project = root / "project"
+        theme_cache = root / "theme-cache"
         for relative in ("FFX&X-2_LAUNCHER.exe", "FFX.exe", "FFX-2.exe", "fahrenheit/bin/fhstage0.exe"):
             target = game / relative
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -159,37 +167,59 @@ def smoke() -> list[str]:
         (game / "fahrenheit" / "mods" / "loadorder").write_text("other-mod\n", encoding="utf-8")
         ffx_archive = game / "data" / "FFX_Data.vbf"
         _write_fixture_vbf(ffx_archive, [
-            (treasures.ARCHIVE_PATH, treasure_fixture),
-            (item_shops.ARCHIVE_PATH, shop_fixture),
+            (treasure_raw, treasure_fixture),
+            (shop_raw, shop_fixture),
+            (font_raw, b"SYNTHETIC-FONT-ATLAS"),
+            (texture_raw, b"SYNTHETIC-MENU-TEXTURE"),
+            (sfx_raw, b"FSB5-SYNTHETIC-UI-SOUND-BANK"),
         ])
         _write_fixture_vbf(game / "data" / "FFX2_Data.vbf", [
-            ("FFX2_Data/ffx_ps2/ffx2/master/test.bin", b"X2 fixture")
+            ("ffx_ps2/ffx2/master/test.bin", b"X2 fixture")
+        ])
+        _write_fixture_vbf(game / "data" / "metamenu.vbf", [
+            ("metamenu/ps3data/menumetamenu/us/titlemenu.png", title_png),
         ])
         archive_hash = hashlib.sha256(ffx_archive.read_bytes()).hexdigest()
 
         with FFXX2Session({
             "LEXEDITOR_FFX_X2_ROOT": str(game),
             "LEXEDITOR_FFX_X2_PROJECT": str(project),
+            "LEXEDITOR_FFX_X2_THEME_CACHE": str(theme_cache),
         }) as session:
             identity = request_json(session.url + "api/plugin")
             capabilities = identity.get("capabilities", [])
             if (identity.get("pluginId") != "ffx-x2" or "vbf-index" not in capabilities
                     or "ffx-treasure-editor" not in capabilities
-                    or "ffx-item-shop-editor" not in capabilities):
+                    or "ffx-item-shop-editor" not in capabilities
+                    or "installed-game-theme" not in capabilities):
                 raise RuntimeError("FFX/X-2 plugin returned the wrong managed identity")
             data_map = request_json(session.url + "api/datamap")
             if sum(row.get("status") == "integrated" for row in data_map.get("rows", [])) < 5:
                 raise RuntimeError("FFX/X-2 Data Map did not expose VBFs, structured tables and deployment")
 
+            theme_state = request_json(session.url + "api/theme")
+            if (not theme_state.get("background", {}).get("ready")
+                    or theme_state.get("font", {}).get("atlasCached", 0) < 1
+                    or theme_state.get("textures", {}).get("cached", 0) < 1
+                    or theme_state.get("sfx", {}).get("cachedBanks", 0) < 1):
+                raise RuntimeError("FFX/X-2 installed-game theme cache did not extract its synthetic sources")
+            with urllib.request.urlopen(
+                session.url + theme_state["background"]["url"].removeprefix("/"), timeout=5
+            ) as response:
+                if response.read() != title_png:
+                    raise RuntimeError("FFX/X-2 cached title-menu art was not served byte-exactly")
+
             catalog = request_json(session.url + "api/archive?game=x&q=takara&limit=10")
-            if catalog.get("total") != 1 or catalog["entries"][0]["path"] != treasures.ARCHIVE_PATH:
-                raise RuntimeError("FFX VBF catalog did not return the treasure fixture entry")
+            if (catalog.get("total") != 1 or catalog["entries"][0]["path"] != treasure_raw
+                    or catalog["entries"][0]["eflPath"] != treasures.ARCHIVE_PATH):
+                raise RuntimeError("FFX VBF catalog did not translate the raw treasure path to Fahrenheit EFL")
             extracted = request_json(session.url + "api/project/extract", {
-                "game": "x", "path": treasures.ARCHIVE_PATH, "headerMd5": catalog["headerMd5"],
+                "game": "x", "path": treasure_raw, "headerMd5": catalog["headerMd5"],
             })
             treasure_project = project / "efl" / "x" / Path(*treasures.ARCHIVE_PATH.split("/"))
-            if not extracted.get("created") or treasure_project.read_bytes() != treasure_fixture:
-                raise RuntimeError("FFX VBF entry did not extract byte-exactly to the project overlay")
+            if (not extracted.get("created") or extracted.get("eflPath") != treasures.ARCHIVE_PATH
+                    or treasure_project.read_bytes() != treasure_fixture):
+                raise RuntimeError("FFX raw VBF entry did not extract byte-exactly to its virtual EFL path")
 
             treasure_state = request_json(session.url + "api/treasures")
             if treasure_state.get("source") != "project" or len(treasure_state.get("rows", [])) != 3:
@@ -211,7 +241,7 @@ def smoke() -> list[str]:
 
             shop_state = request_json(session.url + "api/item-shops")
             if shop_state.get("source") != "archive" or len(shop_state.get("rows", [])) != 2:
-                raise RuntimeError("FFX item-shop API did not parse the archive-only fixture")
+                raise RuntimeError("FFX item-shop API did not resolve the raw archive-only fixture")
             shop_saved = request_json(session.url + "api/item-shops/save", {
                 "headerMd5": shop_state["headerMd5"],
                 "baselineSha256": shop_state["baselineSha256"],
@@ -262,7 +292,8 @@ def smoke() -> list[str]:
             raise RuntimeError("FFX/X-2 child port is still open after host shutdown")
     return [
         "FFX and FFX-2 Steam collection identity confirmed on synthetic layout",
-        "VBF header/path validation, search and compressed extraction passed",
+        "VBF raw-path validation, search, virtual EFL translation and compressed extraction passed",
+        "installed-game title art, font atlas, menu texture and UI-sound-bank cache passed",
         "FFX treasure and item-shop structured edit/save/readback paths passed",
         "staged-baseline and archive-baseline structured saves both passed",
         "installed VBF stayed byte-identical while project overrides changed",
@@ -276,7 +307,7 @@ PLUGIN = GamePlugin(
     name="Final Fantasy X/X-2 HD Remaster",
     process_names=("FFX.exe", "FFX-2.exe", "FFX&X-2_LAUNCHER.exe"),
     subtitle="FFX / FFX-2 Steam collection",
-    description="Reads both VBF archives, edits proved FFX tables in safe project overlays, and deploys through Fahrenheit.",
+    description="Edits proved FFX tables, derives its theme from installed game assets, and deploys safe overlays through Fahrenheit.",
     accent="#5f8fd3",
     check=check,
     launch=launch,
