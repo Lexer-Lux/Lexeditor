@@ -61,6 +61,7 @@ jobs:
         with:
           python-version: '3.13'
       - name: Verify binary formats, preservation and HTTP behavior
+        shell: bash
         run: |
           python tools/verify_ff7_datasets.py
           python tools/verify_ff7_kernel_layout_contract.py
