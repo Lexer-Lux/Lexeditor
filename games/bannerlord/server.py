@@ -17,6 +17,7 @@ from .skill_data import (
     save_skill_definitions,
 )
 from .perk_data import (
+    augment_data_map,
     read_perk_definitions,
     read_xp_source_definitions,
     save_perk_definitions,
@@ -93,6 +94,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_file(target)
             else:
                 self.send_json({"error": "Shared UI asset not found"}, 404)
+            return
+        if path.startswith("/bannerlord/"):
+            target = (PLUGIN_ROOT / path.removeprefix("/bannerlord/")).resolve()
+            if PLUGIN_ROOT in target.parents and target.is_file():
+                self.send_file(target)
+            else:
+                self.send_json({"error": "Bannerlord plugin asset not found"}, 404)
             return
         if path == "/api/plugin":
             self.send_json(
@@ -181,7 +189,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(error)}, 500)
             return
         if path == "/api/datamap":
-            self.send_json(data_map(PROJECT))
+            self.send_json(augment_data_map(data_map(PROJECT)))
             return
         self.send_json({"error": "Not found"}, 404)
 
