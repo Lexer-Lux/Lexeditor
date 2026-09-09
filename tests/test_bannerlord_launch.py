@@ -314,7 +314,7 @@ class BannerlordLaunchTests(unittest.TestCase):
             with patch.object(Path, "resolve", new=fake_resolve):
                 module_id, installed = selected_module(game, workspace)
             self.assertEqual(module_id, "LexerSkillTweaks")
-            self.assertEqual(installed, deployed)
+            self.assertEqual(installed.resolve(), deployed.resolve())
 
 
 if __name__ == "__main__":
