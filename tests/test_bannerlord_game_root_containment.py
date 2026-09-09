@@ -28,6 +28,17 @@ def fixtures(root: Path):
 
 
 class BannerlordGameRootContainmentTests(unittest.TestCase):
+    def test_contained_game_path_accepts_normal_nested_paths(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            _project, game = fixtures(root)
+            expected = (game / "Modules").resolve()
+            self.assertEqual(paths.contained_game_path(game, "Modules"), expected)
+            executable = paths.contained_game_path(
+                game, "bin", "Win64_Shipping_Client", "Bannerlord.exe", require_file=True
+            )
+            self.assertEqual(executable, (game / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe").resolve())
+
     def test_hosted_build_rejects_modules_root_redirection_before_dotnet(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
