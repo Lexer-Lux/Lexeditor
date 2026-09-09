@@ -84,3 +84,4 @@ jobs:
           PY
           node --check /tmp/chrono-trigger-editor.js
           node --check games/chrono_trigger/event_editor.js
+          node --check games/chrono_trigger/map_previews.js
