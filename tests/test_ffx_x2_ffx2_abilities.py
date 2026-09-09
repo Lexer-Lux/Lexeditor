@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import struct
 
@@ -85,7 +86,7 @@ def test_ffx2_ability_rejects_wrong_record_size_and_duplicate_edits():
         ])
 
 
-def test_ffx2_ability_managed_service_resolves_raw_vbf_and_saves_x2_project(tmp_path: Path):
+def test_ffx2_ability_managed_service_saves_deploys_and_reverts_x2_override(tmp_path: Path):
     source = _table([
         _record(0x10, 0x11, 0x20, 0x21, 0x1111, 0x2222, fill=0xA5),
         _record(0x30, 0x31, 0x40, 0x41, 0x3333, 0x4444, fill=0x5A),
@@ -94,7 +95,17 @@ def test_ffx2_ability_managed_service_resolves_raw_vbf_and_saves_x2_project(tmp_
     game_root = tmp_path / "game"
     project_root = tmp_path / "project"
     theme_cache = tmp_path / "theme"
-    _write_fixture_vbf(game_root / "data" / "FFX2_Data.vbf", [(raw_archive_path, source)])
+    x2_archive = game_root / "data" / "FFX2_Data.vbf"
+    _write_fixture_vbf(x2_archive, [(raw_archive_path, source)])
+    archive_hash = hashlib.sha256(x2_archive.read_bytes()).hexdigest()
+
+    stage0 = game_root / "fahrenheit" / "bin" / "fhstage0.exe"
+    stage0.parent.mkdir(parents=True, exist_ok=True)
+    stage0.write_bytes(b"fixture")
+    mods = game_root / "fahrenheit" / "mods"
+    mods.mkdir(parents=True, exist_ok=True)
+    loadorder = mods / "loadorder"
+    loadorder.write_text("other-mod\n", encoding="utf-8")
 
     with FFXX2Session({
         "LEXEDITOR_FFX_X2_ROOT": str(game_root),
@@ -108,6 +119,7 @@ def test_ffx2_ability_managed_service_resolves_raw_vbf_and_saves_x2_project(tmp_
         assert state["rows"][0]["animation1"] == 0x1111
 
         edit = {"id": 0x100, "animation1": 0xBEEF, "animation2": 0xCAFE}
+        expected = apply_edits(source, [edit])
         saved = request_json(session.url + "api/ffx2-abilities/save", {
             "headerMd5": state["headerMd5"],
             "baselineSha256": state["baselineSha256"],
@@ -119,7 +131,22 @@ def test_ffx2_ability_managed_service_resolves_raw_vbf_and_saves_x2_project(tmp_
         assert (saved["rows"][0]["animation1"], saved["rows"][0]["animation2"]) == (0xBEEF, 0xCAFE)
 
         target = project_root / "efl" / "x2" / Path(*ARCHIVE_PATH.split("/"))
-        assert target.read_bytes() == apply_edits(source, [edit])
+        assert target.read_bytes() == expected
         assert not (project_root / "efl" / "x2" / Path(*raw_archive_path.split("/"))).exists()
 
+        deployed = request_json(session.url + "api/deployment/deploy", {})
+        deployed_target = (
+            game_root / "fahrenheit" / "mods" / "lexeditor-ffx-x2" /
+            "efl" / "x2" / Path(*ARCHIVE_PATH.split("/"))
+        )
+        assert deployed["deployed"] is True
+        assert deployed_target.read_bytes() == expected
+        assert loadorder.read_text(encoding="utf-8").splitlines() == ["other-mod", "lexeditor-ffx-x2"]
+
+        reverted = request_json(session.url + "api/deployment/revert", {})
+        assert reverted["deployed"] is False
+        assert not deployed_target.exists()
+        assert loadorder.read_text(encoding="utf-8").splitlines() == ["other-mod"]
+
+    assert hashlib.sha256(x2_archive.read_bytes()).hexdigest() == archive_hash
     assert session.wait_closed()
