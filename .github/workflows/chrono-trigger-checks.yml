@@ -38,6 +38,7 @@ jobs:
           games/chrono_trigger/field_semantics.py
           games/chrono_trigger/event_edit.py
           games/chrono_trigger/field_editors.py
+          games/chrono_trigger/palettes.py
           games/chrono_trigger/scene_tables.py
           games/chrono_trigger/scene_maps.py
           games/chrono_trigger/scene_render.py
@@ -56,6 +57,7 @@ jobs:
           tools/chrono_trigger_map.py
           tools/chrono_trigger_inventory.py
           tools/chrono_trigger_event.py
+          tools/chrono_trigger_palette.py
       - name: Plugin descriptor
         run: python -c "from plugin_api import validate_plugin; from games.chrono_trigger.plugin import PLUGIN; validate_plugin(PLUGIN); assert PLUGIN.plugin_id == 'chrono-trigger'"
       - name: Chrono Trigger regressions
