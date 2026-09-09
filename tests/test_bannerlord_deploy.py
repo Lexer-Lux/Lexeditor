@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from games.bannerlord.deploy_data import deploy_target, sync_project_assets
 from games.bannerlord.runtime_data import deployment_status
@@ -135,6 +136,20 @@ class BannerlordDeployTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "unsafe"):
                 sync_project_assets(project, game)
             self.assertFalse((game / "Escape").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_existing_module_target_must_stay_inside_modules_root(self):
+        temporary, project, game, _deployed = self.fixture(installed=False)
+        try:
+            outside = project.parent / "outside-module"
+            outside.mkdir()
+            with patch(
+                "games.bannerlord.deploy_data.installed_modules",
+                return_value={"LexerSkillTweaks": outside},
+            ):
+                with self.assertRaisesRegex(ValueError, "escaped the Modules folder"):
+                    deploy_target(project, game)
         finally:
             temporary.cleanup()
 
