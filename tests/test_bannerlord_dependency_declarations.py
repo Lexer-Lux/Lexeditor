@@ -17,10 +17,13 @@ def module_model(*, dependencies=(), load_after=(), incompatible=()):
 def write_module(game: Path, module_id: str, *, dependencies=(), incompatible=()) -> Path:
     folder = game / "Modules" / module_id
     folder.mkdir(parents=True, exist_ok=True)
-    deps = "\n".join(
-        f'    <DependedModule Id="{dep_id}"{' Optional="true"' if optional else ""} />'
-        for dep_id, optional in dependencies
-    )
+    dependency_lines = []
+    for dep_id, optional in dependencies:
+        optional_attribute = ' Optional="true"' if optional else ""
+        dependency_lines.append(
+            f'    <DependedModule Id="{dep_id}"{optional_attribute} />'
+        )
+    deps = "\n".join(dependency_lines)
     inc = "\n".join(f'    <Module Id="{value}" />' for value in incompatible)
     (folder / "SubModule.xml").write_text(
         f"""<Module>
