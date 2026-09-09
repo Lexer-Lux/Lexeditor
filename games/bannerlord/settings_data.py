@@ -7,6 +7,8 @@ from pathlib import Path
 import re
 import shutil
 
+from .paths import contained_project_path
+
 
 _NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?[fFdDmM]?"
 _STRING = r'"(?:\\.|[^"\\])*"'
@@ -28,6 +30,15 @@ _GROUP_ORDER = re.compile(r"\bGroupOrder\s*=\s*(-?\d+)\b")
 _HINT = re.compile(rf"\bHintText\s*=\s*(?P<value>{_STRING})", re.DOTALL)
 _FLOAT_ARGS = re.compile(rf"^\s*,\s*(?P<min>{_NUMBER})\s*,\s*(?P<max>{_NUMBER})\s*,\s*(?P<format>{_STRING})", re.DOTALL)
 _INT_ARGS = re.compile(r"^\s*,\s*(?P<min>-?\d+)\s*,\s*(?P<max>-?\d+)", re.DOTALL)
+
+
+def _settings_path(project: Path, *, require_file: bool = False) -> Path:
+    return contained_project_path(
+        project,
+        "src",
+        "LexerSkillTweaksSettings.cs",
+        require_file=require_file,
+    )
 
 
 def _unquote(token: str) -> str:
@@ -201,7 +212,7 @@ def _parse_settings(text: str) -> list[dict]:
 
 
 def read_mcm_defaults(project: Path) -> dict:
-    path = project / "src" / "LexerSkillTweaksSettings.cs"
+    path = _settings_path(project)
     if not path.is_file():
         return {"available": False, "path": str(path), "settings": [], "groups": []}
     text = path.read_text(encoding="utf-8-sig")
@@ -220,9 +231,7 @@ def read_mcm_defaults(project: Path) -> dict:
 
 
 def save_mcm_defaults(project: Path, edits: list[dict]) -> dict:
-    path = project / "src" / "LexerSkillTweaksSettings.cs"
-    if not path.is_file():
-        raise FileNotFoundError(path)
+    path = _settings_path(project, require_file=True)
     text = path.read_text(encoding="utf-8-sig")
     rows = _parse_settings(text)
     by_property = {row["property"]: row for row in rows}
