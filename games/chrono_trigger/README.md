@@ -16,7 +16,10 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - Eight overworld headers plus existing world exits/triggers/script-address editing.
 - Fail-closed read-only world script disassembly.
 - Localized labels where Steam message resources exist.
-- Actual PC scene/world L1/L2 PNG raster exporters.
+- Actual PC scene/world L1/L2 PNG raster rendering in both the desktop Map views and `tools/chrono_trigger_map.py`.
+  - Scene Map can switch between structural collision/tile-ID views and isolated rendered L1/L2.
+  - Worlds has a Map tab for isolated rendered L1/L2.
+  - Animated chips, scene L3 artwork, and main/sub-screen blend/priority composition remain explicitly unsupported until current-PC evidence is sufficient.
 - Fixed 256-color BGR555 scene/world palette editing.
 - Project change inventory/revert and deterministic CTP export.
 - CTExt audit/deploy/deactivate/manifest-owned undeploy.
@@ -41,8 +44,8 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 
 ## Remaining high-value work
 
-1. Surface the existing scene/world L1/L2 raster renderers directly in the desktop map views.
-2. Add L3/animated-tile rendering and correct main/sub-screen composition only where current PC evidence is sufficient.
-3. Run the inventory against a current real Steam install and reverse-engineer actual PC battle/enemy/item/tech stat families before implementing stat editors.
-4. Keep improving event editing without moving command boundaries unless a tested assembler/relocation model is developed.
+1. Add scene L3/animated-tile rendering and correct main/sub-screen composition only where current PC evidence is sufficient.
+2. Run the inventory against a current real Steam install and reverse-engineer actual PC battle/enemy/item/tech stat families before implementing stat editors.
+3. Keep improving event editing without moving command boundaries unless a tested assembler/relocation model is developed.
+4. Expand browser-level regression coverage for the integrated Chrono desktop surfaces.
 5. Keep ARC1 rebuilding as fallback experimentation only after real-install round-trip validation; CTExt loose/CTP stays the default deployment model.
