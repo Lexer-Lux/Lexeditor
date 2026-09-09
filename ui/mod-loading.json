@@ -32,9 +32,9 @@
       "overriding": "Lexeditor does not stack or semantically merge multiple FFIX projects. Other Memoria mods may coexist and Memoria resolves them according to its FolderNames ordering; conflicts with the same underlying content therefore follow Memoria's own resolution rules."
     },
     "palworld": {
-      "loader": "Pocketpair's official Palworld v0.7+ mod loader and Steam Workshop package model. PalSchema raw-table projects run through the package's Type=PalSchema rule; Lexeditor authors compatible patches but does not install or replace PalSchema/UE4SS.",
-      "structure": "One selected Lexeditor project is an official package rooted at Info.json. PalSchema targets contain per-mod raw/*.json[c] patches beneath the package target; installed Palworld game data remains read-only.",
-      "overriding": "The official loader enables packages by PackageName. PalSchema raw patches apply named DataTable row/property values rather than whole assets, so non-overlapping fields can coexist; when multiple patches target the same field, Lexeditor does not claim or impose a separate conflict winner beyond PalSchema's runtime order."
+      "loader": "Pocketpair's official Palworld v0.7+ mod loader and Steam Workshop package model. Lexeditor authors compatible official packages and PalSchema raw-table patches, and builds a clean project-owned package snapshot for the official uploader/Workshop flow. It does not activate mods, publish to Steam, or install/replace PalSchema or UE4SS.",
+      "structure": "One selected Lexeditor project is an authoring package rooted at Info.json. Declared InstallRule targets remain project source; Build Package creates <project>/build/official-package from Info.json, Thumbnail and those targets while excluding Lexeditor recovery artifacts. The built snapshot is ownership/digest tracked and reversible; installed Palworld data stays read-only.",
+      "overriding": "The official loader enables packages by PackageName. PalSchema raw patches apply named DataTable row/property values rather than whole assets, so non-overlapping fields can coexist; when multiple runtime patches target the same field, Lexeditor does not claim or impose a separate conflict winner beyond PalSchema's runtime order."
     },
     "rdr": {
       "loader": "De novo Lexeditor deployment through RedHook / Ultimate ASI Loader's update-folder override mechanism.",
