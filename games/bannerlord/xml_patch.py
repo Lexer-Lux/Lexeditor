@@ -16,7 +16,6 @@ def _decode(value: str) -> str:
 
 
 def infer_kind(name: str, value: str, enums: dict[str, tuple[str, ...]] | None = None) -> tuple[str, list[str]]:
-    """Infer only syntax-safe controls; domain enums must be supplied explicitly."""
     if value.startswith("@") or value.startswith("{"):
         return "binding", []
     choices = (enums or {}).get(name)
@@ -30,7 +29,7 @@ def infer_kind(name: str, value: str, enums: dict[str, tuple[str, ...]] | None =
 
 
 def scan_xml_start_tags(text: str, enums: dict[str, tuple[str, ...]] | None = None) -> list[dict]:
-    """Scan start tags while retaining exact attribute-value and insertion spans."""
+    """Scan XML elements while retaining exact source spans for loss-minimizing edits."""
     elements: list[dict] = []
     stack: list[dict] = []
     root_counts: dict[str, int] = {}
@@ -54,7 +53,10 @@ def scan_xml_start_tags(text: str, enums: dict[str, tuple[str, ...]] | None = No
         if text.startswith("</", left):
             right = text.find(">", left + 2)
             if stack:
-                stack.pop()
+                frame = stack.pop()
+                element = frame["element"]
+                element["_closeTagSpan"] = (left, right + 1 if right >= 0 else len(text))
+                element["_fullSpan"] = (element["_startTagSpan"][0], right + 1 if right >= 0 else len(text))
             offset = len(text) if right < 0 else right + 1
             continue
         if text.startswith("<!", left):
@@ -126,27 +128,28 @@ def scan_xml_start_tags(text: str, enums: dict[str, tuple[str, ...]] | None = No
             or identity.get("Sprite")
             or ""
         )
-        elements.append(
-            {
-                "index": len(elements),
-                "path": element_path,
-                "tag": tag,
-                "depth": len(stack),
-                "line": text.count("\n", 0, left) + 1,
-                "hint": hint,
-                "attributes": public_attributes,
-                "_attributes": attributes,
-                "_attributeInsert": insert_position,
-            }
-        )
+        element = {
+            "index": len(elements),
+            "path": element_path,
+            "tag": tag,
+            "depth": len(stack),
+            "line": text.count("\n", 0, left) + 1,
+            "hint": hint,
+            "attributes": public_attributes,
+            "_attributes": attributes,
+            "_attributeInsert": insert_position,
+            "_startTagSpan": (left, right + 1),
+        }
+        if self_closing:
+            element["_fullSpan"] = (left, right + 1)
+        elements.append(element)
         if not self_closing:
-            stack.append({"path": element_path, "children": {}})
+            stack.append({"path": element_path, "children": {}, "element": element})
         offset = right + 1
     return elements
 
 
 def serialize_attribute(attribute: dict, incoming) -> str:
-    """Validate and XML-escape one replacement according to inferred/schema metadata."""
     kind = attribute["kind"]
     original = attribute["value"]
     if kind == "bool":
@@ -190,7 +193,6 @@ def serialize_attribute(attribute: dict, incoming) -> str:
 
 
 def serialize_new_attribute(name: str, metadata: dict, incoming) -> str:
-    """Validate a newly inserted XSD-declared attribute with double-quote escaping."""
     attribute = {
         "name": name,
         "value": "",
