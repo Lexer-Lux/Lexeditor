@@ -40,14 +40,14 @@ BUTTON_CHECK_LABELS = {
     0x37: "Y button · current",
     0x38: "L button · current",
     0x39: "R button · current",
-    0x3B: "Dash action · since last check",
-    0x3C: "Confirm action · since last check",
-    0x3F: "A button · since last check",
-    0x40: "B button · since last check",
-    0x41: "X button · since last check",
-    0x42: "Y button · since last check",
-    0x43: "L button · since last check",
-    0x44: "R button · since last check",
+    0x3B: "Dash action · since last",
+    0x3C: "Confirm action · since last",
+    0x3F: "A button · since last",
+    0x40: "B button · since last",
+    0x41: "X button · since last",
+    0x42: "Y button · since last",
+    0x43: "L button · since last",
+    0x44: "R button · since last",
 }
 
 
