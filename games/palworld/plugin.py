@@ -46,12 +46,14 @@ def launch() -> int:
 
 
 def smoke() -> list[str]:
-    """Exercise package + PalSchema + clean build paths without installed game data."""
+    """Exercise package, PalSchema, build and local-test deployment with fixtures."""
     with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-") as temp_name:
         temp = Path(temp_name)
         game = temp / "Palworld"
         (game / "Pal" / "Content" / "Paks").mkdir(parents=True)
         (game / "Palworld.exe").write_bytes(b"")
+        workshop = temp / "steamapps" / "workshop" / "content" / "1623730"
+        workshop.mkdir(parents=True)
 
         # Synthetic stand-in for the JSON schemas generated locally by PalSchema.
         schema_root = game / "Mods" / "NativeMods" / "UE4SS" / "Mods" / "PalSchema" / "schemas"
@@ -124,6 +126,7 @@ def smoke() -> list[str]:
         with PalworldSession({
             "LEXEDITOR_PALWORLD_ROOT": str(game),
             "LEXEDITOR_PALWORLD_PROJECT": str(project),
+            "LEXEDITOR_PALWORLD_WORKSHOP_ROOT": str(workshop),
         }) as session:
             identity = request_json(session.url + "api/plugin")
             if identity.get("pluginId") != "palworld" or identity.get("hosted") is not True:
@@ -135,9 +138,10 @@ def smoke() -> list[str]:
                 "palschema-generated-schemas",
                 "palschema-add-existing-row-fields",
                 "official-package-build",
+                "official-local-workshop-deploy",
             }
             if not required.issubset(capabilities):
-                raise RuntimeError("Palworld service did not advertise package, PalSchema and build support")
+                raise RuntimeError("Palworld service did not advertise the complete authoring/test path")
 
             info = request_json(session.url + "api/info")
             if info.get("data", {}).get("PackageName") != "LexeditorSmoke":
@@ -236,6 +240,33 @@ def smoke() -> list[str]:
                 raise RuntimeError("Palworld build did not include the declared PalSchema target")
             if (build_root / "PalSchema" / "LexeditorSmokeBalance" / "raw" / "balance.json.lexeditor.bak").exists():
                 raise RuntimeError("Palworld build leaked a Lexeditor recovery backup into the official package")
+
+            local_status = request_json(session.url + "api/workshop")
+            if local_status.get("ready") is not True or local_status.get("deployed") is not False:
+                raise RuntimeError("Palworld local Workshop deployment reported the wrong initial state")
+            deployed = request_json(session.url + "api/workshop/deploy", {})
+            folder = str(deployed.get("folder", ""))
+            target_path = Path(str(deployed.get("targetPath", "")))
+            if (
+                deployed.get("deployed") is not True
+                or deployed.get("current") is not True
+                or len(folder) != 10
+                or not folder.isdigit()
+                or target_path.parent.resolve() != workshop.resolve()
+            ):
+                raise RuntimeError("Palworld local Workshop deployment did not use the owned 10-digit test shape")
+            if not (target_path / "Info.json").is_file() or not (
+                target_path / "PalSchema" / "LexeditorSmokeBalance" / "raw" / "balance.json"
+            ).is_file():
+                raise RuntimeError("Palworld local Workshop deployment did not copy the clean package")
+            if (target_path / ".workshop.json").exists() or (
+                target_path / "PalSchema" / "LexeditorSmokeBalance" / "raw" / "balance.json.lexeditor.bak"
+            ).exists():
+                raise RuntimeError("Palworld local Workshop deployment leaked publishing/recovery metadata")
+            removed = request_json(session.url + "api/workshop/remove", {})
+            if removed.get("deployed") is not False or target_path.exists():
+                raise RuntimeError("Palworld owned local Workshop deployment did not remove cleanly")
+
             reverted = request_json(session.url + "api/build/revert", {})
             if reverted.get("built") is not False or build_root.exists():
                 raise RuntimeError("Palworld clean package build did not revert cleanly")
@@ -251,6 +282,8 @@ def smoke() -> list[str]:
         "generated schema exposed a safe addable property on an already-targeted row",
         "schema-backed PalSchema scalar edit and property addition survived save/readback",
         "clean official-package build included declared targets and excluded Lexeditor backups",
+        "Pocketpair-style local test deployment used an owned ten-digit Workshop folder",
+        "owned local Workshop deployment removed without touching source/build data",
         "owned package build reverted without touching project sources",
         "Info.json and PalSchema changed writes created recovery backups",
         "PalSchema JSONC patches stayed readable but changed-write disabled",
@@ -262,7 +295,7 @@ PLUGIN = GamePlugin(
     plugin_id="palworld",
     name=DISPLAY_NAME,
     subtitle="Official mod packages",
-    description="Author and build Palworld v0.7+ packages with schema-aware PalSchema raw DataTable patches while installed game data stays read-only.",
+    description="Author, build and locally test Palworld v0.7+ packages with schema-aware PalSchema patches while installed game data stays read-only.",
     accent="#55c7d9",
     check=check,
     launch=launch,
