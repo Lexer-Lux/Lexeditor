@@ -61,20 +61,26 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
 
     raw = project / "PalSchema" / "Balance" / "raw"
     raw.mkdir(parents=True)
-    (raw / "aaa_bad.json").write_text('{"DT_Broken":', encoding="utf-8")
+    bad = raw / "aaa_bad.json"
     good = raw / "balance.json"
-    good.write_text(json.dumps({
-        "DT_PalMonsterParameter": {
-            "Kitsunebi": {
-                "WorkSuitability_EmitFlame": 3,
-                "DisplayLabel": "Foxparks",
-                "Mode": "ModeA",
-                "NestedPreserved": {"keep": [1, 2, 3]},
-            }
-        }
-    }, indent=2) + "\n", encoding="utf-8")
     commented = raw / "notes.jsonc"
-    commented.write_text('// keep me\n{"DT_Test":{"Row":{"Value":1}}}\n', encoding="utf-8")
+
+    def reset_patch_fixtures() -> None:
+        bad.write_text('{"DT_Broken":', encoding="utf-8")
+        good.write_text(json.dumps({
+            "DT_PalMonsterParameter": {
+                "Kitsunebi": {
+                    "WorkSuitability_EmitFlame": 3,
+                    "DisplayLabel": "Foxparks",
+                    "Mode": "ModeA",
+                    "NestedPreserved": {"keep": [1, 2, 3]},
+                }
+            }
+        }, indent=2) + "\n", encoding="utf-8")
+        commented.write_text('// keep me\n{"DT_Test":{"Row":{"Value":1}}}\n', encoding="utf-8")
+        backup = good.with_name(good.name + ".lexeditor.bak")
+        if backup.exists():
+            backup.unlink()
 
     errors = []
     with PalworldSession({
@@ -89,11 +95,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
             )
             try:
                 for width, height in ((900, 620), (1280, 800)):
+                    reset_patch_fixtures()
                     page = browser.new_page(viewport={"width": width, "height": height})
                     page.on("pageerror", lambda error: errors.append(str(error)))
                     page.goto(session.url, wait_until="domcontentloaded")
-                    page.wait_for_selector("#lexeditor-shell")
-                    page.wait_for_function("typeof navigate === 'function' && typeof model === 'object' && model !== null")
+                    page.wait_for_function("typeof navigate === 'function' && typeof model === 'object' && model !== null && typeof shell === 'object' && shell !== null")
 
                     # A malformed alphabetically-first patch must not prevent the editor from opening.
                     page.evaluate('navigate("palschema")')
@@ -122,8 +128,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     # Generated enum definitions become a semantic select and remain schema validated.
                     page.locator(".pal-patch-row").filter(has_text="Mode").click()
                     page.wait_for_timeout(100)
-                    enum_select = page.locator(".pal-schema-columns .pal-detail select").filter(has=page.locator("option"))
-                    enum_select = enum_select.filter(has_text="ModeA")
+                    enum_select = page.locator(".pal-schema-columns .pal-detail select").filter(has_text="ModeA")
                     assert enum_select.count() >= 1
                     enum_select.first.select_option("ModeB")
                     page.evaluate("save()")
