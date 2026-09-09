@@ -63,6 +63,7 @@ jobs:
         run: >-
           python -m pytest -q
           tests/test_ffx_x2_vbf.py
+          tests/test_ffx_x2_paths.py
           tests/test_ffx_x2_deployment.py
           tests/test_ffx_x2_treasures.py
           tests/test_ffx_x2_item_shops.py
