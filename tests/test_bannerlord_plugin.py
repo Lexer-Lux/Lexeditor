@@ -1,7 +1,7 @@
 """Focused checks for the Bannerlord Lexeditor plugin."""
 from __future__ import annotations
 from pathlib import Path
-import subprocess,tempfile,unittest
+import os,subprocess,tempfile,unittest
 from unittest.mock import patch
 from plugin_api import validate_plugin
 
@@ -21,6 +21,23 @@ class BannerlordPluginTests(unittest.TestCase):
             module=read_submodule(source);self.assertEqual(module["dependencies"][1]["dependentVersion"],"v2.3.3");self.assertEqual(module["incompatibleModules"][0]["id"],"Bad.Mod")
             result=save_module(source,{"metadata":{"name":"Lexer Skill Tweaks Redux","id":"LexerSkillTweaks","version":"v2.0.0","defaultModule":False,"singleplayer":True,"multiplayer":False},"dependencies":[module["dependencies"][1],{"index":None,"id":"Native","dependentVersion":"","optional":True,"attributes":{}}],"incompatibleModules":[],"submodules":[{**module["submodules"][0],"name":"Lexer Skill Tweaks Redux","tags":[{**module["submodules"][0]["tags"][0],"value":"client"}]}],"xmls":[{**module["xmls"][0],"path":"items2","includedGameTypes":[{"index":0,"value":"Campaign"},{"index":None,"value":"CustomGame"}]}]})
             self.assertGreater(result["saved"],0);self.assertTrue(Path(result["backup"]).is_file());self.assertEqual([r["id"] for r in result["module"]["dependencies"]],["Bannerlord.Harmony","Native"]);rewritten=source.read_text();self.assertIn("preserve this module comment",rewritten);self.assertIn('Mystery="keep"',rewritten);self.assertIn('<Unknown value="keep"',rewritten);rows={r["filename"]:r for r in data_map(project)["rows"]};self.assertEqual(rows["SubModule.xml"]["coverage"],"structured");self.assertEqual(rows["LexerSkillTweaks.csproj"]["coverage"],"structured");self.assertEqual(rows["src/SubModule.cs"]["coverage"],"source")
+    def test_submodule_save_rejects_redirected_descriptor(self):
+        from games.bannerlord.module_data import save_module
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);project=root/"project";project.mkdir();source=project/"SubModule.xml";source.write_text(SUBMODULE,encoding="utf-8");outside=root/"outside.xml";outside.write_text(SUBMODULE,encoding="utf-8");outside_resolved=outside.resolve();real_resolve=Path.resolve
+            def fake_resolve(path,*args,**kwargs):
+                if path==source:return outside_resolved
+                return real_resolve(path,*args,**kwargs)
+            with patch.object(Path,"resolve",new=fake_resolve):
+                with self.assertRaisesRegex(ValueError,"escaped the selected project"):
+                    save_module(source,{"metadata":{"name":"Escaped"}})
+            self.assertIn('Name value="Lexer Skill Tweaks"',outside.read_text(encoding="utf-8"))
+    def test_submodule_write_helpers_do_not_follow_existing_hardlinks(self):
+        from games.bannerlord.module_data import read_submodule,save_module
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);source=root/"SubModule.xml";source.write_text(SUBMODULE,encoding="utf-8");backup=source.with_name(source.name+".lexeditor.bak");temporary=source.with_name(source.name+".lexeditor.tmp");outside_backup=root/"outside-backup.txt";outside_temporary=root/"outside-temporary.txt";outside_backup.write_text("backup sentinel",encoding="utf-8");outside_temporary.write_text("temporary sentinel",encoding="utf-8");os.link(outside_backup,backup);os.link(outside_temporary,temporary)
+            result=save_module(source,{"metadata":{"name":"Lexer Skill Tweaks Hardened"}})
+            self.assertEqual(outside_backup.read_text(encoding="utf-8"),"backup sentinel");self.assertEqual(outside_temporary.read_text(encoding="utf-8"),"temporary sentinel");self.assertEqual(read_submodule(backup)["name"],"Lexer Skill Tweaks");self.assertEqual(result["module"]["name"],"Lexer Skill Tweaks Hardened")
     def test_msbuild_properties_source_and_build_helpers(self):
         from games.bannerlord.project_data import read_project_file,read_source,run_build,save_project_properties,save_source
         with tempfile.TemporaryDirectory() as name:
