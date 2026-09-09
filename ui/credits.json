@@ -107,6 +107,53 @@
         }
       ]
     },
+    "ff7r": {
+      "contributions": [
+        {
+          "name": "Jordan Tucker / FF7 Remake Data Editor",
+          "role": "Reference for FF7R DataObject package layouts and safe fixed-layout editing.",
+          "url": "https://github.com/jordanbtucker/ff7r-data-editor"
+        },
+        {
+          "name": "MatyaModding / ff7r-text-tool",
+          "role": "Reference for FF7R text-resource layout, FString encoding and serialized-size handling.",
+          "url": "https://github.com/matyamod/ff7r-text-tool"
+        },
+        {
+          "name": "MatyaModding / FF7R-font-mod-tools",
+          "role": "Reference for FF7R menu bitmap-font glyph records and BC5 atlas layout.",
+          "url": "https://github.com/matyamod/FF7R-font-mod-tools"
+        },
+        {
+          "name": "trumank / repak",
+          "role": "Pinned external helper for reading and building Unreal Engine PAK files.",
+          "url": "https://github.com/trumank/repak"
+        },
+        {
+          "name": "TheUnlocked / ff7r-kbm-hook",
+          "role": "Reference for FF7R Native Mod Loader interoperability and installed-build compatibility signatures.",
+          "url": "https://github.com/TheUnlocked/ff7r-kbm-hook"
+        },
+        {
+          "name": "xCENTx / FinalFantasy7Remake-Menu",
+          "role": "Public interoperability reference for FF7R runtime process and game-state layout.",
+          "url": "https://github.com/xCENTx/FinalFantasy7Remake-Menu"
+        },
+        {
+          "name": "narknon / EndGameProj",
+          "role": "Generated Remake API research reference for reflected FF7R types, properties, enums and functions.",
+          "url": "https://github.com/narknon/EndGameProj"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "FF7R references and tools — source/license notices",
+          "sourcePath": "games/ff7r/THIRD_PARTY.md",
+          "text": "# Third-party references and tools\n\n## FF7 Remake Data Editor\n\nThe narrow `DataObject` package reader/writer in this plugin is a clean Python\nimplementation based on the documented behavior and MIT-licensed source of\nJordan Tucker's **FF7 Remake Data Editor**:\n\n- https://github.com/jordanbtucker/ff7r-data-editor\n- License: MIT\n\nThat project established the FF7R DataObject `.uasset` name/export-table shape,\nthe `.uexp` property type codes and fixed-row layout, and the safe same-size\nediting model used here. Lexeditor does not bundle its application or proprietary\ngame data.\n\n## FF7R Text Tool\n\nThe `GameContents/Text/<language>/*_TxtRes` reader/writer is a clean Python\nimplementation based on the documented behavior and MIT-licensed source of\nMatyaModding's **ff7r-text-tool**:\n\n- https://github.com/matyamod/ff7r-text-tool\n- License: MIT\n\nThat project documents the FF7R text-resource entry/sub-entry layout, Unreal\nFString encoding, name-map references and the paired `.uasset` serialized-size\nfield required when variable-length text changes. Lexeditor does not bundle the\ntool or any extracted game text.\n\n## FF7R Font Mod Tools\n\nThe local-only menu-font theming path is a narrow Python implementation based on\nthe documented layouts and MIT-licensed source of MatyaModding's\n**FF7R-font-mod-tools**:\n\n- https://github.com/matyamod/FF7R-font-mod-tools\n- License: MIT\n\nThat project documents the `GameContents/Menu/Resident/Font/JP/SystemFont*4K`\nglyph UEXP record shape and the matching\n`GameContents/Menu/Billboard/Common/U_Com_JP_SystemFont*4K-01` 2048x2048 BC5\nbitmap-atlas layout. Lexeditor validates those exact installed assets, decodes\n`SystemFontNormal` only into the user's private cache, and uses the resulting\natlas/glyph metrics for editor chrome. It does not bundle or publish Square Enix\nfont assets.\n\n## repak\n\nLexeditor downloads a pinned release of **repak** only when the user chooses to\ninstall the FF7R archive helper:\n\n- https://github.com/trumank/repak\n- License: dual Apache-2.0 / MIT\n- Pinned release: v0.2.3\n\nrepak reads the installed Unreal Engine PAK indexes/files on demand and packs the\nseparate Lexeditor project tree into a mod PAK. FF7R's `../../../` mount point is\npassed explicitly when listing, extracting and packing. repak is not committed\ninto this repository.\n\n## Improved Keyboard and Mouse Controls / Native Mod Loader research\n\nThe FF7R native-runtime probe uses independently implemented compatibility checks\ninformed by TheUnlocked's maintained, MIT-licensed **ff7r-kbm-hook**:\n\n- https://github.com/TheUnlocked/ff7r-kbm-hook\n- License: MIT\n\nThat project provides public evidence for the Native Mod Loader `Init()` export\ncontract and current FF7R byte signatures around map control and raw-input\ninitialization. Lexeditor uses those signatures only as compatibility probes. It\ndoes not copy the hook implementation and does not treat those known addresses as\nthe cutscene-speed or minimap-toggle hook sites required by #413/#414.\n\n## FinalFantasy7Remake-Menu interoperability research\n\nThe guarded HP runtime implementation is informed by public interoperability\ninformation in xCENTx's **FinalFantasy7Remake-Menu** repository:\n\n- https://github.com/xCENTx/FinalFantasy7Remake-Menu\n- No repository license file was present when this reference was recorded.\n\nLexeditor does not copy or bundle that project's implementation. It uses factual\nprocess-layout information (the `AGameState` / `APlayerStats` field layout and a\nRIP-relative game-state lookup instruction shape) as a research reference, then\nindependently validates the installed executable at runtime. No fixed RVA from\nthat project is shipped or trusted.\n\n## EndGameProj generated Remake API research\n\nPublic generated Remake headers in narknon's **EndGameProj** are used only as\ninteroperability/research evidence for reflected type, property, enum and function\nnames such as `EGameSpeed_CUT`, `AEndGameState::SetGameSpeed`, ATB DataObject\nfields, and menu widget settings:\n\n- https://github.com/narknon/EndGameProj\n\nThese generated declarations are not bundled into Lexeditor and are not treated\nas current installed-build offsets or validated hook addresses. Installed-game\nprobes must still establish the concrete target before a runtime mutation can be\nenabled.\n"
+        }
+      ]
+    },
     "ff8": {
       "contributions": [
         {
