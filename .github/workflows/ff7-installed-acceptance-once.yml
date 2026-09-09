@@ -6,6 +6,7 @@ on:
       - work/ff7-complete-kernel-surface
     paths:
       - 'tools/_ff7_installed_acceptance_once.py'
+      - 'tools/_ff7_installed_acceptance_testfix_once.py'
       - '.github/workflows/ff7-installed-acceptance-once.yml'
 
 permissions:
@@ -24,7 +25,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: Apply installed acceptance hardening
-        run: python tools/_ff7_installed_acceptance_once.py
+        run: |
+          python tools/_ff7_installed_acceptance_once.py
+          python tools/_ff7_installed_acceptance_testfix_once.py
       - name: Verify FF7 binary and acceptance contracts
         run: |
           python tools/verify_ff7_datasets.py
@@ -35,9 +38,9 @@ jobs:
       - name: Commit tested acceptance hardening and remove scaffold
         shell: bash
         run: |
-          git rm tools/_ff7_installed_acceptance_once.py .github/workflows/ff7-installed-acceptance-once.yml
+          git rm tools/_ff7_installed_acceptance_once.py tools/_ff7_installed_acceptance_testfix_once.py .github/workflows/ff7-installed-acceptance-once.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add games/ff7/kernel.py tools/verify_ff7_installed.py tools/verify_ff7_installed_contract.py tools/FF7-checks.cmd .github/workflows/ff7-data-regressions.yml
+          git add games/ff7/kernel.py tools/verify_ff7_installed.py tools/verify_ff7_installed_contract.py tools/verify_ff7_completion.py tools/FF7-checks.cmd .github/workflows/ff7-data-regressions.yml
           git commit -m 'Harden FF7 installed-data acceptance proof'
           git push origin HEAD:work/ff7-complete-kernel-surface
