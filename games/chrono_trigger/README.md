@@ -12,7 +12,7 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - Localization/message editing.
 - Scene headers, existing exits and treasure editing.
 - Scene MapTable/collision inspection.
-- Atel parsing, PC disassembly, semantics, control-flow diagnostics and CLI fixed-width argument editing.
+- Atel parsing, PC disassembly, semantics and control-flow diagnostics, with named fixed-width argument editing in both the desktop Events UI and CLI. Unsupported, variable-width and unresolved commands remain read-only.
 - Eight overworld headers plus existing world exits/triggers/script-address editing.
 - Fail-closed read-only world script disassembly.
 - Localized labels where Steam message resources exist.
@@ -41,8 +41,8 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 
 ## Remaining high-value work
 
-1. Named fixed-width Atel controls in the desktop Events UI.
-2. L3/animated-tile and correct main/sub-screen map composition.
-3. Desktop raster previews using the existing renderers.
-4. Run the inventory against a current real Steam install and reverse-engineer actual PC battle/enemy/item/tech stat families before implementing stat editors.
+1. Surface the existing scene/world L1/L2 raster renderers directly in the desktop map views.
+2. Add L3/animated-tile rendering and correct main/sub-screen composition only where current PC evidence is sufficient.
+3. Run the inventory against a current real Steam install and reverse-engineer actual PC battle/enemy/item/tech stat families before implementing stat editors.
+4. Keep improving event editing without moving command boundaries unless a tested assembler/relocation model is developed.
 5. Keep ARC1 rebuilding as fallback experimentation only after real-install round-trip validation; CTExt loose/CTP stays the default deployment model.
