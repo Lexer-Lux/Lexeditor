@@ -391,6 +391,9 @@ class Kernel:
             self.file_types.append(file_type)
             offset = end
         self.trailer = self.original[offset:]
+        self.original_sections = tuple(bytes(section) for section in self.sections)
+        self.original_file_types = tuple(self.file_types)
+        self.original_trailer = self.trailer
 
     @property
     def sha256(self) -> str:
@@ -458,6 +461,13 @@ class Kernel:
             self.sections[description_index] = bytearray(packed_descriptions)
 
     def to_bytes(self) -> bytes:
+        # A no-op save must preserve the installed container byte-for-byte.
+        # Recompress only after modeled content actually changes; compressor
+        # provenance/header differences are otherwise meaningless churn.
+        if (tuple(self.file_types) == self.original_file_types
+                and self.trailer == self.original_trailer
+                and all(bytes(current) == original for current, original in zip(self.sections, self.original_sections))):
+            return self.original
         output = bytearray()
         for raw, file_type in zip(self.sections, self.file_types):
             compressed = gzip.compress(bytes(raw), compresslevel=9, mtime=0)
