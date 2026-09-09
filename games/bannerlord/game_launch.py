@@ -24,30 +24,35 @@ CORE_SINGLEPLAYER_MODULES = (
 )
 
 
-def _contained_descriptor(folder: Path, *, missing_message: str | None = None) -> Path:
-    root = folder.resolve()
+def _module_id(path: Path) -> str:
+    metadata = read_submodule(path / "SubModule.xml")
+    module_id = str(metadata.get("id") or "").strip()
+    if not module_id:
+        raise RuntimeError(f"Bannerlord module has no Id in {path / 'SubModule.xml'}")
+    return module_id
+
+
+def _selected_project_descriptor(project: Path) -> Path:
+    root = project.resolve()
     descriptor = (root / "SubModule.xml").resolve()
     if root not in descriptor.parents:
-        raise RuntimeError(
-            f"Resolved Bannerlord SubModule.xml path escaped its module/project folder: {folder}"
-        )
+        raise RuntimeError("Resolved selected Bannerlord project SubModule.xml path escaped the project folder")
     if not descriptor.is_file():
-        raise RuntimeError(missing_message or f"Bannerlord module has no SubModule.xml: {root}")
+        raise RuntimeError("The selected Bannerlord project has no SubModule.xml.")
     return descriptor
 
 
-def _module_id(path: Path) -> str:
-    descriptor = _contained_descriptor(path)
-    metadata = read_submodule(descriptor)
-    module_id = str(metadata.get("id") or "").strip()
-    if not module_id:
-        raise RuntimeError(f"Bannerlord module has no Id in {descriptor}")
-    return module_id
+def _selected_project_id(project: Path) -> str:
+    descriptor = _selected_project_descriptor(project)
+    project_id = str(read_submodule(descriptor).get("id") or "").strip()
+    if not project_id:
+        raise RuntimeError("The selected Bannerlord project has no module Id.")
+    return project_id
 
 
 def installed_modules(game_root: Path) -> dict[str, Path]:
     """Installed Bannerlord modules keyed by their SubModule.xml Id."""
-    modules_root = (game_root.resolve() / "Modules").resolve()
+    modules_root = game_root.resolve() / "Modules"
     if not modules_root.is_dir():
         raise RuntimeError(f"Bannerlord Modules folder not found: {modules_root}")
     modules: dict[str, Path] = {}
@@ -55,29 +60,18 @@ def installed_modules(game_root: Path) -> dict[str, Path]:
         descriptor = folder / "SubModule.xml"
         if not folder.is_dir() or not descriptor.is_file():
             continue
-        resolved_folder = folder.resolve()
-        if modules_root not in resolved_folder.parents:
-            raise RuntimeError(
-                f"Resolved installed Bannerlord module path escaped the Modules folder: {folder}"
-            )
-        module_id = _module_id(resolved_folder)
-        if module_id in modules and modules[module_id] != resolved_folder:
+        module_id = _module_id(folder)
+        if module_id in modules and modules[module_id].resolve() != folder.resolve():
             raise RuntimeError(
                 f"Several installed Bannerlord modules declare Id {module_id}: "
-                f"{modules[module_id]} and {resolved_folder}"
+                f"{modules[module_id]} and {folder}"
             )
-        modules[module_id] = resolved_folder
+        modules[module_id] = folder
     return modules
 
 
 def _selected_module_from_index(project: Path, modules: dict[str, Path]) -> tuple[str, Path]:
-    descriptor = _contained_descriptor(
-        project,
-        missing_message="The selected Bannerlord project has no SubModule.xml.",
-    )
-    project_id = str(read_submodule(descriptor).get("id") or "").strip()
-    if not project_id:
-        raise RuntimeError("The selected Bannerlord project has no module Id.")
+    project_id = _selected_project_id(project)
     installed = modules.get(project_id)
     if installed is None:
         raise RuntimeError(
@@ -102,7 +96,7 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
     """
     modules = installed_modules(game_root)
     selected_id, installed = _selected_module_from_index(project, modules)
-    selected_metadata = read_submodule(_contained_descriptor(installed))
+    selected_metadata = read_submodule(installed / "SubModule.xml")
     if not is_singleplayer_module(selected_metadata):
         raise RuntimeError(
             f"Bannerlord module {selected_id} is not declared as a single-player module; "
@@ -116,7 +110,7 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
             folder = modules.get(module_id)
             if folder is None:
                 raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
-            metadata_cache[module_id] = read_submodule(_contained_descriptor(folder))
+            metadata_cache[module_id] = read_submodule(folder / "SubModule.xml")
         return metadata_cache[module_id]
 
     included: set[str] = set()
@@ -247,7 +241,7 @@ class BannerlordGameController:
             if current["running"]:
                 return {**current, "alreadyRunning": True}
             load_order = module_load_order(game_root, project)
-            module_id = _module_id(project.resolve())
+            module_id = _selected_project_id(project)
             command = _launch_command(game_root, load_order)
             cwd = game_root.resolve() / "bin" / "Win64_Shipping_Client"
             process = self._process_factory(command, cwd=str(cwd))
