@@ -1,7 +1,7 @@
 """Structured Steam datasets backed by read-only ``resources.bin`` plus project overlays.
 
 Chrono Trigger Extender (CTExt) can redirect the game's resource loader to loose
-files using the same virtual paths as ``resources.bin``.  Lexeditor therefore
+files using the same virtual paths as ``resources.bin``. Lexeditor therefore
 stores edits as loose ``Game/...`` and ``Localize/...`` project files and never
 needs to overwrite the installed archive.
 """
@@ -30,6 +30,8 @@ _LOCALIZE_RE = re.compile(r"^Localize/([^/]+)/msg/([^/]+\.txt)$", re.IGNORECASE)
 _SCENE_RE = re.compile(r"^Game/field/Mapinfo/mapinfo_(\d+)\.dat$", re.IGNORECASE)
 _FIELD_EVENT_RE = re.compile(r"^Game/field/atel/Atel_(\d+)\.dat$", re.IGNORECASE)
 _WORLD_EVENT_RE = re.compile(r"^Game/world/esl/Event_(\d+)\.dat$", re.IGNORECASE)
+_EXIT_TABLES = {"game/common/mapjumpoffsettbl.dat", "game/common/mapjumpdatatbl.dat"}
+_TREASURE_TABLES = {"game/common/takaraoffsettbl.dat", "game/common/takaradatatbl.dat"}
 
 
 @dataclass(frozen=True)
@@ -130,6 +132,7 @@ class OverlayStore:
 
     def localization_files(self) -> list[dict]:
         rows = []
+        known = {name.casefold() for name in MESSAGE_TABLE_FILES}
         for entry in self.archive.entries:
             match = _LOCALIZE_RE.match(entry.path)
             if not match:
@@ -138,7 +141,7 @@ class OverlayStore:
                 "language": match.group(1),
                 "file": match.group(2),
                 "path": entry.path,
-                "knownEventTable": match.group(2).casefold() in {name.casefold() for name in MESSAGE_TABLE_FILES},
+                "knownEventTable": match.group(2).casefold() in known,
                 "source": "project" if self.overlay_exists(entry.path) else "archive",
             })
         return sorted(rows, key=lambda row: (row["language"].casefold(), row["file"].casefold()))
@@ -298,10 +301,14 @@ def classify_resource(path: str) -> dict:
         return {"kind": "localization-text", "coverage": "structured", "status": "integrated", "target": "text"}
     if _SCENE_RE.match(virtual):
         return {"kind": "scene-header", "coverage": "structured", "status": "integrated", "target": "scenes"}
+    if lower in _EXIT_TABLES:
+        return {"kind": "scene-exits", "coverage": "structured", "status": "integrated", "target": "scenes"}
+    if lower in _TREASURE_TABLES:
+        return {"kind": "scene-treasure", "coverage": "structured", "status": "integrated", "target": "scenes"}
     if _FIELD_EVENT_RE.match(virtual):
-        return {"kind": "field-event-script", "coverage": "decoded-upstream", "status": "partial", "target": "resources"}
+        return {"kind": "field-event-script", "coverage": "structural", "status": "partial", "target": "events"}
     if _WORLD_EVENT_RE.match(virtual):
-        return {"kind": "world-event-script", "coverage": "decoded-upstream", "status": "partial", "target": "resources"}
+        return {"kind": "world-event-script", "coverage": "known", "status": "partial", "target": "resources"}
     if lower.startswith("game/field/") or lower.startswith("game/world/"):
         return {"kind": "map-world-data", "coverage": "known", "status": "partial", "target": "resources"}
     suffix = PurePosixPath(virtual).suffix.casefold()
@@ -316,11 +323,14 @@ def classify_resource(path: str) -> dict:
 
 def data_map(store: OverlayStore) -> dict:
     entries = [entry.path for entry in store.archive.entries]
+    lowered = {path.casefold() for path in entries}
     counts = {
         "messages": sum(bool(_LOCALIZE_RE.match(path)) for path in entries),
         "scenes": sum(bool(_SCENE_RE.match(path)) for path in entries),
         "fieldEvents": sum(bool(_FIELD_EVENT_RE.match(path)) for path in entries),
         "worldEvents": sum(bool(_WORLD_EVENT_RE.match(path)) for path in entries),
+        "exitTables": sum(path in lowered for path in _EXIT_TABLES),
+        "treasureTables": sum(path in lowered for path in _TREASURE_TABLES),
     }
     rows = [
         {
@@ -344,10 +354,24 @@ def data_map(store: OverlayStore) -> dict:
             "coverage": "structured", "openable": bool(counts["scenes"]), "target": "scenes",
         },
         {
+            "filename": "Game/common/MapJumpOffsetTbl.dat + MapJumpDataTbl.dat",
+            "controls": "Scene exits: trigger position/size, facing/shift flags, destination and destination tile",
+            "notes": "PC records are fixed 8-byte entries. Existing records are editable; the shared offset table and record count stay unchanged.",
+            "status": "integrated" if counts["exitTables"] == 2 else "partial",
+            "coverage": "structured", "openable": counts["exitTables"] == 2, "target": "scenes",
+        },
+        {
+            "filename": "Game/common/TakaraOffsetTbl.dat + TakaraDataTbl.dat",
+            "controls": "Scene treasure: tile position, encoded contents/gold/item category and trailing u16",
+            "notes": "PC records are fixed 6-byte entries. Existing records are editable; the shared offset table and record count stay unchanged.",
+            "status": "integrated" if counts["treasureTables"] == 2 else "partial",
+            "coverage": "structured", "openable": counts["treasureTables"] == 2, "target": "scenes",
+        },
+        {
             "filename": "Game/field/atel/Atel_*.dat",
-            "controls": f"{counts['fieldEvents']} field event scripts",
-            "notes": "PC event bytecode structure is documented and parsed by Temporal Redux/CTViewer; Lexeditor command editing is the next integration slice.",
-            "status": "partial", "coverage": "decoded-upstream", "openable": True, "target": "resources",
+            "controls": f"{counts['fieldEvents']} field event scripts: objects, 16 function slots/object and bytecode bounds",
+            "notes": "Steam retains the count + function-pointer-table + bytecode layout. Structural inspection is integrated; opcode editing remains read-only.",
+            "status": "partial", "coverage": "structural", "openable": True, "target": "events",
         },
         {
             "filename": "Game/world/esl/Event_*.dat",
@@ -357,14 +381,14 @@ def data_map(store: OverlayStore) -> dict:
         },
         {
             "filename": "Game/field/*; Game/world/*; Game/chara/*",
-            "controls": "Maps, exits, treasures, palettes, sprites and related assets",
-            "notes": "Their Steam paths and several binary layouts are documented by CTViewer. Raw access exists; structured editors will be added incrementally.",
+            "controls": "Maps, palettes, sprites and related assets",
+            "notes": "Their Steam paths and several binary layouts are documented by CTViewer. Raw access exists; structured editors are added only when the layout is proven.",
             "status": "partial", "coverage": "known", "openable": True, "target": "resources",
         },
         {
             "filename": "CTExt mods/<project>/...",
             "controls": "Loose-file runtime overlay",
-            "notes": "Lexeditor projects use archive-relative Game/... and Localize/... paths compatible with CTExt's resource redirection. Runtime installation/configuration is not automated yet.",
+            "notes": "Lexeditor projects use archive-relative Game/... and Localize/... paths compatible with CTExt resource redirection. Runtime installation/configuration is not automated yet.",
             "status": "partial", "coverage": "deployment", "openable": False,
         },
     ]
