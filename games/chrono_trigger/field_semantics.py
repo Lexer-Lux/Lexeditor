@@ -8,6 +8,8 @@ layer may write a subset of these fields without changing command boundaries.
 from __future__ import annotations
 
 
+SCRIPT_MEM_START = 0x7F0200
+
 BATTLE_FLAGS = (
     (0, 0x01, "no win pose"),
     (0, 0x02, "bottom menu"),
@@ -30,6 +32,10 @@ BATTLE_FLAGS = (
 
 def _u16(data: bytes, offset: int = 0) -> int:
     return int.from_bytes(data[offset:offset + 2], "little")
+
+
+def _script_address(offset: int) -> int:
+    return SCRIPT_MEM_START + int(offset) * 2
 
 
 def _lookup(values: list[str], index: int, prefix: str) -> str:
@@ -64,11 +70,24 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
             "summary": f"String {index} · option/flags 0x{args[2]:02X}",
             "stringIndex": index, "optionFlags": args[2],
         }
+    if opcode == 0xC7 and len(args) == 2:
+        address = _script_address(args[0])
+        return {
+            "summary": f"Add item from 0x{address:06X} · category {args[1]}",
+            "sourceAddress": address, "category": args[1],
+        }
     if opcode == 0xC9 and len(args) == 3:
         item = _u16(args)
         return {
             "summary": f"Has {_lookup(items, item, 'Item')} ({item}) → jump +{args[2]}",
             "itemId": item, "itemName": _lookup(items, item, "Item"), "jumpOffset": args[2],
+        }
+    if opcode in {0xCA, 0xCB} and len(args) == 2:
+        operation = "add" if opcode == 0xCA else "remove"
+        verb = "Add" if opcode == 0xCA else "Remove"
+        return {
+            "summary": f"{verb} item index {args[0]} · category {args[1]}",
+            "itemIndex": args[0], "category": args[1], "operation": operation,
         }
     if opcode == 0xCC and len(args) == 3:
         gold = _u16(args)
@@ -91,6 +110,18 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
     if opcode in {0xD0, 0xD1, 0xD3, 0xD4, 0xD6} and len(args) == 1:
         pc = args[0]
         return {"summary": f"{_lookup(players, pc, 'PC')} ({pc})", "playerId": pc}
+    if opcode == 0xD5 and len(args) == 3:
+        pc = args[0]
+        return {
+            "summary": f"Equip {_lookup(players, pc, 'PC')} ({pc}) · item index {args[1]} · category {args[2]}",
+            "playerId": pc, "itemIndex": args[1], "category": args[2],
+        }
+    if opcode == 0xD7 and len(args) == 3:
+        address = _script_address(args[2])
+        return {
+            "summary": f"Item index {args[0]} · category {args[1]} quantity → 0x{address:06X}",
+            "itemIndex": args[0], "category": args[1], "storeAddress": address,
+        }
     if opcode == 0xD8 and len(args) == 2:
         enabled = [name for byte_index, bit, name in BATTLE_FLAGS if args[byte_index] & bit]
         return {
