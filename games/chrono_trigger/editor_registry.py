@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from .comparisons import apply_comparison, comparison_field_specs, comparison_values
+from .comparisons import (
+    apply_comparison,
+    comparison_field_specs,
+    comparison_values,
+    decorate_comparison_semantics,
+)
 from .data import OverlayStore
 from .event_edit import save_event_arguments
 from .events import get_event
@@ -46,6 +51,7 @@ def editor_schema(command: dict) -> dict | None:
 
 
 def decorate_event_editors(payload: dict) -> dict:
+    decorate_comparison_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
         for function in obj.get("functions", []):
