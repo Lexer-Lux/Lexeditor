@@ -35,7 +35,9 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - Project change inventory/revert and deterministic CTP export.
 - CTExt audit/deploy/deactivate/manifest-owned undeploy.
 - Full-scene integrity audit and Atel jump-boundary diagnostics.
-- ARC1 index-only gameplay-family inventory for future PC stat reverse engineering.
+- Gameplay-data research tooling that remains read-only:
+  - `chrono_trigger_inventory.py` ranks battle/enemy/tech/item/shop/party candidates from the real ARC1 index, clusters parent directories/extensions/stored sizes, can optionally peek only each candidate's decoded 4-byte declared payload size, and emits repeated path/size groups suitable for follow-up probing.
+  - `chrono_trigger_probe.py` decompresses only an explicitly selected family (optionally one path prefix), with hard resource/stored/uncompressed-size caps checked first, then reports hashes, bounded prefix hex, payload-size clusters, and byte-level constant/variable positions across same-size samples. Those differences are structural evidence only; no stat meaning is assigned.
 
 ## Tools
 
@@ -44,12 +46,14 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - `tools/chrono_trigger_event.py` — show/set-args/set-fields
 - `tools/chrono_trigger_palette.py` — palette show/set
 - `tools/chrono_trigger_map.py` — scene L1/L2/L3 and world L1/L2 PNG render
-- `tools/chrono_trigger_inventory.py` — real-install resource-family inventory
+- `tools/chrono_trigger_inventory.py` — real-install resource-family inventory + optional 4-byte declared-size clustering
+- `tools/chrono_trigger_probe.py` — bounded read-only payload comparison for one candidate family/path cluster
 
 ## Validation
 
 - Dedicated `Chrono Trigger checks` workflow compiles the plugin/tools, validates the descriptor, auto-discovers all `test_chrono_trigger_*.py` suites, runs the managed ARC1/CTExt smoke, checks editor JavaScript, and runs Playwright desktop regressions.
 - Event-editor regressions cover PC item/category layouts, script-memory `/2` address round-trips, doubled coordinate-read target IDs, palette/storyline/raw-solidity, movement/facing/animation/pause controls, fixed-size preservation, partial edits, and fail-closed invalid encodings.
+- Research-tool regressions enforce family/path scoping, deterministic cluster output, pre-decompression size caps, no-decompression inventory mode, 4-byte-only declared-size peeking, and same-size byte-difference reporting.
 - Playwright covers scene/world raster views and render diagnostics plus the real Events UI named-editor workflow: it changes an `NPC Facing` field, verifies the `/api/save/event-fields` stale-hash POST coordinates/payload, and confirms the rerendered semantic summary and argument byte.
 
 ## Evidence
@@ -64,7 +68,7 @@ See [`FORMAT_EVIDENCE.md`](FORMAT_EVIDENCE.md) for the PC-format evidence ledger
 ## Remaining high-value work
 
 1. Determine exact current-PC initial-frame/phase behavior for scene chip animations before enabling playback, and independently evidence main/sub-screen composition and `PrioMap` semantics before implementing composed rendering.
-2. Run the inventory against a current real Steam install and reverse-engineer actual PC battle/enemy/item/tech stat families before implementing stat editors.
+2. Run the inventory/probe pipeline against a current real Steam install, isolate repeated battle/enemy/item/tech record families, and reverse-engineer fields only after cross-record correlations and reversible loose-file tests establish them.
 3. Keep improving event editing without moving command boundaries unless a tested assembler/relocation model is developed.
 4. Keep expanding browser-level regression coverage for integrated Chrono desktop surfaces.
 5. Keep ARC1 rebuilding as fallback experimentation only after real-install round-trip validation; CTExt loose/CTP stays the default deployment model.
