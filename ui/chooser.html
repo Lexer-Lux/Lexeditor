@@ -259,9 +259,12 @@
     };
     function button(label,action,secondary=false){const control=document.createElement("button");control.textContent=label;control.classList.toggle("secondary",secondary);control.onclick=action;return control;}
     function sizeResidentHandle(){if(residentHandle.hidden)return;
-      const box=residentHandle.getBoundingClientRect(),safe=box.height*.12,
+      const box=residentHandle.getBoundingClientRect(),safe=box.height*.07,
         saveSize=Math.max(18,Math.min(48,box.width*.58,box.height*.09)),
-        arrowHeight=box.height*.24;
+        // A smaller arrow and a tighter bottom inset hand the name the space
+        // the handle was leaving empty, so it stays legible instead of
+        // shrinking towards its floor on shorter screens.
+        arrowHeight=box.height*.16;
       residentHandle.style.setProperty("--lex-resident-arrow-height",`${arrowHeight}px`);
       residentHandle.style.setProperty("--lex-resident-safe-inset",`${safe}px`);
       residentHandle.style.setProperty("--lex-resident-save-size",`${saveSize}px`);
@@ -279,7 +282,7 @@
       // which mis-sized every name that was not average width.
       let nameSize=Math.min(20,box.width*.28);
       residentHandle.style.setProperty("--lex-resident-name-size",`${nameSize}px`);
-      for(;nameSize>7;nameSize-=0.5){
+      for(;nameSize>9;nameSize-=0.5){
         residentHandle.style.setProperty("--lex-resident-name-size",`${nameSize}px`);
         if(nameNode.scrollHeight<=nameNode.clientHeight)break;
       }}
