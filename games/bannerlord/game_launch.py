@@ -11,7 +11,6 @@ import subprocess
 import threading
 
 from .module_data import is_singleplayer_module, read_submodule
-from .module_relations import read_module_relations
 
 
 CORE_SINGLEPLAYER_MODULES = (
@@ -92,7 +91,6 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
         )
 
     metadata_cache: dict[str, dict] = {selected_id: selected_metadata}
-    relations_cache: dict[str, dict[str, list[str]]] = {}
 
     def metadata(module_id: str) -> dict:
         if module_id not in metadata_cache:
@@ -101,14 +99,6 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
                 raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
             metadata_cache[module_id] = read_submodule(folder / "SubModule.xml")
         return metadata_cache[module_id]
-
-    def relations(module_id: str) -> dict[str, list[str]]:
-        if module_id not in relations_cache:
-            folder = modules.get(module_id)
-            if folder is None:
-                raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
-            relations_cache[module_id] = read_module_relations(folder / "SubModule.xml")
-        return relations_cache[module_id]
 
     included: set[str] = set()
     preference: list[str] = []
@@ -150,7 +140,8 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
 
     conflicts = []
     for module_id in list(included):
-        for dependency in metadata(module_id).get("dependencies", []):
+        model = metadata(module_id)
+        for dependency in model.get("dependencies", []):
             dependency_id = str(dependency.get("id") or "").strip()
             if dependency_id in included:
                 add_edge(dependency_id, module_id)
@@ -158,11 +149,12 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
                 # Defensive consistency check; include_required should have caught it.
                 raise RuntimeError(f"Required Bannerlord dependency is not enabled: {dependency_id}")
 
-        module_relations = relations(module_id)
-        for after_id in module_relations.get("loadAfterThis", []):
+        for relation in model.get("modulesToLoadAfterThis", []):
+            after_id = str(relation.get("id") or "").strip()
             if after_id in included:
                 add_edge(module_id, after_id)
-        for incompatible_id in module_relations.get("incompatible", []):
+        for relation in model.get("incompatibleModules", []):
+            incompatible_id = str(relation.get("id") or "").strip()
             if incompatible_id in included:
                 conflicts.append((module_id, incompatible_id))
 
