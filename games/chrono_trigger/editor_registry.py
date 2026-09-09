@@ -27,6 +27,7 @@ from .memory_ops import (
     memory_field_specs,
     memory_values,
 )
+from .misc_ops import apply_misc_op, decorate_misc_semantics, misc_field_specs, misc_values
 from .movement_ops import (
     apply_movement_op,
     decorate_movement_semantics,
@@ -101,6 +102,10 @@ def audio_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, audio_field_specs(command), audio_values(command))
 
 
+def misc_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, misc_field_specs(command), misc_values(command))
+
+
 def jump_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
 
@@ -114,6 +119,7 @@ _REGISTRY_BUILDERS = (
     object_editor_schema,
     scene_event_editor_schema,
     audio_editor_schema,
+    misc_editor_schema,
     jump_editor_schema,
 )
 _REGISTRY_APPLIERS = (
@@ -125,6 +131,7 @@ _REGISTRY_APPLIERS = (
     apply_object_op,
     apply_scene_event_op,
     apply_audio_op,
+    apply_misc_op,
     apply_jump,
 )
 
@@ -146,6 +153,7 @@ def decorate_event_editors(payload: dict) -> dict:
     decorate_object_semantics(payload)
     decorate_scene_event_semantics(payload)
     decorate_audio_semantics(payload)
+    decorate_misc_semantics(payload)
     decorate_jump_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
