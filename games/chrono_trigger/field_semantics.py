@@ -72,12 +72,21 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
             "xStoreAddress": x_address,
             "yStoreAddress": y_address,
         }
+    if opcode == 0x33 and len(args) == 1:
+        return {"summary": f"Change palette {args[0]}", "paletteId": args[0]}
+    if opcode == 0x5A and len(args) == 1:
+        return {"summary": f"Set storyline {args[0]}", "storylineValue": args[0]}
     if opcode == 0x83 and len(args) == 3:
         enemy = _u16(args)
         return {
             "summary": f"Enemy {enemy} · slot {args[2] & 0x7F} · {'static' if args[2] & 0x80 else 'dynamic'}",
             "enemyId": enemy, "slot": args[2] & 0x7F, "static": bool(args[2] & 0x80),
             "slotFlags": args[2],
+        }
+    if opcode == 0x84 and len(args) == 1:
+        return {
+            "summary": f"NPC solidity properties 0x{args[0]:02X} (raw)",
+            "solidityProperties": args[0],
         }
     if opcode == 0x87 and len(args) == 1 and args[0] <= 0x80:
         return {"summary": f"Script speed {args[0]}", "scriptSpeed": args[0]}
