@@ -93,6 +93,27 @@ class CTExtCliTests(unittest.TestCase):
             self.assertTrue(payload["deployment"]["active"])
             self.assertTrue((game / "mods/CliMod/lexeditor-project.json").is_file())
 
+    def test_deactivate_keeps_deployed_files_but_removes_load_order(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-cli-") as temp_name:
+            game, project = _fixture(Path(temp_name))
+            self._run(game, project, "deploy")
+            code, payload = self._run(game, project, "deactivate")
+            self.assertEqual(code, 0)
+            self.assertFalse(payload["active"])
+            self.assertTrue(payload["deployed"])
+            self.assertTrue((game / "mods/CliMod/lexeditor-project.json").is_file())
+
+    def test_undeploy_removes_owned_copy_after_deactivation(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-cli-") as temp_name:
+            game, project = _fixture(Path(temp_name))
+            self._run(game, project, "deploy")
+            code, payload = self._run(game, project, "undeploy")
+            self.assertEqual(code, 0)
+            self.assertTrue(payload["deactivated"])
+            self.assertTrue(payload["undeployed"])
+            self.assertFalse(payload["active"])
+            self.assertFalse((game / "mods/CliMod").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
