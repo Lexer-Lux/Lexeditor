@@ -78,7 +78,11 @@
       changeQuery:value=>{state.query=value;state.page=0;renderDataMap()},
       changeStatus:value=>{state.mapStatus=value;state.page=0;renderDataMap()},
       changePage:value=>{state.page=value;renderDataMap()},
-      changeSort:value=>{state.sort=value;renderDataMap()}
+      changeSort:key=>{
+        const [active,direction]=state.sort;
+        state.sort=[key,active===key?-direction:1];
+        renderDataMap();
+      }
     });
     main.replaceChildren(view);
   }

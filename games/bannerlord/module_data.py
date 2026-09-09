@@ -130,6 +130,13 @@ def data_map(project: Path) -> dict:
                 "id": f"bannerlord-{index}",
                 "filename": filename,
                 "area": area,
+                "controls": {
+                    "SubModule.xml": "Module identity, version, dependencies, and entry points",
+                    "*.csproj": "Build project metadata",
+                    "src/**/*.cs": "Gameplay and module C# source",
+                    "ModuleData/**/*.xml": "Module data XML",
+                    "GUI/**/*.xml": "Gauntlet/UI XML",
+                }[filename],
                 "coverage": coverage,
                 "status": status,
                 "target": target,
