@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 
 from . import paths
-from .game_launch import selected_module
+from .deploy_data import deploy_target
 from .perk_data import read_xp_source_definitions
 from .skill_data import read_effect_definitions
 
@@ -41,17 +41,27 @@ def _xp_amount(value, label: str) -> float:
 
 
 def _deployed_module(project: Path, game_root: Path | None = None) -> tuple[str, Path]:
-    return selected_module((game_root or paths.game_root()).resolve(), project.resolve())
+    game = (game_root or paths.game_root()).resolve()
+    module_id, deployed, existed = deploy_target(project.resolve(), game)
+    if not existed:
+        raise RuntimeError(
+            f"Bannerlord module {module_id} is not deployed under {paths.modules_root(game)}. "
+            "Build/deploy it before editing runtime overrides."
+        )
+    return module_id, deployed.resolve()
 
 
 def _paths(project: Path, game_root: Path | None = None) -> tuple[Path, Path, Path]:
     _module_id, deployed = _deployed_module(project, game_root)
-    module_data = deployed / "ModuleData"
-    return (
-        module_data,
-        module_data / "custom_skill_effects.json",
-        module_data / "custom_skill_xp_sources.json",
-    )
+    module_data = (deployed / "ModuleData").resolve()
+    if deployed not in module_data.parents:
+        raise ValueError("Resolved Bannerlord runtime ModuleData path escaped the deployed module")
+    effects_path = (module_data / "custom_skill_effects.json").resolve()
+    xp_path = (module_data / "custom_skill_xp_sources.json").resolve()
+    for target in (effects_path, xp_path):
+        if module_data not in target.parents:
+            raise ValueError("Resolved Bannerlord runtime override path escaped ModuleData")
+    return module_data, effects_path, xp_path
 
 
 def read_runtime_overrides(project: Path, game_root: Path | None = None) -> dict:
