@@ -5,7 +5,10 @@ from pathlib import Path
 import shutil
 import xml.etree.ElementTree as ET
 
+from . import paths
+from .module_data import read_submodule
 from .xml_patch import scan_xml_start_tags, serialize_attribute
+from .xsd_data import enrich_elements, find_schema
 
 
 def list_documents(project: Path) -> list[str]:
@@ -53,17 +56,59 @@ def _record_rows(elements: list[dict]) -> list[dict]:
     return records
 
 
-def read_document(project: Path, requested: str) -> dict:
+def _normalized_module_path(value: str) -> str:
+    value = str(value or "").replace("\\", "/").strip().lstrip("/")
+    if value.casefold().startswith("moduledata/"):
+        value = value[len("ModuleData/"):]
+    if value.casefold().endswith(".xml"):
+        value = value[:-4]
+    return value.casefold()
+
+
+def _registration_id(project: Path, path: Path) -> str:
+    descriptor = project / "SubModule.xml"
+    if not descriptor.is_file():
+        return ""
+    try:
+        module = read_submodule(descriptor)
+    except Exception:
+        return ""
+    relative = path.relative_to((project / "ModuleData").resolve()).as_posix()
+    wanted = _normalized_module_path(relative)
+    for row in module.get("xmls", []):
+        if _normalized_module_path(row.get("path", "")) == wanted:
+            return str(row.get("id") or "")
+    return ""
+
+
+def _schema_for(project: Path, path: Path, root_tag: str, game_root: Path | None) -> dict | None:
+    game = (game_root or paths.game_root()).resolve()
+    return find_schema(game, _registration_id(project, path), root_tag)
+
+
+def _scan_document(text: str, schema: dict | None) -> list[dict]:
+    # ModuleData starts with syntax-safe bool/number inference, then upgrades
+    # controls only when a uniquely matched Bannerlord XSD explicitly says so.
+    return enrich_elements(scan_xml_start_tags(text), schema)
+
+
+def read_document(project: Path, requested: str, game_root: Path | None = None) -> dict:
     path = _document_path(project, requested)
     text = path.read_text(encoding="utf-8-sig")
     try:
         root = ET.fromstring(text)
     except ET.ParseError as error:
         raise ValueError(f"Invalid Bannerlord ModuleData XML in {requested}: {error}") from error
-    # No Gauntlet enum map is supplied here. ModuleData only infers syntax-safe
-    # booleans/numbers until a format/XSD-specific schema says more.
-    elements = scan_xml_start_tags(text)
+    schema = _schema_for(project, path, root.tag, game_root)
+    elements = _scan_document(text, schema)
     records = _record_rows(elements)
+    public_schema = None
+    if schema:
+        public_schema = {
+            "id": schema.get("id") or schema.get("stem") or "",
+            "path": schema.get("path") or "",
+            "matchedByRegistration": bool(_registration_id(project, path)),
+        }
     return {
         "path": str(path),
         "relativePath": path.relative_to(project.resolve()).as_posix(),
@@ -71,13 +116,24 @@ def read_document(project: Path, requested: str) -> dict:
         "recordCount": len(records),
         "records": records,
         "elements": [_public(element) for element in elements],
+        "schema": public_schema,
     }
 
 
-def save_document(project: Path, requested: str, edits: list[dict]) -> dict:
+def save_document(
+    project: Path,
+    requested: str,
+    edits: list[dict],
+    game_root: Path | None = None,
+) -> dict:
     path = _document_path(project, requested)
     text = path.read_text(encoding="utf-8-sig")
-    elements = scan_xml_start_tags(text)
+    try:
+        root = ET.fromstring(text)
+    except ET.ParseError as error:
+        raise ValueError(f"Invalid Bannerlord ModuleData XML in {requested}: {error}") from error
+    schema = _schema_for(project, path, root.tag, game_root)
+    elements = _scan_document(text, schema)
     by_path = {element["path"]: element for element in elements}
     replacements: list[tuple[int, int, str]] = []
     touched: set[tuple[str, str]] = set()
@@ -124,7 +180,7 @@ def save_document(project: Path, requested: str, edits: list[dict]) -> dict:
         temporary = path.with_name(path.name + ".lexeditor.tmp")
         temporary.write_text(candidate, encoding="utf-8")
         temporary.replace(path)
-    result = read_document(project, requested)
+    result = read_document(project, requested, game_root)
     result.update({"saved": changed, "backup": str(backup) if changed else ""})
     return result
 
@@ -156,7 +212,7 @@ def augment_data_map(project: Path, value: dict) -> dict:
                         "editorPath": filename,
                         "notes": (
                             "Record-oriented ModuleData XML editor. Existing nested element attributes "
-                            "are type-aware and edited surgically; unknown nodes remain intact."
+                            "are edited surgically; installed XSDs enrich controls when a unique schema matches."
                         ),
                     }
                 )
