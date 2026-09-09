@@ -129,6 +129,16 @@
     main.replaceChildren(el("div",{class:"bl-split"},master,detail));
   }
 
+  function deploymentAssetBlock(title,status){
+    const row=status||{source:0,deployed:0,missing:[],different:[],inSync:true};
+    const missing=row.missing||[],different=row.different||[];
+    return el("div",{class:"bl-list-block"},el("h3",{},title),
+      el("div",{},`${row.source||0} project file(s) · ${row.deployed||0} deployed · ${missing.length} missing · ${different.length} different`),
+      missing.length?el("ul",{},...missing.map(value=>el("li",{},`Missing: ${value}`))):null,
+      different.length?el("ul",{},...different.map(value=>el("li",{},`Different: ${value}`))):null,
+      row.inSync?el("div",{class:"bl-note"},"Project-owned files match the deployed copies."):null);
+  }
+
   function renderDeployment(){
     const d=state.deployment;
     if(!d){main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Deployment"),el("div",{class:"bl-empty"},"Deployment status is unavailable.")));return}
@@ -150,17 +160,18 @@
         d.issues?.length?el("ul",{},...d.issues.map(value=>el("li",{},value))):el("div",{class:"bl-note"},"No deployment problems detected by the static checks."))
     );
     const deps=d.dependencies||[],bins=d.binaries||[],assets=d.assets||{},overrides=d.runtimeOverrides||{};
+    const legacyGui={source:assets.sourceGuiXml||0,deployed:assets.deployedGuiXml||0,missing:assets.missingGuiXml||[],different:assets.differentGuiXml||[],inSync:!(assets.missingGuiXml||[]).length&&!(assets.differentGuiXml||[]).length};
     const detail=el("section",{class:"bl-card"},
       el("h2",{},"Installed module diagnostics"),
       el("div",{class:"bl-list-block"},el("h3",{},"Dependencies"),
         deps.length?el("ul",{},...deps.map(row=>el("li",{},`${row.installed?"✓":"✗"} ${row.id}${row.optional?" (optional)":""}${row.requiredVersion?` requires ${row.requiredVersion}`:""}${row.installedVersion?` · installed ${row.installedVersion}`:""}`))):el("div",{class:"bl-note"},"No declared dependencies.")),
       el("div",{class:"bl-list-block"},el("h3",{},"Module binaries"),
         bins.length?el("ul",{},...bins.map(row=>el("li",{},`${row.exists?"✓":"✗"} ${row.name}${row.exists?` · ${row.size} bytes`:" · missing"}${row.classType?` · ${row.classType}`:""}`))):el("div",{class:"bl-note"},"No SubModule DLL entries.")),
-      el("div",{class:"bl-list-block"},el("h3",{},"GUI deployment"),
-        el("div",{},`${assets.sourceGuiXml||0} project XML · ${assets.deployedGuiXml||0} deployed · ${(assets.missingGuiXml||[]).length} missing`),
-        (assets.missingGuiXml||[]).length?el("ul",{},...assets.missingGuiXml.map(value=>el("li",{},value))):null),
+      deploymentAssetBlock("GUI assets",assets.gui||legacyGui),
+      deploymentAssetBlock("ModuleData assets",assets.moduleData),
       el("div",{class:"bl-list-block"},el("h3",{},"Runtime balancing overrides"),
-        ...Object.entries(overrides).map(([key,row])=>el("div",{},`${key}: ${row.exists?(row.valid?`${row.keys} override key(s)`:"INVALID JSON"):"not present"}`,row.error?el("small",{},` · ${row.error}`):null)))
+        ...Object.entries(overrides).map(([key,row])=>el("div",{},`${key}: ${row.exists?(row.valid?`${row.keys} override key(s)`:"INVALID JSON"):"not present"}`,row.error?el("small",{},` · ${row.error}`):null))),
+      el("div",{class:"bl-note"},"Runtime balance JSON is intentionally excluded from project/deployed asset sync because it is managed as deployed runtime state by the Runtime tab.")
     );
     main.replaceChildren(el("div",{class:"bl-build-layout"},summary,detail));
   }
