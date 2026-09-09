@@ -1,4 +1,4 @@
-"""Final Palworld loopback service surface, including read-only loader state."""
+"""Final Palworld loopback service surface."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import loader_state
+from . import dedicated_server, loader_state
 from .build_server import Handler as BuildHandler
 from .palschema import (
     PatchValidationError,
@@ -107,6 +107,8 @@ class Handler(BuildHandler):
                     "official-package-build",
                     "official-local-workshop-deploy",
                     "official-loader-state-readonly",
+                    "official-dedicated-server-deploy",
+                    "official-dedicated-server-activation",
                     "data-map",
                 ],
             })
@@ -126,6 +128,19 @@ class Handler(BuildHandler):
                     "error": str(error),
                     "active": False,
                     "listed": False,
+                })
+            return
+        if path == "/api/dedicated-server":
+            try:
+                payload = dedicated_server.status(project_root())
+                payload["ready"] = True
+                self.send_json(payload)
+            except Exception as error:
+                self.send_json({
+                    "ready": False,
+                    "error": str(error),
+                    "serverRoot": "",
+                    "platformSupported": os.name == "nt",
                 })
             return
         if path == "/api/palschema/patch":
@@ -149,6 +164,43 @@ class Handler(BuildHandler):
                 self.send_json({"error": str(error)}, 400)
             return
         super().do_GET()
+
+    def do_POST(self):
+        path = urlparse(self.path).path
+        actions = {
+            "/api/dedicated-server/deploy",
+            "/api/dedicated-server/remove",
+            "/api/dedicated-server/enable",
+            "/api/dedicated-server/revert-activation",
+        }
+        if path not in actions:
+            super().do_POST()
+            return
+        if not self._same_editor_request():
+            self.send_json({"error": "Only this editor may change Palworld dedicated-server deployment"}, 403)
+            return
+        try:
+            self._action_payload()
+            if path == "/api/dedicated-server/deploy":
+                result = dedicated_server.deploy(project_root())
+            elif path == "/api/dedicated-server/remove":
+                result = dedicated_server.remove(project_root())
+            elif path == "/api/dedicated-server/enable":
+                result = dedicated_server.enable(project_root())
+            else:
+                result = dedicated_server.revert_activation(project_root())
+            result["ready"] = True
+            self.send_json(result)
+        except (
+            dedicated_server.DedicatedServerOwnershipError,
+            dedicated_server.DedicatedServerChangedError,
+            dedicated_server.DedicatedServerRefreshError,
+        ) as error:
+            self.send_json({"error": str(error)}, 409)
+        except dedicated_server.DedicatedServerUnavailableError as error:
+            self.send_json({"error": str(error)}, 400)
+        except (OSError, RuntimeError, ValueError) as error:
+            self.send_json({"error": str(error)}, 400)
 
     def save_palschema_patch(self):
         try:
