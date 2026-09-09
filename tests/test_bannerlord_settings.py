@@ -1,6 +1,7 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 TEXT = r'''using System;
 public sealed class Settings {
@@ -48,5 +49,32 @@ class SettingsTests(unittest.TestCase):
             self.assertIn('[SettingPropertyFloatingInteger("Interval", 0.25f, 30f',rewritten)
             with self.assertRaises(ValueError):save_mcm_defaults(root,[{'property':'Columns','value':21}])
             with self.assertRaises(ValueError):save_mcm_defaults(root,[{'property':'Native','value':1}])
+
+    def test_settings_source_redirection_outside_project_is_rejected(self):
+        from games.bannerlord.settings_data import save_mcm_defaults
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            (root / 'src').mkdir()
+            source = root / 'src/LexerSkillTweaksSettings.cs'
+            source.write_text(TEXT, encoding='utf-8')
+            outside = root.parent / (root.name + '-outside-settings.cs')
+            outside.write_text(TEXT, encoding='utf-8')
+            root_resolved = root.resolve()
+            source_path = root_resolved / 'src' / 'LexerSkillTweaksSettings.cs'
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == source_path:
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            try:
+                with patch.object(Path, 'resolve', new=fake_resolve):
+                    with self.assertRaisesRegex(ValueError, 'project path escaped'):
+                        save_mcm_defaults(root, [{'property':'Native','value':True}])
+                self.assertEqual(outside.read_text(encoding='utf-8'), TEXT)
+            finally:
+                outside.unlink(missing_ok=True)
 
 if __name__=='__main__':unittest.main()
