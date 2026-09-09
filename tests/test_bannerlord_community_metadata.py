@@ -2,7 +2,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from games.bannerlord.community_metadata import read_community_dependencies
+from games.bannerlord.community_metadata import community_version_matches, read_community_dependencies
 from games.bannerlord.game_launch import module_load_order
 
 
@@ -91,6 +91,14 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
             self.assertEqual(rows[0]["version"], "v2.*")
             self.assertEqual(rows[0]["attributes"]["Future"], "keep")
 
+    def test_community_version_rules_use_minimums_wildcards_and_ranges(self):
+        self.assertTrue(community_version_matches("v2.1.*", "v2.1.9.4"))
+        self.assertFalse(community_version_matches("v2.2.*", "v2.1.9.4"))
+        self.assertTrue(community_version_matches("v2.0.0-v2.3.*", "v2.3.7"))
+        self.assertFalse(community_version_matches("v2.0.0-v2.3.*", "v2.4.0"))
+        self.assertFalse(community_version_matches("v1.0.0", "e9.9.9"))
+        self.assertIsNone(community_version_matches("not-a-version", "v2.1.0"))
+
     def test_required_load_before_metadata_enables_and_orders_dependency_first(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
@@ -127,6 +135,24 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
                 "Selected",
                 community=[{
                     "id": "OptionalLibrary",
+                    "order": "LoadBeforeThis",
+                    "optional": True,
+                }],
+            )
+            workspace = write_workspace(root, "Selected")
+            self.assertEqual(module_load_order(game, workspace), ["Selected"])
+
+    def test_community_optional_row_overrides_duplicated_native_requiredness(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            write_module(game, "Library")
+            write_module(
+                game,
+                "Selected",
+                native_dependencies=(("Library", False),),
+                community=[{
+                    "id": "Library",
                     "order": "LoadBeforeThis",
                     "optional": True,
                 }],
