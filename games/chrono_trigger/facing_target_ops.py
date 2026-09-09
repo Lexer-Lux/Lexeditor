@@ -1,9 +1,10 @@
 """Proven target-facing editors for Chrono Trigger Steam field events.
 
-Temporal Redux's live FaceObjectMenu and GetFacingMenu establish that 0xA8/0xA9
-and 0x23/0x24 store target IDs doubled in one byte. Get-facing commands also
-store their result through the ordinary one-byte /2 script-memory slot.
-Malformed odd target bytes remain read-only rather than being rounded.
+Temporal Redux's live facing menus establish several doubled-target encodings:
+0x23/0x24 get object/PC facing into script memory, 0xA8/0xA9 face an
+object/PC, and 0x1E/0x1F/0x25/0x26 set an NPC Up/Down/Left/Right with direction
+encoded in the immutable opcode. Malformed or out-of-menu-range target bytes
+remain read-only rather than being rounded or broadened.
 """
 
 from __future__ import annotations
@@ -11,9 +12,12 @@ from __future__ import annotations
 
 U8 = 0xFF
 TARGET_MAX = U8 // 2
+NPC_DIRECTION_TARGET_MAX = 0x32
 SCRIPT_MEM_START = 0x7F0200
 SCRIPT_MEM_LAST = SCRIPT_MEM_START + U8 * 2
-FACING_TARGET_OPCODES = frozenset({0x23, 0x24, 0xA8, 0xA9})
+_DIRECTION_BY_OPCODE = {0x1E: "up", 0x1F: "down", 0x25: "left", 0x26: "right"}
+_NPC_DIRECTION_OPCODES = frozenset(_DIRECTION_BY_OPCODE)
+FACING_TARGET_OPCODES = frozenset({0x1E, 0x1F, 0x23, 0x24, 0x25, 0x26, 0xA8, 0xA9})
 
 
 def _args(command: dict) -> bytearray | None:
@@ -22,8 +26,15 @@ def _args(command: dict) -> bytearray | None:
     except ValueError:
         return None
     opcode = int(command["opcode"])
-    expected = {0x23: 2, 0x24: 2, 0xA8: 1, 0xA9: 1}.get(opcode)
+    expected = {
+        0x1E: 1, 0x1F: 1,
+        0x23: 2, 0x24: 2,
+        0x25: 1, 0x26: 1,
+        0xA8: 1, 0xA9: 1,
+    }.get(opcode)
     if expected is None or len(args) != expected or args[0] & 1:
+        return None
+    if opcode in _NPC_DIRECTION_OPCODES and args[0] // 2 > NPC_DIRECTION_TARGET_MAX:
         return None
     return args
 
@@ -50,7 +61,13 @@ def _script_offset(value, label: str) -> int:
 
 
 def _target_label(opcode: int) -> str:
+    if opcode in _NPC_DIRECTION_OPCODES:
+        return "NPC ID"
     return "Player character" if opcode in {0x24, 0xA9} else "Object ID"
+
+
+def _target_max(opcode: int) -> int:
+    return NPC_DIRECTION_TARGET_MAX if opcode in _NPC_DIRECTION_OPCODES else TARGET_MAX
 
 
 def facing_target_field_specs(command: dict) -> list[dict] | None:
@@ -62,7 +79,7 @@ def facing_target_field_specs(command: dict) -> list[dict] | None:
         "key": "targetId",
         "label": _target_label(opcode),
         "minimum": 0,
-        "maximum": TARGET_MAX,
+        "maximum": _target_max(opcode),
     }]
     if opcode in {0x23, 0x24}:
         fields.append({
@@ -96,7 +113,7 @@ def apply_facing_target_op(command: dict, values: dict) -> bytes | None:
     if unknown:
         raise ValueError(f"Unknown fields for opcode 0x{opcode:02X}: {', '.join(sorted(unknown))}")
     if "targetId" in values:
-        args[0] = _int(values["targetId"], 0, TARGET_MAX, _target_label(opcode)) * 2
+        args[0] = _int(values["targetId"], 0, _target_max(opcode), _target_label(opcode)) * 2
     if opcode in {0x23, 0x24} and "storeAddress" in values:
         args[1] = _script_offset(values["storeAddress"], "Facing destination")
     return bytes(args)
@@ -108,6 +125,15 @@ def facing_target_semantics(command: dict) -> dict | None:
         return None
     opcode = int(command["opcode"])
     target_id = args[0] // 2
+    if opcode in _NPC_DIRECTION_OPCODES:
+        direction = _DIRECTION_BY_OPCODE[opcode]
+        return {
+            "summary": f"Set NPC {target_id} facing {direction}",
+            "targetId": target_id,
+            "targetType": "npc",
+            "direction": direction,
+            "operation": "set-npc-facing",
+        }
     is_pc = opcode in {0x24, 0xA9}
     target = "PC" if is_pc else "object"
     if opcode in {0x23, 0x24}:
