@@ -1,6 +1,7 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from games.bannerlord.game_launch import launch_command, module_load_order, selected_module
 
@@ -262,6 +263,57 @@ class BannerlordLaunchTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(RuntimeError, "single-player modules only"):
                 launch_command(game, workspace)
+
+    def test_selected_project_descriptor_redirection_is_rejected(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            (workspace / "SubModule.xml").write_text(
+                '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
+            )
+            write_module(game, "LexerSkillTweaks", "LexerSkillTweaks")
+            outside = root / "outside-project.xml"
+            outside.write_text('<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8")
+            workspace_resolved = workspace.resolve()
+            descriptor = workspace_resolved / "SubModule.xml"
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == descriptor:
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(RuntimeError, "SubModule.xml path escaped"):
+                    selected_module(game, workspace)
+
+    def test_installed_module_folder_redirection_is_rejected(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            (workspace / "SubModule.xml").write_text(
+                '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
+            )
+            deployed = write_module(game, "LexerSkillTweaks", "LexerSkillTweaks")
+            outside = root / "outside-module"
+            outside.mkdir()
+            deployed_resolved = deployed.resolve()
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == deployed_resolved:
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(RuntimeError, "module path escaped the Modules folder"):
+                    selected_module(game, workspace)
 
 
 if __name__ == "__main__":
