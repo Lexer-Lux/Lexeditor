@@ -44,6 +44,12 @@ def _record_rows(elements: list[dict]) -> list[dict]:
         if element["depth"] != 1:
             continue
         attributes = {row["name"]: row["value"] for row in element["attributes"]}
+        prefix = element["path"] + "/"
+        descendants = [
+            row for row in elements
+            if row["path"] == element["path"] or row["path"].startswith(prefix)
+        ]
+        issue_count = sum(len(row.get("schemaIssues") or []) for row in descendants)
         records.append(
             {
                 "path": element["path"],
@@ -51,6 +57,7 @@ def _record_rows(elements: list[dict]) -> list[dict]:
                 "line": element["line"],
                 "id": attributes.get("id") or attributes.get("Id") or "",
                 "name": attributes.get("name") or attributes.get("Name") or "",
+                "schemaIssueCount": issue_count,
             }
         )
     return records
@@ -117,6 +124,7 @@ def read_document(project: Path, requested: str, game_root: Path | None = None) 
         "records": records,
         "elements": [_public(element) for element in elements],
         "schema": public_schema,
+        "schemaIssueCount": sum(len(element.get("schemaIssues") or []) for element in elements),
     }
 
 
@@ -212,7 +220,7 @@ def augment_data_map(project: Path, value: dict) -> dict:
                         "editorPath": filename,
                         "notes": (
                             "Record-oriented ModuleData XML editor. Existing nested element attributes "
-                            "are edited surgically; installed XSDs enrich controls when a unique schema matches."
+                            "are edited surgically; installed XSDs enrich controls and diagnostics when a unique schema matches."
                         ),
                     }
                 )
