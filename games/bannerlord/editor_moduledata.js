@@ -44,6 +44,7 @@ function applyModuleDataRecordSelection(record){
   state.moduleDataElementPath=record?.path||"";
   state.moduleDataNewId=defaultDuplicateId(record);
 }
+const xmlBooleanChecked=value=>["true","1"].includes(String(value).trim().toLowerCase());
 
 async function ensureModuleDataFiles(){
   if(state.moduleDataFiles!==null)return state.moduleDataFiles;
@@ -73,7 +74,7 @@ async function loadModuleData(path,ask=true){
 function moduleDataControl(attribute){
   if(attribute.fixed!==undefined)return el("code",{title:"Fixed by Bannerlord XSD"},String(attribute.value));
   const assign=value=>{attribute.value=String(value);refresh()};
-  if(attribute.kind==="bool")return checkbox(String(attribute.value).toLowerCase()==="true",value=>assign(value?"true":"false"));
+  if(attribute.kind==="bool")return checkbox(xmlBooleanChecked(attribute.value),value=>assign(value?"true":"false"));
   if(attribute.kind==="enum")return select(attribute.value,(attribute.choices||[]).map(value=>[value,value]),assign);
   if(attribute.kind==="number"){
     const attrs={step:attribute.integer?1:"any"};
@@ -89,7 +90,7 @@ function missingRequiredValueControl(attribute){
   const assign=value=>{attribute.value=String(value);refresh()};
   if(attribute.fixed!==undefined)return el("code",{},String(attribute.fixed));
   if(attribute.kind==="bool")return el("input",{
-    type:"checkbox",checked:String(attribute.value).toLowerCase()==="true",disabled,
+    type:"checkbox",checked:xmlBooleanChecked(attribute.value),disabled,
     onchange:event=>assign(event.target.checked?"true":"false")
   });
   if(attribute.kind==="enum"){
