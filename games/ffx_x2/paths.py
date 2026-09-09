@@ -69,7 +69,7 @@ def ensure_project(root: Path = PROJECT_ROOT) -> None:
 def check() -> list[str]:
     problems: list[str] = []
     for relative in (
-        "editor.html", "server.py", "plugin.py", "paths.py", "vbf.py", "deployment.py", "theme.py",
+        "editor.html", "server.py", "plugin.py", "paths.py", "vbf.py", "deployment.py", "theme.py", "launch.py",
         "ffx_table.py", "ffx2_table.py", "shop_table.py", "u32_prices.py", "treasures.py", "item_prices.py",
         "auto_ability_prices.py", "ctb_base.py", "mix_table.py", "item_shops.py", "gear_shops.py",
         "ffx2_abilities.py", "ffx2_accessories.py", "project-template/README.md",
