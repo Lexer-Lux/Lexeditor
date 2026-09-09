@@ -248,6 +248,47 @@ bounded number/range controls for real numeric limits, and decomposed bitflags w
 possible. Help text should explain effect, unit, special values and restart/runtime
 requirements rather than restating the field name.
 
+### Derive the plugin theme from the installed game when feasible
+
+A plugin should not look like the Blank gallery with a different accent color when
+the game already ships a strong UI language of its own. **Research the game's menu
+art, fonts, icons, cursor/highlight treatment and short UI sound effects as part of
+the normal plugin research pass.** Prefer those proved source assets over drawing a
+generic imitation by hand.
+
+The safe default is **local derivation, not redistribution**:
+
+- read theme sources from the user's own supported game installation;
+- keep installed archives/files strictly read-only, just like gameplay source data;
+- write a bounded derived/cached theme outside the repository (normally under the
+  user's Lexeditor cache or other local application-data directory);
+- key/invalidate that cache by a source hash/header hash/build signature so stale
+  assets do not silently survive a game update;
+- never commit proprietary game textures, fonts, audio banks or extracted dumps to
+  Lexeditor just to make a plugin look authentic;
+- never expose arbitrary raw cache paths through the plugin HTTP service. Serve
+  only explicit browser-ready assets through the same resolved-path containment
+  rules as other local assets.
+
+Prefer formats the browser can already consume directly (`png`, `webp`,
+`ttf`/`otf`/`woff`, `wav`/`ogg`/`mp3`, etc.). When the game uses a proprietary
+container/atlas/bank, first look for a compatible licensed decoder/converter and
+credit it. It is fine to cache the recognized raw local source while conversion is
+still unsupported, but the UI must say that honestly instead of claiming the font
+or SFX is active.
+
+Theme extraction is cosmetic and must **fail soft**. Missing `metamenu`/UI assets,
+an unsupported bitmap-font atlas, or an undecoded sound bank must not block a safe
+gameplay editor. Keep a deliberate fallback theme that preserves the game's color,
+spacing and interaction character without pretending it is the original asset.
+When browser-ready local UI SFX exist, play them only after a user gesture and keep
+them subtle; do not auto-play game audio.
+
+Add the theme surface to the Data Map or another honest diagnostics surface. Real UI
+acceptance should verify both the installed-asset path and the fallback path. A
+screenshot/source inspection is not enough to prove a local texture, font or sound
+actually renders/plays in the desktop host.
+
 Credits and Mod Loading are shared Info-page sections; do not hand-build per-game
 copies. A plugin still has to supply their data, and discovery will reject it if it
 does not.
@@ -336,8 +377,10 @@ A new plugin is not complete until the applicable items below are true:
 - [ ] Save/deployment writes are atomic and recovery/revert behavior is defined.
 - [ ] The deployment, revert, launch and native acceptance path was designed before the endgame.
 - [ ] Shared UI controls are used instead of game-local clones.
+- [ ] Game-original UI art/fonts/icons/SFX were researched and locally derived where feasible; fallback behavior is explicit where they are not browser-ready.
+- [ ] Proprietary theme sources remain private/read-only and any local theme cache is bounded, source-versioned and path-contained.
 - [ ] Safe smoke test exists and does not mutate a real installation/save.
-- [ ] Browser/shared-UI acceptance passes.
+- [ ] Browser/shared-UI acceptance passes, including installed-theme and fallback states when applicable.
 - [ ] The normal installed Lexeditor runtime can start the plugin and its dependencies.
 - [ ] Real installed-game deployment/loading has been exercised when the plugin claims it.
 - [ ] Native gameplay/visual/audio behavior has been checked for features that require it.
@@ -351,6 +394,7 @@ A new plugin is not complete until the applicable items below are true:
 - Reimplementing a parser/library that can legally and cleanly be reused.
 - Inventing a new plugin lifecycle when an existing Lexeditor precedent already fits.
 - Building UI before proving serialization and the loader/deployment boundary.
+- Hand-drawing a generic "game-like" theme before checking whether the installed game already contains usable menu art, fonts, icons and UI SFX.
 - Inventing a new mod loader when the established ecosystem loader is sufficient.
 - Leaving deployment/revert/native acceptance design until every editor screen is finished.
 - Assuming one observed game build proves offsets/layout for every edition.
