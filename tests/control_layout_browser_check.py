@@ -87,8 +87,12 @@ def main():
             a=page.locator('[data-lex-toggle=a]');b=page.locator('[data-lex-toggle=b]')
             assert not a.locator('.lex-info-help').is_visible()
             a.hover()
-            assert a.locator('.lex-info-help').is_visible() and not a.locator('.lex-toggle-type').is_visible()
-            assert not b.locator('.lex-info-help').is_visible() and b.locator('.lex-toggle-type').is_visible()
+            # The property's own type rail declares BOOL once. Switches no
+            # longer repeat it, so a switch shows only its own help on hover.
+            assert a.locator('.lex-info-help').is_visible()
+            assert a.locator('.lex-toggle-type').count()==0
+            assert not b.locator('.lex-info-help').is_visible()
+            assert b.locator('.lex-toggle-type').count()==0
             a.locator('input').check()
             assert a.locator('input').is_checked()
             page.screenshot(path=str(OUT/'boolean-hover.png'))

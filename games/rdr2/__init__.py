@@ -1,1 +1,1 @@
-"""Red Dead Redemption 2 plugin."""
+"""Red Dead Redemption II plugin."""

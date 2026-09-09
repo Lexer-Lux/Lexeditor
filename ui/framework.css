@@ -924,7 +924,6 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 
 .lex-detail-panel {
-  --lex-detail-label-width:clamp(125px, 18%, 230px);
   display:grid !important;
   /* Every Detail reserves the same top tenth for identity. Plugins may scale
      the contents inside it, but they must not make the heading consume more
@@ -4499,7 +4498,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_SHARED_UI_STANDARDIZATION_20260906 */
-:root { --lex-detail-label-width:10%; }
+/* One definition. This lived on .lex-detail-panel as well, which beat :root,
+   so edits to the :root value silently did nothing. */
+:root { --lex-detail-label-width:clamp(64px, 5%, 150px); --lex-copy-gutter:19px; }
 .lex-detail-field { grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr); }
 .lex-detail-field-label {
   min-width:0; min-height:0; height:100%; overflow:hidden;
@@ -4688,12 +4689,14 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_FIELD_METADATA_GEOMETRY_20260906 */
-/* Property names own exactly ten percent of an ordinary Detail row.  The text
+/* Property names own the shared label lane width, never a literal repeated
+   here; a hardcoded percentage in this block silently beat every other
+   definition, including :root.  The text
    sits against the value side of that lane; the shared type/help rail occupies
    the metadata space to its left and is positioned by framework.js from the
    actually rendered text width. */
 .lex-detail-field:not(.lex-boolean-field) {
-  grid-template-columns:10% minmax(0,1fr) !important;
+  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr) !important;
 }
 .lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label {
   justify-content:flex-end;
@@ -4810,8 +4813,18 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 
 /* Controls reserve their own space at every panel width. */
-.lex-detail-field-control:has(> .lex-copy-value) {
-  display:grid; grid-template-columns:19px minmax(0,1fr); gap:6px; align-items:center;
+/* Every control reserves the copy gutter, whether or not it has a copy
+   button. Giving only copyable fields the extra column pushed their controls
+   right and broke alignment down the panel. */
+.lex-detail-field-control {
+  position:relative;
+  padding-inline-start:calc(10px + var(--lex-copy-gutter) + 4px);
+}
+.lex-detail-field-control > .lex-copy-value {
+  position:absolute;
+  top:50%;
+  left:8px;
+  transform:translateY(-50%);
 }
 .lex-copy-value:focus-visible { opacity:1; }
 .lex-project-menu-item > .lex-project-menu-item-select {

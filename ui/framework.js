@@ -963,13 +963,18 @@
       host.append(lock);
     }
     node.lexRejectValue = rejectValue;
-
     // A bounded number draws its own value as a fill behind the box, and on
     // hover the fill slides out into a slider for rough adjustment.
-    const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
-    const highBound = max === null || max === undefined || max === "" ? null : Number(max);
-    if (input && !readOnly && numericLike &&
-        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
+    // Applied to every bounded numeric input in the control: a multi-number
+    // property holds several, and only the first one used to get a slider.
+    const installValueFill = input => {
+      if (!input || readOnly) return;
+      if (String(input.type || "").toLocaleLowerCase() !== "number" && !numericLike) return;
+      const rawLow = input.getAttribute?.("min") ?? input.dataset?.min ?? min;
+      const rawHigh = input.getAttribute?.("max") ?? input.dataset?.max ?? max;
+      const lowBound = rawLow === null || rawLow === undefined || rawLow === "" ? null : Number(rawLow);
+      const highBound = rawHigh === null || rawHigh === undefined || rawHigh === "" ? null : Number(rawHigh);
+      if (!Number.isFinite(lowBound) || !Number.isFinite(highBound) || highBound <= lowBound) return;
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
       fill.append(handle);
@@ -1044,7 +1049,12 @@
       (control instanceof Element && control.matches(".lex-unit-field") ? control : input.parentElement)
         ?.prepend(fill);
       requestAnimationFrame(paint);
-    }
+    };
+    const boundedInputs = control instanceof Element
+      ? [...control.querySelectorAll('input[type="number"]')] : [];
+    if (boundedInputs.length > 1) boundedInputs.forEach(installValueFill);
+    else installValueFill(input);
+
 
     if (input && !readOnly && inputType !== "checkbox") {
       // Selecting the whole value on focus keeps a drag inside the field from
@@ -1107,10 +1117,10 @@
         "aria-label": toggle.label,
         onchange: event => toggle.change?.(event.target.checked, event),
       });
-      // Each switch carries its own type rail, matching every other property:
-      // BOOL until pointed at, then the help marker for that flag.
-      const rail = element("span", {class: "lex-toggle-rail"},
-        element("span", {class: "lex-toggle-type"}, "BOOL"));
+      // The property's own type rail already declares BOOL once. Repeating it
+      // on every switch was noise, so the rail carries only that flag's help
+      // marker, which appears when the switch is pointed at.
+      const rail = element("span", {class: "lex-toggle-rail"});
       const label = element("label", {
         class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),
         "data-lex-toggle": toggle.key || toggle.label || "",

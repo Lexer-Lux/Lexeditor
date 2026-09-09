@@ -5098,7 +5098,7 @@ class Handler(BaseHTTPRequestHandler):
                     self._json({
                         "apiVersion": PLUGIN_API_VERSION,
                         "pluginId": PLUGIN_ID,
-                        "name": "Red Dead Redemption 2",
+                        "name": "Red Dead Redemption II",
                         "hosted": PLUGIN_HOSTED,
                         "windowHost": os.environ.get("LEXEDITOR_WINDOW_HOST", ""),
                         "projectRoot": str(PROJECT_ROOT),
