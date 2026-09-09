@@ -52,6 +52,17 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             self.assertIn(f"-p:BannerlordDir={selected_game.resolve()}", runner.call_args.args[0])
             self.assertEqual(result["gameRootOverride"], str(selected_game.resolve()))
 
+    def test_auto_selected_project_file_cannot_escape_selected_project(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            project = root / "project"
+            project.mkdir()
+            outside = root / "Outside.csproj"
+            outside.write_text(CSPROJ, encoding="utf-8")
+            with patch("games.bannerlord.project_data.primary_project_file", return_value=outside):
+                with self.assertRaisesRegex(ValueError, "stay inside"):
+                    run_build(project)
+
 
 if __name__ == "__main__":
     unittest.main()
