@@ -270,9 +270,17 @@ def _build_path_overrides(project: Path, selected_game: Path) -> dict[str, str]:
     module_id = str(read_submodule(descriptor).get("id") or "").strip()
     if not module_id or not _MODULE_ID.fullmatch(module_id):
         raise ValueError(f"Bannerlord project has an unsafe module Id: {module_id or '(missing)'}")
-    game_bin = selected_game / "bin" / "Win64_Shipping_Client"
-    module_dir = selected_game / "Modules" / module_id
-    output_path = module_dir / "bin" / "Win64_Shipping_Client"
+
+    selected_game = selected_game.resolve()
+    game_bin = (selected_game / "bin" / "Win64_Shipping_Client").resolve()
+    modules_root = (selected_game / "Modules").resolve()
+    module_dir = (modules_root / module_id).resolve()
+    if modules_root not in module_dir.parents:
+        raise ValueError("Resolved Bannerlord build module path escaped the Modules folder")
+    output_path = (module_dir / "bin" / "Win64_Shipping_Client").resolve()
+    if module_dir not in output_path.parents:
+        raise ValueError("Resolved Bannerlord build output path escaped the module folder")
+
     return {
         "BannerlordDir": str(selected_game),
         "GameBin": str(game_bin),
