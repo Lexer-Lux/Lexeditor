@@ -81,6 +81,7 @@ class BannerlordXsdTests(unittest.TestCase):
 
             document = read_document(project, "ModuleData/items.xml", game)
             self.assertEqual(document["schema"]["id"], "Items")
+            self.assertEqual(document["schemaIssueCount"], 0)
             item = next(row for row in document["elements"] if row["tag"] == "Item")
             attrs = {row["name"]: row for row in item["attributes"]}
             self.assertTrue(attrs["id"]["required"])
@@ -93,6 +94,38 @@ class BannerlordXsdTests(unittest.TestCase):
             self.assertEqual(attrs["tier"]["min"], 0.0)
             self.assertEqual(attrs["tier"]["max"], 6.0)
             self.assertEqual(attrs["fixedValue"]["fixed"], "locked")
+            self.assertEqual(item["schemaIssues"], [])
+            self.assertEqual(item["missingRequired"], [])
+        finally:
+            temporary.cleanup()
+
+    def test_existing_invalid_values_and_missing_required_attributes_are_reported(self):
+        temporary, project, game, source, _schema_path = self.fixture()
+        try:
+            source.write_text(
+                '<Items>\n'
+                '  <Item enabled="maybe" weight="heavy" Type="Food" tier="7.5" fixedValue="changed" />\n'
+                '</Items>\n',
+                encoding="utf-8",
+            )
+            document = read_document(project, "ModuleData/items.xml", game)
+            self.assertEqual(document["schemaIssueCount"], 6)
+            self.assertEqual(document["records"][0]["schemaIssueCount"], 6)
+            item = next(row for row in document["elements"] if row["tag"] == "Item")
+            self.assertEqual([row["name"] for row in item["missingRequired"]], ["id"])
+            issues = "\n".join(item["schemaIssues"])
+            self.assertIn("Missing required attribute: id", issues)
+            self.assertIn("enabled has value 'maybe'; expected an XML boolean", issues)
+            self.assertIn("weight has value 'heavy'; expected float", issues)
+            self.assertIn("Type has value 'Food'; expected one of", issues)
+            self.assertIn("tier has value '7.5'; expected an integer", issues)
+            self.assertIn("fixedValue must equal fixed schema value 'locked'", issues)
+            attrs = {row["name"]: row for row in item["attributes"]}
+            self.assertIn("schemaIssue", attrs["enabled"])
+            self.assertIn("schemaIssue", attrs["weight"])
+            self.assertIn("schemaIssue", attrs["Type"])
+            self.assertIn("schemaIssue", attrs["tier"])
+            self.assertIn("schemaIssue", attrs["fixedValue"])
         finally:
             temporary.cleanup()
 
@@ -135,6 +168,7 @@ class BannerlordXsdTests(unittest.TestCase):
                 game,
             )
             self.assertEqual(saved["saved"], 3)
+            self.assertEqual(saved["schemaIssueCount"], 0)
             rewritten = source.read_text(encoding="utf-8")
             self.assertIn('Type="Armor"', rewritten)
             self.assertIn('tier="3"', rewritten)
@@ -150,11 +184,13 @@ class BannerlordXsdTests(unittest.TestCase):
             no_schema_game.mkdir()
             document = read_document(project, "ModuleData/items.xml", no_schema_game)
             self.assertIsNone(document["schema"])
+            self.assertEqual(document["schemaIssueCount"], 0)
             item = next(row for row in document["elements"] if row["tag"] == "Item")
             attrs = {row["name"]: row for row in item["attributes"]}
             self.assertEqual(attrs["Type"]["kind"], "text")
             self.assertEqual(attrs["tier"]["kind"], "number")
             self.assertNotIn("max", attrs["tier"])
+            self.assertNotIn("schemaIssues", item)
         finally:
             temporary.cleanup()
 
