@@ -13,9 +13,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from games.chrono_trigger.data import OverlayStore
+from games.chrono_trigger.editor_registry import decorate_event_editors, save_event_fields
 from games.chrono_trigger.event_edit import save_event_arguments
 from games.chrono_trigger.events import get_event
-from games.chrono_trigger.field_editors import decorate_event_editors, save_event_fields
 
 
 def _json_object(value: str) -> dict:
