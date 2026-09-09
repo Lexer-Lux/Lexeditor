@@ -51,12 +51,13 @@ class BannerlordPlayDiagnosticTests(unittest.TestCase):
             status = deployment_status(project, game)
             self.assertTrue(status["runnable"])
             self.assertEqual(status["playError"], "")
+            self.assertEqual(status["dependencyDeclarationIssues"], [])
             self.assertEqual(status["loadOrder"], module_load_order(game, project))
             self.assertEqual(status["loadOrder"], ["Library", "Selected"])
         finally:
             temporary.cleanup()
 
-    def test_load_order_cycle_makes_status_non_runnable_with_play_error(self):
+    def test_conflicting_load_declaration_makes_status_non_runnable_with_play_error(self):
         temporary, game, project = self.fixture()
         try:
             write_module(game, "Library")
@@ -69,7 +70,11 @@ class BannerlordPlayDiagnosticTests(unittest.TestCase):
             (project / "SubModule.xml").write_bytes((deployed / "SubModule.xml").read_bytes())
             status = deployment_status(project, game)
             self.assertFalse(status["runnable"])
-            self.assertIn("load-order constraints form a cycle", status["playError"])
+            self.assertIn("both LoadBeforeThis and LoadAfterThis", status["playError"])
+            self.assertTrue(any(
+                "both LoadBeforeThis and LoadAfterThis" in row
+                for row in status["dependencyDeclarationIssues"]
+            ))
             self.assertTrue(any("Play load-order validation failed" in row for row in status["issues"]))
         finally:
             temporary.cleanup()
