@@ -56,6 +56,7 @@ class MemoryOpTests(unittest.TestCase):
         fixtures = {
             0x19: b"\x10",
             0x1A: b"\x05\x01",
+            0x1C: b"\x44",
             0x4F: b"\x7F\x10",
             0x50: b"\x34\x12\x10",
             0x51: b"\x10\x11",
@@ -82,11 +83,35 @@ class MemoryOpTests(unittest.TestCase):
         self.assertEqual(editor_schema(store_result)["values"], {"storeAddress": 0x7F0230})
         self.assertEqual(memory_semantics(store_result)["summary"], "Result → 0x7F0230")
 
+        bank_result = command(0x1C, b"\x44")
+        bank_schema = editor_schema(bank_result)
+        self.assertEqual(bank_schema["values"], {"storeAddress": 0x7F0044})
+        self.assertEqual(bank_schema["fields"][0]["min"], 0x7F0000)
+        self.assertEqual(bank_schema["fields"][0]["max"], 0x7F00FF)
+        self.assertEqual(memory_semantics(bank_result)["summary"], "Result → 0x7F0044 (bank 7F)")
+        self.assertEqual(memory_semantics(bank_result)["addressMode"], "bank7f-byte-offset")
+
         check = command(0x1A, b"\x05\x03")
         self.assertEqual(editor_schema(check)["values"], {"resultValue": 5, "jumpOffset": 3})
         semantic = memory_semantics(check)
         self.assertTrue(semantic["jumpOnMismatch"])
         self.assertEqual(semantic["summary"], "Result must equal 5 · mismatch → jump +3")
+
+    def test_bank7f_result_write_uses_literal_one_byte_offset(self):
+        original = event(bytes((0x1C, 0x44, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"storeAddress": 0x7F00AA})
+        self.assertEqual(store.overlay[33:35], bytes((0x1C, 0xAA)))
+        self.assertEqual(len(store.overlay), len(original))
+
+    def test_bank7f_result_range_is_narrowed_to_encodable_byte(self):
+        original = event(bytes((0x1C, 0x44, 0x00)))
+        for address in (0x7EFFFF, 0x7F0100, 0x7F0200):
+            with self.subTest(address=address):
+                store = FakeStore(original)
+                with self.assertRaisesRegex(ValueError, "Bank-7F result address must be between"):
+                    save_event_fields(store, 1, 0, 0, 0, sha256(original), {"storeAddress": address})
+                self.assertIsNone(store.overlay)
 
     def test_immediate_assignments_use_u8_and_little_endian_u16(self):
         one = command(0x4F, b"\x7F\x10")
