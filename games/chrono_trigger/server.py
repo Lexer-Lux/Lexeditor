@@ -126,7 +126,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/13"
+    server_version = "LexeditorChronoTrigger/14"
 
     def log_message(self, _format, *_args):
         return
@@ -143,6 +143,14 @@ class Handler(BaseHTTPRequestHandler):
     def send_file(self, target: Path):
         self.send_bytes(target.read_bytes(), mimetypes.guess_type(target.name)[0] or "application/octet-stream")
 
+    def send_editor(self):
+        html = (PLUGIN_ROOT / "editor.html").read_text(encoding="utf-8")
+        marker = "</body>"
+        if marker not in html:
+            raise RuntimeError("Chrono Trigger editor document is missing its body terminator")
+        html = html.replace(marker, '<script src="/event_editor.js"></script></body>', 1)
+        self.send_bytes(html.encode("utf-8"), "text/html; charset=utf-8")
+
     def send_bytes(self, data: bytes, content_type: str, *, attachment: bool = False):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
@@ -158,7 +166,9 @@ class Handler(BaseHTTPRequestHandler):
         path, params = parsed.path, parse_qs(parsed.query)
         try:
             if path == "/":
-                self.send_file(PLUGIN_ROOT / "editor.html")
+                self.send_editor()
+            elif path == "/event_editor.js":
+                self.send_file(PLUGIN_ROOT / "event_editor.js")
             elif path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()
