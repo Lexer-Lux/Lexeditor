@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import deployment, paths, treasures
+from . import deployment, item_shops, paths, treasures
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
 
@@ -19,7 +19,7 @@ HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 256 * 1024
 POST_ROUTES = {
-    "/api/project/extract", "/api/treasures/save",
+    "/api/project/extract", "/api/treasures/save", "/api/item-shops/save",
     "/api/deployment/deploy", "/api/deployment/revert",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
@@ -71,45 +71,74 @@ def _archive_status(game: str) -> dict:
                 "ready": False, "error": str(error), "fileCount": 0}
 
 
-def _treasure_current() -> tuple[VBFIndex, Path, bytes, str]:
+def _structured_current(archive_path: str) -> tuple[VBFIndex, Path, bytes, str]:
     index = _index("x")
-    entry = index.find(treasures.ARCHIVE_PATH)
+    entry = index.find(archive_path)
     target = _project_target("x", entry.path)
     if target.is_file():
         return index, target, target.read_bytes(), "project"
     return index, target, read_entry(index, entry), "archive"
 
 
-def treasure_catalog() -> dict:
-    index, target, data, source = _treasure_current()
-    result = treasures.payload(data)
+def _structured_payload(archive_path: str, builder) -> dict:
+    index, target, data, source = _structured_current(archive_path)
+    result = builder(data)
     result.update({
-        "game": "x",
-        "archivePath": treasures.ARCHIVE_PATH,
-        "headerMd5": index.header_md5,
-        "source": source,
-        "staged": target.is_file(),
-        "projectPath": str(target),
+        "game": "x", "archivePath": archive_path, "headerMd5": index.header_md5,
+        "source": source, "staged": target.is_file(), "projectPath": str(target),
     })
     return result
 
 
-def save_treasures(request: dict) -> dict:
-    index, target, data, _source = _treasure_current()
-    expected_header = str(request.get("headerMd5", ""))
-    if expected_header != index.header_md5:
-        raise RuntimeError("The FFX VBF changed; refresh Treasures before saving")
-    expected_baseline = str(request.get("baselineSha256", ""))
+def _structured_save(request: dict, archive_path: str, apply, builder, label: str) -> dict:
+    index, target, data, _source = _structured_current(archive_path)
+    if str(request.get("headerMd5", "")) != index.header_md5:
+        raise RuntimeError(f"The FFX VBF changed; refresh {label} before saving")
     current_baseline = treasures.sha256_bytes(data)
-    if expected_baseline != current_baseline:
-        raise RuntimeError("takara.bin changed outside this editor; refresh Treasures before saving")
+    if str(request.get("baselineSha256", "")) != current_baseline:
+        raise RuntimeError(f"{Path(archive_path).name} changed outside this editor; refresh {label} before saving")
     edits = request.get("edits")
-    edited = treasures.apply_edits(data, edits)
+    edited = apply(data, edits)
     paths.ensure_project()
     treasures.atomic_write(target, edited)
-    result = treasure_catalog()
+    result = _structured_payload(archive_path, builder)
     result["saved"] = len(edits)
     return result
+
+
+def treasure_catalog() -> dict:
+    return _structured_payload(treasures.ARCHIVE_PATH, treasures.payload)
+
+
+def save_treasures(request: dict) -> dict:
+    return _structured_save(
+        request, treasures.ARCHIVE_PATH, treasures.apply_edits, treasures.payload, "Treasures"
+    )
+
+
+def item_shop_catalog() -> dict:
+    return _structured_payload(item_shops.ARCHIVE_PATH, item_shops.payload)
+
+
+def save_item_shops(request: dict) -> dict:
+    return _structured_save(
+        request, item_shops.ARCHIVE_PATH, item_shops.apply_edits, item_shops.payload, "Item Shops"
+    )
+
+
+def _map_structured_row(archive_path: str, controls: str, builder, notes) -> dict:
+    try:
+        state = _structured_payload(archive_path, builder)
+        status = "integrated"
+        note = notes(state)
+    except (OSError, VBFError, ValueError) as error:
+        status = "partial"
+        note = f"Recognized structured table, but it is unavailable: {error}"
+    return {
+        "filename": archive_path, "controls": controls, "notes": note,
+        "status": status, "coverage": "structured-record-editor",
+        "openable": status == "integrated", "game": "x",
+    }
 
 
 def data_map() -> dict:
@@ -125,33 +154,36 @@ def data_map() -> dict:
             ),
             "status": "integrated" if state["ready"] else "partial",
             "coverage": "archive-index-and-extract",
-            "openable": state["ready"],
-            "target": "archives",
-            "game": key,
+            "openable": state["ready"], "target": "archives", "game": key,
         })
-    try:
-        treasure_state = treasure_catalog()
-        treasure_status = "integrated"
-        treasure_note = (
-            f"{len(treasure_state['rows'])} fixed reward records. Lexeditor edits only kind, quantity, "
-            "and 16-bit type ID, preserves all other bytes, and writes a project EFL override."
-        )
-    except (OSError, VBFError, ValueError) as error:
-        treasure_status = "partial"
-        treasure_note = f"Recognized structured treasure table, but it is unavailable: {error}"
+    treasure_row = _map_structured_row(
+        treasures.ARCHIVE_PATH,
+        "Structured treasure reward editor",
+        treasures.payload,
+        lambda state: (
+            f"{len(state['rows'])} fixed reward records. Edits only kind, quantity and 16-bit type ID; "
+            "all other bytes are preserved in a project EFL override."
+        ),
+    )
+    treasure_row["target"] = "treasures"
+    rows.append(treasure_row)
+    shop_row = _map_structured_row(
+        item_shops.ARCHIVE_PATH,
+        "Structured 16-slot item shop editor",
+        item_shops.payload,
+        lambda state: (
+            f"{len(state['rows'])} shops with {state['slotCount']} item/command ID slots each. "
+            "The unproved/unused leading rate field is read-only and preserved."
+        ),
+    )
+    shop_row["target"] = "item-shops"
+    rows.append(shop_row)
     rows.extend([
-        {
-            "filename": treasures.ARCHIVE_PATH,
-            "controls": "Structured treasure reward editor",
-            "notes": treasure_note,
-            "status": treasure_status, "coverage": "structured-record-editor",
-            "openable": treasure_status == "integrated", "target": "treasures", "game": "x",
-        },
         {
             "filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*",
             "controls": "Remaining gameplay/kernel family",
-            "notes": "Treasure rewards are structured; other kernel tables can still be located and staged through the VBF browser.",
-            "status": "partial", "coverage": "one-structured-family", "openable": False,
+            "notes": "Treasure rewards and item shops are structured; other kernel tables remain available through the VBF browser.",
+            "status": "partial", "coverage": "two-structured-families", "openable": False,
         },
         {
             "filename": "FFX2_Data/ffx_ps2/ffx2/**",
@@ -175,16 +207,13 @@ def dashboard() -> dict:
     deploy = deployment.status(paths.GAME_ROOT, paths.PROJECT_ROOT)
     return {
         "game": {
-            "root": str(paths.GAME_ROOT),
-            "ready": not paths.game_problems(),
-            "steamAppId": "359870",
-            "launcher": str(paths.GAME_ROOT / "FFX&X-2_LAUNCHER.exe"),
+            "root": str(paths.GAME_ROOT), "ready": not paths.game_problems(),
+            "steamAppId": "359870", "launcher": str(paths.GAME_ROOT / "FFX&X-2_LAUNCHER.exe"),
             "executables": [str(paths.GAME_ROOT / "FFX.exe"), str(paths.GAME_ROOT / "FFX-2.exe")],
         },
         "archives": archives,
         "project": {"root": str(paths.PROJECT_ROOT), "fileCount": deploy["projectFileCount"]},
-        "deployment": deploy,
-        "problems": paths.game_problems(),
+        "deployment": deploy, "problems": paths.game_problems(),
     }
 
 
@@ -198,13 +227,10 @@ def archive_catalog(game: str, query: str, offset: int, limit: int) -> dict:
     page = rows[offset:offset + limit]
     project_root = paths.PROJECT_ROOT.resolve()
     return {
-        "game": key,
-        "headerMd5": index.header_md5,
+        "game": key, "headerMd5": index.header_md5,
         "total": len(rows), "offset": offset, "limit": limit,
         "entries": [{
-            "path": entry.path,
-            "bytes": entry.size,
-            "blocks": entry.block_count,
+            "path": entry.path, "bytes": entry.size, "blocks": entry.block_count,
             "staged": _project_target(key, entry.path).is_file(),
         } for entry in page],
         "projectRoot": str(project_root),
@@ -256,7 +282,7 @@ class Handler(BaseHTTPRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": [
                         "data-map", "vbf-index", "vbf-extract", "project-overlay",
-                        "ffx-treasure-editor", "fahrenheit-deploy",
+                        "ffx-treasure-editor", "ffx-item-shop-editor", "fahrenheit-deploy",
                     ],
                 })
             elif route == "/api/dashboard":
@@ -265,13 +291,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(data_map())
             elif route == "/api/treasures":
                 self.json_response(treasure_catalog())
+            elif route == "/api/item-shops":
+                self.json_response(item_shop_catalog())
             elif route == "/api/archive":
                 query = parse_qs(parsed.query)
                 self.json_response(archive_catalog(
-                    query.get("game", ["x"])[0],
-                    query.get("q", [""])[0],
-                    int(query.get("offset", ["0"])[0]),
-                    int(query.get("limit", ["100"])[0]),
+                    query.get("game", ["x"])[0], query.get("q", [""])[0],
+                    int(query.get("offset", ["0"])[0]), int(query.get("limit", ["100"])[0]),
                 ))
             elif route == "/api/deployment":
                 self.json_response(deployment.status(paths.GAME_ROOT, paths.PROJECT_ROOT))
@@ -315,6 +341,8 @@ class Handler(BaseHTTPRequestHandler):
                 result.update({"game": key, "archivePath": entry.path, "headerMd5": index.header_md5})
             elif route == "/api/treasures/save":
                 result = save_treasures(request)
+            elif route == "/api/item-shops/save":
+                result = save_item_shops(request)
             elif route == "/api/deployment/deploy":
                 result = deployment.deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
             else:
