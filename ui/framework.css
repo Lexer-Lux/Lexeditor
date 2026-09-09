@@ -4800,8 +4800,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    Size containment removes the label's intrinsic block-size contribution;
    the row is then sized by the actual control, and fitLabel() scales/wraps the
    label into that fixed space. */
+/* Contain the inline axis only. Full size containment sizes the label as if
+   it were empty, so any label that wraps to a second line was cut off. The
+   block size has to follow the text. */
 .lex-detail-field > .lex-detail-field-label {
-  contain:size;
+  contain:inline-size;
   min-block-size:0;
   overflow:hidden;
 }

@@ -13,7 +13,11 @@ from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 OUT=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'out'/'data-map-browser'
 OUT.mkdir(parents=True,exist_ok=True)
-GAMES=('ff7','ff7_2013','ff8','ff9','rdr','rdr2','blank')
+# Derived, never hand-listed: a hardcoded tuple silently skipped ff7r, so its
+# Data Map went unchecked from the day the plugin landed. New plugins are
+# covered by existing. ff7_2013 is an edition of ff7 rather than its own folder.
+GAMES=tuple(sorted({p.name for p in (ROOT/'games').iterdir()
+                    if (p/'editor.html').is_file()} | {'ff7_2013'}))
 if os.environ.get('DATAMAP_GAMES'):
     GAMES=tuple(os.environ['DATAMAP_GAMES'].split(','))
 ROWS=[{'id':str(i),'filename':f'file-{i:03}.dat','controls':f'Interface {i:03}',
@@ -24,7 +28,7 @@ ROWS[0]['filename']='same-file.dat';ROWS[4]['filename']='same-file.dat'  # IDs m
 
 def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
-    html=(ROOT/'games'/source_game/'editor.html').read_text()
+    html=(ROOT/'games'/source_game/'editor.html').read_text(encoding='utf-8')
     # Synthetic set_content() documents otherwise use about:blank, which cannot
     # resolve the shared framework's optional relative assets or push fragment URLs.
     html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
@@ -32,10 +36,10 @@ def html_for(game):
     history.replaceState=(s,u)=>replace(s,u);history.pushState=(s,u)=>push(s,u);
     window.fetch=()=>new Promise(()=>{});
     window.__lexeditorPlugin={id:"'''+game+'''",name:"Fixture edition",edition:"Fixture"};'''
-    html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
-    html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text()+'</script>')
+    html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
+    html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
     if '<script src="/cards_ui.js"></script>' in html:
-        html=html.replace('<script src="/cards_ui.js"></script>','<script>'+(ROOT/'games/ff8/cards_ui.js').read_text()+'</script>')
+        html=html.replace('<script src="/cards_ui.js"></script>','<script>'+(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8')+'</script>')
     # No third-party requests are made by these HTML documents in this harness.
     return html
 

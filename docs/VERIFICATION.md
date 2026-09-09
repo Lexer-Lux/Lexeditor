@@ -10,8 +10,14 @@ Install the test packages in the editor's Python environment:
 Node.js must also be on PATH. Run the baseline checks with:
 
 ```powershell
-.venv/Scripts/python.exe tools/verify_all.py verify_regressions.py verify_browser_regressions.py frontend_syntax shared_ui_contract --jobs 2 --timeout 300 --retries 0
+.venv/Scripts/python.exe tools/verify_all.py verify_regressions.py verify_browser_regressions.py frontend_syntax shared_ui_contract no_clipped_text --jobs 2 --timeout 300 --retries 0
 ```
+
+`verify_no_clipped_text.py` sweeps every plugin's tabs at two widths and fails
+on any text box whose content overflows it. It was outside this baseline while
+49 labels were clipped, so keep it in the command rather than running it only
+when something looks wrong. Every entry is written to
+`out/no-clipped-text.json`; the console prints the first twenty.
 
 This checks Python behavior, JavaScript behavior and syntax, shared UI rules,
 and the browser fixture suites. The service tests start Blank with no game

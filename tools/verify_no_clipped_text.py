@@ -124,7 +124,14 @@ def main() -> int:
     for plugin in plugins:
         for width, height in ((1600, 950), (1280, 720)):
             clipped.extend(sweep(plugin, width, height))
-    print(json.dumps({"plugins": plugins, "clipped": len(clipped)}))
+    # Twenty printed lines hid most of a failure, so every entry is also
+    # written out; grouping there is what makes a shared cause obvious.
+    report = ROOT / "out" / "no-clipped-text.json"
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text(json.dumps(
+        {"plugins": plugins, "clipped": clipped}, indent=1), encoding="utf-8")
+    print(json.dumps({"plugins": plugins, "clipped": len(clipped),
+                      "report": str(report)}))
     if clipped:
         for entry in clipped[:20]:
             print(json.dumps(entry, ensure_ascii=True))
