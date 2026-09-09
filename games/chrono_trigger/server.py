@@ -23,6 +23,7 @@ from .data import (
 from .events import event_entries, get_event, load_events
 from .resources import ResourceArchiveError
 from .scene_tables import load_exits, load_treasure, save_exit, save_treasure
+from .worlds import load_worlds, save_world
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,7 +32,10 @@ PORT = int(os.environ.get("LEXEDITOR_CHRONO_TRIGGER_PORT", os.environ.get("LEXED
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
-POST_ROUTES = {"/api/save/message", "/api/save/scene", "/api/save/exit", "/api/save/treasure"}
+POST_ROUTES = {
+    "/api/save/message", "/api/save/scene", "/api/save/exit",
+    "/api/save/treasure", "/api/save/world",
+}
 
 
 @lru_cache(maxsize=1)
@@ -102,6 +106,7 @@ def dashboard() -> dict:
             "localizationFiles": len(messages),
             "sceneHeaders": len(scenes),
             "fieldEvents": len(events),
+            "worldHeaders": 8 if store.exists("Game/common/bankc6.bin") else 0,
         },
         "deployment": {
             "format": "ctext-loose-files",
@@ -112,7 +117,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/4"
+    server_version = "LexeditorChronoTrigger/5"
 
     def log_message(self, _format, *_args):
         return
@@ -160,7 +165,8 @@ class Handler(BaseHTTPRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT),
                     "capabilities": [
                         "data-map", "resource-index", "localization-text", "scene-headers",
-                        "scene-exits", "scene-treasure", "field-events", "project-overlay", "read", "save",
+                        "scene-exits", "scene-treasure", "field-events", "world-headers",
+                        "project-overlay", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
@@ -192,6 +198,8 @@ class Handler(BaseHTTPRequestHandler):
                         int(params.get("offset", ["0"])[0]),
                         int(params.get("limit", ["100"])[0]),
                     ))
+            elif path == "/api/worlds":
+                self.send_json(load_worlds(_store(), _source(params)))
             elif path == "/api/messages/catalog":
                 self.send_json({"files": _store().localization_files()})
             elif path == "/api/messages":
@@ -248,10 +256,15 @@ class Handler(BaseHTTPRequestHandler):
                     str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")),
                     payload.get("values", {}),
                 )
-            else:
+            elif path == "/api/save/treasure":
                 result = save_treasure(
                     _store(), int(payload.get("sceneId", -1)), int(payload.get("index", -1)),
                     str(payload.get("offsetSha256", "")), str(payload.get("dataSha256", "")),
+                    payload.get("values", {}),
+                )
+            else:
+                result = save_world(
+                    _store(), int(payload.get("id", -1)), str(payload.get("sha256", "")),
                     payload.get("values", {}),
                 )
             self.send_json(result)
