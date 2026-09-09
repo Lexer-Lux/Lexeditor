@@ -25,7 +25,7 @@ def resource_override(path: str) -> dict | None:
     if _WORLD_SCRIPT_RE.match(path):
         return {"kind": "world-script", "coverage": "structural", "status": "partial", "target": "worlds"}
     if _FIELD_SCRIPT_RE.match(path):
-        return {"kind": "field-event-script", "coverage": "structural", "status": "partial", "target": "events"}
+        return {"kind": "field-event-script", "coverage": "structural + fixed-write", "status": "partial", "target": "events"}
     if _SCENE_MAP_RE.match(path):
         return {"kind": "scene-map-layout", "coverage": "structural", "status": "integrated", "target": "scenes"}
     if _SCENE_PALETTE_RE.match(path) or _WORLD_PALETTE_RE.match(path):
@@ -58,8 +58,8 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
         elif filename.startswith("Game/field/atel/"):
             rows[index] = {
                 **row,
-                "controls": f"{field_scripts} field event scripts: object/function layout, PC command disassembly, semantics and control-flow diagnostics",
-                "notes": "Existing fixed-width argument bytes can be edited through stale-hash-protected project overlays; named editors cover proven enemy/location/text/inventory/gold/party/audio/battle layouts. Opcode changes, insertion/deletion, pointer relocation and variable/unresolved commands remain read-only.",
+                "controls": f"{field_scripts} field event scripts: object/function layout, PC command disassembly, semantics, control-flow diagnostics and named fixed-width editing",
+                "notes": "The desktop Events view and tools/chrono_trigger_event.py can edit proven named fixed-width argument fields through stale-hash-protected project overlays. Opcode changes, insertion/deletion, pointer relocation and variable/unresolved commands remain read-only.",
                 "status": "partial", "coverage": "structural + fixed-write", "openable": bool(field_scripts), "target": "events",
             }
         elif filename.startswith("CTExt mods/"):
