@@ -513,9 +513,9 @@ def _edit_incompatible_modules(root: ET.Element, rows: list[dict]) -> int:
         accepted_tags={"Module", "IncompatibleModule"},
     )
 
-def _edit_tags(parent: ET.Element, rows: list[dict]) -> int:
+def _edit_tags(parent: ET.Element, rows: list[dict], *, ensure: bool = False) -> int:
     tags_root = parent.find("Tags")
-    if tags_root is None and not rows:
+    if tags_root is None and not rows and not ensure:
         return 0
     tags_root = tags_root if tags_root is not None else _submodule_child_or_create(parent, "Tags")
     existing = _element_children(tags_root, "Tag")
@@ -541,9 +541,9 @@ def _edit_tags(parent: ET.Element, rows: list[dict]) -> int:
     return changes
 
 
-def _edit_assemblies(parent: ET.Element, rows: list[dict]) -> int:
+def _edit_assemblies(parent: ET.Element, rows: list[dict], *, ensure: bool = False) -> int:
     assemblies_root = parent.find("Assemblies")
-    if assemblies_root is None and not rows:
+    if assemblies_root is None and not rows and not ensure:
         return 0
     assemblies_root = assemblies_root if assemblies_root is not None else _submodule_child_or_create(parent, "Assemblies")
     existing = _element_children(assemblies_root, "Assembly")
@@ -589,8 +589,8 @@ def _edit_submodules(root: ET.Element, rows: list[dict]) -> int:
         changes += int(_set_value(element, "Name", name, submodule_order=True))
         changes += int(_set_value(element, "DLLName", dll_name, submodule_order=True))
         changes += int(_set_value(element, "SubModuleClassType", class_type, submodule_order=True))
-        changes += _edit_assemblies(element, list(row.get("assemblies") or []))
-        changes += _edit_tags(element, list(row.get("tags") or []))
+        changes += _edit_assemblies(element, list(row.get("assemblies") or []), ensure=created)
+        changes += _edit_tags(element, list(row.get("tags") or []), ensure=created)
         output.append(element)
     if len(existing) != len(output) or any(a is not b for a, b in zip(existing, output)):
         changes += 1

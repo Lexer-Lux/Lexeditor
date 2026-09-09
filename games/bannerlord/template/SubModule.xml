@@ -18,6 +18,7 @@
       <Name value="{{MODULE_NAME}}" />
       <DLLName value="{{MODULE_ID}}.dll" />
       <SubModuleClassType value="{{MODULE_ID}}.SubModule" />
+      <Assemblies />
       <Tags>
         <Tag key="DedicatedServerType" value="none" />
         <Tag key="IsNoRenderModeElement" value="false" />
