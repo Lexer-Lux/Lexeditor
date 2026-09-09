@@ -12,6 +12,7 @@ U8 = 0xFF
 SCRIPT_MEM_START = 0x7F0200
 SCRIPT_MEM_LAST = SCRIPT_MEM_START + U8 * 2
 MOVEMENT_OPCODES = frozenset({
+    0x7A,
     0x8F, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9A, 0x9D,
     0xA0, 0xA1, 0xB5, 0xB6,
 })
@@ -54,6 +55,7 @@ def _layout(command: dict) -> tuple[int, bytearray] | None:
     if opcode not in MOVEMENT_OPCODES or args is None:
         return None
     expected = {
+        0x7A: 3,
         0x8F: 1,
         0x94: 1, 0x95: 1,
         0x96: 2, 0x97: 2,
@@ -81,6 +83,12 @@ def movement_field_specs(command: dict) -> list[dict] | None:
         "key": key, "label": label,
         "minimum": SCRIPT_MEM_START, "maximum": SCRIPT_MEM_LAST,
     }
+    if opcode == 0x7A:
+        return [
+            number("x", "X coordinate byte"),
+            number("y", "Y coordinate byte"),
+            number("jumpHeightSpeed", "Jump height/speed byte"),
+        ]
     if opcode in {0x8F, 0x95, 0xB6}:
         return [number("playerId", "Player character", 1, 6)]
     if opcode in {0x94, 0xB5}:
@@ -103,6 +111,8 @@ def movement_values(command: dict) -> dict | None:
     if parsed is None:
         return None
     opcode, args = parsed
+    if opcode == 0x7A:
+        return {"x": args[0], "y": args[1], "jumpHeightSpeed": args[2]}
     if opcode in {0x8F, 0x95, 0xB6}:
         return {"playerId": args[0]}
     if opcode in {0x94, 0xB5}:
@@ -131,7 +141,14 @@ def apply_movement_op(command: dict, values: dict) -> bytes | None:
     if unknown:
         raise ValueError(f"Unknown fields for opcode 0x{opcode:02X}: {', '.join(sorted(unknown))}")
 
-    if opcode in {0x8F, 0x95, 0xB6}:
+    if opcode == 0x7A:
+        if "x" in values:
+            args[0] = _int(values["x"], 0, U8, "X coordinate byte")
+        if "y" in values:
+            args[1] = _int(values["y"], 0, U8, "Y coordinate byte")
+        if "jumpHeightSpeed" in values:
+            args[2] = _int(values["jumpHeightSpeed"], 0, U8, "Jump height/speed byte")
+    elif opcode in {0x8F, 0x95, 0xB6}:
         if "playerId" in values:
             args[0] = _int(values["playerId"], 1, 6, "Player character")
     elif opcode in {0x94, 0xB5}:
@@ -177,6 +194,12 @@ def movement_semantics(command: dict) -> dict | None:
     if parsed is None:
         return None
     opcode, args = parsed
+    if opcode == 0x7A:
+        return {
+            "summary": f"NPC jump · coordinate bytes ({args[0]}, {args[1]}) · height/speed byte {args[2]}",
+            "x": args[0], "y": args[1], "jumpHeightSpeed": args[2],
+            "operation": "npc-jump",
+        }
     if opcode == 0x8F:
         return {"summary": f"Follow PC {args[0]} at distance", "playerId": args[0], "operation": "follow-pc-distance"}
     if opcode == 0x94:
