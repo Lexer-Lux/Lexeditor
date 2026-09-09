@@ -4951,3 +4951,13 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   text-align:right;
 }
 
+/* Cell text ellipsises at its trailing edge instead of being clipped at both. */
+.lex-column-cell-text {
+  display:block;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+

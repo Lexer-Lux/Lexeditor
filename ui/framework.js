@@ -4430,7 +4430,14 @@
             typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || ""].filter(Boolean).join(" "),
           role: "cell",
           "data-column-key": column.key,
-        }, element("span", {class: "lex-column-cell-content"}, content));
+          // Plain text goes in its own block. As a bare text node inside the
+          // inline-flex content box, text-overflow had nothing to act on, so a
+          // long value was centred and clipped at BOTH ends rather than
+          // ellipsised at one.
+        }, element("span", {class: "lex-column-cell-content"},
+          content === null || content === undefined || content instanceof Node
+            ? content
+            : element("span", {class: "lex-column-cell-text"}, content)));
         if (column.edit) {
           cell.addEventListener("dblclick", event => {
             event.preventDefault();

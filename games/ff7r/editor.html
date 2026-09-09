@@ -204,7 +204,6 @@
   function tweaksPanel(){
     const list=tweakAssets();
     if(!list.length)return loadingPanel("Tweaks","No Lexeditor tweak groups were found in the catalog.");
-    if(!list.some(item=>item.asset===state.asset)){const first=list[0];if(state.asset!==first.asset){selectAsset(first.asset);return loadingPanel("Tweaks","Opening the first tweak group…")}}
     if(state.busy)return loadingPanel("Loading tweak","Reading the selected tweak group…");
     if(state.error&&!state.data)return errorPanel(state.error);
     return el("div",{class:"ff7r-view"},assetToolbar(),pagedDataPanel());
@@ -289,7 +288,14 @@
   function infoPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Information",icon:infoIcon(),meta:"FINAL FANTASY VII REMAKE INTERGRADE",body:[detailSection({title:"GAME",body:[detailField({label:"ROOT",control:readonlyField(info.gameRoot||"—")}),detailField({label:"DATAOBJECTS",control:readonlyField(String(info.dataObjects??"—"))}),detailField({label:"TEXT RESOURCES",control:readonlyField(String(info.textResources??"—"))}),detailField({label:"LANGUAGES",control:readonlyField((info.textLanguages||[]).join(", ")||"—")}),detailField({label:"PAK VERSION",control:readonlyField(info.pakVersion||"Detected when archives are indexed")})]}),detailSection({title:"SEMANTIC EDITORS",body:[detailField({label:"ITEMS",control:readonlyField("Validated BuyValue / SaleValue / CanSale / MaxCount fields from installed Item, Equipment, and Materia DataObjects")}),detailField({label:"ENEMY LOOT",control:readonlyField("BattleItemPossession normal/rare drop item arrays, raw percent chances, and steal item/quantity arrays")})]}),detailSection({title:"HELPER",body:[detailField({label:"REPAK",control:readonlyField(info.helper?.installed?`${info.helper.version} installed`:"Not installed")}),detailField({label:"MOUNT POINT",control:readonlyField(info.pakMountPoint||"../../../")})]}),detailSection({title:"EDITOR COVERAGE",body:[detailField({label:"GAMEPLAY",control:readonlyField("DataObject booleans, bytes, 16/32-bit numbers, floats, existing FNames and fixed array elements")}),detailField({label:"TEXT",control:readonlyField("Variable-length localized text and existing text sub-entry contents")}),detailField({label:"READ ONLY",control:readonlyField("DataObject structural row/property changes, array resizing, text IDs and text entry structure")})]})]})}
 
   function render(){let content;if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="tweaks")content=tweaksPanel();else if(state.tab==="project")content=projectPanel();else if(state.tab==="info")content=infoPanel();else if(state.tab==="text")content=textPanel();else if(state.tab==="economy")content=economyPanel();else if(state.tab==="loot")content=lootPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
-  async function navigate(tab){const previous=state.tab;state.tab=tab;render();if(tab==="text"&&state.textAsset&&!state.textData)await loadTextAsset(state.textAsset);else if(tab==="economy"){if(!await loadEconomy()){state.tab=previous;render()}}else if(tab==="loot"){if(!await loadLoot()){state.tab=previous;render()}}}
+  async function navigate(tab){const previous=state.tab;state.tab=tab;render();if(tab==="text"&&state.textAsset&&!state.textData)await loadTextAsset(state.textAsset);else if(tab==="economy"){if(!await loadEconomy()){state.tab=previous;render()}}else if(tab==="loot"){if(!await loadLoot()){state.tab=previous;render()}}
+    else if(tab==="data"||tab==="tweaks"){
+      // Opening these tabs loaded nothing, so the table sat empty behind the
+      // picker until the user changed the dropdown by hand.
+      const list=tab==="tweaks"?tweakAssets():gameAssets();
+      const wanted=list.some(item=>item.asset===state.asset)?state.asset:(list[0]?.asset||"");
+      if(wanted&&(state.asset!==wanted||!state.data)){state.asset=wanted;await loadAsset(wanted);render()}
+    }}
 
   async function save(){
     if(state.activeSource!=="mine")return;
