@@ -203,7 +203,7 @@ def test_refined_master_and_detail_ux(self):
 
     self.navigate("items")
     self.assertGreaterEqual(self.page.get_by_text("Power", exact=True).count(), 1)
-    self.assertGreaterEqual(self.page.get_by_text("Formula", exact=True).count(), 1)
+    self.assertGreaterEqual(self.page.get_by_text("CALC", exact=True).count(), 1)
 
     self.navigate("characterAI")
     row_name = self.page.evaluate("state.records.characterAI.find(r=>r.id===state.selected.characterAI).name")
@@ -213,7 +213,7 @@ def test_refined_master_and_detail_ux(self):
     self.assertEqual(self.page.locator(".ff7-detail textarea").count(), 1)
     self.assertEqual(self.page.locator('[data-concept="ai-event-editor"]').count(), 1)
     self.assertIn("Cloud AI", self.page.locator("main").inner_text())
-    self.assertGreaterEqual(self.page.get_by_text("Scripts", exact=True).count(), 1)
+    self.assertGreaterEqual(self.page.get_by_text("AI", exact=True).count(), 1)
     self.assertEqual(self.page.get_by_text("EVENTS", exact=True).count(), 1)
     event.select_option("1")
     main_label = self.page.evaluate("state.data.categories.find(c=>c.id==='characterAI').fields.find(f=>f.key==='script1').label")
@@ -305,6 +305,16 @@ def test_small_fixed_datasets_do_not_stretch_or_overlap(self):
     self.originals_unchanged()
 
 
+def test_master_summary_headers_stay_single_line_at_narrow_width(self):
+    self.install(); self.open(); self.page.set_viewport_size({"width":900,"height":620})
+    for group in ("characters","items","weapons","armor","materia","playerAttacks","enemies","encounters"):
+        with self.subTest(group=group):
+            self.navigate(group); self.page.wait_for_timeout(40)
+            clipped=self.page.locator('.ff7-table .lex-column-list-head-cell .header-label').evaluate_all("""labels=>labels.filter(label=>label.scrollWidth>label.clientWidth+1).map(label=>label.textContent.trim())""")
+            self.assertEqual(clipped,[],(group,clipped))
+    self.originals_unchanged()
+
+
 target.RenderedTests.open = open_with_neutral
 target.RenderedTests.test_materia_uses_human_semantic_controls = test_materia_uses_human_semantic_controls
 target.RenderedTests.test_full_ff7_surface_uses_human_controls = test_full_ff7_surface_uses_human_controls
@@ -314,6 +324,7 @@ target.RenderedTests.test_refined_master_and_detail_ux = test_refined_master_and
 target.RenderedTests.test_finished_high_value_detail_views = test_finished_high_value_detail_views
 target.RenderedTests.test_dense_custom_views_fit_narrow_detail_pane = test_dense_custom_views_fit_narrow_detail_pane
 target.RenderedTests.test_small_fixed_datasets_do_not_stretch_or_overlap = test_small_fixed_datasets_do_not_stretch_or_overlap
+target.RenderedTests.test_master_summary_headers_stay_single_line_at_narrow_width = test_master_summary_headers_stay_single_line_at_narrow_width
 
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)

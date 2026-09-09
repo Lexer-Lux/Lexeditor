@@ -505,30 +505,30 @@
     return conceptPanel(row,ordinarySections(row));
   }
   const MASTER_SUMMARY_FIELDS={
-    characters:[["level","Lv"],["maxHp","HP"],["maxMp","MP"]],
-    recruits:[["level","Lv"],["maxHp","HP"],["maxMp","MP"]],
-    commands:[["initialCursorAction","Action"]],
-    playerAttacks:[["mpCost","MP"],["attackPower","Power"],["damageCalculationId","Formula"]],
-    limitBreaks:[["mpCost","MP"],["attackPower","Power"],["damageCalculationId","Formula"]],
-    items:[["attackPower","Power"],["damageCalculationId","Formula"]],
-    weapons:[["attackStrength","Attack"],["accuracyRate","Hit"],["growthRate","AP growth"]],
-    armor:[["defense","Defense"],["magicDefense","M.Def"],["growthRate","AP growth"]],
-    accessories:[["specialEffect","Effect"]],
-    materia:[["level5Ap","Master AP"],["materiaType","Behavior"]],
-    materiaEquipEffects:[["hpPercent","HP %"],["mpPercent","MP %"]],
-    enemies:[["level","Lv"],["hp","HP"],["experience","EXP"]],
-    enemyAttacks:[["cost","MP"],["power","Power"],["formula","Formula"]],
-    shops:[["type","Type"],["count","Slots"]],
-    prices:[["price","Price"]],
-    initialState:[["gil","Gil"]],
-    initialInventory:[["amount","Qty"]],
+    characters:[["level","LV"],["maxHp","HP"],["maxMp","MP"]],
+    recruits:[["level","LV"],["maxHp","HP"],["maxMp","MP"]],
+    commands:[["initialCursorAction","ACTION"]],
+    playerAttacks:[["mpCost","MP"],["attackPower","PWR"],["damageCalculationId","CALC"]],
+    limitBreaks:[["mpCost","MP"],["attackPower","PWR"],["damageCalculationId","CALC"]],
+    items:[["attackPower","PWR"],["damageCalculationId","CALC"]],
+    weapons:[["attackStrength","ATK"],["accuracyRate","HIT"],["growthRate","AP"]],
+    armor:[["defense","DEF"],["magicDefense","M.DEF"],["growthRate","AP"]],
+    accessories:[["specialEffect","FX"]],
+    materia:[["level5Ap","M.AP"],["materiaType","TYPE"]],
+    materiaEquipEffects:[["hpPercent","HP%"],["mpPercent","MP%"]],
+    enemies:[["level","LV"],["hp","HP"],["experience","EXP"]],
+    enemyAttacks:[["cost","MP"],["power","PWR"],["formula","CALC"]],
+    shops:[["type","TYPE"],["count","SLOTS"]],
+    prices:[["price","PRICE"]],
+    initialState:[["gil","GIL"]],
+    initialInventory:[["amount","QTY"]],
     initialMateria:[["ap","AP"]],
     stolenMateria:[["ap","AP"]],
-    magicOrder:[["menuGroup","Section"],["position","Pos"]],
-    itemSortOrder:[["position","Sort"]],
-    materiaPriority:[["priority","Priority"]],
-    audioMixing:[["volume","Volume"],["pan","Pan"]],
-    apMultiplier:[["multiplier","Multiplier"]],
+    magicOrder:[["menuGroup","MENU"],["position","POS"]],
+    itemSortOrder:[["position","SORT"]],
+    materiaPriority:[["priority","ORDER"]],
+    audioMixing:[["volume","VOL"],["pan","PAN"]],
+    apMultiplier:[["multiplier","RATE"]],
   };
   function globalInventoryRecord(value,priceTable=false){
     const id=Number(value),specs=priceTable?[["items",0,128],["weapons",128,128],["armor",256,32],["accessories",288,32],["materia",384,96]]:[["items",0,128],["weapons",128,128],["armor",256,32],["accessories",288,32]];
@@ -584,16 +584,17 @@
     return undefined;
   }
   function derivedSummaryColumns(){
-    if(["characterAI","enemyAI","formationAI"].includes(state.tab))return[{key:"derived:aiScripts",label:"Scripts",sortable:true,grow:.55,render:row=>`${aiUsedCount(row)}/16`}];
-    if(state.tab==="growthCurves")return[{key:"derived:growthKind",label:"Type",sortable:true,grow:.65,render:row=>({primary:"Primary",hp:"HP",mp:"MP",exp:"EXP"}[growthCurveKind(row)])}];
-    if(state.tab==="encounters")return[{key:"derived:encounterEnemies",label:"Enemies",sortable:true,grow:.55,render:row=>derivedListValue(row,"derived:encounterEnemies")}];
-    if(["texts","exeText"].includes(state.tab))return[{key:"derived:textLength",label:"Chars",sortable:true,grow:.5,render:row=>derivedListValue(row,"derived:textLength")}];
+    if(["characterAI","enemyAI","formationAI"].includes(state.tab))return[{key:"derived:aiScripts",label:"AI",help:"Battle-AI event scripts used out of the sixteen available hooks.",sortable:true,grow:.42,render:row=>`${aiUsedCount(row)}/16`}];
+    if(state.tab==="growthCurves")return[{key:"derived:growthKind",label:"TYPE",help:"What this growth curve controls.",sortable:true,grow:.48,render:row=>({primary:"Primary",hp:"HP",mp:"MP",exp:"EXP"}[growthCurveKind(row)])}];
+    if(state.tab==="encounters")return[{key:"derived:encounterEnemies",label:"FOES",help:"Number of non-empty enemy slots in this formation.",sortable:true,grow:.42,render:row=>derivedListValue(row,"derived:encounterEnemies")}];
+    if(["texts","exeText"].includes(state.tab))return[{key:"derived:textLength",label:"CHARS",help:"Decoded character count for this text record.",sortable:true,grow:.42,render:row=>derivedListValue(row,"derived:textLength")}];
     return[];
   }
   function summaryColumns(){
+    const explained=new Set(["CALC","FX","M.AP","TYPE","MENU","ORDER","RATE"]);
     const fields=(MASTER_SUMMARY_FIELDS[state.tab]||[]).flatMap(([fieldKey,label],index)=>{
       const field=fieldByKey(fieldKey);if(!field)return[];
-      return[{key:`value:${fieldKey}`,label,sortable:true,grow:.65,pinned:index>=2?false:true,render:row=>{const full=semanticListValue(row,field);return el("span",{title:full},compactListValue(full))}}];
+      return[{key:`value:${fieldKey}`,label,help:explained.has(label)?field.label:null,sortable:true,grow:.48,pinned:index>=2?false:true,render:row=>{const full=semanticListValue(row,field);return el("span",{title:full},compactListValue(full))}}];
     });
     return[...fields,...derivedSummaryColumns()];
   }
@@ -619,7 +620,7 @@
       {key:"id",label:"ID",numberedId:true,sortable:true},
       {key:"name",label:"Name",sortable:true,grow:2,render:row=>{const name=displayRowName(row);return el("span",{title:name},name)}},
       ...summaries,
-      ...(category()?.descriptionEditable&&!summaries.length?[{key:"description",label:"Description",sortable:true,grow:3,pinned:false,render:row=>el("span",{title:row.description},row.description)}]:[]),
+      ...(category()?.descriptionEditable&&!summaries.length?[{key:"description",label:"DESC",help:"In-game description text",sortable:true,grow:3,pinned:false,render:row=>el("span",{title:row.description},row.description)}]:[]),
     ];
     const prefs=columnPreferences(`ff7-v2-${state.tab}`,columns,()=>render());
     const sort=state.sort[state.tab]||{key:"id",dir:1};
