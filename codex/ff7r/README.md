@@ -51,3 +51,47 @@ Deploy is a separate explicit action that copies that built PAK to the game's
   array lengths and adding new FNames require package rebuilding and are not yet
   supported.
 - Source/API/synthetic-fixture checks do not establish live in-game acceptance.
+
+## Installed-PAK extraction is currently broken (found 2026-09-09)
+
+The plugin cannot read any asset from a real FF7R install. `build_index`
+succeeds and lists 1128 DataObjects, but extracting even the first one fails,
+so opening any asset in the editor fails. This is not specific to UMG or to the
+battle HUD; it affects the shipping DataObject surface equally. The existing
+checks did not catch it because they run on synthetic fixtures and never open an
+installed PAK, which this file already warns about under proven limits.
+
+Pinned `repak` v0.2.3 panics in `repak/src/entry.rs:397`:
+
+```
+index out of bounds: the len is 3 but the index is 3
+```
+
+Cause. FF7R ships PAK version 4, which predates the FName-based compression
+table, so `pak.rs` hardcodes exactly three legacy slots: Zlib, Gzip, Oodle at
+indices 0, 1 and 2. Both entry readers convert the stored value with `n - 1`, so
+a stored 4 becomes slot 3 and indexes past that three-element table. Legacy
+Unreal stored this field as a bitflag, where 1 is Zlib, 2 is Gzip and 4 is
+Custom, which FF7R uses for Oodle. repak treats the value as a dense slot index
+instead, so any Custom/Oodle entry panics.
+
+Only entries small enough to be stored uncompressed extract today. A sample of
+36 entries across six PAKs returned 4 successes, all between 118 and 181 bytes.
+
+Not the cause, both ruled out by testing. v0.2.3 is the latest release, so there
+is no newer build to move to, and master carries the identical line. The CLI
+already enables the `oodle` feature by default; supplying the Oodle library that
+`oodle_loader` expects, `oo2core_9_win64.dll` matching its pinned SHA-256
+`6f5d41a7...f457`, next to `repak.exe` does not help, because the failure is the
+slot lookup rather than a missing decompressor. That library is now present in
+the helper directory and is still required once the lookup is fixed.
+
+Fixing this needs the legacy slot mapping corrected so Custom resolves to Oodle,
+which means building repak from source, or reading PAK entries directly with
+Oodle called through the shipped library. The game's own
+`Engine/Binaries/ThirdParty/Oodle/Win64/oo2core_7_win64.dll` is also present.
+
+Battle HUD assets, located for issue research but not yet readable:
+`Menu/Resident/Battle/Status` is the party member panel, alongside `ATBGauge`,
+`Gauge_Cell`, `Status_BtnGuide`, `Status_LimitEffect_00`/`_01`, `EnemyStatus`,
+and the textures `U_CharaStatus_Base_02` and `U_CharaStatus_ATB_03`.
