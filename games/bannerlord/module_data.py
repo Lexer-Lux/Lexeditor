@@ -5,6 +5,8 @@ from pathlib import Path
 import shutil
 import xml.etree.ElementTree as ET
 
+from . import paths
+
 
 def _value(parent: ET.Element, tag: str) -> str:
     element = parent.find(tag)
@@ -438,7 +440,6 @@ def _edit_submodules(root: ET.Element, rows: list[dict]) -> int:
         parent.append(element)
     return changes
 
-
 def _edit_game_types(parent: ET.Element, rows: list[dict]) -> int:
     included = _included_game_types(parent)
     if included is None and not rows:
@@ -515,6 +516,8 @@ def _edit_xmls(root: ET.Element, rows: list[dict]) -> int:
 
 
 def save_module(path: Path, payload: dict) -> dict:
+    path = Path(path)
+    path = paths.contained_project_path(path.parent, path.name, require_file=True)
     allowed = {"metadata", "dependencies", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}
     unknown = set(payload) - allowed
     if unknown:
@@ -539,9 +542,11 @@ def save_module(path: Path, payload: dict) -> dict:
 
     backup = path.with_name(path.name + ".lexeditor.bak")
     if changes:
+        paths.clear_write_helper(backup)
         shutil.copy2(path, backup)
         ET.indent(tree, space="  ")
         temporary = path.with_name(path.name + ".lexeditor.tmp")
+        paths.clear_write_helper(temporary)
         tree.write(temporary, encoding="utf-8", xml_declaration=True, short_empty_elements=True)
         temporary.replace(path)
     return {"saved": changes, "backup": str(backup) if changes else "", "module": read_submodule(path)}
