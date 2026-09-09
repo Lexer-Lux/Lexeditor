@@ -6,6 +6,7 @@ on:
       - 'games/palworld/**'
       - 'codex/palworld/**'
       - 'tests/test_palworld_*.py'
+      - 'tests/palworld_browser_check.py'
       - 'runtime_bootstrap.py'
       - 'ui/mod-loading.json'
       - 'ui/credits-sources.json'
@@ -54,3 +55,25 @@ jobs:
           python app.py --game palworld --smoke
       - name: Check editor JavaScript syntax
         run: node --check games/palworld/editor.js
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser acceptance dependencies
+        run: |
+          python -m pip install -r requirements.txt playwright
+          python -m playwright install --with-deps chromium
+      - name: Run Palworld browser acceptance
+        run: python tests/palworld_browser_check.py out/palworld-browser
+      - name: Preserve Palworld browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: palworld-browser
+          path: out/palworld-browser
+          if-no-files-found: ignore
+          retention-days: 7
