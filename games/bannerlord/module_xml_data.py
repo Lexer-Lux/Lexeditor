@@ -126,6 +126,77 @@ def read_document(project: Path, requested: str, game_root: Path | None = None) 
     }
 
 
+def _record_id_attribute(element: dict) -> dict | None:
+    return next((row for row in element.get("_attributes", []) if row["name"] in {"id", "Id"}), None)
+
+
+def _record_element(by_path: dict[str, dict], operation: dict) -> dict:
+    element_path = str(operation.get("elementPath") or "")
+    element = by_path.get(element_path)
+    if element is None:
+        raise ValueError(f"ModuleData record changed or no longer exists: {element_path}")
+    if element.get("depth") != 1:
+        raise ValueError("Record lifecycle actions are limited to top-level ModuleData object records")
+    expected_tag = str(operation.get("tag") or "")
+    if expected_tag and expected_tag != element["tag"]:
+        raise ValueError(f"ModuleData record identity changed: {element_path}")
+    current_id = (_record_id_attribute(element) or {}).get("value", "")
+    if "originalId" in operation and str(operation.get("originalId") or "") != str(current_id):
+        raise ValueError(f"ModuleData record ID changed on disk: {element_path}")
+    return element
+
+
+def _duplicate_record(text: str, elements: list[dict], element: dict, new_id: str) -> tuple[int, int, str]:
+    full_span = element.get("_fullSpan")
+    if not full_span:
+        raise ValueError(f"Could not locate the full XML span for {element['path']}")
+    left, right = full_span
+    snippet = text[left:right]
+    id_attribute = _record_id_attribute(element)
+    if id_attribute is not None:
+        incoming = str(new_id or "").strip()
+        if not incoming:
+            raise ValueError("Duplicating a record with an id attribute requires a new ID")
+        if incoming.casefold() == str(id_attribute["value"]).casefold():
+            raise ValueError("Duplicate record ID must differ from the source record")
+        existing_ids = {
+            str(attribute["value"]).casefold()
+            for row in elements if row.get("depth") == 1
+            for attribute in row.get("_attributes", []) if attribute["name"] in {"id", "Id"}
+        }
+        if incoming.casefold() in existing_ids:
+            raise ValueError(f"A top-level ModuleData record already uses ID {incoming}")
+        replacement = serialize_attribute(id_attribute, incoming)
+        value_left, value_right = id_attribute["_span"]
+        local_left, local_right = value_left - left, value_right - left
+        snippet = snippet[:local_left] + replacement + snippet[local_right:]
+
+    line_start = text.rfind("\n", 0, left) + 1
+    indentation = text[line_start:left]
+    if indentation.strip():
+        indentation = ""
+    newline = "\r\n" if "\r\n" in text else "\n"
+    return right, right, newline + indentation + snippet
+
+
+def _delete_record_span(text: str, element: dict) -> tuple[int, int, str]:
+    full_span = element.get("_fullSpan")
+    if not full_span:
+        raise ValueError(f"Could not locate the full XML span for {element['path']}")
+    left, right = full_span
+    line_start = text.rfind("\n", 0, left) + 1
+    if not text[line_start:left].strip():
+        left = line_start
+    tail = right
+    while tail < len(text) and text[tail] in " \t":
+        tail += 1
+    if text.startswith("\r\n", tail):
+        right = tail + 2
+    elif text.startswith("\n", tail):
+        right = tail + 1
+    return left, right, ""
+
+
 def save_document(
     project: Path,
     requested: str,
@@ -146,9 +217,27 @@ def save_document(
     insertions: dict[int, list[str]] = {}
     touched: set[tuple[str, str]] = set()
     changed = 0
-    existing_edits = [row for row in edits if not row.get("addRequired")]
+    record_actions = [row for row in edits if row.get("recordAction")]
+    existing_edits = [row for row in edits if not row.get("addRequired") and not row.get("recordAction")]
     required_additions = [row for row in edits if row.get("addRequired")]
     required_additions.extend(list(additions or []))
+
+    if record_actions and (existing_edits or required_additions):
+        raise ValueError("Record lifecycle actions cannot be combined with attribute edits in one save")
+    if len(record_actions) > 1:
+        raise ValueError("Only one ModuleData record lifecycle action is allowed per save")
+
+    if record_actions:
+        operation = record_actions[0]
+        element = _record_element(by_path, operation)
+        action = str(operation.get("recordAction") or "")
+        if action == "duplicate":
+            replacements.append(_duplicate_record(text, elements, element, str(operation.get("newId") or "")))
+        elif action == "delete":
+            replacements.append(_delete_record_span(text, element))
+        else:
+            raise ValueError(f"Unsupported ModuleData record action: {action}")
+        changed = 1
 
     for edit in existing_edits:
         element_path = str(edit.get("elementPath") or "")
@@ -163,15 +252,11 @@ def save_document(
         expected_tag = str(edit.get("tag") or "")
         if expected_tag and expected_tag != element["tag"]:
             raise ValueError(f"ModuleData element identity changed: {element_path}")
-        attribute = next(
-            (row for row in element["_attributes"] if row["name"] == attribute_name), None
-        )
+        attribute = next((row for row in element["_attributes"] if row["name"] == attribute_name), None)
         if attribute is None:
             raise ValueError(f"{element_path} no longer has attribute {attribute_name}")
         if "originalValue" in edit and str(edit["originalValue"]) != attribute["value"]:
-            raise ValueError(
-                f"{element_path} {attribute_name} changed on disk; reload before saving"
-            )
+            raise ValueError(f"{element_path} {attribute_name} changed on disk; reload before saving")
         replacement = serialize_attribute(attribute, edit.get("value"))
         left, right = attribute["_span"]
         if text[left:right] != replacement:
@@ -192,17 +277,10 @@ def save_document(
         if expected_tag and expected_tag != element["tag"]:
             raise ValueError(f"ModuleData element identity changed: {element_path}")
         if any(row["name"] == attribute_name for row in element["_attributes"]):
-            raise ValueError(
-                f"{element_path} already has attribute {attribute_name}; reload before saving"
-            )
-        missing = next(
-            (row for row in element.get("missingRequired", []) if row.get("name") == attribute_name),
-            None,
-        )
+            raise ValueError(f"{element_path} already has attribute {attribute_name}; reload before saving")
+        missing = next((row for row in element.get("missingRequired", []) if row.get("name") == attribute_name), None)
         if missing is None:
-            raise ValueError(
-                f"{attribute_name} is not a schema-declared missing required attribute on {element_path}"
-            )
+            raise ValueError(f"{attribute_name} is not a schema-declared missing required attribute on {element_path}")
         escaped_value = serialize_new_attribute(attribute_name, missing, addition.get("value"))
         position = int(element["_attributeInsert"])
         insertions.setdefault(position, []).append(f' {attribute_name}="{escaped_value}"')
@@ -255,8 +333,8 @@ def augment_data_map(project: Path, value: dict) -> dict:
                         "openable": True,
                         "editorPath": filename,
                         "notes": (
-                            "Record-oriented ModuleData XML editor. Existing attributes are edited surgically; "
-                            "matched XSDs add typed controls, diagnostics, and repair of missing required attributes."
+                            "Record-oriented ModuleData XML editor with surgical attribute edits, XSD diagnostics/repair, "
+                            "and loss-minimizing top-level record duplicate/delete operations."
                         ),
                     }
                 )
