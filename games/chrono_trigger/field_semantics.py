@@ -136,10 +136,14 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
             "sceneId": scene, "sceneName": _lookup(scenes, scene, "Scene"),
             "facing": facing, "tileX": x, "tileY": y,
         }
+    if opcode == 0xE3 and len(args) == 1 and args[0] in {0, 1}:
+        return {"summary": f"Explore mode {'on' if args[0] else 'off'}", "enabled": bool(args[0])}
     if opcode == 0xE8 and len(args) == 1:
         return {"summary": f"Sound effect {args[0]}", "soundId": args[0]}
     if opcode == 0xEA and len(args) == 1:
         return {"summary": f"Music {args[0]}", "musicId": args[0]}
+    if opcode == 0xF0 and len(args) == 1:
+        return {"summary": f"Darken screen · duration {args[0]} (raw)", "duration": args[0]}
     return None
 
 
