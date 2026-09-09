@@ -14,6 +14,7 @@ bootstrap_environment()
 
 from desktop_host import run_host, smoke_host_switch
 from plugin_api import GamePlugin, validate_plugin
+from plugin_metadata import validate_repository_metadata
 
 
 ROOT = Path(__file__).resolve().parent
@@ -34,6 +35,10 @@ def discover_plugins() -> dict[str, GamePlugin]:
         plugins[plugin.plugin_id] = plugin
     if not plugins:
         raise RuntimeError("Lexeditor found no game plugins")
+    # Documentation is part of the plugin contract, not optional polish. A new
+    # integration must explain its loading model and explicitly credit its
+    # sources (or explicitly state that there were none) before Lexeditor runs.
+    validate_repository_metadata(plugins.keys(), ROOT)
     return plugins
 
 

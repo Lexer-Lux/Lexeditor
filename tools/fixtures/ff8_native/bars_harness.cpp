@@ -5,9 +5,11 @@
 #include <cstring>
 #include <span>
 #include <vector>
+#include <string>
 #include <cmath>
 #include <cassert>
 #include <cstdio>
+#include <ctime>
 #include <sys/mman.h>
 #define __cdecl
 #define FF8_US_VERSION true
@@ -17,9 +19,12 @@
 using ImU32=std::uint32_t;
 struct ImVec2 { float x,y; ImVec2(float a=0,float b=0):x(a),y(b){} };
 struct Rect { ImVec2 lo,hi;ImU32 color; };
+struct TextDraw { ImVec2 pos;ImU32 color;std::string text; };
 struct ImDrawList {
     std::vector<Rect> rectangles;
+    std::vector<TextDraw> texts;
     void AddRectFilled(ImVec2 lo,ImVec2 hi,ImU32 c) { rectangles.push_back({lo,hi,c}); }
+    void AddText(ImVec2 pos,ImU32 c,const char *text) { texts.push_back({pos,c,text?text:""}); }
 } draw_list;
 namespace ImGui {
 struct IO { ImVec2 DisplaySize{640,480}; } io;
@@ -55,7 +60,7 @@ struct Externals {
     std::uintptr_t engine_reset_viewport_sub_4972D0=0,battle_menu_sub_4A3D20=0;
     Callback menu_callbacks[17]{};
 } ff8_externals;
-static bool ff8=true,enable_ff8_hp_bars=true,enable_ff8_xp_bars=false,enable_ff8_gf_hp_bars=true;
+static bool ff8=true,enable_ff8_hp_bars=true,enable_ff8_xp_bars=false,enable_ff8_gf_hp_bars=true,enable_ff8_ingame_time=false;
 constexpr int MODE_BATTLE=1,MODE_MENU=2;
 struct Mode {int driver_mode=MODE_BATTLE;} mode;
 static Mode *getmode_cached(){return &mode;}
@@ -63,3 +68,6 @@ static std::uintptr_t get_absolute_value(std::uintptr_t,int){return 0;}
 static std::uintptr_t get_relative_call(std::uintptr_t,int){return 0;}
 static void replace_call(std::uintptr_t,void*){}
 static void patch_code_dword(std::uintptr_t,std::uint32_t){}
+#ifndef _WIN32
+static int localtime_s(std::tm *out,const std::time_t *value){return localtime_r(value,out)?0:1;}
+#endif

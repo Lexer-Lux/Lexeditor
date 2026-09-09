@@ -29,9 +29,13 @@ ALTERNATE_COMMAND_FLAG = 0x04
 
 BUILDER_CAVE = 0x0279F900
 COMMAND_LABEL_CAVE = 0x0279F9A0
-POST_BUILDER_CAVE = 0x0279FA40
+# The command-label, post-builder and learned-command helpers share the
+# existing 0x0279F9A0..0x0279FAFF fixed-command reservation. Angelo
+# needs slightly more of both variable-sized helpers, so repartition the
+# same block without crossing Switch's reserved cave at 0x0279FB00.
+POST_BUILDER_CAVE = 0x0279FA60
 SWITCH_RESERVED_CAVE_START = 0x0279FB00
-LEARNED_COMMAND_CAVE = POST_BUILDER_CAVE + 0x60
+LEARNED_COMMAND_CAVE = POST_BUILDER_CAVE + 0x80
 GF_LEARNED_BITS = 0x01CFDCBC
 GF_SAVE_STRIDE = 0x44
 
@@ -46,7 +50,16 @@ SELECTED_ACTOR = 0x01D76844
 RUNTIME_ACTOR_BASE = 0x01CFF000
 RUNTIME_ACTOR_STRIDE = 0x1D0
 CHARACTER_ID_OFFSET = 0x1C3
+RINOA = 4
 SELPHIE = 5
+
+# OpenFF8's runtime Kernel layout and the current FF8 decomp agree that
+# kernel section 1 (battle commands) is resident at this address. Each
+# record is 8 bytes; bytes +5/+6 are Menu flags and TargetInfo. Copy the
+# live values so a kernel mod is not silently overwritten by this tweak.
+KERNEL_BATTLE_COMMANDS = 0x01CF3F2C
+COMBINE_COMMAND = 0x13
+COMBINE_MENU_TARGET = KERNEL_BATTLE_COMMANDS + COMBINE_COMMAND * 8 + 5
 
 # FF8's encoded text bytes. This resolver keeps synthetic Switch readable,
 # renames command 0x0E from Shot to the requested Shoot, and shows GF as Summon
@@ -54,6 +67,8 @@ SELPHIE = 5
 SHOOT_TEXT = bytes.fromhex("57 66 6D 6D 72 00")
 SWITCH_TEXT = bytes.fromhex("57 75 67 72 61 66 00")
 SUMMON_TEXT = bytes.fromhex("57 73 6B 6B 6D 6C 00")
+# "Angelo" in FF8's European code page, followed by the string terminator.
+ANGELO_TEXT = bytes.fromhex("45 6C 65 63 6A 6D 00")
 
 # Source IDs consumed by the vanilla descriptor builder. They are command
 # ability IDs, not battle-command IDs. The vanilla builder translates them
@@ -65,7 +80,7 @@ CHARACTER_SOURCE_ABILITIES = {
     1: 0x1D,  # Zell: Defend.
     2: None,  # Irvine: custom Shoot is not vanilla Shot.
     3: 0x16,  # Quistis: Draw.
-    4: None,  # Rinoa: Angelo has no command-ability source record.
+    4: None,  # Rinoa: post-builder installs vanilla Combine as Angelo.
     5: 0x15,  # Selphie: vanilla GF command, shown as Summon by the custom menu.
 }
 GF_SOURCE_ABILITIES = {
@@ -103,7 +118,7 @@ CHARACTER_COMMANDS = {
     1: ("Zell", "Defend", 23),
     2: ("Irvine", "Shoot", None),
     3: ("Quistis", "Draw", 6),
-    4: ("Rinoa", "Angelo", None),
+    4: ("Rinoa", "Angelo", COMBINE_COMMAND),
     5: ("Selphie", "Summon", 3),
 }
 
@@ -146,9 +161,10 @@ def fixed_source_commands(character_id: int, gf_mask: int) -> tuple[int, int, in
     character_id = int(character_id)
     if character_id not in CHARACTER_SOURCE_ABILITIES:
         raise ValueError("Character ID must be from 0 to 5")
-    # Squall and Irvine use separate guarded runtime handlers. Rinoa's Angelo
-    # remains unavailable. Their source slot stays empty in this vanilla-source
-    # builder, so no existing command can masquerade as the requested command.
+    # Squall and Irvine use separate guarded runtime handlers. Rinoa has no
+    # command-ability source record, so the post-builder installs the existing
+    # vanilla Combine command descriptor directly and labels it Angelo. These
+    # generic source slots remain empty so nothing can masquerade as them.
     character_source = CHARACTER_SOURCE_TABLE[character_id]
     gf_id = single_gf_id(gf_mask)
     gf_source = EMPTY_SOURCE_ABILITY if gf_id is None else GF_SOURCE_TABLE[gf_id]
@@ -251,12 +267,14 @@ def _builder_payload() -> bytes:
 
 
 def _command_label_payload() -> bytes:
-    """Resolve the three requested custom names without changing dispatch IDs."""
+    """Resolve custom fixed-menu names without changing their dispatch IDs."""
     code = _Code(COMMAND_LABEL_CAVE)
     code.add(bytes.fromhex("8B 44 24 04 3D FE 00 00 00"))
     code.branch(bytes.fromhex("0F 84"), "switch")
     code.add(bytes.fromhex("83 F8 0E"))
     code.branch(bytes.fromhex("0F 84"), "shoot")
+    code.add(bytes.fromhex("83 F8 13"))
+    code.branch(bytes.fromhex("0F 84"), "angelo_check")
     code.add(bytes.fromhex("83 F8 03"))
     code.branch(bytes.fromhex("0F 85"), "vanilla")
     code.add(b"\x0F\xB6\x0D" + SELECTED_ACTOR.to_bytes(4, "little"))
@@ -271,6 +289,19 @@ def _command_label_payload() -> bytes:
     code.branch(bytes.fromhex("0F 85"), "vanilla")
     code.absolute(b"\xB8", "summon")
     code.add(b"\xC3")
+    code.label("angelo_check")
+    code.add(b"\x0F\xB6\x0D" + SELECTED_ACTOR.to_bytes(4, "little"))
+    code.add(bytes.fromhex("83 F9 0A"))
+    code.branch(bytes.fromhex("0F 87"), "vanilla")
+    code.add(bytes.fromhex("69 C9 D0 01 00 00"))
+    code.add(
+        b"\x80\xB9"
+        + (RUNTIME_ACTOR_BASE + CHARACTER_ID_OFFSET).to_bytes(4, "little")
+        + bytes((RINOA,))
+    )
+    code.branch(bytes.fromhex("0F 85"), "vanilla")
+    code.absolute(b"\xB8", "angelo")
+    code.add(b"\xC3")
     code.label("shoot")
     code.absolute(b"\xB8", "shoot_text")
     code.add(b"\xC3")
@@ -283,6 +314,8 @@ def _command_label_payload() -> bytes:
                    COMMAND_LABEL_HOOK + len(COMMAND_LABEL_ORIGINAL)))
     code.label("summon")
     code.add(SUMMON_TEXT)
+    code.label("angelo")
+    code.add(ANGELO_TEXT)
     code.label("shoot_text")
     code.add(SHOOT_TEXT)
     code.label("switch_text")
@@ -307,7 +340,7 @@ def _learned_command_payload() -> bytes:
 
 
 def _post_builder_payload() -> bytes:
-    """Finish Tonberry's alternate descriptor and the custom Irvine slot."""
+    """Finish Tonberry alternate, Rinoa Angelo, and the custom Irvine slot."""
     from . import shoot_issue_54
 
     code = _Code(POST_BUILDER_CAVE)
@@ -316,10 +349,21 @@ def _post_builder_payload() -> bytes:
     # actor+0x2E, the hidden fifth runtime descriptor. Flag 0x04 on the visible
     # GF slot makes the renderer draw the arrow and 0x4BC770 select that pointer.
     code.add(bytes.fromhex("80 7E 2A 21"))  # visible GF command is LV Down
-    code.branch(bytes.fromhex("0F 85"), "irvine")
+    code.branch(bytes.fromhex("0F 85"), "rinoa")
     code.add(bytes.fromhex("80 7E 2E 22"))  # hidden alternate is LV Up
-    code.branch(bytes.fromhex("0F 85"), "irvine")
+    code.branch(bytes.fromhex("0F 85"), "rinoa")
     code.add(bytes.fromhex("80 4E 2D 04"))
+    code.label("rinoa")
+    code.add(b"\x80\xBE" + CHARACTER_ID_OFFSET.to_bytes(4, "little") + bytes((RINOA,)))
+    code.branch(bytes.fromhex("0F 85"), "irvine")
+    # Runtime descriptor = command id, Menu flags, TargetInfo, disabled flags.
+    # Command 0x13 is vanilla Combine; copy its live Menu+Target word rather
+    # than hard-coding kernel metadata. BattleMenu_ExecuteSelectedCommand then
+    # opens submenu type 8 (the native Angelo/Combine list), which owns learned
+    # Angelo-move filtering and target selection.
+    code.add(bytes.fromhex("C6 46 26 13 50 66 A1") + COMBINE_MENU_TARGET.to_bytes(4, "little"))
+    code.add(bytes.fromhex("66 89 46 27 58 C6 46 29 00"))
+    code.branch(b"\xE9", "done")
     code.label("irvine")
     code.add(b"\x80\xBE" + CHARACTER_ID_OFFSET.to_bytes(4, "little") + b"\x02")
     code.branch(bytes.fromhex("0F 85"), "done")
@@ -339,7 +383,7 @@ def supported_command_audit() -> dict[str, tuple[str, str]]:
         "Zell": ("Defend", "verified vanilla dispatcher"),
         "Irvine": ("Shoot", "static-verified custom dispatcher; runtime test required"),
         "Quistis": ("Draw", "verified vanilla dispatcher"),
-        "Rinoa": ("blank", "Angelo is explicitly TBD"),
+        "Rinoa": ("Angelo", "verified vanilla Combine submenu/dispatcher"),
         "Selphie": ("Summon", "verified vanilla GF dispatcher"),
     }
 
@@ -360,7 +404,7 @@ def build_builder_component() -> str:
 
 
 def build_post_builder_component() -> str:
-    """Emit the single owner for Tonberry alternate and Irvine Shoot slots."""
+    """Emit the single owner for Tonberry alternate, Rinoa Angelo, and Irvine Shoot."""
     payload = _post_builder_payload()
     if POST_BUILDER_CAVE + len(payload) > LEARNED_COMMAND_CAVE:
         raise AssertionError("Shared post-builder overlaps the Switch cave")
@@ -368,7 +412,7 @@ def build_post_builder_component() -> str:
     gate = _learned_command_payload()
     assert LEARNED_COMMAND_CAVE + len(gate) <= SWITCH_RESERVED_CAVE_START
     return "\n".join((
-        "# Fixed command post-builder: Tonberry alternate and Irvine Shoot.",
+        "# Fixed command post-builder: Tonberry alternate, Rinoa Angelo, and Irvine Shoot.",
         f"{POST_BUILDER_CAVE:X}:{len(payload):X}",
         f"{POST_BUILDER_HOOK:X} = {hook.hex(' ').upper()}",
         f"{POST_BUILDER_CAVE:X} = {payload.hex(' ').upper()}",
@@ -379,7 +423,7 @@ def build_post_builder_component() -> str:
 
 
 def build_supported_components() -> str:
-    """Emit the verified builder, Switch, and repaired Shoot components."""
+    """Emit the verified builder, Angelo, Switch, and repaired Shoot components."""
     from . import switch_issue_52
     from . import shoot_issue_54
 

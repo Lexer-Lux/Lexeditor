@@ -83,11 +83,12 @@ ABILITY_TEXT_RENDER_CALL_ORIGINAL = bytes.fromhex("E8 96 08 FC FF")
 ABILITY_TEXT_RENDERER = 0x004BDE30
 ENHANCED_ABILITY_PALETTE_CAVE = 0x027A1160
 
-INGAME_TIME_BLOCKER = (
-    "In-game Time is unresolved: FF8 imports GetLocalTime at IAT 0x00B69178, "
-    "but no proved live main-menu renderer handoff was found for both the PLAY "
-    "label and its digits. Writing clock time to played_time_secs would alter save data."
-)
+# The old blocker was the absence of a proved live main-menu draw handoff.
+# The FFNx derivative now owns one: the same guarded callback used by XP bars
+# identifies the real in-game main menu and excludes the title save browser.
+# The clock reads Windows local time only; it never touches played_time_secs.
+INGAME_TIME_AVAILABLE = True
+INGAME_TIME_BLOCKER = ""
 BATTLE_ITEM_AUTO_SORT_BLOCKER = (
     "Battle Item auto-sort is unresolved: native Item sort state 0x004FB422 "
     "sorts only the 198 inventory pairs at controller offset 0x20. FFNx proves "

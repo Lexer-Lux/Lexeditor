@@ -1,4 +1,4 @@
-"""Add world-only manual analog camera controls to the supported FFNx tree."""
+"""Add supported world and idle-battle analog camera controls to FFNx."""
 from pathlib import Path
 from games.ff8.ffnx_status_bars.apply_to_ffnx import verify_revision
 
@@ -14,17 +14,18 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
              '\tenable_devtools = config["enable_devtools"].value_or(false);\n\tenable_ff8_modern_controls = config["enable_ff8_modern_controls"].value_or(false);'),
         ],
         'src/cfg.h': [('extern bool enable_devtools;', 'extern bool enable_devtools;\nextern bool enable_ff8_modern_controls;')],
-        'misc/FFNx.toml': [('enable_devtools = false', 'enable_devtools = false\n\n# Manual analog world-map camera. Battle inputs are unchanged.\nenable_ff8_modern_controls = false')],
+        'misc/FFNx.toml': [('enable_devtools = false', 'enable_devtools = false\n\n# Manual analog world-map and safe idle-battle camera controls.\nenable_ff8_modern_controls = false')],
         'src/ff8_opengl.cpp': [
             ('#include "ff8.h"', '#include "ff8.h"\n#include "lexeditor_ff8_modern_controls.h"'),
             ('void ff8_init_hooks(struct game_obj *_game_object)\n{',
              'void ff8_init_hooks(struct game_obj *_game_object)\n{\n\tlexeditor_ff8_modern_controls_install();'),
             ('LPDIJOYSTATE2 ff8_update_gamepad_status()\n{',
              'LPDIJOYSTATE2 ff8_update_gamepad_status()\n{\n'
-             '\t// A disconnected or blocked controller must not leave a stale camera axis.\n'
+             '\t// A disconnected or blocked controller must not leave a stale world-camera axis.\n'
              '\tif (lexeditor_ff8_modern_controls_world_active()) right_stick_x = right_stick_y = 128;'),
             ('\treturn ff8_externals.dinput_gamepad_state;\n}',
              '\t// Keep native right-stick digital aliases out of world movement/zoom.\n'
+             '\t// Battle remains read-only: its command/target input is never cleared or consumed.\n'
              '\tif (lexeditor_ff8_modern_controls_world_active()) {\n'
              '\t\tff8_externals.dinput_gamepad_state->lRx = 0;\n'
              '\t\tff8_externals.dinput_gamepad_state->lRy = 0;\n\t}\n'
@@ -46,7 +47,7 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
                 raise RuntimeError(f'Unexpected or already patched Modern Controls source: {name}')
             content = content.replace(old, new, 1)
         outputs[path] = content.encode().replace(b'\n', newline)
-    for name in ('camera_axis.h', 'lexeditor_ff8_modern_controls.h', 'lexeditor_ff8_modern_controls.cpp'):
+    for name in ('camera_axis.h', 'battle_camera.h', 'lexeditor_ff8_modern_controls.h', 'lexeditor_ff8_modern_controls.cpp'):
         target = root / 'src' / name
         if target.exists():
             raise RuntimeError(f'Refusing to replace existing source: {target}')

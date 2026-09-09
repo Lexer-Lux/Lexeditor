@@ -1,19 +1,25 @@
 """Validated GF spellbook data and stock-independent view/selection core.
 
-This is not a runtime patch. Native menu integration must preserve reservation
-and queue semantics, status restrictions, and the shared-stock transaction.
-Page and slot order are array order; no implicit sorting or stock filtering.
+Project JSON remains the editable source of truth. A compact runtime snapshot is
+written under direct/lexeditor so the FFNx derivative can consume it without
+borrowing a fixed region of FF8_EN.exe memory.
 """
 from __future__ import annotations
 from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import struct
 import tempfile
 from typing import Mapping
 
 SCHEMA_VERSION = 1
 FILE_NAME = "gf-spellbooks.json"
+RUNTIME_RELATIVE = Path("direct") / "lexeditor" / "gf-spellbooks.bin"
+RUNTIME_MAGIC = b"LXSB"
+RUNTIME_VERSION = 1
+RUNTIME_DEFINITION_BYTES = 16 * 8 * 4 * 2
+RUNTIME_PAGE_BYTES = 16
 # FFNx save_data.h: G_FORCE_NUM=16, complete_abilities[16]. The kernel's
 # current named stock spells are1..56; unknown/summon IDs are not spell choices.
 _magic_schema = json.loads((Path(__file__).parent / "schema" / "magic.json").read_text(encoding="utf-8"))
@@ -47,12 +53,12 @@ def validate(document):
         if gf in seen_gfs:
             raise SpellbookError("A GF can have only one spellbook")
         seen_gfs.add(gf)
-        if not isinstance(book["pages"], list):
-            raise SpellbookError("Pages must be a list")
+        if not isinstance(book["pages"], list) or not 1 <= len(book["pages"]) <= 8:
+            raise SpellbookError("A spellbook requires one to eight pages")
         pages, seen_magic = [], set()
         for page in book["pages"]:
-            if not isinstance(page, list):
-                raise SpellbookError("Each page must be a list of spell slots")
+            if not isinstance(page, list) or len(page) > 4:
+                raise SpellbookError("Each page must contain at most four spell slots")
             slots = []
             for slot in page:
                 if not isinstance(slot, dict) or set(slot) != {"magicId", "abilityId"}:
@@ -80,23 +86,109 @@ def load(project: Path):
         raise SpellbookError(f"Cannot read {FILE_NAME}: {error}") from error
 
 
+def runtime_bytes(document) -> bytes:
+    """Build the complete loader-owned runtime snapshot.
+
+    Per GF, 64 bytes hold 32 (magic, required-ability) pairs. Required ability
+    255 means no gate. The trailing 16 bytes are page counts. Empty slots are
+    0/255 and therefore never alias a valid spell.
+    """
+    checked = validate(document)
+    definitions = bytearray([0, 255] * (16 * 8 * 4))
+    page_counts = bytearray(16)
+    for book in checked["books"]:
+        gf = book["gfId"]
+        page_counts[gf] = len(book["pages"])
+        for page_index, page in enumerate(book["pages"]):
+            for slot_index, slot in enumerate(page):
+                offset = gf * 64 + (page_index * 4 + slot_index) * 2
+                definitions[offset] = slot["magicId"]
+                definitions[offset + 1] = 255 if slot["abilityId"] is None else slot["abilityId"]
+    header = struct.pack("<4sBBBB", RUNTIME_MAGIC, RUNTIME_VERSION, 16, 8, 4)
+    return header + bytes(definitions) + bytes(page_counts)
+
+
+def parse_runtime(raw: bytes) -> dict:
+    expected = 8 + RUNTIME_DEFINITION_BYTES + RUNTIME_PAGE_BYTES
+    if len(raw) != expected:
+        raise SpellbookError("Invalid GF spellbook runtime snapshot size")
+    magic, version, gf_count, max_pages, slots = struct.unpack_from("<4sBBBB", raw)
+    if (magic, version, gf_count, max_pages, slots) != (RUNTIME_MAGIC, RUNTIME_VERSION, 16, 8, 4):
+        raise SpellbookError("Unsupported GF spellbook runtime snapshot")
+    definitions = raw[8:8 + RUNTIME_DEFINITION_BYTES]
+    page_counts = raw[-RUNTIME_PAGE_BYTES:]
+    books = []
+    for gf, count in enumerate(page_counts):
+        if count > 8:
+            raise SpellbookError("Invalid GF spellbook page count")
+        if not count:
+            continue
+        pages = []
+        seen = set()
+        for page_index in range(count):
+            page = []
+            for slot_index in range(4):
+                offset = gf * 64 + (page_index * 4 + slot_index) * 2
+                magic_id, ability_id = definitions[offset], definitions[offset + 1]
+                if not magic_id:
+                    if ability_id != 255:
+                        raise SpellbookError("Empty runtime spellbook slot has a prerequisite")
+                    continue
+                if magic_id not in MAGIC_IDS or magic_id in seen:
+                    raise SpellbookError("Invalid or duplicate runtime spell")
+                seen.add(magic_id)
+                if ability_id != 255 and ability_id not in ABILITY_IDS:
+                    raise SpellbookError("Invalid runtime spellbook prerequisite")
+                page.append({"magicId": magic_id, "abilityId": None if ability_id == 255 else ability_id})
+            pages.append(page)
+        books.append({"gfId": gf, "pages": pages})
+    return validate({"schemaVersion": SCHEMA_VERSION, "books": books})
+
+
+def _atomic(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".gf-spellbooks-", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 def save(project: Path, document):
-    """Atomically persist only project data; never writes runtime/save data."""
+    """Atomically persist editable JSON plus the deterministic runtime snapshot."""
     checked = validate(document)
     directory = Path(project)
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / FILE_NAME
-    descriptor, temporary = tempfile.mkstemp(prefix=".gf-spellbooks-", suffix=".tmp", dir=directory)
+    runtime = directory / RUNTIME_RELATIVE
+    previous = [(path, path.read_bytes() if path.is_file() else None) for path in (target, runtime)]
     try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write((json.dumps(checked, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, target)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+        _atomic(target, (json.dumps(checked, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+        _atomic(runtime, runtime_bytes(checked))
+    except Exception:
+        for path, data in previous:
+            if data is None:
+                path.unlink(missing_ok=True)
+            else:
+                _atomic(path, data)
+        raise
     return checked
+
+
+def payload(project: Path) -> dict:
+    document = load(project)
+    return {
+        "document": document,
+        "magicIds": sorted(MAGIC_IDS),
+        "abilityIds": sorted(ABILITY_IDS),
+        "limits": {"maxPages": 8, "slotsPerPage": 4},
+        "runtimePath": str(Path(project) / RUNTIME_RELATIVE),
+    }
 
 
 def _stock(stock):

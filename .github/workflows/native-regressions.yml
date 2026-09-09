@@ -3,6 +3,11 @@ on:
   pull_request:
     paths:
       - 'games/ff8/**'
+      - 'tests/test_ff8_field_assets.py'
+      - 'tests/test_ff8_drop_chance.py'
+      - 'tests/test_ff8_formulae_rework.py'
+      - 'tests/test_ff8_rinoa_angelo.py'
+      - 'tests/test_ff8_ingame_time.py'
       - 'tools/verify_ff8_*'
       - 'tools/package_ff8_native_driver.py'
       - 'tools/prepare_ff8_native_build.py'
@@ -13,6 +18,11 @@ on:
     branches: [master, fix/ff8-native-battle-batch]
     paths:
       - 'games/ff8/**'
+      - 'tests/test_ff8_field_assets.py'
+      - 'tests/test_ff8_drop_chance.py'
+      - 'tests/test_ff8_formulae_rework.py'
+      - 'tests/test_ff8_rinoa_angelo.py'
+      - 'tests/test_ff8_ingame_time.py'
       - 'tools/verify_ff8_*'
       - 'tools/package_ff8_native_driver.py'
       - 'tools/prepare_ff8_native_build.py'
@@ -44,21 +54,33 @@ jobs:
         run: |
           python tools/verify_ff8_native_package.py
           python tools/verify_ff8_native_compiled.py
+          python tools/verify_ff8_battle_camera.py
+          python tools/verify_ff8_reptile_atb.py
           python tools/verify_ff8_gf_bar_settings.py
-          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py
+          python -m unittest tests.test_ff8_field_assets tests.test_ff8_drop_chance tests.test_ff8_formulae_rework tests.test_ff8_rinoa_angelo tests.test_ff8_ingame_time -v
+          python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py tools/package_ff8_native_driver.py tools/verify_ff8_native_battle_regressions.py tools/verify_ff8_linked_runtime.py tools/verify_ff8_cards_players_ui.py tools/verify_ff8_battle_camera.py tools/verify_ff8_battle_camera_native_seam.py tools/verify_ff8_reptile_atb.py tools/verify_ff8_reptile_atb_native_seam.py tools/verify_ff8_reptile_atb_binary.py
+          node --check games/ff8/cards_ui.js
           python - <<'PY'
           import pathlib, re, subprocess
           text = pathlib.Path('games/ff8/editor.html').read_text(encoding='utf-8')
           for script in re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', text, re.S | re.I):
               subprocess.run(['node', '--check'], input=script, text=True, check=True)
           PY
-      - name: Preserve search and all merged FF8 UI fixes
+      - name: Preserve FF8 editor layout contracts
         working-directory: editor
-        run: |
-          python tools/verify_ff8_editor_layout_contracts.py
-          python tools/verify_ff8_ui_battle_regressions.py --browser ''
-          python tools/verify_ff8_enemy_compact_ui.py --browser ''
-          python tools/verify_ff8_card_art.py
+        run: python tools/verify_ff8_editor_layout_contracts.py
+      - name: Preserve FF8 search and FFNx settings UI
+        working-directory: editor
+        run: python tools/verify_ff8_ui_battle_regressions.py --browser ''
+      - name: Preserve compact Enemy editor UI
+        working-directory: editor
+        run: python tools/verify_ff8_enemy_compact_ui.py --browser ''
+      - name: Preserve Cards and NPC Players UI
+        working-directory: editor
+        run: python tools/verify_ff8_cards_players_ui.py --browser ''
+      - name: Preserve FF8 card artwork decoding and route
+        working-directory: editor
+        run: python tools/verify_ff8_card_art.py
       - name: Record native test boundary
         run: echo 'Private executable tests run separately with a supplied FF8_EN.exe. No game executable is downloaded or uploaded. These checks do not claim in-game acceptance.'
   windows-install:

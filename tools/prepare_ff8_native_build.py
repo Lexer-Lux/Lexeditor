@@ -31,9 +31,23 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         ('ffnx_party_switch','lexeditor_ff8_party_switch.h'),
     ):
         shutil.copyfile(ROOT/f'games/ff8/{folder}/ffnx-src/{name}',source/'src'/name)
+    # Modern Controls is also present in the provenance patch, but its maintained
+    # sources move faster than that immutable build snapshot. Always overlay the
+    # current audited implementation after applying the pinned derivative patch.
+    for name in (
+        'camera_axis.h',
+        'battle_camera.h',
+        'vehicle_drive.h',
+        'lexeditor_ff8_modern_controls.cpp',
+        'lexeditor_ff8_modern_controls.h',
+    ):
+        shutil.copyfile(ROOT/'games/ff8/ffnx_modern_controls'/name, source/'src'/name)
     extension_files = [
         'lexeditor_ff8_shared_party.h', 'lexeditor_ff8_shared_party.inc',
         'lexeditor_ff8_stock_tweaks.h', 'lexeditor_ff8_stock_tweaks.cpp',
+        'lexeditor_ff8_gf_spellbooks.h', 'lexeditor_ff8_gf_spellbooks.cpp',
+        'reptile_atb_runtime.h', 'lexeditor_ff8_reptile_atb.h',
+        'lexeditor_ff8_reptile_atb.cpp',
     ]
     for name in extension_files:
         destination = source / 'src' / ('ff8' if name.endswith('.inc') else '') / name
@@ -48,19 +62,24 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             ('bool enable_ff8_hp_bars;','bool enable_ff8_hp_bars;\nbool enable_ff8_gf_hp_bars;'),
             ('\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);',
              '\tenable_ff8_hp_bars = config["enable_ff8_hp_bars"].value_or(false);\n\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);'),
+            ('bool enable_ff8_gf_hp_bars;','bool enable_ff8_gf_hp_bars;\nbool enable_ff8_ingame_time;'),
+            ('\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);',
+             '\tenable_ff8_gf_hp_bars = config["enable_ff8_gf_hp_bars"].value_or(false);\n\tenable_ff8_ingame_time = config["enable_ff8_ingame_time"].value_or(false);'),
         ],
         'src/cfg.h':[
             ('extern bool enable_ff8_party_switch;', 'extern bool enable_ff8_party_switch;\nextern bool enable_ff8_no_magic_consumption;'),
             ('extern bool enable_ff8_hp_bars;','extern bool enable_ff8_hp_bars;\nextern bool enable_ff8_gf_hp_bars;'),
+            ('extern bool enable_ff8_gf_hp_bars;','extern bool enable_ff8_gf_hp_bars;\nextern bool enable_ff8_ingame_time;'),
         ],
         'misc/FFNx.toml':[
             ('enable_ff8_party_switch = false', 'enable_ff8_party_switch = false\n\n# Keep spell stock on successful field/battle casts; items still consume.\nenable_ff8_no_magic_consumption = false'),
             ('enable_ff8_hp_bars = false','enable_ff8_hp_bars = false\n\n# Blue junctioned-GF HP bar above each party name.\nenable_ff8_gf_hp_bars = false'),
+            ('enable_ff8_gf_hp_bars = false','enable_ff8_gf_hp_bars = false\n\n# Show the computer local clock on FF8 main menu without changing PLAY time.\nenable_ff8_ingame_time = false'),
         ],
     }
     changes['src/ff8_opengl.cpp'] = [
-        ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_stock_tweaks.h"'),
-        ('\tlexeditor_ff8_party_switch_install();', '\tlexeditor_ff8_party_switch_install();\n\tlexeditor_ff8_stock_tweaks_install();'),
+        ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_stock_tweaks.h"\n#include "lexeditor_ff8_gf_spellbooks.h"\n#include "lexeditor_ff8_reptile_atb.h"'),
+        ('\tlexeditor_ff8_party_switch_install();', '\tlexeditor_ff8_party_switch_install();\n\tlexeditor_ff8_stock_tweaks_install();\n\tlexeditor_ff8_gf_spellbooks_install();\n\tlexeditor_ff8_reptile_atb_install();'),
     ]
     # Stock reconciliation and actor readiness stay owned by the existing
     # Shared Magic runtime. Add the explicit DLL-caller lifecycle there.
@@ -96,6 +115,9 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     patch_paths = [line[6:] for line in patch.read_text(encoding="utf-8").splitlines()
                    if line.startswith("+++ b/")]
     patch_paths.extend('src/' + ('ff8/' if name.endswith('.inc') else '') + name for name in extension_files)
+    for relative in ('src/battle_camera.h', 'src/vehicle_drive.h'):
+        if relative not in patch_paths:
+            patch_paths.append(relative)
     for name in patch_paths:
         relative = Path(name)
         if relative.is_absolute() or ".." in relative.parts or not (source / relative).is_file():

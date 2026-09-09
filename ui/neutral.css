@@ -85,3 +85,10 @@ body.lex-neutral-ui * { box-sizing:border-box; }
   font-size:1.45em;
   text-align:center;
 }
+
+/* Shared semantic reference picker: search, entity selection and record navigation. */
+.lex-neutral-ui .lex-semantic-reference-control{display:grid;grid-template-columns:2rem minmax(8rem,.8fr) minmax(11rem,1.2fr);align-items:center;gap:6px;width:100%;min-width:0}
+.lex-neutral-ui .lex-semantic-reference-control:not(.searchable){grid-template-columns:2rem minmax(0,1fr)}
+.lex-neutral-ui .lex-semantic-reference-control input,.lex-neutral-ui .lex-semantic-reference-control select{width:100%;min-width:0}
+.lex-neutral-ui .lex-semantic-reference-open{display:grid;width:2rem;height:2rem;min-width:2rem;padding:0;place-items:center;font:inherit;line-height:1}
+@media(max-width:860px){.lex-neutral-ui .lex-semantic-reference-control.searchable{grid-template-columns:2rem minmax(0,1fr)}.lex-neutral-ui .lex-semantic-reference-control.searchable .lex-semantic-reference-search{grid-column:1/-1;grid-row:1}.lex-neutral-ui .lex-semantic-reference-control.searchable .lex-semantic-reference-open{grid-row:2}.lex-neutral-ui .lex-semantic-reference-control.searchable select{grid-row:2}}

@@ -254,13 +254,16 @@ class PageTests(unittest.TestCase):
 
     def test_text_and_shop_ui_persistence(self):
         from games.ff7 import extended as ex
+        write_kernel(self.backend.game/PATHS[0])
         text=self.install_extra("text");shop=self.install_extra("shop")
         text_before,shop_before=text.read_bytes(),shop.read_bytes()
         self.open();self.click("Text")
         self.page.get_by_label("Text for Command help 0",exact=True).fill("Edited help")
         self.save_wait()
         self.click("Shops")
-        self.page.get_by_label("Item ID for Shop 0",exact=True).first.fill("17")
+        product=self.page.get_by_label("Slot 1 product for Shop 0",exact=True).first
+        self.assertEqual(product.evaluate("e=>e.tagName"),"SELECT")
+        product.select_option("17")
         self.save_wait()
         self.click("Prices")
         self.page.get_by_label("Purchase price (gil) for Items 0",exact=True).fill("777")

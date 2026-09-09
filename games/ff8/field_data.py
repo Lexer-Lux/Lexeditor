@@ -36,6 +36,8 @@ LITERAL_OPCODE = 0x07
 VARIABLE_OPCODES = {0x0A, 0x0C, 0x0E, 0x10, 0x11, 0x12}
 EDITABLE_OPCODES = {LITERAL_OPCODE, *VARIABLE_OPCODES}
 VERTEX_AXES = ("x", "y", "z")
+MAP_ASSET_EXTENSIONS = ("jsm", "sym", "inf", "msd", "id", "map", "mim", "mrt", "rat")
+MAP_CACHE_VERSION = 6
 
 
 def _prefix() -> Path:
@@ -62,6 +64,45 @@ def _memory_entries(fi: bytes, fl: bytes) -> list[dict]:
                         "unpacked": unpacked, "offset": offset,
                         "compressed": bool(compression)})
     return entries
+
+
+def _memory_entry_for_map(entries: list[dict], map_name: str, extension: str,
+                          field_key: str) -> dict | None:
+    """Resolve a map asset without assuming the inner basename always matches the outer map."""
+    expected = f"{map_name}.{extension}".casefold()
+    exact = [entry for entry in entries if entry["basename"] == expected]
+    if len(exact) == 1:
+        return exact[0]
+    if len(exact) > 1:
+        raise ValueError(
+            f"Field map {field_key} has ambiguous {extension.upper()} assets named {map_name}.{extension}")
+    suffix = f".{extension}".casefold()
+    candidates = [entry for entry in entries if entry["basename"].endswith(suffix)]
+    if not candidates:
+        return None
+    if len(candidates) > 1:
+        names = ", ".join(sorted(str(entry["name"]) for entry in candidates))
+        raise ValueError(
+            f"Field map {field_key} has ambiguous {extension.upper()} assets: {names}")
+    return candidates[0]
+
+
+def _validate_asset_relationships(field_key: str, assets) -> None:
+    """Enforce only relationships that FF8 itself requires.
+
+    Deling's JSM API explicitly accepts an empty SYM, so JSM-without-SYM is a
+    valid field.  SYM-without-JSM is an orphan and remains a hard failure.
+    MAP/MIM and MRT/RAT are true pairs.
+    """
+    names = set(assets)
+    if "sym" in names and "jsm" not in names:
+        raise ValueError(f"Field map {field_key} has an orphan SYM asset; missing JSM")
+    for first, second, label in (("map", "mim", "MAP/MIM background"),
+                                 ("mrt", "rat", "MRT/RAT encounter")):
+        if (first in names) != (second in names):
+            missing = second.upper() if first in names else first.upper()
+            raise ValueError(
+                f"Field map {field_key} has an incomplete {label} pair; missing {missing}")
 
 
 def _memory_extract(fs: bytes, entries: list[dict], basename: str) -> bytes:
@@ -178,36 +219,33 @@ def ensure_map_baseline(key: str) -> tuple[Path | None, Path | None, Path | None
         try:
             cached = json.loads(metadata.read_text(encoding="utf-8"))
             assets = cached.get("assets", [])
-            if (cached.get("version") == 5 and cached.get("source") == fingerprint and
-                    all(name in {"jsm", "sym", "inf", "msd", "id", "map", "mim"}
-                        or name in {"mrt", "rat"} for name in assets) and
+            if (cached.get("version") == MAP_CACHE_VERSION and cached.get("source") == fingerprint and
+                    all(name in MAP_ASSET_EXTENSIONS for name in assets) and
                     all((directory / f"{row['name']}.{name}").is_file()
                         for name in assets)):
-                if "jsm" in assets and "sym" in assets:
-                    _parse_card_players(jsm_path.read_bytes(), sym_path.read_bytes())
-                elif "jsm" in assets or "sym" in assets:
-                    raise ValueError("Field map has an incomplete JSM/SYM pair")
+                _validate_asset_relationships(key, assets)
+                if "jsm" in assets:
+                    _parse_card_players(
+                        jsm_path.read_bytes(),
+                        sym_path.read_bytes() if "sym" in assets else b"")
                 if "inf" in assets:
                     _parse_inf(inf_path.read_bytes())
                 if "msd" in assets:
                     field_dialogue.read((directory / f"{row['name']}.msd").read_bytes())
                 if "id" in assets:
                     field_walkmesh.read((directory / f"{row['name']}.id").read_bytes())
-                if ("map" in assets) != ("mim" in assets):
-                    raise ValueError("Field map has an incomplete MAP/MIM background pair")
                 if "map" in assets:
                     field_background.read(
                         (directory / f"{row['name']}.map").read_bytes(),
                         (directory / f"{row['name']}.mim").read_bytes())
-                if ("mrt" in assets) != ("rat" in assets):
-                    raise ValueError("Field map has an incomplete MRT/RAT encounter pair")
                 if "mrt" in assets:
                     field_encounters.read_mrt(
                         (directory / f"{row['name']}.mrt").read_bytes())
                     rate = field_encounters.read_rat(
                         (directory / f"{row['name']}.rat").read_bytes())
                     if not rate["canonical"]:
-                        raise ValueError("Field RAT does not contain four matching rate bytes")
+                        raise ValueError(
+                            f"Field map {key} RAT does not contain four matching rate bytes")
                 return (jsm_path if "jsm" in assets else None,
                         sym_path if "sym" in assets else None,
                         inf_path if "inf" in assets else None)
@@ -219,45 +257,37 @@ def ensure_map_baseline(key: str) -> tuple[Path | None, Path | None, Path | None
     fi = archive.extract(group["entries"][".fi"])
     fl = archive.extract(group["entries"][".fl"])
     entries = _memory_entries(fi, fl)
-    by_name = {entry["basename"]: entry for entry in entries}
     extracted = {}
-    for extension in ("jsm", "sym", "inf", "msd", "id", "map", "mim", "mrt", "rat"):
-        basename = f"{row['name']}.{extension}".casefold()
-        if basename in by_name:
-            extracted[extension] = _memory_extract(fs, entries, basename)
-    if ("jsm" in extracted) != ("sym" in extracted):
-        raise ValueError("Field map has an incomplete JSM/SYM pair")
+    for extension in MAP_ASSET_EXTENSIONS:
+        entry = _memory_entry_for_map(entries, row["name"], extension, key)
+        if entry is not None:
+            extracted[extension] = _memory_extract(fs, entries, entry["basename"])
+    _validate_asset_relationships(key, extracted)
     if "jsm" in extracted:
-        _parse_card_players(extracted["jsm"], extracted["sym"])
+        _parse_card_players(extracted["jsm"], extracted.get("sym", b""))
     if "inf" in extracted:
         _parse_inf(extracted["inf"])
     if "msd" in extracted:
         field_dialogue.read(extracted["msd"])
     if "id" in extracted:
         field_walkmesh.read(extracted["id"])
-    if ("map" in extracted) != ("mim" in extracted):
-        raise ValueError("Field map has an incomplete MAP/MIM background pair")
     if "map" in extracted:
         field_background.read(extracted["map"], extracted["mim"])
-    if ("mrt" in extracted) != ("rat" in extracted):
-        raise ValueError("Field map has an incomplete MRT/RAT encounter pair")
     if "mrt" in extracted:
         field_encounters.read_mrt(extracted["mrt"])
         rate = field_encounters.read_rat(extracted["rat"])
         if not rate["canonical"]:
-            raise ValueError("Field RAT does not contain four matching rate bytes")
+            raise ValueError(f"Field map {key} RAT does not contain four matching rate bytes")
     directory.mkdir(parents=True, exist_ok=True)
-    for extension, destination in (("jsm", jsm_path), ("sym", sym_path), ("inf", inf_path),
-                                   ("msd", directory / f"{row['name']}.msd"),
-                                   ("id", directory / f"{row['name']}.id"),
-                                   ("map", directory / f"{row['name']}.map"),
-                                   ("mim", directory / f"{row['name']}.mim"),
-                                   ("mrt", directory / f"{row['name']}.mrt"),
-                                   ("rat", directory / f"{row['name']}.rat")):
+    destinations = {
+        extension: directory / f"{row['name']}.{extension}"
+        for extension in MAP_ASSET_EXTENSIONS
+    }
+    for extension, destination in destinations.items():
         destination.unlink(missing_ok=True)
         if extension in extracted:
             destination.write_bytes(extracted[extension])
-    metadata.write_text(json.dumps({"version": 5, "source": fingerprint,
+    metadata.write_text(json.dumps({"version": MAP_CACHE_VERSION, "source": fingerprint,
                                     "assets": sorted(extracted)}, indent=2) + "\n",
                         encoding="utf-8")
     return (jsm_path if "jsm" in extracted else None,
@@ -537,6 +567,7 @@ def map_rows(key: str, dataset: str = "current") -> dict:
     jsm, sym = _source_paths(key, dataset)
     inf_path = _inf_source_path(key, dataset)
     raw = jsm.read_bytes() if jsm is not None else None
+    sym_raw = sym.read_bytes() if sym is not None else b""
     inf_raw = inf_path.read_bytes() if inf_path is not None else None
     dialogue_path = _dialogue_source_path(key, dataset)
     dialogue_raw = dialogue_path.read_bytes() if dialogue_path is not None else None
@@ -556,7 +587,7 @@ def map_rows(key: str, dataset: str = "current") -> dict:
                  {"variant": None, "size": 0, "gateways": [], "triggers": []})
     script_error = None
     try:
-        scripts = field_scripts.read(raw, sym.read_bytes()) if raw is not None and sym is not None else {
+        scripts = field_scripts.read(raw, sym_raw) if raw is not None else {
             "header": None, "groups": [], "methods": [],
             "opcodeCount": len(field_scripts.OPCODE_NAMES)}
     except ValueError as error:
@@ -601,8 +632,8 @@ def map_rows(key: str, dataset: str = "current") -> dict:
         }
     else:
         random_encounters = {"formations": [], "rate": None}
-    return {**row, "players": _parse_card_players(raw, sym.read_bytes())
-            if raw is not None and sym is not None else [],
+    return {**row, "players": _parse_card_players(raw, sym_raw)
+            if raw is not None else [],
             "scripts": scripts,
             "entrances": entrances,
             "dialogue": field_dialogue.read(dialogue_raw)["lines"]
@@ -751,9 +782,10 @@ def _prepare_dialogue_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, i
 def _prepare_script_documents(key: str, documents: list[dict]) -> tuple[Path, bytes, int]:
     row = _map_row(key)
     source, sym = _source_paths(key, "current")
-    if source is None or sym is None:
-        raise ValueError(f"Field map {key} has no JSM/SYM scripts")
-    raw, changed = field_scripts.rebuild(source.read_bytes(), sym.read_bytes(), documents)
+    if source is None:
+        raise ValueError(f"Field map {key} has no JSM scripts")
+    sym_raw = sym.read_bytes() if sym is not None else b""
+    raw, changed = field_scripts.rebuild(source.read_bytes(), sym_raw, documents)
     destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
                    f"{row['name']}.jsm")
     return destination, raw, changed
@@ -871,9 +903,9 @@ def save(edits: list[dict]) -> dict:
         if script_edits:
             row = _map_row(key)
             source, sym = _source_paths(key, "current")
-            if source is None or sym is None:
-                raise ValueError(f"Field map {key} has no JSM/SYM scripts")
-            sym_raw = sym.read_bytes()
+            if source is None:
+                raise ValueError(f"Field map {key} has no JSM scripts")
+            sym_raw = sym.read_bytes() if sym is not None else b""
             original_players = _parse_card_players(source.read_bytes(), sym_raw)
             raw = bytearray(prepared_scripts[1] if prepared_scripts else source.read_bytes())
             players = _parse_card_players(raw, sym_raw)

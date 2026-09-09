@@ -26,7 +26,7 @@
     .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.card{padding:16px;border:1px solid var(--lex-border);border-radius:5px;background:#f5e9c9}.card h2{margin:0 0 12px;color:#651919;font:700 20px var(--lex-heading-font)}.path-row{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid #d9c69b}.path-row code{overflow:hidden;text-overflow:ellipsis}.ok{color:#45631e}.error{color:#9d2424}
     .build-log{max-height:42vh;overflow:auto;padding:12px;color:#d8dee9;border:1px solid #444;background:#101216;font:13px/1.4 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
     .warband-bitmap-text{display:inline-flex;align-items:flex-start;vertical-align:middle;white-space:nowrap}.warband-glyph-slot{position:relative;display:inline-block;flex:none;height:var(--wb-line-height)}.warband-glyph{position:absolute;display:block;background-color:currentColor;-webkit-mask-image:url('/api/warband-font/atlas');mask-image:url('/api/warband-font/atlas');-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
-    .warband-item-detail{--lex-detail-icon-size:96px;display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;border:1px solid var(--lex-border);background:#f7edcf}.warband-item-detail>.lex-detail-panel-heading{padding:10px 10px 12px;border-bottom:1px solid #c8ae78}.warband-item-detail .lex-detail-panel-title{color:#651919;font:700 24px/1.1 var(--lex-heading-font)}.warband-item-detail .lex-detail-panel-id{margin-top:4px;color:var(--lex-muted);font:11px Consolas,monospace}.warband-item-detail .lex-detail-panel-icon{width:auto;height:100%;max-height:100%;aspect-ratio:1;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-item-thumbnail{position:relative;width:100%;height:100%;overflow:hidden}.warband-item-thumbnail canvas{display:block;width:100%;height:100%;pointer-events:none}.warband-item-thumbnail .warband-preview-message{padding:8px}.warband-mesh-list{padding:9px 2px;color:var(--lex-muted)}.warband-mesh-list b{color:#651919}.warband-preview-stage{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-preview-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.warband-preview-stage canvas.dragging{cursor:grabbing}.warband-preview-message{position:absolute;inset:0;display:grid;place-items:center;padding:28px;color:#ead8ac;text-align:center}.warband-preview-facts{display:flex;gap:16px;padding:8px 2px 0;color:var(--lex-muted);font:11px Consolas,monospace}.warband-preview-spin{width:22px;height:22px;border:3px solid #d5b46955;border-top-color:#d5b469;border-radius:50%;animation:warband-spin .7s linear infinite}@keyframes warband-spin{to{transform:rotate(360deg)}}
+    .warband-item-detail{--lex-detail-icon-size:96px;display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;border:1px solid var(--lex-border);background:#f7edcf}.warband-item-detail>.lex-detail-panel-heading{padding:10px 10px 12px;border-bottom:1px solid #c8ae78}.warband-item-detail .lex-detail-panel-title{color:#651919;font:700 24px/1.1 var(--lex-heading-font)}.warband-item-detail .lex-detail-panel-id{margin-top:4px;color:var(--lex-muted);font:11px Consolas,monospace}.warband-item-detail .lex-detail-panel-icon{width:auto;height:100%;max-height:100%;aspect-ratio:1;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-item-thumbnail{position:relative;width:100%;height:100%;overflow:hidden}.warband-item-thumbnail canvas{display:block;width:100%;height:100%;pointer-events:none}.warband-item-thumbnail .warband-preview-message{padding:8px}.warband-mesh-list{padding:9px 2px;color:var(--lex-muted)}.warband-mesh-list b{color:#651919}.warband-item-detail .lex-detail-panel-body{overflow:auto}.warband-item-expression{min-height:72px!important;resize:vertical!important;font:12px/1.35 "Cascadia Mono",Consolas,monospace!important}.warband-preview-stage{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-preview-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.warband-preview-stage canvas.dragging{cursor:grabbing}.warband-preview-message{position:absolute;inset:0;display:grid;place-items:center;padding:28px;color:#ead8ac;text-align:center}.warband-preview-facts{display:flex;gap:16px;padding:8px 2px 0;color:var(--lex-muted);font:11px Consolas,monospace}.warband-preview-spin{width:22px;height:22px;border:3px solid #d5b46955;border-top-color:#d5b469;border-radius:50%;animation:warband-spin .7s linear infinite}@keyframes warband-spin{to{transform:rotate(360deg)}}
     .warband-cell-text{min-width:0;max-width:100%;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     [hidden]{display:none!important}.warband-item-thumbnail img{width:100%;height:100%;object-fit:contain;display:block}.warband-icon-message{padding:8px;color:var(--lex-text);background:var(--lex-panel);font-size:11px}
     .warband-trees{align-items:stretch;grid-template-rows:minmax(0,1fr)}.warband-trees>.lex-panel-layout-pane{align-self:stretch;height:100%;min-height:0}
@@ -47,20 +47,21 @@
   <script src="/warband/troop_trees.js"></script>
   <script>
   "use strict";
-  const {el,columnList,list,masterDetail,pagedListDetail,pager,clone,showAlert,hoverable,detailPanel}=LexeditorUI;
+  const {el,columnList,list,masterDetail,pagedListDetail,pager,clone,showAlert,hoverable,detailPanel,detailField,detailGroup}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
   const state={
     booting:true,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
     manual:null,font:null,selectedModule:"",selectedSetting:"",selectedItem:"",selectedTroop:"",selectedUpgrade:"",selectedFile:"",catalogFile:null,catalogDraft:"",
-    settingEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
+    settingEdits:{},itemEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
     pages:{items:0,troops:0,upgrades:0,datamap:0},pageSizes:{items:20,troops:20,upgrades:20},sorts:{items:["name",1],troops:["name",1],upgrades:["from",1],datamap:["filename",1]},
     build:{cursor:0,lines:[],running:false,returnCode:null},status:"Ready"
   };
 
   async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(value.error)throw new Error(value.error);return value;}
-  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
-  function historyCapture(){return {settingEdits:clone(state.settingEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
-  async function historyRestore(snapshot){state.settingEdits=clone(snapshot.settingEdits);state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
+  function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Object.keys(row.fields||{}).length,0);}
+  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
+  function historyCapture(){return {settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
+  async function historyRestore(snapshot){state.settingEdits=clone(snapshot.settingEdits);state.itemEdits=clone(snapshot.itemEdits||{});state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
   function effectiveSetting(row){return state.settingEdits[row.line]??row.value;}
   function setStatus(text){state.status=text;const target=$("#plugin-status");if(target)target.textContent=text;}
   function bitmapText(text,pixels){
@@ -122,37 +123,57 @@
   function disposeWarbandPreview(){
     if(window.__warbandPreview){window.__warbandPreview.forEach(controller=>controller.dispose());delete window.__warbandPreview;}
   }
+  function itemEditKey(item){return String(item.recordIndex??item.line??item.id);}
+  function effectiveItemField(item,key){return state.itemEdits[itemEditKey(item)]?.fields?.[key]??item.fields?.[key]??"";}
+  function setItemField(item,key,value){
+    const recordKey=itemEditKey(item),base=String(item.fields?.[key]??""),next=String(value);
+    if(next===base){const existing=state.itemEdits[recordKey];if(existing?.fields)delete existing.fields[key];if(existing&&!Object.keys(existing.fields).length)delete state.itemEdits[recordKey];}
+    else{const existing=state.itemEdits[recordKey]||(state.itemEdits[recordKey]={recordIndex:item.recordIndex,originalId:item.id,fields:{}});existing.fields[key]=next;}
+    shell.refresh();
+  }
+  function itemTypeFromFlags(flags){return (String(flags).match(/itp_type_([a-z0-9_]+)/i)||[])[1]||"";}
+  function setItemType(item,value){
+    const clean=String(value).trim().replace(/^itp_type_/i,""),flags=String(effectiveItemField(item,"flags"));if(!clean)return;
+    const token=`itp_type_${clean}`,next=/itp_type_[a-z0-9_]+/i.test(flags)?flags.replace(/itp_type_[a-z0-9_]+/i,token):(flags.trim()?`${token}|${flags}`:token);
+    setItemField(item,"flags",next);const control=document.querySelector('[data-lex-property="flags"] textarea');if(control)control.value=next;
+  }
+  function itemWeightFromStats(stats){return (String(stats).match(/weight\(([^)]+)\)/)||[])[1]?.trim()||"";}
+  function setItemWeight(item,value){
+    const clean=String(value).trim();if(!clean)return;const stats=String(effectiveItemField(item,"stats"));
+    const next=/weight\([^)]+\)/.test(stats)?stats.replace(/weight\([^)]+\)/,`weight(${clean})`):(stats.trim()?`weight(${clean})|${stats}`:`weight(${clean})`);
+    setItemField(item,"stats",next);const control=document.querySelector('[data-lex-property="stats"] textarea');if(control)control.value=next;
+  }
+  const ITEM_HELP={
+    id:"Module System identifier referenced by troops, shops, scripts, and other records. Renaming it here does not rewrite those references.",
+    name:"Player-facing item name compiled into the module's item data.",
+    type:"The itp_type_* flag defines the item's fundamental equipment/use class and changes how Warband interprets its other stats.",
+    value:"Base item price before merchant, trade-skill, abundance, and other economy adjustments.",
+    weight:"Inventory/equipment weight from the weight(...) stat macro; Warband uses it for encumbrance and other weight-sensitive behavior.",
+    meshes:"Meshes used to render the item. The first mesh is also the source for Lexeditor's generated inventory icon.",
+    flags:"Item behavior flags control equipment class, merchandise/civilian availability, handedness, and other engine behavior.",
+    capabilities:"Weapon capability expression controlling supported attacks and animations; non-weapons commonly leave this at zero.",
+    stats:"Gameplay stat macros for weight, abundance, armor, speed, reach, damage, ammunition, and related item values.",
+    modifierBits:"Controls which generated item modifiers such as rusty, balanced, masterwork, or lordly may apply.",
+    factions:"Optional faction list restricting where merchandise for this item may appear."
+  };
+  function itemExpressionControl(item,key){return el("textarea",{class:"warband-item-expression",value:effectiveItemField(item,key),oninput:event=>setItemField(item,key,event.target.value)});}
+  function itemFieldLabel(key){return ({meshes:"Meshes",flags:"Flags",capabilities:"Capabilities",value:"Value",stats:"Stats",modifierBits:"Modifier bits",factions:"Factions"})[key]||key.replace(/^extra/,"Extra field ");}
   function warbandItemDetail(item){
     disposeWarbandPreview();
     if(!item)return detailPanel({className:"warband-item-detail",title:"Select an item"});
-    const thumbnailMessage=el("div",{class:"warband-icon-message"},item.inventoryMesh?"Preparing icon…":"No mesh");
-    const thumbnail=el("div",{class:"warband-item-thumbnail"},thumbnailMessage);
-    const message=el("div",{class:"warband-preview-message"},item.inventoryMesh?el("span",{class:"warband-preview-spin"}):"This item does not name an inventory mesh.");
-    const canvas=el("canvas",{tabindex:"0","aria-label":`${item.name} inventory mesh preview`});
-    const stage=el("div",{class:"warband-preview-stage"},canvas,message);
-    const facts=el("div",{class:"warband-preview-facts"});
-    let data=null,open=false,generation=0;
-    const previewBody=el("div",{class:"warband-shared-model-preview"},stage,facts);
-    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,
-      body:[el("div",{class:"warband-mesh-list"},el("b",{},"Meshes: "),item.meshes.length?item.meshes.join(" · "):"None")],
-      modelPreview:{content:previewBody,label:`${item.name} 3D model preview`,onOpen:async()=>{open=true;generation++;if(data)await showPreview();},onClose:()=>{open=false;generation++;disposeWarbandPreview();}}});
-    async function showPreview(){
-      const token=++generation;
-      try{
-        const controller=await createWarbandRenderer(canvas,data,true);
-        if(!detail.isConnected||!open||token!==generation){controller.dispose();return;}
-        window.__warbandPreview=[controller];message.hidden=true;
-      }catch(error){if(detail.isConnected&&token===generation){message.hidden=false;message.textContent=error.message;}}
-    }
-    if(item.inventoryMesh)requestAnimationFrame(async()=>{
-      loadWarbandIcon(item,detail,thumbnail,thumbnailMessage);
-      try{
-        data=await api(`/api/item-preview?mesh=${encodeURIComponent(item.inventoryMesh)}`);
-        if(!detail.isConnected)return;
-        facts.replaceChildren(el("span",{},data.resource),el("span",{},data.material),el("span",{},`${data.summary.vertices} vertices · ${data.summary.triangles} triangles`));
-        if(open)await showPreview();
-      }catch(error){if(detail.isConnected){message.textContent=error.message;message.title=error.message;}}
-    });
+    const thumbnailMessage=el("div",{class:"warband-icon-message"},item.inventoryMesh?"Preparing icon…":"No mesh"),thumbnail=el("div",{class:"warband-item-thumbnail"},thumbnailMessage);
+    const readOnly=state.activeSource!=="mine";
+    const core=detailGroup({title:"Item",body:[
+      detailField({label:"ID",property:"id",dataType:"STRING",description:ITEM_HELP.id,control:el("input",{value:effectiveItemField(item,"id"),disabled:readOnly,oninput:event=>setItemField(item,"id",event.target.value)})}),
+      detailField({label:"Name",property:"name",dataType:"STRING",description:ITEM_HELP.name,control:el("input",{value:effectiveItemField(item,"name"),disabled:readOnly,oninput:event=>setItemField(item,"name",event.target.value)})}),
+      detailField({label:"Type",property:"type",dataType:"STRING",description:ITEM_HELP.type,control:el("input",{value:itemTypeFromFlags(effectiveItemField(item,"flags")),disabled:readOnly,onchange:event=>setItemType(item,event.target.value)})}),
+      detailField({label:"Value",property:"value",dataType:"EXPR",description:ITEM_HELP.value,control:el("input",{value:effectiveItemField(item,"value"),disabled:readOnly,oninput:event=>setItemField(item,"value",event.target.value)})}),
+      detailField({label:"Weight",property:"weight",dataType:"FLOAT",description:ITEM_HELP.weight,control:el("input",{type:"number",step:"any",value:itemWeightFromStats(effectiveItemField(item,"stats")),disabled:readOnly,onchange:event=>setItemWeight(item,event.target.value)})})
+    ]});
+    const sourceFields=(item.fieldOrder||[]).filter(key=>!["id","name","value"].includes(key));
+    const source=detailGroup({title:"Module System fields",body:sourceFields.map(key=>detailField({label:itemFieldLabel(key),property:key,dataType:"EXPR",description:ITEM_HELP[key]||"",control:(()=>{const control=itemExpressionControl(item,key);control.disabled=readOnly;return control;})()}))});
+    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,body:[core,source]});
+    if(item.inventoryMesh)requestAnimationFrame(()=>loadWarbandIcon(item,detail,thumbnail,thumbnailMessage));
     return detail;
   }
   async function loadWarbandIcon(item,detail,thumbnail,message){
@@ -313,7 +334,16 @@
 
   async function saveAll(){
     try{
+      const itemSourceDirty=state.catalogFile?.filename==="module_items.py"&&state.catalogFile.editable&&state.catalogDraft!==state.catalogFile.text;
+      if(itemDirtyCount()&&itemSourceDirty)throw new Error("Items has structured edits while module_items.py also has unsaved source edits. Save or discard one editing path before using the other.");
       if(Object.keys(state.settingEdits).length){const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};setStatus(`Saved ${result.saved} settings`);}
+      if(itemDirtyCount()){
+        const selectedRecord=state.items.rows.find(row=>row.id===state.selectedItem)?.recordIndex,edits=Object.values(state.itemEdits);
+        const result=await api("/api/items/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.items=await api("/api/items");state.itemEdits={};
+        if(selectedRecord!==undefined)state.selectedItem=state.items.rows.find(row=>row.recordIndex===selectedRecord)?.id||"";
+        if(state.catalogFile?.filename==="module_items.py"){state.catalogFile=await api("/api/catalog/file?name=module_items.py");state.catalogDraft=state.catalogFile.text;}
+        setStatus(`Saved ${result.saved} item records`);
+      }
       if(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text){const result=await api("/api/catalog/file/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({filename:state.catalogFile.filename,text:state.catalogDraft,encoding:state.catalogFile.encoding})});state.catalogFile.text=state.catalogDraft;setStatus(`Saved ${state.catalogFile.filename}; backup created`);}
       await buildSavedModule();
       shell.history.clear();shell.refresh();render();

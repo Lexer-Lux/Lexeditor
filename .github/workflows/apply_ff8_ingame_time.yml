@@ -1,0 +1,70 @@
+name: Apply FF8 in-game clock integration
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'tools/apply_ff8_ingame_time.py'
+      - 'tests/test_ff8_ingame_time.py'
+      - '.github/workflows/apply_ff8_ingame_time.yml'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 1
+      - name: Install FF8 test dependency
+        run: python -m pip install pillow
+      - name: Apply guarded clock migration
+        run: python tools/apply_ff8_ingame_time.py
+      - name: Validate source contracts and preserve output
+        id: validate
+        shell: bash
+        run: |
+          set +e
+          (
+            python -m unittest tests.test_ff8_ingame_time -v
+            TEST=$?
+            python -m compileall -q games/ff8 tools/prepare_ff8_native_build.py
+            COMPILE=$?
+            python - <<'PY'
+          import pathlib, re, subprocess
+          text = pathlib.Path('games/ff8/editor.html').read_text(encoding='utf-8')
+          for script in re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', text, re.S | re.I):
+              subprocess.run(['node', '--check'], input=script, text=True, check=True)
+          PY
+            JS=$?
+            git diff --check
+            DIFF=$?
+            echo "RESULT test=$TEST compile=$COMPILE js=$JS diff=$DIFF"
+            exit $(( TEST || COMPILE || JS || DIFF ))
+          ) > clock-validation.txt 2>&1
+          STATUS=$?
+          cat clock-validation.txt
+          echo "status=$STATUS" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload clock diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: ff8-clock-validation
+          path: clock-validation.txt
+          if-no-files-found: error
+      - name: Commit integrated source
+        if: steps.validate.outputs.status == '0'
+        run: |
+          if git diff --quiet -- games/ff8/menu_qol_issue_61.py games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp games/ff8/gameplay_settings.py games/ff8/editor.html tools/prepare_ff8_native_build.py; then
+            echo 'No integration changes were needed.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add games/ff8/menu_qol_issue_61.py games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp games/ff8/gameplay_settings.py games/ff8/editor.html tools/prepare_ff8_native_build.py
+          git commit -m 'Integrate FF8 local main-menu clock'
+          git push origin HEAD:master
+      - name: Fail after preserving diagnostics
+        if: steps.validate.outputs.status != '0'
+        run: exit 1

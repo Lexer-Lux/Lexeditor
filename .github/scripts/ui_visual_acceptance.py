@@ -111,6 +111,9 @@ with sync_playwright() as p:
               const label=e.querySelector('.lex-detail-field-label');
               const help=e.querySelector('.lex-info-help');
               const lb=label.getBoundingClientRect(), hb=help?.getBoundingClientRect();
+              const glyph=help?.querySelector(':scope > span');
+              const gb=glyph?.getBoundingClientRect();
+              const hs=help?getComputedStyle(help):null, gs=glyph?getComputedStyle(glyph):null;
               const range=document.createRange();
               const text=[...label.childNodes].find(n=>n.nodeType===Node.TEXT_NODE&&n.textContent.trim());
               if(text) range.selectNodeContents(text);
@@ -118,7 +121,9 @@ with sync_playwright() as p:
               return {field:{left:field.left,right:field.right,width:field.width,height:field.height},
                 label:{left:lb.left,right:lb.right,width:lb.width,height:lb.height,scrollWidth:label.scrollWidth,clientWidth:label.clientWidth,scrollHeight:label.scrollHeight,clientHeight:label.clientHeight},
                 text:{left:tb.left,right:tb.right,width:tb.width},
-                help:hb?{left:hb.left,right:hb.right,width:hb.width,height:hb.height,center:hb.left+hb.width/2}:null};
+                help:hb?{left:hb.left,right:hb.right,top:hb.top,bottom:hb.bottom,width:hb.width,height:hb.height,center:hb.left+hb.width/2}:null,
+                glyph:gb?{left:gb.left,right:gb.right,top:gb.top,bottom:gb.bottom,width:gb.width,height:gb.height,
+                  centerX:gb.left+gb.width/2,centerY:gb.top+gb.height/2,fontFamily:hs.fontFamily,top:gs.top}:null};
             }""")
             assert first_geom['label']['scrollWidth'] <= first_geom['label']['clientWidth'] + 1, (width, 'property label overflows horizontally', first_geom)
             assert first_geom['label']['scrollHeight'] <= first_geom['label']['clientHeight'] + 1, (width, 'property label changes row height/overflows vertically', first_geom)
@@ -126,6 +131,14 @@ with sync_playwright() as p:
                 desired = (first_geom['field']['left'] + first_geom['text']['right']) / 2
                 assert abs(first_geom['help']['center'] - desired) <= 6, (width, 'info bubble is not centred between panel edge and property text', desired, first_geom)
                 assert abs(first_geom['help']['width'] - first_geom['help']['height']) <= 0.5, (width, 'info bubble is not circular', first_geom)
+                glyph = first_geom['glyph']
+                assert glyph, (width, 'info bubble ? glyph is missing', first_geom)
+                bubble_cx = first_geom['help']['left'] + first_geom['help']['width'] / 2
+                bubble_cy = first_geom['help']['top'] + first_geom['help']['height'] / 2
+                assert abs(glyph['centerX'] - bubble_cx) <= 0.75, (width, 'info bubble ? is not horizontally centered', first_geom)
+                assert abs(glyph['centerY'] - bubble_cy) <= 1.0, (width, 'info bubble ? is not vertically centered', first_geom)
+                assert 'Segoe UI Symbol' in glyph['fontFamily'], (width, 'info bubble inherited game typography', glyph)
+                assert glyph['top'] == '-0.5px', (width, 'info bubble lost its optical punctuation adjustment', glyph)
 
             enabled = page.locator('.lex-boolean-field').first
             bool_ref = enabled.evaluate("""e=>{

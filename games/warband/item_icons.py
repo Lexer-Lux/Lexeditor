@@ -17,7 +17,7 @@ from PIL import Image, ImageDraw
 
 from . import model_preview as models
 
-RENDER_VERSION = "inventory-orthographic-three-quarter-v1"
+RENDER_VERSION = "inventory-auto-principal-three-quarter-v2"
 SIZE = 192
 
 
@@ -25,10 +25,36 @@ def icon_key(dependency_key: str) -> str:
     return hashlib.sha256(f"{RENDER_VERSION}|{SIZE}|{dependency_key}".encode()).hexdigest()
 
 
+def _canonical_yaw(positions) -> float:
+    """Derive one stable horizontal presentation angle from the mesh itself.
+
+    Warband assets do not share one authoring yaw: a fixed camera makes some
+    armor and footwear appear sideways while other meshes look fine.  The
+    dominant horizontal principal axis gives every mesh the same presentation
+    convention without maintaining an item-by-item correction table.
+    """
+    horizontal = [(float(row[0]), -float(row[1])) for row in positions]
+    if len(horizontal) < 2:
+        return .64
+    mean_x = sum(row[0] for row in horizontal) / len(horizontal)
+    mean_z = sum(row[1] for row in horizontal) / len(horizontal)
+    xx = sum((x - mean_x) ** 2 for x, _z in horizontal) / len(horizontal)
+    zz = sum((z - mean_z) ** 2 for _x, z in horizontal) / len(horizontal)
+    xz = sum((x - mean_x) * (z - mean_z) for x, z in horizontal) / len(horizontal)
+    trace = xx + zz
+    discriminant = math.hypot(xx - zz, 2 * xz)
+    if trace < 1e-10 or discriminant / trace < .08:
+        return .64
+    principal = .5 * math.atan2(2 * xz, xx - zz)
+    # A slight deterministic three-quarter bias keeps depth readable while the
+    # geometry, rather than a hand-curated item list, chooses the base yaw.
+    return principal + math.radians(12)
+
+
 def render_icon(data: dict, texture: Path, destination: Path) -> None:
     """Small software z-buffer renderer; does not require a GPU or game window."""
     g = data["geometry"]
-    yaw, pitch = .64, -.30
+    yaw, pitch = _canonical_yaw(g["positions"]), -.30
     cy, sy, cp, sp = math.cos(yaw), math.sin(yaw), math.cos(pitch), math.sin(pitch)
 
     def rotate(v):

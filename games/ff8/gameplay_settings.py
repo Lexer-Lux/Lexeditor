@@ -30,9 +30,11 @@ from . import damage_limit
 from . import fast_start
 from . import streamlined_draw
 from . import healing_rework
+from . import formulae_rework as formulae_rework_contract
 from . import flat_stat_abilities
 from . import max_spell
 from . import mug_drops
+from . import drop_chance
 from .ffnx_issue_51 import runtime_config as shared_magic_runtime_config
 
 
@@ -60,6 +62,7 @@ DEFAULT_SHARED_MAGIC_INVENTORY = False
 DEFAULT_XP_BARS = False
 DEFAULT_HP_BARS = False
 DEFAULT_GF_HP_BARS = False
+DEFAULT_INGAME_TIME = menu_qol_issue_61.DEFAULT_INGAME_TIME
 DEFAULT_FLAT_STAT_ABILITIES = flat_stat_abilities.DEFAULT_FLAT_STAT_ABILITIES
 DEFAULT_MAX_SPELL_ENABLED = max_spell.DEFAULT_MAX_SPELL_ENABLED
 DEFAULT_MAX_SPELL = max_spell.DEFAULT_MAX_SPELL
@@ -72,8 +75,9 @@ ACCEPTED_TWEAKS = frozenset({
     "sharedMagicInventory", "partySwitch", "drawOncePerEnemy",
     "streamlinedDraw", "betterCard", "fixedCommandMenu", "trueAtbWait",
     "modernControls", "vibrationConsolidation", "betterTargeting",
-    "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "gfHpBars",
+    "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "gfHpBars", "inGameTime",
     "flatStatAbilities", "maxSpellEnabled", "noMagicConsumption", "dropsAfterMug",
+    "dropChance",
 })
 MIN_FLYING_EVA_BONUS = 0
 MAX_FLYING_EVA_BONUS = 100
@@ -339,8 +343,12 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
     gf_hp_bars = data.get("gfHpBars", DEFAULT_GF_HP_BARS)
     if not isinstance(gf_hp_bars, bool):
         gf_hp_bars = DEFAULT_GF_HP_BARS
+    in_game_time = data.get("inGameTime", DEFAULT_INGAME_TIME)
+    if not isinstance(in_game_time, bool):
+        in_game_time = DEFAULT_INGAME_TIME
     no_magic_consumption = data.get("noMagicConsumption") is True
     drops_after_mug = data.get("dropsAfterMug") is True
+    drop_chance_enabled = data.get("dropChance") is True
     flat_stat_abilities_enabled = data.get(
         "flatStatAbilities", DEFAULT_FLAT_STAT_ABILITIES,
     )
@@ -355,10 +363,11 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         )
     except ValueError:
         max_spell_value = DEFAULT_MAX_SPELL
-    # The complete Formulae Rework is not implemented. Old files can contain
-    # its short-lived key, but loading it must not arm a hidden partial patch.
-    # Every visible Tweak keeps its stored value.
-    formulae_rework = False
+    # A formula description is not an implementation. Keep the owning toggle
+    # off until every row in the central Formulae Rework contract has a real
+    # guarded runtime component.
+    if not formulae_rework_contract.available():
+        formulae_rework = False
     shared_magic = _shared_magic_payload(project, game, runtime_root)
     return {
         "flyingEvaBonus": bonus,
@@ -375,7 +384,8 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "drawOncePerEnemy": draw_once,
         "streamlinedDraw": streamlined_draw_enabled,
         "formulaeRework": formulae_rework,
-        "formulaeReworkAvailable": False,
+        "formulaeReworkAvailable": formulae_rework_contract.available(),
+        "formulaeReworkFormulas": formulae_rework_contract.rows(),
         "betterCard": better_card_enabled,
         "fixedCommandMenu": fixed_command_menu_enabled,
         "trueAtbWait": true_atb_wait,
@@ -389,8 +399,11 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "xpBars": xp_bars,
         "hpBars": hp_bars,
         "gfHpBars": gf_hp_bars,
+        "inGameTime": in_game_time,
         "noMagicConsumption": no_magic_consumption,
         "dropsAfterMug": drops_after_mug,
+        "dropChance": drop_chance_enabled,
+        "dropChanceWeights": drop_chance.metadata(),
         "flatStatAbilities": flat_stat_abilities_enabled,
         "maxSpellEnabled": max_spell_enabled,
         "maxSpell": max_spell_value,
@@ -469,6 +482,7 @@ def _verify_executable(game_root: Path) -> Path:
         flat_stat_abilities.verify_executable(stream)
         max_spell.verify_executable(stream)
         mug_drops.verify_executable(stream)
+        drop_chance.verify_executable(stream)
     if branch != b"\x75" or displaced != bytes.fromhex("8A 8D D2 7B D2 01"):
         raise RuntimeError("The installed FF8 hit-check bytes do not match the verified build")
     if item_open != inventory_auto_sort.ITEM_OPEN_SORT_ORIGINAL:
@@ -504,7 +518,9 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
                max_spell_enabled: bool = DEFAULT_MAX_SPELL_ENABLED,
                max_spell_value: int = DEFAULT_MAX_SPELL,
                flying_eva_enabled: bool = True,
-               drops_after_mug: bool = False) -> str:
+               drops_after_mug: bool = False,
+               drop_chance_enabled: bool = False,
+               drop_chance_plan=None) -> str:
     bonus = _bounded_bonus(bonus)
     flying_eva_enabled = _boolean(flying_eva_enabled, "Flying EVA Bonus")
     auto_sort = _boolean(auto_sort, "Auto-sort Inventory")
@@ -541,6 +557,7 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
     max_spell_enabled = _boolean(max_spell_enabled, "Max Spell")
     max_spell_value = max_spell.bounded_limit(max_spell_value)
     drops_after_mug = _boolean(drops_after_mug, "Drops After Mug")
+    drop_chance_enabled = _boolean(drop_chance_enabled, "Drop Chance")
     header = [
         "# Generated by Lexeditor for FF8 2013 Steam EN.",
         "# Intrinsic flying targets gain the configured effective EVA.",
@@ -669,6 +686,11 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
     mug_drop_patch = mug_drops.build_hext(drops_after_mug)
     if mug_drop_patch:
         lines.extend(mug_drop_patch.rstrip().splitlines())
+    drop_chance_patch = drop_chance.build_hext(drop_chance_enabled, drop_chance_plan)
+    if drop_chance_patch:
+        lines.extend(drop_chance_patch.rstrip().splitlines())
+    else:
+        lines.append("# Drop Chance is disabled; regular drops and Mug use vanilla slot weights.")
     max_spell_patch = max_spell.build_hext(max_spell_enabled, max_spell_value)
     if max_spell_patch:
         lines.extend(max_spell_patch.rstrip().splitlines())
@@ -695,6 +717,7 @@ def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
                              better_targeting: bool, fast_start: bool = False,
                              modern_controls: bool = False, party_switch: bool = False,
                              gf_hp_bars: bool = False,
+                             in_game_time: bool = False,
                              no_magic_consumption: bool = False) -> None:
     """Set derivative options without changing unrelated FFNx settings."""
     text = config.read_text(encoding="utf-8", errors="strict")
@@ -702,6 +725,7 @@ def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
         ("enable_ff8_xp_bars", xp_bars),
         ("enable_ff8_hp_bars", hp_bars),
         ("enable_ff8_gf_hp_bars", gf_hp_bars),
+        ("enable_ff8_ingame_time", in_game_time),
         ("enable_ff8_better_targeting", better_targeting),
         ("enable_ff8_fast_start", fast_start),
         ("enable_ff8_modern_controls", modern_controls),
@@ -777,8 +801,10 @@ def initialize_project(project_root: Path) -> None:
         "xpBars": False,
         "hpBars": False,
         "gfHpBars": False,
+        "inGameTime": False,
         "noMagicConsumption": False,
         "dropsAfterMug": False,
+        "dropChance": False,
         "flatStatAbilities": False,
         "maxSpellEnabled": False,
         "maxSpell": DEFAULT_MAX_SPELL,
@@ -876,8 +902,10 @@ def save(data: dict, game_root: Path | None = None,
     xp_bars = _boolean(data.get("xpBars", DEFAULT_XP_BARS), "XP Bars")
     hp_bars = _boolean(data.get("hpBars", DEFAULT_HP_BARS), "HP Bars")
     gf_hp_bars = _boolean(data.get("gfHpBars", DEFAULT_GF_HP_BARS), "GF HP Bars")
+    in_game_time = _boolean(data.get("inGameTime", DEFAULT_INGAME_TIME), "In-game Time")
     no_magic_consumption = _boolean(data.get("noMagicConsumption", False), "No Magic Consumption")
     drops_after_mug = _boolean(data.get("dropsAfterMug", False), "Drops After Mug")
+    drop_chance_enabled = _boolean(data.get("dropChance", False), "Drop Chance")
     flat_stat_abilities_enabled = _boolean(
         data.get("flatStatAbilities", DEFAULT_FLAT_STAT_ABILITIES),
         "Flat +Stat Abilities",
@@ -894,8 +922,9 @@ def save(data: dict, game_root: Path | None = None,
     )
     # Do not let an old page or direct API call arm incomplete hidden features.
     # Visible Tweaks must keep the value the user selected.
-    if formulae_rework:
-        raise ValueError("Formulae Rework is not available")
+    if formulae_rework and not formulae_rework_contract.available():
+        missing = ", ".join(formulae_rework_contract.incomplete_ids())
+        raise ValueError(f"Formulae Rework is not available; incomplete: {missing}")
     if party_switch and not party_switch_issue_62.PARTY_SWITCH_AVAILABLE:
         raise ValueError(party_switch_issue_62.PARTY_SWITCH_BLOCKER)
     if modern_controls and not modern_controls_issue_65.MODERN_CONTROLS_AVAILABLE:
@@ -910,7 +939,10 @@ def save(data: dict, game_root: Path | None = None,
     # Save must never turn an enabled feature off behind the user's back.
     if fixed_command_menu_enabled and not single_gf:
         raise ValueError("Fixed Command Menu requires Monogamy")
-    _verify_executable(game)
+    executable = _verify_executable(game)
+    drop_chance_plan = (
+        drop_chance.discover_path(executable) if drop_chance_enabled else None
+    )
     hext = build_hext(
         bonus, auto_sort, single_gf, universal_item, draw_once,
         better_card_enabled,
@@ -932,6 +964,8 @@ def save(data: dict, game_root: Path | None = None,
         max_spell_value=max_spell_value,
         flying_eva_enabled=flying_enabled,
         drops_after_mug=drops_after_mug,
+        drop_chance_enabled=drop_chance_enabled,
+        drop_chance_plan=drop_chance_plan,
     )
     settings_data = {
         "autoSortInventory": auto_sort,
@@ -957,8 +991,10 @@ def save(data: dict, game_root: Path | None = None,
         "xpBars": xp_bars,
         "hpBars": hp_bars,
         "gfHpBars": gf_hp_bars,
+        "inGameTime": in_game_time,
         "noMagicConsumption": no_magic_consumption,
         "dropsAfterMug": drops_after_mug,
+        "dropChance": drop_chance_enabled,
         "flatStatAbilities": flat_stat_abilities_enabled,
         "maxSpellEnabled": max_spell_enabled,
         "maxSpell": max_spell_value,
@@ -971,7 +1007,7 @@ def save(data: dict, game_root: Path | None = None,
     install_needed = bool(
         install_runtime
         and
-        (shared_magic_inventory or xp_bars or hp_bars or gf_hp_bars or better_targeting or fast_start_enabled
+        (shared_magic_inventory or xp_bars or hp_bars or gf_hp_bars or in_game_time or better_targeting or fast_start_enabled
          or modern_controls or party_switch or no_magic_consumption)
         and not shared_magic_status.get("sharedMagicInventoryRuntime")
     )
@@ -1038,7 +1074,7 @@ def save(data: dict, game_root: Path | None = None,
         if install_runtime:
             _set_ffnx_runtime_tweaks(
                 game / "FFNx.toml", xp_bars=xp_bars, hp_bars=hp_bars, gf_hp_bars=gf_hp_bars,
-                better_targeting=better_targeting,
+                in_game_time=in_game_time, better_targeting=better_targeting,
                 fast_start=fast_start_enabled,
                 modern_controls=modern_controls, party_switch=party_switch,
                 no_magic_consumption=no_magic_consumption,

@@ -2,6 +2,7 @@
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PLUGIN_EDITORS = sorted((ROOT / "games").glob("*/editor.html"))
 
 def text(path):
     return (ROOT / path).read_text("utf-8")
@@ -21,10 +22,7 @@ def test_manual_defines_semantic_only_contract():
     assert "If no useful semantic explanation is known, omit the info" in manual
 
 def test_known_metadata_filler_is_gone_from_plugins():
-    sources = "\n".join(text(path) for path in (
-        "games/blank/editor.html", "games/ff7/editor.html", "games/ff8/editor.html",
-        "games/ff9/editor.html", "games/rdr/editor.html", "games/rdr2/editor.html",
-    ))
+    sources = "\n".join(path.read_text("utf-8") for path in PLUGIN_EDITORS)
     for forbidden in (
         "Storage range:", "Editor range:", "This Memoria array is edited as a comma-separated list.",
         "Stored parameter 1.", "Stored parameter 2.", "These are the exact stored Renzokuken table values.",
@@ -54,3 +52,25 @@ def test_rdr2_setting_help_does_not_append_visible_metadata():
     assert "Editor range:" not in block
     assert "Unit:" not in block
     assert "has no field-specific behavior description" not in block
+
+
+def test_rdr_uses_shared_detail_fields_and_semantic_reward_help():
+    rdr = text("games/rdr/editor.html")
+    helper = rdr[rdr.index("function detailField"):rdr.index("function applyControlValue")]
+    assert "LexeditorUI.detailField({label,control,description:help||\"\"})" in helper
+    assert 'class:"detail-field"' not in helper
+    assert "XML value attribute" not in rdr
+    assert '"XML text"' not in rdr
+    assert "Base value:" not in rdr
+    assert "Integer range" not in rdr
+    for phrase in (
+        "Changes the cash awarded when this mission completes",
+        "completion Fame award independently",
+        "completion Honor adjustment independently",
+    ):
+        assert phrase in rdr
+    # RDR theming may paint shared rows, but it may not restore a plugin-owned
+    # fixed label lane or the legacy private generic Detail-row classes.
+    assert ".detail-field{display:grid" not in rdr
+    assert ".detail-field{grid-template-columns" not in rdr
+    assert ".record-detail .lex-detail-field-label" in rdr

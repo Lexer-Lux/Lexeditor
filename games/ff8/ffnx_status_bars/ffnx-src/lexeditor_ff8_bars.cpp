@@ -4,6 +4,8 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
+#include <ctime>
 
 #include <imgui.h>
 
@@ -276,6 +278,23 @@ float xp_fraction(std::uint32_t exp, std::uint8_t character)
     return static_cast<float>(bounded - lower) / static_cast<float>(upper - lower);
 }
 
+void draw_main_menu_clock()
+{
+    const auto *mode = getmode_cached();
+    if (mode == nullptr || mode->driver_mode != MODE_MENU) return;
+    const std::time_t now = std::time(nullptr);
+    std::tm local{};
+    if (localtime_s(&local, &now) != 0) return;
+    char text[16]{};
+    std::snprintf(text, sizeof text, "LOCAL %02d:%02d", local.tm_hour, local.tm_min);
+    // The main menu is authored on FF8's 640x448 game surface. Keep the clock
+    // in the lower-right information area, next to rather than on top of the
+    // native PLAY/Gil block, and project it through FFNx's real viewport.
+    const ImVec2 position(scale_x(500.0f), scale_y(412.0f));
+    ImGui::GetForegroundDrawList()->AddText(
+        position, IM_COL32(255, 255, 255, 255), text);
+}
+
 void draw_main_menu_xp()
 {
     for (std::size_t slot = 0; slot < 3; ++slot) {
@@ -378,12 +397,12 @@ void draw_battle_hp()
 
 bool lexeditor_ff8_bars_enabled()
 {
-    return ff8 && (enable_ff8_xp_bars || enable_ff8_hp_bars || enable_ff8_gf_hp_bars);
+    return ff8 && (enable_ff8_xp_bars || enable_ff8_hp_bars || enable_ff8_gf_hp_bars || enable_ff8_ingame_time);
 }
 
 void lexeditor_ff8_bars_install()
 {
-    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars && !enable_ff8_gf_hp_bars)) {
+    if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars && !enable_ff8_gf_hp_bars && !enable_ff8_ingame_time)) {
         return;
     }
 
@@ -405,16 +424,22 @@ void lexeditor_ff8_bars_install()
         replace_call(0x004B1100, reinterpret_cast<void *>(&hp_glyph_hook));
         replace_call(0x004B127B, reinterpret_cast<void *>(&atb_glyph_hook));
     }
-    if (!enable_ff8_xp_bars) return;
+    if (!enable_ff8_xp_bars && !enable_ff8_ingame_time) return;
 
-    // The callback entries contain PUSH-immediate renderer pointers. FFNx
-    // already resolves this same table from the supported executable.
+    // The callback entry contains a PUSH-immediate renderer pointer. The same
+    // guarded hook can identify the real main-menu frame for XP bars and the
+    // local clock; it explicitly excludes the title save-block browser.
     const std::uint32_t main_callback = static_cast<std::uint32_t>(
         reinterpret_cast<std::uintptr_t>(ff8_externals.menu_callbacks[16].func));
-    const std::uint32_t status_callback = static_cast<std::uint32_t>(
-        reinterpret_cast<std::uintptr_t>(ff8_externals.menu_callbacks[5].func));
     g_main_menu_renderer = reinterpret_cast<MenuRenderer>(
         get_absolute_value(main_callback, 0x3));
+    patch_code_dword(main_callback + 0x3,
+        static_cast<std::uint32_t>(
+            reinterpret_cast<std::uintptr_t>(&main_menu_renderer_hook)));
+    if (!enable_ff8_xp_bars) return;
+
+    const std::uint32_t status_callback = static_cast<std::uint32_t>(
+        reinterpret_cast<std::uintptr_t>(ff8_externals.menu_callbacks[5].func));
     g_status_menu_renderer = reinterpret_cast<MenuRenderer>(
         get_absolute_value(status_callback, 0x3));
     g_after_battle_renderer = reinterpret_cast<AfterBattleRenderer>(
@@ -426,10 +451,6 @@ void lexeditor_ff8_bars_install()
     const auto row_call = reinterpret_cast<std::uintptr_t>(g_after_battle_renderer) + 0x2BD;
     g_result_row_renderer = reinterpret_cast<ResultRowRenderer>(get_relative_call(row_call, 0));
     replace_call(row_call, reinterpret_cast<void *>(&result_row_renderer_hook));
-
-    patch_code_dword(main_callback + 0x3,
-        static_cast<std::uint32_t>(
-            reinterpret_cast<std::uintptr_t>(&main_menu_renderer_hook)));
     patch_code_dword(status_callback + 0x3,
         static_cast<std::uint32_t>(
             reinterpret_cast<std::uintptr_t>(&status_menu_renderer_hook)));
@@ -441,6 +462,9 @@ void lexeditor_ff8_bars_draw()
 {
     if (enable_ff8_hp_bars || enable_ff8_gf_hp_bars) {
         draw_battle_hp();
+    }
+    if (enable_ff8_ingame_time && g_capture.surface == XpSurface::main_menu) {
+        draw_main_menu_clock();
     }
     if (enable_ff8_xp_bars) {
         switch (g_capture.surface) {

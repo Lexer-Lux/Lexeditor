@@ -7,6 +7,7 @@ the running desktop app, but these invariants are structural and deterministic.
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +29,53 @@ host = text("desktop_host.py")
 github = text("github_integration.py")
 blank = text("games/blank/editor.html")
 warband = text("games/warband/editor.html")
+
+# Shared chrome is global by construction. Every real editor shell must load the
+# shared framework, and a game theme may not swap the info-bubble glyph back to
+# its own game font. This is what keeps Blank fixes from becoming Blank-only.
+plugin_editors = sorted((ROOT / "games").glob("*/editor.html"))
+require(plugin_editors, "no game editor shells were found")
+for editor_path in plugin_editors:
+    source = editor_path.read_text(encoding="utf-8")
+    relative = editor_path.relative_to(ROOT).as_posix()
+    require('/shared/framework.css' in source and '/shared/framework.js' in source,
+            f"{relative} is bypassing the shared UI framework")
+    require("Lexer Mode" not in source and "lexerMode" not in source,
+            f"legacy Lexer Mode leaked into {relative}")
+    for block in re.findall(r"\.lex-info-help\s*\{([^}]*)\}", source, re.I | re.S):
+        family = re.search(r"font-family\s*:\s*([^;]+)", block, re.I)
+        require(not family or "--lex-symbol-font" in family.group(1),
+                f"{relative} overrides info-bubble glyph typography with a game font")
+    for block in re.findall(r"\.lex-info-help\s*>\s*span\s*\{([^}]*)\}", source, re.I | re.S):
+        require(not re.search(r"(?:transform|translate|top|bottom|left|right|font-family)\s*:", block, re.I),
+                f"{relative} overrides shared info-bubble glyph geometry")
+
+# Every plugin Info page gets the same three Mod Loading bullets from one
+# reviewed registry. The registry and discovered plugin IDs must remain exact so
+# adding a plugin without documenting its loader semantics fails CI.
+mod_loading = json.loads(text("ui/mod-loading.json"))
+mod_loading_plugins = mod_loading.get("plugins", {})
+plugin_ids = set()
+for plugin_path in sorted((ROOT / "games").glob("*/plugin.py")):
+    source = plugin_path.read_text(encoding="utf-8")
+    match = re.search(r"\bplugin_id\s*=\s*['\"]([^'\"]+)['\"]", source)
+    require(match is not None, f"{plugin_path.relative_to(ROOT)} does not declare plugin_id")
+    plugin_ids.add(match.group(1))
+require(set(mod_loading_plugins) == plugin_ids,
+        "mod-loading.json must cover every discovered plugin exactly")
+for plugin_id, details in mod_loading_plugins.items():
+    require(set(details) == {"loader", "structure", "overriding"},
+            f"{plugin_id} Mod Loading entry must have exactly loader/structure/overriding")
+    for field in ("loader", "structure", "overriding"):
+        require(isinstance(details[field], str) and details[field].strip(),
+                f"{plugin_id} Mod Loading {field} is empty")
+require('new URL("mod-loading.json", sharedAssetBase)' in framework and
+        'class: "lex-plugin-mod-loading"' in framework,
+        "shared Info pages do not load the Mod Loading registry")
+for label in ("Mod Loading", "Mod Loader", "Mod Structure", "Overriding"):
+    require(label in framework, f"shared Mod Loading panel is missing label: {label}")
+require("parent.append(modLoadingPanel(pluginId))" in framework,
+        "shared Info pages do not inject the Mod Loading panel")
 
 # One central GitHub workspace, filtered per game.
 require('full_name=LEXEDITOR_REPOSITORY.full_name' in host,
@@ -51,11 +99,16 @@ require("Editable Table" not in blank, "Blank still exposes a separate Editable 
 require(not (ROOT / "ui/design-review.js").exists() and not (ROOT / "ui/design-review.css").exists(),
         "Design Review implementation files still exist")
 
-# Shared model preview drawer; Warband consumes it rather than owning a panel type.
+# The shared model-preview drawer remains a reusable Detail capability, but the
+# Warband Items detail is now the actual record editor rather than a preview
+# surface. Do not regress it back into a model viewer just because the shared
+# framework still supports model previews elsewhere.
 require("modelPreview" in framework and "lex-model-preview-drawer" in framework,
         "shared Detail-panel model preview drawer is missing")
-require("modelPreview:" in warband,
-        "Warband is not using the shared model preview contract")
+require("modelPreview:" not in warband and "Open model preview" not in warband,
+        "Warband Items regressed back to a model-preview detail pane")
+require("detailField" in warband and "/api/items/save" in warband,
+        "Warband Items is not using structured editable Detail properties")
 require("warband-item-preview-action" not in warband,
         "Warband still owns its old separate model-preview action")
 

@@ -15,6 +15,7 @@ import zlib
 
 from . import kernel as base
 from . import kernel_extra
+from . import semantics
 from .storage import target_path, replace_project, records_match
 
 INITIAL_FIELDS = (
@@ -150,11 +151,12 @@ class Kernel(base.Kernel):
 
 def category_metadata():
     result = base.category_metadata()
+    character_fields = [{"key": f.key, "label": f.label, "dataType": "int",
+        "minimum": f.minimum, "maximum": f.maximum, "step": f.scale,
+        "group": "Starting stats" if f in INITIAL_FIELDS else "Growth and limits"}
+        for f in INITIAL_FIELDS + LIMIT_FIELDS]
     result.append({"id": "characters", "label": "Characters", "note": CHARACTER_NOTE,
-        "fields": [{"key": f.key, "label": f.label, "dataType": "int",
-            "minimum": f.minimum, "maximum": f.maximum, "step": f.scale,
-            "group": "Starting stats" if f in INITIAL_FIELDS else "Growth and limits"}
-            for f in INITIAL_FIELDS + LIMIT_FIELDS]})
+        "fields": semantics.apply("characters", character_fields)})
     result.extend(dict(id=key, label=spec['label'], fields=spec['fields'])
                   for key, spec in kernel_extra.EXTRAS.items())
     return result

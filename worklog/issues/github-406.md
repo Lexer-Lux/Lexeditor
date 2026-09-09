@@ -43,4 +43,16 @@ FF7R-specific CI covers Python syntax, editor/theme JavaScript syntax, plugin/se
 
 The theme implementation is source-verifiable but not visually accepted from CI. Installed acceptance must confirm the FF7R palette/layout in the real desktop WebView, successful `SystemFontNormal` discovery/decode on a current installed build, readable atlas-rendered labels at normal/high DPI, and any menu SFX/texture overrides that are actually decoded from the user's copy. Cooked menu textures and SoundWave assets remain an explicit next theming frontier rather than being misrepresented as already usable browser files.
 
+### BLOCKED WITHOUT LOCAL FILE ACCESS — cooked FF7R UI assets
+
+Finishing cooked FF7R menu texture and UI-SFX reuse requires direct filesystem access to a real local FF7R installation. An agent/session that cannot read the user's installed FF7R files **must refuse to claim or mark this item complete**: do not guess asset paths, pixel formats, Wwise/SoundWave mapping, codecs, or acceptance results from source/CI alone. Leave this item blocked until local file access is available.
+
+When local access is available:
+
+1. Inventory the installed menu/UI PAK assets and record the exact texture/audio source paths plus formats used by the current build.
+2. Implement the narrow local-only decoders/converters needed for those verified assets; never bundle or redistribute Square Enix source assets.
+3. Wire the decoded textures/SFX into `games/ff7r/theme.py` / `theme.js` and keep the authored palette as a fallback; derive color tokens from real assets only where the local evidence supports it.
+4. Add proprietary-data-free decoder fixtures plus installed-game smoke/visual/audio acceptance.
+5. Mark this frontier complete only after the actual installed build proves texture rendering, UI SFX playback, cache confinement, and fallback behavior.
+
 Live game acceptance remains separate: actual installed PAK indexing, representative real DataObject/text parsing, semantic gameplay effects, game load, deployed-value effects and theme appearance must be checked on an installed copy before #406 or its follow-ups are considered complete.

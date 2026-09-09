@@ -1,5 +1,13 @@
 # Lexeditor project rules
 
+- Before creating a new game plugin, read `docs/ADDING_A_GAME.md` and follow its
+  research-first workflow. Survey existing open-source tools/loaders, documentation
+  and format knowledge before writing new parsers, and record material sources in
+  Credits as they are used rather than reconstructing provenance later.
+- Default to one implementation branch/PR for a new game plugin from initial
+  integration through acceptance. Do not fragment one new plugin into PRs for each
+  parser, screen or subsystem unless genuinely shared infrastructure has an
+  independent reason to land first.
 - Every game plugin must expose a Data Map screen. Do not use a generic Files
   tab as the player-facing editor for data that needs a format-specific view.
 - Always use the most appropriate HTML control for the value. Use checkboxes
@@ -18,6 +26,13 @@ project discussion. Agents may summarize implementation state in an internal
 handoff, but must not mirror or archive complete issue bodies, comments, attachment
 files, screenshots, or GitHub API metadata into this repository.
 
+- Game-specific issues must carry the appropriate game label. Apply the game
+  label when the issue is created rather than encoding game identity in its title.
+- Do not prefix or suffix issue titles with a game name or abbreviation (for
+  example `FF7R:` or `FF8:`). The game label identifies the plugin; the title
+  describes only the requested work.
+- If a required game label is missing, add/apply it before treating the issue as
+  correctly filed. Do not substitute a game-name title prefix for a missing label.
 - Keep one current implementation handoff at `worklog/issues/github-<number>.md`
   when an issue needs internal continuity. It should contain current requirements,
   implementation state, evidence, and next work; it is not a verbatim issue archive.
