@@ -17,6 +17,8 @@ ChronoMod's `resourcebin.cpp` independently establishes the ARC1 header/index mo
 
 Important limitation: ChronoMod treats archive entries as opaque replacement blobs. Its UI/source contains no enemy/item/tech/battle record parser. It is therefore evidence for the **container**, not for gameplay-stat structures.
 
+Each ARC1 resource block also has a decoded four-byte big-endian uncompressed-size prefix before its gzip stream. Lexeditor can read that prefix independently with `ResourceArchive.declared_payload_size()` without inflating the resource. This is valid size metadata, not gameplay-field evidence.
+
 ## Field events (`Game/field/atel/Atel_*.dat`)
 
 **Status: PC structural parser + growing proven fixed-width operand set.**
@@ -83,12 +85,18 @@ Current public evidence is insufficient for a current-Steam record layout:
 - Historical Steam mods prove names/resources can be replaced through CT_Explore patches, but that does not establish current enemy-stat record boundaries.
 - SNES/DS tables are not assumed to map to the PC port.
 
-`tools/chrono_trigger_inventory.py` therefore remains index-only. It ranks likely path families from the user's **actual** ARC1 index without decompressing candidate payloads. A gameplay-stat editor should not be added until real current-install candidates are collected and at least one record family is independently decoded and round-trip tested.
+### Research tooling boundary
+
+`tools/chrono_trigger_inventory.py` is the first pass. By default it uses ARC1 index metadata only: candidate path scores, parent-directory clusters, extensions and stored sizes. `--peek-sizes` additionally reads only the four-byte declared payload-size prefixes. It still does **not** decompress candidate gzip payloads. Repeated path/size groups are emitted as `probeClusters` to suggest bounded follow-up targets; equal directory/size does not prove equal record semantics.
+
+`tools/chrono_trigger_probe.py` is the second pass. It requires one explicit candidate family and may be restricted to one archive path prefix. It enforces maximum resource count, compressed-block size and declared-uncompressed size **before** candidate decompression. For loaded samples it reports payload hashes, bounded prefix bytes, payload-size clusters, and constant/variable byte positions only among equal-size payloads. These are reverse-engineering diagnostics, not stat-field claims, and the probe has no write path.
+
+A gameplay-stat editor should not be added merely because a byte position varies. A field needs independent semantic evidence: known-value correlation across multiple entities plus reversible loose-file validation without collateral changes.
 
 ## Practical next evidence needed
 
-1. Run `tools/chrono_trigger_inventory.py` against a current Steam `resources.bin` and retain the candidate path/size clusters for enemy/item/tech/shop families.
-2. Compare multiple records in each promising family, looking first for fixed record sizes, count headers, pointer/index tables, and known-value correlations.
-3. Validate any proposed field against at least two known entities and a reversible loose-file test before exposing a writer.
+1. Run `tools/chrono_trigger_inventory.py --peek-sizes` against a current Steam `resources.bin`, preferably one family at a time, and retain promising `probeClusters` for enemy/item/tech/shop families.
+2. Run `tools/chrono_trigger_probe.py` only against a selected family/path cluster. Look for repeated payload sizes, stable headers, sparse variable positions, count/pointer patterns and correlations with known game values.
+3. Validate any proposed field against at least two known entities and a reversible CTExt loose-file test before exposing a writer.
 4. For scene composition, independently resolve `PrioMap` and main/sub blend ordering before adding a composed renderer.
 5. For BGAnime, establish the real game's initial copy/frame phase before enabling animated map playback.
