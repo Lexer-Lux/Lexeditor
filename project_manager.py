@@ -128,13 +128,23 @@ class ProjectManager:
         target = parent / clean_name
         if target.exists():
             raise ValueError(f"A file or folder already exists: {target}")
-        shutil.copytree(
-            spec.template_root, target,
-            ignore=lambda _root, names: [name for name in names if name in IGNORED_NAMES],
-        )
-        if spec.initialize is not None:
-            spec.initialize(target)
-        return self.select(plugin_id, str(target))
+        try:
+            shutil.copytree(
+                spec.template_root, target,
+                ignore=lambda _root, names: [name for name in names if name in IGNORED_NAMES],
+            )
+            if spec.initialize is not None:
+                spec.initialize(target)
+            return self.select(plugin_id, str(target))
+        except Exception as error:
+            if target.exists():
+                try:
+                    shutil.rmtree(target)
+                except Exception as cleanup_error:
+                    raise RuntimeError(
+                        f"Project creation failed and the new folder could not be cleaned up: {cleanup_error}"
+                    ) from error
+            raise
 
     def rename(self, plugin_id: str, root_value: str, name: str) -> dict:
         """Rename one known project folder and keep its selection stable."""
