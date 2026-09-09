@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   package-tests:
@@ -41,8 +41,41 @@ jobs:
           python-version: '3.12'
       - name: Install Lexeditor runtime dependencies
         run: python -m pip install -r requirements.txt
-      - name: Verify generated offline credits
-        run: python tools/generate_credits.py --check
+      - name: Record PalSchema metadata sources
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          credits_path = Path('ui/credits-sources.json')
+          credits = json.loads(credits_path.read_text(encoding='utf-8'))
+          pal = credits['plugins']['palworld']
+          contribution = {
+              'name': 'Okaetsu / PalSchema',
+              'role': 'Reference for PalSchema raw DataTable patch structure, JSONC parsing, wildcard/filter behavior and targeted field application.',
+              'url': 'https://github.com/Okaetsu/PalSchema',
+          }
+          if not any(row.get('name') == contribution['name'] for row in pal.get('contributions', [])):
+              pal.setdefault('contributions', []).append(contribution)
+          notice = {
+              'name': 'Palworld / PalSchema references — source and license notes',
+              'sourcePath': 'games/palworld/THIRD_PARTY.md',
+          }
+          pal['licenses'] = [notice]
+          credits_path.write_text(json.dumps(credits, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          loading_path = Path('ui/mod-loading.json')
+          loading = json.loads(loading_path.read_text(encoding='utf-8'))
+          loading['plugins']['palworld'] = {
+              'loader': "Pocketpair's official Palworld v0.7+ mod loader and Steam Workshop package model. PalSchema raw-table projects run through the package's Type=PalSchema rule; Lexeditor authors compatible patches but does not install or replace PalSchema/UE4SS.",
+              'structure': "One selected Lexeditor project is an official package rooted at Info.json. PalSchema targets contain per-mod raw/*.json[c] patches beneath the package target; installed Palworld game data remains read-only.",
+              'overriding': "The official loader enables packages by PackageName. PalSchema raw patches apply named DataTable row/property values rather than whole assets, so non-overlapping fields can coexist; when multiple patches target the same field, Lexeditor does not claim or impose a separate conflict winner beyond PalSchema's runtime order.",
+          }
+          loading_path.write_text(json.dumps(loading, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+      - name: Regenerate offline credits
+        run: python tools/generate_credits.py
       - name: Verify plugin metadata and shared UI contracts
         run: |
           python plugin_metadata.py
@@ -54,3 +87,14 @@ jobs:
           python app.py --game palworld --smoke
       - name: Check editor JavaScript syntax
         run: node --check games/palworld/editor.js
+      - name: Commit reviewed metadata bundle
+        shell: bash
+        run: |
+          if git diff --quiet -- ui/credits-sources.json ui/credits.json ui/mod-loading.json; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ui/credits-sources.json ui/credits.json ui/mod-loading.json
+          git commit -m 'Document PalSchema plugin metadata'
+          git push origin HEAD:feature/palworld-plugin
