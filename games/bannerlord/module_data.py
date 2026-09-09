@@ -60,12 +60,29 @@ def read_submodule(path: Path) -> dict:
                 }
             )
 
+    modules_to_load_after_this = []
+    load_after_root = root.find("ModulesToLoadAfterThis")
+    if load_after_root is not None:
+        for index, element in enumerate(_element_children(load_after_root, "Module")):
+            modules_to_load_after_this.append(
+                {"index": index, "id": element.attrib.get("Id", ""), "attributes": dict(element.attrib)}
+            )
+
     incompatible_modules = []
     incompatible_root = root.find("IncompatibleModules")
     if incompatible_root is not None:
-        for index, element in enumerate(_element_children(incompatible_root, "IncompatibleModule")):
+        elements = [
+            child for child in list(incompatible_root)
+            if child.tag in {"Module", "IncompatibleModule"}
+        ]
+        for index, element in enumerate(elements):
             incompatible_modules.append(
-                {"index": index, "id": element.attrib.get("Id", ""), "attributes": dict(element.attrib)}
+                {
+                    "index": index,
+                    "id": element.attrib.get("Id", ""),
+                    "elementTag": element.tag,
+                    "attributes": dict(element.attrib),
+                }
             )
 
     submodules = []
@@ -130,6 +147,7 @@ def read_submodule(path: Path) -> dict:
         "singleplayer": _truth(_value(root, "SingleplayerModule")),
         "multiplayer": _truth(_value(root, "MultiplayerModule")),
         "dependencies": dependencies,
+        "modulesToLoadAfterThis": modules_to_load_after_this,
         "incompatibleModules": incompatible_modules,
         "submodules": submodules,
         "xmls": xmls,
@@ -256,20 +274,30 @@ def _edit_dependencies(root: ET.Element, rows: list[dict]) -> int:
     return changes
 
 
-def _edit_incompatible_modules(root: ET.Element, rows: list[dict]) -> int:
-    parent = root.find("IncompatibleModules")
+def _edit_module_id_rows(
+    root: ET.Element,
+    parent_tag: str,
+    rows: list[dict],
+    *,
+    label: str,
+    accepted_tags: set[str],
+) -> int:
+    parent = root.find(parent_tag)
     if parent is None and not rows:
         return 0
-    parent = parent if parent is not None else ET.SubElement(root, "IncompatibleModules")
-    existing = _element_children(parent, "IncompatibleModule")
+    parent = parent if parent is not None else ET.SubElement(root, parent_tag)
+    existing = [child for child in list(parent) if child.tag in accepted_tags]
     changes = 0
     reused: set[int] = set()
     output = []
     for position, row in enumerate(rows):
         module_id = str(row.get("id", "")).strip()
         if not module_id:
-            raise ValueError(f"Incompatible module {position + 1} needs an ID")
-        element, created = _reuse(existing, row.get("index"), reused, "IncompatibleModule")
+            raise ValueError(f"{label} {position + 1} needs an ID")
+        new_tag = str(row.get("elementTag") or "Module")
+        if new_tag not in accepted_tags:
+            new_tag = "Module"
+        element, created = _reuse(existing, row.get("index"), reused, new_tag)
         changes += int(created)
         before = dict(element.attrib)
         element.set("Id", module_id)
@@ -277,11 +305,32 @@ def _edit_incompatible_modules(root: ET.Element, rows: list[dict]) -> int:
         output.append(element)
     if len(existing) != len(output) or any(a is not b for a, b in zip(existing, output)):
         changes += 1
-    _remove_tagged_children(parent, "IncompatibleModule")
+    for child in list(parent):
+        if child.tag in accepted_tags:
+            parent.remove(child)
     for element in output:
         parent.append(element)
     return changes
 
+
+def _edit_modules_to_load_after_this(root: ET.Element, rows: list[dict]) -> int:
+    return _edit_module_id_rows(
+        root,
+        "ModulesToLoadAfterThis",
+        rows,
+        label="Load-after module",
+        accepted_tags={"Module"},
+    )
+
+
+def _edit_incompatible_modules(root: ET.Element, rows: list[dict]) -> int:
+    return _edit_module_id_rows(
+        root,
+        "IncompatibleModules",
+        rows,
+        label="Incompatible module",
+        accepted_tags={"Module", "IncompatibleModule"},
+    )
 
 def _edit_tags(parent: ET.Element, rows: list[dict]) -> int:
     tags_root = parent.find("Tags")
@@ -418,7 +467,7 @@ def _edit_xmls(root: ET.Element, rows: list[dict]) -> int:
 
 
 def save_module(path: Path, payload: dict) -> dict:
-    allowed = {"metadata", "dependencies", "incompatibleModules", "submodules", "xmls"}
+    allowed = {"metadata", "dependencies", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}
     unknown = set(payload) - allowed
     if unknown:
         raise ValueError(f"Unsupported SubModule.xml sections: {', '.join(sorted(unknown))}")
@@ -431,6 +480,8 @@ def save_module(path: Path, payload: dict) -> dict:
         changes += int(setter(root, _EDITABLE_METADATA[field], value))
     if "dependencies" in payload:
         changes += _edit_dependencies(root, list(payload.get("dependencies") or []))
+    if "modulesToLoadAfterThis" in payload:
+        changes += _edit_modules_to_load_after_this(root, list(payload.get("modulesToLoadAfterThis") or []))
     if "incompatibleModules" in payload:
         changes += _edit_incompatible_modules(root, list(payload.get("incompatibleModules") or []))
     if "submodules" in payload:

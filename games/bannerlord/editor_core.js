@@ -24,7 +24,7 @@
   const refresh=()=>shell?.refresh?.();
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   const metadata=m=>({name:m.name,id:m.id,version:m.version,moduleCategory:m.moduleCategory||"",moduleType:m.moduleType||"",defaultModule:!!m.defaultModule,singleplayer:!!m.singleplayer,multiplayer:!!m.multiplayer});
-  const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;
+  const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],modulesToLoadAfterThis:m.modulesToLoadAfterThis||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;
   const moduleDirty=()=>state.module&&state.savedModule&&!same(moduleEditable(state.module),moduleEditable(state.savedModule));
   const projectDirty=()=>state.project?.projectFile&&state.savedProject?.projectFile&&!same(state.project.projectFile.properties,state.savedProject.projectFile.properties);
   const skillsEditable=value=>value?{attributes:value.attributes||[],skills:value.skills||[]}:null;
@@ -74,6 +74,7 @@
         ...fieldRow("Multi-player",checkbox(m.multiplayer,value=>setModuleField("multiplayer",value))),
         ...fieldRow("SubModule.xml",el("code",{},m.path)),
         ...fieldRow("Dependencies",String((m.dependencies||[]).length)),
+        ...fieldRow("Modules forced after this",String((m.modulesToLoadAfterThis||[]).length)),
         ...fieldRow("Incompatible modules",String((m.incompatibleModules||[]).length)),
         ...fieldRow("Submodules",String((m.submodules||[]).length)),
         ...fieldRow("XML registrations",String((m.xmls||[]).length))
@@ -82,25 +83,34 @@
     ));
   }
 
+  function relationList(kind){
+    if(kind==="incompatible")return state.module.incompatibleModules||[];
+    if(kind==="loadAfter")return state.module.modulesToLoadAfterThis||[];
+    return state.module.dependencies||[];
+  }
   function dependencyRows(){
     return [
       ...(state.module.dependencies||[]).map((row,index)=>({kind:"dependency",index,row})),
+      ...(state.module.modulesToLoadAfterThis||[]).map((row,index)=>({kind:"loadAfter",index,row})),
       ...(state.module.incompatibleModules||[]).map((row,index)=>({kind:"incompatible",index,row}))
     ];
   }
   function addDependency(kind){
-    if(kind==="incompatible"){
-      state.module.incompatibleModules.push({index:null,id:""});
-      state.dependencySelection={kind,index:state.module.incompatibleModules.length-1};
-    }else{
+    if(kind==="dependency"){
       state.module.dependencies.push({index:null,id:"",dependentVersion:"",optional:false,attributes:{}});
-      state.dependencySelection={kind:"dependency",index:state.module.dependencies.length-1};
+    }else if(kind==="loadAfter"){
+      state.module.modulesToLoadAfterThis=state.module.modulesToLoadAfterThis||[];
+      state.module.modulesToLoadAfterThis.push({index:null,id:"",attributes:{}});
+    }else{
+      state.module.incompatibleModules.push({index:null,id:"",elementTag:"Module",attributes:{}});
     }
+    const list=relationList(kind);
+    state.dependencySelection={kind,index:list.length-1};
     render();refresh();
   }
   function removeDependency(){
     const selection=state.dependencySelection;
-    const list=selection.kind==="incompatible"?state.module.incompatibleModules:state.module.dependencies;
+    const list=relationList(selection.kind);
     if(!list.length)return;
     list.splice(selection.index,1);
     state.dependencySelection={kind:selection.kind,index:Math.max(0,Math.min(selection.index,list.length-1))};
@@ -109,15 +119,16 @@
   function renderDependencies(){
     const rows=dependencyRows();
     const selection=state.dependencySelection;
-    const list=selection.kind==="incompatible"?state.module.incompatibleModules:state.module.dependencies;
+    const list=relationList(selection.kind);
     const record=list[selection.index];
     const master=el("div",{class:"bl-master"},
       el("div",{class:"bl-master-head"},el("strong",{},"Module relations"),
         el("button",{type:"button",onclick:()=>addDependency("dependency"),title:"Add dependency"},"+ Dep"),
+        el("button",{type:"button",onclick:()=>addDependency("loadAfter"),title:"Force another module to load after this module"},"+ After"),
         el("button",{type:"button",onclick:()=>addDependency("incompatible"),title:"Add incompatible module"},"+ Inc")),
       el("div",{class:"bl-list"},...rows.map(item=>{
         const active=item.kind===selection.kind&&item.index===selection.index;
-        const label=item.kind==="dependency"?"Depends on":"Incompatible";
+        const label=item.kind==="dependency"?"Depends on":item.kind==="loadAfter"?"Loads after this":"Incompatible";
         return el("button",{type:"button",class:`bl-item${active?" active":""}`,onclick:()=>{state.dependencySelection={kind:item.kind,index:item.index};render()}},
           item.row.id||"(new module)",el("small",{},label+(item.row.dependentVersion?` · ${item.row.dependentVersion}`:"")));
       }))
@@ -127,9 +138,13 @@
     else if(selection.kind==="incompatible")detail=el("div",{class:"bl-detail"},
       el("section",{class:"bl-panel"},el("h2",{},record.id||"New incompatible module"),
         el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
-        el("div",{class:"bl-grid"},
-          ...fieldRow("Module ID",textInput(record.id,value=>record.id=value))
-        )));
+        el("div",{class:"bl-grid"},...fieldRow("Module ID",textInput(record.id,value=>record.id=value))),
+        el("div",{class:"bl-note"},"If this module is enabled too, Bannerlord treats the relation as incompatible. New rows use the current <Module Id=…> shape; older existing rows keep their original element shape.")));
+    else if(selection.kind==="loadAfter")detail=el("div",{class:"bl-detail"},
+      el("section",{class:"bl-panel"},el("h2",{},record.id||"New inverse dependency"),
+        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
+        el("div",{class:"bl-grid"},...fieldRow("Module ID",textInput(record.id,value=>record.id=value))),
+        el("div",{class:"bl-note"},"Bannerlord will force this module to load after the current module. This is an ordering constraint, not a request to enable the target module.")));
     else detail=el("div",{class:"bl-detail"},
       el("section",{class:"bl-panel"},el("h2",{},record.id||"New dependency"),
         el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
@@ -138,7 +153,7 @@
           ...fieldRow("Dependent version",textInput(record.dependentVersion,value=>record.dependentVersion=value,{placeholder:"Optional"})),
           ...fieldRow("Optional",checkbox(record.optional,value=>record.optional=value))
         ),
-        el("div",{class:"bl-note"},"Unknown dependency attributes are preserved when an existing row is edited.")
+        el("div",{class:"bl-note"},"Optional dependencies constrain order only when already enabled; Lexeditor Play does not auto-enable an optional module merely because it is installed. Unknown dependency attributes are preserved when an existing row is edited.")
       ));
     main.replaceChildren(el("div",{class:"bl-split"},master,detail));
   }
