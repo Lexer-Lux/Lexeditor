@@ -53,6 +53,33 @@ def smoke() -> list[str]:
         (game / "Pal" / "Content" / "Paks").mkdir(parents=True)
         (game / "Palworld.exe").write_bytes(b"")
 
+        # Synthetic stand-in for the JSON schemas generated locally by PalSchema.
+        schema_root = game / "Mods" / "NativeMods" / "UE4SS" / "Mods" / "PalSchema" / "schemas"
+        (schema_root / "raw").mkdir(parents=True)
+        (schema_root / "raw" / "DT_PalMonsterParameter.schema.json").write_text(
+            json.dumps({
+                "type": "object",
+                "additionalProperties": {
+                    "type": "object",
+                    "properties": {
+                        "WorkSuitability_EmitFlame": {
+                            "type": "integer",
+                            "description": "IntProperty",
+                        },
+                        "FutureNested": {
+                            "type": "object",
+                            "description": "StructProperty",
+                            "properties": {},
+                        },
+                    },
+                },
+            }, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        (schema_root / "enums.schema.json").write_text(
+            json.dumps({"definitions": {}}, indent=2) + "\n", encoding="utf-8"
+        )
+
         project = temp / "project"
         project.mkdir()
         fixture = default_info("LexeditorSmoke")
@@ -98,8 +125,9 @@ def smoke() -> list[str]:
             if identity.get("pluginId") != "palworld" or identity.get("hosted") is not True:
                 raise RuntimeError("Palworld service returned the wrong managed identity")
             capabilities = identity.get("capabilities", [])
-            if "official-package-info" not in capabilities or "palschema-raw-patches" not in capabilities:
-                raise RuntimeError("Palworld service did not advertise package + PalSchema editing")
+            required = {"official-package-info", "palschema-raw-patches", "palschema-generated-schemas"}
+            if not required.issubset(set(capabilities)):
+                raise RuntimeError("Palworld service did not advertise package + schema-aware PalSchema editing")
 
             info = request_json(session.url + "api/info")
             if info.get("data", {}).get("PackageName") != "LexeditorSmoke":
@@ -118,6 +146,8 @@ def smoke() -> list[str]:
 
             catalog = request_json(session.url + "api/palschema/catalog")
             patches = catalog.get("patches", [])
+            if catalog.get("schemaAvailable") is not True:
+                raise RuntimeError("PalSchema service did not detect generated runtime schemas")
             if [row.get("name") for row in patches] != ["balance.json", "commented.jsonc"]:
                 raise RuntimeError("PalSchema catalog did not mirror direct raw-folder discovery")
             if [row.get("writable") for row in patches] != [True, False]:
@@ -133,8 +163,13 @@ def smoke() -> list[str]:
                 and row.get("row") == "Kitsunebi"
                 and row.get("field") == "WorkSuitability_EmitFlame"
             )
-            if target.get("value") != 3 or target.get("writable") is not True:
-                raise RuntimeError("PalSchema service did not expose the scalar patch field")
+            if (
+                target.get("value") != 3
+                or target.get("writable") is not True
+                or target.get("schemaState") != "matched"
+                or target.get("schemaType") != "integer"
+            ):
+                raise RuntimeError("PalSchema service did not apply generated schema metadata to the scalar field")
 
             saved_patch = request_json(session.url + "api/palschema/patch/save", {
                 "path": relative,
@@ -151,7 +186,7 @@ def smoke() -> list[str]:
                 if row.get("field") == "WorkSuitability_EmitFlame"
             )
             if updated.get("value") != 4:
-                raise RuntimeError("PalSchema service scalar edit did not survive readback")
+                raise RuntimeError("PalSchema service schema-backed scalar edit did not survive readback")
             disk = json.loads(json_patch.read_text("utf-8"))
             if disk["DT_PalMonsterParameter"]["Kitsunebi"]["FutureNested"] != {"preserve": [1, 2, 3]}:
                 raise RuntimeError("PalSchema edit did not preserve an unmodeled nested property")
@@ -165,7 +200,8 @@ def smoke() -> list[str]:
         "managed Palworld service identified the selected official package project",
         "official Info.json edit survived save/readback with unknown metadata preserved",
         "PalSchema catalog mirrored official target and non-recursive raw discovery",
-        "PalSchema JSON scalar edit survived save/readback while nested data was preserved",
+        "installed-style generated PalSchema schema supplied the scalar field type",
+        "schema-backed PalSchema scalar edit survived save/readback while nested data was preserved",
         "Info.json and PalSchema changed writes created recovery backups",
         "PalSchema JSONC patches stayed readable but changed-write disabled",
         "host-owned Palworld child service stopped cleanly",
@@ -176,7 +212,7 @@ PLUGIN = GamePlugin(
     plugin_id="palworld",
     name=DISPLAY_NAME,
     subtitle="Official mod packages",
-    description="Create Palworld v0.7+ packages and edit PalSchema raw DataTable patches while installed game data stays read-only.",
+    description="Create Palworld v0.7+ packages and schema-aware PalSchema raw DataTable patches while installed game data stays read-only.",
     accent="#55c7d9",
     check=check,
     launch=launch,
