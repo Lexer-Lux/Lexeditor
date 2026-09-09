@@ -6,6 +6,11 @@
     .ct-raster-wrap{overflow:auto;max-height:62vh;border:1px solid var(--lex-border);background:var(--lex-bg)}
     .ct-raster-image{display:block;image-rendering:pixelated;max-width:none}
     .ct-raster-policy{margin-top:10px}
+    .ct-render-diagnostics{margin:0 0 10px;border:1px solid var(--lex-border);background:var(--lex-bg)}
+    .ct-render-diagnostics>summary{padding:8px 10px;cursor:pointer;font-weight:600}
+    .ct-render-diag-grid{display:grid;grid-template-columns:minmax(130px,190px) 1fr;gap:5px 10px;padding:8px 10px;border-top:1px solid var(--lex-border);font-size:.88em}
+    .ct-render-diag-grid strong{color:var(--lex-muted);font-weight:500}
+    .ct-animation-table{font-size:.84em;border-top:1px solid var(--lex-border)}
   `;
   document.head.append(style);
 
@@ -22,6 +27,65 @@
     return el("div", {}, wrap, el("div", {class: "ct-table-note ct-raster-policy"}, policy));
   }
 
+  const layerNames = {layer1: "L1", layer2: "L2", layer3: "L3", sprites: "sprites"};
+  function enabledNames(flags) {
+    const names = Object.entries(flags || {}).filter(([, enabled]) => enabled).map(([name]) => layerNames[name] || name);
+    return names.length ? names.join(", ") : "none";
+  }
+
+  function sceneDiagnostics(data) {
+    const composition = data.compositionBits || {};
+    const screen = composition.screen || {};
+    const effects = composition.effects || {};
+    const animations = data.chipAnimations || {};
+    const animationSummary = animations.present
+      ? `${animations.decodedAnimationCount ?? 0}/${animations.declaredAnimationCount ?? 0} BGAnime records`
+      : "no BGAnime descriptor";
+    const effectExtras = [
+      effects.defaultColor ? "default-color" : null,
+      effects.halfIntensity ? "half-intensity" : null,
+      effects.subtract ? "subtract" : null,
+      effects.unknown08 ? "unknown-0x08" : null,
+    ].filter(Boolean);
+    const details = el("details", {class: "ct-render-diagnostics"},
+      el("summary", {}, `Render diagnostics · ${animationSummary}`),
+      el("div", {class: "ct-render-diag-grid"},
+        el("strong", {}, "MapTable screen bits"),
+        el("span", {}, `main: ${enabledNames(screen.main)} · sub: ${enabledNames(screen.sub)}`),
+        el("strong", {}, "MapTable effect bits"),
+        el("span", {}, `targets: ${enabledNames(effects.targets)}${effectExtras.length ? ` · ${effectExtras.join(", ")}` : ""}`),
+        el("strong", {}, "PrioMap"),
+        el("span", {}, data.layerPriorities ? `${data.layerPriorities.join(" / ")} · raw PC bytes; semantics unknown` : "not present"),
+        el("strong", {}, "Chip animation"),
+        el("span", {}, animations.present
+          ? `${animations.path} · descriptor decoded read-only; runtime phase/initial frame not inferred`
+          : `${animations.path || "BGAnime"} · descriptor not present`),
+      ),
+    );
+    if (animations.valid === false) {
+      details.append(el("div", {class: "ct-warning"}, `BGAnime diagnostics stopped safely: ${animations.error || "invalid descriptor"}`));
+    } else if (animations.present && Array.isArray(animations.animations) && animations.animations.length) {
+      const visible = animations.animations.slice(0, 32);
+      details.append(el("table", {class: "ct-animation-table"},
+        el("thead", {}, el("tr", {}, el("th", {}, "Animation"), el("th", {}, "Destination"), el("th", {}, "Frames"))),
+        el("tbody", {}, ...visible.map(animation => el("tr", {},
+          el("td", {class: "ct-number"}, String(animation.index)),
+          el("td", {class: "ct-mono"}, `chips ${animation.destinationChipRange?.join("–") || "?"}`),
+          el("td", {}, ...(animation.frames || []).map((frame, index) => el("span", {},
+            `${index ? " · " : ""}src ${frame.sourceChipRange?.join("–") || "?"}, ` +
+            `${frame.durationTicks == null ? `raw 0x${Number(frame.durationRaw || 0).toString(16).padStart(2, "0")}` : `${frame.durationTicks} ticks`}`
+          ))),
+        ))),
+      ));
+      if (animations.animations.length > visible.length) {
+        details.append(el("div", {class: "ct-table-note"}, `${animations.animations.length - visible.length} additional animation records omitted from this compact view.`));
+      }
+    }
+    details.append(el("div", {class: "ct-table-note"},
+      "These are PC resource bit/record diagnostics only. Lexeditor still does not emulate animation playback, main/sub-screen blending, or PrioMap render ordering."));
+    return details;
+  }
+
   function sceneRasterPanel(data, layer) {
     const layerData = data.layers[`layer${layer}`];
     const width = Number(layerData.width) * 16;
@@ -31,7 +95,7 @@
     })}`;
     const limitation = layer === 3
       ? "Color-zero transparency is preserved; main/sub-screen blend/priority composition is not emulated."
-      : "Color-zero transparency is preserved; animated chips are not played and main/sub-screen blend/priority composition is not emulated.";
+      : "Color-zero transparency is preserved; animated chips are decoded as diagnostics but not played, and main/sub-screen blend/priority composition is not emulated.";
     return rasterNode(
       url,
       `Chrono Trigger scene ${state.scenes.selected} rendered layer ${layer}`,
@@ -60,16 +124,17 @@
     const controls = el("div", {class: "ct-map-controls"},
       el("strong", {}, `${data.sceneWidth}×${data.sceneHeight} map tiles`), select,
       el("span", {}, `MapTable ${data.mapId} · L2 scroll ${data.header.scrollLayer2.xPixelsPerSecond}, ${data.header.scrollLayer2.yPixelsPerSecond} px/s`),
-      data.layerPriorities ? el("span", {}, `Priorities ${data.layerPriorities.join("/")}`) : null,
+      data.layerPriorities ? el("span", {}, `PrioMap ${data.layerPriorities.join("/")} (raw)`) : null,
     );
+    const diagnostics = sceneDiagnostics(data);
     if (selected.startsWith("raster")) {
       const layer = Number(selected.slice("raster".length));
-      return el("div", {class: "ct-map-panel"}, controls, sceneRasterPanel(data, layer));
+      return el("div", {class: "ct-map-panel"}, controls, diagnostics, sceneRasterPanel(data, layer));
     }
     const collision = el("div", {class: "ct-collision-summary"},
       ...Object.entries(data.collisionCounts).sort((a, b) => b[1] - a[1])
         .map(([name, count]) => el("span", {class: "ct-collision-chip"}, `${name}: ${count}`)));
-    return el("div", {class: "ct-map-panel"}, controls,
+    return el("div", {class: "ct-map-panel"}, controls, diagnostics,
       el("div", {class: "ct-map-canvas-wrap"}, mapCanvas(data, selected)),
       selected === "collision" ? collision : null,
       el("div", {class: "ct-table-note"},
