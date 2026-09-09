@@ -139,6 +139,24 @@
       row.inSync?el("div",{class:"bl-note"},"Project-owned files match the deployed copies."):null);
   }
 
+  function dependencyDiagnosticLine(row){
+    let source="Native dependency";
+    if(row.origin==="DependedModuleMetadatas")source="BLSE metadata";
+    else if(row.origin==="LoadAfterModules")source="Legacy LoadAfterModules";
+    else if(String(row.origin||"").startsWith("OptionalDependModules/")||row.origin==="DependedModules/OptionalDependModule")source="Launcher optional dependency";
+    const details=[source];
+    if(row.order==="LoadBeforeThis")details.push("loads before this");
+    else if(row.order==="LoadAfterThis")details.push("loads after this");
+    if(row.optional)details.push("optional");
+    if(row.incompatible)details.push("incompatible");
+    if(row.overriddenByCommunityMetadata)details.push("native row overridden by extended metadata");
+    if(row.requiredVersion)details.push(`requires ${row.requiredVersion}`);
+    if(row.installedVersion)details.push(`installed ${row.installedVersion}`);
+    if(row.versionMatch===true)details.push("version OK");
+    else if(row.versionMatch===false)details.push("VERSION MISMATCH");
+    return `${row.installed?"✓":"✗"} ${row.id} — ${details.join(" · ")}`;
+  }
+
   function renderDeployment(){
     const d=state.deployment;
     if(!d){main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Deployment"),el("div",{class:"bl-empty"},"Deployment status is unavailable.")));return}
@@ -164,7 +182,7 @@
     const detail=el("section",{class:"bl-card"},
       el("h2",{},"Installed module diagnostics"),
       el("div",{class:"bl-list-block"},el("h3",{},"Dependencies"),
-        deps.length?el("ul",{},...deps.map(row=>el("li",{},`${row.installed?"✓":"✗"} ${row.id}${row.optional?" (optional)":""}${row.requiredVersion?` requires ${row.requiredVersion}`:""}${row.installedVersion?` · installed ${row.installedVersion}`:""}`))):el("div",{class:"bl-note"},"No declared dependencies.")),
+        deps.length?el("ul",{},...deps.map(row=>el("li",{},dependencyDiagnosticLine(row)))):el("div",{class:"bl-note"},"No declared dependency relations.")),
       el("div",{class:"bl-list-block"},el("h3",{},"Module binaries"),
         bins.length?el("ul",{},...bins.map(row=>el("li",{},`${row.exists?"✓":"✗"} ${row.name}${row.exists?` · ${row.size} bytes`:" · missing"}${row.classType?` · ${row.classType}`:""}`))):el("div",{class:"bl-note"},"No SubModule DLL entries.")),
       deploymentAssetBlock("GUI assets",assets.gui||legacyGui),

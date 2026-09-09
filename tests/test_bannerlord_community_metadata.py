@@ -282,6 +282,8 @@ class BannerlordCommunityMetadataTests(unittest.TestCase):
             status = deployment_status(workspace, game)
             community_row = next(row for row in status["dependencies"] if row["source"] == "community")
             self.assertFalse(community_row["versionMatch"])
+            self.assertEqual(community_row["source"], "community")
+            self.assertEqual(community_row["origin"], "DependedModuleMetadatas")
             self.assertEqual(community_row["order"], "LoadBeforeThis")
             self.assertTrue(any("BLSE community dependency version warning" in issue for issue in status["issues"]))
             self.assertEqual(status["loadOrder"], ["Library", "Selected"])
