@@ -16,6 +16,7 @@ from .module_data import read_submodule
 CORE_SINGLEPLAYER_MODULES = (
     "Native",
     "SandBoxCore",
+    "BirthAndDeath",
     "CustomBattle",
     "Sandbox",
     "StoryMode",
