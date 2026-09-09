@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -49,6 +50,30 @@ class SettingsTests(unittest.TestCase):
             self.assertIn('[SettingPropertyFloatingInteger("Interval", 0.25f, 30f',rewritten)
             with self.assertRaises(ValueError):save_mcm_defaults(root,[{'property':'Columns','value':21}])
             with self.assertRaises(ValueError):save_mcm_defaults(root,[{'property':'Native','value':1}])
+
+    def test_settings_write_helpers_do_not_follow_existing_hardlinks(self):
+        from games.bannerlord.settings_data import save_mcm_defaults
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            (root/'src').mkdir()
+            path = root/'src/LexerSkillTweaksSettings.cs'
+            path.write_text(TEXT, encoding='utf-8')
+            backup = path.with_name(path.name + '.lexeditor.bak')
+            temporary_path = path.with_name(path.name + '.lexeditor.tmp')
+            outside_backup = root/'outside-backup.txt'
+            outside_temporary = root/'outside-temporary.txt'
+            outside_backup.write_text('backup sentinel', encoding='utf-8')
+            outside_temporary.write_text('temporary sentinel', encoding='utf-8')
+            os.link(outside_backup, backup)
+            os.link(outside_temporary, temporary_path)
+
+            result = save_mcm_defaults(root, [{'property':'Native','value':True}])
+
+            self.assertEqual(result['saved'], 1)
+            self.assertEqual(outside_backup.read_text(encoding='utf-8'), 'backup sentinel')
+            self.assertEqual(outside_temporary.read_text(encoding='utf-8'), 'temporary sentinel')
+            self.assertEqual(backup.read_text(encoding='utf-8'), TEXT)
+            self.assertIn('private bool _native = true;', path.read_text(encoding='utf-8'))
 
     def test_settings_source_redirection_outside_project_is_rejected(self):
         from games.bannerlord.settings_data import save_mcm_defaults
