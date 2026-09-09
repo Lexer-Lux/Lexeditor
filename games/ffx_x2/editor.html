@@ -14,6 +14,7 @@
     .ffxx2-path{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9em;word-break:break-all}.ffxx2-error{color:#ff9f9f;white-space:pre-wrap}
     .ffxx2-scroll{max-height:560px;overflow:auto}.ffxx2-scroll thead{position:sticky;top:0;background:var(--panel,#171b24);z-index:1}
     .ffxx2-table input[type=number]{width:8em}.ffxx2-dirty{font-weight:700}.ffxx2-hex{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+    .ffxx2-slot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:12px}.ffxx2-slot{display:grid;gap:5px;border:1px solid var(--line,rgba(255,255,255,.12));padding:10px;border-radius:9px}.ffxx2-slot input{width:100%;box-sizing:border-box}
   </style>
 </head>
 <body>
@@ -44,6 +45,18 @@
     <div class="ffxx2-scroll"><table class="ffxx2-table"><thead><tr><th>Index</th><th>Kind</th><th>Quantity</th><th>Type ID</th><th>Reward</th></tr></thead><tbody id="treasure-rows"></tbody></table></div>
   </section>
 
+  <section class="ffxx2-card" style="margin-top:14px" id="item-shops">
+    <h2>FFX Item Shops</h2>
+    <p class="ffxx2-muted">Structured editor for <span class="ffxx2-path">item_shop.bin</span>. Each shop exposes its 16 item/command ID slots; the leading unused rate field stays read-only and byte-identical.</p>
+    <div class="ffxx2-toolbar">
+      <label>Shop<select id="shop-select"></select></label>
+      <button id="shop-refresh" type="button">Refresh</button>
+      <button id="shop-save" type="button" disabled>Save Item Shop Edits</button>
+    </div>
+    <p id="shop-summary" class="ffxx2-muted"></p>
+    <div id="shop-slots" class="ffxx2-slot-grid"></div>
+  </section>
+
   <section class="ffxx2-card" style="margin-top:14px" id="archives">
     <h2>VBF Archive Browser</h2>
     <div class="ffxx2-toolbar">
@@ -70,6 +83,8 @@ const $ = id => document.getElementById(id);
 let catalog = null;
 let treasureState = null;
 const treasureDirty = new Set();
+let shopState = null;
+const shopDirty = new Map();
 const knownTreasureKinds = [[0,'Gil'],[2,'Item'],[5,'Gear'],[10,'Key Item']];
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(url, options){ const r=await fetch(url, options); const j=await r.json(); if(!r.ok) throw new Error(j.error||`${r.status}`); return j; }
@@ -108,9 +123,7 @@ function renderTreasures(){
   $('treasure-save').disabled=treasureDirty.size===0;
   $('treasure-summary').textContent=`${treasureState.rows.length.toLocaleString()} record(s) · ${treasureState.source==='project'?'reading staged project override':'reading installed VBF'} · record size ${treasureState.recordSize} bytes${treasureDirty.size?` · ${treasureDirty.size} unsaved edit(s)`:''}`;
 }
-async function refreshTreasures(){
-  showError(); treasureState=await api('/api/treasures'); treasureDirty.clear(); renderTreasures();
-}
+async function refreshTreasures(){ showError(); treasureState=await api('/api/treasures'); treasureDirty.clear(); renderTreasures(); }
 function treasureInputChanged(target){
   const tr=target.closest('[data-treasure]'); if(!tr||!treasureState)return;
   const id=Number(tr.dataset.treasure), row=treasureState.rows.find(item=>item.id===id); if(!row)return;
@@ -129,6 +142,39 @@ async function saveTreasures(){
   treasureState=await api('/api/treasures/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({headerMd5:treasureState.headerMd5,baselineSha256:treasureState.baselineSha256,edits})});
   treasureDirty.clear(); renderTreasures(); await Promise.all([refreshOverview(),refreshMap(),searchArchive()]);
 }
+function shopDirtyCount(){ let count=0; for(const slots of shopDirty.values())count+=slots.size; return count; }
+function selectedShop(){ if(!shopState)return null; const id=Number($('shop-select').value); return shopState.rows.find(row=>row.id===id)||shopState.rows[0]||null; }
+function renderShopSelector(preferred){
+  if(!shopState)return;
+  $('shop-select').innerHTML=shopState.rows.map(row=>`<option value="${row.id}">${row.id} · ${hex(row.id)} · ${row.occupiedSlots} occupied</option>`).join('');
+  if(preferred!=null && shopState.rows.some(row=>row.id===preferred))$('shop-select').value=String(preferred);
+}
+function renderItemShop(){
+  const row=selectedShop(); if(!row){$('shop-slots').innerHTML='';return;}
+  const dirty=shopDirty.get(row.id)||new Set();
+  $('shop-slots').innerHTML=row.itemIds.map((itemId,slot)=>`<label class="ffxx2-slot ${dirty.has(slot)?'ffxx2-dirty':''}" data-shop-slot="${slot}">Slot ${slot}<input type="number" min="0" max="65535" value="${itemId}"><span class="ffxx2-hex">${hex(itemId)}</span></label>`).join('');
+  const dirtyCount=shopDirtyCount();
+  $('shop-save').disabled=dirtyCount===0;
+  $('shop-summary').textContent=`Shop ${row.id} (${hex(row.id)}) · ${row.occupiedSlots} occupied slot(s) · preserved unused rate ${row.legacyRate} · ${shopState.source==='project'?'reading staged project override':'reading installed VBF'}${dirtyCount?` · ${dirtyCount} unsaved slot edit(s)`:''}`;
+}
+async function refreshItemShops(){
+  showError(); const previous=selectedShop()?.id; shopState=await api('/api/item-shops'); shopDirty.clear(); renderShopSelector(previous); renderItemShop();
+}
+function shopInputChanged(target){
+  const wrapper=target.closest('[data-shop-slot]'), row=selectedShop(); if(!wrapper||!row)return;
+  const slot=Number(wrapper.dataset.shopSlot), itemId=Number(target.value); row.itemIds[slot]=itemId;
+  row.occupiedSlots=row.itemIds.filter(value=>Number(value)!==0).length;
+  if(!shopDirty.has(row.id))shopDirty.set(row.id,new Set()); shopDirty.get(row.id).add(slot);
+  wrapper.classList.add('ffxx2-dirty'); wrapper.querySelector('.ffxx2-hex').textContent=hex(itemId);
+  $('shop-save').disabled=false; $('shop-summary').textContent=`Shop ${row.id} (${hex(row.id)}) · ${shopDirtyCount()} unsaved slot edit(s)`;
+}
+async function saveItemShops(){
+  showError(); if(!shopState||!shopDirtyCount())return;
+  const edits=[...shopDirty.entries()].sort((a,b)=>a[0]-b[0]).map(([id,slots])=>{ const row=shopState.rows.find(item=>item.id===id); return {id,slots:[...slots].sort((a,b)=>a-b).map(slot=>({slot,itemId:row.itemIds[slot]}))}; });
+  const previous=selectedShop()?.id;
+  shopState=await api('/api/item-shops/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({headerMd5:shopState.headerMd5,baselineSha256:shopState.baselineSha256,edits})});
+  shopDirty.clear(); renderShopSelector(previous); renderItemShop(); await Promise.all([refreshOverview(),refreshMap(),searchArchive()]);
+}
 async function searchArchive(){
   showError(); const game=$('game').value, q=$('query').value;
   catalog=await api(`/api/archive?game=${encodeURIComponent(game)}&q=${encodeURIComponent(q)}&limit=150`);
@@ -140,6 +186,7 @@ async function extractIndex(i){
   await api('/api/project/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:catalog.game,path:entry.path,headerMd5:catalog.headerMd5})});
   await Promise.all([searchArchive(),refreshOverview()]);
   if(entry.path===treasureState?.archivePath)await refreshTreasures();
+  if(entry.path===shopState?.archivePath)await refreshItemShops();
 }
 function renderDeployment(d){
   $('deployment-text').innerHTML = d.fahrenheitReady
@@ -154,13 +201,17 @@ $('treasure-refresh').addEventListener('click',()=>refreshTreasures().catch(show
 $('treasure-save').addEventListener('click',()=>saveTreasures().catch(showError));
 $('treasure-rows').addEventListener('input',e=>treasureInputChanged(e.target));
 $('treasure-rows').addEventListener('change',e=>treasureInputChanged(e.target));
+$('shop-select').addEventListener('change',renderItemShop);
+$('shop-refresh').addEventListener('click',()=>refreshItemShops().catch(showError));
+$('shop-save').addEventListener('click',()=>saveItemShops().catch(showError));
+$('shop-slots').addEventListener('input',e=>shopInputChanged(e.target));
 $('search').addEventListener('click',()=>searchArchive().catch(showError));
 $('query').addEventListener('keydown',e=>{if(e.key==='Enter')searchArchive().catch(showError)});
 $('game').addEventListener('change',()=>searchArchive().catch(showError));
 $('entries').addEventListener('click',e=>{const b=e.target.closest('[data-extract]'); if(b) extractIndex(Number(b.dataset.extract)).catch(showError)});
 $('deploy').addEventListener('click',()=>deploymentAction('/api/deployment/deploy').catch(showError));
 $('revert').addEventListener('click',()=>deploymentAction('/api/deployment/revert').catch(showError));
-Promise.all([refreshOverview(),refreshMap(),searchArchive(),refreshTreasures()]).catch(showError);
+Promise.all([refreshOverview(),refreshMap(),searchArchive(),refreshTreasures(),refreshItemShops()]).catch(showError);
 </script>
 </body>
 </html>
