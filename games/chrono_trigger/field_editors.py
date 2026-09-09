@@ -123,6 +123,17 @@ def editor_schema(command: dict) -> dict | None:
     if opcode == 0x83:
         fields = [Field("enemyId", "Enemy ID", 0, U16), Field("slot", "Enemy slot", 0, 0x7F),
                   Field("static", "Static enemy", 0, 1, "boolean")]
+    elif opcode == 0x87:
+        args = _base_args(command)
+        if len(args) != 1 or args[0] > 0x80:
+            return None
+        fields = [Field("scriptSpeed", "Script speed", 0, 0x80)]
+    elif opcode == 0x89:
+        fields = [Field("movementSpeed", "NPC movement speed", 0, U8)]
+    elif opcode == 0x8A:
+        fields = [Field("speedAddress", "Speed source address", SCRIPT_MEM_START, SCRIPT_MEM_LAST)]
+    elif opcode == 0x8B:
+        fields = [Field("tileX", "Tile X", 0, U8), Field("tileY", "Tile Y", 0, U8)]
     elif 0xDC <= opcode <= 0xE1:
         fields = [Field("sceneId", "Destination scene", 0, U16), Field("facing", "Facing", 0, 3),
                   Field("tileX", "Destination X", 0, U8), Field("tileY", "Destination Y", 0, U8)]
@@ -187,6 +198,14 @@ def editor_values(command: dict) -> dict:
     args = _base_args(command)
     if opcode == 0x83 and len(args) == 3:
         return {"enemyId": _u16(args), "slot": args[2] & 0x7F, "static": bool(args[2] & 0x80)}
+    if opcode == 0x87 and len(args) == 1 and args[0] <= 0x80:
+        return {"scriptSpeed": args[0]}
+    if opcode == 0x89 and len(args) == 1:
+        return {"movementSpeed": args[0]}
+    if opcode == 0x8A and len(args) == 1:
+        return {"speedAddress": _script_address(args[0])}
+    if opcode == 0x8B and len(args) == 2:
+        return {"tileX": args[0], "tileY": args[1]}
     if 0xDC <= opcode <= 0xE1 and len(args) == 5:
         return {"sceneId": _u16(args), "facing": args[2], "tileX": args[3], "tileY": args[4]}
     if opcode == 0xB8 and len(args) == 1:
@@ -241,6 +260,20 @@ def _apply(command: dict, values: dict) -> bytes:
         slot = _int(values.get("slot", args[2] & 0x7F), 0, 0x7F, "Enemy slot")
         static = _bool(values.get("static", bool(args[2] & 0x80)), "Static enemy")
         args[2] = slot | (0x80 if static else 0)
+    elif opcode == 0x87:
+        if "scriptSpeed" in values:
+            args[0] = _int(values["scriptSpeed"], 0, 0x80, "Script speed")
+    elif opcode == 0x89:
+        if "movementSpeed" in values:
+            args[0] = _int(values["movementSpeed"], 0, U8, "NPC movement speed")
+    elif opcode == 0x8A:
+        if "speedAddress" in values:
+            args[0] = _script_offset(values["speedAddress"], "Speed source address")
+    elif opcode == 0x8B:
+        if "tileX" in values:
+            args[0] = _int(values["tileX"], 0, U8, "Tile X")
+        if "tileY" in values:
+            args[1] = _int(values["tileY"], 0, U8, "Tile Y")
     elif 0xDC <= opcode <= 0xE1:
         if "sceneId" in values:
             _put_u16(args, 0, _int(values["sceneId"], 0, U16, "Destination scene"))
