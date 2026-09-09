@@ -30,6 +30,61 @@ class FieldCommandTests(unittest.TestCase):
         self.assertTrue(decoded["complete"])
         self.assertEqual([row["size"] for row in decoded["commands"]], [2, 3])
 
+    def test_dynamic_ec_known_subcommand_widths_preserve_following_boundaries(self):
+        # EC/88 is subcommand-only (1 arg), EC/14 has one extra parameter
+        # (2 args total), and EC/82 has two extra parameters (3 args total).
+        data = bytes([
+            0xEC, 0x88,
+            0xAD, 0x01,
+            0xEC, 0x14, 0x05,
+            0xAD, 0x02,
+            0xEC, 0x82, 0x03, 0x7F,
+            0x00,
+        ])
+        decoded = disassemble_function(data, 0, len(data))
+        self.assertTrue(decoded["complete"])
+        self.assertEqual([row["opcode"] for row in decoded["commands"]], [
+            0xEC, 0xAD, 0xEC, 0xAD, 0xEC, 0x00,
+        ])
+        self.assertEqual([row["size"] for row in decoded["commands"]], [2, 2, 3, 2, 4, 1])
+        self.assertEqual(decoded["commands"][0]["argumentsHex"], "88")
+        self.assertEqual(decoded["commands"][2]["argumentsHex"], "14 05")
+        self.assertEqual(decoded["commands"][4]["argumentsHex"], "82 03 7F")
+
+    def test_dynamic_ec_covers_all_documented_sound_menu_subcommands(self):
+        expected_argument_bytes = {
+            0x88: 1, 0xF0: 1, 0xF2: 1,
+            0x14: 2, 0x19: 2,
+            0x82: 3, 0x83: 3, 0x85: 3, 0x86: 3,
+        }
+        for subcommand, width in expected_argument_bytes.items():
+            with self.subTest(subcommand=subcommand):
+                data = bytes([0xEC, subcommand, 0x11, 0x22])
+                spec, error = command_spec(data, 0)
+                self.assertIsNone(error)
+                self.assertEqual(spec.argument_bytes, width)
+
+    def test_unknown_ec_subcommand_fails_closed(self):
+        decoded = disassemble_function(bytes([0xEC, 0x99, 0x00]), 0, 3)
+        self.assertFalse(decoded["complete"])
+        self.assertEqual(decoded["commands"], [])
+        self.assertEqual(decoded["problem"]["opcode"], 0xEC)
+        self.assertIn("unknown PC all-purpose sound subcommand 0x99", decoded["problem"]["reason"])
+
+    def test_truncated_known_ec_subcommand_does_not_consume_following_bytes(self):
+        # EC/82 requires opcode + subcommand + two parameters = four bytes.
+        decoded = disassemble_function(bytes([0xEC, 0x82, 0x03]), 0, 3)
+        self.assertFalse(decoded["complete"])
+        self.assertEqual(decoded["commands"], [])
+        self.assertIn("needs 4 bytes but only 3 remain", decoded["problem"]["reason"])
+
+    def test_eb_song_volume_remains_fixed_two_argument_bytes(self):
+        data = bytes([0xEB, 0x20, 0xFF, 0x00])
+        decoded = disassemble_function(data, 0, len(data))
+        self.assertTrue(decoded["complete"])
+        self.assertEqual([row["size"] for row in decoded["commands"]], [3, 1])
+        self.assertEqual(decoded["commands"][0]["argumentsHex"], "20 FF")
+
     def test_dynamic_memory_copy_uses_pc_length_field(self):
         data = bytes([0x4E, 0x00, 0x20, 0x05, 0x00, 0xAA, 0xBB, 0xCC])
         decoded = disassemble_function(data, 0, len(data))
