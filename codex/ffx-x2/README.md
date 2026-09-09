@@ -26,6 +26,8 @@ The integrated VBF reader is intentionally read-only. The archive format is esta
 
 The reader validates the signature, header hash, per-path MD5, table boundaries, data offsets, path safety and decompressed lengths before exposing an entry.
 
+Real archive names may omit the game-facing virtual archive root. Lexeditor therefore resolves both `ffx_ps2/...` and `FFX_Data/ffx_ps2/...` source spellings, but always stages FFX replacements beneath the canonical Fahrenheit path `efl/x/FFX_Data/...` (and equivalently `efl/x2/FFX2_Data/...` for FFX-2).
+
 ## FFX fixed-record table contract
 
 `FFXDataParser` was used as a research cross-check for the common FFX kernel-table container. Lexeditor's implementation is independent and only encodes the observed format facts:
@@ -55,25 +57,43 @@ For each fixed-size treasure record, only these proved fields are interpreted or
 - `+0x01`: quantity (`u8`); gil uses `quantity × 100`.
 - `+0x02..+0x03`: reward type ID (`u16`, little-endian).
 
-Unknown reward kinds remain representable. Any bytes after `+0x03` in a record are preserved byte-for-byte. Saving is guarded by the VBF header MD5 and the SHA-256 of the exact `takara.bin` bytes shown to the editor, so a concurrent external change causes a conflict rather than an overwrite.
+Unknown reward kinds remain representable. Any bytes after `+0x03` in a record are preserved byte-for-byte.
+
+### `item_shop.bin` inventories
+
+Integrated path:
+
+`FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/item_shop.bin`
+
+The proved record length is `0x22` bytes:
+
+- `+0x00..+0x01`: legacy/unused rate field (`u16`). Lexeditor displays it but does not edit it because its gameplay semantics are not established.
+- `+0x02..+0x21`: sixteen item/command IDs (`u16`, little-endian), one per shop slot.
+
+Lexeditor writes only explicitly changed inventory slots and preserves the leading rate field byte-for-byte.
+
+Both structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
 
 ## Project and loader boundary
 
 The project contains only replacement files:
 
-- `<project>/efl/x/<VBF path>` for FFX.
-- `<project>/efl/x2/<VBF path>` for FFX-2.
+- `<project>/efl/x/<canonical FFX virtual path>` for FFX.
+- `<project>/efl/x2/<canonical FFX-2 virtual path>` for FFX-2.
 
-This mirrors Fahrenheit's External File Loader exactly. For example, an archive entry such as
-`FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin` becomes
+For example, a raw VBF entry `ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin` is staged as
 `<project>/efl/x/FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin`.
 
-Structured editors follow the same boundary. They read the staged project file when one exists; otherwise they read the installed VBF entry. A save creates or atomically replaces only the project override. Installed VBF bytes remain untouched.
+Structured editors read the staged project file when one exists; otherwise they read the installed VBF entry. A save creates or atomically replaces only the project override. Installed VBF bytes remain untouched.
 
 Deploy Project creates one file-only Fahrenheit mod at
 `<game>/fahrenheit/mods/lexeditor-ffx-x2/`, writes its manifest, copies the project EFL tree, and adds exactly one `lexeditor-ffx-x2` line to `fahrenheit/mods/loadorder` while preserving every other line. Revert removes only the unchanged Lexeditor-owned mod and that load-order entry.
 
 Deployment refuses to overwrite a pre-existing foreign directory or a Lexeditor deployment changed outside Lexeditor.
+
+## Installed-game theme boundary
+
+Lexeditor can derive bounded cosmetic assets from the user's own installed VBFs and optional `data/metamenu.vbf`. The private cache may expose browser-ready title/menu PNGs, web fonts or audio when those formats already exist, while recognizing/caching non-browser-ready font atlases, UI textures and FMOD banks for later conversion work. No proprietary theme asset is committed to Lexeditor, and theme extraction is never a readiness gate for editing or deployment.
 
 ## Current coverage
 
@@ -81,11 +101,14 @@ Integrated:
 
 - Steam collection discovery.
 - Validation and indexing of both VBF archives.
+- Raw/virtual archive path normalization into canonical Fahrenheit EFL paths.
 - Path search and byte-exact extraction/decompression.
-- Safe extraction to a project overlay without overwriting an edited project file.
+- Safe extraction to a project overlay without overwriting edited project data.
 - Common FFX fixed-record table validation.
 - Structured FFX `takara.bin` treasure reward editing.
+- Structured FFX `item_shop.bin` 16-slot inventory editing.
 - Reversible file-only Fahrenheit deployment mechanics.
+- Private installed-game cosmetic theme extraction/cache with safe fallback.
 - Evidence-based Data Map.
 
 Not yet integrated:
@@ -93,7 +116,7 @@ Not yet integrated:
 - Other FFX gameplay/kernel record editors.
 - Dialogue/text editing.
 - FFX-2 structured tables.
-- Texture/model/audio formats.
+- Conversion of recognized proprietary font/texture/audio formats that are not already browser-ready.
 - Installing/updating Fahrenheit itself.
 - Choosing FFX vs FFX-2 when launching through Fahrenheit from Lexeditor.
 - Live installed-game acceptance for replacement loading.
