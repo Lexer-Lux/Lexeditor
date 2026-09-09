@@ -17,6 +17,7 @@ on:
       - 'docs/ADDING_A_GAME.md'
       - 'docs/UI-MANUAL.md'
       - 'worklog/acceptance/warband/**'
+      - 'tests/test_global_developer_mode.py'
       - 'tools/generate_credits.py'
       - 'tools/verify_shared_ui_contract.py'
       - '.github/workflows/shared-ui-contract.yml'
@@ -35,6 +36,7 @@ on:
       - 'docs/ADDING_A_GAME.md'
       - 'docs/UI-MANUAL.md'
       - 'worklog/acceptance/warband/**'
+      - 'tests/test_global_developer_mode.py'
       - 'tools/generate_credits.py'
       - 'tools/verify_shared_ui_contract.py'
       - '.github/workflows/shared-ui-contract.yml'
@@ -49,6 +51,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Shared UI contract
         run: python tools/verify_shared_ui_contract.py
+      - name: Developer Mode and Restart contracts
+        run: python -m unittest tests.test_global_developer_mode -v
       - name: Plugin documentation metadata
         run: |
           python plugin_metadata.py
@@ -56,4 +60,4 @@ jobs:
       - name: JavaScript syntax
         run: node --check ui/framework.js
       - name: Python syntax
-        run: python -m py_compile app.py desktop_host.py github_integration.py plugin_api.py plugin_metadata.py settings_manager.py tools/generate_credits.py
+        run: python -m py_compile app.py desktop_host.py github_integration.py plugin_api.py plugin_metadata.py settings_manager.py tests/test_global_developer_mode.py tools/generate_credits.py
