@@ -1,7 +1,7 @@
-from pathlib import Path
-
 from games.ff7r import theme
+from games.ff7r.plugin import FF7RSession
 from games.ff7r.themed_server import themed_editor_html
+from service_session import request_json
 
 
 def test_theme_fallback_is_proprietary_free_and_semantically_complete(tmp_path):
@@ -38,7 +38,7 @@ def test_installed_browser_ready_assets_are_copied_only_to_private_cache(tmp_pat
         "End/Content/GameContents/Menu/Sound/MenuOpen.wav",
         "End/Content/GameContents/Menu/Sound/MenuClose.wav",
         "End/Content/GameContents/Menu/Sound/MenuSave.wav",
-        # Cooked sources are reported for future decoding, never served as web assets.
+        # Cooked sources are reported for decoding, never served as web assets.
         "End/Content/GameContents/Menu/Resident/Font/SystemFontNormal.uasset",
         "End/Content/GameContents/Menu/Resident/Texture/T_MenuWindow.uasset",
     ]
@@ -90,3 +90,21 @@ def test_themed_server_injects_one_ff7r_style_and_script_without_editing_documen
     assert html.count('/theme/ff7r.js') == 1
     assert html.index('/shared/framework.css') < html.index('/theme/ff7r.css')
     assert html.index('/shared/framework.js') < html.index('/theme/ff7r.js')
+
+
+def test_managed_ff7r_service_exposes_fallback_theme_contract(tmp_path):
+    game = tmp_path / "game"
+    (game / "End" / "Content" / "Paks").mkdir(parents=True)
+    data = tmp_path / "data"
+    project = tmp_path / "project"
+
+    with FF7RSession({
+        "LEXEDITOR_FF7R_ROOT": str(game),
+        "LEXEDITOR_FF7R_DATA_ROOT": str(data),
+        "LEXEDITOR_FF7R_PROJECT": str(project),
+    }) as session:
+        payload = request_json(session.url + "api/theme?scan=1")
+        assert payload["themeName"] == "ff7r"
+        assert payload["assetMode"] == "fallback"
+        assert payload["bitmapFont"]["available"] is False
+        assert [row["slot"] for row in payload["sounds"]["rows"]] == list(theme.SOUND_SLOTS)
