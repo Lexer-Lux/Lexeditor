@@ -57,6 +57,7 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(enemy["extensionClusters"][0], {"extension": ".dat", "count": 1})
         self.assertEqual(enemy["storedSizeClusters"], [])
         self.assertEqual(enemy["declaredSizeClusters"], [])
+        self.assertEqual(enemy["probeClusters"], [])
         self.assertGreaterEqual(payload["candidates"]["item"]["matchCount"], 2)
         self.assertIn("ARC1-index-only", payload["method"])
         self.assertIn("stored sizes", payload["method"])
@@ -86,6 +87,14 @@ class InventoryTests(unittest.TestCase):
         ])
         self.assertEqual(enemy["samples"][0]["storedSize"], 80)
         self.assertEqual(enemy["directoryClusters"][0], {"path": "Game/enemy", "count": 3})
+        self.assertEqual(enemy["probeClusters"], [{
+            "pathPrefix": "Game/enemy",
+            "sizeBasis": "storedSize",
+            "storedSize": 64,
+            "count": 2,
+            "samplePaths": ["Game/enemy/Enemy_0001.dat", "Game/enemy/Enemy_0002.dat"],
+            "probeArgs": {"family": "enemy", "pathPrefix": "Game/enemy"},
+        }])
         self.assertEqual(archive.peeked, [])
 
     def test_declared_size_peek_clusters_four_byte_header_metadata(self):
@@ -107,6 +116,14 @@ class InventoryTests(unittest.TestCase):
             {"declaredSize": 128, "count": 2},
             {"declaredSize": 160, "count": 1},
         ])
+        self.assertEqual(enemy["probeClusters"], [{
+            "pathPrefix": "Game/enemy",
+            "sizeBasis": "declaredSize",
+            "declaredSize": 128,
+            "count": 2,
+            "samplePaths": ["Game/enemy/Enemy_0001.dat", "Game/enemy/Enemy_0002.dat"],
+            "probeArgs": {"family": "enemy", "pathPrefix": "Game/enemy"},
+        }])
         self.assertEqual(enemy["samples"][0]["declaredSize"], 128)
         self.assertEqual(set(archive.peeked), {
             "Game/enemy/Enemy_0001.dat",
@@ -114,6 +131,7 @@ class InventoryTests(unittest.TestCase):
             "Game/enemy/Enemy_0003.dat",
         })
         self.assertIn("four-byte decoded entry-size prefixes", payload["method"])
+        self.assertIn("probe-ready", payload["method"])
         self.assertIn("no candidate gzip payloads were decompressed", payload["method"])
 
     def test_family_filter_limits_candidate_analysis_and_peeks(self):
@@ -159,6 +177,7 @@ class InventoryTests(unittest.TestCase):
         bad = next(row for row in enemy["samples"] if row["path"].endswith("0002.dat"))
         self.assertIn("declaredSizeError", bad)
         self.assertEqual(enemy["declaredSizeClusters"], [{"declaredSize": 128, "count": 1}])
+        self.assertEqual(enemy["probeClusters"], [])
         self.assertEqual(payload["peekedResourceCount"], 2)
 
     def test_invalid_or_empty_family_selection_fails_closed(self):
@@ -187,6 +206,7 @@ class InventoryTests(unittest.TestCase):
             {"storedSize": 10, "count": 1},
             {"storedSize": 20, "count": 1},
         ])
+        self.assertEqual(family["probeClusters"], [])
 
 
 if __name__ == "__main__":
