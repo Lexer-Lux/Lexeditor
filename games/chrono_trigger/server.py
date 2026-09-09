@@ -21,6 +21,7 @@ from .data import (
     save_message_table,
     save_scene,
 )
+from .deployment import deploy_audited_project, deployment_status
 from .events import event_entries, get_event, load_events
 from .resources import ResourceArchiveError
 from .scene_tables import load_exits, load_treasure, save_exit, save_treasure
@@ -43,7 +44,7 @@ MAX_REQUEST_BYTES = 2 * 1024 * 1024
 POST_ROUTES = {
     "/api/save/message", "/api/save/scene", "/api/save/exit", "/api/save/treasure",
     "/api/save/world", "/api/save/world-exit", "/api/save/world-trigger",
-    "/api/save/world-script-address",
+    "/api/save/world-script-address", "/api/deployment/deploy",
 }
 
 
@@ -84,6 +85,7 @@ def _archive_payload(query: str = "", offset: int = 0, limit: int = 250) -> dict
 
 def dashboard() -> dict:
     store = _store()
+    deployment = deployment_status(store, paths.GAME_ROOT)
     return {
         "game": {
             "root": str(paths.GAME_ROOT), "archive": str(paths.RESOURCE_PATH),
@@ -101,15 +103,12 @@ def dashboard() -> dict:
             "fieldEvents": len(event_entries(store)),
             "worldHeaders": 8 if store.exists("Game/common/bankc6.bin") else 0,
         },
-        "deployment": {
-            "format": "ctext-loose-files", "automated": False,
-            "message": "Project paths match CTExt loose-file resource overrides; CTExt installation/load-order setup is not automated yet.",
-        },
+        "deployment": deployment,
     }
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/8"
+    server_version = "LexeditorChronoTrigger/9"
 
     def log_message(self, _format, *_args):
         return
@@ -154,11 +153,13 @@ class Handler(BaseHTTPRequestHandler):
                         "data-map", "resource-index", "localization-text", "scene-headers",
                         "scene-exits", "scene-treasure", "field-events", "world-headers",
                         "world-exits", "world-triggers", "world-script-addresses",
-                        "world-script-disassembly", "project-overlay", "read", "save",
+                        "world-script-disassembly", "project-overlay", "ctext-deploy", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
                 self.send_json(dashboard())
+            elif path == "/api/deployment":
+                self.send_json(deployment_status(_store(), paths.GAME_ROOT))
             elif path == "/api/datamap":
                 self.send_json(augment_data_map(_store(), data_map(_store())))
             elif path == "/api/archive":
@@ -228,7 +229,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             payload = self._request_json()
-            if path == "/api/save/message":
+            if path == "/api/deployment/deploy":
+                result = deploy_audited_project(_store(), paths.GAME_ROOT)
+            elif path == "/api/save/message":
                 result = save_message_table(_store(), str(payload.get("path", "")), str(payload.get("sha256", "")), payload.get("changes", []))
             elif path == "/api/save/scene":
                 result = save_scene(_store(), int(payload.get("id", -1)), str(payload.get("sha256", "")), payload.get("values", {}))
