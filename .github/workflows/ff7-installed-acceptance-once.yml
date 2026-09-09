@@ -37,12 +37,16 @@ jobs:
           python tools/verify_ff7_completion.py
           python tools/verify_ff7_installed_contract.py
           python tools/verify_ff7_semantic_surface.py
-      - name: Commit tested acceptance hardening and remove scaffold
+      - name: Commit tested acceptance hardening and remove code scaffolds
         shell: bash
         run: |
-          git rm tools/_ff7_installed_acceptance_once.py tools/_ff7_installed_acceptance_testfix_once.py tools/_ff7_lgp_terminator_fix_once.py .github/workflows/ff7-installed-acceptance-once.yml
+          # The Actions token can push code but cannot modify workflow files.
+          # Restore the normal regression workflow here; it is updated directly
+          # after this tested code commit lands.
+          git checkout -- .github/workflows/ff7-data-regressions.yml
+          git rm tools/_ff7_installed_acceptance_once.py tools/_ff7_installed_acceptance_testfix_once.py tools/_ff7_lgp_terminator_fix_once.py
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add games/ff7/kernel.py games/ff7/archives.py tools/verify_ff7_installed.py tools/verify_ff7_installed_contract.py tools/verify_ff7_completion.py tools/FF7-checks.cmd .github/workflows/ff7-data-regressions.yml
+          git add games/ff7/kernel.py games/ff7/archives.py tools/verify_ff7_installed.py tools/verify_ff7_installed_contract.py tools/verify_ff7_completion.py tools/FF7-checks.cmd
           git commit -m 'Harden FF7 installed-data acceptance proof'
           git push origin HEAD:work/ff7-complete-kernel-surface
