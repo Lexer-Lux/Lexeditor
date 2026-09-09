@@ -54,6 +54,7 @@ jobs:
           games/chrono_trigger/object_ops.py
           games/chrono_trigger/scene_event_ops.py
           games/chrono_trigger/audio_ops.py
+          games/chrono_trigger/misc_ops.py
           games/chrono_trigger/jump_ops.py
           games/chrono_trigger/event_flow.py
           games/chrono_trigger/event_edit.py
