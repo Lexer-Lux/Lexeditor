@@ -104,10 +104,19 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
             added.add(module_id)
             order.append(module_id)
 
+    # This direct-launch path deliberately targets Bannerlord single-player.
+    # Refuse a module that explicitly is not a single-player module rather than
+    # constructing a /singleplayer command that cannot represent its declared mode.
+    selected_metadata = read_submodule(installed / "SubModule.xml")
+    if not selected_metadata.get("singleplayer"):
+        raise RuntimeError(
+            f"Bannerlord module {selected_id} is not declared as a single-player module; "
+            "Lexeditor Play currently supports single-player modules only."
+        )
+
     # Respect the selected module's declared dependency order first.  Then add
     # any standard single-player modules that are installed but were not already
     # reached through dependency metadata.  Finally add the selected module.
-    selected_metadata = read_submodule(installed / "SubModule.xml")
     for dependency in selected_metadata.get("dependencies", []):
         dependency_id = str(dependency.get("id") or "").strip()
         if not dependency_id:
