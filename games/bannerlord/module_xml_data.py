@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 
 from . import paths
 from .module_data import read_submodule
-from .xml_patch import scan_xml_start_tags, serialize_attribute
+from .xml_patch import scan_xml_start_tags, serialize_attribute, serialize_new_attribute
 from .xsd_data import enrich_elements, find_schema
 
 
@@ -94,8 +94,6 @@ def _schema_for(project: Path, path: Path, root_tag: str, game_root: Path | None
 
 
 def _scan_document(text: str, schema: dict | None) -> list[dict]:
-    # ModuleData starts with syntax-safe bool/number inference, then upgrades
-    # controls only when a uniquely matched Bannerlord XSD explicitly says so.
     return enrich_elements(scan_xml_start_tags(text), schema)
 
 
@@ -133,6 +131,7 @@ def save_document(
     requested: str,
     edits: list[dict],
     game_root: Path | None = None,
+    additions: list[dict] | None = None,
 ) -> dict:
     path = _document_path(project, requested)
     text = path.read_text(encoding="utf-8-sig")
@@ -144,6 +143,7 @@ def save_document(
     elements = _scan_document(text, schema)
     by_path = {element["path"]: element for element in elements}
     replacements: list[tuple[int, int, str]] = []
+    insertions: dict[int, list[str]] = {}
     touched: set[tuple[str, str]] = set()
     changed = 0
 
@@ -175,8 +175,41 @@ def save_document(
             replacements.append((left, right, replacement))
             changed += 1
 
+    for addition in list(additions or []):
+        element_path = str(addition.get("elementPath") or "")
+        attribute_name = str(addition.get("attribute") or "")
+        identity = (element_path, attribute_name)
+        if identity in touched:
+            raise ValueError(f"Duplicate ModuleData edit for {element_path} {attribute_name}")
+        touched.add(identity)
+        element = by_path.get(element_path)
+        if element is None:
+            raise ValueError(f"ModuleData element changed or no longer exists: {element_path}")
+        expected_tag = str(addition.get("tag") or "")
+        if expected_tag and expected_tag != element["tag"]:
+            raise ValueError(f"ModuleData element identity changed: {element_path}")
+        if any(row["name"] == attribute_name for row in element["_attributes"]):
+            raise ValueError(
+                f"{element_path} already has attribute {attribute_name}; reload before saving"
+            )
+        missing = next(
+            (row for row in element.get("missingRequired", []) if row.get("name") == attribute_name),
+            None,
+        )
+        if missing is None:
+            raise ValueError(
+                f"{attribute_name} is not a schema-declared missing required attribute on {element_path}"
+            )
+        escaped_value = serialize_new_attribute(attribute_name, missing, addition.get("value"))
+        position = int(element["_attributeInsert"])
+        insertions.setdefault(position, []).append(f' {attribute_name}="{escaped_value}"')
+        changed += 1
+
+    for position, values in insertions.items():
+        replacements.append((position, position, "".join(values)))
+
     candidate = text
-    for left, right, replacement in sorted(replacements, reverse=True):
+    for left, right, replacement in sorted(replacements, key=lambda row: row[0], reverse=True):
         candidate = candidate[:left] + replacement + candidate[right:]
     backup = path.with_name(path.name + ".lexeditor.bak")
     if changed:
@@ -219,8 +252,8 @@ def augment_data_map(project: Path, value: dict) -> dict:
                         "openable": True,
                         "editorPath": filename,
                         "notes": (
-                            "Record-oriented ModuleData XML editor. Existing nested element attributes "
-                            "are edited surgically; installed XSDs enrich controls and diagnostics when a unique schema matches."
+                            "Record-oriented ModuleData XML editor. Existing attributes are edited surgically; "
+                            "matched XSDs add typed controls, diagnostics, and repair of missing required attributes."
                         ),
                     }
                 )
