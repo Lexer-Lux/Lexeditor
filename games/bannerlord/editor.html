@@ -9,159 +9,394 @@
     :root{--lex-accent:#8d2f25;--lex-highlight:#a56b34}
     *{box-sizing:border-box}
     body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:14px/1.4 var(--lex-font)}
-    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:auto}
-    .bannerlord-card{max-width:1100px;margin:0 auto;border:1px solid var(--lex-border);background:var(--lex-panel)}
-    .bannerlord-card h2{margin:0;padding:14px 18px;border-bottom:1px solid var(--lex-border)}
-    .bannerlord-grid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:0}
-    .bannerlord-grid>*{padding:9px 14px;border-bottom:1px solid var(--lex-border)}
-    .bannerlord-label{font-weight:700;color:var(--lex-muted)}
-    .bannerlord-grid input[type="text"]{width:min(100%,620px);padding:6px 8px;color:var(--lex-text);border:1px solid var(--lex-border);background:var(--lex-panel)}
-    .bannerlord-grid input[type="checkbox"]{width:18px;height:18px}
-    .bannerlord-list{margin:0;padding:10px 28px}
-    .bannerlord-note{padding:12px 18px;color:var(--lex-muted)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
+    button,input,select,textarea{font:inherit}
+    .bl-card{height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel);overflow:auto}
+    .bl-card>h2,.bl-panel h2{margin:0;padding:12px 16px;border-bottom:1px solid var(--lex-border);font-size:18px}
+    .bl-grid{display:grid;grid-template-columns:190px minmax(0,1fr)}
+    .bl-grid>*{padding:8px 12px;border-bottom:1px solid var(--lex-border)}
+    .bl-label{font-weight:700;color:var(--lex-muted)}
+    .bl-control{display:flex;align-items:center;gap:8px;min-width:0}
+    .bl-control input[type="text"],.bl-control input[type="number"],.bl-control select{width:min(100%,760px);padding:6px 8px;color:var(--lex-text);border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bl-control input[type="checkbox"]{width:18px;height:18px}
+    .bl-split{display:grid;grid-template-columns:minmax(240px,340px) minmax(0,1fr);height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bl-master{min-height:0;overflow:auto;border-right:1px solid var(--lex-border)}
+    .bl-master-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:9px;border-bottom:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bl-master-head strong{margin-right:auto}
+    .bl-list{display:flex;flex-direction:column}
+    .bl-item{display:block;width:100%;padding:9px 11px;border:0;border-bottom:1px solid var(--lex-border);color:var(--lex-text);background:transparent;text-align:left;cursor:pointer}
+    .bl-item:hover{background:var(--lex-panel-2)}
+    .bl-item.active{color:var(--lex-accent-text);background:var(--lex-accent)}
+    .bl-item small{display:block;overflow:hidden;color:inherit;opacity:.72;text-overflow:ellipsis;white-space:nowrap}
+    .bl-detail{min-width:0;min-height:0;overflow:auto}
+    .bl-panel{min-height:100%}
+    .bl-actions{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px;border-bottom:1px solid var(--lex-border)}
+    .bl-actions button,.bl-master-head button,.bl-build-button{padding:6px 10px;border:1px solid var(--lex-border);color:var(--lex-text);background:var(--lex-panel-2);cursor:pointer}
+    .bl-actions button.danger{color:#fff;background:#8d2f25}
+    .bl-empty{padding:18px;color:var(--lex-muted)}
+    .bl-tags{padding:10px 12px}
+    .bl-tag-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) auto;gap:8px;margin-bottom:7px}
+    .bl-tag-row input{min-width:0;padding:6px 8px;border:1px solid var(--lex-border);color:var(--lex-text);background:var(--lex-panel)}
+    .bl-tag-row button{border:1px solid var(--lex-border);background:var(--lex-panel-2);cursor:pointer}
+    .bl-note{padding:10px 14px;color:var(--lex-muted)}
+    .bl-build-layout{display:grid;grid-template-columns:minmax(390px,.9fr) minmax(0,1.1fr);height:100%;min-height:0;gap:var(--lex-panel-gap)}
+    .bl-build-layout>.bl-card{min-width:0}
+    .bl-list-block{padding:10px 14px;border-bottom:1px solid var(--lex-border)}
+    .bl-list-block h3{margin:0 0 8px}
+    .bl-list-block ul{margin:0;padding-left:20px}
+    .bl-build-toolbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--lex-border)}
+    .bl-build-log{min-height:260px;margin:0;padding:12px;overflow:auto;color:#d8dee9;background:#101216;font:12px/1.45 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
+    .bl-source{display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bl-source-head{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--lex-border)}
+    .bl-source-head code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .bl-source textarea{flex:1;min-height:0;width:100%;padding:12px;resize:none;border:0;outline:0;color:var(--lex-text);background:var(--lex-panel);font:12px/1.45 "Cascadia Mono",Consolas,monospace;tab-size:4}
     code{overflow-wrap:anywhere}
+    @media(max-width:900px){.bl-split,.bl-build-layout{grid-template-columns:1fr}.bl-master{max-height:36vh;border-right:0;border-bottom:1px solid var(--lex-border)}}
   </style>
 </head>
 <body>
   <header id="lexeditor-shell"></header>
-  <main id="main"><div>Loading Bannerlord module…</div></main>
+  <main id="main"><div>Loading Bannerlord project…</div></main>
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
   const {el,clone,showAlert}=LexeditorUI;
-  const state={tab:"module",module:null,saved:null,datamap:{rows:[]},query:"",mapStatus:"",page:0,sort:["filename",1]};
   const main=document.querySelector("#main");
+  const state={
+    tab:"module",module:null,savedModule:null,project:null,savedProject:null,
+    datamap:{rows:[]},query:"",mapStatus:"",page:0,sort:["filename",1],
+    dependencySelection:{kind:"dependency",index:0},submoduleIndex:0,xmlIndex:0,
+    buildConfiguration:"Debug",building:false,buildResult:null,
+    source:null,savedSourceText:null
+  };
 
   async function api(path,options){
     const response=await fetch(path,options);
     const value=await response.json();
-    if(value.error)throw new Error(value.error);
+    if(!response.ok||value.error)throw new Error(value.error||`${response.status} ${response.statusText}`);
     return value;
   }
+  const post=(path,payload)=>api(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  const refresh=()=>shell?.refresh?.();
+  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const metadata=m=>({name:m.name,id:m.id,version:m.version,defaultModule:!!m.defaultModule,singleplayer:!!m.singleplayer,multiplayer:!!m.multiplayer});
+  const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;
+  const moduleDirty=()=>state.module&&state.savedModule&&!same(moduleEditable(state.module),moduleEditable(state.savedModule));
+  const projectDirty=()=>state.project?.projectFile&&state.savedProject?.projectFile&&!same(state.project.projectFile.properties,state.savedProject.projectFile.properties);
+  const sourceDirty=()=>state.source&&state.savedSourceText!==null&&state.source.text!==state.savedSourceText;
+  function dirtyCount(){return Number(moduleDirty())+Number(projectDirty())+Number(sourceDirty())}
 
-  function dirtyCount(){
-    if(!state.module||!state.saved)return 0;
-    const fields=["name","id","version","singleplayer","multiplayer"];
-    return fields.reduce((count,key)=>count+Number(state.module[key]!==state.saved[key]),0);
+  function fieldRow(label,control){return [el("div",{class:"bl-label"},label),el("div",{class:"bl-control"},control)]}
+  function textInput(value,change,attrs={}){
+    return el("input",{type:"text",value:value??"",...attrs,oninput:event=>{change(event.target.value);refresh()}});
   }
-
-  function textField(key){
-    return el("input",{type:"text",value:state.module[key]||"",oninput:event=>{
-      state.module[key]=event.target.value;
-      shell.refresh();
-    }});
+  function checkbox(value,change){
+    return el("input",{type:"checkbox",checked:!!value,onchange:event=>{change(event.target.checked);refresh()}});
   }
-
-  function boolField(key){
-    return el("input",{type:"checkbox",checked:!!state.module[key],onchange:event=>{
-      state.module[key]=event.target.checked;
-      shell.refresh();
-    }});
+  function select(value,choices,change){
+    const node=el("select",{onchange:event=>{change(event.target.value);refresh()}},
+      ...choices.map(([key,label])=>{const option=el("option",{value:key},label);option.selected=key===value;return option}));
+    return node;
   }
-
-  function row(label,value){
-    return [el("div",{class:"bannerlord-label"},label),el("div",{},value||"—")];
-  }
+  function setModuleField(key,value){state.module[key]=value}
 
   function renderModule(){
-    const module=state.module;
-    if(!module){main.replaceChildren(el("div",{},"No module metadata loaded."));return;}
-    const dependencies=(module.dependencies||[]).map(dep=>dep.Id||dep.id||JSON.stringify(dep));
-    const submodules=(module.submodules||[]).map(entry=>`${entry.name||"(unnamed)"} — ${entry.dllName||"no DLL"} — ${entry.classType||"no class"}`);
-    main.replaceChildren(
-      el("section",{class:"bannerlord-card"},
-        el("h2",{},module.name||module.id||"Bannerlord Module"),
-        el("div",{class:"bannerlord-grid"},
-          ...row("Name",textField("name")),
-          ...row("ID",textField("id")),
-          ...row("Version",textField("version")),
-          ...row("Single-player",boolField("singleplayer")),
-          ...row("Multi-player",boolField("multiplayer")),
-          ...row("SubModule.xml",el("code",{},module.path))
-        ),
-        el("h2",{},"Dependencies"),
-        dependencies.length?el("ul",{class:"bannerlord-list"},...dependencies.map(value=>el("li",{},value))):el("div",{class:"bannerlord-note"},"No dependencies declared."),
-        el("h2",{},"Submodules"),
-        submodules.length?el("ul",{class:"bannerlord-list"},...submodules.map(value=>el("li",{},value))):el("div",{class:"bannerlord-note"},"No SubModule entries declared."),
-        el("div",{class:"bannerlord-note"},"Dependency and submodule editing will follow as separate structured editors; this slice edits the top-level module metadata only.")
-      )
+    const m=state.module;
+    if(!m){main.replaceChildren(el("div",{class:"bl-empty"},"No SubModule.xml loaded."));return}
+    main.replaceChildren(el("section",{class:"bl-card"},
+      el("h2",{},m.name||m.id||"Bannerlord Module"),
+      el("div",{class:"bl-grid"},
+        ...fieldRow("Name",textInput(m.name,value=>setModuleField("name",value))),
+        ...fieldRow("ID",textInput(m.id,value=>setModuleField("id",value))),
+        ...fieldRow("Version",textInput(m.version,value=>setModuleField("version",value))),
+        ...fieldRow("Default module",checkbox(m.defaultModule,value=>setModuleField("defaultModule",value))),
+        ...fieldRow("Single-player",checkbox(m.singleplayer,value=>setModuleField("singleplayer",value))),
+        ...fieldRow("Multi-player",checkbox(m.multiplayer,value=>setModuleField("multiplayer",value))),
+        ...fieldRow("SubModule.xml",el("code",{},m.path)),
+        ...fieldRow("Dependencies",String((m.dependencies||[]).length)),
+        ...fieldRow("Incompatible modules",String((m.incompatibleModules||[]).length)),
+        ...fieldRow("Submodules",String((m.submodules||[]).length)),
+        ...fieldRow("XML registrations",String((m.xmls||[]).length))
+      ),
+      el("div",{class:"bl-note"},"The remaining SubModule.xml records have dedicated list/detail tabs so record identity stays in the master list and editable fields stay in the detail pane.")
+    ));
+  }
+
+  function dependencyRows(){
+    return [
+      ...(state.module.dependencies||[]).map((row,index)=>({kind:"dependency",index,row})),
+      ...(state.module.incompatibleModules||[]).map((row,index)=>({kind:"incompatible",index,row}))
+    ];
+  }
+  function addDependency(kind){
+    if(kind==="incompatible"){
+      state.module.incompatibleModules.push({index:null,id:""});
+      state.dependencySelection={kind,index:state.module.incompatibleModules.length-1};
+    }else{
+      state.module.dependencies.push({index:null,id:"",dependentVersion:"",optional:false,attributes:{}});
+      state.dependencySelection={kind:"dependency",index:state.module.dependencies.length-1};
+    }
+    render();refresh();
+  }
+  function removeDependency(){
+    const selection=state.dependencySelection;
+    const list=selection.kind==="incompatible"?state.module.incompatibleModules:state.module.dependencies;
+    if(!list.length)return;
+    list.splice(selection.index,1);
+    state.dependencySelection={kind:selection.kind,index:Math.max(0,Math.min(selection.index,list.length-1))};
+    render();refresh();
+  }
+  function renderDependencies(){
+    const rows=dependencyRows();
+    const selection=state.dependencySelection;
+    const list=selection.kind==="incompatible"?state.module.incompatibleModules:state.module.dependencies;
+    const record=list[selection.index];
+    const master=el("div",{class:"bl-master"},
+      el("div",{class:"bl-master-head"},el("strong",{},"Module relations"),
+        el("button",{type:"button",onclick:()=>addDependency("dependency"),title:"Add dependency"},"+ Dep"),
+        el("button",{type:"button",onclick:()=>addDependency("incompatible"),title:"Add incompatible module"},"+ Inc")),
+      el("div",{class:"bl-list"},...rows.map(item=>{
+        const active=item.kind===selection.kind&&item.index===selection.index;
+        const label=item.kind==="dependency"?"Depends on":"Incompatible";
+        return el("button",{type:"button",class:`bl-item${active?" active":""}`,onclick:()=>{state.dependencySelection={kind:item.kind,index:item.index};render()}},
+          item.row.id||"(new module)",el("small",{},label+(item.row.dependentVersion?` · ${item.row.dependentVersion}`:"")));
+      }))
     );
+    let detail;
+    if(!record)detail=el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"Select or add a module relation."));
+    else if(selection.kind==="incompatible")detail=el("div",{class:"bl-detail"},
+      el("section",{class:"bl-panel"},el("h2",{},record.id||"New incompatible module"),
+        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
+        el("div",{class:"bl-grid"},
+          ...fieldRow("Module ID",textInput(record.id,value=>record.id=value))
+        )));
+    else detail=el("div",{class:"bl-detail"},
+      el("section",{class:"bl-panel"},el("h2",{},record.id||"New dependency"),
+        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
+        el("div",{class:"bl-grid"},
+          ...fieldRow("Module ID",textInput(record.id,value=>record.id=value)),
+          ...fieldRow("Dependent version",textInput(record.dependentVersion,value=>record.dependentVersion=value,{placeholder:"Optional"})),
+          ...fieldRow("Optional",checkbox(record.optional,value=>record.optional=value))
+        ),
+        el("div",{class:"bl-note"},"Unknown dependency attributes are preserved when an existing row is edited.")
+      ));
+    main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+  }
+
+  function addTag(submodule){
+    submodule.tags=submodule.tags||[];
+    submodule.tags.push({index:null,key:"",value:"",attributes:{}});
+    render();refresh();
+  }
+  function renderTags(submodule){
+    const rows=(submodule.tags||[]).map((tag,index)=>el("div",{class:"bl-tag-row"},
+      textInput(tag.key,value=>tag.key=value,{placeholder:"key"}),
+      textInput(tag.value,value=>tag.value=value,{placeholder:"value"}),
+      el("button",{type:"button",onclick:()=>{submodule.tags.splice(index,1);render();refresh()},title:"Remove tag"},"×")
+    ));
+    return el("div",{class:"bl-tags"},
+      ...rows,
+      el("div",{class:"bl-actions"},el("button",{type:"button",onclick:()=>addTag(submodule)},"+ Add tag"))
+    );
+  }
+  function addSubmodule(){
+    state.module.submodules.push({index:null,name:"",dllName:"",classType:"",tags:[]});
+    state.submoduleIndex=state.module.submodules.length-1;render();refresh();
+  }
+  function removeSubmodule(){
+    state.module.submodules.splice(state.submoduleIndex,1);
+    state.submoduleIndex=Math.max(0,Math.min(state.submoduleIndex,state.module.submodules.length-1));render();refresh();
+  }
+  function renderSubmodules(){
+    const rows=state.module.submodules||[];
+    const record=rows[state.submoduleIndex];
+    const master=el("div",{class:"bl-master"},
+      el("div",{class:"bl-master-head"},el("strong",{},"Submodules"),el("button",{type:"button",onclick:addSubmodule},"+ Add")),
+      el("div",{class:"bl-list"},...rows.map((row,index)=>el("button",{type:"button",class:`bl-item${index===state.submoduleIndex?" active":""}`,onclick:()=>{state.submoduleIndex=index;render()}},
+        row.name||"(new submodule)",el("small",{},row.dllName||row.classType||"No DLL/class yet"))))
+    );
+    const detail=!record?el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"Select or add a submodule.")):el("div",{class:"bl-detail"},
+      el("section",{class:"bl-panel"},el("h2",{},record.name||"New submodule"),
+        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeSubmodule},"Remove")),
+        el("div",{class:"bl-grid"},
+          ...fieldRow("Name",textInput(record.name,value=>record.name=value)),
+          ...fieldRow("DLL name",textInput(record.dllName,value=>record.dllName=value)),
+          ...fieldRow("Class type",textInput(record.classType,value=>record.classType=value))
+        ),
+        el("h2",{},"Tags"),renderTags(record)
+      ));
+    main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+  }
+
+  function addGameType(xml){
+    xml.includedGameTypes=xml.includedGameTypes||[];
+    xml.includedGameTypes.push({index:null,value:"",attributes:{}});
+    render();refresh();
+  }
+  function renderGameTypes(xml){
+    return el("div",{class:"bl-tags"},
+      ...(xml.includedGameTypes||[]).map((row,index)=>el("div",{class:"bl-tag-row",style:"grid-template-columns:minmax(180px,1fr) auto"},
+        textInput(row.value,value=>row.value=value,{placeholder:"GameType value"}),
+        el("button",{type:"button",onclick:()=>{xml.includedGameTypes.splice(index,1);render();refresh()}},"×")
+      )),
+      el("div",{class:"bl-actions"},el("button",{type:"button",onclick:()=>addGameType(xml)},"+ Add game type"))
+    );
+  }
+  function addXml(){
+    state.module.xmls.push({index:null,id:"",path:"",includedGameTypes:[]});
+    state.xmlIndex=state.module.xmls.length-1;render();refresh();
+  }
+  function removeXml(){
+    state.module.xmls.splice(state.xmlIndex,1);
+    state.xmlIndex=Math.max(0,Math.min(state.xmlIndex,state.module.xmls.length-1));render();refresh();
+  }
+  function renderXmls(){
+    const rows=state.module.xmls||[];
+    const record=rows[state.xmlIndex];
+    const master=el("div",{class:"bl-master"},
+      el("div",{class:"bl-master-head"},el("strong",{},"XML registrations"),el("button",{type:"button",onclick:addXml},"+ Add")),
+      el("div",{class:"bl-list"},...rows.map((row,index)=>el("button",{type:"button",class:`bl-item${index===state.xmlIndex?" active":""}`,onclick:()=>{state.xmlIndex=index;render()}},
+        row.id||"(new XML)",el("small",{},row.path||"No path yet"))))
+    );
+    const detail=!record?el("div",{class:"bl-detail"},el("div",{class:"bl-empty"},"No Xmls/XmlNode registrations in this project.")):el("div",{class:"bl-detail"},
+      el("section",{class:"bl-panel"},el("h2",{},record.id||"New XML registration"),
+        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeXml},"Remove")),
+        el("div",{class:"bl-grid"},
+          ...fieldRow("ID",textInput(record.id,value=>record.id=value)),
+          ...fieldRow("Path",textInput(record.path,value=>record.path=value))
+        ),
+        el("h2",{},"Included game types"),renderGameTypes(record)
+      ));
+    main.replaceChildren(el("div",{class:"bl-split"},master,detail));
+  }
+
+  const booleanProjectProperties=new Set(["AppendTargetFrameworkToOutputPath","CopyLocalLockFileAssemblies"]);
+  function projectControl(name,value){
+    if(booleanProjectProperties.has(name))return checkbox(String(value).toLowerCase()==="true",checked=>state.project.projectFile.properties[name]=checked?"true":"false");
+    if(name==="Nullable")return select(value||"disable",[["disable","disable"],["enable","enable"],["warnings","warnings"],["annotations","annotations"]],next=>state.project.projectFile.properties[name]=next);
+    return textInput(value,next=>state.project.projectFile.properties[name]=next);
+  }
+  function runBuild(){
+    if(state.building)return;
+    state.building=true;state.buildResult={output:"Building…",succeeded:false};renderBuild();
+    post("/api/build",{project:state.project.projectFile?.name||null,configuration:state.buildConfiguration}).then(result=>{
+      state.buildResult=result;
+    }).catch(error=>{
+      state.buildResult={output:String(error.message||error),succeeded:false};
+    }).finally(()=>{state.building=false;renderBuild();refresh()});
+  }
+  function renderBuild(){
+    const project=state.project?.projectFile;
+    if(!project){main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Build"),el("div",{class:"bl-empty"},"No .csproj exists in this project.")));return}
+    const editable=project.editableProperties||[];
+    const props=project.properties||{};
+    const left=el("section",{class:"bl-card"},el("h2",{},project.name),
+      el("div",{class:"bl-grid"},...editable.flatMap(name=>fieldRow(name,projectControl(name,props[name]??"")))),
+      el("div",{class:"bl-note"},`SDK: ${project.sdk||"(classic MSBuild)"} · ${project.references.length} assembly references · ${project.packages.length} packages`)
+    );
+    const referenceLines=project.references.map(row=>`${row.include}${row.metadata?.HintPath?` — ${row.metadata.HintPath}`:""}`);
+    const packageLines=project.packages.map(row=>`${row.include}${row.metadata?.Version?` ${row.metadata.Version}`:""}`);
+    const targetLines=project.targets.map(row=>`${row.name||"(unnamed target)"}${row.afterTargets?` after ${row.afterTargets}`:""}${row.beforeTargets?` before ${row.beforeTargets}`:""}`);
+    const right=el("section",{class:"bl-card"},
+      el("h2",{},"Build & project inventory"),
+      el("div",{class:"bl-build-toolbar"},
+        select(state.buildConfiguration,[["Debug","Debug"],["Release","Release"]],value=>state.buildConfiguration=value),
+        el("button",{type:"button",class:"bl-build-button",disabled:state.building,onclick:runBuild},state.building?"Building…":"dotnet build"),
+        state.buildResult?el("strong",{},state.buildResult.succeeded?"PASS":""):null
+      ),
+      el("div",{class:"bl-list-block"},el("h3",{},"References"),referenceLines.length?el("ul",{},...referenceLines.map(v=>el("li",{},v))):el("div",{class:"bl-note"},"No assembly references.")),
+      el("div",{class:"bl-list-block"},el("h3",{},"Packages"),packageLines.length?el("ul",{},...packageLines.map(v=>el("li",{},v))):el("div",{class:"bl-note"},"No package references.")),
+      el("div",{class:"bl-list-block"},el("h3",{},"Targets"),targetLines.length?el("ul",{},...targetLines.map(v=>el("li",{},v))):el("div",{class:"bl-note"},"No explicit MSBuild targets.")),
+      el("pre",{class:"bl-build-log"},state.buildResult?.output||"Build output will appear here. Lexeditor invokes dotnet directly without a shell.")
+    );
+    main.replaceChildren(el("div",{class:"bl-build-layout"},left,right));
+  }
+
+  async function openSource(row){
+    try{
+      const source=await api(`/api/source?path=${encodeURIComponent(row.filename)}`);
+      state.source=source;state.savedSourceText=source.text;state.tab="source";render();
+    }catch(error){showAlert?.(String(error.message||error),"Bannerlord source error")}
+  }
+  function renderSource(){
+    if(!state.source){main.replaceChildren(el("div",{class:"bl-empty"},"No source file selected."));return}
+    const textarea=el("textarea",{value:state.source.text,spellcheck:"false",oninput:event=>{state.source.text=event.target.value;refresh()}});
+    main.replaceChildren(el("section",{class:"bl-source"},
+      el("div",{class:"bl-source-head"},el("strong",{},"Source only"),el("code",{},state.source.path),el("span",{},`${state.source.encoding} · ${state.source.size} bytes`)),
+      textarea
+    ));
   }
 
   function renderDataMap(){
     const view=LexeditorUI.dataMap({
-      rows:state.datamap.rows,
-      query:state.query,
-      status:state.mapStatus,
-      page:state.page,
-      sort:state.sort,
+      rows:state.datamap.rows,query:state.query,status:state.mapStatus,page:state.page,sort:state.sort,
       tableClass:"bannerlord-data-map",
-      open:row=>{if(row.target==="module")navigate("module")},
-      openSource:()=>{},
+      open:row=>{if(row.target==="module")navigate("module");else if(row.target==="build")navigate("build")},
+      openSource,
       changeQuery:value=>{state.query=value;state.page=0;renderDataMap()},
       changeStatus:value=>{state.mapStatus=value;state.page=0;renderDataMap()},
       changePage:value=>{state.page=value;renderDataMap()},
-      changeSort:key=>{
-        const [active,direction]=state.sort;
-        state.sort=[key,active===key?-direction:1];
-        renderDataMap();
-      }
+      changeSort:key=>{const [active,direction]=state.sort;state.sort=[key,active===key?-direction:1];renderDataMap()}
     });
     main.replaceChildren(view);
   }
 
-  function navigate(tab){
-    state.tab=tab;
-    render();
-  }
-
+  function navigate(tab){state.tab=tab;render()}
   function render(){
-    if(state.tab==="datamap")renderDataMap();
-    else renderModule();
-    shell.refresh();
+    const views={module:renderModule,dependencies:renderDependencies,submodules:renderSubmodules,xmls:renderXmls,build:renderBuild,datamap:renderDataMap,source:renderSource};
+    (views[state.tab]||renderModule)();
+    refresh();
   }
 
   async function save(){
-    if(!dirtyCount())return;
     try{
-      const fields=["name","id","version","singleplayer","multiplayer"];
-      const edits=Object.fromEntries(fields.map(key=>[key,state.module[key]]));
-      const result=await api("/api/module/save",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({edits})
-      });
-      state.module=result.module;
-      state.saved=clone(result.module);
+      if(moduleDirty()){
+        const result=await post("/api/module/save",moduleEditable(state.module));
+        state.module=result.module;state.savedModule=clone(result.module);
+      }
+      if(projectDirty()){
+        const current=state.project.projectFile.properties;
+        const before=state.savedProject.projectFile.properties;
+        const edits=Object.fromEntries((state.project.projectFile.editableProperties||[])
+          .filter(name=>current[name]!==before[name]).map(name=>[name,current[name]]));
+        if(Object.keys(edits).length){
+          const result=await post("/api/project/save",{edits});
+          state.project.projectFile=result.project;
+          state.savedProject=clone(state.project);
+        }
+      }
+      if(sourceDirty()){
+        const result=await post("/api/source/save",{path:state.source.path,text:state.source.text});
+        state.source=result;state.savedSourceText=result.text;
+        if(state.source.path.toLowerCase().endsWith(".csproj")){
+          state.project=await api("/api/project");state.savedProject=clone(state.project);
+        }
+      }
+      state.datamap=await api("/api/datamap");
       render();
-    }catch(error){
-      showAlert?.(String(error.message||error),"Bannerlord save failed");
-    }
+    }catch(error){showAlert?.(String(error.message||error),"Bannerlord save failed")}
   }
 
   const shell=LexeditorUI.mountShell({
-    host:"#lexeditor-shell",
-    brand:"LEXEDITOR",
+    host:"#lexeditor-shell",brand:"LEXEDITOR",
     plugin:{id:"bannerlord",themeName:"bannerlord",theme:{accent:"#8d2f25",highlight:"#a56b34"}},
-    tabs:[{id:"module",label:"Module"}],
-    activeTab:()=>state.tab,
-    navigate,
-    help:()=>navigate("datamap"),
-    helpActive:()=>state.tab==="datamap",
-    helpTitle:"Open the Bannerlord Data Map",
-    dirtyCount,
-    readonly:()=>false,
-    save
+    tabs:[
+      {id:"module",label:"Module"},{id:"dependencies",label:"Dependencies"},
+      {id:"submodules",label:"Submodules"},{id:"xmls",label:"XML"},
+      {id:"build",label:"Build"}
+    ],
+    activeTab:()=>state.tab,navigate,
+    help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the Bannerlord Data Map",
+    dirtyCount,readonly:()=>false,save
   });
 
-  Promise.all([api("/api/module"),api("/api/datamap")]).then(([module,datamap])=>{
-    state.module=module;
-    state.saved=clone(module);
-    state.datamap=datamap;
-    render();
+  Promise.all([api("/api/module"),api("/api/project"),api("/api/datamap")]).then(([module,project,datamap])=>{
+    state.module=module;state.savedModule=clone(module);
+    state.project=project;state.savedProject=clone(project);
+    state.datamap=datamap;render();
   }).catch(error=>{
-    main.replaceChildren(el("section",{class:"bannerlord-card"},el("h2",{},"Bannerlord plugin error"),el("div",{class:"bannerlord-note"},String(error.message||error))));
-    shell.refresh();
+    main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Bannerlord plugin error"),el("div",{class:"bl-note"},String(error.message||error))));
+    refresh();
   });
   </script>
 </body>

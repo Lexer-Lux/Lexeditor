@@ -7,9 +7,17 @@ import json
 import mimetypes
 import os
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
-from .module_data import data_map, read_submodule, save_module_metadata
+from .module_data import data_map, read_submodule, save_module
+from .project_data import (
+    primary_project_file,
+    read_project_file,
+    read_source,
+    run_build,
+    save_project_properties,
+    save_source,
+)
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -18,6 +26,14 @@ PROJECT = Path(os.environ.get("LEXEDITOR_BANNERLORD_PROJECT", r"C:\Bannermod"))
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED", "0") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "")
+
+
+def project_summary() -> dict:
+    project_file = primary_project_file(PROJECT)
+    return {
+        "root": str(PROJECT),
+        "projectFile": read_project_file(project_file) if project_file else None,
+    }
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -51,7 +67,9 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+        query = parse_qs(parsed.query)
         if path == "/":
             self.send_file(PLUGIN_ROOT / "editor.html")
             return
@@ -73,7 +91,16 @@ class Handler(BaseHTTPRequestHandler):
                     "windowHost": WINDOW_HOST,
                     "editorRoot": str(PLUGIN_ROOT),
                     "projectRoot": str(PROJECT),
-                    "capabilities": ["module-metadata", "data-map"],
+                    "capabilities": [
+                        "module-metadata",
+                        "module-dependencies",
+                        "module-submodules",
+                        "module-xml-registrations",
+                        "msbuild-project",
+                        "dotnet-build",
+                        "source-only-editor",
+                        "data-map",
+                    ],
                 }
             )
             return
@@ -84,6 +111,24 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 self.send_json(read_submodule(source))
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/project":
+            try:
+                self.send_json(project_summary())
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/source":
+            requested = (query.get("path") or [""])[0]
+            if not requested:
+                self.send_json({"error": "Missing source path"}, 400)
+                return
+            try:
+                self.send_json(read_source(PROJECT, requested))
+            except (ValueError, FileNotFoundError) as error:
+                self.send_json({"error": str(error)}, 400)
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
@@ -101,10 +146,55 @@ class Handler(BaseHTTPRequestHandler):
                 return
             try:
                 payload = self.read_json()
-                edits = dict(payload.get("edits") or {})
-                self.send_json(save_module_metadata(source, edits))
+                self.send_json(save_module(source, payload))
             except (ValueError, TypeError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/project/save":
+            project_file = primary_project_file(PROJECT)
+            if project_file is None:
+                self.send_json({"error": f"No .csproj found in {PROJECT}"}, 404)
+                return
+            try:
+                payload = self.read_json()
+                edits = dict(payload.get("edits") or {})
+                self.send_json(save_project_properties(project_file, edits))
+            except (ValueError, TypeError, json.JSONDecodeError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/source/save":
+            try:
+                payload = self.read_json()
+                self.send_json(
+                    save_source(
+                        PROJECT,
+                        str(payload.get("path") or ""),
+                        str(payload.get("text") or ""),
+                    )
+                )
+            except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
+            return
+        if path == "/api/build":
+            try:
+                payload = self.read_json()
+                self.send_json(
+                    run_build(
+                        PROJECT,
+                        requested=payload.get("project"),
+                        configuration=payload.get("configuration", "Debug"),
+                    )
+                )
+            except (ValueError, FileNotFoundError, TypeError, json.JSONDecodeError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except RuntimeError as error:
+                self.send_json({"error": str(error)}, 503)
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
