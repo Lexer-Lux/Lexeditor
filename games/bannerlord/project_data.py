@@ -11,6 +11,7 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 from .module_data import read_submodule
+from .paths import clear_write_helper, contained_project_path
 
 
 EDITABLE_PROJECT_PROPERTIES = (
@@ -188,8 +189,10 @@ def save_project_properties(path: Path, edits: dict) -> dict:
     backup = path.with_name(path.name + ".lexeditor.bak")
     if saved:
         ET.fromstring(candidate)
+        clear_write_helper(backup)
         shutil.copy2(path, backup)
         temporary = path.with_name(path.name + ".lexeditor.tmp")
+        clear_write_helper(temporary)
         temporary.write_text(candidate, encoding="utf-8")
         temporary.replace(path)
     return {
@@ -247,8 +250,10 @@ def save_source(project: Path, requested: str, text: str) -> dict:
         except ET.ParseError as error:
             raise ValueError(f"XML is not well formed: {error}") from error
     backup = target.with_name(target.name + ".lexeditor.bak")
+    clear_write_helper(backup)
     shutil.copy2(target, backup)
     temporary = target.with_name(target.name + ".lexeditor.tmp")
+    clear_write_helper(temporary)
     temporary.write_text(candidate, encoding=encoding)
     temporary.replace(target)
     result = read_source(project, requested)
@@ -264,9 +269,7 @@ def _selected_game_root(explicit: Path | None) -> Path | None:
 
 
 def _build_path_overrides(project: Path, selected_game: Path) -> dict[str, str]:
-    descriptor = project.resolve() / "SubModule.xml"
-    if not descriptor.is_file():
-        raise FileNotFoundError(f"Bannerlord project has no SubModule.xml: {descriptor}")
+    descriptor = contained_project_path(project, "SubModule.xml", require_file=True)
     module_id = str(read_submodule(descriptor).get("id") or "").strip()
     if not module_id or not _MODULE_ID.fullmatch(module_id):
         raise ValueError(f"Bannerlord project has an unsafe module Id: {module_id or '(missing)'}")
