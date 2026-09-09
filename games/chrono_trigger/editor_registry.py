@@ -38,6 +38,12 @@ from .object_ops import (
     object_field_specs,
     object_values,
 )
+from .scene_event_ops import (
+    apply_scene_event_op,
+    decorate_scene_event_semantics,
+    scene_event_field_specs,
+    scene_event_values,
+)
 
 
 def _schema_from_specs(command: dict, specs: list[dict] | None, values: dict | None) -> dict | None:
@@ -86,6 +92,10 @@ def object_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, object_field_specs(command), object_values(command))
 
 
+def scene_event_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, scene_event_field_specs(command), scene_event_values(command))
+
+
 def jump_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
 
@@ -97,6 +107,7 @@ _REGISTRY_BUILDERS = (
     movement_editor_schema,
     call_editor_schema,
     object_editor_schema,
+    scene_event_editor_schema,
     jump_editor_schema,
 )
 _REGISTRY_APPLIERS = (
@@ -106,6 +117,7 @@ _REGISTRY_APPLIERS = (
     apply_movement_op,
     apply_call_op,
     apply_object_op,
+    apply_scene_event_op,
     apply_jump,
 )
 
@@ -125,6 +137,7 @@ def decorate_event_editors(payload: dict) -> dict:
     decorate_movement_semantics(payload)
     decorate_call_semantics(payload)
     decorate_object_semantics(payload)
+    decorate_scene_event_semantics(payload)
     decorate_jump_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
