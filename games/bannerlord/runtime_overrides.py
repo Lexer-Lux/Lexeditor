@@ -121,9 +121,11 @@ def read_runtime_overrides(project: Path, game_root: Path | None = None) -> dict
 def _write_json(path: Path, value: dict) -> str:
     path.parent.mkdir(parents=True, exist_ok=True)
     backup = path.with_name(path.name + ".lexeditor.bak")
+    paths.clear_write_helper(backup)
     if path.is_file():
         shutil.copy2(path, backup)
     temporary = path.with_name(path.name + ".lexeditor.tmp")
+    paths.clear_write_helper(temporary)
     temporary.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     temporary.replace(path)
     return str(backup) if backup.is_file() else ""
