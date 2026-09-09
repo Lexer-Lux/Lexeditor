@@ -59,6 +59,27 @@ For each fixed-size treasure record, only these proved fields are interpreted or
 
 Unknown reward kinds remain representable. Any bytes after `+0x03` in a record are preserved byte-for-byte.
 
+### `item_rate.bin` item/command prices
+
+Integrated path:
+
+`FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/item_rate.bin`
+
+Each proved record is exactly four bytes containing one little-endian unsigned `u32` gil price. `FFXDataParser` maps table order to item/command IDs beginning at `0x2000`; Lexeditor exposes both the source record ID and that derived command ID and writes only selected four-byte price records.
+
+### `ctb_base.bin` battle timing
+
+Integrated path:
+
+`FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/ctb_base.bin`
+
+Each proved record is exactly two bytes:
+
+- `+0x00`: tick speed (`u8`).
+- `+0x01`: ICV bonus (`u8`).
+
+The source tool labels each row as `Agility = record index + 1`. Lexeditor also shows the derived initial CTB range used by that research model: maximum ICV = `tick speed × 3`; minimum ICV = maximum ICV − ICV bonus. Only the two source bytes are written.
+
 ### `item_shop.bin` inventories
 
 Integrated path:
@@ -85,7 +106,7 @@ This table uses the same proved `0x22`-byte shop record shape:
 
 Item and gear shops share one validated binary implementation; their public APIs remain semantic (`itemIds` versus `gearIds`). Lexeditor writes only explicitly changed slots and preserves the leading rate field byte-for-byte.
 
-All three structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
+All five structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
 
 ## Project and loader boundary
 
@@ -119,6 +140,8 @@ Integrated:
 - Safe extraction to a project overlay without overwriting edited project data.
 - Common FFX fixed-record table validation.
 - Structured FFX `takara.bin` treasure reward editing.
+- Structured FFX `item_rate.bin` item/command gil-price editing.
+- Structured FFX `ctb_base.bin` tick-speed / ICV-bonus editing.
 - Structured FFX `item_shop.bin` 16-slot item/command inventory editing.
 - Structured FFX `arms_shop.bin` 16-slot gear inventory editing.
 - Reversible file-only Fahrenheit deployment mechanics.
