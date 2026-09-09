@@ -1,7 +1,9 @@
 from pathlib import Path
 from types import SimpleNamespace
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from project_manager import ProjectManager
 
@@ -106,6 +108,41 @@ class ProjectCreateRollbackTests(unittest.TestCase):
                 manager.rename("test", str(project), "CON.txt")
             self.assertTrue(project.is_dir())
             self.assertEqual(Path(manager.snapshot("test")["current"]).resolve(), project.resolve())
+
+    def test_registry_temp_hardlink_is_detached_before_write(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            parent = root / "projects"
+            parent.mkdir()
+            manager = self.manager(root, lambda _target: None)
+            outside = root / "outside.txt"
+            outside.write_text("outside-sentinel", encoding="utf-8")
+            temporary = manager.path.with_suffix(manager.path.suffix + ".tmp")
+            os.link(outside, temporary)
+
+            manager.create("test", str(parent), "Good")
+
+            self.assertEqual(outside.read_text(encoding="utf-8"), "outside-sentinel")
+            self.assertTrue(manager.path.is_file())
+            self.assertFalse(temporary.exists())
+
+    def test_rename_rolls_folder_back_when_registry_persistence_fails(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            parent = root / "projects"
+            parent.mkdir()
+            manager = self.manager(root, lambda _target: None)
+            snapshot = manager.create("test", str(parent), "Before")
+            original = Path(snapshot["current"])
+            renamed = original.with_name("After")
+
+            with patch.object(manager, "_write", side_effect=OSError("registry failed")):
+                with self.assertRaisesRegex(OSError, "registry failed"):
+                    manager.rename("test", str(original), "After")
+
+            self.assertTrue(original.is_dir())
+            self.assertFalse(renamed.exists())
+            self.assertEqual(Path(manager.snapshot("test")["current"]).resolve(), original.resolve())
 
 
 if __name__ == "__main__":
