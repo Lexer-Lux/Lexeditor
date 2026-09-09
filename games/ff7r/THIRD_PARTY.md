@@ -28,6 +28,23 @@ FString encoding, name-map references and the paired `.uasset` serialized-size
 field required when variable-length text changes. Lexeditor does not bundle the
 tool or any extracted game text.
 
+## FF7R Font Mod Tools
+
+The local-only menu-font theming path is a narrow Python implementation based on
+the documented layouts and MIT-licensed source of MatyaModding's
+**FF7R-font-mod-tools**:
+
+- https://github.com/matyamod/FF7R-font-mod-tools
+- License: MIT
+
+That project documents the `GameContents/Menu/Resident/Font/JP/SystemFont*4K`
+glyph UEXP record shape and the matching
+`GameContents/Menu/Billboard/Common/U_Com_JP_SystemFont*4K-01` 2048x2048 BC5
+bitmap-atlas layout. Lexeditor validates those exact installed assets, decodes
+`SystemFontNormal` only into the user's private cache, and uses the resulting
+atlas/glyph metrics for editor chrome. It does not bundle or publish Square Enix
+font assets.
+
 ## repak
 
 Lexeditor downloads a pinned release of **repak** only when the user chooses to

@@ -41,15 +41,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python -m pip install pytest
+      - name: Install test and theme decoder dependencies
+        run: python -m pip install pytest Pillow==12.3.0 texfury==1.6.2
       - name: Python syntax
         run: python -m compileall -q games/ff7r tools
       - name: Editor JavaScript syntax
         run: >-
           python -c "from pathlib import Path; import re; s=Path('games/ff7r/editor.html').read_text(encoding='utf-8'); Path('ff7r-inline.js').write_text('\n'.join(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)), encoding='utf-8')"
           && node --check ff7r-inline.js
+      - name: Theme JavaScript syntax
+        run: node --check games/ff7r/theme.js
       - name: Plugin descriptor
-        run: python -c "from games.ff7r.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ff7r.server' in SERVICE_MODULES; print(PLUGIN.name)"
+        run: python -c "from games.ff7r.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ff7r.server' in SERVICE_MODULES; assert 'games.ff7r.themed_server' in SERVICE_MODULES; print(PLUGIN.name)"
       - name: Gameplay, text, semantic and runtime regressions
         run: >-
           python -c "from pathlib import Path; import pytest; files=[str(path) for path in sorted(Path('tests').glob('test_ff7r_*.py'))]; print(f'Running {len(files)} FF7R test files'); raise SystemExit(pytest.main(['-q', *files]))"

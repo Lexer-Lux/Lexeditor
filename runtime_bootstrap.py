@@ -7,8 +7,9 @@ import subprocess
 import sys
 
 SERVICE_MODULES = frozenset({
-    'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff8.server',
-    'games.ff9.server', 'games.rdr.server', 'games.rdr2.server', 'games.warband.server',
+    'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff7r.themed_server',
+    'games.ff8.server', 'games.ff9.server', 'games.rdr.server', 'games.rdr2.server',
+    'games.warband.server',
 })
 
 
