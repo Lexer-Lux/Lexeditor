@@ -28,7 +28,7 @@ SCENE_MAP = {
     "layers": {
         "layer1": {"width": 16, "height": 16, "tiles": [1] * 256},
         "layer2": {"width": 16, "height": 16, "tiles": [2] * 256},
-        "layer3": {"enabled": False, "width": 0, "height": 0, "tiles": []},
+        "layer3": {"enabled": True, "width": 16, "height": 16, "tiles": [3] * 256},
     },
     "properties": [{"collisionIndex": 1}] * 256,
     "collisionCounts": {"Full": 256},
@@ -40,7 +40,8 @@ SCENES = {
     "rows": [{
         "id": 0, "name": "Millennial Fair", "path": "Game/field/Mapinfo/mapinfo_0.dat",
         "source": "archive", "sha256": "a" * 64,
-        "values": {"musicIndex": 10, "tilesetL12": 1, "tilesetL12Assembly": 2, "palette": 3, "mapIndex": 0},
+        "values": {"musicIndex": 10, "tilesetL12": 1, "tilesetL12Assembly": 2, "tilesetL3": 9,
+                   "palette": 3, "mapIndex": 0},
     }],
 }
 WORLDS = {
@@ -123,6 +124,14 @@ def main() -> None:
             assert page.locator(".ct-warning").count() == 0
             page.screenshot(path=str(ARTIFACTS / "scene-raster.png"), full_page=True)
 
+            scene_select.select_option("raster3")
+            page.wait_for_function('document.querySelector(".ct-raster-image")?.src.includes("layer=3")')
+            page.wait_for_function('document.querySelector(".ct-raster-image")?.naturalWidth > 0')
+            assert "Actual PC L3 raster" in page.locator(".ct-raster-policy").inner_text()
+            assert "main/sub-screen" in page.locator(".ct-raster-policy").inner_text()
+            assert page.locator(".ct-warning").count() == 0
+            page.screenshot(path=str(ARTIFACTS / "scene-raster-l3.png"), full_page=True)
+
             page.evaluate('navigate("worlds")')
             page.wait_for_function('state.worlds.data?.rows?.length === 1')
             page.locator(".ct-section-tabs").get_by_role("button", name="Map", exact=True).click()
@@ -138,7 +147,7 @@ def main() -> None:
             assert page.locator(".ct-warning").count() == 0
             page.screenshot(path=str(ARTIFACTS / "world-raster.png"), full_page=True)
 
-            results.append({"sceneRaster": True, "worldRaster": True, "errors": len(errors)})
+            results.append({"sceneRaster": True, "sceneL3Raster": True, "worldRaster": True, "errors": len(errors)})
             page.close()
         finally:
             browser.close()
