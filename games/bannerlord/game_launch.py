@@ -1,8 +1,8 @@
 """Bannerlord direct-launch support for the selected Lexeditor module.
 
 Bannerlord accepts an explicit module loadout through
-``/singleplayer _MODULES_*...*_MODULES_``.  Lexeditor derives that loadout from
-SubModule.xml rather than launching an unrelated launcher profile.
+``/singleplayer _MODULES_*...*_MODULES_``. Lexeditor derives that loadout from
+SubModule.xml relations rather than launching an unrelated launcher profile.
 """
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import subprocess
 import threading
 
 from .module_data import is_singleplayer_module, read_submodule
+from .module_relations import read_module_relations
 
 
 CORE_SINGLEPLAYER_MODULES = (
@@ -74,13 +75,24 @@ def selected_module(game_root: Path, project: Path) -> tuple[str, Path]:
 
 
 def module_load_order(game_root: Path, project: Path) -> list[str]:
-    """Resolve core SP modules, required dependency closure, then the selected mod."""
+    """Resolve the enabled module set and topologically sort Bannerlord relations.
+
+    Non-optional ``DependedModule`` entries are enabled recursively. Optional
+    dependencies constrain order only when the dependency is already in the
+    enabled set, matching Bannerlord launcher semantics. ``ModulesToLoadAfterThis``
+    adds the inverse edge without enabling its target.
+    """
     modules = installed_modules(game_root)
     selected_id, installed = _selected_module_from_index(project, modules)
-    metadata_cache: dict[str, dict] = {}
-    visiting: set[str] = set()
-    added: set[str] = set()
-    order: list[str] = []
+    selected_metadata = read_submodule(installed / "SubModule.xml")
+    if not is_singleplayer_module(selected_metadata):
+        raise RuntimeError(
+            f"Bannerlord module {selected_id} is not declared as a single-player module; "
+            "Lexeditor Play currently supports single-player modules only."
+        )
+
+    metadata_cache: dict[str, dict] = {selected_id: selected_metadata}
+    relations_cache: dict[str, dict[str, list[str]]] = {}
 
     def metadata(module_id: str) -> dict:
         if module_id not in metadata_cache:
@@ -90,53 +102,94 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
             metadata_cache[module_id] = read_submodule(folder / "SubModule.xml")
         return metadata_cache[module_id]
 
-    def add(module_id: str) -> None:
-        if module_id in added:
+    def relations(module_id: str) -> dict[str, list[str]]:
+        if module_id not in relations_cache:
+            folder = modules.get(module_id)
+            if folder is None:
+                raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
+            relations_cache[module_id] = read_module_relations(folder / "SubModule.xml")
+        return relations_cache[module_id]
+
+    included: set[str] = set()
+    preference: list[str] = []
+    visiting: set[str] = set()
+
+    def include_required(module_id: str) -> None:
+        if module_id in included:
             return
         if module_id in visiting:
-            raise RuntimeError(f"Bannerlord module dependency cycle includes {module_id}")
+            raise RuntimeError(f"Bannerlord required-dependency cycle includes {module_id}")
+        if module_id not in modules:
+            raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
         visiting.add(module_id)
         for dependency in metadata(module_id).get("dependencies", []):
             dependency_id = str(dependency.get("id") or "").strip()
-            if not dependency_id:
+            if not dependency_id or dependency.get("optional"):
                 continue
-            if dependency.get("optional") and dependency_id not in modules:
-                continue
-            add(dependency_id)
+            include_required(dependency_id)
         visiting.remove(module_id)
-        if module_id not in added:
-            added.add(module_id)
-            order.append(module_id)
+        included.add(module_id)
+        preference.append(module_id)
 
-    # This direct-launch path deliberately targets Bannerlord single-player.
-    # Refuse a module that explicitly is not a single-player module rather than
-    # constructing a /singleplayer command that cannot represent its declared mode.
-    selected_metadata = read_submodule(installed / "SubModule.xml")
-    if not is_singleplayer_module(selected_metadata):
-        raise RuntimeError(
-            f"Bannerlord module {selected_id} is not declared as a single-player module; "
-            "Lexeditor Play currently supports single-player modules only."
-        )
-
-    # Establish the official single-player prefix first. A selected module often
-    # declares Native/SandBoxCore/Sandbox itself; resolving those declarations
-    # first would otherwise allow Sandbox to jump ahead of newer official modules
-    # such as BirthAndDeath. Recursive dependency resolution still prevents an
-    # official module from being placed before something it actually requires.
+    # Lexeditor's direct single-player profile includes the installed official SP
+    # stack, then the selected project's required closure. Optional dependencies
+    # are deliberately not auto-enabled merely because their folders exist.
     for module_id in CORE_SINGLEPLAYER_MODULES:
         if module_id in modules:
-            add(module_id)
+            include_required(module_id)
+    include_required(selected_id)
 
-    # Then preserve the selected module's external dependency order and closure.
-    # Core dependencies already reached above are naturally de-duplicated.
-    for dependency in selected_metadata.get("dependencies", []):
-        dependency_id = str(dependency.get("id") or "").strip()
-        if not dependency_id:
-            continue
-        if dependency.get("optional") and dependency_id not in modules:
-            continue
-        add(dependency_id)
-    add(selected_id)
+    edges: dict[str, set[str]] = {module_id: set() for module_id in included}
+    indegree = {module_id: 0 for module_id in included}
+
+    def add_edge(before: str, after: str) -> None:
+        if before == after or after in edges[before]:
+            return
+        edges[before].add(after)
+        indegree[after] += 1
+
+    conflicts = []
+    for module_id in list(included):
+        for dependency in metadata(module_id).get("dependencies", []):
+            dependency_id = str(dependency.get("id") or "").strip()
+            if dependency_id in included:
+                add_edge(dependency_id, module_id)
+            elif dependency_id and not dependency.get("optional"):
+                # Defensive consistency check; include_required should have caught it.
+                raise RuntimeError(f"Required Bannerlord dependency is not enabled: {dependency_id}")
+
+        module_relations = relations(module_id)
+        for after_id in module_relations.get("loadAfterThis", []):
+            if after_id in included:
+                add_edge(module_id, after_id)
+        for incompatible_id in module_relations.get("incompatible", []):
+            if incompatible_id in included:
+                conflicts.append((module_id, incompatible_id))
+
+    if conflicts:
+        rows = ", ".join(f"{left} ↔ {right}" for left, right in conflicts)
+        raise RuntimeError(f"Incompatible Bannerlord modules would be enabled together: {rows}")
+
+    rank = {module_id: index for index, module_id in enumerate(preference)}
+    ready = [module_id for module_id, count in indegree.items() if count == 0]
+    order: list[str] = []
+    while ready:
+        ready.sort(key=lambda value: (rank.get(value, len(rank)), value.casefold()))
+        module_id = ready.pop(0)
+        order.append(module_id)
+        for after_id in sorted(edges[module_id], key=str.casefold):
+            indegree[after_id] -= 1
+            if indegree[after_id] == 0:
+                ready.append(after_id)
+
+    if len(order) != len(included):
+        blocked = sorted(
+            (module_id for module_id, count in indegree.items() if count > 0),
+            key=str.casefold,
+        )
+        raise RuntimeError(
+            "Bannerlord module load-order constraints form a cycle: " + ", ".join(blocked)
+        )
     return order
 
 
