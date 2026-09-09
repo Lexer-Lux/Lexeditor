@@ -62,6 +62,16 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
             0x7F: "Random value",
         }[opcode]
         return {"summary": f"{label} → 0x{address:06X}", "storeAddress": address}
+    if opcode in {0x21, 0x22} and len(args) == 3 and not (args[0] & 1):
+        target = args[0] // 2
+        x_address, y_address = _script_address(args[1]), _script_address(args[2])
+        target_name = f"Object {target}" if opcode == 0x21 else f"{_lookup(players, target, 'PC')} ({target})"
+        return {
+            "summary": f"{target_name} coords → X 0x{x_address:06X} · Y 0x{y_address:06X}",
+            "targetId": target,
+            "xStoreAddress": x_address,
+            "yStoreAddress": y_address,
+        }
     if opcode == 0x83 and len(args) == 3:
         enemy = _u16(args)
         return {
@@ -89,6 +99,19 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
     if opcode == 0xA7 and len(args) == 1:
         address = _script_address(args[0])
         return {"summary": f"NPC facing from 0x{address:06X}", "facingAddress": address}
+    if opcode in {0xAA, 0xAB, 0xAC} and len(args) == 1:
+        mode = {0xAA: "Loop animation", 0xAB: "Animation", 0xAC: "Static animation"}[opcode]
+        return {"summary": f"{mode} {args[0]}", "animationId": args[0]}
+    if opcode == 0xAD and len(args) == 1:
+        return {
+            "summary": f"Pause {args[0]} tick(s) · {args[0]}/16 second",
+            "pauseTicks": args[0],
+        }
+    if opcode == 0xB7 and len(args) == 2:
+        return {
+            "summary": f"Loop animation {args[0]} × {args[1]}",
+            "animationId": args[0], "loopCount": args[1],
+        }
     if opcode == 0xB8 and len(args) == 1:
         return {"summary": f"Message table {args[0]}", "messageTable": args[0]}
     if opcode in {0xBB, 0xC1, 0xC2} and len(args) >= 2:
