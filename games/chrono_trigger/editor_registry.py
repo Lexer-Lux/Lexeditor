@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .bit_ops import apply_bit_op, bit_field_specs, bit_values, decorate_bit_semantics
 from .comparisons import (
     apply_comparison,
     comparison_field_specs,
@@ -56,12 +57,16 @@ def memory_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, memory_field_specs(command), memory_values(command))
 
 
+def bit_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, bit_field_specs(command), bit_values(command))
+
+
 def jump_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, jump_field_specs(command), jump_values(command))
 
 
-_REGISTRY_BUILDERS = (comparison_editor_schema, memory_editor_schema, jump_editor_schema)
-_REGISTRY_APPLIERS = (apply_comparison, apply_memory_op, apply_jump)
+_REGISTRY_BUILDERS = (comparison_editor_schema, memory_editor_schema, bit_editor_schema, jump_editor_schema)
+_REGISTRY_APPLIERS = (apply_comparison, apply_memory_op, apply_bit_op, apply_jump)
 
 
 def editor_schema(command: dict) -> dict | None:
@@ -75,6 +80,7 @@ def editor_schema(command: dict) -> dict | None:
 def decorate_event_editors(payload: dict) -> dict:
     decorate_comparison_semantics(payload)
     decorate_memory_semantics(payload)
+    decorate_bit_semantics(payload)
     decorate_jump_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
