@@ -11,6 +11,7 @@ from plugin_api import validate_plugin
 
 SUBMODULE = """<?xml version="1.0" encoding="utf-8"?>
 <Module>
+  <!-- preserve this module comment -->
   <Name value="Lexer Skill Tweaks"/>
   <Id value="LexerSkillTweaks"/>
   <Version value="v1.2.3"/>
@@ -42,7 +43,7 @@ class BannerlordPluginTests(unittest.TestCase):
         self.assertEqual(PLUGIN.installation.launch_path, "bin/Win64_Shipping_Client/Bannerlord.exe")
 
     def test_submodule_metadata_and_data_map(self):
-        from games.bannerlord.module_data import data_map, read_submodule
+        from games.bannerlord.module_data import data_map, read_submodule, save_module_metadata
 
         with tempfile.TemporaryDirectory() as name:
             project = Path(name)
@@ -62,6 +63,21 @@ class BannerlordPluginTests(unittest.TestCase):
             self.assertTrue(rows["SubModule.xml"]["openable"])
             self.assertTrue(rows["*.csproj"]["sourceAvailable"])
             self.assertEqual(rows["src/**/*.cs"]["coverage"], "source")
+
+            result = save_module_metadata(
+                project / "SubModule.xml",
+                {"name": "Lexer Skill Tweaks Redux", "singleplayer": False},
+            )
+            self.assertEqual(result["saved"], 2)
+            self.assertTrue(Path(result["backup"]).is_file())
+            self.assertEqual(result["module"]["name"], "Lexer Skill Tweaks Redux")
+            self.assertFalse(result["module"]["singleplayer"])
+            rewritten = (project / "SubModule.xml").read_text(encoding="utf-8")
+            self.assertIn("preserve this module comment", rewritten)
+            self.assertEqual(
+                [row["Id"] for row in result["module"]["dependencies"]],
+                ["Native", "Bannerlord.Harmony"],
+            )
 
 
 if __name__ == "__main__":

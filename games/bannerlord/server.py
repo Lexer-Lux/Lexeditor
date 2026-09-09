@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .module_data import data_map, read_submodule
+from .module_data import data_map, read_submodule, save_module_metadata
 
 
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -31,6 +31,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def read_json(self) -> dict:
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        if length <= 0:
+            return {}
+        return json.loads(self.rfile.read(length).decode("utf-8"))
 
     def send_file(self, target: Path):
         data = target.read_bytes()
@@ -83,6 +89,24 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/datamap":
             self.send_json(data_map(PROJECT))
+            return
+        self.send_json({"error": "Not found"}, 404)
+
+    def do_POST(self):
+        path = urlparse(self.path).path
+        if path == "/api/module/save":
+            source = PROJECT / "SubModule.xml"
+            if not source.is_file():
+                self.send_json({"error": f"SubModule.xml not found: {source}"}, 404)
+                return
+            try:
+                payload = self.read_json()
+                edits = dict(payload.get("edits") or {})
+                self.send_json(save_module_metadata(source, edits))
+            except (ValueError, TypeError, json.JSONDecodeError) as error:
+                self.send_json({"error": str(error)}, 400)
+            except Exception as error:
+                self.send_json({"error": str(error)}, 500)
             return
         self.send_json({"error": "Not found"}, 404)
 

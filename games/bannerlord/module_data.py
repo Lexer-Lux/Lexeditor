@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import shutil
 import xml.etree.ElementTree as ET
 
 
@@ -17,9 +18,14 @@ def _truth(value: str) -> bool:
     return value.strip().casefold() in {"1", "true", "yes"}
 
 
+def _parse_tree(path: Path) -> ET.ElementTree:
+    parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
+    return ET.parse(path, parser=parser)
+
+
 def read_submodule(path: Path) -> dict:
     """Parse the stable, user-facing portions of Bannerlord SubModule.xml."""
-    root = ET.parse(path).getroot()
+    root = _parse_tree(path).getroot()
 
     dependencies = []
     depended_modules = root.find("DependedModules")
@@ -69,6 +75,51 @@ def read_submodule(path: Path) -> dict:
         "dependencies": dependencies,
         "submodules": submodules,
         "xmls": xmls,
+    }
+
+
+_EDITABLE_METADATA = {
+    "name": "Name",
+    "id": "Id",
+    "version": "Version",
+    "singleplayer": "SingleplayerModule",
+    "multiplayer": "MultiplayerModule",
+}
+
+
+def save_module_metadata(path: Path, edits: dict) -> dict:
+    """Update only the module's top-level identity/compatibility metadata."""
+    unknown = set(edits) - set(_EDITABLE_METADATA)
+    if unknown:
+        raise ValueError(f"Unsupported SubModule.xml fields: {', '.join(sorted(unknown))}")
+
+    tree = _parse_tree(path)
+    root = tree.getroot()
+    saved = 0
+    for field, tag in _EDITABLE_METADATA.items():
+        if field not in edits:
+            continue
+        element = root.find(tag)
+        if element is None:
+            raise ValueError(f"SubModule.xml does not contain <{tag}>")
+        if field in {"singleplayer", "multiplayer"}:
+            value = "true" if bool(edits[field]) else "false"
+        else:
+            value = str(edits[field]).strip()
+            if not value:
+                raise ValueError(f"{field} cannot be empty")
+        if element.attrib.get("value", "") != value:
+            element.set("value", value)
+            saved += 1
+
+    backup = path.with_name(path.name + ".lexeditor.bak")
+    if saved:
+        shutil.copy2(path, backup)
+        tree.write(path, encoding="utf-8", xml_declaration=True, short_empty_elements=True)
+    return {
+        "saved": saved,
+        "backup": str(backup) if saved else "",
+        "module": read_submodule(path),
     }
 
 
