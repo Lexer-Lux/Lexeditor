@@ -281,6 +281,30 @@ def test_dense_custom_views_fit_narrow_detail_pane(self):
     self.originals_unchanged()
 
 
+def test_small_fixed_datasets_do_not_stretch_or_overlap(self):
+    self.install(); self.open(); self.page.set_viewport_size({"width":900,"height":620})
+
+    # Single-record datasets use the whole editing surface instead of wasting
+    # half of it on a one-row master table.
+    for group in ("initialState","apMultiplier"):
+        with self.subTest(single=group):
+            self.navigate(group)
+            self.assertEqual(self.page.locator('.ff7-detail').count(),1)
+            self.assertEqual(self.page.locator('.ff7-table').count(),0)
+
+    # Tiny multi-record datasets keep ordinary list rows. This guards the old
+    # Cait Sith/Vincent overlay where both names occupied the same giant row.
+    for group,count in (("recruits",2),("growthBonuses",3)):
+        with self.subTest(tiny=group):
+            self.navigate(group); self.page.wait_for_timeout(50)
+            rows=self.page.locator('.ff7-compact-master .lex-column-list-row')
+            self.assertEqual(rows.count(),count)
+            boxes=rows.evaluate_all('(rows)=>rows.map(row=>{const r=row.getBoundingClientRect();return{top:r.top,bottom:r.bottom,height:r.height}})')
+            self.assertTrue(all(20<=box['height']<=60 for box in boxes),(group,boxes))
+            self.assertTrue(all(left['bottom']<=right['top']+1 for left,right in zip(boxes,boxes[1:])),(group,boxes))
+    self.originals_unchanged()
+
+
 target.RenderedTests.open = open_with_neutral
 target.RenderedTests.test_materia_uses_human_semantic_controls = test_materia_uses_human_semantic_controls
 target.RenderedTests.test_full_ff7_surface_uses_human_controls = test_full_ff7_surface_uses_human_controls
@@ -289,6 +313,7 @@ target.RenderedTests.test_holistic_ff7_concept_views_and_new_game_data = test_ho
 target.RenderedTests.test_refined_master_and_detail_ux = test_refined_master_and_detail_ux
 target.RenderedTests.test_finished_high_value_detail_views = test_finished_high_value_detail_views
 target.RenderedTests.test_dense_custom_views_fit_narrow_detail_pane = test_dense_custom_views_fit_narrow_detail_pane
+target.RenderedTests.test_small_fixed_datasets_do_not_stretch_or_overlap = test_small_fixed_datasets_do_not_stretch_or_overlap
 
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)
