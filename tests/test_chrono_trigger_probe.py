@@ -41,6 +41,7 @@ class ProbeTests(unittest.TestCase):
 
         self.assertEqual(payload["family"], "enemy")
         self.assertEqual(payload["candidateCount"], 2)
+        self.assertEqual(payload["filteredCandidateCount"], 2)
         self.assertEqual(payload["attemptedCount"], 2)
         self.assertEqual(payload["loadedCount"], 2)
         self.assertEqual(set(archive.read_paths), {
@@ -56,6 +57,25 @@ class ProbeTests(unittest.TestCase):
             {"start": 2, "endExclusive": 3, "length": 1, "hex": "30"},
         ])
         self.assertIn("structural diagnostics only", payload["method"])
+
+    def test_path_prefix_scopes_family_before_any_payload_reads(self):
+        archive = FakeArchive([
+            ("Game/battle/enemy/Enemy_0001.dat", b"AA", None),
+            ("Game/battle/enemy/Enemy_0002.dat", b"BB", None),
+            ("Game/boss/Boss_0001.dat", b"CC", None),
+        ])
+        payload = probe_family(
+            archive, "enemy", path_prefix="Game\\battle\\enemy", limit=8, byte_window=2,
+        )
+        self.assertEqual(payload["pathPrefix"], "Game/battle/enemy")
+        self.assertEqual(payload["candidateCount"], 3)
+        self.assertEqual(payload["filteredCandidateCount"], 2)
+        self.assertEqual(payload["attemptedCount"], 2)
+        self.assertEqual(archive.read_paths, [
+            "Game/battle/enemy/Enemy_0001.dat",
+            "Game/battle/enemy/Enemy_0002.dat",
+        ])
+        self.assertNotIn("Game/boss/Boss_0001.dat", archive.peek_paths)
 
     def test_declared_size_cap_skips_before_decompression(self):
         archive = FakeArchive([
