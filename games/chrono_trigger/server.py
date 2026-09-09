@@ -33,7 +33,9 @@ from .labels import (
     decorate_worlds,
     label_bundle,
 )
+from .resource_view import read_resource, resource_info
 from .resources import ResourceArchiveError
+from .scene_maps import load_scene_map
 from .scene_tables import load_exits, load_treasure, save_exit, save_treasure
 from .worlds import load_worlds, save_world
 from .world_scripts import load_world_script
@@ -123,7 +125,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/11"
+    server_version = "LexeditorChronoTrigger/12"
 
     def log_message(self, _format, *_args):
         return
@@ -138,10 +140,14 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def send_file(self, target: Path):
-        data = target.read_bytes()
+        self.send_bytes(target.read_bytes(), mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+
+    def send_bytes(self, data: bytes, content_type: str, *, attachment: bool = False):
         self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+        self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        if attachment:
+            self.send_header("Content-Disposition", "attachment")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -165,11 +171,12 @@ class Handler(BaseHTTPRequestHandler):
                     "edition": "Steam / resources.bin / CTExt loose-file projects",
                     "hosted": HOSTED, "windowHost": WINDOW_HOST, "projectRoot": str(paths.PROJECT_ROOT),
                     "capabilities": [
-                        "data-map", "resource-index", "localization-text", "localized-labels",
-                        "scene-headers", "scene-exits", "scene-treasure", "field-events",
-                        "field-event-disassembly", "world-headers", "world-exits", "world-triggers",
-                        "world-script-addresses", "world-script-disassembly", "project-overlay",
-                        "project-changes", "ctext-deploy", "ctp-export", "read", "save",
+                        "data-map", "resource-index", "resource-preview", "localization-text",
+                        "localized-labels", "scene-headers", "scene-exits", "scene-treasure",
+                        "scene-map-layout", "field-events", "field-event-disassembly",
+                        "world-headers", "world-exits", "world-triggers", "world-script-addresses",
+                        "world-script-disassembly", "project-overlay", "project-changes",
+                        "ctext-deploy", "ctp-export", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
@@ -187,6 +194,19 @@ class Handler(BaseHTTPRequestHandler):
                     params.get("q", [""])[0], int(params.get("offset", ["0"])[0]),
                     int(params.get("limit", ["250"])[0]),
                 ))
+            elif path == "/api/resource":
+                self.send_json(resource_info(_store(), params.get("path", [""])[0], _source(params)))
+            elif path == "/api/resource/raw":
+                source = _source(params)
+                virtual = params.get("path", [""])[0]
+                info = resource_info(_store(), virtual, source)
+                data, _origin, _virtual = read_resource(_store(), virtual, source)
+                is_image = info["previewKind"] == "image"
+                self.send_bytes(
+                    data,
+                    info["contentType"] if is_image else "application/octet-stream",
+                    attachment=not is_image,
+                )
             elif path == "/api/scenes":
                 source = _source(params)
                 payload = load_scenes(
@@ -194,6 +214,10 @@ class Handler(BaseHTTPRequestHandler):
                     int(params.get("offset", ["0"])[0]), int(params.get("limit", ["100"])[0]),
                 )
                 self.send_json(decorate_scenes(payload, _labels(source)))
+            elif path == "/api/scene-map":
+                self.send_json(load_scene_map(
+                    _store(), int(params.get("scene", ["-1"])[0]), _source(params)
+                ))
             elif path == "/api/exits":
                 source = _source(params)
                 payload = load_exits(_store(), int(params.get("scene", ["-1"])[0]), source)
