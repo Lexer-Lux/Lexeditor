@@ -80,8 +80,8 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
         }
     if opcode in BUTTON_CHECK_LABELS and len(args) == 1:
         return {
-            "summary": f"{BUTTON_CHECK_LABELS[opcode]} check · jump +{args[0]}",
-            "check": BUTTON_CHECK_LABELS[opcode], "jumpOffset": args[0],
+            "summary": f"{BUTTON_CHECK_LABELS[opcode]} check · failure → jump +{args[0]}",
+            "check": BUTTON_CHECK_LABELS[opcode], "jumpOffset": args[0], "jumpOnFailure": True,
         }
     if opcode in {0x20, 0x55, 0x7F} and len(args) == 1:
         address = _script_address(args[0])
