@@ -378,6 +378,7 @@ def _build_path_overrides(project: Path, selected_game: Path) -> dict[str, str]:
         "GameBin": str(game_bin),
         "ModuleDir": str(module_dir),
         "OutputPath": str(output_path) + os.sep,
+        "LexeditorSkipAssetDeploy": "true",
     }
 
 

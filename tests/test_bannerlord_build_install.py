@@ -46,6 +46,7 @@ class BannerlordBuildInstallTests(unittest.TestCase):
                 "GameBin": str((selected / "bin" / "Win64_Shipping_Client").resolve()),
                 "ModuleDir": str((selected / "Modules" / "SafeModule").resolve()),
                 "OutputPath": str((selected / "Modules" / "SafeModule" / "bin" / "Win64_Shipping_Client").resolve()) + os.sep,
+                "LexeditorSkipAssetDeploy": "true",
             }
             for property_name, value in expected.items():
                 argument = f"-p:{property_name}={value}"
@@ -73,6 +74,7 @@ class BannerlordBuildInstallTests(unittest.TestCase):
             self.assertIn(f"-p:BannerlordDir={selected}", command)
             self.assertIn(f"-p:GameBin={(selected / 'bin' / 'Win64_Shipping_Client').resolve()}", command)
             self.assertIn(f"-p:ModuleDir={(selected / 'Modules' / 'SafeModule').resolve()}", command)
+            self.assertIn("-p:LexeditorSkipAssetDeploy=true", command)
             self.assertEqual(result["gameRootOverride"], str(selected))
 
     def test_selected_install_build_rejects_unsafe_module_id_before_dotnet(self):

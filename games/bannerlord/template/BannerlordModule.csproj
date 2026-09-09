@@ -39,7 +39,7 @@
                      Exclude="ModuleData\custom_skill_effects.json;ModuleData\custom_skill_xp_sources.json" />
   </ItemGroup>
 
-  <Target Name="CopyModuleFiles" AfterTargets="Build">
+  <Target Name="CopyModuleFiles" AfterTargets="Build" Condition="'$(LexeditorSkipAssetDeploy)' != 'true'">
     <MakeDir Directories="$(ModuleDir)" />
     <MakeDir Directories="$(ModuleDir)\ModuleData" Condition="'@(ModuleDataAsset)' != ''" />
     <Copy SourceFiles="SubModule.xml" DestinationFolder="$(ModuleDir)" />
