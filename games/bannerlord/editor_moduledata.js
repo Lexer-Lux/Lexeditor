@@ -45,10 +45,24 @@ async function loadModuleData(path,ask=true){
 }
 
 function moduleDataControl(attribute){
+  if(attribute.fixed!==undefined)return el("code",{title:"Fixed by Bannerlord XSD"},String(attribute.value));
   const assign=value=>{attribute.value=String(value);refresh()};
   if(attribute.kind==="bool")return checkbox(String(attribute.value).toLowerCase()==="true",value=>assign(value?"true":"false"));
-  if(attribute.kind==="number")return numberInput(Number(attribute.value),value=>assign(value),{step:"any"});
+  if(attribute.kind==="enum")return select(attribute.value,(attribute.choices||[]).map(value=>[value,value]),assign);
+  if(attribute.kind==="number"){
+    const attrs={step:attribute.integer?1:"any"};
+    if(attribute.min!==undefined)attrs.min=attribute.min;
+    if(attribute.max!==undefined)attrs.max=attribute.max;
+    return numberInput(Number(attribute.value),assign,attrs);
+  }
   return textInput(attribute.value,assign,{spellcheck:"false"});
+}
+
+function moduleDataAttributeLabel(attribute){
+  const suffix=[];
+  if(attribute.required)suffix.push("required");
+  if(attribute.schemaType)suffix.push(attribute.schemaType);
+  return suffix.length?`${attribute.name} · ${suffix.join(" · ")}`:attribute.name;
 }
 
 function moduleDataRecordLabel(record){
@@ -84,9 +98,13 @@ function renderModuleData(){
   if(!node&&nodes.length){node=nodes[0];state.moduleDataElementPath=node.path}
 
   const fileSelect=select(state.moduleData.relativePath,state.moduleDataFiles.map(path=>[path,path]),value=>loadModuleData(value));
+  const schema=state.moduleData.schema;
   const master=el("div",{class:"bl-master"},
     el("div",{class:"bl-master-head"},el("strong",{},`${state.moduleData.rootTag} (${state.moduleData.recordCount||0})`)),
     el("div",{class:"bl-list-block"},fileSelect),
+    el("div",{class:"bl-list-block"},
+      schema?el("div",{},el("strong",{},`XSD: ${schema.id||"matched schema"}`),el("small",{},` · ${schema.path||""}`)):
+        el("div",{class:"bl-note"},"No unique installed Bannerlord XSD matched; using conservative literal typing.")),
     el("div",{class:"bl-list-block"},textInput(state.moduleDataFilter,value=>{state.moduleDataFilter=value;render()},{placeholder:"Filter records"})),
     el("div",{class:"bl-list"},...records.map(row=>el("button",{
       type:"button",class:`bl-item${row.path===state.moduleDataRecordPath?" active":""}`,
@@ -101,7 +119,15 @@ function renderModuleData(){
       element.path,
       `${"· ".repeat(Math.max(0,element.depth-1))}${element.tag}${element.hint?` · ${element.hint}`:""}`
     ]);
-    const attributeRows=node?(node.attributes||[]).flatMap(attribute=>fieldRow(attribute.name,moduleDataControl(attribute))):[];
+    const attributeRows=node?(node.attributes||[]).flatMap(attribute=>fieldRow(moduleDataAttributeLabel(attribute),moduleDataControl(attribute))):[];
+    const boundNotes=node?(node.attributes||[]).flatMap(attribute=>{
+      const constraints=[];
+      if(attribute.min!==undefined)constraints.push(`min ${attribute.min}`);
+      if(attribute.max!==undefined)constraints.push(`max ${attribute.max}`);
+      if(attribute.fixed!==undefined)constraints.push(`fixed ${attribute.fixed}`);
+      if(attribute.default!==undefined)constraints.push(`default ${attribute.default}`);
+      return constraints.length?[el("div",{class:"bl-note"},`${attribute.name}: ${constraints.join(" · ")}`)]:[];
+    }):[];
     detail=el("div",{class:"bl-detail"},el("section",{class:"bl-panel"},
       el("h2",{},moduleDataRecordLabel(record)),
       el("div",{class:"bl-grid"},
@@ -115,7 +141,10 @@ function renderModuleData(){
           ...attributeRows
         ]:[])
       ),
-      el("div",{class:"bl-note"},"Top-level children are treated as Bannerlord object records; their nested components remain attached to the record. Existing literal booleans and numbers get typed controls, while references, localization strings, IDs, enums, and bindings remain text until an XSD-specific control exists."),
+      ...boundNotes,
+      el("div",{class:"bl-note"},schema?
+        "Bannerlord XSD metadata is active for this document: enumerations become selects, schema booleans become checkboxes, numeric bounds are enforced, integer types reject fractions, and fixed values are read-only. Required attributes are marked in their labels.":
+        "Without a unique installed XSD match, Lexeditor only infers literal booleans and numbers; references, localization strings, IDs, enums, and other values remain text."),
       el("div",{class:"bl-note"},"This slice edits existing attributes only. Unknown child elements and attributes are deliberately preserved, and saves patch only changed value spans instead of reserializing the document.")
     ));
   }
