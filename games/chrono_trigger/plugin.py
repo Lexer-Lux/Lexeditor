@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+import zipfile
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession, request_json
@@ -48,7 +49,6 @@ def launch() -> int:
 
 
 def _build_smoke_archive(path: Path, resources: list[tuple[str, bytes]]) -> None:
-    """Build the smallest valid ARC1 fixture needed by the managed smoke test."""
     offset = 16
     blocks: list[bytes] = []
     records: list[tuple[str, int, int]] = []
@@ -57,32 +57,42 @@ def _build_smoke_archive(path: Path, resources: list[tuple[str, bytes]]) -> None
         blocks.append(ResourceArchive.decode(decoded, offset))
         records.append((virtual_path, offset, len(decoded)))
         offset += len(decoded)
-
     table_size = 4 + len(records) * 12
-    string_table = bytearray()
-    path_offsets: list[int] = []
+    strings = bytearray()
+    path_offsets = []
     for virtual_path, _entry_offset, _stored_size in records:
-        path_offsets.append(table_size + len(string_table))
-        string_table.extend(virtual_path.encode("utf-8") + b"\0")
-
+        path_offsets.append(table_size + len(strings))
+        strings.extend(virtual_path.encode("utf-8") + b"\0")
     index = bytearray(struct.pack("<I", len(records)))
     for path_offset, (_virtual_path, entry_offset, stored_size) in zip(path_offsets, records):
         index.extend(struct.pack("<III", path_offset, entry_offset, stored_size))
-    index.extend(string_table)
+    index.extend(strings)
     encoded_index = len(index).to_bytes(4, "big") + gzip.compress(bytes(index), mtime=0)
     index_offset = offset
-    header = b"ARC1" + struct.pack(
-        "<III", index_offset + len(encoded_index), index_offset, len(encoded_index)
-    )
-    path.write_bytes(
-        ResourceArchive.decode(header, 0)
-        + b"".join(blocks)
-        + ResourceArchive.decode(encoded_index, index_offset)
-    )
+    header = b"ARC1" + struct.pack("<III", index_offset + len(encoded_index), index_offset, len(encoded_index))
+    path.write_bytes(ResourceArchive.decode(header, 0) + b"".join(blocks) + ResourceArchive.decode(encoded_index, index_offset))
+
+
+def _field_event(payload: bytes) -> bytes:
+    return bytes([1]) + b"".join(struct.pack("<H", 32) for _ in range(16)) + payload
+
+
+def _world_labels() -> bytes:
+    rows = [f"{index:04d},World Exit {index}" for index in range(106)]
+    rows.extend([
+        "0106,Present", "0107,Middle Ages", "0108,Future",
+        "0109,Prehistory", "0110,Antiquity", "0111,End of Time",
+    ])
+    return ("\n".join(rows) + "\n").encode("utf-8")
+
+
+def _scene_map() -> bytes:
+    # 16x16 L1/L2, no L3, then one RLE Full-collision prop repeated 256 times.
+    return bytes([0, 0, 0, 0, 3, 0x11]) + bytes([1]) * 256 + bytes([2]) * 256 + bytes([0x84, 0, 0, 0])
 
 
 def smoke() -> list[str]:
-    """Exercise the managed service, overlay writes and explicit deployment safely."""
+    """Exercise the managed service, overlays, inspection/export and deployment."""
     with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-trigger-plugin-") as temp_name:
         root = Path(temp_name)
         game = root / "game"
@@ -96,11 +106,18 @@ def smoke() -> list[str]:
 
         scene = bytearray(24)
         struct.pack_into("<H", scene, 0, 10)
+        struct.pack_into("<H", scene, 12, 0)
         struct.pack_into("<H", scene, 16, 20)
         bank = bytearray(WORLD_HEADER_OFFSET + 8 * WORLD_HEADER_SIZE + 16)
+        event = _field_event(bytes([0x83, 0x34, 0x12, 0x80, 0x00]))
         _build_smoke_archive(game / "resources.bin", [
             ("Localize/en/msg/item.txt", b"0000,Potion\r\n0001,Ether\r\n"),
+            ("Localize/en/msg/debug_map.txt", b"0000,Millennial Fair\n0001,Guardia Forest\n"),
+            ("Localize/en/msg/w_map.txt", _world_labels()),
+            ("Localize/en/msg/player.txt", b"0000,Crono\n0001,Marle\n"),
             ("Game/field/Mapinfo/mapinfo_0.dat", bytes(scene)),
+            ("Game/field/MapTable/MapTable_0000.dat", _scene_map()),
+            ("Game/field/atel/Atel_0020.dat", event),
             (WORLD_BANK, bytes(bank)),
             ("Game/world/EventTable/EventTable_0000.dat", b"\x00\x00\x00\x00"),
             ("Game/world/esl/Event_0000.dat", b"\x00\x52"),
@@ -115,17 +132,22 @@ def smoke() -> list[str]:
         with session:
             identity = request_json(session.url + "api/plugin")
             required = {
-                "resource-index", "localization-text", "scene-headers", "project-overlay",
-                "ctext-deploy", "world-script-disassembly",
+                "resource-index", "resource-preview", "localized-labels", "scene-map-layout",
+                "localization-text", "scene-headers", "field-event-disassembly", "project-overlay",
+                "project-changes", "ctp-export", "ctext-deploy", "world-script-disassembly",
             }
             if identity.get("pluginId") != "chrono-trigger" or not required.issubset(identity.get("capabilities", [])):
                 raise RuntimeError("Chrono Trigger service returned the wrong managed capabilities")
 
-            message = request_json(
-                session.url + "api/messages?path=Localize%2Fen%2Fmsg%2Fitem.txt&source=mine"
-            )
-            if message["rows"][0]["text"] != "Potion" or message["source"] != "archive":
-                raise RuntimeError("Chrono Trigger smoke message table did not load from ARC1")
+            labels = request_json(session.url + "api/labels?source=mine")
+            if labels["languages"]["items"] != "en" or labels["worldNames"][0] != "Present":
+                raise RuntimeError("Chrono Trigger localized labels did not resolve")
+
+            resource = request_json(session.url + "api/resource?path=Localize%2Fen%2Fmsg%2Fitem.txt&source=mine")
+            if resource["previewKind"] != "text" or "Potion" not in resource["preview"]:
+                raise RuntimeError("Chrono Trigger resource text preview did not decode")
+
+            message = request_json(session.url + "api/messages?path=Localize%2Fen%2Fmsg%2Fitem.txt&source=mine")
             saved_message = request_json(session.url + "api/save/message", {
                 "path": message["path"], "sha256": message["sha256"],
                 "changes": [{"id": 0, "text": "Tonic"}],
@@ -137,19 +159,43 @@ def smoke() -> list[str]:
             first = scenes["rows"][0]
             if first["values"]["musicIndex"] != 10 or first["values"]["scriptIndex"] != 20:
                 raise RuntimeError("Chrono Trigger smoke scene header did not decode")
+            map_data = request_json(session.url + "api/scene-map?scene=0&source=mine")
+            if map_data["sceneWidth"] != 16 or map_data["collisionCounts"] != {"Full": 256}:
+                raise RuntimeError("Chrono Trigger smoke structural scene map did not decode")
+
+            event_data = request_json(session.url + "api/events?id=20&source=mine")
+            if event_data["decodedCommandCount"] != 2 or event_data["problemFunctionBounds"]:
+                raise RuntimeError("Chrono Trigger smoke field event commands did not disassemble")
+            first_fn = event_data["objects"][0]["functions"][0]
+            if first_fn["commands"][0]["name"] != "Load Enemy" or not first_fn["complete"]:
+                raise RuntimeError("Chrono Trigger smoke field event command metadata is wrong")
+
             saved_scene = request_json(session.url + "api/save/scene", {
                 "id": first["id"], "sha256": first["sha256"], "values": {"musicIndex": 42},
             })
             if saved_scene["values"]["musicIndex"] != 42 or saved_scene["source"] != "project":
                 raise RuntimeError("Chrono Trigger smoke scene overlay did not save")
-
             vanilla = request_json(session.url + "api/scenes?source=vanilla")
             if vanilla["rows"][0]["values"]["musicIndex"] != 10:
                 raise RuntimeError("Chrono Trigger smoke write modified the Vanilla source")
 
+            changes = request_json(session.url + "api/changes")
+            changed_paths = {row["path"] for row in changes["rows"]}
+            if {"Localize/en/msg/item.txt", "Game/field/Mapinfo/mapinfo_0.dat"} - changed_paths:
+                raise RuntimeError("Chrono Trigger project change inventory missed saved overlays")
+
+            exported = request_json(session.url + "api/export/ctp", {})
+            export_path = Path(exported["path"])
+            if exported["fileCount"] != 2 or not export_path.is_file():
+                raise RuntimeError("Chrono Trigger CTP export did not contain the project overlays")
+            with zipfile.ZipFile(export_path) as archive:
+                if set(archive.namelist()) != changed_paths:
+                    raise RuntimeError("Chrono Trigger CTP members do not match project resources")
+
             mapped = request_json(session.url + "api/datamap")
-            if not any(row.get("status") == "integrated" for row in mapped.get("rows", [])):
-                raise RuntimeError("Chrono Trigger Data Map did not report integrated coverage")
+            map_rows = {row["filename"]: row for row in mapped.get("rows", [])}
+            if map_rows.get("Game/field/MapTable/MapTable_*.dat", {}).get("status") != "integrated":
+                raise RuntimeError("Chrono Trigger Data Map did not report structural map coverage")
 
             deployment = request_json(session.url + "api/deployment")
             if not deployment["ctext"]["installed"] or not deployment["ctext"]["configValid"]:
@@ -164,10 +210,6 @@ def smoke() -> list[str]:
 
         if not session.wait_closed():
             raise RuntimeError("Chrono Trigger child service port is still open after smoke shutdown")
-        if not (project / "Localize/en/msg/item.txt").is_file():
-            raise RuntimeError("Chrono Trigger message project overlay was not created")
-        if not (project / "Game/field/Mapinfo/mapinfo_0.dat").is_file():
-            raise RuntimeError("Chrono Trigger scene project overlay was not created")
         if (game / "resources.bin").read_bytes() != original_archive:
             raise RuntimeError("Chrono Trigger deployment changed the Vanilla ARC1 archive")
         config = json.loads((game / "ctext.json").read_text(encoding="utf-8"))
@@ -177,13 +219,12 @@ def smoke() -> list[str]:
             raise RuntimeError("Chrono Trigger deployment did not create the CTExt config backup")
 
     return [
-        "Chrono Trigger managed service identity confirmed",
-        "ARC1 localization and scene data decoded",
-        "message and scene edits saved to loose project overlays",
-        "Vanilla archive remained unchanged",
-        "Data Map served integrated coverage",
-        "CTExt deployment preflight passed and explicit deployment activated the project",
-        "CTExt config backup and load-order activation verified",
+        "managed service and expanded capability contract confirmed",
+        "localized labels, bounded resource preview, scene MapTable and field-event commands decoded",
+        "message and scene edits saved to loose overlays while Vanilla stayed unchanged",
+        "project change inventory and deterministic CTP export verified",
+        "Data Map reflected structural map coverage",
+        "CTExt preflight/deployment, config backup and load-order activation verified",
         "host-owned child service stopped cleanly",
     ]
 
@@ -202,11 +243,7 @@ PLUGIN = GamePlugin(
     projects=ModProjectSpec(
         root_env="LEXEDITOR_CHRONO_TRIGGER_PROJECT",
         default_root=paths.DEFAULT_PROJECT_ROOT,
-        required_any=(
-            (paths.PROJECT_MARKER,),
-            ("Game",),
-            ("Localize",),
-        ),
+        required_any=((paths.PROJECT_MARKER,), ("Game",), ("Localize",)),
         template_root=paths.PROJECT_TEMPLATE_ROOT,
         discover=paths.discover_projects,
     ),
