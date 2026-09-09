@@ -57,8 +57,12 @@ def command(opcode: int, arguments: bytes) -> dict:
 class FacingTargetOpTests(unittest.TestCase):
     def test_selected_opcodes_have_named_schemas(self):
         fixtures = {
+            0x1E: b"\x06",
+            0x1F: b"\x08",
             0x23: b"\x06\x10",
             0x24: b"\x04\x11",
+            0x25: b"\x0A",
+            0x26: b"\x0C",
             0xA8: b"\x08",
             0xA9: b"\x0A",
         }
@@ -68,6 +72,43 @@ class FacingTargetOpTests(unittest.TestCase):
                 schema = editor_schema(command(opcode, args))
                 self.assertIsNotNone(schema)
                 self.assertTrue(schema["fixedWidth"])
+
+    def test_directional_npc_facing_uses_opcode_for_direction_and_doubled_target(self):
+        expected = {
+            0x1E: "up",
+            0x1F: "down",
+            0x25: "left",
+            0x26: "right",
+        }
+        for opcode, direction in expected.items():
+            with self.subTest(opcode=opcode):
+                cmd = command(opcode, b"\x06")
+                schema = editor_schema(cmd)
+                self.assertEqual(schema["values"], {"targetId": 3})
+                self.assertEqual(schema["fields"][0]["label"], "NPC ID")
+                self.assertEqual(schema["fields"][0]["max"], 0x32)
+                semantic = facing_target_semantics(cmd)
+                self.assertEqual(semantic["direction"], direction)
+                self.assertEqual(semantic["summary"], f"Set NPC 3 facing {direction}")
+
+    def test_directional_npc_write_changes_only_doubled_target(self):
+        original = event(bytes((0x25, 0x06, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"targetId": 0x12})
+        self.assertEqual(store.overlay[33:35], bytes((0x25, 0x24)))
+        self.assertEqual(len(store.overlay), len(original))
+
+    def test_directional_npc_range_matches_live_menu(self):
+        original = event(bytes((0x1E, 0x06, 0x00)))
+        store = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "NPC ID must be between 0 and 50"):
+            save_event_fields(store, 1, 0, 0, 0, sha256(original), {"targetId": 0x33})
+        self.assertIsNone(store.overlay)
+
+        # Even bytes above the menu's documented/displayed NPC range stay read-only.
+        for opcode in (0x1E, 0x1F, 0x25, 0x26):
+            with self.subTest(opcode=opcode):
+                self.assertIsNone(editor_schema(command(opcode, bytes((0x66,)))))
 
     def test_get_facing_decodes_doubled_target_and_script_memory_destination(self):
         obj = command(0x23, b"\x06\x10")
@@ -116,8 +157,12 @@ class FacingTargetOpTests(unittest.TestCase):
 
     def test_odd_stored_targets_remain_read_only(self):
         for opcode, args in (
+            (0x1E, b"\x05"),
+            (0x1F, b"\x05"),
             (0x23, b"\x05\x10"),
             (0x24, b"\x03\x10"),
+            (0x25, b"\x05"),
+            (0x26, b"\x05"),
             (0xA8, b"\x07"),
             (0xA9, b"\x09"),
         ):
