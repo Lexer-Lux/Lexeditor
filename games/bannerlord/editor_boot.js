@@ -17,7 +17,7 @@
         const edits=Object.fromEntries((state.project.projectFile.editableProperties||[])
           .filter(name=>current[name]!==before[name]).map(name=>[name,current[name]]));
         if(Object.keys(edits).length){
-          const result=await post("/api/project/save",{edits});
+          const result=await post("/api/project/save",{project:state.project.projectFile?.name||null,edits});
           state.project.projectFile=result.project;
           state.savedProject=clone(state.project);
         }

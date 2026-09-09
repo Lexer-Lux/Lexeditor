@@ -44,9 +44,10 @@ from .runtime_overrides import (
 )
 from .settings_data import read_mcm_defaults, save_mcm_defaults
 from .project_data import (
-    primary_project_file,
+    project_files,
     read_project_file,
     read_source,
+    resolve_project_file,
     run_build,
     save_project_properties,
     save_source,
@@ -61,11 +62,21 @@ HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED", "0") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "")
 
 
-def project_summary() -> dict:
-    project_file = primary_project_file(PROJECT)
+def project_summary(requested: str | None = None) -> dict:
+    files = project_files(PROJECT)
+    selected = None
+    project_error = ""
+    if requested:
+        selected = resolve_project_file(PROJECT, requested)
+    elif len(files) == 1:
+        selected = files[0]
+    elif len(files) > 1:
+        project_error = "Several .csproj files exist; choose the project to edit/build."
     return {
         "root": str(PROJECT),
-        "projectFile": read_project_file(project_file) if project_file else None,
+        "projectFiles": [path.name for path in files],
+        "projectFile": read_project_file(selected) if selected else None,
+        "projectError": project_error,
     }
 
 
@@ -168,7 +179,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/project":
             try:
-                self.send_json(project_summary())
+                requested = (query.get("project") or [""])[0] or None
+                self.send_json(project_summary(requested))
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
@@ -380,12 +392,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(error)}, 500)
             return
         if path == "/api/project/save":
-            project_file = primary_project_file(PROJECT)
-            if project_file is None:
-                self.send_json({"error": f"No .csproj found in {PROJECT}"}, 404)
-                return
             try:
                 payload = self.read_json()
+                project_file = resolve_project_file(PROJECT, payload.get("project"))
                 self.send_json(
                     save_project_properties(project_file, dict(payload.get("edits") or {}))
                 )

@@ -53,23 +53,37 @@ def _project_files(project: Path) -> list[Path]:
     return sorted(path for path in project.glob("*.csproj") if path.is_file())
 
 
-def primary_project_file(project: Path) -> Path | None:
+def project_files(project: Path) -> list[Path]:
+    """Return selectable top-level project files without following escapes."""
     root = project.resolve()
-    files = _project_files(root)
+    result = []
+    for candidate in _project_files(root):
+        target = candidate.resolve()
+        if target != root and root not in target.parents:
+            raise ValueError("Project file must stay inside the selected Bannerlord project")
+        if target.suffix.casefold() != ".csproj" or not target.is_file():
+            raise FileNotFoundError(target)
+        result.append(target)
+    return result
+
+
+def primary_project_file(project: Path) -> Path | None:
+    files = project_files(project)
     if not files:
         return None
-    target = files[0].resolve()
-    if target != root and root not in target.parents:
-        raise ValueError("Project file must stay inside the selected Bannerlord project")
-    if target.suffix.casefold() != ".csproj" or not target.is_file():
-        raise FileNotFoundError(target)
-    return target
+    if len(files) > 1:
+        names = ", ".join(path.name for path in files)
+        raise ValueError(f"Several .csproj files exist; select one explicitly: {names}")
+    return files[0]
 
 
-def _resolve_project_file(project: Path, requested: str | None = None) -> Path:
+def resolve_project_file(project: Path, requested: str | None = None) -> Path:
     root = project.resolve()
     if requested:
-        target = (root / requested).resolve()
+        relative = Path(str(requested).replace("\\", "/"))
+        if relative.is_absolute() or ".." in relative.parts or len(relative.parts) != 1:
+            raise ValueError("Project file selection must be a top-level .csproj filename")
+        target = (root / relative).resolve()
     else:
         candidate = primary_project_file(project)
         if candidate is None:
@@ -378,7 +392,7 @@ def run_build(
     configuration = str(configuration or "Debug")
     if configuration not in {"Debug", "Release"}:
         raise ValueError("Configuration must be Debug or Release")
-    project_file = _resolve_project_file(project, requested)
+    project_file = resolve_project_file(project, requested)
     selected_game = _selected_game_root(game_root)
     command = [
         "dotnet",

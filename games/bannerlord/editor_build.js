@@ -56,9 +56,28 @@
       el("div",{class:"bl-note"},"Runtime balance JSON is intentionally excluded so build/deploy cannot overwrite values managed by the Runtime tab."));
   }
 
+  async function selectBuildProject(name){
+    if(!name)return;
+    try{
+      const project=await api(`/api/project?project=${encodeURIComponent(name)}`);
+      state.project=project;state.savedProject=clone(project);renderBuild();refresh();
+    }catch(error){showAlert?.(String(error.message||error),"Bannerlord project selection failed")}
+  }
+
   function renderBuild(){
     const project=state.project?.projectFile;
-    if(!project){main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Build"),el("div",{class:"bl-empty"},"No .csproj exists in this project.")));return}
+    if(!project){
+      const files=state.project?.projectFiles||[];
+      if(files.length>1){
+        main.replaceChildren(el("section",{class:"bl-card"},
+          el("h2",{},"Choose build project"),
+          el("div",{class:"bl-list-block"},
+            el("div",{class:"bl-note"},state.project?.projectError||"Several .csproj files exist. Lexeditor will not choose one alphabetically."),
+            select("",[["","Choose .csproj"],...files.map(name=>[name,name])],value=>selectBuildProject(value))
+          )));return
+      }
+      main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Build"),el("div",{class:"bl-empty"},"No .csproj exists in this project.")));return
+    }
     const editable=project.editableProperties||[];
     const props=project.properties||{};
     const left=el("section",{class:"bl-card"},el("h2",{},project.name),
