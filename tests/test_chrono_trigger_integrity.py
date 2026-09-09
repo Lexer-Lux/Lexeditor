@@ -42,8 +42,10 @@ def _fixture(root: Path, *, omit_field=False, omit_world_table=False, omit_world
     scene = bytearray(24)
     struct.pack_into("<H", scene, 16, 2)
     bank = bytearray(WORLD_HEADER_OFFSET + 8 * WORLD_HEADER_SIZE + 16)
-    bank[WORLD_HEADER_OFFSET + 21] = 3
-    bank[WORLD_HEADER_OFFSET + 22] = 4
+    for world_id in range(8):
+        start = WORLD_HEADER_OFFSET + world_id * WORLD_HEADER_SIZE
+        bank[start + 21] = 3
+        bank[start + 22] = 4
     resources = [
         ("Game/field/Mapinfo/mapinfo_0.dat", bytes(scene)),
         (WORLD_BANK, bytes(bank)),
