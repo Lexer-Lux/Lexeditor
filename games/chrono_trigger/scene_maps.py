@@ -1,9 +1,9 @@
 """Structural scene-map decoder for Chrono Trigger Steam MapTable resources.
 
-This intentionally stops below tileset rendering: it exposes layer dimensions,
-raw tile indices, scrolling/blend flags and the RLE-compressed collision/property
-grid. Those structures are sufficient for a useful map-layout/collision view
-without guessing how PC tileset graphics should be composed.
+This exposes layer dimensions, raw tile indices, scrolling/composition bitfields,
+RLE-compressed collision/property data and read-only scene animation descriptors.
+Raster composition itself stays deliberately separate until PC render-order and
+blend behavior are independently evidenced.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections import Counter
 
 from .data import OverlayStore, load_scene, sha256
+from .scene_animations import load_scene_chip_animations
 
 
 DIRECTIONS = ("North", "South", "East", "West")
@@ -34,6 +35,42 @@ def _scroll(value: int) -> dict:
               -0.0, -3.75, -7.5, -15.0, -30.0, -60.0, -120.0, -240.0)
     return {"raw": value, "xPixelsPerSecond": speeds[value & 0x0F],
             "yPixelsPerSecond": speeds[(value >> 4) & 0x0F]}
+
+
+def _screen_targets(value: int) -> dict:
+    """Expose CTViewer's PC MapTable bit labels without composing the layers."""
+    return {
+        "raw": value,
+        "main": {
+            "layer1": bool(value & 0x01),
+            "layer2": bool(value & 0x02),
+            "layer3": bool(value & 0x04),
+            "sprites": bool(value & 0x08),
+        },
+        "sub": {
+            "layer1": bool(value & 0x10),
+            "layer2": bool(value & 0x20),
+            "layer3": bool(value & 0x40),
+            "sprites": bool(value & 0x80),
+        },
+    }
+
+
+def _effect_bits(value: int) -> dict:
+    """Expose CTViewer's PC effect-bit names while keeping rendering unclaimed."""
+    return {
+        "raw": value,
+        "targets": {
+            "layer1": bool(value & 0x01),
+            "layer2": bool(value & 0x02),
+            "layer3": bool(value & 0x04),
+            "sprites": bool(value & 0x10),
+        },
+        "unknown08": bool(value & 0x08),
+        "defaultColor": bool(value & 0x20),
+        "halfIntensity": bool(value & 0x40),
+        "subtract": bool(value & 0x80),
+    }
 
 
 def _property(raw: bytes) -> dict:
@@ -139,14 +176,14 @@ def parse_scene_map(raw: bytes) -> dict:
     # Apply the two documented high-bank flags to the effective layer tile IDs.
     for y in range(heights["layer1"]):
         for x in range(widths["layer1"]):
-            prop = props[y * scene_width + x]
-            if prop["flags"]["layer1TileAdd"]:
+            prop_index = y * scene_width + x
+            if props[prop_index]["flags"]["layer1TileAdd"]:
                 index = y * widths["layer1"] + x
                 layers["layer1"]["tiles"][index] += 256
     for y in range(heights["layer2"]):
         for x in range(widths["layer2"]):
-            prop = props[y * scene_width + x]
-            if prop["flags"]["layer2TileAdd"]:
+            prop_index = y * scene_width + x
+            if props[prop_index]["flags"]["layer2TileAdd"]:
                 index = y * widths["layer2"] + x
                 layers["layer2"]["tiles"][index] += 256
 
@@ -158,6 +195,11 @@ def parse_scene_map(raw: bytes) -> dict:
             "scrollBits": (bits & 0x70) >> 4,
             "screenFlags": screen_flags, "effectFlags": effect_flags,
             "layer3Enabled": layer3_enabled,
+        },
+        "compositionBits": {
+            "screen": _screen_targets(screen_flags),
+            "effects": _effect_bits(effect_flags),
+            "semantics": "CTViewer PC MapTable bit labels only; Lexeditor does not emulate render order or blending from these flags.",
         },
         "sceneWidth": scene_width, "sceneHeight": scene_height,
         "layers": layers,
@@ -187,5 +229,8 @@ def load_scene_map(store: OverlayStore, scene_id: int, source: str = "mine") -> 
         "kind": "scene-map-layout", "sceneId": scene_id, "mapId": map_id,
         "path": path, "source": origin, "readOnly": True, "sha256": sha256(raw),
         "layerPriorities": priorities,
+        "priorityPath": priority_path if priorities is not None else None,
+        "prioritySemanticsKnown": False,
+        "chipAnimations": load_scene_chip_animations(store, scene_id, source),
         **parse_scene_map(raw),
     }
