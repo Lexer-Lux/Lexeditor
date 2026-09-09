@@ -1,0 +1,71 @@
+name: Chrono metadata sync
+
+on:
+  push:
+    branches:
+      - feat/chrono-trigger-steam
+    paths:
+      - '.github/workflows/chrono-metadata-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/chrono-trigger-steam
+      - name: Add Chrono Trigger documentation metadata
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          credits_path = Path('ui/credits.json')
+          credits = json.loads(credits_path.read_text(encoding='utf-8-sig'))
+          credits['plugins']['chrono-trigger'] = {
+              'contributions': [
+                  {
+                      'name': 'jimzrt / ChronoMod contributors',
+                      'role': 'Steam resources.bin ARC1 archive format reference.',
+                      'url': 'https://github.com/jimzrt/ChronoMod',
+                  },
+                  {
+                      'name': 'GitExl / CTViewer contributors',
+                      'role': 'Steam scene, overworld, map, tileset, palette and script format references.',
+                      'url': 'https://github.com/GitExl/CTViewer',
+                  },
+                  {
+                      'name': 'OnemusCT / Temporal Redux contributors',
+                      'role': 'PC Atel event command widths and behavior references.',
+                      'url': 'https://github.com/OnemusCT/temporal-redux',
+                  },
+                  {
+                      'name': 'TheRealBiggs / CTExt contributors',
+                      'role': 'Chrono Trigger Steam loose-file and CTP runtime loading model.',
+                      'url': 'https://github.com/TheRealBiggs/ctext',
+                  },
+              ],
+              'thanks': [],
+              'licenses': [],
+          }
+          credits_path.write_text(json.dumps(credits, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+          loading_path = Path('ui/mod-loading.json')
+          loading = json.loads(loading_path.read_text(encoding='utf-8-sig'))
+          loading['plugins']['chrono-trigger'] = {
+              'loader': 'CTExt. Lexeditor uses an already-installed CTExt runtime for explicit loose-file deployment and activation; it never installs or replaces the CTExt DLLs automatically.',
+              'structure': 'One selected Lexeditor project is a CTExt-compatible archive-relative overlay containing Game/... and Localize/... paths. External projects can be mirrored into <Chrono Trigger>/mods/<project-name>; a source project already directly under mods/<name> is used in place and is never deleted by Lexeditor.',
+              'overriding': 'CTExt owns runtime mod load order through ctext.json. Lexeditor appends or removes only its selected project entry, preserves unrelated entries, and never semantically merges separate projects; within the selected project, loose files replace the corresponding resources.bin resources while the installed archive remains immutable.',
+          }
+          loading_path.write_text(json.dumps(loading, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+          PY
+      - name: Commit metadata
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add ui/credits.json ui/mod-loading.json
+          git commit -m 'Document Chrono Trigger plugin metadata'
+          git push origin HEAD:feat/chrono-trigger-steam
