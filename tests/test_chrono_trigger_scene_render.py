@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 import struct
+import tempfile
 import unittest
 import zlib
 
+from games.chrono_trigger.data import OverlayStore
+from games.chrono_trigger.plugin import _build_smoke_archive
 from games.chrono_trigger.scene_render import png_rgba, render_scene_layer
 
 
@@ -129,6 +133,19 @@ class SceneRenderTests(unittest.TestCase):
         self.assertEqual(meta["paletteGroupSize"], 4)
         self.assertEqual(meta["logicalBitsPerPixel"], 2)
         self.assertEqual(meta["composition"], "isolated-layer")
+
+    def test_renders_layer_three_through_real_arc1_overlay_store(self):
+        fixture = _fixture()
+        with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-l3-") as temp_name:
+            root = Path(temp_name)
+            archive = root / "resources.bin"
+            _build_smoke_archive(archive, list(fixture.resources.items()))
+            store = OverlayStore(archive, root / "project")
+            png, meta = render_scene_layer(store, 0, 3, "mine")
+            width, height, pixels = _decode_png_rgba(png)
+            self.assertEqual((width, height), (256, 256))
+            self.assertEqual(pixels[:4], bytes((0, 255, 0, 255)))
+            self.assertEqual(meta["graphicsPath"], "Game/field/weather_bin/cg9.bin")
 
     def test_rejects_layer_three_when_map_does_not_enable_it(self):
         with self.assertRaisesRegex(ValueError, "does not enable layer 3"):
