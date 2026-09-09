@@ -60,6 +60,61 @@ class EventEditTests(unittest.TestCase):
         self.assertEqual(command["size"], 4)
         self.assertEqual(command["argumentsHex"], "78 56 01")
 
+    def test_changed_forward_jump_must_land_on_decoded_command_boundary(self):
+        # 0x18 at offset 32 is 3 bytes, so its jump origin is 34. The two
+        # Pause commands begin at 35 and 37; Return begins at 39.
+        original = _event(bytes((
+            0x18, 0x20, 0x01,
+            0xAD, 0x01,
+            0xAD, 0x02,
+            0x00,
+        )))
+        store = FakeStore(original)
+        result = save_event_arguments(
+            store, 1, 0, 0, 0, sha256(original), "20 03"
+        )
+        self.assertIsNotNone(store.overlay)
+        self.assertEqual(len(store.overlay), len(original))
+        self.assertEqual(result["savedCommand"]["argumentsHex"], "20 03")
+
+        rejected = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "not a decoded command boundary"):
+            save_event_arguments(
+                rejected, 1, 0, 0, 0, sha256(original), "20 02"
+            )
+        self.assertIsNone(rejected.overlay)
+
+    def test_existing_invalid_jump_does_not_block_unrelated_operand_edit(self):
+        # Jump distance 2 from origin 34 points to offset 36, in the middle of
+        # the first Pause command. Preserve that legacy byte while allowing the
+        # storyline operand itself to change.
+        original = _event(bytes((
+            0x18, 0x20, 0x02,
+            0xAD, 0x01,
+            0x00,
+        )))
+        store = FakeStore(original)
+        result = save_event_arguments(
+            store, 1, 0, 0, 0, sha256(original), "30 02"
+        )
+        self.assertEqual(result["savedCommand"]["argumentsHex"], "30 02")
+        self.assertEqual(store.overlay[34:36], bytes((0x30, 0x02)))
+
+    def test_changed_backward_jump_is_validated_too(self):
+        # Pause begins at 32, backward jump at 34 has origin 35. Distance 3
+        # lands on 32; distance 2 would split the Pause at offset 33.
+        original = _event(bytes((
+            0xAD, 0x01,
+            0x11, 0x03,
+            0x00,
+        )))
+        store = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "not a decoded command boundary"):
+            save_event_arguments(
+                store, 1, 0, 0, 1, sha256(original), "02"
+            )
+        self.assertIsNone(store.overlay)
+
     def test_rejects_stale_sha_without_writing(self):
         original = _event(bytes((0x83, 0x34, 0x12, 0x80, 0x00)))
         store = FakeStore(original)
