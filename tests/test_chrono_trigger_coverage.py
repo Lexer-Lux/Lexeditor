@@ -18,6 +18,12 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(script["coverage"], "structural")
         self.assertEqual(script["target"], "worlds")
 
+    def test_field_events_report_fixed_width_write_coverage(self):
+        event = resource_override("Game/field/atel/Atel_0020.dat")
+        self.assertEqual(event["status"], "partial")
+        self.assertEqual(event["coverage"], "structural + fixed-write")
+        self.assertEqual(event["target"], "events")
+
     def test_data_map_includes_world_headers_navigation_and_scripts(self):
         store = SimpleNamespace(archive=SimpleNamespace(entries=[
             SimpleNamespace(path="Game/common/bankc6.bin"),
@@ -42,6 +48,20 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(mapped["counts"]["worldHeaders"], 8)
         self.assertEqual(mapped["counts"]["worldEventTables"], 2)
         self.assertEqual(mapped["counts"]["worldScripts"], 1)
+
+    def test_data_map_describes_desktop_named_event_editing(self):
+        store = SimpleNamespace(archive=SimpleNamespace(entries=[
+            SimpleNamespace(path="Game/field/atel/Atel_0020.dat"),
+        ]))
+        base = {
+            "rows": [{"filename": "Game/field/atel/Atel_*.dat", "status": "partial"}],
+            "counts": {"resources": 1},
+        }
+        mapped = augment_data_map(store, base)
+        event_row = next(row for row in mapped["rows"] if row["filename"] == "Game/field/atel/Atel_*.dat")
+        self.assertEqual(event_row["coverage"], "structural + fixed-write")
+        self.assertIn("named fixed-width editing", event_row["controls"])
+        self.assertIn("desktop Events view", event_row["notes"])
 
 
 if __name__ == "__main__":
