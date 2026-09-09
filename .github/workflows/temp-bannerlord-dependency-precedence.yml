@@ -21,194 +21,146 @@ jobs:
         run: |
           from pathlib import Path
 
-          def replace_once(text, old, new, label):
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"{label}: expected one match, found {count}")
-              return text.replace(old, new, 1)
+          def replace_between(text, start, end, replacement, label, *, keep_end=True):
+              if text.count(start) != 1:
+                  raise SystemExit(f"{label}: start marker count is {text.count(start)}")
+              start_at = text.index(start)
+              tail = text[start_at:]
+              if tail.count(end) != 1:
+                  raise SystemExit(f"{label}: end marker count after start is {tail.count(end)}")
+              end_at = text.index(end, start_at)
+              if not keep_end:
+                  end_at += len(end)
+              return text[:start_at] + replacement + text[end_at:]
 
           path = Path("games/bannerlord/game_launch.py")
           text = path.read_text(encoding="utf-8")
 
-          old = '''    def community(module_id: str) -> list[dict]:
-              if module_id not in community_cache:
-                  folder = modules.get(module_id)
-                  if folder is None:
-                      raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
-                  community_cache[module_id] = read_community_dependencies(folder / "SubModule.xml")
-              return community_cache[module_id]
+          helpers = "\n".join([
+              '    def community(module_id: str) -> list[dict]:',
+              '        if module_id not in community_cache:',
+              '            folder = modules.get(module_id)',
+              '            if folder is None:',
+              '                raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")',
+              '            community_cache[module_id] = read_community_dependencies(folder / "SubModule.xml")',
+              '        return community_cache[module_id]',
+              '',
+              '    def dependencies_to_load(module_id: str) -> list[dict]:',
+              '        """Mirror ModuleManager DependenciesToLoadDistinct first-ID-wins precedence."""',
+              '        result: list[dict] = []',
+              '        seen: set[str] = set()',
+              '',
+              '        for row in community(module_id):',
+              '            dependency_id = str(row.get("id") or "").strip()',
+              '            if not dependency_id or row.get("incompatible") or dependency_id in seen:',
+              '                continue',
+              '            seen.add(dependency_id)',
+              '            result.append(row)',
+              '',
+              '        for row in metadata(module_id).get("dependencies", []):',
+              '            dependency_id = str(row.get("id") or "").strip()',
+              '            if not dependency_id or dependency_id in seen:',
+              '                continue',
+              '            seen.add(dependency_id)',
+              '            result.append({',
+              '                "id": dependency_id,',
+              '                "order": "LoadBeforeThis",',
+              '                "optional": bool(row.get("optional")),',
+              '                "incompatible": False,',
+              '                "source": "native",',
+              '            })',
+              '',
+              '        for row in metadata(module_id).get("modulesToLoadAfterThis", []):',
+              '            dependency_id = str(row.get("id") or "").strip()',
+              '            if not dependency_id or dependency_id in seen:',
+              '                continue',
+              '            seen.add(dependency_id)',
+              '            result.append({',
+              '                "id": dependency_id,',
+              '                "order": "LoadAfterThis",',
+              '                "optional": True,',
+              '                "incompatible": False,',
+              '                "source": "native-load-after",',
+              '            })',
+              '        return result',
+              '',
+              '    def incompatible_relations(module_id: str) -> list[str]:',
+              '        """Mirror DependenciesIncompatiblesDistinct first-ID-wins precedence."""',
+              '        result: list[str] = []',
+              '        seen: set[str] = set()',
+              '        for row in community(module_id):',
+              '            dependency_id = str(row.get("id") or "").strip()',
+              '            if not dependency_id or not row.get("incompatible") or dependency_id in seen:',
+              '                continue',
+              '            seen.add(dependency_id)',
+              '            result.append(dependency_id)',
+              '        for row in metadata(module_id).get("incompatibleModules", []):',
+              '            dependency_id = str(row.get("id") or "").strip()',
+              '            if not dependency_id or dependency_id in seen:',
+              '                continue',
+              '            seen.add(dependency_id)',
+              '            result.append(dependency_id)',
+              '        return result',
+              '',
+              '',
+          ])
+          text = replace_between(
+              text,
+              '    def community(module_id: str) -> list[dict]:\n',
+              '    included: set[str] = set()\n',
+              helpers,
+              'resolver helper insertion',
+          )
 
-          included: set[str] = set()
-          '''
-          new = '''    def community(module_id: str) -> list[dict]:
-              if module_id not in community_cache:
-                  folder = modules.get(module_id)
-                  if folder is None:
-                      raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
-                  community_cache[module_id] = read_community_dependencies(folder / "SubModule.xml")
-              return community_cache[module_id]
+          closure = "\n".join([
+              '        visiting.add(module_id)',
+              '        for dependency in dependencies_to_load(module_id):',
+              '            dependency_id = str(dependency.get("id") or "").strip()',
+              '            if not dependency_id or dependency.get("optional"):',
+              '                continue',
+              '            include_required(dependency_id)',
+              '        visiting.remove(module_id)',
+              '',
+          ])
+          text = replace_between(
+              text,
+              '        visiting.add(module_id)\n',
+              '        visiting.remove(module_id)\n',
+              closure,
+              'required dependency closure',
+              keep_end=False,
+          )
 
-          def dependencies_to_load(module_id: str) -> list[dict]:
-              """Mirror ModuleManager DependenciesToLoadDistinct first-ID-wins precedence."""
-              result: list[dict] = []
-              seen: set[str] = set()
+          graph = "\n".join([
+              '    conflicts = []',
+              '    for module_id in list(included):',
+              '        for relation in dependencies_to_load(module_id):',
+              '            related_id = str(relation.get("id") or "").strip()',
+              '            if not related_id:',
+              '                continue',
+              '            if related_id not in included:',
+              '                if not relation.get("optional"):',
+              '                    raise RuntimeError(f"Required Bannerlord dependency is not enabled: {related_id}")',
+              '                continue',
+              '            order = relation.get("order")',
+              '            if order == "LoadBeforeThis":',
+              '                add_edge(related_id, module_id)',
+              '            elif order == "LoadAfterThis":',
+              '                add_edge(module_id, related_id)',
+              '',
+              '        for incompatible_id in incompatible_relations(module_id):',
+              '            if incompatible_id in included:',
+              '                conflicts.append((module_id, incompatible_id))',
+              '',
+          ])
+          text = replace_between(
+              text,
+              '    conflicts = []\n',
+              '    if conflicts:\n',
+              graph,
+              'distinct relation graph',
+          )
 
-              for row in community(module_id):
-                  dependency_id = str(row.get("id") or "").strip()
-                  if not dependency_id or row.get("incompatible") or dependency_id in seen:
-                      continue
-                  seen.add(dependency_id)
-                  result.append(row)
-
-              for row in metadata(module_id).get("dependencies", []):
-                  dependency_id = str(row.get("id") or "").strip()
-                  if not dependency_id or dependency_id in seen:
-                      continue
-                  seen.add(dependency_id)
-                  result.append({
-                      "id": dependency_id,
-                      "order": "LoadBeforeThis",
-                      "optional": bool(row.get("optional")),
-                      "incompatible": False,
-                      "source": "native",
-                  })
-
-              for row in metadata(module_id).get("modulesToLoadAfterThis", []):
-                  dependency_id = str(row.get("id") or "").strip()
-                  if not dependency_id or dependency_id in seen:
-                      continue
-                  seen.add(dependency_id)
-                  result.append({
-                      "id": dependency_id,
-                      "order": "LoadAfterThis",
-                      "optional": True,
-                      "incompatible": False,
-                      "source": "native-load-after",
-                  })
-              return result
-
-          def incompatible_relations(module_id: str) -> list[str]:
-              """Mirror DependenciesIncompatiblesDistinct first-ID-wins precedence."""
-              result: list[str] = []
-              seen: set[str] = set()
-              for row in community(module_id):
-                  dependency_id = str(row.get("id") or "").strip()
-                  if not dependency_id or not row.get("incompatible") or dependency_id in seen:
-                      continue
-                  seen.add(dependency_id)
-                  result.append(dependency_id)
-              for row in metadata(module_id).get("incompatibleModules", []):
-                  dependency_id = str(row.get("id") or "").strip()
-                  if not dependency_id or dependency_id in seen:
-                      continue
-                  seen.add(dependency_id)
-                  result.append(dependency_id)
-              return result
-
-          included: set[str] = set()
-          '''
-          text = replace_once(text, old, new, "resolver helper insertion")
-
-          old = '''        visiting.add(module_id)
-              community_rows = community(module_id)
-              # Bannerlord.ModuleManager's DependenciesToLoadDistinct yields community
-              # non-incompatible metadata before native dependency rows. Match that
-              # precedence when deciding whether a duplicated dependency is required.
-              community_dependency_ids = {
-                  str(row.get("id") or "").strip()
-                  for row in community_rows
-                  if not row.get("incompatible") and str(row.get("id") or "").strip()
-              }
-              for dependency in metadata(module_id).get("dependencies", []):
-                  dependency_id = str(dependency.get("id") or "").strip()
-                  if (
-                      not dependency_id
-                      or dependency_id in community_dependency_ids
-                      or dependency.get("optional")
-                  ):
-                      continue
-                  include_required(dependency_id)
-              for dependency in community_rows:
-                  dependency_id = str(dependency.get("id") or "").strip()
-                  if not dependency_id or dependency.get("optional") or dependency.get("incompatible"):
-                      continue
-                  include_required(dependency_id)
-              visiting.remove(module_id)
-          '''
-          new = '''        visiting.add(module_id)
-              for dependency in dependencies_to_load(module_id):
-                  dependency_id = str(dependency.get("id") or "").strip()
-                  if not dependency_id or dependency.get("optional"):
-                      continue
-                  include_required(dependency_id)
-              visiting.remove(module_id)
-          '''
-          text = replace_once(text, old, new, "required closure")
-
-          old = '''    conflicts = []
-              for module_id in list(included):
-                  model = metadata(module_id)
-                  for dependency in model.get("dependencies", []):
-                      dependency_id = str(dependency.get("id") or "").strip()
-                      if dependency_id in included:
-                          add_edge(dependency_id, module_id)
-                      elif dependency_id and not dependency.get("optional"):
-                          overridden = any(
-                              str(row.get("id") or "").strip() == dependency_id
-                              and not row.get("incompatible")
-                              for row in community(module_id)
-                          )
-                          if not overridden:
-                              raise RuntimeError(f"Required Bannerlord dependency is not enabled: {dependency_id}")
-
-                  for relation in model.get("modulesToLoadAfterThis", []):
-                      after_id = str(relation.get("id") or "").strip()
-                      if after_id in included:
-                          add_edge(module_id, after_id)
-                  for relation in model.get("incompatibleModules", []):
-                      incompatible_id = str(relation.get("id") or "").strip()
-                      if incompatible_id in included:
-                          conflicts.append((module_id, incompatible_id))
-
-                  for relation in community(module_id):
-                      related_id = str(relation.get("id") or "").strip()
-                      if not related_id:
-                          continue
-                      if relation.get("incompatible"):
-                          if related_id in included:
-                              conflicts.append((module_id, related_id))
-                          continue
-                      if related_id not in included:
-                          if not relation.get("optional"):
-                              raise RuntimeError(f"Required Bannerlord dependency is not enabled: {related_id}")
-                          continue
-                      order = relation.get("order")
-                      if order == "LoadBeforeThis":
-                          add_edge(related_id, module_id)
-                      elif order == "LoadAfterThis":
-                          add_edge(module_id, related_id)
-          '''
-          new = '''    conflicts = []
-              for module_id in list(included):
-                  for relation in dependencies_to_load(module_id):
-                      related_id = str(relation.get("id") or "").strip()
-                      if not related_id:
-                          continue
-                      if related_id not in included:
-                          if not relation.get("optional"):
-                              raise RuntimeError(f"Required Bannerlord dependency is not enabled: {related_id}")
-                          continue
-                      order = relation.get("order")
-                      if order == "LoadBeforeThis":
-                          add_edge(related_id, module_id)
-                      elif order == "LoadAfterThis":
-                          add_edge(module_id, related_id)
-
-                  for incompatible_id in incompatible_relations(module_id):
-                      if incompatible_id in included:
-                          conflicts.append((module_id, incompatible_id))
-          '''
-          text = replace_once(text, old, new, "distinct relation graph")
           path.write_text(text, encoding="utf-8")
       - name: Write precedence regressions
         run: |
