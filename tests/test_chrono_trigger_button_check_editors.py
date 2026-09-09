@@ -59,15 +59,17 @@ class ButtonCheckEditorTests(unittest.TestCase):
                 self.assertEqual(schema["values"], {"jumpOffset": 5})
                 self.assertEqual([field["key"] for field in schema["fields"]], ["jumpOffset"])
 
-    def test_semantics_identify_check_without_claiming_branch_polarity(self):
+    def test_semantics_identify_check_and_proven_failure_branch(self):
         current = command_semantics(command(0x34, 3), {})
         self.assertEqual(current["check"], "A button · current")
         self.assertEqual(current["jumpOffset"], 3)
-        self.assertEqual(current["summary"], "A button · current check · jump +3")
+        self.assertTrue(current["jumpOnFailure"])
+        self.assertEqual(current["summary"], "A button · current check · failure → jump +3")
 
         since = command_semantics(command(0x3C, 7), {})
         self.assertEqual(since["check"], "Confirm action · since last")
-        self.assertEqual(since["summary"], "Confirm action · since last check · jump +7")
+        self.assertTrue(since["jumpOnFailure"])
+        self.assertEqual(since["summary"], "Confirm action · since last check · failure → jump +7")
 
     def test_jump_only_editor_retargets_to_valid_boundary(self):
         # One-byte argument means the check at 32 has jump origin 33. Pause
