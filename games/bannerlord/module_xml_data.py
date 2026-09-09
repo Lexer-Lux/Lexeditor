@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import xml.etree.ElementTree as ET
 
-from .gauntlet_data import _scan, _serialize
+from .xml_patch import scan_xml_start_tags, serialize_attribute
 
 
 def list_documents(project: Path) -> list[str]:
@@ -60,7 +60,9 @@ def read_document(project: Path, requested: str) -> dict:
         root = ET.fromstring(text)
     except ET.ParseError as error:
         raise ValueError(f"Invalid Bannerlord ModuleData XML in {requested}: {error}") from error
-    elements = _scan(text)
+    # No Gauntlet enum map is supplied here. ModuleData only infers syntax-safe
+    # booleans/numbers until a format/XSD-specific schema says more.
+    elements = scan_xml_start_tags(text)
     records = _record_rows(elements)
     return {
         "path": str(path),
@@ -75,7 +77,7 @@ def read_document(project: Path, requested: str) -> dict:
 def save_document(project: Path, requested: str, edits: list[dict]) -> dict:
     path = _document_path(project, requested)
     text = path.read_text(encoding="utf-8-sig")
-    elements = _scan(text)
+    elements = scan_xml_start_tags(text)
     by_path = {element["path"]: element for element in elements}
     replacements: list[tuple[int, int, str]] = []
     touched: set[tuple[str, str]] = set()
@@ -103,7 +105,7 @@ def save_document(project: Path, requested: str, edits: list[dict]) -> dict:
             raise ValueError(
                 f"{element_path} {attribute_name} changed on disk; reload before saving"
             )
-        replacement = _serialize(attribute, edit.get("value"))
+        replacement = serialize_attribute(attribute, edit.get("value"))
         left, right = attribute["_span"]
         if text[left:right] != replacement:
             replacements.append((left, right, replacement))
