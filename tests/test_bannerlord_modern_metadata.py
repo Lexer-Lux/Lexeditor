@@ -38,6 +38,26 @@ class BannerlordModernMetadataTests(unittest.TestCase):
             self.assertFalse(is_singleplayer_module(saved["module"]))
             self.assertTrue(Path(saved["backup"]).is_file())
 
+    def test_modern_category_is_authoritative_over_legacy_flags(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = Path(name) / "SubModule.xml"
+            path.write_text(
+                MODERN.replace(
+                    '<ModuleCategory value="Singleplayer" />',
+                    '<ModuleCategory value="Multiplayer" />\n  <SingleplayerModule value="true" />',
+                ),
+                encoding="utf-8",
+            )
+            module = read_submodule(path)
+            self.assertTrue(module["singleplayer"])
+            self.assertEqual(module["moduleCategory"], "Multiplayer")
+            self.assertFalse(is_singleplayer_module(module))
+
+    def test_legacy_flags_and_modern_default_remain_compatible(self):
+        self.assertTrue(is_singleplayer_module({"moduleCategory": "", "singleplayer": True, "multiplayer": False}))
+        self.assertFalse(is_singleplayer_module({"moduleCategory": "", "singleplayer": False, "multiplayer": True}))
+        self.assertTrue(is_singleplayer_module({"moduleCategory": "", "singleplayer": False, "multiplayer": False}))
+
     def test_optional_modern_metadata_can_be_removed_without_creating_legacy_nodes(self):
         with tempfile.TemporaryDirectory() as name:
             path = Path(name) / "SubModule.xml"
