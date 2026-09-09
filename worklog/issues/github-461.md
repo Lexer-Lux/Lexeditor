@@ -10,7 +10,7 @@ Status: actionable. One branch/PR: `feature/ffx-x2-plugin`.
 - Real VBF names can use raw `ffx_ps2/...` paths while Fahrenheit addresses them through the virtual `FFX_Data/...` / `FFX2_Data/...` roots; the plugin normalizes that boundary explicitly.
 - `FFXDataParser` is a research cross-check for the FFX `u16` fixed-record container, the FFX-2 `u32` fixed-record container and the proved `command.bin` fields. Its source is not copied into Lexeditor.
 - `HeartlessSeph/FFX2-010-Templates` independently establishes the `accessory.bin` 0x54-byte record layout used as a factual format cross-check; its template source is not copied.
-- Fahrenheit Stage 0 accepts `fhstage0.exe {EXECUTABLE_TO_LAUNCH} {ARGS}`; Fahrenheit's own build docs demonstrate targeting `FFX.exe` directly.
+- Fahrenheit Stage 0 accepts `fhstage0.exe {EXECUTABLE_TO_LAUNCH} {ARGS}`. Fahrenheit's own docs launch FFX as `fhstage0.exe ..\..\FFX.exe`, and Stage 0 resolves `fhstage1.dll` by relative name, so the required working directory is `<game>/fahrenheit/bin`.
 
 ## Implemented in this PR
 
@@ -28,14 +28,18 @@ Status: actionable. One branch/PR: `feature/ffx-x2-plugin`.
 - Game-keyed structured service writes FFX under `efl/x/FFX_Data/...` and FFX-2 under `efl/x2/FFX2_Data/...`.
 - Reversible Lexeditor-owned Fahrenheit file-only deployment with foreign/external-change guards.
 - Private installed-game theme extraction/cache with safe fallback and no bundled proprietary assets.
-- Nine structured UI views are now integrated: seven FFX plus X-2 Abilities and X-2 Accessories. The accessory panel is a plugin-specific extension loaded by the stable shared shell.
-- The nine-editor checkpoint passes FFX-X2 checks on Windows and Ubuntu, Shared UI contract, and Shared UI visual acceptance.
+- Nine structured UI views are integrated: seven FFX plus X-2 Abilities and X-2 Accessories. The accessory panel remains a plugin-specific extension loaded by the stable shared shell.
+- Collection-aware Play is wired through Fahrenheit Stage 0. `/api/play` accepts only the exact bodies `{"game":"x"}` or `{"game":"x2"}`; there is no executable, path, command or argument input.
+- Play never uses `FFX&X-2_LAUNCHER.exe`. It requires `fhstage0.exe`, `fhstage1.dll` and the selected game executable, runs Stage 0 with cwd `<game>/fahrenheit/bin`, and passes only the fixed relative target `..\..\FFX.exe` or `..\..\FFX-2.exe`.
+- `/api/launch` and the dashboard expose Stage 0/Stage 1, per-title executable and Windows-host readiness; `fahrenheit-launch` is advertised in plugin capabilities and the Data Map.
+- The UI exposes explicit **Play FFX** and **Play FFX-2** controls and disables them when the fixed launch contract is not actionable.
+- API regressions run the loopback service, patch only the launch execution boundary, prove both fixed keys reach it, and reject extra arguments, paths, launcher names, uppercase aliases, wrong types and non-object request bodies without spawning a game.
+- The nine-editor checkpoint before Play passed FFX-X2 checks on Windows and Ubuntu, Shared UI contract, and Shared UI visual acceptance. Play support is covered by the same matrix; keep this entry tied to the latest green head rather than treating synthetic launch tests as real in-game acceptance.
 
 ## Remaining actionable work
 
-- Add a collection-aware Play path that intentionally launches either `FFX.exe` or `FFX-2.exe` through Fahrenheit Stage 0.
 - Continue through well-documented FFX kernel families rather than exposing a generic hex editor.
 - Expand FFX-2 only through independently proved record fields; localized string editing, creature-extension accessory fields and other command fields remain intentionally untouched.
 - Convert recognized non-browser-ready font atlases, menu textures and UI-audio banks only when a proved/local conversion path is available.
 - Add Fahrenheit helper/version management if Lexeditor is going to install it rather than merely interoperate with an existing installation.
-- Use a real Steam installation to verify actual VBF inventories and record sizes, UI performance on full archive counts, one harmless structured/EFL replacement in each game, and deploy/revert acceptance. Do not close #461 from CI alone.
+- Use a real Steam installation to verify actual VBF inventories and record sizes, UI performance on full archive counts, one harmless structured/EFL replacement in each game, and real **Play FFX / Play FFX-2** Stage 0 startup plus deploy/revert acceptance. Do not close #461 from CI alone.
