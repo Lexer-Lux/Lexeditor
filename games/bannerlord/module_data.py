@@ -89,6 +89,17 @@ def read_submodule(path: Path) -> dict:
     submodule_root = root.find("SubModules")
     if submodule_root is not None:
         for index, element in enumerate(_element_children(submodule_root, "SubModule")):
+            assemblies = []
+            assemblies_root = element.find("Assemblies")
+            if assemblies_root is not None:
+                for assembly_index, assembly in enumerate(_element_children(assemblies_root, "Assembly")):
+                    assemblies.append(
+                        {
+                            "index": assembly_index,
+                            "value": assembly.attrib.get("value", ""),
+                            "attributes": dict(assembly.attrib),
+                        }
+                    )
             tags = []
             tags_root = element.find("Tags")
             if tags_root is not None:
@@ -107,6 +118,7 @@ def read_submodule(path: Path) -> dict:
                     "name": _value(element, "Name"),
                     "dllName": _value(element, "DLLName"),
                     "classType": _value(element, "SubModuleClassType"),
+                    "assemblies": assemblies,
                     "tags": tags,
                 }
             )
@@ -155,8 +167,16 @@ def read_submodule(path: Path) -> dict:
 
 
 def is_singleplayer_module(module: dict) -> bool:
-    """Accept both legacy SingleplayerModule and modern ModuleCategory metadata."""
-    return bool(module.get("singleplayer")) or str(module.get("moduleCategory") or "").strip().casefold() == "singleplayer"
+    """Resolve modern ModuleCategory first, then legacy flags/defaults."""
+    category = str(module.get("moduleCategory") or "").strip().casefold()
+    if category:
+        return category == "singleplayer"
+    if module.get("singleplayer"):
+        return True
+    if module.get("multiplayer"):
+        return False
+    # ModuleCategory replaced the legacy flags and defaults to Singleplayer.
+    return True
 
 
 _EDITABLE_METADATA = {
@@ -360,6 +380,33 @@ def _edit_tags(parent: ET.Element, rows: list[dict]) -> int:
     return changes
 
 
+def _edit_assemblies(parent: ET.Element, rows: list[dict]) -> int:
+    assemblies_root = parent.find("Assemblies")
+    if assemblies_root is None and not rows:
+        return 0
+    assemblies_root = assemblies_root if assemblies_root is not None else ET.SubElement(parent, "Assemblies")
+    existing = _element_children(assemblies_root, "Assembly")
+    changes = 0
+    reused: set[int] = set()
+    output = []
+    for position, row in enumerate(rows):
+        value = str(row.get("value", "")).strip()
+        if not value:
+            raise ValueError(f"Submodule assembly {position + 1} needs a value")
+        element, created = _reuse(existing, row.get("index"), reused, "Assembly")
+        changes += int(created)
+        before = dict(element.attrib)
+        element.set("value", value)
+        changes += int(before != element.attrib)
+        output.append(element)
+    if len(existing) != len(output) or any(a is not b for a, b in zip(existing, output)):
+        changes += 1
+    _remove_tagged_children(assemblies_root, "Assembly")
+    for element in output:
+        assemblies_root.append(element)
+    return changes
+
+
 def _edit_submodules(root: ET.Element, rows: list[dict]) -> int:
     parent = _child_or_create(root, "SubModules")
     existing = _element_children(parent, "SubModule")
@@ -381,6 +428,7 @@ def _edit_submodules(root: ET.Element, rows: list[dict]) -> int:
         changes += int(_set_value(element, "Name", name))
         changes += int(_set_value(element, "DLLName", dll_name))
         changes += int(_set_value(element, "SubModuleClassType", class_type))
+        changes += _edit_assemblies(element, list(row.get("assemblies") or []))
         changes += _edit_tags(element, list(row.get("tags") or []))
         output.append(element)
     if len(existing) != len(output) or any(a is not b for a, b in zip(existing, output)):
@@ -554,7 +602,7 @@ def data_map(project: Path) -> dict:
             "id": "bannerlord-submodule",
             "filename": "SubModule.xml",
             "area": "Module",
-            "controls": "Module identity, compatibility, dependencies, submodules, and XML registrations",
+            "controls": "Module identity/category, dependency and inverse-load relations, incompatibilities, submodule DLL/class/assemblies/tags, and XML registrations",
             "coverage": "structured" if submodule.is_file() else "unavailable",
             "status": "integrated" if submodule.is_file() else "not-integrated",
             "target": "module" if submodule.is_file() else "",
@@ -562,7 +610,13 @@ def data_map(project: Path) -> dict:
             "openable": submodule.is_file(),
             "sourceAvailable": submodule.is_file(),
             "sourcePath": str(submodule),
-            "notes": "Full structured SubModule.xml editor." if submodule.is_file() else "SubModule.xml is required for a Bannerlord module project.",
+            "notes": (
+                "Structured editor for identity/category, dependency/load-order relations, incompatibilities, "
+                "submodule DLL/class/assemblies/tags, and XML registrations; unsupported or unknown nodes are "
+                "preserved and remain source-editable."
+                if submodule.is_file()
+                else "SubModule.xml is required for a Bannerlord module project."
+            ),
         }
     )
 

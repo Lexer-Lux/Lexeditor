@@ -174,8 +174,22 @@
       el("div",{class:"bl-actions"},el("button",{type:"button",onclick:()=>addTag(submodule)},"+ Add tag"))
     );
   }
+  function addAssembly(submodule){
+    submodule.assemblies=submodule.assemblies||[];
+    submodule.assemblies.push({index:null,value:"",attributes:{}});
+    render();refresh();
+  }
+  function renderAssemblies(submodule){
+    return el("div",{class:"bl-tags"},
+      ...(submodule.assemblies||[]).map((assembly,index)=>el("div",{class:"bl-tag-row",style:"grid-template-columns:minmax(180px,1fr) auto"},
+        textInput(assembly.value,value=>assembly.value=value,{placeholder:"Additional assembly DLL"}),
+        el("button",{type:"button",onclick:()=>{submodule.assemblies.splice(index,1);render();refresh()},title:"Remove assembly"},"×")
+      )),
+      el("div",{class:"bl-actions"},el("button",{type:"button",onclick:()=>addAssembly(submodule)},"+ Add assembly"))
+    );
+  }
   function addSubmodule(){
-    state.module.submodules.push({index:null,name:"",dllName:"",classType:"",tags:[]});
+    state.module.submodules.push({index:null,name:"",dllName:"",classType:"",assemblies:[],tags:[]});
     state.submoduleIndex=state.module.submodules.length-1;render();refresh();
   }
   function removeSubmodule(){
@@ -198,6 +212,8 @@
           ...fieldRow("DLL name",textInput(record.dllName,value=>record.dllName=value)),
           ...fieldRow("Class type",textInput(record.classType,value=>record.classType=value))
         ),
+        el("h2",{},"Assemblies"),renderAssemblies(record),
+        el("div",{class:"bl-note"},"Additional assemblies declared under this SubModule are preserved and edited as explicit DLL names."),
         el("h2",{},"Tags"),renderTags(record)
       ));
     main.replaceChildren(el("div",{class:"bl-split"},master,detail));
