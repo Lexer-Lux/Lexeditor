@@ -16,6 +16,8 @@ on:
       - 'settings_manager.py'
       - 'docs/UI-MANUAL.md'
       - '.github/scripts/ui_visual_acceptance.py'
+      - 'tests/global_browser_check.py'
+      - 'tests/global_controls_check.py'
       - 'tests/rdr_browser_check.py'
       - 'tests/ff8_graph_design_a_browser_check.py'
       - '.github/workflows/ui-visual-acceptance.yml'
@@ -32,6 +34,8 @@ on:
       - 'settings_manager.py'
       - 'docs/UI-MANUAL.md'
       - '.github/scripts/ui_visual_acceptance.py'
+      - 'tests/global_browser_check.py'
+      - 'tests/global_controls_check.py'
       - 'tests/rdr_browser_check.py'
       - 'tests/ff8_graph_design_a_browser_check.py'
       - '.github/workflows/ui-visual-acceptance.yml'
@@ -50,6 +54,12 @@ jobs:
           python -m playwright install --with-deps chromium
       - name: Shared Blank acceptance
         run: python .github/scripts/ui_visual_acceptance.py out/ui-visual-acceptance
+      - name: Global rendered browser regression
+        env:
+          LEXEDITOR_TEST_OUTPUT: out/global-browser
+        run: python tests/global_browser_check.py
+      - name: Global shared-control browser regression
+        run: python tests/global_controls_check.py
       - name: Data Map browser regression
         run: python tests/data_map_browser_check.py out/data-map-browser
       - name: RDR1 shared Detail acceptance
@@ -64,6 +74,8 @@ jobs:
           name: ui-visual-acceptance
           path: |
             out/ui-visual-acceptance
+            out/global-browser
+            out/global-controls
             out/data-map-browser
             out/rdr-browser
             out/ff8-graph-design-a
