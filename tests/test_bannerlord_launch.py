@@ -210,20 +210,23 @@ class BannerlordLaunchTests(unittest.TestCase):
             game = root / "game"
             workspace = root / "workspace"
             workspace.mkdir()
-            write_module(game, "Library", "Library")
+            write_module(
+                game,
+                "Library",
+                "Library",
+                (("LexerSkillTweaks", True),),
+            )
             write_module(
                 game,
                 "LexerSkillTweaks",
                 "LexerSkillTweaks",
                 (("Library", False),),
-                load_after=("Library",),
             )
             (workspace / "SubModule.xml").write_text(
                 '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
             )
             with self.assertRaisesRegex(RuntimeError, "load-order constraints form a cycle"):
                 module_load_order(game, workspace)
-
     def test_incompatible_enabled_module_is_rejected(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)

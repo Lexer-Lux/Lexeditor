@@ -124,6 +124,63 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
             community_cache[module_id] = read_community_dependencies(folder / "SubModule.xml")
         return community_cache[module_id]
 
+    def dependencies_to_load(module_id: str) -> list[dict]:
+        """Mirror ModuleManager DependenciesToLoadDistinct first-ID-wins precedence."""
+        result: list[dict] = []
+        seen: set[str] = set()
+
+        for row in community(module_id):
+            dependency_id = str(row.get("id") or "").strip()
+            if not dependency_id or row.get("incompatible") or dependency_id in seen:
+                continue
+            seen.add(dependency_id)
+            result.append(row)
+
+        for row in metadata(module_id).get("dependencies", []):
+            dependency_id = str(row.get("id") or "").strip()
+            if not dependency_id or dependency_id in seen:
+                continue
+            seen.add(dependency_id)
+            result.append({
+                "id": dependency_id,
+                "order": "LoadBeforeThis",
+                "optional": bool(row.get("optional")),
+                "incompatible": False,
+                "source": "native",
+            })
+
+        for row in metadata(module_id).get("modulesToLoadAfterThis", []):
+            dependency_id = str(row.get("id") or "").strip()
+            if not dependency_id or dependency_id in seen:
+                continue
+            seen.add(dependency_id)
+            result.append({
+                "id": dependency_id,
+                "order": "LoadAfterThis",
+                "optional": True,
+                "incompatible": False,
+                "source": "native-load-after",
+            })
+        return result
+
+    def incompatible_relations(module_id: str) -> list[str]:
+        """Mirror DependenciesIncompatiblesDistinct first-ID-wins precedence."""
+        result: list[str] = []
+        seen: set[str] = set()
+        for row in community(module_id):
+            dependency_id = str(row.get("id") or "").strip()
+            if not dependency_id or not row.get("incompatible") or dependency_id in seen:
+                continue
+            seen.add(dependency_id)
+            result.append(dependency_id)
+        for row in metadata(module_id).get("incompatibleModules", []):
+            dependency_id = str(row.get("id") or "").strip()
+            if not dependency_id or dependency_id in seen:
+                continue
+            seen.add(dependency_id)
+            result.append(dependency_id)
+        return result
+
     included: set[str] = set()
     preference: list[str] = []
     visiting: set[str] = set()
@@ -136,27 +193,9 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
         if module_id not in modules:
             raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
         visiting.add(module_id)
-        community_rows = community(module_id)
-        # Bannerlord.ModuleManager's DependenciesToLoadDistinct yields community
-        # non-incompatible metadata before native dependency rows. Match that
-        # precedence when deciding whether a duplicated dependency is required.
-        community_dependency_ids = {
-            str(row.get("id") or "").strip()
-            for row in community_rows
-            if not row.get("incompatible") and str(row.get("id") or "").strip()
-        }
-        for dependency in metadata(module_id).get("dependencies", []):
+        for dependency in dependencies_to_load(module_id):
             dependency_id = str(dependency.get("id") or "").strip()
-            if (
-                not dependency_id
-                or dependency_id in community_dependency_ids
-                or dependency.get("optional")
-            ):
-                continue
-            include_required(dependency_id)
-        for dependency in community_rows:
-            dependency_id = str(dependency.get("id") or "").strip()
-            if not dependency_id or dependency.get("optional") or dependency.get("incompatible"):
+            if not dependency_id or dependency.get("optional"):
                 continue
             include_required(dependency_id)
         visiting.remove(module_id)
@@ -182,37 +221,9 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
 
     conflicts = []
     for module_id in list(included):
-        model = metadata(module_id)
-        for dependency in model.get("dependencies", []):
-            dependency_id = str(dependency.get("id") or "").strip()
-            if dependency_id in included:
-                add_edge(dependency_id, module_id)
-            elif dependency_id and not dependency.get("optional"):
-                # A community row with the same ID can override native requiredness.
-                overridden = any(
-                    str(row.get("id") or "").strip() == dependency_id
-                    and not row.get("incompatible")
-                    for row in community(module_id)
-                )
-                if not overridden:
-                    raise RuntimeError(f"Required Bannerlord dependency is not enabled: {dependency_id}")
-
-        for relation in model.get("modulesToLoadAfterThis", []):
-            after_id = str(relation.get("id") or "").strip()
-            if after_id in included:
-                add_edge(module_id, after_id)
-        for relation in model.get("incompatibleModules", []):
-            incompatible_id = str(relation.get("id") or "").strip()
-            if incompatible_id in included:
-                conflicts.append((module_id, incompatible_id))
-
-        for relation in community(module_id):
+        for relation in dependencies_to_load(module_id):
             related_id = str(relation.get("id") or "").strip()
             if not related_id:
-                continue
-            if relation.get("incompatible"):
-                if related_id in included:
-                    conflicts.append((module_id, related_id))
                 continue
             if related_id not in included:
                 if not relation.get("optional"):
@@ -224,6 +235,9 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
             elif order == "LoadAfterThis":
                 add_edge(module_id, related_id)
 
+        for incompatible_id in incompatible_relations(module_id):
+            if incompatible_id in included:
+                conflicts.append((module_id, incompatible_id))
     if conflicts:
         rows = ", ".join(f"{left} ↔ {right}" for left, right in conflicts)
         raise RuntimeError(f"Incompatible Bannerlord modules would be enabled together: {rows}")
