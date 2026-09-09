@@ -80,6 +80,14 @@ Each proved record is exactly two bytes:
 
 The source tool labels each row as `Agility = record index + 1`. Lexeditor also shows the derived initial CTB range used by that research model: maximum ICV = `tick speed × 3`; minimum ICV = maximum ICV − ICV bonus. Only the two source bytes are written.
 
+### `prepare.bin` Rikku Mix results
+
+Integrated path:
+
+`FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/prepare.bin`
+
+Each proved record is exactly `0xE0` bytes: 112 little-endian `u16` result command IDs, one for each possible second ingredient. `FFXDataParser` maps record ordinal to the first ingredient command ID `0x2000 + ordinal`, and partner slot `i` to the second ingredient command ID `0x2000 + i`. Lexeditor edits only selected 16-bit result cells; zero remains a valid/undefined result value.
+
 ### `item_shop.bin` inventories
 
 Integrated path:
@@ -106,7 +114,7 @@ This table uses the same proved `0x22`-byte shop record shape:
 
 Item and gear shops share one validated binary implementation; their public APIs remain semantic (`itemIds` versus `gearIds`). Lexeditor writes only explicitly changed slots and preserves the leading rate field byte-for-byte.
 
-All five structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
+All six structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
 
 ## Project and loader boundary
 
@@ -142,6 +150,7 @@ Integrated:
 - Structured FFX `takara.bin` treasure reward editing.
 - Structured FFX `item_rate.bin` item/command gil-price editing.
 - Structured FFX `ctb_base.bin` tick-speed / ICV-bonus editing.
+- Structured FFX `prepare.bin` Rikku Mix result editing.
 - Structured FFX `item_shop.bin` 16-slot item/command inventory editing.
 - Structured FFX `arms_shop.bin` 16-slot gear inventory editing.
 - Reversible file-only Fahrenheit deployment mechanics.
