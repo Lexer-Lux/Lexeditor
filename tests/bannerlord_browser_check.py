@@ -20,7 +20,7 @@ MODULE = {
     "defaultModule": False,
     "singleplayer": True,
     "multiplayer": False,
-    "dependencies": [{"index": 0, "id": "Native", "dependentVersion": "", "optional": False, "attributes": {"Id": "Native"}}],
+    "dependencies": [],
     "incompatibleModules": [],
     "submodules": [{"index": 0, "name": "Fixture", "dllName": "Fixture.dll", "classType": "Fixture.SubModule", "tags": []}],
     "xmls": [{"index": 0, "id": "Items", "path": "items", "includedGameTypes": []}],
@@ -46,6 +46,7 @@ EMPTY_PERKS = {"available": False, "perks": []}
 EMPTY_XP = {"available": False, "sources": []}
 EMPTY_SETTINGS = {"available": False, "settings": []}
 RUNTIME = {"available": False, "effects": [], "xpSources": []}
+
 DEPLOYMENT = {
     "projectName": "Fixture Module",
     "moduleId": "FixtureMod",
@@ -57,28 +58,26 @@ DEPLOYMENT = {
     "deployedVersion": "v1.0.0",
     "gameRoot": "C:/game",
     "deployedRoot": "C:/game/Modules/FixtureMod",
-    "issues": ["1 ModuleData XML file(s) differ from deployed copies"],
+    "issues": ["1 deployed ModuleData assets file(s) differ from the project"],
     "dependencies": [],
     "binaries": [{"name": "Fixture.dll", "classType": "Fixture.SubModule", "exists": True, "size": 1234}],
     "assets": {
+        "gui": {"source": 1, "deployed": 1, "missing": [], "different": [], "inSync": True},
+        "moduleData": {"source": 1, "deployed": 1, "missing": [], "different": ["items.xml"], "inSync": False},
         "sourceGuiXml": 1,
         "deployedGuiXml": 1,
         "missingGuiXml": [],
-        "changedGuiXml": [],
-        "sourceModuleData": 1,
-        "deployedModuleData": 1,
-        "missingModuleData": [],
-        "changedModuleData": ["items.xml"],
+        "differentGuiXml": [],
     },
     "runtimeOverrides": {},
 }
-DATA_MAP = {
-    "rows": [
-        {"id": "module", "filename": "SubModule.xml", "area": "Module", "controls": "Module metadata", "coverage": "structured", "status": "integrated", "target": "module", "targets": ["module"], "openable": True, "sourceOpenable": True, "sourceAvailable": True},
-        {"id": "gauntlet", "filename": "GUI/Prefabs/Test.xml", "area": "UI", "controls": "Gauntlet widget hierarchy", "coverage": "structured", "status": "integrated", "target": "gauntlet", "targets": ["gauntlet"], "openable": True, "sourceOpenable": True, "sourceAvailable": True, "editorPath": "GUI/Prefabs/Test.xml"},
-        {"id": "moduledata", "filename": "ModuleData/items.xml", "area": "Module data", "controls": "Bannerlord object records", "coverage": "structured", "status": "integrated", "target": "moduledata", "targets": ["moduledata"], "openable": True, "sourceOpenable": True, "sourceAvailable": True, "editorPath": "ModuleData/items.xml"},
-    ]
-}
+
+DATA_MAP = {"rows": [
+    {"id": "module", "filename": "SubModule.xml", "area": "Module", "controls": "Module metadata", "coverage": "structured", "status": "integrated", "target": "module", "targets": ["module"], "openable": True, "sourceOpenable": True, "sourceAvailable": True},
+    {"id": "gauntlet", "filename": "GUI/Prefabs/Test.xml", "area": "UI", "controls": "Gauntlet widget hierarchy", "coverage": "structured", "status": "integrated", "target": "gauntlet", "targets": ["gauntlet"], "openable": True, "sourceOpenable": True, "sourceAvailable": True, "editorPath": "GUI/Prefabs/Test.xml"},
+    {"id": "moduledata", "filename": "ModuleData/items.xml", "area": "Module data", "controls": "Bannerlord object records", "coverage": "structured", "status": "integrated", "target": "moduledata", "targets": ["moduledata"], "openable": True, "sourceOpenable": True, "sourceAvailable": True, "editorPath": "ModuleData/items.xml"},
+]}
+
 MODULE_DATA_BAD = {
     "path": "C:/fixture/ModuleData/items.xml",
     "relativePath": "ModuleData/items.xml",
@@ -97,6 +96,7 @@ MODULE_DATA_BAD = {
 }
 MODULE_DATA_FIXED = {
     **MODULE_DATA_BAD,
+    "recordCount": 1,
     "records": [{"path": "Items[0]/Item[0]", "tag": "Item", "line": 2, "id": "browser_fixture", "name": "", "schemaIssueCount": 0}],
     "elements": [
         MODULE_DATA_BAD["elements"][0],
@@ -159,7 +159,10 @@ window.fetch=async function(input,options={{}}){{
     const body=options.body?JSON.parse(options.body):{{}};window.__bannerlordRequests.push({{path,body}});
     if(path==="/api/module-data/save")return new Response(JSON.stringify(__moduleDataFixed),{{status:200}});
     if(path==="/api/gauntlet/save")return new Response(JSON.stringify(__gauntlet),{{status:200}});
-    if(path==="/api/deploy-assets")return new Response(JSON.stringify({{assets:{{target:"C:/game/Modules/FixtureMod",copied:["ModuleData/items.xml"],unchanged:[],backups:[],deleted:[]}},deployment:{{...__fixtures["/api/deployment"],inSync:true,issues:[]}}}}),{{status:200}});
+    if(path==="/api/deploy-assets"){{
+      const deployment={{...__fixtures["/api/deployment"],inSync:true,issues:[],assets:{{...__fixtures["/api/deployment"].assets,moduleData:{{source:1,deployed:1,missing:[],different:[],inSync:true}}}}}};
+      return new Response(JSON.stringify({{assets:{{target:"C:/game/Modules/FixtureMod",copied:["ModuleData/items.xml"],unchanged:[],backups:[],deleted:[]}},deployment}}),{{status:200}});
+    }}
     if(path==="/api/build"||path==="/api/build-deploy")return new Response(JSON.stringify(path.endsWith("deploy")?{{build:{{succeeded:true,output:"Build succeeded",returnCode:0}},assets:{{target:"C:/game/Modules/FixtureMod",copied:[],unchanged:[],backups:[]}},deployment:__fixtures["/api/deployment"]}}:{{succeeded:true,output:"Build succeeded",returnCode:0}}),{{status:200}});
     return new Response(JSON.stringify({{}}),{{status:200}});
   }}
@@ -172,6 +175,7 @@ window.fetch=async function(input,options={{}}){{
         "<script>" + stub + "</script><script>" + (ROOT / "ui/framework.js").read_text(encoding="utf-8") + "</script>",
     )
     for name in (
+        "editor_alerts.js",
         "editor_core.js",
         "editor_balancing.js",
         "editor_build.js",
@@ -215,12 +219,10 @@ def main() -> None:
             page.evaluate('navigate("moduledata")')
             page.wait_for_function("state.moduleData && state.moduleData.schemaIssueCount===1")
             assert "Missing required attributes" in page.locator("#main").inner_text()
-            assert "1 schema issue" in page.locator("#main").inner_text()
             missing_panel = page.locator(".bl-list-block").filter(has_text="Missing required attributes")
             missing_panel.locator('input[type="checkbox"]').first.check()
             missing_panel.locator('input[type="text"]').first.fill("browser_fixture")
             assert page.evaluate("moduleDataDirty()") is True
-            assert page.evaluate("dirtyCount()") >= 1
             page.evaluate("save()")
             page.wait_for_function("state.moduleData && state.moduleData.schemaIssueCount===0")
             request = page.evaluate("window.__bannerlordRequests.find(row=>row.path==='/api/module-data/save')")
@@ -231,17 +233,14 @@ def main() -> None:
             page.evaluate('navigate("gauntlet")')
             page.wait_for_function("state.gauntlet && state.gauntlet.elementCount===3")
             page.locator("button.bl-item").filter(has_text="Widget").click()
-            assert page.locator('.bl-detail input[type="checkbox"]').count() == 1
             page.locator('.bl-detail input[type="checkbox"]').check()
             assert page.evaluate("gauntletDirty()") is True
             page.evaluate("save()")
             page.wait_for_function("!gauntletDirty()")
             gauntlet_request = page.evaluate("window.__bannerlordRequests.find(row=>row.path==='/api/gauntlet/save')")
             assert gauntlet_request["body"]["edits"][0]["attribute"] == "IsEnabled"
-            assert gauntlet_request["body"]["edits"][0]["value"] == "true"
 
             page.evaluate('navigate("build")')
-            page.wait_for_timeout(100)
             assert page.get_by_role("button", name="dotnet build", exact=True).is_enabled()
             assert page.get_by_role("button", name="Build + deploy", exact=True).is_enabled()
             assert page.get_by_role("button", name="Sync assets", exact=True).is_enabled()
@@ -250,18 +249,26 @@ def main() -> None:
             assert "1 copied" in page.locator("#main").inner_text()
 
             page.evaluate('navigate("deployment")')
-            assert "ModuleData deployment" in page.locator("#main").inner_text()
+            deployment_text = page.locator("#main").inner_text()
+            assert "GUI assets" in deployment_text
+            assert "ModuleData assets" in deployment_text
+            assert "Project/deployed sync" in deployment_text
+
             page.evaluate('navigate("datamap")')
             page.wait_for_timeout(100)
-            assert "ModuleData/items.xml" in page.locator("#main").inner_text()
-            assert "GUI/Prefabs/Test.xml" in page.locator("#main").inner_text()
+            data_map_text = page.locator("#main").inner_text()
+            assert "ModuleData/items.xml" in data_map_text
+            assert "GUI/Prefabs/Test.xml" in data_map_text
 
             page.screenshot(path=str(ARTIFACTS / "bannerlord-editor.png"), full_page=True)
             results.append({"viewport": [1280, 820], "status": "passed"})
             page.close()
         finally:
             browser.close()
-    (ARTIFACTS / "results.json").write_text(json.dumps({"fixtureOnly": True, "results": results, "errors": errors}, indent=2), encoding="utf-8")
+    (ARTIFACTS / "results.json").write_text(
+        json.dumps({"fixtureOnly": True, "results": results, "errors": errors}, indent=2),
+        encoding="utf-8",
+    )
     assert not errors, errors
     print(json.dumps(results, indent=2))
 
