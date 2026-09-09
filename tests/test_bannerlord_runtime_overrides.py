@@ -40,7 +40,7 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
         try:
             data = read_runtime_overrides(project, game)
             self.assertTrue(data["available"])
-            self.assertEqual(data["deployedRoot"], str(deployed))
+            self.assertEqual(Path(data["deployedRoot"]).resolve(), deployed.resolve())
             self.assertFalse(data["effects"][0]["overridden"])
             self.assertEqual(data["effects"][0]["low"], 150)
             self.assertEqual(data["effects"][0]["high"], 50)
