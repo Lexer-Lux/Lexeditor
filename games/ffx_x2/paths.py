@@ -70,7 +70,8 @@ def check() -> list[str]:
     problems: list[str] = []
     for relative in (
         "editor.html", "server.py", "plugin.py", "paths.py", "vbf.py", "deployment.py", "theme.py",
-        "ffx_table.py", "treasures.py", "item_shops.py", "project-template/README.md",
+        "ffx_table.py", "shop_table.py", "treasures.py", "item_shops.py", "gear_shops.py",
+        "project-template/README.md",
     ):
         target = PLUGIN_ROOT / relative
         if not target.is_file():
