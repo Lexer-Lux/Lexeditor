@@ -15,6 +15,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Inventory Chrono Trigger Steam resources.bin families")
     parser.add_argument("--game", required=True, type=Path, help="Chrono Trigger Steam install directory")
     parser.add_argument("--samples", type=int, default=40, help="Maximum samples per candidate family")
+    parser.add_argument(
+        "--peek-sizes", action="store_true",
+        help="Also read each candidate block's decoded 4-byte declared payload size; gzip payloads are not decompressed",
+    )
     return parser
 
 
@@ -23,7 +27,9 @@ def main(argv: list[str] | None = None) -> int:
     archive_path = args.game.expanduser().resolve() / "resources.bin"
     try:
         archive = ResourceArchive(archive_path)
-        payload = inventory_archive(archive, sample_limit=args.samples)
+        payload = inventory_archive(
+            archive, sample_limit=args.samples, peek_declared_sizes=args.peek_sizes,
+        )
     except (OSError, ValueError, ResourceArchiveError) as error:
         print(json.dumps({"error": str(error)}, ensure_ascii=False))
         return 1
