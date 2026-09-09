@@ -179,7 +179,7 @@ def is_singleplayer_module(module: dict) -> bool:
     """Resolve modern ModuleCategory first, then legacy flags/defaults."""
     category = str(module.get("moduleCategory") or "").strip().casefold()
     if category:
-        return category == "singleplayer"
+        return category in {"singleplayer", "singleplayeroptional"}
     if module.get("singleplayer"):
         return True
     if module.get("multiplayer"):
@@ -200,7 +200,7 @@ _EDITABLE_METADATA = {
 }
 _BOOLEAN_METADATA = {"defaultModule", "singleplayer", "multiplayer"}
 _ENUM_METADATA = {
-    "moduleCategory": {"Singleplayer", "Multiplayer", "MultiplayerOptional", "Server"},
+    "moduleCategory": {"Singleplayer", "SingleplayerOptional", "Multiplayer", "MultiplayerOptional", "Server", "ServerOptional"},
     "moduleType": {"Community", "Official", "OfficialOptional"},
 }
 _OPTIONAL_METADATA = set(_ENUM_METADATA)

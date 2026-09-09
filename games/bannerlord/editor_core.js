@@ -67,7 +67,7 @@
         ...fieldRow("Name",textInput(m.name,value=>setModuleField("name",value))),
         ...fieldRow("ID",textInput(m.id,value=>setModuleField("id",value))),
         ...fieldRow("Version",textInput(m.version,value=>setModuleField("version",value))),
-        ...fieldRow("Module category",select(m.moduleCategory||"",[["","Legacy / not set"],["Singleplayer","Singleplayer"],["Multiplayer","Multiplayer"],["MultiplayerOptional","Multiplayer optional"],["Server","Server"]],value=>setModuleField("moduleCategory",value))),
+        ...fieldRow("Module category",select(m.moduleCategory||"",[["","Legacy / not set"],["Singleplayer","Singleplayer"],["SingleplayerOptional","Singleplayer optional"],["Multiplayer","Multiplayer"],["MultiplayerOptional","Multiplayer optional"],["Server","Server"],["ServerOptional","Server optional"]],value=>setModuleField("moduleCategory",value))),
         ...fieldRow("Module type",select(m.moduleType||"",[["","Default / not set"],["Community","Community"],["Official","Official"],["OfficialOptional","Official optional"]],value=>setModuleField("moduleType",value))),
         ...fieldRow("Default module",checkbox(m.defaultModule,value=>setModuleField("defaultModule",value))),
         ...fieldRow("Single-player",checkbox(m.singleplayer,value=>setModuleField("singleplayer",value))),
