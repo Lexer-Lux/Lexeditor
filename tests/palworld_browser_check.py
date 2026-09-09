@@ -171,8 +171,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     # malformed fixture makes Build available; Build/Revert remains separate from activation.
                     page.evaluate('navigate("build")')
                     page.wait_for_function("typeof palBuildState === 'object' && palBuildState !== null && !palBuildLoading")
-                    assert palBuildError := page.evaluate("palBuildError")
-                    assert "aaa_bad.json" in palBuildError
+                    build_error = page.evaluate("palBuildError")
+                    assert build_error
+                    assert "aaa_bad.json" in build_error
                     bad.unlink()
                     page.get_by_role("button", name="Refresh", exact=True).click()
                     page.wait_for_function("palBuildState?.ready === true && !palBuildLoading")
