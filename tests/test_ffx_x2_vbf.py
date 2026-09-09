@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
+import struct
 
 import pytest
 
@@ -29,6 +31,18 @@ def test_vbf_rejects_corrupt_header_hash(tmp_path: Path):
     data[-1] ^= 0xFF
     archive.write_bytes(data)
     with pytest.raises(VBFError, match="header MD5"):
+        read_index(archive)
+
+
+def test_vbf_rejects_path_hash_mismatch_even_with_valid_header_hash(tmp_path: Path):
+    archive = tmp_path / "fixture.vbf"
+    _write_fixture_vbf(archive, [("FFX_Data/a.bin", b"abc")])
+    data = bytearray(archive.read_bytes())
+    header_length = struct.unpack_from("<I", data, 4)[0]
+    data[16] ^= 0xFF
+    data[-16:] = hashlib.md5(data[:header_length]).digest()
+    archive.write_bytes(data)
+    with pytest.raises(VBFError, match="path MD5"):
         read_index(archive)
 
 
