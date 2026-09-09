@@ -142,6 +142,11 @@ def _structured_current_for(game: str, archive_path: str) -> tuple[VBFIndex, Pat
     return index, target, read_entry(index, entry), "archive"
 
 
+def _structured_current(archive_path: str) -> tuple[VBFIndex, Path, bytes, str]:
+    """Compatibility wrapper for the original FFX-only structured helper."""
+    return _structured_current_for("x", archive_path)
+
+
 def _structured_payload_for(game: str, archive_path: str, builder) -> dict:
     key = _game_key(game)
     index, target, data, source = _structured_current_for(key, archive_path)
