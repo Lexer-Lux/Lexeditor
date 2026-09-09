@@ -16,10 +16,11 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - Eight overworld headers plus existing world exits/triggers/script-address editing.
 - Fail-closed read-only world script disassembly.
 - Localized labels where Steam message resources exist.
-- Actual PC scene/world L1/L2 PNG raster rendering in both the desktop Map views and `tools/chrono_trigger_map.py`.
-  - Scene Map can switch between structural collision/tile-ID views and isolated rendered L1/L2.
-  - Worlds has a Map tab for isolated rendered L1/L2.
-  - Animated chips, scene L3 artwork, and main/sub-screen blend/priority composition remain explicitly unsupported until current-PC evidence is sufficient.
+- Actual PC scene/world PNG raster rendering in both the desktop Map views and `tools/chrono_trigger_map.py`.
+  - Scene Map can switch between structural collision/tile-ID views and isolated rendered L1/L2/L3.
+  - Scene L3 follows CTViewer's current PC path: `weather_bin/cg*.bin`, scene-indexed `ChipTableBg3_*.dat`, 256 four-corner tiles, PC 3-byte corner records, and 4-color palette groups.
+  - Worlds has a Map tab for isolated rendered L1/L2 only.
+  - Animated L1/L2 chip playback and main/sub-screen blend/priority composition remain explicitly unsupported. PC `PrioMap` bytes are exposed but their semantics are not claimed.
 - Fixed 256-color BGR555 scene/world palette editing.
 - Project change inventory/revert and deterministic CTP export.
 - CTExt audit/deploy/deactivate/manifest-owned undeploy.
@@ -32,7 +33,7 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - `tools/chrono_trigger_ctext.py` — status/audit/deploy/deactivate/undeploy
 - `tools/chrono_trigger_event.py` — show/set-args/set-fields
 - `tools/chrono_trigger_palette.py` — palette show/set
-- `tools/chrono_trigger_map.py` — scene/world L1/L2 PNG render
+- `tools/chrono_trigger_map.py` — scene L1/L2/L3 and world L1/L2 PNG render
 - `tools/chrono_trigger_inventory.py` — real-install resource-family inventory
 
 ## Evidence
@@ -44,7 +45,7 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 
 ## Remaining high-value work
 
-1. Add scene L3/animated-tile rendering and correct main/sub-screen composition only where current PC evidence is sufficient.
+1. Add animated L1/L2 chip playback and correct main/sub-screen composition only where current PC evidence is sufficient; keep PC `PrioMap` semantics unclaimed until independently evidenced.
 2. Run the inventory against a current real Steam install and reverse-engineer actual PC battle/enemy/item/tech stat families before implementing stat editors.
 3. Keep improving event editing without moving command boundaries unless a tested assembler/relocation model is developed.
 4. Expand browser-level regression coverage for the integrated Chrono desktop surfaces.
