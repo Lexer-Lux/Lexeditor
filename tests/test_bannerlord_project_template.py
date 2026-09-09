@@ -37,6 +37,8 @@ class BannerlordProjectTemplateTests(unittest.TestCase):
             module = read_submodule(project / "SubModule.xml")
             self.assertEqual(module["name"], "My Cool Mod")
             self.assertEqual(module["id"], "MyCoolMod")
+            self.assertEqual(module["moduleCategory"], "Singleplayer")
+            self.assertEqual(module["moduleType"], "Community")
             self.assertTrue(module["singleplayer"])
             self.assertFalse(module["multiplayer"])
             self.assertEqual([row["id"] for row in module["dependencies"]], ["Native", "SandBoxCore", "Sandbox"])
