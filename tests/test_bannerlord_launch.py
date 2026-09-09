@@ -65,6 +65,7 @@ class BannerlordLaunchTests(unittest.TestCase):
             write_module(game, "CustomBattle", "CustomBattle", (("Native", False), ("SandBoxCore", False)))
             write_module(game, "SandBox", "Sandbox", (("Native", False), ("SandBoxCore", False)))
             write_module(game, "StoryMode", "StoryMode", (("Native", False), ("SandBoxCore", False), ("Sandbox", False)))
+            write_module(game, "NavalDLC", "NavalDLC", (("Native", False), ("SandBoxCore", False), ("Sandbox", False)))
             write_module(
                 game,
                 "LexerSkillTweaks",
@@ -76,8 +77,8 @@ class BannerlordLaunchTests(unittest.TestCase):
             )
             order = module_load_order(game, workspace)
             self.assertEqual(
-                order[:6],
-                ["Native", "SandBoxCore", "BirthAndDeath", "CustomBattle", "Sandbox", "StoryMode"],
+                order[:7],
+                ["Native", "SandBoxCore", "BirthAndDeath", "CustomBattle", "Sandbox", "StoryMode", "NavalDLC"],
             )
             self.assertEqual(order[-1], "LexerSkillTweaks")
             self.assertLess(order.index("Bannerlord.Harmony"), order.index("LexerSkillTweaks"))
@@ -85,6 +86,34 @@ class BannerlordLaunchTests(unittest.TestCase):
             command = launch_command(game, workspace)
             self.assertEqual(command[1], "/singleplayer")
             self.assertEqual(command[2], "_MODULES_*" + "*".join(order) + "*_MODULES_")
+
+    def test_modern_singleplayer_module_category_is_accepted_without_legacy_flag(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            game = root / "game"
+            workspace = root / "workspace"
+            workspace.mkdir()
+            bin_dir = game / "bin" / "Win64_Shipping_Client"
+            bin_dir.mkdir(parents=True)
+            (bin_dir / "Bannerlord.exe").write_bytes(b"")
+            module = game / "Modules" / "ModernModule"
+            module.mkdir(parents=True)
+            (module / "SubModule.xml").write_text(
+                '''<Module>
+  <Name value="Modern Module" />
+  <Id value="ModernModule" />
+  <Version value="v1.0.0" />
+  <ModuleCategory value="Singleplayer" />
+  <ModuleType value="Community" />
+  <DependedModules />
+</Module>''',
+                encoding="utf-8",
+            )
+            (workspace / "SubModule.xml").write_text(
+                '<Module><Id value="ModernModule" /></Module>', encoding="utf-8"
+            )
+            self.assertEqual(module_load_order(game, workspace), ["ModernModule"])
+            self.assertEqual(launch_command(game, workspace)[1], "/singleplayer")
 
     def test_missing_required_dependency_refuses_launch(self):
         with tempfile.TemporaryDirectory() as name:
