@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Inspect or explicitly deploy one Lexeditor Chrono Trigger project through CTExt."""
+"""Inspect and explicitly manage one Lexeditor Chrono Trigger project through CTExt."""
 
 from __future__ import annotations
 
@@ -12,7 +12,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from games.chrono_trigger.ctext_manager import deploy_project, status
+from games.chrono_trigger.ctext_manager import (
+    deactivate_project,
+    deploy_project,
+    status,
+    undeploy_project,
+)
 from games.chrono_trigger.data import OverlayStore
 from games.chrono_trigger.integrity import audit_project
 
@@ -23,13 +28,13 @@ def _print(payload: dict) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Chrono Trigger Steam CTExt project status/audit/deployment",
+        description="Chrono Trigger Steam CTExt project status/audit/deployment lifecycle",
     )
     parser.add_argument("--game", type=Path, required=True, help="Chrono Trigger Steam directory")
     parser.add_argument("--project", type=Path, required=True, help="Lexeditor/CTExt loose-file project")
     parser.add_argument(
-        "action", choices=("status", "audit", "deploy"), nargs="?", default="status",
-        help="operation to perform (default: status)",
+        "action", choices=("status", "audit", "deploy", "deactivate", "undeploy"),
+        nargs="?", default="status", help="operation to perform (default: status)",
     )
     args = parser.parse_args(argv)
     game = args.game.resolve()
@@ -37,6 +42,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.action == "status":
         _print(status(game, project))
+        return 0
+    if args.action == "deactivate":
+        _print(deactivate_project(game, project))
+        return 0
+    if args.action == "undeploy":
+        _print(undeploy_project(game, project))
         return 0
 
     archive = game / "resources.bin"
