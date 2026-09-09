@@ -2,7 +2,6 @@ name: Chrono Trigger checks
 
 on:
   push:
-    branches: [master]
     paths:
       - 'games/chrono_trigger/**'
       - 'tests/test_chrono_trigger_resources.py'
