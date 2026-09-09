@@ -37,6 +37,10 @@ U16 = 0xFFFF
 SCRIPT_MEM_START = 0x7F0200
 SCRIPT_MEM_LAST = SCRIPT_MEM_START + U8 * 2
 ENCODED_TARGET_MAX = U8 // 2
+BUTTON_JUMP_OPCODES = frozenset({
+    0x2D, 0x30, 0x31, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39,
+    0x3B, 0x3C, 0x3F, 0x40, 0x41, 0x42, 0x43, 0x44,
+})
 
 BATTLE_BITS = {
     "noWinPose": (0, 0x01, "No win pose"),
@@ -127,6 +131,11 @@ def editor_schema(command: dict) -> dict | None:
             return None
         fields = [Field("storylineValue", "Storyline threshold", 0, U8),
                   Field("jumpOffset", "Jump bytes", 0, U8)]
+    elif opcode in BUTTON_JUMP_OPCODES:
+        args = _base_args(command)
+        if len(args) != 1:
+            return None
+        fields = [Field("jumpOffset", "Jump bytes", 0, U8)]
     elif opcode in {0x20, 0x55, 0x7F}:
         label = {
             0x20: "Store PC1 ID at",
@@ -244,6 +253,8 @@ def editor_values(command: dict) -> dict:
     args = _base_args(command)
     if opcode == 0x18 and len(args) == 2:
         return {"storylineValue": args[0], "jumpOffset": args[1]}
+    if opcode in BUTTON_JUMP_OPCODES and len(args) == 1:
+        return {"jumpOffset": args[0]}
     if opcode in {0x20, 0x55, 0x7F} and len(args) == 1:
         return {"storeAddress": _script_address(args[0])}
     if opcode in {0x21, 0x22} and len(args) == 3 and not (args[0] & 1):
@@ -333,6 +344,9 @@ def _apply(command: dict, values: dict) -> bytes:
             args[0] = _int(values["storylineValue"], 0, U8, "Storyline threshold")
         if "jumpOffset" in values:
             args[1] = _int(values["jumpOffset"], 0, U8, "Jump bytes")
+    elif opcode in BUTTON_JUMP_OPCODES:
+        if "jumpOffset" in values:
+            args[0] = _int(values["jumpOffset"], 0, U8, "Jump bytes")
     elif opcode in {0x20, 0x55, 0x7F}:
         if "storeAddress" in values:
             args[0] = _script_offset(values["storeAddress"], "Store address")
