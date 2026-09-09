@@ -53,8 +53,26 @@ def _counter_rows(counter: Counter, *, key: str, limit: int = 40) -> list[dict]:
     ]
 
 
+def _selected_families(families) -> list[str]:
+    if families is None:
+        return list(CANDIDATE_KEYWORDS)
+    selected: list[str] = []
+    for value in families:
+        family = str(value).strip().casefold()
+        if family not in CANDIDATE_KEYWORDS:
+            raise ValueError(
+                f"unknown candidate family {value!r}; expected one of {', '.join(CANDIDATE_KEYWORDS)}"
+            )
+        if family not in selected:
+            selected.append(family)
+    if not selected:
+        raise ValueError("at least one candidate family must be selected")
+    return selected
+
+
 def inventory_archive(
     archive: ResourceArchive, *, sample_limit: int = 40, peek_declared_sizes: bool = False,
+    families=None,
 ) -> dict:
     entries = list(archive.entries)
     paths = [entry.path for entry in entries]
@@ -66,12 +84,30 @@ def inventory_archive(
         parent = PurePosixPath(path).parent.as_posix()
         directories[parent] += 1
 
+    selected_families = _selected_families(families)
     size_peeker = getattr(archive, "declared_payload_size", None)
     if peek_declared_sizes and not callable(size_peeker):
         raise ValueError("archive does not support declared payload-size peeking")
 
+    # A resource path can match more than one candidate family (for example an
+    # enemy file under Game/battle). Read its four-byte prefix at most once.
+    declared_cache: dict[str, tuple[int | None, str | None]] = {}
+
+    def declared_for(path: str, entry) -> tuple[int | None, str | None]:
+        if path in declared_cache:
+            return declared_cache[path]
+        try:
+            value = int(size_peeker(entry))
+        except Exception as error:
+            result = (None, str(error))
+        else:
+            result = (value, None)
+        declared_cache[path] = result
+        return result
+
     candidates: dict[str, dict] = {}
-    for family, words in CANDIDATE_KEYWORDS.items():
+    for family in selected_families:
+        words = CANDIDATE_KEYWORDS[family]
         scored = []
         family_directories = Counter()
         family_extensions = Counter()
@@ -95,10 +131,9 @@ def inventory_archive(
                 row["storedSize"] = stored_size
                 family_sizes[stored_size] += 1
             if peek_declared_sizes:
-                try:
-                    declared_size = int(size_peeker(entry))
-                except Exception as error:
-                    row["declaredSizeError"] = str(error)
+                declared_size, declared_error = declared_for(path, entry)
+                if declared_error is not None:
+                    row["declaredSizeError"] = declared_error
                 else:
                     row["declaredSize"] = declared_size
                     family_declared_sizes[declared_size] += 1
@@ -122,7 +157,7 @@ def inventory_archive(
     if peek_declared_sizes:
         method = (
             "ARC1 index + four-byte decoded entry-size prefixes only; candidate directory/extension/stored-size/"
-            "declared-size clusters; no candidate gzip payloads were decompressed"
+            "declared-size clusters; repeated candidate paths are peeked once; no candidate gzip payloads were decompressed"
         )
     else:
         method = (
@@ -133,7 +168,9 @@ def inventory_archive(
         "kind": "chrono-trigger-resource-inventory",
         "archive": str(archive.path),
         "resourceCount": len(paths),
+        "selectedFamilies": selected_families,
         "peekDeclaredSizes": bool(peek_declared_sizes),
+        "peekedResourceCount": len(declared_cache),
         "extensions": dict(sorted(extensions.items(), key=lambda row: (-row[1], row[0]))),
         "topLevel": dict(sorted(top.items(), key=lambda row: (-row[1], row[0].casefold()))),
         "directories": directory_rows,
