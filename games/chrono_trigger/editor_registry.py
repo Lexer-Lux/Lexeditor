@@ -17,11 +17,15 @@ from .field_editors import (
     editor_schema as base_editor_schema,
     save_event_fields as save_base_event_fields,
 )
+from .memory_ops import (
+    apply_memory_op,
+    decorate_memory_semantics,
+    memory_field_specs,
+    memory_values,
+)
 
 
-def comparison_editor_schema(command: dict) -> dict | None:
-    specs = comparison_field_specs(command)
-    values = comparison_values(command)
+def _schema_from_specs(command: dict, specs: list[dict] | None, values: dict | None) -> dict | None:
     if specs is None or values is None:
         return None
     fields = [
@@ -43,22 +47,34 @@ def comparison_editor_schema(command: dict) -> dict | None:
     }
 
 
+def comparison_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, comparison_field_specs(command), comparison_values(command))
+
+
+def memory_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, memory_field_specs(command), memory_values(command))
+
+
 def editor_schema(command: dict) -> dict | None:
-    comparison = comparison_editor_schema(command)
-    if comparison is not None:
-        return comparison
+    for builder in (comparison_editor_schema, memory_editor_schema):
+        schema = builder(command)
+        if schema is not None:
+            return schema
     return base_editor_schema(command)
 
 
 def decorate_event_editors(payload: dict) -> dict:
     decorate_comparison_semantics(payload)
+    decorate_memory_semantics(payload)
     decorate_base_editors(payload)
     for obj in payload.get("objects", []):
         for function in obj.get("functions", []):
             for command in function.get("commands", []):
-                comparison = comparison_editor_schema(command)
-                if comparison is not None:
-                    command["editor"] = comparison
+                for builder in (comparison_editor_schema, memory_editor_schema):
+                    schema = builder(command)
+                    if schema is not None:
+                        command["editor"] = schema
+                        break
     return payload
 
 
@@ -79,13 +95,14 @@ def save_event_fields(store: OverlayStore, event_id: int, object_id: int, functi
     if not isinstance(values, dict):
         raise ValueError("Event field changes must be an object")
     command = _command(store, event_id, object_id, function_id, command_index)
-    replacement = apply_comparison(command, values)
-    if replacement is None:
-        return save_base_event_fields(
-            store, event_id, object_id, function_id, command_index,
-            expected_sha256, values,
-        )
-    return save_event_arguments(
+    for apply in (apply_comparison, apply_memory_op):
+        replacement = apply(command, values)
+        if replacement is not None:
+            return save_event_arguments(
+                store, event_id, object_id, function_id, command_index,
+                expected_sha256, replacement,
+            )
+    return save_base_event_fields(
         store, event_id, object_id, function_id, command_index,
-        expected_sha256, replacement,
+        expected_sha256, values,
     )
