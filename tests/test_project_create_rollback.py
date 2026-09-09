@@ -71,6 +71,42 @@ class ProjectCreateRollbackTests(unittest.TestCase):
             self.assertEqual(Path(snapshot["current"]).resolve(), target)
             self.assertTrue((root / "projects.json").is_file())
 
+    def test_windows_reserved_and_trailing_dot_names_are_rejected_cross_platform(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            parent = root / "projects"
+            parent.mkdir()
+            manager = self.manager(root, lambda _target: None)
+            for invalid in ("CON", "con.txt", "NUL.mod", "COM1", "LPT9.data", "AUX", "Bad."):
+                with self.subTest(invalid=invalid):
+                    with self.assertRaisesRegex(ValueError, "valid folder name"):
+                        manager.create("test", str(parent), invalid)
+            self.assertEqual(list(parent.iterdir()), [])
+            self.assertFalse((root / "projects.json").exists())
+
+    def test_control_characters_are_rejected_before_copy(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            parent = root / "projects"
+            parent.mkdir()
+            manager = self.manager(root, lambda _target: None)
+            with self.assertRaisesRegex(ValueError, "valid folder name"):
+                manager.create("test", str(parent), "bad\nname")
+            self.assertEqual(list(parent.iterdir()), [])
+
+    def test_rename_uses_the_same_portable_folder_name_rules(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            parent = root / "projects"
+            parent.mkdir()
+            manager = self.manager(root, lambda _target: None)
+            snapshot = manager.create("test", str(parent), "Good")
+            project = Path(snapshot["current"])
+            with self.assertRaisesRegex(ValueError, "valid folder name"):
+                manager.rename("test", str(project), "CON.txt")
+            self.assertTrue(project.is_dir())
+            self.assertEqual(Path(manager.snapshot("test")["current"]).resolve(), project.resolve())
+
 
 if __name__ == "__main__":
     unittest.main()
