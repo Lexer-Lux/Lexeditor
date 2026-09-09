@@ -305,8 +305,10 @@ def save_document(
             ET.fromstring(candidate)
         except ET.ParseError as error:
             raise ValueError(f"Saving would create invalid ModuleData XML: {error}") from error
+        paths.clear_write_helper(backup)
         shutil.copy2(path, backup)
         temporary = path.with_name(path.name + ".lexeditor.tmp")
+        paths.clear_write_helper(temporary)
         temporary.write_text(candidate, encoding="utf-8")
         temporary.replace(path)
     result = read_document(project, requested, game_root)
