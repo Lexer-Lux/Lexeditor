@@ -67,6 +67,14 @@ Integrated path:
 
 Each proved record is exactly four bytes containing one little-endian unsigned `u32` gil price. `FFXDataParser` maps table order to item/command IDs beginning at `0x2000`; Lexeditor exposes both the source record ID and that derived command ID and writes only selected four-byte price records.
 
+### `arms_rate.bin` auto-ability prices
+
+Integrated path:
+
+`FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/arms_rate.bin`
+
+This is the same proved four-byte unsigned gil-price table shape. `FFXDataParser` applies the rows by ordinal to auto-ability IDs displayed as `80xx`, so Lexeditor maps ordinal 0 to `0x8000`, ordinal 1 to `0x8001`, and so on. Item prices and auto-ability prices share one binary u32-price implementation while exposing their different semantic ID fields.
+
 ### `ctb_base.bin` battle timing
 
 Integrated path:
@@ -114,7 +122,7 @@ This table uses the same proved `0x22`-byte shop record shape:
 
 Item and gear shops share one validated binary implementation; their public APIs remain semantic (`itemIds` versus `gearIds`). Lexeditor writes only explicitly changed slots and preserves the leading rate field byte-for-byte.
 
-All six structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
+All seven structured editors are guarded by the VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
 
 ## Project and loader boundary
 
@@ -149,6 +157,7 @@ Integrated:
 - Common FFX fixed-record table validation.
 - Structured FFX `takara.bin` treasure reward editing.
 - Structured FFX `item_rate.bin` item/command gil-price editing.
+- Structured FFX `arms_rate.bin` auto-ability gil-price editing.
 - Structured FFX `ctb_base.bin` tick-speed / ICV-bonus editing.
 - Structured FFX `prepare.bin` Rikku Mix result editing.
 - Structured FFX `item_shop.bin` 16-slot item/command inventory editing.
