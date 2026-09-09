@@ -29,6 +29,8 @@ BATTLE_FLAGS = (
     (1, 0x80, "regroup"),
 )
 
+FACING_NAMES = ("up", "down", "left", "right")
+
 
 def _u16(data: bytes, offset: int = 0) -> int:
     return int.from_bytes(data[offset:offset + 2], "little")
@@ -52,6 +54,14 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
     items = labels.get("itemNames", [])
     players = labels.get("playerNames", [])
 
+    if opcode in {0x20, 0x55, 0x7F} and len(args) == 1:
+        address = _script_address(args[0])
+        label = {
+            0x20: "PC1 ID",
+            0x55: "Storyline counter",
+            0x7F: "Random value",
+        }[opcode]
+        return {"summary": f"{label} → 0x{address:06X}", "storeAddress": address}
     if opcode == 0x83 and len(args) == 3:
         enemy = _u16(args)
         return {
@@ -68,6 +78,17 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
         return {"summary": f"NPC speed from 0x{address:06X}", "speedAddress": address}
     if opcode == 0x8B and len(args) == 2:
         return {"summary": f"NPC tile position ({args[0]}, {args[1]})", "tileX": args[0], "tileY": args[1]}
+    if opcode == 0x8C and len(args) == 2:
+        x_address, y_address = _script_address(args[0]), _script_address(args[1])
+        return {
+            "summary": f"NPC position from X 0x{x_address:06X} · Y 0x{y_address:06X}",
+            "xAddress": x_address, "yAddress": y_address,
+        }
+    if opcode == 0xA6 and len(args) == 1 and args[0] <= 3:
+        return {"summary": f"NPC facing {FACING_NAMES[args[0]]}", "facing": args[0], "facingName": FACING_NAMES[args[0]]}
+    if opcode == 0xA7 and len(args) == 1:
+        address = _script_address(args[0])
+        return {"summary": f"NPC facing from 0x{address:06X}", "facingAddress": address}
     if opcode == 0xB8 and len(args) == 1:
         return {"summary": f"Message table {args[0]}", "messageTable": args[0]}
     if opcode in {0xBB, 0xC1, 0xC2} and len(args) >= 2:
