@@ -1,20 +1,61 @@
 "use strict";
+  state.deployResult=null;
   const booleanProjectProperties=new Set(["AppendTargetFrameworkToOutputPath","CopyLocalLockFileAssemblies"]);
   function projectControl(name,value){
     if(booleanProjectProperties.has(name))return checkbox(String(value).toLowerCase()==="true",checked=>state.project.projectFile.properties[name]=checked?"true":"false");
     if(name==="Nullable")return select(value||"disable",[["disable","disable"],["enable","enable"],["warnings","warnings"],["annotations","annotations"]],next=>state.project.projectFile.properties[name]=next);
     return textInput(value,next=>state.project.projectFile.properties[name]=next);
   }
-  function runBuild(){
-    if(state.building)return;
-    state.building=true;state.buildResult={output:"Building…",succeeded:false};renderBuild();
-    post("/api/build",{project:state.project.projectFile?.name||null,configuration:state.buildConfiguration}).then(result=>{
-      state.buildResult=result;
-      return api("/api/deployment").then(value=>{state.deployment=value}).catch(()=>{});
+
+  function requireSavedForBuild(){
+    if(dirtyCount()===0)return true;
+    showAlert?.("Save all Lexeditor changes before building or deploying so the game receives the same data currently shown in the editor.","Unsaved changes");
+    return false;
+  }
+
+  function runBuild(deploy=false){
+    if(state.building||!requireSavedForBuild())return;
+    state.building=true;state.deployResult=null;
+    state.buildResult={output:deploy?"Building, then synchronizing module assets…":"Building…",succeeded:false};renderBuild();
+    const endpoint=deploy?"/api/build-deploy":"/api/build";
+    post(endpoint,{project:state.project.projectFile?.name||null,configuration:state.buildConfiguration}).then(result=>{
+      if(deploy){
+        state.buildResult=result.build||{output:"Build result unavailable.",succeeded:false};
+        state.deployResult=result.assets||null;
+        if(result.deployment)state.deployment=result.deployment;
+      }else{
+        state.buildResult=result;
+        return api("/api/deployment").then(value=>{state.deployment=value}).catch(()=>{});
+      }
     }).catch(error=>{
-      state.buildResult={output:String(error.message||error),succeeded:false};
+      state.buildResult={output:String(error.message||error),succeeded:false};state.deployResult=null;
     }).finally(()=>{state.building=false;renderBuild();refresh()});
   }
+
+  function syncAssets(){
+    if(state.building||!requireSavedForBuild())return;
+    state.building=true;state.deployResult=null;
+    post("/api/deploy-assets",{}).then(result=>{
+      state.deployResult=result.assets||null;
+      if(result.deployment)state.deployment=result.deployment;
+    }).catch(error=>{
+      state.deployResult={error:String(error.message||error),copied:[],unchanged:[],backups:[]};
+    }).finally(()=>{state.building=false;renderBuild();refresh()});
+  }
+
+  function deploySummary(){
+    const d=state.deployResult;
+    if(!d)return null;
+    if(d.error)return el("div",{class:"bl-list-block"},el("h3",{},"Asset deployment"),el("div",{},d.error));
+    const copied=d.copied||[],unchanged=d.unchanged||[],backups=d.backups||[];
+    return el("div",{class:"bl-list-block"},
+      el("h3",{},"Asset deployment"),
+      el("div",{},`${copied.length} copied · ${unchanged.length} unchanged · ${backups.length} backup(s) · 0 deleted`),
+      el("div",{class:"bl-note"},`Target: ${d.target||"—"}`),
+      copied.length?el("ul",{},...copied.map(value=>el("li",{},value))):null,
+      el("div",{class:"bl-note"},"Runtime balance JSON is intentionally excluded so build/deploy cannot overwrite values managed by the Runtime tab."));
+  }
+
   function renderBuild(){
     const project=state.project?.projectFile;
     if(!project){main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Build"),el("div",{class:"bl-empty"},"No .csproj exists in this project.")));return}
@@ -27,17 +68,22 @@
     const referenceLines=project.references.map(row=>`${row.include}${row.metadata?.HintPath?` — ${row.metadata.HintPath}`:""}`);
     const packageLines=project.packages.map(row=>`${row.include}${row.metadata?.Version?` ${row.metadata.Version}`:""}`);
     const targetLines=project.targets.map(row=>`${row.name||"(unnamed target)"}${row.afterTargets?` after ${row.afterTargets}`:""}${row.beforeTargets?` before ${row.beforeTargets}`:""}`);
+    const blocked=state.building||dirtyCount()>0;
     const right=el("section",{class:"bl-card"},
       el("h2",{},"Build & project inventory"),
       el("div",{class:"bl-build-toolbar"},
         select(state.buildConfiguration,[["Debug","Debug"],["Release","Release"]],value=>state.buildConfiguration=value),
-        el("button",{type:"button",class:"bl-build-button",disabled:state.building,onclick:runBuild},state.building?"Building…":"dotnet build"),
+        el("button",{type:"button",class:"bl-build-button",disabled:blocked,onclick:()=>runBuild(false)},state.building?"Working…":"dotnet build"),
+        el("button",{type:"button",class:"bl-build-button",disabled:blocked,onclick:()=>runBuild(true)},"Build + deploy"),
+        el("button",{type:"button",class:"bl-build-button",disabled:blocked,onclick:syncAssets},"Sync assets"),
         state.buildResult?el("strong",{},state.buildResult.succeeded?"PASS":""):null
       ),
+      dirtyCount()>0?el("div",{class:"bl-note"},"Save pending Lexeditor edits before build/deploy. These actions operate on files on disk, not unsaved controls."):null,
       el("div",{class:"bl-list-block"},el("h3",{},"References"),referenceLines.length?el("ul",{},...referenceLines.map(v=>el("li",{},v))):el("div",{class:"bl-note"},"No assembly references.")),
       el("div",{class:"bl-list-block"},el("h3",{},"Packages"),packageLines.length?el("ul",{},...packageLines.map(v=>el("li",{},v))):el("div",{class:"bl-note"},"No package references.")),
       el("div",{class:"bl-list-block"},el("h3",{},"Targets"),targetLines.length?el("ul",{},...targetLines.map(v=>el("li",{},v))):el("div",{class:"bl-note"},"No explicit MSBuild targets.")),
-      el("pre",{class:"bl-build-log"},state.buildResult?.output||"Build output will appear here. Lexeditor invokes dotnet directly without a shell.")
+      deploySummary(),
+      el("pre",{class:"bl-build-log"},state.buildResult?.output||"Build output will appear here. Lexeditor invokes dotnet directly without a shell. Asset deployment is additive and never deletes deployed files.")
     );
     main.replaceChildren(el("div",{class:"bl-build-layout"},left,right));
   }
@@ -74,7 +120,5 @@
   function navigate(tab){state.tab=tab;render()}
   function render(){
     const views={module:renderModule,dependencies:renderDependencies,submodules:renderSubmodules,xmls:renderXmls,skills:renderSkills,effects:renderEffects,perks:renderPerks,xp:renderXpSources,build:renderBuild,deployment:renderDeployment,datamap:renderDataMap,source:renderSource};
-    (views[state.tab]||renderModule)();
-    refresh();
+    (views[state.tab]||renderModule)();refresh();
   }
-
