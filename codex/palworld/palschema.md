@@ -63,7 +63,8 @@ Lexeditor auto-detects that installed path and also accepts `LEXEDITOR_PALWORLD_
 - `raw.schema.json` — top-level DataTable catalog;
 - `raw/<DataTable>.schema.json` — each row struct's generated property schema;
 - `enums.schema.json` — enum definitions referenced from DataTable properties;
-- utility/other schema files for additional referenced constraints.
+- `utility.schema.json` — shared path constraints referenced by object/class properties;
+- additional schema files for other PalSchema loader families.
 
 For each DataTable, the per-table file uses `additionalProperties.properties` as the row-property catalog. Generated property types include:
 
@@ -74,7 +75,25 @@ For each DataTable, the per-table file uses `additionalProperties.properties` as
 - struct -> `object` with nested `properties`;
 - arrays/maps -> complex array/`oneOf` shapes;
 - enum -> `string` plus `$ref` into `enums.schema.json`;
-- object/class paths -> `string` plus `$ref` into utility constraints.
+- object/class paths -> `string` plus `$ref` into `utility.schema.json`.
+
+### Utility object/class path constraints
+
+Upstream's generated `utility.schema.json` defines two path-string references used by raw DataTable schemas:
+
+- `ObjectPathRegex`: `^/Game(?:/[^/]+)*/([A-Za-z0-9_]+)\.\1$`
+- `ClassPathRegex`: `^/Game(?:/[^/]+)*/([A-Za-z0-9_]+)\.\1_C$`
+
+The first requires a `/Game/.../Asset.Asset` object path; the second requires `/Game/.../Asset.Asset_C` for a class path.
+
+Lexeditor resolves **only these two named generated utility definitions**. For an object/class path field already present in a writable raw `.json` patch:
+
+- the referenced utility definition must exist in the user's generated `utility.schema.json`;
+- the current value must match the generated regex before editing is enabled;
+- every replacement value must match that same generated regex at save time;
+- missing, malformed or future/unknown utility definitions remain fail-closed.
+
+Object/class path fields remain **non-addable** through the Add Property workflow. The generated regex proves path syntax, but it does not prove that an arbitrary user-entered asset actually exists in the installed game. Adding such a field safely therefore needs a concrete asset-identity source, not just JSON Schema syntax.
 
 ### Lexeditor schema policy
 
@@ -84,10 +103,11 @@ When generated schemas are present, they become the write authority:
 
 - integer/number/bool/string types drive semantic controls and server validation;
 - resolved enum refs become selects and values outside the generated enum list are rejected;
+- resolved existing `ObjectPathRegex` / `ClassPathRegex` fields are regex-validated strings;
 - a field missing from the generated DataTable schema becomes read-only;
-- a patch value mismatching the generated type becomes read-only;
+- a patch value mismatching the generated type or supported utility regex becomes read-only;
 - complex object/array/map properties remain read-only;
-- unresolved referenced constraints (for example object/class path regex refs) fail closed rather than degrading to arbitrary strings.
+- unresolved enum, utility or other referenced constraints fail closed rather than degrading to arbitrary strings.
 
 ## Schema-backed property addition
 
@@ -100,10 +120,11 @@ The add path deliberately refuses:
 - duplicate fields;
 - missing schemas;
 - complex fields;
+- referenced utility/object/class constraints;
 - unresolved referenced constraints;
 - invalid enum/type values.
 
-This avoids the dangerous PalSchema behavior where a typo in a new row name can create a default-initialized DataTable row.
+This avoids the dangerous PalSchema behavior where a typo in a new row name can create a default-initialized DataTable row, and avoids inventing object/class asset identities from syntactically valid strings.
 
 ## JSONC
 
@@ -131,4 +152,5 @@ At runtime, PalSchema applies targeted properties rather than replacing a comple
 - `src/Loader/WildcardFilter/*`
 - `src/Utility/JsonHelpers.cpp`
 - `src/Generator/JsonSchema/JsonSchemaGenerator.cpp`
+- `assets/schemas/utility.schema.json`
 - Pocketpair `PalworldModUploader` package/InstallRule documentation and PalSchema template target.
