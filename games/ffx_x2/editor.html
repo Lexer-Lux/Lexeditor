@@ -12,6 +12,8 @@
     .ffxx2-table{width:100%;border-collapse:collapse}.ffxx2-table th,.ffxx2-table td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line,rgba(255,255,255,.12));vertical-align:top}
     .ffxx2-table td:nth-child(2){white-space:nowrap}.ffxx2-muted{opacity:.72}.ffxx2-status{font-weight:700}.ffxx2-actions{display:flex;gap:8px;flex-wrap:wrap}
     .ffxx2-path{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9em;word-break:break-all}.ffxx2-error{color:#ff9f9f;white-space:pre-wrap}
+    .ffxx2-scroll{max-height:560px;overflow:auto}.ffxx2-scroll thead{position:sticky;top:0;background:var(--panel,#171b24);z-index:1}
+    .ffxx2-table input[type=number]{width:8em}.ffxx2-dirty{font-weight:700}.ffxx2-hex{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
   </style>
 </head>
 <body>
@@ -19,15 +21,27 @@
   <header>
     <p class="ffxx2-muted">LEXEDITOR · STEAM COLLECTION</p>
     <h1>Final Fantasy X / X-2 HD Remaster</h1>
-    <p>Read-only VBF source archives → safe project overlays → Fahrenheit External File Loader.</p>
+    <p>Read-only VBF source archives → structured project edits → Fahrenheit External File Loader.</p>
   </header>
 
   <section class="ffxx2-grid" id="overview"></section>
 
   <section class="ffxx2-card" style="margin-top:14px">
     <h2>Data Map</h2>
-    <p class="ffxx2-muted">Coverage is explicit: archive browsing is not presented as structured game-data editing.</p>
+    <p class="ffxx2-muted">Coverage is explicit: integrated structured tables are distinguished from generic archive extraction.</p>
     <div style="overflow:auto"><table class="ffxx2-table"><thead><tr><th>Area</th><th>Status</th><th>Controls</th><th>Notes</th></tr></thead><tbody id="datamap"></tbody></table></div>
+  </section>
+
+  <section class="ffxx2-card" style="margin-top:14px" id="treasures">
+    <h2>FFX Treasure Rewards</h2>
+    <p class="ffxx2-muted">Structured editor for <span class="ffxx2-path">takara.bin</span>. Only reward kind, quantity, and type ID are changed; all unknown bytes and trailing data are preserved.</p>
+    <div class="ffxx2-toolbar">
+      <label class="ffxx2-grow">Filter<input id="treasure-filter" type="search" placeholder="index, item, gear, 0x1234 …"></label>
+      <button id="treasure-refresh" type="button">Refresh</button>
+      <button id="treasure-save" type="button" disabled>Save Treasure Edits</button>
+    </div>
+    <p id="treasure-summary" class="ffxx2-muted"></p>
+    <div class="ffxx2-scroll"><table class="ffxx2-table"><thead><tr><th>Index</th><th>Kind</th><th>Quantity</th><th>Type ID</th><th>Reward</th></tr></thead><tbody id="treasure-rows"></tbody></table></div>
   </section>
 
   <section class="ffxx2-card" style="margin-top:14px" id="archives">
@@ -54,9 +68,13 @@
 <script>
 const $ = id => document.getElementById(id);
 let catalog = null;
+let treasureState = null;
+const treasureDirty = new Set();
+const knownTreasureKinds = [[0,'Gil'],[2,'Item'],[5,'Gear'],[10,'Key Item']];
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 async function api(url, options){ const r=await fetch(url, options); const j=await r.json(); if(!r.ok) throw new Error(j.error||`${r.status}`); return j; }
 function bytes(n){ if(n==null)return '—'; const u=['B','KiB','MiB','GiB']; let i=0,v=Number(n); while(v>=1024&&i<u.length-1){v/=1024;i++} return `${v.toFixed(i?1:0)} ${u[i]}`; }
+function hex(n,width=4){ return `0x${Number(n).toString(16).toUpperCase().padStart(width,'0')}`; }
 function showError(error){ $('error').textContent=error ? String(error.message||error) : ''; }
 async function refreshOverview(){
   const d=await api('/api/dashboard');
@@ -69,6 +87,48 @@ async function refreshMap(){
   const d=await api('/api/datamap');
   $('datamap').innerHTML=d.rows.map(r=>`<tr><td class="ffxx2-path">${esc(r.filename)}</td><td>${esc(r.status)}</td><td>${esc(r.controls)}</td><td>${esc(r.notes)}</td></tr>`).join('');
 }
+function treasureKindName(kind){ const known=knownTreasureKinds.find(([value])=>value===Number(kind)); return known?known[1]:`Unknown ${hex(kind,2)}`; }
+function treasureReward(row){
+  if(Number(row.kind)===0)return `${Number(row.quantity)*100} gil`;
+  if(Number(row.kind)===2)return `${row.quantity} × command/item ${hex(row.typeId)}`;
+  if(Number(row.kind)===5)return `gear pickup ${hex(row.typeId)} × ${row.quantity}`;
+  if(Number(row.kind)===10)return `key item ${hex(row.typeId)}`;
+  return `kind ${hex(row.kind,2)}, quantity ${row.quantity}, type ${hex(row.typeId)}`;
+}
+function treasureKindOptions(row){
+  const values=new Set(knownTreasureKinds.map(([value])=>value));
+  const extra=values.has(Number(row.kind))?'':`<option value="${Number(row.kind)}">${esc(treasureKindName(row.kind))}</option>`;
+  return extra+knownTreasureKinds.map(([value,name])=>`<option value="${value}" ${Number(row.kind)===value?'selected':''}>${esc(name)} (${hex(value,2)})</option>`).join('');
+}
+function renderTreasures(){
+  if(!treasureState)return;
+  const needle=$('treasure-filter').value.trim().toLowerCase();
+  const rows=treasureState.rows.filter(row=>!needle || `${row.id} ${hex(row.id)} ${treasureKindName(row.kind)} ${treasureReward(row)} ${hex(row.typeId)}`.toLowerCase().includes(needle));
+  $('treasure-rows').innerHTML=rows.map(row=>`<tr data-treasure="${row.id}" class="${treasureDirty.has(row.id)?'ffxx2-dirty':''}"><td class="ffxx2-hex">${row.id} · ${hex(row.id)}</td><td><select data-field="kind">${treasureKindOptions(row)}</select></td><td><input data-field="quantity" type="number" min="0" max="255" value="${row.quantity}"></td><td><input data-field="typeId" type="number" min="0" max="65535" value="${row.typeId}"> <span class="ffxx2-hex">${hex(row.typeId)}</span></td><td data-summary>${esc(treasureReward(row))}</td></tr>`).join('') || '<tr><td colspan="5">No treasure records match this filter.</td></tr>';
+  $('treasure-save').disabled=treasureDirty.size===0;
+  $('treasure-summary').textContent=`${treasureState.rows.length.toLocaleString()} record(s) · ${treasureState.source==='project'?'reading staged project override':'reading installed VBF'} · record size ${treasureState.recordSize} bytes${treasureDirty.size?` · ${treasureDirty.size} unsaved edit(s)`:''}`;
+}
+async function refreshTreasures(){
+  showError(); treasureState=await api('/api/treasures'); treasureDirty.clear(); renderTreasures();
+}
+function treasureInputChanged(target){
+  const tr=target.closest('[data-treasure]'); if(!tr||!treasureState)return;
+  const id=Number(tr.dataset.treasure), row=treasureState.rows.find(item=>item.id===id); if(!row)return;
+  row.kind=Number(tr.querySelector('[data-field="kind"]').value);
+  row.quantity=Number(tr.querySelector('[data-field="quantity"]').value);
+  row.typeId=Number(tr.querySelector('[data-field="typeId"]').value);
+  treasureDirty.add(id); tr.classList.add('ffxx2-dirty');
+  tr.querySelector('[data-summary]').textContent=treasureReward(row);
+  const hexLabel=tr.querySelector('[data-field="typeId"] + .ffxx2-hex'); if(hexLabel)hexLabel.textContent=hex(row.typeId);
+  $('treasure-save').disabled=false;
+  $('treasure-summary').textContent=`${treasureState.rows.length.toLocaleString()} record(s) · ${treasureDirty.size} unsaved edit(s)`;
+}
+async function saveTreasures(){
+  showError(); if(!treasureState||!treasureDirty.size)return;
+  const edits=[...treasureDirty].sort((a,b)=>a-b).map(id=>{ const row=treasureState.rows.find(item=>item.id===id); return {id:row.id,kind:row.kind,quantity:row.quantity,typeId:row.typeId}; });
+  treasureState=await api('/api/treasures/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({headerMd5:treasureState.headerMd5,baselineSha256:treasureState.baselineSha256,edits})});
+  treasureDirty.clear(); renderTreasures(); await Promise.all([refreshOverview(),refreshMap(),searchArchive()]);
+}
 async function searchArchive(){
   showError(); const game=$('game').value, q=$('query').value;
   catalog=await api(`/api/archive?game=${encodeURIComponent(game)}&q=${encodeURIComponent(q)}&limit=150`);
@@ -79,6 +139,7 @@ async function extractIndex(i){
   const entry=catalog.entries[i];
   await api('/api/project/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:catalog.game,path:entry.path,headerMd5:catalog.headerMd5})});
   await Promise.all([searchArchive(),refreshOverview()]);
+  if(entry.path===treasureState?.archivePath)await refreshTreasures();
 }
 function renderDeployment(d){
   $('deployment-text').innerHTML = d.fahrenheitReady
@@ -88,13 +149,18 @@ function renderDeployment(d){
   $('revert').disabled=!d.deployed||d.deployedChangedExternally;
 }
 async function deploymentAction(route){ showError(); const d=await api(route,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); renderDeployment(d); await refreshOverview(); }
+$('treasure-filter').addEventListener('input',renderTreasures);
+$('treasure-refresh').addEventListener('click',()=>refreshTreasures().catch(showError));
+$('treasure-save').addEventListener('click',()=>saveTreasures().catch(showError));
+$('treasure-rows').addEventListener('input',e=>treasureInputChanged(e.target));
+$('treasure-rows').addEventListener('change',e=>treasureInputChanged(e.target));
 $('search').addEventListener('click',()=>searchArchive().catch(showError));
 $('query').addEventListener('keydown',e=>{if(e.key==='Enter')searchArchive().catch(showError)});
 $('game').addEventListener('change',()=>searchArchive().catch(showError));
 $('entries').addEventListener('click',e=>{const b=e.target.closest('[data-extract]'); if(b) extractIndex(Number(b.dataset.extract)).catch(showError)});
 $('deploy').addEventListener('click',()=>deploymentAction('/api/deployment/deploy').catch(showError));
 $('revert').addEventListener('click',()=>deploymentAction('/api/deployment/revert').catch(showError));
-Promise.all([refreshOverview(),refreshMap(),searchArchive()]).catch(showError);
+Promise.all([refreshOverview(),refreshMap(),searchArchive(),refreshTreasures()]).catch(showError);
 </script>
 </body>
 </html>
