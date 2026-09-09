@@ -260,6 +260,27 @@ def test_finished_high_value_detail_views(self):
     self.originals_unchanged()
 
 
+def test_dense_custom_views_fit_narrow_detail_pane(self):
+    self.install(); self.open()
+    self.page.set_viewport_size({"width":900,"height":620})
+    for group in ("characters","playerAttacks","encounters","shops"):
+        with self.subTest(group=group):
+            self.navigate(group); self.page.wait_for_timeout(50)
+            metrics=self.page.evaluate("""()=>{
+              const detail=document.querySelector('.ff7-detail'),dr=detail.getBoundingClientRect();
+              const visible=node=>{const r=node.getBoundingClientRect();return r.width>0&&r.height>0};
+              const clipped=[...detail.querySelectorAll('input,select,textarea,button')].filter(visible).filter(node=>{const r=node.getBoundingClientRect();return r.left<dr.left-2||r.right>dr.right+2}).length;
+              const tableOverflow=[...detail.querySelectorAll('.ff7-concept-table')].filter(table=>table.scrollWidth>table.clientWidth+1).length;
+              const subtabOverflow=[...document.querySelectorAll('.lex-subtab-button .lex-tab-label-text')].filter(label=>label.scrollWidth>label.clientWidth+1).length;
+              return {clipped,tableOverflow,subtabOverflow,documentWidth:document.documentElement.scrollWidth};
+            }""")
+            self.assertEqual(metrics["clipped"],0,(group,metrics))
+            self.assertEqual(metrics["tableOverflow"],0,(group,metrics))
+            self.assertEqual(metrics["subtabOverflow"],0,(group,metrics))
+            self.assertLessEqual(metrics["documentWidth"],902,(group,metrics))
+    self.originals_unchanged()
+
+
 target.RenderedTests.open = open_with_neutral
 target.RenderedTests.test_materia_uses_human_semantic_controls = test_materia_uses_human_semantic_controls
 target.RenderedTests.test_full_ff7_surface_uses_human_controls = test_full_ff7_surface_uses_human_controls
@@ -267,6 +288,7 @@ target.RenderedTests.test_accessory_description_is_editable_game_text = test_acc
 target.RenderedTests.test_holistic_ff7_concept_views_and_new_game_data = test_holistic_ff7_concept_views_and_new_game_data
 target.RenderedTests.test_refined_master_and_detail_ux = test_refined_master_and_detail_ux
 target.RenderedTests.test_finished_high_value_detail_views = test_finished_high_value_detail_views
+target.RenderedTests.test_dense_custom_views_fit_narrow_detail_pane = test_dense_custom_views_fit_narrow_detail_pane
 
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)
