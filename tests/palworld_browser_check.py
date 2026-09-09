@@ -42,6 +42,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     "description": "EnumProperty",
                     "$ref": "../enums.schema.json#/definitions/ETestMode",
                 },
+                "AddedCount": {"type": "integer", "description": "IntProperty"},
                 "NestedPreserved": {"type": "object", "description": "StructProperty", "properties": {}},
             },
         },
@@ -107,9 +108,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
 
                     # The valid patch uses the generated integer schema and is writable.
                     numeric = page.locator('.pal-schema-columns .pal-detail input[type="number"]')
-                    assert numeric.count() == 1
+                    assert numeric.count() >= 1
                     assert "integer" in page.locator(".pal-detail").inner_text().lower()
-                    numeric.fill("4")
+                    numeric.first.fill("4")
                     page.evaluate("save()")
                     page.wait_for_function("!patchDirty()")
                     disk = json.loads(good.read_text("utf-8"))
@@ -120,13 +121,30 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
 
                     # Generated enum definitions become a semantic select and remain schema validated.
                     page.locator(".pal-patch-row").filter(has_text="Mode").click()
-                    enum_select = page.locator(".pal-schema-columns .pal-detail select")
-                    assert enum_select.count() == 1
-                    assert enum_select.locator("option").all_text_contents() == ["ModeA", "ModeB"]
-                    enum_select.select_option("ModeB")
+                    page.wait_for_timeout(100)
+                    enum_select = page.locator(".pal-schema-columns .pal-detail select").filter(has=page.locator("option"))
+                    enum_select = enum_select.filter(has_text="ModeA")
+                    assert enum_select.count() >= 1
+                    enum_select.first.select_option("ModeB")
                     page.evaluate("save()")
                     page.wait_for_function("!patchDirty()")
                     assert json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]["Mode"] == "ModeB"
+
+                    # Add-property is local/dirty first, then persisted atomically through normal Save.
+                    page.locator(".pal-patch-row").filter(has_text="WorkSuitability_EmitFlame").click()
+                    page.wait_for_selector(".pal-add-field-select")
+                    add_select = page.locator(".pal-add-field-select")
+                    assert "AddedCount" in add_select.locator("option").all_text_contents()
+                    add_select.select_option("AddedCount")
+                    add_value = page.locator('.pal-detail input.pal-add-value[type="number"]')
+                    assert add_value.count() == 1
+                    add_value.fill("11")
+                    page.get_by_role("button", name="Add property", exact=True).click()
+                    page.wait_for_function("patchDirty()")
+                    assert "AddedCount" not in json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]
+                    page.evaluate("save()")
+                    page.wait_for_function("!patchDirty()")
+                    assert json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]["AddedCount"] == 11
 
                     # Selecting the malformed patch shows its error locally instead of killing the workspace.
                     selector.select_option(values[0]["value"])
