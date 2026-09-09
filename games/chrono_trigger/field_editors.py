@@ -137,9 +137,15 @@ def editor_schema(command: dict) -> dict | None:
             Field("xStoreAddress", "Store X coordinate at", SCRIPT_MEM_START, SCRIPT_MEM_LAST),
             Field("yStoreAddress", "Store Y coordinate at", SCRIPT_MEM_START, SCRIPT_MEM_LAST),
         ]
+    elif opcode == 0x33:
+        fields = [Field("paletteId", "Palette ID", 0, U8)]
+    elif opcode == 0x5A:
+        fields = [Field("storylineValue", "Storyline value", 0, U8)]
     elif opcode == 0x83:
         fields = [Field("enemyId", "Enemy ID", 0, U16), Field("slot", "Enemy slot", 0, 0x7F),
                   Field("static", "Static enemy", 0, 1, "boolean")]
+    elif opcode == 0x84:
+        fields = [Field("solidityProperties", "Solidity properties (raw)", 0, U8)]
     elif opcode == 0x87:
         args = _base_args(command)
         if len(args) != 1 or args[0] > 0x80:
@@ -238,8 +244,14 @@ def editor_values(command: dict) -> dict:
             "xStoreAddress": _script_address(args[1]),
             "yStoreAddress": _script_address(args[2]),
         }
+    if opcode == 0x33 and len(args) == 1:
+        return {"paletteId": args[0]}
+    if opcode == 0x5A and len(args) == 1:
+        return {"storylineValue": args[0]}
     if opcode == 0x83 and len(args) == 3:
         return {"enemyId": _u16(args), "slot": args[2] & 0x7F, "static": bool(args[2] & 0x80)}
+    if opcode == 0x84 and len(args) == 1:
+        return {"solidityProperties": args[0]}
     if opcode == 0x87 and len(args) == 1 and args[0] <= 0x80:
         return {"scriptSpeed": args[0]}
     if opcode == 0x89 and len(args) == 1:
@@ -319,12 +331,21 @@ def _apply(command: dict, values: dict) -> bytes:
             args[1] = _script_offset(values["xStoreAddress"], "X coordinate store address")
         if "yStoreAddress" in values:
             args[2] = _script_offset(values["yStoreAddress"], "Y coordinate store address")
+    elif opcode == 0x33:
+        if "paletteId" in values:
+            args[0] = _int(values["paletteId"], 0, U8, "Palette ID")
+    elif opcode == 0x5A:
+        if "storylineValue" in values:
+            args[0] = _int(values["storylineValue"], 0, U8, "Storyline value")
     elif opcode == 0x83:
         if "enemyId" in values:
             _put_u16(args, 0, _int(values["enemyId"], 0, U16, "Enemy ID"))
         slot = _int(values.get("slot", args[2] & 0x7F), 0, 0x7F, "Enemy slot")
         static = _bool(values.get("static", bool(args[2] & 0x80)), "Static enemy")
         args[2] = slot | (0x80 if static else 0)
+    elif opcode == 0x84:
+        if "solidityProperties" in values:
+            args[0] = _int(values["solidityProperties"], 0, U8, "Solidity properties")
     elif opcode == 0x87:
         if "scriptSpeed" in values:
             args[0] = _int(values["scriptSpeed"], 0, 0x80, "Script speed")
