@@ -36,7 +36,7 @@ Build from `C:\Bannermod`:
 dotnet build
 ```
 
-The project file copies `SubModule.xml` and `GUI\Prefabs\**\*.*` into the deployed Bannerlord module folder after build.
+For an ordinary external `dotnet build`, the project file copies `SubModule.xml`, GUI assets, and non-runtime ModuleData assets into the deployed Bannerlord module folder after build. Lexeditor-hosted builds set `LexeditorSkipAssetDeploy=true`, so the cooperative template target skips those raw asset copies and Lexeditor performs non-binary deployment through its own staged/backup/rollback transaction instead.
 
 ## Dependencies
 
@@ -130,16 +130,21 @@ As of 2026-09-09, the Bannerlord plugin uses these conservative rules. Keep them
 ### Build and project handling
 
 - Lexeditor-hosted builds pin `BannerlordDir`, `GameBin`, `ModuleDir`, and `OutputPath` to the selected Bannerlord installation/module so project-local values cannot redirect the standard hosted output paths.
-- This path pinning is not a sandbox. `dotnet build` executes project-defined/imported MSBuild targets and tasks with the user's permissions. Build only trusted projects.
+- Lexeditor-hosted builds also pass `LexeditorSkipAssetDeploy=true`. The packaged `CopyModuleFiles` target honors that flag so non-binary assets are not raw-copied by MSBuild before Lexeditor can back them up and commit them transactionally. External `dotnet build` does not set the flag and retains the template's normal asset-copy behavior.
+- This path pinning/skip convention is not a sandbox. `dotnet build` executes project-defined/imported MSBuild targets and tasks with the user's permissions. Build only trusted projects; arbitrary custom targets may ignore Lexeditor-specific properties.
 - Structured `.csproj` property editing is intentionally non-evaluating: only a uniquely-defined, unconditional property is editable. Duplicate or conditional definitions remain visible but read-only, and backend saves reject them.
 - Text-preserving `.csproj` edits ignore XML comments and CDATA when locating live property/`PropertyGroup` spans.
 - If a workspace contains multiple top-level `.csproj` files, do not pick alphabetically. Require an explicit project selection and pass that exact filename through Build/property-save APIs.
 - New Project creation is transactional across template copy, plugin initialization, and final project selection/validation. On failure, remove only the newly-created target directory and leave the registry/parent/siblings unchanged.
+- Project registry temporary writes detach predictable helper aliases before writing; Rename restores the original folder if registry persistence fails.
+- Create/Rename use portable Windows-safe folder-name rules even when Lexeditor runs on another platform.
 - Bannerlord template display names must be escaped for XML contexts independently from the sanitized module/C# identifier.
 
 ### Deploy and runtime boundaries
 
-- Asset deployment is additive and never deletes deployed files. Overwrites get backups.
+- Asset deployment is additive and never intentionally deletes pre-existing deployed files as part of a successful sync. Overwrites get backups.
+- Before the first deployed-file write, Lexeditor validates the complete source/destination/helper plan. All changed assets are staged to temporary files and all existing destinations are backed up before the first replacement.
+- If a late destination replacement fails, already-committed existing assets are restored from backups and already-committed newly-created assets are removed; staged temporary files are cleaned up. Incomplete rollback is surfaced as an explicit error rather than silently reported as success.
 - Runtime balancing files managed by the Runtime Overrides editor are excluded from ordinary build/deploy asset synchronization.
 - Write-capable project/deploy paths reject resolved symlink/junction escapes. Read-only installed-module discovery remains compatible with legitimate mod-manager junctions where no write occurs.
 - CI and isolated smoke tests establish editor/build/deploy behavior only; they do not establish real in-game runtime or visual acceptance. A local Bannerlord launch remains required for that final acceptance step.
