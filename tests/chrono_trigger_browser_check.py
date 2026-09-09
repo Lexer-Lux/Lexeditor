@@ -256,6 +256,8 @@ def main() -> None:
             facing_input.fill("3")
             editor.get_by_role("button", name="Apply command", exact=True).click()
             page.wait_for_function('state.events.detail?.objects?.[0]?.functions?.[0]?.commands?.[0]?.editor?.values?.facing === 3')
+            page.wait_for_function('document.querySelector(".ct-command-summary")?.textContent === "NPC facing right"')
+            page.wait_for_function('document.querySelector(".ct-hex")?.textContent === "03"')
             assert saved_event_requests
             saved_request = saved_event_requests[-1]
             assert saved_request["eventId"] == 20
