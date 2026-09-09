@@ -76,8 +76,14 @@ class SceneAnimationTests(unittest.TestCase):
         self.assertEqual(parsed["unknownDurationFrames"], 1)
 
     def test_declared_animation_truncation_fails_closed(self):
-        with self.assertRaisesRegex(ValueError, "declared animation count"):
-            parse_scene_chip_animations(bytes([2, 0]))
+        with self.assertRaisesRegex(ValueError, "destination offset"):
+            parse_scene_chip_animations(bytes([2, 1]))
+
+    def test_terminator_before_declared_count_is_reported_not_guessed(self):
+        parsed = parse_scene_chip_animations(bytes([2, 0]))
+        self.assertEqual(parsed["decodedAnimationCount"], 0)
+        self.assertTrue(parsed["terminatedBeforeDeclaredCount"])
+        self.assertEqual(parsed["terminator"]["marker"], 0)
 
     def test_loads_scene_reference_and_bgset_animation_slot(self):
         # One 128x64 packed cg sheet -> 128 chips after nibble unpacking.
