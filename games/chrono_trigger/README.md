@@ -19,6 +19,7 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - Atel parsing, PC disassembly, semantics and control-flow diagnostics, with named fixed-width argument editing in both the desktop Events UI and CLI. Unsupported, variable-width and unresolved commands remain read-only.
   - Proven Steam item-command editors now include `0xC7` Add Item from Memory, `0xCA` Add Item, `0xCB` Remove Item, `0xD5` Equip Item and `0xD7` Get Item Quantity.
   - Their PC-only extra category byte is exposed as a raw numeric value rather than an invented enum/global item ID. C7/D7 local-memory slots are shown as even `0x7F0200`–`0x7F03FE` script-memory addresses and round-trip back to the one-byte PC slot without resizing commands.
+  - Additional proven fixed-width controls include `0x87` Script Speed (`0x00`–`0x80`), `0x89` NPC Speed, `0x8A` NPC Speed from script memory, `0x8B` tile position, `0xB8` message-table selection, `0xE3` Explore Mode and `0xF0` raw darken duration. Unknown/out-of-domain values remain read-only rather than being coerced.
 - Eight overworld headers plus existing world exits/triggers/script-address editing.
 - Fail-closed read-only world script disassembly.
 - Localized labels where Steam message resources exist.
