@@ -6,6 +6,7 @@ on:
       - work/ff7-complete-kernel-surface
     paths:
       - 'tools/_ff7_ui_finish_once.py'
+      - 'tools/_ff7_ui_finish_fix.py'
 
 permissions:
   contents: write
@@ -23,7 +24,9 @@ jobs:
         with:
           python-version: '3.13'
       - name: Apply FF7 finishing pass
-        run: python tools/_ff7_ui_finish_once.py
+        run: |
+          python tools/_ff7_ui_finish_once.py
+          python tools/_ff7_ui_finish_fix.py
       - name: Verify FF7 source contracts
         run: |
           python tools/verify_ff7_semantic_surface.py
@@ -39,7 +42,7 @@ jobs:
       - name: Commit tested finishing pass and remove scaffold
         shell: bash
         run: |
-          git rm tools/_ff7_ui_finish_once.py .github/workflows/ff7-ui-finish-once.yml
+          git rm tools/_ff7_ui_finish_once.py tools/_ff7_ui_finish_fix.py .github/workflows/ff7-ui-finish-once.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add games/ff7/editor.html tools/verify_ff7_rendered_neutral.py
