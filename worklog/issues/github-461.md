@@ -8,7 +8,7 @@ Status: actionable. One branch/PR: `feature/ffx-x2-plugin`.
 - `michivi/vbf-fs` (BSD-3-Clause) establishes the VBF header, name/entry/block tables, 64 KiB blocks, zlib block behavior and trailing header MD5.
 - Fahrenheit explicitly supports file-only mods. A mod lives under `fahrenheit/mods/<id>`, has `<id>.manifest.json`, is named in `mods/loadorder`, and EFL replacements mirror game-facing VBF paths under `efl/x` or `efl/x2`.
 - Real VBF names can use raw `ffx_ps2/...` paths while Fahrenheit addresses them through the virtual `FFX_Data/...` / `FFX2_Data/...` roots; the plugin normalizes that boundary explicitly.
-- `FFXDataParser` is a research cross-check for the common FFX fixed-record container and the proved fields in `takara.bin`, `item_rate.bin`, `ctb_base.bin`, `item_shop.bin` and `arms_shop.bin`. Its source is not copied into Lexeditor.
+- `FFXDataParser` is a research cross-check for the common FFX fixed-record container and the proved fields in `takara.bin`, `item_rate.bin`, `ctb_base.bin`, `prepare.bin`, `item_shop.bin` and `arms_shop.bin`. Its source is not copied into Lexeditor.
 
 ## Implemented in this PR
 
@@ -19,14 +19,15 @@ Status: actionable. One branch/PR: `feature/ffx-x2-plugin`.
 - Structured `takara.bin` treasure editor for reward kind, quantity and type ID only; unknown record bytes and trailing data are preserved.
 - Structured `item_rate.bin` editor for four-byte unsigned gil prices mapped to item/command IDs beginning at `0x2000`.
 - Structured `ctb_base.bin` editor for tick speed and ICV bonus by Agility, with derived ICV ranges shown in the UI.
+- Structured `prepare.bin` editor for the 112 × N Rikku Mix result-command matrix; only selected 16-bit result cells are written.
 - Shared validated `0x22`-byte / 16-slot FFX shop-table core.
 - Structured `item_shop.bin` editor for sixteen item/command ID slots per shop; the leading unused/legacy rate field is preserved read-only.
 - Structured `arms_shop.bin` editor for sixteen gear-index slots per shop with the same preservation boundary.
 - Structured saves use exact VBF-header and table-byte baselines so stale/external changes fail closed.
 - Reversible Lexeditor-owned Fahrenheit file-only deployment with foreign/external-change guards.
 - Private installed-game theme extraction/cache with safe fallback and no bundled proprietary assets.
-- Shared-shell Treasure, Item Price, CTB Timing, Item Shop and Gear Shop views plus archive browser, Data Map and install/project/deployment status.
-- Cross-platform synthetic smoke and dedicated VBF/path/deployment/structured-table regressions, including managed raw-VBF-to-canonical-EFL save coverage for Item Prices, CTB and Gear Shops.
+- Shared-shell Treasure, Item Price, CTB Timing, Mix Results, Item Shop and Gear Shop views plus archive browser, Data Map and install/project/deployment status.
+- Cross-platform synthetic smoke and dedicated VBF/path/deployment/structured-table regressions, including managed raw-VBF-to-canonical-EFL save coverage for Item Prices, CTB, Mix and Gear Shops.
 
 ## Remaining actionable work
 
