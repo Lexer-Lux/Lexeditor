@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from pathlib import Path
 import struct
 
 import pytest
 
-from games.ffx_x2.ffx2_abilities import FFX2AbilityError, apply_edits, parse_abilities, payload
+from games.ffx_x2.ffx2_abilities import (
+    ARCHIVE_PATH, FFX2AbilityError, apply_edits, parse_abilities, payload,
+)
 from games.ffx_x2.ffx2_table import FFX2TableError, parse_table
+from games.ffx_x2.plugin import FFXX2Session, _write_fixture_vbf
+from service_session import request_json
 
 
 def _record(name_offset: int, name_key: int, desc_offset: int, desc_key: int,
@@ -78,3 +83,43 @@ def test_ffx2_ability_rejects_wrong_record_size_and_duplicate_edits():
             {"id": 0, "animation1": 1, "animation2": 2},
             {"id": 0, "animation1": 3, "animation2": 4},
         ])
+
+
+def test_ffx2_ability_managed_service_resolves_raw_vbf_and_saves_x2_project(tmp_path: Path):
+    source = _table([
+        _record(0x10, 0x11, 0x20, 0x21, 0x1111, 0x2222, fill=0xA5),
+        _record(0x30, 0x31, 0x40, 0x41, 0x3333, 0x4444, fill=0x5A),
+    ], min_index=0x100, trailing=b"opaque-x2-strings")
+    raw_archive_path = ARCHIVE_PATH.removeprefix("FFX2_Data/")
+    game_root = tmp_path / "game"
+    project_root = tmp_path / "project"
+    theme_cache = tmp_path / "theme"
+    _write_fixture_vbf(game_root / "data" / "FFX2_Data.vbf", [(raw_archive_path, source)])
+
+    with FFXX2Session({
+        "LEXEDITOR_FFX_X2_ROOT": str(game_root),
+        "LEXEDITOR_FFX_X2_PROJECT": str(project_root),
+        "LEXEDITOR_FFX_X2_THEME_CACHE": str(theme_cache),
+    }) as session:
+        state = request_json(session.url + "api/ffx2-abilities")
+        assert state["game"] == "x2"
+        assert state["source"] == "archive"
+        assert state["archivePath"] == ARCHIVE_PATH
+        assert state["rows"][0]["animation1"] == 0x1111
+
+        edit = {"id": 0x100, "animation1": 0xBEEF, "animation2": 0xCAFE}
+        saved = request_json(session.url + "api/ffx2-abilities/save", {
+            "headerMd5": state["headerMd5"],
+            "baselineSha256": state["baselineSha256"],
+            "edits": [edit],
+        })
+        assert saved["saved"] == 1
+        assert saved["game"] == "x2"
+        assert saved["source"] == "project"
+        assert (saved["rows"][0]["animation1"], saved["rows"][0]["animation2"]) == (0xBEEF, 0xCAFE)
+
+        target = project_root / "efl" / "x2" / Path(*ARCHIVE_PATH.split("/"))
+        assert target.read_bytes() == apply_edits(source, [edit])
+        assert not (project_root / "efl" / "x2" / Path(*raw_archive_path.split("/"))).exists()
+
+    assert session.wait_closed()
