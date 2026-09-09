@@ -1,6 +1,7 @@
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from games.bannerlord.gauntlet_data import (
     augment_data_map,
@@ -108,6 +109,29 @@ class BannerlordGauntletTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "only opens XML files under GUI/Prefabs"):
                 read_prefab(project, "../outside.xml")
         finally:
+            temporary.cleanup()
+
+    def test_prefab_root_redirection_outside_project_is_rejected(self):
+        temporary, project, _source = self.fixture()
+        try:
+            outside = project.parent / (project.name + "-outside-gauntlet")
+            outside.mkdir()
+            project_resolved = project.resolve()
+            prefab_root = project_resolved / "GUI" / "Prefabs"
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == prefab_root:
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            with patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(ValueError, "project path escaped"):
+                    read_prefab(project, "GUI/Prefabs/Mission/LexerMoraleBars.xml")
+        finally:
+            if 'outside' in locals() and outside.exists():
+                outside.rmdir()
             temporary.cleanup()
 
     def test_data_map_upgrades_only_gauntlet_prefabs(self):
