@@ -79,9 +79,9 @@ class BannerlordXsdTests(unittest.TestCase):
             self.assertIsNotNone(found)
             self.assertEqual(found["path"], str(schema_path.resolve()))
 
-            value = read_document(project, "ModuleData/items.xml", game)
-            self.assertEqual(value["schema"]["id"], "Items")
-            item = next(row for row in value["elements"] if row["tag"] == "Item")
+            document = read_document(project, "ModuleData/items.xml", game)
+            self.assertEqual(document["schema"]["id"], "Items")
+            item = next(row for row in document["elements"] if row["tag"] == "Item")
             attrs = {row["name"]: row for row in item["attributes"]}
             self.assertTrue(attrs["id"]["required"])
             self.assertEqual(attrs["enabled"]["kind"], "bool")
@@ -99,11 +99,11 @@ class BannerlordXsdTests(unittest.TestCase):
     def test_schema_constraints_are_enforced_on_surgical_save(self):
         temporary, project, game, source, _schema_path = self.fixture()
         try:
-            value = read_document(project, "ModuleData/items.xml", game)
-            item = next(row for row in value["elements"] if row["tag"] == "Item")
+            document = read_document(project, "ModuleData/items.xml", game)
+            item = next(row for row in document["elements"] if row["tag"] == "Item")
             path = item["path"]
 
-            for attribute, value, message in (
+            for attribute, incoming, message in (
                 ("Type", "Food", "must be one of"),
                 ("tier", 7, "must be at most"),
                 ("tier", 2.5, "must be an integer"),
@@ -113,20 +113,20 @@ class BannerlordXsdTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     save_document(
                         project,
-                        value["relativePath"],
+                        document["relativePath"],
                         [{
                             "elementPath": path,
                             "tag": "Item",
                             "attribute": attribute,
                             "originalValue": original,
-                            "value": value,
+                            "value": incoming,
                         }],
                         game,
                     )
 
             saved = save_document(
                 project,
-                value["relativePath"],
+                document["relativePath"],
                 [
                     {"elementPath": path, "tag": "Item", "attribute": "Type", "originalValue": "Weapon", "value": "Armor"},
                     {"elementPath": path, "tag": "Item", "attribute": "tier", "originalValue": "2", "value": 3},
@@ -148,9 +148,9 @@ class BannerlordXsdTests(unittest.TestCase):
         try:
             no_schema_game = Path(temporary.name) / "no-schema-game"
             no_schema_game.mkdir()
-            value = read_document(project, "ModuleData/items.xml", no_schema_game)
-            self.assertIsNone(value["schema"])
-            item = next(row for row in value["elements"] if row["tag"] == "Item")
+            document = read_document(project, "ModuleData/items.xml", no_schema_game)
+            self.assertIsNone(document["schema"])
+            item = next(row for row in document["elements"] if row["tag"] == "Item")
             attrs = {row["name"]: row for row in item["attributes"]}
             self.assertEqual(attrs["Type"]["kind"], "text")
             self.assertEqual(attrs["tier"]["kind"], "number")
