@@ -121,7 +121,13 @@ def editor_schema(command: dict) -> dict | None:
     opcode = int(command["opcode"])
     fields: list[Field] = []
     editor = "fixed-fields"
-    if opcode in {0x20, 0x55, 0x7F}:
+    if opcode == 0x18:
+        args = _base_args(command)
+        if len(args) != 2:
+            return None
+        fields = [Field("storylineValue", "Storyline threshold", 0, U8),
+                  Field("jumpOffset", "Jump bytes", 0, U8)]
+    elif opcode in {0x20, 0x55, 0x7F}:
         label = {
             0x20: "Store PC1 ID at",
             0x55: "Store storyline counter at",
@@ -236,6 +242,8 @@ def editor_schema(command: dict) -> dict | None:
 def editor_values(command: dict) -> dict:
     opcode = int(command["opcode"])
     args = _base_args(command)
+    if opcode == 0x18 and len(args) == 2:
+        return {"storylineValue": args[0], "jumpOffset": args[1]}
     if opcode in {0x20, 0x55, 0x7F} and len(args) == 1:
         return {"storeAddress": _script_address(args[0])}
     if opcode in {0x21, 0x22} and len(args) == 3 and not (args[0] & 1):
@@ -320,7 +328,12 @@ def _apply(command: dict, values: dict) -> bytes:
     if unknown:
         raise ValueError(f"Unknown fields for opcode 0x{opcode:02X}: {', '.join(sorted(unknown))}")
 
-    if opcode in {0x20, 0x55, 0x7F}:
+    if opcode == 0x18:
+        if "storylineValue" in values:
+            args[0] = _int(values["storylineValue"], 0, U8, "Storyline threshold")
+        if "jumpOffset" in values:
+            args[1] = _int(values["jumpOffset"], 0, U8, "Jump bytes")
+    elif opcode in {0x20, 0x55, 0x7F}:
         if "storeAddress" in values:
             args[0] = _script_offset(values["storeAddress"], "Store address")
     elif opcode in {0x21, 0x22}:
