@@ -8,6 +8,7 @@ exports project resource files directly without ever rebuilding resources.bin.
 from __future__ import annotations
 
 import hashlib
+import os
 from pathlib import Path, PurePosixPath
 import tempfile
 import zipfile
@@ -46,7 +47,7 @@ def export_ctp(project_root: Path, target: Path) -> dict:
         raise RuntimeError("The Chrono Trigger project has no resource files to export")
     destination.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix=destination.name + ".", suffix=".tmp", dir=destination.parent)
-    Path(name).unlink(missing_ok=True)
+    os.close(fd)
     try:
         with zipfile.ZipFile(name, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
             for virtual, path in rows:
@@ -55,8 +56,7 @@ def export_ctp(project_root: Path, target: Path) -> dict:
                 info.create_system = 3
                 info.external_attr = 0o100644 << 16
                 archive.writestr(info, path.read_bytes(), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
-        temporary = Path(name)
-        temporary.replace(destination)
+        Path(name).replace(destination)
     finally:
         Path(name).unlink(missing_ok=True)
     digest = hashlib.sha256(destination.read_bytes()).hexdigest()
