@@ -9,7 +9,7 @@ from __future__ import annotations
 
 
 U8 = 0xFF
-MISC_OPCODES = frozenset({0x29, 0x82, 0xC8})
+MISC_OPCODES = frozenset({0x29, 0x81, 0x82, 0xC8})
 
 
 def _args(command: dict) -> bytearray | None:
@@ -47,6 +47,8 @@ def misc_field_specs(command: dict) -> list[dict] | None:
     opcode = int(command["opcode"])
     if opcode == 0x29:
         return [{"key": "asciiIndex", "label": "ASCII text index", "minimum": 0, "maximum": 0x7F}]
+    if opcode == 0x81:
+        return [{"key": "pcId", "label": "Player character ID", "minimum": 0, "maximum": U8}]
     if opcode == 0x82:
         return [{"key": "npcId", "label": "NPC ID", "minimum": 0, "maximum": U8}]
     return [{"key": "dialogId", "label": "Special dialog ID (raw)", "minimum": 0, "maximum": U8}]
@@ -59,6 +61,8 @@ def misc_values(command: dict) -> dict | None:
     opcode = int(command["opcode"])
     if opcode == 0x29:
         return {"asciiIndex": args[0] & 0x7F}
+    if opcode == 0x81:
+        return {"pcId": args[0]}
     if opcode == 0x82:
         return {"npcId": args[0]}
     return {"dialogId": args[0]}
@@ -77,6 +81,8 @@ def apply_misc_op(command: dict, values: dict) -> bytes | None:
 
     if opcode == 0x29 and "asciiIndex" in values:
         args[0] = _int(values["asciiIndex"], 0, 0x7F, "ASCII text index") | 0x80
+    elif opcode == 0x81 and "pcId" in values:
+        args[0] = _int(values["pcId"], 0, U8, "Player character ID")
     elif opcode == 0x82 and "npcId" in values:
         args[0] = _int(values["npcId"], 0, U8, "NPC ID")
     elif opcode == 0xC8 and "dialogId" in values:
@@ -92,6 +98,8 @@ def misc_semantics(command: dict) -> dict | None:
     if opcode == 0x29:
         index = args[0] & 0x7F
         return {"summary": f"Load ASCII text index {index}", "asciiIndex": index, "storedByte": args[0]}
+    if opcode == 0x81:
+        return {"summary": f"Load PC {args[0]} (always)", "pcId": args[0], "always": True}
     if opcode == 0x82:
         return {"summary": f"Load NPC {args[0]}", "npcId": args[0]}
     return {"summary": f"Special dialog 0x{args[0]:02X} (raw)", "dialogId": args[0]}
