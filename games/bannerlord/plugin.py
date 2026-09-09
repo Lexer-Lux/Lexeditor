@@ -9,6 +9,7 @@ from service_session import LocalPluginSession
 
 from . import paths
 from .game_launch import BannerlordGameController
+from .project_template import initialize_project
 
 
 def check() -> list[str]:
@@ -41,7 +42,7 @@ PLUGIN = GamePlugin(
     plugin_id="bannerlord",
     name="Mount & Blade II: Bannerlord",
     subtitle="BANNERLORD",
-    description="Edit Bannerlord module metadata and progressively integrate module data.",
+    description="Edit Bannerlord modules, C# projects, Gauntlet UI, and ModuleData.",
     accent="#8d2f25",
     check=check,
     launch=launch,
@@ -57,7 +58,8 @@ PLUGIN = GamePlugin(
         required_paths=("SubModule.xml",),
         required_any=(("SubModule.xml",),),
         discover=paths.installed_modules,
-        template_root=paths.DEFAULT_PROJECT_ROOT,
+        template_root=paths.PLUGIN_ROOT / "template",
+        initialize=initialize_project,
     ),
     installation=GameInstallSpec(
         root_env="LEXEDITOR_BANNERLORD_ROOT",
