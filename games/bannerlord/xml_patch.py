@@ -157,8 +157,8 @@ def serialize_attribute(attribute: dict, incoming) -> str:
             value = "true" if incoming else "false"
         else:
             value = str(incoming).strip().casefold()
-            if value not in {"true", "false"}:
-                raise ValueError(f"{attribute['name']} must be true or false")
+            if value not in {"true", "false", "1", "0"}:
+                raise ValueError(f"{attribute['name']} must be true, false, 1, or 0")
     elif kind == "number":
         number = float(incoming)
         if not math.isfinite(number):
