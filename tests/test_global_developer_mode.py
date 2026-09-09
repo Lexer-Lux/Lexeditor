@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 import threading
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from desktop_host import HostApi, LEXEDITOR_REPOSITORY
 from games.blank.plugin import PLUGIN as BLANK_PLUGIN
@@ -47,6 +47,46 @@ class DeveloperModeHostTests(unittest.TestCase):
         self.assertTrue(settings["developerMode"])
         self.assertTrue(settings["developerAuthorized"])
         self.assertEqual(settings["developerLogin"], "Lexer-Lux")
+
+    def test_developer_mode_rechecks_identity_instead_of_latching_owner_state(self):
+        identity = {"repository": "Lexer-Lux/Lexeditor", "login": "Lexer-Lux"}
+        host = self.host()
+        host._github.visible_repository.side_effect = [identity, None]
+
+        first = host.lexeditor_settings()
+        second = host.lexeditor_settings()
+
+        self.assertTrue(first["developerMode"])
+        self.assertEqual(first["developerLogin"], "Lexer-Lux")
+        self.assertFalse(second["developerMode"])
+        self.assertFalse(second["developerAuthorized"])
+        self.assertEqual(second["developerLogin"], "")
+        self.assertEqual(
+            host._github.visible_repository.call_args_list,
+            [call(LEXEDITOR_REPOSITORY), call(LEXEDITOR_REPOSITORY)],
+        )
+
+    def test_packaged_default_write_requires_fresh_owner_authentication(self):
+        values = {"soundVolumePercent": 35}
+        denied = self.host(None)
+        denied._settings.save_packaged_defaults = Mock()
+        with self.assertRaisesRegex(PermissionError, "active GitHub account"):
+            denied.save_developer_setting_defaults(values)
+        denied._github.visible_repository.assert_called_once_with(
+            LEXEDITOR_REPOSITORY, refresh=True)
+        denied._settings.save_packaged_defaults.assert_not_called()
+
+        identity = {"repository": "Lexer-Lux/Lexeditor", "login": "Lexer-Lux"}
+        allowed = self.host(identity)
+        allowed._settings.save_packaged_defaults = Mock()
+        result = allowed.save_developer_setting_defaults(values)
+        allowed._settings.save_packaged_defaults.assert_called_once_with(values)
+        self.assertEqual(
+            allowed._github.visible_repository.call_args_list,
+            [call(LEXEDITOR_REPOSITORY, refresh=True), call(LEXEDITOR_REPOSITORY)],
+        )
+        self.assertTrue(result["developerMode"])
+        self.assertEqual(result["developerLogin"], "Lexer-Lux")
 
     def test_blank_game_is_owner_only_but_does_not_require_installation(self):
         installation = {
