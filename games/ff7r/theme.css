@@ -12,7 +12,7 @@
 
 /* FF7R keeps its information dense, but frames it like a translucent combat
    HUD: cold blue glass, bright cyan linework, clipped corners and fine light
-   sweeps.  All artwork URLs below point only at the user's private cache. */
+   sweeps. All artwork URLs below point only at the user's private cache. */
 body[data-lex-theme="ff7r"] {
   background-color: var(--lex-bg);
   background-image:
@@ -148,6 +148,36 @@ body[data-lex-theme="ff7r"] .ff7r-loot-slot label > span {
 body[data-lex-theme="ff7r"] ::selection {
   color: #fff;
   background: rgba(42, 166, 219, .72);
+}
+
+/* When the documented installed SystemFontNormal pair validates, the theme JS
+   replaces shell tab/detail-title text with canvases cropped directly from the
+   decoded game atlas. The DOM keeps an accessible aria-label for every canvas. */
+html[data-lex-ff7r-bitmap-font="installed"] .ff7r-bitmapized {
+  font-size: inherit;
+}
+
+html[data-lex-ff7r-bitmap-font="installed"] canvas.ff7r-bitmap-label {
+  display: block;
+  max-width: 100%;
+  flex: 0 1 auto;
+  pointer-events: none;
+  object-fit: contain;
+  opacity: .94;
+}
+
+html[data-lex-ff7r-bitmap-font="installed"] #lexeditor-shell button[data-tab] canvas.ff7r-bitmap-label {
+  margin: 0 auto;
+}
+
+html[data-lex-ff7r-bitmap-font="installed"] #lexeditor-shell button[data-tab]:not(.active) canvas.ff7r-bitmap-label {
+  opacity: .79;
+}
+
+html[data-lex-ff7r-bitmap-font="installed"] .lex-detail-panel-title.ff7r-bitmapized {
+  display: flex;
+  align-items: center;
+  min-width: 0;
 }
 
 html[data-lex-ff7r-assets="installed"] body[data-lex-theme="ff7r"] .ff7r-toolbar {
