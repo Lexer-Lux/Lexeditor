@@ -108,11 +108,13 @@ def sync_project_assets(project: Path, game_root: Path | None = None) -> dict:
             continue
         if destination.exists() and not destination.is_file():
             raise ValueError(f"Deployment destination is not a file: {destination}")
+        backup = destination.with_name(destination.name + ".lexeditor.bak")
+        paths.clear_write_helper(backup)
         if destination.is_file():
-            backup = destination.with_name(destination.name + ".lexeditor.bak")
             shutil.copy2(destination, backup)
             backups.append(backup.relative_to(target).as_posix())
         temporary = destination.with_name(destination.name + ".lexeditor.tmp")
+        paths.clear_write_helper(temporary)
         shutil.copy2(source, temporary)
         temporary.replace(destination)
         copied.append(relative)
