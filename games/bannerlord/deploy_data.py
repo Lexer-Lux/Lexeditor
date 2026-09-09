@@ -32,9 +32,7 @@ def _hash(path: Path) -> str:
 
 
 def _module_id(project: Path) -> str:
-    descriptor = project / "SubModule.xml"
-    if not descriptor.is_file():
-        raise FileNotFoundError(descriptor)
+    descriptor = paths.contained_project_path(project, "SubModule.xml", require_file=True)
     module_id = str(read_submodule(descriptor).get("id") or "").strip()
     if not module_id:
         raise ValueError("Project SubModule.xml has no module Id")
