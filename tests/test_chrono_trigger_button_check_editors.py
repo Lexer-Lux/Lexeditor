@@ -66,8 +66,8 @@ class ButtonCheckEditorTests(unittest.TestCase):
         self.assertEqual(current["summary"], "A button · current check · jump +3")
 
         since = command_semantics(command(0x3C, 7), {})
-        self.assertEqual(since["check"], "Confirm action · since last check")
-        self.assertEqual(since["summary"], "Confirm action · since last check check · jump +7")
+        self.assertEqual(since["check"], "Confirm action · since last")
+        self.assertEqual(since["summary"], "Confirm action · since last check · jump +7")
 
     def test_jump_only_editor_retargets_to_valid_boundary(self):
         # One-byte argument means the check at 32 has jump origin 33. Pause
