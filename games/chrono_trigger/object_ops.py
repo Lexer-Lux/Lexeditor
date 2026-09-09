@@ -5,9 +5,11 @@ from __future__ import annotations
 
 U8 = 0xFF
 ENCODED_TARGET_MAX = U8 // 2
-OBJECT_OPCODES = frozenset({0x0A, 0x7C, 0x7D})
+OBJECT_OPCODES = frozenset({0x0A, 0x0B, 0x0C, 0x7C, 0x7D})
 _OPERATION = {
     0x0A: "remove",
+    0x0B: "processing-off",
+    0x0C: "processing-on",
     0x7C: "drawing-on",
     0x7D: "drawing-off",
 }
@@ -66,12 +68,13 @@ def object_semantics(command: dict) -> dict | None:
         return None
     opcode = int(command["opcode"])
     object_id = args[0] // 2
-    if opcode == 0x0A:
-        summary = f"Remove object {object_id}"
-    elif opcode == 0x7C:
-        summary = f"Turn drawing on for object {object_id}"
-    else:
-        summary = f"Turn drawing off for object {object_id}"
+    summary = {
+        0x0A: f"Remove object {object_id}",
+        0x0B: f"Disable script processing for object {object_id}",
+        0x0C: f"Enable script processing for object {object_id}",
+        0x7C: f"Turn drawing on for object {object_id}",
+        0x7D: f"Turn drawing off for object {object_id}",
+    }[opcode]
     return {"summary": summary, "objectId": object_id, "operation": _OPERATION[opcode]}
 
 
