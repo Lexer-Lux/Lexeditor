@@ -134,6 +134,13 @@ PLUGIN = GamePlugin(
         default_root=EDITABLE_MOD_ROOT,
         required_paths=("install.xml",),
         template_root=EDITABLE_MOD_ROOT,
+        content_types=(
+            ("Metadata", (".ymt", ".xml", ".meta")),
+            ("Archives", (".rpf",)),
+            ("Textures", (".ytd", ".dds", ".png")),
+            ("Models", (".ydr", ".yft", ".ydd")),
+            ("Scripts", (".asi", ".lua", ".dll")),
+        ),
     ),
     installation=GameInstallSpec(
         root_env="RDR2_GAME_ROOT",

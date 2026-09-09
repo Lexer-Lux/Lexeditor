@@ -129,6 +129,110 @@ EMPTY_PROBE = r"""
 """
 
 
+# A column's sort control is a transparent hit area drawn inside the header
+# cell's own box. A theme that skins every `button` fills it, and the result is
+# a second rectangle painted inside every header cell - which is exactly what
+# FF7R shipped. Nothing about that is visible in the plugin's own source, so it
+# has to be caught by measuring what the browser actually paints.
+CHROME_PROBE = r"""
+(()=>{
+  const opaque=value=>{
+    if(!value||value==='none') return false;
+    const m=value.match(/rgba?\(([^)]+)\)/);
+    if(!m) return true;
+    const parts=m[1].split(',').map(s=>parseFloat(s));
+    return parts.length<4 || parts[3]>0.02;
+  };
+  const bad=[];
+  for(const control of document.querySelectorAll(
+      '.lex-column-list-head-cell .lex-column-sort, .lex-column-list-head-cell .lex-info-help')){
+    const cs=getComputedStyle(control);
+    const painted=[];
+    if(opaque(cs.backgroundColor)) painted.push('background '+cs.backgroundColor);
+    if(parseFloat(cs.borderTopWidth)>0&&cs.borderTopStyle!=='none')
+      painted.push('border '+cs.borderTopWidth);
+    if(!painted.length) continue;
+    // The info bubble is a filled disc by design; only a squared-off fill on it
+    // reads as a stray rectangle.
+    if(control.classList.contains('lex-info-help')
+       && /50%|9999px/.test(cs.borderRadius)) continue;
+    bad.push({control:String(control.className).slice(0,30),
+              label:(control.textContent||'').trim().slice(0,20),painted});
+  }
+  return JSON.stringify(bad.slice(0,10));
+})()
+"""
+
+
+# A few shared containers are given a fixed share of their parent and clip what
+# does not fit. That is invisible to the leaf-text sweep, because the box doing
+# the cutting has children rather than text of its own - which is how a detail
+# panel spent weeks slicing the source line under every record name in half.
+# These are named explicitly; a general ancestor check was tried and drowned in
+# false positives.
+CONTAINER_PROBE = r"""
+(()=>{
+  const bad=[];
+  const names=['.lex-detail-panel-heading','.lex-detail-section-title',
+               '.lex-column-list-header','.lex-pager'];
+  for(const node of document.querySelectorAll(names.join(','))){
+    const cs=getComputedStyle(node);
+    if(cs.display==='none'||cs.visibility==='hidden') continue;
+    if(!/(hidden|clip)/.test(cs.overflowX+' '+cs.overflowY)) continue;
+    const overW=node.scrollWidth-node.clientWidth;
+    const overH=node.scrollHeight-node.clientHeight;
+    if(overW>1||overH>1){
+      bad.push({cls:String(node.className).slice(0,40),
+                text:(node.textContent||'').trim().slice(0,30),overW,overH});
+    }
+  }
+  return JSON.stringify(bad.slice(0,10));
+})()
+"""
+
+
+# Two controls that keep silently regressing, checked by measuring what is on
+# screen rather than by reading the CSS.
+#
+# The boolean leader arrow exists to connect a property name to the checkbox it
+# governs. When a layout change widened the row, the arrow kept its old cap and
+# stopped in mid-air, pointing at nothing - the "can sell arrow bugged" report.
+#
+# The value slider is only meaningful when a pixel of travel is worth a sensible
+# amount. Offered over a raw 32-bit range it writes tens of millions into a
+# price on a drag to the middle, which reads as a broken control.
+CONTROLS_PROBE = r"""
+(()=>{
+  const bad=[];
+  for(const field of document.querySelectorAll('.lex-boolean-field')){
+    const arrow=field.querySelector('.lex-field-boolean-arrow');
+    const target=field.querySelector('.lex-detail-field-control input,.lex-detail-field-control select');
+    if(!arrow||!target) continue;
+    const a=arrow.getBoundingClientRect(), t=target.getBoundingClientRect();
+    if(a.width<1||t.width<1) continue;
+    const gap=t.left-a.right;
+    if(gap>14){
+      bad.push({kind:'arrow-short-of-control',gap:Math.round(gap),
+                label:(field.querySelector('.lex-detail-field-label')?.textContent||'').trim().slice(0,24)});
+    }
+  }
+  for(const fill of document.querySelectorAll('.lex-has-value-fill')){
+    const input=fill.querySelector('input[type="number"]');
+    if(!input) continue;
+    const low=Number(input.min), high=Number(input.max);
+    const step=Number(input.step)||1;
+    if(!Number.isFinite(low)||!Number.isFinite(high)||high<=low) continue;
+    const span=(high-low)/step;
+    if(span>100000){
+      bad.push({kind:'slider-over-unusable-range',span:Math.round(span),
+                label:(input.getAttribute('aria-label')||input.name||'').slice(0,24)});
+    }
+  }
+  return JSON.stringify(bad.slice(0,10));
+})()
+"""
+
+
 def sweep(plugin: str, width: int, height: int) -> list[dict]:
     profile = tempfile.TemporaryDirectory(prefix="lex-clip-", ignore_cleanup_errors=True)
     project = tempfile.TemporaryDirectory(prefix="lex-clip-project-", ignore_cleanup_errors=True)
@@ -182,6 +286,24 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
                     entry["size"] = f"{width}x{height}"
                     entry["defect"] = "empty-tab"
                     found.append(entry)
+                for entry in json.loads(cdp.eval(CHROME_PROBE)):
+                    entry["plugin"] = plugin
+                    entry["tab"] = tab
+                    entry["size"] = f"{width}x{height}"
+                    entry["defect"] = "boxed-header-control"
+                    found.append(entry)
+                for entry in json.loads(cdp.eval(CONTAINER_PROBE)):
+                    entry["plugin"] = plugin
+                    entry["tab"] = tab
+                    entry["size"] = f"{width}x{height}"
+                    entry["defect"] = "clipped-container"
+                    found.append(entry)
+                for entry in json.loads(cdp.eval(CONTROLS_PROBE)):
+                    entry["plugin"] = plugin
+                    entry["tab"] = tab
+                    entry["size"] = f"{width}x{height}"
+                    entry["defect"] = "broken-control"
+                    found.append(entry)
                 for entry in json.loads(cdp.eval(PAGER_PROBE)):
                     entry["plugin"] = plugin
                     entry["tab"] = tab
@@ -201,25 +323,36 @@ def main() -> int:
         for width, height in ((1600, 950), (1280, 720)):
             findings.extend(sweep(plugin, width, height))
     pagerless = [row for row in findings if row.get("defect") == "table-without-pager"]
+    boxed = [row for row in findings if row.get("defect") == "boxed-header-control"]
+    cropped = [row for row in findings if row.get("defect") == "clipped-container"]
+    controls = [row for row in findings if row.get("defect") == "broken-control"]
     empty = [row for row in findings if row.get("defect") == "empty-tab"]
     clipped = [row for row in findings
-               if row.get("defect") not in ("table-without-pager", "empty-tab")]
+               if row.get("defect") not in ("table-without-pager", "empty-tab",
+                                            "boxed-header-control",
+                                            "clipped-container", "broken-control")]
     # Twenty printed lines hid most of a failure, so every entry is also
     # written out; grouping there is what makes a shared cause obvious.
     report = ROOT / "out" / "no-clipped-text.json"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text(json.dumps(
         {"plugins": plugins, "clipped": clipped, "pagerless": pagerless,
-         "empty": empty}, indent=1), encoding="utf-8")
+         "empty": empty, "boxed": boxed, "cropped": cropped, "controls": controls}, indent=1), encoding="utf-8")
     print(json.dumps({"plugins": plugins, "clipped": len(clipped),
                       "pagerless": len(pagerless), "emptyTabs": len(empty),
+                      "boxedHeaderControls": len(boxed),
+                      "clippedContainers": len(cropped),
+                      "brokenControls": len(controls),
                       "report": str(report)}))
-    for entry in (clipped + pagerless + empty)[:20]:
+    for entry in (clipped + pagerless + empty + boxed + cropped + controls)[:20]:
         print(json.dumps(entry, ensure_ascii=True))
-    if clipped or pagerless or empty:
+    if clipped or pagerless or empty or boxed or cropped or controls:
         raise AssertionError(
             f"{len(clipped)} clipped text boxes, {len(pagerless)} tables without "
-            f"a pager, {len(empty)} tabs rendering nothing")
+            f"a pager, {len(empty)} tabs rendering nothing, {len(boxed)} header "
+            f"controls painting their own box, {len(cropped)} shared "
+            f"containers cutting off what they hold, {len(controls)} controls "
+            f"pointing nowhere or spanning an unusable range")
     return 0
 
 

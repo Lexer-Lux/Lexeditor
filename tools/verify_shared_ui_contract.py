@@ -135,10 +135,17 @@ require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
 # Pin the single definition, not the number. Three separate declarations of
 # this width existed at once and only the last one was live, so edits to the
 # others silently did nothing.
-require("--lex-detail-label-width:10%" in css.replace(" ", ""),
-        "Detail property-name lane is not standardized to the shared 10% lane")
-require("grid-template-columns:10%" not in css.replace(" ", ""),
-        "A literal property-name lane width is overriding the shared variable")
+# The lane is still ten percent wherever ten percent is wide enough to hold a
+# property name. It now carries a font-relative floor as well, because ten
+# percent of a narrow detail panel is a twenty-pixel column that cuts every
+# label off. Both halves are required: the floor without the percentage would
+# let the lane grow without limit.
+flat = css.replace(" ", "")
+require("--lex-detail-label-width:minmax(var(--lex-detail-label-floor),10%)" in flat,
+        "Detail property-name lane is not standardized to the shared 10% lane "
+        "with its font-relative floor")
+require("--lex-detail-label-floor:" in flat,
+        "Detail property-name lane has no font-relative minimum width")
 require("lex-info-help" in css and "place-items:center" in css.replace(" ", ""),
         "info bubble glyph centering is not defined")
 require("lex-toggle-name" in css and "writing-mode:horizontal-tb" in css,

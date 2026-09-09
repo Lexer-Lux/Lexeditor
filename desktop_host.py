@@ -530,6 +530,7 @@ class HostApi:
             payload.get("mainMenuHeightPercent"),
             None if "soundEnabled" not in payload else bool(payload["soundEnabled"]),
             payload.get("soundVolumePercent"),
+            None if "pageWrapAround" not in payload else bool(payload["pageWrapAround"]),
         )
         return self.lexeditor_settings()
 
@@ -1004,7 +1005,8 @@ class HostApi:
         if not selected:
             return {**current, "cancelled": True}
         project = self._projects.select(plugin_id, selected)
-        return self._restart_for_project(plugin_id, project)
+        return {**self._restart_for_project(plugin_id, project),
+                "contents": self._projects.contents(plugin_id, selected)}
 
     def create_mod_project(self, plugin_id: str, name: str) -> dict:
         """Clone the plugin's valid starter into a new selected folder."""
@@ -1013,7 +1015,19 @@ class HostApi:
         if not selected:
             return {**self._projects.snapshot(plugin_id), "cancelled": True}
         project = self._projects.create(plugin_id, selected, name)
-        return self._restart_for_project(plugin_id, project)
+        return {**self._restart_for_project(plugin_id, project),
+                "contents": self._projects.contents(plugin_id, str(Path(selected) / name))}
+
+    def mod_project_contents(self, plugin_id: str, path: str = "") -> dict:
+        """Report what this game's loader recognises inside one mod folder."""
+        return self._projects.contents(plugin_id, path)
+
+    def remove_mod_project(self, plugin_id: str, path: str) -> dict:
+        """Stop listing one mod. The folder and its files are left alone."""
+        before = self._projects.snapshot(plugin_id)
+        was_current = os.path.normcase(before.get("current", "")) == os.path.normcase(str(Path(path).resolve()))
+        project = self._projects.forget(plugin_id, path)
+        return self._restart_for_project(plugin_id, project) if was_current else project
 
     def rename_mod_project(self, plugin_id: str, path: str, name: str) -> dict:
         """Rename one editable project and restart it when it is active."""

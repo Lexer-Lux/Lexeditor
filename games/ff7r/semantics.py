@@ -35,6 +35,16 @@ NAME_PROPERTY_HINTS = (
     "ItemNameLabel", "NameLabel", "ItemName", "Name", "DisplayName",
     "TextLabel", "Label", "EquipmentName", "MateriaNameLabel",
 )
+# An item's description lives in the same text resource as its name, behind a
+# second label property. The item tables were only ever asked for the name, so
+# the editor showed prices for equipment whose in-game description it never
+# read. As with the name hints, these are candidates: a name absent from the
+# installed table is simply skipped.
+DESCRIPTION_PROPERTY_HINTS = (
+    "ItemHelpLabel", "HelpLabel", "ItemExplanationLabel", "ExplanationLabel",
+    "DescriptionLabel", "ItemDescriptionLabel", "Description", "CaptionLabel",
+    "MateriaHelpLabel", "EquipmentHelpLabel",
+)
 
 
 def _basename(asset: str) -> str:
@@ -43,6 +53,14 @@ def _basename(asset: str) -> str:
 
 def _property_map(package) -> dict[str, Any]:
     return {prop.name: prop for prop in package.properties}
+
+
+def _first_description_id(values: dict[str, Any], name_id: str) -> str:
+    for hint in DESCRIPTION_PROPERTY_HINTS:
+        value = values.get(hint)
+        if isinstance(value, str) and value.startswith("$") and value != name_id:
+            return value
+    return ""
 
 
 def _first_text_id(values: dict[str, Any]) -> str:
@@ -99,6 +117,8 @@ def _economy_tables(game_root, data_root, project_root, index: dict,
             display = text.get(text_id, "") if text_id else ""
             if not display:
                 display = entry.tag
+            description_id = _first_description_id(entry.values, text_id)
+            description = text.get(description_id, "") if description_id else ""
             if entry.tag:
                 item_names[entry.tag] = display
             if text_id:
@@ -118,6 +138,8 @@ def _economy_tables(game_root, data_root, project_root, index: dict,
                 "id": entry.tag,
                 "name": display,
                 "textId": text_id,
+                "description": description,
+                "descriptionId": description_id,
                 "fields": fields,
             })
         tables.append({

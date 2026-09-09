@@ -968,8 +968,18 @@
     // hover the fill slides out into a slider for rough adjustment.
     const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
     const highBound = max === null || max === undefined || max === "" ? null : Number(max);
+    // A drag slider is only honest when a pixel of travel is worth a sensible
+    // amount. Over a raw INT32 field the whole range is four billion wide, so
+    // the pointer lands a hair off centre and writes -24832854 into a price -
+    // the control looks broken because it is being asked to resolve four
+    // billion values across three hundred pixels. Past this span the value gets
+    // a plain number box with no fill and no handle.
+    const SLIDER_MAX_STEPS = 100000;
+    const boundedSpan = Number.isFinite(lowBound) && Number.isFinite(highBound)
+      ? (highBound - lowBound) / (Number(step) || 1) : Infinity;
     if (input && !readOnly && numericLike &&
-        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
+        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound &&
+        boundedSpan <= SLIDER_MAX_STEPS) {
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
       fill.append(handle);
@@ -2011,6 +2021,38 @@
     return {refresh: () => normalized.forEach(apply), overlay};
   };
 
+  // A yes/no question with a plain explanation. showAlert only ever had one
+  // button, so anything needing consent grew its own dialog; this is the shared
+  // one. Resolves true only when the confirming button is pressed.
+  const confirmAction = options => new Promise(resolve => {
+    const previousFocus = document.activeElement;
+    const backdrop = element("div", {class: "lex-dialog-backdrop lex-important-backdrop", "data-lex-history-control": true});
+    const cancel = element("button", {class: "lex-dialog-action", text: String(options?.cancelLabel || "Cancel")});
+    const confirm = element("button", {class: "lex-dialog-action primary", text: String(options?.confirmLabel || "Continue")});
+    const body = element("p", {class: "lex-important-message"});
+    // The explanation is the point of the dialog, so its line breaks are kept.
+    body.style.whiteSpace = "pre-line";
+    body.textContent = String(options?.message || "");
+    const dialog = element("section", {
+      class: "lex-dialog lex-important-dialog", role: "alertdialog", "aria-modal": "true",
+    }, element("h2", {text: String(options?.title || "Are you sure?")}), body,
+      element("div", {class: "lex-dialog-actions"}, cancel, confirm));
+    const finish = answer => {
+      backdrop.remove();
+      document.removeEventListener("keydown", onKey);
+      previousFocus?.focus?.();
+      resolve(answer);
+    };
+    const onKey = event => { if (event.key === "Escape") finish(false); };
+    cancel.onclick = () => finish(false);
+    confirm.onclick = () => finish(true);
+    backdrop.onclick = event => { if (event.target === backdrop) finish(false); };
+    document.addEventListener("keydown", onKey);
+    backdrop.append(dialog);
+    document.body.append(backdrop);
+    confirm.focus();
+  });
+
   const showAlert = options => {
     const title = String(options?.title || "Lexeditor message");
     const message = String(options?.message || "An important event needs your attention.");
@@ -2616,6 +2658,49 @@
     });
   };
 
+  // "Did it actually pick anything up?" is the first thing a player wants to
+  // know after pointing Lexeditor at a mod folder, and the answer used to be
+  // silence. This turns one scan into a plain report: what the loader
+  // recognised, and how much it will ignore.
+  const modContentsReport = (contents, title) => {
+    if (!contents) return;
+    if (!contents.exists) {
+      showAlert({title, message: `Nothing is there to read yet:
+${contents.path}`});
+      return;
+    }
+    if (!contents.declared) {
+      showAlert({title, message:
+        `${contents.files} file${contents.files === 1 ? "" : "s"} in ${contents.path}.
+
+`
+        + "This game's plugin has not declared which file types its loader recognises, "
+        + "so Lexeditor cannot break that down yet."});
+      return;
+    }
+    const found = contents.categories.filter(row => row.count > 0);
+    const items = found.map(row => ({
+      item: row.label,
+      issue: `${row.count} file${row.count === 1 ? "" : "s"} (${row.suffixes.join(", ")})`,
+    }));
+    if (!items.length) {
+      showAlert({title, message:
+        `Lexeditor recognised none of the ${contents.files} file`
+        + `${contents.files === 1 ? "" : "s"} in ${contents.path}.
+
+`
+        + "This mod will load nothing. Check that you pointed at the mod's own folder "
+        + "rather than a folder above it."});
+      return;
+    }
+    if (contents.unrecognized) {
+      items.push({item: "Not recognised",
+        issue: `${contents.unrecognized} file${contents.unrecognized === 1 ? "" : "s"} `
+          + "this game's loader will ignore"});
+    }
+    showAlert({title, items, message: contents.path});
+  };
+
   const mountProjectControl = (options, host) => {
     const mode = element("span", {class: "lex-project-source-mode", hidden: true});
     const name = element("span", {class: "lex-project-name"}, "Loading mod…");
@@ -2626,7 +2711,23 @@
       title: "Choose a mod project", "aria-haspopup": "menu", "aria-expanded": "false",
     }, mode, name, path, status);
     const menu = element("div", {class: "lex-project-menu", role: "menu", hidden: true});
-    const box = element("div", {class: "lex-project-control", hidden: true}, trigger, menu);
+    const about = element("button", {
+      class: "lex-project-about", type: "button",
+      title: "What did Lexeditor find in this mod?",
+      "aria-label": "What did Lexeditor find in this mod?",
+      onclick: async event => {
+        event.preventDefault();
+        event.stopPropagation();
+        try {
+          const contents = await callWindow("mod_project_contents", options.plugin.id, "");
+          modContentsReport(contents, "Loaded mod contents");
+        } catch (error) {
+          showAlert({title: "Could not read the mod folder",
+                     message: error.message || String(error)});
+        }
+      },
+    }, "i");
+    const box = element("div", {class: "lex-project-control", hidden: true}, trigger, about, menu);
     host.append(box);
     let snapshot = null;
     const closeMenu = () => { menu.hidden = true; trigger.setAttribute("aria-expanded", "false"); };
@@ -2704,7 +2805,32 @@
             catch (error) { showAlert({title: "Could not open the mod folder", message: error.message || String(error)}); }
           },
         }, folderIcon());
-        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`}, select, rename, folder, select.querySelector(".lex-project-source-status"));
+        // Removing a mod is a list operation, not a file operation. The prompt
+        // says so plainly, because "remove" next to a folder name reads as
+        // "delete my work" and these folders are often not ours to delete.
+        const remove = element("button", {
+          class: "lex-project-remove", type: "button",
+          title: `Remove ${row.name} from Lexeditor`,
+          "aria-label": `Remove ${row.name} from Lexeditor`,
+          onclick: async event => {
+            event.preventDefault();
+            event.stopPropagation();
+            closeMenu();
+            const agreed = await confirmAction({
+              title: `Remove ${row.name}?`,
+              message: `${row.name} will no longer be listed here and Lexeditor will stop loading it.
+
+`
+                + `Nothing is deleted. The folder and every file in it stay exactly where they are:
+${row.path}`,
+              confirmLabel: "Remove from Lexeditor",
+              cancelLabel: "Keep it",
+            });
+            if (!agreed) return;
+            guarded(() => callWindow("remove_mod_project", options.plugin.id, row.path));
+          },
+        }, "🗑");
+        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`}, select, rename, folder, remove, select.querySelector(".lex-project-source-status"));
       });
       const sourceRows = sources.map(row => element("button", {
         class: `lex-project-menu-item-select lex-project-menu-item lex-project-reference${String(row.key) === activeSource ? " active" : ""}`,
@@ -2725,12 +2851,24 @@
         hidden: !value.canCreate, onclick: async () => {
           closeMenu();
           const projectName = await askProjectName(options.plugin.name || options.plugin.id, options.projectCreatePrompt || {});
-          if (projectName) guarded(() => options.createProject ? options.createProject(projectName) : callWindow("create_mod_project", options.plugin.id, projectName));
+          if (projectName) guarded(async () => {
+            const result = options.createProject
+              ? await options.createProject(projectName)
+              : await callWindow("create_mod_project", options.plugin.id, projectName);
+            if (result?.contents && !result.cancelled) modContentsReport(result.contents, `Added ${projectName}`);
+            return result;
+          });
         },
       }, "➕ Add a Mod");
       const browse = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
-        onclick: () => { closeMenu(); guarded(() => options.browseProject ? options.browseProject() : callWindow("browse_mod_project", options.plugin.id)); },
+        onclick: () => { closeMenu(); guarded(async () => {
+          const result = options.browseProject
+            ? await options.browseProject()
+            : await callWindow("browse_mod_project", options.plugin.id);
+          if (result?.contents && !result.cancelled) modContentsReport(result.contents, "Added mod");
+          return result;
+        }); },
       }, "🔍 Find a Mod");
       const manage = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
@@ -2813,6 +2951,7 @@
         {key:"updateCheckFrequency", scope:"user", title:"Update check frequency", description:"Used by LEXEDITOR and managed helpers such as FFNx.", type:"select", choices:settings.updateCheckChoices || []},
         {key:"hoverableAltClick", scope:"user", title:"Alt + Click hoverable linking", description:"When enabled, ordinary clicks do not follow linked record mentions. Alt+Click opens them.", type:"checkbox"},
         {key:"selectionHoldMs", scope:"user", title:"Searcher hold time", description:"How long a record must be held before a Searcher selects it.", type:"number", min:150, max:2000, step:50, unit:"ms"},
+        {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"boolean"},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
         {key:"mainMenuHeightPercent", scope:"user", title:"Menu bar height", description:"Height of the menu bar in the Home screen and every game plugin, as a percentage of the screen.", type:"number", min:3, max:20, step:.25, unit:"%"},
@@ -4383,7 +4522,15 @@
             typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || ""].filter(Boolean).join(" "),
           role: "cell",
           "data-column-key": column.key,
-        }, element("span", {class: "lex-column-cell-content"}, content));
+        // A bare string handed straight to the flex content span cannot be
+        // ellipsised: text-overflow does nothing on a flex container, so a long
+        // value was hard-cut mid-character. Wrapping plain text in its own
+        // block gives the existing single-line truncation something to act on,
+        // and the title keeps the full value reachable.
+        }, element("span", {class: "lex-column-cell-content"},
+          (typeof content === "string" || typeof content === "number")
+            ? element("span", {class: "lex-column-cell-text", title: String(content)}, String(content))
+            : content));
         if (column.edit) {
           cell.addEventListener("dblclick", event => {
             event.preventDefault();
@@ -4866,6 +5013,38 @@
     return element("label", {class: "lex-pager-search"}, searchIcon(), control);
   };
 
+  // The pager's right-hand side is where filters live. These are the two shapes
+  // a plugin needs, so every game's filters look and behave the same instead of
+  // each one growing its own strip above the table.
+  const pagerToggle = spec => {
+    const input = element("input", {
+      type: "checkbox", checked: spec.checked === true, disabled: spec.disabled === true,
+      "aria-label": String(spec.label || "Filter"),
+      onchange: event => spec.change?.(event.target.checked),
+    });
+    return element("label", {
+      class: `lex-pager-filter lex-pager-toggle${spec.disabled ? " disabled" : ""}`,
+      title: String(spec.title || spec.label || ""),
+    }, input, element("span", {}, String(spec.label || "Filter")));
+  };
+
+  const pagerSelect = spec => {
+    const select = element("select", {
+      disabled: spec.disabled === true,
+      "aria-label": String(spec.label || "Filter"),
+      onchange: event => spec.change?.(event.target.value),
+    });
+    for (const option of spec.options || []) {
+      const node = element("option", {value: String(option.id)}, String(option.label));
+      node.selected = String(option.id) === String(spec.value);
+      select.append(node);
+    }
+    return element("label", {
+      class: "lex-pager-filter lex-pager-select",
+      title: String(spec.title || spec.label || ""),
+    }, spec.label ? element("span", {}, String(spec.label)) : null, select);
+  };
+
   const pager = options => {
     const pages = Math.max(1, Number(options.pages) || 1);
     const page = Math.max(0, Math.min(Number(options.page) || 0, pages - 1));
@@ -5153,7 +5332,13 @@
       page, pageSize, selected, reason, ...patch,
     });
     const changePage = target => {
-      const targetPage = Math.max(0, Math.min(Number(target) || 0, pages - 1));
+      const requested = Number(target) || 0;
+      // Paging past either end wraps to the other, so a wheel at the last page
+      // does something instead of silently re-rendering the same page.
+      const wraps = sharedSettingsSnapshot?.pageWrapAround !== false;
+      const targetPage = wraps && pages > 1
+        ? ((requested % pages) + pages) % pages
+        : Math.max(0, Math.min(requested, pages - 1));
       if (targetPage === page) return false;
       const first = records[targetPage * barrelSize] || null;
       change("page", {page: targetPage, selected: first ? keyOf(first) : null});
@@ -5661,6 +5846,10 @@
     const saved = dataMapState.get(stateKey) || {pageSize:15, selected:null};
     dataMapState.set(stateKey, saved);
     const labels = {structured:"Structured editable", view:"Read-only view", source:"Source only", unavailable:"Unavailable"};
+    // A glyph per coverage state, so the column reads at a glance instead of
+    // being four columns of similar words. The word stays beside it: state is
+    // never carried by colour alone.
+    const glyphs = {structured:"◉", view:"◎", source:"○", unavailable:"✕"};
     const coverage = row => Object.hasOwn(labels, row.coverage) ? row.coverage : "unavailable";
     const label = row => labels[coverage(row)] + (coverage(row)==="structured" && row.status==="partial" ? " (partial)" : "");
     const keyOf = row => row.id || `${row.filename}\u001f${row.controls || ""}`;
@@ -5679,7 +5868,9 @@
       }));
     const detail = row => {
       const body = [element("p",{class:"lex-data-map-scope"},row.controls || "No mapped interface"),
-        element("p",{class:`lex-data-map-coverage ${coverage(row)}`},label(row)),
+        element("p",{class:`lex-data-map-coverage ${coverage(row)}`},
+          element("span",{class:"lex-coverage-icon","aria-hidden":"true"},glyphs[coverage(row)]),
+          element("span",{},label(row))),
         element("p",{class:"lex-data-map-notes"},row.notes || "No further notes.")];
       const actions=[];
       const targets = row.targets || (row.target || row.view ? [{id:row.target || row.view,label:row.target || row.view}] : []);
@@ -5716,7 +5907,10 @@
         sortState:{key:sortKey,dir:direction},sort:options.changeSort,
         columns:[{key:"filename",label:"Filename",sortable:true,align:"start"},
           {key:"controls",label:"What it controls",sortable:true,align:"start"},
-          {key:"status",label:"Coverage",sortable:true,align:"start",render:row=>element("span",{title:label(row)},label(row))}]}),
+          {key:"status",label:"Coverage",sortable:true,align:"start",
+            render:row=>element("span",{class:`lex-coverage-cell ${coverage(row)}`,title:label(row)},
+              element("span",{class:"lex-coverage-icon","aria-hidden":"true"},glyphs[coverage(row)]),
+              element("span",{class:"lex-coverage-text"},label(row)))}]}),
       detail,
     });
     return {controls:[],content,page,pages:Math.max(1,Math.ceil(filtered.length/saved.pageSize)),filtered};
@@ -5787,7 +5981,7 @@
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {element, el: element, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {element, el: element, confirmAction, pagerToggle, pagerSelect, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
@@ -6008,12 +6202,37 @@
   const fitAllLabels = root => root.querySelectorAll?.(
     '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label',
   ).forEach(fitLabel);
-  const labelObserver = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
-    if (node instanceof Element) fitAllLabels(node);
-  })));
+  // Measuring inside the mutation callback reads a layout that is not final:
+  // the label's own height comes from the row, and the row is sized by a
+  // control that has not been laid out yet. Every label measured that way keeps
+  // its full size and then clips once the row settles, which is where the
+  // sweep's list of cut-off property names came from. Batch the pass into the
+  // next frame instead, when the row heights are real.
+  //
+  // Re-fitting cannot feed back into layout: `contain:size` on the label means
+  // its font size cannot change the row's height, so this settles in one pass.
+  let fitPending = false;
+  const scheduleFit = () => {
+    if (fitPending) return;
+    fitPending = true;
+    requestAnimationFrame(() => {
+      fitPending = false;
+      fitAllLabels(document);
+    });
+  };
+  const labelObserver = new MutationObserver(records => {
+    if (records.some(record => record.addedNodes.length)) scheduleFit();
+  });
   labelObserver.observe(document.documentElement, {childList: true, subtree: true});
-  window.addEventListener('resize', () => fitAllLabels(document));
-  requestAnimationFrame(() => fitAllLabels(document));
+  window.addEventListener('resize', scheduleFit);
+  // A panel split drag resizes the lane without adding a node or resizing the
+  // window, so watch the region the fields actually live in as well.
+  new ResizeObserver(scheduleFit).observe(document.documentElement);
+  // A label measured against the fallback font is re-laid-out when the real
+  // face arrives, and the few extra pixels that brings are enough to clip a
+  // line that had just fitted. Re-fit once the fonts are actually in.
+  document.fonts?.ready?.then(scheduleFit);
+  scheduleFit();
 })();
 
 

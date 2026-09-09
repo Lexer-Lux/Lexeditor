@@ -747,7 +747,10 @@
     const nav=subtabBar({tabs:sub.map(id=>({id,label:subtabLabels[id]||labels[id]})),active:state.tab,label:labels[parentTab(state.tab)]+" datasets",change:id=>{if(id!==state.tab)LexeditorUI.playThemeSound?.("confirm");navigate(id)}});
     return el("section",{class:"ff7-workspace lex-tabbed-panel"},nav,summary,el("div",{class:"lex-tabbed-panel-content"},integratedView()));
   }
-  function render(){if(!state.loaded)return;let content;if(state.tab==="info")content=infoView();else if(state.tab==="datamap")content=mapView();else if(state.tab==="tweaks")content=tweakView();else if(integrated.includes(state.tab))content=dataWorkspace();else content=unresolvedView();main.replaceChildren(content);shellRefresh()}
+  // Returning early left #main completely empty until the kernel finished
+  // reading, so whichever tab the user opened first was a blank page rather
+  // than a page that was loading. A tab must always render something.
+  function render(){if(!state.loaded){main.replaceChildren(detailPanel({className:"ff7-detail",title:"Loading FF7 data",identity:null,meta:"Reading kernel.bin",body:[detailSection({title:"STATUS",body:[detailField({label:"STATE",control:readonlyField("Reading the installed FF7 data files…")})]})]}));return}let content;if(state.tab==="info")content=infoView();else if(state.tab==="datamap")content=mapView();else if(state.tab==="tweaks")content=tweakView();else if(integrated.includes(state.tab))content=dataWorkspace();else content=unresolvedView();main.replaceChildren(content);shellRefresh()}
   function navigate(tab){state.tab=tab;render();if(tab==="tweaks")void refreshPlatformConfig()}
   async function save(){
     if(readonly())return;

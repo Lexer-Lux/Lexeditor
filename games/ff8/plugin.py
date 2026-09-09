@@ -171,6 +171,13 @@ PLUGIN = GamePlugin(
         required_paths=("direct",),
         template_root=paths.PROJECT_ROOT,
         initialize=gameplay_settings.initialize_project,
+        content_types=(
+            ("Game data", (".bin", ".fs", ".fi", ".fl")),
+            ("Textures", (".png", ".dds", ".tex")),
+            ("Audio", (".ogg", ".wav", ".sgt")),
+            ("Field maps", (".msd", ".jsm", ".sym")),
+            ("FFNx runtime", (".toml", ".dll", ".p")),
+        ),
     ),
     installation=GameInstallSpec(
         root_env="LEXEDITOR_FF8_ROOT",

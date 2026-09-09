@@ -248,9 +248,26 @@ bounded number/range controls for real numeric limits, and decomposed bitflags w
 possible. Help text should explain effect, unit, special values and restart/runtime
 requirements rather than restating the field name.
 
+Present the type the player edits, not the type the file stores. A value kept as a
+byte that only ever means yes or no is a switch, and is written back as 0 or 1. A
+byte that indexes a fixed list is a select, not a number. Reading the storage type
+straight out of a schema is what produced a spin box labelled "Can Sell" with a
+range of 0-255. Keep a small per-field override map in the plugin next to the
+schema, so the mapping is visible and each entry can be justified.
+
+Every list of records is a shared paged Table + Detail. Its search and paging live
+in the shared bottom bar, so a plugin never builds its own search box above a bare
+table: doing that silently caps the view at one page.
+
+Tweaks is a settings page, not a record table. `games/blank`'s Tweaks tab is the
+reference: a master switch that owns the page, dependent controls disabled until it
+is on, bounded values with units, selects for fixed choices, and related switches
+grouped into one property.
+
 Credits and Mod Loading are shared Info-page sections; do not hand-build per-game
 copies. A plugin still has to supply their data, and discovery will reject it if it
-does not.
+does not. The Mod Loader section is enforced: every plugin must call
+`LexeditorUI.modLoaderSection` and fill all five fields.
 
 ## 7. Credits and provenance are a hard requirement
 

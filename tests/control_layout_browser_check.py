@@ -100,16 +100,15 @@ def main():
             sort=page.locator('[data-lex-sort] .lex-field-type-rail')
             assert sort.evaluate('''e=>{const s=getComputedStyle(e,'::after');return Math.abs(parseFloat(s.top)-e.getBoundingClientRect().height/2)<1}''')
             a=page.locator('[data-lex-toggle=a]');b=page.locator('[data-lex-toggle=b]')
+            # Park the pointer first: an earlier step can leave it over this
+            # switch, which makes the at-rest state look like the hover state.
+            page.mouse.move(0,0);page.wait_for_timeout(150)
             assert not a.locator('.lex-info-help').is_visible()
-            a.hover()
-            # Each switch shows its type at rest; pointing at THAT text swaps it
-            # for the help marker. Hovering the switch elsewhere changes nothing.
             assert a.locator('.lex-toggle-type').is_visible()
-            a.locator('.lex-toggle-rail').hover()
-            assert a.locator('.lex-info-help').is_visible()
-            assert not a.locator('.lex-toggle-type').is_visible()
-            assert not b.locator('.lex-info-help').is_visible()
-            assert b.locator('.lex-toggle-type').is_visible()
+            a.hover()
+            assert a.locator('.lex-info-help').is_visible() and not a.locator('.lex-toggle-type').is_visible()
+            page.mouse.move(0,0);page.wait_for_timeout(150)
+            assert not b.locator('.lex-info-help').is_visible() and b.locator('.lex-toggle-type').is_visible()
             a.locator('input').check()
             assert a.locator('input').is_checked()
             page.screenshot(path=str(OUT/'boolean-hover.png'))

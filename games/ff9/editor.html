@@ -7,13 +7,31 @@
   <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
   <link rel="stylesheet" href="/shared/framework.css">
   <style>
-    :root{--lex-radius:5px}
-    *{box-sizing:border-box}body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:radial-gradient(circle at 48% 12%,#211941,#090713 70%);font:15px/1.35 "Segoe UI",sans-serif}
-    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}.ff9-layout,.lex-paged-list-detail{height:100%}.ff9-table,.ff9-detail{height:100%;min-height:0}.ff9-table{background:linear-gradient(145deg,#4b3a7d,#2a224d)}
-    .ff9-detail .lex-detail-panel-heading{background:linear-gradient(135deg,#604c96,#30255b)}.ff9-detail .lex-detail-panel-body{padding:10px;gap:10px}.ff9-detail input{font:inherit}.ff9-runtime-actions{display:flex;flex-wrap:wrap;gap:8px}
-    .ff9-card{max-width:980px;padding:22px 24px;border:2px solid var(--lex-border);background:linear-gradient(135deg,#594585,#2b2050 72%);box-shadow:inset 2px 2px #ffffff2d,inset -2px -2px #0008}.ff9-card h2{margin:0 0 12px;font:30px/1.15 Georgia,serif}.ff9-card p{max-width:820px;margin:8px 0}.ff9-path{display:block;margin:7px 0;overflow-wrap:anywhere;color:#fff}.ff9-warning{display:inline-block;margin-top:10px;padding:5px 9px;color:#171717;background:#efc64f;font-weight:700}.ff9-source{color:var(--lex-muted)}
-    #toolbar{display:flex;margin:var(--lex-panel-gap) var(--lex-panel-gap) 0;gap:8px}#toolbar:empty{display:none}.ff9-readonly{white-space:normal;overflow-wrap:anywhere}.lex-data-map-view{height:100%;overflow:hidden}.lex-data-map-table{background:#382d68}.lex-column-list-header{background:#1e1838}
-    :root{--lex-radius:5px}body{background:var(--lex-bg);font:15px/1.35 var(--lex-font)}.ff9-table,.ff9-detail .lex-detail-panel-heading,.ff9-card,.lex-data-map-table,.lex-column-list-header{background:var(--lex-panel);box-shadow:none}.ff9-card h2{font-family:var(--lex-heading-font)}
+    /* FF9 draws on the shared baseline and nothing else. The bespoke purple
+       gradients were layered over by a later reset that only caught some of
+       them, so the page still leaked its old palette. Colour now comes from
+       the framework's tokens; only structure lives here. */
+    *{box-sizing:border-box}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;
+      color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
+    .ff9-layout,.lex-paged-list-detail{height:100%}
+    .ff9-table,.ff9-detail{height:100%;min-height:0}
+    .ff9-detail .lex-detail-panel-body{padding:10px;gap:10px}
+    .ff9-detail input{font:inherit}
+    .ff9-runtime-actions{display:flex;flex-wrap:wrap;gap:8px}
+    .ff9-card{max-width:980px;padding:22px 24px;border:1px solid var(--lex-border);
+      background:var(--lex-panel)}
+    .ff9-card h2{margin:0 0 12px;font:30px/1.15 var(--lex-heading-font)}
+    .ff9-card p{max-width:820px;margin:8px 0}
+    .ff9-path{display:block;margin:7px 0;overflow-wrap:anywhere}
+    .ff9-warning{display:inline-block;margin-top:10px;padding:5px 9px;
+      color:var(--lex-accent-text);background:var(--lex-accent);font-weight:700}
+    .ff9-source{color:var(--lex-muted)}
+    #toolbar{display:flex;margin:var(--lex-panel-gap) var(--lex-panel-gap) 0;gap:8px}
+    #toolbar:empty{display:none}
+    .ff9-readonly{white-space:normal;overflow-wrap:anywhere}
+    .lex-data-map-view{height:100%;overflow:hidden}
   </style>
 </head>
 <body>

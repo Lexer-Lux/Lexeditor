@@ -10,7 +10,7 @@
     *{box-sizing:border-box}
     body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
     main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
-    .ff7r-view{display:flex;flex-direction:column;height:100%;min-height:0;gap:var(--lex-panel-gap)}
+    .ff7r-view{display:flex;flex-direction:column;height:100%;min-height:0;gap:var(--lex-panel-gap)}.ff7r-tweaks-view>.ff7r-tweaks{flex:1 1 auto;min-height:0}
     .ff7r-toolbar{display:flex;gap:8px;align-items:center;min-height:38px;flex-wrap:wrap}
     .ff7r-toolbar label{font-weight:700}.ff7r-toolbar select{min-width:180px;max-width:min(720px,70vw)}
     .ff7r-toolbar input[type=search]{min-width:220px;flex:1}
@@ -40,7 +40,7 @@
   const $=selector=>document.querySelector(selector);
   async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
-  const state={
+  const state={modOnly:false,
     tab:"data",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
     asset:"",data:null,dataBaseline:null,selected:0,query:"",sort:{key:"tag",dir:1},
     economy:null,economyKey:"",economyError:"",economyTable:"",economyQuery:"",economySort:{key:"name",dir:1},
@@ -182,23 +182,58 @@
 
   function setScalar(row,prop,value){row.values[prop.name]=value;refreshShell()}
   function setArrayValue(row,prop,index,value){if(!Array.isArray(row.values[prop.name]))return;row.values[prop.name][index]=value;refreshShell()}
-  function numericInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const attrs={type:"number",value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=prop.type==="FLOAT"?Number(event.target.value):Number.parseInt(event.target.value,10);if(index===null)setScalar(row,prop,value);else setArrayValue(row,prop,index,value)}};if(prop.min!==null&&prop.min!==undefined)attrs.min=prop.min;if(prop.max!==null&&prop.max!==undefined)attrs.max=prop.max;attrs.step=prop.type==="FLOAT"?"any":1;return el("input",attrs)}
+  function numericInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const attrs={type:"number",value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=prop.type==="FLOAT"?Number(event.target.value):Number.parseInt(event.target.value,10);if(index===null)setScalar(row,prop,value);else setArrayValue(row,prop,index,value)}};const low=semanticMin(prop),high=semanticMax(prop);if(low!==null&&low!==undefined)attrs.min=low;if(high!==null&&high!==undefined)attrs.max=high;attrs.step=prop.type==="FLOAT"?"any":1;return el("input",attrs)}
   function percentInput(row,prop,index){const current=row.values[prop.name]?.[index]??0;return el("input",{type:"number",min:0,max:100,step:1,value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=Number.parseInt(event.target.value,10);if(Number.isFinite(value)&&value>=0&&value<=100)setArrayValue(row,prop,index,value)},onchange:event=>{let value=Number.parseInt(event.target.value,10);if(!Number.isFinite(value))value=current;value=Math.max(0,Math.min(100,value));event.target.value=String(value);setArrayValue(row,prop,index,value)}})}
   function boolInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];return el("input",{type:"checkbox",checked:!!current,disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.checked);else setArrayValue(row,prop,index,event.target.checked)}})}
   function nameInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.value);else setArrayValue(row,prop,index,event.target.value)}});for(const name of state.data.names){const option=el("option",{value:name},name);option.selected=name===current;select.append(option)}return select}
   function semanticItemInput(row,prop,index){const current=row.values[prop.name]?.[index]??"";const choices=[...(state.loot?.itemChoices||[])];if(current&&!choices.some(choice=>choice.id===current))choices.unshift({id:current,name:current});const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>setArrayValue(row,prop,index,event.target.value)});for(const choice of choices){const option=el("option",{value:choice.id},choice.name&&choice.name!==choice.id?`${choice.name} (${choice.id})`:choice.id);option.selected=choice.id===current;select.append(option)}return select}
   function readonlyResolved(value){const resolved=resolvedText(value);return resolved?el("div",{class:"ff7r-resolved"},readonlyField(resolved),el("small",{},value)):readonlyField(String(value??""))}
-  function scalarControl(row,prop,index=null){if(prop.type==="BOOL")return boolInput(row,prop,index);if(prop.type==="ENUM")return nameInput(row,prop,index);if(["BYTE","INT16","UINT16","INT32","FLOAT"].includes(prop.type))return numericInput(row,prop,index);const value=index===null?row.values[prop.name]:row.values[prop.name][index];return readonlyResolved(value)}
+  // A value's storage type is not always the type a person should edit. CanSale
+  // is stored as a byte but only ever means yes or no, so it is presented as a
+  // switch and written back as 0 or 1. Add a field here when the schema type is
+  // wider than the meaning.
+  const SEMANTIC_TYPES={CanSale:"BOOL"};
+  // The storage type is a signed 32-bit integer, so the schema's honest range is
+  // plus or minus two billion. A price is not, and a slider handed that range
+  // put -24832854 into a Buy Price on a drag to the middle. These are the
+  // meanings, not the storage limits, and they only ever narrow.
+  const SEMANTIC_BOUNDS={BuyValue:{min:0,max:99999999},SaleValue:{min:0,max:99999999},
+    MaxCount:{min:0,max:99}};
+  function semanticMin(prop){
+    const bound=SEMANTIC_BOUNDS[prop.name];
+    if(!bound)return prop.min;
+    return prop.min===null||prop.min===undefined?bound.min:Math.max(Number(prop.min),bound.min);
+  }
+  function semanticMax(prop){
+    const bound=SEMANTIC_BOUNDS[prop.name];
+    if(!bound)return prop.max;
+    return prop.max===null||prop.max===undefined?bound.max:Math.min(Number(prop.max),bound.max);
+  }
+  function semanticType(prop){
+    const wanted=SEMANTIC_TYPES[prop.name];
+    if(!wanted)return prop.type;
+    if(wanted==="BOOL"&&["BYTE","INT16","UINT16","INT32"].includes(prop.type))return "BOOL";
+    return prop.type;
+  }
+  function byteBoolInput(row,prop,index=null){
+    const current=index===null?row.values[prop.name]:row.values[prop.name][index];
+    return el("input",{type:"checkbox",checked:Number(current)!==0,
+      disabled:state.activeSource!=="mine"||!prop.editable,
+      "aria-label":prop.label||prop.name,
+      onchange:event=>{const value=event.target.checked?1:0;
+        if(index===null)setScalar(row,prop,value);else setArrayValue(row,prop,index,value)}});
+  }
+  function scalarControl(row,prop,index=null){if(semanticType(prop)==="BOOL"&&prop.type!=="BOOL")return byteBoolInput(row,prop,index);if(prop.type==="BOOL")return boolInput(row,prop,index);if(prop.type==="ENUM")return nameInput(row,prop,index);if(["BYTE","INT16","UINT16","INT32","FLOAT"].includes(prop.type))return numericInput(row,prop,index);const value=index===null?row.values[prop.name]:row.values[prop.name][index];return readonlyResolved(value)}
   function propertyControl(row,prop){if(!prop.array)return scalarControl(row,prop);const values=row.values[prop.name]||[];return el("div",{class:"ff7r-array"},...values.map((_value,index)=>el("label",{},el("span",{},`#${index+1}`),scalarControl(row,prop,index))))}
   function propertyHelp(prop){if(!prop.editable)return infoHelp("This DataObject stores this value in a form Lexeditor cannot safely rewrite in place.");if(prop.type==="ENUM")return infoHelp("This value is an Unreal FName. A same-size edit can choose only a name already present in this .uasset's name table.");if(prop.array)return infoHelp("Existing array elements are editable. Resizing the array would move later row data and is not yet supported.");return null}
 
   function recordPanel(row=selectedRecord()){
     if(!row)return detailPanel({className:"ff7r-detail",title:"No record",body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField("This DataObject has no rows.")})]})]});
-    const fields=state.data.properties.map(prop=>detailField({label:prop.label,control:propertyControl(row,prop),dataType:prop.array?`${prop.type}[]`:prop.type,min:prop.min,max:prop.max,help:propertyHelp(prop)}));
+    const fields=state.data.properties.map(prop=>detailField({label:prop.label,control:propertyControl(row,prop),dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),min:semanticMin(prop),max:semanticMax(prop),help:propertyHelp(prop)}));
     return detailPanel({className:"ff7r-detail",title:row.tag||`Record ${row.id}`,identity:recordId(row.id),meta:currentAsset()?.name||state.asset,body:[detailSection({title:"PROPERTIES",body:fields})]});
   }
   function tablePanel(){const rows=sortedRows();return columnList({rows,key:row=>row.id,selected:state.selected,select:row=>{state.selected=row.id;render()},sortState:state.sort,sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};render()},columnPreferences:dataPrefs,columns:dataColumns,class:"ff7r-table","aria-label":"FF7 Remake DataObject records"})}
-  function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake DataObject",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of (state.tab==="tweaks"?tweakAssets():gameAssets())){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}return el("div",{class:"ff7r-toolbar"},el("label",{},"DataObject"),select)}
+  function assetToolbar(){const select=el("select",{"aria-label":"FF7 Remake misc data table",onchange:event=>selectAsset(event.target.value),disabled:state.busy});for(const item of (state.tab==="tweaks"?tweakAssets():gameAssets())){const label=item.group?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.asset;select.append(option)}return el("div",{class:"ff7r-toolbar"},el("label",{},"Table"),select)}
   function dataPanel(){if(state.busy&&state.tab==="data")return loadingPanel("Loading DataObject","Reading the selected gameplay .uasset/.uexp pair…");if(state.error&&!state.data)return errorPanel(state.error);return el("div",{class:"ff7r-view"},assetToolbar(),pagedDataPanel())}
   // The DataObject list uses the shared paged Table + Detail, so its search and
   // paging live in the standard bottom bar instead of a private top strip.
@@ -207,7 +242,26 @@
     if(!list.length)return loadingPanel("Tweaks","No Lexeditor tweak groups were found in the catalog.");
     if(state.busy)return loadingPanel("Loading tweak","Reading the selected tweak group…");
     if(state.error&&!state.data)return errorPanel(state.error);
-    return el("div",{class:"ff7r-view"},tweakToolbar(list),pagedDataPanel());
+    return el("div",{class:"ff7r-view ff7r-tweaks-view"},tweakToolbar(list),tweakSettingsPanel());
+  }
+  // Tweaks are settings, not records. A group holds a handful of switches and
+  // bounded values that the player reads top to bottom, so it is one scrolling
+  // settings page - the shape games/blank demonstrates - rather than a table
+  // with a search box and a pager over five rows.
+  function tweakSettingsPanel(){
+    const rows=records(),asset=currentAsset();
+    const title=asset?.name||"Tweaks";
+    if(!rows.length)return detailPanel({className:"ff7r-detail ff7r-tweaks",title,
+      body:[detailSection({title:"SETTINGS",body:[detailField({label:"STATE",
+        control:readonlyField("This tweak group exposes no settings.")})]})]});
+    const sections=rows.map(row=>detailSection({
+      title:String(row.tag||`SETTING ${row.id}`).toLocaleUpperCase(),
+      body:state.data.properties.map(prop=>detailField({label:prop.label,
+        control:propertyControl(row,prop),
+        dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),
+        min:prop.min,max:prop.max,help:propertyHelp(prop)}))}));
+    return detailPanel({className:"ff7r-detail ff7r-tweaks",title,
+      identity:String(rows.length),meta:asset?.group||"Lexeditor tweaks",body:sections});
   }
   function tweakToolbar(list){
     return LexeditorUI.subtabBar({
@@ -215,6 +269,34 @@
       active:state.asset,label:"FF7 Remake tweak groups",
       change:value=>selectAsset(value).then(()=>render()),
     });
+  }
+  // "Mod contents only" hides everything this mod does not touch. For a data
+  // table that means the rows whose values differ from the vanilla baseline the
+  // editor loaded, which is exactly what a save would write.
+  function modOnlyAvailable(){return state.activeSource==="mine"&&!!state.dataBaseline}
+  function recordChangedFromVanilla(record){
+    const baseline=state.dataBaseline?.records?.[record.entry??record.index];
+    const base=baseline||state.dataBaseline?.records?.find(row=>row.id===record.id);
+    if(!base)return true;
+    for(const prop of state.data?.properties||[]){
+      if(JSON.stringify(record.values[prop.name])!==JSON.stringify(base.values[prop.name]))return true;
+    }
+    return false;
+  }
+  function modOnlyFilter(){
+    return LexeditorUI.pagerToggle({
+      label:"Mod contents only",
+      title:modOnlyAvailable()
+        ? "Show only the records this mod changes."
+        : "Available once an editable mod and its vanilla baseline are both loaded.",
+      checked:state.modOnly===true,
+      disabled:!modOnlyAvailable(),
+      change:value=>{state.modOnly=value;for(const key of Object.keys(state.pages))state.pages[key]=0;render()},
+    });
+  }
+  function applyModOnly(rows,recordOf){
+    if(!state.modOnly||!modOnlyAvailable())return rows;
+    return rows.filter(row=>recordChangedFromVanilla(recordOf?recordOf(row):row));
   }
   function pagedTable(spec){
     return LexeditorUI.pagedListDetail({
@@ -225,6 +307,7 @@
       search:{key:`ff7r-${spec.id}`,value:spec.query,label:spec.searchLabel,
         placeholder:spec.searchPlaceholder,
         change:value=>{spec.setQuery(value);state.pages[spec.id]=0;render()}},
+      filters:spec.filters||[],
       change:next=>{state.pages[spec.id]=next.page;render()},
       sync:next=>{state.pages[spec.id]=next.page},
       master:({rows,selected,select})=>columnList({rows,key:spec.key,selected,
@@ -236,7 +319,7 @@
     });
   }
   function pagedDataPanel(){
-    const rows=sortedRows();
+    const rows=applyModOnly(sortedRows());
     return LexeditorUI.pagedListDetail({
       rows,key:row=>row.id,slots:false,noun:"records",
       page:state.dataPage||0,selected:state.selected,
@@ -245,7 +328,7 @@
       search:{key:"ff7r-data",value:state.query,label:"Search FF7 Remake records",
         placeholder:"Search IDs, values, and resolved names",
         change:value=>{state.query=value;state.dataPage=0;render()}},
-      change:next=>{state.dataPage=next.page;render()},
+      filters:[modOnlyFilter()],change:next=>{state.dataPage=next.page;render()},
       sync:next=>{state.dataPage=next.page},
       master:({rows:page,selected,select})=>columnList({rows:page,key:row=>row.id,selected,
         select:row=>{state.selected=row.id;select(row);},
@@ -272,12 +355,19 @@
   function economyTablePanel(){const rows=economyViewRows();return columnList({rows,key:row=>row.record.id,selected:state.selected,select:row=>{state.selected=row.record.id;render()},sortState:state.economySort,sort:key=>{state.economySort=state.economySort.key===key?{key,dir:-state.economySort.dir}:{key,dir:1};render()},columnPreferences:economyPrefs,columns:economyColumns,class:"ff7r-table","aria-label":"FF7 Remake item prices and carry capacity"})}
   function economyRecordPanel(row=selectedRecord()){
     const table=currentEconomyTable();if(!row||!table)return loadingPanel("Item settings","No editable item-setting rows were found.");const semantic=economySemanticRow(row.tag);const fields=[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:economyPrefs.pinButton("tag","ID")})];
-    const specs=[["BuyValue","BUY PRICE"],["SaleValue","SELL PRICE"],["CanSale","CAN SELL"],["MaxCount","MAX CARRY"]];for(const[name,label]of specs){const prop=property(name);if(prop){let help=null;if(name==="BuyValue")help=infoHelp("The installed FF7R table exposes BuyValue directly; this control writes that same DataObject field.");else if(name==="MaxCount")help=infoHelp("FF7R's Item/Equipment schema exposes MaxCount as the inventory carry/stack cap; this control writes that authoritative DataObject field.");fields.push(detailField({label,control:propertyControl(row,prop),dataType:prop.type,min:name==="CanSale"?undefined:prop.min,max:name==="CanSale"?undefined:prop.max,help}))}}
+    const specs=[["BuyValue","BUY PRICE"],["SaleValue","SELL PRICE"],["CanSale","CAN SELL"],["MaxCount","MAX CARRY"]];for(const[name,label]of specs){const prop=property(name);if(prop){let help=null;if(name==="BuyValue")help=infoHelp("The installed FF7R table exposes BuyValue directly; this control writes that same DataObject field.");else if(name==="MaxCount")help=infoHelp("FF7R's Item/Equipment schema exposes MaxCount as the inventory carry/stack cap; this control writes that authoritative DataObject field.");fields.push(detailField({label,control:propertyControl(row,prop),dataType:semanticType(prop),min:name==="CanSale"?undefined:semanticMin(prop),max:name==="CanSale"?undefined:semanticMax(prop),help}))}}
     if(semantic?.textId)fields.splice(1,0,detailField({label:"TEXT ID",control:readonlyField(semantic.textId)}));
+    // The description is the same text resource the name comes from, so it is
+    // shown here and edited on the Text tab rather than duplicated as a second
+    // editable copy that could disagree with the resource.
+    if(semantic?.descriptionId)fields.push(detailField({label:"DESCRIPTION",
+      control:readonlyField(semantic.description||"(this language has no text for "+semantic.descriptionId+")"),
+      help:infoHelp("Item descriptions live in the FF7R text resource. Edit the wording on the Text tab; this shows the "+(state.textLanguage||"US")+" entry for "+semantic.descriptionId+".")}));
     return detailPanel({className:"ff7r-detail",title:semantic?.name||row.tag,identity:recordId(row.id),meta:table.name||"Item settings",body:[detailSection({title:"ITEM SETTINGS",body:fields})]});
   }
   function economyPanel(){if(state.busy&&state.tab==="economy")return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return loadingPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return loadingPanel("Item settings","Open this tab to discover installed FF7R item tables.");if(state.data?.asset!==table.asset)return loadingPanel("Loading item table","Reading the selected item DataObject…");return el("div",{class:"ff7r-view"},economyToolbar(),pagedTable({id:"economy",noun:"items",
-      rows:economyViewRows(),key:row=>row.record.id,selected:state.selected,
+      filters:[modOnlyFilter()],
+      rows:applyModOnly(economyViewRows(),row=>row.record),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
       query:state.economyQuery,setQuery:value=>{state.economyQuery=value},
       searchLabel:"Search FF7 Remake items",searchPlaceholder:"Search items and IDs",
@@ -287,17 +377,30 @@
 
   function lootChoiceName(id){return state.loot?.itemChoices?.find(choice=>choice.id===id)?.name||id}
   function lootSpec(kind){return state.loot?.groups?.find(group=>group.kind===kind)||null}
-  function lootSummary(record,spec){if(!spec)return"—";const items=record.values[spec.itemProperty]||[],chances=spec.percentProperty?(record.values[spec.percentProperty]||[]):[],quantities=spec.quantityProperty?(record.values[spec.quantityProperty]||[]):[];if(!items.length)return"—";return items.map((item,index)=>{let suffix="";if(index<chances.length)suffix=` ${chances[index]}%`;else if(index<quantities.length)suffix=` ×${quantities[index]}`;return`${lootChoiceName(item)}${suffix}`}).join(", ")}
+  function lootSummary(record,spec){if(!spec)return"—";const items=record.values[spec.itemProperty]||[],chances=spec.percentProperty?(record.values[spec.percentProperty]||[]):[],quantities=spec.quantityProperty?(record.values[spec.quantityProperty]||[]):[];if(!items.length)return"—";return items.map((item,index)=>{let suffix="";if(index<chances.length)suffix=` ${chances[index]}%`;else if(index<quantities.length)suffix=` [${quantities[index]}]`;return`${lootChoiceName(item)}${suffix}`}).join(", ")}
   function lootViewRows(){const q=state.lootQuery.toLocaleLowerCase();return records().map(record=>({record,tag:record.tag,normal:lootSummary(record,lootSpec("normal")),rare:lootSummary(record,lootSpec("rare")),steal:lootSummary(record,lootSpec("steal"))})).filter(row=>!q||`${row.tag} ${row.normal} ${row.rare} ${row.steal}`.toLocaleLowerCase().includes(q)).sort((a,b)=>compareValues(a[state.lootSort.key],b[state.lootSort.key])*state.lootSort.dir)}
   function lootTablePanel(){const rows=lootViewRows();return columnList({rows,key:row=>row.record.id,selected:state.selected,select:row=>{state.selected=row.record.id;render()},sortState:state.lootSort,sort:key=>{state.lootSort=state.lootSort.key===key?{key,dir:-state.lootSort.dir}:{key,dir:1};render()},columnPreferences:lootPrefs,columns:lootColumns,class:"ff7r-table","aria-label":"FF7 Remake enemy drops and steals"})}
-  function lootSlotControl(row,spec,index){const itemProp=property(spec.itemProperty);if(!itemProp)return readonlyField("Installed schema no longer matches this semantic slot.");const slot=el("div",{class:"ff7r-loot-slot"},el("label",{},el("span",{},"ITEM"),semanticItemInput(row,itemProp,index)));if(spec.percentProperty){const chanceProp=property(spec.percentProperty);if(chanceProp)slot.append(el("label",{},el("span",{},"CHANCE %"),percentInput(row,chanceProp,index)))}if(spec.quantityProperty){const quantityProp=property(spec.quantityProperty);if(quantityProp)slot.append(el("label",{},el("span",{},"QUANTITY"),numericInput(row,quantityProp,index)))}return slot}
+  function lootSlotControl(row,spec,index){const itemProp=property(spec.itemProperty);if(!itemProp)return readonlyField("Installed schema no longer matches this semantic slot.");const slot=el("div",{class:"ff7r-loot-slot"},el("label",{},el("span",{},"ITEM"),semanticItemInput(row,itemProp,index)));if(spec.percentProperty){const chanceProp=property(spec.percentProperty);if(chanceProp)slot.append(el("label",{},el("span",{},"CHANCE %"),percentInput(row,chanceProp,index)))}if(spec.quantityProperty){const quantityProp=property(spec.quantityProperty);if(quantityProp){const label=el("label",{},el("span",{},stealFieldLabel(spec)),numericInput(row,quantityProp,index));const note=stealFieldHelp(spec);if(note)label.append(note);slot.append(label)}}return slot}
+  // BattleItemPossession gives steal a single numeric array and no percent
+  // array. Calling it QUANTITY produced readings like "25 bladed staffs" for a
+  // unique weapon, which no steal table can mean. Until the field's meaning is
+  // confirmed against the running game, the control is named after the raw
+  // property and says plainly that the unit is unverified.
+  function stealFieldLabel(spec){
+    return spec.percentProperty?"QUANTITY":String(spec.quantityProperty||"VALUE").replace(/_Array$/,"");
+  }
+  function stealFieldHelp(spec){
+    if(spec.percentProperty)return null;
+    return infoHelp("The installed table exposes this array without a matching percent array, so Lexeditor cannot tell whether the number is a count or a steal rate. It is shown and written as the raw "+spec.quantityProperty+" value.");
+  }
   function lootRecordPanel(row=selectedRecord()){
     if(!row)return loadingPanel("Enemy loot","No BattleItemPossession rows were found.");const sections=[detailSection({title:"BATTLE",body:[detailField({label:"DATA ID",control:readonlyField(row.tag),pin:lootPrefs.pinButton("tag","Enemy / Battle ID")})]})];
     const labels={normal:"NORMAL DROPS",rare:"RARE DROPS",steal:"STEAL"};for(const spec of state.loot?.groups||[]){const itemProp=property(spec.itemProperty),items=itemProp?(row.values[itemProp.name]||[]):[];const body=items.length?items.map((_item,index)=>detailField({label:`SLOT ${index+1}`,control:lootSlotControl(row,spec,index),help:spec.percentProperty?infoHelp("Chance is the installed raw percent field, constrained by this semantic editor to 0–100."):null})): [detailField({label:"STATE",control:readonlyField("No fixed slots in this array.")})];sections.push(detailSection({title:labels[spec.kind]||spec.kind.toUpperCase(),body}))}
     return detailPanel({className:"ff7r-detail",title:row.tag||`Battle ${row.id}`,identity:recordId(row.id),meta:"BattleItemPossession",body:sections});
   }
   function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return loadingPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return loadingPanel("Enemy loot","Open this tab to discover the installed FF7R loot table.");if(state.data?.asset!==state.loot.asset)return loadingPanel("Loading enemy loot","Reading BattleItemPossession…");return el("div",{class:"ff7r-view"},pagedTable({id:"loot",noun:"enemies",
-      rows:lootViewRows(),key:row=>row.record.id,selected:state.selected,
+      filters:[modOnlyFilter()],
+      rows:applyModOnly(lootViewRows(),row=>row.record),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
       query:state.lootQuery,setQuery:value=>{state.lootQuery=value},
       searchLabel:"Search FF7 Remake enemy loot",searchPlaceholder:"Search enemies, battle IDs, items, and chances",
@@ -307,12 +410,32 @@
 
   function languages(){return [...new Set(textAssets().map(row=>row.language).filter(Boolean))].sort()}
   function textAssetsForLanguage(){return textAssets().filter(row=>row.language===state.textLanguage)}
-  function textToolbar(){
-    const language=el("select",{"aria-label":"Text language",onchange:event=>selectTextLanguage(event.target.value),disabled:state.busy});
-    for(const code of languages()){const option=el("option",{value:code},code);option.selected=code===state.textLanguage;language.append(option)}
-    const select=el("select",{"aria-label":"FF7 Remake text resource",onchange:event=>selectTextAsset(event.target.value),disabled:state.busy});
-    for(const item of textAssetsForLanguage()){const label=item.group&&item.group!=="Text"?`${item.group} / ${item.name}`:item.name;const option=el("option",{value:item.asset},label);option.selected=item.asset===state.textAsset;select.append(option)}
-    return el("div",{class:"ff7r-toolbar"},el("label",{},"Language"),language,el("label",{},"Resource"),select);
+  // Country flags for the shipped language codes; an unlisted code keeps its
+  // own letters rather than showing a wrong flag.
+  const LANGUAGE_FLAGS={US:"🇺🇸",UK:"🇬🇧",GB:"🇬🇧",FR:"🇫🇷",DE:"🇩🇪",IT:"🇮🇹",ES:"🇪🇸",JP:"🇯🇵",KR:"🇰🇷",CN:"🇨🇳",TW:"🇹🇼",BR:"🇧🇷",RU:"🇷🇺",PL:"🇵🇱"};
+  function languageLabel(code){
+    const flag=LANGUAGE_FLAGS[String(code||"").toUpperCase()];
+    return flag?`${flag} ${code}`:String(code||"");
+  }
+  function textLanguageBar(){
+    return LexeditorUI.subtabBar({
+      tabs:languages().map(code=>({id:code,label:languageLabel(code)})),
+      active:state.textLanguage,label:"FF7 Remake text languages",
+      change:value=>selectTextLanguage(value),
+    });
+  }
+  // The resource chooser belongs with the other filters on the pagination bar,
+  // not in a private strip above the table.
+  function textResourceFilter(){
+    return LexeditorUI.pagerSelect({
+      label:"Resource","aria-label":"FF7 Remake text resource",
+      title:"Which text resource this tab is showing",
+      disabled:state.busy,
+      value:state.textAsset,
+      options:textAssetsForLanguage().map(item=>({id:item.asset,
+        label:item.group&&item.group!=="Text"?`${item.group} / ${item.name}`:item.name})),
+      change:value=>selectTextAsset(value),
+    });
   }
   function textArea(value,oninput,sub=false){const area=el("textarea",{class:`ff7r-textarea${sub?" ff7r-subtext":""}`,value:value??"",disabled:state.activeSource!=="mine",oninput:event=>oninput(event.target.value)});area.value=value??"";return area}
   function textRecordPanel(row=selectedTextRecord()){
@@ -324,7 +447,8 @@
     return detailPanel({className:"ff7r-detail",title:row.key||`Text ${row.id}`,identity:recordId(row.id),meta:`${state.textData?.language||state.textLanguage} · ${currentTextAsset()?.name||"Text resource"}`,body:sections});
   }
   function textTablePanel(){const rows=sortedTextRows();return columnList({rows,key:row=>row.id,selected:state.textSelected,select:row=>{state.textSelected=row.id;render()},sortState:state.textSort,sort:key=>{state.textSort=state.textSort.key===key?{key,dir:-state.textSort.dir}:{key,dir:1};render()},columnPreferences:textPrefs,columns:textColumns,class:"ff7r-table","aria-label":"FF7 Remake localized text entries"})}
-  function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.busy&&state.tab==="text")return loadingPanel("Loading text resource","Reading localized FF7R text…");if(state.error&&!state.textData)return errorPanel(state.error);if(!state.textData)return loadingPanel("Text resource","Choose a language/resource to load localized text.");return el("div",{class:"ff7r-view"},textToolbar(),pagedTable({id:"text",noun:"entries",
+  function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.busy&&state.tab==="text")return loadingPanel("Loading text resource","Reading localized FF7R text…");if(state.error&&!state.textData)return errorPanel(state.error);if(!state.textData)return loadingPanel("Text resource","Choose a language/resource to load localized text.");return el("div",{class:"ff7r-view"},textLanguageBar(),pagedTable({id:"text",noun:"entries",
+      filters:[textResourceFilter()],
       rows:sortedTextRows(),key:row=>row.id,selected:state.textSelected,
       setSelected:row=>{state.textSelected=row.id},
       query:state.textQuery,setQuery:value=>{state.textQuery=value},
@@ -374,7 +498,7 @@
   const editHistory=new EditHistory({capture:()=>({data:state.data?clone(state.data.records):null,text:state.textData?clone(state.textData.records):null}),restore:snapshot=>{if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);if(state.textData&&snapshot?.text)state.textData.records=clone(snapshot.text)},render:async()=>render(),enabled:()=>state.activeSource==="mine"&&["data","economy","loot","text"].includes(state.tab),changed:()=>refreshShell()});
 
   async function selectProjectSource(value){if(dirtyCount()&&!window.confirm("Discard all unsaved FF7R changes and switch source?"))return;state.activeSource=String(value||"mine");state.economyKey="";state.lootKey="";if(state.data)await loadAsset(state.asset);if(state.textData)await loadTextAsset(state.textAsset);if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot()}
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"economy",label:"Items"},{id:"loot",label:"Enemy Loot"},{id:"data",label:"DataObjects"},{id:"tweaks",label:"Tweaks"},{id:"text",label:"Text"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK resources"}],projectActiveSource:()=>state.activeSource,selectProjectSource,info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"economy",label:"Items"},{id:"loot",label:"Enemy Loot"},{id:"data",label:"Misc"},{id:"tweaks",label:"Tweaks"},{id:"text",label:"Text"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK resources"}],projectActiveSource:()=>state.activeSource,selectProjectSource,info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
   editHistory.observe(document);
 
   (async()=>{try{

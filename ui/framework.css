@@ -639,7 +639,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   transform:translateY(-3px);
 }
 
+/* The settings tab is set apart by a paler fill, so it must never stretch.
+   On a nav that wraps, flex:1 handed the last row's spare width to this one
+   button and the paler fill became a grey slab across half the row. */
 .lex-shell-header nav button.lex-settings-tab {
+  flex: 0 1 auto;
   margin-left: 10px;
   background: color-mix(in srgb, var(--lex-panel-2) 72%, var(--lex-bg));
 }
@@ -731,6 +735,26 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   text-align: left;
   cursor: pointer;
 }
+/* The selector and its info button sit side by side; the button never steals
+   width from the mod name. */
+.lex-project-control { display:flex; align-items:center; gap:6px; min-width:0; }
+.lex-project-control > .lex-project-select { flex:1 1 auto; min-width:0; }
+.lex-project-about {
+  flex:0 0 auto;
+  display:grid;
+  place-items:center;
+  width:28px;
+  min-width:28px;
+  padding:0;
+  border:1px solid var(--lex-border);
+  border-radius:50%;
+  color:var(--lex-highlight);
+  background:var(--lex-panel-2);
+  font:800 13px/1 var(--lex-symbol-font);
+  cursor:pointer;
+}
+.lex-project-about:hover { color:var(--lex-accent-text); background:var(--lex-accent); }
+
 .lex-project-name { flex: 0 0 auto; color: var(--lex-highlight); white-space: nowrap; }
 .lex-project-path {
   align-self:center;flex:0 1 auto;min-width:0;overflow:hidden;color:var(--lex-muted);
@@ -764,7 +788,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 .lex-project-menu-item {
   display: grid;
-  grid-template-columns:minmax(0,1fr) 34px 34px 26px;
+  grid-template-columns:minmax(0,1fr) 34px 34px 34px 26px;
   width: 100%;
   padding:0;
   border: 0;
@@ -776,7 +800,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 .lex-project-menu-item-select {
   display:grid;
-  grid-template-columns:auto minmax(40px,1fr);
+  /* Lock/pencil, name, path - three things on one row. Two columns pushed the
+     path onto a second implicit row, where it sat under the mode icon and the
+     two overlapped. */
+  grid-template-columns:auto auto minmax(40px,1fr);
+  align-items:center;
   gap:9px;
   min-width:0;
   padding:7px 9px;
@@ -796,6 +824,16 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   font:inherit;
 }
 .lex-project-rename:hover { color:var(--lex-highlight);background:var(--lex-panel-2); }
+.lex-project-remove {
+  display:grid;
+  place-items:center;
+  width:34px;
+  border:0;
+  color:var(--lex-muted);
+  background:transparent;
+  font:inherit;
+}
+.lex-project-remove:hover { color:#ef5d61;background:var(--lex-panel-2); }
 .lex-project-menu-item:hover,
 .lex-project-menu-item.active { background: var(--lex-panel-2); }
 .lex-project-menu-name { color: var(--lex-highlight); white-space: nowrap; }
@@ -928,8 +966,13 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   display:grid !important;
   /* Every Detail reserves the same top tenth for identity. Plugins may scale
      the contents inside it, but they must not make the heading consume more
-     of the editing surface. */
-  grid-template-rows:10% minmax(0,1fr) !important;
+     of the editing surface.
+     A flat 10% is a promise the panel cannot always keep: in a short panel the
+     tenth is thinner than the record name plus its source line, and the two
+     lines were sliced through the middle. min-content is the heading's own
+     honest minimum - a title line and a meta line - so the tenth still governs
+     wherever a tenth is enough, and the row grows only when it is not. */
+  grid-template-rows:minmax(min-content, 10%) minmax(0,1fr) !important;
   min-width: 0;
   min-height: 0;
 }
@@ -942,7 +985,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   align-items: center;
   gap: 12px;
   min-height:0;
-  height:100%;
+  /* No height:100% here. A grid item already stretches to its row, and forcing
+     the percentage against a row that is itself sized from this item's
+     min-content made the browser resolve the two against each other and drop
+     the bottom padding - two pixels of every heading, clipped. */
   padding: 10px 14px 10px 10px;
   overflow:hidden;
 }
@@ -971,12 +1017,19 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   gap:6px 14px;
   min-width:0;
 }
-.lex-detail-panel-identity:has(> .lex-detail-panel-id) { padding-right:clamp(50px,10%,120px); }
+/* The big record number is absolutely positioned, so it contributes nothing to
+   the heading's intrinsic height and the heading - which clips - shaved a few
+   pixels off the top and bottom of the numeral. Reserving its own height here
+   puts it back into the min-content the heading row is sized from. */
+.lex-detail-panel-identity:has(> .lex-detail-panel-id) {
+  padding-right:clamp(50px,10%,120px);
+  min-height:var(--lex-detail-id-size);
+}
 .lex-detail-panel-title { min-width:0;margin:0;font-size:clamp(21px,2.5vw,32px);line-height:1.1; }
 .lex-detail-panel-meta { font-size:clamp(15px,1.45vw,20px); }
 .lex-detail-panel-meta { color: var(--lex-muted); }
 .lex-detail-panel-id { color:color-mix(in srgb,var(--lex-muted) 42%,var(--lex-panel)); }
-.lex-detail-panel-id { position:absolute;top:calc(50% - 2px);right:0;display:flex;align-items:center;justify-self:end;margin-left:auto;font-size:clamp(30px,3.6vw,48px);font-weight:300;line-height:1;text-align:right;transform:translateY(-50%); }
+.lex-detail-panel-id { position:absolute;top:calc(50% - 2px);right:0;display:flex;align-items:center;justify-self:end;margin-left:auto;font-size:var(--lex-detail-id-size);font-weight:300;line-height:1;text-align:right;transform:translateY(-50%); }
 .lex-detail-panel-id .lex-record-id { align-items:center;line-height:1; }
 .lex-detail-panel-meta { grid-column:1 / -1; }
 .lex-detail-panel-actions {
@@ -1144,9 +1197,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-boolean-field .lex-detail-field-label { min-width:0; }
 .lex-field-boolean-arrow {
   position:relative;
-  flex:0 1 48px;
+  /* The arrow is a leader line: it has to span whatever gap the row leaves
+     between the property name and the checkbox it points at. Capped at 48px it
+     stopped in mid-air on any row wider than that, pointing at nothing. */
+  flex:1 1 auto;
   min-width:12px;
-  max-width:48px;
   height:1px;
   margin-left:4px;
   margin-right:-6px;
@@ -1165,7 +1220,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 .lex-boolean-field .lex-detail-field-control {
   display:flex;
-  min-width:58px;
+  /* No reserved width. A minimum here is slack the leader arrow cannot cross,
+     and the arrow then stopped short of the checkbox it points at. */
+  min-width:0;
+  width:max-content;
   justify-content:flex-end;
 }
 .lex-boolean-field .lex-detail-field-control > .lex-source-control { width:auto; }
@@ -2405,6 +2463,15 @@ body.lex-panel-layout-dragging * {
   overflow:visible;
 }
 
+.lex-column-cell-text {
+  display:block;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
 .lex-column-cell-content > :not(input):not(select):not(textarea) {
   min-width:0;
   overflow:hidden;
@@ -2729,6 +2796,20 @@ body:has(.lex-pager) #main {
 }
 
 .lex-pager-right select,
+.lex-pager-filter {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  padding:0 8px;
+  color:var(--lex-muted);
+  white-space:nowrap;
+  font-size:.92em;
+}
+.lex-pager-filter > span { letter-spacing:.04em;text-transform:uppercase; }
+.lex-pager-filter.disabled { opacity:.45; }
+.lex-pager-select select { min-width:0;max-width:16em; }
+
 .lex-pager-right button {
   min-height: 32px;
 }
@@ -4499,7 +4580,22 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_SHARED_UI_STANDARDIZATION_20260906 */
-:root { --lex-detail-label-width:10%; }
+/* Ten percent of a narrow detail panel is a twenty-pixel column, and no amount
+   of font shrinking fits "WEAPON HIT RATE" into twenty pixels - it just wraps
+   into a tower that the row then cuts off. The lane keeps its ten percent
+   wherever ten percent is actually usable and otherwise falls back to a floor
+   measured in ems, so it tracks the reader's font rather than their screen.
+   The min() stops the floor from eating a genuinely cramped panel. */
+:root {
+  /* One name for the big record number's size, used both to draw it and to
+     reserve room for it. A plugin that wants a smaller number overrides this
+     rather than the font-size, so the reservation shrinks with it - overriding
+     only the font left the reservation at the shared size and pushed the
+     heading past what its container would give it. */
+  --lex-detail-id-size:clamp(30px, 3.6vw, 48px);
+  --lex-detail-label-floor:min(6.5em, 34%);
+  --lex-detail-label-width:minmax(var(--lex-detail-label-floor), 10%);
+}
 .lex-detail-field { grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr); }
 .lex-detail-field-label {
   min-width:0; min-height:0; height:100%; overflow:hidden;
@@ -4693,7 +4789,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    the metadata space to its left and is positioned by framework.js from the
    actually rendered text width. */
 .lex-detail-field:not(.lex-boolean-field) {
-  grid-template-columns:10% minmax(0,1fr) !important;
+  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr) !important;
 }
 .lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label {
   justify-content:flex-end;
@@ -4855,4 +4951,18 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   flex:1 1 auto;
   min-height:0;
 }
+
+/* Coverage reads as a coloured glyph plus its word. */
+.lex-coverage-cell { display:inline-flex; min-width:0; align-items:center; gap:6px; }
+.lex-coverage-text { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lex-coverage-icon { flex:0 0 auto; font-family:var(--lex-symbol-font); font-size:1.05em; line-height:1; }
+.lex-data-map-coverage { display:flex; align-items:center; gap:6px; }
+.lex-coverage-cell.structured .lex-coverage-icon,
+.lex-data-map-coverage.structured .lex-coverage-icon { color:#3fa45b; }
+.lex-coverage-cell.view .lex-coverage-icon,
+.lex-data-map-coverage.view .lex-coverage-icon { color:#4f8fe8; }
+.lex-coverage-cell.source .lex-coverage-icon,
+.lex-data-map-coverage.source .lex-coverage-icon { color:#d6a936; }
+.lex-coverage-cell.unavailable .lex-coverage-icon,
+.lex-data-map-coverage.unavailable .lex-coverage-icon { color:#b74a42; }
 

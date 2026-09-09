@@ -156,7 +156,55 @@
   }
   function inspectorPanel(){const row=selectedRow();return detailPanel({className:"blank-detail",title:"Inspector",identity:"LIVE",meta:"Third shared pane",body:[detailSection({title:"SELECTION",body:[detailField({label:"RECORD",control:readonlyField(row.name)}),detailField({label:"VALUE",control:readonlyField(String(row.value))})]}),detailSection({title:"INTEGRATION STATES",body:[el("div",{class:"blank-statuses"},integrationStatus("integrated"),integrationStatus("partial"),integrationStatus("not-integrated"))]}),detailSection({title:"REFERENCE DISPLAY",body:[referenceDisplay({current:row.value,sources:[{name:"Vanilla",value:vanillaRow(row.id).value}],apply:()=>{}})]})]})}
   function subtabPanel(){const tabs=[{id:"controls",label:"Controls"},{id:"references",label:"References"},{id:"states",label:"States"}];let content;if(subtab==="references")content=detailSection({title:"REFERENCE VALUES",body:[detailField({label:"NUMBER",control:numericReferenceControl(),dataType:"INT",min:0,max:255}),detailField({label:"BOOLEAN",control:booleanReferenceControl(),dataType:"BOOL"})]});else if(subtab==="states")content=detailSection({title:"STATUS TOKENS",body:[el("div",{class:"blank-statuses"},integrationStatus("integrated"),integrationStatus("partial"),integrationStatus("not-integrated"))]});else content=detailSection({title:"STANDARD CONTROLS",body:[detailField({label:"TEXT",control:el("input",{type:"text",value:demo.text,disabled:activeSource!=="mine",oninput:event=>{demo.text=event.target.value;refreshShell()}})}),detailField({label:"NUMBER",control:numericReferenceControl(),dataType:"INT",min:0,max:255}),detailField({label:"TOGGLE",control:booleanReferenceControl(),dataType:"BOOL"})]});return tabbedPanel({className:"blank-subtab-panel",tabs,active:subtab,label:"Blank Game tabbed-panel example",change:value=>{subtab=value;render()},content})}
-  function tweaksPanel(){return detailPanel({className:"blank-detail blank-tweaks",title:"Tweaks",icon:blankIcon(),identity:"OFF",meta:"Plugin tweak controls",body:[detailSection({title:"TWEAKS",body:[detailField({label:"EXAMPLE TWEAK",help:infoHelp("Blank demonstrates the shared Tweaks layout. Real tweaks remain disabled until a mod enables them."),control:el("input",{type:"checkbox",checked:false})}),detailField({label:"TWEAK VALUE",control:el("input",{type:"number",min:0,max:100,step:1,value:50}),dataType:"INT",min:0,max:100})]})]})}
+  // The reference Tweaks page. A plugin's tweak surface is a settings page,
+  // not a record table: groups of switches and bounded values, with dependent
+  // controls disabled until their parent switch is on. Copy this shape.
+  const tweaks={enabled:false,difficulty:"normal",damage:120,speed:1.5,label:"My preset",
+    flags:{fastTravel:true,autoLoot:false,hardcore:false,permadeath:false}};
+  function tweakSwitch(key,label,help){
+    return detailField({label,help:help?infoHelp(help):null,dataType:"BOOL",
+      control:el("input",{type:"checkbox",checked:tweaks[key],disabled:activeSource!=="mine",
+        "aria-label":label,onchange:event=>{tweaks[key]=event.target.checked;render();refreshShell()}})});
+  }
+  function tweaksPanel(){
+    const gate=!tweaks.enabled||activeSource!=="mine";
+    return detailPanel({className:"blank-detail blank-tweaks",title:"Tweaks",icon:blankIcon(),
+      identity:tweaks.enabled?"ON":"OFF",meta:"Reference tweak page: switches, bounded values and dependent controls",
+      body:[
+        detailSection({title:"MASTER",body:[
+          tweakSwitch("enabled","ENABLED","Everything below is inert until this is on. A tweak page always has one switch that owns the rest."),
+        ]}),
+        detailSection({title:"BEHAVIOUR",body:[
+          detailField({label:"DIFFICULTY",dataType:"ENUM",
+            help:infoHelp("A fixed set of choices is a select, never a free number."),
+            control:el("select",{disabled:gate,"aria-label":"Difficulty",
+              onchange:event=>{tweaks.difficulty=event.target.value;refreshShell()}},
+              ...[["easy","Easy"],["normal","Normal"],["hard","Hard"]].map(([value,text])=>{
+                const option=el("option",{value},text);option.selected=tweaks.difficulty===value;return option;}))}),
+          detailField({label:"DAMAGE",dataType:"INT",min:0,max:400,
+            help:infoHelp("A bounded number draws its own value behind the box and can be dragged."),
+            control:unitField(el("input",{type:"number",min:0,max:400,step:1,value:tweaks.damage,disabled:gate,
+              "aria-label":"Damage percent",oninput:event=>{tweaks.damage=Number(event.target.value);refreshShell()}}),"%")}),
+          detailField({label:"SPEED",dataType:"FLOAT",min:0.25,max:4,
+            control:unitField(el("input",{type:"number",min:0.25,max:4,step:.05,value:tweaks.speed,disabled:gate,
+              "aria-label":"Speed multiplier",oninput:event=>{tweaks.speed=Number(event.target.value);refreshShell()}}),"x")}),
+          detailField({label:"PRESET NAME",dataType:"STRING",
+            control:el("input",{type:"text",value:tweaks.label,disabled:gate,"aria-label":"Preset name",
+              oninput:event=>{tweaks.label=event.target.value;refreshShell()}})}),
+        ]}),
+        detailSection({title:"OPTIONS",body:[
+          detailField({label:"FLAGS",dataType:"BOOL",
+            help:infoHelp("Several related switches are one property, not one row each."),
+            control:toggleRow({label:"Blank tweak flags",columns:2,
+              toggles:Object.entries({fastTravel:"Fast travel",autoLoot:"Auto loot",
+                hardcore:"Hardcore",permadeath:"Permadeath"}).map(([key,label])=>({
+                key,label,checked:tweaks.flags[key],disabled:gate,
+                help:`Blank sample flag: ${label}.`,
+                change:value=>{tweaks.flags[key]=value;refreshShell()}}))})}),
+        ]}),
+      ]});
+  }
+
   function graphsPanel(){
     const cards=[['Linear',level=>level],['Quadratic',level=>level*level/100]].map(([title,evaluate])=>{
       const scale=el("input",{type:"number",min:0,max:5,step:.1,value:1,"aria-label":`${title} multiplier`});
