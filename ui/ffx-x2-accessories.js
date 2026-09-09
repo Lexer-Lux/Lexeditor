@@ -35,6 +35,14 @@
     </div>`;
   workspace.insertBefore(panel, archivesPanel);
 
+  const x2Card = document.querySelector('[data-panel="dashboard"] .ffxx2-dashboard-card:nth-child(2)');
+  if (x2Card) {
+    const detail = x2Card.querySelector('p');
+    const count = x2Card.querySelector('.big');
+    if (detail) detail.textContent = 'Command animation IDs plus accessory base abilities/prices are structured; text and accessory creature-extension data remain read-only.';
+    if (count) count.textContent = '2 editors';
+  }
+
   let state = null;
   const dirty = new Map();
 
@@ -154,6 +162,13 @@
   $('x2-accessory-refresh').addEventListener('click', () => refresh().catch(showError));
   $('x2-accessory-save').addEventListener('click', () => save().catch(showError));
   $('x2-accessory-fields').addEventListener('input', event => inputChanged(event.target));
+
+  const originalExtractIndex = extractIndex;
+  extractIndex = async function patchedExtractIndex(index) {
+    const entry = catalog?.entries?.[index];
+    await originalExtractIndex(index);
+    if (entry?.eflPath === state?.archivePath) await refresh();
+  };
 
   refresh().catch(showError);
 })();
