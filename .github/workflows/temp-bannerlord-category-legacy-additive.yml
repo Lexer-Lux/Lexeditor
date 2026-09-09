@@ -1,0 +1,85 @@
+name: Temporary Bannerlord category legacy compatibility correction
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-category-legacy-additive.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - name: Match ModuleManager additive category semantics
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
+
+          path = Path("games/bannerlord/module_data.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''def is_singleplayer_module(module: dict) -> bool:
+              """Resolve modern ModuleCategory first, then legacy flags/defaults."""
+              category = str(module.get("moduleCategory") or "").strip().casefold()
+              if category:
+                  return category in {"singleplayer", "singleplayeroptional"}
+              if module.get("singleplayer"):
+                  return True
+              if module.get("multiplayer"):
+                  return False
+              # ModuleCategory replaced the legacy flags and defaults to Singleplayer.
+              return True
+          '''
+          import textwrap
+          old = textwrap.dedent(old)
+          new = '''def is_singleplayer_module(module: dict) -> bool:
+              """Mirror ModuleManager's additive modern/legacy single-player flags."""
+              category = str(module.get("moduleCategory") or "").strip().casefold()
+              if module.get("singleplayer") or category in {"singleplayer", "singleplayeroptional"}:
+                  return True
+              if category or module.get("multiplayer"):
+                  return False
+              # Descriptors predating both category and legacy flags default to SP.
+              return True
+          '''
+          new = textwrap.dedent(new)
+          text = replace_once(text, old, new, "singleplayer classification")
+          path.write_text(text, encoding="utf-8")
+
+          test = Path("tests/test_bannerlord_modern_metadata.py")
+          text = test.read_text(encoding="utf-8")
+          text = replace_once(
+              text,
+              '    def test_modern_category_is_authoritative_over_legacy_flags(self):\n',
+              '    def test_modern_category_and_legacy_flags_are_additive(self):\n',
+              "test name",
+          )
+          text = replace_once(
+              text,
+              '            self.assertFalse(is_singleplayer_module(module))\n\n    def test_legacy_flags_and_modern_default_remain_compatible(self):\n',
+              '            self.assertTrue(is_singleplayer_module(module))\n\n    def test_legacy_flags_and_modern_default_remain_compatible(self):\n',
+              "mixed category expectation",
+          )
+          test.write_text(text, encoding="utf-8")
+      - name: Validate classification semantics
+        run: |
+          python -m compileall -q games/bannerlord
+          python -m unittest tests.test_bannerlord_modern_metadata tests.test_bannerlord_module_categories tests.test_bannerlord_launch -v
+      - name: Commit compatibility correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/bannerlord/module_data.py tests/test_bannerlord_modern_metadata.py
+          git commit -m "Match Bannerlord additive module categories"
+          git push origin HEAD:feature/bannerlord-plugin
