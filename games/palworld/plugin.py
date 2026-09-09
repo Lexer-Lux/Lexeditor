@@ -145,12 +145,20 @@ def smoke() -> list[str]:
                 "palschema-raw-patches",
                 "palschema-generated-schemas",
                 "palschema-add-existing-row-fields",
+                "palschema-utility-path-refs",
                 "official-package-build",
                 "official-local-workshop-deploy",
                 "official-loader-state-readonly",
+                "official-dedicated-server-deploy",
+                "official-dedicated-server-activation",
             }
             if not required.issubset(capabilities):
-                raise RuntimeError("Palworld service did not advertise the complete authoring/test path")
+                missing = sorted(required - capabilities)
+                raise RuntimeError(f"Palworld service did not advertise the complete authoring/test path: {missing}")
+
+            server_state = request_json(session.url + "api/dedicated-server")
+            if server_state.get("ready") is not True or "platformSupported" not in server_state:
+                raise RuntimeError("Palworld service did not expose dedicated-server status safely")
 
             loader = request_json(session.url + "api/loader-state")
             if (
@@ -295,6 +303,8 @@ def smoke() -> list[str]:
 
     return [
         "managed Palworld service identified the selected official package project",
+        "final service advertised PalSchema utility and dedicated-server capabilities",
+        "dedicated-server status endpoint remained safe without a native server fixture",
         "read-only PalModSettings state identified the active package without changing activation",
         "official Info.json edit survived save/readback with unknown metadata preserved",
         "PalSchema catalog mirrored official target and non-recursive raw discovery",
@@ -315,7 +325,10 @@ PLUGIN = GamePlugin(
     plugin_id="palworld",
     name=DISPLAY_NAME,
     subtitle="Official mod packages",
-    description="Author, build and locally test Palworld v0.7+ packages with schema-aware PalSchema patches while installed game data stays read-only.",
+    description=(
+        "Author, build and locally test Palworld v0.7+ packages with schema-aware PalSchema patches; "
+        "stage and reversibly activate server-compatible packages on the Windows dedicated server while installed game data stays read-only."
+    ),
     accent="#55c7d9",
     check=check,
     launch=launch,
