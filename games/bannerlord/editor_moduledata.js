@@ -6,11 +6,31 @@ state.moduleDataRecordPath="";
 state.moduleDataElementPath="";
 state.moduleDataFilter="";
 
+function prepareModuleData(value){
+  for(const element of value?.elements||[]){
+    for(const missing of element.missingRequired||[]){
+      if(missing.add===undefined)missing.add=false;
+      if(missing.value===undefined){
+        if(missing.fixed!==undefined)missing.value=String(missing.fixed);
+        else if(missing.default!==undefined)missing.value=String(missing.default);
+        else if(missing.choices?.length)missing.value=String(missing.choices[0]);
+        else if(missing.kind==="bool")missing.value="false";
+        else if(missing.kind==="number")missing.value=String(missing.min!==undefined?missing.min:0);
+        else missing.value="";
+      }
+    }
+  }
+  return value;
+}
+
 const moduleDataEditable=value=>value?{
   relativePath:value.relativePath,
   elements:(value.elements||[]).map(element=>({
     path:element.path,tag:element.tag,
-    attributes:(element.attributes||[]).map(attribute=>({name:attribute.name,value:String(attribute.value)}))
+    attributes:(element.attributes||[]).map(attribute=>({name:attribute.name,value:String(attribute.value)})),
+    missingRequired:(element.missingRequired||[]).map(attribute=>({
+      name:attribute.name,add:!!attribute.add,value:attribute.add?String(attribute.value??""):""
+    }))
   }))
 }:null;
 const moduleDataDirty=()=>state.moduleData&&state.savedModuleData&&!same(moduleDataEditable(state.moduleData),moduleDataEditable(state.savedModuleData));
@@ -34,7 +54,7 @@ async function loadModuleData(path,ask=true){
   if(!path)return;
   if(ask&&moduleDataDirty()&&!window.confirm("Discard unsaved ModuleData changes?"))return;
   try{
-    const value=await api(`/api/module-data?path=${encodeURIComponent(path)}`);
+    const value=prepareModuleData(await api(`/api/module-data?path=${encodeURIComponent(path)}`));
     state.moduleData=value;state.savedModuleData=clone(value);
     const first=value.records?.[0];
     state.moduleDataRecordPath=first?.path||"";
@@ -56,6 +76,37 @@ function moduleDataControl(attribute){
     return numberInput(Number(attribute.value),assign,attrs);
   }
   return textInput(attribute.value,assign,{spellcheck:"false"});
+}
+
+function missingRequiredValueControl(attribute){
+  const disabled=!attribute.add;
+  const assign=value=>{attribute.value=String(value);refresh()};
+  if(attribute.fixed!==undefined)return el("code",{},String(attribute.fixed));
+  if(attribute.kind==="bool")return el("input",{
+    type:"checkbox",checked:String(attribute.value).toLowerCase()==="true",disabled,
+    onchange:event=>assign(event.target.checked?"true":"false")
+  });
+  if(attribute.kind==="enum"){
+    const node=el("select",{disabled,onchange:event=>assign(event.target.value)},
+      ...(attribute.choices||[]).map(value=>el("option",{value},value)));
+    node.value=String(attribute.value);
+    return node;
+  }
+  if(attribute.kind==="number"){
+    const attrs={disabled,step:attribute.integer?1:"any"};
+    if(attribute.min!==undefined)attrs.min=attribute.min;
+    if(attribute.max!==undefined)attrs.max=attribute.max;
+    return numberInput(Number(attribute.value),assign,attrs);
+  }
+  return textInput(attribute.value,assign,{disabled,spellcheck:"false"});
+}
+
+function missingRequiredControl(attribute){
+  const toggle=el("input",{
+    type:"checkbox",checked:!!attribute.add,title:"Add this XSD-required attribute on Save",
+    onchange:event=>{attribute.add=event.target.checked;render();refresh()}
+  });
+  return el("div",{class:"bl-control"},toggle,missingRequiredValueControl(attribute));
 }
 
 function moduleDataAttributeLabel(attribute){
@@ -139,8 +190,11 @@ function renderModuleData(){
       el("h3",{},"XSD issues"),el("ul",{},...node.schemaIssues.map(value=>el("li",{},value)))):null;
     const missingPanel=missing.length?el("div",{class:"bl-list-block"},
       el("h3",{},"Missing required attributes"),
-      el("ul",{},...missing.map(value=>el("li",{},`${value.name}${value.schemaType?` (${value.schemaType})`:""}`))),
-      el("div",{class:"bl-note"},"Missing required attributes are diagnosed but not auto-created in this slice; use Source for structural XML changes.")):null;
+      el("div",{class:"bl-grid"},...missing.flatMap(value=>fieldRow(
+        `${value.name}${value.schemaType?` · ${value.schemaType}`:""}`,
+        missingRequiredControl(value)
+      ))),
+      el("div",{class:"bl-note"},"Check an attribute to repair it on Save. Lexeditor only inserts attributes the active XSD marks as required; all other structural XML changes remain source-only.")):null;
     detail=el("div",{class:"bl-detail"},el("section",{class:"bl-panel"},
       el("h2",{},moduleDataRecordLabel(record)),
       el("div",{class:"bl-grid"},
@@ -157,9 +211,9 @@ function renderModuleData(){
       ),
       issuePanel,missingPanel,...boundNotes,
       el("div",{class:"bl-note"},schema?
-        "Bannerlord XSD metadata is active: enums become selects, booleans checkboxes, numeric bounds are enforced, integer types reject fractions, fixed values are read-only, and malformed existing values/missing required attributes are flagged.":
+        "Bannerlord XSD metadata is active: enums become selects, booleans checkboxes, numeric bounds are enforced, integer types reject fractions, fixed values are read-only, malformed existing values are flagged, and missing required attributes can be repaired surgically.":
         "Without a unique installed XSD match, Lexeditor only infers literal booleans and numbers; references, localization strings, IDs, enums, and other values remain text."),
-      el("div",{class:"bl-note"},"This slice edits existing attributes only. Unknown child elements and attributes are deliberately preserved, and saves patch only changed value spans instead of reserializing the document.")
+      el("div",{class:"bl-note"},"Unknown child elements and attributes are deliberately preserved, and saves patch only changed/added attribute spans instead of reserializing the document.")
     ));
   }
   main.replaceChildren(el("div",{class:"bl-split"},master,detail));
@@ -181,6 +235,14 @@ function moduleDataEdits(){
         });
       }
     }
+    for(const missing of element.missingRequired||[]){
+      if(missing.add){
+        edits.push({
+          addRequired:true,elementPath:element.path,tag:element.tag,
+          attribute:missing.name,value:missing.value
+        });
+      }
+    }
   }
   return edits;
 }
@@ -188,7 +250,7 @@ function moduleDataEdits(){
 async function saveModuleData(){
   const edits=moduleDataEdits();
   if(!edits.length)return;
-  const result=await post("/api/module-data/save",{path:state.moduleData.relativePath,edits});
+  const result=prepareModuleData(await post("/api/module-data/save",{path:state.moduleData.relativePath,edits}));
   state.moduleData=result;state.savedModuleData=clone(result);
   if(!(result.records||[]).some(record=>record.path===state.moduleDataRecordPath)){
     state.moduleDataRecordPath=result.records?.[0]?.path||"";
