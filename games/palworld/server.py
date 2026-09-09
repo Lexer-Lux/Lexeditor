@@ -22,6 +22,7 @@ from .palschema import (
     patch_payload,
     resolve_discovered_patch,
 )
+from .palschema_fields import available_fields, coerce_new_value
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +30,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_REQUEST_BYTES = 256 * 1024
 MAX_PATCH_EDITS = 1000
+MAX_PATCH_ADDS = 100
 
 DATA_MAP = [
     {
@@ -40,8 +42,8 @@ DATA_MAP = [
     },
     {
         "filename": "PalSchema/<mod>/raw/*.json",
-        "controls": "PalSchema DataTable → row → existing scalar property patches",
-        "notes": "Structured/editable. Mirrors PalSchema's direct raw-folder loader; generated PalSchema schemas are used as the type/enum authority when available.",
+        "controls": "PalSchema DataTable → row → scalar property patches",
+        "notes": "Structured/editable. Existing scalar values are editable; generated-schema scalar properties can also be added to an already-targeted explicit row.",
         "coverage": "structured",
         "status": "integrated",
     },
@@ -60,9 +62,9 @@ DATA_MAP = [
         "status": "partial",
     },
     {
-        "filename": "PalSchema raw wildcards / nested values",
-        "controls": "$Filters, row deletion/addition and complex property payloads",
-        "notes": "Recognized/read-only in this slice. Wildcard/delete semantics are surfaced but not edited without a dedicated semantic control.",
+        "filename": "PalSchema raw wildcards / new rows / nested values",
+        "controls": "$Filters, row creation/deletion and complex property payloads",
+        "notes": "Recognized/read-only. Add-property support is deliberately limited to explicit rows already present in the patch; wildcard/new-row semantics need dedicated controls and stronger identity evidence.",
         "coverage": "recognized",
         "status": "partial",
     },
@@ -156,6 +158,57 @@ def palschema_catalog_payload() -> dict:
     }
 
 
+def palschema_fields_payload(relative: str, table: str, row: str) -> dict:
+    schema_root = palschema_schema_root()
+    if schema_root is None:
+        raise ValueError("Generated PalSchema schemas are required to add a property")
+    info = info_document().data
+    target = resolve_discovered_patch(project_root(), info, relative, schema_root=schema_root)
+    document = RawPatchDocument.load(target, schema_root=schema_root)
+    if "*" in row:
+        raise ValueError("Adding properties to wildcard rows is not supported")
+    try:
+        row_data = document.data[table][row]
+    except (KeyError, TypeError) as error:
+        raise ValueError("Add-property target must be an existing row in the selected patch") from error
+    if not isinstance(row_data, dict):
+        raise ValueError("Add-property target row must contain an object patch")
+    return {
+        "path": relative,
+        "table": table,
+        "row": row,
+        "fields": available_fields(schema_root, table, present_fields=row_data.keys()),
+    }
+
+
+def apply_additions(document: RawPatchDocument, additions: list, schema_root: Path | None) -> int:
+    if additions and schema_root is None:
+        raise ValueError("Generated PalSchema schemas are required to add properties")
+    changed = 0
+    for index, addition in enumerate(additions):
+        if not isinstance(addition, dict):
+            raise ValueError(f"adds[{index}] must be an object")
+        table = addition.get("table")
+        row = addition.get("row")
+        field = addition.get("field")
+        if not all(isinstance(value, str) and value for value in (table, row, field)):
+            raise ValueError(f"adds[{index}] needs table, row and field strings")
+        if "*" in row:
+            raise ValueError("Adding properties to wildcard rows is not supported")
+        try:
+            row_data = document.data[table][row]
+        except (KeyError, TypeError) as error:
+            raise ValueError("Add-property target must be an existing row in the selected patch") from error
+        if not isinstance(row_data, dict):
+            raise ValueError("Add-property target row must contain an object patch")
+        if field in row_data:
+            raise ValueError(f"{table}.{row}.{field} already exists in this patch row")
+        assert schema_root is not None
+        row_data[field] = coerce_new_value(schema_root, table, field, addition.get("value"))
+        changed += 1
+    return changed
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, _format, *_args):
         return
@@ -221,6 +274,7 @@ class Handler(BaseHTTPRequestHandler):
                     "official-package-info",
                     "palschema-raw-patches",
                     "palschema-generated-schemas",
+                    "palschema-add-existing-row-fields",
                     "data-map",
                 ],
             })
@@ -244,6 +298,17 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(patch_payload(
                     project_root(), info_document().data, relative,
                     schema_root=palschema_schema_root(),
+                ))
+            except (OSError, ValueError) as error:
+                self.send_json({"error": str(error)}, 400)
+            return
+        if path == "/api/palschema/fields":
+            try:
+                values = parse_qs(parsed.query, keep_blank_values=True)
+                self.send_json(palschema_fields_payload(
+                    values.get("path", [""])[0],
+                    values.get("table", [""])[0],
+                    values.get("row", [""])[0],
                 ))
             except (OSError, ValueError) as error:
                 self.send_json({"error": str(error)}, 400)
@@ -289,16 +354,20 @@ class Handler(BaseHTTPRequestHandler):
             payload = self.read_json()
             relative = payload.get("path")
             source_sha = payload.get("sourceSha256")
-            edits = payload.get("edits")
+            edits = payload.get("edits", [])
+            additions = payload.get("adds", [])
             if not isinstance(source_sha, str) or len(source_sha) != 64:
                 raise ValueError("sourceSha256 must be the 64-character hash returned by /api/palschema/patch")
             if not isinstance(edits, list) or len(edits) > MAX_PATCH_EDITS:
                 raise ValueError(f"edits must be an array of at most {MAX_PATCH_EDITS} scalar edits")
+            if not isinstance(additions, list) or len(additions) > MAX_PATCH_ADDS:
+                raise ValueError(f"adds must be an array of at most {MAX_PATCH_ADDS} schema-backed additions")
             info = info_document().data
             schema_root = palschema_schema_root()
             target = resolve_discovered_patch(project_root(), info, relative, schema_root=schema_root)
             document = RawPatchDocument.load(target, schema_root=schema_root)
             document.apply_edits(edits)
+            apply_additions(document, additions, schema_root)
             document.save(expected_sha256=source_sha)
             self.send_json(patch_payload(project_root(), info, relative, schema_root=schema_root))
         except PatchValidationError as error:
