@@ -83,3 +83,4 @@ jobs:
           Path('/tmp/chrono-trigger-editor.js').write_text(html[start + len('<script>'):end], encoding='utf-8')
           PY
           node --check /tmp/chrono-trigger-editor.js
+          node --check games/chrono_trigger/event_editor.js
