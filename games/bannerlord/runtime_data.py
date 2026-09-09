@@ -15,6 +15,7 @@ _RUNTIME_STATE_FILES = {
     "custom_skill_effects.json",
     "custom_skill_xp_sources.json",
 }
+_VERSION_PREFIXES = {"a", "b", "e", "v", "d"}
 
 
 def _sha256(path: Path) -> str:
@@ -49,6 +50,39 @@ def _installed_index(game_root: Path) -> dict[str, dict]:
             "descriptorError": "",
         }
     return result
+
+
+def _bannerlord_version_identity(value: str) -> tuple[str, int, int, int] | None:
+    """Parse the version fields Bannerlord's launcher compares for dependency warnings."""
+    raw = str(value or "").strip()
+    parts = raw.split(".")
+    if len(parts) not in {3, 4} or len(parts[0]) < 2:
+        return None
+    prefix = parts[0][0]
+    if prefix not in _VERSION_PREFIXES:
+        return None
+    try:
+        major = int(parts[0][1:])
+        minor = int(parts[1])
+        revision = int(parts[2])
+        if len(parts) == 4:
+            int(parts[3])
+    except ValueError:
+        return None
+    # TaleWorlds LauncherVM calls ApplicationVersion.IsSame(..., checkChangeSet=False).
+    # Application version type plus major/minor/revision therefore determine the warning;
+    # an explicit or implicit fourth change-set component does not.
+    return prefix, major, minor, revision
+
+
+def _dependency_version_matches(required: str, installed: str) -> bool:
+    required_identity = _bannerlord_version_identity(required)
+    installed_identity = _bannerlord_version_identity(installed)
+    if required_identity is not None and installed_identity is not None:
+        return required_identity == installed_identity
+    # Preserve conservative behavior for malformed/nonstandard versions that
+    # TaleWorlds' ApplicationVersion parser would not accept.
+    return str(required or "").strip().casefold() == str(installed or "").strip().casefold()
 
 
 def _json_override(path: Path, nested: bool) -> dict:
@@ -159,7 +193,7 @@ def deployment_status(project: Path, game_root: Path | None = None) -> dict:
         if not found and not optional:
             missing_required.append(dep_id)
         if found and required_version:
-            version_match = required_version.casefold() == installed_version.casefold()
+            version_match = _dependency_version_matches(required_version, installed_version)
             if not version_match:
                 version_mismatches.append(
                     f"{dep_id} requires {required_version}, installed "
