@@ -1,0 +1,83 @@
+name: Temporary Bannerlord XML game-type validation
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-xml-game-types.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - name: Apply guarded XML game-type patch
+        run: python tools/temp_bannerlord_xml_game_types.py
+      - name: Add regressions
+        run: |
+          cat > tests/test_bannerlord_xml_game_types.py <<'PY'
+          from pathlib import Path
+          import tempfile
+          import unittest
+          import xml.etree.ElementTree as ET
+
+          from games.bannerlord.module_data import save_module
+
+
+          class BannerlordXmlGameTypeTests(unittest.TestCase):
+              def test_new_xml_registration_requires_at_least_one_game_type(self):
+                  with tempfile.TemporaryDirectory() as name:
+                      path = Path(name) / "SubModule.xml"
+                      original = '<Module><Name value="Example"/><Id value="Example"/><Version value="v1.0.0"/></Module>'
+                      path.write_text(original, encoding="utf-8")
+                      with self.assertRaisesRegex(ValueError, "at least one included game type"):
+                          save_module(path, {"xmls": [{"index": None, "id": "Items", "path": "items", "includedGameTypes": []}]})
+                      self.assertEqual(path.read_text(encoding="utf-8"), original)
+                      self.assertFalse(path.with_name(path.name + ".lexeditor.bak").exists())
+
+              def test_new_xml_registration_with_game_type_uses_modern_schema_shape(self):
+                  with tempfile.TemporaryDirectory() as name:
+                      path = Path(name) / "SubModule.xml"
+                      path.write_text('<Module><Name value="Example"/><Id value="Example"/><Version value="v1.0.0"/></Module>', encoding="utf-8")
+                      save_module(path, {"xmls": [{
+                          "index": None,
+                          "id": "Items",
+                          "path": "items",
+                          "includedGameTypes": [{"index": None, "value": "Campaign", "attributes": {}}],
+                      }]})
+                      node = ET.parse(path).getroot().find("./Xmls/XmlNode")
+                      self.assertEqual(node.find("XmlName").attrib, {"id": "Items", "path": "items"})
+                      self.assertEqual(node.find("./IncludedGameTypes/GameType").attrib.get("value"), "Campaign")
+
+              def test_existing_empty_registration_can_be_preserved_during_unrelated_edit(self):
+                  with tempfile.TemporaryDirectory() as name:
+                      path = Path(name) / "SubModule.xml"
+                      path.write_text('''<Module><Name value="Example"/><Id value="Example"/><Version value="v1.0.0"/><Xmls><XmlNode><XmlName id="Items" path="items"/></XmlNode></Xmls></Module>''', encoding="utf-8")
+                      save_module(path, {
+                          "metadata": {"name": "Renamed"},
+                          "xmls": [{"index": 0, "id": "Items", "path": "items", "includedGameTypes": []}],
+                      })
+                      node = ET.parse(path).getroot().find("./Xmls/XmlNode")
+                      self.assertIsNone(node.find("IncludedGameTypes"))
+
+
+          if __name__ == "__main__":
+              unittest.main()
+          PY
+      - name: Validate XML game-type requirements
+        run: |
+          python -m compileall -q games/bannerlord
+          python -m unittest tests.test_bannerlord_xml_game_types tests.test_bannerlord_legacy_xml_order tests.test_bannerlord_plugin -v
+          node --check games/bannerlord/editor_core.js
+      - name: Commit XML game-type validation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/bannerlord/module_data.py games/bannerlord/editor_core.js tests/test_bannerlord_xml_game_types.py
+          git commit -m "Validate Bannerlord XML registration game types"
+          git push origin HEAD:feature/bannerlord-plugin
