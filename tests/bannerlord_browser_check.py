@@ -153,7 +153,7 @@ const __moduleDataBad={json.dumps(MODULE_DATA_BAD)};
 const __moduleDataFixed={json.dumps(MODULE_DATA_FIXED)};
 const __gauntlet={json.dumps(GAUNTLET)};
 window.fetch=async function(input,options={{}}){{
-  const url=new URL(String(input),location.href);const path=url.pathname;
+  const url=new URL(String(input),document.baseURI);const path=url.pathname;
   const method=String(options.method||"GET").toUpperCase();
   if(method==="POST"){{
     const body=options.body?JSON.parse(options.body):{{}};window.__bannerlordRequests.push({{path,body}});
@@ -201,7 +201,15 @@ def main() -> None:
             page = browser.new_page(viewport={"width": 1280, "height": 820})
             page.on("pageerror", lambda error: errors.append(str(error)))
             page.set_content(inline_editor(), wait_until="domcontentloaded")
-            page.wait_for_function("state.module && state.project && state.datamap")
+            try:
+                page.wait_for_function("state.module && state.project && state.datamap", timeout=8000)
+            except Exception:
+                raise AssertionError({
+                    "pageErrors": errors,
+                    "mainText": page.locator("#main").inner_text(),
+                    "requests": page.evaluate("window.__bannerlordRequests || []"),
+                    "stateType": page.evaluate("typeof state"),
+                })
             assert "Fixture Module" in page.locator("#main").inner_text()
 
             page.evaluate('navigate("moduledata")')
