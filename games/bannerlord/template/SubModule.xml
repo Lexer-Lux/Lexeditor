@@ -4,6 +4,8 @@
   <Id value="{{MODULE_ID}}" />
   <Version value="v0.1.0" />
   <DefaultModule value="false" />
+  <ModuleCategory value="Singleplayer" />
+  <ModuleType value="Community" />
   <SingleplayerModule value="true" />
   <MultiplayerModule value="false" />
   <DependedModules>
