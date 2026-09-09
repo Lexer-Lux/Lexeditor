@@ -194,6 +194,8 @@ PLUGIN = GamePlugin(
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FFX_X2_PROJECT",
         default_root=paths.PROJECT_ROOT,
+        required_paths=("efl",),
+        template_root=paths.PLUGIN_ROOT / "project-template",
         initialize=_initialize_project,
     ),
     installation=GameInstallSpec(
