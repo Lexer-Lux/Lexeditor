@@ -75,12 +75,11 @@ class BannerlordLaunchTests(unittest.TestCase):
                 '<Module><Id value="LexerSkillTweaks" /></Module>', encoding="utf-8"
             )
             order = module_load_order(game, workspace)
+            self.assertEqual(
+                order[:6],
+                ["Native", "SandBoxCore", "BirthAndDeath", "CustomBattle", "Sandbox", "StoryMode"],
+            )
             self.assertEqual(order[-1], "LexerSkillTweaks")
-            self.assertLess(order.index("Native"), order.index("SandBoxCore"))
-            self.assertLess(order.index("SandBoxCore"), order.index("BirthAndDeath"))
-            self.assertLess(order.index("BirthAndDeath"), order.index("CustomBattle"))
-            self.assertLess(order.index("SandBoxCore"), order.index("Sandbox"))
-            self.assertLess(order.index("Sandbox"), order.index("StoryMode"))
             self.assertLess(order.index("Bannerlord.Harmony"), order.index("LexerSkillTweaks"))
             self.assertEqual(len(order), len(set(order)))
             command = launch_command(game, workspace)
