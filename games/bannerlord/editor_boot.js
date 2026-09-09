@@ -4,6 +4,9 @@
       if(gauntletDirty()&&sourceDirty()&&state.source?.path===state.gauntlet?.relativePath){
         throw new Error("The same Gauntlet prefab has unsaved structured and raw-source edits. Save or discard one editing surface before saving the other.");
       }
+      if(moduleDataDirty()&&sourceDirty()&&state.source?.path===state.moduleData?.relativePath){
+        throw new Error("The same ModuleData XML has unsaved structured and raw-source edits. Save or discard one editing surface before saving the other.");
+      }
       if(moduleDirty()){
         const result=await post("/api/module/save",moduleEditable(state.module));
         state.module=result.module;state.savedModule=clone(result.module);
@@ -84,6 +87,7 @@
         state.runtimeOverrides=result;state.savedRuntimeOverrides=clone(result);
       }
       if(gauntletDirty())await saveGauntlet();
+      if(moduleDataDirty())await saveModuleData();
       if(sourceDirty()){
         const result=await post("/api/source/save",{path:state.source.path,text:state.source.text});
         state.source=result;state.savedSourceText=result.text;
@@ -107,7 +111,7 @@
       {id:"submodules",label:"Submodules"},{id:"xmls",label:"XML"},
       {id:"skills",label:"Skills"},{id:"effects",label:"Effects"},
       {id:"perks",label:"Perks"},{id:"xp",label:"XP"},{id:"settings",label:"Settings"},
-      {id:"runtime",label:"Runtime"},{id:"gauntlet",label:"Gauntlet"},{id:"build",label:"Build"},{id:"deployment",label:"Deployment"}
+      {id:"runtime",label:"Runtime"},{id:"gauntlet",label:"Gauntlet"},{id:"moduledata",label:"ModuleData"},{id:"build",label:"Build"},{id:"deployment",label:"Deployment"}
     ],
     activeTab:()=>state.tab,navigate,
     help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the Bannerlord Data Map",
