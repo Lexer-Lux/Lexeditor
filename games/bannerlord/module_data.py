@@ -224,10 +224,10 @@ _MODULE_STRUCTURAL_TAGS = {
 }
 
 
-def _set_value(parent: ET.Element, tag: str, value: str) -> bool:
+def _set_value(parent: ET.Element, tag: str, value: str, *, submodule_order: bool = False) -> bool:
     element = parent.find(tag)
     if element is None:
-        element = ET.SubElement(parent, tag)
+        element = _submodule_child_or_create(parent, tag) if submodule_order else ET.SubElement(parent, tag)
         element.set("value", value)
         return True
     old = element.attrib.get("value", (element.text or "").strip())
@@ -312,10 +312,52 @@ def _normalize_metadata(edits: dict) -> dict:
     return normalized
 
 
+_MODULE_SECTION_ORDER = (
+    "DependedModules",
+    "ModulesToLoadAfterThis",
+    "IncompatibleModules",
+    "DependedModuleMetadatas",
+    "SubModules",
+    "Xmls",
+)
+_SUBMODULE_CHILD_ORDER = ("Name", "DLLName", "SubModuleClassType", "Assemblies", "Tags")
+
+
+def _insert_ordered_child(parent: ET.Element, element: ET.Element, order: tuple[str, ...]) -> ET.Element:
+    """Insert a newly-created known child before the next known schema sibling.
+
+    Existing elements are never moved. Unknown/comment nodes keep their relative
+    positions; this only prevents Lexeditor-created nodes from being appended
+    after later structural sections.
+    """
+    try:
+        target_rank = order.index(element.tag)
+    except ValueError:
+        parent.append(element)
+        return element
+    for index, child in enumerate(list(parent)):
+        try:
+            child_rank = order.index(child.tag)
+        except ValueError:
+            continue
+        if child_rank > target_rank:
+            parent.insert(index, element)
+            return element
+    parent.append(element)
+    return element
+
+
 def _child_or_create(parent: ET.Element, tag: str) -> ET.Element:
     child = parent.find(tag)
     if child is None:
-        child = ET.SubElement(parent, tag)
+        child = _insert_ordered_child(parent, ET.Element(tag), _MODULE_SECTION_ORDER)
+    return child
+
+
+def _submodule_child_or_create(parent: ET.Element, tag: str) -> ET.Element:
+    child = parent.find(tag)
+    if child is None:
+        child = _insert_ordered_child(parent, ET.Element(tag), _SUBMODULE_CHILD_ORDER)
     return child
 
 
@@ -369,7 +411,7 @@ def _edit_community_dependencies(root: ET.Element, rows: list[dict]) -> int:
     parent = root.find("DependedModuleMetadatas")
     if parent is None and not rows:
         return 0
-    parent = parent if parent is not None else ET.SubElement(root, "DependedModuleMetadatas")
+    parent = parent if parent is not None else _insert_ordered_child(root, ET.Element("DependedModuleMetadatas"), _MODULE_SECTION_ORDER)
     existing = _element_children(parent, "DependedModuleMetadata")
     changes = 0
     reused: set[int] = set()
@@ -424,7 +466,7 @@ def _edit_module_id_rows(
     parent = root.find(parent_tag)
     if parent is None and not rows:
         return 0
-    parent = parent if parent is not None else ET.SubElement(root, parent_tag)
+    parent = parent if parent is not None else _insert_ordered_child(root, ET.Element(parent_tag), _MODULE_SECTION_ORDER)
     existing = [child for child in list(parent) if child.tag in accepted_tags]
     changes = 0
     reused: set[int] = set()
@@ -475,7 +517,7 @@ def _edit_tags(parent: ET.Element, rows: list[dict]) -> int:
     tags_root = parent.find("Tags")
     if tags_root is None and not rows:
         return 0
-    tags_root = tags_root if tags_root is not None else ET.SubElement(parent, "Tags")
+    tags_root = tags_root if tags_root is not None else _submodule_child_or_create(parent, "Tags")
     existing = _element_children(tags_root, "Tag")
     changes = 0
     reused: set[int] = set()
@@ -503,7 +545,7 @@ def _edit_assemblies(parent: ET.Element, rows: list[dict]) -> int:
     assemblies_root = parent.find("Assemblies")
     if assemblies_root is None and not rows:
         return 0
-    assemblies_root = assemblies_root if assemblies_root is not None else ET.SubElement(parent, "Assemblies")
+    assemblies_root = assemblies_root if assemblies_root is not None else _submodule_child_or_create(parent, "Assemblies")
     existing = _element_children(assemblies_root, "Assembly")
     changes = 0
     reused: set[int] = set()
@@ -544,9 +586,9 @@ def _edit_submodules(root: ET.Element, rows: list[dict]) -> int:
             raise ValueError(f"Submodule {position + 1} needs a DLL name")
         if not class_type:
             raise ValueError(f"Submodule {position + 1} needs a class type")
-        changes += int(_set_value(element, "Name", name))
-        changes += int(_set_value(element, "DLLName", dll_name))
-        changes += int(_set_value(element, "SubModuleClassType", class_type))
+        changes += int(_set_value(element, "Name", name, submodule_order=True))
+        changes += int(_set_value(element, "DLLName", dll_name, submodule_order=True))
+        changes += int(_set_value(element, "SubModuleClassType", class_type, submodule_order=True))
         changes += _edit_assemblies(element, list(row.get("assemblies") or []))
         changes += _edit_tags(element, list(row.get("tags") or []))
         output.append(element)
@@ -607,7 +649,7 @@ def _edit_xmls(root: ET.Element, rows: list[dict]) -> int:
     parent = root.find("Xmls")
     if parent is None and not rows:
         return 0
-    parent = parent if parent is not None else ET.SubElement(root, "Xmls")
+    parent = parent if parent is not None else _insert_ordered_child(root, ET.Element("Xmls"), _MODULE_SECTION_ORDER)
     existing = _element_children(parent, "XmlNode")
     changes = 0
     reused: set[int] = set()
