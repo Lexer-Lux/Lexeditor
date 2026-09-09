@@ -25,6 +25,12 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual(scene_map["status"], "integrated")
         self.assertEqual(scene_map["coverage"], "structural + raster")
         self.assertEqual(scene_map["target"], "scenes")
+        l3_graphics = resource_override("Game/field/weather_bin/cg9.bin")
+        self.assertEqual(l3_graphics["kind"], "scene-l3-graphics")
+        self.assertEqual(l3_graphics["coverage"], "raster")
+        l3_assembly = resource_override("Game/field/ChipTable/ChipTableBg3_0020.dat")
+        self.assertEqual(l3_assembly["kind"], "scene-l3-assembly")
+        self.assertEqual(l3_assembly["target"], "scenes")
 
     def test_field_events_report_fixed_width_write_coverage(self):
         event = resource_override("Game/field/atel/Atel_0020.dat")
@@ -78,13 +84,20 @@ class CoverageTests(unittest.TestCase):
     def test_data_map_describes_desktop_scene_raster_without_overclaiming_composition(self):
         store = SimpleNamespace(archive=SimpleNamespace(entries=[
             SimpleNamespace(path="Game/field/MapTable/MapTable_0000.dat"),
+            SimpleNamespace(path="Game/field/weather_bin/cg9.bin"),
+            SimpleNamespace(path="Game/field/ChipTable/ChipTableBg3_0000.dat"),
         ]))
-        mapped = augment_data_map(store, {"rows": [], "counts": {"resources": 1}})
+        mapped = augment_data_map(store, {"rows": [], "counts": {"resources": 3}})
         row = next(item for item in mapped["rows"] if str(item["filename"]).startswith("Game/field/MapTable/"))
         self.assertEqual(row["coverage"], "structural + raster")
-        self.assertIn("desktop", row["controls"])
+        self.assertIn("L1/L2/L3", row["controls"])
+        self.assertIn("weather_bin", row["notes"])
+        self.assertIn("ChipTableBg3", row["notes"])
         self.assertIn("main/sub-screen", row["notes"])
         self.assertIn("unsupported", row["notes"])
+        self.assertIn("PrioMap", row["notes"])
+        self.assertEqual(mapped["counts"]["sceneL3Graphics"], 1)
+        self.assertEqual(mapped["counts"]["sceneL3Assemblies"], 1)
 
 
 if __name__ == "__main__":
