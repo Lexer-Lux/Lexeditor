@@ -49,6 +49,7 @@ jobs:
           games/chrono_trigger/comparisons.py
           games/chrono_trigger/memory_ops.py
           games/chrono_trigger/bit_ops.py
+          games/chrono_trigger/movement_ops.py
           games/chrono_trigger/jump_ops.py
           games/chrono_trigger/event_flow.py
           games/chrono_trigger/event_edit.py
@@ -93,7 +94,7 @@ jobs:
           start = html.rfind('<script>')
           end = html.find('</script>', start)
           if start < 0 or end < 0:
-              raise SystemExit('Chrono Trigger editor inline script was not found')
+            raise SystemExit('Chrono Trigger editor inline script was not found')
           Path('/tmp/chrono-trigger-editor.js').write_text(html[start + len('<script>'):end], encoding='utf-8')
           PY
           node --check /tmp/chrono-trigger-editor.js
