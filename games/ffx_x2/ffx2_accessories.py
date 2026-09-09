@@ -45,6 +45,10 @@ def _table(data: bytes):
         table = parse_table(data)
     except FFX2TableError as error:
         raise FFX2AccessoryError(str(error)) from error
+    if table.min_index != 0:
+        raise FFX2AccessoryError(
+            f"accessory.bin does not start at record zero as proved by the template: {table.min_index}"
+        )
     if table.record_size != RECORD_SIZE:
         raise FFX2AccessoryError(
             f"accessory.bin record size does not match the proved 0x{RECORD_SIZE:X}-byte layout: {table.record_size}"
