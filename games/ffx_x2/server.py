@@ -8,8 +8,8 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import deployment, paths
-from .vbf import VBFError, VBFIndex, extract_to, read_index
+from . import deployment, paths, treasures
+from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
@@ -18,7 +18,10 @@ PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 256 * 1024
-POST_ROUTES = {"/api/project/extract", "/api/deployment/deploy", "/api/deployment/revert"}
+POST_ROUTES = {
+    "/api/project/extract", "/api/treasures/save",
+    "/api/deployment/deploy", "/api/deployment/revert",
+}
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
 
 
@@ -68,6 +71,47 @@ def _archive_status(game: str) -> dict:
                 "ready": False, "error": str(error), "fileCount": 0}
 
 
+def _treasure_current() -> tuple[VBFIndex, Path, bytes, str]:
+    index = _index("x")
+    entry = index.find(treasures.ARCHIVE_PATH)
+    target = _project_target("x", entry.path)
+    if target.is_file():
+        return index, target, target.read_bytes(), "project"
+    return index, target, read_entry(index, entry), "archive"
+
+
+def treasure_catalog() -> dict:
+    index, target, data, source = _treasure_current()
+    result = treasures.payload(data)
+    result.update({
+        "game": "x",
+        "archivePath": treasures.ARCHIVE_PATH,
+        "headerMd5": index.header_md5,
+        "source": source,
+        "staged": target.is_file(),
+        "projectPath": str(target),
+    })
+    return result
+
+
+def save_treasures(request: dict) -> dict:
+    index, target, data, _source = _treasure_current()
+    expected_header = str(request.get("headerMd5", ""))
+    if expected_header != index.header_md5:
+        raise RuntimeError("The FFX VBF changed; refresh Treasures before saving")
+    expected_baseline = str(request.get("baselineSha256", ""))
+    current_baseline = treasures.sha256_bytes(data)
+    if expected_baseline != current_baseline:
+        raise RuntimeError("takara.bin changed outside this editor; refresh Treasures before saving")
+    edits = request.get("edits")
+    edited = treasures.apply_edits(data, edits)
+    paths.ensure_project()
+    treasures.atomic_write(target, edited)
+    result = treasure_catalog()
+    result["saved"] = len(edits)
+    return result
+
+
 def data_map() -> dict:
     rows: list[dict] = []
     for key, filename in (("x", "data/FFX_Data.vbf"), ("x2", "data/FFX2_Data.vbf")):
@@ -77,7 +121,7 @@ def data_map() -> dict:
             "controls": "Validated VBF archive index, search, read-only extraction to project overlay",
             "notes": (
                 f"{paths.GAME_LABELS[key]} archive. Installed bytes are read-only. "
-                "Extract creates a Fahrenheit EFL project copy; it is not a structured field editor."
+                "Extract creates a Fahrenheit EFL project copy."
             ),
             "status": "integrated" if state["ready"] else "partial",
             "coverage": "archive-index-and-extract",
@@ -85,12 +129,29 @@ def data_map() -> dict:
             "target": "archives",
             "game": key,
         })
+    try:
+        treasure_state = treasure_catalog()
+        treasure_status = "integrated"
+        treasure_note = (
+            f"{len(treasure_state['rows'])} fixed reward records. Lexeditor edits only kind, quantity, "
+            "and 16-bit type ID, preserves all other bytes, and writes a project EFL override."
+        )
+    except (OSError, VBFError, ValueError) as error:
+        treasure_status = "partial"
+        treasure_note = f"Recognized structured treasure table, but it is unavailable: {error}"
     rows.extend([
         {
+            "filename": treasures.ARCHIVE_PATH,
+            "controls": "Structured treasure reward editor",
+            "notes": treasure_note,
+            "status": treasure_status, "coverage": "structured-record-editor",
+            "openable": treasure_status == "integrated", "target": "treasures", "game": "x",
+        },
+        {
             "filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*",
-            "controls": "Recognized gameplay/kernel family",
-            "notes": "Files can be located and staged through the VBF browser. Structured record editing is not integrated yet.",
-            "status": "not-integrated", "coverage": "recognized", "openable": False,
+            "controls": "Remaining gameplay/kernel family",
+            "notes": "Treasure rewards are structured; other kernel tables can still be located and staged through the VBF browser.",
+            "status": "partial", "coverage": "one-structured-family", "openable": False,
         },
         {
             "filename": "FFX2_Data/ffx_ps2/ffx2/**",
@@ -193,12 +254,17 @@ class Handler(BaseHTTPRequestHandler):
                     "edition": "Steam collection / VBF / Fahrenheit EFL",
                     "hosted": HOSTED, "windowHost": WINDOW_HOST,
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
-                    "capabilities": ["data-map", "vbf-index", "vbf-extract", "project-overlay", "fahrenheit-deploy"],
+                    "capabilities": [
+                        "data-map", "vbf-index", "vbf-extract", "project-overlay",
+                        "ffx-treasure-editor", "fahrenheit-deploy",
+                    ],
                 })
             elif route == "/api/dashboard":
                 self.json_response(dashboard())
             elif route == "/api/datamap":
                 self.json_response(data_map())
+            elif route == "/api/treasures":
+                self.json_response(treasure_catalog())
             elif route == "/api/archive":
                 query = parse_qs(parsed.query)
                 self.json_response(archive_catalog(
@@ -234,19 +300,21 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
             if not 0 < length <= MAX_REQUEST_BYTES:
                 self.json_response({"error": "Invalid or oversized request body"}, 413); return
-            payload = json.loads(self.rfile.read(length).decode("utf-8"))
-            if not isinstance(payload, dict):
+            request = json.loads(self.rfile.read(length).decode("utf-8"))
+            if not isinstance(request, dict):
                 raise ValueError("The request must be a JSON object")
             if route == "/api/project/extract":
-                key = _game_key(str(payload.get("game", "")))
+                key = _game_key(str(request.get("game", "")))
                 index = _index(key)
-                expected = str(payload.get("headerMd5", ""))
+                expected = str(request.get("headerMd5", ""))
                 if expected != index.header_md5:
                     raise RuntimeError("The VBF index changed; refresh the archive browser before extracting")
-                entry = index.find(str(payload.get("path", "")))
+                entry = index.find(str(request.get("path", "")))
                 paths.ensure_project()
                 result = extract_to(index, entry, _project_target(key, entry.path))
                 result.update({"game": key, "archivePath": entry.path, "headerMd5": index.header_md5})
+            elif route == "/api/treasures/save":
+                result = save_treasures(request)
             elif route == "/api/deployment/deploy":
                 result = deployment.deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
             else:
