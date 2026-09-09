@@ -8,7 +8,10 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import ctb_base, deployment, gear_shops, item_prices, item_shops, mix_table, paths, theme, treasures
+from . import (
+    auto_ability_prices, ctb_base, deployment, gear_shops, item_prices, item_shops,
+    mix_table, paths, theme, treasures,
+)
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
 
@@ -19,8 +22,9 @@ HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 256 * 1024
 POST_ROUTES = {
-    "/api/project/extract", "/api/treasures/save", "/api/item-prices/save", "/api/ctb-base/save",
-    "/api/mix-table/save", "/api/item-shops/save", "/api/gear-shops/save",
+    "/api/project/extract", "/api/treasures/save", "/api/item-prices/save",
+    "/api/auto-ability-prices/save", "/api/ctb-base/save", "/api/mix-table/save",
+    "/api/item-shops/save", "/api/gear-shops/save",
     "/api/deployment/deploy", "/api/deployment/revert",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
@@ -179,6 +183,17 @@ def save_item_prices(request: dict) -> dict:
     return _structured_save(request, item_prices.ARCHIVE_PATH, item_prices.apply_edits, item_prices.payload, "Item Prices")
 
 
+def auto_ability_price_catalog() -> dict:
+    return _structured_payload(auto_ability_prices.ARCHIVE_PATH, auto_ability_prices.payload)
+
+
+def save_auto_ability_prices(request: dict) -> dict:
+    return _structured_save(
+        request, auto_ability_prices.ARCHIVE_PATH, auto_ability_prices.apply_edits,
+        auto_ability_prices.payload, "Auto-Ability Prices",
+    )
+
+
 def ctb_base_catalog() -> dict:
     return _structured_payload(ctb_base.ARCHIVE_PATH, ctb_base.payload)
 
@@ -242,6 +257,8 @@ def data_map() -> dict:
          lambda s: f"{len(s['rows'])} reward records; edits only kind, quantity and 16-bit type ID.", "treasures"),
         (item_prices.ARCHIVE_PATH, "Structured item/command gil-price editor", item_prices.payload,
          lambda s: f"{len(s['rows'])} four-byte prices mapped to command IDs starting at 0x{s['commandBase']:04X}.", "item-prices"),
+        (auto_ability_prices.ARCHIVE_PATH, "Structured auto-ability gil-price editor", auto_ability_prices.payload,
+         lambda s: f"{len(s['rows'])} four-byte prices mapped to auto-ability IDs starting at 0x{s['abilityBase']:04X}.", "auto-ability-prices"),
         (ctb_base.ARCHIVE_PATH, "Structured CTB tick-speed and ICV-bonus editor", ctb_base.payload,
          lambda s: f"{len(s['rows'])} two-byte Agility records with derived initial-CTB ranges.", "ctb-base"),
         (mix_table.ARCHIVE_PATH, "Structured Rikku Mix result editor", mix_table.payload,
@@ -266,8 +283,8 @@ def data_map() -> dict:
          "notes": "; ".join(theme_parts) or "Theme extraction falls back safely when cosmetic source assets are unavailable.",
          "status": "partial" if themed.get("source") == "installed-game" else "not-integrated", "coverage": "game-derived-theme", "openable": False},
         {"filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*", "controls": "Remaining gameplay/kernel family",
-         "notes": "Treasure rewards, item prices, CTB timing, Mix results, item shops and gear shops are structured; other kernel tables remain available through the VBF browser.",
-         "status": "partial", "coverage": "six-structured-families", "openable": False},
+         "notes": "Treasure rewards, item/auto-ability prices, CTB timing, Mix results, item shops and gear shops are structured; other kernel tables remain available through the VBF browser.",
+         "status": "partial", "coverage": "seven-structured-families", "openable": False},
         {"filename": "FFX2_Data/ffx_ps2/ffx2/**", "controls": "Recognized FFX-2 game-data families",
          "notes": "Files can be located and staged through the VBF browser. FFX-2 format-specific editors remain to be implemented.",
          "status": "not-integrated", "coverage": "recognized", "openable": False},
@@ -329,13 +346,14 @@ class Handler(BaseHTTPRequestHandler):
                     "edition": "Steam collection / VBF / Fahrenheit EFL", "hosted": HOSTED, "windowHost": WINDOW_HOST,
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": ["data-map", "vbf-index", "vbf-extract", "project-overlay", "ffx-treasure-editor",
-                        "ffx-item-price-editor", "ffx-ctb-base-editor", "ffx-mix-editor", "ffx-item-shop-editor",
-                        "ffx-gear-shop-editor", "installed-game-theme", "fahrenheit-deploy"]})
+                        "ffx-item-price-editor", "ffx-auto-ability-price-editor", "ffx-ctb-base-editor", "ffx-mix-editor",
+                        "ffx-item-shop-editor", "ffx-gear-shop-editor", "installed-game-theme", "fahrenheit-deploy"]})
             elif route == "/api/dashboard": self.json_response(dashboard())
             elif route == "/api/datamap": self.json_response(data_map())
             elif route == "/api/theme": self.json_response(theme_status())
             elif route == "/api/treasures": self.json_response(treasure_catalog())
             elif route == "/api/item-prices": self.json_response(item_price_catalog())
+            elif route == "/api/auto-ability-prices": self.json_response(auto_ability_price_catalog())
             elif route == "/api/ctb-base": self.json_response(ctb_base_catalog())
             elif route == "/api/mix-table": self.json_response(mix_catalog())
             elif route == "/api/item-shops": self.json_response(item_shop_catalog())
@@ -365,6 +383,7 @@ class Handler(BaseHTTPRequestHandler):
                 result.update({"game": key, "archivePath": entry.path, "eflPath": paths.efl_archive_path(key, entry.path), "headerMd5": index.header_md5})
             elif route == "/api/treasures/save": result = save_treasures(request)
             elif route == "/api/item-prices/save": result = save_item_prices(request)
+            elif route == "/api/auto-ability-prices/save": result = save_auto_ability_prices(request)
             elif route == "/api/ctb-base/save": result = save_ctb_base(request)
             elif route == "/api/mix-table/save": result = save_mix(request)
             elif route == "/api/item-shops/save": result = save_item_shops(request)
