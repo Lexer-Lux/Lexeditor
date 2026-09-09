@@ -59,6 +59,15 @@ def command_semantics(command: dict, labels: dict) -> dict | None:
             "enemyId": enemy, "slot": args[2] & 0x7F, "static": bool(args[2] & 0x80),
             "slotFlags": args[2],
         }
+    if opcode == 0x87 and len(args) == 1 and args[0] <= 0x80:
+        return {"summary": f"Script speed {args[0]}", "scriptSpeed": args[0]}
+    if opcode == 0x89 and len(args) == 1:
+        return {"summary": f"NPC movement speed {args[0]}", "movementSpeed": args[0]}
+    if opcode == 0x8A and len(args) == 1:
+        address = _script_address(args[0])
+        return {"summary": f"NPC speed from 0x{address:06X}", "speedAddress": address}
+    if opcode == 0x8B and len(args) == 2:
+        return {"summary": f"NPC tile position ({args[0]}, {args[1]})", "tileX": args[0], "tileY": args[1]}
     if opcode == 0xB8 and len(args) == 1:
         return {"summary": f"Message table {args[0]}", "messageTable": args[0]}
     if opcode in {0xBB, 0xC1, 0xC2} and len(args) >= 2:
