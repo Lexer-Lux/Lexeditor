@@ -17,13 +17,13 @@ async function api(path,options={}){
 }
 
 function textControl(key,{placeholder=""}={}){
-  return el("input",{type:"text",value:model[key]??"",placeholder,oninput:event=>{model[key]=event.target.value;render();refreshShell()}});
+  return el("input",{type:"text",value:model[key]??"",placeholder,oninput:event=>{model[key]=event.target.value;refreshShell()}});
 }
 function numberControl(key){
-  return el("input",{type:"number",min:0,step:1,value:model[key]??"",oninput:event=>{model[key]=event.target.value===""?null:Number(event.target.value);render();refreshShell()}});
+  return el("input",{type:"number",min:0,step:1,value:model[key]??"",oninput:event=>{model[key]=event.target.value===""?null:Number(event.target.value);refreshShell()}});
 }
 function boolControl(key){
-  return el("input",{type:"checkbox",checked:!!model[key],onchange:event=>{model[key]=event.target.checked;render();refreshShell()}});
+  return el("input",{type:"checkbox",checked:!!model[key],onchange:event=>{model[key]=event.target.checked;refreshShell()}});
 }
 function listControl(key){
   return el("textarea",{rows:3,value:Array.isArray(model[key])?model[key].join("\n"):"",oninput:event=>{model[key]=event.target.value.split(/[\n,]+/).map(value=>value.trim()).filter(Boolean);refreshShell()}});
@@ -40,7 +40,7 @@ function tagControl(){
   }),unknown.length?el("div",{class:"lex-muted"},`Preserved unknown tags: ${unknown.join(", ")}`):null);
 }
 function selectType(rule){
-  const select=el("select",{onchange:event=>{rule.Type=event.target.value;render();refreshShell()}},...TYPES.map(value=>{
+  const select=el("select",{onchange:event=>{rule.Type=event.target.value;refreshShell()}},...TYPES.map(value=>{
     const option=el("option",{value},value);option.selected=value===rule.Type;return option;
   }));
   return select;
