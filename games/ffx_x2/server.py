@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import deployment, item_shops, paths, theme, treasures
+from . import deployment, gear_shops, item_shops, paths, theme, treasures
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
 
@@ -19,7 +19,7 @@ HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 256 * 1024
 POST_ROUTES = {
-    "/api/project/extract", "/api/treasures/save", "/api/item-shops/save",
+    "/api/project/extract", "/api/treasures/save", "/api/item-shops/save", "/api/gear-shops/save",
     "/api/deployment/deploy", "/api/deployment/revert",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
@@ -182,6 +182,16 @@ def save_item_shops(request: dict) -> dict:
     )
 
 
+def gear_shop_catalog() -> dict:
+    return _structured_payload(gear_shops.ARCHIVE_PATH, gear_shops.payload)
+
+
+def save_gear_shops(request: dict) -> dict:
+    return _structured_save(
+        request, gear_shops.ARCHIVE_PATH, gear_shops.apply_edits, gear_shops.payload, "Gear Shops"
+    )
+
+
 def _map_structured_row(archive_path: str, controls: str, builder, notes) -> dict:
     try:
         state = _structured_payload(archive_path, builder)
@@ -223,7 +233,7 @@ def data_map() -> dict:
     )
     treasure_row["target"] = "treasures"
     rows.append(treasure_row)
-    shop_row = _map_structured_row(
+    item_shop_row = _map_structured_row(
         item_shops.ARCHIVE_PATH,
         "Structured 16-slot item shop editor",
         item_shops.payload,
@@ -232,8 +242,19 @@ def data_map() -> dict:
             "The unproved/unused leading rate field is read-only and preserved."
         ),
     )
-    shop_row["target"] = "item-shops"
-    rows.append(shop_row)
+    item_shop_row["target"] = "item-shops"
+    rows.append(item_shop_row)
+    gear_shop_row = _map_structured_row(
+        gear_shops.ARCHIVE_PATH,
+        "Structured 16-slot gear shop editor",
+        gear_shops.payload,
+        lambda state: (
+            f"{len(state['rows'])} shops with {state['slotCount']} gear-index slots each. "
+            "The unproved/unused leading rate field is read-only and preserved."
+        ),
+    )
+    gear_shop_row["target"] = "gear-shops"
+    rows.append(gear_shop_row)
     themed = theme_status()
     theme_parts = []
     if themed.get("background", {}).get("ready"):
@@ -255,8 +276,8 @@ def data_map() -> dict:
         {
             "filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*",
             "controls": "Remaining gameplay/kernel family",
-            "notes": "Treasure rewards and item shops are structured; other kernel tables remain available through the VBF browser.",
-            "status": "partial", "coverage": "two-structured-families", "openable": False,
+            "notes": "Treasure rewards, item shops and gear shops are structured; other kernel tables remain available through the VBF browser.",
+            "status": "partial", "coverage": "three-structured-families", "openable": False,
         },
         {
             "filename": "FFX2_Data/ffx_ps2/ffx2/**",
@@ -358,7 +379,8 @@ class Handler(BaseHTTPRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": [
                         "data-map", "vbf-index", "vbf-extract", "project-overlay",
-                        "ffx-treasure-editor", "ffx-item-shop-editor", "installed-game-theme", "fahrenheit-deploy",
+                        "ffx-treasure-editor", "ffx-item-shop-editor", "ffx-gear-shop-editor",
+                        "installed-game-theme", "fahrenheit-deploy",
                     ],
                 })
             elif route == "/api/dashboard":
@@ -371,6 +393,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(treasure_catalog())
             elif route == "/api/item-shops":
                 self.json_response(item_shop_catalog())
+            elif route == "/api/gear-shops":
+                self.json_response(gear_shop_catalog())
             elif route == "/api/archive":
                 query = parse_qs(parsed.query)
                 self.json_response(archive_catalog(
@@ -424,6 +448,8 @@ class Handler(BaseHTTPRequestHandler):
                 result = save_treasures(request)
             elif route == "/api/item-shops/save":
                 result = save_item_shops(request)
+            elif route == "/api/gear-shops/save":
+                result = save_gear_shops(request)
             elif route == "/api/deployment/deploy":
                 result = deployment.deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
             else:
