@@ -1,6 +1,8 @@
+import io
 import struct
 
 import pytest
+from PIL import Image
 
 from games.ff7r import bitmap_font
 
@@ -77,6 +79,20 @@ def test_atlas_layout_matches_documented_2048_bc5_mip_chain():
     )
     with pytest.raises(ValueError, match="font atlas size"):
         bitmap_font.decode_font_atlas_png(b"too small")
+
+
+def test_pinned_texfury_decodes_documented_bc5_atlas_shape_to_png():
+    # Zero BC5 blocks are valid compressed blocks. This exercises the pinned
+    # texfury/Pillow production path without committing a proprietary atlas.
+    payload = bytearray(bitmap_font.ATLAS_UEXP_SIZE)
+    payload[-4:] = bitmap_font.UNREAL_TAG
+
+    png = bitmap_font.decode_font_atlas_png(bytes(payload))
+
+    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    image = Image.open(io.BytesIO(png))
+    assert image.mode == "RGBA"
+    assert image.size == (bitmap_font.ATLAS_WIDTH, bitmap_font.ATLAS_HEIGHT)
 
 
 def test_installed_font_pipeline_caches_only_decoded_private_assets(tmp_path, monkeypatch):
