@@ -11,7 +11,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import paths
+from .changes import list_changes, revert_change
 from .coverage import augment_data_map, resource_override
+from .ctp import default_target, export_ctp
 from .data import (
     OverlayStore,
     classify_resource,
@@ -45,6 +47,7 @@ POST_ROUTES = {
     "/api/save/message", "/api/save/scene", "/api/save/exit", "/api/save/treasure",
     "/api/save/world", "/api/save/world-exit", "/api/save/world-trigger",
     "/api/save/world-script-address", "/api/deployment/deploy",
+    "/api/changes/revert", "/api/export/ctp",
 }
 
 
@@ -108,7 +111,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/9"
+    server_version = "LexeditorChronoTrigger/10"
 
     def log_message(self, _format, *_args):
         return
@@ -151,15 +154,18 @@ class Handler(BaseHTTPRequestHandler):
                     "hosted": HOSTED, "windowHost": WINDOW_HOST, "projectRoot": str(paths.PROJECT_ROOT),
                     "capabilities": [
                         "data-map", "resource-index", "localization-text", "scene-headers",
-                        "scene-exits", "scene-treasure", "field-events", "world-headers",
-                        "world-exits", "world-triggers", "world-script-addresses",
-                        "world-script-disassembly", "project-overlay", "ctext-deploy", "read", "save",
+                        "scene-exits", "scene-treasure", "field-events", "field-event-disassembly",
+                        "world-headers", "world-exits", "world-triggers", "world-script-addresses",
+                        "world-script-disassembly", "project-overlay", "project-changes",
+                        "ctext-deploy", "ctp-export", "read", "save",
                     ],
                 })
             elif path == "/api/dashboard":
                 self.send_json(dashboard())
             elif path == "/api/deployment":
                 self.send_json(deployment_status(_store(), paths.GAME_ROOT))
+            elif path == "/api/changes":
+                self.send_json(list_changes(_store()))
             elif path == "/api/datamap":
                 self.send_json(augment_data_map(_store(), data_map(_store())))
             elif path == "/api/archive":
@@ -231,6 +237,10 @@ class Handler(BaseHTTPRequestHandler):
             payload = self._request_json()
             if path == "/api/deployment/deploy":
                 result = deploy_audited_project(_store(), paths.GAME_ROOT)
+            elif path == "/api/changes/revert":
+                result = revert_change(_store(), str(payload.get("path", "")), str(payload.get("sha256", "")))
+            elif path == "/api/export/ctp":
+                result = export_ctp(paths.PROJECT_ROOT, default_target(paths.PROJECT_ROOT))
             elif path == "/api/save/message":
                 result = save_message_table(_store(), str(payload.get("path", "")), str(payload.get("sha256", "")), payload.get("changes", []))
             elif path == "/api/save/scene":
