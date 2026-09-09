@@ -2,215 +2,206 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Lexeditor - Final Fantasy X / X-2</title>
+  <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
   <link rel="stylesheet" href="/shared/framework.css">
   <style>
-    .ffxx2-page{max-width:1180px;margin:0 auto;padding:20px}.ffxx2-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
-    .ffxx2-card{border:1px solid var(--line,rgba(255,255,255,.12));border-radius:12px;padding:16px;background:var(--panel,rgba(20,25,35,.72))}
-    .ffxx2-toolbar{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.ffxx2-toolbar label{display:grid;gap:5px}.ffxx2-grow{flex:1;min-width:240px}
-    .ffxx2-table{width:100%;border-collapse:collapse}.ffxx2-table th,.ffxx2-table td{padding:9px 8px;text-align:left;border-bottom:1px solid var(--line,rgba(255,255,255,.12));vertical-align:top}
-    .ffxx2-table td:nth-child(2){white-space:nowrap}.ffxx2-muted{opacity:.72}.ffxx2-status{font-weight:700}.ffxx2-actions{display:flex;gap:8px;flex-wrap:wrap}
-    .ffxx2-path{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9em;word-break:break-all}.ffxx2-error{color:#ff9f9f;white-space:pre-wrap}
-    .ffxx2-scroll{max-height:560px;overflow:auto}.ffxx2-scroll thead{position:sticky;top:0;background:var(--panel,#171b24);z-index:1}
-    .ffxx2-table input[type=number]{width:8em}.ffxx2-dirty{font-weight:700}.ffxx2-hex{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
-    .ffxx2-slot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:12px}.ffxx2-slot{display:grid;gap:5px;border:1px solid var(--line,rgba(255,255,255,.12));padding:10px;border-radius:9px}.ffxx2-slot input{width:100%;box-sizing:border-box}
+    :root{
+      --lex-bg:#090a16;--lex-panel:#17152d;--lex-panel-2:#211d43;--lex-border:#7770a4;
+      --lex-text:#f7f7ff;--lex-muted:#bbbcd2;--lex-accent:#68d4ec;--lex-accent-text:#07141b;
+      --lex-highlight:#f2d958;--lex-success:#8ee8c0;--lex-radius:3px;
+      --ffx-violet:#37296f;--ffx-violet-2:#544294;--ffx-violet-3:#7662bd;
+      --ffx-cyan:#67d8ee;--ffx-gold:#f2d958;--ffx-rose:#d35a9c;--ffx-shadow:#050610;
+      --ffxx2-font:Inter,"Segoe UI",Arial,sans-serif;--ffxx2-theme-art:none;
+    }
+    *{box-sizing:border-box}
+    html,body{width:100%;height:100%;margin:0}
+    body{position:relative;overflow:hidden;color:var(--lex-text);background:
+      radial-gradient(circle at 72% 8%,#3c2a7450 0,transparent 35%),
+      radial-gradient(circle at 10% 80%,#17647a35 0,transparent 28%),#090a16;
+      font:15px/1.35 var(--ffxx2-font);text-shadow:0 1px 1px #000}
+    body::before{content:"";position:fixed;inset:-3%;z-index:-3;background-image:var(--ffxx2-theme-art);background-size:cover;background-position:center 18%;opacity:.20;filter:saturate(.9) contrast(1.08);transform:scale(1.04)}
+    body::after{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;background:
+      linear-gradient(90deg,#080914f5 0,#0a0b18e8 28%,#0a0b18a8 66%,#090a16e8 100%),
+      linear-gradient(180deg,#0b0c19aa 0,#0b0c1950 35%,#090a16e8 100%)}
+    button,input,select{font:inherit;color:inherit}
+    button{cursor:pointer}
+    button:disabled{cursor:default;opacity:.42}
+    :focus-visible{outline:2px solid var(--ffx-gold);outline-offset:2px}
+    .ffxx2-app{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;height:100%}
+    .ffxx2-topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:end;padding:14px 22px 11px;background:linear-gradient(90deg,#111126f2,#251c4ed9 65%,#12132be8);border-bottom:1px solid #a49de455;box-shadow:0 9px 28px #0008}
+    .ffxx2-kicker{margin:0 0 3px;color:var(--ffx-cyan);font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;text-shadow:0 0 12px #4dd7ff66}
+    .ffxx2-brand{display:flex;align-items:baseline;gap:12px;min-width:0}.ffxx2-brand h1{margin:0;font:600 clamp(22px,2.25vw,34px)/1.05 var(--ffxx2-font);letter-spacing:.01em;white-space:nowrap}.ffxx2-brand .collection{color:#c8c5df;font-size:13px;white-space:nowrap}
+    .ffxx2-pipeline{display:flex;gap:7px;align-items:center;color:#d8d7e8;font-size:12px;white-space:nowrap}.ffxx2-pipeline i{display:block;width:16px;height:1px;background:linear-gradient(90deg,#6f6a9f,var(--ffx-cyan));box-shadow:0 0 6px #5adbf566}.ffxx2-pipeline b{color:#fff;font-weight:650}
+    .ffxx2-nav{display:flex;align-items:stretch;min-height:44px;padding:0 14px;background:#0c0d1bec;border-bottom:1px solid #7770a455;box-shadow:0 7px 18px #0005;overflow-x:auto}
+    .ffxx2-nav button{position:relative;min-width:max-content;padding:0 16px;border:0;background:transparent;color:#b9b8cc;font-weight:650;letter-spacing:.015em}
+    .ffxx2-nav button:hover{color:#fff;background:#43357c33}.ffxx2-nav button.active{color:#fff;background:linear-gradient(180deg,#493a8438,#493a8414)}
+    .ffxx2-nav button.active::after{content:"";position:absolute;left:13px;right:13px;bottom:0;height:3px;background:linear-gradient(90deg,var(--ffx-gold),#fff2a8 46%,var(--ffx-cyan));box-shadow:0 0 10px #f2d95877}
+    .ffxx2-workspace{display:grid;grid-template-columns:280px minmax(0,1fr);min-height:0;gap:12px;padding:12px 14px 13px}
+    .ffxx2-rail,.ffxx2-panel{min-width:0;border:1px solid #8d85bd70;background:linear-gradient(145deg,#25204bdc,#15162be9 58%,#101221ec);box-shadow:inset 1px 1px #ffffff16,inset -1px -1px #050611aa,0 14px 36px #0006;backdrop-filter:blur(10px)}
+    .ffxx2-rail{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+    .ffxx2-rail-head{padding:13px 15px 11px;background:linear-gradient(90deg,#4d3d89d4,#302866b5);border-bottom:1px solid #a79fe05c}.ffxx2-rail-head strong{display:block;font-size:16px}.ffxx2-rail-head span{display:block;margin-top:2px;color:#c8c6d9;font-size:11px}
+    .ffxx2-rail-body{min-height:0;padding:7px;overflow:auto}.ffxx2-stat{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 8px;padding:10px 9px;border-bottom:1px solid #ffffff13}.ffxx2-stat:last-child{border-bottom:0}.ffxx2-stat .label{color:#b9b7ce;font-size:11px;font-weight:750;letter-spacing:.08em;text-transform:uppercase}.ffxx2-stat .value{color:#fff;font-weight:700;text-align:right}.ffxx2-stat .detail{grid-column:1/-1;color:#9fa1b9;font-size:11px;overflow-wrap:anywhere}.ffxx2-stat .ok{color:var(--lex-success)}.ffxx2-stat .warn{color:#ffc477}
+    .ffxx2-theme-strip{display:flex;flex-wrap:wrap;gap:5px;grid-column:1/-1;margin-top:3px}.ffxx2-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 6px;border:1px solid #8d85bd63;background:#211d43b0;color:#c9c8dc;font-size:10px}.ffxx2-chip.ready{border-color:#65d9bb66;color:#baf4dd}.ffxx2-chip.partial{border-color:#e4c45c66;color:#f0d987}
+    .ffxx2-panel{display:flex;flex-direction:column;min-height:0;overflow:hidden}.ffxx2-panel[hidden]{display:none}
+    .ffxx2-panel-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:13px 16px 11px;background:linear-gradient(90deg,#554292c7,#322a68b8 55%,#24214db8);border-bottom:1px solid #aaa2df5c}.ffxx2-panel-title h2{margin:0;font-size:20px;line-height:1.1}.ffxx2-panel-title p{margin:4px 0 0;color:#c0bfd2;font-size:12px}.ffxx2-panel-body{min-height:0;padding:12px 14px 15px;overflow:auto}.ffxx2-panel-body.flush{padding:0;overflow:hidden}.ffxx2-toolbar{display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:10px}.ffxx2-toolbar label{display:grid;gap:4px;color:#c6c5d7;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}.ffxx2-grow{flex:1;min-width:220px}
+    input,select{min-height:33px;padding:5px 8px;border:1px solid #938bc0;background:linear-gradient(180deg,#17162d,#0f1021);box-shadow:inset 1px 1px #0008;color:#fff}input[type=search]{width:100%}select{padding-right:25px}
+    input:focus,select:focus{border-color:var(--ffx-cyan);box-shadow:0 0 0 1px #64d9f366,inset 1px 1px #0008;outline:0}
+    .ffxx2-button{min-height:33px;padding:6px 11px;border:1px solid #8f86c0;background:linear-gradient(180deg,#4a3b82,#30275e);box-shadow:inset 1px 1px #ffffff18,0 2px 6px #0004;font-weight:700}.ffxx2-button:hover:not(:disabled){border-color:#bdb6e5;background:linear-gradient(180deg,#5b4995,#392e6b)}.ffxx2-button.primary{border-color:#7bd7e8;background:linear-gradient(180deg,#389eb7,#24768d);color:#fff}.ffxx2-button.save{border-color:#f4dd76;background:linear-gradient(180deg,#9d7f28,#6f581d);color:#fff}.ffxx2-button.danger{border-color:#c37b9f;background:linear-gradient(180deg,#743755,#4e263d)}
+    .ffxx2-summary{margin:6px 0 10px;color:#aaaac0;font-size:12px}.ffxx2-path,.ffxx2-hex{font-family:"Cascadia Mono",Consolas,monospace}.ffxx2-path{font-size:.88em;overflow-wrap:anywhere}.ffxx2-hex{color:#aab7d3;font-size:.9em}
+    .ffxx2-table-wrap{min-height:0;max-height:100%;overflow:auto;border:1px solid #7770a442;background:#0d0f1fc2}.ffxx2-table{width:100%;border-collapse:collapse}.ffxx2-table th,.ffxx2-table td{padding:8px 9px;text-align:left;border-bottom:1px solid #ffffff12;vertical-align:middle}.ffxx2-table th{position:sticky;top:0;z-index:2;background:linear-gradient(180deg,#30295d,#211d43);color:#d8d6e8;font-size:10px;letter-spacing:.08em;text-transform:uppercase;box-shadow:0 1px #8e86b750}.ffxx2-table tbody tr{transition:background .12s}.ffxx2-table tbody tr:hover{background:#5949892c}.ffxx2-table tbody tr.ffxx2-dirty{background:#7b652f34;box-shadow:inset 3px 0 var(--ffx-gold)}.ffxx2-table tbody tr.ffxx2-dirty:hover{background:#8c723b42}.ffxx2-table input[type=number]{width:7.8em}.ffxx2-table .path-cell{max-width:720px}
+    .ffxx2-status-pill{display:inline-flex;padding:3px 7px;border:1px solid #7770a466;background:#17162d;color:#c2c1d3;font-size:10px;font-weight:750;letter-spacing:.055em;text-transform:uppercase}.ffxx2-status-pill.integrated{border-color:#64d9b565;color:#a9efd6}.ffxx2-status-pill.partial{border-color:#e4c45c65;color:#f1da87}.ffxx2-status-pill.not-integrated{border-color:#aa718565;color:#d6a5b6}
+    .ffxx2-slot-grid{display:grid;grid-template-columns:repeat(4,minmax(145px,1fr));gap:8px}.ffxx2-slot{display:grid;grid-template-columns:1fr auto;gap:5px 8px;padding:9px;border:1px solid #766fa055;background:linear-gradient(145deg,#211d43b8,#111329);color:#c8c6d9;font-size:11px;font-weight:700}.ffxx2-slot input{grid-column:1/-1;width:100%}.ffxx2-slot .ffxx2-hex{justify-self:end}.ffxx2-slot.ffxx2-dirty{border-color:#f2d958a8;box-shadow:inset 3px 0 #f2d958;background:#63532638}
+    .ffxx2-dashboard-grid{display:grid;grid-template-columns:repeat(2,minmax(250px,1fr));gap:10px}.ffxx2-dashboard-card{min-height:145px;padding:14px;border:1px solid #8e86b75a;background:linear-gradient(145deg,#2b2453bf,#121427da);box-shadow:inset 1px 1px #fff0}.ffxx2-dashboard-card h3{margin:0 0 7px;color:#fff;font-size:16px}.ffxx2-dashboard-card p{margin:5px 0;color:#b9b9cd}.ffxx2-dashboard-card .big{margin-top:10px;color:var(--ffx-gold);font-size:24px;font-weight:750;text-shadow:0 0 10px #f2d95833}.ffxx2-flow{display:flex;align-items:center;gap:8px;margin-top:15px;color:#d5d4e4;font-size:12px}.ffxx2-flow span{padding:5px 8px;border:1px solid #7770a46b;background:#17162d}.ffxx2-flow i{flex:1;height:1px;min-width:12px;background:linear-gradient(90deg,#7770a4,var(--ffx-cyan))}
+    .ffxx2-map-note{max-width:460px;color:#aeadc1;font-size:12px}.ffxx2-efl{display:block;margin-top:3px;color:#7dd8eb;font-size:10px}
+    .ffxx2-errorbar{display:none;min-height:33px;padding:7px 14px;border-top:1px solid #c75e845c;background:#441c2eea;color:#ffd6e3;font-size:12px;white-space:pre-wrap}.ffxx2-errorbar:not(:empty){display:block}
+    .ffxx2-empty{padding:28px;color:#a9a8bc;text-align:center}
+    @media(max-width:1050px){.ffxx2-workspace{grid-template-columns:230px minmax(0,1fr)}.ffxx2-slot-grid{grid-template-columns:repeat(2,minmax(145px,1fr))}.ffxx2-pipeline{display:none}}
+    @media(max-width:760px){body{overflow:auto}.ffxx2-app{height:auto;min-height:100%;grid-template-rows:auto auto auto auto}.ffxx2-workspace{grid-template-columns:1fr}.ffxx2-rail{max-height:none}.ffxx2-panel{min-height:560px}.ffxx2-topbar{grid-template-columns:1fr}.ffxx2-brand{align-items:flex-start;flex-direction:column;gap:2px}.ffxx2-slot-grid,.ffxx2-dashboard-grid{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
-<div id="lexeditor-shell" class="ffxx2-page">
-  <header>
-    <p class="ffxx2-muted">LEXEDITOR · STEAM COLLECTION</p>
-    <h1>Final Fantasy X / X-2 HD Remaster</h1>
-    <p>Read-only VBF source archives → structured project edits → Fahrenheit External File Loader.</p>
+<div id="lexeditor-shell" class="ffxx2-app">
+  <header class="ffxx2-topbar">
+    <div>
+      <p class="ffxx2-kicker">LEXEDITOR · STEAM COLLECTION</p>
+      <div class="ffxx2-brand"><h1>Final Fantasy X / X-2 HD Remaster</h1><span class="collection">APP 359870</span></div>
+    </div>
+    <div class="ffxx2-pipeline" aria-label="mod pipeline"><b>VBF</b><i></i><b>PROJECT</b><i></i><b>FAHRENHEIT EFL</b></div>
   </header>
-
-  <section class="ffxx2-grid" id="overview"></section>
-
-  <section class="ffxx2-card" style="margin-top:14px">
-    <h2>Data Map</h2>
-    <p class="ffxx2-muted">Coverage is explicit: integrated structured tables are distinguished from generic archive extraction.</p>
-    <div style="overflow:auto"><table class="ffxx2-table"><thead><tr><th>Area</th><th>Status</th><th>Controls</th><th>Notes</th></tr></thead><tbody id="datamap"></tbody></table></div>
-  </section>
-
-  <section class="ffxx2-card" style="margin-top:14px" id="treasures">
-    <h2>FFX Treasure Rewards</h2>
-    <p class="ffxx2-muted">Structured editor for <span class="ffxx2-path">takara.bin</span>. Only reward kind, quantity, and type ID are changed; all unknown bytes and trailing data are preserved.</p>
-    <div class="ffxx2-toolbar">
-      <label class="ffxx2-grow">Filter<input id="treasure-filter" type="search" placeholder="index, item, gear, 0x1234 …"></label>
-      <button id="treasure-refresh" type="button">Refresh</button>
-      <button id="treasure-save" type="button" disabled>Save Treasure Edits</button>
-    </div>
-    <p id="treasure-summary" class="ffxx2-muted"></p>
-    <div class="ffxx2-scroll"><table class="ffxx2-table"><thead><tr><th>Index</th><th>Kind</th><th>Quantity</th><th>Type ID</th><th>Reward</th></tr></thead><tbody id="treasure-rows"></tbody></table></div>
-  </section>
-
-  <section class="ffxx2-card" style="margin-top:14px" id="item-shops">
-    <h2>FFX Item Shops</h2>
-    <p class="ffxx2-muted">Structured editor for <span class="ffxx2-path">item_shop.bin</span>. Each shop exposes its 16 item/command ID slots; the leading unused rate field stays read-only and byte-identical.</p>
-    <div class="ffxx2-toolbar">
-      <label>Shop<select id="shop-select"></select></label>
-      <button id="shop-refresh" type="button">Refresh</button>
-      <button id="shop-save" type="button" disabled>Save Item Shop Edits</button>
-    </div>
-    <p id="shop-summary" class="ffxx2-muted"></p>
-    <div id="shop-slots" class="ffxx2-slot-grid"></div>
-  </section>
-
-  <section class="ffxx2-card" style="margin-top:14px" id="archives">
-    <h2>VBF Archive Browser</h2>
-    <div class="ffxx2-toolbar">
-      <label>Game<select id="game"><option value="x">Final Fantasy X</option><option value="x2">Final Fantasy X-2</option></select></label>
-      <label class="ffxx2-grow">Path search<input id="query" type="search" placeholder="battle/kernel, dialogue, .bin …"></label>
-      <button id="search" type="button">Search</button>
-    </div>
-    <p id="archive-summary" class="ffxx2-muted"></p>
-    <div style="overflow:auto"><table class="ffxx2-table"><thead><tr><th>Archive path</th><th>Size</th><th>Project</th><th></th></tr></thead><tbody id="entries"></tbody></table></div>
-  </section>
-
-  <section class="ffxx2-card" style="margin-top:14px" id="deployment">
-    <h2>Fahrenheit Deployment</h2>
-    <p id="deployment-text"></p>
-    <div class="ffxx2-actions"><button id="deploy" type="button">Deploy Project</button><button id="revert" type="button">Revert Lexeditor Mod</button></div>
-    <p class="ffxx2-muted">Lexeditor owns only <span class="ffxx2-path">fahrenheit/mods/lexeditor-ffx-x2</span> and its exact <span class="ffxx2-path">loadorder</span> entry. Other mods are preserved.</p>
-  </section>
-
-  <p id="error" class="ffxx2-error"></p>
+  <nav class="ffxx2-nav" aria-label="FFX and FFX-2 editor sections">
+    <button class="active" type="button" data-view="dashboard">Dashboard</button>
+    <button type="button" data-view="treasures">Treasure Rewards</button>
+    <button type="button" data-view="item-shops">Item Shops</button>
+    <button type="button" data-view="archives">Archive Browser</button>
+    <button type="button" data-view="datamap">Data Map</button>
+    <button type="button" data-view="deployment">Deploy</button>
+  </nav>
+  <div class="ffxx2-workspace">
+    <aside class="ffxx2-rail" aria-label="FFX/X-2 project status">
+      <div class="ffxx2-rail-head"><strong>Collection status</strong><span>Installed source is always read-only</span></div>
+      <div class="ffxx2-rail-body" id="status-rail"><div class="ffxx2-empty">Reading collection…</div></div>
+    </aside>
+    <main class="ffxx2-panel" data-panel="dashboard">
+      <div class="ffxx2-panel-head"><div class="ffxx2-panel-title"><h2>Dashboard</h2><p>What Lexeditor can safely edit right now.</p></div></div>
+      <div class="ffxx2-panel-body">
+        <div class="ffxx2-dashboard-grid">
+          <article class="ffxx2-dashboard-card"><h3>Structured FFX data</h3><p>Treasure rewards and item-shop inventories are decoded as fixed records and patched surgically.</p><div class="big">2 editors</div></article>
+          <article class="ffxx2-dashboard-card"><h3>FFX-2</h3><p>The full archive is indexed and can be staged safely; format-specific record editors are still being added.</p><div class="big">VBF mapped</div></article>
+          <article class="ffxx2-dashboard-card"><h3>Game-derived theme</h3><p id="theme-detail">Looking for original menu art, font atlases, textures and UI sound banks in your installed copy…</p><div id="theme-big" class="big">Scanning</div></article>
+          <article class="ffxx2-dashboard-card"><h3>Deployment boundary</h3><p>Project files remain separate until you explicitly deploy one Lexeditor-owned, file-only Fahrenheit mod.</p><div id="deploy-big" class="big">Checking</div></article>
+        </div>
+        <div class="ffxx2-flow"><span>Installed VBF</span><i></i><span>Structured edit / extraction</span><i></i><span>Project EFL overlay</span><i></i><span>Fahrenheit</span></div>
+      </div>
+    </main>
+    <main class="ffxx2-panel" data-panel="treasures" hidden>
+      <div class="ffxx2-panel-head"><div class="ffxx2-panel-title"><h2>FFX Treasure Rewards</h2><p><span class="ffxx2-path">takara.bin</span> · reward kind, quantity and type ID only; opaque bytes preserved.</p></div><button id="treasure-save" class="ffxx2-button save" type="button" disabled>Save edits</button></div>
+      <div class="ffxx2-panel-body">
+        <div class="ffxx2-toolbar"><label class="ffxx2-grow">Filter<input id="treasure-filter" type="search" placeholder="index, item, gear, 0x1234 …"></label><button id="treasure-refresh" class="ffxx2-button" type="button">Refresh source</button></div>
+        <p id="treasure-summary" class="ffxx2-summary"></p>
+        <div class="ffxx2-table-wrap"><table class="ffxx2-table"><thead><tr><th>Index</th><th>Kind</th><th>Quantity</th><th>Type ID</th><th>Reward</th></tr></thead><tbody id="treasure-rows"></tbody></table></div>
+      </div>
+    </main>
+    <main class="ffxx2-panel" data-panel="item-shops" hidden>
+      <div class="ffxx2-panel-head"><div class="ffxx2-panel-title"><h2>FFX Item Shops</h2><p><span class="ffxx2-path">item_shop.bin</span> · 16 inventory slots; unproved legacy rate stays read-only.</p></div><button id="shop-save" class="ffxx2-button save" type="button" disabled>Save edits</button></div>
+      <div class="ffxx2-panel-body">
+        <div class="ffxx2-toolbar"><label>Shop<select id="shop-select"></select></label><button id="shop-refresh" class="ffxx2-button" type="button">Refresh source</button></div>
+        <p id="shop-summary" class="ffxx2-summary"></p><div id="shop-slots" class="ffxx2-slot-grid"></div>
+      </div>
+    </main>
+    <main class="ffxx2-panel" data-panel="archives" hidden>
+      <div class="ffxx2-panel-head"><div class="ffxx2-panel-title"><h2>VBF Archive Browser</h2><p>Search source paths and stage a byte-exact copy into the canonical Fahrenheit virtual path.</p></div></div>
+      <div class="ffxx2-panel-body">
+        <div class="ffxx2-toolbar"><label>Game<select id="game"><option value="x">Final Fantasy X</option><option value="x2">Final Fantasy X-2</option></select></label><label class="ffxx2-grow">Path search<input id="query" type="search" placeholder="battle/kernel, menu, sound_pc, .phyre …"></label><button id="search" class="ffxx2-button primary" type="button">Search</button></div>
+        <p id="archive-summary" class="ffxx2-summary"></p>
+        <div class="ffxx2-table-wrap"><table class="ffxx2-table"><thead><tr><th>Archive / EFL path</th><th>Size</th><th>Project</th><th>Action</th></tr></thead><tbody id="entries"></tbody></table></div>
+      </div>
+    </main>
+    <main class="ffxx2-panel" data-panel="datamap" hidden>
+      <div class="ffxx2-panel-head"><div class="ffxx2-panel-title"><h2>Data Map</h2><p>Structured coverage is kept separate from recognized or raw-extraction-only data.</p></div></div>
+      <div class="ffxx2-panel-body flush"><div class="ffxx2-table-wrap" style="border:0"><table class="ffxx2-table"><thead><tr><th>Area</th><th>Status</th><th>Controls</th><th>Notes</th></tr></thead><tbody id="datamap"></tbody></table></div></div>
+    </main>
+    <main class="ffxx2-panel" data-panel="deployment" hidden>
+      <div class="ffxx2-panel-head"><div class="ffxx2-panel-title"><h2>Fahrenheit Deployment</h2><p>One owned file-only mod; unrelated mods and load-order entries are preserved.</p></div></div>
+      <div class="ffxx2-panel-body">
+        <article class="ffxx2-dashboard-card" style="max-width:760px"><h3>Current deployment</h3><p id="deployment-text">Checking Fahrenheit…</p><div class="ffxx2-toolbar" style="margin-top:16px;margin-bottom:0"><button id="deploy" class="ffxx2-button primary" type="button">Deploy project</button><button id="revert" class="ffxx2-button danger" type="button">Revert Lexeditor mod</button></div><p class="ffxx2-summary" style="margin-top:14px">Owned path: <span class="ffxx2-path">fahrenheit/mods/lexeditor-ffx-x2</span>. Revert refuses to remove a deployment changed outside Lexeditor.</p></article>
+      </div>
+    </main>
+  </div>
+  <div id="error" class="ffxx2-errorbar" role="alert"></div>
 </div>
 <script src="/shared/framework.js"></script>
 <script>
-const $ = id => document.getElementById(id);
-let catalog = null;
-let treasureState = null;
-const treasureDirty = new Set();
-let shopState = null;
-const shopDirty = new Map();
-const knownTreasureKinds = [[0,'Gil'],[2,'Item'],[5,'Gear'],[10,'Key Item']];
-const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function api(url, options){ const r=await fetch(url, options); const j=await r.json(); if(!r.ok) throw new Error(j.error||`${r.status}`); return j; }
-function bytes(n){ if(n==null)return '—'; const u=['B','KiB','MiB','GiB']; let i=0,v=Number(n); while(v>=1024&&i<u.length-1){v/=1024;i++} return `${v.toFixed(i?1:0)} ${u[i]}`; }
-function hex(n,width=4){ return `0x${Number(n).toString(16).toUpperCase().padStart(width,'0')}`; }
-function showError(error){ $('error').textContent=error ? String(error.message||error) : ''; }
+"use strict";
+const $=id=>document.getElementById(id);
+let catalog=null,treasureState=null,shopState=null,themeState=null,uiSfx=null;
+const treasureDirty=new Set(),shopDirty=new Map();
+const knownTreasureKinds=[[0,'Gil'],[2,'Item'],[5,'Gear'],[10,'Key Item']];
+const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function api(url,options){const r=await fetch(url,options),j=await r.json();if(!r.ok)throw new Error(j.error||`${r.status}`);return j}
+function bytes(n){if(n==null)return'—';const u=['B','KiB','MiB','GiB'];let i=0,v=Number(n);while(v>=1024&&i<u.length-1){v/=1024;i++}return`${v.toFixed(i?1:0)} ${u[i]}`}
+function hex(n,width=4){return`0x${Number(n).toString(16).toUpperCase().padStart(width,'0')}`}
+function showError(error){$('error').textContent=error?String(error.message||error):''}
+function showView(name){document.querySelectorAll('[data-panel]').forEach(panel=>panel.hidden=panel.dataset.panel!==name);document.querySelectorAll('[data-view]').forEach(button=>{const active=button.dataset.view===name;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active))})}
+function themeChips(t){
+  const chips=[];const bg=t?.background||{},font=t?.font||{},textures=t?.textures||{},sfx=t?.sfx||{};
+  chips.push(`<span class="ffxx2-chip ${bg.ready?'ready':'partial'}">ART ${bg.ready?'ACTIVE':'FALLBACK'}</span>`);
+  if(font.webReady)chips.push('<span class="ffxx2-chip ready">FONT ACTIVE</span>');else if(font.atlasRecognized)chips.push(`<span class="ffxx2-chip partial">FONT ATLAS ${font.atlasCached}/${font.atlasRecognized}</span>`);
+  if(textures.recognized)chips.push(`<span class="ffxx2-chip ${textures.cached?'ready':'partial'}">UI TEX ${textures.cached}/${textures.recognized}</span>`);
+  if(sfx.webReady)chips.push('<span class="ffxx2-chip ready">UI SFX ACTIVE</span>');else if(sfx.recognizedBanks)chips.push(`<span class="ffxx2-chip partial">SFX BANK ${sfx.cachedBanks}/${sfx.recognizedBanks}</span>`);
+  return chips.join('');
+}
+function applyTheme(t){
+  themeState=t;if(t?.background?.ready)document.documentElement.style.setProperty('--ffxx2-theme-art',`url("${t.background.url}")`);
+  if(t?.font?.webReady){const style=document.createElement('style');style.textContent=`@font-face{font-family:"FFXX2 Installed Menu";src:url("${t.font.url}");font-display:swap} :root{--ffxx2-font:"FFXX2 Installed Menu",Inter,"Segoe UI",sans-serif}`;document.head.append(style)}
+  if(t?.sfx?.webReady){uiSfx=new Audio(t.sfx.url);uiSfx.volume=.16}
+  const parts=[];if(t?.background?.ready)parts.push('original title/menu art');if(t?.font?.webReady)parts.push('native web font');else if(t?.font?.atlasRecognized)parts.push(`${t.font.atlasCached} bitmap font atlas source(s) cached`);if(t?.textures?.cached)parts.push(`${t.textures.cached} UI texture source(s) cached`);if(t?.sfx?.webReady)parts.push('UI sound active');else if(t?.sfx?.cachedBanks)parts.push(`${t.sfx.cachedBanks} FMOD UI bank(s) cached`);
+  $('theme-detail').textContent=parts.length?parts.join(' · '):'No browser-ready installed theme assets were found; the FFX-inspired fallback remains active.';
+  $('theme-big').textContent=t?.background?.ready?'Installed art active':(t?.source==='installed-game'?'Local assets cached':'Fallback theme');
+}
+function playUiSfx(){if(!uiSfx)return;try{uiSfx.currentTime=0;void uiSfx.play()}catch(_error){}}
 async function refreshOverview(){
-  const d=await api('/api/dashboard');
-  $('overview').innerHTML = `<article class="ffxx2-card"><h2>Steam install</h2><p class="ffxx2-status">${d.game.ready?'Ready':'Incomplete'}</p><p class="ffxx2-path">${esc(d.game.root)}</p></article>`+
-    d.archives.map(a=>`<article class="ffxx2-card"><h2>${esc(a.label)}</h2><p class="ffxx2-status">${a.ready?`${a.fileCount.toLocaleString()} files`:'Unavailable'}</p><p>${a.ready?bytes(a.bytes):esc(a.error)}</p></article>`).join('')+
-    `<article class="ffxx2-card"><h2>Project</h2><p class="ffxx2-status">${d.project.fileCount} replacement file(s)</p><p class="ffxx2-path">${esc(d.project.root)}</p></article>`;
-  renderDeployment(d.deployment);
+  const d=await api('/api/dashboard');applyTheme(d.theme||{});renderDeployment(d.deployment);
+  const archive=(key)=>d.archives.find(a=>a.game===key)||{};
+  $('status-rail').innerHTML=`
+    <div class="ffxx2-stat"><span class="label">Steam install</span><span class="value ${d.game.ready?'ok':'warn'}">${d.game.ready?'READY':'INCOMPLETE'}</span><span class="detail">${esc(d.game.root)}</span></div>
+    <div class="ffxx2-stat"><span class="label">Final Fantasy X</span><span class="value">${archive('x').ready?archive('x').fileCount.toLocaleString():'—'}</span><span class="detail">${archive('x').ready?bytes(archive('x').bytes):esc(archive('x').error||'archive unavailable')}</span></div>
+    <div class="ffxx2-stat"><span class="label">Final Fantasy X-2</span><span class="value">${archive('x2').ready?archive('x2').fileCount.toLocaleString():'—'}</span><span class="detail">${archive('x2').ready?bytes(archive('x2').bytes):esc(archive('x2').error||'archive unavailable')}</span></div>
+    <div class="ffxx2-stat"><span class="label">Project overrides</span><span class="value">${d.project.fileCount}</span><span class="detail">${esc(d.project.root)}</span></div>
+    <div class="ffxx2-stat"><span class="label">Theme sources</span><span class="value ${d.theme?.source==='installed-game'?'ok':''}">${d.theme?.source==='installed-game'?'LOCAL':'FALLBACK'}</span><div class="ffxx2-theme-strip">${themeChips(d.theme)}</div></div>
+    <div class="ffxx2-stat"><span class="label">Fahrenheit</span><span class="value ${d.deployment.fahrenheitReady?'ok':'warn'}">${d.deployment.fahrenheitReady?'FOUND':'MISSING'}</span><span class="detail">${d.deployment.deployed?'Lexeditor project is deployed.':'No Lexeditor deployment active.'}</span></div>`;
 }
-async function refreshMap(){
-  const d=await api('/api/datamap');
-  $('datamap').innerHTML=d.rows.map(r=>`<tr><td class="ffxx2-path">${esc(r.filename)}</td><td>${esc(r.status)}</td><td>${esc(r.controls)}</td><td>${esc(r.notes)}</td></tr>`).join('');
-}
-function treasureKindName(kind){ const known=knownTreasureKinds.find(([value])=>value===Number(kind)); return known?known[1]:`Unknown ${hex(kind,2)}`; }
-function treasureReward(row){
-  if(Number(row.kind)===0)return `${Number(row.quantity)*100} gil`;
-  if(Number(row.kind)===2)return `${row.quantity} × command/item ${hex(row.typeId)}`;
-  if(Number(row.kind)===5)return `gear pickup ${hex(row.typeId)} × ${row.quantity}`;
-  if(Number(row.kind)===10)return `key item ${hex(row.typeId)}`;
-  return `kind ${hex(row.kind,2)}, quantity ${row.quantity}, type ${hex(row.typeId)}`;
-}
-function treasureKindOptions(row){
-  const values=new Set(knownTreasureKinds.map(([value])=>value));
-  const extra=values.has(Number(row.kind))?'':`<option value="${Number(row.kind)}">${esc(treasureKindName(row.kind))}</option>`;
-  return extra+knownTreasureKinds.map(([value,name])=>`<option value="${value}" ${Number(row.kind)===value?'selected':''}>${esc(name)} (${hex(value,2)})</option>`).join('');
-}
+async function refreshMap(){const d=await api('/api/datamap');$('datamap').innerHTML=d.rows.map(r=>`<tr ${r.target?`data-map-target="${esc(r.target)}" tabindex="0"`:''}><td class="ffxx2-path">${esc(r.filename)}</td><td><span class="ffxx2-status-pill ${esc(r.status)}">${esc(r.status)}</span></td><td>${esc(r.controls)}</td><td class="ffxx2-map-note">${esc(r.notes)}</td></tr>`).join('')}
+function treasureKindName(kind){const known=knownTreasureKinds.find(([value])=>value===Number(kind));return known?known[1]:`Unknown ${hex(kind,2)}`}
+function treasureReward(row){if(Number(row.kind)===0)return`${Number(row.quantity)*100} gil`;if(Number(row.kind)===2)return`${row.quantity} × command/item ${hex(row.typeId)}`;if(Number(row.kind)===5)return`gear pickup ${hex(row.typeId)} × ${row.quantity}`;if(Number(row.kind)===10)return`key item ${hex(row.typeId)}`;return`kind ${hex(row.kind,2)}, quantity ${row.quantity}, type ${hex(row.typeId)}`}
+function treasureKindOptions(row){const values=new Set(knownTreasureKinds.map(([value])=>value)),extra=values.has(Number(row.kind))?'':`<option value="${Number(row.kind)}">${esc(treasureKindName(row.kind))}</option>`;return extra+knownTreasureKinds.map(([value,name])=>`<option value="${value}" ${Number(row.kind)===value?'selected':''}>${esc(name)} (${hex(value,2)})</option>`).join('')}
 function renderTreasures(){
-  if(!treasureState)return;
-  const needle=$('treasure-filter').value.trim().toLowerCase();
-  const rows=treasureState.rows.filter(row=>!needle || `${row.id} ${hex(row.id)} ${treasureKindName(row.kind)} ${treasureReward(row)} ${hex(row.typeId)}`.toLowerCase().includes(needle));
-  $('treasure-rows').innerHTML=rows.map(row=>`<tr data-treasure="${row.id}" class="${treasureDirty.has(row.id)?'ffxx2-dirty':''}"><td class="ffxx2-hex">${row.id} · ${hex(row.id)}</td><td><select data-field="kind">${treasureKindOptions(row)}</select></td><td><input data-field="quantity" type="number" min="0" max="255" value="${row.quantity}"></td><td><input data-field="typeId" type="number" min="0" max="65535" value="${row.typeId}"> <span class="ffxx2-hex">${hex(row.typeId)}</span></td><td data-summary>${esc(treasureReward(row))}</td></tr>`).join('') || '<tr><td colspan="5">No treasure records match this filter.</td></tr>';
-  $('treasure-save').disabled=treasureDirty.size===0;
-  $('treasure-summary').textContent=`${treasureState.rows.length.toLocaleString()} record(s) · ${treasureState.source==='project'?'reading staged project override':'reading installed VBF'} · record size ${treasureState.recordSize} bytes${treasureDirty.size?` · ${treasureDirty.size} unsaved edit(s)`:''}`;
+  if(!treasureState)return;const needle=$('treasure-filter').value.trim().toLowerCase();const rows=treasureState.rows.filter(row=>!needle||`${row.id} ${hex(row.id)} ${treasureKindName(row.kind)} ${treasureReward(row)} ${hex(row.typeId)}`.toLowerCase().includes(needle));
+  $('treasure-rows').innerHTML=rows.map(row=>`<tr data-treasure="${row.id}" class="${treasureDirty.has(row.id)?'ffxx2-dirty':''}"><td class="ffxx2-hex">${row.id} · ${hex(row.id)}</td><td><select data-field="kind">${treasureKindOptions(row)}</select></td><td><input data-field="quantity" type="number" min="0" max="255" value="${row.quantity}"></td><td><input data-field="typeId" type="number" min="0" max="65535" value="${row.typeId}"> <span class="ffxx2-hex">${hex(row.typeId)}</span></td><td data-summary>${esc(treasureReward(row))}</td></tr>`).join('')||'<tr><td class="ffxx2-empty" colspan="5">No treasure records match this filter.</td></tr>';
+  $('treasure-save').disabled=treasureDirty.size===0;$('treasure-summary').textContent=`${treasureState.rows.length.toLocaleString()} records · ${treasureState.source==='project'?'staged project override':'installed VBF'} · ${treasureState.recordSize} bytes/record${treasureDirty.size?` · ${treasureDirty.size} unsaved`:''}`;
 }
-async function refreshTreasures(){ showError(); treasureState=await api('/api/treasures'); treasureDirty.clear(); renderTreasures(); }
-function treasureInputChanged(target){
-  const tr=target.closest('[data-treasure]'); if(!tr||!treasureState)return;
-  const id=Number(tr.dataset.treasure), row=treasureState.rows.find(item=>item.id===id); if(!row)return;
-  row.kind=Number(tr.querySelector('[data-field="kind"]').value);
-  row.quantity=Number(tr.querySelector('[data-field="quantity"]').value);
-  row.typeId=Number(tr.querySelector('[data-field="typeId"]').value);
-  treasureDirty.add(id); tr.classList.add('ffxx2-dirty');
-  tr.querySelector('[data-summary]').textContent=treasureReward(row);
-  const hexLabel=tr.querySelector('[data-field="typeId"] + .ffxx2-hex'); if(hexLabel)hexLabel.textContent=hex(row.typeId);
-  $('treasure-save').disabled=false;
-  $('treasure-summary').textContent=`${treasureState.rows.length.toLocaleString()} record(s) · ${treasureDirty.size} unsaved edit(s)`;
-}
-async function saveTreasures(){
-  showError(); if(!treasureState||!treasureDirty.size)return;
-  const edits=[...treasureDirty].sort((a,b)=>a-b).map(id=>{ const row=treasureState.rows.find(item=>item.id===id); return {id:row.id,kind:row.kind,quantity:row.quantity,typeId:row.typeId}; });
-  treasureState=await api('/api/treasures/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({headerMd5:treasureState.headerMd5,baselineSha256:treasureState.baselineSha256,edits})});
-  treasureDirty.clear(); renderTreasures(); await Promise.all([refreshOverview(),refreshMap(),searchArchive()]);
-}
-function shopDirtyCount(){ let count=0; for(const slots of shopDirty.values())count+=slots.size; return count; }
-function selectedShop(){ if(!shopState)return null; const id=Number($('shop-select').value); return shopState.rows.find(row=>row.id===id)||shopState.rows[0]||null; }
-function renderShopSelector(preferred){
-  if(!shopState)return;
-  $('shop-select').innerHTML=shopState.rows.map(row=>`<option value="${row.id}">${row.id} · ${hex(row.id)} · ${row.occupiedSlots} occupied</option>`).join('');
-  if(preferred!=null && shopState.rows.some(row=>row.id===preferred))$('shop-select').value=String(preferred);
-}
-function renderItemShop(){
-  const row=selectedShop(); if(!row){$('shop-slots').innerHTML='';return;}
-  const dirty=shopDirty.get(row.id)||new Set();
-  $('shop-slots').innerHTML=row.itemIds.map((itemId,slot)=>`<label class="ffxx2-slot ${dirty.has(slot)?'ffxx2-dirty':''}" data-shop-slot="${slot}">Slot ${slot}<input type="number" min="0" max="65535" value="${itemId}"><span class="ffxx2-hex">${hex(itemId)}</span></label>`).join('');
-  const dirtyCount=shopDirtyCount();
-  $('shop-save').disabled=dirtyCount===0;
-  $('shop-summary').textContent=`Shop ${row.id} (${hex(row.id)}) · ${row.occupiedSlots} occupied slot(s) · preserved unused rate ${row.legacyRate} · ${shopState.source==='project'?'reading staged project override':'reading installed VBF'}${dirtyCount?` · ${dirtyCount} unsaved slot edit(s)`:''}`;
-}
-async function refreshItemShops(){
-  showError(); const previous=selectedShop()?.id; shopState=await api('/api/item-shops'); shopDirty.clear(); renderShopSelector(previous); renderItemShop();
-}
-function shopInputChanged(target){
-  const wrapper=target.closest('[data-shop-slot]'), row=selectedShop(); if(!wrapper||!row)return;
-  const slot=Number(wrapper.dataset.shopSlot), itemId=Number(target.value); row.itemIds[slot]=itemId;
-  row.occupiedSlots=row.itemIds.filter(value=>Number(value)!==0).length;
-  if(!shopDirty.has(row.id))shopDirty.set(row.id,new Set()); shopDirty.get(row.id).add(slot);
-  wrapper.classList.add('ffxx2-dirty'); wrapper.querySelector('.ffxx2-hex').textContent=hex(itemId);
-  $('shop-save').disabled=false; $('shop-summary').textContent=`Shop ${row.id} (${hex(row.id)}) · ${shopDirtyCount()} unsaved slot edit(s)`;
-}
-async function saveItemShops(){
-  showError(); if(!shopState||!shopDirtyCount())return;
-  const edits=[...shopDirty.entries()].sort((a,b)=>a[0]-b[0]).map(([id,slots])=>{ const row=shopState.rows.find(item=>item.id===id); return {id,slots:[...slots].sort((a,b)=>a-b).map(slot=>({slot,itemId:row.itemIds[slot]}))}; });
-  const previous=selectedShop()?.id;
-  shopState=await api('/api/item-shops/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({headerMd5:shopState.headerMd5,baselineSha256:shopState.baselineSha256,edits})});
-  shopDirty.clear(); renderShopSelector(previous); renderItemShop(); await Promise.all([refreshOverview(),refreshMap(),searchArchive()]);
-}
-async function searchArchive(){
-  showError(); const game=$('game').value, q=$('query').value;
-  catalog=await api(`/api/archive?game=${encodeURIComponent(game)}&q=${encodeURIComponent(q)}&limit=150`);
-  $('archive-summary').textContent=`${catalog.total.toLocaleString()} match(es) · source header ${catalog.headerMd5}`;
-  $('entries').innerHTML=catalog.entries.map((e,i)=>`<tr><td class="ffxx2-path">${esc(e.path)}</td><td>${bytes(e.bytes)}</td><td>${e.staged?'Staged':'Source only'}</td><td><button type="button" data-extract="${i}" ${e.staged?'disabled':''}>${e.staged?'Extracted':'Extract to Project'}</button></td></tr>`).join('') || '<tr><td colspan="4">No matching archive entries.</td></tr>';
-}
-async function extractIndex(i){
-  const entry=catalog.entries[i];
-  await api('/api/project/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:catalog.game,path:entry.path,headerMd5:catalog.headerMd5})});
-  await Promise.all([searchArchive(),refreshOverview()]);
-  if(entry.path===treasureState?.archivePath)await refreshTreasures();
-  if(entry.path===shopState?.archivePath)await refreshItemShops();
-}
-function renderDeployment(d){
-  $('deployment-text').innerHTML = d.fahrenheitReady
-    ? `Fahrenheit found. ${d.deployed?'Lexeditor mod is deployed.':'No Lexeditor mod is deployed.'}${d.deployedChangedExternally?' <strong>Deployed files changed externally; Lexeditor will refuse to overwrite them.</strong>':''}`
-    : `Fahrenheit is not installed at <span class="ffxx2-path">${esc(d.fahrenheitRoot)}</span>. You can still build the project now; deployment will remain disabled.`;
-  $('deploy').disabled=!d.fahrenheitReady||d.projectFileCount===0||d.deployedChangedExternally;
-  $('revert').disabled=!d.deployed||d.deployedChangedExternally;
-}
-async function deploymentAction(route){ showError(); const d=await api(route,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}); renderDeployment(d); await refreshOverview(); }
-$('treasure-filter').addEventListener('input',renderTreasures);
-$('treasure-refresh').addEventListener('click',()=>refreshTreasures().catch(showError));
-$('treasure-save').addEventListener('click',()=>saveTreasures().catch(showError));
-$('treasure-rows').addEventListener('input',e=>treasureInputChanged(e.target));
-$('treasure-rows').addEventListener('change',e=>treasureInputChanged(e.target));
-$('shop-select').addEventListener('change',renderItemShop);
-$('shop-refresh').addEventListener('click',()=>refreshItemShops().catch(showError));
-$('shop-save').addEventListener('click',()=>saveItemShops().catch(showError));
-$('shop-slots').addEventListener('input',e=>shopInputChanged(e.target));
-$('search').addEventListener('click',()=>searchArchive().catch(showError));
-$('query').addEventListener('keydown',e=>{if(e.key==='Enter')searchArchive().catch(showError)});
-$('game').addEventListener('change',()=>searchArchive().catch(showError));
-$('entries').addEventListener('click',e=>{const b=e.target.closest('[data-extract]'); if(b) extractIndex(Number(b.dataset.extract)).catch(showError)});
-$('deploy').addEventListener('click',()=>deploymentAction('/api/deployment/deploy').catch(showError));
-$('revert').addEventListener('click',()=>deploymentAction('/api/deployment/revert').catch(showError));
+async function refreshTreasures(){showError();treasureState=await api('/api/treasures');treasureDirty.clear();renderTreasures()}
+function treasureInputChanged(target){const tr=target.closest('[data-treasure]');if(!tr||!treasureState)return;const id=Number(tr.dataset.treasure),row=treasureState.rows.find(item=>item.id===id);if(!row)return;row.kind=Number(tr.querySelector('[data-field="kind"]').value);row.quantity=Number(tr.querySelector('[data-field="quantity"]').value);row.typeId=Number(tr.querySelector('[data-field="typeId"]').value);treasureDirty.add(id);tr.classList.add('ffxx2-dirty');tr.querySelector('[data-summary]').textContent=treasureReward(row);const hexLabel=tr.querySelector('[data-field="typeId"] + .ffxx2-hex');if(hexLabel)hexLabel.textContent=hex(row.typeId);$('treasure-save').disabled=false;$('treasure-summary').textContent=`${treasureState.rows.length.toLocaleString()} records · ${treasureDirty.size} unsaved edit(s)`}
+async function saveTreasures(){showError();if(!treasureState||!treasureDirty.size)return;const edits=[...treasureDirty].sort((a,b)=>a-b).map(id=>{const row=treasureState.rows.find(item=>item.id===id);return{id:row.id,kind:row.kind,quantity:row.quantity,typeId:row.typeId}});treasureState=await api('/api/treasures/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({headerMd5:treasureState.headerMd5,baselineSha256:treasureState.baselineSha256,edits})});treasureDirty.clear();renderTreasures();await Promise.all([refreshOverview(),refreshMap(),searchArchive()])}
+function shopDirtyCount(){let count=0;for(const slots of shopDirty.values())count+=slots.size;return count}
+function selectedShop(){if(!shopState)return null;const id=Number($('shop-select').value);return shopState.rows.find(row=>row.id===id)||shopState.rows[0]||null}
+function renderShopSelector(preferred){if(!shopState)return;$('shop-select').innerHTML=shopState.rows.map(row=>`<option value="${row.id}">${row.id} · ${hex(row.id)} · ${row.occupiedSlots} occupied</option>`).join('');if(preferred!=null&&shopState.rows.some(row=>row.id===preferred))$('shop-select').value=String(preferred)}
+function renderItemShop(){const row=selectedShop();if(!row){$('shop-slots').innerHTML='';return}const dirty=shopDirty.get(row.id)||new Set();$('shop-slots').innerHTML=row.itemIds.map((itemId,slot)=>`<label class="ffxx2-slot ${dirty.has(slot)?'ffxx2-dirty':''}" data-shop-slot="${slot}"><span>Slot ${String(slot+1).padStart(2,'0')}</span><span class="ffxx2-hex">${hex(itemId)}</span><input aria-label="Shop ${row.id} slot ${slot+1}" type="number" min="0" max="65535" value="${itemId}"></label>`).join('');const dirtyCount=shopDirtyCount();$('shop-save').disabled=dirtyCount===0;$('shop-summary').textContent=`Shop ${row.id} (${hex(row.id)}) · ${row.occupiedSlots} occupied · preserved legacy rate ${row.legacyRate} · ${shopState.source==='project'?'staged project override':'installed VBF'}${dirtyCount?` · ${dirtyCount} unsaved`:''}`}
+async function refreshItemShops(){showError();const previous=selectedShop()?.id;shopState=await api('/api/item-shops');shopDirty.clear();renderShopSelector(previous);renderItemShop()}
+function shopInputChanged(target){const wrapper=target.closest('[data-shop-slot]'),row=selectedShop();if(!wrapper||!row)return;const slot=Number(wrapper.dataset.shopSlot),itemId=Number(target.value);row.itemIds[slot]=itemId;row.occupiedSlots=row.itemIds.filter(value=>Number(value)!==0).length;if(!shopDirty.has(row.id))shopDirty.set(row.id,new Set());shopDirty.get(row.id).add(slot);wrapper.classList.add('ffxx2-dirty');wrapper.querySelector('.ffxx2-hex').textContent=hex(itemId);$('shop-save').disabled=false;$('shop-summary').textContent=`Shop ${row.id} (${hex(row.id)}) · ${shopDirtyCount()} unsaved slot edit(s)`}
+async function saveItemShops(){showError();if(!shopState||!shopDirtyCount())return;const edits=[...shopDirty.entries()].sort((a,b)=>a[0]-b[0]).map(([id,slots])=>{const row=shopState.rows.find(item=>item.id===id);return{id,slots:[...slots].sort((a,b)=>a-b).map(slot=>({slot,itemId:row.itemIds[slot]}))}}),previous=selectedShop()?.id;shopState=await api('/api/item-shops/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({headerMd5:shopState.headerMd5,baselineSha256:shopState.baselineSha256,edits})});shopDirty.clear();renderShopSelector(previous);renderItemShop();await Promise.all([refreshOverview(),refreshMap(),searchArchive()])}
+async function searchArchive(){showError();const game=$('game').value,q=$('query').value;catalog=await api(`/api/archive?game=${encodeURIComponent(game)}&q=${encodeURIComponent(q)}&limit=150`);$('archive-summary').textContent=`${catalog.total.toLocaleString()} matches · header ${catalog.headerMd5}`;$('entries').innerHTML=catalog.entries.map((e,i)=>`<tr><td class="path-cell"><span class="ffxx2-path">${esc(e.path)}</span>${e.eflPath!==e.path?`<span class="ffxx2-efl">EFL → ${esc(e.eflPath)}</span>`:''}</td><td>${bytes(e.bytes)}</td><td><span class="ffxx2-status-pill ${e.staged?'integrated':'partial'}">${e.staged?'staged':'source only'}</span></td><td><button class="ffxx2-button" type="button" data-extract="${i}" ${e.staged?'disabled':''}>${e.staged?'Extracted':'Extract'}</button></td></tr>`).join('')||'<tr><td class="ffxx2-empty" colspan="4">No matching archive entries.</td></tr>'}
+async function extractIndex(i){const entry=catalog.entries[i];await api('/api/project/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({game:catalog.game,path:entry.path,headerMd5:catalog.headerMd5})});await Promise.all([searchArchive(),refreshOverview()]);if(entry.eflPath===treasureState?.archivePath)await refreshTreasures();if(entry.eflPath===shopState?.archivePath)await refreshItemShops()}
+function renderDeployment(d){$('deployment-text').innerHTML=d.fahrenheitReady?`Fahrenheit is ready. ${d.deployed?'The Lexeditor project is currently deployed.':'No Lexeditor mod is currently deployed.'}${d.deployedChangedExternally?' <strong>Deployed files changed externally; Lexeditor will not overwrite or remove them.</strong>':''}`:`Fahrenheit is not installed at <span class="ffxx2-path">${esc(d.fahrenheitRoot)}</span>. You can keep editing the project; deployment stays disabled.`;$('deploy').disabled=!d.fahrenheitReady||d.projectFileCount===0||d.deployedChangedExternally;$('revert').disabled=!d.deployed||d.deployedChangedExternally;$('deploy-big').textContent=d.fahrenheitReady?(d.deployed?'Deployed':'Ready to deploy'):'Fahrenheit missing'}
+async function deploymentAction(route){showError();const d=await api(route,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});renderDeployment(d);await refreshOverview()}
+document.querySelector('.ffxx2-nav').addEventListener('click',event=>{const button=event.target.closest('[data-view]');if(button){showView(button.dataset.view);playUiSfx()}});
+document.querySelectorAll('button').forEach(button=>button.addEventListener('click',event=>{if(!event.currentTarget.closest('.ffxx2-nav'))playUiSfx()}));
+$('datamap').addEventListener('click',event=>{const row=event.target.closest('[data-map-target]');if(row)showView(row.dataset.mapTarget)});$('datamap').addEventListener('keydown',event=>{const row=event.target.closest('[data-map-target]');if(row&&(event.key==='Enter'||event.key===' ')){event.preventDefault();showView(row.dataset.mapTarget)}});
+$('treasure-filter').addEventListener('input',renderTreasures);$('treasure-refresh').addEventListener('click',()=>refreshTreasures().catch(showError));$('treasure-save').addEventListener('click',()=>saveTreasures().catch(showError));$('treasure-rows').addEventListener('input',event=>treasureInputChanged(event.target));$('treasure-rows').addEventListener('change',event=>treasureInputChanged(event.target));
+$('shop-select').addEventListener('change',renderItemShop);$('shop-refresh').addEventListener('click',()=>refreshItemShops().catch(showError));$('shop-save').addEventListener('click',()=>saveItemShops().catch(showError));$('shop-slots').addEventListener('input',event=>shopInputChanged(event.target));
+$('search').addEventListener('click',()=>searchArchive().catch(showError));$('query').addEventListener('keydown',event=>{if(event.key==='Enter')searchArchive().catch(showError)});$('game').addEventListener('change',()=>searchArchive().catch(showError));$('entries').addEventListener('click',event=>{const button=event.target.closest('[data-extract]');if(button)extractIndex(Number(button.dataset.extract)).catch(showError)});
+$('deploy').addEventListener('click',()=>deploymentAction('/api/deployment/deploy').catch(showError));$('revert').addEventListener('click',()=>deploymentAction('/api/deployment/revert').catch(showError));
 Promise.all([refreshOverview(),refreshMap(),searchArchive(),refreshTreasures(),refreshItemShops()]).catch(showError);
 </script>
 </body>
