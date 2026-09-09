@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from plugin_api import GameInstallSpec, GamePlugin
+from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
 from service_session import LocalPluginSession
 
 from . import paths
@@ -18,10 +18,13 @@ def check() -> list[str]:
 
 
 class ChronoTriggerSession(LocalPluginSession):
-    """One host-owned Chrono Trigger archive-browser service."""
+    """One host-owned Chrono Trigger Steam editor service."""
 
     def __init__(self, extra_env: dict[str, str] | None = None):
-        environment = {"LEXEDITOR_CHRONO_TRIGGER_ROOT": str(paths.GAME_ROOT)}
+        environment = {
+            "LEXEDITOR_CHRONO_TRIGGER_ROOT": str(paths.GAME_ROOT),
+            "LEXEDITOR_CHRONO_TRIGGER_PROJECT": str(paths.PROJECT_ROOT),
+        }
         environment.update(extra_env or {})
         super().__init__(
             module="games.chrono_trigger.server",
@@ -42,12 +45,23 @@ PLUGIN = GamePlugin(
     plugin_id="chrono-trigger",
     name="Chrono Trigger",
     subtitle="Steam",
-    description="Steam resources.bin browser and editor groundwork.",
+    description="Steam resource, localization and scene editor with CTExt-compatible loose-file projects.",
     accent="#d3a348",
     check=check,
     launch=launch,
     session_factory=ChronoTriggerSession,
     process_names=("Chrono Trigger.exe",),
+    projects=ModProjectSpec(
+        root_env="LEXEDITOR_CHRONO_TRIGGER_PROJECT",
+        default_root=paths.DEFAULT_PROJECT_ROOT,
+        required_any=(
+            (paths.PROJECT_MARKER,),
+            ("Game",),
+            ("Localize",),
+        ),
+        template_root=paths.PROJECT_TEMPLATE_ROOT,
+        discover=paths.discover_projects,
+    ),
     installation=GameInstallSpec(
         root_env="LEXEDITOR_CHRONO_TRIGGER_ROOT",
         required_paths=("Chrono Trigger.exe", "resources.bin"),
