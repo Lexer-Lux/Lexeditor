@@ -10,12 +10,12 @@ Current scope targets **Palworld Windows Steam v0.7+ official mod packages**, a 
 | Clean official-package snapshot | `<project>/build/official-package/**` | **Build + reversible** | Copies only `Info.json`, referenced thumbnail and declared InstallRule targets; excludes Lexeditor recovery/temp artifacts, rejects missing targets/symlinks, ownership/digest tracks the output, and refuses external modifications. |
 | Local test Workshop deployment | `steamapps/workshop/content/1623730/<random-10-digit>/` | **Deploy + reversible** | Mirrors Pocketpair Mod Uploader's Shift-created unregistered local test package shape. Requires a current clean build, rejects duplicate `PackageName`, owns only its fresh 10-digit folder, detects external changes/root tampering/symlink replacement, and removes only the unchanged owned folder. |
 | Steam Workshop subscribed/published items | `steamapps/workshop/content/1623730/<Steam-item-id>/` | **Read-only / not managed** | Lexeditor never chooses an existing subscribed item as its local test folder, never overwrites another item, and does not create/upload Steam Workshop registrations. |
-| Loader activation config | `<Palworld>/Mods/PalModSettings.ini` | **Known runtime config, not edited** | Windows client activation stays owned by Palworld's Options → Mod Management UI. Lexeditor does not modify `ActiveModList` or global enable state. |
-| PalSchema generated schemas | `<Palworld>/Mods/NativeMods/UE4SS/Mods/PalSchema/schemas/**` | **Read-only validation source** | Auto-detected when installed; optional `LEXEDITOR_PALWORLD_PALSCHEMA_SCHEMAS` override. Raw DataTable field types and enum definitions become write authority; Lexeditor never rewrites generated schemas. |
+| Loader activation config | `<Palworld>/Mods/PalModSettings.ini` | **Read-only loader state** | Lexeditor reads global enable state, `WorkshopRootDir`, and repeated `ActiveModList` entries so Build can report whether the current `PackageName` is active. Activation remains owned by Palworld Options → Mod Management; Lexeditor never writes this file. |
+| PalSchema generated schemas | `<Palworld>/Mods/NativeMods/UE4SS/Mods/PalSchema/schemas/**` | **Read-only validation source** | Auto-detected when installed; optional `LEXEDITOR_PALWORLD_PALSCHEMA_SCHEMAS` override. Raw DataTable field types, enum definitions, and supported utility path constraints become write authority; Lexeditor never rewrites generated schemas. |
 | PalSchema raw JSON patches | `<PalSchema target>/<mod>/raw/*.json` | **Structured + editable** | Existing scalar properties are editable. With generated schemas, resolved scalar properties can also be added to an explicit row already present in the patch. Stale hashes, atomic writes and backups apply. |
 | PalSchema raw JSONC patches | `<PalSchema target>/<mod>/raw/*.jsonc` | **Structured + read-only** | Comments are parsed compatibly with PalSchema. Changed writes are intentionally blocked so Lexeditor never destroys comments. |
 | PalSchema schema enums | `schemas/enums.schema.json` | **Structured validation** | Resolved enum refs become semantic selects and reject values outside the generated enum list. Missing/unresolved enum refs fail closed. |
-| PalSchema referenced object/class constraints | generated `$ref` values outside enums | **Recognized + read-only** | Lexeditor does not broaden a referenced constraint into an arbitrary string; unresolved refs are disabled. |
+| PalSchema object/class path refs | `schemas/utility.schema.json -> ObjectPathRegex / ClassPathRegex` | **Structured validation for existing fields** | Existing string fields using these two generated utility refs are editable only when the utility definition resolves; new values must match the generated regex. Unknown/missing utility refs fail closed. These refs remain non-addable because the schema proves path syntax, not asset existence. |
 | PalSchema wildcards / filters | raw row names containing `*`, optional `$Filters` | **Recognized + read-only** | `$Filters` is recognized and validated as an array. Add-property and ordinary semantic editors do not operate on wildcard rows. |
 | PalSchema new-row creation / row deletion | missing rows / `null` row values | **Recognized + read-only** | Runtime semantics are known, but Lexeditor will not create or delete rows until row identity/existing-game-data evidence is stronger. |
 | PalSchema nested properties | objects/arrays within a row patch | **Readable + read-only** | Preserved on scalar writes. Generated struct/array/map schemas are recognized as complex and remain read-only. |
@@ -35,7 +35,7 @@ Current scope targets **Palworld Windows Steam v0.7+ official mod packages**, a 
 
 ### PalSchema raw DataTable patches
 
-Official `Type=PalSchema` target -> discover direct `<mod>/raw/*.json[c]` -> parse table/row/property patches -> optionally load the user's generated DataTable/enum schemas -> show semantic scalar controls -> edit existing scalar -> add a generated-schema scalar to an already-targeted explicit row -> serialize atomically -> reopen/read back. Unmodeled/nested values survive unchanged. Discovery stays non-recursive because PalSchema's own loader uses a direct directory iterator. JSONC no-op reads are supported but changed JSONC writes remain blocked to preserve comments.
+Official `Type=PalSchema` target -> discover direct `<mod>/raw/*.json[c]` -> parse table/row/property patches -> optionally load the user's generated DataTable/enum/utility schemas -> show semantic scalar controls -> edit existing scalar -> validate resolved enum and object/class path refs -> add a generated-schema scalar to an already-targeted explicit row -> serialize atomically -> reopen/read back. Unmodeled/nested values survive unchanged. Discovery stays non-recursive because PalSchema's own loader uses a direct directory iterator. JSONC no-op reads are supported but changed JSONC writes remain blocked to preserve comments.
 
 ### Clean official-package build
 
@@ -54,6 +54,7 @@ Require a current clean build -> resolve/verify the Steam Workshop content root 
 - no PalSchema schema generation inside Lexeditor; generated runtime schemas are consumed read-only;
 - no wildcard/filter writer;
 - no new-row creation, row deletion, or complex nested-property writer;
-- no resolution/editor for utility/object/class `$ref` constraints yet;
+- no add-from-scratch object/class path fields without concrete asset-identity evidence;
+- no arbitrary/future utility `$ref` support beyond `ObjectPathRegex` and `ClassPathRegex`;
 - no Unreal `.pak`, `.uasset`, `.uexp`, Blueprint, map, or arbitrary asset parser;
 - no real installed-game or dedicated-server acceptance yet.
