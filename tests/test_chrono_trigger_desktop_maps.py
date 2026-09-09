@@ -37,6 +37,17 @@ class DesktopMapPreviewContractTests(unittest.TestCase):
         self.assertIn('["layer3", "L3 tile IDs"]', module)
         self.assertIn('data.layers.layer3.enabled', module)
 
+    def test_scene_view_exposes_read_only_render_diagnostics(self):
+        module = MAP_PREVIEWS.read_text(encoding="utf-8")
+        self.assertIn("Render diagnostics", module)
+        self.assertIn("MapTable screen bits", module)
+        self.assertIn("MapTable effect bits", module)
+        self.assertIn("BGAnime", module)
+        self.assertIn("runtime phase/initial frame not inferred", module)
+        self.assertIn("PrioMap", module)
+        self.assertIn("semantics unknown", module)
+        self.assertIn("does not emulate animation playback", module)
+
     def test_worlds_view_exposes_map_tab_without_claiming_l3(self):
         module = MAP_PREVIEWS.read_text(encoding="utf-8")
         world_panel = module.split("function worldMapPanel", 1)[1].split("worldsView =", 1)[0]
