@@ -11,6 +11,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import paths
+from .coverage import augment_data_map, resource_override
 from .data import (
     OverlayStore,
     classify_resource,
@@ -62,13 +63,16 @@ def _archive_payload(query: str = "", offset: int = 0, limit: int = 250) -> dict
     matches = archive.matching(query)
     offset = max(0, min(offset, len(matches)))
     limit = max(1, min(limit, 1000))
-    entries = [{
-        "path": entry.path,
-        "offset": entry.offset,
-        "storedSize": entry.stored_size,
-        "source": "project" if _store().overlay_exists(entry.path) else "archive",
-        **classify_resource(entry.path),
-    } for entry in matches[offset:offset + limit]]
+    entries = []
+    for entry in matches[offset:offset + limit]:
+        classification = resource_override(entry.path) or classify_resource(entry.path)
+        entries.append({
+            "path": entry.path,
+            "offset": entry.offset,
+            "storedSize": entry.stored_size,
+            "source": "project" if _store().overlay_exists(entry.path) else "archive",
+            **classification,
+        })
     return {
         "archive": str(archive.path), "fileSize": archive.file_size,
         "declaredSize": archive.declared_size, "indexOffset": archive.index_offset,
@@ -104,7 +108,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/6"
+    server_version = "LexeditorChronoTrigger/7"
 
     def log_message(self, _format, *_args):
         return
@@ -155,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/dashboard":
                 self.send_json(dashboard())
             elif path == "/api/datamap":
-                self.send_json(data_map(_store()))
+                self.send_json(augment_data_map(_store(), data_map(_store())))
             elif path == "/api/archive":
                 self.send_json(_archive_payload(
                     params.get("q", [""])[0], int(params.get("offset", ["0"])[0]),
