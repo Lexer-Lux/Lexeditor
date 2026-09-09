@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import deployment, gear_shops, item_shops, paths, theme, treasures
+from . import deployment, gear_shops, item_prices, item_shops, paths, theme, treasures
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
 
@@ -19,7 +19,8 @@ HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 256 * 1024
 POST_ROUTES = {
-    "/api/project/extract", "/api/treasures/save", "/api/item-shops/save", "/api/gear-shops/save",
+    "/api/project/extract", "/api/treasures/save", "/api/item-prices/save",
+    "/api/item-shops/save", "/api/gear-shops/save",
     "/api/deployment/deploy", "/api/deployment/revert",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
@@ -172,6 +173,16 @@ def save_treasures(request: dict) -> dict:
     )
 
 
+def item_price_catalog() -> dict:
+    return _structured_payload(item_prices.ARCHIVE_PATH, item_prices.payload)
+
+
+def save_item_prices(request: dict) -> dict:
+    return _structured_save(
+        request, item_prices.ARCHIVE_PATH, item_prices.apply_edits, item_prices.payload, "Item Prices"
+    )
+
+
 def item_shop_catalog() -> dict:
     return _structured_payload(item_shops.ARCHIVE_PATH, item_shops.payload)
 
@@ -233,6 +244,17 @@ def data_map() -> dict:
     )
     treasure_row["target"] = "treasures"
     rows.append(treasure_row)
+    item_price_row = _map_structured_row(
+        item_prices.ARCHIVE_PATH,
+        "Structured item/command gil-price editor",
+        item_prices.payload,
+        lambda state: (
+            f"{len(state['rows'])} four-byte price records mapped by table order to command IDs "
+            f"starting at 0x{state['commandBase']:04X}."
+        ),
+    )
+    item_price_row["target"] = "item-prices"
+    rows.append(item_price_row)
     item_shop_row = _map_structured_row(
         item_shops.ARCHIVE_PATH,
         "Structured 16-slot item shop editor",
@@ -276,8 +298,8 @@ def data_map() -> dict:
         {
             "filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*",
             "controls": "Remaining gameplay/kernel family",
-            "notes": "Treasure rewards, item shops and gear shops are structured; other kernel tables remain available through the VBF browser.",
-            "status": "partial", "coverage": "three-structured-families", "openable": False,
+            "notes": "Treasure rewards, item prices, item shops and gear shops are structured; other kernel tables remain available through the VBF browser.",
+            "status": "partial", "coverage": "four-structured-families", "openable": False,
         },
         {
             "filename": "FFX2_Data/ffx_ps2/ffx2/**",
@@ -379,8 +401,8 @@ class Handler(BaseHTTPRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": [
                         "data-map", "vbf-index", "vbf-extract", "project-overlay",
-                        "ffx-treasure-editor", "ffx-item-shop-editor", "ffx-gear-shop-editor",
-                        "installed-game-theme", "fahrenheit-deploy",
+                        "ffx-treasure-editor", "ffx-item-price-editor", "ffx-item-shop-editor",
+                        "ffx-gear-shop-editor", "installed-game-theme", "fahrenheit-deploy",
                     ],
                 })
             elif route == "/api/dashboard":
@@ -391,6 +413,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(theme_status())
             elif route == "/api/treasures":
                 self.json_response(treasure_catalog())
+            elif route == "/api/item-prices":
+                self.json_response(item_price_catalog())
             elif route == "/api/item-shops":
                 self.json_response(item_shop_catalog())
             elif route == "/api/gear-shops":
@@ -446,6 +470,8 @@ class Handler(BaseHTTPRequestHandler):
                 })
             elif route == "/api/treasures/save":
                 result = save_treasures(request)
+            elif route == "/api/item-prices/save":
+                result = save_item_prices(request)
             elif route == "/api/item-shops/save":
                 result = save_item_shops(request)
             elif route == "/api/gear-shops/save":
