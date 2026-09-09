@@ -31,7 +31,7 @@ class PalworldSession(LocalPluginSession):
         environment = {"LEXEDITOR_PALWORLD_PROJECT": str(DEFAULT_PROJECT)}
         environment.update(extra_env or {})
         super().__init__(
-            module="games.palworld.build_server",
+            module="games.palworld.full_server",
             plugin_id="palworld",
             app_root=ROOT,
             check=check,
@@ -54,8 +54,16 @@ def smoke() -> list[str]:
         (game / "Palworld.exe").write_bytes(b"")
         workshop = temp / "steamapps" / "workshop" / "content" / "1623730"
         workshop.mkdir(parents=True)
+        loader_settings = game / "Mods" / "PalModSettings.ini"
+        loader_settings.parent.mkdir(parents=True, exist_ok=True)
+        loader_settings.write_text(
+            "[PalModSettings]\n"
+            "bGlobalEnableMod=True\n"
+            f"WorkshopRootDir={workshop}\n"
+            "ActiveModList=LexeditorSmoke\n",
+            encoding="utf-8",
+        )
 
-        # Synthetic stand-in for the JSON schemas generated locally by PalSchema.
         schema_root = game / "Mods" / "NativeMods" / "UE4SS" / "Mods" / "PalSchema" / "schemas"
         (schema_root / "raw").mkdir(parents=True)
         (schema_root / "raw" / "DT_PalMonsterParameter.schema.json").write_text(
@@ -139,9 +147,20 @@ def smoke() -> list[str]:
                 "palschema-add-existing-row-fields",
                 "official-package-build",
                 "official-local-workshop-deploy",
+                "official-loader-state-readonly",
             }
             if not required.issubset(capabilities):
                 raise RuntimeError("Palworld service did not advertise the complete authoring/test path")
+
+            loader = request_json(session.url + "api/loader-state")
+            if (
+                loader.get("readOnly") is not True
+                or loader.get("available") is not True
+                or loader.get("active") is not True
+                or loader.get("listed") is not True
+                or loader.get("packageName") != "LexeditorSmoke"
+            ):
+                raise RuntimeError("Palworld service did not expose the active loader configuration read-only")
 
             info = request_json(session.url + "api/info")
             if info.get("data", {}).get("PackageName") != "LexeditorSmoke":
@@ -276,6 +295,7 @@ def smoke() -> list[str]:
 
     return [
         "managed Palworld service identified the selected official package project",
+        "read-only PalModSettings state identified the active package without changing activation",
         "official Info.json edit survived save/readback with unknown metadata preserved",
         "PalSchema catalog mirrored official target and non-recursive raw discovery",
         "installed-style generated PalSchema schema supplied scalar field types",
