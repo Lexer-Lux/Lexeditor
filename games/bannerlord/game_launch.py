@@ -136,12 +136,25 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
         if module_id not in modules:
             raise RuntimeError(f"Required Bannerlord dependency is not installed: {module_id}")
         visiting.add(module_id)
+        community_rows = community(module_id)
+        # Bannerlord.ModuleManager's DependenciesToLoadDistinct yields community
+        # non-incompatible metadata before native dependency rows. Match that
+        # precedence when deciding whether a duplicated dependency is required.
+        community_dependency_ids = {
+            str(row.get("id") or "").strip()
+            for row in community_rows
+            if not row.get("incompatible") and str(row.get("id") or "").strip()
+        }
         for dependency in metadata(module_id).get("dependencies", []):
             dependency_id = str(dependency.get("id") or "").strip()
-            if not dependency_id or dependency.get("optional"):
+            if (
+                not dependency_id
+                or dependency_id in community_dependency_ids
+                or dependency.get("optional")
+            ):
                 continue
             include_required(dependency_id)
-        for dependency in community(module_id):
+        for dependency in community_rows:
             dependency_id = str(dependency.get("id") or "").strip()
             if not dependency_id or dependency.get("optional") or dependency.get("incompatible"):
                 continue
@@ -175,8 +188,14 @@ def module_load_order(game_root: Path, project: Path) -> list[str]:
             if dependency_id in included:
                 add_edge(dependency_id, module_id)
             elif dependency_id and not dependency.get("optional"):
-                # Defensive consistency check; include_required should have caught it.
-                raise RuntimeError(f"Required Bannerlord dependency is not enabled: {dependency_id}")
+                # A community row with the same ID can override native requiredness.
+                overridden = any(
+                    str(row.get("id") or "").strip() == dependency_id
+                    and not row.get("incompatible")
+                    for row in community(module_id)
+                )
+                if not overridden:
+                    raise RuntimeError(f"Required Bannerlord dependency is not enabled: {dependency_id}")
 
         for relation in model.get("modulesToLoadAfterThis", []):
             after_id = str(relation.get("id") or "").strip()
