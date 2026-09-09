@@ -6,6 +6,11 @@
       "structure": "Template only. A shipping plugin must declare its mod root or package format and the file layout users should install or edit.",
       "overriding": "Template only. A shipping plugin must declare whether mods stack, replace whole files, merge semantic records, or are mutually exclusive."
     },
+    "bannerlord": {
+      "loader": "Bannerlord's native module loader. Lexeditor deploys the selected project as one Modules/<SubModule ID> module and launches the game with Bannerlord's native /singleplayer _MODULES_*...*_MODULES_ module list.",
+      "structure": "Each mod is a native Bannerlord module rooted at <Bannerlord>/Modules/<module>/ with SubModule.xml, optional bin/Win64_Shipping_Client assemblies, ModuleData XML/data files, GUI assets, and other module-owned resources. Lexeditor edits one source project and deploys its module-owned outputs additively into that layout.",
+      "overriding": "Bannerlord can load multiple modules together. Lexeditor resolves the selected module's required dependency closure and launch order, but it does not semantically merge independent external modules or invent conflict resolution for two modules that replace the same runtime resource."
+    },
     "ff7": {
       "loader": "Not implemented. Lexeditor currently edits safe project copies and does not deploy or load mods into the current Steam FFVII installation.",
       "structure": "One selected Lexeditor project mirrors the supported FFVII game-data sources outside the installed game. The installed game files are treated as read-only source data.",
