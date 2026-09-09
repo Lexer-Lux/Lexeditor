@@ -43,16 +43,17 @@ def installed_modules(root: Path | None = None) -> list[Path]:
     )
 
 
-def check() -> list[str]:
+def check(project: Path | None = None, game: Path | None = None) -> list[str]:
+    """Validate an explicit session root when supplied, otherwise current defaults."""
     problems: list[str] = []
-    game = game_root()
+    game = Path(game or game_root())
     executable = game / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
     if not executable.is_file():
         problems.append(f"Missing Bannerlord executable: {executable}")
     if not modules_root(game).is_dir():
         problems.append(f"Missing Bannerlord Modules directory: {modules_root(game)}")
 
-    project = project_root()
+    project = Path(project or project_root())
     if not (project / "SubModule.xml").is_file():
         problems.append(f"Missing Bannerlord project SubModule.xml: {project / 'SubModule.xml'}")
     return problems
