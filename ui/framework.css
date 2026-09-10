@@ -1029,7 +1029,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-detail-panel-meta { font-size:clamp(15px,1.45vw,20px); }
 .lex-detail-panel-meta { color: var(--lex-muted); }
 .lex-detail-panel-id { color:color-mix(in srgb,var(--lex-muted) 42%,var(--lex-panel)); }
-.lex-detail-panel-id { position:absolute;top:calc(50% - 2px);right:0;display:flex;align-items:center;justify-self:end;margin-left:auto;font-size:var(--lex-detail-id-size);font-weight:300;line-height:1;text-align:right;transform:translateY(-50%); }
+/* Centred on its identity block, with no nudge: the two-pixel lift was tuned
+   against a heading that was a flat tenth of the panel, and now that the
+   heading is sized from its own content it just puts the number off centre. */
+.lex-detail-panel-id { position:absolute;top:50%;right:0;display:flex;align-items:center;justify-self:end;margin-left:auto;font-size:var(--lex-detail-id-size);font-weight:300;line-height:1;text-align:right;transform:translateY(-50%); }
 .lex-detail-panel-id .lex-record-id { align-items:center;line-height:1; }
 .lex-detail-panel-meta { grid-column:1 / -1; }
 .lex-detail-panel-actions {
