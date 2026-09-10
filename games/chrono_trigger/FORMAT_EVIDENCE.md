@@ -39,7 +39,7 @@ Temporal Redux supplies explicit `Platform.PC` width overrides, a platform-aware
 - `0x0D/0x0E`: constructors define only bits 0–1 (`through walls`, `through PCs`, `onto tile`, `onto object`). Lexeditor changes only those bits and preserves all higher unknown bits.
 - `0x19`: result -> one `/2` script-memory slot.
 - `0x1C`: live `GetResultMenu` decodes the stored byte as `0x7F0000 + byte`; writable range is therefore only `0x7F0000–0x7F00FF`.
-- `0x48–0x4D`: `Platform.PC` overrides explicitly replace the SNES 24-bit address with a two-byte `seg_addr`. `0x48/49` are raw segment source + one-byte local destination slot; `0x4A/4B` are raw segment destination + u8/u16 immediate value; `0x4C/4D` are raw segment destination + one-byte local source slot. Lexeditor exposes the segment as raw u16 and the local byte as a raw slot; it does **not** fabricate a full PC RAM address (`fullAddressKnown: false`).
+- PC `0x48–0x4D`: platform overrides establish a raw u16 segment field rather than the SNES three-byte address. `0x48/49` are raw segment source + raw local destination slot, `0x4A/4B` raw segment destination + immediate u8/u16, and `0x4C/4D` raw local source slot + raw segment destination. Lexeditor deliberately does not reconstruct a full PC RAM address and reports `fullAddressKnown: false`.
 - `0x4F/0x50`: immediate u8/u16 -> `/2` script-memory destination.
 - `0x51/0x52`: `/2` script-memory source -> `/2` script-memory destination, 8/16-bit.
 - `0x53/0x54`: u16 offset from `0x7F0000` -> `/2` script-memory destination, 8/16-bit. Temporal Redux chooses these only when `is_local_mem()` is true, so Lexeditor limits the bank side to `0x7F0000–0x7F01FF`; wider encoded offsets remain read-only.
@@ -68,11 +68,26 @@ Temporal Redux supplies explicit `Platform.PC` width overrides, a platform-aware
 - `0xC8`: one raw Special Dialog ID byte; arbitrary raw values are not reinterpreted as rename/switch-PC actions.
 - Existing base-editor families also cover item/category forms, text/message IDs, item/gold checks, party controls, `0x83` enemy load, palette/storyline/raw solidity, movement speed/position, direct facing, animation/timing, location, battle flags and other proven fixed-width operands.
 
-Ordinary script-memory UI addresses are even `0x7F0200–0x7F03FE` and round-trip to one-byte `/2` slots. Odd/out-of-range values fail closed. Raw PC segment values, PC-only extended-memory raw slots and bank-7F offset forms are separate models and are not silently translated into that address space.
+Ordinary script-memory UI addresses are even `0x7F0200–0x7F03FE` and round-trip to one-byte `/2` slots. Odd/out-of-range values fail closed. PC-only extended-memory raw slots, PC raw segment fields and bank-7F offset forms are separate models and are not silently translated into that address space.
 
 Doubled targets also fail closed on odd stored bytes. The generic one-byte doubled representation allows logical 0–127 unless a stricter live constructor/menu domain is independently established.
 
 Relative jump writes have one additional invariant: when the jump byte changes, the new target must be a decoded command boundary or function end. Existing malformed jumps may be preserved when another operand changes. This applies to ordinary comparisons and PC-only `0x6E` alike.
+
+### Real-install event audit
+
+`tools/chrono_trigger_event_audit.py` is a **read-only research instrument**, not format evidence by itself. It can consume exported event JSON or scan a current Steam `resources.bin` plus selected project overlay directly through the same fail-closed parser/editor registry.
+
+Its metrics intentionally:
+
+- deduplicate the 16 function slots by unique `(start, end)` bounds so aliased slots do not inflate opcode frequency;
+- report all decoded commands, but measure editor coverage only across commands that actually carry arguments;
+- exclude zero-argument commands from the missing-editor queue;
+- rank parser-stop opcodes ahead of ordinary read-only frequency because an unresolved boundary hides the remainder of a function;
+- continue past malformed project overlays and report each failed event separately;
+- support `--source vanilla` so a suspect project event can be compared against the immutable archive.
+
+Audit frequency may prioritize the next research target, but it never promotes an opcode to writable status without the independent PC evidence rules above.
 
 ### Dynamic / mode-dependent PC boundaries
 
@@ -82,7 +97,7 @@ Relative jump writes have one additional invariant: when the jump byte changes, 
 - `14/19`: 2 argument bytes total.
 - `82/83/85/86`: 3 argument bytes total.
 
-Known forms receive read-only semantics. Unknown/truncated forms fail closed. EC remains unwritable through both the named editor registry and raw `set-args` writer.
+Known forms receive read-only semantics. Unknown/truncated forms fail closed. EC remains unwritable through both named editing and raw `set-args`.
 
 For `0x2E`, `0x88` and `0x4E`, the platform-specific PC parser is the authoritative boundary source when generic menus suggest a different construction:
 
@@ -100,8 +115,8 @@ These opcode families remain read-only through the fixed-width argument writer e
 
 - `0x60`: PC width override conflicts with the generic 16-bit-immediate constructor semantics.
 - `0x61`: upstream literally describes the operation width as `1 byte?`.
-- `0x67`: constructor/table disagree on reset-mask polarity (`reset bitmask` vs `bits to keep`).
-- `0x75/0x76`: upstream says set memory to `1 (0xFF?)`; `0x77` says `1 byte?`.
+- `0x67`: constructor/table disagree on reset-mask polarity (`reset bitmask` vs `bits to keep`). Its target-byte interpretation is research-only and deliberately unregistered.
+- `0x75/0x76`: upstream says set memory to `1 (0xFF?)`; `0x77` says `1 byte?`. Their target-byte interpretation is research-only and deliberately unregistered.
 - `0x7B`: unused NPC jump with unknown destination fields and `speed/height?` operands.
 - `0x27/0x28`: live menus treat the displayed object ID as the stored argument while helper constructors divide the supplied ID by two.
 - `0x8D`: upstream itself notes pixel-position/shift mismatch.
@@ -132,7 +147,7 @@ MapTable main/sub/effect bits are surfaced using CTViewer's PC labels, but no fu
 
 CTViewer establishes the leading animation count, frame count, four-chip source/destination groups, PC offset `/32`, and duration upper-nibble mapping (`0x10/0x20/0x40/0x80` -> 16/12/8/4 ticks). The lower duration nibble is unknown.
 
-CTViewer's renderer initialization/advance sequence is renderer behavior, not proof of Steam runtime phase. Lexeditor does not enable playback until the actual game's initial copy/frame behavior is independently established.
+CTViewer's renderer initialization/advance sequence is renderer behavior, not proof of Steam runtime phase. [`BGANIME_RUNTIME_EVIDENCE.md`](BGANIME_RUNTIME_EVIDENCE.md) records the exact hypotheses and runtime observations required before Lexeditor may enable isolated animated playback. Composition remains a separate evidence gate.
 
 ## Gameplay stats: enemies / items / techs / shops
 
@@ -147,6 +162,7 @@ A gameplay-stat writer requires independent known-value correlation across multi
 ## Practical next evidence needed
 
 1. Run inventory/probe against a current Steam `resources.bin` and isolate repeated enemy/item/tech/shop families.
-2. Correlate candidate fields across multiple known entities and validate reversibly before exposing a writer.
-3. Independently resolve `PrioMap` and main/sub composition ordering before composed rendering.
-4. Establish real-game BGAnime initial phase/frame behavior before playback.
+2. Run the live event audit and prioritize parser stops/high-frequency argument-bearing read-only opcodes, then resolve them with independent PC evidence.
+3. Correlate candidate gameplay fields across multiple known entities and validate reversibly before exposing a writer.
+4. Independently resolve `PrioMap` and main/sub composition ordering before composed rendering.
+5. Establish real-game BGAnime initialization/phase/timing per `BGANIME_RUNTIME_EVIDENCE.md` before playback.
