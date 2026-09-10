@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 import struct
 
@@ -53,8 +54,10 @@ def test_verify_install_validates_raw_vbf_path_and_structured_table(tmp_path: Pa
 
     assert report["ok"] is True
     assert report["contract"] == "Lexeditor.ffx-x2-install-verification"
+    assert report["archiveHashesIncluded"] is False
     assert report["archives"]["x"]["ready"] is True
     assert report["archives"]["x2"]["ready"] is True
+    assert "sha256" not in report["archives"]["x"]
     row = report["structured"][0]
     assert row["status"] == "validated"
     assert row["sourcePath"] == raw_path
@@ -64,6 +67,26 @@ def test_verify_install_validates_raw_vbf_path_and_structured_table(tmp_path: Pa
     assert row["tableSha256"] == treasures.sha256_bytes(source)
     assert report["launch"]["ready"] is True
     assert all(game["ready"] for game in report["launch"]["games"].values())
+
+
+def test_verify_install_optionally_hashes_complete_vbfs(tmp_path: Path):
+    game_root = tmp_path / "game"
+    source = _treasure_table()
+    raw_path = treasures.ARCHIVE_PATH.removeprefix("FFX_Data/")
+    _write_collection(game_root, [(raw_path, source)])
+
+    report = inspect_install(game_root, specs=({
+        "game": "x",
+        "key": "treasures",
+        "archivePath": treasures.ARCHIVE_PATH,
+        "builder": treasures.payload,
+    },), hash_archives=True)
+
+    assert report["ok"] is True
+    assert report["archiveHashesIncluded"] is True
+    for game, filename in (("x", "FFX_Data.vbf"), ("x2", "FFX2_Data.vbf")):
+        target = game_root / "data" / filename
+        assert report["archives"][game]["sha256"] == hashlib.sha256(target.read_bytes()).hexdigest()
 
 
 def test_verify_install_fails_closed_when_claimed_table_is_missing(tmp_path: Path):
