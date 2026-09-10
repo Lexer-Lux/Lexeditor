@@ -138,12 +138,17 @@
       for (const row of hotspots) {
         const stops = Number(row.stopCount || 0);
         const readOnly = Number(row.readOnlyCount || 0);
+        const sampleIds = (row.sampleEventIds || []).slice(0, 8)
+          .map(value => String(value).padStart(4, "0"));
+        const sampleText = sampleIds.length
+          ? ` · event${sampleIds.length === 1 ? "" : "s"} ${sampleIds.join(", ")}${row.sampleEventIdsTruncated ? "…" : ""}`
+          : "";
         hotspotGrid.append(
           el("span", {class: `ct-event-audit-opcode${row.dynamicOrUnresolvedBoundary ? " ct-event-audit-dynamic" : ""}`}, row.opcodeHex),
           el("span", {}, stops
             ? `${stops} parser stop${stops === 1 ? "" : "s"}${readOnly ? ` · ${readOnly} decoded read-only` : ""}`
             : `${readOnly} argument command${readOnly === 1 ? "" : "s"} read-only`),
-          el("span", {}, row.dynamicOrUnresolvedBoundary ? "dynamic/unresolved" : "fixed boundary"),
+          el("span", {}, `${row.dynamicOrUnresolvedBoundary ? "dynamic/unresolved" : "fixed boundary"}${sampleText}`),
         );
       }
     }
