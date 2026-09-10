@@ -1,6 +1,13 @@
 "use strict";
 
 (() => {
+  if (!document.querySelector('script[data-ffx-auto-abilities]')) {
+    const autoAbilityScript = document.createElement('script');
+    autoAbilityScript.src = '/shared/ffx-auto-abilities.js';
+    autoAbilityScript.dataset.ffxAutoAbilities = '1';
+    document.head.appendChild(autoAbilityScript);
+  }
+
   const nav = document.querySelector('.ffxx2-nav');
   const workspace = document.querySelector('.ffxx2-workspace');
   const x2Panel = document.querySelector('[data-panel="ffx2-abilities"]');
@@ -48,8 +55,8 @@
   if (ffxCard) {
     const detail = ffxCard.querySelector('p');
     const count = ffxCard.querySelector('.big');
-    if (detail) detail.textContent = 'Treasure rewards, prices, CTB timing, Mix results, shops, and four proved FFX ability-animation tables are patched surgically.';
-    if (count) count.textContent = '11 editors';
+    if (detail) detail.textContent = 'Treasure rewards, prices, CTB timing, Mix results, shops, four ability-animation tables, and auto-ability elemental masks are patched surgically.';
+    if (count) count.textContent = '12 editors';
   }
 
   let state = null;
