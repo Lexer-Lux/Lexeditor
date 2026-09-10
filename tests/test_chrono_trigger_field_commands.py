@@ -23,7 +23,7 @@ class FieldCommandTests(unittest.TestCase):
     def test_f1_conflicting_public_width_rules_fail_closed(self):
         # Temporal Redux's live ColorAddMenu can emit a one-argument F1 with a
         # nonzero color/intensity byte, while its command-table description says
-        # a nonzero first argument carries a second 0x80 add/sub byte.  Raw event
+        # a nonzero first argument carries a second 0x80 add/sub byte. Raw event
         # bytes cannot distinguish F1 21 + following opcode 80 from F1 21 80.
         for data in (
             bytes([0xF1, 0x00, 0x00]),
@@ -89,6 +89,32 @@ class FieldCommandTests(unittest.TestCase):
         self.assertFalse(decoded["complete"])
         self.assertEqual(decoded["commands"], [])
         self.assertIn("needs 4 bytes but only 3 remain", decoded["problem"]["reason"])
+
+    def test_dynamic_mode7_known_forms_preserve_following_boundaries(self):
+        data = bytes([
+            0xFF, 0x42,
+            0xAD, 0x01,
+            0xFF, 0x90, 0x11, 0x22, 0x33,
+            0xFF, 0x91,
+            0xFF, 0x97, 0x44, 0x55, 0x66,
+            0xFF, 0x98,
+            0x00,
+        ])
+        decoded = disassemble_function(data, 0, len(data))
+        self.assertTrue(decoded["complete"])
+        self.assertEqual([row["opcode"] for row in decoded["commands"]], [
+            0xFF, 0xAD, 0xFF, 0xFF, 0xFF, 0xFF, 0x00,
+        ])
+        self.assertEqual([row["size"] for row in decoded["commands"]], [2, 2, 5, 2, 5, 2, 1])
+
+    def test_unknown_mode7_modes_fail_closed(self):
+        for mode in (0x8A, 0x8F, 0x99, 0xFF):
+            with self.subTest(mode=mode):
+                decoded = disassemble_function(bytes([0xFF, mode, 0x00]), 0, 3)
+                self.assertFalse(decoded["complete"])
+                self.assertEqual(decoded["commands"], [])
+                self.assertEqual(decoded["problem"]["opcode"], 0xFF)
+                self.assertIn(f"unknown PC Mode 7 mode 0x{mode:02X}", decoded["problem"]["reason"])
 
     def test_eb_song_volume_remains_fixed_two_argument_bytes(self):
         data = bytes([0xEB, 0x20, 0xFF, 0x00])
