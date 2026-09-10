@@ -2062,6 +2062,20 @@
   // ReShade is not installed, the mod ships no preset, or the manifest names a
   // preset file that is not there. Each of those used to look identical to a
   // working setup right up until the game launched unchanged.
+  // Settings are read, not searched. A game's whole tweak surface belongs on
+  // one scrolling page in as many columns as the window allows, the shape RDR2
+  // established: no subtabs to click through, no dropdown to pick a group from,
+  // nothing loaded on demand. Sections keep their own order and never split
+  // across a column boundary.
+  const settingsColumns = (sections, options = {}) => {
+    const root = element("div", {
+      class: ["lex-settings-columns", options.className || ""].filter(Boolean).join(" "),
+    }, ...(sections || []).filter(Boolean));
+    if (options.columnWidth)
+      root.style.setProperty("--lex-settings-column-width", options.columnWidth);
+    return root;
+  };
+
   const reshadeSection = spec => {
     const data = spec?.snapshot || {};
     const manifest = data.manifest || {};
@@ -6121,7 +6135,7 @@ ${row.path}`,
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {element, el: element, confirmAction, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {element, el: element, confirmAction, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

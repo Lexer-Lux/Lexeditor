@@ -77,12 +77,16 @@
   const semanticKey=()=>`${state.activeSource}:${state.textLanguage||"US"}`;
   const property=name=>state.data?.properties?.find(prop=>prop.name===name)||null;
 
-  function dataEdits(){
-    if(state.activeSource!=="mine"||!state.data||!state.dataBaseline)return[];
+  function dataEdits(){return diffRecords(state.data,state.dataBaseline)}
+  // Both the Misc tab and every tweak group on the Tweaks page compare a loaded
+  // DataObject against the copy it was loaded as. One routine, so a tweak edit
+  // is written back exactly the way a Misc edit is.
+  function diffRecords(current,baseline){
+    if(state.activeSource!=="mine"||!current||!baseline)return[];
     const out=[];
-    for(let i=0;i<state.data.records.length;i++){
-      const row=state.data.records[i],base=state.dataBaseline.records[i];if(!base)continue;
-      for(const prop of state.data.properties){
+    for(let i=0;i<current.records.length;i++){
+      const row=current.records[i],base=baseline.records[i];if(!base)continue;
+      for(const prop of current.properties){
         if(!prop.editable)continue;
         const value=row.values[prop.name],old=base.values[prop.name];
         if(prop.array){const count=Math.min(value.length,old.length);for(let j=0;j<count;j++)if(comparable(value[j])!==comparable(old[j]))out.push({entry:i,property:prop.name,index:j,value:value[j]})}
@@ -102,7 +106,7 @@
     }
     return out;
   }
-  const dirtyCount=()=>dataEdits().length+textEdits().length;
+  const dirtyCount=()=>dataEdits().length+textEdits().length+tweakEditGroups().reduce((total,group)=>total+group.edits.length,0);
 
   function flattenStrings(value,out=[]){if(typeof value==="string")out.push(value);else if(Array.isArray(value))for(const child of value)flattenStrings(child,out);else if(value&&typeof value==="object")for(const child of Object.values(value))flattenStrings(child,out);return out}
   function resolvedText(value){return typeof value==="string"?state.data?.textLookup?.[value]||"":""}
@@ -191,7 +195,7 @@
   function numericInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const attrs={type:"number",value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=prop.type==="FLOAT"?Number(event.target.value):Number.parseInt(event.target.value,10);if(index===null)setScalar(row,prop,value);else setArrayValue(row,prop,index,value)}};const low=semanticMin(prop),high=semanticMax(prop);if(low!==null&&low!==undefined)attrs.min=low;if(high!==null&&high!==undefined)attrs.max=high;attrs.step=prop.type==="FLOAT"?"any":1;return el("input",attrs)}
   function percentInput(row,prop,index){const current=row.values[prop.name]?.[index]??0;return el("input",{type:"number",min:0,max:100,step:1,value:current,disabled:state.activeSource!=="mine"||!prop.editable,oninput:event=>{if(event.target.value==="")return;const value=Number.parseInt(event.target.value,10);if(Number.isFinite(value)&&value>=0&&value<=100)setArrayValue(row,prop,index,value)},onchange:event=>{let value=Number.parseInt(event.target.value,10);if(!Number.isFinite(value))value=current;value=Math.max(0,Math.min(100,value));event.target.value=String(value);setArrayValue(row,prop,index,value)}})}
   function boolInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];return el("input",{type:"checkbox",checked:!!current,disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.checked);else setArrayValue(row,prop,index,event.target.checked)}})}
-  function nameInput(row,prop,index=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.value);else setArrayValue(row,prop,index,event.target.value)}});for(const name of state.data.names){const option=el("option",{value:name},name);option.selected=name===current;select.append(option)}return select}
+  function nameInput(row,prop,index=null,source=null){const current=index===null?row.values[prop.name]:row.values[prop.name][index];const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>{if(index===null)setScalar(row,prop,event.target.value);else setArrayValue(row,prop,index,event.target.value)}});for(const name of (source||state.data).names){const option=el("option",{value:name},name);option.selected=name===current;select.append(option)}return select}
   function semanticItemInput(row,prop,index){const current=row.values[prop.name]?.[index]??"";const choices=[...(state.loot?.itemChoices||[])];if(current&&!choices.some(choice=>choice.id===current))choices.unshift({id:current,name:current});const select=el("select",{disabled:state.activeSource!=="mine"||!prop.editable,onchange:event=>setArrayValue(row,prop,index,event.target.value)});for(const choice of choices){const option=el("option",{value:choice.id},choice.name&&choice.name!==choice.id?`${choice.name} (${choice.id})`:choice.id);option.selected=choice.id===current;select.append(option)}return select}
   function readonlyResolved(value){const resolved=resolvedText(value);return resolved?el("div",{class:"ff7r-resolved"},readonlyField(resolved),el("small",{},value)):readonlyField(String(value??""))}
   // A value's storage type is not always the type a person should edit. CanSale
@@ -246,8 +250,8 @@
       onchange:event=>{const value=event.target.checked?1:0;
         if(index===null)setScalar(row,prop,value);else setArrayValue(row,prop,index,value)}});
   }
-  function scalarControl(row,prop,index=null){if(semanticType(prop)==="BOOL"&&prop.type!=="BOOL")return byteBoolInput(row,prop,index);if(prop.type==="BOOL")return boolInput(row,prop,index);if(prop.type==="ENUM")return nameInput(row,prop,index);if(["BYTE","INT16","UINT16","INT32","FLOAT"].includes(prop.type))return numericInput(row,prop,index);const value=index===null?row.values[prop.name]:row.values[prop.name][index];return readonlyResolved(value)}
-  function propertyControl(row,prop){if(!prop.array)return scalarControl(row,prop);const values=row.values[prop.name]||[];return el("div",{class:"ff7r-array"},...values.map((_value,index)=>el("label",{},el("span",{},`#${index+1}`),scalarControl(row,prop,index))))}
+  function scalarControl(row,prop,index=null,source=null){if(semanticType(prop)==="BOOL"&&prop.type!=="BOOL")return byteBoolInput(row,prop,index);if(prop.type==="BOOL")return boolInput(row,prop,index);if(prop.type==="ENUM")return nameInput(row,prop,index,source);if(["BYTE","INT16","UINT16","INT32","FLOAT"].includes(prop.type))return numericInput(row,prop,index);const value=index===null?row.values[prop.name]:row.values[prop.name][index];return readonlyResolved(value)}
+  function propertyControl(row,prop,source=null){if(!prop.array)return scalarControl(row,prop,null,source);const values=row.values[prop.name]||[];return el("div",{class:"ff7r-array"},...values.map((_value,index)=>el("label",{},el("span",{},`#${index+1}`),scalarControl(row,prop,index,source))))}
   function propertyHelp(prop){if(!prop.editable)return infoHelp("This DataObject stores this value in a form Lexeditor cannot safely rewrite in place.");if(prop.type==="ENUM")return infoHelp("This value is an Unreal FName. A same-size edit can choose only a name already present in this .uasset's name table.");if(prop.array)return infoHelp("Existing array elements are editable. Resizing the array would move later row data and is not yet supported.");return null}
 
   function recordPanel(row=selectedRecord()){
@@ -260,17 +264,67 @@
   function dataPanel(){if(state.busy&&state.tab==="data")return loadingPanel("Loading DataObject","Reading the selected gameplay .uasset/.uexp pair…");if(state.error&&!state.data)return errorPanel(state.error);return el("div",{class:"ff7r-view"},assetToolbar(),pagedDataPanel())}
   // The DataObject list uses the shared paged Table + Detail, so its search and
   // paging live in the standard bottom bar instead of a private top strip.
+  // Tweaks are settings, not records, and they are not seventeen destinations
+  // either. Every group is loaded up front and laid out on one scrolling page
+  // in as many columns as the window allows, which is the shape RDR2 uses. No
+  // subtab bar to walk, no dropdown to pick a group from, and no load between
+  // reading one switch and the next.
   function tweaksPanel(){
     const list=tweakAssets();
     if(!list.length)return loadingPanel("Tweaks","No Lexeditor tweak groups were found in the catalog.");
-    if(state.busy)return loadingPanel("Loading tweak","Reading the selected tweak group…");
-    if(state.error&&!state.data)return errorPanel(state.error);
-    return el("div",{class:"ff7r-view ff7r-tweaks-view"},tweakToolbar(list),tweakSettingsPanel());
+    if(state.tweaksBusy||!state.tweaks)return loadingPanel("Loading tweaks","Reading every Lexeditor tweak group…");
+    if(state.tweaksError&&!Object.keys(state.tweaks).length)return errorPanel(state.tweaksError);
+    const cards=list.map(item=>tweakCard(state.tweaks[item.asset])).filter(Boolean);
+    cards.push(LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}));
+    return el("div",{class:"ff7r-view ff7r-tweaks-view"},
+      LexeditorUI.settingsColumns(cards,{className:"ff7r-tweaks"}));
   }
-  // Tweaks are settings, not records. A group holds a handful of switches and
-  // bounded values that the player reads top to bottom, so it is one scrolling
-  // settings page - the shape games/blank demonstrates - rather than a table
-  // with a search box and a pager over five rows.
+  // A group with one record shows its properties by name. A group with several
+  // names each row, because the row is the thing being configured.
+  function tweakCard(entry){
+    if(!entry)return null;
+    const {item,data}=entry;
+    const title=String(item.name||item.asset.split("/").pop()).toLocaleUpperCase();
+    if(!data?.records?.length)return detailSection({title,body:[detailField({
+      label:"STATE",control:readonlyField("This tweak group exposes no settings.")})]});
+    const fieldsOf=row=>data.properties.map(prop=>detailField({
+      label:prop.label,
+      control:propertyControl(row,prop,data),
+      dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),
+      min:prop.min,max:prop.max,help:propertyHelp(prop)}));
+    // A group with several records nests one titled block per record. Naming
+    // the record inside each property label instead produced a compound name
+    // no property lane could hold, and the label fitter shrank it to a smudge.
+    const body=data.records.length>1
+      ? data.records.map(row=>detailSection({
+          title:String(row.tag||`#${row.id}`),body:fieldsOf(row)}))
+      : fieldsOf(data.records[0]);
+    return detailSection({title,body});
+  }
+  // Seventeen small DataObjects, read together. They are requested in parallel
+  // because the page cannot show anything until the last of them arrives.
+  async function loadAllTweaks(){
+    const list=tweakAssets();
+    if(!list.length){state.tweaks={};return}
+    state.tweaksBusy=true;state.tweaksError="";render();
+    try{
+      const loaded={};
+      await Promise.all(list.map(async item=>{
+        try{
+          const data=await api(`/api/data?asset=${encodeURIComponent(item.asset)}${sourceSuffix()}&language=${encodeURIComponent(state.textLanguage||"US")}`);
+          loaded[item.asset]={item,data,baseline:clone(data)};
+        }catch(error){state.tweaksError=error.message}
+      }));
+      state.tweaks=loaded;
+    }catch(error){state.tweaksError=error.message;state.tweaks=state.tweaks||{}}
+    finally{state.tweaksBusy=false;render();refreshShell()}
+  }
+  function tweakEditGroups(){
+    if(state.activeSource!=="mine"||!state.tweaks)return[];
+    return Object.values(state.tweaks)
+      .map(entry=>({entry,edits:diffRecords(entry.data,entry.baseline)}))
+      .filter(group=>group.edits.length);
+  }
   async function loadReshade(){
     try{const value=await LexeditorUI.callWindow?.("mod_reshade","ff7r");if(value)state.reshade=value}
     catch(_error){/* browser preview has no desktop host; the section still renders */}
@@ -289,29 +343,6 @@
     try{const value=await LexeditorUI.callWindow?.("save_mod_reshade","ff7r",manifest);if(value)state.reshade=value}
     catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
     render();
-  }
-  function tweakSettingsPanel(){
-    const rows=records(),asset=currentAsset();
-    const title=asset?.name||"Tweaks";
-    if(!rows.length)return detailPanel({className:"ff7r-detail ff7r-tweaks",title,
-      body:[detailSection({title:"SETTINGS",body:[detailField({label:"STATE",
-        control:readonlyField("This tweak group exposes no settings.")})]})]});
-    const sections=rows.map(row=>detailSection({
-      title:String(row.tag||`SETTING ${row.id}`).toLocaleUpperCase(),
-      body:state.data.properties.map(prop=>detailField({label:prop.label,
-        control:propertyControl(row,prop),
-        dataType:prop.array?`${semanticType(prop)}[]`:semanticType(prop),
-        min:prop.min,max:prop.max,help:propertyHelp(prop)}))}));
-    sections.push(LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}));
-    return detailPanel({className:"ff7r-detail ff7r-tweaks",title,
-      identity:String(rows.length),meta:asset?.group||"Lexeditor tweaks",body:sections});
-  }
-  function tweakToolbar(list){
-    return LexeditorUI.subtabBar({
-      tabs:list.map(item=>({id:item.asset,label:item.name||item.asset.split("/").pop()})),
-      active:state.asset,label:"FF7 Remake tweak groups",
-      change:value=>selectAsset(value).then(()=>render()),
-    });
   }
   // "Mod contents only" hides everything this mod does not touch. For a data
   // table that means the rows whose values differ from the vanilla baseline the
@@ -592,30 +623,40 @@
       }
       state.pages[tab]=0;render();
     }
-    else if(tab==="data"||tab==="tweaks"){
-      if(tab==="tweaks"&&!state.reshade)await loadReshade();
-      // Opening these tabs loaded nothing, so the table sat empty behind the
+    else if(tab==="tweaks"){
+      if(!state.reshade)await loadReshade();
+      if(!state.tweaks)await loadAllTweaks();else render();
+    }
+    else if(tab==="data"){
+      // Opening this tab loaded nothing, so the table sat empty behind the
       // picker until the user changed the dropdown by hand.
-      const list=tab==="tweaks"?tweakAssets():gameAssets();
+      const list=gameAssets();
       const wanted=list.some(item=>item.asset===state.asset)?state.asset:(list[0]?.asset||"");
       if(wanted&&(state.asset!==wanted||!state.data)){state.asset=wanted;await loadAsset(wanted);render()}
     }}
 
   async function save(){
     if(state.activeSource!=="mine")return;
-    const gameplay=dataEdits(),text=textEdits();if(!gameplay.length&&!text.length)return;
+    const gameplay=dataEdits(),text=textEdits(),tweaks=tweakEditGroups();
+    if(!gameplay.length&&!text.length&&!tweaks.length)return;
     state.busy=true;state.error="";render();
     try{
       if(gameplay.length){const result=await api("/api/save",{asset:state.data.asset,sourceSha256:state.data.sourceSha256,activeSha256:state.data.activeSha256,edits:gameplay});state.data.activeSha256=result.activeSha256;state.data.usingProject=true;state.dataBaseline=clone(state.data);state.projectMessage=`Saved ${result.saved} gameplay value${result.saved===1?"":"s"}.`}
+      for(const group of tweakEditGroups()){
+        const data=group.entry.data;
+        const result=await api("/api/save",{asset:data.asset,sourceSha256:data.sourceSha256,activeSha256:data.activeSha256,edits:group.edits});
+        data.activeSha256=result.activeSha256;data.usingProject=true;group.entry.baseline=clone(data);
+        state.projectMessage=`${state.projectMessage?state.projectMessage+" ":""}Saved ${result.saved} value${result.saved===1?"":"s"} in ${group.entry.item.name||data.asset}.`;
+      }
       if(text.length){const result=await api("/api/text/save",{asset:state.textData.asset,sourceUassetSha256:state.textData.sourceUassetSha256,sourceUexpSha256:state.textData.sourceUexpSha256,activeUassetSha256:state.textData.activeUassetSha256,activeUexpSha256:state.textData.activeUexpSha256,edits:text});state.textData.activeUassetSha256=result.activeUassetSha256;state.textData.activeUexpSha256=result.activeUexpSha256;state.textData.usingProject=true;state.textBaseline=clone(state.textData);state.projectMessage=`${state.projectMessage?state.projectMessage+" ":""}Saved ${result.saved} text value${result.saved===1?"":"s"}.`}
       editHistory.clear();
     }catch(error){state.error=error.message;throw error}
     finally{state.busy=false;render();refreshShell()}
   }
-  async function discard(){if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
+  async function discard(){if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);for(const entry of Object.values(state.tweaks||{}))entry.data=clone(entry.baseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
   const editHistory=new EditHistory({capture:()=>({data:state.data?clone(state.data.records):null,text:state.textData?clone(state.textData.records):null}),restore:snapshot=>{if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);if(state.textData&&snapshot?.text)state.textData.records=clone(snapshot.text)},render:async()=>render(),enabled:()=>state.activeSource==="mine"&&["data","economy","loot","text"].includes(state.tab),changed:()=>refreshShell()});
 
-  async function selectProjectSource(value){if(dirtyCount()&&!await LexeditorUI.confirmAction({title:"Discard unsaved changes?",message:"Switching source reloads everything from the other source. All unsaved FF7R changes would be lost.",confirmLabel:"Discard and switch",cancelLabel:"Keep editing"}))return;state.activeSource=String(value||"mine");state.economyKey="";state.lootKey="";if(state.data)await loadAsset(state.asset);if(state.textData)await loadTextAsset(state.textAsset);if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot()}
+  async function selectProjectSource(value){if(dirtyCount()&&!await LexeditorUI.confirmAction({title:"Discard unsaved changes?",message:"Switching source reloads everything from the other source. All unsaved FF7R changes would be lost.",confirmLabel:"Discard and switch",cancelLabel:"Keep editing"}))return;state.activeSource=String(value||"mine");state.economyKey="";state.lootKey="";if(state.data)await loadAsset(state.asset);if(state.tweaks){state.tweaks=null;if(state.tab==="tweaks")await loadAllTweaks()}if(state.textData)await loadTextAsset(state.textAsset);if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot()}
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"economy",label:"Items"},{id:"characters",label:"Characters"},{id:"abilities",label:"Abilities"},{id:"enemies",label:"Enemies"},{id:"loot",label:"Enemy Loot"},{id:"data",label:"Misc"},{id:"tweaks",label:"Tweaks"},{id:"text",label:"Text"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK resources"}],projectActiveSource:()=>state.activeSource,selectProjectSource,info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
   editHistory.observe(document);
 

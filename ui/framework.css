@@ -5104,3 +5104,43 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   border-radius:9px;
   text-align:left;
 }
+
+
+/* LEXEDITOR_SETTINGS_COLUMNS_20260910 */
+/* One scrolling settings page in as many columns as the window allows. CSS
+   columns rather than a resize observer rebuilding lanes: a section never
+   splits across a boundary, and the count follows the panel with no script. */
+.lex-settings-columns {
+  columns:var(--lex-settings-column-width,30em);
+  column-gap:var(--lex-panel-gap,10px);
+  height:100%;
+  padding:0;
+  overflow-y:auto;
+}
+.lex-settings-columns > * {
+  break-inside:avoid;
+  margin:0 0 var(--lex-panel-gap,10px);
+}
+
+
+/* A settings column is narrow and its property names are long, so the tenth of
+   the row that a wide Detail panel gives a label is not enough here: it wrapped
+   "Resident Parameter ID" into three lines. */
+.lex-settings-columns { --lex-detail-label-width:minmax(min(9em,34%),30%); }
+
+
+/* LEXEDITOR_NESTED_SETTINGS_SECTION_20260910 */
+/* A section inside a section is a record inside a settings group. It reads as
+   a subheading, not as a second card: no frame of its own, a quieter title,
+   and its properties indented under it. */
+.lex-detail-section .lex-detail-section {
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+.lex-detail-section .lex-detail-section > .lex-detail-section-title {
+  padding-block:6px;
+  color:var(--lex-muted);
+  border-bottom:1px dashed color-mix(in srgb,var(--lex-border) 60%,transparent);
+  font-size:.78em;
+}

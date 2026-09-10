@@ -89,6 +89,8 @@ def main() -> int:
     parser.add_argument("--step", action="append", default=[])
     parser.add_argument("--size", default="1600x1000")
     parser.add_argument("--eval", dest="expression")
+    parser.add_argument("--wait", help="JS condition to wait for after the steps")
+    parser.add_argument("--wait-seconds", type=int, default=180)
     parser.add_argument("--live", action="store_true",
                         help="use the real project instead of a temporary one")
     args = parser.parse_args()
@@ -125,6 +127,9 @@ def main() -> int:
             for step in args.step:
                 cdp.eval(step)
                 time.sleep(.45)
+            if args.wait:
+                wait_eval(cdp, args.wait, args.wait_seconds)
+                time.sleep(.8)
             shot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,
             })
