@@ -87,6 +87,9 @@ class EventAuditCliTests(unittest.TestCase):
             self.assertEqual(result["kind"], "chrono-trigger-event-audit-summary")
             self.assertEqual(result["scanSource"], "mine")
             self.assertEqual(result["selectedEventIds"], [1, 2])
+            self.assertEqual(result["auditedEventIds"], [1, 2])
+            self.assertEqual(result["scanErrorCount"], 0)
+            self.assertEqual(result["scanErrors"], [])
             self.assertEqual(result["events"], 2)
             self.assertEqual(result["functions"], 2)
             self.assertEqual(result["decodedCommands"], 4)
@@ -109,9 +112,52 @@ class EventAuditCliTests(unittest.TestCase):
             self.assertEqual(selected["eventId"], 2)
             self.assertEqual(selected["scanSource"], "vanilla")
             self.assertEqual(selected["selectedEventIds"], [2])
+            self.assertEqual(selected["auditedEventIds"], [2])
+            self.assertEqual(selected["scanErrorCount"], 0)
             self.assertEqual(selected["argumentCommands"], 1)
             self.assertEqual(selected["readOnlyCommands"], 1)
             self.assertEqual(selected["writablePercent"], 0.0)
+
+    def test_direct_scan_reports_bad_overlay_and_vanilla_still_audits(self):
+        with tempfile.TemporaryDirectory(prefix="chrono-event-audit-overlay-") as temp_name:
+            root = Path(temp_name)
+            game = root / "game"
+            project = root / "project"
+            game.mkdir()
+            _build_smoke_archive(game / "resources.bin", [
+                ("Game/field/atel/Atel_0001.dat", _field_event(bytes((0x82, 0x04, 0x00)))),
+            ])
+            overlay = project / "Game" / "field" / "atel" / "Atel_0001.dat"
+            overlay.parent.mkdir(parents=True)
+            overlay.write_bytes(b"\x01")
+
+            mine_output = io.StringIO()
+            with redirect_stdout(mine_output):
+                code = main([
+                    "--game", str(game), "--project", str(project), "--event", "1",
+                ])
+            self.assertEqual(code, 0)
+            mine = json.loads(mine_output.getvalue())
+            self.assertEqual(mine["kind"], "chrono-trigger-event-audit-summary")
+            self.assertEqual(mine["selectedEventIds"], [1])
+            self.assertEqual(mine["auditedEventIds"], [])
+            self.assertEqual(mine["scanErrorCount"], 1)
+            self.assertEqual(mine["scanErrors"][0]["eventId"], 1)
+            self.assertIn("pointer table is truncated", mine["scanErrors"][0]["error"])
+
+            vanilla_output = io.StringIO()
+            with redirect_stdout(vanilla_output):
+                code = main([
+                    "--game", str(game), "--project", str(project),
+                    "--source", "vanilla", "--event", "1",
+                ])
+            self.assertEqual(code, 0)
+            vanilla = json.loads(vanilla_output.getvalue())
+            self.assertEqual(vanilla["kind"], "chrono-trigger-event-audit")
+            self.assertEqual(vanilla["auditedEventIds"], [1])
+            self.assertEqual(vanilla["scanErrorCount"], 0)
+            self.assertEqual(vanilla["argumentCommands"], 1)
+            self.assertEqual(vanilla["writableCommands"], 1)
 
 
 if __name__ == "__main__":
