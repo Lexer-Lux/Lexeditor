@@ -136,7 +136,14 @@ def _dynamic_argument_bytes(data: bytes, offset: int, opcode: int) -> tuple[int 
             return None, f"unknown PC all-purpose sound subcommand 0x{subcommand:02X}"
         return widths[subcommand], None
     if opcode == 0xFF:
-        return (4 if data[offset + 1] in {0x90, 0x97} else 1), None
+        mode = data[offset + 1]
+        if mode <= 0x89:
+            return 1, None
+        if mode in {0x90, 0x97}:
+            return 4, None
+        if 0x91 <= mode <= 0x98:
+            return 1, None
+        return None, f"unknown PC Mode 7 mode 0x{mode:02X}"
     return None, "dynamic command has no decoder"
 
 
