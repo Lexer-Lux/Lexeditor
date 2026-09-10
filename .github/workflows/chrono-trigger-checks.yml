@@ -10,6 +10,7 @@ on:
       - 'tests/chrono_trigger_pc_extended_browser_check.py'
       - 'tests/chrono_trigger_event_control_browser_check.py'
       - 'tests/chrono_trigger_bank7f_browser_check.py'
+      - 'tests/chrono_trigger_segment_memory_browser_check.py'
       - 'tools/chrono_trigger_*.py'
       - 'runtime_bootstrap.py'
       - '.github/workflows/chrono-trigger-checks.yml'
@@ -22,6 +23,7 @@ on:
       - 'tests/chrono_trigger_pc_extended_browser_check.py'
       - 'tests/chrono_trigger_event_control_browser_check.py'
       - 'tests/chrono_trigger_bank7f_browser_check.py'
+      - 'tests/chrono_trigger_segment_memory_browser_check.py'
       - 'tools/chrono_trigger_*.py'
       - 'runtime_bootstrap.py'
       - '.github/workflows/chrono-trigger-checks.yml'
@@ -98,6 +100,7 @@ jobs:
           tests/chrono_trigger_pc_extended_browser_check.py
           tests/chrono_trigger_event_control_browser_check.py
           tests/chrono_trigger_bank7f_browser_check.py
+          tests/chrono_trigger_segment_memory_browser_check.py
       - name: Plugin descriptor
         run: python -c "from plugin_api import validate_plugin; from games.chrono_trigger.plugin import PLUGIN; validate_plugin(PLUGIN); assert PLUGIN.plugin_id == 'chrono-trigger'"
       - name: Chrono Trigger regressions
@@ -131,6 +134,8 @@ jobs:
         run: python tests/chrono_trigger_event_control_browser_check.py out/chrono-trigger-event-control-browser
       - name: Bank-7F editor browser regression
         run: python tests/chrono_trigger_bank7f_browser_check.py out/chrono-trigger-bank7f-browser
+      - name: Segment-memory editor browser regression
+        run: python tests/chrono_trigger_segment_memory_browser_check.py out/chrono-trigger-segment-memory-browser
       - name: Upload browser artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -142,4 +147,5 @@ jobs:
             out/chrono-trigger-pc-extended-browser
             out/chrono-trigger-event-control-browser
             out/chrono-trigger-bank7f-browser
+            out/chrono-trigger-segment-memory-browser
           if-no-files-found: ignore
