@@ -9,6 +9,7 @@ Two read-only input modes are supported:
 
 The report ranks parser-stop opcodes ahead of ordinary read-only frequency so
 research effort is driven by real Steam scripts instead of opcode-name guesses.
+Zero-argument commands are reported but do not count as missing editor coverage.
 This tool never writes game or project files.
 """
 
@@ -52,6 +53,7 @@ def _iter_functions(payload: dict):
 def audit_event(payload: dict) -> dict:
     """Return deterministic coverage counters for one parsed field event."""
     opcode_counts: Counter[int] = Counter()
+    argument_counts: Counter[int] = Counter()
     writable_counts: Counter[int] = Counter()
     read_only_counts: Counter[int] = Counter()
     stop_counts: Counter[int] = Counter()
@@ -66,11 +68,14 @@ def audit_event(payload: dict) -> dict:
         for command in function.get("commands", []):
             opcode = int(command["opcode"])
             opcode_counts[opcode] += 1
-            editor = command.get("editor")
-            if editor and bool(editor.get("fixedWidth")):
-                writable_counts[opcode] += 1
-            else:
-                read_only_counts[opcode] += 1
+            argument_bytes = int(command.get("argumentBytes", 0))
+            if argument_bytes > 0:
+                argument_counts[opcode] += 1
+                editor = command.get("editor")
+                if editor and bool(editor.get("fixedWidth")):
+                    writable_counts[opcode] += 1
+                else:
+                    read_only_counts[opcode] += 1
         problem = function.get("problem")
         if problem:
             opcode = int(problem.get("opcode", -1))
@@ -79,6 +84,7 @@ def audit_event(payload: dict) -> dict:
             stop_reasons[str(problem.get("reason") or "unknown")] += 1
 
     decoded = sum(opcode_counts.values())
+    argument_commands = sum(argument_counts.values())
     writable = sum(writable_counts.values())
     read_only = sum(read_only_counts.values())
     return {
@@ -89,14 +95,17 @@ def audit_event(payload: dict) -> dict:
         "completeFunctions": complete_functions,
         "problemFunctions": functions - complete_functions,
         "decodedCommands": decoded,
+        "argumentCommands": argument_commands,
+        "zeroArgumentCommands": decoded - argument_commands,
         "writableCommands": writable,
         "readOnlyCommands": read_only,
-        "writablePercent": round((writable * 100.0 / decoded), 2) if decoded else 0.0,
+        "writablePercent": round((writable * 100.0 / argument_commands), 2) if argument_commands else 0.0,
         "opcodes": [
             {
                 "opcode": opcode,
                 "opcodeHex": _opcode_key(opcode),
                 "count": opcode_counts[opcode],
+                "argumentBearing": argument_counts[opcode],
                 "writable": writable_counts[opcode],
                 "readOnly": read_only_counts[opcode],
                 "dynamicOrUnresolvedBoundary": opcode in VARIABLE_OR_UNRESOLVED,
@@ -118,6 +127,7 @@ def merge_audits(audits: Iterable[dict]) -> dict:
     """Aggregate event audits and rank read-only/editor-research hotspots."""
     audits = list(audits)
     counts: Counter[int] = Counter()
+    argument_counts: Counter[int] = Counter()
     writable: Counter[int] = Counter()
     read_only: Counter[int] = Counter()
     stops: Counter[int] = Counter()
@@ -127,6 +137,7 @@ def merge_audits(audits: Iterable[dict]) -> dict:
         for row in audit.get("opcodes", []):
             opcode = int(row["opcode"])
             counts[opcode] += int(row.get("count", 0))
+            argument_counts[opcode] += int(row.get("argumentBearing", 0))
             writable[opcode] += int(row.get("writable", 0))
             read_only[opcode] += int(row.get("readOnly", 0))
         for row in audit.get("stops", []):
@@ -135,6 +146,7 @@ def merge_audits(audits: Iterable[dict]) -> dict:
             reasons[str(row["reason"])] += int(row.get("count", 0))
 
     decoded = sum(counts.values())
+    argument_commands = sum(argument_counts.values())
     writable_total = sum(writable.values())
     read_only_total = sum(read_only.values())
     hotspots = sorted(
@@ -144,6 +156,7 @@ def merge_audits(audits: Iterable[dict]) -> dict:
                 "opcodeHex": _opcode_key(opcode),
                 "readOnlyCount": read_only[opcode],
                 "decodedCount": counts[opcode],
+                "argumentCount": argument_counts[opcode],
                 "stopCount": stops[opcode],
                 "dynamicOrUnresolvedBoundary": opcode in VARIABLE_OR_UNRESOLVED,
             }
@@ -159,9 +172,11 @@ def merge_audits(audits: Iterable[dict]) -> dict:
         "completeFunctions": sum(int(audit.get("completeFunctions", 0)) for audit in audits),
         "problemFunctions": sum(int(audit.get("problemFunctions", 0)) for audit in audits),
         "decodedCommands": decoded,
+        "argumentCommands": argument_commands,
+        "zeroArgumentCommands": decoded - argument_commands,
         "writableCommands": writable_total,
         "readOnlyCommands": read_only_total,
-        "writablePercent": round((writable_total * 100.0 / decoded), 2) if decoded else 0.0,
+        "writablePercent": round((writable_total * 100.0 / argument_commands), 2) if argument_commands else 0.0,
         "hotspots": hotspots,
         "stopReasons": [
             {"reason": reason, "count": count}
