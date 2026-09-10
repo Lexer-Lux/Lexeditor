@@ -39,6 +39,7 @@ Temporal Redux supplies explicit `Platform.PC` width overrides, a platform-aware
 - `0x0D/0x0E`: constructors define only bits 0–1 (`through walls`, `through PCs`, `onto tile`, `onto object`). Lexeditor changes only those bits and preserves all higher unknown bits.
 - `0x19`: result -> one `/2` script-memory slot.
 - `0x1C`: live `GetResultMenu` decodes the stored byte as `0x7F0000 + byte`; writable range is therefore only `0x7F0000–0x7F00FF`.
+- `0x48–0x4D`: `Platform.PC` overrides explicitly replace the SNES 24-bit address with a two-byte `seg_addr`. `0x48/49` are raw segment source + one-byte local destination slot; `0x4A/4B` are raw segment destination + u8/u16 immediate value; `0x4C/4D` are raw segment destination + one-byte local source slot. Lexeditor exposes the segment as raw u16 and the local byte as a raw slot; it does **not** fabricate a full PC RAM address (`fullAddressKnown: false`).
 - `0x4F/0x50`: immediate u8/u16 -> `/2` script-memory destination.
 - `0x51/0x52`: `/2` script-memory source -> `/2` script-memory destination, 8/16-bit.
 - `0x53/0x54`: u16 offset from `0x7F0000` -> `/2` script-memory destination, 8/16-bit. Temporal Redux chooses these only when `is_local_mem()` is true, so Lexeditor limits the bank side to `0x7F0000–0x7F01FF`; wider encoded offsets remain read-only.
@@ -67,7 +68,7 @@ Temporal Redux supplies explicit `Platform.PC` width overrides, a platform-aware
 - `0xC8`: one raw Special Dialog ID byte; arbitrary raw values are not reinterpreted as rename/switch-PC actions.
 - Existing base-editor families also cover item/category forms, text/message IDs, item/gold checks, party controls, `0x83` enemy load, palette/storyline/raw solidity, movement speed/position, direct facing, animation/timing, location, battle flags and other proven fixed-width operands.
 
-Ordinary script-memory UI addresses are even `0x7F0200–0x7F03FE` and round-trip to one-byte `/2` slots. Odd/out-of-range values fail closed. PC-only extended-memory raw slots and bank-7F offset forms are separate models and are not silently translated into that address space.
+Ordinary script-memory UI addresses are even `0x7F0200–0x7F03FE` and round-trip to one-byte `/2` slots. Odd/out-of-range values fail closed. Raw PC segment values, PC-only extended-memory raw slots and bank-7F offset forms are separate models and are not silently translated into that address space.
 
 Doubled targets also fail closed on odd stored bytes. The generic one-byte doubled representation allows logical 0–127 unless a stricter live constructor/menu domain is independently established.
 
@@ -81,7 +82,7 @@ Relative jump writes have one additional invariant: when the jump byte changes, 
 - `14/19`: 2 argument bytes total.
 - `82/83/85/86`: 3 argument bytes total.
 
-Known forms receive read-only semantics. Unknown/truncated forms fail closed. EC remains unwritable.
+Known forms receive read-only semantics. Unknown/truncated forms fail closed. EC remains unwritable through both the named editor registry and raw `set-args` writer.
 
 For `0x2E`, `0x88` and `0x4E`, the platform-specific PC parser is the authoritative boundary source when generic menus suggest a different construction:
 
@@ -97,7 +98,6 @@ These opcode families remain read-only through the fixed-width argument writer e
 
 ### Intentionally excluded from named editing
 
-- `0x48–0x4D`: PC overrides replace the SNES address with a two-byte **segment address**; current menus do not establish a reversible full PC RAM address mapping.
 - `0x60`: PC width override conflicts with the generic 16-bit-immediate constructor semantics.
 - `0x61`: upstream literally describes the operation width as `1 byte?`.
 - `0x67`: constructor/table disagree on reset-mask polarity (`reset bitmask` vs `bits to keep`).
@@ -109,7 +109,7 @@ These opcode families remain read-only through the fixed-width argument writer e
 - `0x92/0x9C`: constructor doubles magnitude while live menu decode displays the stored magnitude directly.
 - `0x9E/0x9F`: table definitions and constructors remain internally inconsistent; Lexeditor records their PC widths unresolved.
 - `0xE4/0xE5/0xE6`: unresolved tile-copy/layer-scroll flags or fields.
-- `0xEC`: dynamic known-form reads only; no subcommand writer yet.
+- `0xEC`: dynamic known-form reads only; no subcommand writer.
 - `0xF1`: unresolved command boundary.
 - `0xFF`: Mode 7 forms remain semantic-only/read-only.
 - Other variable/unresolved commands remain read-only unless a relocation-capable assembler and stronger PC evidence are developed.
