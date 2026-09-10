@@ -10,8 +10,8 @@ from urllib.parse import parse_qs, urlparse
 
 from . import (
     auto_ability_prices, ctb_base, deployment, ffx_auto_abilities, ffx_commands,
-    ffx2_accessories, ffx2_abilities, gear_shops, item_prices, item_shops,
-    launch as fahrenheit_launch, mix_table, paths, theme, treasures,
+    ffx_player_stats, ffx2_accessories, ffx2_abilities, gear_shops, item_prices,
+    item_shops, launch as fahrenheit_launch, mix_table, paths, theme, treasures,
 )
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
@@ -25,10 +25,10 @@ MAX_REQUEST_BYTES = 256 * 1024
 POST_ROUTES = {
     "/api/project/extract", "/api/treasures/save", "/api/item-prices/save",
     "/api/auto-ability-prices/save", "/api/ffx-auto-abilities/save",
-    "/api/ctb-base/save", "/api/mix-table/save", "/api/item-shops/save",
-    "/api/gear-shops/save", "/api/ffx-commands/save", "/api/ffx2-abilities/save",
-    "/api/ffx2-accessories/save", "/api/deployment/deploy", "/api/deployment/revert",
-    "/api/play",
+    "/api/ffx-player-stats/save", "/api/ctb-base/save", "/api/mix-table/save",
+    "/api/item-shops/save", "/api/gear-shops/save", "/api/ffx-commands/save",
+    "/api/ffx2-abilities/save", "/api/ffx2-accessories/save",
+    "/api/deployment/deploy", "/api/deployment/revert", "/api/play",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
 _META_CACHE: tuple[tuple[int, int], VBFIndex] | None = None
@@ -253,6 +253,17 @@ def save_ffx_auto_abilities(request: dict) -> dict:
     )
 
 
+def ffx_player_stats_catalog() -> dict:
+    return _structured_payload(ffx_player_stats.ARCHIVE_PATH, ffx_player_stats.payload)
+
+
+def save_ffx_player_stats(request: dict) -> dict:
+    return _structured_save(
+        request, ffx_player_stats.ARCHIVE_PATH, ffx_player_stats.apply_edits,
+        ffx_player_stats.payload, "Player Base Stats",
+    )
+
+
 def ctb_base_catalog() -> dict:
     return _structured_payload(ctb_base.ARCHIVE_PATH, ctb_base.payload)
 
@@ -364,6 +375,11 @@ def data_map() -> dict:
              f"{len(s['rows'])} English/US 0x6C-byte auto-ability records; edits only known Fire/Ice/Thunder/Water/Holy "
              "bits at +0x11..+0x15 while preserving each byte's unknown upper bits and all other data."
          ), "ffx-auto-abilities"),
+        (ffx_player_stats.ARCHIVE_PATH, "Conservative player base-stat editor", ffx_player_stats.payload,
+         lambda s: (
+             f"{len(s['rows'])} English/US 0x94-byte player records; edits only base HP/MP at +0x04/+0x08 "
+             "and STR/DEF/MAG/MDF/AGI/LCK/EVA/ACC at +0x0C..+0x13. Bytes +0x14 onward stay opaque."
+         ), "ffx-player-stats"),
         (ctb_base.ARCHIVE_PATH, "Structured CTB tick-speed and ICV-bonus editor", ctb_base.payload,
          lambda s: f"{len(s['rows'])} two-byte Agility records with derived initial-CTB ranges.", "ctb-base"),
         (mix_table.ARCHIVE_PATH, "Structured Rikku Mix result editor", mix_table.payload,
@@ -423,8 +439,8 @@ def data_map() -> dict:
          "notes": "; ".join(theme_parts) or "Theme extraction falls back safely when cosmetic source assets are unavailable.",
          "status": "partial" if themed.get("source") == "installed-game" else "not-integrated", "coverage": "game-derived-theme", "openable": False},
         {"filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*", "controls": "Remaining FFX gameplay/kernel family",
-         "notes": "Twelve FFX kernel families are structured; other kernel tables remain available through the VBF browser.",
-         "status": "partial", "coverage": "twelve-structured-families", "openable": False},
+         "notes": "Thirteen FFX kernel families are structured; other kernel tables remain available through the VBF browser.",
+         "status": "partial", "coverage": "thirteen-structured-families", "openable": False},
         {"filename": "FFX2_Data/ffx_ps2/ffx2/**", "controls": "Remaining FFX-2 game-data families",
          "notes": "English/US command animations and accessory base ability/price fields are structured; other FFX-2 formats remain read/extract-only until proved.",
          "status": "partial", "coverage": "two-structured-families", "openable": False},
@@ -490,9 +506,10 @@ class Handler(BaseHTTPRequestHandler):
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": ["data-map", "vbf-index", "vbf-extract", "project-overlay", "ffx-treasure-editor",
                         "ffx-item-price-editor", "ffx-auto-ability-price-editor", "ffx-auto-ability-elements-editor",
-                        "ffx-ctb-base-editor", "ffx-mix-editor", "ffx-item-shop-editor", "ffx-gear-shop-editor",
-                        "ffx-command-animation-editor", "ffx-ability-animation-editor", "ffx2-ability-animation-editor",
-                        "ffx2-accessory-editor", "installed-game-theme", "fahrenheit-deploy", "fahrenheit-launch"]})
+                        "ffx-player-base-stats-editor", "ffx-ctb-base-editor", "ffx-mix-editor", "ffx-item-shop-editor",
+                        "ffx-gear-shop-editor", "ffx-command-animation-editor", "ffx-ability-animation-editor",
+                        "ffx2-ability-animation-editor", "ffx2-accessory-editor", "installed-game-theme",
+                        "fahrenheit-deploy", "fahrenheit-launch"]})
             elif route == "/api/dashboard": self.json_response(dashboard())
             elif route == "/api/datamap": self.json_response(data_map())
             elif route == "/api/launch": self.json_response(launch_status())
@@ -501,6 +518,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/item-prices": self.json_response(item_price_catalog())
             elif route == "/api/auto-ability-prices": self.json_response(auto_ability_price_catalog())
             elif route == "/api/ffx-auto-abilities": self.json_response(ffx_auto_ability_catalog())
+            elif route == "/api/ffx-player-stats": self.json_response(ffx_player_stats_catalog())
             elif route == "/api/ctb-base": self.json_response(ctb_base_catalog())
             elif route == "/api/mix-table": self.json_response(mix_catalog())
             elif route == "/api/item-shops": self.json_response(item_shop_catalog())
@@ -536,6 +554,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/item-prices/save": result = save_item_prices(request)
             elif route == "/api/auto-ability-prices/save": result = save_auto_ability_prices(request)
             elif route == "/api/ffx-auto-abilities/save": result = save_ffx_auto_abilities(request)
+            elif route == "/api/ffx-player-stats/save": result = save_ffx_player_stats(request)
             elif route == "/api/ctb-base/save": result = save_ctb_base(request)
             elif route == "/api/mix-table/save": result = save_mix(request)
             elif route == "/api/item-shops/save": result = save_item_shops(request)
