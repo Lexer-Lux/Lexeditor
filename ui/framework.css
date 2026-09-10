@@ -5021,3 +5021,86 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-coverage-cell.unavailable .lex-coverage-icon,
 .lex-data-map-coverage.unavailable .lex-coverage-icon { color:#b74a42; }
 
+
+
+/* LEXEDITOR_TOGGLE_RAIL_HOVER_ONLY_20260910 */
+/* A later block forced every per-toggle rail visible, so a row of eight flags
+   painted eight permanent "BOOL" labels beside its eight checkboxes. The type
+   code is a hover affordance on every other property and it is one here too:
+   hidden until that individual switch is pointed at, not the whole field. */
+.lex-toggle-rail { opacity:0; }
+.lex-detail-field:hover .lex-toggle-rail,
+.lex-detail-field:focus-within .lex-toggle-rail { opacity:0; }
+.lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail { opacity:1; }
+
+
+/* LEXEDITOR_BOOLEAN_REFERENCE_INLINE_20260910 */
+/* Provenance for a boolean used to hang below its checkbox on an absolute
+   offset. It cleared the row's own bottom border, so it read as a stray mark
+   floating between two properties and it was centred on nothing. It now sits
+   in a real rail column to the right of the checkbox, vertically centred, the
+   same place the rail occupies on every non-boolean property. */
+.lex-boolean-field { --lex-boolean-reference-width:3.4em; }
+.lex-boolean-field:has(.lex-source-control > .lex-reference-values) {
+  padding-bottom:0;
+  margin-bottom:0;
+}
+/* The rail is a grid track now, so the row no longer needs padding standing in
+   for it. */
+.lex-boolean-field:has(.lex-source-control:not(.no-reference)) > .lex-detail-field-control {
+  padding-right:0;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  display:grid;
+  grid-template-columns:auto var(--lex-boolean-reference-width);
+  gap:8px;
+  align-items:center;
+  justify-items:center;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control.no-reference {
+  grid-template-columns:auto;
+}
+.lex-boolean-field .lex-source-control > .lex-reference-values {
+  position:static;
+  top:auto;
+  right:auto;
+  bottom:auto;
+  left:auto;
+  width:var(--lex-boolean-reference-width);
+  min-width:0;
+  align-self:center;
+  align-content:center;
+  justify-items:start;
+  transform:none;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  align-items:center;
+  justify-content:flex-start;
+  padding-block:0;
+  line-height:1;
+}
+.lex-boolean-field .lex-reference-values .lex-boolean-mark { align-self:center;line-height:1; }
+
+
+/* LEXEDITOR_NUMERIC_BOX_SHAPE_20260910 */
+/* A number and a name were the same box, so nothing on screen said which one a
+   property wanted. Numbers are now right-aligned on tabular figures in a
+   square-cornered box with an accent tick on its leading edge; names keep the
+   soft rounded box and read from the left. */
+.lex-detail-field[data-lex-type="INT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]),
+.lex-detail-field[data-lex-type="FLOAT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]) {
+  border-radius:3px;
+  box-shadow:inset 3px 0 0 color-mix(in srgb,var(--lex-accent) 60%,transparent);
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
+  text-align:right;
+  /* No padding of its own: the box may already be reserving room on the right
+     for an internal reference or a unit, and overriding that is what made the
+     value paint straight through its own reference marker. */
+  padding-left:calc(3px + .45em);
+}
+.lex-detail-field[data-lex-type="STRING"] :is(input,textarea,.lex-readonly-field),
+.lex-detail-field[data-lex-type="TEXT"] :is(input,textarea,.lex-readonly-field) {
+  border-radius:9px;
+  text-align:left;
+}
