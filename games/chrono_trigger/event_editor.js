@@ -76,6 +76,20 @@
     }
   }
 
+  function downloadEventAudit() {
+    const current = state.events.auditSource === state.source ? state.events.audit : null;
+    if (!current) return;
+    const blob = new Blob([`${JSON.stringify(current, null, 2)}\n`], {type: "application/json"});
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `chrono-trigger-event-audit-${state.source}.json`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   function eventAuditPanel() {
     const current = state.events.auditSource === state.source ? state.events.audit : null;
     const button = el("button", {
@@ -83,8 +97,13 @@
       disabled: state.busy,
       onclick: runEventAudit,
     }, current ? "Refresh coverage audit" : state.busy && state.events.auditSource === state.source ? "Auditing…" : "Run coverage audit");
+    const download = current ? el("button", {
+      type: "button",
+      disabled: state.busy,
+      onclick: downloadEventAudit,
+    }, "Download audit JSON") : null;
     const head = el("div", {class: "ct-event-audit-head"},
-      el("strong", {}, "Real-install event coverage"), button,
+      el("strong", {}, "Real-install event coverage"), button, download,
       el("span", {class: "ct-event-audit-note"},
         `Read-only ${state.source === "vanilla" ? "Vanilla" : "selected project + Vanilla fallback"} scan; runs only on request.`));
     if (!current) {
