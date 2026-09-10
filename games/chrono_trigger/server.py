@@ -25,6 +25,7 @@ from .data import (
 )
 from .deployment import deploy_audited_project, deployment_status
 from .editor_registry import decorate_event_editors, save_event_fields
+from .event_audit import audit_store
 from .events import event_entries, get_event, load_events
 from .labels import (
     decorate_scene_exits,
@@ -128,7 +129,7 @@ def dashboard() -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "LexeditorChronoTrigger/15"
+    server_version = "LexeditorChronoTrigger/16"
 
     def log_message(self, _format, *_args):
         return
@@ -190,7 +191,7 @@ class Handler(BaseHTTPRequestHandler):
                         "data-map", "resource-index", "resource-preview", "localization-text",
                         "localized-labels", "scene-headers", "scene-exits", "scene-treasure",
                         "scene-map-layout", "scene-raster-preview", "field-events", "field-event-disassembly",
-                        "field-event-fixed-edit", "world-headers", "world-exits", "world-triggers",
+                        "field-event-fixed-edit", "field-event-audit", "world-headers", "world-exits", "world-triggers",
                         "world-raster-preview", "world-script-addresses", "world-script-disassembly",
                         "project-overlay", "project-changes", "ctext-deploy", "ctp-export", "read", "save",
                     ],
@@ -257,6 +258,12 @@ class Handler(BaseHTTPRequestHandler):
                         _store(), _source(params), params.get("q", [""])[0],
                         int(params.get("offset", ["0"])[0]), int(params.get("limit", ["100"])[0]),
                     ))
+            elif path == "/api/event-audit":
+                self.send_json(audit_store(
+                    _store(), _source(params),
+                    [int(value) for value in params.get("event", [])],
+                    int(params.get("limit", ["0"])[0]),
+                ))
             elif path == "/api/worlds":
                 source = _source(params)
                 self.send_json(decorate_worlds(load_worlds(_store(), source), _labels(source)))
