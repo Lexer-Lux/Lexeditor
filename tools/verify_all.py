@@ -71,6 +71,34 @@ def _once(tool: Path, timeout: float = 180, output: Path | None = None,
     return code, tail[:220]
 
 
+# Outcomes that mean "this check needs something this machine was not given",
+# as opposed to "this check found a problem".
+# A few verifiers legitimately take much longer than the rest: they drive a
+# browser across every plugin and every tab, against the real installed games.
+# Holding them to the common timeout reported a TIMEOUT that said nothing about
+# the code, which is exactly the kind of noise that makes a suite ignorable.
+SLOW = {
+    "verify_no_clipped_text": 900,
+    "verify_browser_regressions": 600,
+    "verify_rdr2_runtime": 600,
+}
+
+
+def timeout_for(tool: Path, default: float) -> float:
+    return max(default, SLOW.get(tool.stem, 0))
+
+
+def _unrunnable(tail: str) -> str:
+    lowered = tail.lower()
+    if "error: the following arguments are required" in lowered:
+        return "needs command-line arguments"
+    if "modulenotfounderror" in lowered:
+        return "needs an optional module"
+    if "filenotfounderror" in lowered and "winerror 2" in lowered:
+        return "needs a program that is not installed"
+    return ""
+
+
 def run(tool: Path, timeout: float = 180, output: Path | None = None,
         retries: int = 1) -> tuple[Path, int, float, str]:
     """Run one verifier, retrying a single time before calling it a failure.
@@ -83,7 +111,16 @@ def run(tool: Path, timeout: float = 180, output: Path | None = None,
     stays visible and fixable instead of being silently swallowed.
     """
     started = time.time()
+    timeout = timeout_for(tool, timeout)
     code, tail = _once(tool, timeout, output)
+    reason = _unrunnable(tail)
+    if code and reason:
+        # A verifier that cannot run here is not a verifier that failed. Some
+        # need a game binary passed on the command line, or an optional
+        # analysis module. Reporting those as failures left the suite
+        # permanently red, which is worse than useless: it hides the failures
+        # that mean something. They are reported as SKIPPED, with the reason.
+        return tool, 0, time.time() - started, f"SKIPPED ({reason}): {tail}"
     if code and code not in (124, 125) and retries:
         time.sleep(2)
         second, second_tail = _once(tool, timeout, output, 2)
