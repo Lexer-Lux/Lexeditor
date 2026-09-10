@@ -8,22 +8,23 @@ This checklist covers the evidence CI cannot provide for #461 / PR #462. Keep PR
 - Do not use the Square Enix collection launcher for Lexeditor Play acceptance.
 - Keep all replacement files under the Lexeditor project and its owned Fahrenheit mod.
 - Prefer a byte-identical extracted file for the first EFL startup check; gameplay changes are unnecessary to prove the loader path.
-- Capture the verifier JSON and the source VBF hashes before any deploy/launch test.
+- Capture the verifier JSON and full source VBF SHA-256 values before any deploy/launch test.
 
 ## 1. Read-only inventory verification
 
 From the Lexeditor repository root on the Windows machine with the game installed:
 
 ```powershell
-python -m games.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" --require-fahrenheit --json > ffx-x2-install-verification.json
+python -m games.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" --require-fahrenheit --hash-archives --json > ffx-x2-install-verification.json
 ```
 
-Use the actual Steam library path if different.
+Use the actual Steam library path if different. `--hash-archives` deliberately reads the complete large VBF files, so it is optional during ordinary development but required for the draft-exit baseline.
 
 Acceptance requirements:
 
 - `acceptanceReady` is `true`.
-- Both `archives.x.ready` and `archives.x2.ready` are `true`.
+- `archiveHashesIncluded` is `true`.
+- Both `archives.x.ready` and `archives.x2.ready` are `true` and each has a full-file `sha256`.
 - Every `structured[]` row has `status: "validated"`.
 - The four FFX ability tables report:
   - `command`: `0x60` records;
@@ -64,7 +65,7 @@ Then:
 5. Confirm FFX reaches normal startup/title flow through Stage 0 with the file-only mod enabled.
 6. Revert the Lexeditor deployment.
 7. Confirm the owned mod is removed and unrelated loadorder entries remain unchanged.
-8. Re-run the read-only verifier or otherwise re-hash `FFX_Data.vbf`; it must be byte-identical to its pre-test state.
+8. Re-run the verifier with `--hash-archives`; `archives.x.sha256` must exactly match the pre-test baseline.
 
 This first acceptance deliberately uses unchanged replacement bytes so the test exercises the EFL/deploy/launch route without introducing a gameplay-format variable.
 
@@ -75,7 +76,7 @@ Repeat the same procedure for one small FFX-2 archive entry under canonical `efl
 Acceptance requirements mirror FFX:
 
 - normal Stage 0 startup/title flow;
-- no installed-VBF mutation;
+- `archives.x2.sha256` remains identical to the baseline;
 - one Lexeditor loadorder entry while deployed;
 - clean revert preserving unrelated mods.
 
@@ -91,7 +92,7 @@ For each selected table:
 4. Deploy and launch the corresponding game.
 5. Confirm the game accepts the replacement and the intended value is observable if practical.
 6. Restore the original value through Lexeditor, deploy/retest if needed, then revert the deployment.
-7. Confirm the installed VBF hash never changed.
+7. Re-run `verify_install --hash-archives` and confirm both installed VBF hashes are unchanged.
 
 Do not use an unknown field or a generic byte edit for acceptance.
 
@@ -101,8 +102,8 @@ Before marking PR #462 ready, record:
 
 - Steam install path used;
 - verifier JSON/report date;
-- `FFX_Data.vbf` header MD5 and file hash before/after acceptance;
-- `FFX2_Data.vbf` header MD5 and file hash before/after acceptance;
+- `FFX_Data.vbf` header MD5 and full SHA-256 before/after acceptance;
+- `FFX2_Data.vbf` header MD5 and full SHA-256 before/after acceptance;
 - FFX byte-identical EFL startup result;
 - FFX-2 byte-identical EFL startup result;
 - one structured round-trip result for FFX;
