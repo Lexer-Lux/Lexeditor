@@ -56,6 +56,8 @@ class BitOpTests(unittest.TestCase):
         fixtures = {
             0x63: b"\x03\x10",
             0x64: b"\x04\x11",
+            0x65: b"\x03\x12",
+            0x66: b"\x86\x44",
             0x69: b"\xA5\x12",
             0x6B: b"\x5A\x13",
             0x6F: b"\x03\x14",
@@ -78,6 +80,43 @@ class BitOpTests(unittest.TestCase):
         })
         self.assertEqual(bit_semantics(set_bit)["summary"], "Set bit 3 in 0x7F0220")
         self.assertEqual(bit_semantics(reset_bit)["summary"], "Reset bit 7 in 0x7F0230")
+
+    def test_bank7f_single_bits_decode_page_bit_and_low_address_byte(self):
+        low = command(0x65, b"\x03\x44")
+        high = command(0x66, b"\x86\x55")
+        self.assertEqual(editor_schema(low)["values"], {
+            "memoryAddress": 0x7F0044, "bitIndex": 3,
+        })
+        self.assertEqual(editor_schema(high)["values"], {
+            "memoryAddress": 0x7F0155, "bitIndex": 6,
+        })
+        self.assertEqual(bit_semantics(low)["summary"], "Set bit 3 in 0x7F0044")
+        self.assertEqual(bit_semantics(high)["summary"], "Reset bit 6 in 0x7F0155")
+
+    def test_bank7f_write_reencodes_page_and_bit_index_without_resizing(self):
+        original = event(bytes((0x65, 0x02, 0x44, 0x00)))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {
+            "memoryAddress": 0x7F01AA,
+            "bitIndex": 7,
+        })
+        self.assertEqual(store.overlay[34:36], bytes((0x87, 0xAA)))
+        self.assertEqual(len(store.overlay), len(original))
+
+        partial = FakeStore(original)
+        save_event_fields(partial, 1, 0, 0, 0, sha256(original), {"bitIndex": 5})
+        self.assertEqual(partial.overlay[34:36], bytes((0x05, 0x44)))
+
+    def test_bank7f_noncanonical_flag_bits_and_out_of_range_address_fail_closed(self):
+        for first in (0x08, 0x78, 0x88, 0xFF):
+            with self.subTest(first=first):
+                self.assertIsNone(editor_schema(command(0x65, bytes((first, 0x10)))))
+
+        original = event(bytes((0x66, 0x80, 0x00, 0x00)))
+        store = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "Bank-7F address must be between"):
+            save_event_fields(store, 1, 0, 0, 0, sha256(original), {"memoryAddress": 0x7F0200})
+        self.assertIsNone(store.overlay)
 
     def test_mask_and_shift_semantics_stay_literal(self):
         self.assertEqual(bit_semantics(command(0x69, b"\xA5\x10"))["summary"],
@@ -116,10 +155,8 @@ class BitOpTests(unittest.TestCase):
         self.assertIsNone(editor_schema(command(0x63, b"\x08\x10")))
         self.assertIsNone(editor_schema(command(0x6F, b"\xFF\x10")))
 
-    def test_ambiguous_bank_and_reset_mask_neighbors_stay_unregistered(self):
-        for opcode in (0x65, 0x66, 0x67):
-            with self.subTest(opcode=opcode):
-                self.assertIsNone(editor_schema(command(opcode, b"\x01\x10")))
+    def test_ambiguous_reset_mask_neighbor_stays_unregistered(self):
+        self.assertIsNone(editor_schema(command(0x67, b"\x01\x10")))
 
 
 if __name__ == "__main__":
