@@ -17,6 +17,7 @@ from .events import event_entries, parse_event
 
 
 HOTSPOT_EVENT_SAMPLE_LIMIT = 8
+HOTSPOT_CONTEXT_SAMPLE_LIMIT = 4
 
 
 def _opcode_key(value: int) -> str:
@@ -37,13 +38,20 @@ def _iter_functions(payload: dict):
 
 
 def audit_event(payload: dict) -> dict:
-    """Return deterministic editor-coverage counters for one parsed field event."""
+    """Return deterministic editor-coverage counters for one parsed field event.
+
+    A few bounded raw examples are retained for read-only commands and parser
+    stops. They are evidence aids only; the audit still makes no semantic claim
+    beyond the parser/editor state already established elsewhere.
+    """
     opcode_counts: Counter[int] = Counter()
     argument_counts: Counter[int] = Counter()
     writable_counts: Counter[int] = Counter()
     read_only_counts: Counter[int] = Counter()
     stop_counts: Counter[int] = Counter()
     stop_reasons: Counter[str] = Counter()
+    read_only_samples: dict[int, list[dict]] = defaultdict(list)
+    stop_samples: dict[int, list[dict]] = defaultdict(list)
     functions = 0
     complete_functions = 0
 
@@ -51,6 +59,8 @@ def audit_event(payload: dict) -> dict:
         functions += 1
         if function.get("complete"):
             complete_functions += 1
+        function_start = int(function.get("start", 0))
+        function_end = int(function.get("end", function_start))
         for command in function.get("commands", []):
             opcode = int(command["opcode"])
             opcode_counts[opcode] += 1
@@ -62,11 +72,34 @@ def audit_event(payload: dict) -> dict:
                     writable_counts[opcode] += 1
                 else:
                     read_only_counts[opcode] += 1
+                    if len(read_only_samples[opcode]) < HOTSPOT_CONTEXT_SAMPLE_LIMIT:
+                        read_only_samples[opcode].append({
+                            "opcode": opcode,
+                            "opcodeHex": _opcode_key(opcode),
+                            "offset": int(command.get("offset", 0)),
+                            "functionStart": function_start,
+                            "functionEnd": function_end,
+                            "name": str(command.get("name") or ""),
+                            "rawHex": str(command.get("rawHex") or ""),
+                            "argumentsHex": str(command.get("argumentsHex") or ""),
+                        })
         problem = function.get("problem")
         if problem:
             opcode = int(problem.get("opcode", -1))
             if 0 <= opcode <= 0xFF:
                 stop_counts[opcode] += 1
+                if len(stop_samples[opcode]) < HOTSPOT_CONTEXT_SAMPLE_LIMIT:
+                    stop_samples[opcode].append({
+                        "opcode": opcode,
+                        "opcodeHex": _opcode_key(opcode),
+                        "offset": int(problem.get("offset", 0)),
+                        "functionStart": function_start,
+                        "functionEnd": function_end,
+                        "reason": str(problem.get("reason") or "unknown"),
+                        "remainingBytes": int(problem.get("remainingBytes", 0)),
+                        "rawPreview": str(problem.get("rawPreview") or ""),
+                        "truncatedPreview": bool(problem.get("truncatedPreview", False)),
+                    })
             stop_reasons[str(problem.get("reason") or "unknown")] += 1
 
     decoded = sum(opcode_counts.values())
@@ -102,6 +135,12 @@ def audit_event(payload: dict) -> dict:
             {"opcode": opcode, "opcodeHex": _opcode_key(opcode), "count": count}
             for opcode, count in sorted(stop_counts.items())
         ],
+        "readOnlySamples": [
+            sample for opcode in sorted(read_only_samples) for sample in read_only_samples[opcode]
+        ],
+        "stopSamples": [
+            sample for opcode in sorted(stop_samples) for sample in stop_samples[opcode]
+        ],
         "stopReasons": [
             {"reason": reason, "count": count}
             for reason, count in sorted(stop_reasons.items(), key=lambda row: (-row[1], row[0]))
@@ -109,12 +148,31 @@ def audit_event(payload: dict) -> dict:
     }
 
 
+def _bounded_samples(samples: list[dict], raw_key: str) -> tuple[list[dict], bool]:
+    """Return unique deterministic context samples with a hard report-size cap."""
+    unique: dict[tuple, dict] = {}
+    for sample in samples:
+        key = (
+            int(sample.get("eventId", -1)),
+            int(sample.get("offset", -1)),
+            str(sample.get(raw_key) or ""),
+        )
+        unique.setdefault(key, sample)
+    ordered = sorted(
+        unique.values(),
+        key=lambda row: (
+            int(row.get("eventId", -1)), int(row.get("offset", -1)), str(row.get(raw_key) or ""),
+        ),
+    )
+    return ordered[:HOTSPOT_CONTEXT_SAMPLE_LIMIT], len(ordered) > HOTSPOT_CONTEXT_SAMPLE_LIMIT
+
+
 def merge_audits(audits: Iterable[dict]) -> dict:
     """Aggregate event audits and rank read-only/parser research hotspots.
 
-    Each hotspot includes a bounded deterministic list of event IDs containing
-    that opcode. This makes an exported aggregate report actionable without
-    embedding event payloads or requiring the whole archive to be shared.
+    Each hotspot includes bounded event IDs and raw byte-context samples. This
+    makes an exported aggregate report actionable without embedding full Atel
+    payloads or requiring the whole archive to be shared.
     """
     audits = list(audits)
     counts: Counter[int] = Counter()
@@ -125,6 +183,8 @@ def merge_audits(audits: Iterable[dict]) -> dict:
     reasons: Counter[str] = Counter()
     read_only_events: dict[int, set[int]] = defaultdict(set)
     stop_events: dict[int, set[int]] = defaultdict(set)
+    read_only_contexts: dict[int, list[dict]] = defaultdict(list)
+    stop_contexts: dict[int, list[dict]] = defaultdict(list)
 
     for audit in audits:
         event_id = audit.get("eventId")
@@ -144,6 +204,15 @@ def merge_audits(audits: Iterable[dict]) -> dict:
             stops[opcode] += stop_count
             if stop_count and normalized_event_id is not None:
                 stop_events[opcode].add(normalized_event_id)
+        if normalized_event_id is not None:
+            for sample in audit.get("readOnlySamples", []):
+                opcode = int(sample.get("opcode", -1))
+                if 0 <= opcode <= 0xFF:
+                    read_only_contexts[opcode].append({"eventId": normalized_event_id, **sample})
+            for sample in audit.get("stopSamples", []):
+                opcode = int(sample.get("opcode", -1))
+                if 0 <= opcode <= 0xFF:
+                    stop_contexts[opcode].append({"eventId": normalized_event_id, **sample})
         for row in audit.get("stopReasons", []):
             reasons[str(row["reason"])] += int(row.get("count", 0))
 
@@ -158,6 +227,12 @@ def merge_audits(audits: Iterable[dict]) -> dict:
         read_only_ids = sorted(read_only_events[opcode])
         stop_ids = sorted(stop_events[opcode])
         combined_ids = sorted(read_only_events[opcode] | stop_events[opcode])
+        read_only_samples, read_only_samples_truncated = _bounded_samples(
+            read_only_contexts[opcode], "rawHex"
+        )
+        stop_samples, stop_samples_truncated = _bounded_samples(
+            stop_contexts[opcode], "rawPreview"
+        )
         hotspot_rows.append({
             "opcode": opcode,
             "opcodeHex": _opcode_key(opcode),
@@ -172,6 +247,10 @@ def merge_audits(audits: Iterable[dict]) -> dict:
             "readOnlyEventIdsTruncated": len(read_only_ids) > HOTSPOT_EVENT_SAMPLE_LIMIT,
             "stopEventIds": stop_ids[:HOTSPOT_EVENT_SAMPLE_LIMIT],
             "stopEventIdsTruncated": len(stop_ids) > HOTSPOT_EVENT_SAMPLE_LIMIT,
+            "readOnlySamples": read_only_samples,
+            "readOnlySamplesTruncated": read_only_samples_truncated,
+            "stopSamples": stop_samples,
+            "stopSamplesTruncated": stop_samples_truncated,
         })
     hotspots = sorted(
         hotspot_rows,
