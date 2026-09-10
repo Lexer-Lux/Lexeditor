@@ -7,11 +7,12 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from games.chrono_trigger.plugin import _build_smoke_archive, _field_event
 from tools.chrono_trigger_event_audit import main
 
 
 def payload(event_id: int, opcode: int, writable: bool, problem: dict | None = None) -> dict:
-    command = {"opcode": opcode}
+    command = {"opcode": opcode, "argumentBytes": 1}
     if writable:
         command["editor"] = {"fixedWidth": True}
     return {
@@ -47,6 +48,7 @@ class EventAuditCliTests(unittest.TestCase):
             self.assertEqual(result["kind"], "chrono-trigger-event-audit-summary")
             self.assertEqual(result["events"], 2)
             self.assertEqual(result["decodedCommands"], 2)
+            self.assertEqual(result["argumentCommands"], 2)
             self.assertEqual(result["writableCommands"], 1)
             self.assertEqual(result["readOnlyCommands"], 1)
             self.assertEqual(result["hotspots"][0]["opcode"], 0xF1)
@@ -65,6 +67,51 @@ class EventAuditCliTests(unittest.TestCase):
             self.assertEqual(result["kind"], "chrono-trigger-event-audit")
             self.assertEqual(result["eventId"], 9)
             self.assertEqual(result["writablePercent"], 100.0)
+
+    def test_direct_install_scan_reads_arc1_and_filters_events(self):
+        with tempfile.TemporaryDirectory(prefix="chrono-event-audit-live-") as temp_name:
+            root = Path(temp_name)
+            game = root / "game"
+            project = root / "project"
+            game.mkdir()
+            _build_smoke_archive(game / "resources.bin", [
+                ("Game/field/atel/Atel_0001.dat", _field_event(bytes((0x82, 0x04, 0x00)))),
+                ("Game/field/atel/Atel_0002.dat", _field_event(bytes((0x8E, 0x80, 0x00)))),
+            ])
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                code = main(["--game", str(game), "--project", str(project)])
+            self.assertEqual(code, 0)
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["kind"], "chrono-trigger-event-audit-summary")
+            self.assertEqual(result["scanSource"], "mine")
+            self.assertEqual(result["selectedEventIds"], [1, 2])
+            self.assertEqual(result["events"], 2)
+            self.assertEqual(result["functions"], 2)
+            self.assertEqual(result["decodedCommands"], 4)
+            self.assertEqual(result["argumentCommands"], 2)
+            self.assertEqual(result["zeroArgumentCommands"], 2)
+            self.assertEqual(result["writableCommands"], 1)
+            self.assertEqual(result["readOnlyCommands"], 1)
+            self.assertEqual(result["writablePercent"], 50.0)
+            self.assertEqual([row["opcode"] for row in result["hotspots"]], [0x8E])
+
+            selected_output = io.StringIO()
+            with redirect_stdout(selected_output):
+                code = main([
+                    "--game", str(game), "--project", str(project),
+                    "--source", "vanilla", "--event", "2",
+                ])
+            self.assertEqual(code, 0)
+            selected = json.loads(selected_output.getvalue())
+            self.assertEqual(selected["kind"], "chrono-trigger-event-audit")
+            self.assertEqual(selected["eventId"], 2)
+            self.assertEqual(selected["scanSource"], "vanilla")
+            self.assertEqual(selected["selectedEventIds"], [2])
+            self.assertEqual(selected["argumentCommands"], 1)
+            self.assertEqual(selected["readOnlyCommands"], 1)
+            self.assertEqual(selected["writablePercent"], 0.0)
 
 
 if __name__ == "__main__":
