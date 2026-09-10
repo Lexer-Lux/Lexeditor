@@ -69,6 +69,7 @@ class EventAuditTests(unittest.TestCase):
         self.assertEqual(audit["readOnlyCommands"], 1)
         summary = merge_audits([audit])
         self.assertEqual([row["opcode"] for row in summary["hotspots"]], [0x8E])
+        self.assertEqual(summary["hotspots"][0]["sampleEventIds"], [8])
 
     def test_aliased_function_slots_are_counted_once_by_bounds(self):
         shared = {
@@ -90,7 +91,7 @@ class EventAuditTests(unittest.TestCase):
         self.assertEqual(audit["writableCommands"], 1)
         self.assertEqual(audit["opcodes"][0]["count"], 1)
 
-    def test_merge_ranks_stops_before_plain_read_only_frequency(self):
+    def test_merge_ranks_stops_before_plain_read_only_frequency_and_reports_events(self):
         first = audit_event(event_payload(
             1,
             [
@@ -124,6 +125,33 @@ class EventAuditTests(unittest.TestCase):
         self.assertEqual(summary["hotspots"][2]["opcode"], 0x8E)
         self.assertTrue(summary["hotspots"][0]["dynamicOrUnresolvedBoundary"])
         self.assertTrue(summary["hotspots"][1]["dynamicOrUnresolvedBoundary"])
+
+        by_opcode = {row["opcode"]: row for row in summary["hotspots"]}
+        self.assertEqual(by_opcode[0x9E]["sampleEventIds"], [2])
+        self.assertEqual(by_opcode[0x9E]["stopEventIds"], [2])
+        self.assertEqual(by_opcode[0x9E]["readOnlyEventIds"], [])
+        self.assertEqual(by_opcode[0xF1]["sampleEventIds"], [1])
+        self.assertEqual(by_opcode[0x8E]["sampleEventIds"], [1, 2])
+        self.assertEqual(by_opcode[0x8E]["readOnlyEventIds"], [1, 2])
+        self.assertEqual(by_opcode[0x8E]["stopEventIds"], [])
+        self.assertFalse(by_opcode[0x8E]["sampleEventIdsTruncated"])
+
+    def test_hotspot_event_samples_are_sorted_unique_and_bounded(self):
+        audits = [
+            audit_event(event_payload(event_id, [command(0x8E, writable=False)]))
+            for event_id in range(12, 1, -1)
+        ]
+        # Duplicate one event audit deliberately; samples must still be unique.
+        audits.append(audits[-1])
+        summary = merge_audits(audits)
+        hotspot = summary["hotspots"][0]
+        self.assertEqual(hotspot["opcode"], 0x8E)
+        self.assertEqual(hotspot["sampleEventIds"], list(range(2, 10)))
+        self.assertEqual(hotspot["readOnlyEventIds"], list(range(2, 10)))
+        self.assertEqual(hotspot["stopEventIds"], [])
+        self.assertTrue(hotspot["sampleEventIdsTruncated"])
+        self.assertTrue(hotspot["readOnlyEventIdsTruncated"])
+        self.assertFalse(hotspot["stopEventIdsTruncated"])
 
     def test_empty_event_has_zero_percent_without_division_error(self):
         audit = audit_event(event_payload(0, []))
