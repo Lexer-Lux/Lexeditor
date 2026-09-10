@@ -273,14 +273,21 @@ def save_gear_shops(request: dict) -> dict:
     return _structured_save(request, gear_shops.ARCHIVE_PATH, gear_shops.apply_edits, gear_shops.payload, "Gear Shops")
 
 
-def ffx_command_catalog() -> dict:
-    return _structured_payload(ffx_commands.ARCHIVE_PATH, ffx_commands.payload)
+def ffx_command_catalog(table: str = "command") -> dict:
+    spec = ffx_commands.table_spec(table)
+    return _structured_payload(
+        spec.archive_path,
+        lambda data: ffx_commands.payload_for(data, spec.key),
+    )
 
 
 def save_ffx_commands(request: dict) -> dict:
+    spec = ffx_commands.table_spec(request.get("table", "command"))
     return _structured_save(
-        request, ffx_commands.ARCHIVE_PATH, ffx_commands.apply_edits,
-        ffx_commands.payload, "FFX Commands",
+        request, spec.archive_path,
+        lambda data, edits: ffx_commands.apply_table_edits(data, edits, spec.key),
+        lambda data: ffx_commands.payload_for(data, spec.key),
+        f"FFX {spec.label}",
     )
 
 
@@ -348,9 +355,18 @@ def data_map() -> dict:
          lambda s: f"{len(s['rows'])} shops with {s['slotCount']} item/command ID slots; leading legacy rate is read-only.", "item-shops"),
         (gear_shops.ARCHIVE_PATH, "Structured 16-slot gear shop editor", gear_shops.payload,
          lambda s: f"{len(s['rows'])} shops with {s['slotCount']} gear-index slots; leading legacy rate is read-only.", "gear-shops"),
-        (ffx_commands.ARCHIVE_PATH, "Conservative FFX command animation-ID editor", ffx_commands.payload,
-         lambda s: f"{len(s['rows'])} English/US command records; edits only animation IDs at +0x10/+0x12 and preserves every other byte and trailing strings.", "ffx-commands"),
     ]
+    for spec in ffx_commands.TABLES.values():
+        structured_x.append((
+            spec.archive_path,
+            f"Conservative FFX {spec.label.lower()} animation-ID editor",
+            lambda data, spec=spec: ffx_commands.payload_for(data, spec.key),
+            lambda s, spec=spec: (
+                f"{len(s['rows'])} English/US {spec.label.lower()} records; edits only animation IDs "
+                f"at +0x10/+0x12 in proved 0x{spec.record_size:X}-byte records and preserves every other byte and trailing strings."
+            ),
+            "ffx-commands",
+        ))
     for archive_path, controls, builder, notes, target in structured_x:
         row = _map_structured_row("x", archive_path, controls, builder, notes)
         row["target"] = target
@@ -390,8 +406,8 @@ def data_map() -> dict:
          "notes": "; ".join(theme_parts) or "Theme extraction falls back safely when cosmetic source assets are unavailable.",
          "status": "partial" if themed.get("source") == "installed-game" else "not-integrated", "coverage": "game-derived-theme", "openable": False},
         {"filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*", "controls": "Remaining FFX gameplay/kernel family",
-         "notes": "Eight FFX kernel families are structured; other kernel tables remain available through the VBF browser.",
-         "status": "partial", "coverage": "eight-structured-families", "openable": False},
+         "notes": "Eleven FFX kernel families are structured; other kernel tables remain available through the VBF browser.",
+         "status": "partial", "coverage": "eleven-structured-families", "openable": False},
         {"filename": "FFX2_Data/ffx_ps2/ffx2/**", "controls": "Remaining FFX-2 game-data families",
          "notes": "English/US command animations and accessory base ability/price fields are structured; other FFX-2 formats remain read/extract-only until proved.",
          "status": "partial", "coverage": "two-structured-families", "openable": False},
@@ -458,8 +474,8 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": ["data-map", "vbf-index", "vbf-extract", "project-overlay", "ffx-treasure-editor",
                         "ffx-item-price-editor", "ffx-auto-ability-price-editor", "ffx-ctb-base-editor", "ffx-mix-editor",
                         "ffx-item-shop-editor", "ffx-gear-shop-editor", "ffx-command-animation-editor",
-                        "ffx2-ability-animation-editor", "ffx2-accessory-editor", "installed-game-theme",
-                        "fahrenheit-deploy", "fahrenheit-launch"]})
+                        "ffx-ability-animation-editor", "ffx2-ability-animation-editor", "ffx2-accessory-editor",
+                        "installed-game-theme", "fahrenheit-deploy", "fahrenheit-launch"]})
             elif route == "/api/dashboard": self.json_response(dashboard())
             elif route == "/api/datamap": self.json_response(data_map())
             elif route == "/api/launch": self.json_response(launch_status())
@@ -471,7 +487,8 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/mix-table": self.json_response(mix_catalog())
             elif route == "/api/item-shops": self.json_response(item_shop_catalog())
             elif route == "/api/gear-shops": self.json_response(gear_shop_catalog())
-            elif route == "/api/ffx-commands": self.json_response(ffx_command_catalog())
+            elif route == "/api/ffx-commands":
+                q = parse_qs(parsed.query); self.json_response(ffx_command_catalog(q.get("table", ["command"])[0]))
             elif route == "/api/ffx2-abilities": self.json_response(ffx2_ability_catalog())
             elif route == "/api/ffx2-accessories": self.json_response(ffx2_accessory_catalog())
             elif route == "/api/archive":
