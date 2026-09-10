@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import struct
 import unittest
 
-from games.chrono_trigger.comparisons import comparison_semantics
+from games.chrono_trigger.comparisons import COMPARISON_OPCODES, comparison_semantics
 from games.chrono_trigger.data import sha256
 from games.chrono_trigger.editor_registry import editor_schema, save_event_fields
 
@@ -52,6 +52,9 @@ def command(opcode: int, arguments: bytes) -> dict:
 
 
 class MemoryComparisonEditorTests(unittest.TestCase):
+    def test_selected_comparison_opcodes_are_registered(self):
+        self.assertEqual(COMPARISON_OPCODES, frozenset({0x12, 0x13, 0x14, 0x15, 0x16}))
+
     def test_u8_immediate_comparison_schema_and_semantics(self):
         cmd = command(0x12, bytes((0x10, 0x7F, 2, 3)))
         schema = editor_schema(cmd)
@@ -102,11 +105,46 @@ class MemoryComparisonEditorTests(unittest.TestCase):
                 self.assertEqual(semantic["operationName"], "greater or equal")
                 self.assertTrue(semantic["jumpOnFalse"])
 
-    def test_invalid_comparator_and_0x16_fail_closed(self):
+    def test_bank7f_comparison_decodes_low_and_high_address_pages(self):
+        low = command(0x16, bytes((0x44, 0x7F, 2, 3)))
+        low_schema = editor_schema(low)
+        self.assertEqual(low_schema["values"], {
+            "memoryAddress": 0x7F0044,
+            "value": 0x7F,
+            "operation": 2,
+            "jumpOffset": 3,
+        })
+        self.assertEqual(low_schema["fields"][0]["min"], 0x7F0000)
+        self.assertEqual(low_schema["fields"][0]["max"], 0x7F01FF)
+        self.assertEqual(
+            comparison_semantics(low)["summary"],
+            "8-bit 0x7F0044 greater than 127 · false → jump +3",
+        )
+        self.assertTrue(comparison_semantics(low)["bank7F"])
+
+        high = command(0x16, bytes((0x55, 0x22, 0x85, 1)))
+        self.assertEqual(editor_schema(high)["values"], {
+            "memoryAddress": 0x7F0155,
+            "value": 0x22,
+            "operation": 5,
+            "jumpOffset": 1,
+        })
+        self.assertEqual(comparison_semantics(high)["operationName"], "less or equal")
+
+    def test_invalid_comparator_and_noncanonical_bank7f_operator_bits_fail_closed(self):
         invalid = command(0x12, bytes((0x02, 0x10, 8, 1)))
         self.assertIsNone(editor_schema(invalid))
         self.assertIsNone(comparison_semantics(invalid))
-        self.assertIsNone(editor_schema(command(0x16, bytes((0x02, 0x10, 0, 1)))))
+
+        for packed_operation in (0x08, 0x78, 0x88, 0xFF):
+            with self.subTest(packed_operation=packed_operation):
+                cmd = command(0x16, bytes((0x02, 0x10, packed_operation, 1)))
+                self.assertIsNone(editor_schema(cmd))
+                self.assertIsNone(comparison_semantics(cmd))
+
+        # Page bit 7 plus a valid operation remains canonical.
+        self.assertIsNotNone(editor_schema(command(0x16, bytes((0x02, 0x10, 0x80, 1)))))
+        self.assertIsNotNone(editor_schema(command(0x16, bytes((0x02, 0x10, 0x87, 1)))))
 
     def test_u16_partial_write_preserves_operation_and_jump(self):
         original = event(bytes((
@@ -136,6 +174,31 @@ class MemoryComparisonEditorTests(unittest.TestCase):
         self.assertEqual(store.overlay[34:38], bytes((0x10, 0x03, 7, 1)))
         self.assertEqual(len(store.overlay), len(original))
 
+    def test_bank7f_write_reencodes_page_and_operation_without_resizing(self):
+        original = event(bytes((
+            0x16, 0x44, 0x10, 2, 1,
+            0xAD, 0x01,
+            0x00,
+        )))
+        store = FakeStore(original)
+        save_event_fields(
+            store, 1, 0, 0, 0, sha256(original),
+            {"memoryAddress": 0x7F01AA, "operation": 7},
+        )
+        self.assertEqual(store.overlay[34:38], bytes((0xAA, 0x10, 0x87, 1)))
+        self.assertEqual(len(store.overlay), len(original))
+
+        high_original = event(bytes((
+            0x16, 0x55, 0x22, 0x85, 1,
+            0xAD, 0x01,
+            0x00,
+        )))
+        partial = FakeStore(high_original)
+        save_event_fields(
+            partial, 1, 0, 0, 0, sha256(high_original), {"operation": 1}
+        )
+        self.assertEqual(partial.overlay[34:38], bytes((0x55, 0x22, 0x81, 1)))
+
     def test_changed_jump_must_land_on_decoded_boundary(self):
         original = event(bytes((
             0x12, 0x02, 0x10, 0, 1,
@@ -152,7 +215,23 @@ class MemoryComparisonEditorTests(unittest.TestCase):
             save_event_fields(rejected, 1, 0, 0, 0, sha256(original), {"jumpOffset": 2})
         self.assertIsNone(rejected.overlay)
 
-    def test_script_addresses_and_operation_range_are_validated(self):
+    def test_bank7f_jump_retargeting_uses_same_boundary_validator(self):
+        original = event(bytes((
+            0x16, 0x44, 0x10, 0, 1,
+            0xAD, 0x01,
+            0xAD, 0x02,
+            0x00,
+        )))
+        store = FakeStore(original)
+        save_event_fields(store, 1, 0, 0, 0, sha256(original), {"jumpOffset": 3})
+        self.assertEqual(store.overlay[37], 3)
+
+        rejected = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "not a decoded command boundary"):
+            save_event_fields(rejected, 1, 0, 0, 0, sha256(original), {"jumpOffset": 2})
+        self.assertIsNone(rejected.overlay)
+
+    def test_script_and_bank7f_addresses_and_value_ranges_are_validated(self):
         original = event(bytes((
             0x12, 0x02, 0x10, 0, 1,
             0xAD, 0x01,
@@ -170,6 +249,24 @@ class MemoryComparisonEditorTests(unittest.TestCase):
                 store, 1, 0, 0, 0, sha256(original), {"operation": 8}
             )
         self.assertIsNone(store.overlay)
+
+        bank_original = event(bytes((
+            0x16, 0x02, 0x10, 0, 1,
+            0xAD, 0x01,
+            0x00,
+        )))
+        bank = FakeStore(bank_original)
+        with self.assertRaisesRegex(ValueError, "Bank-7F address must be between"):
+            save_event_fields(
+                bank, 1, 0, 0, 0, sha256(bank_original), {"memoryAddress": 0x7F0200}
+            )
+        self.assertIsNone(bank.overlay)
+
+        with self.assertRaisesRegex(ValueError, "Comparison value must be between 0 and 255"):
+            save_event_fields(
+                bank, 1, 0, 0, 0, sha256(bank_original), {"value": 256}
+            )
+        self.assertIsNone(bank.overlay)
 
 
 if __name__ == "__main__":
