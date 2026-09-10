@@ -110,20 +110,25 @@ def _dynamic_argument_bytes(data: bytes, offset: int, opcode: int) -> tuple[int 
         if mode in {4, 5}:
             return 5, None
         if mode == 8:
-            return None, "PC color-math assignment mode has unresolved variable payload width"
+            # Temporal Redux's PC parser explicitly overrides mode 8 to three
+            # one-byte arguments. Its generic ColorMathMenu's variable blob is
+            # a SNES-side construction and is not the PC event representation.
+            return 3, None
         return None, f"unknown PC color-math mode {mode}"
     if opcode == 0x4E:
         if remaining < 5:
             return None, "PC memory-copy header is truncated"
+        # PC parser: [destination u16][encoded length u16][payload].
         encoded = int.from_bytes(data[offset + 3:offset + 5], "little")
         if encoded < 2:
             return None, f"PC memory-copy encoded length is invalid: {encoded}"
         return 4 + encoded - 2, None
     if opcode == 0x88:
         mode = data[offset + 1] >> 4
-        widths = {0: 1, 2: 3, 3: 3, 4: 4, 5: 4}
-        if mode == 8:
-            return None, "PC multi-mode-copy mode 8 has unresolved variable payload width"
+        # Temporal Redux's PC parser explicitly uses two one-byte arguments for
+        # mode 8; the generic MultiModeMenu's appended blob is not serialized
+        # by its unchanged base arg_lens and is not PC boundary evidence.
+        widths = {0: 1, 2: 3, 3: 3, 4: 4, 5: 4, 8: 2}
         if mode not in widths:
             return None, f"unknown PC multi-mode copy mode {mode}"
         return widths[mode], None
