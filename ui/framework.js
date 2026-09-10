@@ -5520,9 +5520,16 @@ ${row.path}`,
       fitBarrelTableColumns(node);
       // Filler rows exist to square off a growable list. A slot table shows one
       // row per real slot, so a short last page simply ends.
-      if (!slotBased) padBarrelTable(node, pageSize);
+      // Pad to the track count this table actually declares. Padding to the
+      // page size instead put forty rows into a ten-track grid whenever a
+      // table held less than one page: the ten declared tracks collapsed to
+      // zero and every real record painted on top of the others in one band.
+      if (!slotBased) padBarrelTable(node, rowCapacity);
       node.classList.add("lex-page-sized-table");
-      node.style.setProperty("--lex-page-row-count", String(rowCapacity));
+      // The track count is read back from the rows that are really there, so
+      // a padding rule and a capacity rule can never disagree again.
+      node.style.setProperty("--lex-page-row-count",
+        String(Math.max(1, node.querySelectorAll(":scope > .lex-column-list-row").length || rowCapacity)));
       node.dataset.lexBarrel = String(index + 1);
       if (index) node.classList.add("lex-fitted-page");
       return node;
