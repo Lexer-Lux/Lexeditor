@@ -37,42 +37,32 @@ class FieldCommandTests(unittest.TestCase):
                 self.assertEqual(decoded["problem"]["opcode"], 0xF1)
                 self.assertIn("unresolved", decoded["problem"]["reason"])
 
-    def test_color_math_fixed_add_sub_modes_keep_known_width(self):
+    def test_color_math_pc_modes_match_platform_parser(self):
         data = bytes([
             0x2E, 0x40, 0x01, 0x02, 0x34, 0x05,
             0x2E, 0x57, 0x06, 0x07, 0x89, 0x0A,
+            0x2E, 0x80, 0x31, 0x05,
             0x00,
         ])
         decoded = disassemble_function(data, 0, len(data))
         self.assertTrue(decoded["complete"])
-        self.assertEqual([row["size"] for row in decoded["commands"]], [6, 6, 1])
+        self.assertEqual([row["size"] for row in decoded["commands"]], [6, 6, 4, 1])
+        self.assertEqual(decoded["commands"][2]["argumentsHex"], "80 31 05")
 
-    def test_color_math_assignment_mode_fails_closed_until_payload_layout_is_proven(self):
-        decoded = disassemble_function(bytes([0x2E, 0x80, 0x31, 0x05, 0x00, 0xAA, 0xBB, 0xCC, 0x00]), 0, 9)
-        self.assertFalse(decoded["complete"])
-        self.assertEqual(decoded["commands"], [])
-        self.assertEqual(decoded["problem"]["opcode"], 0x2E)
-        self.assertIn("unresolved variable payload width", decoded["problem"]["reason"])
-
-    def test_dynamic_88_fixed_modes(self):
+    def test_dynamic_88_pc_modes_match_platform_parser(self):
         data = bytes([
             0x88, 0x01,
             0x88, 0x20, 0x11, 0x22,
             0x88, 0x30, 0x33, 0x44,
             0x88, 0x40, 0x55, 0x66, 0x77,
             0x88, 0x50, 0x88, 0x99, 0xAA,
+            0x88, 0x80, 0xBB,
             0x00,
         ])
         decoded = disassemble_function(data, 0, len(data))
         self.assertTrue(decoded["complete"])
-        self.assertEqual([row["size"] for row in decoded["commands"]], [2, 4, 4, 5, 5, 1])
-
-    def test_dynamic_88_mode80_fails_closed_until_payload_layout_is_proven(self):
-        decoded = disassemble_function(bytes([0x88, 0x80, 0x11, 0x04, 0xAA, 0xBB, 0x00]), 0, 7)
-        self.assertFalse(decoded["complete"])
-        self.assertEqual(decoded["commands"], [])
-        self.assertEqual(decoded["problem"]["opcode"], 0x88)
-        self.assertIn("unresolved variable payload width", decoded["problem"]["reason"])
+        self.assertEqual([row["size"] for row in decoded["commands"]], [2, 4, 4, 5, 5, 3, 1])
+        self.assertEqual(decoded["commands"][-2]["argumentsHex"], "80 BB")
 
     def test_dynamic_ec_known_subcommand_widths_preserve_following_boundaries(self):
         # EC/88 is subcommand-only (1 arg), EC/14 has one extra parameter
@@ -155,11 +145,14 @@ class FieldCommandTests(unittest.TestCase):
         self.assertEqual([row["size"] for row in decoded["commands"]], [3, 1])
         self.assertEqual(decoded["commands"][0]["argumentsHex"], "20 FF")
 
-    def test_dynamic_memory_copy_uses_pc_length_field(self):
-        data = bytes([0x4E, 0x00, 0x20, 0x05, 0x00, 0xAA, 0xBB, 0xCC])
+    def test_dynamic_memory_copy_uses_pc_layout_and_length_field(self):
+        # PC get_command(): [destination u16][encoded length u16][payload].
+        # encoded length includes its own two bytes, so 5 means three payload bytes.
+        data = bytes([0x4E, 0x00, 0x20, 0x05, 0x00, 0xAA, 0xBB, 0xCC, 0x00])
         decoded = disassemble_function(data, 0, len(data))
         self.assertTrue(decoded["complete"])
-        self.assertEqual(decoded["commands"][0]["size"], 8)
+        self.assertEqual([row["size"] for row in decoded["commands"]], [8, 1])
+        self.assertEqual(decoded["commands"][0]["argumentsHex"], "00 20 05 00 AA BB CC")
 
     def test_invalid_memory_copy_fails_closed(self):
         data = bytes([0x4E, 0x00, 0x20, 0x01, 0x00])
