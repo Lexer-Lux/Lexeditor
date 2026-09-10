@@ -71,8 +71,9 @@ def check() -> list[str]:
     for relative in (
         "editor.html", "server.py", "plugin.py", "paths.py", "vbf.py", "deployment.py", "theme.py", "launch.py",
         "verify_install.py", "ffx_table.py", "ffx2_table.py", "shop_table.py", "u32_prices.py", "treasures.py",
-        "item_prices.py", "auto_ability_prices.py", "ctb_base.py", "mix_table.py", "item_shops.py", "gear_shops.py",
-        "ffx_commands.py", "ffx2_abilities.py", "ffx2_accessories.py", "project-template/README.md",
+        "item_prices.py", "auto_ability_prices.py", "ffx_auto_abilities.py", "ctb_base.py", "mix_table.py",
+        "item_shops.py", "gear_shops.py", "ffx_commands.py", "ffx2_abilities.py", "ffx2_accessories.py",
+        "project-template/README.md",
     ):
         target = PLUGIN_ROOT / relative
         if not target.is_file():
