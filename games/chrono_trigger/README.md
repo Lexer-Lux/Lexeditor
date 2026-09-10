@@ -21,13 +21,13 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - Fixed 256-color BGR555 scene/world palette editing with header/trailing-byte preservation.
 - Project change inventory/revert, deterministic CTP export, CTExt audit/deploy/deactivate/manifest-owned undeploy and deployment/integrity checks.
 - Read-only gameplay-data inventory/probe tooling with strict decompression caps and no stat-field claims.
-- Read-only field-event coverage audit that can consume exported Event JSON or scan a real Steam `resources.bin`/project overlay directly.
+- Read-only field-event coverage audit that can consume exported Event JSON or scan a real Steam `resources.bin`/project overlay directly; the same audit is available on demand in the desktop Events view.
 
 ## Field events
 
 `Atel_*.dat` support includes object/function bounds, fail-closed PC disassembly, semantic summaries, control-flow diagnostics and named **fixed-width argument editing** in both the desktop Events UI and `tools/chrono_trigger_event.py`. Opcode changes, command insertion/deletion, resizing and pointer relocation remain unsupported.
 
-`tools/chrono_trigger_event_audit.py` ranks the next event-research targets using actual Steam scripts. It deduplicates aliased function slots by `(start, end)`, reports total decoded commands separately from argument-bearing commands, excludes zero-argument commands from missing-editor coverage, and prioritizes parser-stop opcodes because one unresolved boundary hides the remainder of a function. Direct scans continue past malformed project overlays and report those errors per event; `--source vanilla` provides the immutable baseline.
+`games/chrono_trigger/event_audit.py` provides the shared read-only audit core used by both `tools/chrono_trigger_event_audit.py` and `GET /api/event-audit`. The Events view exposes **Run coverage audit** only on explicit request, never as a startup-wide scan. It deduplicates aliased function slots by `(start, end)`, reports total decoded commands separately from argument-bearing commands, excludes zero-argument commands from missing-editor coverage, and prioritizes parser-stop opcodes because one unresolved boundary hides the remainder of a function. Direct scans continue past malformed project overlays and report those errors per event; `--source vanilla` provides the immutable baseline. Completed desktop audits expose **Download audit JSON**; `chrono-trigger-event-audit-<source>.json` is the preferred small handoff artifact for further opcode research instead of sharing `resources.bin`.
 
 Examples:
 
@@ -125,13 +125,14 @@ All three opcode families remain unwritable through the fixed-width raw writer e
 
 The dedicated `Chrono Trigger checks` workflow explicitly compiles the production tools/modules plus quarantined research helpers, validates the descriptor, auto-discovers all `test_chrono_trigger_*.py` suites, runs the managed ARC1/CTExt smoke, checks editor JavaScript and runs Playwright regressions.
 
-Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, raw PC segment u16/slot/value round trips, bank-7F page/range distinctions, `0x16` and `0x6E` comparison retargeting, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries plus raw-write blocking, PC-specific `2E/88/4E` boundaries, F1 fail-closed behavior, read-only `FF` Mode 7 semantics and fail-closed malformed encodings. Event-audit regressions additionally cover unique-bound alias deduplication, argument-bearing coverage metrics, direct ARC1 scanning, event filtering and malformed-overlay reporting with a clean Vanilla comparison.
+Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, raw PC segment u16/slot/value round trips, bank-7F page/range distinctions, `0x16` and `0x6E` comparison retargeting, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries plus raw-write blocking, PC-specific `2E/88/4E` boundaries, F1 fail-closed behavior, read-only `FF` Mode 7 semantics and fail-closed malformed encodings. Event-audit regressions additionally cover shared CLI/server core behavior, unique-bound alias deduplication, argument-bearing coverage metrics, direct ARC1 scanning, event filtering, malformed-overlay reporting with a clean Vanilla comparison, source-aware desktop results and the exact downloaded JSON filename/payload.
 
 Browser coverage includes:
 - main scene/world/Event surfaces and a sequential NPC Facing -> `0x13` comparison save,
 - `0x6B` Toggle Bits,
 - PC-only extended raw-slot editing including `0x6E`,
 - a three-save Events sequence for `0x23` Get Facing, `0x0B` processing target and `0x9D` vector-memory sources,
+- on-demand Mine/Vanilla event coverage audits plus downloadable audit JSON,
 - bank-7F `0x65` + `0x16` page-bit editing,
 - raw PC segment-memory `0x4B` editing with exact little-endian bytes and no full-address claim.
 
@@ -147,7 +148,7 @@ See [`FORMAT_EVIDENCE.md`](FORMAT_EVIDENCE.md) for the PC-format evidence ledger
 ## Remaining high-value work
 
 1. Run the inventory/probe pipeline against a current Steam install and identify real gameplay-data record families before any stat editor.
-2. Run the event coverage audit against a current Steam install, then prioritize unresolved parser stops and high-frequency argument-bearing read-only opcodes from that evidence.
+2. Run the Events coverage audit against a current Steam install, download its JSON, and prioritize unresolved parser stops and high-frequency argument-bearing read-only opcodes from that evidence.
 3. Continue expanding only independently proven fixed-width event semantics/editors.
 4. Resolve Steam BGAnime initial-frame/phase behavior and `PrioMap`/main-sub composition before playback/composed rendering.
 5. Keep expanding browser-level coverage for integrated Chrono surfaces.
