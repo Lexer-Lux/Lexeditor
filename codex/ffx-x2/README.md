@@ -94,7 +94,31 @@ Writable known bits:
 
 For each byte, only bits `0x01|0x02|0x04|0x08|0x10` are changed. Bits `0x20|0x40|0x80` are preserved from the original byte even if present. The SOS byte at `+0x10`, all status/effect/stat/group/icon fields, text references, unknown data and trailing strings remain opaque/read-only.
 
-This is intentionally **not** a general auto-ability editor.
+### `ply_save.bin` — player base stats
+
+English/US path:
+
+`FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/ply_save.bin`
+
+Two independent references agree on the narrow prefix exposed by Lexeditor:
+
+- `Karifean/FFXDataParser` defines `PlayerCharStatDataObject.LENGTH = 0x94` and reads base HP at `+0x04`, base MP at `+0x08`, then STR/DEF/MAG/MDF/AGI/LCK/EVA/ACC as bytes `+0x0C..+0x13`. Its localized reader resolves `battle/kernel/ply_save.bin` under the default US `new_uspc` root.
+- Fahrenheit independently asserts `sizeof(FFX.PlySave) == 0x94` for `ply_save.bin`. Its sequential struct places one four-byte text offset first, then `uint base_hp`, `uint base_mp`, followed by the same eight base-stat bytes in the same order.
+
+Writable fields only:
+
+- `+0x04..+0x07`: base HP (`u32`);
+- `+0x08..+0x0B`: base MP (`u32`);
+- `+0x0C`: Strength (`u8`);
+- `+0x0D`: Defense (`u8`);
+- `+0x0E`: Magic (`u8`);
+- `+0x0F`: Magic Defense (`u8`);
+- `+0x10`: Agility (`u8`);
+- `+0x11`: Luck (`u8`);
+- `+0x12`: Evasion (`u8`);
+- `+0x13`: Accuracy (`u8`).
+
+The four-byte text metadata at `+0x00..+0x03` is read-only. **Everything beginning at `+0x14` is intentionally opaque**, because the independent sources do not uniformly agree on all later field semantics. Lexeditor therefore does not expose total/current AP, current/max HP/MP, current stats, equipment/state data or character-name mapping from this record.
 
 ### `ctb_base.bin` — battle timing
 
@@ -188,7 +212,7 @@ The `+0x24..+0x53` creature extension, string references, unknown bytes and trai
 
 ## Structured write guarantees
 
-The plugin currently exposes **14 proved structured tables**: twelve FFX tables and two FFX-2 tables.
+The plugin currently exposes **15 proved structured tables**: thirteen FFX tables and two FFX-2 tables.
 
 Every structured save is guarded by:
 
@@ -237,7 +261,7 @@ The verifier:
 
 - validates both installed VBF indexes;
 - resolves raw/virtual path spellings;
-- reads and validates all 14 currently supported structured tables with the production parsers;
+- reads and validates all 15 currently supported structured tables with the production parsers;
 - reports source paths, table SHA-256 values, record counts/sizes and VBF header metadata;
 - optionally streams each complete VBF through SHA-256 with `--hash-archives`;
 - reports Fahrenheit launch prerequisites;
@@ -257,7 +281,7 @@ Integrated:
 - Validated read-only indexing/decompression of both VBFs.
 - Raw VBF path → canonical Fahrenheit EFL normalization.
 - Searchable archive browser and byte-exact project extraction.
-- Twelve FFX structured tables: treasure rewards, two price tables, auto-ability elemental masks, CTB timing, Mix results, two shop tables, and four ability-animation tables.
+- Thirteen FFX structured tables: treasure rewards, two price tables, auto-ability elemental masks, player base stats, CTB timing, Mix results, two shop tables, and four ability-animation tables.
 - Two FFX-2 structured tables: command animation IDs and accessory base abilities/price.
 - Exact VBF/table stale-write guards and project-only saves.
 - Reversible Fahrenheit file-only deployment.
@@ -268,7 +292,7 @@ Integrated:
 
 Not yet integrated/proved:
 
-- Other FFX kernel formats or any unproved fields in `a_ability.bin` / the four ability tables.
+- Other FFX kernel formats or any unproved fields in `a_ability.bin`, `ply_save.bin`, or the four ability tables.
 - FFX localized dialogue/string editing.
 - Other FFX-2 structured tables, localized string editing, creature-extension accessory fields or non-US variants.
 - Conversion of recognized proprietary font/texture/audio formats that are not browser-ready.
