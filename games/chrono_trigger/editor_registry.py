@@ -65,6 +65,12 @@ from .scene_event_ops import (
     scene_event_field_specs,
     scene_event_values,
 )
+from .segment_memory_ops import (
+    apply_segment_memory_op,
+    decorate_segment_memory_semantics,
+    segment_memory_field_specs,
+    segment_memory_values,
+)
 
 
 def _schema_from_specs(command: dict, specs: list[dict] | None, values: dict | None) -> dict | None:
@@ -95,6 +101,10 @@ def comparison_editor_schema(command: dict) -> dict | None:
 
 def memory_editor_schema(command: dict) -> dict | None:
     return _schema_from_specs(command, memory_field_specs(command), memory_values(command))
+
+
+def segment_memory_editor_schema(command: dict) -> dict | None:
+    return _schema_from_specs(command, segment_memory_field_specs(command), segment_memory_values(command))
 
 
 def bit_editor_schema(command: dict) -> dict | None:
@@ -144,6 +154,7 @@ def jump_editor_schema(command: dict) -> dict | None:
 _REGISTRY_BUILDERS = (
     comparison_editor_schema,
     memory_editor_schema,
+    segment_memory_editor_schema,
     bit_editor_schema,
     movement_editor_schema,
     call_editor_schema,
@@ -159,6 +170,7 @@ _REGISTRY_BUILDERS = (
 _REGISTRY_APPLIERS = (
     apply_comparison,
     apply_memory_op,
+    apply_segment_memory_op,
     apply_bit_op,
     apply_movement_op,
     apply_call_op,
@@ -184,6 +196,7 @@ def editor_schema(command: dict) -> dict | None:
 def decorate_event_editors(payload: dict) -> dict:
     decorate_comparison_semantics(payload)
     decorate_memory_semantics(payload)
+    decorate_segment_memory_semantics(payload)
     decorate_bit_semantics(payload)
     decorate_movement_semantics(payload)
     decorate_call_semantics(payload)
