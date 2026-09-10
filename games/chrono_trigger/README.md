@@ -29,7 +29,9 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 ### Proven writable families
 
 - Steam item layouts: `C7`, `CA`, `CB`, `D5`, `D7`; PC category bytes remain raw.
-- Conditions: `18`; button/action checks `2D`, `30/31`, `34–39`, `3B/3C`, `3F–44`; script-memory comparisons `12–15`.
+- Conditions: `18`; button/action checks `2D`, `30/31`, `34–39`, `3B/3C`, `3F–44`; memory comparisons `12–16`.
+  - `12/13` compare one `/2` script-memory slot with an immediate u8/u16 value; `14/15` compare two `/2` script-memory slots at 8/16-bit width.
+  - `16` is the separately proven bank-7F 8-bit form: `[low address byte, value, comparator|page bit, jump]`. Comparator is bits 0–2, bit 7 selects `0x7F0100–0x7F01FF`, and bits 3–6 must be clear. Lexeditor exposes the resulting address only within `0x7F0000–0x7F01FF`.
 - Script-memory result/store/copy/math: `19`, `1A`, `4F`, `50`, `51`, `52`, `5B`, `5D`, `5E`, `5F`, `71`, `72`, `73`, plus existing `20`, `55`, `7F` and memory-source controls. Ordinary script-memory addresses are even `0x7F0200–0x7F03FE` and round-trip through the one-byte `/2` slot.
 - Narrow bank-7F result: `1C` stores one literal byte offset from `0x7F0000`; Lexeditor exposes only the actually encodable `0x7F0000–0x7F00FF` range.
 - Proven bank-7F assignments:
@@ -37,8 +39,11 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
   - `58/59`: script-memory source -> bank-local `0x7F0000–0x7F01FF` destination, 8/16-bit.
   - `56`: u8 immediate -> full u16 bank offset `0x7F0000–0x7FFFFF`.
   - Wider pre-existing `53/54/58/59` offsets remain read-only because Temporal Redux constructors select those opcodes only for `is_local_mem()` (`0x7F0000–0x7F01FF`).
-- Local bit ops: `63` Set Bit, `64` Reset Bit, `69` Set Bits, `6B` Toggle Bits, `6F` Shift Right.
-- PC-only raw-slot ops: `3A`, `3D`, `3E`, `45`, `46`, `70`, `74`, `78`. Local/extended/party operands remain raw bytes because the PC factories do not run them through the ordinary `/2` address helper.
+- Bit ops:
+  - `63` Set Bit, `64` Reset Bit, `69` Set Bits, `6B` Toggle Bits and `6F` Shift Right use ordinary `/2` script memory.
+  - Bank-7F `65/66` Set/Reset Bit use `[bitIndex|pageBit, lowAddress]`: bits 0–2 are the bit index, bit 7 selects the upper `0x100`-byte page, and undocumented bits 3–6 must be clear. The editable address domain is exactly `0x7F0000–0x7F01FF`.
+- PC-only raw-slot ops: `3A`, `3D`, `3E`, `45`, `46`, `6E`, `70`, `74`, `78`. Local/extended/party operands remain raw bytes because the PC factories do not run them through the ordinary `/2` address helper.
+  - `6E` is a raw-slot 8-bit comparison `[extendedSlot, value, comparator, jump]`; comparator is validated to 0–7 and the jump byte uses the same decoded-command-boundary validator as other conditionals.
 - Function calls `02–07`: doubled target byte + packed priority/function nibbles; opcode fixes continue/sync/halt.
 - Doubled object controls `0A`, `0B`, `0C`, `7C`, `7D`; `0B/0C` edit only the target while the opcode keeps processing off/on fixed.
 - Facing target/result controls:
@@ -70,16 +75,25 @@ Known EC forms receive read-only semantic labels. Unknown subcommands and trunca
 - scenes `00–89`: one scene byte
 - specials `90` and `97`: special byte + three raw parameters
 - specials `91–96` and `98`: special byte only
+- unknown modes `8A–8F` and `99–FF` fail closed rather than being guessed as one-byte forms
 
-The shared fixed-width writer still rejects `0xFF` because its PC width is dynamic. Tests pin that guard for both a normal scene and a parameterized special; no Mode 7 writer exception was added.
+The shared fixed-width writer still rejects `0xFF` because its PC width is dynamic. No Mode 7 writer exception was added.
+
+`0x2E`, `0x88` and `0x4E` follow Temporal Redux's **platform-specific PC parser** when generic menus disagree:
+
+- Color Math `2E`: PC modes 4/5 have five argument bytes; PC mode 8 has three.
+- Multi-mode Copy `88`: PC modes 0/2/3/4/5/8 have 1/3/3/4/4/2 argument bytes respectively.
+- Memory Copy `4E`: PC is `[destination u16, encoded-length u16, payload]`; the encoded length includes its own two-byte field.
+
+All three opcode families remain unwritable through the fixed-width raw writer even when a particular PC form has a known boundary.
+
+`0xF1` Color Addition is **boundary-unresolved**: the platform PC parser/table treats a nonzero first argument as a two-argument form, while the live ColorAdd menu can construct a nonzero one-argument form. Raw bytes cannot safely distinguish those interpretations, so field disassembly stops at F1 rather than consuming a possible following opcode.
 
 ### Intentionally read-only / unresolved
 
-- `16` bank-7F comparison packing.
 - `48–4D` PC two-byte **segment-address** forms: the current menus do not establish a reversible full PC RAM-address mapping.
 - `60` PC width/constructor semantic conflict; `61` operation width is literally documented upstream as `1 byte?`.
-- `65/66` bank-7F bit packing; `67` reset-mask polarity conflict.
-- `6E` PC extended-memory comparison semantics/address meaning.
+- `67` reset-mask polarity conflict.
 - `75/76/77`: upstream descriptions include `1 (0xFF?)` / `1 byte?` uncertainty.
 - `7B` unused NPC jump with unknown destination and `speed/height?` fields.
 - `27/28` target normalization: live menus and helper constructors disagree about `/2` handling.
@@ -87,6 +101,7 @@ The shared fixed-width writer still rejects `0xFF` because its PC width is dynam
 - `92/9C` direct vector movement: constructor doubles magnitude but the live menu does not undo that on decode.
 - `9E/9F` movement widths/targets: upstream metadata remains internally inconsistent and Lexeditor marks those widths unresolved.
 - `E4/E5/E6` tile-copy/layer-scroll unknown flags/fields.
+- `F1` command boundary due conflicting PC parser/menu evidence.
 - `FF` Mode 7 writes: decoded forms remain semantic-only because the opcode is dynamically sized.
 - variable/dynamic unresolved command writes generally.
 
@@ -94,7 +109,7 @@ The shared fixed-width writer still rejects `0xFF` because its PC width is dynam
 
 The dedicated `Chrono Trigger checks` workflow compiles plugin/tools, validates the descriptor, auto-discovers all `test_chrono_trigger_*.py` suites, runs the managed ARC1/CTExt smoke, checks editor JavaScript and runs Playwright regressions.
 
-Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, bank-7F range distinctions, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries, read-only `FF` Mode 7 semantics and fail-closed malformed encodings.
+Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, bank-7F page/range distinctions, `0x16` and `0x6E` comparison retargeting, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries, PC-specific `2E/88/4E` boundaries, F1 fail-closed behavior, read-only `FF` Mode 7 semantics and fail-closed malformed encodings.
 
 Browser coverage includes:
 - main scene/world/Event surfaces and a sequential NPC Facing -> `0x13` comparison save,
@@ -108,7 +123,7 @@ See [`FORMAT_EVIDENCE.md`](FORMAT_EVIDENCE.md) for the PC-format evidence ledger
 
 - ChronoMod: ARC1 container/replacement evidence, not gameplay-stat layouts.
 - CTViewer: current PC scene/world/map/tile/palette/render diagnostics.
-- Temporal Redux: PC Atel widths, constructors and live command menus.
+- Temporal Redux: PC Atel widths, constructors, platform-specific parser and live command menus.
 - CTExt: loose-file/CTP runtime loading.
 
 ## Remaining high-value work
