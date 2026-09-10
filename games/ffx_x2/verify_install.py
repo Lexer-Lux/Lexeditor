@@ -15,8 +15,8 @@ from typing import Callable, Iterable
 
 from . import (
     auto_ability_prices, ctb_base, ffx_auto_abilities, ffx_commands,
-    ffx2_accessories, ffx2_abilities, gear_shops, item_prices, item_shops,
-    launch, mix_table, paths, treasures,
+    ffx_player_stats, ffx2_accessories, ffx2_abilities, gear_shops, item_prices,
+    item_shops, launch, mix_table, paths, treasures,
 )
 from .vbf import VBFError, VBFIndex, read_entry, read_index
 
@@ -32,6 +32,7 @@ STRUCTURED_SPECS = (
     {"game": "x", "key": "item-prices", "archivePath": item_prices.ARCHIVE_PATH, "builder": item_prices.payload},
     {"game": "x", "key": "auto-ability-prices", "archivePath": auto_ability_prices.ARCHIVE_PATH, "builder": auto_ability_prices.payload},
     {"game": "x", "key": "auto-ability-elements", "archivePath": ffx_auto_abilities.ARCHIVE_PATH, "builder": ffx_auto_abilities.payload},
+    {"game": "x", "key": "player-base-stats", "archivePath": ffx_player_stats.ARCHIVE_PATH, "builder": ffx_player_stats.payload},
     {"game": "x", "key": "ctb-base", "archivePath": ctb_base.ARCHIVE_PATH, "builder": ctb_base.payload},
     {"game": "x", "key": "mix-table", "archivePath": mix_table.ARCHIVE_PATH, "builder": mix_table.payload},
     {"game": "x", "key": "item-shops", "archivePath": item_shops.ARCHIVE_PATH, "builder": item_shops.payload},
