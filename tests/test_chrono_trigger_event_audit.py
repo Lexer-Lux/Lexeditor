@@ -19,8 +19,8 @@ def event_payload(event_id: int, commands: list[dict], *, problem: dict | None =
     }
 
 
-def command(opcode: int, *, writable: bool) -> dict:
-    row = {"opcode": opcode}
+def command(opcode: int, *, writable: bool, argument_bytes: int = 1) -> dict:
+    row = {"opcode": opcode, "argumentBytes": argument_bytes}
     if writable:
         row["editor"] = {"fixedWidth": True}
     return row
@@ -44,6 +44,8 @@ class EventAuditTests(unittest.TestCase):
         self.assertEqual(audit["completeFunctions"], 0)
         self.assertEqual(audit["problemFunctions"], 1)
         self.assertEqual(audit["decodedCommands"], 4)
+        self.assertEqual(audit["argumentCommands"], 4)
+        self.assertEqual(audit["zeroArgumentCommands"], 0)
         self.assertEqual(audit["writableCommands"], 2)
         self.assertEqual(audit["readOnlyCommands"], 2)
         self.assertEqual(audit["writablePercent"], 50.0)
@@ -53,6 +55,20 @@ class EventAuditTests(unittest.TestCase):
         self.assertEqual(rows[0x8E]["readOnly"], 1)
         self.assertTrue(rows[0xEC]["dynamicOrUnresolvedBoundary"])
         self.assertEqual(audit["stops"], [{"opcode": 0xF1, "opcodeHex": "0xF1", "count": 1}])
+
+    def test_zero_argument_commands_do_not_pollute_editor_gap_metrics(self):
+        payload = event_payload(8, [
+            command(0x00, writable=False, argument_bytes=0),
+            command(0x90, writable=False, argument_bytes=0),
+            command(0x8E, writable=False),
+        ])
+        audit = audit_event(payload)
+        self.assertEqual(audit["decodedCommands"], 3)
+        self.assertEqual(audit["argumentCommands"], 1)
+        self.assertEqual(audit["zeroArgumentCommands"], 2)
+        self.assertEqual(audit["readOnlyCommands"], 1)
+        summary = merge_audits([audit])
+        self.assertEqual([row["opcode"] for row in summary["hotspots"]], [0x8E])
 
     def test_aliased_function_slots_are_counted_once_by_bounds(self):
         shared = {
@@ -96,6 +112,7 @@ class EventAuditTests(unittest.TestCase):
         summary = merge_audits([first, second])
         self.assertEqual(summary["events"], 2)
         self.assertEqual(summary["decodedCommands"], 6)
+        self.assertEqual(summary["argumentCommands"], 6)
         self.assertEqual(summary["writableCommands"], 2)
         self.assertEqual(summary["readOnlyCommands"], 4)
         self.assertEqual(summary["writablePercent"], 33.33)
@@ -111,9 +128,11 @@ class EventAuditTests(unittest.TestCase):
     def test_empty_event_has_zero_percent_without_division_error(self):
         audit = audit_event(event_payload(0, []))
         self.assertEqual(audit["decodedCommands"], 0)
+        self.assertEqual(audit["argumentCommands"], 0)
         self.assertEqual(audit["writablePercent"], 0.0)
         summary = merge_audits([audit])
         self.assertEqual(summary["decodedCommands"], 0)
+        self.assertEqual(summary["argumentCommands"], 0)
         self.assertEqual(summary["writablePercent"], 0.0)
         self.assertEqual(summary["hotspots"], [])
 
