@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Summarize writable/read-only coverage from Chrono Trigger event JSON.
+"""Audit Chrono Trigger Steam field-event editor coverage.
 
-Input is one or more JSON payloads produced by `tools/chrono_trigger_event.py
-show` (or `-` for stdin).  This tool never opens or writes game files.  It is
-intended to rank the next PC event commands using real Steam script frequency
-rather than opcode-name guesses.
+Two read-only input modes are supported:
+
+- one or more JSON payloads produced by ``tools/chrono_trigger_event.py show``;
+- a real Steam install/project pair, which scans selected or all ``Atel_*.dat``
+  resources directly through Lexeditor's fail-closed PC parser.
+
+The report ranks parser-stop opcodes ahead of ordinary read-only frequency so
+research effort is driven by real Steam scripts instead of opcode-name guesses.
+This tool never writes game or project files.
 """
 
 from __future__ import annotations
@@ -21,7 +26,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from games.chrono_trigger.data import OverlayStore
+from games.chrono_trigger.editor_registry import decorate_event_editors
 from games.chrono_trigger.event_edit import VARIABLE_OR_UNRESOLVED
+from games.chrono_trigger.events import event_entries, parse_event
 
 
 def _opcode_key(value: int) -> str:
@@ -29,8 +37,15 @@ def _opcode_key(value: int) -> str:
 
 
 def _iter_functions(payload: dict):
+    """Yield unique decoded function bounds, not aliased 16-slot references."""
+    seen_bounds: set[tuple[int, int]] = set()
     for obj in payload.get("objects", []):
         for function in obj.get("functions", []):
+            if "start" in function and "end" in function:
+                key = (int(function["start"]), int(function["end"]))
+                if key in seen_bounds:
+                    continue
+                seen_bounds.add(key)
             yield function
 
 
@@ -162,17 +177,87 @@ def _load(path: str) -> dict:
         return json.load(handle)
 
 
+def _direct_audits(game: Path, project: Path, source: str,
+                   requested_ids: list[int], limit: int) -> list[dict]:
+    game = game.expanduser().resolve()
+    project = project.expanduser().resolve()
+    archive = game / "resources.bin"
+    if not archive.is_file():
+        raise FileNotFoundError(f"resources.bin not found: {archive}")
+
+    store = OverlayStore(archive, project)
+    entries = event_entries(store)
+    by_id = {event_id: path for event_id, path in entries}
+    if requested_ids:
+        selected_ids = sorted(set(int(value) for value in requested_ids))
+        missing = [event_id for event_id in selected_ids if event_id not in by_id]
+        if missing:
+            rendered = ", ".join(str(value) for value in missing)
+            raise ValueError(f"Unknown Chrono Trigger field event(s): {rendered}")
+        selected = [(event_id, by_id[event_id]) for event_id in selected_ids]
+    else:
+        selected = entries
+
+    if limit < 0:
+        raise ValueError("Audit limit must be 0 or greater")
+    if limit:
+        selected = selected[:limit]
+
+    audits: list[dict] = []
+    for event_id, path in selected:
+        raw, origin = store.read(path, source)
+        payload = {
+            "id": event_id,
+            "path": path,
+            "source": origin,
+            **parse_event(raw),
+        }
+        decorate_event_editors(payload)
+        audits.append(audit_event(payload))
+    return audits
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Audit named event-editor coverage from Chrono Trigger event-show JSON."
+        description="Audit Chrono Trigger Steam field-event editor coverage."
     )
-    parser.add_argument("inputs", nargs="+", help="Event JSON file(s), or '-' for stdin")
+    parser.add_argument("inputs", nargs="*", help="Event JSON file(s), or '-' for stdin")
+    parser.add_argument("--game", type=Path, help="Chrono Trigger Steam install directory")
+    parser.add_argument("--project", type=Path, help="Lexeditor/CTExt project overlay")
+    parser.add_argument("--source", choices=("mine", "vanilla"), default="mine",
+                        help="Direct-scan source: project overlay when present, or immutable vanilla")
+    parser.add_argument("--event", dest="event_ids", action="append", type=int, default=[],
+                        help="Direct scan: restrict to this event ID; repeat for multiple events")
+    parser.add_argument("--limit", type=int, default=0,
+                        help="Direct scan: maximum events after filtering; 0 scans all")
     args = parser.parse_args(argv)
-    if args.inputs.count("-") > 1:
-        parser.error("stdin may be specified only once")
 
-    audits = [audit_event(_load(path)) for path in args.inputs]
+    direct_mode = args.game is not None or args.project is not None
+    if direct_mode:
+        if args.game is None or args.project is None:
+            parser.error("--game and --project must be supplied together")
+        if args.inputs:
+            parser.error("JSON inputs cannot be combined with --game/--project")
+        try:
+            audits = _direct_audits(
+                args.game, args.project, args.source, args.event_ids, args.limit,
+            )
+        except Exception as error:
+            print(json.dumps({"error": str(error)}, ensure_ascii=False))
+            return 1
+    else:
+        if args.event_ids or args.limit or args.source != "mine":
+            parser.error("--event, --limit and --source require --game/--project")
+        if not args.inputs:
+            parser.error("provide event JSON input(s) or --game/--project")
+        if args.inputs.count("-") > 1:
+            parser.error("stdin may be specified only once")
+        audits = [audit_event(_load(path)) for path in args.inputs]
+
     output = audits[0] if len(audits) == 1 else merge_audits(audits)
+    if direct_mode:
+        output["scanSource"] = args.source
+        output["selectedEventIds"] = [audit.get("eventId") for audit in audits]
     print(json.dumps(output, indent=2, sort_keys=False))
     return 0
 
