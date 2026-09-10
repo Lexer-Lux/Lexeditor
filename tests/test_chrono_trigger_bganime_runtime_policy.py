@@ -12,13 +12,17 @@ class BgAnimeRuntimePolicyTests(unittest.TestCase):
     def test_runtime_evidence_gate_records_required_hypotheses_and_separate_composition_gate(self):
         text = (GAME / "BGANIME_RUNTIME_EVIDENCE.md").read_text(encoding="utf-8")
         for phrase in (
-            "H0 — initial copy of frame 0",
-            "H1 — base destination first, then frame 0",
-            "H2 — advance before first copy",
-            "H3 — externally seeded/shared phase",
-            "Composition is a separate gate",
+            "H0 — base graphics first",
+            "H1 — frame 0 copied on load",
+            "H2 — frame 0 copied on first tick",
+            "H3 — pre-advanced phase",
+            "first observable rendered state",
+            "wraps at least once",
+            "leaving and re-entering the location resets or preserves the phase",
+            "Composition remains a separate gate",
             "PrioMap",
-            "Until every item needed for the claimed behavior is satisfied",
+            "Runtime animation playback: unsupported",
+            "Main/sub/priority composition: unsupported",
         ):
             self.assertIn(phrase, text)
 
@@ -28,6 +32,7 @@ class BgAnimeRuntimePolicyTests(unittest.TestCase):
         self.assertIn("Main/sub blend and priority composition remain unsupported", text)
         self.assertIn("PrioMap", text)
         self.assertIn("unknown PC-only layer-priority data", text)
+        self.assertIn("BGANIME_RUNTIME_EVIDENCE.md", text)
 
     def test_data_map_keeps_bganime_structural_not_integrated_playback(self):
         text = (GAME / "coverage.py").read_text(encoding="utf-8")
