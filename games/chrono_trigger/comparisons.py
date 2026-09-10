@@ -1,9 +1,9 @@
 """Proven fixed-width Steam field-event memory comparisons.
 
-Temporal Redux's PC command definitions establish the four comparison layouts
-handled here. This module deliberately excludes 0x16 because that command folds
-bank-7F addressing state into the operator byte and is not equivalent to the
-plain script-memory layouts below.
+Temporal Redux's PC command definitions establish the comparison layouts here.
+The bank-7F 0x16 form is intentionally treated separately from ordinary script
+memory: its low address byte is arg0 and arg2 packs comparison operation bits
+0-2 plus a 0x80 page bit selecting 0x7F0100-0x7F01FF.
 """
 
 from __future__ import annotations
@@ -13,6 +13,8 @@ U8 = 0xFF
 U16 = 0xFFFF
 SCRIPT_MEM_START = 0x7F0200
 SCRIPT_MEM_LAST = SCRIPT_MEM_START + U8 * 2
+BANK7F_START = 0x7F0000
+BANK7F_LAST = 0x7F01FF
 OPERATION_NAMES = (
     "equals",
     "not equals",
@@ -23,7 +25,7 @@ OPERATION_NAMES = (
     "bitwise AND nonzero",
     "bitwise OR nonzero",
 )
-COMPARISON_OPCODES = frozenset({0x12, 0x13, 0x14, 0x15})
+COMPARISON_OPCODES = frozenset({0x12, 0x13, 0x14, 0x15, 0x16})
 
 
 def _args(command: dict) -> bytearray | None:
@@ -54,6 +56,10 @@ def _script_offset(value, label: str) -> int:
     return (address - SCRIPT_MEM_START) // 2
 
 
+def _bank7f_address(low_byte: int, packed_operation: int) -> int:
+    return BANK7F_START + int(low_byte) + (0x100 if packed_operation & 0x80 else 0)
+
+
 def _layout(command: dict) -> tuple[int, bytearray, int] | None:
     opcode = int(command["opcode"])
     args = _args(command)
@@ -63,11 +69,17 @@ def _layout(command: dict) -> tuple[int, bytearray, int] | None:
         operation_offset = 2
     elif opcode == 0x13 and len(args) == 5:
         operation_offset = 3
-    elif opcode in {0x14, 0x15} and len(args) == 4:
+    elif opcode in {0x14, 0x15, 0x16} and len(args) == 4:
         operation_offset = 2
     else:
         return None
-    if args[operation_offset] >= len(OPERATION_NAMES):
+    packed_operation = args[operation_offset]
+    if opcode == 0x16:
+        # Constructor/parser evidence establishes only low comparator bits and
+        # bit 7 as the 0x100 address-page selector. Bits 3-6 stay unclaimed.
+        if packed_operation & 0x78:
+            return None
+    elif packed_operation >= len(OPERATION_NAMES):
         return None
     return opcode, args, operation_offset
 
@@ -77,6 +89,13 @@ def comparison_field_specs(command: dict) -> list[dict] | None:
     if parsed is None:
         return None
     opcode, _args_value, _operation_offset = parsed
+    if opcode == 0x16:
+        return [
+            {"key": "memoryAddress", "label": "Bank-7F address", "minimum": BANK7F_START, "maximum": BANK7F_LAST},
+            {"key": "value", "label": "Comparison value", "minimum": 0, "maximum": U8},
+            {"key": "operation", "label": "Comparison operation (0–7)", "minimum": 0, "maximum": 7},
+            {"key": "jumpOffset", "label": "Jump bytes if false", "minimum": 0, "maximum": U8},
+        ]
     if opcode in {0x12, 0x13}:
         value_max = U8 if opcode == 0x12 else U16
         return [
@@ -112,6 +131,13 @@ def comparison_values(command: dict) -> dict | None:
             "operation": args[operation_offset],
             "jumpOffset": args[4],
         }
+    if opcode == 0x16:
+        return {
+            "memoryAddress": _bank7f_address(args[0], args[operation_offset]),
+            "value": args[1],
+            "operation": args[operation_offset] & 0x07,
+            "jumpOffset": args[3],
+        }
     return {
         "leftAddress": _script_address(args[0]),
         "rightAddress": _script_address(args[1]),
@@ -125,7 +151,7 @@ def apply_comparison(command: dict, values: dict) -> bytes | None:
     if parsed is None:
         return None
     opcode, args, operation_offset = parsed
-    if opcode in {0x12, 0x13}:
+    if opcode in {0x12, 0x13, 0x16}:
         allowed = {"memoryAddress", "value", "operation", "jumpOffset"}
     else:
         allowed = {"leftAddress", "rightAddress", "operation", "jumpOffset"}
@@ -133,7 +159,16 @@ def apply_comparison(command: dict, values: dict) -> bytes | None:
     if unknown:
         raise ValueError(f"Unknown fields for opcode 0x{opcode:02X}: {', '.join(sorted(unknown))}")
 
-    if opcode in {0x12, 0x13}:
+    if opcode == 0x16:
+        current_address = _bank7f_address(args[0], args[operation_offset])
+        address = _int(values.get("memoryAddress", current_address), BANK7F_START, BANK7F_LAST, "Bank-7F address")
+        relative = address - BANK7F_START
+        operation = _int(values.get("operation", args[operation_offset] & 0x07), 0, 7, "Comparison operation")
+        args[0] = relative & 0xFF
+        args[operation_offset] = operation | (0x80 if relative >= 0x100 else 0)
+        if "value" in values:
+            args[1] = _int(values["value"], 0, U8, "Comparison value")
+    elif opcode in {0x12, 0x13}:
         if "memoryAddress" in values:
             args[0] = _script_offset(values["memoryAddress"], "Script-memory address")
         if "value" in values:
@@ -143,13 +178,15 @@ def apply_comparison(command: dict, values: dict) -> bytes | None:
                 args[1] = value
             else:
                 args[1:3] = value.to_bytes(2, "little")
+        if "operation" in values:
+            args[operation_offset] = _int(values["operation"], 0, 7, "Comparison operation")
     else:
         if "leftAddress" in values:
             args[0] = _script_offset(values["leftAddress"], "Left script-memory address")
         if "rightAddress" in values:
             args[1] = _script_offset(values["rightAddress"], "Right script-memory address")
-    if "operation" in values:
-        args[operation_offset] = _int(values["operation"], 0, 7, "Comparison operation")
+        if "operation" in values:
+            args[operation_offset] = _int(values["operation"], 0, 7, "Comparison operation")
     if "jumpOffset" in values:
         args[-1] = _int(values["jumpOffset"], 0, U8, "Jump bytes")
     return bytes(args)
@@ -161,7 +198,7 @@ def comparison_semantics(command: dict) -> dict | None:
         return None
     opcode, args, operation_offset = parsed
     width = 2 if opcode in {0x13, 0x15} else 1
-    operation = args[operation_offset]
+    operation = args[operation_offset] & 0x07 if opcode == 0x16 else args[operation_offset]
     operation_name = OPERATION_NAMES[operation]
     if opcode == 0x12:
         left = _script_address(args[0])
@@ -192,6 +229,22 @@ def comparison_semantics(command: dict) -> dict | None:
             "operationName": operation_name,
             "jumpOffset": jump,
             "jumpOnFalse": True,
+        }
+    if opcode == 0x16:
+        left = _bank7f_address(args[0], args[operation_offset])
+        value = args[1]
+        jump = args[3]
+        summary = f"8-bit 0x{left:06X} {operation_name} {value} · false → jump +{jump}"
+        return {
+            "summary": summary,
+            "widthBytes": 1,
+            "memoryAddress": left,
+            "value": value,
+            "operation": operation,
+            "operationName": operation_name,
+            "jumpOffset": jump,
+            "jumpOnFalse": True,
+            "bank7F": True,
         }
     left = _script_address(args[0])
     right = _script_address(args[1])
