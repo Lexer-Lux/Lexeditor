@@ -74,6 +74,14 @@
     }
   }
 
+  function updateSummary(row) {
+    if (!row) return;
+    $('ffx-player-summary').textContent =
+      `Record ${row.id} (${hex(row.id)}) · ${state.source === 'project' ? 'staged FFX project override' : 'installed FFX VBF'} · ` +
+      `0x${Number(state.recordSize).toString(16).toUpperCase()} bytes/record · bytes +0x14 onward remain opaque${dirty.has(row.id) ? ' · unsaved base-stat edit' : ''}`;
+    $('ffx-player-save').disabled = dirty.size === 0;
+  }
+
   function render() {
     const row = selected();
     if (!row) {
@@ -86,10 +94,7 @@
         <span>${esc(label)}</span><span class="ffxx2-hex">${Number(row[key]).toLocaleString()}</span>
         <input aria-label="${esc(label)} for player-stat record ${row.id}" type="number" min="${minimum}" max="${maximum}" step="1" value="${row[key]}">
       </label>`).join('');
-    $('ffx-player-summary').textContent =
-      `Record ${row.id} (${hex(row.id)}) · ${state.source === 'project' ? 'staged FFX project override' : 'installed FFX VBF'} · ` +
-      `0x${Number(state.recordSize).toString(16).toUpperCase()} bytes/record · bytes +0x14 onward remain opaque${dirty.has(row.id) ? ' · unsaved base-stat edit' : ''}`;
-    $('ffx-player-save').disabled = dirty.size === 0;
+    updateSummary(row);
   }
 
   async function refresh() {
@@ -109,7 +114,11 @@
     if (!fieldSpecs.some(([field]) => field === key)) return;
     row[key] = Number(target.value);
     dirty.add(row.id);
-    render();
+    wrapper.classList.add('ffxx2-dirty');
+    const valueLabel = wrapper.querySelector('.ffxx2-hex');
+    if (valueLabel) valueLabel.textContent = Number(row[key]).toLocaleString();
+    document.querySelectorAll('#ffx-player-fields .ffxx2-slot').forEach(item => item.classList.add('ffxx2-dirty'));
+    updateSummary(row);
   }
 
   async function save() {
