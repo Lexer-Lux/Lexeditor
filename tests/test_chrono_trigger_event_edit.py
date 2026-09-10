@@ -6,6 +6,7 @@ import unittest
 
 from games.chrono_trigger.data import sha256
 from games.chrono_trigger.event_edit import save_event_arguments
+from games.chrono_trigger.events import parse_event
 
 
 EVENT_PATH = "Game/field/atel/Atel_0001.dat"
@@ -129,11 +130,31 @@ class EventEditTests(unittest.TestCase):
             save_event_arguments(store, 1, 0, 0, 0, sha256(original), "01 02")
         self.assertIsNone(store.overlay)
 
-    def test_variable_width_color_addition_remains_read_only(self):
-        # F1 with nonzero color has two argument bytes in the decoded command.
-        original = _event(bytes((0xF1, 0x21, 0x80, 0x00)))
+    def test_decoded_dynamic_command_remains_read_only(self):
+        # PC Color Math mode 4 has a proven five-argument boundary, but the
+        # generic argument writer still blocks this dynamic opcode family.
+        original = _event(bytes((0x2E, 0x40, 0x01, 0x02, 0x03, 0x04, 0x00)))
+        parsed = parse_event(original)
+        command = parsed["objects"][0]["functions"][0]["commands"][0]
+        self.assertEqual(command["opcode"], 0x2E)
+        self.assertEqual(command["argumentBytes"], 5)
+
         store = FakeStore(original)
         with self.assertRaisesRegex(ValueError, "variable or unresolved"):
+            save_event_arguments(store, 1, 0, 0, 0, sha256(original), "40 05 06 07 08")
+        self.assertIsNone(store.overlay)
+
+    def test_unresolved_f1_stops_before_event_write_selection(self):
+        original = _event(bytes((0xF1, 0x21, 0x80, 0x00)))
+        parsed = parse_event(original)
+        function = parsed["objects"][0]["functions"][0]
+        self.assertFalse(function["complete"])
+        self.assertEqual(function["commands"], [])
+        self.assertEqual(function["problem"]["opcode"], 0xF1)
+        self.assertIn("unresolved", function["problem"]["reason"])
+
+        store = FakeStore(original)
+        with self.assertRaisesRegex(ValueError, "outside function"):
             save_event_arguments(store, 1, 0, 0, 0, sha256(original), "22 80")
         self.assertIsNone(store.overlay)
 
