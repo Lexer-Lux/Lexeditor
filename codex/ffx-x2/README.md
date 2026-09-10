@@ -8,38 +8,38 @@
 - Game executables: `FFX.exe` and `FFX-2.exe`.
 - Primary archives: `data/FFX_Data.vbf` and `data/FFX2_Data.vbf`.
 
-Lexeditor treats both games as one plugin because Steam ships them as one collection and Fahrenheit supports both archives from one framework installation. Lexeditor's Play controls intentionally bypass the Square Enix collection launcher and target each game through Fahrenheit Stage 0 directly.
+Lexeditor treats both games as one plugin because Steam ships them as one collection and Fahrenheit supports both archives from one framework installation. Play intentionally bypasses the Square Enix collection launcher and targets each game through Fahrenheit Stage 0 directly.
 
 ## VBF read contract
 
-The integrated VBF reader is intentionally read-only. The archive format is established from `michivi/vbf-fs`:
+The integrated VBF reader is intentionally read-only. The format is established from `michivi/vbf-fs`:
 
 1. ASCII signature `SRYK`.
 2. 32-bit little-endian header length.
 3. 64-bit little-endian file count.
 4. 16-byte MD5 path hash per file.
-5. 32-byte file entry records: start block, reserved word, uncompressed byte count, data offset, name-table offset.
+5. 32-byte file-entry records: start block, reserved word, uncompressed byte count, data offset, name-table offset.
 6. Length-prefixed NUL-terminated name table.
 7. 16-bit block descriptors for 64 KiB logical blocks.
-8. File payload blocks, with non-final nonzero descriptors representing zlib-compressed byte lengths; a short final descriptor equal to the final logical length is a raw partial block; zero is a full passthrough block.
-9. Final 16 bytes are the MD5 of the complete header.
+8. File payload blocks, including zlib-compressed blocks and passthrough blocks.
+9. Final 16 bytes: MD5 of the complete header.
 
-The reader validates the signature, header hash, per-path MD5, table boundaries, data offsets, path safety and decompressed lengths before exposing an entry.
+The reader validates signature, header hash, per-path MD5, table boundaries, data offsets, path safety and decompressed lengths before exposing an entry.
 
-Real archive names may omit the game-facing virtual archive root. Lexeditor therefore resolves both `ffx_ps2/...` and `FFX_Data/ffx_ps2/...` source spellings, but always stages FFX replacements beneath the canonical Fahrenheit path `efl/x/FFX_Data/...` (and equivalently `efl/x2/FFX2_Data/...` for FFX-2).
+Real archive names may omit the game-facing virtual archive root. Lexeditor resolves both `ffx_ps2/...` and `FFX_Data/ffx_ps2/...` source spellings, but always stages FFX replacements beneath canonical Fahrenheit path `efl/x/FFX_Data/...`; FFX-2 equivalently uses `efl/x2/FFX2_Data/...`.
 
 ## FFX fixed-record table contract
 
-`FFXDataParser` was used as a research cross-check for the common FFX kernel-table container. Lexeditor's implementation is independent and only encodes the observed format facts:
+`FFXDataParser` is a research cross-check for the common FFX kernel-table container. Lexeditor independently implements only these format facts:
 
 - minimum record index: little-endian `u16` at `0x08`;
 - maximum record index: little-endian `u16` at `0x0A`;
 - fixed record size: little-endian `u16` at `0x0C`;
 - total fixed-record bytes: little-endian `u16` at `0x0E`;
 - fixed records begin at `0x14`;
-- bytes after the fixed-record region are opaque trailing data and are preserved exactly.
+- bytes after the fixed-record region remain opaque and are preserved exactly.
 
-Lexeditor rejects inconsistent index ranges, zero record sizes, mismatched record byte counts and truncated record regions instead of guessing.
+Lexeditor rejects inconsistent index ranges, zero record sizes, mismatched record-byte counts and truncated record regions instead of guessing.
 
 ### `takara.bin` treasure rewards
 
@@ -47,17 +47,13 @@ Integrated path:
 
 `FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin`
 
-For each fixed-size treasure record, only these proved fields are interpreted or changed:
+Only these proved fields are editable:
 
-- `+0x00`: reward kind (`u8`)
-  - `0x00` = gil
-  - `0x02` = item/command
-  - `0x05` = gear pickup
-  - `0x0A` = key item
+- `+0x00`: reward kind (`u8`): `0x00` gil, `0x02` item/command, `0x05` gear, `0x0A` key item.
 - `+0x01`: quantity (`u8`); gil uses `quantity × 100`.
-- `+0x02..+0x03`: reward type ID (`u16`, little-endian).
+- `+0x02..+0x03`: reward type ID (`u16`).
 
-Unknown reward kinds remain representable. Any bytes after `+0x03` in a record are preserved byte-for-byte.
+Unknown kinds stay representable; all other bytes are preserved.
 
 ### `item_rate.bin` item/command prices
 
@@ -65,7 +61,7 @@ Integrated path:
 
 `FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/item_rate.bin`
 
-Each proved record is exactly four bytes containing one little-endian unsigned `u32` gil price. `FFXDataParser` maps table order to item/command IDs beginning at `0x2000`; Lexeditor exposes both the source record ID and that derived command ID and writes only selected four-byte price records.
+Each proved record is one little-endian `u32` gil price. Table ordinal maps to command/item IDs beginning at `0x2000`. Only selected four-byte prices are written.
 
 ### `arms_rate.bin` auto-ability prices
 
@@ -73,7 +69,7 @@ Integrated path:
 
 `FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/arms_rate.bin`
 
-This is the same proved four-byte unsigned gil-price table shape. `FFXDataParser` applies the rows by ordinal to auto-ability IDs displayed as `80xx`, so Lexeditor maps ordinal 0 to `0x8000`, ordinal 1 to `0x8001`, and so on. Item prices and auto-ability prices share one binary u32-price implementation while exposing their different semantic ID fields.
+This uses the same four-byte `u32` price-table shape, with ordinal zero mapped to auto-ability ID `0x8000`. It shares the validated price implementation with `item_rate.bin` while retaining separate semantic IDs.
 
 ### `ctb_base.bin` battle timing
 
@@ -81,12 +77,12 @@ Integrated path:
 
 `FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/ctb_base.bin`
 
-Each proved record is exactly two bytes:
+Each record is exactly two bytes:
 
 - `+0x00`: tick speed (`u8`).
 - `+0x01`: ICV bonus (`u8`).
 
-The source tool labels each row as `Agility = record index + 1`. Lexeditor also shows the derived initial CTB range used by that research model: maximum ICV = `tick speed × 3`; minimum ICV = maximum ICV − ICV bonus. Only the two source bytes are written.
+The UI also derives the researched initial-CTB range, but only those two source bytes are written.
 
 ### `prepare.bin` Rikku Mix results
 
@@ -94,7 +90,7 @@ Integrated path:
 
 `FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/prepare.bin`
 
-Each proved record is exactly `0xE0` bytes: 112 little-endian `u16` result command IDs, one for each possible second ingredient. `FFXDataParser` maps record ordinal to the first ingredient command ID `0x2000 + ordinal`, and partner slot `i` to the second ingredient command ID `0x2000 + i`. Lexeditor edits only selected 16-bit result cells; zero remains a valid/undefined result value.
+Each record is `0xE0` bytes: 112 little-endian `u16` result command IDs. Record ordinal is first ingredient `0x2000 + ordinal`; partner slot `i` is second ingredient `0x2000 + i`. Only explicitly changed result cells are written.
 
 ### `item_shop.bin` inventories
 
@@ -102,12 +98,12 @@ Integrated path:
 
 `FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/item_shop.bin`
 
-The proved record length is `0x22` bytes:
+Each record is `0x22` bytes:
 
-- `+0x00..+0x01`: legacy/unused rate field (`u16`). Lexeditor displays it but does not edit it because its gameplay semantics are not established.
-- `+0x02..+0x21`: sixteen item/command IDs (`u16`, little-endian), one per shop slot.
+- `+0x00..+0x01`: legacy rate (`u16`), displayed read-only because its gameplay semantics are unproved.
+- `+0x02..+0x21`: sixteen item/command IDs (`u16`).
 
-Lexeditor writes only explicitly changed inventory slots and preserves the leading rate field byte-for-byte.
+Only selected inventory slots are written.
 
 ### `arms_shop.bin` gear inventories
 
@@ -115,31 +111,39 @@ Integrated path:
 
 `FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/arms_shop.bin`
 
-This table uses the same proved `0x22`-byte shop record shape:
+This shares the proved `0x22`-byte shop layout with `item_shop.bin`: the leading rate remains read-only and only the sixteen gear-index slots can be changed.
 
-- `+0x00..+0x01`: legacy/unused rate field (`u16`), displayed read-only.
-- `+0x02..+0x21`: sixteen gear indices (`u16`, little-endian), one per shop slot.
+### Ability animation family
 
-Item and gear shops share one validated binary implementation; their public APIs remain semantic (`itemIds` versus `gearIds`). Lexeditor writes only explicitly changed slots and preserves the leading rate field byte-for-byte.
+Integrated English/US paths:
 
-### `command.bin` animation IDs
+- `FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/command.bin`
+- `FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/item.bin`
+- `FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/monmagic1.bin`
+- `FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/monmagic2.bin`
 
-Integrated English/US path:
+Two independent implementations agree on the narrow surface Lexeditor exposes.
 
-`FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/command.bin`
+`Karifean/FFXDataParser` models all four files with the same command-data class, reads animation ID 1 at record `+0x10` and animation ID 2 at `+0x12`, defines player-command records as `0x60` bytes, and defines monster-magic records as `0x5C` bytes. Its write paths use the `0x60` form for `command.bin` and `item.bin` and the `0x5C` form for `monmagic1.bin` and `monmagic2.bin`.
 
-Two independent implementations agree on the narrow fields Lexeditor exposes. `FFXDataParser` defines player-command records as `0x60` bytes and reads animation IDs at `+0x10` and `+0x12`. `osdanova/FFXProjectEditor` independently packs English/US command entries at `0x60` bytes; its serialized layout places four four-byte text-reference structures before the two `u16` animation IDs, yielding the same `+0x10/+0x12` offsets. Neither project's source is copied into Lexeditor.
+`osdanova/FFXProjectEditor` independently identifies the same four files under `new_uspc/battle/kernel`. Its serialized ability structure places four four-byte text-reference structures before `Anim1Id`/`Anim2Id`, independently confirming offsets `+0x10/+0x12`; command/item records include the four-byte player extension while monster magic does not.
 
-Lexeditor therefore requires a `0x60` record size and edits only:
+Lexeditor therefore enforces:
 
-- `+0x10..+0x11`: animation ID 1 (`u16`, little-endian).
-- `+0x12..+0x13`: animation ID 2 (`u16`, little-endian).
+- `command.bin`: `0x60`-byte records.
+- `item.bin`: `0x60`-byte records.
+- `monmagic1.bin`: `0x5C`-byte records.
+- `monmagic2.bin`: `0x5C`-byte records.
+- `+0x10..+0x11`: animation ID 1 (`u16`), editable.
+- `+0x12..+0x13`: animation ID 2 (`u16`), editable.
 
-Every other command-record byte, all text references and the trailing string region remain opaque and byte-preserved. The write API also rejects extra edit fields rather than silently accepting an unproved command property.
+Everything else—including text references, command properties, combat fields, unknown bytes and trailing localized strings—remains opaque and byte-preserved. The write API rejects unknown table names and extra edit fields.
+
+The UI presents these as one **FFX Abilities** editor with an explicit fixed table selector, not as a generic file or hex editor.
 
 ## FFX-2 fixed-record table contract
 
-FFX-2 uses a different generic fixed-record container. `FFXDataParser.readGenericX2DataFile` establishes the fields Lexeditor currently validates:
+FFX-2 uses a different generic fixed-record container. Lexeditor currently validates:
 
 - minimum record index: little-endian `u32` at `0x0C`;
 - maximum record index: little-endian `u32` at `0x10`;
@@ -147,9 +151,7 @@ FFX-2 uses a different generic fixed-record container. `FFXDataParser.readGeneri
 - total fixed-record bytes: little-endian `u32` at `0x18`;
 - bytes `0x1C..0x1F` remain opaque;
 - fixed records begin at `0x20`;
-- bytes after the fixed-record region, including localized string data, are preserved exactly.
-
-Lexeditor validates the index range, record size/count arithmetic and record-region boundary before exposing an X-2 table. It does not reuse the FFX `u16` header parser.
+- all bytes after the record region are preserved exactly.
 
 ### `command.bin` ability animation IDs
 
@@ -157,16 +159,12 @@ Integrated English/US path:
 
 `FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/command.bin`
 
-The proved fixed record length is `0x8C` bytes. The research model identifies:
+The proved record length is `0x8C`. Lexeditor reads string offset/key pairs at `+0x00..+0x07` for context but edits only:
 
-- `+0x00..+0x01`: name string offset (`u16`), read-only in Lexeditor;
-- `+0x02..+0x03`: name string key (`u16`), read-only;
-- `+0x04..+0x05`: description string offset (`u16`), read-only;
-- `+0x06..+0x07`: description string key (`u16`), read-only;
-- `+0x08..+0x09`: animation ID 1 (`u16`), editable;
-- `+0x0A..+0x0B`: animation ID 2 (`u16`), editable.
+- `+0x08..+0x09`: animation ID 1 (`u16`).
+- `+0x0A..+0x0B`: animation ID 2 (`u16`).
 
-Lexeditor deliberately does **not** decode or rewrite FFX-2 strings yet. A save patches only `+0x08..+0x0B` in selected records and preserves every other byte, including all unknown record fields and the trailing localized strings.
+Every other byte and the localized string tail are preserved.
 
 ### `accessory.bin` base abilities and prices
 
@@ -174,93 +172,118 @@ Integrated English/US path:
 
 `FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/accessory.bin`
 
-The independent `HeartlessSeph/FFX2-010-Templates` accessory template establishes a `0x54`-byte accessory record and explicitly enumerates accessory records from zero. Lexeditor therefore fails closed if this table does not start at record zero. The currently exposed fields are:
+The independent `HeartlessSeph/FFX2-010-Templates` reference establishes zero-based `0x54`-byte records. Lexeditor edits only:
 
-- `+0x00..+0x07`: name/help string offsets and keys (`u16` pairs), read-only;
-- `+0x0B`: icon byte, read-only;
-- `+0x18..+0x1F`: four base ability IDs (`u16` each), editable;
-- `+0x20..+0x23`: base price (`u32`), editable;
-- `+0x24..+0x53`: creature-extension data, completely opaque/read-only in Lexeditor.
+- `+0x18..+0x1F`: four base ability IDs (`u16` each).
+- `+0x20..+0x23`: base price (`u32`).
 
-The template also confirms that the bytes after the fixed-record region contain string data. Lexeditor writes only selected base ability slots and/or the price. Regression coverage compares every byte outside those writable fields to the original and preserves the creature-extension region and trailing strings byte-for-byte. The public template is used only as a format cross-check; its source is not copied into Lexeditor.
+The `+0x24..+0x53` creature extension, string references and trailing strings remain opaque/read-only.
 
-All ten structured editors are guarded by the relevant source VBF header MD5 and the SHA-256 of the exact table bytes shown to the editor. A concurrent project or source change causes a conflict instead of an overwrite.
+## Structured write guarantees
+
+The plugin currently exposes **13 proved structured tables**: eleven FFX tables and two FFX-2 tables. Every structured save is guarded by both:
+
+- the installed source VBF header MD5; and
+- SHA-256 of the exact table bytes shown to the editor.
+
+Concurrent source/project changes therefore fail closed instead of being overwritten. Saves create or replace only project-overlay files; installed VBFs are never rewritten.
 
 ## Project and loader boundary
 
-The project contains only replacement files:
+Project replacement roots are:
 
-- `<project>/efl/x/<canonical FFX virtual path>` for FFX.
-- `<project>/efl/x2/<canonical FFX-2 virtual path>` for FFX-2.
+- `<project>/efl/x/<canonical FFX virtual path>`
+- `<project>/efl/x2/<canonical FFX-2 virtual path>`
 
-For example, a raw FFX VBF entry `ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin` is staged as
-`<project>/efl/x/FFX_Data/ffx_ps2/ffx/master/jppc/battle/kernel/takara.bin`.
-A raw FFX-2 entry `ffx_ps2/ffx2/master/new_uspc/battle/kernel/command.bin` is staged as
-`<project>/efl/x2/FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/command.bin`.
+For example, raw VBF path `ffx_ps2/ffx/master/new_uspc/battle/kernel/item.bin` is staged as:
 
-Structured editors read the staged project file when one exists; otherwise they read the installed VBF entry. A save creates or atomically replaces only the project override. Installed VBF bytes remain untouched.
+`<project>/efl/x/FFX_Data/ffx_ps2/ffx/master/new_uspc/battle/kernel/item.bin`
 
-Deploy Project creates one file-only Fahrenheit mod at
-`<game>/fahrenheit/mods/lexeditor-ffx-x2/`, writes its manifest, copies the project EFL tree, and adds exactly one `lexeditor-ffx-x2` line to `fahrenheit/mods/loadorder` while preserving every other line. Revert removes only the unchanged Lexeditor-owned mod and that load-order entry.
-
-Deployment refuses to overwrite a pre-existing foreign directory or a Lexeditor deployment changed outside Lexeditor.
+Deploy creates one Lexeditor-owned Fahrenheit file-only mod under `fahrenheit/mods/lexeditor-ffx-x2`, preserves unrelated load-order entries, and refuses to overwrite a foreign or externally changed deployment. Revert removes only an unchanged Lexeditor-owned deployment.
 
 ## Collection-aware Play boundary
 
-Fahrenheit's Stage 0 contract is `fhstage0.exe {EXECUTABLE_TO_LAUNCH} {ARGS}`. Its own FFX documentation uses `fhstage0.exe ..\..\FFX.exe`. Stage 0 loads `fhstage1.dll` by relative name, so Lexeditor launches with the working directory fixed to `<game>/fahrenheit/bin`.
+Fahrenheit Stage 0 accepts `fhstage0.exe {EXECUTABLE_TO_LAUNCH} {ARGS}` and loads `fhstage1.dll` by relative name. Lexeditor therefore fixes the working directory to `<game>/fahrenheit/bin` and exposes exactly two choices:
 
-Lexeditor exposes two and only two launch choices:
+- `x` → `[<game>/fahrenheit/bin/fhstage0.exe, "..\\..\\FFX.exe"]`
+- `x2` → `[<game>/fahrenheit/bin/fhstage0.exe, "..\\..\\FFX-2.exe"]`
 
-- `x` → argv `[<game>/fahrenheit/bin/fhstage0.exe, "..\\..\\FFX.exe"]`
-- `x2` → argv `[<game>/fahrenheit/bin/fhstage0.exe, "..\\..\\FFX-2.exe"]`
+Before launch it requires `fhstage0.exe`, `fhstage1.dll` and the selected executable. Process creation is refused on non-Windows hosts.
 
-Before launch, the helper requires `fhstage0.exe`, `fhstage1.dll` and the selected game executable to exist. Actual process creation is refused on non-Windows hosts. The UI therefore shows explicit **Play FFX** and **Play FFX-2** buttons and disables either button unless its fixed launch contract is actionable.
+The loopback API exposes `GET /api/launch`, launch readiness in `GET /api/dashboard`, and `POST /api/play`. `/api/play` accepts exactly `{"game":"x"}` or `{"game":"x2"}`. It accepts no executable, path, command, launcher selection, arguments or additional keys, and never launches `FFX&X-2_LAUNCHER.exe`.
 
-The loopback service exposes:
+## Read-only real-install verification
 
-- `GET /api/launch` for Stage 0/Stage 1, Windows-host and per-title readiness;
-- the same launch status inside `GET /api/dashboard`;
-- `POST /api/play`, which accepts exactly `{"game":"x"}` or `{"game":"x2"}`.
+CI can validate synthetic archive/container behavior but cannot prove the actual Steam inventory. `games.ffx_x2.verify_install` exists specifically to turn the remaining real-install inventory check into a deterministic read-only operation.
 
-`/api/play` does not accept an executable, path, command, launcher selection, arbitrary arguments or additional JSON keys. It never launches through `FFX&X-2_LAUNCHER.exe`. API regressions patch only the process-execution boundary to prove the two allowed keys reach it while rejected shapes cannot trigger launch.
+Example:
+
+```powershell
+python -m games.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster"
+```
+
+Machine-readable report:
+
+```powershell
+python -m games.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" --json
+```
+
+Also require Fahrenheit Stage 0, Stage 1 and both game executables to be present:
+
+```powershell
+python -m games.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" --require-fahrenheit
+```
+
+The verifier:
+
+- validates both installed VBF indexes and hashes;
+- resolves raw versus canonical EFL spellings;
+- reads/decompresses every one of the 13 currently supported structured tables;
+- runs each table through the same strict parser used by the editor;
+- reports record counts/sizes, source paths and exact table SHA-256 values;
+- reports Fahrenheit launch prerequisites;
+- performs **no project write, deployment, VBF rewrite, or game launch**.
+
+A successful verifier run proves the installed inventory and supported record layouts match Lexeditor's expectations. It still does **not** prove that Fahrenheit accepts a replacement in-game or that Stage 0 successfully starts either title.
 
 ## Installed-game theme boundary
 
-Lexeditor can derive bounded cosmetic assets from the user's own installed VBFs and optional `data/metamenu.vbf`. The private cache may expose browser-ready title/menu PNGs, web fonts or audio when those formats already exist, while recognizing/caching non-browser-ready font atlases, UI textures and FMOD banks for later conversion work. No proprietary theme asset is committed to Lexeditor, and theme extraction is never a readiness gate for editing or deployment.
+Lexeditor may derive bounded cosmetic assets from the user's own installed VBFs and optional `data/metamenu.vbf`. Browser-ready assets may be cached privately; recognized non-browser-ready font atlases, UI textures and FMOD banks may also be cached for later conversion. No proprietary theme asset is committed, and theme extraction is never an editor/deployment readiness gate.
 
 ## Current coverage
 
 Integrated:
 
-- Steam collection discovery.
-- Validation and indexing of both VBF archives.
-- Raw/virtual archive path normalization into canonical Fahrenheit EFL paths.
-- Path search and byte-exact extraction/decompression.
-- Safe extraction to a project overlay without overwriting edited project data.
-- Common FFX fixed-record table validation.
-- Structured FFX `takara.bin` treasure reward editing.
-- Structured FFX `item_rate.bin` item/command gil-price editing.
-- Structured FFX `arms_rate.bin` auto-ability gil-price editing.
-- Structured FFX `ctb_base.bin` tick-speed / ICV-bonus editing.
-- Structured FFX `prepare.bin` Rikku Mix result editing.
-- Structured FFX `item_shop.bin` 16-slot item/command inventory editing.
-- Structured FFX `arms_shop.bin` 16-slot gear inventory editing.
-- Conservative FFX `command.bin` animation-ID editing for the English/US `new_uspc` table.
-- FFX-2 `u32` fixed-record table validation.
-- Conservative FFX-2 `command.bin` animation-ID editing for the `new_uspc` table.
-- Conservative FFX-2 `accessory.bin` base ability/price editing for the `new_uspc` table.
-- Reversible file-only Fahrenheit deployment mechanics for both `efl/x` and `efl/x2` project trees.
-- Collection-aware Fahrenheit Stage 0 launch status and fixed **Play FFX / Play FFX-2** actions.
-- Private installed-game cosmetic theme extraction/cache with safe fallback.
-- Evidence-based Data Map, including `fahrenheit-launch` coverage.
+- Steam collection discovery and validated read-only VBF indexing/decompression.
+- Raw VBF path → canonical Fahrenheit EFL normalization.
+- Searchable archive browser and safe project extraction.
+- Eleven FFX structured tables:
+  - `takara.bin`
+  - `item_rate.bin`
+  - `arms_rate.bin`
+  - `ctb_base.bin`
+  - `prepare.bin`
+  - `item_shop.bin`
+  - `arms_shop.bin`
+  - `new_uspc/battle/kernel/command.bin` animation IDs
+  - `new_uspc/battle/kernel/item.bin` animation IDs
+  - `new_uspc/battle/kernel/monmagic1.bin` animation IDs
+  - `new_uspc/battle/kernel/monmagic2.bin` animation IDs
+- Two FFX-2 structured tables: `command.bin` animation IDs and `accessory.bin` base abilities/price.
+- Exact table/VBF stale-write guards and project-only saves.
+- Reversible Fahrenheit file-only deployment.
+- Fixed collection-aware Stage 0 Play actions.
+- Private installed-game theme cache.
+- Read-only real-install inventory/record-layout verifier.
+- Evidence-based Data Map.
 
-Not yet integrated:
+Not yet integrated/proved:
 
-- Other FFX gameplay/kernel record editors or unproved fields in `command.bin`.
-- FFX dialogue/text editing, including `command.bin` text references/string payloads.
-- Other FFX-2 structured tables, localized string editing, creature-extension accessory fields, or non-US table variants.
-- Conversion of recognized proprietary font/texture/audio formats that are not already browser-ready.
+- Other FFX gameplay/kernel formats or any unproved fields in the four ability tables.
+- FFX dialogue/localized string editing.
+- Other FFX-2 structured tables, localized string editing, creature-extension accessory fields, or non-US variants.
+- Conversion of recognized proprietary font/texture/audio formats that are not browser-ready.
 - Installing/updating Fahrenheit itself.
-- Live installed-game acceptance for replacement loading or Stage 0 startup through Lexeditor.
+- Real in-game EFL replacement acceptance and real Stage 0 startup through Lexeditor.
 
-Synthetic/API tests prove parser, service, project, deployment and launch-route mechanics. They do not prove that a real Steam build accepts a given replacement file in-game or that Stage 0 successfully starts both real game executables on the user's installation.
+Synthetic/API/CI tests prove parser, service, project, deployment and launch-route mechanics. They do not substitute for the remaining real installed-game and in-game acceptance checks.
