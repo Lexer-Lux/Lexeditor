@@ -1,6 +1,13 @@
 "use strict";
 
 (() => {
+  if (!document.querySelector('script[data-ffx-player-stats]')) {
+    const playerStatsScript = document.createElement('script');
+    playerStatsScript.src = '/shared/ffx-player-stats.js';
+    playerStatsScript.dataset.ffxPlayerStats = '1';
+    document.head.appendChild(playerStatsScript);
+  }
+
   const nav = document.querySelector('.ffxx2-nav');
   const workspace = document.querySelector('.ffxx2-workspace');
   const x2Panel = document.querySelector('[data-panel="ffx2-abilities"]');
