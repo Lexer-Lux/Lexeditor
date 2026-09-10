@@ -53,6 +53,8 @@ class EventAuditCliTests(unittest.TestCase):
             self.assertEqual(result["readOnlyCommands"], 1)
             self.assertEqual(result["hotspots"][0]["opcode"], 0xF1)
             self.assertEqual(result["hotspots"][0]["stopCount"], 1)
+            self.assertEqual(result["hotspots"][0]["sampleEventIds"], [2])
+            self.assertEqual(result["hotspots"][0]["stopEventIds"], [2])
             self.assertTrue(result["hotspots"][0]["dynamicOrUnresolvedBoundary"])
 
     def test_single_input_keeps_event_level_output(self):
@@ -99,6 +101,9 @@ class EventAuditCliTests(unittest.TestCase):
             self.assertEqual(result["readOnlyCommands"], 1)
             self.assertEqual(result["writablePercent"], 50.0)
             self.assertEqual([row["opcode"] for row in result["hotspots"]], [0x8E])
+            self.assertEqual(result["hotspots"][0]["sampleEventIds"], [2])
+            self.assertEqual(result["hotspots"][0]["readOnlyEventIds"], [2])
+            self.assertEqual(result["hotspots"][0]["stopEventIds"], [])
 
             selected_output = io.StringIO()
             with redirect_stdout(selected_output):
