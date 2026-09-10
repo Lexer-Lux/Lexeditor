@@ -89,11 +89,14 @@ class CoverageTests(unittest.TestCase):
         self.assertIn("movement/follow", event_row["controls"])
         self.assertIn("audio", event_row["controls"])
         notes = event_row["notes"]
-        self.assertIn("0x12–0x15", notes)
+        self.assertIn("0x12–0x16", notes)
+        self.assertIn("bank-7F page/operator packing", notes)
         self.assertIn("0x7F0000–0x7F00FF", notes)
         self.assertIn("0x53/54/56/58/59", notes)
         self.assertIn("0x63/64/69/6B/6F", notes)
-        self.assertIn("0x3A/3D/3E/45/46/70/74/78", notes)
+        self.assertIn("0x65/66", notes)
+        self.assertIn("0x3A/3D/3E/45/46/6E/70/74/78", notes)
+        self.assertIn("raw extended slot + value + comparator", notes)
         self.assertIn("0x02–0x07", notes)
         self.assertIn("0x0A/0B/0C/7C/7D", notes)
         self.assertIn("0x23/24/A8/A9", notes)
@@ -107,7 +110,10 @@ class CoverageTests(unittest.TestCase):
         self.assertIn("coordinate", notes)
         self.assertIn("EC is dynamically disassembled", notes)
         self.assertIn("read-only known-form semantics", notes)
-        self.assertIn("0x16/48–4D/60/61/65/66/67/6E/75/76/77/7B/27/28/8D/8E/92/9C/9E/9F", notes)
+        self.assertIn("PC parser contracts govern 0x2E/0x88/0x4E", notes)
+        self.assertIn("F1 stops fail-closed", notes)
+        self.assertIn("0x48–4D/60/61/67/75/76/77/7B/27/28/8D/8E/92/9C/9E/9F", notes)
+        self.assertNotIn("Ambiguous 0x16/", notes)
         self.assertIn("decoded command boundaries", notes)
 
     def test_data_map_describes_gameplay_research_inventory_and_probe_boundaries(self):
