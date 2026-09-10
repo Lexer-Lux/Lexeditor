@@ -86,7 +86,7 @@ def main() -> None:
             args=["--no-sandbox", "--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
         )
         try:
-            page = browser.new_page(viewport={"width": 1200, "height": 800})
+            page = browser.new_page(viewport={"width": 1200, "height": 800}, accept_downloads=True)
             page.on("pageerror", lambda error: errors.append(str(error)))
 
             def handle(route):
@@ -122,6 +122,7 @@ def main() -> None:
             assert "Run coverage audit" in initial
             assert "runs only on request" in initial
             assert "Aliased function bounds" in initial
+            assert panel.get_by_role("button", name="Download audit JSON", exact=True).count() == 0
 
             panel.get_by_role("button", name="Run coverage audit", exact=True).click()
             page.wait_for_function('state.events.audit?.scanSource === "mine"')
@@ -143,12 +144,27 @@ def main() -> None:
             error_details.locator("summary").click()
             assert "0021" in error_details.inner_text()
             assert "pointer table is truncated" in error_details.inner_text()
+
+            with page.expect_download() as download_info:
+                panel.get_by_role("button", name="Download audit JSON", exact=True).click()
+            download = download_info.value
+            assert download.suggested_filename == "chrono-trigger-event-audit-mine.json"
+            mine_download_path = ARTIFACTS / download.suggested_filename
+            download.save_as(str(mine_download_path))
+            downloaded = json.loads(mine_download_path.read_text(encoding="utf-8"))
+            assert downloaded["scanSource"] == "mine"
+            assert downloaded["selectedEventIds"] == [20, 21]
+            assert downloaded["auditedEventIds"] == [20]
+            assert downloaded["scanErrorCount"] == 1
+            assert downloaded["hotspots"][0]["opcode"] == 0xF1
+            assert downloaded["hotspots"][0]["stopCount"] == 2
             page.screenshot(path=str(ARTIFACTS / "event-audit-mine.png"), full_page=True)
 
             page.evaluate('selectSource("vanilla")')
             page.wait_for_function('state.source === "vanilla" && state.events.detail?.id === 20')
             stale_text = panel.inner_text()
             assert "Run coverage audit" in stale_text
+            assert "Download audit JSON" not in stale_text
             assert "0xF1" not in stale_text
             assert "50.00%" not in stale_text
             assert "Read-only Vanilla scan" in stale_text
@@ -160,6 +176,7 @@ def main() -> None:
             assert "12 argument commands" in vanilla_text
             assert "100.00% named-editor coverage" in vanilla_text
             assert "0 fail-closed functions" in vanilla_text
+            assert "Download audit JSON" in vanilla_text
             assert "No argument-bearing read-only or parser-stop hotspots found." in vanilla_text
             assert audit_queries[-1] == {"source": ["vanilla"]}
             page.screenshot(path=str(ARTIFACTS / "event-audit-vanilla.png"), full_page=True)
@@ -171,6 +188,7 @@ def main() -> None:
         "fixtureOnly": True,
         "eventAuditUi": True,
         "mineAndVanilla": True,
+        "auditDownload": True,
         "auditRequests": len(audit_queries),
         "errors": errors,
     }
