@@ -57,7 +57,7 @@ STUB = """
 """
 
 
-def session_for(plugin_id: str, project: str):
+def session_for(plugin_id: str, project: str | None):
     """Return the plugin's own session class, not the shared base class."""
     module = __import__(f"games.{plugin_id}.plugin", fromlist=["PLUGIN"])
     from service_session import LocalPluginSession
@@ -74,8 +74,10 @@ def session_for(plugin_id: str, project: str):
         "ff9": "LEXEDITOR_FF9_PROJECT", "rdr2": "LEXEDITOR_RDR2_PROJECT",
         "rdr": "LEXEDITOR_RDR_PROJECT", "warband": "LEXEDITOR_WARBAND_PROJECT",
     }.get(plugin_id)
+    # --live passes no project, so the plugin resolves its own real one from the
+    # environment the desktop shell would give it.
     try:
-        return session_class({variable: project} if variable else {})
+        return session_class({variable: project} if variable and project else {})
     except TypeError:
         return session_class()
 
@@ -97,7 +99,7 @@ def main() -> int:
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     browser = None
     try:
-        with session_for(args.plugin, project.name) as session:
+        with session_for(args.plugin, None if args.live else project.name) as session:
             port = free_port()
             browser = subprocess.Popen([
                 str(EDGE), "--headless=new", "--no-first-run", "--no-default-browser-check",
