@@ -152,7 +152,9 @@ class EventCliTests(unittest.TestCase):
                 "set-args", "--sha256", shown["sha256"], "--hex", "22 80",
             ])
             self.assertEqual(code, 1)
-            self.assertIn("outside function", payload["error"])
+            self.assertIn("disassembly stopped", payload["error"])
+            self.assertIn("0xF1", payload["error"])
+            self.assertIn("unresolved", payload["error"])
             self.assertFalse((project / EVENT_PATH).exists())
 
 
