@@ -77,7 +77,7 @@
       const mask = Number(row[field]);
       const checks = state.elements.map(element => `
         <label style="display:flex;gap:7px;align-items:center;font-weight:600;text-transform:none;letter-spacing:0">
-          <input type="checkbox" data-element-field="${field}" data-element-bit="${element.bit}" ${mask & element.bit ? 'checked' : ''}>
+          <input style="width:auto;min-height:0;padding:0" type="checkbox" data-element-field="${field}" data-element-bit="${element.bit}" ${mask & element.bit ? 'checked' : ''}>
           <span>${esc(element.label)}</span>
         </label>`).join('');
       return `<section class="ffxx2-slot ${dirty.has(row.id) ? 'ffxx2-dirty' : ''}" style="display:block" data-element-group="${field}">
