@@ -15,16 +15,28 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
   - L1/L2: BGSetTable + `map_bin/cg*.bin` + `ChipTable_*.dat`.
   - L3: `weather_bin/cg*.bin` + scene-indexed `ChipTableBg3_*.dat`, 256 four-corner tiles, PC 3-byte corner records and 4-color palette groups.
   - MapTable main/sub/effect bits are diagnostic only. PC `PrioMap` remains raw: CTViewer still describes its four bytes as unknown PC-only layer-priority data.
-  - BGAnime descriptors are decoded read-only (count, four-chip source/destination groups, `/32` offsets, duration upper nibble). Steam runtime initial phase/frame behavior is not proven, so animation playback remains disabled.
+  - BGAnime descriptors are decoded read-only (count, four-chip source/destination groups, `/32` offsets, duration upper nibble). Steam runtime initial phase/frame behavior is not proven, so animation playback remains disabled. The exact runtime acceptance gate is recorded in [`BGANIME_RUNTIME_EVIDENCE.md`](BGANIME_RUNTIME_EVIDENCE.md).
   - Main/sub blend and priority composition remain unsupported until current-PC runtime semantics are independently established.
 - Eight overworld headers, existing exits/triggers/script-address editing, fail-closed world-script disassembly and isolated world L1/L2 raster rendering.
 - Fixed 256-color BGR555 scene/world palette editing with header/trailing-byte preservation.
 - Project change inventory/revert, deterministic CTP export, CTExt audit/deploy/deactivate/manifest-owned undeploy and deployment/integrity checks.
 - Read-only gameplay-data inventory/probe tooling with strict decompression caps and no stat-field claims.
+- Read-only field-event coverage audit that can consume exported Event JSON or scan a real Steam `resources.bin`/project overlay directly.
 
 ## Field events
 
 `Atel_*.dat` support includes object/function bounds, fail-closed PC disassembly, semantic summaries, control-flow diagnostics and named **fixed-width argument editing** in both the desktop Events UI and `tools/chrono_trigger_event.py`. Opcode changes, command insertion/deletion, resizing and pointer relocation remain unsupported.
+
+`tools/chrono_trigger_event_audit.py` ranks the next event-research targets using actual Steam scripts. It deduplicates aliased function slots by `(start, end)`, reports total decoded commands separately from argument-bearing commands, excludes zero-argument commands from missing-editor coverage, and prioritizes parser-stop opcodes because one unresolved boundary hides the remainder of a function. Direct scans continue past malformed project overlays and report those errors per event; `--source vanilla` provides the immutable baseline.
+
+Examples:
+
+```bash
+python tools/chrono_trigger_event_audit.py --game "C:/Program Files (x86)/Steam/steamapps/common/Chrono Trigger" --project "C:/mods/MyChronoMod"
+python tools/chrono_trigger_event_audit.py --game "C:/Program Files (x86)/Steam/steamapps/common/Chrono Trigger" --project "C:/mods/MyChronoMod" --event 20 --event 21
+python tools/chrono_trigger_event_audit.py --game "C:/Program Files (x86)/Steam/steamapps/common/Chrono Trigger" --project "C:/mods/MyChronoMod" --source vanilla
+python tools/chrono_trigger_event_audit.py event20.json event21.json
+```
 
 ### Proven writable families
 
@@ -113,7 +125,7 @@ All three opcode families remain unwritable through the fixed-width raw writer e
 
 The dedicated `Chrono Trigger checks` workflow compiles plugin/tools, validates the descriptor, auto-discovers all `test_chrono_trigger_*.py` suites, runs the managed ARC1/CTExt smoke, checks editor JavaScript and runs Playwright regressions.
 
-Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, raw PC segment u16/slot/value round trips, bank-7F page/range distinctions, `0x16` and `0x6E` comparison retargeting, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries plus raw-write blocking, PC-specific `2E/88/4E` boundaries, F1 fail-closed behavior, read-only `FF` Mode 7 semantics and fail-closed malformed encodings.
+Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, raw PC segment u16/slot/value round trips, bank-7F page/range distinctions, `0x16` and `0x6E` comparison retargeting, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries plus raw-write blocking, PC-specific `2E/88/4E` boundaries, F1 fail-closed behavior, read-only `FF` Mode 7 semantics and fail-closed malformed encodings. Event-audit regressions additionally cover unique-bound alias deduplication, argument-bearing coverage metrics, direct ARC1 scanning, event filtering and malformed-overlay reporting with a clean Vanilla comparison.
 
 Browser coverage includes:
 - main scene/world/Event surfaces and a sequential NPC Facing -> `0x13` comparison save,
@@ -125,7 +137,7 @@ Browser coverage includes:
 
 ## Evidence
 
-See [`FORMAT_EVIDENCE.md`](FORMAT_EVIDENCE.md) for the PC-format evidence ledger and explicit proven/read-only/unresolved boundaries.
+See [`FORMAT_EVIDENCE.md`](FORMAT_EVIDENCE.md) for the PC-format evidence ledger and explicit proven/read-only/unresolved boundaries. See [`BGANIME_RUNTIME_EVIDENCE.md`](BGANIME_RUNTIME_EVIDENCE.md) for the exact observations required before enabling animated scene playback.
 
 - ChronoMod: ARC1 container/replacement evidence, not gameplay-stat layouts.
 - CTViewer: current PC scene/world/map/tile/palette/render diagnostics.
@@ -135,7 +147,8 @@ See [`FORMAT_EVIDENCE.md`](FORMAT_EVIDENCE.md) for the PC-format evidence ledger
 ## Remaining high-value work
 
 1. Run the inventory/probe pipeline against a current Steam install and identify real gameplay-data record families before any stat editor.
-2. Continue expanding only independently proven fixed-width event semantics/editors.
-3. Resolve Steam BGAnime initial-frame/phase behavior and `PrioMap`/main-sub composition before playback/composed rendering.
-4. Keep expanding browser-level coverage for integrated Chrono surfaces.
-5. Keep ARC1 rebuilding as fallback experimentation only after real-install round-trip validation; CTExt loose files/CTP remain the default deployment model.
+2. Run the event coverage audit against a current Steam install, then prioritize unresolved parser stops and high-frequency argument-bearing read-only opcodes from that evidence.
+3. Continue expanding only independently proven fixed-width event semantics/editors.
+4. Resolve Steam BGAnime initial-frame/phase behavior and `PrioMap`/main-sub composition before playback/composed rendering.
+5. Keep expanding browser-level coverage for integrated Chrono surfaces.
+6. Keep ARC1 rebuilding as fallback experimentation only after real-install round-trip validation; CTExt loose files/CTP remain the default deployment model.
