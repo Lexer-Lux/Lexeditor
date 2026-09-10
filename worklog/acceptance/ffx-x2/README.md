@@ -25,8 +25,9 @@ Acceptance requirements:
 - `acceptanceReady` is `true`.
 - `archiveHashesIncluded` is `true`.
 - Both `archives.x.ready` and `archives.x2.ready` are `true` and each has a full-file `sha256`.
-- Every one of the 14 `structured[]` rows has `status: "validated"`.
+- Every one of the 15 `structured[]` rows has `status: "validated"`.
 - FFX `a_ability.bin` reports `0x6C` records.
+- FFX `ply_save.bin` reports `0x94` records.
 - The four FFX animation tables report:
   - `command`: `0x60` records;
   - `item`: `0x60` records;
@@ -50,6 +51,7 @@ Acceptance requirements:
 - Each structured editor opens its full real table without parser errors.
 - **FFX Abilities** can switch among Commands, Items, Monster Magic 1 and Monster Magic 2 and shows the expected record size for each.
 - **FFX Auto-Abilities** opens `a_ability.bin`, shows Fire/Ice/Thunder/Water/Holy controls for Strike/Absorb/Immune/Resist/Weak, and does not expose SOS/status/effect/icon/group fields.
+- **FFX Base Stats** opens `ply_save.bin` and exposes only base HP, base MP, Strength, Defense, Magic, Magic Defense, Agility, Luck, Evasion and Accuracy. It must not expose text/name metadata, AP, current HP/MP, current stats or any field at/after record `+0x14`.
 - No project file is created merely by browsing/refreshing.
 
 Record any unexpectedly large table or UI delay before changing data.
@@ -86,12 +88,14 @@ Acceptance requirements mirror FFX:
 
 Only after byte-identical EFL startup passes, test one reversible structured edit in each game.
 
-For FFX, `a_ability.bin` is a useful conservative acceptance candidate because the editor can toggle one known elemental bit while preserving the rest of the record. If using it:
+For FFX, `a_ability.bin` remains a useful conservative acceptance candidate because the editor can toggle one known elemental bit while preserving the rest of the record. If using it:
 
 1. Save the original mask and table SHA-256.
 2. Toggle exactly one known element flag in one behavior.
 3. Confirm the project-file diff is confined to the selected record byte at `+0x11..+0x15` and that bits `0xE0` of that byte are unchanged.
 4. Do not modify SOS, status/effect, icon/group or any other field.
+
+If testing `ply_save.bin` instead, use only a base-stat field and confirm the project diff is confined to the selected record `+0x04..+0x13`; bytes before `+0x04` and all bytes from `+0x14` onward must remain identical.
 
 For every selected structured table:
 
