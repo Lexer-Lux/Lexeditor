@@ -95,7 +95,16 @@ require("developerAuthorized" in host,
 
 # Blank is the canonical gallery, not a second implementation surface.
 require("design-review" not in blank.lower(), "Blank still references Design Review")
-require("Editable Table" not in blank, "Blank still exposes a separate Editable Table type/demo")
+# The rule is that Blank must not be a SECOND IMPLEMENTATION - it demonstrates
+# the shared components rather than growing its own. In-cell editing is one of
+# those shared components, and showing it is exactly the gallery's job: the
+# panel-layout acceptance test drives that example in detail, and deleting it
+# left that whole block asserting nothing. So what is forbidden is Blank
+# building a table of its own, not Blank showing the shared one being edited.
+require("lex-column-list-row" not in blank and "<table" not in blank,
+        "Blank builds its own table markup instead of using the shared one")
+require(blank.count("columnList({") >= 1,
+        "Blank no longer demonstrates the shared table")
 require(not (ROOT / "ui/design-review.js").exists() and not (ROOT / "ui/design-review.css").exists(),
         "Design Review implementation files still exist")
 

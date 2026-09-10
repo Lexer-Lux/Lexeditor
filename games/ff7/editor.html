@@ -732,15 +732,6 @@
     ]});
   }
   function mapView(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,open:row=>{const target=row.target||row.category;if(target)navigate(target)},query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:value=>{state.mapPage=value;render()},changeSort:key=>{const[active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return view.content}
-  function datasetSummary(){
-    const metadata=category(),family=state.data.families?.[metadata?.family],rows=state.records[state.tab]||[],saved=state.saved[state.tab]||[];
-    const source=family?.sourceRelativePath||state.data.sourceRelativePath||metadata?.family||"Loaded game data";
-    const usingProject=family?!!family.usingProject:!!state.data.usingProject,dirty=JSON.stringify(rows)!==JSON.stringify(saved);
-    const status=dirty?"Unsaved changes":usingProject?"Project copy":"Vanilla source";
-    const parts=[el("strong",{},labels[state.tab]),el("span",{style:"opacity:.72"},`${rows.length.toLocaleString()} records`),el("span",{style:"font-weight:600"},status)];
-    if(source)parts.push(el("span",{title:String(source),style:"margin-left:auto;max-width:42ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.62"},String(source)));
-    return el("div",{class:"ff7-dataset-summary",style:"display:flex;align-items:center;gap:.7rem;flex-wrap:wrap;padding:.55rem .75rem;min-width:0"},...parts);
-  }
   // The strip above the table repeated the record count the pager already
   // shows and pushed the table down a line on every dataset. What it alone
   // carried - whether this view is vanilla or a project copy, and which file
