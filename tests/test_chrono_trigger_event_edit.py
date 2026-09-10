@@ -154,7 +154,7 @@ class EventEditTests(unittest.TestCase):
         self.assertIn("unresolved", function["problem"]["reason"])
 
         store = FakeStore(original)
-        with self.assertRaisesRegex(ValueError, "outside function"):
+        with self.assertRaisesRegex(ValueError, "disassembly stopped.*0xF1.*unresolved"):
             save_event_arguments(store, 1, 0, 0, 0, sha256(original), "22 80")
         self.assertIsNone(store.overlay)
 
