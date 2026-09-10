@@ -30,11 +30,34 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 - https://github.com/fahrenheit-crew/fahrenheit
 - License: LGPL-3.0-or-later
 
-Fahrenheit documents file-only mods, `<mod>.manifest.json`, `mods/loadorder`, and the External File Loader roots `efl/x` and `efl/x2`. No Fahrenheit source or binary is bundled by this plugin.
+Fahrenheit documents file-only mods, `<mod>.manifest.json`, `mods/loadorder`, the External File Loader roots `efl/x` and `efl/x2`, and the Stage 0 launch contract used by the explicit Play actions. No Fahrenheit source or binary is bundled by this plugin.
 
-## FFXDataParser and VBFTool
+## FFXDataParser
 
-The following public reverse-engineering projects were used as research cross-checks only; their code is not copied or distributed by Lexeditor:
+**Karifean/FFXDataParser** is used only as a public reverse-engineering cross-check; its source is not copied or distributed by Lexeditor:
 
 - https://github.com/Karifean/FFXDataParser
+
+For the conservative FFX ability-animation family, it independently identifies `command.bin`, `item.bin`, `monmagic1.bin`, and `monmagic2.bin` as the same command-data layout family, reads the two animation IDs at record offsets `+0x10/+0x12`, uses `0x60` records for player-command/item tables, and `0x5C` records for the two monster-magic tables.
+
+It is also a research cross-check for the FFX fixed-record container, the FFX-2 u32 fixed-record container, and other explicitly documented structured fields used by this plugin.
+
+## FFXProjectEditor
+
+**osdanova/FFXProjectEditor** is a second independent format cross-check; its source is not copied or distributed by Lexeditor:
+
+- https://github.com/osdanova/FFXProjectEditor
+
+Its project paths identify the English/US FFX `new_uspc/battle/kernel` files `command.bin`, `item.bin`, `monmagic1.bin`, and `monmagic2.bin`. Its serialized ability layout places four four-byte text references before the animation IDs and distinguishes the four-byte player extension used by command/item records from monster-magic records, independently agreeing with the `+0x10/+0x12`, `0x60`, and `0x5C` facts above.
+
+## FFX2-010-Templates
+
+**HeartlessSeph/FFX2-010-Templates** is used as an independent factual cross-check for the FFX-2 `accessory.bin` record layout; its template source is not copied into Lexeditor:
+
+- https://github.com/HeartlessSeph/FFX2-010-Templates
+
+## VBFTool
+
+**topher-au/VBFTool** is a historical VBF and Steam-layout research cross-check only; its source is not copied or distributed by Lexeditor:
+
 - https://github.com/topher-au/VBFTool
