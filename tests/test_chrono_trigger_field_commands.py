@@ -20,10 +20,22 @@ class FieldCommandTests(unittest.TestCase):
         self.assertEqual(decoded["commands"][1]["name"], "Load Enemy")
         self.assertEqual(decoded["commands"][2]["name"], "Change Location")
 
-    def test_dynamic_f1_width(self):
-        decoded = disassemble_function(bytes([0xF1, 0x00, 0xF1, 0x21, 0x80]), 0, 5)
-        self.assertTrue(decoded["complete"])
-        self.assertEqual([row["size"] for row in decoded["commands"]], [2, 3])
+    def test_f1_conflicting_public_width_rules_fail_closed(self):
+        # Temporal Redux's live ColorAddMenu can emit a one-argument F1 with a
+        # nonzero color/intensity byte, while its command-table description says
+        # a nonzero first argument carries a second 0x80 add/sub byte.  Raw event
+        # bytes cannot distinguish F1 21 + following opcode 80 from F1 21 80.
+        for data in (
+            bytes([0xF1, 0x00, 0x00]),
+            bytes([0xF1, 0x21, 0x00]),
+            bytes([0xF1, 0x21, 0x80, 0x00]),
+        ):
+            with self.subTest(data=data.hex()):
+                decoded = disassemble_function(data, 0, len(data))
+                self.assertFalse(decoded["complete"])
+                self.assertEqual(decoded["commands"], [])
+                self.assertEqual(decoded["problem"]["opcode"], 0xF1)
+                self.assertIn("unresolved", decoded["problem"]["reason"])
 
     def test_dynamic_88_modes(self):
         decoded = disassemble_function(bytes([0x88, 0x01, 0x88, 0x80, 0x44]), 0, 5)
