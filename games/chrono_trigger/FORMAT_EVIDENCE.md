@@ -9,6 +9,8 @@ This file records why Lexeditor treats a Steam structure as writable, read-only,
 - **Renderer behavior only** — a viewer implements something, but Steam runtime equivalence is not proven.
 - **Candidate only** — path/name/size evidence without a verified record layout.
 
+When sources conflict, a platform-specific PC parser/override is stronger boundary evidence than a generic menu or SNES-oriented constructor. A menu can still establish operand semantics when its PC encoding is internally reversible and consistent with the PC width table.
+
 ## ARC1 `resources.bin`
 
 **Status: proven container; Vanilla remains immutable.**
@@ -23,12 +25,13 @@ ChronoMod does not provide enemy/item/tech/battle record parsers, so it is evide
 
 **Status: PC structural parser + growing proven fixed-width operand set.**
 
-Temporal Redux supplies explicit `Platform.PC` width overrides plus command tables, constructors and live editor menus. Lexeditor exposes a named writer only when the current command can be rewritten at exactly the same width and the relevant PC operand meaning is explicit.
+Temporal Redux supplies explicit `Platform.PC` width overrides, a platform-aware command parser, command tables, constructors and live editor menus. Lexeditor exposes a named writer only when the current command can be rewritten at exactly the same width and the relevant PC operand meaning is explicit.
 
 ### Proven families
 
 - `0x12`/`0x13`: `/2` script-memory slot vs immediate u8/u16, comparison op 0–7, jump-if-false byte.
 - `0x14`/`0x15`: two `/2` script-memory slots, comparison op 0–7, jump-if-false byte; opcode selects 8/16-bit width.
+- `0x16`: bank-7F 8-bit comparison. The constructor emits `[addressLow, value, operation|pageBit, jump]`, restricts the address to `0x7F0000–0x7F01FF`, stores the comparator in bits 0–2 and uses bit 7 to select the upper `0x100`-byte page. Lexeditor rejects stored operator bytes with any undocumented bits 3–6 set.
 - `0x18`: storyline threshold + jump byte.
 - Button/action checks `0x2D`, `0x30/31`, `0x34–39`, `0x3B/3C`, `0x3F–44`: opcode fixes the check/mode; the sole argument is the failure jump distance.
 - `0x02–07`: doubled object/PC target + packed `priority<<4 | functionId`; opcode fixes continue/sync/halt.
@@ -46,9 +49,11 @@ Temporal Redux supplies explicit `Platform.PC` width overrides plus command tabl
 - `0x23/0x24`: live `GetFacingMenu` fixes object vs PC by opcode and writes `targetId*2` plus a `/2` script-memory result destination.
 - `0xA8/0xA9`: live `FaceObjectMenu` fixes object vs PC by opcode and writes `targetId*2`.
 - `0x63/0x64`: bit index 0–7 + `/2` script-memory slot.
+- `0x65/0x66`: bank-7F Set/Reset Bit. Constructor/table agree that bits 0–2 hold the bit index, bit 7 adds `0x100` to the low address byte, and the address domain is `0x7F0000–0x7F01FF`. Lexeditor accepts only canonical first bytes `00–07` or `80–87`; undocumented bits 3–6 fail closed.
 - `0x69`/`0x6B`: raw u8 bitmask + `/2` script-memory slot.
 - `0x6F`: right-shift count 0–7 + `/2` script-memory slot.
 - PC-only `0x3A`, `0x3D`, `0x3E`, `0x45`, `0x46`, `0x70`, `0x74`, `0x78`: explicit PC factories + width overrides establish two one-byte operands. They remain raw local/extended/party slot bytes because the PC factories do not use the ordinary `get_offset()` helper.
+- PC-only `0x6E`: factory and PC width override establish `[extendedSlot, u8 value, comparison op, jump]`. The extended slot stays a raw byte; Lexeditor does not invent an address mapping. Comparison op is restricted to the same proven 0–7 enum and the final byte is validated as a jump-if-false distance.
 - `0x7A`: live `JumpMenu` and table agree on X byte, Y byte and a third `height/speed` byte. Lexeditor does not invent pixel/tile units or separate height vs speed semantics.
 - `0x8F`, `0x94/95`, `0x96/97`, `0x98/99`, `0x9A`, `0xA0/A1`, `0xB5/B6`: live movement/follow constructors agree on operand order. Direct X/Y values remain labeled coordinate bytes unless units are independently proven.
 - `0x9D`: live `VectorMoveFromMemMenu` writes two `/2` script-memory sources, direction then magnitude, and decodes them inversely.
@@ -64,31 +69,38 @@ Temporal Redux supplies explicit `Platform.PC` width overrides plus command tabl
 
 Ordinary script-memory UI addresses are even `0x7F0200–0x7F03FE` and round-trip to one-byte `/2` slots. Odd/out-of-range values fail closed. PC-only extended-memory raw slots and bank-7F offset forms are separate models and are not silently translated into that address space.
 
-Doubled targets also fail closed on odd stored bytes. The generic one-byte doubled representation allows logical 0–127 unless a stricter live constructor/menu domain is independently established (for example directional NPC facing `0x00–0x32` or follow-PC `1–6`).
+Doubled targets also fail closed on odd stored bytes. The generic one-byte doubled representation allows logical 0–127 unless a stricter live constructor/menu domain is independently established.
 
-Relative jump writes have one additional invariant: when the jump byte changes, the new target must be a decoded command boundary or function end. Existing malformed jumps may be preserved when another operand changes.
+Relative jump writes have one additional invariant: when the jump byte changes, the new target must be a decoded command boundary or function end. Existing malformed jumps may be preserved when another operand changes. This applies to ordinary comparisons and PC-only `0x6E` alike.
 
-### `0xEC` all-purpose sound
+### Dynamic / mode-dependent PC boundaries
 
-**Status: dynamic PC boundaries + known read-only semantics; no writer.**
+`0xEC` All Purpose Sound uses live Sound-menu constructors to establish exact known forms:
 
-Live `SoundMenu.py` constructors establish:
+- `88/F0/F2`: 1 argument byte total.
+- `14/19`: 2 argument bytes total.
+- `82/83/85/86`: 3 argument bytes total.
 
-- `88/F0/F2`: subcommand only -> 1 argument byte total.
-- `14/19`: subcommand + one parameter -> 2 argument bytes total.
-- `82/83/85/86`: subcommand + two parameters -> 3 argument bytes total.
+Known forms receive read-only semantics. Unknown/truncated forms fail closed. EC remains unwritable.
 
-Lexeditor dynamically sizes these known forms and gives them read-only semantic labels. Unknown EC subcommands fail closed; truncated known forms cannot consume the following opcode. Boundary evidence is not treated as write authorization.
+For `0x2E`, `0x88` and `0x4E`, the platform-specific PC parser is the authoritative boundary source when generic menus suggest a different construction:
+
+- `0x2E` Color Math: PC modes 4/5 = five argument bytes; PC mode 8 = three.
+- `0x88` Multi-mode Copy: PC modes 0/2/3/4/5/8 = 1/3/3/4/4/2 argument bytes.
+- `0x4E` Memory Copy: PC parser layout is `[destination u16, encodedLength u16, payload]`, where the encoded length includes the two-byte length field itself.
+
+These opcode families remain read-only through the fixed-width argument writer even when a particular mode has a known boundary.
+
+`0xFF` Mode 7 uses live Mode7Menu + PC parser evidence for read-only boundaries/semantics: scenes `00–89` are one argument byte, `90` and `97` carry three additional raw parameters, and `91–96/98` are one-byte special forms. Unknown `8A–8F` and `99–FF` modes fail closed.
+
+`0xF1` Color Addition remains **boundary-unresolved**. The PC parser/table interprets a nonzero first byte as a two-argument form, while the live ColorAdd menu can construct a nonzero one-argument form. Raw bytes can therefore be ambiguous with the next opcode. Lexeditor stops disassembly at F1 rather than choosing one interpretation.
 
 ### Intentionally excluded from named editing
 
-- `0x16`: distinct bank-7F comparison/operator packing.
 - `0x48–0x4D`: PC overrides replace the SNES address with a two-byte **segment address**; current menus do not establish a reversible full PC RAM address mapping.
 - `0x60`: PC width override conflicts with the generic 16-bit-immediate constructor semantics.
 - `0x61`: upstream literally describes the operation width as `1 byte?`.
-- `0x65/0x66`: separate bank-7F bit/address packing.
 - `0x67`: constructor/table disagree on reset-mask polarity (`reset bitmask` vs `bits to keep`).
-- `0x6E`: PC factory/width are known, but extended-memory comparison semantics/address meaning are not strong enough for a writer.
 - `0x75/0x76`: upstream says set memory to `1 (0xFF?)`; `0x77` says `1 byte?`.
 - `0x7B`: unused NPC jump with unknown destination fields and `speed/height?` operands.
 - `0x27/0x28`: live menus treat the displayed object ID as the stored argument while helper constructors divide the supplied ID by two.
@@ -98,6 +110,8 @@ Lexeditor dynamically sizes these known forms and gives them read-only semantic 
 - `0x9E/0x9F`: table definitions and constructors remain internally inconsistent; Lexeditor records their PC widths unresolved.
 - `0xE4/0xE5/0xE6`: unresolved tile-copy/layer-scroll flags or fields.
 - `0xEC`: dynamic known-form reads only; no subcommand writer yet.
+- `0xF1`: unresolved command boundary.
+- `0xFF`: Mode 7 forms remain semantic-only/read-only.
 - Other variable/unresolved commands remain read-only unless a relocation-capable assembler and stronger PC evidence are developed.
 
 ## Scene maps / tiles / palettes
