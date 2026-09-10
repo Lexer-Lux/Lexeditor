@@ -8,6 +8,7 @@ report suitable for real-install testing that CI cannot provide.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 from typing import Callable, Iterable
@@ -23,6 +24,7 @@ ARCHIVE_FILES = {
     "x": Path("data") / "FFX_Data.vbf",
     "x2": Path("data") / "FFX2_Data.vbf",
 }
+HASH_CHUNK_SIZE = 1024 * 1024
 
 STRUCTURED_SPECS = (
     {"game": "x", "key": "treasures", "archivePath": treasures.ARCHIVE_PATH, "builder": treasures.payload},
@@ -54,8 +56,25 @@ def _find_entry(index: VBFIndex, game: str, archive_path: str):
     raise FileNotFoundError(archive_path)
 
 
-def inspect_install(game_root: Path, specs: Iterable[dict] = STRUCTURED_SPECS) -> dict:
-    """Validate installed archives and all requested structured tables read-only."""
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        while True:
+            chunk = stream.read(HASH_CHUNK_SIZE)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def inspect_install(game_root: Path, specs: Iterable[dict] = STRUCTURED_SPECS,
+                    hash_archives: bool = False) -> dict:
+    """Validate installed archives and all requested structured tables read-only.
+
+    ``hash_archives`` optionally streams each complete VBF through SHA-256. It is
+    disabled by default because real collection archives are large; the VBF header
+    MD5 and all structured-table SHA-256 values are always reported.
+    """
     root = Path(game_root).resolve()
     indexes: dict[str, VBFIndex] = {}
     archives: dict[str, dict] = {}
@@ -81,6 +100,8 @@ def inspect_install(game_root: Path, specs: Iterable[dict] = STRUCTURED_SPECS) -
                     "fileCount": index.file_count,
                     "bytes": target.stat().st_size,
                 })
+                if hash_archives:
+                    state["sha256"] = _sha256_file(target)
             except (OSError, VBFError, ValueError) as error:
                 state["error"] = str(error)
         archives[game] = state
@@ -126,6 +147,7 @@ def inspect_install(game_root: Path, specs: Iterable[dict] = STRUCTURED_SPECS) -
         "contract": "Lexeditor.ffx-x2-install-verification",
         "gameRoot": str(root),
         "ok": bool(archives_ok and structured_ok),
+        "archiveHashesIncluded": bool(hash_archives),
         "archives": archives,
         "structured": structured,
         "launch": launch_state,
@@ -137,9 +159,10 @@ def _human_report(report: dict, require_fahrenheit: bool) -> str:
     for game in ("x", "x2"):
         state = report["archives"][game]
         if state.get("ready"):
-            lines.append(
-                f"  {game}: VBF OK — {state['fileCount']} files, header {state['headerMd5']}"
-            )
+            detail = f"{state['fileCount']} files, header {state['headerMd5']}"
+            if state.get("sha256"):
+                detail += f", SHA-256 {state['sha256']}"
+            lines.append(f"  {game}: VBF OK — {detail}")
         else:
             lines.append(f"  {game}: VBF FAIL — {state.get('error', 'unavailable')}")
     for row in report["structured"]:
@@ -168,9 +191,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="Print the full verification report as JSON")
     parser.add_argument("--require-fahrenheit", action="store_true",
                         help="Also fail unless Stage 0, Stage 1 and both game executables are present")
+    parser.add_argument("--hash-archives", action="store_true",
+                        help="Also stream the complete FFX_Data.vbf and FFX2_Data.vbf through SHA-256")
     args = parser.parse_args(argv)
 
-    report = inspect_install(args.game_root)
+    report = inspect_install(args.game_root, hash_archives=args.hash_archives)
     launch_state = report["launch"]
     launch_ready = bool(
         launch_state.get("ready")
