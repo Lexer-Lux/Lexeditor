@@ -25,8 +25,9 @@ Acceptance requirements:
 - `acceptanceReady` is `true`.
 - `archiveHashesIncluded` is `true`.
 - Both `archives.x.ready` and `archives.x2.ready` are `true` and each has a full-file `sha256`.
-- Every `structured[]` row has `status: "validated"`.
-- The four FFX ability tables report:
+- Every one of the 14 `structured[]` rows has `status: "validated"`.
+- FFX `a_ability.bin` reports `0x6C` records.
+- The four FFX animation tables report:
   - `command`: `0x60` records;
   - `item`: `0x60` records;
   - `monmagic1`: `0x5C` records;
@@ -48,6 +49,7 @@ Acceptance requirements:
 - Data Map renders all supported structured rows.
 - Each structured editor opens its full real table without parser errors.
 - **FFX Abilities** can switch among Commands, Items, Monster Magic 1 and Monster Magic 2 and shows the expected record size for each.
+- **FFX Auto-Abilities** opens `a_ability.bin`, shows Fire/Ice/Thunder/Water/Holy controls for Strike/Absorb/Immune/Resist/Weak, and does not expose SOS/status/effect/icon/group fields.
 - No project file is created merely by browsing/refreshing.
 
 Record any unexpectedly large table or UI delay before changing data.
@@ -84,7 +86,14 @@ Acceptance requirements mirror FFX:
 
 Only after byte-identical EFL startup passes, test one reversible structured edit in each game.
 
-For each selected table:
+For FFX, `a_ability.bin` is a useful conservative acceptance candidate because the editor can toggle one known elemental bit while preserving the rest of the record. If using it:
+
+1. Save the original mask and table SHA-256.
+2. Toggle exactly one known element flag in one behavior.
+3. Confirm the project-file diff is confined to the selected record byte at `+0x11..+0x15` and that bits `0xE0` of that byte are unchanged.
+4. Do not modify SOS, status/effect, icon/group or any other field.
+
+For every selected structured table:
 
 1. Save the original field value and table SHA-256.
 2. Make one small valid change through its structured control.
