@@ -13,7 +13,7 @@ from .event_flow import BACKWARD_JUMPS, FORWARD_JUMPS
 from .events import event_entries, get_event, parse_event
 
 
-VARIABLE_OR_UNRESOLVED = frozenset({0x2E, 0x4E, 0x88, 0x9E, 0x9F, 0xF1, 0xFF})
+VARIABLE_OR_UNRESOLVED = frozenset({0x2E, 0x4E, 0x88, 0x9E, 0x9F, 0xEC, 0xF1, 0xFF})
 
 
 def _event_path(store: OverlayStore, event_id: int) -> str:
