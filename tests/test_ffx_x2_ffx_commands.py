@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 import struct
+import urllib.error
+import urllib.request
 
 import pytest
 
@@ -195,4 +198,60 @@ def test_ffx_command_default_route_still_targets_command_bin(tmp_path: Path):
         assert state["table"] == "command"
         assert state["archivePath"] == ARCHIVE_PATH
 
+    assert session.wait_closed()
+
+
+def test_ffx_animation_api_rejects_arbitrary_table_names_and_cross_table_baselines(tmp_path: Path):
+    game_root = tmp_path / "game"
+    project_root = tmp_path / "project"
+    command = _table([_record(0x1111, 0x2222)], min_index=0x20, trailing=b"command-tail")
+    item = _table([_record(0x3333, 0x4444)], min_index=0x30, trailing=b"different-item-tail")
+    _write_fixture_vbf(game_root / "data" / "FFX_Data.vbf", [
+        (TABLES["command"].archive_path.removeprefix("FFX_Data/"), command),
+        (TABLES["item"].archive_path.removeprefix("FFX_Data/"), item),
+    ])
+
+    with FFXX2Session({
+        "LEXEDITOR_FFX_X2_ROOT": str(game_root),
+        "LEXEDITOR_FFX_X2_PROJECT": str(project_root),
+        "LEXEDITOR_FFX_X2_THEME_CACHE": str(tmp_path / "theme"),
+    }) as session:
+        with pytest.raises(urllib.error.HTTPError) as invalid_get:
+            urllib.request.urlopen(session.url + "api/ffx-commands?table=../../FFX.exe", timeout=5)
+        assert invalid_get.value.code == 400
+
+        command_state = request_json(session.url + "api/ffx-commands?table=command")
+        body = json.dumps({
+            "table": "item",
+            "headerMd5": command_state["headerMd5"],
+            "baselineSha256": command_state["baselineSha256"],
+            "edits": [{"id": 0x30, "animation1": 0xBEEF, "animation2": 0xCAFE}],
+        }).encode("utf-8")
+        request = urllib.request.Request(
+            session.url + "api/ffx-commands/save",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as stale_save:
+            urllib.request.urlopen(request, timeout=5)
+        assert stale_save.value.code == 409
+
+        invalid_body = json.dumps({
+            "table": "C:/Windows/System32/calc.exe",
+            "headerMd5": command_state["headerMd5"],
+            "baselineSha256": command_state["baselineSha256"],
+            "edits": [{"id": 0x20, "animation1": 1, "animation2": 2}],
+        }).encode("utf-8")
+        invalid_request = urllib.request.Request(
+            session.url + "api/ffx-commands/save",
+            data=invalid_body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with pytest.raises(urllib.error.HTTPError) as invalid_save:
+            urllib.request.urlopen(invalid_request, timeout=5)
+        assert invalid_save.value.code == 400
+
+    assert not project_root.exists() or not any(path.is_file() for path in project_root.rglob("*"))
     assert session.wait_closed()
