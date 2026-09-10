@@ -99,22 +99,24 @@ def run(output: Path, executable: str | None) -> None:
                 fields = page.locator(".record-detail .lex-detail-field")
                 expect(fields).to_have_count(5)
                 assert page.locator(".record-detail .detail-field").count() == 0
-                amount = fields.filter(has_text="Amount").first
+                amount = page.locator(".record-detail .lex-detail-field:visible").filter(has_text="Amount").first
                 expect(amount.locator("input[type=number]")).to_have_value("3")
                 assert amount.locator(".lex-info-help").count() == 0, "storage metadata became an info bubble"
                 # pagedListDetail finishes split sizing through its layout lifecycle.
-                # DOM presence is not enough: measuring during that brief zero-width
-                # phase makes this visual regression flaky on busy hosted runners.
+                # At narrow widths a zero-width duplicate can briefly coexist with the
+                # live row during relayout; require a visible current Amount row and
+                # measure that row rather than the first DOM match.
                 page.wait_for_function("""() => {
                   const rows=[...document.querySelectorAll('.record-detail .lex-detail-field')];
-                  const field=rows.find(row=>row.textContent.includes('Amount'));
+                  const field=rows.find(row=>row.textContent.includes('Amount') && row.getClientRects().length && row.getBoundingClientRect().width>0);
                   const label=field?.querySelector('.lex-detail-field-label');
-                  return !!field && !!label && field.getBoundingClientRect().width>0 && label.getBoundingClientRect().width>0;
+                  return !!field && !!label && label.getBoundingClientRect().width>0;
                 }""")
                 geometry = amount.evaluate("""e=>{
                   const b=e.getBoundingClientRect(), l=e.querySelector('.lex-detail-field-label').getBoundingClientRect();
                   return {field:b.width,label:l.width,ratio:l.width/b.width};
                 }""")
+                assert geometry["field"] > 0 and geometry["label"] > 0, (width, "RDR1 visible Detail row collapsed", geometry)
                 assert 0.075 <= geometry["ratio"] <= 0.125, (width, "RDR1 bypassed shared ~10% label lane", geometry)
                 page.screenshot(path=str(output / f"rdr-items-{width}.png"), full_page=True)
 
