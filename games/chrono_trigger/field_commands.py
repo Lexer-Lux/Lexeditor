@@ -110,7 +110,7 @@ def _dynamic_argument_bytes(data: bytes, offset: int, opcode: int) -> tuple[int 
         if mode in {4, 5}:
             return 5, None
         if mode == 8:
-            return 3, None
+            return None, "PC color-math assignment mode has unresolved variable payload width"
         return None, f"unknown PC color-math mode {mode}"
     if opcode == 0x4E:
         if remaining < 5:
@@ -121,7 +121,9 @@ def _dynamic_argument_bytes(data: bytes, offset: int, opcode: int) -> tuple[int 
         return 4 + encoded - 2, None
     if opcode == 0x88:
         mode = data[offset + 1] >> 4
-        widths = {0: 1, 2: 3, 3: 3, 4: 4, 5: 4, 8: 2}
+        widths = {0: 1, 2: 3, 3: 3, 4: 4, 5: 4}
+        if mode == 8:
+            return None, "PC multi-mode-copy mode 8 has unresolved variable payload width"
         if mode not in widths:
             return None, f"unknown PC multi-mode copy mode {mode}"
         return widths[mode], None
