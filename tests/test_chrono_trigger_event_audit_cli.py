@@ -101,9 +101,13 @@ class EventAuditCliTests(unittest.TestCase):
             self.assertEqual(result["readOnlyCommands"], 1)
             self.assertEqual(result["writablePercent"], 50.0)
             self.assertEqual([row["opcode"] for row in result["hotspots"]], [0x8E])
-            self.assertEqual(result["hotspots"][0]["sampleEventIds"], [2])
-            self.assertEqual(result["hotspots"][0]["readOnlyEventIds"], [2])
-            self.assertEqual(result["hotspots"][0]["stopEventIds"], [])
+            hotspot = result["hotspots"][0]
+            self.assertEqual(hotspot["sampleEventIds"], [2])
+            self.assertEqual(hotspot["readOnlyEventIds"], [2])
+            self.assertEqual(hotspot["stopEventIds"], [])
+            self.assertEqual(hotspot["readOnlySamples"][0]["eventId"], 2)
+            self.assertEqual(hotspot["readOnlySamples"][0]["rawHex"], "8E 80")
+            self.assertEqual(hotspot["readOnlySamples"][0]["argumentsHex"], "80")
 
             selected_output = io.StringIO()
             with redirect_stdout(selected_output):
@@ -122,6 +126,38 @@ class EventAuditCliTests(unittest.TestCase):
             self.assertEqual(selected["argumentCommands"], 1)
             self.assertEqual(selected["readOnlyCommands"], 1)
             self.assertEqual(selected["writablePercent"], 0.0)
+
+    def test_direct_f1_stop_exports_raw_boundary_preview(self):
+        with tempfile.TemporaryDirectory(prefix="chrono-event-audit-f1-") as temp_name:
+            root = Path(temp_name)
+            game = root / "game"
+            project = root / "project"
+            game.mkdir()
+            _build_smoke_archive(game / "resources.bin", [
+                ("Game/field/atel/Atel_0003.dat", _field_event(bytes((
+                    0xF1, 0x22, 0x80, 0x00, 0xAD, 0x01, 0xAD, 0x02, 0x00,
+                )))),
+            ])
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                code = main([
+                    "--game", str(game), "--project", str(project), "--event", "3",
+                ])
+            self.assertEqual(code, 0)
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["kind"], "chrono-trigger-event-audit")
+            self.assertEqual(result["eventId"], 3)
+            self.assertEqual(result["decodedCommands"], 0)
+            self.assertEqual(result["problemFunctions"], 1)
+            self.assertEqual(result["stops"], [{"opcode": 0xF1, "opcodeHex": "0xF1", "count": 1}])
+            self.assertEqual(len(result["stopSamples"]), 1)
+            sample = result["stopSamples"][0]
+            self.assertEqual(sample["opcode"], 0xF1)
+            self.assertEqual(sample["offset"], 32)
+            self.assertEqual(sample["remainingBytes"], 9)
+            self.assertEqual(sample["rawPreview"], "F1 22 80 00 AD 01 AD 02 00")
+            self.assertFalse(sample["truncatedPreview"])
 
     def test_direct_scan_reports_bad_overlay_and_vanilla_still_audits(self):
         with tempfile.TemporaryDirectory(prefix="chrono-event-audit-overlay-") as temp_name:
