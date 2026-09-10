@@ -118,15 +118,42 @@ class EventCliTests(unittest.TestCase):
             self.assertIn("changed since", payload["error"])
             self.assertFalse((project / EVENT_PATH).exists())
 
-    def test_variable_width_command_remains_read_only(self):
+    def test_decoded_dynamic_command_remains_read_only(self):
+        with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-event-cli-") as temp_name:
+            # PC Color Math mode 4 has a proven five-argument boundary, but the
+            # raw argument writer deliberately keeps the dynamic opcode family read-only.
+            game, project = _fixture(Path(temp_name), bytes((
+                0x2E, 0x40, 0x01, 0x02, 0x03, 0x04,
+                0x00,
+            )))
+            _code, shown = self._run(game, project, ["show"])
+            command = shown["objects"][0]["functions"][0]["commands"][0]
+            self.assertEqual(command["opcode"], 0x2E)
+            self.assertEqual(command["argumentBytes"], 5)
+            code, payload = self._run(game, project, [
+                "set-args", "--sha256", shown["sha256"], "--hex", "40 05 06 07 08",
+            ])
+            self.assertEqual(code, 1)
+            self.assertIn("variable or unresolved", payload["error"])
+            self.assertFalse((project / EVENT_PATH).exists())
+
+    def test_unresolved_f1_stops_disassembly_before_cli_edit_selection(self):
         with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-event-cli-") as temp_name:
             game, project = _fixture(Path(temp_name), bytes((0xF1, 0x21, 0x80, 0x00)))
-            _code, shown = self._run(game, project, ["show"])
+            code, shown = self._run(game, project, ["show"])
+            self.assertEqual(code, 0)
+            function = shown["objects"][0]["functions"][0]
+            self.assertFalse(function["complete"])
+            self.assertEqual(function["commands"], [])
+            self.assertEqual(function["problem"]["opcode"], 0xF1)
+            self.assertIn("unresolved", function["problem"]["reason"])
+
             code, payload = self._run(game, project, [
                 "set-args", "--sha256", shown["sha256"], "--hex", "22 80",
             ])
             self.assertEqual(code, 1)
-            self.assertIn("variable or unresolved", payload["error"])
+            self.assertIn("outside function", payload["error"])
+            self.assertFalse((project / EVENT_PATH).exists())
 
 
 if __name__ == "__main__":
