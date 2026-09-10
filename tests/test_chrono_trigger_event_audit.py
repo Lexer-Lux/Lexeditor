@@ -54,6 +54,26 @@ class EventAuditTests(unittest.TestCase):
         self.assertTrue(rows[0xEC]["dynamicOrUnresolvedBoundary"])
         self.assertEqual(audit["stops"], [{"opcode": 0xF1, "opcodeHex": "0xF1", "count": 1}])
 
+    def test_aliased_function_slots_are_counted_once_by_bounds(self):
+        shared = {
+            "start": 32,
+            "end": 36,
+            "complete": True,
+            "commands": [command(0x83, writable=True)],
+            "problem": None,
+        }
+        payload = {
+            "id": 11,
+            "path": "Game/field/atel/Atel_0011.dat",
+            "objects": [{"functions": [dict(shared), dict(shared), dict(shared)]}],
+        }
+        audit = audit_event(payload)
+        self.assertEqual(audit["functions"], 1)
+        self.assertEqual(audit["completeFunctions"], 1)
+        self.assertEqual(audit["decodedCommands"], 1)
+        self.assertEqual(audit["writableCommands"], 1)
+        self.assertEqual(audit["opcodes"][0]["count"], 1)
+
     def test_merge_ranks_stops_before_plain_read_only_frequency(self):
         first = audit_event(event_payload(
             1,
