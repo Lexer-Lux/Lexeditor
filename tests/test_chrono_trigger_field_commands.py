@@ -37,10 +37,42 @@ class FieldCommandTests(unittest.TestCase):
                 self.assertEqual(decoded["problem"]["opcode"], 0xF1)
                 self.assertIn("unresolved", decoded["problem"]["reason"])
 
-    def test_dynamic_88_modes(self):
-        decoded = disassemble_function(bytes([0x88, 0x01, 0x88, 0x80, 0x44]), 0, 5)
+    def test_color_math_fixed_add_sub_modes_keep_known_width(self):
+        data = bytes([
+            0x2E, 0x40, 0x01, 0x02, 0x34, 0x05,
+            0x2E, 0x57, 0x06, 0x07, 0x89, 0x0A,
+            0x00,
+        ])
+        decoded = disassemble_function(data, 0, len(data))
         self.assertTrue(decoded["complete"])
-        self.assertEqual([row["size"] for row in decoded["commands"]], [2, 3])
+        self.assertEqual([row["size"] for row in decoded["commands"]], [6, 6, 1])
+
+    def test_color_math_assignment_mode_fails_closed_until_payload_layout_is_proven(self):
+        decoded = disassemble_function(bytes([0x2E, 0x80, 0x31, 0x05, 0x00, 0xAA, 0xBB, 0xCC, 0x00]), 0, 9)
+        self.assertFalse(decoded["complete"])
+        self.assertEqual(decoded["commands"], [])
+        self.assertEqual(decoded["problem"]["opcode"], 0x2E)
+        self.assertIn("unresolved variable payload width", decoded["problem"]["reason"])
+
+    def test_dynamic_88_fixed_modes(self):
+        data = bytes([
+            0x88, 0x01,
+            0x88, 0x20, 0x11, 0x22,
+            0x88, 0x30, 0x33, 0x44,
+            0x88, 0x40, 0x55, 0x66, 0x77,
+            0x88, 0x50, 0x88, 0x99, 0xAA,
+            0x00,
+        ])
+        decoded = disassemble_function(data, 0, len(data))
+        self.assertTrue(decoded["complete"])
+        self.assertEqual([row["size"] for row in decoded["commands"]], [2, 4, 4, 5, 5, 1])
+
+    def test_dynamic_88_mode80_fails_closed_until_payload_layout_is_proven(self):
+        decoded = disassemble_function(bytes([0x88, 0x80, 0x11, 0x04, 0xAA, 0xBB, 0x00]), 0, 7)
+        self.assertFalse(decoded["complete"])
+        self.assertEqual(decoded["commands"], [])
+        self.assertEqual(decoded["problem"]["opcode"], 0x88)
+        self.assertIn("unresolved variable payload width", decoded["problem"]["reason"])
 
     def test_dynamic_ec_known_subcommand_widths_preserve_following_boundaries(self):
         # EC/88 is subcommand-only (1 arg), EC/14 has one extra parameter
