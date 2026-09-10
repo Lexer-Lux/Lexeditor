@@ -1,19 +1,22 @@
 """Read-only coverage audit for Chrono Trigger Steam field-event scripts.
 
 This module is shared by the CLI and desktop server so both surfaces use the
-same fail-closed parser/editor coverage policy.  Audits never write project or
+same fail-closed parser/editor coverage policy. Audits never write project or
 game files.
 """
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from typing import Iterable
 
 from .data import OverlayStore
 from .editor_registry import decorate_event_editors
 from .event_edit import VARIABLE_OR_UNRESOLVED
 from .events import event_entries, parse_event
+
+
+HOTSPOT_EVENT_SAMPLE_LIMIT = 8
 
 
 def _opcode_key(value: int) -> str:
@@ -107,7 +110,12 @@ def audit_event(payload: dict) -> dict:
 
 
 def merge_audits(audits: Iterable[dict]) -> dict:
-    """Aggregate event audits and rank read-only/parser research hotspots."""
+    """Aggregate event audits and rank read-only/parser research hotspots.
+
+    Each hotspot includes a bounded deterministic list of event IDs containing
+    that opcode. This makes an exported aggregate report actionable without
+    embedding event payloads or requiring the whole archive to be shared.
+    """
     audits = list(audits)
     counts: Counter[int] = Counter()
     argument_counts: Counter[int] = Counter()
@@ -115,16 +123,27 @@ def merge_audits(audits: Iterable[dict]) -> dict:
     read_only: Counter[int] = Counter()
     stops: Counter[int] = Counter()
     reasons: Counter[str] = Counter()
+    read_only_events: dict[int, set[int]] = defaultdict(set)
+    stop_events: dict[int, set[int]] = defaultdict(set)
 
     for audit in audits:
+        event_id = audit.get("eventId")
+        normalized_event_id = int(event_id) if event_id is not None else None
         for row in audit.get("opcodes", []):
             opcode = int(row["opcode"])
             counts[opcode] += int(row.get("count", 0))
             argument_counts[opcode] += int(row.get("argumentBearing", 0))
             writable[opcode] += int(row.get("writable", 0))
-            read_only[opcode] += int(row.get("readOnly", 0))
+            read_only_count = int(row.get("readOnly", 0))
+            read_only[opcode] += read_only_count
+            if read_only_count and normalized_event_id is not None:
+                read_only_events[opcode].add(normalized_event_id)
         for row in audit.get("stops", []):
-            stops[int(row["opcode"])] += int(row.get("count", 0))
+            opcode = int(row["opcode"])
+            stop_count = int(row.get("count", 0))
+            stops[opcode] += stop_count
+            if stop_count and normalized_event_id is not None:
+                stop_events[opcode].add(normalized_event_id)
         for row in audit.get("stopReasons", []):
             reasons[str(row["reason"])] += int(row.get("count", 0))
 
@@ -132,20 +151,30 @@ def merge_audits(audits: Iterable[dict]) -> dict:
     argument_commands = sum(argument_counts.values())
     writable_total = sum(writable.values())
     read_only_total = sum(read_only.values())
+    hotspot_rows = []
+    for opcode in set(counts) | set(stops):
+        if not read_only[opcode] and not stops[opcode]:
+            continue
+        read_only_ids = sorted(read_only_events[opcode])
+        stop_ids = sorted(stop_events[opcode])
+        combined_ids = sorted(read_only_events[opcode] | stop_events[opcode])
+        hotspot_rows.append({
+            "opcode": opcode,
+            "opcodeHex": _opcode_key(opcode),
+            "readOnlyCount": read_only[opcode],
+            "decodedCount": counts[opcode],
+            "argumentCount": argument_counts[opcode],
+            "stopCount": stops[opcode],
+            "dynamicOrUnresolvedBoundary": opcode in VARIABLE_OR_UNRESOLVED,
+            "sampleEventIds": combined_ids[:HOTSPOT_EVENT_SAMPLE_LIMIT],
+            "sampleEventIdsTruncated": len(combined_ids) > HOTSPOT_EVENT_SAMPLE_LIMIT,
+            "readOnlyEventIds": read_only_ids[:HOTSPOT_EVENT_SAMPLE_LIMIT],
+            "readOnlyEventIdsTruncated": len(read_only_ids) > HOTSPOT_EVENT_SAMPLE_LIMIT,
+            "stopEventIds": stop_ids[:HOTSPOT_EVENT_SAMPLE_LIMIT],
+            "stopEventIdsTruncated": len(stop_ids) > HOTSPOT_EVENT_SAMPLE_LIMIT,
+        })
     hotspots = sorted(
-        (
-            {
-                "opcode": opcode,
-                "opcodeHex": _opcode_key(opcode),
-                "readOnlyCount": read_only[opcode],
-                "decodedCount": counts[opcode],
-                "argumentCount": argument_counts[opcode],
-                "stopCount": stops[opcode],
-                "dynamicOrUnresolvedBoundary": opcode in VARIABLE_OR_UNRESOLVED,
-            }
-            for opcode in set(counts) | set(stops)
-            if read_only[opcode] or stops[opcode]
-        ),
+        hotspot_rows,
         key=lambda row: (-row["stopCount"], -row["readOnlyCount"], row["opcode"]),
     )
     return {
