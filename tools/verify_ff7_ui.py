@@ -55,6 +55,18 @@ window.LexeditorUI={el,clone:structuredClone,columnPreferences:()=>({}),recordId
     return el("div",{},...controls);
   },
   dataMap:o=>({page:0,controls:[],content:el("div",{},...o.rows.map(row=>el("p",{},row.controls," ",row.status," ",row.notes)))}),
+  // These three were missing, so FF7's boot died inside the mock rather than
+  // in the plugin, and every test here timed out waiting for a load that had
+  // already thrown. They mirror the shared components closely enough for the
+  // structure these tests assert.
+  subtabBar:o=>el("div",{class:"lex-subtab-bar",role:"tablist"},
+    ...(o.tabs||[]).map(tab=>{const b=el("button",{class:"lex-subtab-button"+(tab.id===o.active?" active":""),
+      role:"tab","aria-selected":String(tab.id===o.active),onclick:()=>o.change?.(tab.id)},tab.label||tab.id);return b;})),
+  tabbedPanel:o=>el("div",{class:"lex-tabbed-panel "+(o.className||"")},
+    LexeditorUI.subtabBar({tabs:o.tabs,active:o.active,change:o.change}),
+    el("div",{class:"lex-tabbed-panel-content"},...(Array.isArray(o.body)?o.body:[o.body]).filter(Boolean))),
+  integrationStatus:state=>el("span",{class:"lex-integration-status "+String(state||"")},String(state||"")),
+  readonlyField:value=>{const f=el("output",{class:"lex-readonly-field"},String(value??"—"));return f;},
   sharedSettings:()=>({developerMode:false}),configureThemeSounds:()=>{},finishPluginLoading:()=>{window.testLoaded=true},
   EditHistory:class{constructor(o){this.options=o}observe(){}clear(){}},
   mountShell:o=>{

@@ -23,9 +23,23 @@ async function editor() {
   const loaded = new Promise(resolve => finish = resolve);
   let confirm = true;
   const ui = {el: node, clone: structuredClone, finishPluginLoading: finish,
+    // The editor asks the desktop host for its ReShade state; there is no host
+    // here, so the call fails and the section falls back to its empty state,
+    // which is exactly what the browser preview does.
+    callWindow: async () => { throw new Error('no desktop host in tests'); },
     mountShell: () => ({refresh(){}})};
-  for (const name of ['columnList','columnPreferences','detailPanel','detailSection','detailField','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection'])
-    ui[name] = (...args) => node(name, args[0]);
+  // The shared components are stubbed as nodes that KEEP the controls handed
+  // to them, so a test can still find a checkbox after the page moved from a
+  // bespoke card to the shared settings panel. Dropping the arguments was why
+  // reaching for a toggle broke on a purely presentational change.
+  const carried = value => {
+    if (!value || typeof value !== 'object') return [];
+    if (Array.isArray(value)) return value.flatMap(carried);
+    if ('tag' in value) return [value];
+    return Object.values(value).flatMap(carried);
+  };
+  for (const name of ['columnList','columnPreferences','detailPanel','detailSection','detailField','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','confirmAction','showToast'])
+    ui[name] = (...args) => node(name, args[0], ...carried(args[0]));
   const context = vm.createContext({LexeditorUI: ui, structuredClone,
     document: {querySelector: selector => targets[selector] ||= node('target', {})},
     window: {confirm: () => confirm, addEventListener: (event, fn) => listeners[event] = fn},
@@ -63,14 +77,20 @@ function dirtyRecord(e) {
 
 test('Memoria subtab keeps launcher handoff while Lexeditor features are separate', async () => {
   const e = await editor();
-  e.run('navigate("tweaks")');
+  // Opening Tweaks reads the mod's ReShade state, so navigate is async now.
+  await e.run('navigate("tweaks")');
   const strip = e.targets['#toolbar'].children[0];
   assert.equal(strip.tag, 'subtabBar');
   assert.equal(strip.attrs.active, 'memoria');
   assert.deepEqual(Array.from(strip.attrs.tabs.map(tab=>tab.label)), ['Memoria','Improved Interface','Better Eat','XP Bars','HP/MP Bars','Row Rework']);
-  const card = e.targets['#main'].children[0];
-  assert.equal(card.children[1].children[0], message);
-  assert.equal(card.children.length, 2);
+  // The Memoria page says the settings live in Memoria's own launcher; how it
+  // is laid out is the shared settings panel's business, so the assertion is
+  // that the handoff is stated, not where in a tree it sits.
+  const text = JSON.stringify(e.targets['#main']);
+  assert.ok(text.includes('Memoria'), 'the Memoria handoff is not named');
+  assert.ok(/launcher/i.test(text), 'the Memoria launcher handoff is not explained');
+  assert.ok(!text.includes(message.slice(0, 40)),
+    'the placeholder note should have become a real explanation');
   assert.doesNotMatch(source, /platformConfigView|platformChanges|platform-config/);
 });
 
@@ -89,8 +109,16 @@ test('all five Lexeditor runtime toggles are project-owned and independently sav
   const e=await editor();
   for (const [tweak,key] of [['improved','ImprovedInterface'],['eat','BetterEat'],['xp','XPBars'],['hpmp','HPMPBars'],['row','RowRework']]) {
     e.run(`navigate("tweaks"); state.tweak="${tweak}"; tweaks()`);
-    const card=e.targets['#main'].children[0];
-    const toggle=card.children.find(child=>child.tag==='label').children[0];
+    // Find the switch wherever the settings page puts it, rather than at a
+    // fixed position in a markup shape that is allowed to change.
+    const find=(root,match)=>{
+      if(!root||typeof root!=='object')return null;
+      if(match(root))return root;
+      for(const child of root.children||[]){const hit=find(child,match);if(hit)return hit;}
+      return null;
+    };
+    const toggle=find(e.targets['#main'],n=>n.attrs&&n.attrs.type==='checkbox');
+    assert.ok(toggle,`no switch on the ${tweak} tweak page`);
     toggle.attrs.onchange({target:{checked:true}});
     assert.equal(e.run(`state.features.features.${key}`),true);
   }

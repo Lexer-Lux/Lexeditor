@@ -24,7 +24,7 @@
   const parentTab=id=>Object.keys(groups).find(key=>groups[key].includes(id))||id;
   const tabs=[...new Set([...integrated,...unresolved].map(parentTab))].map(id=>({id,label:labels[id]}));
   const api=async(path,options={})=>{const response=await fetch(path,options),body=await response.json();if(!response.ok)throw new Error(body.error||response.statusText);return body};
-  const state={loaded:false,tab:"items",dashboard:null,dataMap:null,data:null,records:{},saved:{},invalid:{},platformConfig:null,savedPlatformConfig:null,platformQuery:"",platformError:"",platformRevision:0,platformLoading:false,activeSource:"mine",selected:{},page:{},pageSize:{},query:{},sort:{},aiEvent:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],saving:false};
+  const state={loaded:false,modOnly:false,tab:"items",dashboard:null,dataMap:null,data:null,records:{},saved:{},invalid:{},platformConfig:null,savedPlatformConfig:null,platformQuery:"",platformError:"",platformRevision:0,platformLoading:false,activeSource:"mine",selected:{},page:{},pageSize:{},query:{},sort:{},aiEvent:{},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1],saving:false};
   const main=document.querySelector("#main");
   const category=()=>state.data.categories.find(value=>value.id===state.tab);
   const rowById=(group,id,source=state.records)=>(source?.[group]||[]).find(row=>row.id===id);
@@ -662,7 +662,7 @@
       master.classList.add("ff7-compact-master");
       return LexeditorUI.listDetail(master,recordDetail(selected),"ff7-layout ff7-compact-layout",{splitKey:`ff7-${group}`,defaultSplit:42,minLeft:260,minRight:360});
     }
-    return pagedListDetail({rows,key:row=>row.id,slots:false,selected:state.selected[group],page:state.page[group]||0,pageSize:state.pageSize[group]||12,noun:labels[group],className:"ff7-layout",splitKey:`ff7-${group}`,rowsKey:`ff7-${group}`,defaultSplit:50,minLeft:320,minRight:360,search:{key:`ff7-${group}`,value:query,label:`Search ${labels[group]}`,change:value=>{state.query[group]=value;state.page[group]=0;render()}},filters:[datasetStatus()],sync:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected},change:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected;render()},master:view=>listTable(view.rows,view.selected,view.select),detail:row=>recordDetail(row)});
+    return pagedListDetail({rows,key:row=>row.id,slots:false,selected:state.selected[group],page:state.page[group]||0,pageSize:state.pageSize[group]||12,noun:labels[group],className:"ff7-layout",splitKey:`ff7-${group}`,rowsKey:`ff7-${group}`,defaultSplit:50,minLeft:320,minRight:360,search:{key:`ff7-${group}`,value:query,label:`Search ${labels[group]}`,change:value=>{state.query[group]=value;state.page[group]=0;render()}},filters:[datasetStatus()],modOnly:modOnlySpec(group),sync:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected},change:next=>{state.page[group]=next.page;state.pageSize[group]=next.pageSize;if(next.selected!==null)state.selected[group]=next.selected;render()},master:view=>listTable(view.rows,view.selected,view.select),detail:row=>recordDetail(row)});
   }
   function unresolvedView(){
     const area=state.data.unresolved?.[state.tab];
@@ -754,6 +754,17 @@
     const status=dirty?"Unsaved changes":usingProject?"Project copy":"Vanilla source";
     return el("span",{class:"lex-pager-filter ff7-dataset-status",
       title:String(source||"Loaded game data")},el("span",{},status));
+  }
+  // FF7 can tell what the mod changes by comparing each record with the saved
+  // baseline for the same dataset, which is exactly what a save would write.
+  function modOnlySpec(group){
+    const saved=state.saved[group]||[];
+    const byId=new Map(saved.map(row=>[row.id,row]));
+    return {available:state.activeSource==="mine"&&saved.length>0,
+      value:state.modOnly===true,
+      changed:row=>{const base=byId.get(row.id);
+        return !base||JSON.stringify(row)!==JSON.stringify(base);},
+      change:value=>{state.modOnly=value;state.page[group]=0;render()}};
   }
   function dataWorkspace(){
     const sub=groups[parentTab(state.tab)];

@@ -276,7 +276,11 @@
     };
     const def=defs[state.tweak]||defs.improved,key=def.key,title=def.title,description=def.description;
     const enabled=!!state.features?.features?.[key],deployed=state.deployment?.deployed;
-    const toggle=el("label",{},el("input",{type:"checkbox",checked:enabled,disabled:state.busy||state.activeSource!=="mine",onchange:event=>{state.features.features[key]=event.target.checked;shell.refresh()}})," Enabled");
+    // The checkbox is built on its own and handed straight to the shared
+    // field. Reaching back into a wrapper for it assumed a live DOM, which the
+    // headless editor tests do not provide.
+    const toggleInput=el("input",{type:"checkbox",checked:enabled,disabled:state.busy||state.activeSource!=="mine",onchange:event=>{state.features.features[key]=event.target.checked;shell.refresh()}});
+    const toggle=el("label",{},toggleInput," Enabled");
     const actions=el("div",{class:"ff9-runtime-actions"},
       el("button",{type:"button",disabled:state.busy||dirtyCount()>0||state.activeSource!=="mine",onclick:()=>deploymentAction("deploy")},deployed?"Redeploy Project":"Deploy Project"),
       el("button",{type:"button",disabled:state.busy||!deployed||state.activeSource!=="mine",onclick:()=>deploymentAction("revert")},"Revert Lexeditor Mod"));
@@ -287,7 +291,7 @@
       identity:enabled?"ON":"OFF",meta:"Memoria runtime tweaks",body:[
         detailSection({title:"TWEAK",body:[
           detailField({label:"WHAT IT DOES",control:readonlyField(description)}),
-          detailField({label:"ENABLED",dataType:"BOOL",control:toggle.querySelector("input")}),
+          detailField({label:"ENABLED",dataType:"BOOL",control:toggleInput}),
         ]}),
         detailSection({title:"DEPLOYMENT",body:[
           detailField({label:"STATE",control:readonlyField(deployed
@@ -320,7 +324,9 @@
   function planned(){const label=tabs.find(tab=>tab.id===state.tab)?.label||"FF9 data";$("#main").replaceChildren(el("section",{class:"ff9-card"},el("h2",{},label),el("p",{},"The installed vanilla source for this area remains inside p0data asset containers. No safe editable CSV source is present."),el("span",{class:"ff9-warning"},"FORMAT NOT INTEGRATED")))}
   function dataMap(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,open:row=>{if(row.target){if(row.datasetKey)state.datasetChoice[row.target]=row.datasetKey;navigate(row.target)}},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;dataMap()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;dataMap()},changePage:page=>{state.mapPage=page;dataMap()},changeSort:key=>{const [active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];dataMap()}});state.mapPage=view.page;setToolbar(view.controls);$("#main").replaceChildren(view.content);shell.refresh()}
   async function render(){if(!state.dashboard)return;if(state.tab==="info"){setToolbar();info()}else if(state.tab==="datamap")dataMap();else if(state.tab==="tweaks"){if(!state.reshade)await loadReshade();tweaks()}else if(state.activeSource!=="mine"){setToolbar();planned()}else{toolbar();const key=activeKey();if(!key)planned();else if(state.tab==="characters"&&key==="characters")await renderCharacterComposite();else if(["weapons","armor","accessories"].includes(state.tab))await renderEquipmentComposite(state.tab);else renderDataset(await loadDataset(key),key)}shell.refresh()}
-  function navigate(tab){state.tab=tab;render();if(tab==="info"&&!state.busy)refreshRuntime().then(()=>{if(state.tab===tab)render()}).catch(error=>{state.runtimeError=error.message;if(state.tab==="info")render()})}
+  // render() is async, so navigate returns its promise: a caller that needs the
+// page to exist can wait for it instead of guessing.
+function navigate(tab){state.tab=tab;const drawn=render();if(tab==="info"&&!state.busy)refreshRuntime().then(()=>{if(state.tab===tab)render()}).catch(error=>{state.runtimeError=error.message;if(state.tab==="info")render()});return drawn}
   async function save(){if(state.busy)return;state.busy=true;shell.refresh();try{for(const [key,data] of Object.entries(state.datasets)){if(!data?.rows)continue;const changes=data.rows.map(row=>({line:row.line,scene:row.scene,record:row.record,values:changedFields(data,row)})).filter(change=>Object.keys(change.values).length);if(changes.length)installData(await api("/api/save",{key,sha256:data.sha256,sceneHashes:data.sceneHashes||{},changes}))}if(Object.keys(featureChanges()).length){state.features=await api("/api/features/save",{sha256:state.savedFeatures.sha256,features:state.features.features});state.savedFeatures=clone(state.features)}state.error=""}catch(error){state.error=error.message;throw error}finally{state.busy=false;render()}}
   async function discard(){for(const key of Object.keys(state.datasets))await loadDataset(key,true);state.features=await api("/api/features");state.savedFeatures=clone(state.features);state.deployment=await api("/api/deployment");render()}
   async function switchProjectSource(value){state.activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";await render()}

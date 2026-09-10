@@ -313,20 +313,13 @@
     }
     return false;
   }
-  function modOnlyFilter(){
-    return LexeditorUI.pagerToggle({
-      label:"Mod contents only",
-      title:modOnlyAvailable()
-        ? "Show only the records this mod changes."
-        : "Available once an editable mod and its vanilla baseline are both loaded.",
-      checked:state.modOnly===true,
-      disabled:!modOnlyAvailable(),
-      change:value=>{state.modOnly=value;for(const key of Object.keys(state.pages))state.pages[key]=0;render()},
-    });
-  }
-  function applyModOnly(rows,recordOf){
-    if(!state.modOnly||!modOnlyAvailable())return rows;
-    return rows.filter(row=>recordChangedFromVanilla(recordOf?recordOf(row):row));
+  // The toggle itself, its place on the pagination bar and the page reset are
+  // the shared table's job now. FF7R only says whether it can tell and how.
+  function modOnlySpec(recordOf){
+    return {available:modOnlyAvailable(),value:state.modOnly===true,
+      changed:row=>recordChangedFromVanilla(recordOf?recordOf(row):row),
+      change:value=>{state.modOnly=value;
+        for(const key of Object.keys(state.pages))state.pages[key]=0;render()}};
   }
   function pagedTable(spec){
     return LexeditorUI.pagedListDetail({
@@ -338,6 +331,7 @@
         placeholder:spec.searchPlaceholder,
         change:value=>{spec.setQuery(value);state.pages[spec.id]=0;render()}},
       filters:spec.filters||[],
+      modOnly:spec.modOnly||null,
       change:next=>{state.pages[spec.id]=next.page;render()},
       sync:next=>{state.pages[spec.id]=next.page},
       master:({rows,selected,select})=>columnList({rows,key:spec.key,selected,
@@ -374,8 +368,8 @@
       `The installed FF7R archives do not contain a ${spec.basename} table.`);
     if(!state.data)return loadingPanel(spec.label,"Open this tab to read the table.");
     return el("div",{class:"ff7r-view"},pagedTable({id:spec.id,noun:spec.noun,
-      filters:[modOnlyFilter()],
-      rows:applyModOnly(curatedRows(spec),row=>row.record),key:row=>row.record.id,
+      modOnly:modOnlySpec(row=>row.record),
+      rows:curatedRows(spec),key:row=>row.record.id,
       selected:state.selected,setSelected:row=>{state.selected=row.record.id},
       query:state.curatedQuery,setQuery:value=>{state.curatedQuery=value},
       searchLabel:`Search ${spec.label}`,searchPlaceholder:"Search record names and IDs",
@@ -398,7 +392,7 @@
     return curatedPrefsCache[spec.id].prefs;
   }
   function pagedDataPanel(){
-    const rows=applyModOnly(sortedRows());
+    const rows=sortedRows();
     return LexeditorUI.pagedListDetail({
       rows,key:row=>row.id,slots:false,noun:"records",
       page:state.dataPage||0,selected:state.selected,
@@ -407,7 +401,7 @@
       search:{key:"ff7r-data",value:state.query,label:"Search FF7 Remake records",
         placeholder:"Search IDs, values, and resolved names",
         change:value=>{state.query=value;state.dataPage=0;render()}},
-      filters:[modOnlyFilter()],change:next=>{state.dataPage=next.page;render()},
+      modOnly:modOnlySpec(),change:next=>{state.dataPage=next.page;render()},
       sync:next=>{state.dataPage=next.page},
       master:({rows:page,selected,select})=>columnList({rows:page,key:row=>row.id,selected,
         select:row=>{state.selected=row.id;select(row);},
@@ -468,8 +462,8 @@
     render();
   }
   function economyPanel(){if(state.busy&&state.tab==="economy")return loadingPanel("Loading item settings","Discovering installed FF7R Item/Equipment/Materia tables…");if(state.economyError)return errorPanel(state.economyError);if(state.economy&&!state.economy.available)return loadingPanel("Item settings unavailable","The installed FF7R archives did not expose a validated Item/Equipment/Materia table containing BuyValue, SaleValue, CanSale, or MaxCount.");const table=currentEconomyTable();if(!table)return loadingPanel("Item settings","Open this tab to discover installed FF7R item tables.");if(state.data?.asset!==table.asset)return loadingPanel("Loading item table","Reading the selected item DataObject…");return el("div",{class:"ff7r-view"},economyToolbar(),pagedTable({id:"economy",noun:"items",
-      filters:[modOnlyFilter()],
-      rows:applyModOnly(economyViewRows(),row=>row.record),key:row=>row.record.id,selected:state.selected,
+      modOnly:modOnlySpec(row=>row.record),
+      rows:economyViewRows(),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
       query:state.economyQuery,setQuery:value=>{state.economyQuery=value},
       searchLabel:"Search FF7 Remake items",searchPlaceholder:"Search items and IDs",
@@ -501,8 +495,8 @@
     return detailPanel({className:"ff7r-detail",title:row.tag||`Battle ${row.id}`,identity:recordId(row.id),meta:"BattleItemPossession",body:sections});
   }
   function lootPanel(){if(state.busy&&state.tab==="loot")return loadingPanel("Loading enemy loot","Discovering BattleItemPossession and validated drop arrays…");if(state.lootError)return errorPanel(state.lootError);if(state.loot&&!state.loot.available)return loadingPanel("Enemy loot unavailable",state.loot.reason||"BattleItemPossession was not found or did not contain recognized drop/steal arrays.");if(!state.loot)return loadingPanel("Enemy loot","Open this tab to discover the installed FF7R loot table.");if(state.data?.asset!==state.loot.asset)return loadingPanel("Loading enemy loot","Reading BattleItemPossession…");return el("div",{class:"ff7r-view"},pagedTable({id:"loot",noun:"enemies",
-      filters:[modOnlyFilter()],
-      rows:applyModOnly(lootViewRows(),row=>row.record),key:row=>row.record.id,selected:state.selected,
+      modOnly:modOnlySpec(row=>row.record),
+      rows:lootViewRows(),key:row=>row.record.id,selected:state.selected,
       setSelected:row=>{state.selected=row.record.id},
       query:state.lootQuery,setQuery:value=>{state.lootQuery=value},
       searchLabel:"Search FF7 Remake enemy loot",searchPlaceholder:"Search enemies, battle IDs, items, and chances",

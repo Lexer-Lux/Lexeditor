@@ -5367,7 +5367,17 @@ ${row.path}`,
     const emptyRow = slotBased && typeof options.empty === "function" ? options.empty : null;
     const hideEmptyKey = slotTablePreferenceKey(options);
     const hideEmpty = Boolean(emptyRow) && readHideEmpty(hideEmptyKey);
-    const suppliedRows = Array.isArray(options.rows) ? options.rows : [];
+    const allRows = Array.isArray(options.rows) ? options.rows : [];
+    // "Mod contents only" belongs to the shared table, not to each plugin.
+    // A plugin says whether it can tell (it needs a vanilla baseline loaded)
+    // and how to tell for one record; the toggle, its placement on the
+    // pagination bar, the filtering and the page reset are handled here, so
+    // adopting it is one option rather than a reimplementation per game.
+    const modOnly = options.modOnly && typeof options.modOnly.changed === "function"
+      ? options.modOnly : null;
+    const modOnlyOn = Boolean(modOnly && modOnly.value && modOnly.available !== false);
+    const suppliedRows = modOnlyOn
+      ? allRows.filter(row => modOnly.changed(row)) : allRows;
     const records = hideEmpty ? suppliedRows.filter(record => !emptyRow(record)) : suppliedRows;
     const emptyCount = emptyRow ? suppliedRows.reduce(
       (count, record) => count + (emptyRow(record) ? 1 : 0), 0) : 0;
@@ -5565,6 +5575,18 @@ ${row.path}`,
     root.dataset.lexPage = String(page);
     root.dataset.lexPageSize = String(pageSize);
     const bottomTools = [...(options.filters || [])];
+    if (modOnly) {
+      bottomTools.unshift(pagerToggle({
+        label: modOnly.label || "Mod contents only",
+        title: modOnly.available === false
+          ? (modOnly.unavailableTitle
+            || "Available once an editable mod and its vanilla baseline are both loaded.")
+          : (modOnly.title || "Show only the records this mod changes."),
+        checked: modOnlyOn,
+        disabled: modOnly.available === false,
+        change: value => modOnly.change?.(value),
+      }));
+    }
     if (!slotBased && typeof options.add === "function") {
       bottomTools.push(newButton({
         class: "lex-pager-add",
