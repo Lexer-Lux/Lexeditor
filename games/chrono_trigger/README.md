@@ -109,8 +109,8 @@ All three opcode families remain unwritable through the fixed-width raw writer e
 ### Intentionally read-only / unresolved
 
 - `60` PC width/constructor semantic conflict; `61` operation width is literally documented upstream as `1 byte?`.
-- `67` reset-mask polarity conflict.
-- `75/76/77`: upstream descriptions include `1 (0xFF?)` / `1 byte?` uncertainty.
+- `67` reset-mask polarity conflict. Its target-byte interpretation is research-only and deliberately unregistered.
+- `75/76/77`: upstream descriptions include `1 (0xFF?)` / `1 byte?` uncertainty. Their target-byte interpretation is research-only and deliberately unregistered.
 - `7B` unused NPC jump with unknown destination and `speed/height?` fields.
 - `27/28` target normalization: live menus and helper constructors disagree about `/2` handling.
 - `8D` pixel-position shift behavior; `8E` priority byte contains explicitly unknown flags and lacks a complete reversible menu decode.
@@ -123,7 +123,7 @@ All three opcode families remain unwritable through the fixed-width raw writer e
 
 ## Validation
 
-The dedicated `Chrono Trigger checks` workflow compiles plugin/tools, validates the descriptor, auto-discovers all `test_chrono_trigger_*.py` suites, runs the managed ARC1/CTExt smoke, checks editor JavaScript and runs Playwright regressions.
+The dedicated `Chrono Trigger checks` workflow explicitly compiles the production tools/modules plus quarantined research helpers, validates the descriptor, auto-discovers all `test_chrono_trigger_*.py` suites, runs the managed ARC1/CTExt smoke, checks editor JavaScript and runs Playwright regressions.
 
 Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, raw PC segment u16/slot/value round trips, bank-7F page/range distinctions, `0x16` and `0x6E` comparison retargeting, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries plus raw-write blocking, PC-specific `2E/88/4E` boundaries, F1 fail-closed behavior, read-only `FF` Mode 7 semantics and fail-closed malformed encodings. Event-audit regressions additionally cover unique-bound alias deduplication, argument-bearing coverage metrics, direct ARC1 scanning, event filtering and malformed-overlay reporting with a clean Vanilla comparison.
 
