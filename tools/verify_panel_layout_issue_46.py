@@ -35,7 +35,7 @@ for required in (
     'pagedListDetail({rows:records',
     # No closing quote: a layout is allowed to carry extra classes after the
     # shared one, and the three-panel example does.
-    'panelLayout([tablePanel(),recordPanel(),inspectorPanel()],"blank-layout',
+    'panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout',
     'panelLayout([subtabPanel()],"blank-layout"',
 ):
     require(required in blank, "Blank Game must demonstrate every shared panel count")

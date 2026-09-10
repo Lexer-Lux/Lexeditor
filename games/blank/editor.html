@@ -33,6 +33,7 @@
     .blank-subtab-panel{display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
     .blank-table .lex-boolean-mark{display:block;font-size:1.45em;text-align:center}
     .blank-tweaks{height:100%}
+    .blank-paged-pane{display:grid;grid-template-rows:minmax(0,1fr) auto;min-height:0;gap:var(--lex-panel-gap)}
     .blank-graphs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,600px),1fr));align-content:start;gap:16px;height:100%;overflow:auto}
     .blank-graphs .lex-curve-editor{display:block;min-width:0}
     /* The drawing is 2:1; a fixed height gave it a differently shaped box, which
@@ -48,7 +49,7 @@
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
-  const {el,columnList,columnPreferences,detailPanel,tabbedPanel,detailSection,detailField,multiNumberRow,unitField,readonlyField,recordId,infoHelp,hoverable,panelLayout,provenanceControl,referenceDisplay,integrationStatus,pagedListDetail,booleanMark,clone,EditHistory,toggleRow,infoIcon}=LexeditorUI;
+  const {el,columnList,columnPreferences,detailPanel,tabbedPanel,detailSection,detailField,multiNumberRow,unitField,readonlyField,recordId,infoHelp,hoverable,panelLayout,provenanceControl,referenceDisplay,integrationStatus,pagedListDetail,pager,booleanMark,clone,EditHistory,toggleRow,infoIcon}=LexeditorUI;
   const categories=["Common","Rare","Weapon","Armor"];
   const seed=[["Example Item","Common",25,true],["Second Item","Rare",100,false],["Fallback Potion","Common",50,true],["Null Sword","Weapon",255,false],["Default Hat","Armor",10,true],["CSS Crystal","Rare",75,true]];
   const vanillaRows=Array.from({length:48},(_unused,id)=>{const sample=seed[id%seed.length];return{id,name:id<seed.length?sample[0]:`Sample Record ${String(id+1).padStart(2,"0")}`,category:sample[1],value:(sample[2]+id*7)%256,enabled:id<seed.length?sample[3]:id%3!==0}});
@@ -149,6 +150,21 @@
     const wrapped=sourceControl({control:unit?unitField(control,unit):control,current:()=>row[key],vanilla:base[key],internal:type==="number",apply:value=>{row[key]=value;if(type==="checkbox")control.checked=!!value;else control.value=value}});
     return{control:wrapped,dataType:dataType||(type==="checkbox"?"BOOL":type==="number"?"INT":type==="select"?"ENUM":"STRING"),min,max,help};
   }
+  // The three-panel example needs a table that is its own pane, so it uses the
+  // shared pager directly rather than borrowing the one inside the paged
+  // list-detail. A record table always has a pager; the sweep enforces that,
+  // and it caught this example the moment it did not.
+  let threePage=0;
+  function pagedTablePane(){
+    const all=sortedRows(),size=12;
+    const pages=Math.max(1,Math.ceil(all.length/size));
+    threePage=Math.max(0,Math.min(threePage,pages-1));
+    const shown=all.slice(threePage*size,threePage*size+size);
+    return el("div",{class:"blank-paged-pane"},
+      tablePanel(shown),
+      pager({page:threePage,pages,total:all.length,pageSize:size,noun:"records",
+        change:next=>{threePage=next;render()}}));
+  }
   function recordPanel(withPins=true,row=selectedRow()){
     const fields={name:editableField(row,"name"),category:editableField(row,"category",{type:"select"}),value:editableField(row,"value",{type:"number",min:0,max:255,step:1,unit:"units",dataType:"INT",help:infoHelp("This sample record demonstrates a numeric property with a Vanilla reference; it has no game-specific meaning.")}),enabled:editableField(row,"enabled",{type:"checkbox"})};
     const sortMarker=property=>sort.key===property?{"data-lex-sort":sort.dir>0?"asc":"desc"}:{};
@@ -245,7 +261,7 @@
     page:mapState.page,query:mapState.query,status:mapState.status,sort:mapState.sort,
     changePage:value=>{mapState.page=value;render()},changeQuery:value=>{mapState.query=value;mapState.page=0;render()},
     changeStatus:value=>{mapState.status=value;mapState.page=0;render()},changeSort:key=>{mapState.sort=[key,-mapState.sort[1]];render()}}).content}
-  function render(){let layout;if(tab==="datamap")layout=dataMapPanel();else if(tab==="info")layout=panelLayout([informationPanel()],"blank-layout",{layoutKey:"blank-info",defaultSizes:[100]});else if(tab==="graphs")layout=panelLayout([graphsPanel()],"blank-layout",{layoutKey:"blank-graphs",defaultSizes:[100]});else if(tab==="one")layout=panelLayout([galleryPanel()],"blank-layout",{layoutKey:"blank-one",defaultSizes:[100]});else if(tab==="three")layout=panelLayout([tablePanel(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980});else if(tab==="subtabs")layout=panelLayout([subtabPanel()],"blank-layout",{layoutKey:"blank-subtabs",defaultSizes:[100]});else if(tab==="tweaks")layout=panelLayout([tweaksPanel()],"blank-layout",{layoutKey:"blank-tweaks",defaultSizes:[100]});else layout=pagedTwoPanel();document.querySelector("#main").replaceChildren(layout);refreshShell()}
+  function render(){let layout;if(tab==="datamap")layout=dataMapPanel();else if(tab==="info")layout=panelLayout([informationPanel()],"blank-layout",{layoutKey:"blank-info",defaultSizes:[100]});else if(tab==="graphs")layout=panelLayout([graphsPanel()],"blank-layout",{layoutKey:"blank-graphs",defaultSizes:[100]});else if(tab==="one")layout=panelLayout([galleryPanel()],"blank-layout",{layoutKey:"blank-one",defaultSizes:[100]});else if(tab==="three")layout=panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980});else if(tab==="subtabs")layout=panelLayout([subtabPanel()],"blank-layout",{layoutKey:"blank-subtabs",defaultSizes:[100]});else if(tab==="tweaks")layout=panelLayout([tweaksPanel()],"blank-layout",{layoutKey:"blank-tweaks",defaultSizes:[100]});else layout=pagedTwoPanel();document.querySelector("#main").replaceChildren(layout);refreshShell()}
   function navigate(value){tab=value;render()}
   const editHistory=new EditHistory({capture:()=>({rows,demo}),restore:snapshot=>{rows=clone(snapshot.rows);demo=clone(snapshot.demo)},render:async()=>render(),enabled:()=>activeSource==="mine",changed:()=>refreshShell()});
   // Saved samples belong to the user data store, not the service's changing port.

@@ -80,8 +80,10 @@
       detailField("Dataset",item.sourceLabel,"","Which shipped data file this item was defined in: the base game or one of its DLC."),
       detailField("Vanilla source",el("code",{title:item.sourcePath},item.sourcePath),"","The untouched file inside the installed content.rpf. Lexeditor never writes here."),
       detailField("Project override",el("code",{title:item.projectPath},item.projectPath),"","Where your edit is written, as a full XML override. The game loads this instead of the vanilla file."),
-      ...item.fields.map(field=>detailField(field.field,scalarControl(item,field),"",
-        `${field.field} on this item's XML record. Editing it writes a complete override of the record into your project; the installed content.rpf stays unchanged.`)));
+      // No bubble on the data fields themselves. A generic note repeated on
+      // every scalar is noise, and the four rows above already say where the
+      // value comes from and where an edit is written.
+      ...item.fields.map(field=>detailField(field.field,scalarControl(item,field))));
   }
   function renderItems(){
     const rows=matchingItems();

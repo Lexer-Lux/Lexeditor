@@ -129,8 +129,16 @@ PAGER_PROBE = r"""
     // only when it drives a selection, so an editable reference grid (GF
     // compatibility, new-game party) has none and is skipped.
     if(!list.querySelector('[aria-selected]')) continue;
-    const host=list.closest('.lex-paged-list-detail');
-    if(host&&host.querySelector('.lex-pager')) continue;
+    // The pager does not have to live inside the shared paged list-detail: a
+    // table composed as its own pane keeps one beside it. What must be true is
+    // that a record list has a pager somewhere above it - so walk up, rather
+    // than naming one container. (closest() with a longer selector list finds a
+    // NEARER ancestor, which is the opposite of being more permissive.)
+    let paged=false;
+    for(let node=list.parentElement;node&&node!==document.body;node=node.parentElement){
+      if(node.querySelector(':scope .lex-pager')){paged=true;break;}
+    }
+    if(paged) continue;
     bad.push({cls:String(list.className).slice(0,60),rows,
               label:list.getAttribute('aria-label')||''});
   }
@@ -315,7 +323,7 @@ def sweep(plugin: str, width: int, height: int) -> list[dict]:
             # killed the whole sweep partway through rather than reporting
             # anything. Give a live game room to answer.
             try:
-                cdp.ws.settimeout(240)
+                cdp.ws.settimeout(420)
             except Exception:  # pragma: no cover - harness detail
                 pass
             cdp.call("Page.enable")

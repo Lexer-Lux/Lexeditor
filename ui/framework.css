@@ -4642,7 +4642,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
      only the font left the reservation at the shared size and pushed the
      heading past what its container would give it. */
   --lex-detail-id-size:clamp(30px, 3.6vw, 48px);
-  --lex-detail-label-floor:min(6.5em, 34%);
+  /* Just enough to hold a short property name. Six and a half ems was more
+     than the tenth it was meant to rescue, so it took over lanes that were
+     perfectly usable and the shared ten-percent rule stopped being the rule. */
+  --lex-detail-label-floor:min(4.2em, 26%);
   --lex-detail-label-width:minmax(var(--lex-detail-label-floor), 10%);
 }
 .lex-detail-field { grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr); }
