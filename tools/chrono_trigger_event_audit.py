@@ -10,7 +10,8 @@ Two read-only input modes are supported:
 The report ranks parser-stop opcodes ahead of ordinary read-only frequency so
 research effort is driven by real Steam scripts instead of opcode-name guesses.
 Zero-argument commands are reported but do not count as missing editor coverage.
-This tool never writes game or project files.
+Direct scans report malformed events individually and continue. This tool never
+writes game or project files.
 """
 
 from __future__ import annotations
@@ -193,7 +194,7 @@ def _load(path: str) -> dict:
 
 
 def _direct_audits(game: Path, project: Path, source: str,
-                   requested_ids: list[int], limit: int) -> list[dict]:
+                   requested_ids: list[int], limit: int) -> tuple[list[dict], list[int], list[dict]]:
     game = game.expanduser().resolve()
     project = project.expanduser().resolve()
     archive = game / "resources.bin"
@@ -218,18 +219,23 @@ def _direct_audits(game: Path, project: Path, source: str,
     if limit:
         selected = selected[:limit]
 
+    selected_ids = [event_id for event_id, _path in selected]
     audits: list[dict] = []
+    errors: list[dict] = []
     for event_id, path in selected:
-        raw, origin = store.read(path, source)
-        payload = {
-            "id": event_id,
-            "path": path,
-            "source": origin,
-            **parse_event(raw),
-        }
-        decorate_event_editors(payload)
-        audits.append(audit_event(payload))
-    return audits
+        try:
+            raw, origin = store.read(path, source)
+            payload = {
+                "id": event_id,
+                "path": path,
+                "source": origin,
+                **parse_event(raw),
+            }
+            decorate_event_editors(payload)
+            audits.append(audit_event(payload))
+        except Exception as error:
+            errors.append({"eventId": event_id, "path": path, "error": str(error)})
+    return audits, selected_ids, errors
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -248,13 +254,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     direct_mode = args.game is not None or args.project is not None
+    selected_ids: list[int] = []
+    scan_errors: list[dict] = []
     if direct_mode:
         if args.game is None or args.project is None:
             parser.error("--game and --project must be supplied together")
         if args.inputs:
             parser.error("JSON inputs cannot be combined with --game/--project")
         try:
-            audits = _direct_audits(
+            audits, selected_ids, scan_errors = _direct_audits(
                 args.game, args.project, args.source, args.event_ids, args.limit,
             )
         except Exception as error:
@@ -269,10 +277,19 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("stdin may be specified only once")
         audits = [audit_event(_load(path)) for path in args.inputs]
 
-    output = audits[0] if len(audits) == 1 else merge_audits(audits)
     if direct_mode:
+        if len(selected_ids) == 1 and len(audits) == 1 and not scan_errors:
+            output = audits[0]
+        else:
+            output = merge_audits(audits)
         output["scanSource"] = args.source
-        output["selectedEventIds"] = [audit.get("eventId") for audit in audits]
+        output["selectedEventIds"] = selected_ids
+        output["auditedEventIds"] = [audit.get("eventId") for audit in audits]
+        output["scanErrorCount"] = len(scan_errors)
+        output["scanErrors"] = scan_errors
+    else:
+        output = audits[0] if len(audits) == 1 else merge_audits(audits)
+
     print(json.dumps(output, indent=2, sort_keys=False))
     return 0
 
