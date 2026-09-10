@@ -9,9 +9,9 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import (
-    auto_ability_prices, ctb_base, deployment, ffx_commands, ffx2_accessories, ffx2_abilities,
-    gear_shops, item_prices, item_shops, launch as fahrenheit_launch, mix_table,
-    paths, theme, treasures,
+    auto_ability_prices, ctb_base, deployment, ffx_auto_abilities, ffx_commands,
+    ffx2_accessories, ffx2_abilities, gear_shops, item_prices, item_shops,
+    launch as fahrenheit_launch, mix_table, paths, theme, treasures,
 )
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
 
@@ -24,10 +24,11 @@ WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 256 * 1024
 POST_ROUTES = {
     "/api/project/extract", "/api/treasures/save", "/api/item-prices/save",
-    "/api/auto-ability-prices/save", "/api/ctb-base/save", "/api/mix-table/save",
-    "/api/item-shops/save", "/api/gear-shops/save", "/api/ffx-commands/save",
-    "/api/ffx2-abilities/save", "/api/ffx2-accessories/save",
-    "/api/deployment/deploy", "/api/deployment/revert", "/api/play",
+    "/api/auto-ability-prices/save", "/api/ffx-auto-abilities/save",
+    "/api/ctb-base/save", "/api/mix-table/save", "/api/item-shops/save",
+    "/api/gear-shops/save", "/api/ffx-commands/save", "/api/ffx2-abilities/save",
+    "/api/ffx2-accessories/save", "/api/deployment/deploy", "/api/deployment/revert",
+    "/api/play",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
 _META_CACHE: tuple[tuple[int, int], VBFIndex] | None = None
@@ -241,6 +242,17 @@ def save_auto_ability_prices(request: dict) -> dict:
     )
 
 
+def ffx_auto_ability_catalog() -> dict:
+    return _structured_payload(ffx_auto_abilities.ARCHIVE_PATH, ffx_auto_abilities.payload)
+
+
+def save_ffx_auto_abilities(request: dict) -> dict:
+    return _structured_save(
+        request, ffx_auto_abilities.ARCHIVE_PATH, ffx_auto_abilities.apply_edits,
+        ffx_auto_abilities.payload, "Auto-Ability Elements",
+    )
+
+
 def ctb_base_catalog() -> dict:
     return _structured_payload(ctb_base.ARCHIVE_PATH, ctb_base.payload)
 
@@ -347,6 +359,11 @@ def data_map() -> dict:
          lambda s: f"{len(s['rows'])} four-byte prices mapped to command IDs starting at 0x{s['commandBase']:04X}.", "item-prices"),
         (auto_ability_prices.ARCHIVE_PATH, "Structured auto-ability gil-price editor", auto_ability_prices.payload,
          lambda s: f"{len(s['rows'])} four-byte prices mapped to auto-ability IDs starting at 0x{s['abilityBase']:04X}.", "auto-ability-prices"),
+        (ffx_auto_abilities.ARCHIVE_PATH, "Conservative auto-ability elemental-mask editor", ffx_auto_abilities.payload,
+         lambda s: (
+             f"{len(s['rows'])} English/US 0x6C-byte auto-ability records; edits only known Fire/Ice/Thunder/Water/Holy "
+             "bits at +0x11..+0x15 while preserving each byte's unknown upper bits and all other data."
+         ), "ffx-auto-abilities"),
         (ctb_base.ARCHIVE_PATH, "Structured CTB tick-speed and ICV-bonus editor", ctb_base.payload,
          lambda s: f"{len(s['rows'])} two-byte Agility records with derived initial-CTB ranges.", "ctb-base"),
         (mix_table.ARCHIVE_PATH, "Structured Rikku Mix result editor", mix_table.payload,
@@ -406,8 +423,8 @@ def data_map() -> dict:
          "notes": "; ".join(theme_parts) or "Theme extraction falls back safely when cosmetic source assets are unavailable.",
          "status": "partial" if themed.get("source") == "installed-game" else "not-integrated", "coverage": "game-derived-theme", "openable": False},
         {"filename": "FFX_Data/ffx_ps2/ffx/**/battle/kernel/*", "controls": "Remaining FFX gameplay/kernel family",
-         "notes": "Eleven FFX kernel families are structured; other kernel tables remain available through the VBF browser.",
-         "status": "partial", "coverage": "eleven-structured-families", "openable": False},
+         "notes": "Twelve FFX kernel families are structured; other kernel tables remain available through the VBF browser.",
+         "status": "partial", "coverage": "twelve-structured-families", "openable": False},
         {"filename": "FFX2_Data/ffx_ps2/ffx2/**", "controls": "Remaining FFX-2 game-data families",
          "notes": "English/US command animations and accessory base ability/price fields are structured; other FFX-2 formats remain read/extract-only until proved.",
          "status": "partial", "coverage": "two-structured-families", "openable": False},
@@ -472,10 +489,10 @@ class Handler(BaseHTTPRequestHandler):
                     "edition": "Steam collection / VBF / Fahrenheit EFL", "hosted": HOSTED, "windowHost": WINDOW_HOST,
                     "projectRoot": str(paths.PROJECT_ROOT), "editorRoot": str(PLUGIN_ROOT),
                     "capabilities": ["data-map", "vbf-index", "vbf-extract", "project-overlay", "ffx-treasure-editor",
-                        "ffx-item-price-editor", "ffx-auto-ability-price-editor", "ffx-ctb-base-editor", "ffx-mix-editor",
-                        "ffx-item-shop-editor", "ffx-gear-shop-editor", "ffx-command-animation-editor",
-                        "ffx-ability-animation-editor", "ffx2-ability-animation-editor", "ffx2-accessory-editor",
-                        "installed-game-theme", "fahrenheit-deploy", "fahrenheit-launch"]})
+                        "ffx-item-price-editor", "ffx-auto-ability-price-editor", "ffx-auto-ability-elements-editor",
+                        "ffx-ctb-base-editor", "ffx-mix-editor", "ffx-item-shop-editor", "ffx-gear-shop-editor",
+                        "ffx-command-animation-editor", "ffx-ability-animation-editor", "ffx2-ability-animation-editor",
+                        "ffx2-accessory-editor", "installed-game-theme", "fahrenheit-deploy", "fahrenheit-launch"]})
             elif route == "/api/dashboard": self.json_response(dashboard())
             elif route == "/api/datamap": self.json_response(data_map())
             elif route == "/api/launch": self.json_response(launch_status())
@@ -483,6 +500,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/treasures": self.json_response(treasure_catalog())
             elif route == "/api/item-prices": self.json_response(item_price_catalog())
             elif route == "/api/auto-ability-prices": self.json_response(auto_ability_price_catalog())
+            elif route == "/api/ffx-auto-abilities": self.json_response(ffx_auto_ability_catalog())
             elif route == "/api/ctb-base": self.json_response(ctb_base_catalog())
             elif route == "/api/mix-table": self.json_response(mix_catalog())
             elif route == "/api/item-shops": self.json_response(item_shop_catalog())
@@ -517,6 +535,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/treasures/save": result = save_treasures(request)
             elif route == "/api/item-prices/save": result = save_item_prices(request)
             elif route == "/api/auto-ability-prices/save": result = save_auto_ability_prices(request)
+            elif route == "/api/ffx-auto-abilities/save": result = save_ffx_auto_abilities(request)
             elif route == "/api/ctb-base/save": result = save_ctb_base(request)
             elif route == "/api/mix-table/save": result = save_mix(request)
             elif route == "/api/item-shops/save": result = save_item_shops(request)
