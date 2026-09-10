@@ -1,16 +1,18 @@
 """PC-only fixed-width extended-memory event editors for Chrono Trigger Steam.
 
 Temporal Redux supplies explicit PC factories and PC width overrides for these
-opcodes.  Their one-byte local/extended operands are kept as raw slot numbers:
+opcodes. Their one-byte local/extended operands are kept as raw slot numbers:
 the upstream PC factories do not translate them through the regular 0x7F0200
 script-memory /2 address helper, so Lexeditor does not invent that mapping.
 """
 
 from __future__ import annotations
 
+from .comparisons import OPERATION_NAMES
+
 
 U8 = 0xFF
-PC_EXTENDED_OPCODES = frozenset({0x3A, 0x3D, 0x3E, 0x45, 0x46, 0x70, 0x74, 0x78})
+PC_EXTENDED_OPCODES = frozenset({0x3A, 0x3D, 0x3E, 0x45, 0x46, 0x6E, 0x70, 0x74, 0x78})
 
 
 def _args(command: dict) -> bytearray | None:
@@ -21,7 +23,12 @@ def _args(command: dict) -> bytearray | None:
         args = bytearray.fromhex(command.get("argumentsHex", ""))
     except ValueError:
         return None
-    return args if len(args) == 2 else None
+    expected = 4 if opcode == 0x6E else 2
+    if len(args) != expected:
+        return None
+    if opcode == 0x6E and args[2] >= len(OPERATION_NAMES):
+        return None
+    return args
 
 
 def _int(value, minimum: int, maximum: int, label: str) -> int:
@@ -38,7 +45,7 @@ def pc_extended_field_specs(command: dict) -> list[dict] | None:
     if _args(command) is None:
         return None
     opcode = int(command["opcode"])
-    number = lambda key, label: {"key": key, "label": label, "minimum": 0, "maximum": U8}
+    number = lambda key, label, maximum=U8: {"key": key, "label": label, "minimum": 0, "maximum": maximum}
     if opcode == 0x3A:
         return [number("value", "Immediate value"), number("extendedSlot", "Extended-memory slot (raw)")]
     if opcode in {0x3D, 0x78}:
@@ -47,6 +54,13 @@ def pc_extended_field_specs(command: dict) -> list[dict] | None:
         return [number("extendedSlot", "Extended-memory slot (raw)"), number("localSlot", "Local-memory slot (raw)")]
     if opcode in {0x45, 0x46}:
         return [number("bit", "Bit operand (raw)"), number("extendedSlot", "Extended-memory slot (raw)")]
+    if opcode == 0x6E:
+        return [
+            number("extendedSlot", "Extended-memory slot (raw)"),
+            number("value", "Comparison value"),
+            number("operation", "Comparison operation (0–7)", 7),
+            number("jumpOffset", "Jump bytes if false"),
+        ]
     return [number("partySlot", "Party slot (raw)"), number("localSlot", "Local-memory slot (raw)")]
 
 
@@ -63,6 +77,13 @@ def pc_extended_values(command: dict) -> dict | None:
         return {"extendedSlot": args[0], "localSlot": args[1]}
     if opcode in {0x45, 0x46}:
         return {"bit": args[0], "extendedSlot": args[1]}
+    if opcode == 0x6E:
+        return {
+            "extendedSlot": args[0],
+            "value": args[1],
+            "operation": args[2],
+            "jumpOffset": args[3],
+        }
     return {"partySlot": args[0], "localSlot": args[1]}
 
 
@@ -79,7 +100,7 @@ def apply_pc_extended_op(command: dict, values: dict) -> bytes | None:
     for index, spec in enumerate(specs):
         key = spec["key"]
         if key in values:
-            args[index] = _int(values[key], 0, U8, spec["label"])
+            args[index] = _int(values[key], int(spec.get("minimum", 0)), int(spec.get("maximum", U8)), spec["label"])
     return bytes(args)
 
 
@@ -103,6 +124,21 @@ def pc_extended_semantics(command: dict) -> dict | None:
     elif opcode == 0x46:
         summary = f"PC BitClear operand {values['bit']} on extended slot {values['extendedSlot']} (raw)"
         width = None
+    elif opcode == 0x6E:
+        operation_name = OPERATION_NAMES[values["operation"]]
+        summary = (
+            f"PC Compare8 extended slot {values['extendedSlot']} {operation_name} {values['value']} "
+            f"· false → jump +{values['jumpOffset']} (raw slot)"
+        )
+        return {
+            "summary": summary,
+            "widthBytes": 1,
+            "pcOnly": True,
+            "rawSlots": True,
+            "operationName": operation_name,
+            "jumpOnFalse": True,
+            **values,
+        }
     elif opcode == 0x70:
         summary = f"PC Copy8 party slot {values['partySlot']} → local slot {values['localSlot']} (raw slots)"
         width = 1
