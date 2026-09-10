@@ -12,6 +12,16 @@
     .ct-command-editor button{padding:5px 10px}
     .ct-command-editor-note{flex-basis:100%;font-size:.78em;color:var(--lex-muted)}
     .ct-command-summary{max-width:300px;color:var(--lex-muted)}
+    .ct-event-audit{display:grid;gap:8px;padding:10px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .ct-event-audit-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+    .ct-event-audit-head button{padding:5px 10px}
+    .ct-event-audit-note{font-size:.82em;color:var(--lex-muted)}
+    .ct-event-audit-stats{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.88em}
+    .ct-event-audit-hotspots{display:grid;grid-template-columns:minmax(72px,auto) 1fr auto;gap:0;border:1px solid var(--lex-border);font-size:.84em}
+    .ct-event-audit-hotspots>span{padding:5px 7px;border-bottom:1px solid var(--lex-border)}
+    .ct-event-audit-hotspots>span:nth-last-child(-n+3){border-bottom:0}
+    .ct-event-audit-opcode{font-family:var(--lex-mono,monospace);font-weight:700}
+    .ct-event-audit-dynamic{color:#e4bd62}
   `;
   document.head.append(style);
 
@@ -34,6 +44,8 @@
         row.source = saved.source;
         row.sha256 = saved.sha256;
       }
+      state.events.audit = null;
+      state.events.auditSource = null;
       await loadDashboard();
     } catch (error) {
       state.error = String(error?.message || error);
@@ -42,6 +54,88 @@
       render();
       refreshShell();
     }
+  }
+
+  async function runEventAudit() {
+    if (state.busy) return;
+    state.busy = true;
+    state.error = "";
+    const source = state.source;
+    state.events.audit = null;
+    state.events.auditSource = source;
+    render();
+    try {
+      state.events.audit = await api(`/api/event-audit?${new URLSearchParams({source})}`);
+    } catch (error) {
+      if (state.events.auditSource === source) state.events.audit = null;
+      state.error = String(error?.message || error);
+    } finally {
+      state.busy = false;
+      render();
+      refreshShell();
+    }
+  }
+
+  function eventAuditPanel() {
+    const current = state.events.auditSource === state.source ? state.events.audit : null;
+    const button = el("button", {
+      type: "button",
+      disabled: state.busy,
+      onclick: runEventAudit,
+    }, current ? "Refresh coverage audit" : state.busy && state.events.auditSource === state.source ? "Auditing…" : "Run coverage audit");
+    const head = el("div", {class: "ct-event-audit-head"},
+      el("strong", {}, "Real-install event coverage"), button,
+      el("span", {class: "ct-event-audit-note"},
+        `Read-only ${state.source === "vanilla" ? "Vanilla" : "selected project + Vanilla fallback"} scan; runs only on request.`));
+    if (!current) {
+      return el("div", {class: "ct-event-audit"}, head,
+        el("div", {class: "ct-event-audit-note"},
+          "Ranks fail-closed parser stops first, then argument-bearing commands that still lack a named editor. Aliased function bounds and zero-argument commands are excluded from gap inflation."));
+    }
+
+    const audited = current.auditedEventIds?.length ?? current.events ?? (current.eventId === undefined ? 0 : 1);
+    const selected = current.selectedEventIds?.length ?? audited;
+    const stats = el("div", {class: "ct-event-audit-stats"},
+      el("span", {}, el("strong", {}, String(audited)), `/${selected} events audited`),
+      el("span", {}, el("strong", {}, String(current.argumentCommands ?? 0)), " argument commands"),
+      el("span", {}, el("strong", {}, `${Number(current.writablePercent ?? 0).toFixed(2)}%`), " named-editor coverage"),
+      el("span", {}, el("strong", {}, String(current.problemFunctions ?? 0)), " fail-closed functions"),
+      current.scanErrorCount ? el("span", {class: "ct-event-audit-dynamic"},
+        el("strong", {}, String(current.scanErrorCount)), " scan error(s)") : null,
+    );
+
+    let hotspots = current.hotspots || [];
+    if (!hotspots.length && current.opcodes) {
+      hotspots = current.opcodes.filter(row => Number(row.readOnly) > 0).map(row => ({
+        opcodeHex: row.opcodeHex,
+        readOnlyCount: row.readOnly,
+        stopCount: 0,
+        dynamicOrUnresolvedBoundary: row.dynamicOrUnresolvedBoundary,
+      }));
+    }
+    hotspots = hotspots.slice(0, 8);
+    const hotspotGrid = hotspots.length ? el("div", {class: "ct-event-audit-hotspots"}) : null;
+    if (hotspotGrid) {
+      for (const row of hotspots) {
+        const stops = Number(row.stopCount || 0);
+        const readOnly = Number(row.readOnlyCount || 0);
+        hotspotGrid.append(
+          el("span", {class: `ct-event-audit-opcode${row.dynamicOrUnresolvedBoundary ? " ct-event-audit-dynamic" : ""}`}, row.opcodeHex),
+          el("span", {}, stops
+            ? `${stops} parser stop${stops === 1 ? "" : "s"}${readOnly ? ` · ${readOnly} decoded read-only` : ""}`
+            : `${readOnly} argument command${readOnly === 1 ? "" : "s"} read-only`),
+          el("span", {}, row.dynamicOrUnresolvedBoundary ? "dynamic/unresolved" : "fixed boundary"),
+        );
+      }
+    }
+    const errors = current.scanErrors?.length
+      ? el("details", {}, el("summary", {}, `${current.scanErrors.length} event scan error(s)`),
+          ...current.scanErrors.slice(0, 8).map(row => el("div", {class: "ct-event-audit-note ct-mono"},
+            `${String(row.eventId).padStart(4, "0")} · ${row.error}`)))
+      : null;
+    return el("div", {class: "ct-event-audit"}, head, stats,
+      hotspotGrid || el("div", {class: "ct-event-audit-note"}, "No argument-bearing read-only or parser-stop hotspots found."),
+      errors);
   }
 
   function eventCommandEditor(objectId, functionId, commandIndex, command) {
@@ -168,7 +262,7 @@
         el("span", {}, state.source === "vanilla"
           ? "PC command-boundary disassembly · Vanilla read-only"
           : "PC command-boundary disassembly · named fixed-width edits")),
-      errorNode(), el("div", {class: "ct-split"}, list, detail),
+      eventAuditPanel(), errorNode(), el("div", {class: "ct-split"}, list, detail),
       el("div", {class: "ct-footer"}, el("span", {}, `Showing ${start}–${end} of ${data.matchCount}`),
         el("div", {}, el("button", {type: "button", disabled: data.offset <= 0,
           onclick: () => { state.events.offset = Math.max(0, state.events.offset - state.events.limit); loadActive(); }}, "Previous"),
