@@ -39,6 +39,11 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
   - `58/59`: script-memory source -> bank-local `0x7F0000–0x7F01FF` destination, 8/16-bit.
   - `56`: u8 immediate -> full u16 bank offset `0x7F0000–0x7FFFFF`.
   - Wider pre-existing `53/54/58/59` offsets remain read-only because Temporal Redux constructors select those opcodes only for `is_local_mem()` (`0x7F0000–0x7F01FF`).
+- PC segment-memory `48–4D` use the Steam/PC width overrides directly:
+  - `48/49`: raw u16 segment source + raw one-byte local destination slot, 8/16-bit.
+  - `4A/4B`: raw u16 segment destination + immediate u8/u16 value.
+  - `4C/4D`: raw u16 segment destination + raw one-byte local source slot, 8/16-bit.
+  - The u16 segment is **not** presented as a full PC RAM address; semantics explicitly report `fullAddressKnown: false`. Local bytes likewise stay raw rather than inheriting the generic menu's inconsistent address conversion.
 - Bit ops:
   - `63` Set Bit, `64` Reset Bit, `69` Set Bits, `6B` Toggle Bits and `6F` Shift Right use ordinary `/2` script memory.
   - Bank-7F `65/66` Set/Reset Bit use `[bitIndex|pageBit, lowAddress]`: bits 0–2 are the bit index, bit 7 selects the upper `0x100`-byte page, and undocumented bits 3–6 must be clear. The editable address domain is exactly `0x7F0000–0x7F01FF`.
@@ -68,7 +73,7 @@ Lexeditor integration for the Windows Steam release (App ID `613830`). PC format
 - `14/19` -> 2 argument bytes total
 - `82/83/85/86` -> 3 argument bytes total
 
-Known EC forms receive read-only semantic labels. Unknown subcommands and truncated known forms fail closed so they cannot consume the following opcode. **EC remains unwritable.**
+Known EC forms receive read-only semantic labels. Unknown subcommands and truncated known forms fail closed so they cannot consume the following opcode. **EC remains unwritable through both named controls and raw `set-args`.**
 
 `0xFF` Mode 7 is also dynamic on PC. Live Mode7Menu evidence is used for **read-only semantics only**:
 
@@ -91,7 +96,6 @@ All three opcode families remain unwritable through the fixed-width raw writer e
 
 ### Intentionally read-only / unresolved
 
-- `48–4D` PC two-byte **segment-address** forms: the current menus do not establish a reversible full PC RAM-address mapping.
 - `60` PC width/constructor semantic conflict; `61` operation width is literally documented upstream as `1 byte?`.
 - `67` reset-mask polarity conflict.
 - `75/76/77`: upstream descriptions include `1 (0xFF?)` / `1 byte?` uncertainty.
@@ -109,13 +113,15 @@ All three opcode families remain unwritable through the fixed-width raw writer e
 
 The dedicated `Chrono Trigger checks` workflow compiles plugin/tools, validates the descriptor, auto-discovers all `test_chrono_trigger_*.py` suites, runs the managed ARC1/CTExt smoke, checks editor JavaScript and runs Playwright regressions.
 
-Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, bank-7F page/range distinctions, `0x16` and `0x6E` comparison retargeting, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries, PC-specific `2E/88/4E` boundaries, F1 fail-closed behavior, read-only `FF` Mode 7 semantics and fail-closed malformed encodings.
+Regression coverage includes exact PC widths/endianness, script-memory `/2` round trips, raw PC segment u16/slot/value round trips, bank-7F page/range distinctions, `0x16` and `0x6E` comparison retargeting, doubled targets, packed call nibbles, property unknown-bit preservation, safe jump retargeting, fixed-size/partial writes, dynamic `EC` boundaries plus raw-write blocking, PC-specific `2E/88/4E` boundaries, F1 fail-closed behavior, read-only `FF` Mode 7 semantics and fail-closed malformed encodings.
 
 Browser coverage includes:
 - main scene/world/Event surfaces and a sequential NPC Facing -> `0x13` comparison save,
 - `0x6B` Toggle Bits,
-- PC-only extended raw-slot editing,
-- a three-save Events sequence for `0x23` Get Facing, `0x0B` processing target and `0x9D` vector-memory sources, with exact refreshed bytes and stale-SHA rollover.
+- PC-only extended raw-slot editing including `0x6E`,
+- a three-save Events sequence for `0x23` Get Facing, `0x0B` processing target and `0x9D` vector-memory sources,
+- bank-7F `0x65` + `0x16` page-bit editing,
+- raw PC segment-memory `0x4B` editing with exact little-endian bytes and no full-address claim.
 
 ## Evidence
 
