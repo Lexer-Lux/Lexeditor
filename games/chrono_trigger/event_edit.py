@@ -77,6 +77,21 @@ def _validate_changed_jump(function: dict, command: dict, replacement: bytes) ->
         )
 
 
+def _missing_command_error(function: dict, object_id: int, function_id: int,
+                           command_index: int) -> ValueError:
+    """Explain when a requested command was never decoded because parsing stopped."""
+    problem = function.get("problem")
+    if problem and command_index >= len(function.get("commands", [])):
+        offset = int(problem.get("offset", 0))
+        opcode = int(problem.get("opcode", 0))
+        reason = str(problem.get("reason") or "unknown command boundary")
+        return ValueError(
+            f"Cannot edit event command {object_id}:{function_id}:{command_index}: "
+            f"disassembly stopped at 0x{offset:X} on opcode 0x{opcode:02X}: {reason}"
+        )
+    return ValueError(f"Event command is outside function {object_id}:{function_id}: {command_index}")
+
+
 def save_event_arguments(store: OverlayStore, event_id: int, object_id: int, function_id: int,
                          command_index: int, expected_sha256: str,
                          arguments: str | bytes | bytearray) -> dict:
@@ -95,7 +110,7 @@ def save_event_arguments(store: OverlayStore, event_id: int, object_id: int, fun
     function = functions[function_id]
     commands = function["commands"]
     if not 0 <= command_index < len(commands):
-        raise ValueError(f"Event command is outside function {object_id}:{function_id}: {command_index}")
+        raise _missing_command_error(function, object_id, function_id, command_index)
     command = commands[command_index]
     opcode = int(command["opcode"])
     if opcode in VARIABLE_OR_UNRESOLVED:
