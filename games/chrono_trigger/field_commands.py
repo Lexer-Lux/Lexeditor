@@ -35,7 +35,7 @@ _PC_ARGUMENT_BYTES: tuple[int | None, ...] = (
     3, 2, 2, 3, 3, 0, 0, 2, 1, 3, 2, 2, 3, 2, 2, 2,
     1, 1, 2, 1, 1, 3, 1, 3, 2, 6, 0, 0, 5, 5, 5, 5,
     5, 5, 4, 1, 7, 7, 4, 2, 1, 0, 1, 2, None, 0, 0, 0,
-    1, None, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 17, None,
+    1, -1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 17, None,
 )
 
 _NAMES = {
@@ -135,8 +135,6 @@ def _dynamic_argument_bytes(data: bytes, offset: int, opcode: int) -> tuple[int 
         if subcommand not in widths:
             return None, f"unknown PC all-purpose sound subcommand 0x{subcommand:02X}"
         return widths[subcommand], None
-    if opcode == 0xF1:
-        return (1 if data[offset + 1] == 0 else 2), None
     if opcode == 0xFF:
         return (4 if data[offset + 1] in {0x90, 0x97} else 1), None
     return None, "dynamic command has no decoder"
