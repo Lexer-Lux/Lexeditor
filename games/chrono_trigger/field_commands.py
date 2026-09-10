@@ -178,13 +178,26 @@ def disassemble_function(data: bytes, start: int, end: int) -> dict:
         spec, error = command_spec(data, pos)
         opcode = data[pos]
         if spec is None:
-            problem = {"offset": pos, "opcode": opcode, "reason": error or "unknown command"}
+            preview_end = min(end, pos + 16)
+            problem = {
+                "offset": pos,
+                "opcode": opcode,
+                "reason": error or "unknown command",
+                "remainingBytes": end - pos,
+                "rawPreview": data[pos:preview_end].hex(" ").upper(),
+                "truncatedPreview": preview_end < end,
+            }
             break
         size = 1 + spec.argument_bytes
         if pos + size > end:
+            preview_end = min(end, pos + 16)
             problem = {
-                "offset": pos, "opcode": opcode,
+                "offset": pos,
+                "opcode": opcode,
                 "reason": f"command needs {size} bytes but only {end - pos} remain in this function",
+                "remainingBytes": end - pos,
+                "rawPreview": data[pos:preview_end].hex(" ").upper(),
+                "truncatedPreview": preview_end < end,
             }
             break
         arguments = data[pos + 1:pos + size]
