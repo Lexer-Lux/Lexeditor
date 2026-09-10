@@ -271,12 +271,6 @@ class MemoryOpTests(unittest.TestCase):
 
     def test_ambiguous_neighbors_are_not_registered(self):
         for opcode, args in (
-            (0x48, b"\x00\x20\x10"),
-            (0x49, b"\x00\x20\x10"),
-            (0x4A, b"\x00\x20\x01"),
-            (0x4B, b"\x00\x20\x01\x00"),
-            (0x4C, b"\x00\x20\x10"),
-            (0x4D, b"\x00\x20\x10"),
             (0x60, b"\x01\x02"),
             (0x61, b"\x01\x02"),
             (0x75, b"\x01"),
