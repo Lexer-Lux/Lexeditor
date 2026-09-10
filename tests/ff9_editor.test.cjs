@@ -38,8 +38,11 @@ async function editor() {
     if ('tag' in value) return [value];
     return Object.values(value).flatMap(carried);
   };
-  for (const name of ['columnList','columnPreferences','detailPanel','detailSection','detailField','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','confirmAction','showToast'])
+  for (const name of ['columnList','columnPreferences','detailPanel','detailSection','detailField','readonlyField','recordId','pagedListDetail','booleanMark','subtabBar','infoHelp','infoIcon','modLoaderSection','reshadeSection','pagerToggle','pagerSelect','showToast'])
     ui[name] = (...args) => node(name, args[0], ...carried(args[0]));
+  // Lexeditor asks its own questions now instead of calling window.confirm, so
+  // the answer this test wants comes from the same flag it always did.
+  ui.confirmAction = async () => confirm;
   const context = vm.createContext({LexeditorUI: ui, structuredClone,
     document: {querySelector: selector => targets[selector] ||= node('target', {})},
     window: {confirm: () => confirm, addEventListener: (event, fn) => listeners[event] = fn},

@@ -246,8 +246,8 @@
   async function runtimeAction(action){
     if(state.busy||state.activeSource!=="mine")return;
     if(dirtyCount()){state.runtimeError="Save or discard your changes before changing Memoria.";await render();return}
-    if(action==="install"&&!window.confirm("Install the pinned Memoria release? Close FF9 and its launcher first. Existing settings will be preserved and changed game files backed up."))return;
-    if(action==="recover"&&!window.confirm("Restore the game files from before the interrupted Memoria installation?"))return;
+    if(action==="install"&&!await LexeditorUI.confirmAction({title:"Install Memoria?",message:"Close FF9 and its launcher first.\n\nExisting settings are preserved, and every game file this changes is backed up.",confirmLabel:"Install",cancelLabel:"Cancel"}))return;
+    if(action==="recover"&&!await LexeditorUI.confirmAction({title:"Restore the game files?",message:"This puts back the files as they were before the interrupted Memoria installation.",confirmLabel:"Restore",cancelLabel:"Cancel"}))return;
     state.busy=true;state.runtimeError="";await render();
     try{await api(`/api/runtime/${action}`,{});if(runtimeRefresh)await runtimeRefresh;await refreshRuntime()}
     catch(error){state.runtimeError=error.message;try{await refreshRuntime()}catch(refreshError){state.runtimeError+=` ${refreshError.message}`}}
@@ -325,7 +325,7 @@
   async function deploymentAction(action){
     if(state.busy||state.activeSource!=="mine")return;
     if(dirtyCount()){state.runtimeError="Save your project changes before deployment.";await render();return}
-    if(action==="revert"&&!window.confirm("Remove only the Lexeditor-owned FF9 Memoria mod folder and its FolderNames entry?"))return;
+    if(action==="revert"&&!await LexeditorUI.confirmAction({title:"Remove the Lexeditor mod?",message:"Only the Lexeditor-owned FF9 Memoria mod folder and its FolderNames entry are removed. Nothing else is touched.",confirmLabel:"Remove",cancelLabel:"Cancel"}))return;
     state.busy=true;shell.refresh();
     try{state.deployment=await api(`/api/deployment/${action}`,{});state.dataMap=await api("/api/datamap");state.runtimeError=""}
     catch(error){state.runtimeError=error.message;throw error}

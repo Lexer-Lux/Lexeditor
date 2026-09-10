@@ -36,7 +36,10 @@ def request_json(url: str, body: dict | None = None) -> dict:
         method="GET" if body is None else "POST",
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(request, timeout=10) as response:
+    # A data-map scan over an installed game takes longer than ten seconds on a
+    # loaded machine, and the timeout surfaced as a bare socket error that said
+    # nothing about which request gave up.
+    with urllib.request.urlopen(request, timeout=45) as response:
         return json.loads(response.read().decode("utf-8"))
 
 

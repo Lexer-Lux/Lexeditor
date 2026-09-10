@@ -85,8 +85,12 @@ def main() -> None:
         page.evaluate('__panels()');page.wait_for_timeout(100)
         restored = int(divider.get_attribute('aria-valuenow'))
         assert abs(restored-moved) <= 1, (restored,moved)
+        # Double-click must NOT reset the split. A divider is dragged, and a
+        # drag that begins with two quick presses would throw the layout away
+        # instead of moving it; two contracts record that decision. Right-click
+        # is the reset, and the next line is what proves it.
         divider.dblclick();page.wait_for_timeout(100)
-        assert abs(float(page.evaluate('localStorage.getItem("lexeditor:list-detail:regression")'))-42)<.1
+        assert float(page.evaluate('localStorage.getItem("lexeditor:list-detail:regression")')) > 42
         divider.focus();page.keyboard.press('ArrowLeft');divider.click(button='right');page.wait_for_timeout(100)
         assert abs(float(page.evaluate('localStorage.getItem("lexeditor:list-detail:regression")'))-42)<.1
         page.set_viewport_size({'width':650,'height':800});page.wait_for_timeout(150)

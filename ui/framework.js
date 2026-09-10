@@ -2847,7 +2847,9 @@ ${contents.path}`});
     };
     const guarded = operation => confirmUnsavedExit(options, async () => {
       try { return openResult(await operation()); }
-      catch (error) { window.alert(String(error?.message || error)); return false; }
+      // A browser alert is an OS dialog wearing the WebView's clothes. Every
+      // message Lexeditor shows is its own.
+      catch (error) { showAlert({title: "Could not switch mod project", message: String(error?.message || error)}); return false; }
     }, {question: "Save before switching mod projects?", exitError: "Could not switch mod projects"});
     const render = value => {
       snapshot = value;
@@ -6379,7 +6381,12 @@ ${row.path}`,
       const label = field.querySelector(':scope > .lex-detail-field-label');
       if (!rail || !help || !label) continue;
       if (field.hasAttribute("data-lex-sort")) { rail.style.left = "0px"; continue; }
-      const text = [...label.childNodes].find(node =>
+      // The property name is wrapped in its own span so the boolean leader
+      // arrow cannot squeeze it, so look inside that wrapper first. Searching
+      // only the label's direct children left the rail parked at the far left
+      // of the lane, a hundred and eighty pixels from the name it annotates.
+      const holder = label.querySelector(":scope > .lex-detail-field-label-text") || label;
+      const text = [...holder.childNodes].find(node =>
         node.nodeType === Node.TEXT_NODE && node.textContent.trim());
       if (!text) continue;
       const range = document.createRange();
@@ -6388,10 +6395,14 @@ ${row.path}`,
       const textBox = range.getBoundingClientRect();
       const railBox = rail.getBoundingClientRect();
       if (!fieldBox.width || !textBox.width || !railBox.width) continue;
-      // User-facing contract: the info bubble/type rail is centred between the
-      // panel-side edge of the property row and the RIGHT edge of its label.
-      const centre = (fieldBox.left + textBox.right) / 2;
-      rail.style.left = `${Math.max(0, centre - fieldBox.left - railBox.width / 2)}px`;
+      // User-facing contract: the info bubble sits JUST LEFT of the property
+      // name it annotates, not centred in the empty lane beside it. Centring
+      // put it a hundred and eighty pixels away in a wide panel, where it read
+      // as belonging to nothing. It stays inside the row when the name runs
+      // long enough to leave no room.
+      const gap = 8;
+      const wanted = textBox.left - gap - railBox.width - fieldBox.left;
+      rail.style.left = `${Math.max(0, wanted)}px`;
     }
   };
   const schedule = root => requestAnimationFrame(() => alignFieldMetadata(root || document));

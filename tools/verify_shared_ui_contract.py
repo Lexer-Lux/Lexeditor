@@ -134,6 +134,21 @@ require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
 # One ReShade lives in Lexeditor; a mod carries only its own preset. Every game
 # that offers a Tweaks page offers it the same way, so a player learns the
 # control once. Games without a Tweaks page yet are not held to it.
+# Lexeditor never shows a browser dialog. window.confirm and window.alert are
+# OS dialogs wearing the WebView's clothes: they ignore the theme, cannot say
+# more than one line, and are the reason "I get this browser message" was a bug
+# report. Every question and every message is Lexeditor's own.
+for source_path in [ROOT / "ui" / "framework.js", ROOT / "ui" / "chooser.html"] + [
+        plugin / "editor.html" for plugin in sorted((ROOT / "games").iterdir())
+        if (plugin / "editor.html").is_file()]:
+    text = source_path.read_text(encoding="utf-8")
+    for banned in ("window.confirm(", "window.alert(", "window.prompt("):
+        require(banned not in text,
+                f"{source_path.name} uses {banned.rstrip('(')}; use the shared "
+                "confirmAction or showAlert instead")
+require("const confirmAction = options =>" in framework,
+        "the shared confirm dialog is not defined in the framework")
+
 require("reshadeSection" in framework,
         "the shared ReShade section is not defined in the framework")
 require("reshadeSection(" in (ROOT / "games" / "blank" / "editor.html").read_text(encoding="utf-8"),

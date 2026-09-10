@@ -125,7 +125,10 @@
   async function confirmReplace(kind){
     const count=kind==="text"?textEdits().length:dataEdits().length;
     if(!count)return true;
-    return window.confirm(`Discard ${count} unsaved ${kind==="text"?"text":"game-data"} change${count===1?"":"s"} and open another resource?`);
+    return LexeditorUI.confirmAction({
+      title:"Discard unsaved changes?",
+      message:`${count} unsaved ${kind==="text"?"text":"game-data"} change${count===1?"":"s"} would be lost by opening another resource.`,
+      confirmLabel:"Discard and open",cancelLabel:"Keep editing"});
   }
   async function loadAsset(asset=state.asset){
     if(!asset)return;
@@ -612,7 +615,7 @@
   async function discard(){if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
   const editHistory=new EditHistory({capture:()=>({data:state.data?clone(state.data.records):null,text:state.textData?clone(state.textData.records):null}),restore:snapshot=>{if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);if(state.textData&&snapshot?.text)state.textData.records=clone(snapshot.text)},render:async()=>render(),enabled:()=>state.activeSource==="mine"&&["data","economy","loot","text"].includes(state.tab),changed:()=>refreshShell()});
 
-  async function selectProjectSource(value){if(dirtyCount()&&!window.confirm("Discard all unsaved FF7R changes and switch source?"))return;state.activeSource=String(value||"mine");state.economyKey="";state.lootKey="";if(state.data)await loadAsset(state.asset);if(state.textData)await loadTextAsset(state.textAsset);if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot()}
+  async function selectProjectSource(value){if(dirtyCount()&&!await LexeditorUI.confirmAction({title:"Discard unsaved changes?",message:"Switching source reloads everything from the other source. All unsaved FF7R changes would be lost.",confirmLabel:"Discard and switch",cancelLabel:"Keep editing"}))return;state.activeSource=String(value||"mine");state.economyKey="";state.lootKey="";if(state.data)await loadAsset(state.asset);if(state.textData)await loadTextAsset(state.textAsset);if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot()}
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"economy",label:"Items"},{id:"characters",label:"Characters"},{id:"abilities",label:"Abilities"},{id:"enemies",label:"Enemies"},{id:"loot",label:"Enemy Loot"},{id:"data",label:"Misc"},{id:"tweaks",label:"Tweaks"},{id:"text",label:"Text"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK resources"}],projectActiveSource:()=>state.activeSource,selectProjectSource,info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
   editHistory.observe(document);
 

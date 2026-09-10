@@ -682,7 +682,7 @@
   async function refreshPlatformConfig(force=false){
     if(state.platformLoading||state.saving||state.activeSource!=="mine")return;
     if(Object.keys(platformChanges()).length){
-      if(!force||!window.confirm("Discard unsaved FFNx settings and reload the installed file?"))return;
+      if(!force||!await LexeditorUI.confirmAction({title:"Discard unsaved FFNx settings?",message:"Reloading reads the installed file again. Your unsaved FFNx settings would be lost.",confirmLabel:"Discard and reload",cancelLabel:"Keep editing"}))return;
     }
     const revision=state.platformRevision;
     state.platformLoading=true;

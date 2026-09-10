@@ -299,7 +299,10 @@ with sync_playwright() as p:
                 arrow_box = arrow.bounding_box(); checkbox_box = tweak_checkbox.bounding_box()
                 assert arrow_box['x'] + arrow_box['width'] <= checkbox_box['x'] + 3, (width, 'Boolean arrow is underneath/past the checkbox', arrow_box, checkbox_box)
                 assert abs(center(arrow_box)[1] - center(checkbox_box)[1]) <= 4, (width, 'Boolean arrow is vertically misaligned', arrow_box, checkbox_box)
-            tweak_field = page.locator('.lex-detail-field').nth(1)
+            # The bounded numeric row, wherever the tweak page puts it. Taking
+            # field index 1 assumed an order the page is free to change, and it
+            # landed on the difficulty select once a section moved.
+            tweak_field = page.locator('.lex-detail-field:has(input[type=number])').first
             tweak_input = tweak_field.locator('input[type=number]').first
             tweak_box = tweak_field.bounding_box(); input_box = tweak_input.bounding_box()
             assert input_box['x'] >= tweak_box['x'] - 1 and input_box['x'] + input_box['width'] <= tweak_box['x'] + tweak_box['width'] + 1, (width, 'numeric input escaped property box', tweak_box, input_box)
@@ -353,10 +356,13 @@ with sync_playwright() as p:
             label = field.locator('.lex-detail-field-label').first
             field_box = field.bounding_box(); label_box = label.bounding_box()
             label_ratio = label_box['width'] / field_box['width'] if field_box['width'] else 0
-            # The lane is the shared 5% clamp, floored at 64px and capped at
-            # 150px, so the ratio drifts with panel width rather than sitting
-            # on one number.
-            assert .07 <= label_ratio <= .16, (width, "label lane is not approximately 10%", label_ratio)
+            # The lane is ten percent of the row wherever ten percent can hold a
+            # property name, and a font-relative floor below that. In a narrow
+            # panel the tenth is a twenty-pixel column that cuts every label off,
+            # so the floor takes over and the ratio rises - by design, and the
+            # reason the band is a band rather than one number. The upper edge is
+            # the floor's own share at the narrowest panel this page renders.
+            assert .07 <= label_ratio <= .20, (width, "label lane is not approximately 10%", label_ratio)
             # Test label fitting with two otherwise identical rows. Different
             # control types legitimately reserve different vertical space (for
             # example a provenance/ref rail), so comparing arbitrary gallery
