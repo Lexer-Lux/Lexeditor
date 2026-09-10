@@ -34,6 +34,13 @@ class BgAnimeRuntimePolicyTests(unittest.TestCase):
         self.assertIn("unknown PC-only layer-priority data", text)
         self.assertIn("BGANIME_RUNTIME_EVIDENCE.md", text)
 
+    def test_evidence_ledger_links_runtime_gate_and_keeps_playback_structural_only(self):
+        text = (GAME / "FORMAT_EVIDENCE.md").read_text(encoding="utf-8")
+        self.assertIn("BGANIME_RUNTIME_EVIDENCE.md", text)
+        self.assertIn("playback disabled", text)
+        self.assertIn("renderer behavior, not proof of Steam runtime phase", text)
+        self.assertIn("Composition remains a separate evidence gate", text)
+
     def test_data_map_keeps_bganime_structural_not_integrated_playback(self):
         text = (GAME / "coverage.py").read_text(encoding="utf-8")
         self.assertIn('"kind": "scene-chip-animation"', text)
