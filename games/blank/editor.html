@@ -205,7 +205,7 @@
         // Every game's Tweaks page offers the same ReShade section. Lexeditor
         // keeps one ReShade; the mod carries only its preset and any shaders
         // its author wrote, so the mod stays installable by hand.
-        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade}),
+        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade}),
       ]});
   }
   let reshade={manifest:{enabled:false,preset:"",repositories:[]},presets:[],shaders:[],
@@ -213,6 +213,16 @@
   async function loadReshade(){
     try{reshade=await LexeditorUI.callWindow?.("mod_reshade","blank")||reshade}
     catch(_error){/* the browser preview has no desktop host; the section still renders */}
+  }
+  // Install, remove and "choose the DLL" each answer with a fresh snapshot.
+  async function actReshade(method,...args){
+    try{
+      const value=method==="adopt_reshade"
+        ? await LexeditorUI.callWindow?.(method)
+        : await LexeditorUI.callWindow?.(method,"blank",...args);
+      if(value&&value.manifest)reshade=value;else await loadReshade();
+    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
+    render();
   }
   async function saveReshade(manifest){
     try{reshade=await LexeditorUI.callWindow?.("save_mod_reshade","blank",manifest)||reshade}

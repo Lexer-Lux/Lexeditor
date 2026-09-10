@@ -76,6 +76,13 @@ ReShade not installed, no preset in the mod, or a manifest naming a preset file
 that is not there - because each of those used to be indistinguishable from a
 working setup until the game launched unchanged.
 
-Still to build: installing and removing ReShade itself from inside the editor
-(item 1), the shared repository list with versions (item 2), and the export note
-for someone installing the mod by hand (item 5).
+Item 1 is done too. Lexeditor keeps one ReShade, which the user points it at
+once; it is not vendored here, because which build to ship is their decision
+rather than one a mod editor should make quietly on their behalf. Installing
+copies that DLL into the game under the loader name its renderer needs, and it
+refuses outright when a file of that name already exists and is not ReShade -
+a game's own d3d11.dll is not ours to replace. Removing deletes only a DLL that
+identifies itself as ReShade, for the same reason.
+
+Still to build: the shared repository list with versions (item 2) and the export
+note for someone installing the mod by hand (item 5).

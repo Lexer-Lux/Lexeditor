@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import shutil
 
 MANIFEST_NAME = "reshade.json"
 RESHADE_DIR = "reshade"
@@ -114,6 +115,84 @@ def installed_renderer(game_root: Path | None) -> str:
     return ""
 
 
+# Lexeditor keeps ONE ReShade and installs it per game. The user supplies that
+# copy once - ReShade is not vendored here, because which build to ship is their
+# decision and not one a mod editor should make quietly on their behalf.
+STORE = Path(os.environ.get("LOCALAPPDATA", "")) / "Lexeditor" / "reshade"
+STORE_DLL = "ReShade64.dll"
+
+
+def store_dll() -> Path:
+    return STORE / STORE_DLL
+
+
+def store_state() -> dict:
+    dll = store_dll()
+    return {"path": str(dll), "present": dll.is_file(),
+            "bytes": dll.stat().st_size if dll.is_file() else 0}
+
+
+def adopt(source: Path) -> dict:
+    """Take the user's ReShade DLL as Lexeditor's one copy."""
+    source = Path(source)
+    if not source.is_file():
+        raise ValueError(f"No file at {source}")
+    try:
+        head = source.read_bytes()[:2_000_000]
+    except OSError as error:
+        raise ValueError(f"Could not read {source}: {error}") from error
+    if b"ReShade" not in head:
+        raise ValueError(f"{source.name} does not look like a ReShade DLL")
+    STORE.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, store_dll())
+    return store_state()
+
+
+def install(game_root: Path, renderer: str) -> dict:
+    """Place Lexeditor's ReShade in one game, under the loader name it needs."""
+    game_root = Path(game_root)
+    dll_name = RENDERER_DLLS.get(str(renderer).lower())
+    if not dll_name:
+        raise ValueError(f"Unknown renderer: {renderer}")
+    if not game_root.is_dir():
+        raise ValueError(f"No game folder at {game_root}")
+    source = store_dll()
+    if not source.is_file():
+        raise ValueError("Lexeditor has no ReShade to install yet")
+    target = game_root / dll_name
+    # A game's own d3d11.dll is not ours to replace. Only an existing ReShade
+    # may be overwritten, and only by another ReShade.
+    if target.is_file():
+        try:
+            existing = target.read_bytes()[:2_000_000]
+        except OSError as error:
+            raise ValueError(f"Could not read {target}: {error}") from error
+        if b"ReShade" not in existing:
+            raise ValueError(
+                f"{dll_name} already exists in this game and is not ReShade. "
+                "Lexeditor will not overwrite it.")
+    shutil.copy2(source, target)
+    return {"installed": True, "renderer": str(renderer).lower(), "path": str(target)}
+
+
+def uninstall(game_root: Path) -> dict:
+    """Remove ReShade from one game. Only a DLL that IS ReShade is deleted."""
+    game_root = Path(game_root)
+    removed = []
+    for renderer, dll_name in RENDERER_DLLS.items():
+        target = game_root / dll_name
+        if not target.is_file():
+            continue
+        try:
+            if b"ReShade" not in target.read_bytes()[:2_000_000]:
+                continue
+            target.unlink()
+        except OSError:
+            continue
+        removed.append({"renderer": renderer, "path": str(target)})
+    return {"removed": removed}
+
+
 def snapshot(project_root: Path, game_root: Path | None = None) -> dict:
     """Everything the Tweaks page needs to describe this mod's ReShade state."""
     root = _reshade_root(project_root)
@@ -130,6 +209,8 @@ def snapshot(project_root: Path, game_root: Path | None = None) -> dict:
         "shaders": shaders,
         "installedRenderer": renderer,
         "reshadeInstalled": bool(renderer),
+        "store": store_state(),
+        "renderers": sorted(RENDERER_DLLS),
         # A preset that names no file, or names one that is not there, would
         # silently do nothing at play time. Say so instead.
         "ready": bool(manifest["enabled"] and manifest["preset"]

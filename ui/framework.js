@@ -2068,12 +2068,39 @@
     const presets = data.presets || [];
     const apply = changes => spec.save?.({...manifest, ...changes});
     const rows = [];
+    const store = data.store || {};
+    const act = (method, ...args) => spec.act?.(method, ...args);
+    const installRow = element("div", {class: "lex-reshade-actions"});
+    if (!store.present) {
+      installRow.append(element("button", {
+        type: "button", class: "lex-dialog-action",
+        onclick: () => act("adopt_reshade"),
+      }, "Choose ReShade64.dll…"));
+    } else if (data.reshadeInstalled) {
+      installRow.append(element("button", {
+        type: "button", class: "lex-dialog-action",
+        onclick: () => act("uninstall_reshade"),
+      }, "Remove ReShade from this game"));
+    } else {
+      const renderer = element("select", {"aria-label": "Renderer to load through"});
+      for (const name of data.renderers || []) {
+        renderer.append(element("option", {value: name}, name));
+      }
+      installRow.append(renderer, element("button", {
+        type: "button", class: "lex-dialog-action primary",
+        onclick: () => act("install_reshade", renderer.value),
+      }, "Install ReShade into this game"));
+    }
     rows.push(detailField({
       label: "ReShade installed",
       control: readonlyField(data.reshadeInstalled
         ? `Yes, loading through ${data.installedRenderer}`
-        : "No. Install ReShade into this game before a preset can do anything."),
+        : store.present
+          ? "Not in this game yet. Lexeditor has a copy ready to install."
+          : "No. Lexeditor does not ship ReShade; point it at a ReShade64.dll once and it keeps that copy for every game."),
+      help: infoHelp("One ReShade, kept by Lexeditor and installed per game under the loader name that game's renderer needs. A game's own DLL of that name is never overwritten."),
     }));
+    rows.push(detailField({label: "Install", control: installRow}));
     const enable = element("input", {
       type: "checkbox", checked: manifest.enabled === true,
       disabled: !presets.length,

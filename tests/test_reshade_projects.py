@@ -79,3 +79,61 @@ def test_a_games_own_loader_dll_is_not_mistaken_for_reshade(tmp_path):
     game.mkdir()
     (game / "d3d11.dll").write_bytes(b"\x00" * 256)
     assert rp.installed_renderer(game) == ""
+
+
+def test_only_a_real_reshade_dll_is_adopted(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path / "store")
+    fake = tmp_path / "NotReShade.dll"
+    fake.write_bytes(b"\x00" * 128)
+    try:
+        rp.adopt(fake)
+    except ValueError as error:
+        assert "does not look like" in str(error)
+    else:  # pragma: no cover - the guard must hold
+        raise AssertionError("a non-ReShade DLL was adopted")
+
+
+def test_install_never_overwrites_a_games_own_loader(tmp_path, monkeypatch):
+    store = tmp_path / "store"
+    store.mkdir()
+    (store / rp.STORE_DLL).write_bytes(b"ReShade" + b"\x00" * 64)
+    monkeypatch.setattr(rp, "STORE", store)
+
+    game = tmp_path / "game"
+    game.mkdir()
+    own = game / "d3d11.dll"
+    own.write_bytes(b"\x00" * 256)
+    try:
+        rp.install(game, "dx11")
+    except ValueError as error:
+        assert "not ReShade" in str(error)
+    else:  # pragma: no cover - the guard must hold
+        raise AssertionError("a game's own loader was overwritten")
+    assert own.read_bytes() == b"\x00" * 256
+
+
+def test_install_and_uninstall_round_trip(tmp_path, monkeypatch):
+    store = tmp_path / "store"
+    store.mkdir()
+    (store / rp.STORE_DLL).write_bytes(b"ReShade" + b"\x00" * 64)
+    monkeypatch.setattr(rp, "STORE", store)
+
+    game = tmp_path / "game"
+    game.mkdir()
+    result = rp.install(game, "dxgi")
+    assert result["installed"] is True
+    assert (game / "dxgi.dll").is_file()
+    assert rp.installed_renderer(game) == "dxgi"
+
+    removed = rp.uninstall(game)
+    assert [entry["renderer"] for entry in removed["removed"]] == ["dxgi"]
+    assert not (game / "dxgi.dll").exists()
+
+
+def test_uninstall_leaves_a_games_own_loader_alone(tmp_path):
+    game = tmp_path / "game"
+    game.mkdir()
+    own = game / "opengl32.dll"
+    own.write_bytes(b"\x00" * 256)
+    assert rp.uninstall(game)["removed"] == []
+    assert own.is_file()

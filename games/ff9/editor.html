@@ -263,7 +263,7 @@
             detailField({label:"EDITOR",control:readonlyField("Memoria's own launcher. Lexeditor does not duplicate it.")}),
             detailField({label:"HOW",control:readonlyField("Press Play. The Memoria launcher opens and its settings are edited there.")}),
           ]}),
-          LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade}),
+          LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}),
         ]}));
       return;
     }
@@ -300,12 +300,22 @@
             :"Save changes, then Deploy Project to activate them in Memoria.")}),
           detailField({label:"ACTIONS",control:actions}),
         ]}),
-        LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade}),
+        LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}),
       ]}));
   }
   async function loadReshade(){
     try{const value=await LexeditorUI.callWindow?.("mod_reshade","ff9");if(value)state.reshade=value}
     catch(_error){/* browser preview has no desktop host; the section still renders */}
+  }
+  // Install, remove and "choose the DLL" each answer with a fresh snapshot.
+  async function actReshade(method,...args){
+    try{
+      const value=method==="adopt_reshade"
+        ? await LexeditorUI.callWindow?.(method)
+        : await LexeditorUI.callWindow?.(method,"ff9",...args);
+      if(value&&value.manifest)state.reshade=value;else await loadReshade();
+    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
+    tweaks();
   }
   async function saveReshade(manifest){
     try{const value=await LexeditorUI.callWindow?.("save_mod_reshade","ff9",manifest);if(value)state.reshade=value}

@@ -1038,6 +1038,45 @@ class HostApi:
         return reshade_projects.snapshot(
             root, Path(game_root) if game_root else None)
 
+    def install_reshade(self, plugin_id: str, renderer: str) -> dict:
+        """Put Lexeditor's one ReShade into this game, under its loader name."""
+        import reshade_projects
+
+        root = self._installations.snapshot(plugin_id).get("root")
+        if not root:
+            raise ValueError("Add this game before installing ReShade for it.")
+        reshade_projects.install(Path(root), renderer)
+        return self.mod_reshade(plugin_id)
+
+    def uninstall_reshade(self, plugin_id: str) -> dict:
+        """Remove ReShade from this game. A game's own loader is left alone."""
+        import reshade_projects
+
+        root = self._installations.snapshot(plugin_id).get("root")
+        if not root:
+            raise ValueError("This game has no folder to remove ReShade from.")
+        reshade_projects.uninstall(Path(root))
+        return self.mod_reshade(plugin_id)
+
+    def adopt_reshade(self) -> dict:
+        """Take a ReShade DLL the user picks as Lexeditor's one copy."""
+        import reshade_projects
+
+        selected = self._choose_file("Choose ReShade64.dll")
+        if not selected:
+            return {**reshade_projects.store_state(), "cancelled": True}
+        return reshade_projects.adopt(Path(selected))
+
+    def _choose_file(self, _title: str = "") -> str:
+        import webview
+
+        selection = self._bound_window().create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=False,
+            file_types=("ReShade DLL (*.dll)",))
+        if not selection:
+            return ""
+        return str(selection[0] if isinstance(selection, (list, tuple)) else selection)
+
     def mod_project_contents(self, plugin_id: str, path: str = "") -> dict:
         """Report what this game's loader recognises inside one mod folder."""
         return self._projects.contents(plugin_id, path)

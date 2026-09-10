@@ -2830,6 +2830,9 @@ body:has(.lex-pager) #main {
 }
 
 .lex-pager-right select,
+.lex-reshade-actions { display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0; }
+.lex-reshade-actions select { min-width:0;max-width:10em; }
+
 .lex-pager-filter {
   display:inline-flex;
   align-items:center;
