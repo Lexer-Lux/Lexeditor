@@ -5710,6 +5710,9 @@ ${contents.path}`});
   };
   const tableCapacityCache = new Map();
   const tableFitCapacityCache = new Map();
+  // Which page each table last drew, so a page the reader asked for can be
+  // told apart from the page a stale selection would pull it back to.
+  const lastRenderedPage = new Map();
   let openBarrelControlKey = "";
   const fitBarrelTableColumns = node => {
     const template = node?.style?.getPropertyValue("--lex-column-list-template");
@@ -5817,9 +5820,19 @@ ${contents.path}`});
     const pages = Math.max(1, Math.ceil(records.length / barrelSize));
     let page = Math.max(0, Math.min(Number(options.page) || 0, pages - 1));
     const requestedIndex = records.findIndex(record => keyOf(record) === requestedSelection);
-    if (options.revealSelected !== false && requestedIndex >= 0 &&
+    // The reveal exists for a selection that arrived from somewhere else - a
+    // search hit, a link followed - and it must not fight the reader. Paging
+    // forward leaves the selection on the page you left, so the reveal dragged
+    // the table straight back to it and pagination looked dead: every press of
+    // Next re-rendered page one. A page the reader asked for wins; the reveal
+    // applies when the PAGE did not change and the selection did.
+    const pagedDeliberately = lastRenderedPage.get(rowPreferenceKey) !== undefined &&
+      lastRenderedPage.get(rowPreferenceKey) !== page;
+    lastRenderedPage.set(rowPreferenceKey, page);
+    if (options.revealSelected !== false && !pagedDeliberately && requestedIndex >= 0 &&
         (requestedIndex < page * barrelSize || requestedIndex >= (page + 1) * barrelSize)) {
       page = Math.floor(requestedIndex / barrelSize);
+      lastRenderedPage.set(rowPreferenceKey, page);
     }
     const groupStart = page * barrelSize;
     const barrelRows = records.length ? Array.from({length: barrels}, (_unused, index) =>

@@ -18,6 +18,7 @@
     .ff7r-array{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;width:100%}
     .ff7r-array label{display:flex;gap:5px;align-items:center;min-width:0}.ff7r-array label>span{min-width:2.5em;color:var(--lex-muted);font-size:.86em}
     .ff7r-array input,.ff7r-array select{min-width:0;width:100%}
+    .ff7r-array-empty{display:block;min-height:1.6em;color:var(--lex-muted);font-style:italic}
     .ff7r-loot-slot{display:grid;grid-template-columns:minmax(180px,2fr) minmax(90px,1fr);gap:8px;width:100%;align-items:end}
     .ff7r-loot-slot label{display:flex;flex-direction:column;gap:3px;min-width:0}.ff7r-loot-slot label>span{font-size:.8em;color:var(--lex-muted);font-weight:700}
     .ff7r-loot-slot select,.ff7r-loot-slot input{width:100%;min-width:0}
@@ -273,8 +274,12 @@
      noun:"abilities",columns:["ATB"]},
   ];
   const curatedSpec=tab=>CURATED_TABLES.find(entry=>entry.id===tab)||null;
-  const curatedAsset=spec=>assets().find(item=>
-    String(item.asset||"").split("/").pop().toLowerCase().replace(/\.uasset$/,"")===spec.basename)||null;
+  // Every archive holding a table of this name. FF7R ships one EnemyParameter
+  // per field map - eight of them - so taking the first match showed one
+  // enemy and silently hid the rest.
+  const curatedAssets=spec=>assets().filter(item=>
+    String(item.asset||"").split("/").pop().toLowerCase().replace(/\.uasset$/,"")===spec.basename);
+  const curatedAsset=spec=>curatedAssets(spec)[0]||null;
   const SEMANTIC_TYPES={CanSale:"BOOL"};
   // The storage type is a signed 32-bit integer, so the schema's honest range is
   // plus or minus two billion. A price is not, and a slider handed that range
@@ -307,7 +312,17 @@
         if(index===null)setScalar(row,prop,value);else setArrayValue(row,prop,index,value)}});
   }
   function scalarControl(row,prop,index=null,source=null){if(semanticType(prop)==="BOOL"&&prop.type!=="BOOL")return byteBoolInput(row,prop,index);if(prop.type==="BOOL")return boolInput(row,prop,index);if(prop.type==="ENUM")return nameInput(row,prop,index,source);if(["BYTE","INT16","UINT16","INT32","FLOAT"].includes(prop.type))return numericInput(row,prop,index);const value=index===null?row.values[prop.name]:row.values[prop.name][index];return readonlyResolved(value)}
-  function propertyControl(row,prop,source=null){if(!prop.array)return scalarControl(row,prop,null,source);const values=row.values[prop.name]||[];return el("div",{class:"ff7r-array"},...values.map((_value,index)=>el("label",{},el("span",{},`#${index+1}`),scalarControl(row,prop,index,source))))}
+  // An array property with nothing in it used to render an empty box: a
+  // fifteen-pixel sliver with a name beside it and no control, which reads as
+  // a broken property rather than an empty one. It says it is empty instead.
+  function propertyControl(row,prop,source=null){
+    if(!prop.array)return scalarControl(row,prop,null,source);
+    const values=row.values[prop.name]||[];
+    if(!values.length)return el("div",{class:"ff7r-array ff7r-array-empty"},
+      el("span",{},"None"));
+    return el("div",{class:"ff7r-array"},...values.map((_value,index)=>
+      el("label",{},el("span",{},`#${index+1}`),scalarControl(row,prop,index,source))));
+  }
   function propertyHelp(prop){if(!prop.editable)return infoHelp("This DataObject stores this value in a form Lexeditor cannot safely rewrite in place.");if(prop.type==="ENUM")return infoHelp("This value is an Unreal FName. A same-size edit can choose only a name already present in this .uasset's name table.");if(prop.array)return infoHelp("Existing array elements are editable. Resizing the array would move later row data and is not yet supported.");return null}
 
   function recordPanel(row=selectedRecord()){
@@ -328,9 +343,13 @@
   function tweaksPanel(){
     const list=tweakAssets();
     if(!list.length)return loadingPanel("Tweaks","No Lexeditor tweak groups were found in the catalog.");
-    if(state.tweaksBusy||!state.tweaks)return loadingPanel("Loading tweaks","Reading every Lexeditor tweak group…");
+    if(!state.tweaks||(!Object.keys(state.tweaks).length&&state.tweaksPending))
+      return loadingPanel("Loading tweaks",`Reading ${state.tweaksPending} tweak group${state.tweaksPending===1?"":"s"}…`);
     if(state.tweaksError&&!Object.keys(state.tweaks).length)return errorPanel(state.tweaksError);
     const cards=list.map(item=>tweakCard(state.tweaks[item.asset])).filter(Boolean);
+    if(state.tweaksPending)cards.push(el("section",{class:"ff7r-card ff7r-tweaks-pending"},
+      el("h3",{},`${state.tweaksPending} more group${state.tweaksPending===1?"":"s"} still reading`),
+      el("p",{},"These take longer to read than the rest and will appear here when they arrive.")));
     cards.push(LexeditorUI.reshadeSection({snapshot:state.reshade,save:saveReshade,act:actReshade}));
     return el("div",{class:"ff7r-view ff7r-tweaks-view"},
       LexeditorUI.settingsColumns(cards,{className:"ff7r-tweaks"}));
@@ -362,18 +381,26 @@
   async function loadAllTweaks(){
     const list=tweakAssets();
     if(!list.length){state.tweaks={};return}
-    state.tweaksBusy=true;state.tweaksError="";render();
-    try{
-      const loaded={};
-      await Promise.all(list.map(async item=>{
-        try{
-          const data=await api(`/api/data?asset=${encodeURIComponent(item.asset)}${sourceSuffix()}&language=${encodeURIComponent(state.textLanguage||"US")}`);
-          loaded[item.asset]={item,data,baseline:clone(data)};
-        }catch(error){state.tweaksError=error.message}
-      }));
-      state.tweaks=loaded;
-    }catch(error){state.tweaksError=error.message;state.tweaks=state.tweaks||{}}
-    finally{state.tweaksBusy=false;render();refreshShell()}
+    // Each group appears as it arrives. Waiting for the last of them meant one
+    // slow asset held the whole page: NoMoreCheats takes the better part of a
+    // minute to read while the other five are back inside a second, so the tab
+    // sat on "Reading every Lexeditor tweak group" long enough to look hung.
+    state.tweaksError="";
+    state.tweaks=state.tweaks||{};
+    state.tweaksBusy=false;
+    state.tweaksPending=list.length;
+    render();
+    await Promise.all(list.map(async item=>{
+      try{
+        const data=await api(`/api/data?asset=${encodeURIComponent(item.asset)}${sourceSuffix()}&language=${encodeURIComponent(state.textLanguage||"US")}`);
+        state.tweaks[item.asset]={item,data,baseline:clone(data)};
+      }catch(error){state.tweaksError=error.message}
+      finally{
+        state.tweaksPending=Math.max(0,(state.tweaksPending||1)-1);
+        if(state.tab==="tweaks")render();
+      }
+    }));
+    state.tweaksPending=0;render();refreshShell()
   }
   function tweakEditGroups(){
     if(state.activeSource!=="mine"||!state.tweaks)return[];
@@ -467,7 +494,19 @@
     if(!curatedAsset(spec))return loadingPanel(spec.label,
       `The installed FF7R archives do not contain a ${spec.basename} table.`);
     if(!state.data)return loadingPanel(spec.label,"Open this tab to read the table.");
-    return el("div",{class:"ff7r-view"},pagedTable({id:spec.id,noun:spec.noun,
+    // Say which of the game's tables this is when there is more than one. The
+    // reader was seeing one field map's enemies with nothing on screen to say
+    // that seven more tables of the same name exist.
+    const siblings=curatedAssets(spec);
+    const picker=siblings.length>1?LexeditorUI.subtabBar({
+      label:`${spec.label} tables`,
+      active:state.data?.asset||siblings[0].asset,
+      tabs:siblings.map(item=>({id:item.asset,
+        label:String(item.asset).split("/").slice(-2,-1)[0]||String(item.asset).split("/").pop()})),
+      change:value=>{state.curatedAsset=value;state.selected=null;state.pages[spec.id]=0;
+        state.asset=value;loadAsset(value).then(()=>render());},
+    }):null;
+    return el("div",{class:"ff7r-view"},picker,pagedTable({id:spec.id,noun:spec.noun,
       modOnly:modOnlySpec(row=>row.record),
       rows:curatedRows(spec),key:row=>row.record.id,
       selected:state.selected,setSelected:row=>{state.selected=row.record.id},
@@ -709,7 +748,9 @@
   async function navigate(tab){const previous=state.tab;state.tab=tab;render();if(tab==="text"){if(!state.textPacks)await loadAllText();else render()}else if(tab==="economy"){if(!await loadEconomy()){state.tab=previous;render()}else{await ensureResidentText();render()}}else if(tab==="loot"){if(!await loadLoot()){state.tab=previous;render()}}
     else if(curatedSpec(tab)){
       const spec=curatedSpec(tab);
-      const item=curatedAsset(spec);
+      // Keep whichever of this table's archives the reader last chose.
+      const siblings=curatedAssets(spec);
+      const item=siblings.find(entry=>entry.asset===state.curatedAsset)||siblings[0]||null;
       if(item&&(state.asset!==item.asset||!state.data)){
         state.asset=item.asset;await loadAsset(item.asset);
       }

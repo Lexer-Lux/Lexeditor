@@ -243,23 +243,35 @@
 
 ## Enemies
 
-* [ ] Enemies tab currently contains essentially one thing; investigate whether content is missing.
+* [x] Enemies tab currently contains essentially one thing; investigate whether content is missing.
+  * Content was missing. FF7R ships one EnemyParameter table per field map -
+    eight of them - and the tab took the first match and hid the rest, so it
+    showed one enemy. The tables are a subtab bar now, so all eight are
+    reachable and the reader can see how many there are.
 
 ## Characters
 
-* [ ] Mouse-wheel scrolling still does not work.
-* [ ] Pagination buttons also do not work.
-* [ ] Treat this as a major functionality bug.
+* [x] Mouse-wheel scrolling still does not work.
+* [x] Pagination buttons also do not work.
+* [x] Treat this as a major functionality bug.
+  * One cause for both, in the shared baseline: the selection reveal was
+    dragging the table back. Paging forward leaves the selected record on the
+    page you left, and the reveal snapped straight back to it, so every press
+    of Next re-rendered page one - 1-40 of 693, forever. A page the reader
+    asked for now wins over the reveal. Characters pages properly (41-80/693)
+    and wheel paging works through the same path.
 
 ## Abilities
 
 * [~] Name should be the second column after a numeric ID.
   * The rule is enforced against the shared demo; FF7R's own ability table
     needs the plugin running to check and reorder.
-* [ ] Investigate malformed/tiny properties such as the field transcribed approximately as `council number`.
-
-  * Control is extremely thin/tiny.
-  * No checkbox/input/control appears to exist.
+* [x] Investigate malformed/tiny properties such as the field transcribed approximately as `council number`.
+  * It is `Cancel Number`, and fifteen of the sixty-one ability properties are
+    like it: array properties - STRING[], BYTE[], FLOAT[] - that are empty on
+    this record. An empty array rendered an empty box, so the property was a
+    sixteen-pixel sliver with a name and no control, which reads as broken
+    rather than empty. They say "None" now.
 
 ## Enemy Loot
 
@@ -286,10 +298,13 @@
 
 ## Tweaks
 
-* [ ] Tweaks tab appears nonfunctional.
-* [ ] It remains indefinitely/for an extremely long time on:
-
-  * `Reading every LexEditor tweak group`
+* [x] Tweaks tab appears nonfunctional.
+* [x] It remains indefinitely/for an extremely long time on `Reading every LexEditor tweak group`.
+  * Five of the six groups come back in under a second; NoMoreCheats takes
+    thirty-eight. The page waited for all of them, so one slow archive held
+    the whole tab. Each group appears as it arrives now, and the card that
+    replaces the missing ones says how many are still reading. The tab is
+    usable in one second.
 
 ---
 
