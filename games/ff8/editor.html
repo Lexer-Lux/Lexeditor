@@ -1260,9 +1260,11 @@
     const A=Number(fields.find(field=>field.field==="exp_linear")?.value??0),B=Number(fields.find(field=>field.field==="exp_quadratic")?.value??0),progress=Math.max(0,level-1);
     return 10*progress*A+Math.floor(progress*progress*B/256);
   }
+  // One scale for every character's experience curve, so a cheap character
+  // reads as cheap. A hundred thousand covers the vanilla curves with room
+  // above them; a curve that goes further takes the axis it needs.
   function characterXpRange(fields){
-    const maximum=Math.max(1000,characterXpValue(fields,100));
-    return {min:0,max:Math.ceil(maximum/1000)*1000};
+    return {min:0,max:Math.max(100000,Math.ceil(characterXpValue(fields,100)/10000)*10000)};
   }
   function characterStatGrowth(fields,rowId,expFields=[]){
     const cards=characterCurveOrder.map(stat=>{
@@ -1272,11 +1274,14 @@
       // 41 then draws inside the bottom sixth of its box and the rest is dead
       // space. The axis follows the data, with a little headroom, and the
       // scale numbers still show the real values.
+      // The axis is the stat's own ceiling, so every character's curve is read
+      // against the same scale and a weak growth looks weak. Following the
+      // data instead re-scaled the box per character, which made every curve
+      // fill its card and told the reader nothing about how high the stat
+      // actually goes.
       const ceiling=stat==="HP"?9999:255;
-      const peak=Math.max(...Array.from({length:100},(_,i)=>
-        Number(characterCurveValue(stat,statFields,i+1))||0));
       const axisMin=Math.min(0,...Array.from({length:100},(_,i)=>Number(characterCurveValue(stat,statFields,i+1))||0));
-      const axisMax=Math.min(ceiling,Math.max(1,Math.ceil(peak*1.08/5)*5));
+      const axisMax=ceiling;
       return curveEditor({title:stat,className:"ff8-character-curve",overlayExtrema:true,variables,domain:{min:1,max:100},range:{min:axisMin,max:axisMax},graphLabel:`${stat} base from level 1 to level 100. ${axisMin<0?"Negative growth can wrap to a high stat in the game; change these coefficients.":["STR","VIT","MAG","SPR"].includes(stat)?"Negative base growth is floored at zero before bonuses.":"Before junction and ability bonuses."}`,evaluate:level=>characterCurveValue(stat,statFields,level),formula:coloredCurveFormula(characterCurveFormula(stat)),invalidText:"A DIVISOR IS 0"});
     });
     if(expFields.length)cards.push(curveEditor({title:"XP",className:"ff8-character-curve",overlayExtrema:true,variables:expFields.map((field,index)=>({label:"AB"[index],control:fieldSourceControl(field,"characters",rowId,{internal:true})})),domain:{min:1,max:100},range:()=>characterXpRange(expFields),graphLabel:"Cumulative experience required from level 1 to level 100",evaluate:level=>characterXpValue(expFields,level),formula:coloredCurveFormula("XP(L) = 10 * (L - 1) * A + floor((L - 1)^2 * B / 256)")}));
@@ -1549,16 +1554,24 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   function enemySimpleTables(row){
     const cards=enemyCardChoices(row),devourChoices=state.data.enemyTables.choices.devour||[];
     const tierNames=['LOW','MID','HIGH'];
-    const devour=columnList({rows:row.tables.devour,key:entry=>entry.slot,class:"ff8-record-list",editable:true,
-      template:"70px minmax(160px,1fr)",columns:[
-        {key:"slot",label:"Tier",render:entry=>tierNames[entry.slot]||entry.slot+1},
-        {key:"value",label:"Result",sortValue:entry=>choiceName(devourChoices,entry.devourId),render:entry=>{
-          const id=Number(entry.devourId),choices=devourChoices.some(value=>Number(value.id)===id)?devourChoices:[...devourChoices,{id,name:`Unknown (${id})`}];
-          return enemyTableSource(selectControl(id,choices,value=>{entry.devourId=Number(value);shell.refresh()}),row,
-            value=>value?.tables.devour[entry.slot]?.devourId,value=>entry.devourId=Number(value),value=>choiceName(choices,value));
-        }}]});
-    const renzokuken=columnList({rows:row.tables.renzokuken,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[{key:"slot",label:"Slot",render:entry=>entry.slot+1},{key:"value",label:"Value",render:entry=>enemyTableSource(numberControl(entry.value,0,65535,1,value=>entry.value=value),row,value=>value?.tables.renzokuken[entry.slot]?.value,value=>entry.value=Number(value))}]});
-    return [detailSection({className:"enemy-table-section",title:"CARDS",body:cards}),detailSection({className:"enemy-table-section",title:"DEVOUR",help:infoHelp("The three bytes select the proven low-, medium-, and high-tier Devour outcomes. Tier level cut-offs vary for a few vanilla enemies, so Lexeditor does not invent universal numeric ranges."),body:devour}),detailSection({className:"enemy-table-section",title:"RENZOKUKEN",body:renzokuken})]
+    // Devouring an enemy has one outcome per tier, so the three tiers are one
+    // property with three variables - the same shape a stat block uses -
+    // rather than three rows of a table with a one-word first column.
+    const devourControl=entry=>{
+      const id=Number(entry.devourId),choices=devourChoices.some(value=>Number(value.id)===id)?devourChoices:[...devourChoices,{id,name:`Unknown (${id})`}];
+      return enemyTableSource(selectControl(id,choices,value=>{entry.devourId=Number(value);shell.refresh()}),row,
+        value=>value?.tables.devour[entry.slot]?.devourId,value=>entry.devourId=Number(value),value=>choiceName(choices,value));
+    };
+    const devour=detailField({label:"DEVOUR",
+      help:infoHelp("Devouring the enemy gives one of these three outcomes. Which tier you get depends on the enemy's level at the time; the cut-offs differ for a few vanilla enemies, so Lexeditor does not state a universal range."),
+      control:multiNumberRow((row.tables.devour||[]).map(entry=>({
+        label:tierNames[entry.slot]||`Tier ${entry.slot+1}`,
+        title:`${tierNames[entry.slot]||`Tier ${entry.slot+1}`}-tier Devour outcome`,
+        control:devourControl(entry)})),{columns:3})});
+    const renzokuken=columnList({rows:row.tables.renzokuken,key:entry=>entry.slot,class:"ff8-record-list",editable:true,template:"70px minmax(120px,1fr)",columns:[
+      {key:"slot",label:"Hit",help:"Which hit of the Renzokuken sequence this row sets. Squall's limit strikes several times, and each hit reads its own entry in this table.",render:entry=>entry.slot+1},
+      {key:"value",label:"Damage",help:"The damage multiplier this hit contributes, out of 65,535. It is not a damage figure: the engine scales it by Squall's attack and the enemy's defence.",render:entry=>enemyTableSource(numberControl(entry.value,0,65535,1,value=>entry.value=value),row,value=>value?.tables.renzokuken[entry.slot]?.value,value=>entry.value=Number(value))}]});
+    return [detailSection({className:"enemy-table-section",title:"CARDS",body:cards}),detailSection({className:"enemy-table-section",title:"DEVOUR",body:devour}),detailSection({className:"enemy-table-section",title:"RENZOKUKEN",body:renzokuken})]
   }
 
   const enemyDefencePrevious=new WeakMap();

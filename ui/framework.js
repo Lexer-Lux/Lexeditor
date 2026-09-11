@@ -558,7 +558,7 @@
       control.matches("input,select,textarea,output,.lex-readonly-field"));
     const prefix = attrs.position === "prefix";
     const reserve = Math.max(1.8, String(unit || "").length * .45 + .9);
-    return element("span", {
+    const field = element("span", {
       class: [
         "lex-unit-field",
         boxed ? "lex-unit-field-boxed" : "lex-unit-field-static",
@@ -571,6 +571,57 @@
     class: ["lex-unit", unit === "×" ? "lex-unit-multiplier" : "", attrs.unitClass || ""].filter(Boolean).join(" "),
     "aria-hidden": "true",
     }, unit) : null);
+    if (boxed && unit && !prefix) followUnit(field, control);
+    return field;
+  };
+
+  // The unit belongs to the number, so it travels with it. Pinned to the far
+  // edge of the box it marked where the box ended rather than where the value
+  // did, and on a wide panel that put a "G" a screen's width away from the
+  // price it qualifies. The unit is placed just after the last glyph of the
+  // value instead, measured in the box's own font.
+  //
+  // It stops short of whatever the box has reserved on its right: an internal
+  // reference rail keeps its lane, so "50,000 G" and its "V 30,000" never
+  // collide however long the number gets. When the value is long enough to
+  // reach that lane the unit parks against it, which is the old behaviour and
+  // the correct one at that width.
+  const followUnit = (field, control) => {
+    const unitNode = field.querySelector(":scope > .lex-unit");
+    if (!unitNode || !(control instanceof HTMLElement)) return;
+    const place = () => {
+      if (!field.isConnected) return;
+      const text = control.value ?? control.textContent ?? "";
+      const style = getComputedStyle(control);
+      const measured = textWidth(String(text),
+        `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`);
+      const start = parseFloat(style.paddingLeft) || 0;
+      const border = parseFloat(style.borderLeftWidth) || 0;
+      const gap = (parseFloat(style.fontSize) || 12) * .4;
+      // The right-hand limit is where the box stops reserving room for
+      // whatever else lives in it - a reference, a lock, a stepper.
+      const reserved = parseFloat(getComputedStyle(field).getPropertyValue("--lex-unit-reserve")) || 0;
+      const limit = Math.max(0, field.clientWidth - unitNode.offsetWidth - reserved);
+      const left = Math.min(border + start + measured + gap, limit);
+      const next = `${Math.round(left)}px`;
+      if (unitNode.style.left !== next) unitNode.style.left = next;
+    };
+    control.addEventListener("input", place);
+    control.addEventListener("change", place);
+    field.lexPlaceUnit = place;
+    requestAnimationFrame(place);
+    document.fonts?.ready?.then(place);
+  };
+
+  // Measuring text without laying it out, so a unit can be placed against a
+  // value the box has not been asked to re-render.
+  let measuringContext = null;
+  const textWidth = (text, font) => {
+    if (!text) return 0;
+    measuringContext = measuringContext || document.createElement("canvas").getContext("2d");
+    if (!measuringContext) return String(text).length * 7;
+    if (font) measuringContext.font = font;
+    return measuringContext.measureText(String(text)).width;
   };
 
   const formatNumber = (value, options = {}) => {

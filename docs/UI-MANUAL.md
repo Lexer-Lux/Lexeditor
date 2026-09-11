@@ -135,9 +135,21 @@ unit.
 
 ## Units and booleans
 
-A unit is part of its field. It can be a suffix such as `%`, `/255`, `G`, or
-`×`, or a prefix when the game requires one. Unit placement is shared so game
-fonts cannot create local alignment errors.
+A unit is part of its field, and it belongs to the **number**, not to the box.
+It can be a suffix such as `%`, `/255`, `G`, or `×`, or a prefix when the game
+requires one. A suffix sits immediately after the last digit of the value and
+travels with it as the value is typed, measured in the box's own font. Pinning
+it to the far edge of the box marked where the box ended rather than where the
+value did, which on a wide panel put a `G` most of a screen away from the price
+it qualifies.
+
+This holds inside an **internal-ref box** too. The unit stops short of whatever
+that box reserves on its right, so the unit and the reference never collide
+however long the number grows; when the value is long enough to reach the
+reserved lane the unit parks against it. So `50,000 G` reads as one thing, and
+its `V 30,000` keeps its own lane to the right of it.
+
+Unit placement is shared so game fonts cannot create local alignment errors.
 
 Every variable uses the most human-friendly semantic control available; its raw
 storage representation is an implementation detail, not UI. Booleans are normally
@@ -162,6 +174,18 @@ field. Cancel returns without a change. The context control can move between
 the source and target while Searcher mode stays active.
 
 ## Hoverables and help
+
+The small circle carrying a question mark beside a property is a **help pip**.
+It is the one name for it: in the code it is `infoHelp()` and the
+`lex-info-help` class, and everywhere else it is a help pip. A pip carries
+authored semantic help and nothing else - never a restatement of the label, the
+storage type, the bounds, the step, the unit, or the edit operation, all of
+which the property already says elsewhere.
+
+A pip lives on a rail and replaces that rail's type code while the rail is
+pointed at. Its glyph is shared chrome: it keeps one size relative to its own
+circle in every plugin theme, so a game font cannot crowd the question mark
+against the ring around it.
 
 A **hoverable** looks and behaves like a link to another editable record. The
 same linked record has the same hover behavior in every list, Table, Detail

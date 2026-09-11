@@ -940,6 +940,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   padding-inline:var(--lex-unit-reserve) .65em !important;
 }
 
+/* The unit travels with the number it qualifies; the left offset is measured
+   and written by the framework. The end offset is the resting place before
+   that measurement lands and the fallback wherever a unit has no value box to
+   follow. */
 .lex-unit-field-boxed > .lex-unit {
   position:absolute;
   z-index:1;
@@ -947,6 +951,9 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   top:50%;
   transform:translateY(-50%);
   pointer-events:none;
+}
+.lex-unit-field-boxed.lex-unit-field-suffix > .lex-unit[style*="left"] {
+  inset-inline-end:auto;
 }
 
 .lex-unit-field-prefix.lex-unit-field-boxed > .lex-unit {
@@ -1198,7 +1205,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 .lex-detail-field:not(:focus-within) .lex-field-type-range { display:block;opacity:0; }
 .lex-field-type-rail:hover { z-index:6; }
-.lex-field-type-rail:hover > span { font-size:13px !important; }
+/* Pointing at the rail enlarges the TYPE CODE, which is text. The help pip is
+   a fixed circle, and growing its glyph to the type code's hover size left the
+   question mark crowding the ring around it. */
+.lex-field-type-rail:hover > span:not(.lex-info-help) { font-size:13px !important; }
 .lex-detail-field:focus-within:has(.lex-field-type-range) .lex-field-type-name { left:25%; }
 .lex-detail-field:focus-within .lex-field-type-range { left:75%;opacity:1; }
 
@@ -5364,4 +5374,34 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   border-color:var(--lex-accent);
   background:color-mix(in srgb,var(--lex-panel-2) 60%,transparent);
   outline:none;
+}
+
+
+/* LEXEDITOR_HELP_PIP_20260910 */
+/* The help pip is the small circle carrying a question mark beside a property.
+   Its glyph is shared chrome, so it keeps one size relative to its own circle
+   whatever a plugin theme says: FF8 forces every pip's type to thirteen pixels
+   with !important, which in an eighteen-pixel circle left the question mark
+   crowding its own edge. The circle is a circle at any size, so the glyph is
+   sized from the circle rather than from the page.
+   The half-pixel is optical, not arithmetic: a question mark's ink sits high
+   in its em box, so a mathematically centred one reads as sitting high. */
+.lex-info-help {
+  font-family: var(--lex-symbol-font) !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  font-variant-numeric: normal;
+  text-shadow: none !important;
+}
+.lex-info-help > * { transform: translateY(.5px); }
+/* Two classes deep, because a plugin theme reaching for .lex-info-help with
+   !important is one class deep and loads after this file. */
+.lex-field-type-rail > .lex-info-help,
+.lex-toggle-rail > .lex-info-help,
+.lex-detail-field-label > .lex-info-help,
+.lex-column-heading > .lex-info-help {
+  font-family: var(--lex-symbol-font) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
 }

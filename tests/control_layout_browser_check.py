@@ -155,6 +155,38 @@ def main():
                 const fill=field.querySelector('.lex-value-fill');
                 done(fill?Number(getComputedStyle(fill).getPropertyValue('--lex-value-ratio')):null);})));}''')
             assert grouped is not None and abs(grouped-50000/655350)<.001,grouped
+            # The unit belongs to the number, so it sits just after the last
+            # digit and moves with it, and it never crosses into whatever the
+            # box reserves on its right for an internal reference.
+            for sample in ('50,000','7','655,350'):
+                unit=page.evaluate('''(text)=>{
+                  const U=LexeditorUI,el=U.el;
+                  const input=el("input",{type:"text",inputmode:"decimal",value:text,
+                    "data-min":0,"data-max":655350,"data-step":10});
+                  const control=U.provenanceControl({control:U.unitField(input,"G"),
+                    current:()=>Number(String(input.value).replaceAll(",","")),vanilla:30000,
+                    references:[],internal:true,apply:v=>{input.value=String(v);}});
+                  document.querySelector('#main').replaceChildren(
+                    U.detailField({label:"BUY PRICE",dataType:"INT",min:0,max:655350,step:10,control}));
+                  return new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+                    const field=document.querySelector('.lex-unit-field-boxed');
+                    const mark=field.querySelector(':scope > .lex-unit');
+                    const box=field.querySelector('input');
+                    const fb=field.getBoundingClientRect(),mb=mark.getBoundingClientRect();
+                    const cs=getComputedStyle(box);
+                    const pen=document.createElement('canvas').getContext('2d');
+                    pen.font=`${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+                    const digitsEnd=fb.left+(parseFloat(cs.borderLeftWidth)||0)+
+                      (parseFloat(cs.paddingLeft)||0)+pen.measureText(box.value).width;
+                    const reserved=parseFloat(getComputedStyle(field)
+                      .getPropertyValue('--lex-unit-reserve'))||0;
+                    done({gap:Math.round(mb.left-digitsEnd),
+                          clear:Math.round(fb.right-reserved-mb.right)});})));}''',sample)
+                assert 0<=unit['gap']<=14,(sample,unit)
+                assert unit['clear']>=-1,(sample,unit)
+            page.reload();page.evaluate("dispatchEvent(new Event('pywebviewready'))")
+            page.locator('.lex-detail-field').first.wait_for()
+            page.wait_for_timeout(300)
             # Ticking a box may not cost more on a big panel than a small one.
             # Re-fitting every label in the document on every DOM change made
             # a four-hundred-property page take a third of a second to respond.
