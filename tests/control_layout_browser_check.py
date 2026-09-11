@@ -135,13 +135,19 @@ def main():
                               markLeft:mark?Math.round(mark.getBoundingClientRect().left-bb.left):0,
                               markRight:mark?Math.round(bb.right-mark.getBoundingClientRect().right):0,
                               markUnder:mark?mark.getBoundingClientRect().top>=bb.bottom-1:true,
-                              pinIn:pin?pin.getBoundingClientRect().right<=e.getBoundingClientRect().right+1:true};}''')
+                              pinIn:pin?pin.getBoundingClientRect().right<=e.getBoundingClientRect().right+1:true,
+                              // A checkbox is small enough that a pin covers it
+                              // whole, so the pin may never touch it.
+                              pinClear:pin?(()=>{const p=pin.getBoundingClientRect();
+                                return p.left>=bb.right-1||p.right<=bb.left+1||
+                                       p.top>=bb.bottom-1||p.bottom<=bb.top+1;})():true};}''')
                     if row is not None:
                         assert abs(row['onCentre'])<=1,row
                         assert 0<=row['tip']<=4,row
                         assert row['markUnder'],row
                         assert abs(row['markLeft'])<=1 and abs(row['markRight'])<=1,row
                         assert row['pinIn'],row
+                        assert row['pinClear'],row
                 # A wrapped tab bar splits its tabs as evenly as the count allows.
                 spread=page.evaluate('''()=>{
                   const bar=document.querySelector('.lex-shell-header nav');

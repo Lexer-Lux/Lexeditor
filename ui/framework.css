@@ -5763,16 +5763,24 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   column-gap:.25em;
   padding:0;
 }
-/* The pin sits where every other property puts its pin: the top-right corner
-   of the control. */
+/* The pin rides the row's own right margin - the band the row already keeps
+   clear past every value box - and it takes the checkbox's grid row, so it
+   lines up with the box without being told a pixel offset. Anywhere inside the
+   control it lands ON the checkbox, which is small enough that a pin covers it
+   whole. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  grid-template-columns:minmax(12px,1fr) var(--lex-boolean-box) 0;
+  column-gap:0;
+}
+.lex-boolean-field .lex-source-control > .lex-field-boolean-arrow { margin-right:3px; }
 .lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
 .lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
-  grid-area:1 / 2 / 2 / 3;
-  position:absolute !important;
-  top:2px !important;
-  right:2px !important;
-  bottom:auto !important;
-  left:auto !important;
+  grid-area:1 / 3 / 2 / 4;
+  position:static !important;
+  align-self:center;
+  justify-self:start;
+  margin-left:2px;
+  inset:auto !important;
   transform:none !important;
 }
 
