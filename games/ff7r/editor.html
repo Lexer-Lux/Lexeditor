@@ -48,7 +48,10 @@
     textLanguage:"US",textAsset:"",textData:null,textBaseline:null,textSelected:0,textQuery:"",textSort:{key:"key",dir:1},
     mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]
   };
-  const dataColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
+  // An ID is four or five digits wide, so it takes four or five digits of the
+  // table. Left to share the grid it took a fifth of the width and pushed the
+  // record name into a column too narrow to read.
+  const dataColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true,width:"74px"},{key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"}];
   const economyColumns=[{key:"tag",label:"ID",sortable:true,width:"minmax(10em,.8fr)"},{key:"name",label:"Item",sortable:true,width:"minmax(14em,1.2fr)"},{key:"buy",label:"Buy",numeric:true,sortable:true},{key:"sale",label:"Sell",numeric:true,sortable:true},{key:"maxCount",label:"Carry Cap",numeric:true,sortable:true}];
   // Four columns at fourteen ems each did not fit the list panel, so the Steal
   // column was cut in half by the panel edge. The minimums are sized so all
@@ -441,7 +444,7 @@
   }
   function curatedColumns(spec){
     const present=(state.data?.properties||[]).filter(prop=>spec.columns.includes(prop.name));
-    return [{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},
+    return [{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true,width:"74px"},
       {key:"tag",label:"Record",sortable:true,width:"minmax(12em,1fr)"},
       ...present.map(prop=>({key:`p:${prop.name}`,label:prop.label||prop.name,
         numeric:true,sortable:true}))];

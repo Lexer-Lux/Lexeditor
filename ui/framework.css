@@ -6020,3 +6020,29 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-curve-svg { background:transparent; }
 .lex-curve-formula { margin-top:-4px;height:2.2em; }
+
+
+/* LEXEDITOR_ID_COLUMN_WIDTH_20260911 */
+/* An ID column holds four or five digits, so it takes four or five digits of
+   the table. Left to share the grid it took a fifth of the width on a
+   two-column table and squeezed the name it sits in front of. A plugin can
+   still set its own width; this is the floor for one that does not. */
+.lex-column-list-head-cell.lex-numbered-id-cell,
+.lex-column-list-cell.lex-numbered-id-cell { max-width:11ch; }
+
+
+/* LEXEDITOR_FORMULA_TYPESETTING_20260911 */
+/* A formula is mathematics, so it is set like mathematics: an italic serif for
+   the letters, upright for the numbers and operators, and figures that line up
+   in a column. It had been set in the interface face, where a formula reads as
+   a line of source code. */
+.lex-curve-formula,
+.lex-curve-path-formula,
+.lex-curve-heading-formula {
+  font-family:"Cambria Math", "Latin Modern Math", Cambria, Georgia, serif;
+  font-variant-numeric:lining-nums tabular-nums;
+  font-feature-settings:"lnum" 1, "tnum" 1;
+  letter-spacing:.01em;
+}
+.lex-curve-formula :is(.lex-curve-variable-a,.lex-curve-variable-b,
+  .lex-curve-variable-c,.lex-curve-variable-d) { font-style:italic;font-weight:600; }

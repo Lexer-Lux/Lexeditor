@@ -1255,7 +1255,19 @@
     if(["STR","VIT","MAG","SPR"].includes(stat))return `${stat}(L)=clamp(0,255,trunc((trunc(L*A/10)+trunc(L/B)-trunc(L*L/(2*D))+C)/4))`;
     return `${stat}(L)=min(255,L*A+trunc(L/B)-trunc(L/D)+C)`;
   }
-  function coloredCurveFormula(text){const fragment=document.createDocumentFragment();String(text).split(/\b([ABCD])\b/g).forEach(part=>fragment.append(/^[ABCD]$/.test(part)?el("span",{class:`lex-curve-variable-${part.toLocaleLowerCase()}`},part):part));return fragment}
+  // Formulas are set as mathematics rather than as source. A variable stays a
+  // coloured letter, but the operators become the symbols a reader expects: a
+  // multiplication dot instead of an asterisk, a division slash with air around
+  // it, and floor brackets instead of the word "trunc".
+  function mathText(part){
+    return String(part)
+      .replace(/\s*\*\s*/g, "\u00b7")
+      .replace(/\s*\/\s*/g, " \u2215 ")
+      .replace(/\btrunc\(/g, "\u230a")
+      .replace(/=/g, " = ")
+      .replace(/\s{2,}/g, " ");
+  }
+  function coloredCurveFormula(text){const fragment=document.createDocumentFragment();String(text).split(/\b([ABCD])\b/g).forEach(part=>fragment.append(/^[ABCD]$/.test(part)?el("span",{class:`lex-curve-variable-${part.toLocaleLowerCase()}`},part):mathText(part)));return fragment}
   function characterXpValue(fields,level){
     const A=Number(fields.find(field=>field.field==="exp_linear")?.value??0),B=Number(fields.find(field=>field.field==="exp_quadratic")?.value??0),progress=Math.max(0,level-1);
     return 10*progress*A+Math.floor(progress*progress*B/256);

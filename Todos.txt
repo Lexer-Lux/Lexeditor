@@ -1,7 +1,9 @@
 # LexEditor Change / Problem Log
 
 > Some of these may already have been fixed indirectly while other work was happening. Remove items from this list as they are verified complete.
-> Put a side chat thing with answers for the answers to questions I ask you because there will be many across different tasks.
+> Answers to every question below live on one page:
+> https://claude.ai/code/artifact/386b1d20-f8d9-4556-a982-2674f0ae3494
+> Each is marked answered, needs-the-game, or your-call.
 
 ## GLOBAL / LEXEDITOR CORE
 
@@ -58,12 +60,11 @@
 * [x] Remove unnecessary disclaimers such as `Read only` when the UI state itself already makes that obvious.
   * RDR1's toolbar banner is gone; Warband's troop panel says where the record
     is edited instead of that it is not editable here.
-* [ ] Standardize the Details-panel 3D Viewer control:
-  * Header control switches/opens the Details panel's 3D Viewer.
-  * Plugins should not be able to silently omit this feature where 3D data is supported.
-  * NOTE: the shared control exists (`modelPreview` on the panel heading icon).
-    Making omission impossible needs a per-plugin declaration of whether the
-    record type has 3D data, which Warband and RDR2 do not currently carry.
+* [~] Standardize the Details-panel 3D Viewer control:
+  * The shared control exists: `modelPreview` on the panel heading icon, with
+    one open/close position every plugin gets. Making omission *impossible*
+    needs each plugin to declare whether a record type has 3D data at all,
+    which Warband and RDR2 do not carry yet - that declaration is the work.
 
 ### Menu Bar / Window Chrome
 
@@ -100,17 +101,20 @@
 
 ### ReShade / Mod Architecture — Questions
 
-* [ ] Why does LexEditor not ship ReShade?
-* [ ] Is licensing/open-source status actually preventing that?
-* [ ] Would it make more sense for LexEditor to maintain one centralized ReShade installation/configuration that individual Lexer's Mods add shaders/filters to?
-* [ ] Architectural requirement: Lexer's Mods should still work without LexEditor installed.
-* [ ] Determine whether **not shipping ReShade at all** is therefore still the preferred solution.
+* [x] Why does LexEditor not ship ReShade? - answered on the answers page.
+* [x] Is licensing/open-source status actually preventing that? - the shaders, not ReShade itself.
+* [x] Would it make more sense for LexEditor to maintain one centralized ReShade installation? - that is what is built.
+* [x] Architectural requirement: Lexer's Mods should still work without LexEditor installed. - they do, by design.
+* [~] Determine whether **not shipping ReShade at all** is therefore still the preferred solution.
+  * Your call. Nothing has changed to reopen it; the answers page says what would.
 
 ### Unclear Global Setting
 
-* [ ] Transcript says something approximately like **“wraparound of the ads”** is currently a free-text developer-setting field even though it appears to be a boolean.
-
-  * Identify the actual setting being referred to before changing it.
+* [x] Transcript says something approximately like **“wraparound of the ads”** is currently a free-text developer-setting field even though it appears to be a boolean.
+  * It is `pageWrapAround`, "Wrap around at the ends", already declared boolean.
+    What it was missing is a default in `ui/default_settings.json`, so its value
+    came from a fallback in code rather than the file every other setting uses.
+    It has one now.
 
 ---
 
@@ -118,7 +122,9 @@
 
 ### Three Panels
 
-* [ ] `Enabled` text in the Three Panels tab is vertically/mutually misaligned with the surrounding content.
+* [x] `Enabled` text in the Three Panels tab is vertically/mutually misaligned with the surrounding content.
+  * Fixed by the boolean-row work: every name in that panel now ends on the
+    same edge, measured at 694px across all four.
 
 ### Graphs
 
@@ -143,12 +149,16 @@
 
 ### Data Map
 
-* [ ] If Data Map really only has three possible values, show the corresponding icon directly in the Detail panel.
-* [ ] Include the human-readable text associated with the icon/value.
+* [x] If Data Map really only has three possible values, show the corresponding icon directly in the Detail panel.
+* [x] Include the human-readable text associated with the icon/value.
+  * Both already shipped: the detail's coverage line carries the glyph and the
+    label together. Verified in the data-map check.
 
 ### Baseline Concern
 
-* [ ] Blank itself sometimes exhibits the panel→pagination empty-space bug, suggesting the problem is in shared layout code rather than individual plugins.
+* [x] Blank itself sometimes exhibits the panel→pagination empty-space bug, suggesting the problem is in shared layout code rather than individual plugins.
+  * You were right that it was shared code. The bar's height was reserved twice,
+    once as padding under #main and again by the row fitter. Fixed globally.
 
 ---
 
@@ -165,40 +175,53 @@
 
 ## Items
 
-* [ ] Most properties lack useful info/help text.
-* [ ] Item names should be editable directly from the Detail-panel header rather than as a separate Name property.
+* [~] Most properties lack useful info/help text.
+  * The rule and the reasoning are in the manual; writing the pips themselves is
+    per-property authoring that needs someone who knows what each value does.
+* [~] Item names should be editable directly from the Detail-panel header rather than as a separate Name property.
+  * The shared control exists (`detailPanel({renameRecord})`) and FF8's cards
+    tab uses it. Wiring RDR1's items to it needs the plugin running.
 
 ## Loot Tables
 
-* [ ] Remove/rethink the `Installed Script Evidence` block; its purpose is unclear.
-* [ ] Remove the large explanatory block at the top of the Loot Tables page.
-
-  * If the explanation is necessary, put it behind a `?` tooltip beside the tab title.
-* [ ] Inputs need clearer descriptions/help text.
+* [x] Remove/rethink the `Installed Script Evidence` block; its purpose is unclear.
+  * It is what proves the override is talking to the script actually installed,
+    so it says that - "Which script this is reading" - and folds away.
+* [x] Remove the large explanatory block at the top of the Loot Tables page.
+  * Now a help pip on the heading it belongs to.
+* [~] Inputs need clearer descriptions/help text.
+  * What each input does is on the answers page; turning that into per-input
+    pips is the remaining authoring.
 
 ### Questions
 
-* [ ] What exactly do the Loot Tables inputs do?
-* [ ] Where are ordinary enemy/item drops edited?
-* [ ] Do enemies have separate drop definitions elsewhere?
+* [x] What exactly do the Loot Tables inputs do? - answered on the answers page.
+* [~] Where are ordinary enemy/item drops edited? - not in Lexeditor; needs the game to confirm where they live.
+* [~] Do enemies have separate drop definitions elsewhere? - same check.
 
 ## Missions
 
-* [ ] Remove the unnecessary `Read only` disclaimer from the Extracted Mission Table.
+* [x] Remove the unnecessary `Read only` disclaimer from the Extracted Mission Table.
+  * The toolbar banner is gone; the lock marks already say it.
 
 ## Tables
 
-* [ ] Fix vertical alignment of Type / Source / Name columns.
-* [ ] Fix the panel→pagination blank-space bug here, unless resolved globally.
+* [~] Fix vertical alignment of Type / Source / Name columns.
+  * Cells centre by the glyphs rather than the line box now, which is the
+    mechanism. Not seen in RDR1 itself, which needs game data to render here.
+* [x] Fix the panel→pagination blank-space bug here, unless resolved globally.
+  * Resolved globally.
 
 ---
 
 # FINAL FANTASY IX
 
-* [ ] Fix input sliders occupying the entire vertical height of their containers.
-* [ ] Investigate why this happens even in a page/control that seemingly has **no plugin overrides**.
-
-  * If there are genuinely no overrides, this is strong evidence the bug is in the shared baseline rather than FF9.
+* [x] Fix input sliders occupying the entire vertical height of their containers.
+* [x] Investigate why this happens even in a page/control that seemingly has **no plugin overrides**.
+  * It was the shared baseline, and the absence of overrides is what exposed it:
+    the fill is positioned against the nearest positioned ancestor, which for a
+    bare input is the field control - the height of the whole row. A plugin that
+    wraps its values never hit it. A bare input gets its own box now.
 
 ---
 
@@ -206,14 +229,17 @@
 
 ## General / Tables
 
-* [ ] ID column is absurdly wide; size it appropriately.
-* [ ] Fix panel→pagination empty-space bug if not solved globally.
-* [ ] Add property pinning support; FF7 Intergrade currently appears not to have pins.
-* [ ] Enforce sensible table column ordering globally:
-
-  * Numeric ID first.
-  * Name second.
-  * String/name-like ID may justify Name first.
+* [x] ID column is absurdly wide; size it appropriately.
+  * 74px on both FF7R tables, and the shared style caps any numbered ID column
+    at eleven characters so a plugin that sets no width cannot repeat it.
+* [x] Fix panel→pagination empty-space bug if not solved globally.
+  * Solved globally: the bar's height was being reserved twice.
+* [~] Add property pinning support; FF7 Intergrade currently appears not to have pins.
+  * Its tables already carry column preferences, so the machinery is there; each
+    detail field has to ask for its pin. Needs the plugin running to wire up.
+* [x] Enforce sensible table column ordering globally:
+  * In the manual, and the layout check fails a table whose name column comes
+    before a numeric ID.
 
 ## Enemies
 
@@ -227,7 +253,9 @@
 
 ## Abilities
 
-* [ ] Name should be the second column after a numeric ID.
+* [~] Name should be the second column after a numeric ID.
+  * The rule is enforced against the shared demo; FF7R's own ability table
+    needs the plugin running to check and reorder.
 * [ ] Investigate malformed/tiny properties such as the field transcribed approximately as `council number`.
 
   * Control is extremely thin/tiny.
@@ -235,20 +263,26 @@
 
 ## Enemy Loot
 
-* [ ] Properties are generically named `State`.
-
-  * Use their actual header/display text as meaningful property names.
-* [ ] Reconsider/remove the repeated subtitle `Battle Item Possession`.
+* [~] Properties are generically named `State`.
+  * Same root cause as the question below it: the label falls back to the data
+    key when nothing has named the property. The rule is now in the manual and
+    the verifier rejects storage labels in the shared demo; naming FF7R's own
+    properties needs the tables loaded.
+* [~] Reconsider/remove the repeated subtitle `Battle Item Possession`.
 
 ### Question
 
-* [ ] What does `Battle Item Possession` actually signify?
+* [~] What does `Battle Item Possession` actually signify?
+  * On the answers page: the name is coming from the data table rather than
+    from anything the plugin authored, which is the same reason its neighbours
+    are called `State`. Reading it needs the game's DataObject tables.
 
 ## Equipment / Items / Materia
 
-* [ ] Equipment, Item, and Materia should be full normal tabs rather than subtabs.
-
-  * This has been requested repeatedly.
+* [~] Equipment, Item, and Materia should be full normal tabs rather than subtabs.
+  * Those subtabs are built from the item tables found in the game's assets, so
+    promoting them to top-level tabs means enumerating that set at build time.
+    Needs the game's data to do without guessing at the names.
 
 ## Tweaks
 
@@ -265,47 +299,55 @@
 
 ### Questions
 
-* [ ] Is Warband actually running against the same current shared UI baseline as Blank?
-* [ ] Why are bugs that were already fixed in Blank/shared UI reappearing in older plugins?
-* [ ] Are these old-plugin overrides, stale baseline code, or genuine technical limitations?
-* [ ] Would reducing plugin-specific overrides and moving Warband closer to Blank eliminate a large class of these problems?
+* [x] Is Warband actually running against the same current shared UI baseline as Blank? - yes, one copy of the shared UI.
+* [x] Why are bugs that were already fixed in Blank/shared UI reappearing in older plugins? - plugin overrides landing after the shared fix.
+* [x] Are these old-plugin overrides, stale baseline code, or genuine technical limitations? - overrides, not stale code.
+* [x] Would reducing plugin-specific overrides and moving Warband closer to Blank eliminate a large class of these problems? - yes; the answers page says which overrides are worth keeping.
 
 ## Details Panel
 
 * [ ] Restore the standardized Details-panel 3D Viewer header control.
 
   * The 3D Viewer is effectively inaccessible at present.
-* [ ] Details-panel header is much too tall.
-* [ ] Fix alignment of property-type text.
+* [x] Details-panel header is much too tall.
+  * Warband's own rule was adding 10/12px on top of the shared padding; 4/5 now.
+* [x] Fix alignment of property-type text.
+  * Fixed globally: every rail sits eight pixels left of its property's name.
 
 ## Tabs
 
-* [ ] Tab text is too small / aliased / difficult to read.
-* [ ] Increase legibility.
+* [x] Tab text is too small / aliased / difficult to read.
+* [x] Increase legibility.
+  * The bitmap face was being rendered at 18px; 26px now.
 
 ## Troop Trees
 
-* [ ] Each troop tree should be its own subtab.
-* [ ] Remove unnecessary instructional text:
-
-  * `Upgrades grow upward.`
-  * `Select a troop to see its details.`
+* [x] Each troop tree should be its own subtab.
+  * The tree dropdown is a subtab bar. A faction with one tree shows no bar,
+    which the shared control already handles.
+* [x] Remove unnecessary instructional text:
+  * Both lines gone. The cyclic-links warning stays, because that one says
+    something the reader cannot see.
 * [ ] Troops should at minimum be openable in the 3D Viewer.
 
 ### Troop Icon Question
 
-* [ ] If LexEditor can generate/create icons or renders for inventory items, can equivalent icons/renders be generated for troops?
-* [ ] If not, explain the technical difference.
+* [~] If LexEditor can generate/create icons or renders for inventory items, can equivalent icons/renders be generated for troops?
+* [x] If not, explain the technical difference.
+  * On the answers page: an item icon is one mesh with a fixed camera; a troop
+    is a body, a morph-built face and runtime-resolved equipment, so the icon is
+    a scene that has to be assembled first.
 
 ### Editing Question
 
-* [ ] Why does the UI say `Read only troop details`?
-* [ ] Why can't troop properties be edited?
-* [ ] Is this a genuine technical limitation of Warband's formats?
+* [x] Why does the UI say `Read only troop details`? - it no longer does; it says where a troop is edited instead.
+* [x] Why can't troop properties be edited? - troops live in module_troops.py, Python source compiled into the game's data.
+* [x] Is this a genuine technical limitation of Warband's formats? - yes. Writing a troop back means editing source and keeping it compilable.
 
 ## Tweaks
 
-* [ ] Remove the plugin-specific Save button from the bar at the top.
+* [x] Remove the plugin-specific Save button from the bar at the top.
+  * Gone. The shell's own Save owns every unsaved change in the editor.
 
   * Saving should use the normal LexEditor mechanism.
 
@@ -315,4 +357,7 @@
 
 ## Formulae
 
-* [ ] Use proper mathematical typesetting for formulas.
+* [x] Use proper mathematical typesetting for formulas.
+  * Set in a math serif with lining tabular figures; asterisks become
+    multiplication dots, slashes get air, trunc() becomes a floor bracket, and
+    the variables stay coloured but italic.
