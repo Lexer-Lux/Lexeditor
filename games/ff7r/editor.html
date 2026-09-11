@@ -40,7 +40,7 @@
   const $=selector=>document.querySelector(selector);
   async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});let payload={};try{payload=await response.json()}catch(_error){}if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
 
-  const state={modOnly:false,reshade:null,curatedQuery:"",curatedSort:{key:"id",dir:1},
+  const state={modOnly:false,textPacks:null,textResource:"",textBusy:false,reshade:null,curatedQuery:"",curatedSort:{key:"id",dir:1},
     tab:"data",catalog:null,info:null,dataMap:null,activeSource:"mine",busy:false,error:"",projectMessage:"",
     asset:"",data:null,dataBaseline:null,selected:0,query:"",sort:{key:"tag",dir:1},
     economy:null,economyKey:"",economyError:"",economyTable:"",economyQuery:"",economySort:{key:"name",dir:1},
@@ -54,7 +54,7 @@
   // column was cut in half by the panel edge. The minimums are sized so all
   // four fit the default split; the cells ellipsise if a value is longer.
   const lootColumns=[{key:"tag",label:"Enemy / Battle ID",sortable:true,width:"minmax(9em,.9fr)"},{key:"normal",label:"Normal",sortable:true,width:"minmax(8em,1fr)"},{key:"rare",label:"Rare",sortable:true,width:"minmax(8em,1fr)"},{key:"steal",label:"Steal",sortable:true,width:"minmax(8em,1fr)"}];
-  const textColumns=[{key:"id",label:"ID",numeric:true,numberedId:true,sortable:true},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
+  const textColumns=[{key:"number",label:"ID",numeric:true,numberedId:true,sortable:true,width:"minmax(4em,max-content)"},{key:"resource",label:"Resource",sortable:true,width:"minmax(10em,.7fr)"},{key:"key",label:"Text ID",sortable:true,width:"minmax(12em,.8fr)"},{key:"text",label:"Text",sortable:true,width:"minmax(16em,1.2fr)"}];
   const dataPrefs=columnPreferences("ff7r-records",dataColumns,()=>render());
   const economyPrefs=columnPreferences("ff7r-economy",economyColumns,()=>render());
   const lootPrefs=columnPreferences("ff7r-loot",lootColumns,()=>render());
@@ -68,9 +68,18 @@
   const currentAsset=()=>assets().find(row=>row.asset===state.asset)||assets()[0]||null;
   const currentTextAsset=()=>textAssets().find(row=>row.asset===state.textAsset)||null;
   const records=()=>state.data?.records||[];
-  const textRecords=()=>state.textData?.records||[];
+  // Every resource for the chosen language is loaded together, so the Text tab
+  // is one list of all the game's text with the resource as an ordinary column.
+  // Picking a resource before being allowed to look at anything was the old
+  // shape, and it meant a search could only ever find what was already open.
+  const textPacks=()=>Object.values(state.textPacks||{});
+  const textRecords=()=>textPacks().flatMap(pack=>pack.data.records.map(row=>({
+    row, asset:pack.item.asset, resource:pack.item.name,
+    id:`${pack.item.asset}#${row.id}`,
+    number:row.id, key:row.key, text:row.text, subentries:row.subentries})));
   const selectedRecord=()=>records().find(row=>row.id===state.selected)||records()[0]||null;
   const selectedTextRecord=()=>textRecords().find(row=>row.id===state.textSelected)||textRecords()[0]||null;
+  const textPackOf=view=>state.textPacks?.[view?.asset]||null;
   const comparable=value=>JSON.stringify(value);
   const refreshShell=()=>shell?.refresh?.();
   const sourceSuffix=()=>state.activeSource==="vanilla"?"&source=vanilla":"";
@@ -95,11 +104,20 @@
     }
     return out;
   }
-  function textEdits(){
-    if(state.activeSource!=="mine"||!state.textData||!state.textBaseline)return[];
+  function textEdits(){return textEditGroups().flatMap(group=>group.edits)}
+  // Every resource is loaded, so a save writes each one that changed rather
+  // than the single resource that happened to be open.
+  function textEditGroups(){
+    if(state.activeSource!=="mine")return[];
+    return textPacks()
+      .map(pack=>({pack,edits:textDiff(pack.data,pack.baseline)}))
+      .filter(group=>group.edits.length);
+  }
+  function textDiff(data,baseline){
+    if(!data||!baseline)return[];
     const out=[];
-    for(let i=0;i<state.textData.records.length;i++){
-      const row=state.textData.records[i],base=state.textBaseline.records[i];if(!base)continue;
+    for(let i=0;i<data.records.length;i++){
+      const row=data.records[i],base=baseline.records[i];if(!base)continue;
       if(row.text!==base.text)out.push({entry:i,text:row.text});
       const baseSubs=new Map((base.subentries||[]).map(sub=>[sub.id,sub.text]));
       for(const sub of row.subentries||[])if(baseSubs.has(sub.id)&&sub.text!==baseSubs.get(sub.id))out.push({entry:i,subId:sub.id,text:sub.text});
@@ -122,7 +140,9 @@
   }
   function sortedTextRows(){
     const q=state.textQuery.toLocaleLowerCase();
-    return [...textRecords()].filter(row=>!q||`${row.id} ${row.key} ${row.text} ${(row.subentries||[]).map(sub=>`${sub.id} ${sub.text}`).join(" ")}`.toLocaleLowerCase().includes(q))
+    return textRecords()
+      .filter(row=>!state.textResource||row.asset===state.textResource)
+      .filter(row=>!q||`${row.number} ${row.resource} ${row.key} ${row.text} ${(row.subentries||[]).map(sub=>`${sub.id} ${sub.text}`).join(" ")}`.toLocaleLowerCase().includes(q))
       .sort((a,b)=>compareValues(a[state.textSort.key],b[state.textSort.key])*state.textSort.dir);
   }
 
@@ -171,10 +191,44 @@
     return true;
   }
 
+  // Thirty-seven resources per language, read together. Requesting them in
+  // parallel is what makes one list of all the game's text practical; asking
+  // for them one after another took long enough that the tab had to make you
+  // choose first, which is the shape this replaces.
+  async function loadAllText(language=state.textLanguage){
+    const list=textAssets().filter(row=>row.language===language);
+    if(!list.length){state.textPacks={};return}
+    state.textBusy=true;state.error="";render();
+    try{
+      const packs={};
+      await Promise.all(list.map(async item=>{
+        try{
+          const data=await api(`/api/text?asset=${encodeURIComponent(item.asset)}${sourceSuffix()}`);
+          packs[item.asset]={item,data,baseline:clone(data)};
+        }catch(error){state.error=error.message}
+      }));
+      state.textPacks=packs;
+      const resident=residentTextAsset();
+      if(resident&&packs[resident.asset]){
+        state.textAsset=resident.asset;
+        state.textData=packs[resident.asset].data;
+        state.textBaseline=packs[resident.asset].baseline;
+      }
+      const first=textRecords()[0];
+      if(!textRecords().some(row=>row.id===state.textSelected))state.textSelected=first?.id??null;
+    }catch(error){state.error=error.message}
+    finally{state.textBusy=false;render();refreshShell()}
+  }
+  // One resource at a time, kept only for the callers that still name one.
   async function loadTextAsset(asset=state.textAsset){
     if(!asset)return;
     state.busy=true;state.error="";render();
-    try{state.textData=await api(`/api/text?asset=${encodeURIComponent(asset)}${sourceSuffix()}`);state.textBaseline=clone(state.textData);state.textSelected=state.textData.records[0]?.id??0;state.textAsset=asset;state.textQuery="";if(state.textData.language)state.textLanguage=state.textData.language}
+    try{const data=await api(`/api/text?asset=${encodeURIComponent(asset)}${sourceSuffix()}`);
+      const item=textAssets().find(row=>row.asset===asset)||{asset,name:asset};
+      state.textPacks={...(state.textPacks||{}),[asset]:{item,data,baseline:clone(data)}};
+      state.textData=data;state.textBaseline=clone(data);
+      state.textSelected=`${asset}#${data.records[0]?.id??0}`;state.textAsset=asset;state.textQuery="";
+      if(data.language)state.textLanguage=data.language}
     catch(error){state.textData=null;state.textBaseline=null;state.error=error.message}
     finally{state.busy=false;render();refreshShell()}
   }
@@ -183,10 +237,9 @@
     if(language===state.textLanguage)return;
     if(!await confirmReplace("text"))return;
     state.textLanguage=language;state.economyKey="";state.lootKey="";
-    const next=textAssets().find(row=>row.language===language);
-    state.textAsset=next?.asset||"";state.textData=null;state.textBaseline=null;
+    state.textAsset="";state.textData=null;state.textBaseline=null;state.textPacks=null;
     if(state.data)await loadAsset(state.asset);
-    if(state.textAsset)await loadTextAsset(state.textAsset);else render();
+    if(state.tab==="text")await loadAllText(language);else render();
     if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot();
   }
 
@@ -494,17 +547,17 @@
   function descriptionRecord(descriptionId){
     if(!descriptionId)return null;
     const resident=residentTextAsset();
-    if(!resident||state.textAsset!==resident.asset)return null;
-    return textRecords().find(row=>row.key===descriptionId)||null;
+    const pack=resident?state.textPacks?.[resident.asset]:null;
+    if(!pack)return null;
+    return pack.data.records.find(row=>row.key===descriptionId)||null;
   }
-  // Opening an item view brings that language's resident text with it, unless
-  // another resource is loaded with edits nobody has saved yet. Replacing that
-  // would silently drop someone's work, so in that case the description stays
-  // read-only and offers the trip to the Text tab instead.
+  // Opening an item view brings that language's resident text with it. That is
+  // the one resource an item's name and description live in, and having it
+  // loaded is what lets the description be edited in the item rather than on
+  // another tab.
   async function ensureResidentText(){
     const resident=residentTextAsset();
-    if(!resident||state.textAsset===resident.asset)return;
-    if(textEdits().length)return;
+    if(!resident||state.textPacks?.[resident.asset])return;
     await loadTextAsset(resident.asset);
   }
   function descriptionControl(semantic){
@@ -531,7 +584,7 @@
     // The entry is in whichever resource holds this language's item text. If
     // the loaded one does not have it, the search box still says what to look
     // for rather than leaving the player guessing.
-    const match=(state.textData?.records||[]).find(row=>row.key===textId);
+    const match=textRecords().find(row=>row.key===textId);
     if(match)state.textSelected=match.id;
     render();
   }
@@ -594,30 +647,36 @@
       change:value=>selectTextLanguage(value),
     });
   }
-  // The resource chooser belongs with the other filters on the pagination bar,
-  // not in a private strip above the table.
+  // Every resource is already loaded, so this narrows the one list rather than
+  // deciding which resource you are allowed to see.
   function textResourceFilter(){
     return LexeditorUI.pagerSelect({
       label:"Resource","aria-label":"FF7 Remake text resource",
-      title:"Which text resource this tab is showing",
-      disabled:state.busy,
-      value:state.textAsset,
-      options:textAssetsForLanguage().map(item=>({id:item.asset,
-        label:item.group&&item.group!=="Text"?`${item.group} / ${item.name}`:item.name})),
-      change:value=>selectTextAsset(value),
+      title:"Narrow the list to one text resource",
+      disabled:state.textBusy,
+      value:state.textResource,
+      options:[{id:"",label:"All resources"},...textAssetsForLanguage().map(item=>({id:item.asset,
+        label:item.group&&item.group!=="Text"?`${item.group} / ${item.name}`:item.name}))],
+      change:value=>{state.textResource=String(value||"");state.pages.text=0;render()},
     });
   }
   function textArea(value,oninput,sub=false){const area=el("textarea",{class:`ff7r-textarea${sub?" ff7r-subtext":""}`,value:value??"",disabled:state.activeSource!=="mine",oninput:event=>oninput(event.target.value)});area.value=value??"";return area}
-  function textRecordPanel(row=selectedTextRecord()){
-    if(!row)return detailPanel({className:"ff7r-detail",title:"No text entry",body:[detailSection({title:"TEXT",body:[detailField({label:"STATE",control:readonlyField("This text resource has no entries.")})]})]});
+  function textRecordPanel(view=selectedTextRecord()){
+    if(!view)return detailPanel({className:"ff7r-detail",title:"No text entry",body:[detailSection({title:"TEXT",body:[detailField({label:"STATE",control:readonlyField("No text entries were loaded for this language.")})]})]});
+    const row=view.row;
     const main=detailField({label:"TEXT",dataType:"STRING",control:textArea(row.text,value=>{row.text=value;refreshShell()}),pin:textPrefs.pinButton("text","Text")});
     const subs=(row.subentries||[]).map(sub=>detailField({label:sub.id,dataType:"STRING",control:textArea(sub.text,value=>{sub.text=value;refreshShell()},true),help:sub.id==="ACTOR"?infoHelp("Actor/speaker metadata stored as an existing text-resource sub-entry."):null}));
-    const sections=[detailSection({title:"ENTRY",body:[detailField({label:"TEXT ID",dataType:"STRING",control:readonlyField(row.key)}),main]})];
+    // The resource is a property of the entry, not a mode the tab is in.
+    const sections=[detailSection({title:"ENTRY",body:[
+      detailField({label:"TEXT ID",dataType:"STRING",control:readonlyField(row.key)}),
+      detailField({label:"RESOURCE",dataType:"STRING",control:readonlyField(view.resource||view.asset),
+        help:infoHelp("Which text resource this entry lives in. Every resource for this language is loaded, so searching and sorting cross all of them; saving writes back only the resources you changed.")}),
+      main]})];
     if(subs.length)sections.push(detailSection({title:"SUB-ENTRIES",body:subs}));
-    return detailPanel({className:"ff7r-detail",title:row.key||`Text ${row.id}`,identity:recordId(row.id),meta:`${state.textData?.language||state.textLanguage} · ${currentTextAsset()?.name||"Text resource"}`,body:sections});
+    return detailPanel({className:"ff7r-detail",title:row.key||`Text ${row.id}`,identity:recordId(row.id),meta:`${state.textLanguage} · ${view.resource||"Text resource"}`,body:sections});
   }
   function textTablePanel(){const rows=sortedTextRows();return columnList({rows,key:row=>row.id,selected:state.textSelected,select:row=>{state.textSelected=row.id;render()},sortState:state.textSort,sort:key=>{state.textSort=state.textSort.key===key?{key,dir:-state.textSort.dir}:{key,dir:1};render()},columnPreferences:textPrefs,columns:textColumns,class:"ff7r-table","aria-label":"FF7 Remake localized text entries"})}
-  function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.busy&&state.tab==="text")return loadingPanel("Loading text resource","Reading localized FF7R text…");if(state.error&&!state.textData)return errorPanel(state.error);if(!state.textData)return loadingPanel("Text resource","Choose a language/resource to load localized text.");return el("div",{class:"ff7r-view"},textLanguageBar(),pagedTable({id:"text",noun:"entries",
+  function textPanel(){if(!textAssets().length)return loadingPanel("No text resources","No paired GameContents/Text .uasset/.uexp resources were found in the indexed FF7R PAKs.");if(state.textBusy||!state.textPacks)return loadingPanel("Loading text","Reading every localized text resource for this language…");if(state.error&&!textRecords().length)return errorPanel(state.error);return el("div",{class:"ff7r-view"},textLanguageBar(),pagedTable({id:"text",noun:"entries",
       filters:[textResourceFilter()],
       rows:sortedTextRows(),key:row=>row.id,selected:state.textSelected,
       setSelected:row=>{state.textSelected=row.id},
@@ -629,7 +688,7 @@
 
   function loadingPanel(title,message){return detailPanel({className:"ff7r-detail",title,body:[detailSection({title:"DATA",body:[detailField({label:"STATE",control:readonlyField(message)})]})]})}
   function errorPanel(message){return detailPanel({className:"ff7r-detail",title:"Resource unavailable",body:[detailSection({title:"ERROR",body:[detailField({label:"DETAIL",control:el("div",{class:"ff7r-message ff7r-error"},message)})]})]})}
-  function openMapRow(row){const asset=row.target||row.view;if(!asset)return;if(textAssets().some(entry=>entry.asset===asset)){state.textAsset=asset;state.textData=null;state.textBaseline=null;return navigate("text")}if(assets().some(entry=>entry.asset===asset)){state.asset=asset;state.data=null;state.dataBaseline=null;return navigate("data")}return navigate(asset)}
+  function openMapRow(row){const asset=row.target||row.view;if(!asset)return;if(textAssets().some(entry=>entry.asset===asset)){state.textResource=asset;return navigate("text")}if(assets().some(entry=>entry.asset===asset)){state.asset=asset;state.data=null;state.dataBaseline=null;return navigate("data")}return navigate(asset)}
   function dataMapPanel(){const rows=state.dataMap?.rows||[];return LexeditorUI.dataMap({rows,open:openMapRow,page:state.mapPage,query:state.mapQuery,status:state.mapStatus,sort:state.mapSort,changePage:value=>{state.mapPage=value;render()},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changeSort:key=>{state.mapSort=state.mapSort[0]===key?[key,-state.mapSort[1]]:[key,1];render()}}).content}
   async function projectAction(kind){if(dirtyCount()){state.projectMessage="Save or discard all current gameplay/text changes before building or deploying.";render();return}state.busy=true;state.projectMessage=`${kind==="deploy"?"Building and deploying":"Building"}…`;render();try{const result=await api(`/api/${kind}`,{});state.projectMessage=`${kind==="deploy"?"Deployed":"Built"}: ${result.path}`;state.info=await api("/api/info")}catch(error){state.projectMessage=`Error: ${error.message}`}finally{state.busy=false;render()}}
   function projectPanel(){const info=state.info||{};return detailPanel({className:"ff7r-detail",title:"Mod Project",meta:"Gameplay and text edits share one project; installed base PAKs are never overwritten",body:[detailSection({title:"PROJECT",body:[detailField({label:"ROOT",control:readonlyField(info.projectRoot||"—")}),detailField({label:"BUILD",control:readonlyField(info.buildPath||"—")}),detailField({label:"DEPLOY",control:readonlyField(info.deployPath||"—")}),detailField({label:"MOUNT",control:readonlyField(info.pakMountPoint||"../../../")})]}),detailSection({title:"ACTIONS",body:[detailField({label:"MOD PAK",control:el("div",{class:"ff7r-actions"},el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("build")},"Build Mod PAK"),el("button",{type:"button",disabled:state.busy,onclick:()=>projectAction("deploy")},"Build & Deploy to ~mods"))}),detailField({label:"STATUS",control:el("div",{class:"ff7r-message"},state.projectMessage||"Save edits, then build a separate _P.pak or explicitly deploy it to FF7R's ~mods folder.")})]})]})}
@@ -644,7 +703,7 @@
       })]})}
 
   function render(){let content;const curated=curatedSpec(state.tab);if(curated)content=curatedPanel(curated);else if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="tweaks")content=tweaksPanel();else if(state.tab==="info")content=infoPanel();else if(state.tab==="text")content=textPanel();else if(state.tab==="economy")content=economyPanel();else if(state.tab==="loot")content=lootPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
-  async function navigate(tab){const previous=state.tab;state.tab=tab;render();if(tab==="text"&&state.textAsset&&!state.textData)await loadTextAsset(state.textAsset);else if(tab==="economy"){if(!await loadEconomy()){state.tab=previous;render()}else{await ensureResidentText();render()}}else if(tab==="loot"){if(!await loadLoot()){state.tab=previous;render()}}
+  async function navigate(tab){const previous=state.tab;state.tab=tab;render();if(tab==="text"){if(!state.textPacks)await loadAllText();else render()}else if(tab==="economy"){if(!await loadEconomy()){state.tab=previous;render()}else{await ensureResidentText();render()}}else if(tab==="loot"){if(!await loadLoot()){state.tab=previous;render()}}
     else if(curatedSpec(tab)){
       const spec=curatedSpec(tab);
       const item=curatedAsset(spec);
@@ -678,15 +737,22 @@
         data.activeSha256=result.activeSha256;data.usingProject=true;group.entry.baseline=clone(data);
         state.projectMessage=`${state.projectMessage?state.projectMessage+" ":""}Saved ${result.saved} value${result.saved===1?"":"s"} in ${group.entry.item.name||data.asset}.`;
       }
-      if(text.length){const result=await api("/api/text/save",{asset:state.textData.asset,sourceUassetSha256:state.textData.sourceUassetSha256,sourceUexpSha256:state.textData.sourceUexpSha256,activeUassetSha256:state.textData.activeUassetSha256,activeUexpSha256:state.textData.activeUexpSha256,edits:text});state.textData.activeUassetSha256=result.activeUassetSha256;state.textData.activeUexpSha256=result.activeUexpSha256;state.textData.usingProject=true;state.textBaseline=clone(state.textData);state.projectMessage=`${state.projectMessage?state.projectMessage+" ":""}Saved ${result.saved} text value${result.saved===1?"":"s"}.`}
+      for(const group of textEditGroups()){
+        const data=group.pack.data;
+        const result=await api("/api/text/save",{asset:data.asset,sourceUassetSha256:data.sourceUassetSha256,sourceUexpSha256:data.sourceUexpSha256,activeUassetSha256:data.activeUassetSha256,activeUexpSha256:data.activeUexpSha256,edits:group.edits});
+        data.activeUassetSha256=result.activeUassetSha256;data.activeUexpSha256=result.activeUexpSha256;data.usingProject=true;
+        group.pack.baseline=clone(data);
+        if(state.textData===data)state.textBaseline=clone(data);
+        state.projectMessage=`${state.projectMessage?state.projectMessage+" ":""}Saved ${result.saved} text value${result.saved===1?"":"s"} in ${group.pack.item.name||data.asset}.`;
+      }
       editHistory.clear();
     }catch(error){state.error=error.message;throw error}
     finally{state.busy=false;render();refreshShell()}
   }
-  async function discard(){if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);for(const entry of Object.values(state.tweaks||{}))entry.data=clone(entry.baseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
-  const editHistory=new EditHistory({capture:()=>({data:state.data?clone(state.data.records):null,text:state.textData?clone(state.textData.records):null}),restore:snapshot=>{if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);if(state.textData&&snapshot?.text)state.textData.records=clone(snapshot.text)},render:async()=>render(),enabled:()=>state.activeSource==="mine"&&["data","economy","loot","text"].includes(state.tab),changed:()=>refreshShell()});
+  async function discard(){if(state.data&&state.dataBaseline)state.data=clone(state.dataBaseline);for(const pack of textPacks())pack.data.records=clone(pack.baseline.records);for(const entry of Object.values(state.tweaks||{}))entry.data=clone(entry.baseline);if(state.textData&&state.textBaseline)state.textData=clone(state.textBaseline);editHistory.clear();render();refreshShell()}
+  const editHistory=new EditHistory({capture:()=>({data:state.data?clone(state.data.records):null,text:Object.fromEntries(textPacks().map(pack=>[pack.item.asset,clone(pack.data.records)]))}),restore:snapshot=>{if(state.data&&snapshot?.data)state.data.records=clone(snapshot.data);for(const [asset,records] of Object.entries(snapshot?.text||{})){const pack=state.textPacks?.[asset];if(pack)pack.data.records=clone(records)}},render:async()=>render(),enabled:()=>state.activeSource==="mine"&&["data","economy","loot","text"].includes(state.tab),changed:()=>refreshShell()});
 
-  async function selectProjectSource(value){if(dirtyCount()&&!await LexeditorUI.confirmAction({title:"Discard unsaved changes?",message:"Switching source reloads everything from the other source. All unsaved FF7R changes would be lost.",confirmLabel:"Discard and switch",cancelLabel:"Keep editing"}))return;state.activeSource=String(value||"mine");state.economyKey="";state.lootKey="";if(state.data)await loadAsset(state.asset);if(state.tweaks){state.tweaks=null;if(state.tab==="tweaks")await loadAllTweaks()}if(state.textData)await loadTextAsset(state.textAsset);if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot()}
+  async function selectProjectSource(value){if(dirtyCount()&&!await LexeditorUI.confirmAction({title:"Discard unsaved changes?",message:"Switching source reloads everything from the other source. All unsaved FF7R changes would be lost.",confirmLabel:"Discard and switch",cancelLabel:"Keep editing"}))return;state.activeSource=String(value||"mine");state.economyKey="";state.lootKey="";if(state.data)await loadAsset(state.asset);if(state.tweaks){state.tweaks=null;if(state.tab==="tweaks")await loadAllTweaks()}if(state.textPacks){state.textPacks=null;state.textData=null;state.textBaseline=null;if(state.tab==="text")await loadAllText();else await ensureResidentText()}if(state.tab==="economy")await loadEconomy();if(state.tab==="loot")await loadLoot()}
   const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"ff7r",name:"FINAL FANTASY VII REMAKE INTERGRADE",themeName:"ff7r",theme:{accent:"#1d6fb8"}},tabs:[{id:"economy",label:"Items"},{id:"characters",label:"Characters"},{id:"abilities",label:"Abilities"},{id:"enemies",label:"Enemies"},{id:"loot",label:"Enemy Loot"},{id:"data",label:"Misc"},{id:"tweaks",label:"Tweaks"},{id:"text",label:"Text"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open FF7 Remake Data Map",dirtyCount,readonly:()=>state.activeSource!=="mine",history:editHistory,save,discard,projectSnapshot:()=>({canCreate:false,projects:[{name:"FF7R Mod",path:state.info?.projectRoot||"Project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Installed FF7R PAK resources"}],projectActiveSource:()=>state.activeSource,selectProjectSource,info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open FF7 Remake setup and runtime information"});
   editHistory.observe(document);
 
