@@ -84,5 +84,21 @@ refuses outright when a file of that name already exists and is not ReShade -
 a game's own d3d11.dll is not ours to replace. Removing deletes only a DLL that
 identifies itself as ReShade, for the same reason.
 
-Still to build: the shared repository list with versions (item 2) and the export
-note for someone installing the mod by hand (item 5).
+Items 2 and 5 are done, which closes the list.
+
+The repository list is one file per machine, `repositories.json` beside the
+stored ReShade DLL, holding a name, a version and an optional URL each. It is
+deliberately not per project: every mod's preset resolves against the same list,
+which is what makes "this mod needs qUINT 3.0" a statement the editor can check.
+The Tweaks section adds and forgets entries, shows what the machine has, and
+reports each repository a mod names as ready, missing, or a version mismatch.
+A mismatch is reported separately from missing because the shaders are there,
+they are just not the ones the preset was authored against, and that produces a
+different kind of wrong picture.
+
+The export note is plain text written into the mod's own `reshade/` folder as
+`INSTALL-RESHADE.txt`. It names the loader DLL the game's renderer wants, every
+repository with its version, where the preset goes, and any shaders the author
+actually wrote. It opens by saying the reader does not need Lexeditor, because
+that is the requirement the whole format exists to satisfy: a published mod has
+to work for someone who has never heard of this editor.

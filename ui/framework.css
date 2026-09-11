@@ -5144,3 +5144,13 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   border-bottom:1px dashed color-mix(in srgb,var(--lex-border) 60%,transparent);
   font-size:.78em;
 }
+
+
+/* LEXEDITOR_RESHADE_REPOSITORY_ROW_20260910 */
+/* The repository row holds three text boxes and a button. Left to the generic
+   action row they each took a third of the panel and the button wrapped alone
+   onto a second line. */
+.lex-reshade-actions { display:flex;flex-wrap:wrap;align-items:center;gap:6px; }
+.lex-reshade-actions > input[type="text"] { flex:1 1 8em;min-width:6em; }
+.lex-reshade-actions > select { flex:0 1 auto;min-width:0; }
+.lex-reshade-actions > button { flex:0 0 auto; }

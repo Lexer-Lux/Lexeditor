@@ -137,3 +137,63 @@ def test_uninstall_leaves_a_games_own_loader_alone(tmp_path):
     own.write_bytes(b"\x00" * 256)
     assert rp.uninstall(game)["removed"] == []
     assert own.is_file()
+
+
+def test_repository_list_is_one_per_machine_and_sorted(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path / "store")
+    rp.add_repository("qUINT", "3.0", "https://example.invalid/quint")
+    rp.add_repository("iMMERSE", "1.2")
+    assert [entry["name"] for entry in rp.repositories()] == ["iMMERSE", "qUINT"]
+
+    # Adding the same name again updates it rather than listing it twice.
+    rp.add_repository("qUINT", "4.0")
+    assert [entry["version"] for entry in rp.repositories()] == ["1.2", "4.0"]
+
+    rp.remove_repository("iMMERSE")
+    assert [entry["name"] for entry in rp.repositories()] == ["qUINT"]
+
+
+def test_repository_status_separates_missing_from_a_version_mismatch(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path / "store")
+    rp.add_repository("qUINT", "3.0")
+    status = rp.repository_status({"repositories": [
+        {"name": "qUINT", "version": "2.0"},
+        {"name": "qUINT", "version": "3.0"},
+        {"name": "Nowhere", "version": "1"},
+    ]})
+    assert [entry["state"] for entry in status] == [
+        "version-mismatch", "present", "missing"]
+
+
+def test_export_note_names_the_loader_repositories_and_authored_shaders(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path / "store")
+    project = tmp_path / "project"
+    rp.write_manifest(project, {
+        "enabled": True, "preset": "MyLook.ini", "renderer": "dx12",
+        "repositories": [{"name": "qUINT", "version": "3.0"}]})
+    (project / "reshade" / "MyLook.ini").write_text("x", encoding="utf-8")
+    shaders = project / "reshade" / "shaders"
+    shaders.mkdir(parents=True, exist_ok=True)
+    (shaders / "MyGrain.fx").write_text("x", encoding="utf-8")
+
+    note = rp.export_note(project)
+    assert "d3d12.dll" in note
+    assert "qUINT (version 3.0)" in note
+    assert "MyLook.ini" in note
+    assert "MyGrain.fx" in note
+    # The reader may never have used the editor, so the note must not need it.
+    assert "Lexeditor" in note and "You do not need Lexeditor" in note
+
+    written = rp.write_export_note(project)
+    assert Path(written).name == rp.EXPORT_NOTE_NAME
+    assert Path(written).read_text(encoding="utf-8") == note
+
+
+def test_snapshot_reports_repository_state_for_the_mods_manifest(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path / "store")
+    rp.add_repository("qUINT", "3.0")
+    project = tmp_path / "project"
+    rp.write_manifest(project, {"repositories": [{"name": "qUINT", "version": "3.0"}]})
+    state = rp.snapshot(project)
+    assert [entry["state"] for entry in state["repositoryStatus"]] == ["present"]
+    assert [entry["name"] for entry in state["repositories"]] == ["qUINT"]

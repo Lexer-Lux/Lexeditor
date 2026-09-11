@@ -1058,6 +1058,38 @@ class HostApi:
         reshade_projects.uninstall(Path(root))
         return self.mod_reshade(plugin_id)
 
+    def reshade_repositories(self) -> list:
+        """The shader repositories this machine has, shared by every project."""
+        import reshade_projects
+
+        return reshade_projects.repositories()
+
+    def add_reshade_repository(self, plugin_id: str, name: str,
+                               version: str = "", url: str = "") -> dict:
+        """Record one repository for the machine, then restate this mod."""
+        import reshade_projects
+
+        reshade_projects.add_repository(name, version, url)
+        return self.mod_reshade(plugin_id)
+
+    def remove_reshade_repository(self, plugin_id: str, name: str) -> dict:
+        """Forget one repository. Mods that name it still name it."""
+        import reshade_projects
+
+        reshade_projects.remove_repository(name)
+        return self.mod_reshade(plugin_id)
+
+    def write_reshade_note(self, plugin_id: str) -> dict:
+        """Write the by-hand install note into the mod's reshade folder."""
+        import reshade_projects
+
+        snapshot = self._projects.snapshot(plugin_id)
+        root = Path(snapshot["current"])
+        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
+        path = reshade_projects.write_export_note(
+            root, Path(game_root) if game_root else None)
+        return {**self.mod_reshade(plugin_id), "notePath": path}
+
     def adopt_reshade(self) -> dict:
         """Take a ReShade DLL the user picks as Lexeditor's one copy."""
         import reshade_projects

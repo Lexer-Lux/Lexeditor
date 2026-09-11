@@ -2140,14 +2140,76 @@
       }
       rows.push(detailField({label: "Preset", control: select}));
     }
+    // The repository list is one per machine, shared by every project. A mod's
+    // manifest names a repository and a version; the shaders themselves are
+    // never copied into the mod, because several of the common repositories
+    // forbid redistribution.
     const repositories = manifest.repositories || [];
+    const status = data.repositoryStatus || [];
+    const describe = entry => entry.state === "missing"
+      ? `${entry.name}${entry.version ? ` ${entry.version}` : ""} — not on this machine`
+      : entry.state === "version-mismatch"
+        ? `${entry.name} ${entry.version} — this machine has ${entry.installedVersion}`
+        : `${entry.name}${entry.version ? ` ${entry.version}` : ""} — ready`;
     rows.push(detailField({
       label: "Needs shaders from",
-      control: readonlyField(repositories.length
-        ? repositories.map(entry =>
-            entry.version ? `${entry.name} ${entry.version}` : entry.name).join(", ")
-        : "No repositories declared."),
+      control: readonlyField(status.length
+        ? status.map(describe).join("; ")
+        : repositories.length
+          ? repositories.map(entry =>
+              entry.version ? `${entry.name} ${entry.version}` : entry.name).join(", ")
+          : "No repositories declared."),
       help: infoHelp("Shader repositories are named here, never copied into the mod: several of them forbid redistribution. Anyone installing this mod by hand installs the repositories named here."),
+    }));
+    const known = data.repositories || [];
+    rows.push(detailField({
+      label: "On this machine",
+      control: readonlyField(known.length
+        ? known.map(entry => entry.version ? `${entry.name} ${entry.version}` : entry.name).join(", ")
+        : "No shader repositories added yet."),
+      help: infoHelp("One list for the whole machine, not one per mod. Every project's preset resolves its repositories against this list."),
+    }));
+    const repositoryName = element("input", {type: "text", placeholder: "Repository name",
+      "aria-label": "Shader repository name"});
+    const repositoryVersion = element("input", {type: "text", placeholder: "Version",
+      "aria-label": "Shader repository version"});
+    const repositoryUrl = element("input", {type: "text", placeholder: "URL (optional)",
+      "aria-label": "Shader repository URL"});
+    rows.push(detailField({
+      label: "Add a repository",
+      control: element("div", {class: "lex-reshade-actions"},
+        repositoryName, repositoryVersion, repositoryUrl,
+        element("button", {type: "button", class: "lex-dialog-action primary",
+          onclick: () => {
+            const name = repositoryName.value.trim();
+            if (!name) return;
+            act("add_reshade_repository", name, repositoryVersion.value.trim(),
+              repositoryUrl.value.trim());
+            repositoryName.value = repositoryVersion.value = repositoryUrl.value = "";
+          }}, "Add")),
+    }));
+    if (known.length) {
+      const forget = element("select", {"aria-label": "Repository to forget"});
+      for (const entry of known) forget.append(element("option", {value: entry.name}, entry.name));
+      rows.push(detailField({
+        label: "Forget one",
+        control: element("div", {class: "lex-reshade-actions"}, forget,
+          element("button", {type: "button", class: "lex-dialog-action",
+            onclick: () => act("remove_reshade_repository", forget.value)},
+            "Remove from this machine")),
+        help: infoHelp("Removes it from this machine's list. Mods that name it still name it, and will report it missing until it is added again."),
+      }));
+    }
+    // Someone who downloads this mod may never have used Lexeditor. The note
+    // tells them what to install and where to put the preset, in plain text,
+    // beside the preset itself.
+    rows.push(detailField({
+      label: "By-hand install note",
+      control: element("div", {class: "lex-reshade-actions"},
+        element("button", {type: "button", class: "lex-dialog-action",
+          onclick: () => act("write_reshade_note")},
+          `Write ${data.exportNote || "INSTALL-RESHADE.txt"}`)),
+      help: infoHelp("Writes a plain-text note into the mod's reshade folder naming the loader DLL, every shader repository with its version, and where the preset goes. It never mentions Lexeditor, because the reader may not have it."),
     }));
     rows.push(detailField({
       label: "Status",
