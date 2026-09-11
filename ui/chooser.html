@@ -376,9 +376,27 @@
     // The name sits in the fixed row gap above its card, so a long name must
     // shrink to fit rather than be clipped mid-line. Sizes are read back from
     // layout, so this follows the font wherever the clamp lands.
+    // The fit measures the title against the height of its row, so it has to
+    // run after that row has a height. Called straight from updateCard it ran
+    // while the card was still being built, measured a zero-height box, and
+    // settled on a single line: "Final Fantasy 7 Remake Intergrade" fits in the
+    // row at full size and was being cut to "Final Fantasy 7…" anyway. A frame
+    // later, and again once the fonts have loaded, is when the answer is real.
+    let nameFitFrame=0;
+    function scheduleGameNameFit(){
+      if(nameFitFrame)return;
+      nameFitFrame=requestAnimationFrame(()=>{
+        nameFitFrame=0;
+        games.querySelectorAll(".game-name").forEach(fitGameName);
+      });
+    }
+    document.fonts?.ready?.then(scheduleGameNameFit).catch(()=>{});
     function fitGameName(name){
       if(!name)return;
       const text=name.querySelector(".game-name-text");if(!text)return;
+      // A box with no height yet cannot say how many lines fit. Measuring it
+      // anyway is what produced the one-line clamp.
+      if(!name.clientHeight){scheduleGameNameFit();return;}
       name.style.removeProperty("--game-name-size");
       const base=parseFloat(getComputedStyle(name).fontSize)||16,floor=10;
       let size=base;
@@ -400,7 +418,7 @@
     }
     function updateCard(card,plugin){
       card._plugin=plugin;card.className=`game state-${plugin.status}`;card.dataset.plugin=plugin.id;card.dataset.status=plugin.status;
-      card.querySelector(".game-name-text").textContent=plugin.name;fitGameName(card.querySelector(".game-name"));
+      card.querySelector(".game-name-text").textContent=plugin.name;fitGameName(card.querySelector(".game-name"));scheduleGameNameFit();
       card.querySelector(".cover-fallback").textContent=plugin.name.split(/\s+/).map(word=>word[0]).join("").slice(0,3).toUpperCase();
       const art=plugin.coverArt||{};let image=card.querySelector(".game-cover");
       if(art.state==="ready"&&art.uri){if(!image||image.dataset.uri!==art.uri){image?.remove();image=document.createElement("img");image.className="game-cover";image.alt=`${plugin.name} cover art`;image.dataset.uri=art.uri;image.src=art.uri;image.onerror=()=>image.remove();card.prepend(image);}}else if(art.state!=="loading") image?.remove();
