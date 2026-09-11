@@ -755,10 +755,58 @@
       const controls = [...panel.querySelectorAll(".lex-source-control[data-lex-rail-width]")]
         .filter(control => !control.classList.contains("lex-source-control-internal"));
       if (!controls.length) continue;
-      const widest = Math.max(...controls.map(control => Number(control.dataset.lexRailWidth) || 0));
-      panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}em`);
+      // Each entry gets an equal share of the space beside the property it
+      // annotates, so a deeper stack is a smaller stack rather than a taller
+      // row.
       for (const control of controls) {
-        control.style.setProperty("--lex-reference-rail-width", `${widest}em`);
+        const stack = control.querySelector(":scope > .lex-reference-values");
+        const count = stack?.children.length || 0;
+        if (!count) {
+          control.style.removeProperty("--lex-reference-slot");
+          control.style.removeProperty("--lex-reference-cap");
+          continue;
+        }
+        // The share is taken from the PROPERTY ROW, not from the value box
+        // inside it. The box is the shorter of the two, and dividing that by
+        // three left a three-deep stack at seven pixels - it fitted, and it
+        // could not be read. The row is the space actually available beside
+        // the box, and staying inside it is what keeps the stack from making
+        // the row taller.
+        const row = control.closest(".lex-detail-field") || control;
+        const cap = Math.max(12, Math.round(row.getBoundingClientRect().height) - 4);
+        control.style.setProperty("--lex-reference-cap", `${cap}px`);
+        control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / count))}px`);
+      }
+      // The rail used to be sized from a character count times a guessed em
+      // width, but the stack draws at roughly two thirds of the control's own
+      // type, so that estimate reserved half a rail of empty space on the right
+      // of every value box on the panel. Measure what the stack actually paints
+      // instead. The variables are cleared first: a tag already carrying a
+      // width from the previous pass measures as that width, which could only
+      // ever ratchet the rail wider.
+      const values = controls.flatMap(control => [...control.querySelectorAll(".lex-reference-value")]);
+      panel.style?.removeProperty("--lex-reference-tag-width");
+      for (const control of controls) {
+        control.style.removeProperty("--lex-reference-rail-width");
+        control.style.removeProperty("--lex-reference-tag-width");
+      }
+      const measure = (node, selector) => {
+        const found = node.querySelector(selector);
+        return found ? Math.ceil(found.getBoundingClientRect().width) : 0;
+      };
+      // A stack with nothing in it still holds its place, so the rail keeps a
+      // floor wide enough for the shortest real entry rather than collapsing
+      // and moving every box on the panel the moment a value matches vanilla.
+      const tag = Math.max(10, ...values.map(value => measure(value, ".lex-reference-tag")));
+      const text = Math.max(14, ...values.map(value => measure(value, ".lex-reference-text")));
+      // tag + the gap the tag's own margin opens + the value, and two pixels so
+      // the last glyph is not flush against the panel edge.
+      const widest = tag + text + 6;
+      panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}px`);
+      panel.style?.setProperty("--lex-reference-tag-width", `${tag}px`);
+      for (const control of controls) {
+        control.style.setProperty("--lex-reference-rail-width", `${widest}px`);
+        control.style.setProperty("--lex-reference-tag-width", `${tag}px`);
       }
     }
   };
@@ -6458,17 +6506,24 @@ ${row.path}`,
     const fields = root?.matches?.('.lex-detail-field')
       ? [root] : [...(root?.querySelectorAll?.('.lex-detail-field') || [])];
     for (const field of fields) {
-      if (field.classList.contains('lex-boolean-field')) continue;
       const rail = field.querySelector(':scope > .lex-field-type-rail');
-      const help = rail?.querySelector('.lex-info-help');
       const label = field.querySelector(':scope > .lex-detail-field-label');
-      if (!rail || !help || !label) continue;
+      // Every property's rail sits in the same place beside its name, whether
+      // or not the property also carries authored help. Requiring a ? here
+      // left every plain property's rail parked in the far-left gutter, so no
+      // two rows in a panel annotated their names from the same place.
+      if (!rail || !label) continue;
       if (field.hasAttribute("data-lex-sort")) { rail.style.left = "0px"; continue; }
       // The property name is wrapped in its own span so the boolean leader
       // arrow cannot squeeze it, so look inside that wrapper first. Searching
       // only the label's direct children left the rail parked at the far left
       // of the lane, a hundred and eighty pixels from the name it annotates.
       const holder = label.querySelector(":scope > .lex-detail-field-label-text") || label;
+      // The label fitter shrinks a long name after this pass has already
+      // measured it, which left the rail sitting where the name used to start
+      // and, on the longest names, painted over the name itself. Watching the
+      // name means the rail follows every re-fit.
+      nameObserver?.observe(holder);
       const text = [...holder.childNodes].find(node =>
         node.nodeType === Node.TEXT_NODE && node.textContent.trim());
       if (!text) continue;
@@ -6488,10 +6543,24 @@ ${row.path}`,
       rail.style.left = `${Math.max(0, wanted)}px`;
     }
   };
-  const schedule = root => requestAnimationFrame(() => alignFieldMetadata(root || document));
+  let pending = false;
+  const schedule = root => {
+    if (root && root !== document) { requestAnimationFrame(() => alignFieldMetadata(root)); return; }
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => { pending = false; alignFieldMetadata(document); });
+  };
+  const nameObserver = typeof ResizeObserver === "undefined"
+    ? null : new ResizeObserver(() => schedule(document));
   new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
     if (node instanceof Element) schedule(node);
   }))).observe(document.documentElement, {childList:true, subtree:true});
   window.addEventListener('resize', () => schedule(document));
+  // The rail is placed against the measured left edge of the property name, so
+  // anything that moves that name has to move the rail with it: a pane drag,
+  // the label fitter's own re-wrap, and the real font face arriving after the
+  // first measurement was taken against the fallback.
+  new ResizeObserver(() => schedule(document)).observe(document.documentElement);
+  document.fonts?.ready?.then(() => schedule(document));
   schedule(document);
 })();

@@ -4416,8 +4416,11 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   pointer-events:auto;
   cursor:pointer;
 }
-.lex-field-type-rail:hover > .lex-field-type-name,
-.lex-field-type-rail:hover > .lex-field-type-range { opacity:0 !important; }
+/* Only a rail that HAS a help mark may blank its type: on a property without
+   one this hid the type code and put nothing in its place, so pointing at the
+   rail of a plain property emptied it. */
+.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-name,
+.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-range { opacity:0 !important; }
 .lex-field-type-rail:hover > .lex-info-help { opacity:1 !important; }
 /* A sorted field uses the same centre point as its type/help marker. */
 .lex-detail-field[data-lex-sort] .lex-field-type-rail::after {
@@ -4973,11 +4976,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-toggle-rail { position:relative; align-self:stretch; opacity:1; }
 .lex-toggle-type { writing-mode:horizontal-tb; text-orientation:mixed; transform:rotate(-90deg); white-space:nowrap; }
 .lex-toggle-rail > .lex-info-help { display:none !important; }
-.lex-toggle:has(.lex-info-help):is(:hover,:focus-within) > .lex-toggle-rail > .lex-toggle-type { display:none; }
-.lex-toggle:not(:has(.lex-info-help)):hover > .lex-toggle-rail > .lex-toggle-type { display:block; }
-.lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail > .lex-info-help {
-  display:inline-grid !important; width:18px; min-width:18px; height:18px; min-height:18px;
-}
+/* Pointing at the switch brings its rail up; the swap to the help mark is the
+   RAIL's own business and lives with the rest of that contract further down.
+   Keying the swap to the whole switch here meant a flag never showed the type
+   code its rail exists to show. */
+.lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail > .lex-toggle-type { display:block; }
 
 
 .lex-subtab-button:has(> .lex-tab-shortcut) {
@@ -5023,15 +5026,29 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 
-/* LEXEDITOR_TOGGLE_RAIL_HOVER_ONLY_20260910 */
-/* A later block forced every per-toggle rail visible, so a row of eight flags
-   painted eight permanent "BOOL" labels beside its eight checkboxes. The type
-   code is a hover affordance on every other property and it is one here too:
-   hidden until that individual switch is pointed at, not the whole field. */
-.lex-toggle-rail { opacity:0; }
-.lex-detail-field:hover .lex-toggle-rail,
-.lex-detail-field:focus-within .lex-toggle-rail { opacity:0; }
+/* LEXEDITOR_TOGGLE_RAIL_CONTRACT_20260910 */
+/* One contract for every type rail in the editor, flags included. Pointing at
+   the PROPERTY brings its type codes up; pointing at an individual RAIL swaps
+   that one code for its help mark. A row of flags used to paint eight
+   permanent "BOOL" labels, and the pass that fixed that overcorrected: the
+   rail stayed dark until a switch was pointed at and then went straight to the
+   question mark, so the type code it is there to show was never readable. */
+.lex-toggle-rail { opacity:0; cursor:help; }
+.lex-detail-field:is(:hover,:focus-within) .lex-toggle-rail,
 .lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail { opacity:1; }
+/* The code is the rail's resting content, whatever the switch around it is
+   doing. */
+.lex-toggle > .lex-toggle-rail > .lex-toggle-type { display:block !important; }
+.lex-toggle > .lex-toggle-rail > .lex-info-help { display:none !important; }
+/* ...and the mark replaces it only while the rail itself is pointed at, and
+   only where there is a mark to replace it with. */
+.lex-toggle > .lex-toggle-rail:is(:hover,:focus-within):has(> .lex-info-help) > .lex-toggle-type {
+  display:none !important;
+}
+.lex-toggle > .lex-toggle-rail:is(:hover,:focus-within) > .lex-info-help {
+  display:inline-grid !important;
+  width:18px; min-width:18px; height:18px; min-height:18px;
+}
 
 
 /* LEXEDITOR_BOOLEAN_REFERENCE_INLINE_20260910 */
@@ -5082,27 +5099,26 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-boolean-field .lex-reference-values .lex-boolean-mark { align-self:center;line-height:1; }
 
 
-/* LEXEDITOR_NUMERIC_BOX_SHAPE_20260910 */
-/* A number and a name were the same box, so nothing on screen said which one a
-   property wanted. Numbers are now right-aligned on tabular figures in a
-   square-cornered box with an accent tick on its leading edge; names keep the
-   soft rounded box and read from the left. */
+/* LEXEDITOR_VALUE_BOX_ONE_SHAPE_20260910 */
+/* A number box and a name box are one box. An earlier pass split them - square
+   corners and an accent tick for a number against a softer round for a name -
+   which is the opposite of what was asked for, and it made a single column of
+   properties read as two different kinds of control. The rail beside the name
+   already says which type a property holds, so the box itself says nothing
+   about it and carries the shared radius and alignment. Numbers keep tabular
+   figures, which lines digits up without changing the box around them. */
 .lex-detail-field[data-lex-type="INT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]),
-.lex-detail-field[data-lex-type="FLOAT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]) {
-  border-radius:3px;
-  box-shadow:inset 3px 0 0 color-mix(in srgb,var(--lex-accent) 60%,transparent);
-  font-variant-numeric:tabular-nums;
-  font-feature-settings:"tnum" 1;
-  text-align:right;
-  /* No padding of its own: the box may already be reserving room on the right
-     for an internal reference or a unit, and overriding that is what made the
-     value paint straight through its own reference marker. */
-  padding-left:calc(3px + .45em);
-}
+.lex-detail-field[data-lex-type="FLOAT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]),
 .lex-detail-field[data-lex-type="STRING"] :is(input,textarea,.lex-readonly-field),
 .lex-detail-field[data-lex-type="TEXT"] :is(input,textarea,.lex-readonly-field) {
-  border-radius:9px;
+  border-radius:var(--lex-radius);
+  box-shadow:none;
   text-align:left;
+}
+.lex-detail-field[data-lex-type="INT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]),
+.lex-detail-field[data-lex-type="FLOAT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]) {
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
 }
 
 
@@ -5154,3 +5170,65 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-reshade-actions > input[type="text"] { flex:1 1 8em;min-width:6em; }
 .lex-reshade-actions > select { flex:0 1 auto;min-width:0; }
 .lex-reshade-actions > button { flex:0 0 auto; }
+
+
+/* LEXEDITOR_CONTROL_LANE_20260910 */
+/* Only a property that offered a copy button reserved a lane for it, so the
+   properties without one - a row of flags, a button pair, a hoverable - began
+   twenty-five pixels left of every value box above them and hung past the line
+   the rest of the column starts on. The lane is part of the control column
+   now, held whether or not this particular property fills it. */
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control {
+  display:grid;
+  grid-template-columns:19px minmax(0,1fr);
+  gap:6px;
+  align-items:center;
+}
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > .lex-copy-value {
+  grid-column:1;
+}
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > *:not(.lex-copy-value) {
+  grid-column:2;
+}
+
+
+/* LEXEDITOR_REFERENCE_PILLAR_20260910 */
+/* Three things the reference pillar was getting wrong.
+   It may not drive the height of the property it annotates: it is pinned to
+   the middle of the value box, capped at that box, and each entry takes an
+   equal share of it, so a three-deep stack is a smaller stack rather than a
+   taller row.
+   Its numbers now start on one edge. Tag and value are two columns, not a
+   sentence, so "V 25" and "R1 130" no longer step their values sideways by the
+   width of the tag in front of them.
+   Its width is measured from what the stack actually paints. It used to be a
+   character count times a guessed em, and the stack draws at about two thirds
+   of the control's type, so every value box on the panel ended early to make
+   room for space nothing was ever going to fill. */
+.lex-source-control:not(.lex-source-control-internal) > .lex-reference-values {
+  /* The cap is the property row, measured per control; the fallback keeps a
+     stack inside its own box wherever no measurement has run yet. */
+  max-height:var(--lex-reference-cap,100%);
+  grid-auto-rows:minmax(0,1fr);
+  overflow:hidden;
+}
+.lex-reference-values .lex-reference-value {
+  display:grid;
+  grid-template-columns:var(--lex-reference-tag-width,auto) minmax(0,1fr);
+  align-items:center;
+  justify-items:start;
+  column-gap:.3em;
+  min-height:0;
+  /* The slot is an equal share of the value box, set per control from the box
+     that is actually there; the 11px ceiling keeps a lone reference from
+     growing to fill a tall row. */
+  font-size:min(11px, max(6px, calc(var(--lex-reference-slot,11px) - 1px)));
+  line-height:1;
+}
+.lex-reference-values .lex-reference-tag { margin-right:0; }
+.lex-reference-values .lex-reference-text {
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}

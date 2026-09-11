@@ -71,10 +71,28 @@ def main():
                         assert inside['left']>=0 and inside['right']>=0,inside
                 for arrow in page.locator('.lex-field-boolean-arrow').all():
                     assert arrow.evaluate('(e)=>getComputedStyle(e).position')=='relative'
-                for tag in page.locator('.lex-reference-tag').all():
-                    if not tag.is_visible():continue
-                    gap=tag.evaluate('(e)=>e.nextElementSibling.getBoundingClientRect().left-e.getBoundingClientRect().right')
-                    assert 0<=gap<=8,gap
+                # A reference stack reads as two columns: every tag starts on one
+                # edge and every value on another, so a stack mixing "V" with
+                # "R1" no longer steps its numbers sideways. The stack also
+                # stays inside the property row rather than making it taller.
+                for stack in page.locator('.lex-reference-values').all():
+                    if not stack.is_visible():continue
+                    data=stack.evaluate('''e=>{
+                      const rows=[...e.querySelectorAll('.lex-reference-value')].map(v=>({
+                        tag:v.querySelector('.lex-reference-tag').getBoundingClientRect(),
+                        text:v.querySelector('.lex-reference-text').getBoundingClientRect()}));
+                      const field=e.closest('.lex-detail-field')||e.closest('.lex-column-list-cell');
+                      return {tags:rows.map(r=>Math.round(r.tag.left)),
+                              texts:rows.map(r=>Math.round(r.text.left)),
+                              indent:Math.max(...rows.map(r=>r.text.left-r.tag.left)),
+                              height:e.getBoundingClientRect().height,
+                              row:field?field.getBoundingClientRect().height:Infinity};}''')
+                    assert len(set(data['tags']))<=1,data
+                    assert len(set(data['texts']))<=1,data
+                    # The tag column is as wide as the widest tag on the panel,
+                    # so a lone "V" holds the same column an "R1" would.
+                    assert 0<=data['indent']<=30,data
+                    assert data['height']<=data['row']+1,data
                 page.screenshot(path=str(OUT/f'blank-{width}.png'))
             page.set_viewport_size({'width':1600,'height':1000})
             page.locator('nav button[data-tab=two]').click()
@@ -103,12 +121,35 @@ def main():
             # Park the pointer first: an earlier step can leave it over this
             # switch, which makes the at-rest state look like the hover state.
             page.mouse.move(0,0);page.wait_for_timeout(150)
+            # One rail contract for flags and for every other property:
+            # pointing at the SWITCH shows its type code, and only pointing at
+            # the RAIL swaps that code for its help mark.
             assert not a.locator('.lex-info-help').is_visible()
             assert a.locator('.lex-toggle-type').is_visible()
             a.hover()
+            assert a.locator('.lex-toggle-type').is_visible() and not a.locator('.lex-info-help').is_visible()
+            a.locator('.lex-toggle-rail').hover()
             assert a.locator('.lex-info-help').is_visible() and not a.locator('.lex-toggle-type').is_visible()
             page.mouse.move(0,0);page.wait_for_timeout(150)
             assert not b.locator('.lex-info-help').is_visible() and b.locator('.lex-toggle-type').is_visible()
+            # Every property's rail sits just left of the name it annotates,
+            # whether or not that property also carries a help mark.
+            for field in page.locator('.lex-detail-field').all():
+                if not field.is_visible():continue
+                offset=field.evaluate('''e=>{
+                  // A sorted property flies its sort arrow in the gutter
+                  // instead, which is its own contract.
+                  if(e.hasAttribute('data-lex-sort'))return null;
+                  const rail=e.querySelector(':scope > .lex-field-type-rail');
+                  const label=e.querySelector(':scope > .lex-detail-field-label');
+                  if(!rail||!label||getComputedStyle(rail).display==='none')return null;
+                  const holder=label.querySelector(':scope > .lex-detail-field-label-text')||label;
+                  const node=[...holder.childNodes].find(n=>n.nodeType===3&&n.textContent.trim());
+                  if(!node)return null;
+                  const range=document.createRange();range.selectNodeContents(node);
+                  return range.getBoundingClientRect().left-rail.getBoundingClientRect().right;}''')
+                if offset is not None:
+                    assert 0<=offset<=10,(field.inner_text()[:20],offset)
             a.locator('input').check()
             assert a.locator('input').is_checked()
             page.screenshot(path=str(OUT/'boolean-hover.png'))
