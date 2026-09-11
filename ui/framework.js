@@ -671,9 +671,23 @@
   // One shared Detail heading owns the optional icon or live-preview slot,
   // record identity, metadata, and actions. Games supply themed content.
   const detailPanel = (options = {}) => {
+    // A record's name is the heading, so the heading is where it is edited. It
+    // was an ordinary property row lower down the panel instead, which meant
+    // the name appeared twice and the copy at the top - the one being read -
+    // was the copy that could not be changed. A panel that hands over
+    // `renameRecord` gets a heading that can be typed into in place.
     const title = options.title instanceof Node
       ? options.title
-      : element("h2", {class: "lex-detail-panel-title"}, String(options.title ?? ""));
+      : typeof options.renameRecord === "function"
+        ? element("h2", {class: "lex-detail-panel-title lex-detail-panel-rename"},
+          element("input", {
+            type: "text",
+            value: String(options.title ?? ""),
+            "aria-label": options.renameLabel || "Record name",
+            title: options.renameLabel || "Record name",
+            oninput: event => options.renameRecord(event.target.value, event),
+          }))
+        : element("h2", {class: "lex-detail-panel-title"}, String(options.title ?? ""));
     const identity = element("div", {class: "lex-detail-panel-identity"},
       title,
       options.identity ? element("div", {class: "lex-detail-panel-id"}, options.identity) : null,

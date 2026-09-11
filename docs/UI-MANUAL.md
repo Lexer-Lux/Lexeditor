@@ -77,6 +77,12 @@ can deliberately overlap it with the group border, as FF8 does, without
 changing the shared structure. Fields can contain text, numbers, booleans,
 flags, references, Thing Selectors, or compact custom controls.
 
+A record's **name is its heading**, and the heading is where it is edited. A
+detail panel that can rename its record types into the heading in place, and
+the record's name column in the master table is editable too. A name is never
+also an ordinary property row: that showed the name twice and made the copy
+being read the copy that could not be changed.
+
 Each pinnable field has a pin at the top-right of its control. A filled pin
 means that the field is visible as a Table column. Clicking it removes the
 column. Hovering an unpinned field shows the available pin. Column changes
