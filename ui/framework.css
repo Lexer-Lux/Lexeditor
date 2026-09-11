@@ -5802,3 +5802,73 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-toggle,
 .lex-toggle-rail,
 .lex-toggle > .lex-toggle-name { overflow:visible; }
+
+
+/* LEXEDITOR_TODO_UI_LAYOUT_20260911 */
+
+/* The pagination bar is one height whatever it is carrying. A page with a
+   search box had a taller bar than a page without one, so the same bar sat at
+   two different heights depending on which view you were in. */
+.lex-pager {
+  box-sizing:border-box;
+  min-height:var(--lex-pager-bar-height, 52px);
+  height:var(--lex-pager-bar-height, 52px);
+}
+.lex-pager > * { min-height:0; }
+.lex-pager-search { height:32px; }
+
+/* Text you can follow says so at rest, the way a link does, rather than only
+   admitting it once the pointer is already on it. */
+.lex-hoverable {
+  color:var(--lex-link, color-mix(in srgb, var(--lex-accent) 72%, var(--lex-text)));
+  text-decoration-color:color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset:.16em;
+}
+.lex-hoverable:hover,
+.lex-hoverable:focus-visible { text-decoration-color:currentColor; }
+
+/* A pin is a small marker, not a metronome. Half the swing, twice as slow, and
+   it settles instead of running forever. */
+.lex-column-pin:hover > svg { animation-duration:1.1s; }
+@keyframes lex-pin-wiggle-stuck {
+  0%,100% { rotate:0deg } 25% { rotate:-4deg } 75% { rotate:4deg }
+}
+@keyframes lex-pin-wiggle {
+  0%,100% { rotate:0deg } 25% { rotate:-5deg } 75% { rotate:5deg }
+}
+
+/* A column arriving or leaving slides in rather than appearing mid-table. */
+@keyframes lex-column-arrive {
+  from { opacity:0; transform:translateX(-6px); }
+  to { opacity:1; transform:none; }
+}
+.lex-column-list-cell.lex-column-arriving,
+.lex-column-list-head-cell.lex-column-arriving {
+  animation:lex-column-arrive .18s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lex-column-list-cell.lex-column-arriving,
+  .lex-column-list-head-cell.lex-column-arriving { animation:none; }
+  .lex-column-pin:hover > svg { animation:none; }
+}
+
+/* A panel heading keeps its left inset whether or not a preview icon sits in
+   front of it. Without the icon the name was flush against the panel edge. */
+.lex-detail-panel-heading.no-icon .lex-detail-panel-identity { padding-left:10px; }
+
+/* A cell centres the LINE BOX, and a font with a tall ascent or a deep descent
+   sits off-centre inside its own line box - which is why the Name, Type and
+   Source columns drift vertically under a game font and not under the shared
+   one. Hugging the glyphs with line-height:1 and centring the box that results
+   takes the font's own metrics out of the sum. */
+.lex-column-list-cell > .lex-column-cell-content,
+.lex-column-list-head-cell > .lex-column-cell-content {
+  display:flex;
+  align-items:center;
+  line-height:1;
+}
+.lex-column-cell-text {
+  display:block;
+  line-height:1;
+  padding-block:.14em;
+}

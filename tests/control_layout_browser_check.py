@@ -222,6 +222,28 @@ def main():
               const row = f.querySelector('.lex-toggle-row');
               return typeof row.lexCopyValue === 'function' ? row.lexCopyValue() : null;}''')
             assert copied==5,copied
+            # A property's name is written for a person, and a record's name is
+            # never also a property: both are rules the shared demo has to keep,
+            # because it is what every plugin is copied from.
+            STORAGE_LABEL=__import__('re').compile(
+                r'^(STATE|VALUE|DATA|FLAG|PARAM|FIELD|UNK|UNKNOWN|BYTE|WORD|RAW)\d*$')
+            labels=page.evaluate('''()=>[...document.querySelectorAll('.lex-detail-field-label-text')]
+              .map(n=>n.textContent.trim()).filter(Boolean)''')
+            raw=[name for name in labels if STORAGE_LABEL.match(name.upper())]
+            assert not raw,raw
+            assert 'NAME' not in [name.upper() for name in labels],labels
+            # A column lights from its header, not from a cell.
+            cell=page.locator('.lex-column-list-cell[data-column-key=name]').first
+            head=page.locator('.lex-column-list-head-cell[data-column-key=name]').first
+            if cell.count() and head.count() and cell.is_visible():
+                page.mouse.move(0,0);page.wait_for_timeout(150)
+                cell.hover();page.wait_for_timeout(150)
+                assert page.evaluate(
+                    "document.querySelectorAll('.lex-column-list-cell.lex-column-lit').length")<=1
+                head.hover();page.wait_for_timeout(150)
+                assert page.evaluate(
+                    "document.querySelectorAll('.lex-column-list-cell.lex-column-lit').length")>1
+                page.mouse.move(0,0);page.wait_for_timeout(150)
             # The flag boxes fill the row rather than leaving it half empty,
             # and nothing on them is clipped by a box with nothing beside it.
             spread=page.evaluate('''()=>{

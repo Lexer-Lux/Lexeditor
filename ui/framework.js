@@ -4633,7 +4633,12 @@ ${contents.path}`});
           "aria-pressed": String(pinned),
           onpointerenter: () => setColumnLit(value, true),
           onpointerleave: () => setColumnLit(value, false),
-          onclick: event => { event.preventDefault(); event.stopPropagation(); api.toggle(value); },
+          onclick: event => {
+            event.preventDefault();
+            event.stopPropagation();
+            api.toggle(value);
+            markArrivingColumn(document, value);
+          },
         }, icon);
       },
     };
@@ -4644,6 +4649,21 @@ ${contents.path}`});
   // whole column and the matching property in the detail pane, so the reader
   // can see what a table column and a detail row have to do with each other.
   const litColumns = new Set();
+  // A column that has just been pinned or unpinned announces itself once, so
+  // the table does not simply have a different shape the next time you look
+  // at it.
+  const markArrivingColumn = (root, key) => {
+    if (!root || !key) return;
+    requestAnimationFrame(() => {
+      root.querySelectorAll?.(`[data-column-key="${CSS.escape(String(key))}"]`)
+        .forEach(node => {
+          node.classList.add("lex-column-arriving");
+          node.addEventListener("animationend",
+            () => node.classList.remove("lex-column-arriving"), {once: true});
+        });
+    });
+  };
+
   const setColumnLit = (key, lit) => {
     if (!key) return;
     if (lit) litColumns.add(key); else litColumns.delete(key);
@@ -4687,8 +4707,13 @@ ${contents.path}`});
     }
   };
 
+  // Only a column's own header lights it. Binding this to a cell lit the whole
+  // column whenever the pointer crossed any row of it, so simply reading down
+  // a table flashed columns on and off.
   const bindColumnHighlight = (node, key) => {
     if (!node || !key) return node;
+    if (!node.classList?.contains("lex-column-list-head-cell") &&
+        !node.classList?.contains("lex-column-heading")) return node;
     node.addEventListener("pointerenter", () => setColumnLit(key, true));
     node.addEventListener("pointerleave", () => setColumnLit(key, false));
     return node;
@@ -6638,6 +6663,13 @@ ${contents.path}`});
     const node = event.target.closest?.('.lex-detail-field,[data-column-key]');
     if (!node) return;
     node.classList.add('lex-self-hover');
+    // A column lights from its HEADER, not from anywhere inside it. Lighting
+    // it from any cell meant reading down a table lit and unlit whole columns
+    // under the pointer, which is motion the reader did not ask for.
+    const fromHeader = node.classList.contains('lex-column-list-head-cell') ||
+      node.classList.contains('lex-detail-field') ||
+      Boolean(event.target.closest?.('.lex-column-pin,.lex-column-list-head-cell'));
+    if (!fromHeader) return;
     const key = hoverKey(node);
     if (!key) return;
     const escaped = CSS.escape(String(key));

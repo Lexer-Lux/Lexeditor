@@ -273,6 +273,23 @@ controls and what it requires without permanent connector clutter.
 - A tab bar wraps only after tightening its tabs, and a bar that does wrap
   splits them as evenly as the count allows: seven tabs over three rows is
   three, two and two, never three, three and one.
+- **A property's name is written for a person.** `State`, `Param1`, `Field03`
+  and `Unknown` are storage labels, not names. A property whose only available
+  name is the field it came from is a property nobody has finished yet; name it
+  for what it does to the game.
+- **A record's name is never also a property.** It is edited in the panel
+  heading and in the table's own name column. A `NAME` row under a heading that
+  already shows the name is the same value twice, and the copy being read is
+  the one that cannot be changed.
+- A column lights when its **header** is hovered. Hovering a cell lights that
+  cell and its matching property, not the whole column: lighting the column
+  from any row made simply reading down a table flash columns on and off.
+- The pagination bar is one height on every page, whether or not it carries a
+  search box.
+- Text that can be followed is coloured like a link at rest, not only once the
+  pointer is on it.
+- A table cell centres its text by the glyphs, not by the line box, so a game
+  font's own ascent and descent cannot push a column off-centre.
 - Value boxes are square. One box shape for names and numbers alike, and a
   plugin theme may restyle it but never round only one kind.
 - A panel ends where the pagination bar begins. The bar reserves its own
