@@ -1277,7 +1277,7 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 /* A normal provenance field ends its live input before the five-em reference
    rail. Put boolean checkboxes on that same vertical edge instead of at the
    far edge of the whole row. */
-.lex-boolean-field:has(.lex-source-control:not(.no-reference)) > .lex-detail-field-control {
+.lex-boolean-field:has(.lex-source-control:not(.lex-source-control-internal):not(.no-reference)) > .lex-detail-field-control {
   padding-right:calc(var(--lex-panel-reference-rail-width,5em) + 18px);
 }
 input[type="checkbox"] { accent-color:var(--lex-accent); }
@@ -5404,4 +5404,16 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   font-size: 11px !important;
   font-weight: 700 !important;
   line-height: 1 !important;
+}
+
+
+/* LEXEDITOR_INTERNAL_RAIL_NO_OUTER_RESERVE_20260910 */
+/* A panel whose references live INSIDE their value boxes has no outside rail,
+   so nothing on it should reserve room for one. The boolean rule above holds
+   five em plus eighteen pixels on the right of every checkbox, from a
+   panel-wide measurement that an internal rail never contributes to - so on
+   FF8's items panel it was reserving a rail that is never drawn, and every
+   property on the panel ended early with a band of empty space beside it. */
+.lex-detail-panel-body:not(:has(.lex-source-control:not(.lex-source-control-internal))) {
+  --lex-panel-reference-rail-width:0px;
 }
