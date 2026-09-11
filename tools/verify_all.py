@@ -158,6 +158,11 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=180, help="seconds per attempt")
     parser.add_argument("--retries", type=int, choices=(0, 1), default=1)
     parser.add_argument("--output", type=Path, default=ROOT / "_scratch" / "verify-results")
+    # One machine running 292 checks in series is the reason a full sweep
+    # takes the best part of an hour. Shards let a CI matrix run them all at
+    # once, each runner taking an interleaved slice so the slow browser
+    # checks spread evenly rather than landing on one unlucky shard.
+    parser.add_argument("--shard", help="i/n; run only this slice of the selection")
     arguments = parser.parse_args()
     if not 0 < arguments.timeout < float("inf"):
         parser.error("--timeout must be a finite positive number")
@@ -178,6 +183,17 @@ def main() -> int:
     if not tools:
         print("No verifier matched.")
         return 1
+    if arguments.shard:
+        try:
+            index, count = (int(part) for part in arguments.shard.split("/", 1))
+        except ValueError:
+            parser.error("--shard must look like 3/8")
+        if not 1 <= index <= count:
+            parser.error(f"--shard {arguments.shard} is out of range")
+        tools = tools[index - 1::count]
+        if not tools:
+            print(f"Shard {arguments.shard} has nothing to run.")
+            return 0
     if arguments.list:
         for tool in tools:
             print(tool.name)
