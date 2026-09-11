@@ -29,7 +29,7 @@
     .warband-item-detail{--lex-detail-icon-size:96px;display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;border:1px solid var(--lex-border);background:#f7edcf}.warband-item-detail>.lex-detail-panel-heading{padding:4px 10px 5px;border-bottom:1px solid #c8ae78}.warband-item-detail .lex-detail-panel-title{color:#651919;font:700 24px/1.1 var(--lex-heading-font)}.warband-item-detail .lex-detail-panel-id{margin-top:4px;color:var(--lex-muted);font:11px Consolas,monospace}.warband-item-detail .lex-detail-panel-icon{width:auto;height:100%;max-height:100%;aspect-ratio:1;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-item-thumbnail{position:relative;width:100%;height:100%;overflow:hidden}.warband-item-thumbnail canvas{display:block;width:100%;height:100%;pointer-events:none}.warband-item-thumbnail .warband-preview-message{padding:8px}.warband-mesh-list{padding:9px 2px;color:var(--lex-muted)}.warband-mesh-list b{color:#651919}.warband-item-detail .lex-detail-panel-body{overflow:auto}.warband-item-expression{min-height:72px!important;resize:vertical!important;font:12px/1.35 "Cascadia Mono",Consolas,monospace!important}.warband-preview-stage{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-preview-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.warband-preview-stage canvas.dragging{cursor:grabbing}.warband-preview-message{position:absolute;inset:0;display:grid;place-items:center;padding:28px;color:#ead8ac;text-align:center}.warband-preview-facts{display:flex;gap:16px;padding:8px 2px 0;color:var(--lex-muted);font:11px Consolas,monospace}.warband-preview-spin{width:22px;height:22px;border:3px solid #d5b46955;border-top-color:#d5b469;border-radius:50%;animation:warband-spin .7s linear infinite}@keyframes warband-spin{to{transform:rotate(360deg)}}
     .warband-cell-text{min-width:0;max-width:100%;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     [hidden]{display:none!important}.warband-item-thumbnail img{width:100%;height:100%;object-fit:contain;display:block}.warband-icon-message{padding:8px;color:var(--lex-text);background:var(--lex-panel);font-size:11px}
-    .warband-trees{align-items:stretch;grid-template-rows:minmax(0,1fr)}.warband-tree-page{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;height:100%}.warband-trees>.lex-panel-layout-pane{align-self:stretch;height:100%;min-height:0}
+    .warband-trees{align-items:stretch;grid-template-rows:minmax(0,1fr)}.warband-tree-page{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;height:100%}.warband-troop-gear{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:8px}.warband-troop-gear figure{margin:0;display:grid;gap:5px}.warband-troop-gear .warband-preview-stage{min-height:150px}.warband-troop-gear figcaption{color:var(--lex-muted);font-size:12px;text-align:center}.warband-trees>.lex-panel-layout-pane{align-self:stretch;height:100%;min-height:0}
     .warband-tree-scroll{overflow:auto;min-width:0;min-height:0;background:var(--lex-panel)}
     .warband-tree-scroll>p{padding:0 12px}.warband-tree-stage{position:relative;margin:auto;min-width:100%}
     .warband-tree-stage svg{position:absolute;inset:0;pointer-events:none}.warband-tree-stage path{fill:none;stroke:var(--lex-accent);stroke-width:2}
@@ -248,7 +248,33 @@
   }
   function troopTreeDetail(node){
     if(!node)return detailPanel({title:"Select a troop"});
-    return detailPanel({className:"detail",title:el("h2",{class:"lex-detail-panel-title"},bitmapText(node.name||node.id,24)),identity:node.id,
+    // A troop has no mesh of its own: it is a body, a face built from morph
+    // keys and a list of equipment. The equipment is the part that resolves to
+    // meshes, so the viewer opens the troop's gear - which is what there is to
+    // look at - rather than staying shut because a troop is not one model.
+    // The tree node carries only the upgrade graph, so the troop's own record
+    // is what holds its equipment.
+    const record=state.troops?.rows?.find(row=>row.id===node.id)||node;
+    // module_troops.py names an item "itm_leather_cap"; the item table's own id
+    // is "leather_cap". Matching the two without stripping the prefix found
+    // nothing, so the viewer stayed shut on every troop in the game.
+    const gear=(record.items||[])
+      .map(id=>{const bare=String(id).replace(/^itm_/,"");
+        return state.items?.rows?.find(row=>row.id===bare||row.id===id);})
+      .filter(item=>item&&item.inventoryMesh)
+      .slice(0,12);
+    // The shared viewer control lives in the heading's icon slot, so a panel
+    // without an icon has nowhere to put it. A troop's icon is the first piece
+    // of equipment it carries, which is also the first thing the drawer shows.
+    const icon=gear.length?el("div",{class:"warband-item-thumbnail"},warbandPreviewStage(gear[0])):null;
+    return detailPanel({className:"detail warband-troop-detail",icon,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(node.name||node.id,24)),identity:node.id,
+      modelPreview:gear.length?{
+        label:`${node.name||node.id} equipment`,
+        openLabel:`Open ${node.name||node.id}'s equipment`,
+        closeLabel:`Close ${node.name||node.id}'s equipment`,
+        content:el("div",{class:"warband-troop-gear"},...gear.map(item=>
+          el("figure",{},warbandPreviewStage(item),el("figcaption",{},item.name||item.id)))),
+      }:null,
       body:node.missing?[el("p",{class:"error"},"This upgrade refers to a troop missing from the parsed active source.")]:[
         el("div",{class:"detail-grid"},...["plural","level","faction","flags","status","line"].flatMap(key=>[
           el("div",{class:"label"},key),el("div",{},String(node[key]??"—"))])),

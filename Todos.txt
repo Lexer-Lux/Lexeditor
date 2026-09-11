@@ -79,8 +79,14 @@
 
 ### Tweaks UI
 
-* [ ] Use the general **RDR2 Tweaks layout** as the structural model, but neutralize all game-specific styling.
-* [ ] Support optional subtabs inside Tweaks using the global single-subtab rule above.
+* [x] Use the general **RDR2 Tweaks layout** as the structural model, but neutralize all game-specific styling.
+  * `settingsColumns()` deals its cards into real columns the way RDR2's own
+    arranger does, re-dealing only when the column count changes. CSS columns
+    cut a card in half across a break; these cannot. None of RDR2's styling
+    came with it - the spacing is the shared panel gap.
+* [x] Support optional subtabs inside Tweaks using the global single-subtab rule above.
+  * `settingsColumns({tabs, activeTab, changeTab})`. Fewer than two tabs draws
+    no bar, same rule as everywhere else.
 
 ### Developer Settings / Manual
 
@@ -321,9 +327,10 @@
 
 ## Details Panel
 
-* [ ] Restore the standardized Details-panel 3D Viewer header control.
-
-  * The 3D Viewer is effectively inaccessible at present.
+* [x] Restore the standardized Details-panel 3D Viewer header control.
+  * Warband's item panel had the renderer and the heading icon but never the
+    control between them. The icon opens the model now and the same slot
+    carries the close mark.
 * [x] Details-panel header is much too tall.
   * Warband's own rule was adding 10/12px on top of the shared padding; 4/5 now.
 * [x] Fix alignment of property-type text.
@@ -343,7 +350,15 @@
 * [x] Remove unnecessary instructional text:
   * Both lines gone. The cyclic-links warning stays, because that one says
     something the reader cannot see.
-* [ ] Troops should at minimum be openable in the 3D Viewer.
+* [x] Troops should at minimum be openable in the 3D Viewer.
+  * A troop has no mesh of its own, so the viewer opens its EQUIPMENT, which
+    is the 3D data a troop actually has. Three things had to change: the
+    troop parser now reads the itm_ references out of module_troops.py (1,140
+    of 1,178 troops carry some), the panel got a heading icon because the
+    shared control lives in that slot, and the ids had to be matched across
+    the itm_ prefix - troops say `itm_leather_cap`, the item table says
+    `leather_cap`, which is why nothing matched at first. Bandit opens twelve
+    pieces of gear, named.
 
 ### Troop Icon Question
 

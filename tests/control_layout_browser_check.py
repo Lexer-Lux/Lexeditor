@@ -89,6 +89,13 @@ def main():
                     if air is not None:
                         assert abs(air[0]-air[1])<=1,air
                         assert air[2]<=1,air
+                # A variable's copy button lights only when the pointer is on
+                # the button. The item used to be a <label>, which adopts its
+                # first labelable descendant as its control - the copy button -
+                # so hovering anywhere in the item lit it.
+                for item in page.locator('.lex-multi-number-item').all():
+                    if not item.is_visible():continue
+                    assert item.evaluate("e=>e.tagName")!='LABEL',                        'a multi-number item is a label and will adopt its copy button'
                 # The fill behind a value is the height of that value's box,
                 # never the height of the property row around it.
                 for field in page.locator('.lex-has-value-fill').all():

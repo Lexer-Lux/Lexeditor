@@ -6046,3 +6046,29 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-curve-formula :is(.lex-curve-variable-a,.lex-curve-variable-b,
   .lex-curve-variable-c,.lex-curve-variable-d) { font-style:italic;font-weight:600; }
+
+
+/* LEXEDITOR_TWEAKS_LAYOUT_20260911 */
+/* The shared Tweaks layout, in RDR2's shape with none of RDR2's styling: real
+   columns dealt by the framework, so a card is never cut in half across a
+   column break the way CSS columns do it. */
+.lex-settings-lane {
+  display:grid;
+  grid-auto-flow:column;
+  grid-auto-columns:minmax(0,1fr);
+  align-items:start;
+  gap:var(--lex-panel-gap, 12px);
+  width:100%;
+  min-width:0;
+}
+.lex-settings-column {
+  display:flex;
+  flex-direction:column;
+  gap:var(--lex-panel-gap, 12px);
+  min-width:0;
+}
+.lex-settings-columns:has(> .lex-settings-lane) {
+  display:block;
+  column-count:auto;
+}
+.lex-settings-subtabs { margin-bottom:var(--lex-panel-gap, 12px); }

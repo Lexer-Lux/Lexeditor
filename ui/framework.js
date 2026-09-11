@@ -1380,10 +1380,20 @@
       class: ["lex-multi-number", options.className || ""].filter(Boolean).join(" "),
       style: `--lex-multi-number-columns:${columns}`,
     }, ...items.map(entry => {
-      const item = element("label", {
+      // The item is a plain box, not a label. As a <label> it adopted its first
+      // labelable descendant as its control - which, once each variable got a
+      // copy button, was the BUTTON. Hovering anywhere in the item lit the
+      // button as though the pointer were on it, and clicking the item's empty
+      // space would have pressed Copy instead of focusing the value.
+      const caption = element("label", {class: "lex-multi-number-label"}, entry.label);
+      const item = element("div", {
         class: "lex-multi-number-item", title: entry.title || undefined,
-      }, element("span", {class: "lex-multi-number-label"}, entry.label),
-        element("span", {class: "lex-multi-number-control"}, entry.control));
+      }, caption, element("span", {class: "lex-multi-number-control"}, entry.control));
+      const field = item.querySelector("input,select,textarea");
+      if (field) {
+        if (!field.id) field.id = `lex-multi-${Math.random().toString(36).slice(2, 9)}`;
+        caption.setAttribute("for", field.id);
+      }
       // Each variable carries its own copy button. One button on the property
       // could only ever hand back one of these numbers, and it handed back
       // whichever happened to be built first.
@@ -2319,12 +2329,53 @@
   // established: no subtabs to click through, no dropdown to pick a group from,
   // nothing loaded on demand. Sections keep their own order and never split
   // across a column boundary.
+  // The shared Tweaks layout, taken from the shape RDR2 uses: one scrolling
+  // page of cards dealt into as many real columns as the width allows, rather
+  // than CSS columns that cut a card in half across a column break. The card
+  // count per column is re-dealt only when the column COUNT changes, so a drag
+  // that does not cross a breakpoint costs nothing.
+  //
+  // A page may also divide itself with subtabs. A bar with fewer than two tabs
+  // is not drawn, which is the same rule every other subtab bar follows.
   const settingsColumns = (sections, options = {}) => {
+    const lane = element("div", {class: "lex-settings-lane"});
     const root = element("div", {
       class: ["lex-settings-columns", options.className || ""].filter(Boolean).join(" "),
-    }, ...(sections || []).filter(Boolean));
+    }, (options.tabs || []).length > 1 ? subtabBar({
+      tabs: options.tabs,
+      active: options.activeTab,
+      label: options.tabsLabel || "Tweak groups",
+      className: "lex-settings-subtabs",
+      change: options.changeTab,
+    }) : null, lane);
     if (options.columnWidth)
       root.style.setProperty("--lex-settings-column-width", options.columnWidth);
+    const cards = (sections || []).filter(Boolean);
+    let dealt = 0;
+    let frame = 0;
+    const deal = () => {
+      frame = 0;
+      if (!lane.isConnected) return;
+      const width = lane.clientWidth || root.clientWidth;
+      const target = parseFloat(getComputedStyle(root)
+        .getPropertyValue("--lex-settings-column-width")) || 320;
+      const count = Math.max(1, Math.min(cards.length, Math.floor(width / target) || 1));
+      if (count === dealt) return;
+      const columns = Array.from({length: count}, () =>
+        element("div", {class: "lex-settings-column"}));
+      cards.forEach((card, index) => columns[index % count].append(card));
+      lane.replaceChildren(...columns);
+      dealt = count;
+    };
+    if (typeof ResizeObserver === "function") {
+      const observer = new ResizeObserver(() => {
+        if (!frame) frame = requestAnimationFrame(deal);
+      });
+      observer.observe(root);
+      root.lexSettingsObserver = observer;
+    }
+    requestAnimationFrame(deal);
+    deal();
     return root;
   };
 
