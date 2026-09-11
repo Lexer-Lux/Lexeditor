@@ -5872,3 +5872,85 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   line-height:1;
   padding-block:.14em;
 }
+
+
+/* LEXEDITOR_FOLDER_TABS_20260911 */
+/* A tab is a folder tab: the page hangs off the one that is selected. The
+   selected tab lifted three pixels and left a grey strip under it, because the
+   lift was the only thing joining it to the page and nothing filled the gap it
+   opened. It still lifts, but it carries the page's own surface down to meet
+   it, so the two read as one piece of card. */
+.lex-shell-header nav button {
+  transition:transform .14s ease, background-color .14s ease, color .14s ease,
+    border-radius .14s ease;
+}
+.lex-shell-header nav button.active,
+.lex-shell-header nav button:hover {
+  transform:translateY(-3px);
+}
+.lex-shell-header nav button.active::after {
+  position:absolute;
+  right:0;
+  bottom:-3px;
+  left:0;
+  height:4px;
+  content:"";
+  background:var(--lex-accent);
+}
+.lex-shell-header nav button.lex-settings-tab.active::after {
+  background:color-mix(in srgb, var(--lex-accent) 72%, var(--lex-panel-2));
+}
+/* Tweaks is an ordinary page with an ordinary tab. It keeps a hint of its own
+   so it is findable, and nothing else. */
+.lex-shell-header nav button.lex-tweaks-tab { flex:1 1 0;margin-left:0; }
+.lex-shell-header nav button.lex-tweaks-tab .lex-tab-label-text { letter-spacing:.09em; }
+
+/* A bar with one tab in it is not a bar. */
+.lex-subtab-bar-single { display:none !important; }
+
+
+/* LEXEDITOR_MENU_ICONS_20260911 */
+/* One shape for every icon on the right of the menu bar: a circle of the same
+   size with the same border and fill, whatever the icon inside it is. They had
+   been drifting - some circular, some not, the GitHub mark square against its
+   neighbours - so the row read as a collection rather than a set. The size
+   follows the command row's height so the circles stay circles rather than
+   flattening into ovals on a short bar. */
+.lex-shell-command-row :is(.lex-settings-button, .lex-help-button,
+  .lex-developer-button, .lex-shortcuts-button, .lex-info-button, .lex-github-tab) {
+  --lex-menu-icon:min(34px, calc(var(--lex-command-row-height) - 6px));
+  box-sizing:border-box;
+  display:inline-grid;
+  width:var(--lex-menu-icon);
+  min-width:var(--lex-menu-icon);
+  height:var(--lex-menu-icon);
+  padding:0;
+  place-items:center;
+  color:var(--lex-highlight);
+  border:1px solid var(--lex-border);
+  border-radius:50%;
+  background:var(--lex-panel-2);
+  cursor:pointer;
+}
+.lex-shell-command-row :is(.lex-settings-button, .lex-help-button,
+  .lex-developer-button, .lex-shortcuts-button, .lex-info-button, .lex-github-tab) > svg {
+  display:block;
+  width:19px;
+  height:19px;
+}
+.lex-shell-command-row :is(.lex-settings-button, .lex-help-button,
+  .lex-developer-button, .lex-shortcuts-button, .lex-info-button,
+  .lex-github-tab):is(:hover, .active) {
+  color:var(--lex-accent-text);
+  border-color:var(--lex-accent);
+  background:var(--lex-accent);
+}
+
+/* Restart acts on the window, so it is one of the window controls: same square
+   shape, same size, and no gap between it and Minimize. */
+.lex-window-restart {
+  display:inline-grid;
+  place-items:center;
+  border-radius:2px;
+}
+.lex-window-restart > svg { width:17px;height:17px;fill:currentColor; }

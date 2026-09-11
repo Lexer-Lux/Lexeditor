@@ -32,22 +32,19 @@
 
 ### Tabs
 
-* [ ] Tabs should behave visually like actual **folder tabs**.
-
-  * Current selected-tab movement exposes an ugly gray area beneath it.
-  * A selected tab can move upward slightly, but the underlying panel/page should visually remain attached to it.
-* [ ] Tween/animate tab movement instead of snapping abruptly.
-* [ ] Tweaks should remain part of the normal tab system rather than being visually segregated as a completely separate thing.
-
-  * It can have a slightly distinct appearance.
-* [ ] **Never create sub-subtabs.**
-
-  * If another layer is required, use tabbed panels inside the page instead.
-  * Ideally enforce this structurally so plugin implementations cannot create sub-subtabs.
-* [ ] Optional subtabs:
-
-  * A page may support subtabs.
-  * If only one subtab exists, do not display a subtab bar at all.
+* [x] Tabs should behave visually like actual **folder tabs**.
+  * The selected tab still lifts, and now carries a band of the page's own
+    surface down to meet it, so the grey strip the lift used to open is gone.
+* [x] Tween/animate tab movement instead of snapping abruptly.
+* [x] Tweaks should remain part of the normal tab system rather than being visually segregated as a completely separate thing.
+  * It was grouped with Settings, which pushed it out of the run and gave it
+    the paler fill. Only Settings sits apart now; Tweaks keeps a little extra
+    letter-spacing so it is still findable.
+* [x] **Never create sub-subtabs.**
+  * `tabbedPanel` throws if a subtab bar ends up inside another one, so a
+    plugin cannot ship the nesting rather than merely being asked not to.
+* [x] Optional subtabs:
+  * A bar with fewer than two tabs renders hidden.
 
 ### Detail Panels / Property Presentation
 
@@ -65,12 +62,14 @@
 
 ### Menu Bar / Window Chrome
 
-* [ ] Standardize the design of the icons on the right side of the menu bar.
-* [ ] Use the circular design for these menu icons.
-* [ ] GitHub button should use the standardized circular shape.
-* [ ] Restart should instead visually belong to the window-control group:
-  * Style it similarly to Minimize / Maximize / Close.
-  * No gap between Restart and those controls.
+* [x] Standardize the design of the icons on the right side of the menu bar.
+* [x] Use the circular design for these menu icons.
+  * One size, border and fill for all of them, and the size follows the command
+    row's height so they stay circles rather than flattening to ovals.
+* [x] GitHub button should use the standardized circular shape.
+* [x] Restart should instead visually belong to the window-control group:
+  * It is a window button now, first in that group, 29px like its neighbours
+    and on the same 30px spacing, so there is no gap.
 
 ### Tweaks UI
 

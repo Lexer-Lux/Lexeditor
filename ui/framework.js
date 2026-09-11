@@ -762,6 +762,24 @@
   // A panel can own local navigation without turning those choices into
   // application-level tabs. Plugins provide the active key and content; this
   // shared component owns the tab semantics and stable panel geometry.
+  // Structural rule: a tabbed panel never nests inside another one. Two layers
+  // of tabs above the page is already the limit; a third asks the reader to
+  // hold three positions at once to know where they are. A plugin that needs
+  // another division uses a tabbed panel INSIDE the page, which is what this
+  // control is, and it may not contain a further one.
+  const NESTED_TAB_ERROR =
+    "Lexeditor has no sub-subtabs. Put the extra division in a tabbed panel " +
+    "inside the page instead of nesting one subtab bar inside another.";
+  const guardNestedTabs = root => {
+    if (!(root instanceof Element)) return root;
+    requestAnimationFrame(() => {
+      if (!root.isConnected) return;
+      const nested = root.querySelector(".lex-subtab-bar .lex-subtab-bar:not([hidden])");
+      if (nested) throw new Error(NESTED_TAB_ERROR);
+    });
+    return root;
+  };
+
   const tabbedPanel = (options = {}) => {
     const tabs = options.tabs || [];
     const active = tabs.some(tab => tab.id === options.active)
@@ -771,7 +789,7 @@
     const content = typeof options.content === "function"
       ? options.content(active, selected)
       : options.content;
-    return element("section", {
+    return guardNestedTabs(element("section", {
       ...(options.attrs || {}),
       class: ["lex-tabbed-panel", options.className || ""].filter(Boolean).join(" "),
     }, subtabBar({
@@ -784,7 +802,7 @@
       class: ["lex-tabbed-panel-content", options.contentClassName || ""].filter(Boolean).join(" "),
       role: "tabpanel",
       "aria-label": selected?.label || "Panel content",
-    }, content || []));
+    }, content || [])));
   };
 
   // Keep the visible value legible when a bounded control contains a long
@@ -1379,7 +1397,11 @@
 
   // Nested navigation is a shared control. Plugins provide only labels,
   // active state, and the page-owned change callback.
-  const subtabBar = (options = {}) => element("div", {
+  // A page with one subtab has no choice to offer, so it shows no bar. A bar
+  // with a single tab in it reads as a control that does nothing.
+  const subtabBar = (options = {}) => (options.tabs || []).length < 2
+    ? element("div", {class: "lex-subtab-bar lex-subtab-bar-single", hidden: true})
+    : element("div", {
     class: ["lex-subtab-bar", options.className || ""].filter(Boolean).join(" "),
     role: "tablist",
     "aria-label": options.label || "Subsections",
@@ -4016,7 +4038,10 @@ ${contents.path}`});
     };
     if (window.pywebview?.api) installPackagedDefaults().catch(() => {});
     else window.addEventListener("pywebviewready", () => installPackagedDefaults().catch(() => {}), {once:true});
-    const isSpecialTab = tab => tab.special === true || ["settings", "tweaks"].includes(tab.id);
+    // Tweaks is an ordinary page. It was grouped with Settings, which pushed it
+    // out of the run of tabs and gave it a paler fill, so a page the reader
+    // uses constantly read as chrome. Settings is the only tab that sits apart.
+    const isSpecialTab = tab => tab.special === true || tab.id === "settings";
     const orderedTabs = [...options.tabs].sort((left, right) => {
       const leftSettings = isSpecialTab(left);
       const rightSettings = isSpecialTab(right);
@@ -4039,7 +4064,9 @@ ${contents.path}`});
       };
       const button = element("button", {
         "data-tab": tab.id,
-        class: [tab.id === options.activeTab() ? "active" : "", isSpecialTab(tab) ? "lex-settings-tab" : ""].filter(Boolean).join(" "),
+        class: [tab.id === options.activeTab() ? "active" : "",
+        isSpecialTab(tab) ? "lex-settings-tab" : "",
+        tab.id === "tweaks" ? "lex-tweaks-tab" : ""].filter(Boolean).join(" "),
         onclick: () => {
           playThemeSound("confirm");
           githubWorkspace?.hide();
@@ -4140,7 +4167,13 @@ ${contents.path}`});
     const leftActions = element("div", {class: "lex-shell-left-actions"}, context);
     const centerActions = element("div", {class: "lex-shell-center-actions"}, undo, save, game, redo);
     const rightActions = element("div", {class: "lex-shell-right-actions"}, settings, shortcuts, help, info);
-    const developerActions = element("div", {class: "lex-developer-actions"}, github, restart);
+    // Restart acts on the window, so it sits with the window controls and is
+    // shaped like them. Parked at the end of the developer group it read as a
+    // developer toggle with a gap between it and the controls it belongs to.
+    restart.classList.remove("lex-developer-button");
+    restart.classList.add("lex-window-button", "lex-window-restart");
+    const developerActions = element("div", {class: "lex-developer-actions"}, github);
+    windowControls.root?.prepend?.(restart);
     const commandRow = element("div", {class: "lex-shell-command-row"},
       brandSlot, leftActions, centerActions, rightActions, developerActions, windowControls.root);
     const header = element("header", {class: "lex-shell-header"}, commandRow, navFrame);
