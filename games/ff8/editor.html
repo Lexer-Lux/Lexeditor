@@ -390,7 +390,7 @@
     .ff8-character-curve,.ff8-character-curve:not(.ff8-enemy-curve){grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"heading" "plot" "formula" "status"!important;grid-template-rows:auto minmax(0,1fr) 2.8em auto;gap:2px!important;padding:4px}
     .ff8-character-curve .lex-curve-plot{min-height:0;aspect-ratio:auto;padding:9px 16px 16px 24px}
     .ff8-character-curve .lex-curve-axis-top{top:9px;left:0}.ff8-character-curve .lex-curve-axis-bottom{bottom:16px;left:0}.ff8-character-curve .lex-curve-axis-start{bottom:1px;left:24px}.ff8-character-curve .lex-curve-axis-end{right:16px;bottom:1px}
-    .ff8-character-curve .lex-curve-variable-overlay{top:9px;right:16px;bottom:16px;width:clamp(88px,31%,126px);align-content:space-between;justify-items:stretch;padding:5px}
+    .ff8-character-curve .lex-curve-variables{top:9px;right:16px;bottom:16px;left:auto;width:clamp(88px,31%,126px);align-content:space-between;justify-items:stretch;padding:5px;transform:translateX(4px)}
     .ff8-character-curve .lex-curve-variable{grid-template-columns:1em minmax(54px,1fr);width:100%}
     .ff8-character-curve .lex-curve-formula{display:block!important;height:2.8em;overflow:hidden;padding:2px 4px;background:transparent;font-size:clamp(8px,.72vw,12px);line-height:1.25}
     .ff8-character-curve .lex-curve-svg{border:0!important}
@@ -509,12 +509,16 @@
       text-align:center;
       transition:opacity .16s ease,transform .16s ease;
     }
-    .ff8-character-curve .lex-curve-variable-overlay{
+    /* The variable controls ride over the top of the graph and slide in when
+       the card is pointed at. They are a sibling of the plot, so the card is
+       what they are positioned against and what reveals them. */
+    .ff8-character-curve .lex-curve-variables{
       position:absolute;z-index:7;top:0;right:0;bottom:auto;left:0;
       display:grid;
       grid-template-columns:repeat(auto-fit,minmax(58px,1fr));
       align-items:center;
       width:auto;
+      max-width:none;
       padding:4px 6px;
       gap:5px;
       background:#242424e6;
@@ -523,8 +527,8 @@
       transform:translateY(-105%);
       transition:opacity .18s ease,transform .18s ease;
     }
-    .ff8-character-curve .lex-curve-plot:hover .lex-curve-variable-overlay,
-    .ff8-character-curve .lex-curve-plot:focus-within .lex-curve-variable-overlay{
+    .ff8-character-curve:hover .lex-curve-variables,
+    .ff8-character-curve:focus-within .lex-curve-variables{
       opacity:1;
       pointer-events:auto;
       transform:translateY(0);
