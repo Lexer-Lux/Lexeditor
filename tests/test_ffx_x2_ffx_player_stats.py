@@ -89,7 +89,7 @@ def test_ffx_player_stats_edit_changes_only_offsets_04_through_13_of_selected_re
     assert edited.endswith(b"opaque-player-tail")
 
 
-def test_ffx_player_stats_rejects_wrong_size_ranges_duplicates_and_extra_fields():
+def test_ffx_player_stats_rejects_wrong_size_ranges_duplicates_extra_fields_and_coercion():
     valid = _table([_record(hp=1, mp=2, stats=(1, 2, 3, 4, 5, 6, 7, 8))])
     wrong = bytearray(valid)
     struct.pack_into("<HH", wrong, 0x0C, 0x93, 0x93)
@@ -105,6 +105,21 @@ def test_ffx_player_stats_rejects_wrong_size_ranges_duplicates_and_extra_fields(
     bad_hp["baseHp"] = 0x100000000
     with pytest.raises(FFXPlayerStatsError, match="Base HP must be between"):
         apply_edits(valid, [bad_hp])
+
+    decimal_stat = _edit(0)
+    decimal_stat["strength"] = 12.5
+    with pytest.raises(FFXPlayerStatsError, match="Strength must be an integer"):
+        apply_edits(valid, [decimal_stat])
+
+    numeric_string = _edit(0)
+    numeric_string["baseHp"] = "9999"
+    with pytest.raises(FFXPlayerStatsError, match="Base HP must be an integer"):
+        apply_edits(valid, [numeric_string])
+
+    decimal_id = _edit(0)
+    decimal_id["id"] = 0.0
+    with pytest.raises(FFXPlayerStatsError, match="record ID must be an integer"):
+        apply_edits(valid, [decimal_id])
 
     with pytest.raises(FFXPlayerStatsError, match="Duplicate"):
         apply_edits(valid, [_edit(0), _edit(0, hp=1, mp=2)])
