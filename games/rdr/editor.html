@@ -39,10 +39,18 @@
   "use strict";
   const {el,list,pagedListDetail,pager,provenanceControl,clone,showAlert,infoHelp}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
-  const state={booting:true,tab:"items",activeSource:"mine",files:{rows:[],counts:{}},dashboard:null,status:"Ready",items:null,itemSelected:"",itemQuery:"",itemSource:"",itemPage:0,itemPageSize:20,itemEdits:{},shops:null,shopSelected:"",shopQuery:"",shopName:"",shopCategory:"",shopPage:0,shopPageSize:20,shopEdits:{},missions:null,missionSelected:"",missionQuery:"",missionArea:"",missionPage:0,missionPageSize:20,missionEdits:{},vanilla:{items:null,shops:null,missions:null},settings:null,settingEdits:{},loot:null,lootDocument:null,lootDirty:false,dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,dataMapSort:["filename",1]};
+  const state={booting:true,modOnly:false,tab:"items",activeSource:"mine",files:{rows:[],counts:{}},dashboard:null,status:"Ready",items:null,itemSelected:"",itemQuery:"",itemSource:"",itemPage:0,itemPageSize:20,itemEdits:{},shops:null,shopSelected:"",shopQuery:"",shopName:"",shopCategory:"",shopPage:0,shopPageSize:20,shopEdits:{},missions:null,missionSelected:"",missionQuery:"",missionArea:"",missionPage:0,missionPageSize:20,missionEdits:{},vanilla:{items:null,shops:null,missions:null},settings:null,settingEdits:{},loot:null,lootDocument:null,lootDirty:false,dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,dataMapSort:["filename",1]};
   const PAGE_SIZE=250;
 
   async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(value.error)throw new Error(value.error);return value;}
+  // "Mod contents only" keeps the rows this project has actually changed. RDR
+  // already records every edit against the record's id, so the filter is that
+  // record set and nothing else.
+  function modOnlySpec(edits,resetPage){
+    return {available:state.activeSource==="mine",value:state.modOnly===true,
+      changed:row=>Object.prototype.hasOwnProperty.call(edits,String(row.id)),
+      change:value=>{state.modOnly=value;resetPage();render()}};
+  }
   function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.itemEdits).length+Object.keys(state.shopEdits).length+Object.keys(state.missionEdits).length+Object.keys(state.settingEdits).length+(state.lootDirty?1:0):0;}
   function setStatus(text){state.status=text;}
   function historyCapture(){return {itemEdits:clone(state.itemEdits),shopEdits:clone(state.shopEdits),missionEdits:clone(state.missionEdits),settingEdits:clone(state.settingEdits),lootDocument:clone(state.lootDocument),lootDirty:state.lootDirty};}
@@ -89,7 +97,7 @@
     const rows=matchingItems();
     $("#toolbar").replaceChildren();
     const sourceFilter=el("select",{"aria-label":"Filter items by source",onchange:event=>{state.itemSource=event.target.value;state.itemPage=0;renderItems();}},el("option",{value:"",selected:!state.itemSource},"Base game and DLC"),...(state.items?.sources||[]).map(source=>el("option",{value:source.id,selected:source.id===state.itemSource},source.label)));
-    $("#main").replaceChildren(pagedListDetail({rows,key:item=>item.id,slots:false,page:state.itemPage,pageSize:state.itemPageSize,selected:state.itemSelected,noun:"items",splitKey:"rdr-items",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(state.itemEdits,()=>{state.itemPage=0}),rows,key:item=>item.id,slots:false,page:state.itemPage,pageSize:state.itemPageSize,selected:state.itemSelected,noun:"items",splitKey:"rdr-items",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
       search:{key:"rdr-items",value:state.itemQuery,placeholder:"Search RDR inventory items…",change:value=>{state.itemQuery=value;state.itemPage=0;renderItems();}},filters:[sourceFilter],
       master:({rows,selected,select})=>list({rows,key:item=>item.id,selected,selectedClass:"sel",select,class:"rdr-record-list",header:el("div",{class:"rdr-listhead"},el("span",{},"Name"),el("span",{},"ID"),el("span",{},"Type"),el("span",{},"Source")),rowClass:"rdr-record-entry",render:itemRow,"aria-label":"RDR inventory items"}),
       detail:()=>itemDetail(),sync:next=>{state.itemPage=next.page;state.itemPageSize=next.pageSize;state.itemSelected=next.selected||"";},change:next=>{state.itemPage=next.page;state.itemPageSize=next.pageSize;state.itemSelected=next.selected||"";renderItems();}}));shell.refresh();
@@ -132,7 +140,7 @@
     $("#toolbar").replaceChildren();
     const shopFilter=el("select",{"aria-label":"Filter shop stock by shop",onchange:event=>{state.shopName=event.target.value;state.shopPage=0;renderShops();}},el("option",{value:"",selected:!state.shopName},"All shops"),...shopNames.map(name=>el("option",{value:name,selected:name===state.shopName},name)));
     const categoryFilter=el("select",{"aria-label":"Filter shop stock by type",onchange:event=>{state.shopCategory=event.target.value;state.shopPage=0;renderShops();}},el("option",{value:"",selected:!state.shopCategory},"All stock types"),...categories.map(category=>el("option",{value:category,selected:category===state.shopCategory},category)));
-    $("#main").replaceChildren(pagedListDetail({rows,key:item=>item.id,slots:false,page:state.shopPage,pageSize:state.shopPageSize,selected:state.shopSelected,noun:"items",splitKey:"rdr-shops",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(state.shopEdits,()=>{state.shopPage=0}),rows,key:item=>item.id,slots:false,page:state.shopPage,pageSize:state.shopPageSize,selected:state.shopSelected,noun:"items",splitKey:"rdr-shops",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
       search:{key:"rdr-shops",value:state.shopQuery,placeholder:"Search RDR shop stock…",change:value=>{state.shopQuery=value;state.shopPage=0;renderShops();}},filters:[shopFilter,categoryFilter],
       master:({rows,selected,select})=>list({rows,key:item=>item.id,selected,selectedClass:"sel",select,class:"rdr-record-list",header:el("div",{class:"rdr-listhead"},el("span",{},"Item"),el("span",{},"Shop"),el("span",{},"Type"),el("span",{},"Qty / Stock")),rowClass:"rdr-record-entry",render:shopRow,"aria-label":"RDR shop inventory"}),
       detail:()=>shopDetail(),sync:next=>{state.shopPage=next.page;state.shopPageSize=next.pageSize;state.shopSelected=next.selected||"";},change:next=>{state.shopPage=next.page;state.shopPageSize=next.pageSize;state.shopSelected=next.selected||"";renderShops();}}));shell.refresh();
@@ -169,7 +177,7 @@
     const areas=[...new Set((state.missions?.missions||[]).map(missionArea))].sort((a,b)=>a.localeCompare(b));
     $("#toolbar").replaceChildren();
     const areaFilter=el("select",{"aria-label":"Filter missions by area",onchange:event=>{state.missionArea=event.target.value;state.missionPage=0;renderMissions();}},el("option",{value:"",selected:!state.missionArea},"All areas"),...areas.map(area=>el("option",{value:area,selected:area===state.missionArea},area)));
-    $("#main").replaceChildren(pagedListDetail({rows,key:mission=>mission.id,slots:false,page:state.missionPage,pageSize:state.missionPageSize,selected:state.missionSelected,noun:"missions",splitKey:"rdr-missions",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(state.missionEdits,()=>{state.missionPage=0}),rows,key:mission=>mission.id,slots:false,page:state.missionPage,pageSize:state.missionPageSize,selected:state.missionSelected,noun:"missions",splitKey:"rdr-missions",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
       search:{key:"rdr-missions",value:state.missionQuery,placeholder:"Search Story missions…",change:value=>{state.missionQuery=value;state.missionPage=0;renderMissions();}},filters:[areaFilter],
       master:({rows,selected,select})=>list({rows,key:mission=>mission.id,selected,selectedClass:"sel",select,class:"rdr-record-list",header:el("div",{class:"rdr-listhead"},el("span",{},"Mission"),el("span",{},"ID / Script"),el("span",{},"Area"),el("span",{},"Cash / Fame / Honor")),rowClass:"rdr-record-entry",render:missionRow,"aria-label":"RDR Story mission rewards"}),
       detail:()=>missionDetail(),sync:next=>{state.missionPage=next.page;state.missionPageSize=next.pageSize;state.missionSelected=next.selected||"";},change:next=>{state.missionPage=next.page;state.missionPageSize=next.pageSize;state.missionSelected=next.selected||"";renderMissions();}}));shell.refresh();

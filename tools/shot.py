@@ -90,6 +90,7 @@ def main() -> int:
     parser.add_argument("--size", default="1600x1000")
     parser.add_argument("--eval", dest="expression")
     parser.add_argument("--wait", help="JS condition to wait for after the steps")
+    parser.add_argument("--ready", help="JS condition to wait for BEFORE the steps run")
     parser.add_argument("--wait-seconds", type=int, default=180)
     parser.add_argument("--live", action="store_true",
                         help="use the real project instead of a temporary one")
@@ -124,6 +125,9 @@ def main() -> int:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state==='undefined'||!state.booting", 90)
             time.sleep(1.2)
+            if args.ready:
+                wait_eval(cdp, args.ready, args.wait_seconds)
+                time.sleep(.8)
             for step in args.step:
                 cdp.eval(step)
                 time.sleep(.45)

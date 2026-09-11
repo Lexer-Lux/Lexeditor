@@ -50,7 +50,7 @@
   const {el,columnList,list,masterDetail,pagedListDetail,pager,clone,showAlert,hoverable,detailPanel,detailField,detailGroup}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
   const state={
-    booting:true,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
+    booting:true,modOnly:false,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
     manual:null,font:null,selectedModule:"",selectedSetting:"",selectedItem:"",selectedTroop:"",selectedUpgrade:"",selectedFile:"",catalogFile:null,catalogDraft:"",
     settingEdits:{},itemEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
     pages:{items:0,troops:0,upgrades:0,datamap:0},pageSizes:{items:20,troops:20,upgrades:20},sorts:{items:["name",1],troops:["name",1],upgrades:["from",1],datamap:["filename",1]},
@@ -58,6 +58,16 @@
   };
 
   async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(value.error)throw new Error(value.error);return value;}
+  // "Mod contents only" keeps the records this project has actually changed.
+  // Warband records edits against the record itself, so the filter is the set
+  // of records that carry one. A view whose records this editor cannot change
+  // says so rather than offering a switch that would hide everything.
+  function modOnlySpec(view,changed){
+    return {available:state.activeSource==="mine"&&typeof changed==="function",
+      value:state.modOnly===true,changed:changed||(()=>true),
+      unavailableTitle:"This view has no editable records to filter by.",
+      change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
+  }
   function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Object.keys(row.fields||{}).length,0);}
   function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
   function historyCapture(){return {settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
@@ -88,7 +98,7 @@
     const detail=row=>row?el("div",{class:"lex-detail detail"},el("h2",{},row.name||(row.from&&row.to?`${row.from} → ${row.to}`:String(keyOf(row)))),
       el("div",{class:"detail-grid"},...columns.flatMap(column=>[el("div",{class:"label"},typeof column.label==="string"?column.label:column.key),el("div",{},String(row[column.key]??"—"))]))):el("div",{class:"lex-detail detail"},"No matching records.");
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(view,options.changed),rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
       search:{key:`warband-${view}`,value:query,placeholder:`Search ${view}…`,change:value=>{state.filters[view]=value;state.pages[view]=0;render();}},filters:options.filters||[],
       master:({rows,selected,select})=>columnList({rows,key:keyOf,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,class:"warband-record-list", "aria-label":`${view} records`}),
       detail,sync:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");},change:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");render();}}));
@@ -112,7 +122,7 @@
     const view="items",columns=itemColumns(),query=state.filters.items||"";
     const filtered=sorted(search(state.items.rows,query,["name","id","type","inventoryMesh"]),view);
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({rows:filtered,key:row=>row.id,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec("items",item=>Object.keys(state.itemEdits[itemEditKey(item)]?.fields||{}).length>0),rows:filtered,key:row=>row.id,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
       search:{key:"warband-items",value:query,placeholder:"Search items…",change:value=>{state.filters.items=value;state.pages.items=0;renderItems();}},
       master:({rows,selected,select})=>columnList({rows,key:row=>row.id,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts.items[0],dir:state.sorts.items[1]},sort:key=>sort("items",key),selected,selectedClass:"selected",select,class:"warband-record-list","aria-label":"Warband items"}),
       detail:()=>warbandItemDetail(state.items.rows.find(row=>row.id===state.selectedItem)),sync:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";},change:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";renderItems();}}));

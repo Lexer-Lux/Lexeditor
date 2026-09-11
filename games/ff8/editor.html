@@ -996,7 +996,7 @@
   "use strict";
   const {enabledMark,el,columnList,columnPreferences,panelLayout,pagedListDetail,pager,detailPanel,tabbedPanel,detailSection,detailField,multiNumberRow,subtabBar,curveEditor,newButton,infoHelp,unitField,readonlyField,formatNumber,numberValue,recordId,closeButton,hoverable,infoIcon,folderIcon,searchIcon,beginSearcher,decorateSearchCandidate,openGameFolder,platformConfigView,clone,showAlert,bindSettingDependencies,toggleRow,autoFitControlText}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
-  const state={booting:true,tab:"items",status:"Loading…",dashboard:null,datamap:null,mods:{rows:[],composition:{}},activeSource:"mine",
+  const state={booting:true,modOnly:false,tab:"items",status:"Loading…",dashboard:null,datamap:null,mods:{rows:[],composition:{}},activeSource:"mine",
     data:{cards:null,items:null,menuItems:null,shops:null,weapons:null,magic:null,gfs:null,characters:null,text:null,enemies:null,enemyTables:null,enemyAi:null,enemyBattleText:null,refine:null,encounters:null,world:null,fields:null,init:null,settings:null},base:{},vanilla:{},references:[],referenceData:{},platformConfig:null,savedPlatformConfig:null,platformQuery:"",settingsTab:"gameplay",enemyPanelTab:"stats",enemyAiView:"structure",mapsTab:"field",worldTab:"map",refineTab:"m000",fieldScriptSelection:{},fieldWalkmeshSelection:{},fieldBackgroundSelection:{},fieldBackgroundPreview:{},
     selected:{cards:null,abilityJunction:null,abilityCommand:null,abilityStat:null,abilityCharacter:null,abilityParty:null,abilityGf:null,abilityMenu:null,items:null,shops:null,weapons:null,magic:null,gfs:null,characters:null,text:null,enemies:null,refine:null,encounters:null,world:null,fields:null,startingCharacter:0,startingGf:0},startingTab:"general",
     pages:{cards:0,abilityJunction:0,abilityCommand:0,abilityStat:0,abilityCharacter:0,abilityParty:0,abilityGf:0,abilityMenu:0,items:0,shops:0,weapons:0,magic:0,gfs:0,characters:0,text:0,enemies:0,refine:0,encounters:0,world:0,fields:0,startingMagic:0,startingInventory:0,datamap:0},
@@ -1009,6 +1009,28 @@
   const editableDatasets=["cards","items","menuItems","shops","weapons","magic","gfs","characters","abilityJunction","abilityCommand","abilityStat","abilityCharacter","abilityParty","abilityGf","abilityMenu","text","enemies","enemyTables","enemyAi","enemyBattleText","refine","encounters","world","fields"];
   const platformFields=config=>Object.fromEntries((config?.sections||[]).flatMap(section=>section.fields).map(field=>[field.id,field.value]));
   function platformChanges(){const current=platformFields(state.platformConfig),saved=platformFields(state.savedPlatformConfig),changes={};for(const [id,value] of Object.entries(current))if(signature(value)!==signature(saved[id]))changes[id]=value;return changes}
+  // "Mod contents only" keeps the rows this project has actually changed.
+  // FF8 mounts every view through one shared paged panel, so rather than name a
+  // dataset at each of its call sites, the baseline for every editable row is
+  // indexed by the row object itself. A row with no baseline is new, which
+  // counts as changed.
+  function baselineByRow(){
+    const map=new WeakMap();
+    for(const name of editableDatasets){
+      const rows=state.data[name]?.rows;if(!rows)continue;
+      const base=state.base[name]||[];
+      rows.forEach((row,index)=>map.set(row,
+        name==="fields"?base.find(entry=>entry.key===row.key):base[index]));
+    }
+    return map;
+  }
+  function modOnlySpec(view){
+    const map=baselineByRow();
+    return {available:state.activeSource==="mine",value:state.modOnly===true,
+      changed:row=>{const base=map.get(row);
+        return base===undefined?true:signature(row)!==signature(base)},
+      change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
+  }
   function dirtyCount(){if(state.activeSource!=="mine")return 0;let count=Object.keys(platformChanges()).length;for(const name of editableDatasets){if(!state.data[name])continue;const current=state.data[name].rows,base=state.base[name]||[];for(let i=0;i<current.length;i++){const before=name==="fields"?base.find(row=>row.key===current[i].key):base[i];if(signature(current[i])!==signature(before))count++;}}if(state.data.init&&signature(state.data.init)!==signature(state.base.init))count++;if(state.data.settings&&signature(state.data.settings)!==signature(state.base.settings))count++;return count}
   function historyCapture(){return {...Object.fromEntries(editableDatasets.map(name=>[name,clone(state.data[name]?.rows||[])])),init:clone(state.data.init||{}),settings:clone(state.data.settings||{})}}
   function historyRestore(snapshot){for(const [name,value] of Object.entries(snapshot)){if(!state.data[name])continue;if(name==="settings"||name==="init")state.data[name]=clone(value);else state.data[name].rows=clone(value)}}
@@ -1022,7 +1044,7 @@
     const noun=view==="gfs"?"GFs":view;
     const normalized=columns.map(column=>({...column,sortable:true,numberedId:column.numberedId??column.key==="id"}));
     const prefs=state.columnPrefs[view]||=columnPreferences(`ff8-${view}`,normalized,()=>render());
-    const root=pagedListDetail({rows,key:row=>row.id,slots:true,empty:emptySlotTest(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun:view==="gfs"?"GFs":view,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,
+    const root=pagedListDetail({modOnly:modOnlySpec(view),rows,key:row=>row.id,slots:true,empty:emptySlotTest(view),page:state.pages[view],pageSize:state.pageSizes[view],selected:state.selected[view],noun:view==="gfs"?"GFs":view,splitKey:`ff8-${view}`,defaultSplit:layout.defaultSplit??42,minLeft:layout.minLeft??340,minRight:layout.minRight??420,maxBarrels:layout.maxBarrels,leadingPanel:layout.leadingPanel,minLeading:layout.minLeading,defaultLeadingWidth:layout.defaultLeadingWidth,
       search:{key:`ff8-${view}`,value:state.filters[view],delay:110,placeholder:`Search ${noun.toLocaleLowerCase()}…`,label:`Search ${noun}`,change:value=>{state.filters[view]=value;state.pages[view]=0;render()}},
       sync:value=>{state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected},
       change:value=>{state.pages[view]=value.page;state.pageSizes[view]=value.pageSize;state.selected[view]=value.selected;render()},

@@ -1013,6 +1013,7 @@ const state = {
   mobs: null,
   mobEdits: {},          // "file|indexPath" -> {file, path, kind, value}
   mobModels: null,
+  modOnly: false,
   localization: null,
   localizationEdits: {},
   weaponData: {},
@@ -1156,6 +1157,29 @@ function localizationTextarea(key,placeholder="No localized description",onEdit)
 }
 async function saveLocalization(){const edits=Object.entries(state.localizationEdits).map(([key,value])=>({key,value}));if(!edits.length)return 0;const r=await api("/api/localization/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});for(const e of edits)state.localization.values[e.key]=e.value;state.localizationEdits={};return r.saved;}
 
+// "Mod contents only" keeps the records this project has actually changed.
+// RDR2 files every edit under a composite key whose first segment names the
+// record it belongs to, so the filter for a view is the set of first segments
+// across the maps that view writes to, plus any dirty sets kept beside them.
+function touchedRecords(maps = [], sets = [], segment = 0) {
+  const out = new Set();
+  for (const map of maps)
+    for (const key of Object.keys(map || {})) out.add(String(key).split("|")[segment]);
+  for (const set of sets) for (const key of (set || [])) out.add(String(key));
+  return out;
+}
+function modOnlySpec(touched, resetPage, redraw) {
+  return {
+    available: !isRO(),
+    value: state.modOnly === true,
+    changed: key => touched.has(String(key)),
+    change: value => { state.modOnly = value; resetPage(); redraw(); },
+  };
+}
+const ITEM_EDIT_MAPS = () => [state.priceEdits, state.buyabilityEdits, state.sellabilityEdits,
+  state.yieldEdits, state.bundleEdits, state.itemEffectEdits, state.itemTagEdits,
+  state.quickSelectEdits, state.descriptionKeyEdits, state.carryEdits, state.craftEdits,
+  state.localizationEdits];
 function dirtyCount() {
   const catalog = ["priceEdits","buyabilityEdits","sellabilityEdits","yieldEdits","bundleEdits",
     "itemEffectEdits","itemTagEdits","quickSelectEdits","descriptionKeyEdits","carryEdits","craftEdits","effectEdits","localizationEdits"]
@@ -1972,6 +1996,8 @@ function renderItems() {
   // The shared preset owns the page slice, selected-row fallback, master,
   // detail, fitted capacity, and fixed bottom pager.
   const view=LexeditorUI.pagedListDetail({
+    modOnly:(()=>{const touched=touchedRecords(ITEM_EDIT_MAPS());
+      return modOnlySpec(touched,()=>{f.itemPage=0;},renderItems);})(),
     rows,key:it=>it.key,slots:false,page:f.itemPage,pageSize:f.itemPageSize,selected:f.itemSel,noun:"items",
     splitKey:"rdr2-items",defaultSplit:44,
     search:{key:"rdr2-items",value:f.q,placeholder:"Search items… (e.g. TONIC, PROVISION_)",label:"Search items",change:value=>{f.q=value;f.itemPage=0;renderItems();}},
@@ -3687,6 +3713,7 @@ function renderCrafting() {
   const m=$("#main");m.innerHTML="";
   if(mode==="custom"&&!state.customCrafting.available){m.append(el("div",{class:"loading"},`Custom crafting runtime files are unavailable for this profile. Expected ${state.customCrafting.customFile||"custom_crafting_recipes.tsv"}.`));return;}
   m.append(LexeditorUI.pagedListDetail({
+    modOnly:modOnlySpec(touchedRecords([state.craftEdits]),()=>{f.craftPage=0;},renderCrafting),
     rows:groups,key:group=>group.key,slots:false,page:f.craftPage,pageSize:f.craftPageSize,selected:f[selectedField],noun:"items",
     splitKey:`rdr2-crafting-${mode}`,defaultSplit:44,
     search:{key:`rdr2-crafting-${mode}`,value:f.craftQ||"",placeholder:"Search recipe outputs…",change:value=>{f.craftQ=value;f.craftIngredient="";f.craftPage=0;renderCrafting();}},filters:bottomFilters,
@@ -4484,6 +4511,10 @@ function renderBehaviors(){
   rows=sortedRows("behaviors",rows,{name:r=>r.name||r.id,id:r=>r.id,used:r=>r.used});
   const m=$("#main");m.innerHTML="";
   m.append(LexeditorUI.pagedListDetail({
+    modOnly:(()=>{const edited=touchedRecords([state.effectEdits]);
+      const ids=new Set(state.catalog.effects.filter(effect=>edited.has(effect.key)).map(effect=>effect.id));
+      return {available:!isRO(),value:state.modOnly===true,changed:row=>ids.has(row.id),
+        change:value=>{state.modOnly=value;f.behaviorPage=0;renderBehaviors();}};})(),
     rows,key:row=>row.id,slots:false,page:f.behaviorPage,pageSize:f.behaviorPageSize,selected:f.behaviorSel,noun:"behavior IDs",
     splitKey:"rdr2-effect-behaviors",defaultSplit:55,minLeft:480,
     search:{key:"rdr2-effect-behaviors",value:f.behaviorQ||"",placeholder:"Search behavior IDs…",change:value=>{f.behaviorQ=value;f.behaviorPage=0;renderBehaviors();}},
@@ -4581,7 +4612,10 @@ function renderEffects(){
     time:e=>+(state.effectEdits[e.key+"|time"]??e.time),units:e=>+(state.effectEdits[e.key+"|timeunits"]??e.timeunits),
     duration:e=>e.durationcategory,used:e=>(usage[e.key]||[]).length});
   const m=$("#main");m.innerHTML="";
-  m.append(LexeditorUI.pagedListDetail({rows,key:e=>e.key,slots:false,page:f.effectPage,pageSize:f.effectPageSize,selected:f.effectSel,noun:"effects",
+  m.append(LexeditorUI.pagedListDetail({modOnly:(()=>{const touched=touchedRecords([state.effectEdits]);
+      return {available:!isRO(),value:state.modOnly===true,changed:e=>touched.has(e.key),
+        change:value=>{state.modOnly=value;f.effectPage=0;renderEffects();}};})(),
+    rows,key:e=>e.key,slots:false,page:f.effectPage,pageSize:f.effectPageSize,selected:f.effectSel,noun:"effects",
     splitKey:"rdr2-effects",defaultSplit:64,minLeft:790,minRight:420,className:"lootsplit",
     search:{key:"rdr2-effects",value:f.effQ||"",placeholder:"Search effects… (e.g. HEALTH_CORE)",change:value=>{f.effQ=value;f.effectPage=0;renderEffects();}},filters:effectFilters,
     fit:{rowSelector:".effect-column-row",headerSelector:".lex-column-list-header",minRowHeight:64},
@@ -4761,6 +4795,10 @@ async function renderLoot() {
   // The shared paged list-detail preset keeps Loot Tables in the same fitted,
   // no-scroll master and fixed-pager contract as Items and Crafting.
   const view=LexeditorUI.pagedListDetail({
+    modOnly:(()=>{const dirty=state.lootDirty[state.lootFile];
+      return {available:!isRO(),value:state.modOnly===true,
+        changed:row=>!!dirty&&dirty.has(row.t.key),
+        change:value=>{state.modOnly=value;f.lootPage=0;renderLoot();}};})(),
     rows,key:row=>row.t.key,slots:false,page:f.lootPage,pageSize:f.lootPageSize,selected:f.lootSel,noun:state.lootFile==="loot_table_herb.meta"?"plant loot tables":"tables",
     splitKey:"rdr2-loot-tables",defaultSplit:44,
     search:{key:"rdr2-loot-tables",value:f.lootQ,placeholder:"Search tables… (e.g. VALENTINE, GANG)",change:value=>{f.lootQ=value;f.lootPage=0;renderLoot();}},filters:lootFilters,
@@ -5591,7 +5629,10 @@ async function renderWeapons() {
   const q=(f.weaponQ||"").toUpperCase();
   const listNames=names.filter(n=>!q||n.includes(q)||(localizedValue(n)||"").toUpperCase().includes(q));
   if(!Number.isFinite(f.weaponPage))f.weaponPage=0;if(!Number.isFinite(f.weaponPageSize))f.weaponPageSize=20;
-  m.append(LexeditorUI.pagedListDetail({rows:listNames,key:n=>n,slots:false,page:f.weaponPage,pageSize:f.weaponPageSize,selected:f.weapon,noun:"records",splitKey:`rdr2-weapons-${section}`,className:"lootsplit",defaultSplit:44,
+  m.append(LexeditorUI.pagedListDetail({modOnly:(()=>{const touched=touchedRecords(Object.values(state.weaponEdits||{}),[],1);
+      return {available:!isRO(),value:state.modOnly===true,changed:name=>touched.has(String(name)),
+        change:value=>{state.modOnly=value;f.weaponPage=0;renderWeapons();}};})(),
+    rows:listNames,key:n=>n,slots:false,page:f.weaponPage,pageSize:f.weaponPageSize,selected:f.weapon,noun:"records",splitKey:`rdr2-weapons-${section}`,className:"lootsplit",defaultSplit:44,
     search:{key:`rdr2-weapons-${section}`,value:f.weaponQ||"",placeholder:`Search ${section}…`,change:value=>{f.weaponQ=value;f.weaponPage=0;renderWeapons();}},filters:weaponFilters,
     master:({rows,selected,select})=>LexeditorUI.list({rows,key:n=>n,selected,selectedClass:"sel",class:"loot-list list-1col",header:el("div",{class:"loot-listhead"},el("span",{},section==="weapons"?"Weapon":"Ammo type")),rowClass:"loot-item",select,render:n=>{const record=records.find(row=>row.name===n);return el("div",{class:"li-key",title:`${n}${localizedValue(n)?" — "+localizedValue(n):""}`},el("span",{class:"k"},originDisplayName(localizedValue(n)||n,record)),localizedValue(n)&&localizedValue(n)!==n?el("span",{class:"li-name"},n):"");}}),
     detail:name=>weaponDetail(d,section,records.find(row=>row.name===name),f),sync:next=>{f.weaponPage=next.page;f.weaponPageSize=next.pageSize;f.weapon=next.selected||"";},change:next=>{f.weaponPage=next.page;f.weaponPageSize=next.pageSize;f.weapon=next.selected||"";renderWeapons();}}));

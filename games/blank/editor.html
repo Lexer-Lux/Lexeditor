@@ -57,6 +57,7 @@
   const vanillaStats={HP:2400,STR:24,MAG:31,SPD:18};
   let demo={text:"Blank value",value:25,floatValue:.9999,enabled:false,choice:"alternate",refValues:[40,40,40,40],flags:{menu:true,gf:true},stats:{HP:2400,STR:30,MAG:31,SPD:18}};
   let saved={rows:clone(rows),demo:clone(demo)};
+  let modOnly=false;
   const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,edit:(row,value)=>{row.name=String(value)}},{key:"category",label:"Category",sortable:true,edit:(row,value)=>{row.category=String(value)}},{key:"value",label:"Value",numeric:true,sortable:true,edit:(row,value)=>{row.value=Math.max(0,Math.min(255,Number(value)||0))}}];
   let tab="one",subtab="controls",selected=0,sort={key:"name",dir:1},query="",page=0,pageSize=12,activeSource="mine";
   const prefs=columnPreferences("blank-records",columns,()=>render());
@@ -288,7 +289,17 @@
     return el("div",{class:"blank-graphs"},...cards);
   }
   function addRecord(){const id=activeRows().reduce((highest,row)=>Math.max(highest,row.id),-1)+1;rows.push({id,name:`New Record ${String(id+1).padStart(2,"0")}`,category:categories[0],value:0,enabled:true});selected=id;render();refreshShell()}
-  function pagedTwoPanel(){const records=sortedRows();return pagedListDetail({rows:records,key:row=>row.id,slots:false,add:addRecord,addTitle:"Add a Blank record",addDisabled:activeSource!=="mine",selected,page,pageSize,noun:"records",className:"blank-layout",splitKey:"blank-two",rowsKey:"blank-two",defaultSplit:50,minLeft:320,minRight:360,search:{key:"blank-records",value:query,label:"Search Blank records",change:value=>{query=value;page=0;render()}},sync:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected},change:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected;render()},master:state=>tablePanel(state.rows,state.selected,state.select),detail:row=>recordPanel(true,row)})}
+  // "Mod contents only" hides every record this project has not touched, which
+  // is the same comparison a save makes: the live record against the copy the
+  // project was last saved as.
+  function modOnlySpec(){
+    const base=new Map((saved?.rows||[]).map(row=>[row.id,row]));
+    return {available:activeSource==="mine"&&base.size>0,value:modOnly===true,
+      changed:row=>{const was=base.get(row.id);
+        return !was||JSON.stringify(row)!==JSON.stringify(was)},
+      change:value=>{modOnly=value;page=0;render()}};
+  }
+  function pagedTwoPanel(){const records=sortedRows();return pagedListDetail({modOnly:modOnlySpec(),rows:records,key:row=>row.id,slots:false,add:addRecord,addTitle:"Add a Blank record",addDisabled:activeSource!=="mine",selected,page,pageSize,noun:"records",className:"blank-layout",splitKey:"blank-two",rowsKey:"blank-two",defaultSplit:50,minLeft:320,minRight:360,search:{key:"blank-records",value:query,label:"Search Blank records",change:value=>{query=value;page=0;render()}},sync:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected},change:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected;render()},master:state=>tablePanel(state.rows,state.selected,state.select),detail:row=>recordPanel(true,row)})}
   const mapState={page:0,query:"",status:"",sort:["filename",1]};
   function dataMapPanel(){return LexeditorUI.dataMap({
     rows:[{filename:"No installed game files",controls:"Blank is an in-memory UI demonstration",notes:"Sample records demonstrate shared controls only. They do not read or save game data.",coverage:"unavailable",status:"not-integrated"}],
