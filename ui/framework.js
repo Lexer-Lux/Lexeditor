@@ -1071,7 +1071,15 @@
       // nothing, which wrapped "CAN SELL" one letter per line and drove the
       // label fitter down to its six-pixel floor.
     }, element("div", {class: "lex-detail-field-label"},
-      element("span", {class: "lex-detail-field-label-text"}, options.label), arrow),
+      element("span", {class: "lex-detail-field-label-text"}, options.label),
+      // The arrow used to live inside the label, which forced a boolean's
+      // label column to span the whole row so the arrow had somewhere to run -
+      // and that is why a boolean's name started at the far left while every
+      // other name sat in the label column. It is its own track now, between
+      // the label column and the control, so the name keeps the column it
+      // shares with the rest of the panel.
+      booleanField ? null : arrow),
+    booleanField ? arrow : null,
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null), typeRail);
     // The rail runs down the side of one row, so its type name has to fit that
@@ -6137,8 +6145,16 @@ ${contents.path}`});
       {name: options.vanillaName || "Vanilla", shortName: options.vanillaShortName || "V", value: options.vanilla},
       ...(options.references || []),
     ];
+    // References live INSIDE the value box by default. An outside pillar
+    // reserves a lane on the right of every box on the panel, which is a band
+    // of empty ground on every property that has nothing to compare. A caller
+    // that wants the outside pillar asks for it with internal:false; a control
+    // with no box to put a reference in - a checkbox - never gets one.
+    const boxed = options.control instanceof Element &&
+      options.control.matches?.("input:not([type=checkbox]):not([type=range]),select,textarea,output,.lex-unit-field,.lex-readonly-field");
+    const internal = options.internal === undefined ? boxed : options.internal !== false;
     const root = element("div", {
-      class: ["lex-source-control", options.internal ? "lex-source-control-internal" : ""].filter(Boolean).join(" "),
+      class: ["lex-source-control", internal ? "lex-source-control-internal" : ""].filter(Boolean).join(" "),
     }, options.control);
     // What the rail must hold is decided by the sources, which do not change
     // while a value is edited - not by which of them happen to differ from the
@@ -6161,7 +6177,7 @@ ${contents.path}`});
     const widestTag = widestOf(shortReferenceName);
     const widestValue = widestOf(painted);
     const referenceCharacters = Math.max(1, widestTag.length + widestValue.length + 1);
-    if (options.internal) {
+    if (internal) {
       // Internal references share the live control's box. Size the reserved
       // lane from the actual tag+value character count with enough average
       // glyph width for game fonts; the old .38em estimate clipped values such

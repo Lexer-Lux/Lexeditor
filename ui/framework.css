@@ -1213,7 +1213,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 .lex-detail-field:focus-within .lex-field-type-range { left:75%;opacity:1; }
 
 .lex-detail-field.lex-boolean-field {
-  grid-template-columns:minmax(0,1fr) auto;
+  /* The same label column as every other property, then the leader arrow's own
+     track, then the checkbox. The label used to take the whole row so the
+     arrow had room to run inside it, which started a boolean's name at the far
+     left while every other name sat in the label column. */
+  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr) auto;
   /* A checkbox is shorter than a text box, so a boolean row collapsed to the
      checkbox's height and the label fitter then shrank "CAN SELL" to a few
      pixels to fit it. Booleans keep the same row height as every other
@@ -4882,7 +4886,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-field:not(.lex-boolean-field) {
   grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr) !important;
 }
-.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label {
+/* Every property name ends on the same edge, booleans included. They were
+   excluded because the leader arrow shared the label box and needed the room;
+   the arrow has its own track now. */
+.lex-detail-field > .lex-detail-field-label {
   justify-content:flex-end;
   text-align:right;
 }
@@ -5539,3 +5546,49 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   padding-inline:6px;
   letter-spacing:0;
 }
+
+
+/* LEXEDITOR_BOOLEAN_ROW_ALIGN_20260911 */
+/* A boolean reads across the row like every other property: its name in the
+   shared label column, a leader arrow spanning the gap, and its checkbox
+   ending on the same edge as every value box above it. */
+.lex-boolean-field > .lex-detail-field-label { padding-right:10px; }
+.lex-boolean-field > .lex-field-boolean-arrow {
+  position:relative;
+  align-self:center;
+  width:auto;
+  min-width:12px;
+  height:1px;
+  margin:0;
+}
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control {
+  display:flex;
+  width:auto;
+  justify-content:flex-end;
+  padding-left:0 !important;
+  padding-right:10px !important;
+}
+/* The pin rides the row's right edge, outside the box it annotates. */
+.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
+  right:-24px !important;
+}
+
+
+/* LEXEDITOR_BOOLEAN_BOX_EDGE_20260911 */
+/* A checkbox ends on the same edge as every value box above it. Its reference
+   mark used to sit to its right, which pushed the box in by the width of the
+   mark, so the one control on the panel that could not hold its reference
+   inside itself was also the one that did not line up. The mark moves to the
+   left of the box, where it has the same room and costs the edge nothing. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  grid-template-columns:var(--lex-boolean-reference-width) auto;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control > input[type="checkbox"] {
+  order:2;
+}
+.lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  order:1;
+  justify-items:end;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value { justify-content:end; }
