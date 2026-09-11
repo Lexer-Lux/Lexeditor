@@ -262,6 +262,11 @@ controls and what it requires without permanent connector clutter.
 - Revealing help is a pointer or keyboard-focus state, never a click state. A
   click that leaves focus on the marker must not hold the swap open after the
   pointer has left.
+- Value boxes are square. One box shape for names and numbers alike, and a
+  plugin theme may restyle it but never round only one kind.
+- A panel ends where the pagination bar begins. The bar reserves its own
+  measured height and nothing more, so the same bar sits the same way in every
+  plugin.
 - A value box holds a number even when it paints that number the way a player
   reads it. A box showing `50,000` is fifty thousand to its own slider, its
   bounds check and anything else that reads it.
