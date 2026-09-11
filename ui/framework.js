@@ -1560,7 +1560,13 @@
         modeToggle.textContent = bar ? "LINE" : "BARS";
       },
     }, "BARS");
-    const plot = element("div", {class: "lex-curve-plot"},
+    // The title is drawn INTO the plot, behind the drawing, so "centred in the
+    // graph" means the graph rather than the card around it. The heading keeps
+    // the text for a screen reader and stops painting it.
+    const plot = element("div", {
+      class: "lex-curve-plot",
+      "data-curve-title": options.title || "CURVE",
+    },
       svg,
       axisTop,
       axisBottom,
@@ -1638,7 +1644,14 @@
       const range = getRange();
       const spanX = Math.max(1, domain.max - domain.min);
       const spanY = Math.max(1, range.max - range.min);
-      const graphX = (x - domain.min) / spanX * 320;
+      // In bar mode a value owns a slot, not a point: the line's x for level N
+      // is the slot's left edge, so the guide and the X marker landed in the
+      // gap between two bars rather than on the bar being read.
+      const slots = Math.max(1, domain.max - domain.min + 1);
+      const barMode = plot.classList.contains("lex-curve-bar-mode");
+      const graphX = barMode
+        ? ((x - domain.min) + .5) / slots * 320
+        : (x - domain.min) / spanX * 320;
       const bounded = Math.max(range.min, Math.min(range.max, y));
       const graphY = 160 - (bounded - range.min) / spanY * 160;
       const cursorY = Math.max(0, Math.min(160, (event.clientY - bounds.top) / bounds.height * 160));

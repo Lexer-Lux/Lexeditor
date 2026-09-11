@@ -122,21 +122,24 @@
 
 ### Graphs
 
-* [ ] Remove the strange white strips at the sides of graphs that are outside the intended margin.
-* [ ] Reduce graph margins substantially.
-* [ ] Use equal margin sizes on all sides.
-* [ ] Move numeric/axis-label text to the **left** side rather than the right.
-* [ ] Redesign the variables display above the graph to follow the general arrangement used by FF8's graph UI.
-
-  * Copy the layout concept, not FF8-specific typography/styling.
-* [ ] Graph title:
-
-  * Huge.
-  * Centered in the graph.
-  * Visually recessed into the background.
-  * Behind graph content, but **not** behind the entire graph/container where it becomes invisible.
-* [ ] Reduce the gap between formula text and the actual graph, perhaps roughly by half.
-* [ ] Bar-chart hover marker/dotted line/X marker should land in the **center of each bar**, not in the gaps between bars.
+* [x] Remove the strange white strips at the sides of graphs that are outside the intended margin.
+  * The drawing's own fill was painting over the card; it is transparent now,
+    and the uneven margin that made the left band read as a strip is gone.
+* [x] Reduce graph margins substantially.
+* [x] Use equal margin sizes on all sides.
+  * One value, 26px, where it had been 46 left, 22 right, 28 top, 30 bottom.
+* [x] Move numeric/axis-label text to the **left** side rather than the right.
+* [x] Redesign the variables display above the graph to follow the general arrangement used by FF8's graph UI.
+  * The variable strip sits above the plot and rises into place on hover or
+    focus, which is FF8's arrangement without FF8's type.
+* [x] Graph title:
+  * Drawn into the plot itself rather than stacked above the card, so it is
+    centred in the graph, huge, and recessed behind the drawing while still in
+    front of the graph's own background.
+* [x] Reduce the gap between formula text and the actual graph, perhaps roughly by half.
+* [x] Bar-chart hover marker/dotted line/X marker should land in the **center of each bar**, not in the gaps between bars.
+  * In bar mode a value owns a slot rather than a point, so the marker uses the
+    slot's centre.
 
 ### Data Map
 

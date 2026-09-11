@@ -5954,3 +5954,69 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   border-radius:2px;
 }
 .lex-window-restart > svg { width:17px;height:17px;fill:currentColor; }
+
+
+/* LEXEDITOR_GRAPH_LAYOUT_20260911 */
+/* One margin on all four sides, and a much smaller one. The plot carried
+   46/22/28/30 - a different number on every side - so the drawing sat off
+   centre in its own card and the wide left band read as a white strip beside
+   the graph rather than as the axis margin it was. */
+.lex-curve-plot {
+  --lex-curve-margin:26px;
+  --lex-curve-margin-left:var(--lex-curve-margin);
+  --lex-curve-margin-right:var(--lex-curve-margin);
+  --lex-curve-margin-top:var(--lex-curve-margin);
+  --lex-curve-margin-bottom:var(--lex-curve-margin);
+  padding:var(--lex-curve-margin);
+}
+/* The scale reads down the LEFT of the graph, which is the side a reader looks
+   to for it. */
+.lex-curve-axis-top,
+.lex-curve-axis-bottom,
+.lex-curve-axis-right,
+.lex-curve-y-axis-right,
+.lex-curve-right-axis :is(.lex-curve-axis,.lex-curve-axis-label,.lex-curve-axis-number) {
+  right:auto !important;
+  left:2px !important;
+  writing-mode:horizontal-tb !important;
+  transform:none !important;
+  text-align:left;
+}
+.lex-curve-axis-name:not(.lex-curve-axis-name-x) {
+  right:auto !important;
+  left:2px !important;
+  writing-mode:vertical-rl !important;
+  transform:rotate(180deg) !important;
+}
+/* The title is the graph's own nameplate: huge, centred in the drawing, and
+   set into the background behind it. It was a heading stacked above the card
+   in ordinary heading type; as a nameplate it says which graph this is without
+   taking a line of the card to do it. */
+.lex-curve-editor { position:relative; }
+.lex-curve-plot { container-type:inline-size; }
+.lex-curve-plot::before {
+  position:absolute;
+  z-index:0;
+  top:50%;
+  left:50%;
+  content:attr(data-curve-title);
+  color:color-mix(in srgb, var(--lex-text) 12%, transparent);
+  font:800 clamp(34px, 17cqw, 110px)/1 var(--lex-heading-font);
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+}
+.lex-curve-heading {
+  position:absolute;
+  width:1px;
+  height:1px;
+  margin:-1px;
+  padding:0;
+  overflow:hidden;
+  clip-path:inset(50%);
+  white-space:nowrap;
+}
+.lex-curve-svg { background:transparent; }
+.lex-curve-formula { margin-top:-4px;height:2.2em; }
