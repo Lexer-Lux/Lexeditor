@@ -6635,6 +6635,68 @@ ${contents.path}`});
     }));
   }, true);
 
+  // A tab bar that has to wrap splits evenly between its rows. Left alone,
+  // flex packs the first row full and strands whichever tabs are left over on
+  // a second row of one or two, which reads as a mistake rather than a layout.
+  // The natural row count is measured with the balancing removed, then each
+  // row is given its equal share.
+  const balanceTabRows = () => {
+    for (const bar of document.querySelectorAll('.lex-shell-header nav, .lex-subtab-bar')) {
+      const tabs = [...bar.children].filter(node =>
+        node instanceof HTMLElement && node.offsetParent !== null);
+      if (tabs.length < 2) { bar.removeAttribute('data-lex-tab-rows'); continue; }
+      bar.removeAttribute('data-lex-tab-rows');
+      bar.removeAttribute('data-lex-tab-tight');
+      bar.style.removeProperty('--lex-tab-columns');
+      tabs.forEach(tab => tab.style.removeProperty('--lex-tab-span'));
+      const rowCount = () => new Set(tabs.map(tab => Math.round(tab.offsetTop))).size;
+      if (rowCount() < 2) continue;
+      // Wrapping is the last resort, so the bar tightens first and is measured
+      // again: a bar that now fits on one line keeps its tabs full size and
+      // needs no balancing at all.
+      bar.dataset.lexTabTight = "";
+      const rows = rowCount();
+      if (rows < 2) continue;
+      // As even as the count allows: seven tabs over three rows is three, two
+      // and two, never three, three and one. The bar becomes a grid of as many
+      // columns as every row divides into, and each tab spans its own row's
+      // share of them.
+      const counts = Array.from({length: rows}, (_, index) =>
+        Math.floor(tabs.length / rows) + (index < tabs.length % rows ? 1 : 0));
+      const divisor = (a, b) => b ? divisor(b, a % b) : a;
+      const columns = counts.reduce((carry, count) => carry * count / divisor(carry, count), 1);
+      bar.dataset.lexTabRows = String(rows);
+      bar.style.setProperty('--lex-tab-columns', String(columns));
+      let index = 0;
+      counts.forEach(count => {
+        for (let seat = 0; seat < count; seat += 1) {
+          tabs[index]?.style.setProperty('--lex-tab-span', String(columns / count));
+          index += 1;
+        }
+      });
+    }
+  };
+  let balancePending = false;
+  const scheduleBalance = () => {
+    if (balancePending) return;
+    balancePending = true;
+    requestAnimationFrame(() => { balancePending = false; balanceTabRows(); });
+  };
+  window.addEventListener('resize', scheduleBalance);
+  document.fonts?.ready?.then(scheduleBalance).catch(() => {});
+  new MutationObserver(records => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node instanceof Element &&
+            (node.matches?.('nav,.lex-subtab-bar') || node.querySelector?.('nav,.lex-subtab-bar'))) {
+          scheduleBalance();
+          return;
+        }
+      }
+    }
+  }).observe(document.documentElement, {childList: true, subtree: true});
+  scheduleBalance();
+
   const dedupeShortcuts = root => root.querySelectorAll?.('nav button[data-tab]').forEach(button => {
     if (button.querySelector('.lex-tab-shortcut')) {
       button.querySelectorAll('.lex-tab-ordinal').forEach(node => node.remove());

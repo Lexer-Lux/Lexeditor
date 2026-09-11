@@ -69,6 +69,24 @@ def main():
                           const b=e.getBoundingClientRect();
                           return {left:c.left-b.left,right:b.right-c.right};}''')
                         assert inside['left']>=0 and inside['right']>=0,inside
+                # A boolean's pin annotates the row, so it never lands on the
+                # checkbox it annotates.
+                for field in page.locator('.lex-boolean-field:has(.lex-column-pin)').all():
+                    if not field.is_visible():continue
+                    clear=field.evaluate('''e=>{
+                      const pin=e.querySelector('.lex-column-pin').getBoundingClientRect();
+                      const box=e.querySelector('input[type=checkbox]').getBoundingClientRect();
+                      return (pin.right<box.left||pin.left>box.right||
+                              pin.bottom<box.top||pin.top>box.bottom)?pin.left-box.right:null;}''')
+                    assert clear is not None and clear>=4,clear
+                # A wrapped tab bar splits its tabs as evenly as the count allows.
+                spread=page.evaluate('''()=>{
+                  const bar=document.querySelector('.lex-shell-header nav');
+                  const tabs=[...bar.children].filter(n=>n.offsetParent!==null);
+                  const rows={};
+                  for(const t of tabs){const k=Math.round(t.offsetTop);rows[k]=(rows[k]||0)+1;}
+                  return Object.values(rows);}''')
+                assert max(spread)-min(spread)<=1,spread
                 for arrow in page.locator('.lex-field-boolean-arrow').all():
                     assert arrow.evaluate('(e)=>getComputedStyle(e).position')=='relative'
                 # A reference stack reads as two columns: every tag starts on one

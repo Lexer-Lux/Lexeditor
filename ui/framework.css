@@ -5422,3 +5422,120 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-panel-body:not(:has(.lex-source-control:not(.lex-source-control-internal))) {
   --lex-panel-reference-rail-width:0px;
 }
+
+
+/* LEXEDITOR_BOOLEAN_PIN_CLEAR_20260911 */
+/* A boolean's source control is only as wide as its checkbox, and the pin was
+   placed inside it - so the pin sat on the corner of the box it was supposed
+   to annotate. It belongs to the row, in the row's own top-right corner, and
+   the row keeps enough room on the right that it never reaches the checkbox
+   or the reference mark beside it. */
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control {
+  padding-right:26px !important;
+}
+.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
+  position:absolute !important;
+  top:50% !important;
+  right:-20px !important;
+  bottom:auto !important;
+  left:auto !important;
+  transform:translateY(-50%) !important;
+}
+
+
+/* LEXEDITOR_COPY_LANE_20260911 */
+/* The copy button is the whole of its lane, so it centres by being the lane's
+   width; it was carrying a six-pixel gap that sat entirely on its right, which
+   read as a button pushed left in a column too wide for it. The lane is the
+   button plus even air on both sides. */
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control,
+.lex-multi-number-item {
+  --lex-copy-lane:15px;
+}
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control {
+  grid-template-columns:var(--lex-copy-lane) minmax(0,1fr);
+  gap:5px;
+}
+.lex-multi-number-item {
+  grid-template-columns:var(--lex-copy-lane) minmax(2.6em,auto) minmax(0,1fr);
+}
+.lex-copy-value {
+  display:grid;
+  place-items:center;
+  box-sizing:border-box;
+  width:var(--lex-copy-lane,15px);
+  height:var(--lex-copy-lane,15px);
+  justify-self:center;
+  padding:0;
+}
+.lex-copy-value > svg { display:block;width:100%;height:100%; }
+
+
+/* LEXEDITOR_DIVIDER_EDGE_20260911 */
+/* Not a thumb in a track. A thumb is what a scrollbar has, and a scrollbar is
+   what the last one looked like. The divider is an EDGE: at rest it is the
+   hairline between two panels, and pointing at it lights the whole edge in the
+   accent and puts a pair of arrows at the middle to say which way it moves. */
+.lex-panel-layout-divider::before {
+  top:0;
+  left:50%;
+  width:1px;
+  height:100%;
+  border-radius:0;
+  background:var(--lex-border);
+  transform:translateX(-50%);
+  transition:width .1s ease,background-color .1s ease;
+}
+.lex-panel-layout-divider:hover::before,
+.lex-panel-layout-divider:focus-visible::before,
+.lex-panel-layout-divider.dragging::before,
+.lex-panel-layout-dragging .lex-panel-layout-divider::before {
+  width:2px;
+  background:var(--lex-accent);
+}
+.lex-panel-layout-divider::after {
+  position:absolute;
+  top:50%;
+  left:50%;
+  content:"\2039\203A";
+  color:var(--lex-accent);
+  font:700 13px/1 var(--lex-symbol-font);
+  letter-spacing:-1px;
+  opacity:0;
+  transform:translate(-50%,-50%);
+  transition:opacity .1s ease;
+  pointer-events:none;
+}
+.lex-panel-layout-divider:hover::after,
+.lex-panel-layout-divider:focus-visible::after,
+.lex-panel-layout-divider.dragging::after,
+.lex-panel-layout-dragging .lex-panel-layout-divider::after { opacity:1; }
+
+
+/* LEXEDITOR_TAB_ROWS_EVEN_20260911 */
+/* A bar that has to wrap splits its tabs evenly between the rows, rather than
+   packing the first row full and leaving one tab alone on the second. The row
+   count is measured and written back as --lex-tab-rows. */
+.lex-shell-header nav[data-lex-tab-rows],
+.lex-subtab-bar[data-lex-tab-rows] {
+  display:grid;
+  grid-template-columns:repeat(var(--lex-tab-columns, 1), minmax(0, 1fr));
+}
+.lex-shell-header nav[data-lex-tab-rows] > *,
+.lex-subtab-bar[data-lex-tab-rows] > * {
+  grid-column:span var(--lex-tab-span, 1);
+  min-width:0;
+  max-width:none;
+}
+
+
+/* LEXEDITOR_TAB_ROWS_FIT_20260911 */
+/* A bar that wrapped is a bar asking for less padding before it asks for a
+   second row. The measuring pass runs again after this lands, so a bar that
+   now fits on one line drops the attribute and its tabs go back to full size. */
+.lex-shell-header nav[data-lex-tab-tight] > button,
+.lex-subtab-bar[data-lex-tab-tight] > .lex-subtab-button {
+  padding-inline:6px;
+  letter-spacing:0;
+}

@@ -262,6 +262,17 @@ controls and what it requires without permanent connector clutter.
 - Revealing help is a pointer or keyboard-focus state, never a click state. A
   click that leaves focus on the marker must not hold the swap open after the
   pointer has left.
+- A boolean's pin annotates the row, not the checkbox. It sits in the row's own
+  right-hand corner, clear of the checkbox and of the reference mark beside it.
+- The copy button is the whole width of its lane, so it centres by filling it.
+  The lane is the button plus even air, never a wide column with the button
+  pushed to one side of it.
+- The divider between two panels is an edge, not a thumb in a track. At rest it
+  is the hairline between the panels; pointing at it lights the whole edge and
+  shows a pair of arrows saying which way it moves.
+- A tab bar wraps only after tightening its tabs, and a bar that does wrap
+  splits them as evenly as the count allows: seven tabs over three rows is
+  three, two and two, never three, three and one.
 - Value boxes are square. One box shape for names and numbers alike, and a
   plugin theme may restyle it but never round only one kind.
 - A panel ends where the pagination bar begins. The bar reserves its own
