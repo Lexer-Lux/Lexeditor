@@ -25,7 +25,7 @@
     .ff7r-subtext{min-height:72px}
     .ff7r-resolved{display:flex;flex-direction:column;gap:2px;min-width:0}
     .ff7r-resolved small{color:var(--lex-muted);overflow-wrap:anywhere}
-    .ff7r-actions{display:flex;flex-wrap:wrap;gap:8px}.ff7r-actions button{padding:7px 12px}.ff7r-description{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0}.ff7r-description-text{min-width:0;overflow-wrap:anywhere}.ff7r-description-edit{padding:4px 10px;white-space:nowrap}
+    .ff7r-actions{display:flex;flex-wrap:wrap;gap:8px}.ff7r-actions button{padding:7px 12px}.ff7r-description{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0}.ff7r-description-text{min-width:0;overflow-wrap:anywhere}.ff7r-description-edit{padding:4px 10px;white-space:nowrap}.ff7r-description-input{display:block;width:100%;min-width:0;resize:vertical;font:inherit;line-height:1.35}
     .ff7r-message{white-space:pre-wrap;overflow-wrap:anywhere}.ff7r-error{color:var(--lex-danger,#b42318)}
     @media(max-width:700px){.ff7r-loot-slot{grid-template-columns:1fr}}
   </style>
@@ -479,14 +479,44 @@
     // editable copy that could disagree with the resource.
     if(semantic?.descriptionId)fields.push(detailField({label:"DESCRIPTION",
       control:descriptionControl(semantic),
-      help:infoHelp("An item's description is one entry in the FF7R text resource, the same place its name comes from. Editing it here would create a second copy that could disagree with the resource, so this opens the Text tab on that entry instead - where the edit is saved into the resource itself, in every language you choose.")}));
+      help:infoHelp("An item's description is one entry in the FF7R text resource that its name also comes from. Editing it here edits that entry: the Text tab shows the same record with the same pending change, and saving writes it into the resource. When another resource is loaded with unsaved changes this stays read-only rather than replacing it, and the button opens the entry on the Text tab.")}));
     return detailPanel({className:"ff7r-detail",title:semantic?.name||row.tag,identity:recordId(row.id),meta:table.name||"Item settings",body:[detailSection({title:"ITEM SETTINGS",body:fields})]});
   }
-  // The description is text-resource content, so it is edited on the Text tab.
-  // Showing it read-only and saying nothing was the reason "how come i can't
-  // edit them" was a fair question; this shows it and takes you to the edit.
+  // Descriptions live in resident_txtres for the current language, the same
+  // resource an item's name comes from. There is exactly one of those per
+  // language, so the Items tab loads it as the tab's text resource and the
+  // description is edited here, in the item, against that one loaded copy.
+  // Nothing is duplicated: the Text tab shows the same record with the same
+  // pending edit, and the existing text save writes it.
+  const residentTextAsset=()=>textAssets().find(row=>
+    row.language===state.textLanguage
+    && String(row.name||"").toLocaleLowerCase()==="resident_txtres");
+  function descriptionRecord(descriptionId){
+    if(!descriptionId)return null;
+    const resident=residentTextAsset();
+    if(!resident||state.textAsset!==resident.asset)return null;
+    return textRecords().find(row=>row.key===descriptionId)||null;
+  }
+  // Opening an item view brings that language's resident text with it, unless
+  // another resource is loaded with edits nobody has saved yet. Replacing that
+  // would silently drop someone's work, so in that case the description stays
+  // read-only and offers the trip to the Text tab instead.
+  async function ensureResidentText(){
+    const resident=residentTextAsset();
+    if(!resident||state.textAsset===resident.asset)return;
+    if(textEdits().length)return;
+    await loadTextAsset(resident.asset);
+  }
   function descriptionControl(semantic){
-    const shown=semantic.description
+    const record=descriptionRecord(semantic.descriptionId);
+    if(record&&state.activeSource==="mine"){
+      const box=el("textarea",{rows:2,class:"ff7r-description-input",
+        "aria-label":`Description for ${semantic.name||semantic.textId||"this item"}`,
+        oninput:event=>{record.text=event.target.value;refreshShell()}});
+      box.value=record.text??"";
+      return box;
+    }
+    const shown=(record?record.text:semantic.description)
       || `(${state.textLanguage||"US"} has no text for ${semantic.descriptionId})`;
     return el("div",{class:"ff7r-description"},
       el("div",{class:"ff7r-description-text"},shown),
@@ -614,7 +644,7 @@
       })]})}
 
   function render(){let content;const curated=curatedSpec(state.tab);if(curated)content=curatedPanel(curated);else if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="tweaks")content=tweaksPanel();else if(state.tab==="info")content=infoPanel();else if(state.tab==="text")content=textPanel();else if(state.tab==="economy")content=economyPanel();else if(state.tab==="loot")content=lootPanel();else content=dataPanel();$("#main").replaceChildren(content);refreshShell()}
-  async function navigate(tab){const previous=state.tab;state.tab=tab;render();if(tab==="text"&&state.textAsset&&!state.textData)await loadTextAsset(state.textAsset);else if(tab==="economy"){if(!await loadEconomy()){state.tab=previous;render()}}else if(tab==="loot"){if(!await loadLoot()){state.tab=previous;render()}}
+  async function navigate(tab){const previous=state.tab;state.tab=tab;render();if(tab==="text"&&state.textAsset&&!state.textData)await loadTextAsset(state.textAsset);else if(tab==="economy"){if(!await loadEconomy()){state.tab=previous;render()}else{await ensureResidentText();render()}}else if(tab==="loot"){if(!await loadLoot()){state.tab=previous;render()}}
     else if(curatedSpec(tab)){
       const spec=curatedSpec(tab);
       const item=curatedAsset(spec);
