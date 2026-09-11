@@ -79,15 +79,11 @@ def parse_player_stats(data: bytes) -> tuple[FFXPlayerStatsRecord, ...]:
 
 
 def _integer(value, label: str, maximum: int) -> int:
-    if isinstance(value, bool):
+    if isinstance(value, bool) or not isinstance(value, int):
         raise FFXPlayerStatsError(f"{label} must be an integer")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as error:
-        raise FFXPlayerStatsError(f"{label} must be an integer") from error
-    if not 0 <= parsed <= maximum:
+    if not 0 <= value <= maximum:
         raise FFXPlayerStatsError(f"{label} must be between 0 and {maximum}")
-    return parsed
+    return value
 
 
 def apply_edits(data: bytes, edits: list[dict]) -> bytes:
@@ -106,10 +102,9 @@ def apply_edits(data: bytes, edits: list[dict]) -> bytes:
                 "Each FFX player base-stat edit must contain only id, baseHp, baseMp, strength, defense, "
                 "magic, magicDefense, agility, luck, evasion and accuracy"
             )
-        try:
-            record_id = int(edit["id"])
-        except (TypeError, ValueError) as error:
-            raise FFXPlayerStatsError("FFX player-stat record ID must be an integer") from error
+        record_id = edit["id"]
+        if isinstance(record_id, bool) or not isinstance(record_id, int):
+            raise FFXPlayerStatsError("FFX player-stat record ID must be an integer")
         if not table.min_index <= record_id <= table.max_index:
             raise FFXPlayerStatsError(
                 f"FFX player-stat record ID must be between {table.min_index} and {table.max_index}"
