@@ -4,6 +4,7 @@
   "hoverableAltClick": false,
   "loadingTransitionMinimumSeconds": 2.5,
   "mainMenuHeightPercent": 5.0,
+  "pagerBarHeight": 52,
   "panelGapPercent": 0.5,
   "residentHandleWidthPercent": 5.0,
   "selectionHoldMs": 500,

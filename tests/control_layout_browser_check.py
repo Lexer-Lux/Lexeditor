@@ -222,6 +222,21 @@ def main():
               const row = f.querySelector('.lex-toggle-row');
               return typeof row.lexCopyValue === 'function' ? row.lexCopyValue() : null;}''')
             assert copied==5,copied
+            # No sub-subtabs, and no bar that offers a single choice.
+            bars=page.evaluate('''()=>({
+              nested:document.querySelectorAll('.lex-subtab-bar .lex-subtab-bar:not([hidden])').length,
+              lonely:[...document.querySelectorAll('.lex-subtab-bar:not([hidden])')]
+                .filter(b=>b.querySelectorAll('.lex-subtab-button').length===1).length})''')
+            assert bars['nested']==0,bars
+            assert bars['lonely']==0,bars
+            # A numeric ID leads the table and the name follows it.
+            order=page.evaluate('''()=>{
+              const head=document.querySelector('.lex-column-list-head');
+              if(!head)return null;
+              return [...head.querySelectorAll('[data-column-key]')]
+                .map(n=>n.dataset.columnKey);}''')
+            if order and 'id' in order and 'name' in order:
+                assert order.index('id')<order.index('name'),order
             # A property's name is written for a person, and a record's name is
             # never also a property: both are rules the shared demo has to keep,
             # because it is what every plugin is copied from.

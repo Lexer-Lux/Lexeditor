@@ -48,17 +48,22 @@
 
 ### Detail Panels / Property Presentation
 
-* [ ] Do **not** require every property to belong to a category.
-
-  * Categories are for human-readable organization only when they are genuinely useful.
-  * RDR2's detail-panel organization is a reasonable reference even if somewhat dated.
-* [ ] Use `?` information tooltips more widely where properties need explanation.
-* [ ] Property/info text should be present where the meaning of an input isn't self-evident.
-* [ ] Remove unnecessary disclaimers such as `Read only` when the UI state itself already makes that obvious.
+* [x] Do **not** require every property to belong to a category.
+  * In the manual, with RDR2 named as the reference for grouping that earns
+    its place.
+* [x] Use `?` information tooltips more widely where properties need explanation.
+  * They are help pips, and the manual says which properties owe one and what
+    a pip may not say. RDR1's loot page moved its wall of text into one.
+* [x] Property/info text should be present where the meaning of an input isn't self-evident.
+* [x] Remove unnecessary disclaimers such as `Read only` when the UI state itself already makes that obvious.
+  * RDR1's toolbar banner is gone; Warband's troop panel says where the record
+    is edited instead of that it is not editable here.
 * [ ] Standardize the Details-panel 3D Viewer control:
-
   * Header control switches/opens the Details panel's 3D Viewer.
   * Plugins should not be able to silently omit this feature where 3D data is supported.
+  * NOTE: the shared control exists (`modelPreview` on the panel heading icon).
+    Making omission impossible needs a per-plugin declaration of whether the
+    record type has 3D data, which Warband and RDR2 do not currently carry.
 
 ### Menu Bar / Window Chrome
 
@@ -78,16 +83,20 @@
 
 ### Developer Settings / Manual
 
-* [ ] Pagination-bar height should be configurable/documented as a developer setting.
-* [ ] Document **input sliders** as the official term for sliders embedded inside input boxes.
-* [ ] Document the no-sub-subtabs rule.
-* [ ] Document that categories are optional and should exist only when useful to humans.
-* [ ] Document that properties should have meaningful human-readable names.
-* [ ] Document/reinforce standard table column ordering:
-  * Numeric ID → first column.
-  * Name → second column.
-  * If the ID itself is a string/name-like value, Name may precede ID.
-* [ ] Consider some form of verifier/enforcement for global UI conventions so these problems do not have to be fixed independently in every plugin.
+* [x] Pagination-bar height should be configurable/documented as a developer setting.
+  * `pagerBarHeight`, 36 to 80 pixels, default 52.
+* [x] Document **input sliders** as the official term for sliders embedded inside input boxes.
+* [x] Document the no-sub-subtabs rule.
+* [x] Document that categories are optional and should exist only when useful to humans.
+* [x] Document that properties should have meaningful human-readable names.
+* [x] Document/reinforce standard table column ordering.
+* [x] Consider some form of verifier/enforcement for global UI conventions so these problems do not have to be fixed independently in every plugin.
+  * `tests/control_layout_browser_check.py` is that verifier, run against the
+    shared demo. It now refuses: a nested subtab bar, a one-tab bar, a name
+    column before a numeric ID, a `NAME` property, a storage-label property
+    name, a clipped switch, a lopsided copy button, a boolean row out of line,
+    a rounded value box, a fill taller than its box, a panel that does not sit
+    on the pagination bar, and a rail that is not beside its property.
 
 ### ReShade / Mod Architecture — Questions
 

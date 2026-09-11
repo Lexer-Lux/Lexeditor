@@ -232,7 +232,7 @@
       body:node.missing?[el("p",{class:"error"},"This upgrade refers to a troop missing from the parsed active source.")]:[
         el("div",{class:"detail-grid"},...["plural","level","faction","flags","status","line"].flatMap(key=>[
           el("div",{class:"label"},key),el("div",{},String(node[key]??"—"))])),
-        el("p",{},"Read-only troop details. Edit module_troops.py through the Data Map to change this record.")]});
+        el("p",{},"Troop records live in module_troops.py; open it in the Data Map to change one.")]});
   }
   function renderUpgrades(){
     const all=WarbandTroopTrees.build(state.troops.rows,state.upgrades.rows);
@@ -261,7 +261,7 @@
       onclick:()=>{state.selectedUpgrade=node.id;stage.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.troop===node.id)));details.replaceChildren(troopTreeDetail(node));}},
       el("strong",{},node.name||node.id),el("small",{},node.id));stage.append(button);}
     const master=el("div",{class:"warband-tree-scroll","aria-label":"Bottom-up troop upgrade tree"},
-      graph.cyclic?el("p",{class:"error"},"Cyclic upgrade links detected. Cycle members share a row; arrows preserve the source links."):el("p",{},"Upgrades grow upward. Select a troop to see its details."),stage);
+      graph.cyclic?el("p",{class:"error"},"Cyclic upgrade links detected. Cycle members share a row; arrows preserve the source links."):null,stage);
     $("#main").replaceChildren(masterDetail(master,details,"warband-trees",{splitKey:"warband-troop-trees",defaultSplit:65}));
     requestAnimationFrame(()=>{if(master.isConnected)master.scrollTop=master.scrollHeight;});
   }

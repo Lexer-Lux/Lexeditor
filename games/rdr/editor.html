@@ -222,11 +222,11 @@
       el("thead",{},el("tr",{},el("th",{},"Item enum"),el("th",{},"Quantity"),el("th",{},"Weight"))),
       el("tbody",{},...bonusRows));
     const source=el("section",{class:"card"},
-      el("h2",{},"Corpse bonus item",el("span",{class:"asi-badge"},"ASI override")),
-      el("div",{class:"source-note"},el("strong",{},"This is not an RPF replacement. "),"LexerRDR.asi owns this schema-versioned project file. Only the five item IDs proven in Function_117 are accepted."),
+      el("h2",{},"Corpse bonus item",el("span",{class:"asi-badge"},"ASI override"),
+        infoHelp("Not an RPF replacement: LexerRDR.asi owns this schema-versioned project file, and it accepts only the five item IDs proven in Function_117.")),
       lootNumber(bonus,"chancePercent","Bonus roll chance (%)","1","0","100"),bonusTable);
     const moneyCard=el("section",{class:"card"},el("h2",{},"Money paths",el("span",{class:"asi-badge"},"ASI override")),el("div",{class:"source-note"},`Function_123: ${money.decoratorPaths.map(path=>`${path.decorator} = ${path.operation}`).join(" · ")}`),el("div",{class:"field-grid"},lootNumber(base.range,"minimum","Base minimum","0.01"),lootNumber(base.range,"maximum","Base maximum","0.01"),lootFlag(base,"applyStatScale","Apply stat scale"),lootFlag(base,"applyItem17Multiplier","Apply item 17 multiplier"),lootFlag(base,"applyFinalMultiplier","Apply final multiplier")));
-    const evidence=el("section",{class:"card"},el("h2",{},"Installed-script evidence"),el("div",{class:"path-row"},el("b",{},"Archive"),el("code",{},doc.source?.archive||"Not supplied")),el("div",{class:"path-row"},el("b",{},"Script"),el("code",{},doc.source?.script||"Not supplied")),el("pre",{class:"manifest"},(doc.source?.functions||[]).map(fn=>`${fn.name} @ ${fn.positionHex} / ${fn.positionDecimal}\n${fn.role}`).join("\n\n")));
+    const evidence=el("details",{class:"card loot-evidence"},el("summary",{},"Which script this is reading"),el("div",{class:"path-row"},el("b",{},"Archive"),el("code",{},doc.source?.archive||"Not supplied")),el("div",{class:"path-row"},el("b",{},"Script"),el("code",{},doc.source?.script||"Not supplied")),el("pre",{class:"manifest"},(doc.source?.functions||[]).map(fn=>`${fn.name} @ ${fn.positionHex} / ${fn.positionDecimal}\n${fn.role}`).join("\n\n")));
     $("#main").replaceChildren(el("div",{class:"stack"},el("div",{class:"loot-layout"},source,moneyCard),evidence));shell.refresh();
   }
 
@@ -248,7 +248,9 @@
   }
 
   function renderProject(){
-    $("#toolbar").replaceChildren(el("span",{},"Read-only game source and Git-backed project overrides"));
+    // No "read only" banner. Every read-only value already carries the shared
+    // lock mark, so the banner restated in words what the controls show.
+    $("#toolbar").replaceChildren();
     const sources=state.dashboard.manifest?.sources||{};
     const statusCard=el("section",{class:"card"},el("h2",{},"Preparation"),state.dashboard.problems.length?el("div",{class:"error"},...state.dashboard.problems.map(problem=>el("div",{},problem))):el("div",{class:"ok"},`${state.files.counts.all||0} tuning files, ${state.items?.counts?.all||0} items, and ${state.shops?.counts?.items||0} shop entries prepared. Installed archives are read-only.`),el("pre",{class:"manifest"},Object.keys(sources).length?`${Object.entries(sources).map(([label,source])=>`${label}: ${source.path}\nSHA-256: ${source.sha256}`).join("\n\n")}\n\nPrepared: ${state.dashboard.manifest.preparedAt}\nInventory files: ${state.dashboard.manifest.fileCounts?.inventory||0}\nShop dictionaries: ${state.dashboard.manifest.fileCounts?.gringoUnpacked||0}`:"Preparation manifest is not available."));
     const redHook=state.dashboard.redHook;

@@ -24,12 +24,36 @@ before adding or changing a game-specific override.
 
 ## Subtabs
 
+A page may divide itself with **subtabs**. A bar with fewer than two tabs in it
+is not shown at all: a control that offers no choice is not a control.
+
+**There are no sub-subtabs.** Two layers of tabs above the page is the limit.
+Where a plugin needs a further division it uses a tabbed panel inside the page,
+and a tabbed panel may not contain another one. This is enforced rather than
+asked for: `tabbedPanel()` throws when a subtab bar ends up nested inside
+another, so the nesting cannot ship.
+
+A selected tab is a **folder tab**. It lifts, and it carries a band of the
+page's own surface down with it, so the page reads as hanging off the tab
+rather than sitting behind a gap. Tab movement is tweened, never snapped.
+
+Tweaks is an ordinary page with an ordinary tab. Settings is the only tab that
+sits apart from the run.
+
 A **subtab bar** navigates related views inside one top-level tab. It uses the
 shared `subtabBar()` control, keyboard focus, selected state, and theme tokens.
 A plugin supplies only the labels, current subtab, and change callback. It must
 not copy a top-level tab bar or create unrelated private button styling.
 
 ## Table panels
+
+**Column order is fixed.** A numeric ID is the first column and the record's
+name is the second. Where the ID is itself a name-like string, the name may
+come first, because two name-shaped columns in the other order read as a
+duplicate. Everything else follows.
+
+A column lights when its **header** is hovered. A cell lights itself and its
+matching property in the detail panel, not the whole column.
 
 A **Table panel** is a record list with columns. It supplies:
 
@@ -50,6 +74,22 @@ extends to the right. For example, `100`, `10`, and `0.9999` keep the same
 decimal boundary instead of using simple right alignment.
 
 ## Detail panels
+
+**Categories are optional.** A group exists when it helps a person find
+something, not because every property must belong to one. A panel of eight
+properties with no natural division is eight properties, not eight properties
+under a heading. RDR2's detail panels are the reference for grouping that earns
+its place.
+
+A **?** beside a property is a **help pip**, and a property whose meaning is not
+obvious from its name and its control should carry one. A pip explains what the
+value does to the game. It never restates the label, the storage type, the
+bounds, the step or the unit - all of which the property already shows.
+
+**No disclaimers for what the controls already say.** A read-only value carries
+the shared lock mark and cannot be typed into; a banner saying "read only"
+above it is the same fact in words. Say the thing the reader cannot see -
+where the value is edited instead, for example - or say nothing.
 
 A **Detail panel** edits one selected record. It has one identity heading and
 groups of rows. Every row uses the same label-to-value division. A plugin can
@@ -134,6 +174,11 @@ name. A boolean shows a check or X. A transformed number shows its transformed
 unit.
 
 ## Units and booleans
+
+A bounded number draws its own value as a fill behind its box, and on hover
+that fill offers a drag handle. The fill and the handle together are an
+**input slider**: a slider living inside a value box, not a separate control
+beside one. It is drawn against the box, never against the property row.
 
 A unit is part of its field, and it belongs to the **number**, not to the box.
 It can be a suffix such as `%`, `/255`, `G`, or `×`, or a prefix when the game
