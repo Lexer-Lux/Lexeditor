@@ -5184,12 +5184,19 @@ ${contents.path}`});
       const listStyle = getComputedStyle(listNode);
       const borderHeight = (parseFloat(listStyle.borderTopWidth) || 0) +
         (parseFloat(listStyle.borderBottomWidth) || 0);
-      // availableNode is the complete paged view. Its bottom pager occupies
-      // real height in the second grid row; counting it as list space is what
-      // produced one clipped row plus a vertical scrollbar on Tweaks/tables.
+      // availableNode is the complete paged view. A pager that sits IN that
+      // view occupies real height in its second grid row, and counting that as
+      // list space produced one clipped row plus a vertical scrollbar. A pager
+      // pinned to the window occupies none: the page already reserves its
+      // height as padding under #main, so subtracting it here reserved the
+      // same band twice and left exactly one pager's worth of empty ground
+      // between the last row and the bar.
       const pagerNode = availableNode.querySelector?.(":scope > .lex-pager");
-      const pagerHeight = pagerNode?.getBoundingClientRect().height ||
-        parseFloat(getComputedStyle(availableNode).getPropertyValue("--lex-pager-height")) || 0;
+      const pagerInFlow = pagerNode && getComputedStyle(pagerNode).position !== "fixed";
+      const pagerHeight = pagerInFlow
+        ? pagerNode.getBoundingClientRect().height
+        : pagerNode ? 0
+        : parseFloat(getComputedStyle(availableNode).getPropertyValue("--lex-pager-height")) || 0;
       const availableHeight = Math.max(0, availableNode.clientHeight - pagerHeight);
       const available = Math.max(0, availableHeight - borderHeight - headerHeight);
       const minimumRowHeight = Math.max(0, Number(options.minRowHeight) || 0);

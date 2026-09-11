@@ -117,15 +117,19 @@ def main():
                 for box in page.locator('.lex-detail-field[data-lex-type] input:not([type=checkbox])').all():
                     if not box.is_visible():continue
                     assert box.evaluate("e=>getComputedStyle(e).borderRadius")=='0px',                        box.evaluate("e=>[e.className,getComputedStyle(e).borderRadius]")
+                # Measured from the last row a reader can SEE, not from the
+                # box around it: the pane reached the bar while its content
+                # stopped a pager's height short, which is the band that was
+                # reported three times and measured away twice.
                 seat=page.evaluate('''()=>{
                   const bar=document.querySelector('.lex-pager');
                   if(!bar)return null;
-                  const panes=[...document.querySelectorAll('#main .lex-panel-layout,#main .lex-detail-panel,#main .lex-column-list')]
-                    .map(n=>n.getBoundingClientRect()).filter(r=>r.height>40);
-                  if(!panes.length)return null;
-                  return Math.round(bar.getBoundingClientRect().top-Math.max(...panes.map(r=>r.bottom)));}''')
+                  const rows=[...document.querySelectorAll('#main .lex-column-list-row')]
+                    .map(n=>n.getBoundingClientRect()).filter(r=>r.height>2);
+                  if(!rows.length)return null;
+                  return Math.round(bar.getBoundingClientRect().top-Math.max(...rows.map(r=>r.bottom)));}''')
                 if seat is not None:
-                    assert -1<=seat<=1,seat
+                    assert -2<=seat<=6,seat
                 page.screenshot(path=str(OUT/f'blank-{width}.png'))
             page.set_viewport_size({'width':1600,'height':1000})
             page.locator('nav button[data-tab=two]').click()
