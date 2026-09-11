@@ -5693,3 +5693,82 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   left:auto !important;
   transform:none !important;
 }
+
+
+/* LEXEDITOR_BOOLEAN_ROW_GRID_20260911 */
+/* One grid holds the whole right-hand end of a boolean row. Row one is the
+   leader arrow and the checkbox it points at, so the arrow is centred on the
+   BOX rather than on the row and cannot drift when the row grows. Row two is
+   the reading, in the box's column, exactly the box's width. */
+.lex-boolean-field > .lex-detail-field-label { padding-right:0 !important; }
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  display:grid !important;
+  /* Column two is the checkbox's own size, so the reading under it can never
+     be wider than the box it reads for. Left to max-content the column grew to
+     whichever of the two was wider, and a two-glyph reading pushed its own
+     left edge nine pixels past the box. */
+  --lex-boolean-box:19px;
+  grid-template-columns:minmax(12px,1fr) var(--lex-boolean-box);
+  grid-template-rows:max-content max-content;
+  align-content:center;
+  justify-items:end;
+  column-gap:3px;
+  row-gap:3px;
+  padding-block:3px;
+  width:100%;
+  height:auto;
+}
+.lex-boolean-field .lex-source-control > .lex-field-boolean-arrow {
+  grid-area:1 / 1 / 2 / 2;
+  align-self:center;
+  justify-self:stretch;
+  width:auto;
+  min-width:12px;
+  margin:0;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control > input[type="checkbox"] {
+  /* Explicit areas, because an auto-placed sibling (the pin) was enough to
+     open an implicit column and slide the reading out from under the box. */
+  grid-area:1 / 2 / 2 / 3;
+  box-sizing:border-box;
+  width:var(--lex-boolean-box);
+  height:var(--lex-boolean-box);
+  margin:0 !important;
+}
+.lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  position:static !important;
+  grid-area:2 / 2 / 3 / 3;
+  justify-self:stretch;
+  align-self:center;
+  width:100% !important;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  margin:0 !important;
+  padding:0;
+  transform:none;
+  /* `translate` is its own property now, so `transform:none` does not clear
+     it. A stray -50% left over from the old centred rail was sliding the
+     reading half its own width off the box it reads for. */
+  translate:none !important;
+  font-size:9px;
+  line-height:1;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  grid-template-columns:auto auto;
+  justify-content:center;
+  column-gap:.25em;
+  padding:0;
+}
+/* The pin sits where every other property puts its pin: the top-right corner
+   of the control. */
+.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
+  grid-area:1 / 2 / 2 / 3;
+  position:absolute !important;
+  top:2px !important;
+  right:2px !important;
+  bottom:auto !important;
+  left:auto !important;
+  transform:none !important;
+}

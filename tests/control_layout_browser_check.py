@@ -101,16 +101,40 @@ def main():
                               Math.round(box.getBoundingClientRect().height)];}''')
                     if fill is not None:
                         assert fill[0]<=fill[1]+3,fill
-                # A boolean's pin annotates the row, so it never lands on the
-                # checkbox it annotates.
-                for field in page.locator('.lex-boolean-field:has(.lex-column-pin)').all():
+                # A boolean row lines up with the properties around it: its
+                # name ends on the shared label edge, its checkbox on the shared
+                # value edge, the leader arrow points at the middle of the box
+                # whatever the row's height, the reading sits under the box
+                # inside its width, and the pin stays in the row.
+                names=page.evaluate('''()=>[...document.querySelectorAll('.lex-detail-field')]
+                  .map(f=>{const t=f.querySelector('.lex-detail-field-label-text');
+                    if(!t)return null;
+                    const r=document.createRange();r.selectNodeContents(t);
+                    return Math.round(r.getBoundingClientRect().right);}).filter(v=>v!==null)''')
+                if names:
+                    assert max(names)-min(names)<=1,names
+                for field in page.locator('.lex-boolean-field').all():
                     if not field.is_visible():continue
-                    clear=field.evaluate('''e=>{
-                      const pin=e.querySelector('.lex-column-pin').getBoundingClientRect();
-                      const box=e.querySelector('input[type=checkbox]').getBoundingClientRect();
-                      return (pin.right<box.left||pin.left>box.right||
-                              pin.bottom<box.top||pin.top>box.bottom)?pin.left-box.right:null;}''')
-                    assert clear is not None and clear>=4,clear
+                    row=field.evaluate('''e=>{
+                      const box=e.querySelector('input[type=checkbox]');
+                      const arrow=e.querySelector('.lex-field-boolean-arrow');
+                      if(!box||!arrow)return null;
+                      const bb=box.getBoundingClientRect(),ab=arrow.getBoundingClientRect();
+                      const mark=e.querySelector('.lex-reference-values');
+                      const pin=e.querySelector('.lex-column-pin');
+                      return {who:e.querySelector('.lex-detail-field-label-text')?.textContent.trim(),
+                              onCentre:Math.round((ab.top+ab.height/2)-(bb.top+bb.height/2)),
+                              tip:Math.round(bb.left-ab.right),
+                              markLeft:mark?Math.round(mark.getBoundingClientRect().left-bb.left):0,
+                              markRight:mark?Math.round(bb.right-mark.getBoundingClientRect().right):0,
+                              markUnder:mark?mark.getBoundingClientRect().top>=bb.bottom-1:true,
+                              pinIn:pin?pin.getBoundingClientRect().right<=e.getBoundingClientRect().right+1:true};}''')
+                    if row is not None:
+                        assert abs(row['onCentre'])<=1,row
+                        assert 0<=row['tip']<=4,row
+                        assert row['markUnder'],row
+                        assert abs(row['markLeft'])<=1 and abs(row['markRight'])<=1,row
+                        assert row['pinIn'],row
                 # A wrapped tab bar splits its tabs as evenly as the count allows.
                 spread=page.evaluate('''()=>{
                   const bar=document.querySelector('.lex-shell-header nav');

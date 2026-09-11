@@ -1086,6 +1086,14 @@
     booleanField ? arrow : null,
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null), typeRail);
+    // The leader arrow shares the checkbox's grid row, so it points at the
+    // middle of the box whatever else the row is carrying and however tall the
+    // row turns out to be. Anchored to the row instead, it tracked the row's
+    // centre and drifted off the box as soon as anything sat under it.
+    if (booleanField && arrow &&
+        control instanceof Element && control.matches(".lex-source-control")) {
+      control.append(arrow);
+    }
     // The rail runs down the side of one row, so its type name has to fit that
     // row's height. A long name (or a range shown on focus) is set smaller
     // rather than being allowed to run into the rows above and below.
