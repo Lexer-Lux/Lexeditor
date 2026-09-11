@@ -739,21 +739,23 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
    width from the mod name. */
 .lex-project-control { display:flex; align-items:center; gap:6px; min-width:0; }
 .lex-project-control > .lex-project-select { flex:1 1 auto; min-width:0; }
+/* The mod report button sits on the mod's own row, shaped like the pencil and
+   the folder next to it. As a lone bordered circle in the command row it was a
+   squashed letter in a ring, and it reported on whichever mod was loaded
+   rather than the one being pointed at. */
 .lex-project-about {
-  flex:0 0 auto;
   display:grid;
   place-items:center;
-  width:28px;
-  min-width:28px;
+  width:34px;
+  height:28px;
   padding:0;
-  border:1px solid var(--lex-border);
-  border-radius:50%;
-  color:var(--lex-highlight);
-  background:var(--lex-panel-2);
-  font:800 13px/1 var(--lex-symbol-font);
+  border:0;
+  color:var(--lex-muted);
+  background:transparent;
+  font:inherit;
   cursor:pointer;
 }
-.lex-project-about:hover { color:var(--lex-accent-text); background:var(--lex-accent); }
+.lex-project-about > svg { width:17px;height:17px; }
 
 .lex-project-name { flex: 0 0 auto; color: var(--lex-highlight); white-space: nowrap; }
 .lex-project-path {
@@ -786,11 +788,24 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   box-shadow: 0 10px 28px #0008;
   font-family: var(--lex-font);
 }
+/* Every row in the mod menu - an editable mod or a read-only reference - is
+   the same five columns: mode, name, description, buttons, tick. Each kind of
+   row used to size its own columns, so "Packaged unchanged sample data" and
+   "Saved Blank samples" began a hundred pixels apart and the two ticks sat on
+   different edges. The name column is one width for the whole menu, measured
+   from the longest name in it. */
 .lex-project-menu-item {
   display: grid;
-  grid-template-columns:minmax(0,1fr) 34px 34px 34px 26px;
+  grid-template-columns:
+    auto
+    var(--lex-project-name-width, max-content)
+    minmax(40px,1fr)
+    var(--lex-project-actions-width, 106px)
+    26px;
+  align-items:center;
+  gap:9px;
   width: 100%;
-  padding:0;
+  padding:7px 9px;
   border: 0;
   border-radius: 2px;
   color: var(--lex-text);
@@ -798,42 +813,42 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   text-align: left;
   font: inherit;
 }
+/* An editable mod's row wraps its mode, name and description in the button
+   that selects it. The button dissolves into the row's own grid so those three
+   land in the same columns a reference row puts them in. */
+.lex-project-menu-item > .lex-project-menu-item-select { display:contents; }
 .lex-project-menu-item-select {
   display:grid;
-  /* Lock/pencil, name, path - three things on one row. Two columns pushed the
-     path onto a second implicit row, where it sat under the mode icon and the
-     two overlapped. */
-  grid-template-columns:auto auto minmax(40px,1fr);
   align-items:center;
   gap:9px;
   min-width:0;
-  padding:7px 9px;
   border:0;
   color:inherit;
   background:transparent;
   text-align:left;
   font:inherit;
+  cursor:pointer;
+}
+.lex-project-menu-item-actions {
+  display:grid;
+  min-height:28px;
+  grid-auto-flow:column;
+  justify-content:end;
+  align-items:center;
+  gap:2px;
+  min-width:var(--lex-project-actions-width, 106px);
 }
 .lex-project-rename {
   display:grid;
   place-items:center;
   width:34px;
+  height:28px;
   border:0;
   color:var(--lex-muted);
   background:transparent;
   font:inherit;
 }
 .lex-project-rename:hover { color:var(--lex-highlight);background:var(--lex-panel-2); }
-.lex-project-remove {
-  display:grid;
-  place-items:center;
-  width:34px;
-  border:0;
-  color:var(--lex-muted);
-  background:transparent;
-  font:inherit;
-}
-.lex-project-remove:hover { color:#ef5d61;background:var(--lex-panel-2); }
 .lex-project-menu-item:hover,
 .lex-project-menu-item.active { background: var(--lex-panel-2); }
 .lex-project-menu-name { color: var(--lex-highlight); white-space: nowrap; }
@@ -872,9 +887,6 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   min-width:14px;
   height:14px;
   transform:translateY(-50%);
-}
-.lex-project-reference.lex-project-menu-item-select {
-  grid-template-columns:auto auto minmax(40px,1fr) auto;
 }
 .lex-project-source-mode,
 .lex-project-source-status {
@@ -1230,7 +1242,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 .lex-field-boolean-arrow::after {
   position:absolute;
-  right:-1px;
+  /* Flush with the end of the line, not a pixel past it. The label clips what
+     overflows it, and the label ends exactly where this line does, so that one
+     pixel of overhang was the arrowhead's own tip being sliced off against an
+     edge with nothing on the other side of it. */
+  right:0;
   top:-4px;
   width:0;
   height:0;
@@ -4100,11 +4116,12 @@ body:has(.lex-data-map-table) #main {
 }
 
 /* A reference row is a whole row like any mod, not a bare label. */
-.lex-project-reference { grid-column:1 / -1;align-items:center; }
+.lex-project-reference { align-items:center; }
 .lex-project-folder {
   display:grid;
   place-items:center;
   width:34px;
+  height:28px;
   border:0;
   color:var(--lex-muted);
   background:transparent;
@@ -4418,10 +4435,14 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
 }
 /* Only a rail that HAS a help mark may blank its type: on a property without
    one this hid the type code and put nothing in its place, so pointing at the
-   rail of a plain property emptied it. */
-.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-name,
-.lex-field-type-rail:hover:has(> .lex-info-help) > .lex-field-type-range { opacity:0 !important; }
-.lex-field-type-rail:hover > .lex-info-help { opacity:1 !important; }
+   rail of a plain property emptied it. Tabbing to the mark reveals it the same
+   way pointing at the rail does; clicking it does not, because a click that
+   leaves focus behind would hold the swap open after the pointer had left. */
+.lex-field-type-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-field-type-name,
+.lex-field-type-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-field-type-range {
+  opacity:0 !important;
+}
+.lex-field-type-rail:is(:hover,:has(:focus-visible)) > .lex-info-help { opacity:1 !important; }
 /* A sorted field uses the same centre point as its type/help marker. */
 .lex-detail-field[data-lex-sort] .lex-field-type-rail::after {
   position:absolute;
@@ -4788,9 +4809,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-curve-axis-start,.lex-curve-axis-end,.lex-curve-axis-name-x {
   top:auto !important; bottom:4px !important;
 }
-.lex-project-menu-item-select {
-  grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;
-}
 .lex-project-menu-item:has(.lex-project-source-status.disabled),
 .lex-project-reference:has(.lex-project-source-status.disabled) {
   filter:grayscale(1) !important; opacity:.42 !important;
@@ -4965,12 +4983,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   display:grid; grid-template-columns:19px minmax(0,1fr); gap:6px; align-items:center;
 }
 .lex-copy-value:focus-visible { opacity:1; }
-.lex-project-menu-item > .lex-project-menu-item-select {
-  grid-template-columns:auto minmax(0,1fr) minmax(0,1fr);
-}
 .lex-project-menu-item > .lex-project-source-status { align-self:center; }
-.lex-project-rename,.lex-project-folder { border-radius:8px; margin-block:3px; }
-.lex-project-rename:is(:hover,:focus-visible),.lex-project-folder:is(:hover,:focus-visible) {
+.lex-project-rename,.lex-project-folder,.lex-project-about { border-radius:8px; }
+.lex-project-rename:is(:hover,:focus-visible),
+.lex-project-folder:is(:hover,:focus-visible),
+.lex-project-about:is(:hover,:focus-visible) {
+  color:var(--lex-highlight);
   background:color-mix(in srgb,var(--lex-accent) 28%,var(--lex-panel));
 }
 .lex-toggle-rail { position:relative; align-self:stretch; opacity:1; }
@@ -5041,11 +5059,15 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-toggle > .lex-toggle-rail > .lex-toggle-type { display:block !important; }
 .lex-toggle > .lex-toggle-rail > .lex-info-help { display:none !important; }
 /* ...and the mark replaces it only while the rail itself is pointed at, and
-   only where there is a mark to replace it with. */
-.lex-toggle > .lex-toggle-rail:is(:hover,:focus-within):has(> .lex-info-help) > .lex-toggle-type {
+   only where there is a mark to replace it with. The keyboard half is
+   :focus-visible, not :focus-within: the mark is a focusable span, so clicking
+   it left focus sitting there and the swap stayed up long after the pointer
+   had gone somewhere else. A click no longer holds the rail open; tabbing to
+   the mark still does. */
+.lex-toggle > .lex-toggle-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-toggle-type {
   display:none !important;
 }
-.lex-toggle > .lex-toggle-rail:is(:hover,:focus-within) > .lex-info-help {
+.lex-toggle > .lex-toggle-rail:is(:hover,:has(:focus-visible)) > .lex-info-help {
   display:inline-grid !important;
   width:18px; min-width:18px; height:18px; min-height:18px;
 }
@@ -5232,3 +5254,52 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   text-overflow:ellipsis;
   white-space:nowrap;
 }
+
+
+/* LEXEDITOR_BOOLEAN_REFERENCE_TIGHT_20260910 */
+/* A boolean's reference does not live in the panel-edge rail; it sits in its
+   own track beside the checkbox. Holding the panel's tag column there put a
+   gap the width of an "R1" between a lone "V" and its tick, and the track was
+   reserved at three and a half em for two glyphs. Both are taken from what
+   this one mark actually needs. */
+.lex-boolean-field { --lex-boolean-reference-width:max-content; }
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  grid-template-columns:auto auto;
+  column-gap:.35em;
+}
+.lex-boolean-field .lex-source-control > .lex-reference-values {
+  width:max-content;
+  min-width:0;
+}
+
+
+/* LEXEDITOR_REFERENCE_PROBE_20260910 */
+/* A hidden copy of the longest entry a panel can ever show. The rail is
+   reserved from this rather than from the entries on screen, so editing a
+   value into or out of agreement with a reference cannot resize the rail and
+   move every value box on the panel. It is pinned to the largest type a stack
+   uses, because a deeper stack only ever draws smaller. */
+.lex-reference-probe {
+  position:absolute;
+  top:0;
+  left:0;
+  visibility:hidden;
+  width:max-content;
+  max-height:none;
+  pointer-events:none;
+  --lex-reference-slot:11px;
+}
+.lex-reference-probe .lex-reference-value { grid-template-columns:auto auto; }
+
+
+/* LEXEDITOR_VARIABLE_COPY_20260910 */
+/* A multi-variable property gives each variable its own copy button, so the
+   item is three columns: button, name, box. The button holds its lane whether
+   or not it is being pointed at, the same way the property-level one does, so
+   no box moves when the pointer crosses the row. */
+.lex-multi-number-item {
+  grid-template-columns:19px minmax(2.6em,auto) minmax(0,1fr);
+}
+.lex-multi-number-item > .lex-copy-value { grid-column:1; }
+.lex-detail-field:hover .lex-multi-number-item > .lex-copy-value { opacity:.7; }
+.lex-multi-number-item > .lex-copy-value:hover { opacity:1; }

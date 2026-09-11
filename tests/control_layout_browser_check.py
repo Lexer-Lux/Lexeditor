@@ -102,6 +102,46 @@ def main():
             data=sort.evaluate("""e=>{const s=getComputedStyle(e,'::after'),r=e.getBoundingClientRect(),f=e.closest('.lex-detail-field').getBoundingClientRect();return {y:r.top+parseFloat(s.top),center:f.top+f.height/2,x:r.left-f.left}}""")
             assert abs(data['y']-data['center'])<1 and abs(data['x'])<1,data
             page.screenshot(path=str(OUT/'sorted-detail.png'))
+            page.locator('nav button[data-tab=one]').click()
+            page.locator('.lex-detail-field').first.wait_for()
+            page.mouse.move(0,0);page.wait_for_timeout(250)
+            # A reference pillar reserves its room in advance. Nothing the
+            # reader types may move a value box: not a rail appearing, not one
+            # disappearing as an edit lands on vanilla, not a longer number.
+            edges = lambda: page.evaluate('''() => [...document.querySelectorAll(
+                '.lex-source-control > :is(input,select,.lex-unit-field)')]
+                .map(e => Math.round(e.getBoundingClientRect().right))''')
+            settled = edges()
+            value = page.locator('.lex-detail-field',has_text='1-REF VALUE').locator('input[type=number]')
+            for sample in ('25','7','255','40'):
+                value.fill(sample);page.wait_for_timeout(200)
+                assert edges()==settled,(sample,settled,edges())
+            # A property holds variables. A multi-variable property gives each
+            # of them its own copy button; a row of switches is one stored word
+            # and copies that word, not the first switch on it.
+            multi = page.locator('.lex-detail-field',has_text='MULTI-NUMBER').first
+            assert multi.locator(':scope > .lex-detail-field-control > .lex-copy-value').count()==0
+            items = multi.locator('.lex-multi-number-item')
+            assert items.count()>1 and multi.locator('.lex-multi-number-item > .lex-copy-value').count()==items.count()
+            copied = page.evaluate('''() => {
+              const f = [...document.querySelectorAll('.lex-detail-field')].find(
+                f => f.textContent.includes('USE FLAGS'));
+              const row = f.querySelector('.lex-toggle-row');
+              return typeof row.lexCopyValue === 'function' ? row.lexCopyValue() : null;}''')
+            assert copied==5,copied
+            # Every row of the mod menu puts its name, description, buttons and
+            # status in the same columns.
+            page.get_by_role('button',name='Active mod project',exact=True).click()
+            page.wait_for_timeout(250)
+            columns=page.evaluate('''() => [...document.querySelectorAll('.lex-project-menu-item')].map(row => {
+              const at = s => { const e = row.querySelector(s);
+                return e ? Math.round(e.getBoundingClientRect().left) : null; };
+              return [at('.lex-project-source-mode'), at('.lex-project-menu-name'),
+                      at('.lex-project-menu-path'), at('.lex-project-source-status')];})''')
+            assert len(columns)>1 and all(row==columns[0] for row in columns),columns
+            assert page.locator('.lex-project-menu-item .lex-project-about').count()>0
+            assert page.locator('.lex-project-remove').count()==0
+            page.keyboard.press('Escape')
             page.locator('nav button[data-tab=subtabs]').click()
             for tab in page.locator('.lex-subtab-button').all():
                 tab.hover()
@@ -150,6 +190,13 @@ def main():
                   return range.getBoundingClientRect().left-rail.getBoundingClientRect().right;}''')
                 if offset is not None:
                     assert 0<=offset<=10,(field.inner_text()[:20],offset)
+            # Clicking the help mark must not leave the swap held open once
+            # the pointer has gone: the mark is focusable, and :focus-within
+            # kept it up for as long as focus sat there.
+            a.locator('.lex-toggle-rail').hover()
+            page.mouse.down();page.mouse.up()
+            page.mouse.move(0,0);page.wait_for_timeout(150)
+            assert not a.locator('.lex-info-help').is_visible() and a.locator('.lex-toggle-type').is_visible()
             a.locator('input').check()
             assert a.locator('input').is_checked()
             page.screenshot(path=str(OUT/'boolean-hover.png'))

@@ -748,11 +748,11 @@
   // keeping its own.
   const alignReferenceRails = (container = document) => {
     const panels = new Set();
-    container.querySelectorAll?.(".lex-source-control[data-lex-rail-width]")
+    container.querySelectorAll?.(".lex-source-control[data-lex-rail-tag]")
       .forEach(control => panels.add(
         control.closest(".lex-detail-panel-body, .lex-detail-panel, .lex-detail") || container));
     for (const panel of panels) {
-      const controls = [...panel.querySelectorAll(".lex-source-control[data-lex-rail-width]")]
+      const controls = [...panel.querySelectorAll(".lex-source-control[data-lex-rail-tag]")]
         .filter(control => !control.classList.contains("lex-source-control-internal"));
       if (!controls.length) continue;
       // Each entry gets an equal share of the space beside the property it
@@ -777,30 +777,30 @@
         control.style.setProperty("--lex-reference-cap", `${cap}px`);
         control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / count))}px`);
       }
-      // The rail used to be sized from a character count times a guessed em
-      // width, but the stack draws at roughly two thirds of the control's own
-      // type, so that estimate reserved half a rail of empty space on the right
-      // of every value box on the panel. Measure what the stack actually paints
-      // instead. The variables are cleared first: a tag already carrying a
-      // width from the previous pass measures as that width, which could only
-      // ever ratchet the rail wider.
-      const values = controls.flatMap(control => [...control.querySelectorAll(".lex-reference-value")]);
-      panel.style?.removeProperty("--lex-reference-tag-width");
-      for (const control of controls) {
-        control.style.removeProperty("--lex-reference-rail-width");
-        control.style.removeProperty("--lex-reference-tag-width");
-      }
-      const measure = (node, selector) => {
-        const found = node.querySelector(selector);
-        return found ? Math.ceil(found.getBoundingClientRect().width) : 0;
-      };
-      // A stack with nothing in it still holds its place, so the rail keeps a
-      // floor wide enough for the shortest real entry rather than collapsing
-      // and moving every box on the panel the moment a value matches vanilla.
-      const tag = Math.max(10, ...values.map(value => measure(value, ".lex-reference-tag")));
-      const text = Math.max(14, ...values.map(value => measure(value, ".lex-reference-text")));
-      // tag + the gap the tag's own margin opens + the value, and two pixels so
-      // the last glyph is not flush against the panel edge.
+      // The rail is reserved in advance from the longest tag and the longest
+      // value any control on this panel can ever put in it, measured in a
+      // hidden copy of a real entry rather than from the entries on screen.
+      // Two earlier attempts both moved the value boxes as values changed: a
+      // character count times a guessed em over-reserved by half a rail, and
+      // measuring what was displayed re-sized the rail on every edit that
+      // matched or stopped matching a reference. The probe is pinned to the
+      // largest type a stack ever uses, because a deeper stack only ever
+      // draws smaller.
+      const longest = (attribute, floor) => controls
+        .map(control => control.dataset[attribute] || "")
+        .reduce((widest, text) => text.length > widest.length ? text : widest, floor);
+      const probe = element("div", {
+        class: "lex-source-strip lex-reference-values lex-reference-probe",
+        "aria-hidden": "true",
+      }, element("span", {class: "lex-reference-value"},
+        element("span", {class: "lex-reference-tag"}, longest("lexRailTag", "V")),
+        element("span", {class: "lex-reference-text"}, longest("lexRailValue", "000"))));
+      (controls[0].parentElement || panel).append(probe);
+      const tag = Math.ceil(probe.querySelector(".lex-reference-tag").getBoundingClientRect().width);
+      const text = Math.ceil(probe.querySelector(".lex-reference-text").getBoundingClientRect().width);
+      probe.remove();
+      // tag + the column gap the stack opens between the two + the value, and
+      // two pixels so the last glyph is not flush against the panel edge.
       const widest = tag + text + 6;
       panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}px`);
       panel.style?.setProperty("--lex-reference-tag-width", `${tag}px`);
@@ -817,6 +817,14 @@
     container.querySelectorAll?.(".lex-source-control").forEach(node => node.refreshReference?.());
     alignReferenceRails(container);
   };
+  // The first pass measures the rail against whatever face is loaded at the
+  // time. A face only starts loading when something asks to paint with it, so
+  // a panel that mounts after the document is otherwise ready measures its
+  // rail against the fallback and re-reserves it a pixel or two later, on the
+  // reader's first edit. Every batch of faces that finishes re-reserves it
+  // instead, which is what the rail exists to prevent.
+  document.fonts?.addEventListener?.("loadingdone", () => alignReferenceRails(document));
+  document.fonts?.ready?.then(() => alignReferenceRails(document));
 
   // Shared Detail internals. A game supplies its theme and field controls;
   // this component owns the repeated section and field structure.
@@ -1134,24 +1142,40 @@
       showToast("Restored the vanilla value");
     });
 
-    if (input && inputType !== "checkbox") {
-      const copy = element("button", {
-        type: "button", class: "lex-copy-value", tabindex: "-1",
-        title: "Copy this value", "aria-label": "Copy this value",
-        onclick: async event => {
-          event.preventDefault();
-          event.stopPropagation();
-          const text = input.tagName === "SELECT"
-            ? (input.selectedOptions[0]?.textContent || input.value)
-            : input.value;
-          const copied = await copyText(String(text));
-          showToast(copied ? `Copied: "${text}"` : "Could not reach the clipboard");
-        },
-      }, copyIcon());
-      node.querySelector(".lex-detail-field-control")?.prepend(copy);
+    // A property holds one variable in the ordinary case and several in a
+    // multi-variable one - a stat block, a junction set. One button for a
+    // property that holds four numbers copied the first of them and called it
+    // the property, so a property with its own idea of what it is worth says
+    // so, a multi-variable property gives each variable its own button, and
+    // only a single-variable property is copied as a whole.
+    const declared = control instanceof Element
+      ? (typeof control.lexCopyValue === "function" ? control
+         : [...control.querySelectorAll("*")].find(node => typeof node.lexCopyValue === "function"))
+      : null;
+    const variables = control instanceof Element
+      ? control.querySelectorAll('input:not([type="checkbox"]):not([type="range"]),select,textarea').length
+      : 0;
+    if (declared) node.querySelector(".lex-detail-field-control")?.prepend(
+      copyValueButton(() => declared.lexCopyValue(), "Copy this property"));
+    else if (input && inputType !== "checkbox" && variables <= 1) {
+      node.querySelector(".lex-detail-field-control")?.prepend(copyValueButton(() => input.tagName === "SELECT"
+        ? (input.selectedOptions[0]?.textContent || input.value)
+        : input.value));
     }
     return node;
   };
+
+  const copyValueButton = (read, label = "Copy this value") => element("button", {
+    type: "button", class: "lex-copy-value", tabindex: "-1",
+    title: label, "aria-label": label,
+    onclick: async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const text = String(read() ?? "");
+      const copied = await copyText(text);
+      showToast(copied ? `Copied: "${text}"` : "Could not reach the clipboard");
+    },
+  }, copyIcon());
 
   // Public names describe the panel archetype, not one historic view. A Detail
   // panel is made from groups of rows. Every row shares the panel's one label
@@ -1187,6 +1211,21 @@
     }, ...toggles);
     if (options.minimum) root.style.setProperty("--lex-toggle-minimum", `${options.minimum}px`);
     if (options.columns) root.style.setProperty("--lex-toggle-columns", String(options.columns));
+    // A row of switches is one property holding one number. Copying it copies
+    // that number - the bare flag word the game actually stores - not a list
+    // of the labels drawn over it. A caller that knows the word passes it; a
+    // caller that does not gets the bits its switches imply, which is where
+    // `bit` on a switch matters when the flags are not consecutive.
+    root.lexCopyValue = () => {
+      if (options.value !== undefined) {
+        return typeof options.value === "function" ? options.value() : options.value;
+      }
+      return (options.toggles || []).reduce((word, toggle, index) => {
+        const bit = Number.isInteger(toggle.bit) ? toggle.bit : index;
+        const on = toggles[index]?.querySelector('input[type="checkbox"]')?.checked;
+        return on ? word + 2 ** bit : word;
+      }, 0);
+    };
     return root;
   };
 
@@ -1202,10 +1241,20 @@
     return element("div", {
       class: ["lex-multi-number", options.className || ""].filter(Boolean).join(" "),
       style: `--lex-multi-number-columns:${columns}`,
-    }, ...items.map(entry => element("label", {
-      class: "lex-multi-number-item", title: entry.title || undefined,
-    }, element("span", {class: "lex-multi-number-label"}, entry.label),
-      element("span", {class: "lex-multi-number-control"}, entry.control))));
+    }, ...items.map(entry => {
+      const item = element("label", {
+        class: "lex-multi-number-item", title: entry.title || undefined,
+      }, element("span", {class: "lex-multi-number-label"}, entry.label),
+        element("span", {class: "lex-multi-number-control"}, entry.control));
+      // Each variable carries its own copy button. One button on the property
+      // could only ever hand back one of these numbers, and it handed back
+      // whichever happened to be built first.
+      const input = item.querySelector('input:not([type="checkbox"]),select,textarea');
+      if (input) item.prepend(copyValueButton(() => input.tagName === "SELECT"
+        ? (input.selectedOptions[0]?.textContent || input.value)
+        : input.value, `Copy ${typeof entry.label === "string" ? entry.label : "this value"}`));
+      return item;
+    }));
   };
 
   // Nested navigation is a shared control. Plugins provide only labels,
@@ -2934,31 +2983,29 @@ ${contents.path}`});
       title: "Choose a mod project", "aria-haspopup": "menu", "aria-expanded": "false",
     }, mode, name, path, status);
     const menu = element("div", {class: "lex-project-menu", role: "menu", hidden: true});
-    const about = element("button", {
-      class: "lex-project-about", type: "button",
-      title: "What did Lexeditor find in this mod?",
-      "aria-label": "What did Lexeditor find in this mod?",
-      onclick: async event => {
-        event.preventDefault();
-        event.stopPropagation();
-        try {
-          const contents = await callWindow("mod_project_contents", options.plugin.id, "");
-          modContentsReport(contents, "Loaded mod contents");
-        } catch (error) {
-          showAlert({title: "Could not read the mod folder",
-                     message: error.message || String(error)});
-        }
-      },
-    }, "i");
-    const box = element("div", {class: "lex-project-control", hidden: true}, trigger, about, menu);
+    const box = element("div", {class: "lex-project-control", hidden: true}, trigger, menu);
     host.append(box);
     let snapshot = null;
     const closeMenu = () => { menu.hidden = true; trigger.setAttribute("aria-expanded", "false"); };
+    // One name column for the whole menu, taken from the longest name in it, so
+    // every row's description starts on the same edge. Measured rather than
+    // guessed: a mod is named by the person using it, and "Vanilla" is not the
+    // longest thing this list ever holds. A hidden menu measures as nothing, so
+    // this runs once it is actually on screen as well as on every render.
+    const measureNameColumn = () => {
+      if (menu.hidden) return;
+      menu.style.removeProperty("--lex-project-name-width");
+      const names = [...menu.querySelectorAll(".lex-project-menu-name")];
+      if (!names.length) return;
+      const widest = Math.ceil(Math.max(...names.map(node => node.getBoundingClientRect().width)));
+      if (widest > 0) menu.style.setProperty("--lex-project-name-width", `${widest}px`);
+    };
     const toggleMenu = () => {
       const open = menu.hidden;
       if (open && snapshot) render(snapshot);
       menu.hidden = !open;
       trigger.setAttribute("aria-expanded", String(open));
+      if (open) measureNameColumn();
     };
     const openResult = result => {
       if (!result || result.cancelled) { render(snapshot); return false; }
@@ -3030,32 +3077,31 @@ ${contents.path}`});
             catch (error) { showAlert({title: "Could not open the mod folder", message: error.message || String(error)}); }
           },
         }, folderIcon());
-        // Removing a mod is a list operation, not a file operation. The prompt
-        // says so plainly, because "remove" next to a folder name reads as
-        // "delete my work" and these folders are often not ours to delete.
-        const remove = element("button", {
-          class: "lex-project-remove", type: "button",
-          title: `Remove ${row.name} from Lexeditor`,
-          "aria-label": `Remove ${row.name} from Lexeditor`,
+        // "What did Lexeditor find in this mod?" belongs to a mod, so it is a
+        // button on that mod's row beside its pencil and its folder. It used
+        // to be a lone circle crammed in beside the mod name in the command
+        // row, where it annotated whichever mod happened to be loaded.
+        const about = element("button", {
+          class: "lex-project-about", type: "button",
+          title: `What did Lexeditor find in ${row.name}?`,
+          "aria-label": `What did Lexeditor find in ${row.name}?`,
           onclick: async event => {
             event.preventDefault();
             event.stopPropagation();
             closeMenu();
-            const agreed = await confirmAction({
-              title: `Remove ${row.name}?`,
-              message: `${row.name} will no longer be listed here and Lexeditor will stop loading it.
-
-`
-                + `Nothing is deleted. The folder and every file in it stay exactly where they are:
-${row.path}`,
-              confirmLabel: "Remove from Lexeditor",
-              cancelLabel: "Keep it",
-            });
-            if (!agreed) return;
-            guarded(() => callWindow("remove_mod_project", options.plugin.id, row.path));
+            try {
+              const contents = await callWindow("mod_project_contents", options.plugin.id, row.path);
+              modContentsReport(contents, `${row.name} contents`);
+            } catch (error) {
+              showAlert({title: "Could not read the mod folder",
+                         message: error.message || String(error)});
+            }
           },
-        }, "🗑");
-        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`}, select, rename, folder, remove, select.querySelector(".lex-project-source-status"));
+        }, infoIcon());
+        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`},
+          select,
+          element("span", {class: "lex-project-menu-item-actions"}, rename, folder, about),
+          select.querySelector(".lex-project-source-status"));
       });
       const sourceRows = sources.map(row => element("button", {
         class: `lex-project-menu-item-select lex-project-menu-item lex-project-reference${String(row.key) === activeSource ? " active" : ""}`,
@@ -3070,6 +3116,10 @@ ${row.path}`,
       }, element("span", {class: "lex-project-source-mode", "aria-label":row.readOnly === false ? "Editable" : "Read only"}, row.readOnly === false ? "📝" : "🔒"),
       element("span", {class: "lex-project-menu-name"}, row.label),
       element("span", {class: "lex-project-menu-path"}, row.path || "Read-only reference"),
+      // A reference has no folder of its own to rename, open or report on, but
+      // it holds the lane those buttons occupy so that every row in the menu
+      // puts its name, its description and its tick in the same place.
+      element("span", {class: "lex-project-menu-item-actions", "aria-hidden": "true"}),
       element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`, "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓")));
       const create = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
@@ -3102,6 +3152,7 @@ ${row.path}`,
       }, "Load Order…");
       menu.replaceChildren(...sourceRows, ...projects,
         element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, create, browse, manage));
+      measureNameColumn();
     };
     trigger.onclick = event => { event.stopPropagation(); toggleMenu(); };
     menu.onclick = event => event.stopPropagation();
@@ -5909,6 +5960,38 @@ ${row.path}`,
     return String(source.name || "").slice(0, 5).toLocaleUpperCase();
   };
 
+  // A reference rail is a narrow, fixed lane. A value that does not fit it is
+  // shortened rather than allowed to widen the lane, because the lane widening
+  // moves every value box on the panel. Thousands become 12K, millions 3.4M,
+  // billions 1.2B; the exact number stays on the entry's tooltip.
+  const REFERENCE_VALUE_CHARACTERS = 6;
+  // Words get more room than digits: a number past six digits says as much
+  // shortened to 1.2M, while "default" cut to "defau…" says nothing.
+  const REFERENCE_WORD_CHARACTERS = 10;
+  const compactReferenceNumber = value => {
+    const numeric = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(numeric)) return String(value);
+    const plain = formatNumber(numeric);
+    if (plain.replace("-", "").length <= REFERENCE_VALUE_CHARACTERS) return plain;
+    const sign = numeric < 0 ? "-" : "";
+    const size = Math.abs(numeric);
+    for (const [limit, suffix] of [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]]) {
+      if (size < limit) continue;
+      const scaled = size / limit;
+      // One decimal while it earns its place: 1.2M says more than 1M, 340M
+      // needs no decimal and has no room for one.
+      const text = scaled < 10 ? scaled.toFixed(1).replace(/\.0$/, "") : String(Math.round(scaled));
+      return `${sign}${text}${suffix}`;
+    }
+    // A long decimal is trimmed from the right, where the least of it lives.
+    return plain.slice(0, REFERENCE_VALUE_CHARACTERS + sign.length);
+  };
+  const compactReferenceText = value => {
+    const text = String(value);
+    return text.length <= REFERENCE_WORD_CHARACTERS
+      ? text : `${text.slice(0, REFERENCE_WORD_CHARACTERS - 1)}…`;
+  };
+
   const booleanMark = value => element("span", {
     class: `lex-boolean-mark ${value ? "true" : "false"}`,
     "aria-label": value ? "Yes" : "No",
@@ -5920,9 +6003,9 @@ ${row.path}`,
   const referenceDisplay = options => {
     const format = options.format || (value => {
       if (typeof value === "boolean") return booleanMark(value);
-      if (typeof value === "number") return formatNumber(value);
-      if (typeof value === "string" && /^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim())) return formatNumber(value);
-      return String(value);
+      if (typeof value === "number") return compactReferenceNumber(value);
+      if (typeof value === "string" && /^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim())) return compactReferenceNumber(value);
+      return compactReferenceText(value);
     });
     const same = options.same || ((left, right) => JSON.stringify(left) === JSON.stringify(right));
     const configuredSources = options.sources || [];
@@ -5940,12 +6023,16 @@ ${row.path}`,
       "data-reference-count": String(sources.length),
     }, ...sources.map(source => {
       const formatted = format(source.value, source);
-      const description = formatted instanceof Node ? formatted.textContent : String(formatted);
+      // The rail may have shortened what it paints; the tooltip says the whole
+      // value, because that is what pressing the entry writes into the box.
+      const exact = typeof source.value === "boolean"
+        ? (source.value ? "Yes" : "No")
+        : typeof source.value === "number" ? formatNumber(source.value) : String(source.value);
       return element("button", {
         type: "button",
         class: ["lex-reference-value", `lex-reference-slot-${source.referenceIndex}`, source.className || ""].filter(Boolean).join(" "),
         "data-reference-index": String(source.referenceIndex),
-        title: `Use ${source.name}: ${description}`,
+        title: `Use ${source.name}: ${exact}`,
         onclick: event => options.apply?.(clone(source.value), event, source),
       },
       element("span", {class: `lex-reference-tag${shortReferenceName(source) === "LL" ? " lex-reference-ll" : ""}`}, shortReferenceName(source)),
@@ -5963,11 +6050,27 @@ ${row.path}`,
     const root = element("div", {
       class: ["lex-source-control", options.internal ? "lex-source-control-internal" : ""].filter(Boolean).join(" "),
     }, options.control);
-    const referenceCharacters = Math.max(1, ...sources.map(source => {
-      const formatted = (options.format || (value => typeof value === "number" ? formatNumber(value) : String(value ?? "")))(source.value, source);
-      const value = formatted instanceof Node ? formatted.textContent : String(formatted);
-      return shortReferenceName(source).length + value.length + 1;
-    }));
+    // What the rail must hold is decided by the sources, which do not change
+    // while a value is edited - not by which of them happen to differ from the
+    // value right now. Measuring the visible entries instead made the rail
+    // breathe every time an edit matched or stopped matching vanilla, and the
+    // whole column of value boxes moved with it.
+    const painted = source => {
+      // What the entry PAINTS, which for a boolean is one tick rather than
+      // the word "true". Reserving for the word made every rail on a panel
+      // holding one boolean four characters wider than anything in it.
+      const formatted = (options.format || (value => typeof value === "boolean"
+        ? booleanMark(value)
+        : typeof value === "number" ? compactReferenceNumber(value)
+        : compactReferenceText(value ?? "")))(source.value, source);
+      return formatted instanceof Node ? formatted.textContent : String(formatted);
+    };
+    const widestOf = pick => sources.map(pick).reduce((longest, text) =>
+      text.length > longest.length ? text : longest, "");
+    const canReference = sources.some(source => source.value !== undefined);
+    const widestTag = widestOf(shortReferenceName);
+    const widestValue = widestOf(painted);
+    const referenceCharacters = Math.max(1, widestTag.length + widestValue.length + 1);
     if (options.internal) {
       // Internal references share the live control's box. Size the reserved
       // lane from the actual tag+value character count with enough average
@@ -5976,13 +6079,13 @@ ${row.path}`,
       const reserve = Math.max(2.75, Math.min(8.5, referenceCharacters * .58 + .65));
       root.style.setProperty("--lex-internal-reference-width", `${reserve}em`);
     } else {
-      const reserve = Math.max(2.35, Math.min(6.25, referenceCharacters * .44 + .45));
-      // Sizing the rail per control makes value boxes on the same panel end
-      // at different edges, because one reference reading "V25" needs less
-      // room than one reading "R130". The requirement is recorded here and a
-      // single widest value is applied across the panel below.
-      root.dataset.lexRailWidth = String(reserve);
-      root.style.setProperty("--lex-reference-rail-width", `${reserve}em`);
+      // Sizing the rail per control makes value boxes on the same panel end at
+      // different edges, because one reference reading "V 25" needs less room
+      // than one reading "R1 130". The requirement is recorded here as the
+      // longest tag and the longest value this control can ever show, and the
+      // panel-wide pass below turns the widest of those into one rail.
+      root.dataset.lexRailTag = widestTag;
+      root.dataset.lexRailValue = widestValue;
     }
     const currentValue = () => typeof options.current === "function" ? options.current() : options.current;
     root.lexVanillaValue = () => options.vanilla;
@@ -6057,7 +6160,12 @@ ${row.path}`,
         class: "lex-source-strip lex-reference-placeholder",
         "aria-hidden": "true",
       }));
-      root.classList.toggle("no-reference", !reference);
+      // The rail belongs to the control, not to today's values. Dropping the
+      // column the moment every reference matched was what made a value box
+      // jump wider the instant an edit landed on vanilla and snap back on the
+      // next keystroke. A control with nothing to compare against still
+      // collapses, because it has no rail to hold.
+      root.classList.toggle("no-reference", !canReference);
     };
     // Run after the game-owned listener has updated its model, but do not wait
     // for a new frame or a tab rebuild. Waiting caused editable tables to show
