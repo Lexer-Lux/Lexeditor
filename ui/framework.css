@@ -5440,14 +5440,20 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-field.lex-boolean-field > .lex-detail-field-control {
   padding-right:26px !important;
 }
+/* The pin is a child of the ROW for booleans, so the row is what it is
+   positioned against; anything still inside the control is pulled out to the
+   same edge. */
 .lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
 .lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
   position:absolute !important;
-  top:50% !important;
-  right:-20px !important;
+  /* The row is taller than the checkbox, so the pin sits in the air above it
+     rather than beside it: inside the panel, clear of the box, and on the same
+     corner every other property puts its pin. */
+  top:2px !important;
+  right:3px !important;
   bottom:auto !important;
   left:auto !important;
-  transform:translateY(-50%) !important;
+  transform:none !important;
 }
 
 
@@ -5573,11 +5579,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   padding-left:0 !important;
   padding-right:10px !important;
 }
-/* The pin rides the row's right edge, outside the box it annotates. */
-.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
-.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
-  right:-24px !important;
-}
+
 
 
 /* LEXEDITOR_BOOLEAN_BOX_EDGE_20260911 */
@@ -5611,3 +5613,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   width:100%;
 }
 .lex-value-host > :is(input,select,textarea) { width:100%;box-sizing:border-box; }
+
+
+/* LEXEDITOR_COPY_AIR_EVEN_20260911 */
+/* Measured from the property NAME, not from the label's box: the label keeps a
+   ten-pixel inset of its own, so six pixels of grid gap on the right of the
+   button sat against sixteen on its left. The label gives its inset up to the
+   lane, which owns the spacing on both sides now. */
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label { padding-right:0; }
+
