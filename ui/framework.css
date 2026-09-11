@@ -5592,3 +5592,17 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   justify-items:end;
 }
 .lex-boolean-field .lex-reference-values .lex-reference-value { justify-content:end; }
+
+
+/* LEXEDITOR_VALUE_FILL_HOST_20260911 */
+/* The box the fill is drawn behind. A bare input has no positioned box of its
+   own, so the fill fell back to the nearest positioned ancestor - the field
+   control, which is the height of the whole property row - and painted the row
+   top to bottom instead of filling the box. */
+.lex-value-host {
+  position:relative;
+  display:block;
+  min-width:0;
+  width:100%;
+}
+.lex-value-host > :is(input,select,textarea) { width:100%;box-sizing:border-box; }

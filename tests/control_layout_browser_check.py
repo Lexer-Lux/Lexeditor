@@ -69,6 +69,18 @@ def main():
                           const b=e.getBoundingClientRect();
                           return {left:c.left-b.left,right:b.right-c.right};}''')
                         assert inside['left']>=0 and inside['right']>=0,inside
+                # The fill behind a value is the height of that value's box,
+                # never the height of the property row around it.
+                for field in page.locator('.lex-has-value-fill').all():
+                    if not field.is_visible():continue
+                    fill=field.evaluate('''e=>{
+                      const f=e.querySelector('.lex-value-fill');
+                      const box=e.querySelector('input,select,textarea');
+                      if(!f||!box)return null;
+                      return [Math.round(f.getBoundingClientRect().height),
+                              Math.round(box.getBoundingClientRect().height)];}''')
+                    if fill is not None:
+                        assert fill[0]<=fill[1]+3,fill
                 # A boolean's pin annotates the row, so it never lands on the
                 # checkbox it annotates.
                 for field in page.locator('.lex-boolean-field:has(.lex-column-pin)').all():

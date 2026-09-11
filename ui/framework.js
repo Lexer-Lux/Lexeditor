@@ -1202,8 +1202,25 @@
         handle.addEventListener("pointercancel", stop);
       });
       node.classList.add("lex-has-value-fill");
-      (control instanceof Element && control.matches(".lex-unit-field") ? control : input.parentElement)
-        ?.prepend(fill);
+      // The fill is drawn behind the value box, so it has to be positioned
+      // against THAT box. Prepending it to whatever happened to be the input's
+      // parent worked where the parent was a unit field or a provenance
+      // control - both of which are positioned and box-shaped - and failed
+      // everywhere else: with a bare input the nearest positioned ancestor is
+      // the field control, which is as tall as the whole property row, so the
+      // fill painted the row from top to bottom. A host of its own means the
+      // box the fill measures is always the box the reader sees.
+      const fillHost = control instanceof Element && control.matches(".lex-unit-field")
+        ? control
+        : input.parentElement?.matches?.(".lex-source-control-internal,.lex-unit-field")
+          ? input.parentElement
+          : (() => {
+            const host = element("span", {class: "lex-value-host"});
+            input.replaceWith(host);
+            host.append(input);
+            return host;
+          })();
+      fillHost?.prepend(fill);
       requestAnimationFrame(paint);
     }
 
