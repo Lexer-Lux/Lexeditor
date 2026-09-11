@@ -67,8 +67,12 @@ def _once(tool: Path, timeout: float = 180, output: Path | None = None,
                 stream.seek(0, os.SEEK_END)
             stream.write(f"\n{reason}\n")
             code = 124 if reason.startswith("TIMEOUT") else 125
-    tail = (log.read_text(encoding="utf-8", errors="replace").strip().splitlines() or [""])[-1]
-    return code, tail[:220]
+    lines = log.read_text(encoding="utf-8", errors="replace").strip().splitlines() or [""]
+    # The last line alone is often the least informative part of a failure: a
+    # shell's "is not recognized" message puts the name on one line and
+    # "operable program or batch file" on the next, so classifying from the
+    # final line alone called an unrunnable verifier a failure.
+    return code, lines[-1][:220], chr(10).join(lines[-6:])
 
 
 # Outcomes that mean "this check needs something this machine was not given",
@@ -96,6 +100,13 @@ def _unrunnable(tail: str) -> str:
         return "needs an optional module"
     if "filenotfounderror" in lowered and "winerror 2" in lowered:
         return "needs a program that is not installed"
+    # A shell reports a missing executable this way rather than raising, so a
+    # verifier that shells out to a tool nobody installed looked like a real
+    # failure instead of one that could not run here.
+    if "is not recognized as an internal or external command" in lowered:
+        return "needs a program that is not installed"
+    if "command not found" in lowered:
+        return "needs a program that is not installed"
     return ""
 
 
@@ -112,8 +123,8 @@ def run(tool: Path, timeout: float = 180, output: Path | None = None,
     """
     started = time.time()
     timeout = timeout_for(tool, timeout)
-    code, tail = _once(tool, timeout, output)
-    reason = _unrunnable(tail)
+    code, tail, context = _once(tool, timeout, output)
+    reason = _unrunnable(context)
     if code and reason:
         # A verifier that cannot run here is not a verifier that failed. Some
         # need a game binary passed on the command line, or an optional
@@ -123,7 +134,7 @@ def run(tool: Path, timeout: float = 180, output: Path | None = None,
         return tool, 0, time.time() - started, f"SKIPPED ({reason}): {tail}"
     if code and code not in (124, 125) and retries:
         time.sleep(2)
-        second, second_tail = _once(tool, timeout, output, 2)
+        second, second_tail, _second_context = _once(tool, timeout, output, 2)
         if not second:
             return tool, 0, time.time() - started, f"FLAKY (passed on retry): {tail}"
         code, tail = second, second_tail
