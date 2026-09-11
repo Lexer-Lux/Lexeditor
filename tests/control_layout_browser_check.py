@@ -222,7 +222,32 @@ def main():
               const row = f.querySelector('.lex-toggle-row');
               return typeof row.lexCopyValue === 'function' ? row.lexCopyValue() : null;}''')
             assert copied==5,copied
-            # A flag box is as wide as the flag in it, so its two insets match.
+            # The flag boxes fill the row rather than leaving it half empty,
+            # and nothing on them is clipped by a box with nothing beside it.
+            spread=page.evaluate('''()=>{
+              const row=document.querySelector('.lex-toggle-row');
+              if(!row)return null;
+              const boxes=[...row.querySelectorAll(':scope > .lex-toggle')]
+                .map(n=>n.getBoundingClientRect());
+              if(boxes.length<2)return null;
+              const widths=boxes.map(b=>Math.round(b.width));
+              return {spread:Math.max(...widths)-Math.min(...widths),
+                      reach:Math.round(row.getBoundingClientRect().right-
+                        Math.max(...boxes.map(b=>b.right)))};}''')
+            if spread is not None:
+                assert spread['spread']<=1,spread
+                assert spread['reach']<=1,spread
+            for rail in page.locator('.lex-toggle-rail').all():
+                if not rail.is_visible():continue
+                # Only the switch's own boxes: the panel body clips because it
+                # scrolls, which is its job.
+                clipped=rail.evaluate('''e=>{
+                  const stop=e.closest('.lex-toggle-row');
+                  for(let n=e;n&&n!==stop;n=n.parentElement){
+                    if(getComputedStyle(n).overflow!=='visible')return n.className;}
+                  return null;}''')
+                assert clipped is None,clipped
+            # Each flag box keeps the same air on both of its sides.
             for toggle in page.locator('.lex-toggle').all():
                 if not toggle.is_visible():continue
                 inset=toggle.evaluate('''e=>{

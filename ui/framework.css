@@ -1208,7 +1208,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 /* Pointing at the rail enlarges the TYPE CODE, which is text. The help pip is
    a fixed circle, and growing its glyph to the type code's hover size left the
    question mark crowding the ring around it. */
-.lex-field-type-rail:hover > span:not(.lex-info-help) { font-size:13px !important; }
+/* The type code does not grow when it is pointed at. Growing it moved the
+   text inside its own rail, which is what kept shaving a glyph against an edge
+   that had nothing on the other side of it. */
+.lex-field-type-rail:hover > span:not(.lex-info-help) { font-size:inherit; }
 .lex-detail-field:focus-within:has(.lex-field-type-range) .lex-field-type-name { left:25%; }
 .lex-detail-field:focus-within .lex-field-type-range { left:75%;opacity:1; }
 
@@ -5772,3 +5775,30 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   left:auto !important;
   transform:none !important;
 }
+
+
+/* LEXEDITOR_FLAG_BOX_FILL_20260911 */
+/* The flag boxes use the whole width of the row. They were shrinking to their
+   own content inside equal tracks, so the space between them was whatever each
+   name happened to leave - ragged, and short of the right-hand edge. Each box
+   fills its track and centres what is in it, which keeps the air on its two
+   sides equal without leaving the row half empty. */
+.lex-toggle-row > .lex-toggle {
+  width:auto;
+  max-width:none;
+  justify-self:stretch;
+  justify-content:center;
+}
+/* The lane in front of the checkbox is the type code and its help pip, and it
+   was twenty-one pixels of the box before the box's own content began. Eleven
+   now, which is what the rotated code actually needs. */
+.lex-toggle { gap:5px; }
+.lex-toggle-rail { width:11px;min-width:11px;overflow:visible; }
+.lex-toggle-type { font-size:8px; }
+.lex-toggle > .lex-toggle-rail > .lex-info-help { --lex-help-pip-size:14px; }
+.lex-toggle-rail > .lex-info-help { width:14px;min-width:14px;height:14px;min-height:14px; }
+/* Nothing on this row clips: a rotated code and a tick both draw past the box
+   the layout gives them, and there is nothing beside them to protect. */
+.lex-toggle,
+.lex-toggle-rail,
+.lex-toggle > .lex-toggle-name { overflow:visible; }
