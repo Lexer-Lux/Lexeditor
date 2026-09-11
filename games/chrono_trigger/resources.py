@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import gzip
 from pathlib import Path
 import struct
+import zlib
 
 
 _MASK32 = 0xFFFFFFFF
@@ -76,7 +77,7 @@ class ResourceArchive:
             return b""
         try:
             payload = gzip.decompress(block[4:])
-        except (OSError, EOFError) as error:
+        except (OSError, EOFError, zlib.error) as error:
             raise ResourceArchiveError(f"{label} gzip payload is invalid") from error
         if len(payload) != expected_size:
             raise ResourceArchiveError(
