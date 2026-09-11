@@ -5127,7 +5127,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   right:auto;
   bottom:auto;
   left:auto;
-  width:var(--lex-boolean-reference-width);
+  width:auto;
   min-width:0;
   align-self:center;
   align-content:center;
@@ -5622,3 +5622,74 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    lane, which owns the spacing on both sides now. */
 .lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label { padding-right:0; }
 
+
+
+/* LEXEDITOR_BOOLEAN_REFERENCE_UNDER_20260911 */
+/* The reference row belongs UNDER the checkbox: the width of the box, no
+   horizontal margin, sitting in the space between the bottom of the box and
+   the bottom of the row with equal air above and below it. Nothing then stands
+   between the leader arrow and the box it points at, and the box keeps the
+   edge every value box on the panel ends on. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  position:relative;
+  display:grid !important;
+  grid-template-columns:max-content;
+  grid-template-rows:max-content max-content;
+  justify-content:end;
+  /* The box and the reading under it are one stack, centred in the row: the
+     gap above the reading and the padding below it are the same three pixels,
+     so the air on both sides of it matches. */
+  align-content:center;
+  gap:0;
+  width:auto;
+  height:100%;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control > input[type="checkbox"] {
+  grid-row:1;
+  grid-column:1;
+  /* No stray margin: the box is the column, so the reading under it is exactly
+     as wide as the box and lines up with both of its edges. */
+  justify-self:stretch;
+  margin:0 !important;
+}
+.lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  position:static;
+  grid-row:2;
+  grid-column:1;
+  align-self:center;
+  justify-self:stretch;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:0;
+  transform:none;
+  font-size:9px;
+  line-height:1;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  grid-template-columns:auto auto;
+  justify-content:center;
+  column-gap:.25em;
+  padding:0;
+}
+/* The row is tall enough to hold a box and a reading under it, and the air
+   above the reading matches the air below it. */
+.lex-detail-field.lex-boolean-field { min-height:3em; }
+.lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  margin-block:auto !important;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  padding-block:3px;
+  row-gap:3px;
+}
+/* The pin stands off the box, on the line the arrow runs along, where there is
+   nothing else in the row. */
+.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
+  position:absolute !important;
+  top:9px !important;
+  right:28px !important;
+  bottom:auto !important;
+  left:auto !important;
+  transform:none !important;
+}
