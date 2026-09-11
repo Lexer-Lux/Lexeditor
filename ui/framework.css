@@ -5303,3 +5303,39 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-multi-number-item > .lex-copy-value { grid-column:1; }
 .lex-detail-field:hover .lex-multi-number-item > .lex-copy-value { opacity:.7; }
 .lex-multi-number-item > .lex-copy-value:hover { opacity:1; }
+
+
+/* LEXEDITOR_FLAG_BOX_EVEN_20260910 */
+/* Each flag box is as wide as the flag in it. The boxes sit on a column grid
+   so their left edges line up, but the box was taking the whole track, so a
+   short name left up to forty pixels of dead space inside the box on the right
+   against nine on the left. The track still sets where a box starts; the box
+   no longer has to fill it. */
+.lex-toggle-row > .lex-toggle {
+  width:max-content;
+  max-width:100%;
+  justify-self:start;
+}
+
+
+/* LEXEDITOR_DIVIDER_GRIP_20260910 */
+/* The grip between two panels is one slim bar, not a field of dots. The dot
+   grid read as a texture rather than a control: it said "something is here"
+   without saying "take hold of this". A bar says which way the thing moves,
+   and it grows and takes the accent under the pointer so the target is
+   unmistakable before the drag starts. */
+.lex-panel-layout-divider::before {
+  width:4px;
+  height:38px;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--lex-border) 88%,var(--lex-text));
+  transition:width .12s ease,height .12s ease,background-color .12s ease;
+}
+.lex-panel-layout-divider:hover::before,
+.lex-panel-layout-divider:focus-visible::before,
+.lex-panel-layout-divider.dragging::before,
+.lex-panel-layout-dragging .lex-panel-layout-divider::before {
+  width:6px;
+  height:52px;
+  background:var(--lex-accent);
+}

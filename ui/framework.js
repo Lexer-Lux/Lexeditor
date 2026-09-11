@@ -584,6 +584,24 @@
     }).format(numeric);
   };
 
+  // What a value box holds, as a number. A plugin is free to paint its number
+  // the way a player reads it - "50,000" rather than 50000 - so reading the box
+  // with a bare Number() returns NaN for every grouped value. That is what put
+  // the fill and the handle of a fifty-thousand gil price hard against the left
+  // edge of its own slider, and what made committing such a field look out of
+  // range and flash rejected.
+  const readNumeric = node => {
+    const text = String(node?.value ?? "").trim();
+    if (!text) return NaN;
+    return Number(text.replace(/,/g, "").replace(/\s/g, ""));
+  };
+  // Writing one back in the shape the box was already using, so a drag does not
+  // strip the separators out from under the reader mid-gesture.
+  const writeNumeric = (node, value) => {
+    const grouped = /\d,\d/.test(String(node.value ?? ""));
+    node.value = grouped ? formatNumber(value) : String(value);
+  };
+
   const numberValue = (value, attrs = {}) => {
     const {class: className = "", format = {}, ...rest} = attrs;
     return element("span", {
@@ -1044,7 +1062,7 @@
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
       fill.append(handle);
       const ratio = () => {
-        const value = Number(input.value);
+        const value = readNumeric(input);
         if (!Number.isFinite(value)) return 0;
         return Math.max(0, Math.min(1, (value - lowBound) / (highBound - lowBound)));
       };
@@ -1059,9 +1077,9 @@
         const step = Number(input.step) || 1;
         const raw = lowBound + share * (highBound - lowBound);
         const snapped = Math.round(raw / step) * step;
-        const nextValue = String(Math.max(lowBound, Math.min(highBound, snapped)));
-        if (input.value === nextValue) return;
-        input.value = nextValue;
+        const nextValue = Math.max(lowBound, Math.min(highBound, snapped));
+        if (readNumeric(input) === nextValue) return;
+        writeNumeric(input, nextValue);
         paint();
         // A plugin still needs the input event so local previews (for example,
         // a curve) can update. Mark drag events so it can avoid refreshing the
@@ -1125,7 +1143,7 @@
           if (event.data && /[^0-9.eE+-]/.test(event.data)) { event.preventDefault(); rejectValue(); }
         });
         input.addEventListener("change", () => {
-          const value = Number(input.value);
+          const value = readNumeric(input);
           const low = min === null || min === undefined || min === "" ? -Infinity : Number(min);
           const high = max === null || max === undefined || max === "" ? Infinity : Number(max);
           if (!Number.isFinite(value) || value < low || value > high) rejectValue();
@@ -6562,18 +6580,35 @@ ${contents.path}`});
   }))).observe(document.documentElement, {childList: true, subtree: true});
   dedupeShortcuts(document);
 
+  // Fitting a label is a read, a write and a read again, which forces the
+  // browser to re-lay-out the page between every pair. Doing that to every
+  // label in the document on every DOM change cost a third of a second per
+  // keystroke on a panel of four hundred properties - the reported lag between
+  // ticking a box and seeing it tick. A label whose box and text have not
+  // moved since it was last fitted is already fitted, and the check for that
+  // reads without writing, so nothing is invalidated and the browser answers
+  // the whole sweep from one layout.
+  const fitted = new WeakMap();
+  const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}`;
   const fitLabel = label => {
     if (!(label instanceof HTMLElement)) return;
+    const key = fitKey(label);
+    if (fitted.get(label) === key) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     while (size > 6 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth + 1)) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }
+    // `contain:size` keeps the font size out of the box's own measurements, so
+    // the key is the same one computed above and the label settles in one pass.
+    fitted.set(label, key);
   };
-  const fitAllLabels = root => root.querySelectorAll?.(
-    '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label',
-  ).forEach(fitLabel);
+  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label';
+  const fitAllLabels = root => {
+    if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fitLabel(root);
+    root.querySelectorAll?.(LABEL_SELECTOR).forEach(fitLabel);
+  };
   // Measuring inside the mutation callback reads a layout that is not final:
   // the label's own height comes from the row, and the row is sized by a
   // control that has not been laid out yet. Every label measured that way keeps
@@ -6584,26 +6619,39 @@ ${contents.path}`});
   // Re-fitting cannot feed back into layout: `contain:size` on the label means
   // its font size cannot change the row's height, so this settles in one pass.
   let fitPending = false;
-  const scheduleFit = () => {
+  let fitRoots = null;
+  // A rebuilt reference stack is not a reason to re-measure the property names
+  // three panels away. Only what was just added is fitted; a resize or a font
+  // arriving is what re-fits the page.
+  const scheduleFit = roots => {
+    if (!Array.isArray(roots)) fitRoots = null;
+    else if (fitRoots) for (const root of roots) fitRoots.add(root);
     if (fitPending) return;
     fitPending = true;
     requestAnimationFrame(() => {
       fitPending = false;
-      fitAllLabels(document);
+      const targets = fitRoots;
+      fitRoots = new Set();
+      if (targets === null || !targets.size) fitAllLabels(document);
+      else for (const root of targets) if (root.isConnected) fitAllLabels(root);
     });
   };
   const labelObserver = new MutationObserver(records => {
-    if (records.some(record => record.addedNodes.length)) scheduleFit();
+    const added = [];
+    for (const record of records) {
+      for (const node of record.addedNodes) if (node instanceof Element) added.push(node);
+    }
+    if (added.length) scheduleFit(added);
   });
   labelObserver.observe(document.documentElement, {childList: true, subtree: true});
-  window.addEventListener('resize', scheduleFit);
+  window.addEventListener('resize', () => scheduleFit());
   // A panel split drag resizes the lane without adding a node or resizing the
   // window, so watch the region the fields actually live in as well.
-  new ResizeObserver(scheduleFit).observe(document.documentElement);
+  new ResizeObserver(() => scheduleFit()).observe(document.documentElement);
   // A label measured against the fallback font is re-laid-out when the real
   // face arrives, and the few extra pixels that brings are enough to clip a
   // line that had just fitted. Re-fit once the fonts are actually in.
-  document.fonts?.ready?.then(scheduleFit);
+  document.fonts?.ready?.then(() => scheduleFit());
   scheduleFit();
 })();
 
@@ -6613,6 +6661,11 @@ ${contents.path}`});
   const alignFieldMetadata = root => {
     const fields = root?.matches?.('.lex-detail-field')
       ? [root] : [...(root?.querySelectorAll?.('.lex-detail-field') || [])];
+    // Every measurement first, every write afterwards. Interleaving them made
+    // each field's style write invalidate the layout that the next field's
+    // measurement then had to rebuild, so a panel of four hundred properties
+    // spent a third of a second re-laying itself out behind every keystroke.
+    const placements = [];
     for (const field of fields) {
       const rail = field.querySelector(':scope > .lex-field-type-rail');
       const label = field.querySelector(':scope > .lex-detail-field-label');
@@ -6621,7 +6674,7 @@ ${contents.path}`});
       // left every plain property's rail parked in the far-left gutter, so no
       // two rows in a panel annotated their names from the same place.
       if (!rail || !label) continue;
-      if (field.hasAttribute("data-lex-sort")) { rail.style.left = "0px"; continue; }
+      if (field.hasAttribute("data-lex-sort")) { placements.push([rail, "0px"]); continue; }
       // The property name is wrapped in its own span so the boolean leader
       // arrow cannot squeeze it, so look inside that wrapper first. Searching
       // only the label's direct children left the rail parked at the far left
@@ -6648,7 +6701,10 @@ ${contents.path}`});
       // long enough to leave no room.
       const gap = 8;
       const wanted = textBox.left - gap - railBox.width - fieldBox.left;
-      rail.style.left = `${Math.max(0, wanted)}px`;
+      placements.push([rail, `${Math.max(0, wanted)}px`]);
+    }
+    for (const [rail, left] of placements) {
+      if (rail.style.left !== left) rail.style.left = left;
     }
   };
   let pending = false;
@@ -6658,8 +6714,20 @@ ${contents.path}`});
     pending = true;
     requestAnimationFrame(() => { pending = false; alignFieldMetadata(document); });
   };
-  const nameObserver = typeof ResizeObserver === "undefined"
-    ? null : new ResizeObserver(() => schedule(document));
+  // Editing a value re-sizes the row, and a taller row re-sizes the label box
+  // inside it, which used to re-run the whole pass twice per keystroke. Only a
+  // name that changed WIDTH can have moved where it starts.
+  const nameWidths = new WeakMap();
+  const nameObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(entries => {
+    let moved = false;
+    for (const entry of entries) {
+      const width = Math.round(entry.contentRect.width);
+      if (nameWidths.get(entry.target) === width) continue;
+      nameWidths.set(entry.target, width);
+      moved = true;
+    }
+    if (moved) schedule(document);
+  });
   new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
     if (node instanceof Element) schedule(node);
   }))).observe(document.documentElement, {childList:true, subtree:true});
@@ -6668,7 +6736,14 @@ ${contents.path}`});
   // anything that moves that name has to move the rail with it: a pane drag,
   // the label fitter's own re-wrap, and the real font face arriving after the
   // first measurement was taken against the fallback.
-  new ResizeObserver(() => schedule(document)).observe(document.documentElement);
+  // Width only: a page that merely got taller moved nothing sideways.
+  let pageWidth = 0;
+  new ResizeObserver(entries => {
+    const width = Math.round(entries[0]?.contentRect.width || 0);
+    if (width === pageWidth) return;
+    pageWidth = width;
+    schedule(document);
+  }).observe(document.documentElement);
   document.fonts?.ready?.then(() => schedule(document));
   schedule(document);
 })();

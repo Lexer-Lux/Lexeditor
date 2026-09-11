@@ -129,6 +129,63 @@ def main():
               const row = f.querySelector('.lex-toggle-row');
               return typeof row.lexCopyValue === 'function' ? row.lexCopyValue() : null;}''')
             assert copied==5,copied
+            # A flag box is as wide as the flag in it, so its two insets match.
+            for toggle in page.locator('.lex-toggle').all():
+                if not toggle.is_visible():continue
+                inset=toggle.evaluate('''e=>{
+                  const b=e.getBoundingClientRect();
+                  const rail=e.querySelector('.lex-toggle-rail');
+                  const name=e.querySelector('.lex-toggle-name');
+                  if(!rail||!name)return null;
+                  return [Math.round(rail.getBoundingClientRect().left-b.left),
+                          Math.round(b.right-name.getBoundingClientRect().right)];}''')
+                if inset is not None:
+                    assert abs(inset[0]-inset[1])<=1,inset
+            # A value box painted the way a player reads it - "50,000" - is
+            # still a number to its own slider. Read with a bare Number() it is
+            # NaN, which pinned the fill and the handle to the left edge.
+            grouped=page.evaluate('''() => {
+              const U=LexeditorUI,e=U.el;
+              const input=e("input",{type:"text",inputmode:"decimal",value:U.formatNumber(50000),
+                "data-min":0,"data-max":655350,"data-step":10});
+              const field=U.detailField({label:"BUY PRICE",dataType:"INT",min:0,max:655350,step:10,
+                control:U.unitField(input,"G")});
+              document.querySelector('#main').replaceChildren(field);
+              return new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+                const fill=field.querySelector('.lex-value-fill');
+                done(fill?Number(getComputedStyle(fill).getPropertyValue('--lex-value-ratio')):null);})));}''')
+            assert grouped is not None and abs(grouped-50000/655350)<.001,grouped
+            # Ticking a box may not cost more on a big panel than a small one.
+            # Re-fitting every label in the document on every DOM change made
+            # a four-hundred-property page take a third of a second to respond.
+            timings={}
+            for size in (40,400):
+                page.evaluate('''(count)=>{
+                  const U=LexeditorUI,e=U.el,rows=[];
+                  for(let i=0;i<count;i++){
+                    const input=e("input",{type:"number",min:0,max:255,value:40+(i%60)});
+                    rows.push(U.detailField({label:`PROPERTY NUMBER ${i}`,dataType:"INT",min:0,max:255,
+                      control:U.provenanceControl({control:input,current:()=>Number(input.value),
+                        vanilla:25,references:[{name:"Reference Mod 1",shortName:"R1",value:30}],
+                        apply:v=>{input.value=v;}})}));}
+                  document.querySelector('#main').replaceChildren(
+                    U.detailSection({title:"STRESS",body:rows}));}''',size)
+                page.wait_for_timeout(500)
+                timings[size]=page.evaluate('''async()=>{
+                  const input=document.querySelector('.lex-detail-field input[type=number]');
+                  const runs=[];
+                  for(let i=0;i<5;i++){
+                    const start=performance.now();
+                    input.value=String(30+i);
+                    input.dispatchEvent(new Event('input',{bubbles:true}));
+                    input.dispatchEvent(new Event('change',{bubbles:true}));
+                    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+                    runs.push(performance.now()-start);}
+                  return Math.min(...runs);}''')
+            assert timings[400]<timings[40]*3+40,timings
+            page.reload();page.evaluate("dispatchEvent(new Event('pywebviewready'))")
+            page.locator('.lex-detail-field').first.wait_for()
+            page.wait_for_timeout(400)
             # Every row of the mod menu puts its name, description, buttons and
             # status in the same columns.
             page.get_by_role('button',name='Active mod project',exact=True).click()

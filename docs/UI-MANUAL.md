@@ -232,6 +232,17 @@ controls and what it requires without permanent connector clutter.
 - Revealing help is a pointer or keyboard-focus state, never a click state. A
   click that leaves focus on the marker must not hold the swap open after the
   pointer has left.
+- A value box holds a number even when it paints that number the way a player
+  reads it. A box showing `50,000` is fifty thousand to its own slider, its
+  bounds check and anything else that reads it.
+- A flag box is as wide as the flag in it, so the space inside it is the same
+  on the left and the right. The boxes sit on a column grid; the track decides
+  where a box starts, not how wide it is.
+- The grip between two panels is one slim bar that grows and takes the accent
+  under the pointer.
+- Responding to an edit costs the same on a large panel as on a small one.
+  Work that reacts to a change is scoped to what changed: a rebuilt reference
+  pillar is not a reason to re-measure the property names three panels away.
 - Tab shortcut badges fit the tab height with a margin. The title reserves space
   on both sides, so the badge cannot cover the text.
 - The detail sort marker stays centered in the left gutter. Boolean arrows keep
