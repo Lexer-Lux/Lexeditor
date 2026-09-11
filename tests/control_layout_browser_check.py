@@ -69,6 +69,26 @@ def main():
                           const b=e.getBoundingClientRect();
                           return {left:c.left-b.left,right:b.right-c.right};}''')
                         assert inside['left']>=0 and inside['right']>=0,inside
+                # The copy button's drawing fills its button, and the air on
+                # each side of it is equal.
+                for field in page.locator('.lex-detail-field:has(> .lex-detail-field-control > .lex-copy-value)').all():
+                    if not field.is_visible():continue
+                    air=field.evaluate('''e=>{
+                      const copy=e.querySelector(':scope > .lex-detail-field-control > .lex-copy-value');
+                      const ink=copy.querySelector('svg');
+                      const label=e.querySelector(':scope > .lex-detail-field-label');
+                      // The thing in the lane's other column, whatever it is:
+                      // a nested grid of its own starts where its column does,
+                      // not where its first input happens to sit.
+                      const box=copy.nextElementSibling;
+                      if(!ink||!box)return null;
+                      const ib=ink.getBoundingClientRect();
+                      return [Math.round(ib.left-label.getBoundingClientRect().right),
+                              Math.round(box.getBoundingClientRect().left-ib.right),
+                              Math.round(copy.getBoundingClientRect().width-ib.width)];}''')
+                    if air is not None:
+                        assert abs(air[0]-air[1])<=1,air
+                        assert air[2]<=1,air
                 # The fill behind a value is the height of that value's box,
                 # never the height of the property row around it.
                 for field in page.locator('.lex-has-value-fill').all():

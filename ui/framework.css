@@ -5458,11 +5458,16 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    button plus even air on both sides. */
 .lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control,
 .lex-multi-number-item {
-  --lex-copy-lane:15px;
+  --lex-copy-lane:12px;
 }
 .lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control {
   grid-template-columns:var(--lex-copy-lane) minmax(0,1fr);
-  gap:5px;
+  /* Even air on both sides of the button: the same six pixels between the
+     property name and the button as between the button and the value box. The
+     control's own ten-pixel inset put ten on one side and four on the other,
+     which is what read as a button sitting off to one side of its column. */
+  gap:6px;
+  padding-left:6px;
 }
 .lex-multi-number-item {
   grid-template-columns:var(--lex-copy-lane) minmax(2.6em,auto) minmax(0,1fr);
@@ -5471,8 +5476,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   display:grid;
   place-items:center;
   box-sizing:border-box;
-  width:var(--lex-copy-lane,15px);
-  height:var(--lex-copy-lane,15px);
+  width:var(--lex-copy-lane,12px);
+  height:calc(var(--lex-copy-lane,12px) * 1.25);
   justify-self:center;
   padding:0;
 }

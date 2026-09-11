@@ -301,7 +301,11 @@
   const copyIcon = () => {
     const namespace = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(namespace, "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
+    // Cropped to the drawing. On a 0 0 24 24 box the two sheets only reach from
+    // 4 to 20 across, so a third of the button was blank margin built into the
+    // icon - which read as a button adrift in a column too wide for it, on top
+    // of whatever the column itself was reserving.
+    svg.setAttribute("viewBox", "4 2 16 20");
     svg.setAttribute("aria-hidden", "true");
     for (const d of ["M9 9h10v12H9z", "M5 15V3h10v2"]) {
       const path = document.createElementNS(namespace, "path");
