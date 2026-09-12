@@ -18,7 +18,15 @@ From the Lexeditor repository root on the Windows machine with the game installe
 python -m games.ffx_x2.verify_install --game-root "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" --require-fahrenheit --hash-archives --json > ffx-x2-install-verification.json
 ```
 
-Use the actual Steam library path if different. `--hash-archives` deliberately reads the complete large VBF files, so it is optional during ordinary development but required for the draft-exit baseline.
+The recommended shortcut runs that strict command and writes the report directly into this acceptance folder:
+
+```powershell
+.\worklog\acceptance\ffx-x2\run-verifier.ps1 -GameRoot "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster"
+```
+
+Use the actual Steam library path if different. `run-verifier.ps1` writes `worklog/acceptance/ffx-x2/install-verification.json` by default and exits with an error unless the report has the expected contract and `acceptanceReady: true`. `--hash-archives` deliberately reads the complete large VBF files, so it is optional during ordinary development but required for the draft-exit baseline.
+
+`verificationPassed` describes the requested verifier invocation; ordinary read-only verification can pass without full archive hashing. `acceptanceReady` is deliberately stricter: it requires validated structured/archive coverage, full SHA-256 values for both installed VBFs, and ready Fahrenheit Stage 0/Stage 1 plus both fixed game executables.
 
 Acceptance requirements:
 
