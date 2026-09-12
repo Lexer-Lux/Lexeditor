@@ -181,7 +181,10 @@ def main() -> None:
             page.evaluate('navigate("deployment")')
             deployment_text = page.locator("#main").inner_text()
             assert "MOD LOADER" in deployment_text
-            assert "Bannerlord's native module loader" in deployment_text
+            loader_values = page.locator("#main .lex-detail-field input").evaluate_all(
+                "nodes => nodes.map(node => node.value)"
+            )
+            assert any("Bannerlord's native module loader" in value for value in loader_values), loader_values
 
             page.evaluate('navigate("moduledata")')
             page.wait_for_function("state.moduleData && state.moduleData.schemaIssueCount===1")
