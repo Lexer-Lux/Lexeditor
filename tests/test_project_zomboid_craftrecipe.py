@@ -21,8 +21,8 @@ class ProjectZomboidCraftRecipeTests(unittest.TestCase):
             '''    category = Carpentry,\n'''
             '''    Icon = Item_Plank,\n'''
             '''    ResearchSkillLevel = -1,\n'''
-            '''    tags = InHandCraft;CanBeDoneFromFloor,\n'''
-            '''    time = 230,\n'''
+            '''    Tags = InHandCraft;CanBeDoneFromFloor,\n'''
+            '''    Time = 230,\n'''
             '''    timedAction = SawLogs,\n'''
             '''    FutureField = KeepMe,\n'''
             '''    inputs\n    {\n      item 1 [Base.Log],\n    }\n'''
@@ -30,10 +30,12 @@ class ProjectZomboidCraftRecipeTests(unittest.TestCase):
             '''  }\n}\n''', encoding="utf-8")
         return project
 
-    def test_surgical_edit_preserves_nested_inputs_outputs(self):
+    def test_surgical_edit_preserves_nested_inputs_outputs_and_property_casing(self):
         with tempfile.TemporaryDirectory() as name:
             root = self.make_project(Path(name))
             row = craftrecipe.read(root)["rows"][0]
+            self.assertEqual(row["fields"]["time"], "230")
+            self.assertEqual(row["fields"]["tags"], "InHandCraft;CanBeDoneFromFloor")
             saved = craftrecipe.save(
                 root, row["path"], row["module"], row["id"], row["sha256"],
                 {"AllowBatchCraft": "false", "time": "120", "tags": "InHandCraft;CanBeDoneInDark"},
@@ -44,9 +46,40 @@ class ProjectZomboidCraftRecipeTests(unittest.TestCase):
             self.assertEqual(saved["fields"]["tags"], "InHandCraft;CanBeDoneInDark")
             self.assertTrue(saved["hasInputs"])
             self.assertTrue(saved["hasOutputs"])
+            self.assertIn("    Time = 120,", text)
+            self.assertIn("    Tags = InHandCraft;CanBeDoneInDark,", text)
             self.assertIn("item 1 [Base.Log]", text)
             self.assertIn("item 3 Base.Plank", text)
             self.assertIn("FutureField = KeepMe,", text)
+
+    def test_case_only_duplicate_is_ambiguous(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = self.make_project(Path(name))
+            script = root / "42" / "media" / "scripts" / "craft.txt"
+            script.write_text(
+                script.read_text(encoding="utf-8").replace("    Time = 230,\n", "    Time = 230,\n    time = 50,\n"),
+                encoding="utf-8",
+            )
+            row = craftrecipe.read(root)["rows"][0]
+            self.assertIn("time", row["duplicateKeys"])
+            with self.assertRaisesRegex(core.ProjectZomboidError, "duplicated craftRecipe properties: time"):
+                craftrecipe.save(root, row["path"], row["module"], row["id"], row["sha256"], {"time": "120"})
+
+    def test_unknown_current_boolean_value_fails_closed(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = self.make_project(Path(name))
+            script = root / "42" / "media" / "scripts" / "craft.txt"
+            script.write_text(
+                script.read_text(encoding="utf-8").replace("AllowBatchCraft = true", "AllowBatchCraft = future"),
+                encoding="utf-8",
+            )
+            row = craftrecipe.read(root)["rows"][0]
+            with self.assertRaisesRegex(core.ProjectZomboidError, "AllowBatchCraft=future"):
+                craftrecipe.save(
+                    root, row["path"], row["module"], row["id"], row["sha256"],
+                    {"AllowBatchCraft": "true", "time": "120"},
+                )
+            self.assertIn("AllowBatchCraft = future", script.read_text(encoding="utf-8"))
 
     def test_typed_validation(self):
         with tempfile.TemporaryDirectory() as name:
