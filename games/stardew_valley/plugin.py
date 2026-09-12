@@ -56,7 +56,9 @@ def smoke() -> list[str]:
         }) + "\n", encoding="utf-8")
         source_before = source.read_bytes()
         cp = game / "Mods" / "Content Patcher"; cp.mkdir(parents=True)
-        (cp / "manifest.json").write_text('{"UniqueID":"Pathoschild.ContentPatcher"}\n', encoding="utf-8")
+        (cp / "manifest.json").write_text(json.dumps({
+            "UniqueID": "Pathoschild.ContentPatcher", "Version": "2.9.1",
+        }) + "\n", encoding="utf-8")
         shutil.copytree(paths.PROJECT_TEMPLATE_ROOT, project)
         initialize_project(project)
         store = ContentPackStore(project)
