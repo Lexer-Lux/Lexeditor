@@ -77,7 +77,7 @@ try {
     )
     if (-not [bool]$report.acceptanceReady -or $failedChecks.Count -ne 0) {
         $detail = if ($failedChecks.Count) { $failedChecks -join ", " } else { "acceptanceReady=false" }
-        throw "Verifier passed its ordinary checks, but draft-exit evidence is incomplete: $detail. Report: $resolvedOutput"
+        throw "Verifier passed its ordinary checks, but the strict real-install baseline is incomplete: $detail. Report: $resolvedOutput"
     }
 
     if ($null -ne $baseline) {
