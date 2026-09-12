@@ -181,3 +181,40 @@ def replace_asset(root: Path, relative: str, data: object, expected_sha256: str)
         return state
     _atomic_replace(target, encoded)
     return asset_state(project, state["path"])
+
+
+def rename_asset(root: Path, relative: str, new_relative: str, expected_sha256: str) -> dict:
+    """Move an asset without overwrite while preserving the asset's format."""
+    project = Path(root).resolve()
+    source, data, state = read_asset(project, relative)
+    if expected_sha256 != state["sha256"]:
+        raise ValueError(f"{state['path']} changed outside Lexeditor; reload before renaming")
+    destination = asset_target(project, new_relative)
+    destination_relative = destination.relative_to(project).as_posix()
+    if destination.suffix.casefold() != source.suffix.casefold():
+        raise ValueError("Asset rename must preserve the file extension")
+    if destination == source:
+        return state
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with destination.open("xb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError as error:
+        raise ValueError(f"Asset file already exists: {destination_relative}") from error
+    try:
+        source.unlink()
+    except OSError:
+        destination.unlink(missing_ok=True)
+        raise
+    return asset_state(project, destination_relative)
+
+
+def delete_asset(root: Path, relative: str, expected_sha256: str) -> dict:
+    """Delete one asset only when its current bytes match the observed SHA."""
+    target, _data, state = read_asset(root, relative)
+    if expected_sha256 != state["sha256"]:
+        raise ValueError(f"{state['path']} changed outside Lexeditor; reload before deleting")
+    target.unlink()
+    return {"path": state["path"], "deleted": True}
