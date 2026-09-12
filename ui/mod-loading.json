@@ -36,6 +36,11 @@
       "structure": "One selected Lexeditor project is rooted at Info.json. Build Package creates <project>/build/official-package from Info.json, Thumbnail and declared InstallRule targets while excluding Lexeditor recovery artifacts. Client local testing uses one owned random 10-digit folder under workshop/content/1623730. Server deployment requires IsServer=true and uses <PalServer>/Mods/Workshop/Lexeditor-<PackageName>; server activation recovery state stays under the project, never inside the package.",
       "overriding": "The official loader identifies packages by PackageName. Lexeditor refuses client or server deployment when another source folder already uses the same PackageName and refuses to overwrite externally modified owned state. PalSchema raw patches apply named DataTable row/property values rather than whole assets; when several runtime patches target the same field, Lexeditor does not claim a separate conflict winner beyond PalSchema's runtime order."
     },
+    "project-zomboid": {
+      "loader": "Project Zomboid's native Build 42 mod system. Lexeditor deploys a local development copy for testing; it does not replace the game loader or publish to Steam Workshop.",
+      "structure": "A Build 42 mod uses common/ plus version folders such as 42/, with mod.info beside that version's media/ content. Lexeditor keeps its authoring project outside the installed game and can copy it to <user>/Zomboid/mods/<project> for local testing.",
+      "overriding": "Project Zomboid owns activation and mod ordering. common content is layered with the selected version folder, while mod.info may declare require, incompatible, loadModBefore and loadModAfter relationships. Lexeditor does not semantically merge conflicts between separate mods."
+    },
     "rdr": {
       "loader": "De novo Lexeditor deployment through RedHook / Ultimate ASI Loader's update-folder override mechanism.",
       "structure": "Lexeditor edits one project (C:\\RDRMod by default); game-data replacements live under <project>\\mod\\ in archive-relative trees. Deploy Project rebuilds affected RPF6 archive copies under <RDR>\\update\\... while leaving the installed source archives untouched.",

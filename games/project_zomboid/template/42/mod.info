@@ -1,0 +1,6 @@
+name=__LEXEDITOR_NAME__
+id=__LEXEDITOR_ID__
+author=Lexer
+modversion=0.1.0
+description=Project Zomboid Build 42 mod created with Lexeditor.
+versionMin=42.20

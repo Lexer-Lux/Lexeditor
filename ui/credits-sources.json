@@ -167,6 +167,10 @@
         }
       ]
     },
+    "project-zomboid": {
+      "source": "games/project_zomboid/credits.json",
+      "licenseRoot": "games/project_zomboid"
+    },
     "warband": {
       "contributions": [
         {
