@@ -43,7 +43,7 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             self.assertNotIn(("craftRecipe", "Fake"), names)
             self.assertEqual(result["errors"], [])
             self.assertEqual(result["counts"]["craftRecipe"], 1)
-            for editable_name in ("Hammer", "Sandwich", "MakeThing", "CustomWater", "TestCar", "TestSound"):
+            for editable_name in ("Hammer", "Sandwich", "MakeThing", "CustomWater", "TestCar", "TestSound", "FancyModel"):
                 with self.subTest(editable_name=editable_name):
                     self.assertTrue(next(row for row in result["rows"] if row["name"] == editable_name)["editable"])
 
