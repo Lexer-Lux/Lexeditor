@@ -38,6 +38,7 @@ jobs:
           browser_path.write_text(browser.replace(old_assert, new_assert, 1), encoding='utf-8')
           PY
           python -m py_compile plugin_api.py tests/test_ffx_x2_browser_check.py
+          python -m pip install pillow
           python -m unittest tests.test_global_issues.Bootstrap.test_plugins_import_without_registry_and_project_roots_are_absolute -v
           python tools/verify_shared_ui_contract.py
           git diff --check
