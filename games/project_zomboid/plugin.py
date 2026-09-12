@@ -288,7 +288,8 @@ PLUGIN = GamePlugin(
         initialize=initialize_project, discover=discover_projects,
     ),
     installation=GameInstallSpec(
-        root_env="LEXEDITOR_PROJECT_ZOMBOID_ROOT", required_paths=("ProjectZomboid64.exe", "media/scripts"),
+        root_env="LEXEDITOR_PROJECT_ZOMBOID_ROOT",
+        required_paths=("ProjectZomboid64.exe", "media/scripts", "media/scripts/generated"),
         steam_app_id="108600", install_dir_names=("ProjectZomboid", "Project Zomboid"),
         default_roots=(Path(r"C:\Program Files (x86)\Steam\steamapps\common\ProjectZomboid"),),
         launch_path="ProjectZomboid64.exe",
