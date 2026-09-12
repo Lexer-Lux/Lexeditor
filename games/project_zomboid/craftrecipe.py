@@ -24,6 +24,8 @@ EDITABLE_FIELDS = (
 )
 BOOLEAN_FIELDS = {"AllowBatchCraft", "CanWalk"}
 INTEGER_FIELDS = {"ResearchSkillLevel", "time"}
+_FIELD_BY_CASEFOLD = {key.casefold(): key for key in EDITABLE_FIELDS}
+_TRUE_FALSE = {"true", "false"}
 
 
 def _module_blocks(text: str) -> list[tuple[core.Block, core.Block]]:
@@ -57,6 +59,39 @@ def _module_blocks(text: str) -> list[tuple[core.Block, core.Block]]:
     return found
 
 
+def _editable_properties(text: str, block: core.Block) -> tuple[dict[str, str], set[str]]:
+    """Read known top-level properties case-insensitively.
+
+    Current Build 42 documentation uses both ``Time``/``Tags`` and
+    ``time``/``tags`` in valid craftRecipe examples. Normalize only the known
+    editable field identities while leaving the source spelling untouched.
+    """
+    body = text[block.open_brace + 1:block.close_brace]
+    masked = core._masked_code(body)
+    values: dict[str, str] = {}
+    duplicates: set[str] = set()
+    depth = 0
+    last = 0
+    for match in core._PROPERTY_RE.finditer(body):
+        for char in masked[last:match.start()]:
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth = max(0, depth - 1)
+        last = match.end()
+        if depth != 0:
+            continue
+        canonical = _FIELD_BY_CASEFOLD.get(match.group("key").casefold())
+        if canonical is None:
+            continue
+        value = match.group("value").strip()
+        if canonical in values:
+            duplicates.add(canonical)
+        else:
+            values[canonical] = value
+    return values, duplicates
+
+
 def read(root: Path) -> dict:
     root = root.resolve()
     rows, errors = [], []
@@ -69,7 +104,7 @@ def read(root: Path) -> dict:
             errors.append({"path": relative, "error": str(error)})
             continue
         for module, block in pairs:
-            values, duplicates = core._properties(text, block)
+            values, duplicates = _editable_properties(text, block)
             rows.append({
                 "key": f"{relative}:{module.name}.{block.name}",
                 "path": relative,
@@ -78,7 +113,7 @@ def read(root: Path) -> dict:
                 "fullType": f"{module.name}.{block.name}",
                 "sha256": core.sha256_bytes(data),
                 "fields": {key: values.get(key, "") for key in EDITABLE_FIELDS},
-                "duplicateKeys": sorted(set(duplicates) & set(EDITABLE_FIELDS)),
+                "duplicateKeys": sorted(duplicates),
                 "hasInputs": bool(re.search(r"\binputs\s*\{", core._masked_code(text[block.open_brace + 1:block.close_brace]), re.IGNORECASE)),
                 "hasOutputs": bool(re.search(r"\boutputs\s*\{", core._masked_code(text[block.open_brace + 1:block.close_brace]), re.IGNORECASE)),
             })
@@ -91,7 +126,7 @@ def _validate(key: str, value: object) -> str:
         raise core.ProjectZomboidError(f"{key} contains script punctuation")
     if key in BOOLEAN_FIELDS:
         lowered = clean.casefold()
-        if lowered not in {"true", "false"}:
+        if lowered not in _TRUE_FALSE:
             raise core.ProjectZomboidError(f"{key} must be true or false")
         return lowered
     if key in INTEGER_FIELDS:
@@ -128,13 +163,23 @@ def save(root: Path, relative: str, module_name: str, recipe_id: str,
     if len(matches) != 1:
         raise core.ProjectZomboidError("Craft recipe identity is missing or ambiguous")
     _module, block = matches[0]
-    values, duplicates = core._properties(text, block)
+    values, duplicates = _editable_properties(text, block)
     unsafe = set(duplicates) & set(edits)
     if unsafe:
         raise core.ProjectZomboidError("Cannot safely edit duplicated craftRecipe properties: " + ", ".join(sorted(unsafe)))
     missing = set(edits) - set(values)
     if missing:
         raise core.ProjectZomboidError("Writer changes existing properties only; missing: " + ", ".join(sorted(missing)))
+
+    unknown_booleans = [
+        f"{key}={values[key]}" for key in sorted(BOOLEAN_FIELDS & set(edits))
+        if values[key].strip().casefold() not in _TRUE_FALSE
+    ]
+    if unknown_booleans:
+        raise core.ProjectZomboidError(
+            "Cannot save while selected fields use unrecognized Build 42 values; "
+            "reload with a Lexeditor version that understands: " + ", ".join(unknown_booleans)
+        )
 
     validated = {key: _validate(key, value) for key, value in edits.items()}
     body_start, body_end = block.open_brace + 1, block.close_brace
@@ -150,9 +195,9 @@ def save(root: Path, relative: str, module_name: str, recipe_id: str,
             elif char == "}":
                 depth = max(0, depth - 1)
         last = match.end()
-        key = match.group("key")
-        if depth == 0 and key in validated:
-            replacements.append((body_start + match.start("value"), body_start + match.end("value"), validated[key]))
+        canonical = _FIELD_BY_CASEFOLD.get(match.group("key").casefold())
+        if depth == 0 and canonical in validated:
+            replacements.append((body_start + match.start("value"), body_start + match.end("value"), validated[canonical]))
     if len(replacements) != len(validated):
         raise core.ProjectZomboidError("Could not locate every craftRecipe property safely")
 
