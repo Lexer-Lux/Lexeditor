@@ -7119,7 +7119,6 @@ ${contents.path}`});
       // left every plain property's rail parked in the far-left gutter, so no
       // two rows in a panel annotated their names from the same place.
       if (!rail || !label) continue;
-      if (field.hasAttribute("data-lex-sort")) { placements.push([rail, "0px"]); continue; }
       // The property name is wrapped in its own span so the boolean leader
       // arrow cannot squeeze it, so look inside that wrapper first. Searching
       // only the label's direct children left the rail parked at the far left

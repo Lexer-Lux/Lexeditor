@@ -4460,12 +4460,12 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   top:50%;
   left:50%;
   display:block;
-  width:9px;
-  height:9px;
+  width:18px;
+  height:18px;
   margin:0;
   content:"\25B2";
   color:var(--lex-highlight);
-  font:700 10px/9px var(--lex-symbol-font);
+  font:700 18px/18px var(--lex-symbol-font);
   text-align:center;
   transform:translate(-50%,-50%);
 }
