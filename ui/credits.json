@@ -408,6 +408,27 @@
       "thanks": [],
       "licenses": []
     },
+    "project-zomboid": {
+      "contributions": [
+        {
+          "name": "PZ Wiki Modding / PZ API Docs",
+          "role": "Build 42 mod.info and ZedScript schema reference used to define the first structured editor boundary.",
+          "url": "https://github.com/PZ-Wiki-Modding/PZ-API-Docs"
+        },
+        {
+          "name": "PZ Wiki Modding / ZedScripts",
+          "role": "Build 42 ZedScript validation and tooling reference.",
+          "url": "https://github.com/PZ-Wiki-Modding/ZedScripts"
+        },
+        {
+          "name": "PZ Wiki Modding / pz-scripts-data",
+          "role": "Current Build 42 script parameter and type-schema research reference.",
+          "url": "https://github.com/PZ-Wiki-Modding/pz-scripts-data"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
     "warband": {
       "contributions": [
         {
