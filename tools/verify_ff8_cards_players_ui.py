@@ -83,7 +83,7 @@ def run(browser_path: str | None) -> None:
             assert not errors, errors
             assert page.evaluate('cardsContract.capturedMount') is False
             assert page.locator('#main > .ff8-card-root').count() == 1
-            assert page.locator('.ff8-card-tabs button').all_text_contents() == ['CARDS', 'PLAYERS']
+            assert page.locator('.lex-subtab-bar button').all_text_contents() == ['CARDS', 'PLAYERS']
             assert page.locator('.fake-paged').count() == 1
 
             page.evaluate('''() => {
@@ -96,16 +96,19 @@ def run(browser_path: str | None) -> None:
             print('PASS card list stays mounted and artwork/rank preview uses production classes')
 
             page.get_by_role('button', name='PLAYERS').click()
-            page.wait_for_selector('.ff8-card-player')
-            assert page.locator('.ff8-card-player h4').inner_text() == 'Queen :: talk'
-            inputs = page.locator('.ff8-card-player-field input')
+            page.wait_for_selector('.ff8-card-players .lex-column-list-row')
+            rows = page.locator('.ff8-card-players .lex-column-list-row')
+            assert rows.count() == 2
+            first_text = rows.nth(0).inner_text()
+            assert 'Queen' in first_text and 'talk' in first_text and 'Rare card' in first_text and 'Literal' in first_text
+            inputs = page.locator('.ff8-card-players .lex-column-list-row input[type=number]')
             assert inputs.count() == 2
             assert inputs.nth(1).is_disabled()
             inputs.nth(0).fill('7')
             page.get_by_role('button', name='SAVE PLAYERS').click()
             page.wait_for_function('window.cardSave !== null')
             assert page.evaluate('window.cardSave') == {'edits':[{'map':'balamb','player':0,'param':0,'value':7}]}
-            assert 'Saved 1 CARDGAME parameter change.' in page.locator('.ff8-card-player-mode').last.inner_text()
+            assert 'Saved 1 CARDGAME parameter change.' in page.locator('.ff8-card-player-state').last.inner_text()
             print('PASS Players subtab loads CARDGAME parameters, preserves read-only variables, and saves edits')
             assert not errors, errors
         finally:
