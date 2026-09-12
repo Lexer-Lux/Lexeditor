@@ -1,0 +1,38 @@
+name: Temporary Bannerlord current shared contract
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-current-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Shared UI contract
+        run: python tools/verify_shared_ui_contract.py
+      - name: Install global regression dependency
+        run: python -m pip install pillow
+      - name: Global unit regressions
+        run: python -m unittest tests.test_global_issues tests.test_global_followup tests.test_global_developer_mode tests.test_home_restart -v
+      - name: Plugin documentation metadata
+        run: |
+          python plugin_metadata.py
+          python tools/generate_credits.py --check
+      - name: Bannerlord UI contract
+        run: python -m unittest tests.test_bannerlord_ui_contract -v
+      - name: Syntax
+        run: |
+          node --check ui/framework.js
+          python -m py_compile app.py desktop_host.py github_integration.py plugin_api.py plugin_metadata.py settings_manager.py tools/generate_credits.py
