@@ -1,0 +1,100 @@
+name: Temporary Bannerlord legacy baseline guard
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-legacy-baseline-guard.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - name: Correct staged regression expectation
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tools/temp_bannerlord_legacy_baseline_guard.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'with self.assertRaisesRegex(ValueError, "loaded baseline"):'
+          new = 'with self.assertRaisesRegex(ValueError, "existing compatibility row"):'
+          if text.count(old) != 1:
+              raise SystemExit(f'Expected one staged regression expectation, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+      - name: Apply baseline guard
+        run: python tools/temp_bannerlord_legacy_baseline_guard.py
+      - name: Focused validation
+        run: |
+          python -m compileall -q games/bannerlord
+          python -m unittest tests.test_bannerlord_legacy_relation_editor tests.test_bannerlord_relation_save_preflight tests.test_bannerlord_community_metadata tests.test_bannerlord_community_editor -v
+          node --check games/bannerlord/editor_core.js
+          node --check games/bannerlord/editor_boot.js
+      - name: Commit baseline guard
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/bannerlord/module_data.py games/bannerlord/editor_core.js games/bannerlord/editor_boot.js tests/test_bannerlord_legacy_relation_editor.py
+          git commit -m "Guard Bannerlord legacy dependency baselines"
+          git push origin HEAD:feature/bannerlord-plugin
+
+  regression:
+    needs: patch
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install Pillow 'fonttools>=4.59,<5'
+      - run: python -m compileall -q games/bannerlord desktop_host.py service_session.py plugin_api.py project_manager.py runtime_bootstrap.py
+      - run: python -m unittest discover -s tests -p 'test_bannerlord*.py' -v
+      - run: python -m unittest discover -s tests -p 'test_project*.py' -v
+      - run: python -m unittest discover -s tests -p test_data_map_coverage.py -v
+      - run: python -c "import glob, subprocess; [subprocess.run(['node','--check',path], check=True) for path in glob.glob('games/bannerlord/*.js')]"
+
+  browser:
+    needs: patch
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/bannerlord_browser_check.py out/bannerlord-legacy-baseline
+
+  cleanup:
+    needs: [regression, browser]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/temp-bannerlord-legacy-baseline-guard.yml tools/temp_bannerlord_legacy_baseline_guard.py
+          git commit -m "Remove temporary Bannerlord baseline guard workflow"
+          git push origin HEAD:feature/bannerlord-plugin
