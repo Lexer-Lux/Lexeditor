@@ -73,6 +73,19 @@ def _loader_evidence(game_root: Path) -> dict:
     return loader
 
 
+def _deployment_matches_project(project_root: Path, deployment: dict) -> bool:
+    if not deployment.get("deployed") or not deployment.get("managed") or deployment.get("externallyChanged"):
+        return False
+    project = Path(project_root).resolve()
+    deployed_root = Path(str(deployment.get("target", "")))
+    for relative in ("manifest.json", "content.json"):
+        source_file = project / relative
+        deployed_file = deployed_root / relative
+        if not source_file.is_file() or not deployed_file.is_file() or _sha256(source_file) != _sha256(deployed_file):
+            return False
+    return True
+
+
 def smapi_log_path() -> Path:
     """Return the canonical SMAPI latest-log path, with an environment override for tests/support."""
     override = os.environ.get("LEXEDITOR_STARDEW_SMAPI_LOG")
@@ -151,16 +164,8 @@ def begin_acceptance(game_root: Path, project_root: Path, *, log_path: Path | No
     if not any(row.get("fields") for row in store.objects()["rows"]):
         raise RuntimeError("Add and save at least one supported Data/Objects field override before acceptance")
     deployment = deployment_status(game, project)
-    if not deployment["deployed"] or not deployment["managed"]:
-        raise RuntimeError("Deploy this project with Lexeditor before beginning installed-game acceptance")
-    if deployment["externallyChanged"]:
-        raise RuntimeError("The deployed content pack changed outside Lexeditor; reconcile it before acceptance")
-    deployed_root = Path(deployment["target"])
-    for relative in ("manifest.json", "content.json"):
-        source_file = project / relative
-        deployed_file = deployed_root / relative
-        if not deployed_file.is_file() or _sha256(source_file) != _sha256(deployed_file):
-            raise RuntimeError("The deployed pack is older than the current project; redeploy before acceptance")
+    if not _deployment_matches_project(project, deployment):
+        raise RuntimeError("Deploy the current project with Lexeditor before beginning installed-game acceptance")
     loader = _loader_evidence(game)
     if not loader["ready"]:
         raise RuntimeError("SMAPI and Content Patcher must both be installed before acceptance")
@@ -196,6 +201,7 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
     marker_path = _marker_path(project)
     loader = _loader_evidence(game)
     deployment = deployment_status(game, project)
+    deployment_matches_project = _deployment_matches_project(project, deployment)
     if not marker_path.is_file():
         return {
             "started": False,
@@ -204,6 +210,7 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
             "targetGameVersion": TARGET_GAME_VERSION,
             "loader": loader,
             "deployment": deployment,
+            "deploymentMatchesProject": deployment_matches_project,
             "smapiLogPath": str(smapi_log_path()),
             "blockers": ["Begin acceptance after deploying a representative Data/Objects edit."],
         }
@@ -218,12 +225,15 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
             "targetGameVersion": TARGET_GAME_VERSION,
             "loader": loader,
             "deployment": deployment,
+            "deploymentMatchesProject": deployment_matches_project,
             "blockers": [f"Acceptance marker is invalid: {error}"],
         }
 
     blockers: list[str] = []
     if Path(str(marker.get("gameRoot", ""))).resolve() != game or Path(str(marker.get("projectRoot", ""))).resolve() != project:
         blockers.append("Acceptance baseline belongs to a different game or project path; begin it again.")
+    if not deployment_matches_project:
+        blockers.append("The current project is no longer the same managed pack that was deployed; redeploy and reset acceptance.")
 
     xnb_path = Path(str(marker.get("objectsXnbPath", game / "Content" / "Data" / "Objects.xnb")))
     current_xnb_sha = _sha256(xnb_path) if xnb_path.is_file() else None
@@ -272,6 +282,7 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
 
     accepted = bool(
         fresh_runtime_log
+        and deployment_matches_project
         and xnb_unchanged
         and game_version_matches
         and evidence["contentPatcherSeen"]
@@ -287,6 +298,7 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
         "targetGameVersion": str(marker.get("targetGameVersion") or TARGET_GAME_VERSION),
         "loader": loader,
         "deployment": deployment,
+        "deploymentMatchesProject": deployment_matches_project,
         "projectName": marker.get("projectName"),
         "projectUniqueID": marker.get("projectUniqueID"),
         "objectsXnbPath": str(xnb_path),
