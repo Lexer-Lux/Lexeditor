@@ -109,7 +109,8 @@ jobs:
           git diff --check
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add games/ffx_x2/server.py ui/credits-sources.json ui/credits.json codex/ffx-x2/README.md worklog/issues/github-461.md worklog/acceptance/ffx-x2/README.md
+          git add games/ffx_x2/server.py ui/credits-sources.json ui/credits.json codex/ffx-x2/README.md
+          git add -f worklog/issues/github-461.md worklog/acceptance/ffx-x2/README.md
           if git diff --cached --quiet; then
             echo 'Cleanup already applied.'
             exit 0
