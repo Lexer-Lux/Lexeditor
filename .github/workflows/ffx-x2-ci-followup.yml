@@ -22,25 +22,17 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
-
           plugin_path = Path('plugin_api.py')
           plugin = plugin_path.read_text(encoding='utf-8')
-          old = '''        if not projects.root_env or not projects.default_root.is_absolute():
-            raise ValueError(f"{plugin.plugin_id} has an invalid project descriptor")
-'''
-          new = '''        if (not projects.root_env or
-                (not projects.default_root.is_absolute()
-                 and not (os.name != "nt" and PureWindowsPath(str(projects.default_root)).is_absolute()))):
-            raise ValueError(f"{plugin.plugin_id} has an invalid project descriptor")
-'''
+          old = "        if not projects.root_env or not projects.default_root.is_absolute():\n            raise ValueError(f\"{plugin.plugin_id} has an invalid project descriptor\")\n"
+          new = "        if (not projects.root_env or\n                (not projects.default_root.is_absolute()\n                 and not (os.name != \"nt\" and PureWindowsPath(str(projects.default_root)).is_absolute()))):\n            raise ValueError(f\"{plugin.plugin_id} has an invalid project descriptor\")\n"
           if plugin.count(old) != 1:
               raise RuntimeError(f'expected one project validation anchor, found {plugin.count(old)}')
           plugin_path.write_text(plugin.replace(old, new, 1), encoding='utf-8')
-
           browser_path = Path('tests/test_ffx_x2_browser_check.py')
           browser = browser_path.read_text(encoding='utf-8')
           old_assert = '                expect(page.locator("#ffxx2-mod-loader")).to_contain_text("Fahrenheit")\n'
-          new_assert = '                expect(page.get_by_role("textbox", name="LOADER", exact=True)).to_have_value("Fahrenheit\\\'s External File Loader (EFL) loads this plugin\\\'s file-only overlay.")\n'
+          new_assert = "                expect(page.get_by_role(\"textbox\", name=\"LOADER\", exact=True)).to_have_value(\"Fahrenheit's External File Loader (EFL) loads this plugin's file-only overlay.\")\n"
           if browser.count(old_assert) != 1:
               raise RuntimeError(f'expected one browser value assertion anchor, found {browser.count(old_assert)}')
           browser_path.write_text(browser.replace(old_assert, new_assert, 1), encoding='utf-8')
