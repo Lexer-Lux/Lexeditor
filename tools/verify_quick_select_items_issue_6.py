@@ -60,11 +60,21 @@ for banned in ('el("input"', "datalist", "validatedKeyEditor"):
 require('("quickselectitems.ymt",' in data_map_source and '"integrated"' in data_map_source,
         "Data Map does not mark quickselectitems.ymt integrated")
 
+# The source contract above is repository-local. The mutation acceptance below
+# intentionally uses the author's private RDR2 project because it needs real
+# catalog/quick-select XML with one-slot, multi-slot and unmapped cases. Name
+# that prerequisite before shutil turns it into an opaque WinError 3 on CI.
+fixture_root = PROJECT / "MyOverhaul"
+for name in ("catalog_sp.ymt", "quickselectitems.ymt", "install.xml"):
+    source = fixture_root / name
+    if not source.is_file():
+        raise FileNotFoundError(f"Missing RDR2 project fixture: {source}")
+
 with tempfile.TemporaryDirectory(prefix="lexeditor-issue-6-", ignore_cleanup_errors=True) as temp_name:
     mod = Path(temp_name) / "mod"
     mod.mkdir()
     for name in ("catalog_sp.ymt", "quickselectitems.ymt", "install.xml"):
-        shutil.copy2(PROJECT / "MyOverhaul" / name, mod / name)
+        shutil.copy2(fixture_root / name, mod / name)
     os.environ["LEXEDITOR_RDR2_PROJECT"] = str(PROJECT)
     os.environ["LEXEDITOR_MOD_ROOT"] = str(mod)
     sys.path.insert(0, str(ROOT))
