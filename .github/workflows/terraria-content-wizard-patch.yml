@@ -1,0 +1,172 @@
+name: Integrate Terraria content wizard
+
+on:
+  push:
+    branches: [feature/terraria-plugin]
+    paths:
+      - '.github/workflows/terraria-content-wizard-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Wire content wizard into service and UI
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              target = Path(path)
+              text = target.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one anchor, found {count}: {old[:80]!r}')
+              target.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Service import + wrapper + route/capability.
+          replace_once(
+              'games/terraria/server.py',
+              'from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text\n',
+              'from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text\nfrom .content_wizard import create_mod_item\n',
+          )
+          replace_once(
+              'games/terraria/server.py',
+              'def _installation_root() -> Path:\n',
+              'def create_content_item(name: object, display_name: object = "", tooltip: object = "") -> dict:\n'
+              '    return create_mod_item(project_root(), name, display_name, tooltip)\n\n\n'
+              'def _installation_root() -> Path:\n',
+          )
+          replace_once(
+              'games/terraria/server.py',
+              '"build-metadata", "localization", "source-text", "assets", "native-build",\n',
+              '"build-metadata", "localization", "source-text", "assets", "content-wizard", "native-build",\n',
+          )
+          replace_once(
+              'games/terraria/server.py',
+              '            if path == "/api/localization/file":\n',
+              '            if path == "/api/content/item":\n'
+              '                payload = self.read_json()\n'
+              '                if not isinstance(payload, dict) or set(payload) != {"name", "displayName", "tooltip"}:\n'
+              '                    raise ValueError("Expected name, displayName and tooltip only")\n'
+              '                self.send_json(create_content_item(payload["name"], payload["displayName"], payload["tooltip"]))\n'
+              '                return\n'
+              '            if path == "/api/localization/file":\n',
+          )
+
+          # UI styles/state.
+          replace_once(
+              'games/terraria/editor.html',
+              '.terraria-build-row,.terraria-localization-toolbar,.terraria-localization-create,.terraria-source-toolbar,.terraria-source-create,.terraria-asset-toolbar,.terraria-asset-action{',
+              '.terraria-build-row,.terraria-localization-toolbar,.terraria-localization-create,.terraria-source-toolbar,.terraria-source-create,.terraria-asset-toolbar,.terraria-asset-action,.terraria-content-form{',
+          )
+          replace_once(
+              'games/terraria/editor.html',
+              '.terraria-localization-create input,.terraria-source-create input,.terraria-asset-action input[type="text"]{',
+              '.terraria-localization-create input,.terraria-source-create input,.terraria-asset-action input[type="text"],.terraria-content-form input{',
+          )
+          replace_once(
+              'games/terraria/editor.html',
+              '  let assetFiles=[],assetCurrent=null,assetLoading=false,assetNewPath="",assetImportFile=null,assetReplaceFile=null,error="";\n',
+              '  let assetFiles=[],assetCurrent=null,assetLoading=false,assetNewPath="",assetImportFile=null,assetReplaceFile=null;\n'
+              '  let contentCreating=false,contentName="",contentDisplay="",contentTooltip="",contentResult=null,error="";\n',
+          )
+
+          content_functions = r'''  async function createContentItem(){
+    if(contentCreating||dirtyCount())return;
+    const name=contentName.trim();if(!name){error="Enter an internal item name.";render();return}
+    contentCreating=true;contentResult=null;error="";render();
+    try{
+      const result=await request("/api/content/item",{method:"POST",body:JSON.stringify({name,displayName:contentDisplay,tooltip:contentTooltip})});
+      const [source,localization,assets,map,locState]=await Promise.all([
+        request("/api/source"),request("/api/localization"),request("/api/assets"),request("/api/data-map"),
+        request(`/api/localization/file?path=${encodeURIComponent(result.localizationPath)}`),
+      ]);
+      sourceFiles=source.files;localizationFiles=localization.files;assetFiles=assets.files;mapRows=map.rows;
+      sourceSaved=clone(result.source);sourceCurrent=clone(result.source);locSaved=clone(locState);locCurrent=clone(locState);assetCurrent=result.texture;
+      contentResult=result;contentName="";contentDisplay="";contentTooltip="";
+    }catch(exc){error=String(exc.message||exc)}
+    contentCreating=false;render();
+  }
+  function contentPanel(){
+    const locked=contentCreating||dirtyCount()>0;
+    const form=el("div",{class:"terraria-note terraria-content-form"},
+      el("strong",{},"New ModItem"),
+      el("input",{type:"text",value:contentName,placeholder:"Internal name (ExampleSword)",disabled:locked,oninput:event=>{contentName=event.target.value}}),
+      el("input",{type:"text",value:contentDisplay,placeholder:"Display name (optional)",disabled:locked,oninput:event=>{contentDisplay=event.target.value}}),
+      el("input",{type:"text",value:contentTooltip,placeholder:"Tooltip (optional, one line)",disabled:locked,oninput:event=>{contentTooltip=event.target.value}}),
+      el("button",{class:"terraria-build-button",type:"button",disabled:locked,onclick:createContentItem},contentCreating?"CREATING…":"CREATE ITEM"));
+    const notes=[el("div",{class:"terraria-note"},"Creates a minimal compilable ModItem with only width/height defaults, standard en-US DisplayName/Tooltip localization, and a conspicuous 16×16 placeholder PNG. It intentionally does not invent damage, recipes, rarity, use style, or balance values.")];
+    if(contentResult){
+      notes.unshift(el("div",{class:"terraria-note terraria-success"},
+        el("strong",{},`${contentResult.name} created.`),
+        el("div",{class:"terraria-build-path"},`Source: ${contentResult.source.path}`),
+        el("div",{class:"terraria-build-path"},`Texture: ${contentResult.texture.path}`),
+        el("div",{class:"terraria-build-path"},`Localization: ${contentResult.localizationPath}`)));
+    }
+    return el("div",{class:"terraria-page"},...warnings(),form,...notes);
+  }
+'''
+          replace_once(
+              'games/terraria/editor.html',
+              '  function addLocalizationEntry(){\n',
+              content_functions + '  function addLocalizationEntry(){\n',
+          )
+          replace_once(
+              'games/terraria/editor.html',
+              '    const content=tab==="datamap"?dataMapPanel():tab==="assets"?assetsPanel():tab==="source"?sourcePanel():tab==="localization"?localizationPanel():tab==="dependencies"?dependenciesPanel():metadataPanel();\n',
+              '    const content=tab==="datamap"?dataMapPanel():tab==="assets"?assetsPanel():tab==="source"?sourcePanel():tab==="localization"?localizationPanel():tab==="content"?contentPanel():tab==="dependencies"?dependenciesPanel():metadataPanel();\n',
+          )
+          replace_once(
+              'games/terraria/editor.html',
+              '    tabs:[{id:"metadata",label:"Mod Metadata"},{id:"dependencies",label:"Dependencies & Build"},{id:"localization",label:"Localization"},{id:"source",label:"Source"},{id:"assets",label:"Assets"}],activeTab:()=>tab,navigate,\n',
+              '    tabs:[{id:"metadata",label:"Mod Metadata"},{id:"dependencies",label:"Dependencies & Build"},{id:"content",label:"Content"},{id:"localization",label:"Localization"},{id:"source",label:"Source"},{id:"assets",label:"Assets"}],activeTab:()=>tab,navigate,\n',
+          )
+
+          # Docs: insert one explicit high-level boundary and update summary bullets.
+          content_docs = '''## Content scaffolding boundary\n\nLexeditor's first higher-level Terraria content action creates a **minimal `ModItem` scaffold**. The item name must be an ASCII C# identifier. The action creates `Content/Items/<Name>.cs`, `Content/Items/<Name>.png`, and standard `Mods.<ModName>.Items.<Name>.DisplayName` localization (plus Tooltip when supplied). Existing source/texture paths are never overwritten.\n\nThe generated C# deliberately sets only `Item.width` and `Item.height`. It does **not** guess damage, damage class, use style/timing, rarity, value, recipes, sounds, stack size, or other gameplay/balance properties. The placeholder texture is a visible 16×16 checker specifically so it is easy to identify and replace in the Assets tab. Generated source remains ordinary raw C# in the Source tab and tModLoader remains authoritative for compilation/runtime semantics.\n\nThis is scaffolding, not a structured `ModItem` property editor. Other content families such as ModNPC/ModProjectile/ModTile are not generated yet.\n\n'''
+          replace_once(
+              'codex/terraria/README.md',
+              '## Native build handoff\n',
+              content_docs + '## Native build handoff\n',
+          )
+          replace_once(
+              'codex/terraria/README.md',
+              '- **Assets:** known tModLoader asset inventory/import/SHA-guarded replacement with PNG/audio previews where the browser supports them.\n',
+              '- **Assets:** known tModLoader asset inventory/import/SHA-guarded replacement with PNG/audio previews where the browser supports them.\n'
+              '- **Content scaffolding:** minimal no-overwrite ModItem source/localization/placeholder-texture generation; all gameplay details remain explicit follow-up edits.\n',
+          )
+          replace_once(
+              'codex/terraria/README.md',
+              '7. Data Map inventory of source code, localization and assets;\n8. invoke the supported build path without modifying the installed game;\n9. report the resulting local package and tModLoader enabled-state record;\n10. verify the resulting local mod is visible/loadable in a real tModLoader install.\n',
+              '7. minimal ModItem source/localization/placeholder-texture scaffolding;\n8. Data Map inventory of source code, localization and assets;\n9. invoke the supported build path without modifying the installed game;\n10. report the resulting local package and tModLoader enabled-state record;\n11. verify the resulting local mod is visible/loadable in a real tModLoader install.\n',
+          )
+          PY
+          git diff --check
+          python -m compileall -q games/terraria plugin_api.py project_manager.py
+          python -m unittest discover -s tests -p 'test_terraria_*.py'
+          python - <<'PY'
+          from pathlib import Path
+          html = Path('games/terraria/editor.html').read_text(encoding='utf-8')
+          Path('/tmp/terraria-editor.js').write_text(html.split('<script>')[-1].split('</script>',1)[0], encoding='utf-8')
+          PY
+          node --check /tmp/terraria-editor.js
+      - name: Commit integrated content wizard
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/terraria-content-wizard-patch.yml
+          git add games/terraria/server.py games/terraria/editor.html codex/terraria/README.md
+          git commit -m 'Wire Terraria ModItem content wizard'
+          git push origin HEAD:feature/terraria-plugin
