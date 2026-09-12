@@ -21,14 +21,11 @@ namespace {
 
 enum class XpSurface : std::uint8_t {
     none,
-    main_menu,
-    status_menu,
     after_battle,
 };
 
 struct XpCapture {
     XpSurface surface = XpSurface::none;
-    std::uint8_t status_character = 0xFF;
 };
 
 using MenuRenderer = std::uint32_t(__cdecl *)(void *, std::uint32_t, std::uint32_t);
@@ -44,8 +41,6 @@ struct ResultRow {
 std::array<ResultRow, 3> g_result_rows;
 
 XpCapture g_capture;
-MenuRenderer g_main_menu_renderer = nullptr;
-MenuRenderer g_status_menu_renderer = nullptr;
 AfterBattleRenderer g_after_battle_renderer = nullptr;
 ResultState g_result_state = nullptr;
 ResultRowRenderer g_result_row_renderer = nullptr;
@@ -168,32 +163,6 @@ static_assert(offsetof(savemap_ff8_character, exp) == 4);
 static_assert(offsetof(savemap_ff8_character, gfs) == 0x58);
 static_assert(offsetof(savemap_ff8_gf, HPs) == 0x12);
 
-std::uint32_t __cdecl main_menu_renderer_hook(
-    void *state, std::uint32_t display_list, std::uint32_t ordering_table)
-{
-    const std::uint32_t result = g_main_menu_renderer(state, display_list, ordering_table);
-    // FF8 also calls this renderer from the title-screen save-block browser.
-    // Draw party XP only in the in-game menu, never across save slots.
-    const auto *mode = getmode_cached();
-    if (mode != nullptr && mode->driver_mode == MODE_MENU) {
-        g_capture.surface = XpSurface::main_menu;
-    } else {
-        g_capture = {};
-    }
-    return result;
-}
-
-std::uint32_t __cdecl status_menu_renderer_hook(
-    void *state, std::uint32_t display_list, std::uint32_t ordering_table)
-{
-    const std::uint32_t result = g_status_menu_renderer(state, display_list, ordering_table);
-    // FF8_EN.exe 004CEF94 reads this byte and uses it to form the selected
-    // savemap_ff8_character address at 004CEFA5.
-    g_capture.status_character = *(static_cast<std::uint8_t *>(state) + 0x36);
-    g_capture.surface = XpSurface::status_menu;
-    return result;
-}
-
 void __cdecl after_battle_renderer_hook()
 {
     g_result_rows = {};
@@ -314,27 +283,89 @@ std::uint32_t __cdecl main_menu_clock_hook(void *state, std::uint32_t display_li
     return g_clock_renderer(state, display_list, cursor, x, y, seconds, playtime);
 }
 
-void draw_main_menu_xp()
+// Capture native widget coordinates and viewport, not guessed screen positions.
+struct MenuXpRow { float x, y, width, fraction; sprite_viewport viewport; };
+std::array<MenuXpRow, 32> g_menu_xp;
+std::size_t g_menu_xp_count = 0;
+void capture_menu_xp(float x, float y, float width, float fraction)
 {
-    for (std::size_t slot = 0; slot < 3; ++slot) {
-        const std::uint8_t character = ff8_externals.savemap->party[slot];
-        if (character >= CHAR_NUM) {
-            continue;
-        }
-        draw_bar(96.0f, 118.0f + 105.0f * slot, 210.0f, 6.0f,
-            xp_fraction(ff8_externals.savemap->chars[character].exp, character),
-            IM_COL32(224, 192, 48, 255));
-    }
+    const auto *mode = getmode_cached();
+    if (!mode || mode->driver_mode != MODE_MENU || !g_active_viewport ||
+        !*g_active_viewport || g_menu_xp_count == g_menu_xp.size()) return;
+    g_menu_xp[g_menu_xp_count++] = {x,y,width,fraction,**g_active_viewport};
 }
-
-void draw_status_menu_xp(std::uint8_t character)
+float gf_xp_fraction(unsigned gf)
 {
-    if (character >= CHAR_NUM) {
-        return;
+    if (gf >= 16) return 0;
+    const auto *saved = reinterpret_cast<const std::uint8_t *>(0x01CFDCA8 + gf * 68);
+    if (!(saved[0x11] & 1)) return 0;
+    const auto exp = *reinterpret_cast<const std::uint32_t *>(saved + 0xC);
+    const auto level = reinterpret_cast<int(__cdecl *)(int,int)>(0x004960C0);
+    const int current = level(exp,gf);
+    if (current >= 100) return 1;
+    const auto boundary = [&](int wanted) {
+        unsigned low=0, high=kMaxSearchExp;
+        while(low<high) { const auto mid=low+(high-low)/2;
+            if(level(mid,gf)>=wanted) high=mid; else low=mid+1; }
+        return low;
+    };
+    const auto low=boundary(current), high=boundary(current+1);
+    return high>low ? static_cast<float>(std::clamp(exp,low,high)-low)/(high-low) : 0;
+}
+using CharacterWidget = std::uint32_t(__cdecl *)(unsigned,unsigned,int,int,const std::uint8_t *,const void *,unsigned);
+std::uint32_t __cdecl character_widget_hook(unsigned display,unsigned cursor,int x,int y,
+    const std::uint8_t *saved,const void *stats,unsigned flags)
+{
+    const auto base=reinterpret_cast<std::uintptr_t>(&ff8_externals.savemap->chars[0]);
+    const auto address=reinterpret_cast<std::uintptr_t>(saved);
+    if(address>=base && (address-base)%sizeof(savemap_ff8_character)==0) {
+        const auto id=(address-base)/sizeof(savemap_ff8_character);
+        if(id<CHAR_NUM) capture_menu_xp(x+79,y+88,70,
+            xp_fraction(ff8_externals.savemap->chars[id].exp,static_cast<std::uint8_t>(id)));
     }
-    draw_bar(348.0f, 104.0f, 218.0f, 7.0f,
-        xp_fraction(ff8_externals.savemap->chars[character].exp, character),
-        IM_COL32(224, 192, 48, 255));
+    return reinterpret_cast<CharacterWidget>(0x004C0780)(display,cursor,x,y,saved,stats,flags);
+}
+using MainRowWidget = std::uint32_t(__cdecl *)(const std::uint8_t *,unsigned,unsigned,int);
+template<unsigned Address, int Spacing>
+std::uint32_t __cdecl main_row_hook(const std::uint8_t *state,unsigned display,unsigned cursor,int slot)
+{
+    if(slot>=0 && slot<3) {
+        const auto id=state[0x35+slot];
+        if(id<CHAR_NUM) capture_menu_xp(40,34+Spacing*slot+23,65,
+            xp_fraction(ff8_externals.savemap->chars[id].exp,id));
+    }
+    return reinterpret_cast<MainRowWidget>(Address)(state,display,cursor,slot);
+}
+using ReserveWidget = std::uint32_t(__cdecl *)(const std::uint8_t *,unsigned,unsigned);
+std::uint32_t __cdecl reserve_widget_hook(const std::uint8_t *state,unsigned display,unsigned cursor)
+{
+    for(unsigned slot=0;slot<8;++slot) {
+        const auto id=state[0x38+slot];
+        if(id<CHAR_NUM) capture_menu_xp(41+120*(slot%2),128+24*(slot/2),50,
+            xp_fraction(ff8_externals.savemap->chars[id].exp,id));
+    }
+    return reinterpret_cast<ReserveWidget>(0x004C2090)(state,display,cursor);
+}
+using GfListWidget = std::uint32_t(__cdecl *)(unsigned,unsigned,int,int,unsigned,unsigned);
+std::uint32_t __cdecl gf_list_hook(unsigned display,unsigned cursor,int x,int y,unsigned gf,unsigned level)
+{
+    if(gf<16) capture_menu_xp(x-2,y+64,36,gf_xp_fraction(gf));
+    return reinterpret_cast<GfListWidget>(0x004D3E40)(display,cursor,x,y,gf,level);
+}
+using GfDetailWidget = std::uint32_t(__cdecl *)(void *,unsigned,unsigned,int,int,unsigned);
+std::uint32_t __cdecl gf_detail_hook(void *state,unsigned display,unsigned cursor,int x,int y,unsigned gf)
+{
+    if(gf<16) capture_menu_xp(x+79,y+88,70,gf_xp_fraction(gf));
+    return reinterpret_cast<GfDetailWidget>(0x004D41B0)(state,display,cursor,x,y,gf);
+}
+void draw_menu_xp()
+{
+    for(std::size_t i=0;i<g_menu_xp_count;++i) {
+        const auto &row=g_menu_xp[i]; const auto &v=row.viewport;
+        draw_bar(row.x*v.scale_x+v.offset_x,row.y*v.scale_y+v.offset_y,
+            row.width*v.scale_x, v.scale_y,row.fraction,IM_COL32(224,192,48,255));
+    }
+    g_menu_xp_count=0;
 }
 
 void draw_after_battle_xp()
@@ -455,22 +486,20 @@ void lexeditor_ff8_bars_install()
     }
     if (!enable_ff8_xp_bars) return;
 
-    // The callback entry contains a PUSH-immediate renderer pointer. The same
-    // guarded hook identifies frames for XP bars. The clock uses its own
-    // native draw call above.
-    const std::uint32_t main_callback = static_cast<std::uint32_t>(
-        reinterpret_cast<std::uintptr_t>(ff8_externals.menu_callbacks[16].func));
-    g_main_menu_renderer = reinterpret_cast<MenuRenderer>(
-        get_absolute_value(main_callback, 0x3));
-    patch_code_dword(main_callback + 0x3,
-        static_cast<std::uint32_t>(
-            reinterpret_cast<std::uintptr_t>(&main_menu_renderer_hook)));
-    if (!enable_ff8_xp_bars) return;
-
-    const std::uint32_t status_callback = static_cast<std::uint32_t>(
-        reinterpret_cast<std::uintptr_t>(ff8_externals.menu_callbacks[5].func));
-    g_status_menu_renderer = reinterpret_cast<MenuRenderer>(
-        get_absolute_value(status_callback, 0x3));
+    if (FF8_US_VERSION) {
+        const auto hook = [&](unsigned address,unsigned target,void *replacement) {
+            if(original_call(address,target)) replace_call(address,replacement);
+            else ffnx_error("XP Bars: unsupported widget call at %08X\n",address);
+        };
+        for(const unsigned call : {0x4C08F4U,0x4CB66CU,0x4CC846U,0x4F6E8EU,0x4F6F17U,0x4F7361U,0x4F73EEU})
+            hook(call,0x4C0780,reinterpret_cast<void *>(&character_widget_hook));
+        hook(0x4C1ADA,0x4C1D50,reinterpret_cast<void *>(&main_row_hook<0x4C1D50,26>));
+        hook(0x4C1AC2,0x4C1ED0,reinterpret_cast<void *>(&main_row_hook<0x4C1ED0,52>));
+        hook(0x4C1AED,0x4C2090,reinterpret_cast<void *>(&reserve_widget_hook));
+        hook(0x4D3DB5,0x4D3E40,reinterpret_cast<void *>(&gf_list_hook));
+        for(const unsigned call : {0x4D3D34U,0x4D3D4AU})
+            hook(call,0x4D41B0,reinterpret_cast<void *>(&gf_detail_hook));
+    }
     g_after_battle_renderer = reinterpret_cast<AfterBattleRenderer>(
         get_relative_call(ff8_externals.battle_menu_sub_4A3D20, 0x139));
     g_result_state = reinterpret_cast<ResultState>(get_relative_call(
@@ -480,9 +509,6 @@ void lexeditor_ff8_bars_install()
     const auto row_call = reinterpret_cast<std::uintptr_t>(g_after_battle_renderer) + 0x2BD;
     g_result_row_renderer = reinterpret_cast<ResultRowRenderer>(get_relative_call(row_call, 0));
     replace_call(row_call, reinterpret_cast<void *>(&result_row_renderer_hook));
-    patch_code_dword(status_callback + 0x3,
-        static_cast<std::uint32_t>(
-            reinterpret_cast<std::uintptr_t>(&status_menu_renderer_hook)));
     replace_call(ff8_externals.battle_menu_sub_4A3D20 + 0x139,
         reinterpret_cast<void *>(&after_battle_renderer_hook));
 }
@@ -493,13 +519,8 @@ void lexeditor_ff8_bars_draw()
         draw_battle_hp();
     }
     if (enable_ff8_xp_bars) {
+        draw_menu_xp();
         switch (g_capture.surface) {
-        case XpSurface::main_menu:
-            draw_main_menu_xp();
-            break;
-        case XpSurface::status_menu:
-            draw_status_menu_xp(g_capture.status_character);
-            break;
         case XpSurface::after_battle:
             draw_after_battle_xp();
             break;
@@ -510,5 +531,6 @@ void lexeditor_ff8_bars_draw()
     // A renderer hook must identify every XP frame. This prevents a bar from
     // leaking onto the next screen after a menu closes.
     g_capture = {};
+    g_menu_xp_count = 0;
     g_hp_rows = {};
 }

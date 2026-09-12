@@ -2064,7 +2064,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       row("TRUE ATB WAIT","Works only when the game is set to ATB Wait mode. Stops all party and enemy ATB filling while any party member is ready to act. Active mode keeps its normal behavior.",trueAtbWait,"boolean"),
       row("UNIVERSAL ITEM","Look Right opens the normal battle Item menu without using an equipped command slot. The shortcut follows the configured input mapping.",universalItem,"boolean"),
       row("VIBRATION RATIONALIZATION","Start uses the normal field and battle pause behavior instead of FFNx's separate vibration screen.",vibrationConsolidation,"boolean"),
-      row("XP BARS","Shows XP progress on the main menu, Status screen, and post-battle report.",xpBars,"boolean"));
+      row("XP BARS","Shows yellow XP bars under main-menu character names, under character and GF level rows, and on the post-battle report.",xpBars,"boolean"));
     $("#main").replaceChildren(LexeditorUI.paginateSettings(view));
     bindSettingDependencies(view,[{
       key:"singleGf->fixedCommandMenu",

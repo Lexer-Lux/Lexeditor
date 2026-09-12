@@ -10,8 +10,9 @@ python games/ff8/ffnx_status_bars/apply_to_ffnx.py <FFNx source directory>
 
 The derivative build adds three default-off FFNx settings:
 
-- `enable_ff8_xp_bars`: level-progress bars on the main menu, Status screen,
-  and post-battle report.
+- `enable_ff8_xp_bars`: yellow XP bars below main-menu names, shared character
+  level rows (including Status and Magic), GF list/detail level rows, and the
+  post-battle report.
 - `enable_ff8_hp_bars`: current/max HP bars for the three active characters in
   battle.
 - `enable_ff8_gf_hp_bars`: blue, left-to-right HP bars above party names.
@@ -30,10 +31,22 @@ Official FFNx resolves the menu callback table, savemap, character-level
 function, battle character IDs, and the three computed battle-stat records for
 this executable.
 
-The native Status renderer at `004CECF0` reads the selected character at state
-offset `0x36` (`004CEF94`) and forms that character's savemap address at
-`004CEFA5`. The main-menu renderer is callback 16's pushed renderer
-`004E5550`. The post-battle dispatch call at `004A3E59` invokes renderer
+Menu XP capture follows native widgets and their active sprite viewport:
+- Shared character widget `004C0780`: level text at `(x+79,y+75)`, bar at
+  `(x+79,y+88)`. Seven call sites cover Status, Magic, and reused character panels.
+- Main-menu rows `004C1D50` / `004C1ED0`: names at `(40,44+spacing*slot)`,
+  with 26/52-pixel spacing; reserve widget `004C2090` uses its eight native slots.
+- GF list `004D3E40`: level row at `y+52`, bar at `y+64`.
+- GF detail `004D41B0`: level row at `(x+79,y+75)`, bar at `y+88`.
+- GF level boundaries use native `004960C0` with saved XP at GF record +0x0C.
+
+The old callback-16 hook identified the save browser, not the main-menu rows.
+It and the fixed Status coordinates have been removed from canonical source.
+`tools/verify_ff8_xp_widgets.py` checks native call targets and executes the
+character and GF list widgets to verify the level-row coordinates. Source
+changes still require a new packaged driver and live visual acceptance.
+
+The post-battle dispatch call at `004A3E59` invokes renderer
 `004A4950`. Its controller calls the native XP updater at `004A4461`, writes
 the displayed running XP total at `004A4485`, and advances that total at
 `004A48B1`. The extension observes those renderers and reads existing native
