@@ -8,8 +8,8 @@ import sys
 
 SERVICE_MODULES = frozenset({
     'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff7r.themed_server',
-    'games.ff8.server', 'games.ff9.server', 'games.rdr.server', 'games.rdr2.server',
-    'games.warband.server',
+    'games.ff8.server', 'games.ff9.server', 'games.project_zomboid.server', 'games.rdr.server',
+    'games.rdr2.server', 'games.warband.server',
 })
 
 
@@ -35,7 +35,8 @@ def bootstrap_environment() -> None:
     os.environ.setdefault('LOCALAPPDATA', str(root.parent))
     if os.name != 'nt':
         for key, game in [('LEXEDITOR_FF8_PROJECT', 'ff8'), ('LEXEDITOR_RDR_PROJECT', 'rdr'),
-                          ('LEXEDITOR_RDR2_PROJECT', 'rdr2'), ('LEXEDITOR_MOD_PROJECT', 'warband')]:
+                          ('LEXEDITOR_RDR2_PROJECT', 'rdr2'), ('LEXEDITOR_MOD_PROJECT', 'warband'),
+                          ('LEXEDITOR_PROJECT_ZOMBOID_PROJECT', 'project-zomboid')]:
             os.environ.setdefault(key, str(root / 'projects' / game))
 
 
