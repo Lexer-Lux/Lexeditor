@@ -124,12 +124,27 @@ record/field merges, mutually exclusive modules, or something else. If a packed
 file can be merged safely at record/field granularity, prefer that over making two
 otherwise-compatible gameplay mods obliterate each other.
 
-### Runtime helpers
+### Helper software and updates
 
-If a helper such as FFNx, Memoria, WSE2, RedHook or another loader/runtime is
-required, keep its installed version, Lexeditor-pinned version and newest upstream
-version distinct. Do not let a helper silently self-update and break the supported
-stack.
+Bundle all helper software used by the plugin with Lexeditor. This includes
+loaders, runtimes, extractors and converters such as FFNx, Memoria, WSE2 or RedHook.
+Install and configure the helpers as part of the plugin's first-time setup. Do not
+require the user to find, download or install them separately.
+
+For each helper:
+
+- Bundle a tested, pinned version with its required license and notices.
+- Add it to the **Updates drawer on the main menu** through the shared update
+  system. Keep the installed version, Lexeditor-pinned version and newest upstream
+  version distinct.
+- Disable automatic updates in the helper and any updater it installs. Lexeditor
+  must not automatically update the helper either. Apply updates only when the
+  user requests them through the shared Updates drawer.
+- Verify installation and the saved automatic-update settings before setup reports
+  success. Check that automatic updates remain disabled after an update or repair.
+
+Test first-time setup with no helper already installed. Confirm that the bundled
+helper works, appears in the Updates drawer and does not update itself.
 
 ### Acceptance and recovery path
 
@@ -348,6 +363,10 @@ A new plugin is not complete until the applicable items below are true:
 - [ ] One representative vertical slice works end to end.
 - [ ] Data Map honestly records editable, partial and unsupported areas.
 - [ ] `ui/mod-loading.json` explains loader, structure and overriding semantics.
+- [ ] All helper software is bundled and installed during first-time setup.
+- [ ] Every helper appears in the main-menu Updates drawer with distinct installed, pinned and upstream versions.
+- [ ] Helper automatic updates are disabled and remain disabled after an update or repair.
+- [ ] First-time setup works without a preinstalled helper; helper installation and update settings are verified.
 - [ ] Credits contain at least one explicit attribution/declaration and regenerate cleanly.
 - [ ] Unknown/unmodeled data is preserved; no-op and changed round-trips are tested.
 - [ ] Save/deployment writes are atomic and recovery/revert behavior is defined.
