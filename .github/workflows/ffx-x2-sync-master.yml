@@ -1,0 +1,31 @@
+name: FFX-X2 master sync probe
+
+on:
+  push:
+    branches: [feature/ffx-x2-plugin]
+    paths:
+      - '.github/workflows/ffx-x2-sync-master.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Probe current master merge
+        shell: bash
+        run: |
+          git fetch origin master
+          set +e
+          git merge --no-commit --no-ff origin/master
+          status=$?
+          echo '--- unresolved paths ---'
+          git diff --name-only --diff-filter=U || true
+          echo '--- merge status ---'
+          git status --short
+          exit "$status"
