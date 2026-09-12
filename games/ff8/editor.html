@@ -1259,7 +1259,7 @@
   function textDetail(row,prefs){
     const input=el("textarea",{rows:8,"aria-label":`Text for ${row.name}`,oninput:event=>{row.value=event.target.value;shell.refresh()}});input.value=row.value;
     const references=state.references.map(reference=>{const value=matchingTextRow(state.referenceData[reference.id],row);return value?{name:reference.name,shortName:reference.shortName,value:value.value}:null}).filter(Boolean);
-    const control=sourceControl(input,()=>row.value,matchingTextRow(state.vanilla,row)?.value,references,value=>row.value=String(value??""));
+    const control=sourceControl(input,()=>row.value,matchingTextRow(state.vanilla,row)?.value,references,value=>row.value=String(value??""),undefined,{internal:true});
     const boundaries={
       mngrp:"Menu text stays inside its original fixed-size mngrp.bin section. An edit that does not fit is rejected; all other menu data remains unchanged.",
       kernel:"Kernel text rebuilds its linked offsets and section table while preserving unrelated kernel data.",
@@ -1269,7 +1269,7 @@
     };
     const boundary=boundaries[row.source]||"This text source is not writable.";
     const roleSuffix=` ${row.role}`,title=row.name.endsWith(roleSuffix)?row.name.slice(0,-roleSuffix.length):row.name;
-    return sharedDetail({...row,id:row.recordId,name:title},prefs,detailSection({className:"kernel-text-editor",title:"TEXT",body:detailField({label:row.role,help:infoHelp(`FF8 text supports game tokens such as {Squall} and {L2}. Unsupported characters are rejected when you save. ${boundary}`),control})}),"",row.role);
+    return sharedDetail({...row,id:row.recordId,name:title},prefs,detailSection({className:"kernel-text-editor",title:"TEXT",body:detailField({className:"lex-detail-field-stacked",label:row.role,help:infoHelp(`FF8 text supports game tokens such as {Squall} and {L2}. Unsupported characters are rejected when you save. ${boundary}`),control})}),"",row.role);
   }
   function renderText(){const rows=filtered("text",["sourceLabel","section","recordId","role","value"]),columns=[{key:"sourceLabel",label:"Source",width:"95px"},{key:"sectionId",label:"Section",numeric:true,width:"70px"},{key:"recordId",label:"Record",numeric:true,width:"70px"},{key:"role",label:"Field",width:"minmax(106px,.55fr)"},{key:"value",label:"Text",grow:1}];showPaged("text",rows,columns,textDetail,"95px 70px 70px minmax(106px,.55fr) minmax(160px,1fr)")}
   const characterCurveOrder=["HP","STR","VIT","MAG","SPR","SPD","LUCK"];

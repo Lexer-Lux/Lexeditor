@@ -6053,3 +6053,35 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-property-grid .flag-list { grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr)); }
 .lex-property-grid .flag-list label { min-width:0;overflow-wrap:normal; }
 .lex-property-grid .flag-list input[type="checkbox"] { flex:0 0 auto;width:18px;min-height:18px;height:18px; }
+
+/* Long text uses the full control width, with its property label above it. */
+.lex-detail-field.lex-detail-field-stacked {
+  grid-template-columns:minmax(0,1fr)!important;
+  padding:0!important;
+  align-items:start!important;
+}
+.lex-detail-field-stacked > .lex-detail-field-label {
+  padding:6px 8px 6px var(--lex-field-type-gutter);
+  justify-content:flex-start;
+  text-align:left;
+}
+.lex-detail-field-stacked > .lex-detail-field-control { padding:0; }
+.lex-detail-field-stacked > .lex-field-type-rail { top:0;bottom:auto;height:30px; }
+
+.lex-detail-field.lex-detail-field-stacked > .lex-detail-field-control {
+  display:block;
+  padding:0!important;
+  position:static;
+}
+.lex-detail-field.lex-detail-field-stacked > .lex-detail-field-label {
+  contain:none;
+  min-height:30px;
+  padding-right:30px;
+}
+.lex-detail-field.lex-detail-field-stacked > .lex-detail-field-control > .lex-copy-value {
+  position:absolute;
+  top:7px;
+  right:8px;
+  left:auto;
+  transform:none;
+}
