@@ -6,6 +6,8 @@ Settled Project Zomboid knowledge used by the Lexeditor plugin. Keep implementat
 
 The initial plugin targets the current Windows Steam Build 42 stable family (Steam app `108600`). At the start of this plugin work on 2026-09-12, the official stable release was 42.20.4. The first structured script schema references are the 42.20.x PZ API Docs, so Lexeditor fails closed instead of assuming undocumented fields or layouts.
 
+Install discovery requires `ProjectZomboid64.exe`, `media/scripts`, and the current Build 42 generated-script tree at `media/scripts/generated`. The generated tree is used as a conservative current-Build-42 discriminator so a legacy install is not accepted merely because it has the executable and older script directory.
+
 The installed Steam directory is source/runtime material and is not an editor-save destination. Authoring happens in a separate mod project. Local acceptance deployment uses Project Zomboid's native user mod directory rather than rewriting installed game files.
 
 ## Build 42 mod layout
@@ -130,7 +132,9 @@ Project APIs expose project-relative paths with forward slashes. On Windows the 
 
 Lexeditor stages a full local-mod copy before replacing an existing Lexeditor-owned deployment. The project records hashes of every deployed file. Redeploy/remove is allowed only while the target still exactly matches the recorded deployment. An unowned folder or any external modification—including an added foreign file—causes refusal instead of overwrite/removal.
 
-Symlinks are refused in this deployment path, and Lexeditor state/temp files are not copied into the game-visible mod. Clean owned deployments can be replaced transactionally and removed completely; foreign or changed deployments are deliberately left untouched for the user to reconcile.
+The deployment-state file is not treated as authority to traverse an arbitrary path. Its recorded target must first equal the currently expected `<user-root>/mods/<project>` target. A forged or stale target outside that location is reported as undeployed/unowned and is never tree-hashed or removed. The installed-game preflight passes its explicit `--user-root` into this same validation instead of relying on process-global environment state.
+
+Symlinks are refused in this deployment path, including replacement of the deployed root with a link after deployment. Lexeditor state/temp files are not copied into the game-visible mod. Clean owned deployments can be replaced transactionally and removed completely; foreign, linked, changed, or state-tampered deployments are deliberately left untouched for the user to reconcile.
 
 ## Research references
 
@@ -140,5 +144,7 @@ Symlinks are refused in this deployment path, and Lexeditor state/temp files are
 - PZ Wiki Modding / PZ API Docs: <https://github.com/PZ-Wiki-Modding/PZ-API-Docs>
 - PZ Wiki Modding / ZedScripts: <https://github.com/PZ-Wiki-Modding/ZedScripts>
 - PZ Wiki Modding / pz-scripts-data: <https://github.com/PZ-Wiki-Modding/pz-scripts-data>
+- JCPaezD / project-zomboid-hosted-toolkit — current Windows Build 42 client-mod-list reference (`Zomboid/mods/default.txt`): <https://github.com/JCPaezD/project-zomboid-hosted-toolkit>
+- Twynzen / pz-forge-live — Build 42.20 local-mod deployment and existing-save `mods.txt` reference: <https://github.com/Twynzen/pz-forge-live>
 
-These references supply format/schema knowledge; no third-party parser source or schema dataset is vendored into Lexeditor.
+These references supply format/schema/runtime knowledge; no third-party parser source, schema dataset, or mod-manager implementation is vendored into Lexeditor.
