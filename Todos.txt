@@ -230,6 +230,23 @@
     renderer hook, and swapping it in is one function because the queue already
     decides everything except the pixels.
 
+* [~] Grey out Summon when no GF is junctioned, and say why.
+  * The rule and its sentence are settled and tested: no junctioned GF means no
+    Summon, the rule asks whether there is a GF rather than exactly one so it
+    holds with Monogamy off, and the greyed slot says which screen to junction
+    one on rather than only refusing.
+  * The mechanism turned out to be FF8's own, found by disassembling
+    FF8_EN.exe rather than by adding hooks. Every battle command entry carries
+    a flags byte at +3 and bit 1 means disabled: the select path reads it at
+    004BC7B5, tests it at 004BC7BB and jumps to 004BCA45, which plays sound 5
+    and returns zero; the render path tests it at 004BCB66 and forces colour
+    index 0 into the text renderer at 004A7250. Both behaviours the request
+    asks for are already there for any command whose flag is set, and the bytes
+    at all four sites are asserted against the installed executable.
+  * What is left: find the GF command entry as the menu builds it, set that bit
+    when the acting character has no junctioned GF, and put the sentence on the
+    refusal instead of only the sound.
+
 ## Loot Tables
 
 * [x] Remove/rethink the `Installed Script Evidence` block; its purpose is unclear.

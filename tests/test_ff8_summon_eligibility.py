@@ -5,6 +5,8 @@ summon, and choosing the slot does nothing, which reads as a bug rather than a
 rule. The rule and the sentence it shows are settled here the way Draw's were,
 so the menu hook has something verified to implement.
 """
+import os
+from pathlib import Path
 import unittest
 
 from games.ff8 import battle_issue_54 as battle
@@ -43,3 +45,37 @@ class SummonEligibility(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DisabledCommandMechanism(unittest.TestCase):
+    """FF8 already greys a command and refuses it. Summon needs that flag, not a hook."""
+
+    def _executable(self):
+        root = os.environ.get("LEXEDITOR_FF8_ROOT")
+        if not root:
+            self.skipTest("Final Fantasy VIII is not installed here")
+        path = Path(root) / "FF8_EN.exe"
+        if not path.is_file():
+            self.skipTest("FF8_EN.exe is not where the installation says it is")
+        return path.read_bytes()
+
+    def test_the_disabled_flag_is_read_and_branched_on(self):
+        image = self._executable()
+        # Virtual address to file offset for this build's .text section.
+        offset = lambda va: 0x1000 + (va - 0x401000)
+        for address, expected in battle.COMMAND_DISABLED_SITES.items():
+            actual = image[offset(address):offset(address) + len(expected)]
+            self.assertEqual(actual, expected, f"{address:08X}")
+
+    def test_the_flag_is_bit_one_of_the_entry_flags(self):
+        # test cl, 2 on the select side and test bl, 2 on the render side.
+        self.assertEqual(battle.COMMAND_FLAG_DISABLED, 0x02)
+        self.assertEqual(battle.COMMAND_FLAGS_OFFSET, 3)
+        self.assertIn(battle.COMMAND_FLAG_DISABLED,
+                      battle.COMMAND_DISABLED_SITES[0x004BC7BB])
+
+    def test_the_refusal_already_makes_a_noise(self):
+        # push 5 into the sound call, so a greyed command is not silent.
+        self.assertEqual(battle.COMMAND_DENIED_SOUND, 5)
+        self.assertEqual(battle.COMMAND_DISABLED_SITES[0x004BCA45],
+                         bytes([0x6A, battle.COMMAND_DENIED_SOUND]))

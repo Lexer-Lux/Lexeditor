@@ -64,8 +64,8 @@ CARD_FILTER_CAVE = 0x027A1380
 
 BLOCKERS = (
     "GF Magic still needs the verified Magic-list builder and a defined GF-to-spell map.",
-    "Greying Summon needs verified render and select addresses for the GF slot, "
-    "the pair Draw already has; the rule and its wording are settled above.",
+    "Greying Summon needs the GF command entry found and its disabled flag set; "
+    "the greying and the refusal are FF8's own, at the addresses recorded above.",
 )
 
 
@@ -344,6 +344,42 @@ SUMMON_UNAVAILABLE_REASON = (
     "No GF is junctioned to this character. Junction one on the Junction "
     "screen to use Summon."
 )
+
+
+# How FF8 already greys a battle command, found by disassembling FF8_EN.exe
+# rather than by adding hooks of our own. Each command entry carries a flags
+# byte at +3, and bit 1 means "disabled":
+#
+#   select  004BC7B5  8A 4B 03        mov cl, [ebx+3]
+#           004BC7BB  F6 C1 02        test cl, 2
+#           004BC7BE  0F 85 ...       jne 004BCA45
+#           004BCA45  6A 05 E8 ...    push 5; call 004A9780   (denied sound)
+#                                     then xor eax,eax; ret   (selection refused)
+#
+#   render  004BCB66  F6 C3 02        test bl, 2
+#           004BCB69  74 02           je  004BCB6D
+#           004BCB6B  33 C9           xor ecx, ecx            (colour index 0)
+#                                     ecx is the last argument to the text
+#                                     renderer at 004A7250
+#
+# So greying Summon needs no render or select hook at all: both behaviours the
+# request asks for - drawn greyed, and refusing the press with a noise - are
+# what the game does for any command whose flag is set. What is left is setting
+# that bit on the GF entry when the acting character has no junctioned GF, and
+# putting our own sentence on the refusal instead of only the sound.
+COMMAND_FLAGS_OFFSET = 3
+COMMAND_FLAG_DISABLED = 0x02
+
+COMMAND_DISABLED_SITES = {
+    # address: the bytes that must still be there for the reading above to hold
+    0x004BC7B5: bytes.fromhex("8A 4B 03"),
+    0x004BC7BB: bytes.fromhex("F6 C1 02"),
+    0x004BCA45: bytes.fromhex("6A 05"),
+    0x004BCB66: bytes.fromhex("F6 C3 02 74 02 33 C9"),
+}
+COMMAND_DENIED_SOUND = 5
+COMMAND_TEXT_RENDERER = 0x004A7250
+COMMAND_SELECT_DISABLED_BRANCH = 0x004BCA45
 
 
 def summon_command_available(*, junctioned_gf_count: int) -> bool:
