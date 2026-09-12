@@ -11,6 +11,10 @@
     body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
     main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
     .sv-layout,.lex-paged-list-detail{height:100%}.sv-table,.sv-detail{height:100%;min-height:0}
+    .sv-layout{align-items:stretch}
+    .sv-layout>.lex-panel-layout-pane{height:100%;align-self:stretch}
+    .sv-layout>.lex-panel-layout-pane>.lex-barrelled-master,.sv-layout>.lex-panel-layout-pane>.sv-detail{height:100%;max-height:none;align-self:stretch}
+    .sv-layout .lex-barrel-grid,.sv-layout .sv-table{height:100%;min-height:0}
     .sv-detail .lex-detail-panel-body{padding:10px;gap:10px}
     .sv-override{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center;width:100%}
     .sv-override>label{display:flex;gap:5px;align-items:center;white-space:nowrap;color:var(--lex-muted)}
