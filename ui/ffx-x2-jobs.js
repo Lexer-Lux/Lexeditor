@@ -75,6 +75,15 @@
     }
   }
 
+  function renderSummary(row) {
+    const count = dirtyCount();
+    $('x2-job-save').disabled = count === 0;
+    $('x2-job-summary').textContent =
+      `Dressphere ${row.id} (${hex(row.id)}) · icon ${row.icon} · default Berserk action ${hex(row.berserkAction)} · ` +
+      `name ref ${hex(row.nameOffset)}/${hex(row.nameKey)} · help ref ${hex(row.helpOffset)}/${hex(row.helpKey)} · ` +
+      `${state.source === 'project' ? 'staged X-2 project override' : 'installed FFX-2 VBF'}${count ? ` · ${count} unsaved ability slot(s)` : ''}`;
+  }
+
   function render() {
     const row = selected();
     if (!row) {
@@ -93,12 +102,7 @@
           <input aria-label="Dressphere ${row.id} ability ${slot + 1}" data-x2-job-field="abilityId" type="number" min="0" max="65535" value="${ability.abilityId}">
         </label>
       </div>`).join('');
-    const count = dirtyCount();
-    $('x2-job-save').disabled = count === 0;
-    $('x2-job-summary').textContent =
-      `Dressphere ${row.id} (${hex(row.id)}) · icon ${row.icon} · default Berserk action ${hex(row.berserkAction)} · ` +
-      `name ref ${hex(row.nameOffset)}/${hex(row.nameKey)} · help ref ${hex(row.helpOffset)}/${hex(row.helpKey)} · ` +
-      `${state.source === 'project' ? 'staged X-2 project override' : 'installed FFX-2 VBF'}${count ? ` · ${count} unsaved ability slot(s)` : ''}`;
+    renderSummary(row);
   }
 
   async function refresh() {
@@ -120,8 +124,7 @@
     row.abilities[slot][field] = Number(target.value);
     dirtySlots(row.id).add(slot);
     slotCard.classList.add('ffxx2-dirty');
-    $('x2-job-save').disabled = false;
-    render();
+    renderSummary(row);
   }
 
   async function save() {
