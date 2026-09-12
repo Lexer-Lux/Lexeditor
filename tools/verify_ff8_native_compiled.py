@@ -5,6 +5,7 @@ semantics are also tested separately with --exe by the Unicorn test. This
 checks production C++ logic, not a rewritten Python model or live rendering.
 """
 from pathlib import Path
+import os
 import subprocess
 import tempfile
 ROOT=Path(__file__).resolve().parents[1]
@@ -37,5 +38,8 @@ def bars_source():
 
 
 if __name__=='__main__':
+    if os.name == 'nt':
+        print('SKIPPED (needs POSIX g++ environment): Linux harness requires sys/mman.h')
+        raise SystemExit(0)
     compile_and_run(party_source(),'party')
     compile_and_run(bars_source(),'bars')
