@@ -1,0 +1,7 @@
+name: Terraria workflow cleanup marker
+on: workflow_dispatch
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo cleanup
