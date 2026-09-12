@@ -93,11 +93,13 @@ std::uint32_t __cdecl draw(std::uint32_t ordering, std::uint32_t primitives, voi
     auto *rect=reinterpret_cast<std::int16_t *>(context+0x34);
     rect[0]=20; rect[1]=26; rect[2]=static_cast<std::int16_t>(std::min(width,296));
     rect[3]=static_cast<std::int16_t>(count*16+12);
-    primitives=native<std::uint32_t>(0x4A7510,ordering,primitives,0x1000,0);
     for(int i=0;i<count;++i) {
         if(i==chosen) primitives=native<std::uint32_t>(0x4A7250,ordering,primitives,24,32+i*16,cursor,7);
         primitives=native<std::uint32_t>(0x4A7250,ordering,primitives,38,32+i*16,names[i],7);
     }
+    // Native ordering-table entries render in reverse submission order.
+    // Submit the background last, as the native battle menus do.
+    primitives=native<std::uint32_t>(0x4A7510,ordering,primitives,0x1000,0);
     return primitives;
 }
 void abort_swap() {
