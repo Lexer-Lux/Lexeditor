@@ -313,14 +313,21 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-      .${PANEL_CLASS}{margin-top:14px;padding:12px;border:1px solid var(--border,#52627c);border-radius:8px;background:rgba(0,0,0,.12)}
+      .${PANEL_CLASS}{margin:0;padding:8px;border:0;border-radius:0;background:var(--lex-panel);color:var(--lex-text);font:inherit}
+      .gf-abilities-views{flex:1;min-height:0;overflow:auto}
+      .gf-abilities-views>[hidden]{display:none!important}
+      .gf-abilities-views>.lex-detail-section-content{height:100%}
+      .gf-panel.abilities>.lex-subtab-bar{flex:0 0 auto}
+      .gf-panel.abilities [role=tab] .lex-info-help{position:relative;inset:auto;margin-left:8px}
+      .${PANEL_CLASS} :is(button,select){color:var(--lex-text);background:var(--lex-panel-2);font:inherit;text-shadow:none;border:1px solid var(--lex-border);border-radius:0;min-height:30px;padding:4px 8px}
+      .${PANEL_CLASS} .lex-spell-row{grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) auto}
       .${PANEL_CLASS} h3{margin:0 0 5px;font-size:14px;letter-spacing:.05em}
       .${PANEL_CLASS} .lex-spell-note{opacity:.78;font-size:12px;margin:0 0 10px}
       .${PANEL_CLASS} .lex-spell-toolbar,.${PANEL_CLASS} .lex-spell-page-head,.${PANEL_CLASS} .lex-spell-row{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
       .${PANEL_CLASS} .lex-spell-toolbar{margin:8px 0}
       .${PANEL_CLASS} .lex-spell-page{padding:8px;margin:8px 0;border:1px solid rgba(160,180,215,.28);border-radius:6px}
       .${PANEL_CLASS} .lex-spell-page-head{justify-content:space-between;margin-bottom:6px;font-size:12px;font-weight:700}
-      .${PANEL_CLASS} .lex-spell-row{display:grid;grid-template-columns:28px minmax(150px,1fr) minmax(160px,1fr) auto;margin:5px 0}
+      .${PANEL_CLASS} .lex-spell-row{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(0,1fr) auto;margin:5px 0}
       .${PANEL_CLASS} select{min-width:0;width:100%}
       .${PANEL_CLASS} button{white-space:nowrap}
       .${PANEL_CLASS} .lex-spell-status{font-size:12px;min-height:1.3em}
@@ -337,7 +344,19 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     marker.className = PANEL_CLASS;
     marker.dataset.gf = String(gfId);
     marker.textContent = "Loading GF spellbook…";
-    host.append(marker);
+    const abilitiesPanel=host.querySelector('[data-gf-panel="abilities"]');
+    if(!abilitiesPanel)return;
+    const abilitiesContent=abilitiesPanel.querySelector('.lex-detail-section-content');
+    abilitiesPanel.querySelector('.lex-detail-section-title')?.remove();
+    const views=document.createElement('div');views.className='gf-abilities-views';
+    const tabs=LexeditorUI.subtabBar({label:'GF abilities and spellbook',active:'abilities',tabs:[{id:'abilities',label:'ABILITIES'},{id:'spellbook',label:'SPELLBOOK'}],change:id=>{
+      abilitiesContent.hidden=id!=='abilities';marker.hidden=id!=='spellbook';
+      tabs.querySelectorAll('[role="tab"]').forEach((tab,index)=>{const active=index===(id==='abilities'?0:1);tab.tabIndex=active?0:-1;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',String(active));});
+    }});
+    const spellTab=tabs.querySelectorAll('button')[1];
+    spellTab?.append(LexeditorUI.infoHelp("Choose and order this GF's Magic pages. This needs Lexer's spellbook tweak, with Single GF on and Shared Magic off. It does not change this GF's learnable abilities. Without the tweak, these pages have no effect in battle."));
+    marker.hidden=true;
+    views.append(abilitiesContent,marker);abilitiesPanel.append(tabs,views);
     ensureStyle();
     try {
       const payload = await request("/api/kernel?section=3&dataset=current");
@@ -437,7 +456,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         });
         toolbar.append(save);
       };
-      marker.append(title,note,toolbar,body,status);
+      marker.append(toolbar,body,status);
       draw();
       window.addEventListener("beforeunload", event => {if(dirty){event.preventDefault();event.returnValue="";}}, {once:true});
     } catch (error) {
