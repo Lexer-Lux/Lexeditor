@@ -28,6 +28,17 @@ class BannerlordSourceSafetyTests(unittest.TestCase):
             self.assertFalse(source.with_name(source.name+".lexeditor.bak").exists())
             self.assertFalse(source.with_name(source.name+".lexeditor.tmp").exists())
 
+    def test_external_bom_only_change_is_rejected_by_exact_byte_revision(self):
+        with tempfile.TemporaryDirectory() as name:
+            project=Path(name);source=project/"notes.cs";source.write_bytes(b"\xef\xbb\xbfloaded\r\n")
+            loaded=read_source(project,"notes.cs")
+            source.write_bytes(b"loaded\r\n")
+            before=source.read_bytes()
+            with self.assertRaisesRegex(ValueError,"changed on disk"):
+                save_source(project,"notes.cs","edited\r\n",loaded["text"],loaded["sourceHash"])
+            self.assertEqual(source.read_bytes(),before)
+            self.assertFalse(source.with_name(source.name+".lexeditor.bak").exists())
+
     def test_matching_source_baseline_writes_and_backs_up(self):
         with tempfile.TemporaryDirectory() as name:
             project=Path(name); source=project/"notes.cs"; source.write_text("loaded\n",encoding="utf-8")

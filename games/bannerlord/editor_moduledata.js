@@ -59,6 +59,11 @@ async function ensureModuleDataFiles(){
   return state.moduleDataFiles;
 }
 
+async function reloadModuleData(){
+  if(!state.moduleData)return;
+  await loadModuleData(state.moduleData.relativePath,true);
+}
+
 async function loadModuleData(path,ask=true){
   if(!path)return;
   if(ask&&moduleDataDirty()){
@@ -154,7 +159,9 @@ async function runModuleDataRecordAction(action,record){
   try{
     const payload={recordAction:action,elementPath:record.path,tag:record.tag,originalId:record.id||""};
     if(action==="duplicate")payload.newId=newId;
-    const result=prepareModuleData(await post("/api/module-data/save",{path:state.moduleData.relativePath,edits:[payload]}));
+    const result=prepareModuleData(await post("/api/module-data/save",{
+      path:state.moduleData.relativePath,edits:[payload],sourceHash:state.savedModuleData.sourceHash||""
+    }));
     state.moduleData=result;state.savedModuleData=clone(result);
     let selected=null;
     if(action==="duplicate"&&newId)selected=(result.records||[]).find(row=>row.id===newId);
@@ -179,7 +186,8 @@ function renderModuleData(){
   const fileSelect=select(state.moduleData.relativePath,state.moduleDataFiles.map(path=>[path,path]),value=>loadModuleData(value));
   const schema=state.moduleData.schema,issueCount=state.moduleData.schemaIssueCount||0;
   const master=el("div",{class:"bl-master"},
-    el("div",{class:"bl-master-head"},el("strong",{},`${state.moduleData.rootTag} (${state.moduleData.recordCount||0})`)),
+    el("div",{class:"bl-master-head"},el("strong",{},`${state.moduleData.rootTag} (${state.moduleData.recordCount||0})`),
+      el("button",{type:"button",onclick:()=>reloadModuleData()},"Reload")),
     el("div",{class:"bl-list-block"},fileSelect),
     el("div",{class:"bl-list-block"},schema?el("div",{},el("strong",{},`XSD: ${schema.id||"matched schema"}`),el("small",{},` · ${schema.path||""}`),el("div",{class:"bl-note"},issueCount?`⚠ ${issueCount} schema issue(s) detected in this document.`:"No XSD attribute issues detected.")):el("div",{class:"bl-note"},"No unique installed Bannerlord XSD matched; using conservative literal typing.")),
     el("div",{class:"bl-list-block"},textInput(state.moduleDataFilter,value=>{state.moduleDataFilter=value;render()},{placeholder:"Filter records"})),
@@ -216,7 +224,7 @@ function moduleDataEdits(){
   for(const element of state.moduleData.elements||[]){const old=beforeElements[element.path];if(!old)continue;const oldAttributes=Object.fromEntries((old.attributes||[]).map(attribute=>[attribute.name,attribute]));for(const attribute of element.attributes||[]){const previous=oldAttributes[attribute.name];if(previous&&String(previous.value)!==String(attribute.value))edits.push({elementPath:element.path,tag:element.tag,attribute:attribute.name,originalValue:String(previous.value),value:attribute.value})}for(const missing of element.missingRequired||[])if(missing.add)edits.push({addRequired:true,elementPath:element.path,tag:element.tag,attribute:missing.name,value:missing.value})}
   return edits;
 }
-async function saveModuleData(){const edits=moduleDataEdits();if(!edits.length)return;const result=prepareModuleData(await post("/api/module-data/save",{path:state.moduleData.relativePath,edits}));state.moduleData=result;state.savedModuleData=clone(result);if(!(result.records||[]).some(record=>record.path===state.moduleDataRecordPath))applyModuleDataRecordSelection(result.records?.[0])}
+async function saveModuleData(){const edits=moduleDataEdits();if(!edits.length)return;const result=prepareModuleData(await post("/api/module-data/save",{path:state.moduleData.relativePath,edits,sourceHash:state.savedModuleData.sourceHash||""}));state.moduleData=result;state.savedModuleData=clone(result);if(!(result.records||[]).some(record=>record.path===state.moduleDataRecordPath))applyModuleDataRecordSelection(result.records?.[0])}
 
 renderDataMap=function(){const view=LexeditorUI.dataMap({rows:state.datamap.rows,query:state.query,status:state.mapStatus,page:state.page,sort:state.sort,tableClass:"bannerlord-data-map",open:row=>{if(row.target==="moduledata")loadModuleData(row.editorPath||row.filename);else if(row.target==="gauntlet")loadGauntlet(row.editorPath||row.filename);else if(row.target==="runtime")navigate("runtime");else if(row.target==="module")navigate("module");else if(row.target==="build")navigate("build");else if(row.target==="skills")navigate("skills");else if(row.target==="effects")navigate("effects");else if(row.target==="perks")navigate("perks");else if(row.target==="xp")navigate("xp");else if(row.target==="settings")navigate("settings")},openSource,changeQuery:value=>{state.query=value;state.page=0;renderDataMap()},changeStatus:value=>{state.mapStatus=value;state.page=0;renderDataMap()},changePage:value=>{state.page=value;renderDataMap()},changeSort:key=>{const [active,direction]=state.sort;state.sort=[key,active===key?-direction:1];renderDataMap()}});main.replaceChildren(view.content)};
 render=function(){const views={module:renderModule,dependencies:renderDependencies,submodules:renderSubmodules,xmls:renderXmls,skills:renderSkills,effects:renderEffects,perks:renderPerks,xp:renderXpSources,settings:renderMcmDefaults,runtime:renderRuntimeOverrides,gauntlet:renderGauntlet,moduledata:renderModuleData,build:renderBuild,deployment:renderDeployment,datamap:renderDataMap,source:renderSource};(views[state.tab]||renderModule)();refresh()};

@@ -51,6 +51,14 @@ class SettingsTests(unittest.TestCase):
             with self.assertRaises(ValueError):save_mcm_defaults(root,[{'property':'Columns','value':21}])
             with self.assertRaises(ValueError):save_mcm_defaults(root,[{'property':'Native','value':1}])
 
+    def test_settings_writer_preserves_bom_and_crlf(self):
+        from games.bannerlord.settings_data import save_mcm_defaults
+        with tempfile.TemporaryDirectory() as name:
+            root=Path(name);(root/"src").mkdir();path=root/"src/LexerSkillTweaksSettings.cs"
+            path.write_bytes(b"\xef\xbb\xbf"+TEXT.replace("\n","\r\n").encode())
+            save_mcm_defaults(root,[{"property":"Native","value":True}])
+            raw=path.read_bytes();self.assertTrue(raw.startswith(b"\xef\xbb\xbf"));self.assertNotIn(b"\n",raw[3:].replace(b"\r\n",b""));self.assertIn(b"private bool _native = true;",raw)
+
     def test_settings_write_helpers_do_not_follow_existing_hardlinks(self):
         from games.bannerlord.settings_data import save_mcm_defaults
         with tempfile.TemporaryDirectory() as name:

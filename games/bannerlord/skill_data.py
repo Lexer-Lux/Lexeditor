@@ -8,7 +8,13 @@ from pathlib import Path
 import re
 import shutil
 
-from .paths import clear_write_helper, contained_project_path
+from .paths import contained_project_path
+from .source_revision import (
+    encode_utf8_source,
+    read_utf8_source,
+    replace_source_bytes,
+    require_source_revision,
+)
 
 
 _STRING = r'"(?:\\.|[^"\\])*"'
@@ -110,7 +116,7 @@ def read_skill_definitions(project: Path) -> dict:
             "attributes": [],
             "skills": [],
         }
-    text = path.read_text(encoding="utf-8-sig")
+    text, _encoding, _revision = read_utf8_source(path)
     attributes = _definition_records(
         text,
         _ATTRIBUTE_CALL,
@@ -176,13 +182,15 @@ def _apply_string_edits(
     return candidate, len(changed_records)
 
 
-def save_skill_definitions(project: Path, payload: dict) -> dict:
+def save_skill_definitions(project: Path, payload: dict, source_hash: str | None = None) -> dict:
     path = _source_path(project, "CustomSkillDefinitions.cs", require_file=True)
     unknown = set(payload) - {"attributes", "skills"}
     if unknown:
         raise ValueError(f"Unsupported skill sections: {', '.join(sorted(unknown))}")
 
-    text = path.read_text(encoding="utf-8-sig")
+    text, encoding, loaded_revision = read_utf8_source(path)
+    if source_hash is not None:
+        require_source_revision(path, source_hash)
     attributes = _definition_records(
         text,
         _ATTRIBUTE_CALL,
@@ -232,16 +240,13 @@ def save_skill_definitions(project: Path, payload: dict) -> dict:
         raise ValueError("Saving changed custom skill IDs; refusing the write")
 
     changed = attribute_changes + skill_changes
-    backup = path.with_name(path.name + ".lexeditor.bak")
+    backup = ""
     if changed:
-        clear_write_helper(backup)
-        shutil.copy2(path, backup)
-        temporary = path.with_name(path.name + ".lexeditor.tmp")
-        clear_write_helper(temporary)
-        temporary.write_text(candidate, encoding="utf-8")
-        temporary.replace(path)
+        backup = replace_source_bytes(
+            path, encode_utf8_source(candidate, encoding), source_hash or loaded_revision
+        )
     result = read_skill_definitions(project)
-    result.update({"saved": changed, "backup": str(backup) if changed else ""})
+    result.update({"saved": changed, "backup": backup})
     return result
 
 
@@ -272,7 +277,7 @@ def read_effect_definitions(project: Path) -> dict:
     path = _source_path(project, "CustomSkillEffectRanges.cs")
     if not path.is_file():
         return {"available": False, "path": str(path), "effects": []}
-    text = path.read_text(encoding="utf-8-sig")
+    text, _encoding, _revision = read_utf8_source(path)
     rows = _effect_records(text)
     if not rows:
         raise ValueError(
@@ -285,9 +290,13 @@ def read_effect_definitions(project: Path) -> dict:
     }
 
 
-def save_effect_definitions(project: Path, edits: list[dict]) -> dict:
+def save_effect_definitions(
+    project: Path, edits: list[dict], source_hash: str | None = None
+) -> dict:
     path = _source_path(project, "CustomSkillEffectRanges.cs", require_file=True)
-    text = path.read_text(encoding="utf-8-sig")
+    text, encoding, loaded_revision = read_utf8_source(path)
+    if source_hash is not None:
+        require_source_revision(path, source_hash)
     rows = _effect_records(text)
     by_index = {row["index"]: row for row in rows}
     replacements: list[tuple[int, int, str]] = []
@@ -324,19 +333,16 @@ def save_effect_definitions(project: Path, edits: list[dict]) -> dict:
     if len(check) != len(rows) or [row["id"] for row in check] != [row["id"] for row in rows]:
         raise ValueError("Saving changed quantitative effect identities; refusing the write")
 
-    backup = path.with_name(path.name + ".lexeditor.bak")
+    backup = ""
     if changed_records:
-        clear_write_helper(backup)
-        shutil.copy2(path, backup)
-        temporary = path.with_name(path.name + ".lexeditor.tmp")
-        clear_write_helper(temporary)
-        temporary.write_text(candidate, encoding="utf-8")
-        temporary.replace(path)
+        backup = replace_source_bytes(
+            path, encode_utf8_source(candidate, encoding), source_hash or loaded_revision
+        )
     result = read_effect_definitions(project)
     result.update(
         {
             "saved": len(changed_records),
-            "backup": str(backup) if changed_records else "",
+            "backup": backup,
         }
     )
     return result

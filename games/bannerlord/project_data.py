@@ -11,7 +11,8 @@ import subprocess
 import xml.etree.ElementTree as ET
 
 from .module_data import read_submodule
-from .paths import clear_write_helper, contained_game_path, contained_project_path
+from .paths import contained_game_path, contained_project_path
+from .source_revision import replace_source_bytes, require_source_revision, revision_bytes
 
 
 EDITABLE_PROJECT_PROPERTIES = (
@@ -186,7 +187,7 @@ def read_project_file(path: Path) -> dict:
     }
 
 
-def save_project_properties(path: Path, edits: dict) -> dict:
+def save_project_properties(path: Path, edits: dict, source_hash: str | None = None) -> dict:
     """Patch a conservative set of simple MSBuild properties with one backup."""
     unknown = set(edits) - set(EDITABLE_PROJECT_PROPERTIES)
     if unknown:
@@ -201,7 +202,12 @@ def save_project_properties(path: Path, edits: dict) -> dict:
             + details
         )
 
-    raw = path.read_text(encoding="utf-8-sig")
+    raw_bytes = path.read_bytes()
+    raw, encoding = _decode_source(raw_bytes)
+    loaded_revision = revision_bytes(raw_bytes)
+    if source_hash is not None:
+        require_source_revision(path, source_hash)
+    newline = "\r\n" if "\r\n" in raw else "\n" if "\n" in raw else "\r" if "\r" in raw else "\n"
     candidate = raw
     saved = 0
 
@@ -271,22 +277,21 @@ def save_project_properties(path: Path, edits: dict) -> dict:
         close_at = group.start() + close.start()
         line_start = candidate.rfind("\n", 0, close_at) + 1
         indentation = re.match(r"\s*", candidate[line_start:close_at]).group(0)
-        insertion = f"{indentation}  <{name}>{escaped}</{name}>\n"
+        insertion = f"{indentation}  <{name}>{escaped}</{name}>{newline}"
         candidate = candidate[:close_at] + insertion + candidate[close_at:]
         saved += 1
 
-    backup = path.with_name(path.name + ".lexeditor.bak")
+    backup = ""
     if saved:
         ET.fromstring(candidate)
-        clear_write_helper(backup)
-        shutil.copy2(path, backup)
-        temporary = path.with_name(path.name + ".lexeditor.tmp")
-        clear_write_helper(temporary)
-        temporary.write_text(candidate, encoding="utf-8")
-        temporary.replace(path)
+        try:
+            encoded = candidate.encode(encoding)
+        except UnicodeEncodeError as error:
+            raise ValueError(f"Project text cannot be encoded as {encoding}") from error
+        backup = replace_source_bytes(path, encoded, source_hash or loaded_revision)
     return {
         "saved": saved,
-        "backup": str(backup) if saved else "",
+        "backup": backup,
         "project": read_project_file(path),
     }
 
@@ -323,9 +328,11 @@ def _decode_source(raw: bytes) -> tuple[str, str]:
 
 def read_source(project: Path, requested: str) -> dict:
     target = _safe_project_path(project, requested)
-    text, encoding = _decode_source(target.read_bytes())
+    raw = target.read_bytes()
+    text, encoding = _decode_source(raw)
     return {
         "path": target.relative_to(project.resolve()).as_posix(),
+        "sourceHash": revision_bytes(raw),
         "absolutePath": str(target),
         "encoding": encoding,
         "text": text,
@@ -338,9 +345,14 @@ def save_source(
     requested: str,
     text: str,
     original_text: str | None = None,
+    source_hash: str | None = None,
 ) -> dict:
     target = _safe_project_path(project, requested)
-    current_text, encoding = _decode_source(target.read_bytes())
+    raw_bytes = target.read_bytes()
+    current_text, encoding = _decode_source(raw_bytes)
+    loaded_revision = revision_bytes(raw_bytes)
+    if source_hash is not None:
+        require_source_revision(target, source_hash)
     if original_text is None:
         raise ValueError("Source save requires the originally loaded text; reload before saving")
     if current_text != str(original_text):
@@ -351,18 +363,13 @@ def save_source(
             ET.fromstring(candidate)
         except ET.ParseError as error:
             raise ValueError(f"XML is not well formed: {error}") from error
-    backup = target.with_name(target.name + ".lexeditor.bak")
-    clear_write_helper(backup)
-    shutil.copy2(target, backup)
-    temporary = target.with_name(target.name + ".lexeditor.tmp")
-    clear_write_helper(temporary)
-    # Write encoded bytes so Python's platform newline translation cannot
-    # rewrite raw-source line endings on Windows. The selected codec still
-    # preserves an existing UTF-8 BOM when one was present on load.
-    temporary.write_bytes(candidate.encode(encoding))
-    temporary.replace(target)
+    try:
+        encoded = candidate.encode(encoding)
+    except UnicodeEncodeError as error:
+        raise ValueError(f"Source text cannot be encoded as {encoding}") from error
+    backup = replace_source_bytes(target, encoded, source_hash or loaded_revision)
     result = read_source(project, requested)
-    result.update({"saved": 1, "backup": str(backup)})
+    result.update({"saved": 1, "backup": backup})
     return result
 
 

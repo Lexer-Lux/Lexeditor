@@ -302,8 +302,9 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"error": f"SubModule.xml not found: {source}"}, 404)
                     return
                 payload = self.read_json()
-                require_source_revision(source, payload.pop("sourceHash", None))
-                result = save_module(source, payload)
+                source_hash = payload.pop("sourceHash", None)
+                require_source_revision(source, source_hash)
+                result = save_module(source, payload, source_hash=source_hash)
                 result["module"] = attach_source_revision(result["module"], source)
                 self.send_json(result)
             except (ValueError, TypeError, json.JSONDecodeError) as error:
@@ -316,8 +317,9 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self.read_json()
                 snapshot = read_skill_definitions(PROJECT)
                 source = Path(str(snapshot.get("path") or ""))
-                require_source_revision(source, payload.pop("sourceHash", None))
-                self.send_json(attach_source_revision(save_skill_definitions(PROJECT, payload)))
+                source_hash = payload.pop("sourceHash", None)
+                require_source_revision(source, source_hash)
+                self.send_json(attach_source_revision(save_skill_definitions(PROJECT, payload, source_hash=source_hash)))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -328,8 +330,9 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self.read_json()
                 snapshot = read_effect_definitions(PROJECT)
                 source = Path(str(snapshot.get("path") or ""))
-                require_source_revision(source, payload.pop("sourceHash", None))
-                self.send_json(attach_source_revision(save_effect_definitions(PROJECT, list(payload.get("edits") or []))))
+                source_hash = payload.pop("sourceHash", None)
+                require_source_revision(source, source_hash)
+                self.send_json(attach_source_revision(save_effect_definitions(PROJECT, list(payload.get("edits") or []), source_hash=source_hash)))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -340,8 +343,9 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self.read_json()
                 snapshot = read_perk_definitions(PROJECT)
                 source = Path(str(snapshot.get("path") or ""))
-                require_source_revision(source, payload.pop("sourceHash", None))
-                self.send_json(attach_source_revision(save_perk_definitions(PROJECT, list(payload.get("edits") or []))))
+                source_hash = payload.pop("sourceHash", None)
+                require_source_revision(source, source_hash)
+                self.send_json(attach_source_revision(save_perk_definitions(PROJECT, list(payload.get("edits") or []), source_hash=source_hash)))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -352,8 +356,9 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self.read_json()
                 snapshot = read_xp_source_definitions(PROJECT)
                 source = Path(str(snapshot.get("path") or ""))
-                require_source_revision(source, payload.pop("sourceHash", None))
-                self.send_json(attach_source_revision(save_xp_source_definitions(PROJECT, list(payload.get("edits") or []))))
+                source_hash = payload.pop("sourceHash", None)
+                require_source_revision(source, source_hash)
+                self.send_json(attach_source_revision(save_xp_source_definitions(PROJECT, list(payload.get("edits") or []), source_hash=source_hash)))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -364,8 +369,9 @@ class Handler(BaseHTTPRequestHandler):
                 payload = self.read_json()
                 snapshot = read_mcm_defaults(PROJECT)
                 source = Path(str(snapshot.get("path") or ""))
-                require_source_revision(source, payload.pop("sourceHash", None))
-                self.send_json(attach_source_revision(save_mcm_defaults(PROJECT, list(payload.get("edits") or []))))
+                source_hash = payload.pop("sourceHash", None)
+                require_source_revision(source, source_hash)
+                self.send_json(attach_source_revision(save_mcm_defaults(PROJECT, list(payload.get("edits") or []), source_hash=source_hash)))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -388,11 +394,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/module-data/save":
             try:
                 payload = self.read_json()
+                requested = str(payload.get("path") or "")
+                snapshot = read_document(PROJECT, requested)
+                source = Path(str(snapshot.get("path") or ""))
+                source_hash = payload.get("sourceHash")
+                require_source_revision(source, source_hash)
                 self.send_json(
                     save_document(
-                        PROJECT,
-                        str(payload.get("path") or ""),
-                        list(payload.get("edits") or []),
+                        PROJECT, requested, list(payload.get("edits") or []),
+                        source_hash=source_hash,
                     )
                 )
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
@@ -403,11 +413,15 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/gauntlet/save":
             try:
                 payload = self.read_json()
+                requested = str(payload.get("path") or "")
+                snapshot = read_prefab(PROJECT, requested)
+                source = Path(str(snapshot.get("path") or ""))
+                source_hash = payload.get("sourceHash")
+                require_source_revision(source, source_hash)
                 self.send_json(
                     save_prefab(
-                        PROJECT,
-                        str(payload.get("path") or ""),
-                        list(payload.get("edits") or []),
+                        PROJECT, requested, list(payload.get("edits") or []),
+                        source_hash=source_hash,
                     )
                 )
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
@@ -419,8 +433,11 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 payload = self.read_json()
                 project_file = resolve_project_file(PROJECT, payload.get("project"))
-                require_source_revision(project_file, payload.pop("sourceHash", None))
-                result = save_project_properties(project_file, dict(payload.get("edits") or {}))
+                source_hash = payload.pop("sourceHash", None)
+                require_source_revision(project_file, source_hash)
+                result = save_project_properties(
+                    project_file, dict(payload.get("edits") or {}), source_hash=source_hash
+                )
                 result["project"] = attach_source_revision(result["project"], project_file)
                 self.send_json(result)
             except (ValueError, TypeError, json.JSONDecodeError) as error:
@@ -437,6 +454,7 @@ class Handler(BaseHTTPRequestHandler):
                         str(payload.get("path") or ""),
                         str(payload.get("text") or ""),
                         payload.get("originalText") if "originalText" in payload else None,
+                        payload.get("sourceHash"),
                     )
                 )
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:

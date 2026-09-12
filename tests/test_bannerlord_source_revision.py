@@ -1,8 +1,12 @@
 from pathlib import Path
+import shutil
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from games.bannerlord.source_revision import attach_source_revision, require_source_revision, source_revision
+from games.bannerlord.source_revision import (
+    attach_source_revision, replace_source_bytes, require_source_revision, source_revision
+)
 
 
 class BannerlordSourceRevisionTests(unittest.TestCase):
@@ -16,6 +20,20 @@ class BannerlordSourceRevisionTests(unittest.TestCase):
             source.write_bytes(b"after\n")
             with self.assertRaisesRegex(ValueError,"changed on disk"):
                 require_source_revision(source,token)
+
+    def test_staged_writer_rechecks_after_backup_before_replacing_target(self):
+        with tempfile.TemporaryDirectory() as name:
+            source=Path(name)/"source.cs";source.write_bytes(b"before\r\n")
+            token=source_revision(source);real_copy2=shutil.copy2
+            def race(src,dst,*args,**kwargs):
+                result=real_copy2(src,dst,*args,**kwargs)
+                source.write_bytes(b"external\r\n")
+                return result
+            with patch("games.bannerlord.source_revision.shutil.copy2",side_effect=race):
+                with self.assertRaisesRegex(ValueError,"changed on disk"):
+                    replace_source_bytes(source,b"ours\r\n",token)
+            self.assertEqual(source.read_bytes(),b"external\r\n")
+            self.assertFalse(source.with_name(source.name+".lexeditor.tmp").exists())
 
     def test_missing_revision_is_rejected(self):
         with tempfile.TemporaryDirectory() as name:

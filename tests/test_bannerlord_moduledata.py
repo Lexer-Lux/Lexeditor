@@ -163,6 +163,30 @@ class BannerlordModuleDataTests(unittest.TestCase):
         finally:
             temporary.cleanup()
 
+    def test_unrelated_external_moduledata_change_rejects_stale_save(self):
+        temporary, project, source = self.fixture()
+        try:
+            value=read_document(project,"ModuleData/items.xml");item=next(row for row in value["elements"] if row["tag"]=="Item")
+            source.write_text(ITEMS.replace("preserve module-specific data","externally changed comment"),encoding="utf-8");before=source.read_bytes()
+            with self.assertRaisesRegex(ValueError,"changed on disk"):
+                save_document(project,value["relativePath"],[{"elementPath":item["path"],"tag":"Item","attribute":"weight","originalValue":"0.2","value":0.4}],source_hash=value["sourceHash"])
+            self.assertEqual(source.read_bytes(),before);self.assertFalse(source.with_name(source.name+".lexeditor.bak").exists())
+        finally: temporary.cleanup()
+
+    def test_moduledata_save_preserves_utf8_bom_and_crlf(self):
+        temporary, project, source = self.fixture()
+        try:
+            source.write_bytes(b"\xef\xbb\xbf"+ITEMS.replace("\n","\r\n").encode("utf-8"))
+            value=read_document(project,"ModuleData/items.xml");item=next(row for row in value["elements"] if row["tag"]=="Item")
+            save_document(project,value["relativePath"],[{"elementPath":item["path"],"tag":"Item","attribute":"weight","originalValue":"0.2","value":0.4}],source_hash=value["sourceHash"])
+            raw=source.read_bytes();self.assertTrue(raw.startswith(b"\xef\xbb\xbf"));body=raw[3:]
+            self.assertIn(b'weight="0.4"',body);self.assertNotIn(b"\n",body.replace(b"\r\n",b""))
+        finally: temporary.cleanup()
+
+    def test_moduledata_editor_sends_revision_and_exposes_reload(self):
+        text=(Path(__file__).resolve().parents[1]/"games"/"bannerlord"/"editor_moduledata.js").read_text(encoding="utf-8")
+        self.assertIn('sourceHash:state.savedModuleData.sourceHash||""',text);self.assertIn("async function reloadModuleData",text);self.assertIn('onclick:()=>reloadModuleData()',text)
+
     def test_moduledata_root_redirection_outside_project_is_rejected(self):
         temporary, project, _source = self.fixture()
         try:

@@ -7,6 +7,12 @@ import xml.etree.ElementTree as ET
 
 from . import paths
 from .module_data import read_submodule
+from .source_revision import (
+    encode_utf8_source,
+    read_utf8_source,
+    replace_source_bytes,
+    require_source_revision,
+)
 from .xml_patch import scan_xml_start_tags, serialize_attribute, serialize_new_attribute
 from .xsd_data import enrich_elements, find_schema
 
@@ -106,7 +112,7 @@ def _scan_document(text: str, schema: dict | None) -> list[dict]:
 
 def read_document(project: Path, requested: str, game_root: Path | None = None) -> dict:
     path = _document_path(project, requested)
-    text = path.read_text(encoding="utf-8-sig")
+    text, _encoding, revision = read_utf8_source(path)
     try:
         root = ET.fromstring(text)
     except ET.ParseError as error:
@@ -124,6 +130,7 @@ def read_document(project: Path, requested: str, game_root: Path | None = None) 
     return {
         "path": str(path),
         "relativePath": path.relative_to(project.resolve()).as_posix(),
+        "sourceHash": revision,
         "rootTag": root.tag,
         "recordCount": len(records),
         "records": records,
@@ -210,9 +217,12 @@ def save_document(
     edits: list[dict],
     game_root: Path | None = None,
     additions: list[dict] | None = None,
+    source_hash: str | None = None,
 ) -> dict:
     path = _document_path(project, requested)
-    text = path.read_text(encoding="utf-8-sig")
+    text, encoding, loaded_revision = read_utf8_source(path)
+    if source_hash is not None:
+        require_source_revision(path, source_hash)
     try:
         root = ET.fromstring(text)
     except ET.ParseError as error:
@@ -299,20 +309,17 @@ def save_document(
     candidate = text
     for left, right, replacement in sorted(replacements, key=lambda row: row[0], reverse=True):
         candidate = candidate[:left] + replacement + candidate[right:]
-    backup = path.with_name(path.name + ".lexeditor.bak")
+    backup = ""
     if changed:
         try:
             ET.fromstring(candidate)
         except ET.ParseError as error:
             raise ValueError(f"Saving would create invalid ModuleData XML: {error}") from error
-        paths.clear_write_helper(backup)
-        shutil.copy2(path, backup)
-        temporary = path.with_name(path.name + ".lexeditor.tmp")
-        paths.clear_write_helper(temporary)
-        temporary.write_text(candidate, encoding="utf-8")
-        temporary.replace(path)
+        backup = replace_source_bytes(
+            path, encode_utf8_source(candidate, encoding), source_hash or loaded_revision
+        )
     result = read_document(project, requested, game_root)
-    result.update({"saved": changed, "backup": str(backup) if changed else ""})
+    result.update({"saved": changed, "backup": backup})
     return result
 
 

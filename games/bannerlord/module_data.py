@@ -1,12 +1,13 @@
 """Read and safely edit Bannerlord module metadata and editor coverage."""
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 import re
-import shutil
 import xml.etree.ElementTree as ET
 
 from . import paths
+from .source_revision import replace_source_bytes, require_source_revision, source_revision
 from .community_metadata import read_community_dependencies
 from .dependency_relations import dependency_declaration_conflicts
 
@@ -858,9 +859,12 @@ def _validate_relation_payload(path: Path, payload: dict) -> None:
         )
 
 
-def save_module(path: Path, payload: dict) -> dict:
+def save_module(path: Path, payload: dict, source_hash: str | None = None) -> dict:
     path = Path(path)
     path = paths.contained_project_path(path.parent, path.name, require_file=True)
+    loaded_revision = source_revision(path)
+    if source_hash is not None:
+        require_source_revision(path, source_hash)
     allowed = {"metadata", "dependencies", "communityDependencies", "legacyDependencies", "legacyDependenciesBaseline", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}
     unknown = set(payload) - allowed
     if unknown:
@@ -894,16 +898,13 @@ def save_module(path: Path, payload: dict) -> dict:
     if "xmls" in payload:
         changes += _edit_xmls(root, list(payload.get("xmls") or []))
 
-    backup = path.with_name(path.name + ".lexeditor.bak")
+    backup = ""
     if changes:
-        paths.clear_write_helper(backup)
-        shutil.copy2(path, backup)
         ET.indent(tree, space="  ")
-        temporary = path.with_name(path.name + ".lexeditor.tmp")
-        paths.clear_write_helper(temporary)
-        tree.write(temporary, encoding="utf-8", xml_declaration=True, short_empty_elements=True)
-        temporary.replace(path)
-    return {"saved": changes, "backup": str(backup) if changes else "", "module": read_submodule(path)}
+        output = BytesIO()
+        tree.write(output, encoding="utf-8", xml_declaration=True, short_empty_elements=True)
+        backup = replace_source_bytes(path, output.getvalue(), source_hash or loaded_revision)
+    return {"saved": changes, "backup": backup, "module": read_submodule(path)}
 
 
 def save_module_metadata(path: Path, edits: dict) -> dict:

@@ -2,10 +2,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-import shutil
 import xml.etree.ElementTree as ET
 
-from .paths import clear_write_helper, contained_project_path, is_contained_file
+from .paths import contained_project_path, is_contained_file
+from .source_revision import (
+    encode_utf8_source,
+    read_utf8_source,
+    replace_source_bytes,
+    require_source_revision,
+)
 from .xml_patch import scan_xml_start_tags, serialize_attribute
 
 
@@ -55,7 +60,7 @@ def _public(element: dict) -> dict:
 
 def read_prefab(project: Path, requested: str) -> dict:
     path = _prefab_path(project, requested)
-    text = path.read_text(encoding="utf-8-sig")
+    text, _encoding, revision = read_utf8_source(path)
     try:
         ET.fromstring(text)
     except ET.ParseError as error:
@@ -64,14 +69,22 @@ def read_prefab(project: Path, requested: str) -> dict:
     return {
         "path": str(path),
         "relativePath": path.relative_to(project.resolve()).as_posix(),
+        "sourceHash": revision,
         "elements": [_public(element) for element in elements],
         "elementCount": len(elements),
     }
 
 
-def save_prefab(project: Path, requested: str, edits: list[dict]) -> dict:
+def save_prefab(
+    project: Path,
+    requested: str,
+    edits: list[dict],
+    source_hash: str | None = None,
+) -> dict:
     path = _prefab_path(project, requested)
-    text = path.read_text(encoding="utf-8-sig")
+    text, encoding, loaded_revision = read_utf8_source(path)
+    if source_hash is not None:
+        require_source_revision(path, source_hash)
     elements = _scan(text)
     by_path = {element["path"]: element for element in elements}
     replacements: list[tuple[int, int, str]] = []
@@ -109,20 +122,17 @@ def save_prefab(project: Path, requested: str, edits: list[dict]) -> dict:
     candidate = text
     for left, right, replacement in sorted(replacements, reverse=True):
         candidate = candidate[:left] + replacement + candidate[right:]
-    backup = path.with_name(path.name + ".lexeditor.bak")
+    backup = ""
     if changed:
         try:
             ET.fromstring(candidate)
         except ET.ParseError as error:
             raise ValueError(f"Saving would create invalid Gauntlet XML: {error}") from error
-        clear_write_helper(backup)
-        shutil.copy2(path, backup)
-        temporary = path.with_name(path.name + ".lexeditor.tmp")
-        clear_write_helper(temporary)
-        temporary.write_text(candidate, encoding="utf-8")
-        temporary.replace(path)
+        backup = replace_source_bytes(
+            path, encode_utf8_source(candidate, encoding), source_hash or loaded_revision
+        )
     result = read_prefab(project, requested)
-    result.update({"saved": changed, "backup": str(backup) if changed else ""})
+    result.update({"saved": changed, "backup": backup})
     return result
 
 

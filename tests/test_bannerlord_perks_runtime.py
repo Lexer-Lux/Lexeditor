@@ -36,6 +36,16 @@ class BannerlordPerksRuntimeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 save_xp_source_definitions(project,[{'index':0,'originalId':sources[0]['id'],'fields':{'defaultAmount':-1}}])
 
+    def test_perk_and_xp_writers_preserve_bom_and_crlf(self):
+        from games.bannerlord.perk_data import read_perk_definitions,read_xp_source_definitions,save_perk_definitions,save_xp_source_definitions
+        with tempfile.TemporaryDirectory() as name:
+            project=Path(name);(project/"src").mkdir();perk_path=project/"src/CustomSkillPerks.cs";xp_path=project/"src/CustomSkillXpSourcesConfig.cs"
+            perk_path.write_bytes(b"\xef\xbb\xbf"+PERKS.replace("\n","\r\n").encode());xp_path.write_bytes(b"\xef\xbb\xbf"+XP.replace("\n","\r\n").encode())
+            perks=read_perk_definitions(project)["perks"];save_perk_definitions(project,[{"index":1,"originalId":perks[1]["id"],"fields":{"level":55}}])
+            sources=read_xp_source_definitions(project)["sources"];save_xp_source_definitions(project,[{"index":1,"originalId":sources[1]["id"],"fields":{"defaultAmount":0.5}}])
+            for path in (perk_path,xp_path):
+                raw=path.read_bytes();self.assertTrue(raw.startswith(b"\xef\xbb\xbf"));self.assertNotIn(b"\n",raw[3:].replace(b"\r\n",b""))
+
     def test_deployment_status_uses_launcher_version_semantics_and_blocks_missing_dependency(self):
         from games.bannerlord.runtime_data import deployment_status
         with tempfile.TemporaryDirectory() as name:

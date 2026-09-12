@@ -29,6 +29,11 @@ async function ensureGauntletFiles(){
   return state.gauntletFiles;
 }
 
+async function reloadGauntlet(){
+  if(!state.gauntlet)return;
+  await loadGauntlet(state.gauntlet.relativePath,true);
+}
+
 async function loadGauntlet(path,ask=true){
   if(!path)return;
   if(ask&&gauntletDirty()){
@@ -83,7 +88,8 @@ function renderGauntlet(){
 
   const fileSelect=select(state.gauntlet.relativePath,state.gauntletFiles.map(path=>[path,path]),value=>loadGauntlet(value));
   const master=el("div",{class:"bl-master"},
-    el("div",{class:"bl-master-head"},el("strong",{},`Widgets (${state.gauntlet.elementCount||0})`)),
+    el("div",{class:"bl-master-head"},el("strong",{},`Widgets (${state.gauntlet.elementCount||0})`),
+      el("button",{type:"button",onclick:()=>reloadGauntlet()},"Reload")),
     el("div",{class:"bl-list-block"},fileSelect),
     el("div",{class:"bl-list-block"},textInput(state.gauntletFilter,value=>{state.gauntletFilter=value;render()},{placeholder:"Filter widgets / attributes"})),
     el("div",{class:"bl-list"},...rows.map(element=>el("button",{
@@ -135,7 +141,9 @@ function gauntletEdits(){
 async function saveGauntlet(){
   const edits=gauntletEdits();
   if(!edits.length)return;
-  const result=await post("/api/gauntlet/save",{path:state.gauntlet.relativePath,edits});
+  const result=await post("/api/gauntlet/save",{
+    path:state.gauntlet.relativePath,edits,sourceHash:state.savedGauntlet.sourceHash||""
+  });
   state.gauntlet=result;state.savedGauntlet=clone(result);
   if(!(result.elements||[]).some(element=>element.path===state.gauntletElementPath))
     state.gauntletElementPath=result.elements?.[0]?.path||"";

@@ -46,6 +46,21 @@ class BannerlordPluginTests(unittest.TestCase):
             completed=subprocess.CompletedProcess(["dotnet"],0,stdout="Build succeeded.\n",stderr="")
             with patch("games.bannerlord.project_data.subprocess.run",return_value=completed) as runner:build=run_build(project,configuration="Release")
             self.assertTrue(build["succeeded"]);self.assertEqual(runner.call_args.args[0][0:2],["dotnet","build"]);self.assertFalse(runner.call_args.kwargs.get("shell",False))
+    def test_text_preserving_project_skill_and_effect_writers_keep_bom_crlf(self):
+        from games.bannerlord.project_data import read_project_file, save_project_properties
+        from games.bannerlord.skill_data import read_effect_definitions, read_skill_definitions, save_effect_definitions, save_skill_definitions
+        with tempfile.TemporaryDirectory() as name:
+            project=Path(name);(project/"src").mkdir()
+            csproj=project/"LexerSkillTweaks.csproj";csproj_text=CSPROJ.replace("><",">\r\n<")+"\r\n";csproj.write_bytes(b"\xef\xbb\xbf"+csproj_text.encode())
+            model=read_project_file(csproj);save_project_properties(csproj,{"OutputPath":"out\\"})
+            raw=csproj.read_bytes();self.assertTrue(raw.startswith(b"\xef\xbb\xbf"));self.assertNotIn(b"\n",raw[3:].replace(b"\r\n",b""));self.assertIn(b"<OutputPath>out\\</OutputPath>",raw)
+            skills_path=project/"src/CustomSkillDefinitions.cs";skills_path.write_bytes(b"\xef\xbb\xbf"+(SKILL_DEFINITIONS+"\r\n").encode())
+            skills=read_skill_definitions(project);save_skill_definitions(project,{"attributes":[{"index":0,"originalId":"Sanguis","fields":{"name":"Blood"}}],"skills":[]})
+            raw=skills_path.read_bytes();self.assertTrue(raw.startswith(b"\xef\xbb\xbf"));self.assertTrue(raw.endswith(b"\r\n"))
+            effects_path=project/"src/CustomSkillEffectRanges.cs";effects_path.write_bytes(b"\xef\xbb\xbf"+(EFFECT_DEFINITIONS+"\r\n").encode())
+            effects=read_effect_definitions(project);save_effect_definitions(project,[{"index":0,"originalId":effects["effects"][0]["id"],"fields":{"defaultLow":140}}])
+            raw=effects_path.read_bytes();self.assertTrue(raw.startswith(b"\xef\xbb\xbf"));self.assertTrue(raw.endswith(b"\r\n"))
+
     def test_custom_skill_and_effect_source_editors(self):
         from games.bannerlord.module_data import data_map
         from games.bannerlord.skill_data import read_effect_definitions,read_skill_definitions,save_effect_definitions,save_skill_definitions

@@ -117,7 +117,8 @@
       if(moduleDataDirty())await saveModuleData();
       if(sourceDirty()){
         const result=await post("/api/source/save",{
-          path:state.source.path,text:state.source.text,originalText:state.savedSourceText
+          path:state.source.path,text:state.source.text,originalText:state.savedSourceText,
+          sourceHash:state.source.sourceHash||""
         });
         state.source=result;state.savedSourceText=result.text;
         await reloadStructuredSource(result.absolutePath||result.path);
