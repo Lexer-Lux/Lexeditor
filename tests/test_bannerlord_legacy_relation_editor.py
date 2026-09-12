@@ -164,6 +164,23 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
             self.assertIn('Id="NestedValid" Future="keep-nested"', rewritten)
             self.assertIn('Id="OptionalValid" Future="keep-optional"', rewritten)
 
+    def test_stale_legacy_row_identity_is_rejected_before_write(self):
+        temporary, source = self.fixture()
+        try:
+            rows = read_submodule(source)["legacyDependencies"]
+            source.write_text(
+                source.read_text(encoding="utf-8").replace('Id="LegacyAfter"', 'Id="ChangedAfter"'),
+                encoding="utf-8",
+            )
+            before = source.read_bytes()
+            with self.assertRaisesRegex(ValueError, "changed on disk"):
+                save_module(source, {"legacyDependencies": rows})
+            self.assertEqual(source.read_bytes(), before)
+            self.assertFalse(source.with_name(source.name + ".lexeditor.bak").exists())
+            self.assertFalse(source.with_name(source.name + ".lexeditor.tmp").exists())
+        finally:
+            temporary.cleanup()
+
     def test_dependency_ui_includes_legacy_read_write_surface(self):
         editor = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_core.js"
         text = editor.read_text(encoding="utf-8")

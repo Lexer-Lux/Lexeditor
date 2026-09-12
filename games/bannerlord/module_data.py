@@ -517,6 +517,11 @@ def _edit_legacy_dependencies(root: ET.Element, rows: list[dict]) -> int:
         key = (origin, index)
         if key not in existing:
             raise ValueError("Legacy dependency changed or no longer exists; reload before saving")
+        _parent, existing_element = existing[key]
+        current_id = str(existing_element.attrib.get("Id") or "").strip()
+        original_id = str((row.get("attributes") or {}).get("Id") or "").strip()
+        if original_id and current_id != original_id:
+            raise ValueError("Legacy dependency changed on disk; reload before saving")
         if key in requested:
             raise ValueError("Duplicate legacy dependency edit")
         requested[key] = module_id
