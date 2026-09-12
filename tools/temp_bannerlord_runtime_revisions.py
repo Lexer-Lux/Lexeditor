@@ -11,7 +11,7 @@ def replace_once(path: Path, old: str, new: str, label: str) -> None:
 
 revision = Path("games/bannerlord/source_revision.py")
 text = revision.read_text(encoding="utf-8")
-addition = '''\n\nMISSING_SOURCE_REVISION = "missing"\n\ndef optional_source_revision(path: Path) -> str:\n    path = Path(path)\n    return source_revision(path) if path.is_file() else MISSING_SOURCE_REVISION\n\n\ndef require_optional_source_revision(path: Path, expected) -> None:\n    token = str(expected or "").strip()\n    if not token:\n        raise ValueError("Runtime save requires the loaded source revision; reload before saving")\n    if optional_source_revision(path) != token:\n        raise ValueError("Runtime source changed on disk; reload before saving")\n'''
+addition = '''\n\nMISSING_SOURCE_REVISION = "missing"\n\ndef optional_source_revision(path: Path) -> str:\n    path = Path(path)\n    if not path.exists():\n        return MISSING_SOURCE_REVISION\n    if not path.is_file():\n        raise ValueError(f"Runtime source path is not a file: {path}")\n    return source_revision(path)\n\n\ndef require_optional_source_revision(path: Path, expected) -> None:\n    token = str(expected or "").strip()\n    if not token:\n        raise ValueError("Runtime save requires the loaded source revision; reload before saving")\n    if optional_source_revision(path) != token:\n        raise ValueError("Runtime source changed on disk; reload before saving")\n'''
 if "MISSING_SOURCE_REVISION" in text:
     raise SystemExit("optional source revision helpers already exist")
 revision.write_text(text.rstrip() + addition + "\n", encoding="utf-8")
@@ -36,6 +36,12 @@ replace_once(
     "runtime revision preflight",
 )
 replace_once(runtime, '''    for edit in list(payload.get("xpSources") or []):\n''', '''    for edit in xp_edits:\n''', "runtime XP edit list")
+replace_once(
+    runtime,
+    '''    backups = {}\n    if changed_effects:\n''',
+    '''    # Narrow the external-write race: verify the loaded revision again\n    # immediately before the first backup/temp/target mutation.\n    if changed_effects:\n        require_optional_source_revision(effects_path, payload.get("effectsHash"))\n    if changed_xp:\n        require_optional_source_revision(xp_path, payload.get("xpSourcesHash"))\n\n    backups = {}\n    if changed_effects:\n''',
+    "runtime pre-write revision recheck",
+)
 
 boot = Path("games/bannerlord/editor_boot.js")
 replace_once(
