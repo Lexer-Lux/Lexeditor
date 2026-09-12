@@ -15,6 +15,43 @@ ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_BODY = 1024 * 1024
+_TRUE_FALSE = ("true", "false")
+
+
+def _guard_known_select_values(root: Path, payload: dict, reader, domains: dict[str, tuple[str, ...]]) -> None:
+    """Fail closed when the UI could otherwise normalize a future enum value.
+
+    HTML selects submit a value even when the on-disk value is newer than the
+    options this Lexeditor build knows. Compare against the authoritative current
+    record before mutation so saving an unrelated field cannot replace unknown
+    future data with the first known option.
+    """
+    edits = payload.get("edits")
+    if not isinstance(edits, dict):
+        return
+    result = reader(root)
+    matches = [
+        row for row in result.get("rows", [])
+        if row.get("path") == str(payload.get("path", ""))
+        and row.get("module") == str(payload.get("module", ""))
+        and row.get("id") == str(payload.get("id", ""))
+    ]
+    if len(matches) != 1:
+        return  # The format writer owns missing/ambiguous identity errors.
+    fields = matches[0].get("fields", {})
+    unknown = []
+    for key, choices in domains.items():
+        if key not in edits:
+            continue
+        current = str(fields.get(key, "")).strip()
+        allowed = {str(choice).casefold() for choice in choices}
+        if current and current.casefold() not in allowed:
+            unknown.append(f"{key}={current}")
+    if unknown:
+        raise core.ProjectZomboidError(
+            "Cannot save while selected fields use unrecognized Build 42 values; "
+            "reload with a Lexeditor version that understands: " + ", ".join(unknown)
+        )
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -126,11 +163,17 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/items/save":
                 if set(payload) != identity:
                     raise core.ProjectZomboidError("Item save requires path, module, id, sha256 and edits")
+                _guard_known_select_values(root, payload, core.read_items, {"ItemType": tuple(core.ITEM_TYPES)})
                 result = core.save_item(root, str(payload["path"]), str(payload["module"]),
                                         str(payload["id"]), str(payload["sha256"]), payload["edits"])
             elif path == "/api/evolvedrecipes/save":
                 if set(payload) != identity:
                     raise core.ProjectZomboidError("Evolved recipe save requires path, module, id, sha256 and edits")
+                _guard_known_select_values(root, payload, evolvedrecipe.read, {
+                    "AddIngredientIfCooked": _TRUE_FALSE,
+                    "CanAddSpicesEmpty": _TRUE_FALSE,
+                    "Cookable": ("true",),
+                })
                 result = evolvedrecipe.save(root, str(payload["path"]), str(payload["module"]),
                                              str(payload["id"]), str(payload["sha256"]), payload["edits"])
             elif path == "/api/craftrecipes/save":
@@ -146,16 +189,31 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/vehicles/save":
                 if set(payload) != identity:
                     raise core.ProjectZomboidError("Vehicle save requires path, module, id, sha256 and edits")
+                _guard_known_select_values(root, payload, vehicle.read, {
+                    "hasLighter": _TRUE_FALSE,
+                    "isSmallVehicle": _TRUE_FALSE,
+                })
                 result = vehicle.save(root, str(payload["path"]), str(payload["module"]),
                                       str(payload["id"]), str(payload["sha256"]), payload["edits"])
             elif path == "/api/sounds/save":
                 if set(payload) != identity:
                     raise core.ProjectZomboidError("Sound save requires path, module, id, sha256 and edits")
+                _guard_known_select_values(root, payload, sound.read, {
+                    "is3D": _TRUE_FALSE,
+                    "loop": _TRUE_FALSE,
+                    "master": tuple(sound.MASTER_VALUES),
+                })
                 result = sound.save(root, str(payload["path"]), str(payload["module"]),
                                     str(payload["id"]), str(payload["sha256"]), payload["edits"])
             elif path == "/api/models/save":
                 if set(payload) != identity:
                     raise core.ProjectZomboidError("Model save requires path, module, id, sha256 and edits")
+                _guard_known_select_values(root, payload, model.read, {
+                    "cullFace": tuple(model.CULL_FACE_VALUES),
+                    "invertX": _TRUE_FALSE,
+                    "static": _TRUE_FALSE,
+                    "undoCoreScale": _TRUE_FALSE,
+                })
                 result = model.save(root, str(payload["path"]), str(payload["module"]),
                                     str(payload["id"]), str(payload["sha256"]), payload["edits"])
             elif path == "/api/deploy":
