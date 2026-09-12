@@ -3,7 +3,9 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$GameRoot,
 
-    [string]$OutputPath = (Join-Path $PSScriptRoot "install-verification.json")
+    [string]$OutputPath = (Join-Path $PSScriptRoot "install-verification.json"),
+
+    [string]$BaselinePath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,6 +15,24 @@ $resolvedOutput = [System.IO.Path]::GetFullPath($OutputPath)
 $outputDirectory = Split-Path -Parent $resolvedOutput
 if ($outputDirectory) {
     New-Item -ItemType Directory -Force -Path $outputDirectory | Out-Null
+}
+
+$baseline = $null
+$resolvedBaseline = ""
+if (-not [string]::IsNullOrWhiteSpace($BaselinePath)) {
+    $resolvedBaseline = (Resolve-Path -LiteralPath $BaselinePath).Path
+    if ([System.StringComparer]::OrdinalIgnoreCase.Equals($resolvedBaseline, $resolvedOutput)) {
+        throw "OutputPath must differ from BaselinePath so the baseline cannot be overwritten."
+    }
+    try {
+        $baseline = Get-Content -LiteralPath $resolvedBaseline -Raw | ConvertFrom-Json
+    }
+    catch {
+        throw "Baseline report is not valid JSON: $resolvedBaseline"
+    }
+    if ($baseline.contract -ne "Lexeditor.ffx-x2-install-verification") {
+        throw "Unexpected baseline verifier contract '$($baseline.contract)': $resolvedBaseline"
+    }
 }
 
 Push-Location $repoRoot
@@ -58,6 +78,25 @@ try {
     if (-not [bool]$report.acceptanceReady -or $failedChecks.Count -ne 0) {
         $detail = if ($failedChecks.Count) { $failedChecks -join ", " } else { "acceptanceReady=false" }
         throw "Verifier passed its ordinary checks, but draft-exit evidence is incomplete: $detail. Report: $resolvedOutput"
+    }
+
+    if ($null -ne $baseline) {
+        foreach ($game in @("x", "x2")) {
+            $before = $baseline.archives.$game
+            $after = $report.archives.$game
+            foreach ($field in @("headerMd5", "sha256")) {
+                $beforeValue = [string]$before.$field
+                $afterValue = [string]$after.$field
+                if ([string]::IsNullOrWhiteSpace($beforeValue) -or [string]::IsNullOrWhiteSpace($afterValue)) {
+                    throw "Cannot compare $game $field because one report is missing it. Baseline: $resolvedBaseline; current: $resolvedOutput"
+                }
+                if ($beforeValue -ne $afterValue) {
+                    throw "Installed $game archive changed: $field differs from baseline. Baseline: $resolvedBaseline; current: $resolvedOutput"
+                }
+            }
+        }
+        Write-Host "Installed VBF immutability comparison PASS"
+        Write-Host "Baseline JSON: $resolvedBaseline"
     }
 
     Write-Host "FFX/X-2 real-install verifier PASS"
