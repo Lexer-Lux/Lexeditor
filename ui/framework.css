@@ -6038,3 +6038,18 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 
 /* Titles contribute to column minima and must not split inside a word. */
 .lex-column-list-head-cell .header-label { white-space:nowrap;overflow-wrap:normal;word-break:normal; }
+
+/* Reusable property grids reserve room for the label, value and reference rail.
+   A flag group needs a full row; squeezing it into a numeric cell hides labels. */
+.lex-property-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,26rem),1fr));
+  gap:4px 12px;
+  min-width:0;
+  align-items:start;
+}
+.lex-property-grid > .lex-detail-field { min-width:0; }
+.lex-property-grid > .lex-detail-field:has(input[type="checkbox"]) { grid-column:1 / -1; }
+.lex-property-grid .flag-list { grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr)); }
+.lex-property-grid .flag-list label { min-width:0;overflow-wrap:normal; }
+.lex-property-grid .flag-list input[type="checkbox"] { flex:0 0 auto;width:18px;min-height:18px;height:18px; }
