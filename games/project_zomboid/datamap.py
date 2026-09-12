@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import core, craftrecipe, evolvedrecipe, fixing, fluid, mannequin, model, sound, vehicle, zedscript
+from . import core, craftrecipe, evolvedrecipe, fixing, fluid, mannequin, model, sound, timedaction, vehicle, zedscript
 
 
 def read(root: Path) -> dict:
@@ -20,6 +20,7 @@ def read(root: Path) -> dict:
     sounds = sound.read(root)
     models = model.read(root)
     mannequins = mannequin.read(root)
+    timed_actions = timedaction.read(root)
     inventory = zedscript.inventory(root)
     by_path: dict[str, set[str]] = {}
     for row in inventory["rows"]:
@@ -33,8 +34,9 @@ def read(root: Path) -> dict:
     sound_paths = {row["path"] for row in sounds["rows"]}
     model_paths = {row["path"] for row in models["rows"]}
     mannequin_paths = {row["path"] for row in mannequins["rows"]}
+    timed_action_paths = {row["path"] for row in timed_actions["rows"]}
     errors = {
-        row["path"] for result in (items, evolved, crafts, fixings, fluids, vehicles, sounds, models, mannequins, inventory)
+        row["path"] for result in (items, evolved, crafts, fixings, fluids, vehicles, sounds, models, mannequins, timed_actions, inventory)
         for row in result.get("errors", []) if isinstance(row, dict) and row.get("path")
     }
 
@@ -59,6 +61,8 @@ def read(root: Path) -> dict:
             editors.append("Models")
         if relative in mannequin_paths:
             editors.append("Mannequins")
+        if relative in timed_action_paths:
+            editors.append("Timed Actions")
         kinds = sorted(by_path.get(relative, set()), key=str.casefold)
         if relative in errors:
             status = "partial" if editors else "recognized"
