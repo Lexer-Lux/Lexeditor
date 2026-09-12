@@ -317,7 +317,8 @@ with sync_playwright() as p:
 
             # Graph contract: large all-caps unsquashed title, no redundant
             # pseudo-title box, variables above the plot, and every right-axis
-            # string (name + range endpoints) rotated in the graph margin.
+            # The Y-axis name stays vertical while the range endpoints sit
+            # horizontally in the left graph margin.
             page.evaluate("navigate('graphs')"); page.wait_for_timeout(180)
             title = page.locator('.lex-curve-heading-title').first
             title_text = title.inner_text()
@@ -336,10 +337,11 @@ with sync_playwright() as p:
             assert title_style['transform'] == 'none', (width, 'graph title is geometrically squashed/stretched', title_style)
             assert pseudo['display'] == 'none' or pseudo['content'] in ('none','""'), (width, 'redundant graph-name pseudo box still exists', pseudo)
             assert variables_box['y'] < plot_box['y'] + 2, (width, 'variable panel is not top-mounted', variables_box, plot_box)
-            for node in (y_name, axis_top, axis_bottom):
-                assert node.evaluate("e=>getComputedStyle(e).writingMode").startswith('vertical'), (width, 'right-axis text is not vertical', node.get_attribute('class'))
+            assert y_name.evaluate("e=>getComputedStyle(e).writingMode").startswith('vertical'), (width, 'y-axis name is not vertical')
+            for node in (axis_top, axis_bottom):
+                assert node.evaluate("e=>getComputedStyle(e).writingMode") == 'horizontal-tb', (width, 'y-scale number is not horizontal', node.get_attribute('class'))
             for node in (axis_top, axis_bottom, y_name):
-                nb = node.bounding_box(); assert nb['x'] + nb['width'] >= svg_box['x'] + svg_box['width'] - 2, (width, 'right-axis text is not in right margin', node.get_attribute('class'), nb, svg_box)
+                nb = node.bounding_box(); assert nb['x'] <= svg_box['x'] + 2, (width, 'y-axis text is not in left margin', node.get_attribute('class'), nb, svg_box)
             for node in (axis_start, axis_end):
                 nb = node.bounding_box(); assert nb['y'] + nb['height'] >= svg_box['y'] + svg_box['height'] - 2, (width, 'x-axis number is not in bottom margin', node.get_attribute('class'), nb, svg_box)
             page.screenshot(path=str(OUT / f"{prefix}-graphs.png"))
