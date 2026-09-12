@@ -16,13 +16,14 @@ from urllib.parse import parse_qs, urlparse
 from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text
 from .localization import apply_localization_changes, parse_localization_text, try_get_culture_and_prefix
 from .plugin import DEFAULT_PROJECT_ROOT, TMODLOADER_SAVE_ROOT
+from .source_text import save_source, source_file_state, source_index
 
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_BODY = 64 * 1024
-MAX_REQUEST_BODY = 512 * 1024
+MAX_REQUEST_BODY = 2 * 1024 * 1024 + 128 * 1024
 MAX_LOCALIZATION = 2 * 1024 * 1024
 MAX_BUILD_OUTPUT = 64 * 1024
 MAX_ENABLED_STATE = 1024 * 1024
@@ -215,6 +216,18 @@ def save_localization(
     encoded = (UTF8_BOM if data.startswith(UTF8_BOM) else b"") + changed.encode("utf-8")
     _atomic_replace(target, encoded)
     return localization_file_state(canonical)
+
+
+def source_state() -> dict:
+    return source_index(project_root())
+
+
+def source_file(relative: str) -> dict:
+    return source_file_state(project_root(), relative)
+
+
+def save_source_file(relative: str, text: object, expected_sha256: str) -> dict:
+    return save_source(project_root(), relative, text, expected_sha256)
 
 
 def _installation_root() -> Path:
@@ -430,7 +443,7 @@ def data_map() -> dict:
         if relative == "build.txt":
             status, family = "structured", "tModLoader metadata"
         elif suffix == ".cs":
-            status, family = "recognized", "C# source"
+            status, family = "recognized", "C# source (raw text editor)"
         elif suffix == ".hjson":
             status, family = "structured", "Localization"
         elif relative.startswith("Content/"):
@@ -477,10 +490,10 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Invalid JSON") from error
 
     @staticmethod
-    def _query_path(parsed) -> str:
+    def _query_path(parsed, label: str) -> str:
         values = parse_qs(parsed.query, keep_blank_values=True).get("path", [])
         if len(values) != 1 or not values[0]:
-            raise ValueError("Localization path query is required")
+            raise ValueError(f"{label} path query is required")
         return values[0]
 
     def do_GET(self):
@@ -504,7 +517,7 @@ class Handler(BaseHTTPRequestHandler):
                     "hosted": True,
                     "windowHost": "webview2",
                     "capabilities": [
-                        "build-metadata", "localization", "native-build",
+                        "build-metadata", "localization", "source-text", "native-build",
                         "local-mod-status", "data-map",
                     ],
                 })
@@ -513,7 +526,11 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/localization":
                 self.send_json(localization_index())
             elif path == "/api/localization/file":
-                self.send_json(localization_file_state(self._query_path(parsed)))
+                self.send_json(localization_file_state(self._query_path(parsed, "Localization")))
+            elif path == "/api/source":
+                self.send_json(source_state())
+            elif path == "/api/source/file":
+                self.send_json(source_file(self._query_path(parsed, "C# source")))
             elif path == "/api/build":
                 self.send_json(build_status())
             elif path == "/api/data-map":
@@ -553,6 +570,17 @@ class Handler(BaseHTTPRequestHandler):
                 ):
                     raise ValueError("Invalid localization request")
                 self.send_json(save_localization(relative, updates, expected, creates))
+                return
+            if path == "/api/source/file":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "text", "expectedSha256"}:
+                    raise ValueError("Expected path, text and expectedSha256 only")
+                relative = payload["path"]
+                text = payload["text"]
+                expected = payload["expectedSha256"]
+                if not isinstance(relative, str) or not isinstance(text, str) or not isinstance(expected, str):
+                    raise ValueError("Invalid C# source request")
+                self.send_json(save_source_file(relative, text, expected))
                 return
             if path != "/api/build-metadata":
                 self.send_json({"error": "Not found"}, 404)
