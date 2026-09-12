@@ -44,6 +44,16 @@
   input:not([type="checkbox"]):not([type="radio"]), select, textarea { line-height:1.35; }
   header { position:sticky; top:0; z-index:100; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px 18px; padding:10px 18px;
             background: #171512; border-bottom: 3px solid var(--accent); }
+  /* Separate the command bar, section tabs and page without changing controls. */
+  .lex-shell-header { background:var(--lex-bg, var(--bg)); }
+  .lex-shell-command-row {
+    background:color-mix(in srgb,var(--lex-panel-2, var(--panel2)) 90%,var(--lex-text, var(--text)));
+    border-bottom:1px solid var(--lex-border, var(--border));
+  }
+  .lex-nav-frame {
+    background:var(--lex-panel-2, var(--panel2));
+    border-bottom:1px solid var(--lex-border, var(--border));
+  }
   header h1 { font:400 31px/1 var(--rdr-font-display); margin:0; color:#f0e8da; letter-spacing:.02em; }
   h2 { font-family:var(--rdr-font-display); font-weight:400; }
   header .path { color:var(--dim); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }

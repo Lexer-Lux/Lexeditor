@@ -5991,7 +5991,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-control-held button[data-shortcut-key] { position:relative; }
 .lex-control-held button[data-shortcut-key] > * { visibility:hidden; }
 .lex-control-held button[data-shortcut-key]::after { content:attr(data-shortcut-key); position:absolute; inset:0; display:grid; place-items:center; color:inherit; font:700 13px/1 var(--lex-font); }
-.lex-control-held nav button:not(.active) .lex-tab-shortcut { opacity:1 !important; visibility:visible !important; display:block !important; }
+.lex-control-held nav button:not(.active) .lex-tab-shortcut { opacity:1 !important; visibility:visible !important; display:grid !important; }
 .lex-control-held nav button.active .lex-tab-shortcut { visibility:hidden !important; }
 
 .lex-curve-plot::before { font-size:clamp(24px,calc(110cqw / var(--lex-curve-title-chars,10)),110px); }
