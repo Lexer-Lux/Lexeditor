@@ -2926,7 +2926,7 @@ body:has(.lex-pager) #main {
 
 .lex-page-sized-table .lex-column-list-row {
   min-height:0;
-  font-size:clamp(11px,calc((100vh - 245px) / var(--lex-page-row-count) * .42),18px);
+  font-size:clamp(11px,calc((100vh - 245px) / var(--lex-page-font-row-count,var(--lex-page-row-count)) * .42),18px);
 }
 
 .lex-pager-controls {
@@ -6017,3 +6017,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 html:has(body > .lex-shell-header) {height:100%;overflow:hidden;}
 body:has(> .lex-shell-header) {height:100dvh;max-height:100dvh;min-height:0;overflow:hidden;}
 body:has(> .lex-shell-header) > main {min-height:0;}
+
+/* Linked names truncate inside their button, including in narrow barrels. */
+.lex-hoverable { max-width:100%; }
+.lex-hoverable-label { display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.lex-hoverable > :is(img,svg) { flex-shrink:0; }

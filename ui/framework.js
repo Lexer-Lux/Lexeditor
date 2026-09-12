@@ -2786,7 +2786,7 @@
       event.stopPropagation();
       options.activate?.();
     };
-    return element("button", {
+    const button = element("button", {
       type: "button",
       class: ["lex-hoverable", options.class || ""].filter(Boolean).join(" "),
       "data-hover-target-type": options.targetType,
@@ -2795,6 +2795,12 @@
       title: `Open ${target}`,
       onclick: activate,
     }, options.content ?? options.label ?? target);
+    // Flex buttons cannot ellipsize anonymous text nodes.
+    [...button.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => {
+      const label = element("span", {class: "lex-hoverable-label"}, node.textContent);
+      node.replaceWith(label);
+    });
+    return button;
   };
 
   const keyboardIcon = () => {
@@ -6071,6 +6077,7 @@ ${contents.path}`});
       // a padding rule and a capacity rule can never disagree again.
       node.style.setProperty("--lex-page-row-count",
         String(Math.max(1, node.querySelectorAll(":scope > .lex-column-list-row").length || rowCapacity)));
+      node.style.setProperty("--lex-page-font-row-count", String(rowCapacity));
       node.dataset.lexBarrel = String(index + 1);
       if (index) node.classList.add("lex-fitted-page");
       return node;
