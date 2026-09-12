@@ -55,7 +55,7 @@ class ProjectZomboidAcceptanceTests(unittest.TestCase):
             self.assertEqual(report["modId"], "LexeditorAcceptance")
             self.assertEqual(report["scriptInventory"]["recordCount"], 1)
             self.assertEqual(report["scriptInventory"]["counts"]["item"], 1)
-            self.assertIn("does not", report["acceptanceBoundary"])
+            self.assertIn("not that Project Zomboid loaded", report["acceptanceBoundary"])
             self.assertEqual(len(report["manualGameTest"]), 5)
 
     def test_missing_game_executable_fails_without_faking_deployment_failure(self):
