@@ -4617,6 +4617,10 @@ nav button.active:focus-visible .lex-tab-shortcut,
   display:block;
   min-width:0;
   max-width:100%;
+  /* Bold game fonts can paint outside their advance box. Keep that ink and
+     its shadow inside the clip area; retain ellipsis for narrow tabs. */
+  box-sizing:border-box;
+  padding:.12em .2em;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;

@@ -909,6 +909,9 @@
     }
     body[data-lex-plugin="ff8"] .lex-shell-header nav button[data-tab]{flex:1 0 auto;min-width:max-content;padding-inline:6px;font-size:clamp(12px,.99vw,18px)}
     body[data-lex-plugin="ff8"] .lex-shell-header nav{flex-wrap:wrap}
+    /* FF8 marks the selected tab with its hand cursor and grey bevel. */
+    body[data-lex-plugin="ff8"] .lex-shell-header nav button.active::after{content:none}
+    body[data-lex-plugin="ff8"] .ff8-portrait-tab.active{box-shadow:none!important}
     .magic-compat-column{height:100%;min-height:0;overflow:hidden;padding-top:10px}
     .magic-compat-column>.gf-panel{display:flex;flex-direction:column;height:100%;min-height:0;margin:0!important}
     .magic-compat-column>.gf-panel>.lex-detail-section-content{flex:1;min-height:0;overflow:hidden}
