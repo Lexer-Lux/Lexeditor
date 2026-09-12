@@ -16,6 +16,24 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: feature/bannerlord-plugin
+      - name: Normalize temporary test quoting
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("tools/temp_bannerlord_legacy_relation_editor.py")
+          text = path.read_text(encoding="utf-8")
+          text = text.replace(
+              'Path("tests/test_bannerlord_legacy_relation_editor.py").write_text(r\'\'\'',
+              'Path("tests/test_bannerlord_legacy_relation_editor.py").write_text(r"""',
+              1,
+          )
+          marker = "\n''', encoding=\"utf-8\")\n"
+          position = text.rfind(marker)
+          if position < 0:
+              raise SystemExit("temporary test-string terminator not found")
+          text = text[:position] + '\n""", encoding="utf-8")\n' + text[position + len(marker):]
+          path.write_text(text, encoding="utf-8")
+          PY
       - name: Apply legacy dependency editor patch
         run: python tools/temp_bannerlord_legacy_relation_editor.py
       - name: Focused validation
