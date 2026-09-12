@@ -1,5 +1,10 @@
 # Make a game plugin for Lexeditor
 
+Reuse the shared controls and layouts before you add a new implementation.
+Within a plugin, use one panel component and one set of CSS sizing rules for
+repeated data views. Check all callers after a shared change. Add a screen-specific
+override only when the screen has a different requirement, and explain why.
+
 This is the default methodology for adding a new game to Lexeditor. It is written
 for humans and coding agents. Follow it in order unless there is a concrete reason
 not to. The goal is to spend effort on the parts nobody has solved yet, preserve

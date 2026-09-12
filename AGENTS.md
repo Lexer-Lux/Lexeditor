@@ -1,5 +1,9 @@
 # Lexeditor project rules
 
+- Reuse existing controls, panel functions, layouts, and CSS classes. When two
+  screens show the same kind of data, use one component and one set of sizing
+  rules. Fix that component and check each caller before adding a screen override.
+
 - Before creating a new game plugin, read `docs/ADDING_A_GAME.md` and follow its
   research-first workflow. Survey existing open-source tools/loaders, documentation
   and format knowledge before writing new parsers, and record material sources in
