@@ -52,6 +52,7 @@ The reverse-engineering projects are factual format cross-checks; their source i
   - `/api/play` accepts only exact `{"game":"x"}` or `{"game":"x2"}`.
   - no executable/path/command/argument input exists.
   - Stage 0 runs from `<game>/fahrenheit/bin` with only `..\..\FFX.exe` or `..\..\FFX-2.exe`.
+  - Stage 0 is spawned with Windows `CREATE_NO_WINDOW`; Lexeditor does not allocate a helper console.
   - the Square Enix collection launcher is never used.
 - `/api/launch`, dashboard state, Data Map, and explicit **Play FFX / Play FFX-2** UI controls expose fixed launch readiness.
 - Read-only real-install verifier: `python -m games.ffx_x2.verify_install`.
@@ -60,8 +61,11 @@ The reverse-engineering projects are factual format cross-checks; their source i
   - parses every currently claimed structured table with production parsers;
   - reports record counts/sizes, exact source table SHA-256 and VBF metadata;
   - `--hash-archives` optionally streams complete installed VBFs through SHA-256;
-  - `--require-fahrenheit` also gates on Stage 0/Stage 1 and both executables;
+  - `--require-fahrenheit` also gates the command exit status on Stage 0/Stage 1 and both executables;
+  - `verificationPassed` records the requested verifier invocation result;
+  - `acceptanceReady` is stricter and requires validated archive/structured coverage, full SHA-256 values for both installed VBFs, and all fixed Fahrenheit/game launch prerequisites;
   - performs no project write, deployment, VBF rewrite or launch.
+- `worklog/acceptance/ffx-x2/run-verifier.ps1` runs the strict real-install command, writes UTF-8 acceptance JSON, fails unless `acceptanceReady` is true, and can compare both installed VBF header MD5/SHA-256 values against a baseline report after deploy/launch tests.
 - `worklog/acceptance/ffx-x2/README.md` defines the remaining real-install draft-exit procedure, starting with byte-identical EFL replacements before any gameplay edit.
 
 ## Regression guarantees
@@ -74,7 +78,9 @@ The reverse-engineering projects are factual format cross-checks; their source i
 - FFX-2 accessory regressions compare all bytes outside the six writable fields and preserve the complete creature extension and trailing strings.
 - FFX-2 ability managed coverage proves project save -> `efl/x2` deploy -> loadorder preservation -> revert while the source VBF remains byte-identical.
 - Play API tests patch only the process-execution boundary and reject generic commands, paths, args, aliases, extra keys, wrong types and non-object bodies without spawning a game.
-- Install-verifier regressions cover raw-path resolution/report metadata, missing-table failure, invalid-VBF failure and optional full-file SHA-256 capture.
+- Stage 0 launch tests assert the fixed argv/cwd and Windows no-console process creation flag without launching the game.
+- Install-verifier regressions cover raw-path resolution/report metadata, missing-table failure, invalid-VBF failure, optional full-file SHA-256 capture, strict draft-exit readiness, and fail-closed incomplete archive/launch maps.
+- The Windows CI leg parses the acceptance PowerShell runner before the rest of the FFX/X-2 regression suite.
 
 ## Remaining actionable work
 
@@ -83,6 +89,6 @@ The reverse-engineering projects are factual format cross-checks; their source i
 - Expand FFX-2 only through independently proved fields; localized strings, accessory creature-extension fields and other command fields remain intentionally untouched.
 - Convert recognized non-browser-ready font atlases, menu textures and UI-audio banks only when a proved/local conversion path exists.
 - Consider Fahrenheit helper/version management separately if Lexeditor should install/update it rather than merely interoperate with an existing setup.
-- On a real Steam collection, run the verifier with `--hash-archives`, capture actual inventories/record sizes, then test one byte-identical EFL replacement in each game, actual **Play FFX / Play FFX-2** Stage 0 startup, and reversible structured round trips.
+- On a real Steam collection, run `worklog/acceptance/ffx-x2/run-verifier.ps1` to capture the baseline, test one byte-identical EFL replacement in each game, verify actual **Play FFX / Play FFX-2** Stage 0 startup and reversible structured round trips, then rerun with `-BaselinePath` to prove both installed VBFs remained unchanged.
 
 Do not close #461 or mark PR #462 ready from synthetic/API/CI evidence alone. Real installed-game and in-game acceptance remain the draft exit criteria.
