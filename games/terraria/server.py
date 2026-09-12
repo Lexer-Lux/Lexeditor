@@ -22,6 +22,7 @@ PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_BODY = 64 * 1024
 MAX_BUILD_OUTPUT = 64 * 1024
+MAX_ENABLED_STATE = 1024 * 1024
 BUILD_TIMEOUT_SECONDS = 15 * 60
 UTF8_BOM = b"\xef\xbb\xbf"
 _BUILD_LOCK = threading.Lock()
@@ -120,8 +121,54 @@ def _source_project_root() -> Path:
     return root
 
 
+def _mods_root() -> Path:
+    return Path(TMODLOADER_SAVE_ROOT).resolve() / "Mods"
+
+
 def _artifact_path(project: Path) -> Path:
-    return Path(TMODLOADER_SAVE_ROOT).resolve() / "Mods" / f"{project.name}.tmod"
+    return _mods_root() / f"{project.name}.tmod"
+
+
+def local_mod_state(project: Path | None = None) -> dict:
+    """Read tModLoader's local package/enabled state without mutating it."""
+    selected = project_root() if project is None else Path(project).resolve()
+    artifact = _artifact_path(selected)
+    enabled_path = _mods_root() / "enabled.json"
+    state = {
+        "expectedArtifact": str(artifact),
+        "artifactExists": artifact.is_file(),
+        "enabled": False,
+        "enabledStatePath": str(enabled_path),
+        "enabledStateExists": False,
+        "enabledStateValid": True,
+        "enabledStateError": "",
+    }
+    try:
+        data = enabled_path.read_bytes()
+    except FileNotFoundError:
+        return state
+    except OSError as error:
+        state["enabledStateValid"] = False
+        state["enabledStateError"] = f"Could not read tModLoader enabled.json: {error}"
+        return state
+
+    state["enabledStateExists"] = True
+    if len(data) > MAX_ENABLED_STATE:
+        state["enabledStateValid"] = False
+        state["enabledStateError"] = "tModLoader enabled.json is unexpectedly large"
+        return state
+    try:
+        payload = json.loads(data.decode("utf-8-sig"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        state["enabledStateValid"] = False
+        state["enabledStateError"] = f"Could not parse tModLoader enabled.json: {error}"
+        return state
+    if not isinstance(payload, list) or any(not isinstance(value, str) for value in payload):
+        state["enabledStateValid"] = False
+        state["enabledStateError"] = "tModLoader enabled.json must contain a JSON array of mod names"
+        return state
+    state["enabled"] = selected.name in set(payload)
+    return state
 
 
 def _trim_output(value: object) -> str:
@@ -152,14 +199,12 @@ def _read_log_tail(path: Path) -> str:
 def build_status(platform_name: str | None = None) -> dict:
     platform_name = os.name if platform_name is None else platform_name
     project = project_root()
-    artifact = _artifact_path(project)
     payload = {
         "available": False,
         "building": _BUILD_LOCK.locked(),
         "project": str(project),
         "saveRoot": str(Path(TMODLOADER_SAVE_ROOT).resolve()),
-        "expectedArtifact": str(artifact),
-        "artifactExists": artifact.is_file(),
+        **local_mod_state(project),
         "reason": "",
     }
     if platform_name != "nt":
@@ -177,6 +222,12 @@ def build_status(platform_name: str | None = None) -> dict:
         return payload
     payload["available"] = True
     return payload
+
+
+def _result_local_state(project: Path) -> dict:
+    state = local_mod_state(project)
+    state["artifact"] = state.pop("expectedArtifact")
+    return state
 
 
 def build_project(run_command=None, platform_name: str | None = None) -> dict:
@@ -217,18 +268,18 @@ def build_project(run_command=None, platform_name: str | None = None) -> dict:
             stdout = _trim_output(completed.stdout)
             stderr = _trim_output(completed.stderr)
             native_log = _read_log_tail(install / "tModLoader-Logs" / "Natives.log")
-            ok = completed.returncode == 0 and artifact.is_file()
+            state = _result_local_state(project)
+            ok = completed.returncode == 0 and state["artifactExists"]
             result = {
                 "ok": ok,
                 "exitCode": int(completed.returncode),
                 "timedOut": False,
-                "artifact": str(artifact),
-                "artifactExists": artifact.is_file(),
+                **state,
                 "stdout": stdout,
                 "stderr": stderr,
                 "nativeLog": native_log,
             }
-            if completed.returncode == 0 and not artifact.is_file():
+            if completed.returncode == 0 and not state["artifactExists"]:
                 result["error"] = "tModLoader exited successfully but the expected .tmod was not found."
             return result
         except subprocess.TimeoutExpired as error:
@@ -236,8 +287,7 @@ def build_project(run_command=None, platform_name: str | None = None) -> dict:
                 "ok": False,
                 "exitCode": None,
                 "timedOut": True,
-                "artifact": str(artifact),
-                "artifactExists": artifact.is_file(),
+                **_result_local_state(project),
                 "stdout": _trim_output(error.stdout),
                 "stderr": _trim_output(error.stderr),
                 "nativeLog": _read_log_tail(install / "tModLoader-Logs" / "Natives.log"),
@@ -323,7 +373,7 @@ class Handler(BaseHTTPRequestHandler):
                     "name": "Terraria",
                     "hosted": True,
                     "windowHost": "webview2",
-                    "capabilities": ["build-metadata", "native-build", "data-map"],
+                    "capabilities": ["build-metadata", "native-build", "local-mod-status", "data-map"],
                 })
             elif path == "/api/build-metadata":
                 self.send_json(build_state())
