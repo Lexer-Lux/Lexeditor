@@ -59,7 +59,11 @@ with sync_playwright() as p:
                     page.evaluate('navigate("datamap")')
                 else:
                     page.evaluate('''rows=>{
-                      state.dataMap={rows};state.datamap={rows};state.booting=false;
+                      const mapPayload={rows};
+                      window.fetch=input=>String(input).includes('/api/datamap')
+                        ? Promise.resolve({ok:true,status:200,json:async()=>mapPayload})
+                        : new Promise(()=>{});
+                      state.dataMap=mapPayload;state.datamap=mapPayload;state.booting=false;
                       if(Object.hasOwn(state,"loaded"))state.loaded=true;
                       state.dashboard={runtime:{installed:true},baseline:{},game:{},manifest:{},paths:{},problems:[]};
                       if(typeof state.data!=="object" || !state.data)state.data={};
