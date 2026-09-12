@@ -167,7 +167,7 @@ def _launch_ready(report: dict) -> bool:
 
 
 def acceptance_checks(report: dict) -> dict[str, bool]:
-    """Return the real-install evidence gates required before this PR leaves draft."""
+    """Return strict verifier-baseline gates; in-game acceptance remains separate."""
     archives = report.get("archives", {})
     archive_hashes_ready = bool(report.get("archiveHashesIncluded")) and all(
         game in archives
@@ -184,7 +184,7 @@ def acceptance_checks(report: dict) -> dict[str, bool]:
 
 
 def finalize_report(report: dict, require_fahrenheit: bool) -> dict:
-    """Add CLI/result state without weakening the stricter draft-exit evidence flag."""
+    """Add CLI/result state without weakening the strict real-install baseline flag."""
     result = dict(report)
     checks = acceptance_checks(result)
     result["acceptanceChecks"] = checks
@@ -224,7 +224,7 @@ def _human_report(report: dict, require_fahrenheit: bool) -> str:
     lines.append(f"Verification result: {'PASS' if verification_passed else 'FAIL'}")
     if "acceptanceReady" in report:
         lines.append(
-            f"Draft-exit evidence: {'READY' if report['acceptanceReady'] else 'NOT READY'}"
+            f"Real-install verifier baseline: {'READY' if report['acceptanceReady'] else 'NOT READY'}"
         )
     return "\n".join(lines)
 
