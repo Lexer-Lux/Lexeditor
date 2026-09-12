@@ -1,6 +1,11 @@
 {
   "contributions": [
     {
+      "name": "The Indie Stone / Project Zomboid",
+      "role": "Official Build 42 stable-status, mod-manager and Java API references used to define the supported install and runtime boundary.",
+      "url": "https://projectzomboid.com/"
+    },
+    {
       "name": "PZ Wiki Modding / PZ API Docs",
       "role": "Build 42 mod.info and ZedScript schema reference used to define the first structured editor boundary.",
       "url": "https://github.com/PZ-Wiki-Modding/PZ-API-Docs"
@@ -14,6 +19,16 @@
       "name": "PZ Wiki Modding / pz-scripts-data",
       "role": "Current Build 42 script parameter and type-schema research reference.",
       "url": "https://github.com/PZ-Wiki-Modding/pz-scripts-data"
+    },
+    {
+      "name": "JCPaezD / project-zomboid-hosted-toolkit",
+      "role": "Current Windows Build 42 user-data reference for the active client mod list at Zomboid/mods/default.txt.",
+      "url": "https://github.com/JCPaezD/project-zomboid-hosted-toolkit"
+    },
+    {
+      "name": "Twynzen / pz-forge-live",
+      "role": "Build 42.20 mod-development reference for local Zomboid/mods deployment and existing-save mods.txt behavior.",
+      "url": "https://github.com/Twynzen/pz-forge-live"
     }
   ],
   "thanks": [],
