@@ -4716,7 +4716,7 @@ ${contents.path}`});
         style: rowStyle,
         title: typeof options.rowTitle === "function" ? options.rowTitle(row) : options.rowTitle,
         "aria-selected": options.select ? String(selected) : null,
-        onclick: options.select ? () => options.select(row) : null,
+        onclick: options.select ? event => options.select(row,event) : null,
       }, options.render(row));
       options.decorateRow?.(rowNode, row, key);
       root.append(rowNode);
@@ -6061,6 +6061,24 @@ ${contents.path}`});
     } catch (_error) {}
   };
 
+  const tableSelections = new Map();
+  const applyRecordDelta = (before,after,target) => {
+    if(Array.isArray(after)&&after.some(value=>value?.field)) {
+      for(const value of after){
+        const old=before?.find(entry=>entry.field===value.field),next=target.find(entry=>entry.field===value.field);
+        if(old&&next)applyRecordDelta(old,value,next);
+      }
+      return;
+    }
+    for (const key of Object.keys(after||{})) {
+      if (!(key in target)) continue;
+      const a=before?.[key],b=after[key];
+      if (JSON.stringify(a)===JSON.stringify(b)) continue;
+      if(a&&b&&typeof a==='object'&&typeof b==='object'&&target[key]&&typeof target[key]==='object')
+        applyRecordDelta(a,b,target[key]);
+      else target[key]=clone(b);
+    }
+  };
   const pagedListDetail = options => {
     const slotBased = options.slots !== false;
     if (options.slots === undefined && sharedSettingsSnapshot?.developerMode) {
@@ -6163,25 +6181,69 @@ ${contents.path}`});
     // Synchronize clamped pages and selection fallback without causing a
     // second render. Interactive changes go through the one change callback.
     options.sync?.({page, pageSize, selected});
+    const selectionKey=options.splitKey || rowPreferenceKey;
+    const selection=tableSelections.get(selectionKey)||{keys:new Set([selected]),anchor:selected};
+    selection.keys=new Set([...selection.keys].filter(key=>records.some(row=>keyOf(row)===key)));
+    if(!selection.keys.size)selection.keys.add(selected);
+    tableSelections.set(selectionKey,selection);
+    const makeDetail=record=>{
+      const node=options.detail(record);
+      const chosen=records.filter(row=>selection.keys.has(keyOf(row)));
+      if(chosen.length>1){
+        const banner=element('div',{class:'lex-multi-edit-notice'},`${chosen.length} records selected. Edits apply to all selected records. Values shown are from ${record.name||keyOf(record)}; other records may differ.`);
+        node.prepend(banner);
+        let editBefore;
+        const beginEdit=event=>{
+          if(!event.target.matches('input,select,textarea'))return;
+          editBefore=clone(record);
+          // An explicit value also applies when it equals the primary value.
+          const label=event.target.getAttribute('aria-label')||'';
+          const index=record.fields?.findIndex(field=>field.label===label);
+          if(index>=0)editBefore.fields[index].value={bulkEdit:true};
+          else {
+            const normalize=value=>String(value).replace(/[^a-z0-9]/gi,'').toLowerCase();
+            const key=Object.keys(record).find(key=>normalize(key)===normalize(label));
+            if(key&&typeof record[key]!=='object')editBefore[key]={bulkEdit:true};
+          }
+        };
+        const finishEdit=()=>{
+          if(!editBefore)return;
+          for(const target of chosen)if(target!==record)applyRecordDelta(editBefore,record,target);
+          editBefore=null;options.bulkChanged?.();
+        };
+        for(const event of ['input','change']){
+          node.addEventListener(event,beginEdit,true);node.addEventListener(event,finishEdit);
+        }
+      }
+      return node;
+    };
     let detailNode = picked
-      ? options.detail(picked)
+      ? makeDetail(picked)
       : (typeof options.emptyDetail === "function" ? options.emptyDetail() : options.emptyDetail || element("div", {class: "lex-detail"}));
     let leadingNode = typeof options.leadingPanel === "function" && picked ? options.leadingPanel(picked) : null;
     let masterNodes = [];
-    const select = record => {
+    const select = (record,event={}) => {
       const nextSelected = keyOf(record);
-      if (nextSelected === selected) return false;
-      selected = nextSelected;
+      if(event.shiftKey){
+        const start=records.findIndex(row=>keyOf(row)===selection.anchor),end=records.indexOf(record);
+        if(!event.ctrlKey&&!event.metaKey)selection.keys.clear();
+        for(const row of records.slice(Math.max(0,Math.min(start,end)),Math.max(start,end)+1))selection.keys.add(keyOf(row));
+      }else if(event.ctrlKey||event.metaKey){
+        if(selection.keys.has(nextSelected)&&selection.keys.size>1)selection.keys.delete(nextSelected);else selection.keys.add(nextSelected);
+        selection.anchor=nextSelected;
+      }else {selection.keys=new Set([nextSelected]);selection.anchor=nextSelected;}
+      selected = selection.keys.has(nextSelected)?nextSelected:[...selection.keys].at(-1);
+      record=records.find(row=>keyOf(row)===selected)||record;
       options.sync?.({page, pageSize, selected, reason:"select"});
       for (const node of masterNodes) {
         node.querySelectorAll(".lex-list-row[data-key]").forEach(row => {
-          const active = String(row.dataset.key) === String(selected);
+          const active = [...selection.keys].some(key=>String(key)===String(row.dataset.key));
           row.classList.toggle("selected", active);
           row.classList.remove("sel");
           row.setAttribute("aria-selected", String(active));
         });
       }
-      const replacement = options.detail(record);
+      const replacement = makeDetail(record);
       if (detailNode.classList.contains("lex-panel-layout-pane")) replacement.classList.add("lex-panel-layout-pane");
       const fixedHeight = detailNode.style.height;
       if (fixedHeight) replacement.style.height = fixedHeight;
@@ -6201,6 +6263,11 @@ ${contents.path}`});
       const node = typeof options.master === "function"
         ? options.master({rows, selected, select, barrel: index, barrels})
         : list({...options.list, rows, key: keyOf, selected, select});
+      node.querySelectorAll('.lex-list-row[data-key]').forEach(row=>{
+        const active=[...selection.keys].some(key=>String(key)===row.dataset.key);
+        row.classList.toggle('selected',active);row.setAttribute('aria-selected',String(active));
+      });
+      node.setAttribute('aria-multiselectable','true');
       fitBarrelTableColumns(node);
       // Filler rows exist to square off a growable list. A slot table shows one
       // row per real slot, so a short last page simply ends.

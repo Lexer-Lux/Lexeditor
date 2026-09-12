@@ -6123,3 +6123,5 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-save-preview ul{padding-left:20px;margin:8px 0}
 .lex-save-preview li{margin:8px 0;overflow-wrap:anywhere}
 .lex-save-preview li div{white-space:pre-wrap}
+
+.lex-multi-edit-notice{padding:8px;border-bottom:1px solid var(--lex-border);font-size:14px;grid-column:1/-1}
