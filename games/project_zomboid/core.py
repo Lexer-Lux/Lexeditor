@@ -619,17 +619,31 @@ def _deployment_state_path(root: Path) -> Path:
     return root / ".lexeditor" / "project-zomboid-deployment.json"
 
 
-def _expected_recorded_target(root: Path, target: Path | None) -> bool:
+def _local_target(root: Path, user_root: Path | None = None) -> Path:
+    name = root.name.strip()
+    if not name or name in {".", ".."} or any(c in name for c in '<>:"/\\|?*'):
+        raise ProjectZomboidError("Project folder name is not safe for local deployment")
+    base_root = user_zomboid_root() if user_root is None else Path(user_root).expanduser().resolve()
+    local_root = base_root / "mods"
+    target = (local_root / name).resolve()
+    if not _inside(local_root, target):
+        raise ProjectZomboidError("Local deployment path escaped Zomboid/mods")
+    return target
+
+
+def _expected_recorded_target(
+    root: Path, target: Path | None, user_root: Path | None = None
+) -> bool:
     if target is None:
         return False
     try:
-        expected_target = _local_target(root)
+        expected_target = _local_target(root, user_root)
     except ProjectZomboidError:
         return False
     return target == expected_target
 
 
-def deployment_state(root: Path) -> dict:
+def deployment_state(root: Path, user_root: Path | None = None) -> dict:
     state_path = _deployment_state_path(root)
     state = {}
     if state_path.is_file():
@@ -639,7 +653,7 @@ def deployment_state(root: Path) -> dict:
             state = {}
     target_value = state.get("target") if isinstance(state, dict) else None
     target = Path(target_value) if isinstance(target_value, str) and target_value else None
-    target_is_expected = _expected_recorded_target(root, target)
+    target_is_expected = _expected_recorded_target(root, target, user_root)
     deployed = bool(
         target_is_expected and target is not None
         and not target.is_symlink() and target.is_dir()
@@ -654,17 +668,6 @@ def deployment_state(root: Path) -> dict:
         "externalChanges": bool(deployed and expected and current != expected),
         "fileCount": len(current),
     }
-
-
-def _local_target(root: Path) -> Path:
-    name = root.name.strip()
-    if not name or name in {".", ".."} or any(c in name for c in '<>:"/\\|?*'):
-        raise ProjectZomboidError("Project folder name is not safe for local deployment")
-    local_root = user_zomboid_root() / "mods"
-    target = (local_root / name).resolve()
-    if not _inside(local_root, target):
-        raise ProjectZomboidError("Local deployment path escaped Zomboid/mods")
-    return target
 
 
 def deploy(root: Path) -> dict:
