@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import core
+from . import core, zedscript
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,6 +82,7 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": [
                         "mod-info",
                         "build42-items",
+                        "build42-zedscript-inventory",
                         "data-map",
                         "local-deploy",
                     ],
@@ -91,6 +92,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(core.read_mod_info(self.project()))
             elif path == "/api/items":
                 self.send_json(core.read_items(self.project()))
+            elif path == "/api/zedscript":
+                self.send_json(zedscript.inventory(self.project()))
             elif path == "/api/datamap":
                 self.send_json(core.data_map(self.project()))
             elif path == "/api/deployment":
