@@ -86,7 +86,7 @@ def _without_comment(value: str) -> str:
     comment = _comment_start(value)
     if comment is not None:
         value = value[:comment]
-    return value.rstrip().removesuffix(",").rstrip()
+    return value.strip().removesuffix(",").rstrip()
 
 
 def _decode_key(token: str) -> str | None:
@@ -205,8 +205,6 @@ def parse_localization_text(text: str, prefix: str = "") -> LocalizationDocument
             continue
 
         if complex_depth:
-            # We only need to keep the outer object stack stable while skipping
-            # an array/inline-complex leaf that Lexeditor will not rewrite.
             complex_depth += stripped.count("[") + stripped.count("{")
             complex_depth -= stripped.count("]") + stripped.count("}")
             if complex_depth <= 0:
