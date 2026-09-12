@@ -57,6 +57,8 @@ def main():
    assert divider.evaluate('e=>getComputedStyle(e,"::before").height')=='32px'
    divider.click(button='right');page.wait_for_timeout(200)
    field=page.locator('.lex-boolean-field').first;checkbox=field.locator('input[type=checkbox]')
+   geometry=field.evaluate("""e=>{const box=e.querySelector('input[type=checkbox]').getBoundingClientRect(),arrow=e.querySelector('.lex-field-boolean-arrow').getBoundingClientRect();return{height:e.getBoundingClientRect().height,boxY:box.y+box.height/2,arrowY:arrow.y+arrow.height/2}}""")
+   assert geometry['height']<=40 and abs(geometry['boxY']-geometry['arrowY'])<=1,geometry
    before=field.bounding_box();checkbox.set_checked(not checkbox.is_checked());page.wait_for_timeout(250)
    assert abs(field.bounding_box()['height']-before['height'])<.5
    marks=field.locator('.lex-reference-values')

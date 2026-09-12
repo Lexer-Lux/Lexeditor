@@ -5648,43 +5648,46 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 
 
-/* One fixed checkbox track and a reserved reference track. */
-.lex-boolean-field > .lex-detail-field-label { overflow:visible; padding-right:0 !important; }
+/* The checkbox sets the normal row height. References use its bottom padding,
+   outside normal flow, and cannot enlarge the row. */
+.lex-detail-field.lex-boolean-field {min-height:0;}
+.lex-boolean-field > .lex-detail-field-label {overflow:visible;padding-right:0 !important;}
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control {padding-block:8px;align-self:stretch;}
 .lex-boolean-field .lex-detail-field-control > .lex-source-control {
   --lex-boolean-box:19px;
   display:grid !important;
   grid-template-columns:minmax(0,1fr) var(--lex-boolean-box);
-  grid-template-rows:var(--lex-boolean-box) minmax(12px,1fr);
-  gap:3px 1vw;
-  align-content:stretch;
-  align-items:center;
-  padding:4px 0 2px 1vw;
-  box-sizing:border-box;
-  width:100%; height:100%; min-height:38px;
-  position:relative; overflow:visible;
+  grid-template-rows:minmax(19px,1fr);
+  column-gap:1vw;row-gap:0;align-items:center;align-content:stretch;
+  padding:0 0 0 1vw;box-sizing:border-box;
+  width:100%;height:auto;min-height:19px;position:relative;overflow:visible;
 }
 .lex-boolean-field .lex-source-control > .lex-field-boolean-arrow {
-  grid-area:1/1; align-self:center; justify-self:stretch;
-  width:auto; min-width:0; margin:0;
+  grid-area:1/1;align-self:center;justify-self:stretch;
+  width:auto;min-width:0;margin:0;
 }
+.lex-boolean-field .lex-field-boolean-arrow::after {top:50%;transform:translateY(-50%);}
 .lex-boolean-field .lex-detail-field-control > .lex-source-control > input[type="checkbox"] {
-  grid-area:1/2; width:var(--lex-boolean-box); height:var(--lex-boolean-box); margin:0 !important;
+  grid-area:1/2;align-self:center;justify-self:end;
+  width:19px;height:19px;margin:0 !important;
 }
 .lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
-  position:static !important; grid-area:2/2; align-self:stretch; justify-self:stretch;
-  width:100% !important; height:100%; min-width:0; max-width:none;
-  overflow:visible; margin:0 !important; padding:0; transform:none; translate:none !important;
-  font-size:9px; line-height:1;
+  position:absolute !important;top:calc(50% + 9.5px);bottom:-8px;right:0;left:auto;
+  width:19px !important;height:auto;min-width:0;max-width:none;
+  display:flex;align-items:center;justify-content:center;
+  overflow:visible;margin:0 !important;padding:0;transform:none;translate:none !important;
+  font:7px/1 "Segoe UI Symbol",sans-serif;
 }
 .lex-boolean-field .lex-reference-values .lex-reference-value {
-  display:flex; align-items:center; justify-content:center; gap:2px;
-  padding:0; min-width:0; overflow:visible; width:100%; height:100%;
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  padding:0;min-width:0;max-width:none;overflow:visible;width:auto;height:auto;
 }
-.lex-boolean-field .lex-reference-values :is(.lex-reference-tag,.lex-boolean-mark) {
-  overflow:visible; min-width:0; flex:none; font-size:inherit;
+.lex-boolean-field .lex-reference-values :is(.lex-reference-tag,.lex-reference-text,.lex-boolean-mark) {
+  display:block;overflow:visible;min-width:0;max-width:none;width:auto;
+  margin:0;padding:0;flex:none;font:inherit;text-overflow:clip;
 }
 .lex-detail-field.lex-boolean-field .lex-column-pin {
-  position:absolute !important; margin:0; bottom:auto !important; transform:none !important;
+  position:absolute !important;margin:0;bottom:auto !important;transform:none !important;
 }
 
 /* LEXEDITOR_FLAG_BOX_FILL_20260911 */
