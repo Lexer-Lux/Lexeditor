@@ -20,7 +20,11 @@ require('class:"item-list-group"' in SOURCE and 'class:"item-list-category"' in 
         "the group and category must be separate master cells")
 require(".loot-list.list-4col" in SOURCE,
         "the four-column master needs an explicit grid contract")
-require('class: "detail-field item-name-field"' in SOURCE,
+# The name/identity field can be assembled through a helper rather than spelling
+# its class literal at one call site. The durable contract is the dedicated
+# one-column field rule plus a full-width identity/control inside it.
+require('.item-detail .detail-field.item-name-field { grid-template-columns:minmax(0,1fr)' in SOURCE
+        and '.item-name-field .detail-control, .item-name-field .item-identity { width:100%; }' in SOURCE,
         "the identity segment must have its own full-width detail field")
 require('class: "item-meta-line"' in SOURCE,
         "the identity block must have one aligned metadata row")
