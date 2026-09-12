@@ -388,27 +388,32 @@ void draw_battle_hp()
             const float width = full_width * std::min(1.0f, maximum / 9999.0f);
             const float x = (from_left ? row.left : row.right) * v.scale_x + v.offset_x;
             const float top = native_y * v.scale_y + v.offset_y;
-            const ImVec2 lo(scale_x(from_left ? x : x - width), scale_y(top));
-            const ImVec2 hi(scale_x(from_left ? x + width : x), scale_y(top + v.scale_y));
-            if (hi.x <= lo.x || hi.y <= lo.y) return;
+            const float left = scale_x(from_left ? x : x - width);
+            const float right = scale_x(from_left ? x + width : x);
+            if (right <= left) return;
             auto *draw = ImGui::GetForegroundDrawList();
-            draw->AddRectFilled(lo, hi, IM_COL32(0, 0, 0, 255));
             const float fraction = std::min(1.0f, current / static_cast<float>(maximum));
-            if (fraction <= 0) return;
-            const float filled = (hi.x - lo.x) * fraction;
-            draw->AddRectFilled(
-                ImVec2(from_left ? lo.x : hi.x - filled, lo.y),
-                ImVec2(from_left ? lo.x + filled : hi.x, hi.y), color);
+            const float filled = (right - left) * fraction;
+            // Match the menu HP gauge: two thin parallel lines with a clear
+            // gap. The unfilled part stays transparent, without a black track.
+            // HP and GF HP share geometry; only anchor, direction and color differ.
+            for (int rail = 0; rail < 2; ++rail) {
+                const float y = top + rail * 2.0f * v.scale_y;
+                if (fraction > 0) draw->AddRectFilled(
+                    ImVec2(from_left ? left : right - filled, scale_y(y)),
+                    ImVec2(from_left ? left + filled : right, scale_y(y + v.scale_y)), color);
+            }
+
         };
         // Native rows are 15 pixels high (004B0FF6) and spaced by 15
         // (004B1978). Text starts at row_y+2 and is 12 pixels high. Glyph
         // atlas cells can contain transparent padding beyond that row.
-        // Anchor the red line to its final pixel, never to atlas-cell bounds.
+        // Anchor the first red rail to its final pixel, never to atlas-cell bounds.
         if (enable_ff8_hp_bars && row.hp_visible)
-            draw_line(row.current, row.maximum, row.top + 14.0f, false, IM_COL32(224, 32, 32, 255));
-        // One native pixel immediately above the name; independent toggle.
+            draw_line(row.current, row.maximum, row.top + 14.0f, false, IM_COL32(236, 0, 0, 255));
+        // Both blue rails fit above the name, whose text starts at row_y+2.
         if (enable_ff8_gf_hp_bars)
-            draw_line(row.gf_current, row.gf_maximum, row.top + 1.0f, true, IM_COL32(48, 128, 255, 255));
+            draw_line(row.gf_current, row.gf_maximum, row.top - 1.0f, true, IM_COL32(48, 128, 255, 255));
     }
 }
 
