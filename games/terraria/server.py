@@ -15,11 +15,30 @@ import tempfile
 import threading
 from urllib.parse import parse_qs, urlparse
 
-from .assets import ASSET_TYPES, asset_index, asset_state, create_asset, read_asset, replace_asset
+from .assets import (
+    ASSET_TYPES,
+    asset_index,
+    asset_state,
+    create_asset,
+    delete_asset,
+    read_asset,
+    rename_asset,
+    replace_asset,
+)
+from .build_diagnostics import parse_build_diagnostics
 from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text
-from .localization import apply_localization_changes, parse_localization_text, try_get_culture_and_prefix
+from .content_wizard import create_mod_item, create_mod_player, create_mod_system
+from .localization import parse_localization_text, try_get_culture_and_prefix
+from .localization_lifecycle import apply_localization_transaction
 from .plugin import DEFAULT_PROJECT_ROOT, TMODLOADER_SAVE_ROOT
-from .source_text import create_source, save_source, source_file_state, source_index
+from .source_text import (
+    create_source,
+    delete_source,
+    rename_source,
+    save_source,
+    source_file_state,
+    source_index,
+)
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +52,7 @@ MAX_ENABLED_STATE = 1024 * 1024
 BUILD_TIMEOUT_SECONDS = 15 * 60
 UTF8_BOM = b"\xef\xbb\xbf"
 _BUILD_LOCK = threading.Lock()
+_IGNORED_PROJECT_PARTS = frozenset({".git", ".pytest_cache", "__pycache__", "out", "obj", "bin", ".vs"})
 
 
 def project_root() -> Path:
@@ -96,11 +116,9 @@ def save_build(updates: dict[str, object], expected_sha256: str) -> dict:
     current_sha = sha256(data).hexdigest()
     if expected_sha256 != current_sha:
         raise ValueError("build.txt changed outside Lexeditor; reload before saving")
-
     changed = update_build_text(text, updates)
     if changed == text:
         return build_state()
-
     encoded = (UTF8_BOM if data.startswith(UTF8_BOM) else b"") + changed.encode("utf-8")
     _atomic_replace(target, encoded)
     return build_state()
@@ -113,6 +131,9 @@ def _localization_target(relative: str) -> Path:
     target = (root / relative).resolve()
     if target == root or root not in target.parents or target.suffix.casefold() != ".hjson":
         raise ValueError("Invalid localization path")
+    parts = target.relative_to(root).parts
+    if _IGNORED_PROJECT_PARTS.intersection(parts) or any(part.startswith(".") for part in parts):
+        raise ValueError("Localization path is inside an ignored/generated folder")
     return target
 
 
@@ -161,11 +182,12 @@ def localization_index() -> dict:
     files: list[dict] = []
     if not root.is_dir():
         return {"root": str(root), "files": files}
-    ignored = {".git", ".pytest_cache", "__pycache__", "out", "obj", "bin"}
     candidates = sorted(
         (
             path for path in root.rglob("*.hjson")
-            if path.is_file() and not ignored.intersection(path.relative_to(root).parts)
+            if path.is_file()
+            and not _IGNORED_PROJECT_PARTS.intersection(path.relative_to(root).parts)
+            and not any(part.startswith(".") for part in path.relative_to(root).parts)
         ),
         key=lambda path: path.relative_to(root).as_posix().casefold(),
     )
@@ -206,6 +228,7 @@ def save_localization(
     updates: dict[str, object],
     expected_sha256: str,
     creates: dict[str, object] | None = None,
+    deletes: list[str] | None = None,
 ) -> dict:
     target, data, text, canonical, culture, prefix = _read_localization(relative)
     if culture is None:
@@ -213,7 +236,7 @@ def save_localization(
     current_sha = sha256(data).hexdigest()
     if expected_sha256 != current_sha:
         raise ValueError(f"{canonical} changed outside Lexeditor; reload before saving")
-    changed = apply_localization_changes(text, updates, creates or {}, prefix)
+    changed = apply_localization_transaction(text, updates, creates or {}, deletes or [], prefix)
     if changed == text:
         return localization_file_state(canonical)
     encoded = (UTF8_BOM if data.startswith(UTF8_BOM) else b"") + changed.encode("utf-8")
@@ -237,6 +260,14 @@ def create_source_file(relative: str, text: object = "") -> dict:
     return create_source(project_root(), relative, text)
 
 
+def rename_source_file(relative: str, new_relative: str, expected_sha256: str) -> dict:
+    return rename_source(project_root(), relative, new_relative, expected_sha256)
+
+
+def delete_source_file(relative: str, expected_sha256: str) -> dict:
+    return delete_source(project_root(), relative, expected_sha256)
+
+
 def assets_state() -> dict:
     return asset_index(project_root())
 
@@ -258,6 +289,14 @@ def replace_asset_file(relative: str, data: bytes, expected_sha256: str) -> dict
     return replace_asset(project_root(), relative, data, expected_sha256)
 
 
+def rename_asset_file(relative: str, new_relative: str, expected_sha256: str) -> dict:
+    return rename_asset(project_root(), relative, new_relative, expected_sha256)
+
+
+def delete_asset_file(relative: str, expected_sha256: str) -> dict:
+    return delete_asset(project_root(), relative, expected_sha256)
+
+
 def _decode_asset_data(value: object) -> bytes:
     if not isinstance(value, str) or not value:
         raise ValueError("Asset dataBase64 is required")
@@ -265,6 +304,18 @@ def _decode_asset_data(value: object) -> bytes:
         return base64.b64decode(value, validate=True)
     except (binascii.Error, ValueError) as error:
         raise ValueError("Asset dataBase64 is invalid") from error
+
+
+def create_content_item(name: object, display_name: object = "", tooltip: object = "") -> dict:
+    return create_mod_item(project_root(), name, display_name, tooltip)
+
+
+def create_content_system(name: object) -> dict:
+    return create_mod_system(project_root(), name)
+
+
+def create_content_player(name: object) -> dict:
+    return create_mod_player(project_root(), name)
 
 
 def _installation_root() -> Path:
@@ -410,7 +461,6 @@ def build_project(run_command=None, platform_name: str | None = None) -> dict:
     install = _installation_root()
     project = _source_project_root()
     save_root = Path(TMODLOADER_SAVE_ROOT).resolve()
-    artifact = _artifact_path(project)
     runner = subprocess.run if run_command is None else run_command
 
     if not _BUILD_LOCK.acquire(blocking=False):
@@ -441,12 +491,14 @@ def build_project(run_command=None, platform_name: str | None = None) -> dict:
             stderr = _trim_output(completed.stderr)
             native_log = _read_log_tail(install / "tModLoader-Logs" / "Natives.log")
             state = _result_local_state(project)
+            diagnostics = parse_build_diagnostics(stdout + "\n" + stderr, project)
             ok = completed.returncode == 0 and state["artifactExists"]
             result = {
                 "ok": ok,
                 "exitCode": int(completed.returncode),
                 "timedOut": False,
                 **state,
+                "diagnostics": diagnostics,
                 "stdout": stdout,
                 "stderr": stderr,
                 "nativeLog": native_log,
@@ -455,13 +507,16 @@ def build_project(run_command=None, platform_name: str | None = None) -> dict:
                 result["error"] = "tModLoader exited successfully but the expected .tmod was not found."
             return result
         except subprocess.TimeoutExpired as error:
+            timeout_stdout = _trim_output(error.stdout)
+            timeout_stderr = _trim_output(error.stderr)
             return {
                 "ok": False,
                 "exitCode": None,
                 "timedOut": True,
                 **_result_local_state(project),
-                "stdout": _trim_output(error.stdout),
-                "stderr": _trim_output(error.stderr),
+                "diagnostics": parse_build_diagnostics(timeout_stdout + "\n" + timeout_stderr, project),
+                "stdout": timeout_stdout,
+                "stderr": timeout_stderr,
                 "nativeLog": _read_log_tail(install / "tModLoader-Logs" / "Natives.log"),
                 "error": "tModLoader build exceeded Lexeditor's build timeout.",
             }
@@ -559,8 +614,8 @@ class Handler(BaseHTTPRequestHandler):
                     "hosted": True,
                     "windowHost": "webview2",
                     "capabilities": [
-                        "build-metadata", "localization", "source-text", "assets", "native-build",
-                        "local-mod-status", "data-map",
+                        "build-metadata", "localization", "source-text", "assets", "content-wizard",
+                        "native-build", "local-mod-status", "data-map",
                     ],
                 })
             elif path == "/api/build-metadata":
@@ -599,26 +654,63 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Terraria build request must be an empty object")
                 self.send_json(build_project())
                 return
+            if path == "/api/content/system":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"name"}:
+                    raise ValueError("Expected name only")
+                self.send_json(create_content_system(payload["name"]))
+                return
+            if path == "/api/content/player":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"name"}:
+                    raise ValueError("Expected name only")
+                self.send_json(create_content_player(payload["name"]))
+                return
+            if path == "/api/content/item":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"name", "displayName", "tooltip"}:
+                    raise ValueError("Expected name, displayName and tooltip only")
+                self.send_json(create_content_item(payload["name"], payload["displayName"], payload["tooltip"]))
+                return
             if path == "/api/localization/file":
                 payload = self.read_json()
                 if not isinstance(payload, dict):
                     raise ValueError("Invalid localization request")
                 required = {"path", "updates", "expectedSha256"}
-                allowed = required | {"creates"}
+                allowed = required | {"creates", "deletes"}
                 if not required.issubset(payload) or not set(payload).issubset(allowed):
-                    raise ValueError("Expected path, updates, optional creates and expectedSha256 only")
+                    raise ValueError("Expected path, updates, optional creates/deletes and expectedSha256 only")
                 relative = payload["path"]
                 updates = payload["updates"]
                 creates = payload.get("creates", {})
+                deletes = payload.get("deletes", [])
                 expected = payload["expectedSha256"]
                 if (
                     not isinstance(relative, str)
                     or not isinstance(updates, dict)
                     or not isinstance(creates, dict)
+                    or not isinstance(deletes, list)
+                    or any(not isinstance(value, str) for value in deletes)
                     or not isinstance(expected, str)
                 ):
                     raise ValueError("Invalid localization request")
-                self.send_json(save_localization(relative, updates, expected, creates))
+                self.send_json(save_localization(relative, updates, expected, creates, deletes))
+                return
+            if path == "/api/source/rename":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "newPath", "expectedSha256"}:
+                    raise ValueError("Expected path, newPath and expectedSha256 only")
+                if not all(isinstance(payload[key], str) for key in ("path", "newPath", "expectedSha256")):
+                    raise ValueError("Invalid C# source rename request")
+                self.send_json(rename_source_file(payload["path"], payload["newPath"], payload["expectedSha256"]))
+                return
+            if path == "/api/source/delete":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "expectedSha256"}:
+                    raise ValueError("Expected path and expectedSha256 only")
+                if not all(isinstance(payload[key], str) for key in ("path", "expectedSha256")):
+                    raise ValueError("Invalid C# source delete request")
+                self.send_json(delete_source_file(payload["path"], payload["expectedSha256"]))
                 return
             if path == "/api/source/create":
                 payload = self.read_json()
@@ -640,6 +732,22 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(relative, str) or not isinstance(text, str) or not isinstance(expected, str):
                     raise ValueError("Invalid C# source request")
                 self.send_json(save_source_file(relative, text, expected))
+                return
+            if path == "/api/assets/rename":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "newPath", "expectedSha256"}:
+                    raise ValueError("Expected path, newPath and expectedSha256 only")
+                if not all(isinstance(payload[key], str) for key in ("path", "newPath", "expectedSha256")):
+                    raise ValueError("Invalid asset rename request")
+                self.send_json(rename_asset_file(payload["path"], payload["newPath"], payload["expectedSha256"]))
+                return
+            if path == "/api/assets/delete":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "expectedSha256"}:
+                    raise ValueError("Expected path and expectedSha256 only")
+                if not all(isinstance(payload[key], str) for key in ("path", "expectedSha256")):
+                    raise ValueError("Invalid asset delete request")
+                self.send_json(delete_asset_file(payload["path"], payload["expectedSha256"]))
                 return
             if path == "/api/assets/create":
                 payload = self.read_json()
