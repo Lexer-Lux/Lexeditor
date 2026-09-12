@@ -940,6 +940,8 @@ def save(data: dict, game_root: Path | None = None,
     # Keep the selected mod's requested value even when the runtime is not yet
     # installed. Activation installs and verifies the runtime before launch.
     # Save must never turn an enabled feature off behind the user's back.
+    if gf_hp_bars and not single_gf:
+        raise ValueError("GF HP Bars requires Monogamy")
     if fixed_command_menu_enabled and not single_gf:
         raise ValueError("Fixed Command Menu requires Monogamy")
     executable = _verify_executable(game)

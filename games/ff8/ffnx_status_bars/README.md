@@ -15,7 +15,7 @@ The derivative build adds three default-off FFNx settings:
 - `enable_ff8_hp_bars`: current/max HP bars for the three active characters in
   battle.
 - `enable_ff8_gf_hp_bars`: blue, left-to-right HP bars above party names.
-  Multiple junctioned GFs contribute combined current/max HP.
+  Requires Monogamy. Multiple junctioned GFs suppress the bar and report an error in the FFNx log. HP is never combined.
 
 Lexeditor stores the choices as `xpBars`, `hpBars` and `gfHpBars` in each mod's
 `lexeditor-settings.json`. At the launch barrier, it writes the selected mod's

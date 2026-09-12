@@ -13,6 +13,7 @@
 #include "common.h"
 #include "ff8.h"
 #include "globals.h"
+#include "log.h"
 #include "patch.h"
 #include "renderer.h"
 
@@ -107,6 +108,16 @@ void capture_gf_hp(std::uint8_t slot, HpCapture &capture)
     const auto character = ff8_externals.character_data_1CFE74C[slot];
     if (character >= CHAR_NUM) return;
     const auto junctions = ff8_externals.savemap->chars[character].gfs;
+    static bool reported[CHAR_NUM] = {};
+    if (junctions && (junctions & (junctions - 1))) {
+        if (!reported[character]) {
+            ffnx_error("GF HP Bars: character %u has multiple GFs junctioned. Requires Monogamy; bar suppressed.\n", character);
+            reported[character] = true;
+        }
+        capture.gf_current = capture.gf_maximum = 0;
+        return;
+    }
+    reported[character] = false;
     const auto *stats = reinterpret_cast<const std::uint8_t *>(
         &ff8_externals.char_comp_stats_1CFF000[slot]);
     const bool summoning = (stats[0x1C] & 1) != 0;
@@ -121,8 +132,8 @@ void capture_gf_hp(std::uint8_t slot, HpCapture &capture)
             current = *reinterpret_cast<const std::uint16_t *>(stats + 0x18);
             maximum = *reinterpret_cast<const std::uint16_t *>(stats + 0x1A);
         }
-        capture.gf_maximum += maximum;
-        capture.gf_current += std::min(current, maximum);
+        capture.gf_maximum = maximum;
+        capture.gf_current = std::min(current, maximum);
     }
 }
 
