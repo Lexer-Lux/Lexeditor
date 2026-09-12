@@ -6115,3 +6115,6 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-bottom-tab-panel > .lex-subtab-bar { order:100;flex:0 0 auto;margin-top:auto; }
 .lex-bottom-tab-panel > :not(.lex-subtab-bar) { min-height:0; }
 .lex-bottom-tab-panel > :not(.lex-subtab-bar):last-child { flex:1;overflow:auto; }
+
+.lex-project-control > .lex-project-contents { flex:0 0 28px; width:28px;min-width:28px;padding:4px; }
+.lex-project-contents > svg { display:block;width:100%;height:20px;fill:none;stroke:currentColor;stroke-width:1.8; }
