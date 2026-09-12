@@ -475,13 +475,16 @@ def _legacy_dependency_elements(root: ET.Element) -> dict[tuple[str, int], tuple
     load_after = root.find("LoadAfterModules")
     if load_after is not None:
         for index, element in enumerate(_element_children(load_after, "LoadAfterModule")):
+            if not str(element.attrib.get("Id") or "").strip():
+                continue
             result[("LoadAfterModules", index)] = (load_after, element)
 
     optional_index = 0
     depended_modules = root.find("DependedModules")
     if depended_modules is not None:
         for element in _element_children(depended_modules, "OptionalDependModule"):
-            result[("DependedModules/OptionalDependModule", optional_index)] = (depended_modules, element)
+            if str(element.attrib.get("Id") or "").strip():
+                result[("DependedModules/OptionalDependModule", optional_index)] = (depended_modules, element)
             optional_index += 1
 
     optional_root = root.find("OptionalDependModules")
@@ -490,7 +493,8 @@ def _legacy_dependency_elements(root: ET.Element) -> dict[tuple[str, int], tuple
             if element.tag not in {"OptionalDependModule", "DependModule"}:
                 continue
             origin = f"OptionalDependModules/{element.tag}"
-            result[(origin, optional_index)] = (optional_root, element)
+            if str(element.attrib.get("Id") or "").strip():
+                result[(origin, optional_index)] = (optional_root, element)
             optional_index += 1
     return result
 

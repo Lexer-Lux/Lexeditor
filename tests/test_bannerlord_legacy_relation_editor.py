@@ -119,6 +119,51 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
         finally:
             temporary.cleanup()
 
+    def test_malformed_legacy_rows_are_preserved_without_shifting_valid_indexes(self):
+        malformed = '''<Module>
+  <Id value="MalformedLegacy" />
+  <LoadAfterModules>
+    <LoadAfterModule Future="blank-after" />
+    <LoadAfterModule Id="ValidAfter" Future="keep-after" />
+  </LoadAfterModules>
+  <DependedModules>
+    <OptionalDependModule Future="blank-nested" />
+    <OptionalDependModule Id="NestedValid" Future="keep-nested" />
+  </DependedModules>
+  <OptionalDependModules>
+    <OptionalDependModule Future="blank-optional" />
+    <DependModule Id="OptionalValid" Future="keep-optional" />
+  </OptionalDependModules>
+</Module>
+'''
+        with tempfile.TemporaryDirectory() as name:
+            source = Path(name) / "SubModule.xml"
+            source.write_text(malformed, encoding="utf-8")
+            rows = read_submodule(source)["legacyDependencies"]
+            self.assertEqual(
+                [(row["id"], row["origin"], row["index"]) for row in rows],
+                [
+                    ("ValidAfter", "LoadAfterModules", 1),
+                    ("NestedValid", "DependedModules/OptionalDependModule", 1),
+                    ("OptionalValid", "OptionalDependModules/DependModule", 3),
+                ],
+            )
+            save_module(
+                source,
+                {"legacyDependencies": [
+                    {**rows[0], "id": "ValidAfterRenamed"},
+                    rows[1],
+                    rows[2],
+                ]},
+            )
+            rewritten = source.read_text(encoding="utf-8")
+            self.assertIn('Future="blank-after"', rewritten)
+            self.assertIn('Future="blank-nested"', rewritten)
+            self.assertIn('Future="blank-optional"', rewritten)
+            self.assertIn('Id="ValidAfterRenamed" Future="keep-after"', rewritten)
+            self.assertIn('Id="NestedValid" Future="keep-nested"', rewritten)
+            self.assertIn('Id="OptionalValid" Future="keep-optional"', rewritten)
+
     def test_dependency_ui_includes_legacy_read_write_surface(self):
         editor = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_core.js"
         text = editor.read_text(encoding="utf-8")
