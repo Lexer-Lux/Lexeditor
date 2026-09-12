@@ -14,6 +14,14 @@ def main():
             browser=pw.chromium.launch(headless=True)
             page=browser.new_page();page.add_init_script(STUB)
             page.goto(f'http://127.0.0.1:{server.server_port}/ui/chooser.html')
+            assert not page.locator('#app-update').is_visible()
+            for available in (True,False):
+                page.evaluate("value=>{window.pywebview.api.app_update_status=async()=>({available:value});}",available)
+                page.evaluate('refreshAppUpdate()')
+                assert page.locator('#app-update').is_visible()==available
+            page.evaluate("()=>{window.pywebview.api.app_update_status=async()=>{throw Error('offline')};}")
+            page.evaluate('refreshAppUpdate().catch(()=>{})')
+            assert not page.locator('#app-update').is_visible()
             page.evaluate("activate({id:'palworld',name:'Palworld',status:'not-added'})")
             assert not page.locator('#dialog-title').is_visible()
             assert page.locator('#dialog-actions button').all_text_contents()==['YES','NO']
