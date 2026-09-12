@@ -6,7 +6,7 @@ import struct
 
 from games.ffx_x2 import treasures
 from games.ffx_x2.plugin import _write_fixture_vbf
-from games.ffx_x2.verify_install import finalize_report, inspect_install
+from games.ffx_x2.verify_install import acceptance_checks, finalize_report, inspect_install
 
 
 def _treasure_table() -> bytes:
@@ -124,6 +124,20 @@ def test_draft_exit_readiness_requires_hashes_and_fahrenheit(tmp_path: Path):
     assert missing_loader["acceptanceReady"] is False
     assert missing_loader["acceptanceChecks"]["archiveHashesReady"] is True
     assert missing_loader["acceptanceChecks"]["fahrenheitReady"] is False
+
+
+def test_draft_exit_readiness_rejects_incomplete_maps():
+    checks = acceptance_checks({
+        "ok": True,
+        "archiveHashesIncluded": True,
+        "archives": {},
+        "launch": {"ready": True, "games": {}},
+    })
+    assert checks == {
+        "archivesAndStructuredValidated": True,
+        "archiveHashesReady": False,
+        "fahrenheitReady": False,
+    }
 
 
 def test_verify_install_fails_closed_when_claimed_table_is_missing(tmp_path: Path):
