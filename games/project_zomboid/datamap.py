@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import core, craftrecipe, evolvedrecipe, fluid, mannequin, model, sound, vehicle, zedscript
+from . import core, craftrecipe, evolvedrecipe, fixing, fluid, mannequin, model, sound, vehicle, zedscript
 
 
 def read(root: Path) -> dict:
@@ -14,6 +14,7 @@ def read(root: Path) -> dict:
     items = core.read_items(root)
     evolved = evolvedrecipe.read(root)
     crafts = craftrecipe.read(root)
+    fixings = fixing.read(root)
     fluids = fluid.read(root)
     vehicles = vehicle.read(root)
     sounds = sound.read(root)
@@ -26,13 +27,14 @@ def read(root: Path) -> dict:
     item_paths = {row["path"] for row in items["rows"]}
     evolved_paths = {row["path"] for row in evolved["rows"]}
     craft_paths = {row["path"] for row in crafts["rows"]}
+    fixing_paths = {row["path"] for row in fixings["rows"]}
     fluid_paths = {row["path"] for row in fluids["rows"]}
     vehicle_paths = {row["path"] for row in vehicles["rows"]}
     sound_paths = {row["path"] for row in sounds["rows"]}
     model_paths = {row["path"] for row in models["rows"]}
     mannequin_paths = {row["path"] for row in mannequins["rows"]}
     errors = {
-        row["path"] for result in (items, evolved, crafts, fluids, vehicles, sounds, models, mannequins, inventory)
+        row["path"] for result in (items, evolved, crafts, fixings, fluids, vehicles, sounds, models, mannequins, inventory)
         for row in result.get("errors", []) if isinstance(row, dict) and row.get("path")
     }
 
@@ -45,6 +47,8 @@ def read(root: Path) -> dict:
             editors.append("Evolved Recipes")
         if relative in craft_paths:
             editors.append("Craft Recipes")
+        if relative in fixing_paths:
+            editors.append("Fixing")
         if relative in fluid_paths:
             editors.append("Fluids")
         if relative in vehicle_paths:
