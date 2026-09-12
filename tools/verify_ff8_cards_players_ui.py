@@ -83,7 +83,8 @@ def run(browser_path: str | None) -> None:
             assert not errors, errors
             assert page.evaluate('cardsContract.capturedMount') is False
             assert page.locator('#main > .ff8-card-root').count() == 1
-            assert page.locator('.lex-subtab-bar button').all_text_contents() == ['CARDS', 'PLAYERS']
+            labels = page.locator('.lex-subtab-bar button .lex-tab-label-text').all_text_contents()
+            assert labels == ['CARDS', 'PLAYERS'], labels
             assert page.locator('.fake-paged').count() == 1
 
             page.evaluate('''() => {
