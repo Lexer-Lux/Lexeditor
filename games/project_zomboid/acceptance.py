@@ -11,13 +11,96 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 
 from . import core, zedscript
+
+
+_MODS_BLOCK_RE = re.compile(r"(?is)(?:^|\n)\s*mods\s*\{(?P<body>.*?)\}")
+_MOD_ENTRY_RE = re.compile(
+    r"(?im)^\s*mod\s*=\s*(?P<id>.*?)\s*,\s*(?://.*)?$"
+)
 
 
 def _check(checks: list[dict], check_id: str, ok: bool, detail: str) -> bool:
     checks.append({"id": check_id, "ok": bool(ok), "detail": detail})
     return bool(ok)
+
+
+def _mod_list_evidence(path: Path, mod_id: str, user_root: Path) -> dict:
+    """Read one PZ mods/default.txt or save mods.txt without changing it."""
+    relative = str(path)
+    try:
+        relative = path.relative_to(user_root).as_posix()
+    except ValueError:
+        pass
+    if not path.is_file():
+        return {
+            "path": relative,
+            "exists": False,
+            "enabled": False,
+            "modIds": [],
+            "error": "",
+        }
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except (OSError, UnicodeError) as error:
+        return {
+            "path": relative,
+            "exists": True,
+            "enabled": False,
+            "modIds": [],
+            "error": str(error),
+        }
+    match = _MODS_BLOCK_RE.search(text)
+    if match is None:
+        return {
+            "path": relative,
+            "exists": True,
+            "enabled": False,
+            "modIds": [],
+            "error": "No mods { ... } block found",
+        }
+    mod_ids = [
+        entry.group("id").strip()
+        for entry in _MOD_ENTRY_RE.finditer(match.group("body"))
+        if entry.group("id").strip()
+    ]
+    enabled = bool(mod_id) and any(value == mod_id for value in mod_ids)
+    return {
+        "path": relative,
+        "exists": True,
+        "enabled": enabled,
+        "modIds": mod_ids,
+        "error": "",
+    }
+
+
+def _activation_evidence(user_root: Path, mod_id: str) -> dict:
+    """Report existing default/save activation evidence without requiring it."""
+    default_list = _mod_list_evidence(
+        user_root / "mods" / "default.txt", mod_id, user_root
+    )
+    save_root = user_root / "Saves"
+    save_lists: list[dict] = []
+    if save_root.is_dir():
+        for path in sorted(save_root.rglob("mods.txt")):
+            save_lists.append(_mod_list_evidence(path, mod_id, user_root))
+    matching_saves = [row for row in save_lists if row["enabled"]]
+    parse_errors = [row for row in save_lists if row["error"]]
+    if default_list["error"]:
+        parse_errors.insert(0, default_list)
+    return {
+        "defaultList": default_list,
+        "saveListsScanned": len(save_lists),
+        "matchingSaves": matching_saves,
+        "parseErrors": parse_errors,
+        "enabledAnywhere": bool(default_list["enabled"] or matching_saves),
+        "boundary": (
+            "Activation files are evidence only. Their presence does not prove the "
+            "game successfully discovered, loaded, or executed the deployed mod."
+        ),
+    }
 
 
 def inspect(game_root: Path, project_root: Path, user_root: Path) -> dict:
@@ -144,6 +227,7 @@ def inspect(game_root: Path, project_root: Path, user_root: Path) -> dict:
         inventory_detail,
     )
 
+    activation = _activation_evidence(user_root, source_id)
     ready = all(check["ok"] for check in checks)
     return {
         "preflightReady": ready,
@@ -159,6 +243,7 @@ def inspect(game_root: Path, project_root: Path, user_root: Path) -> dict:
             "counts": inventory.get("counts", {}),
             "errors": inventory.get("errors", []),
         },
+        "activationEvidence": activation,
         "manualGameTest": [
             "Launch the validated current Project Zomboid Build 42 stable installation.",
             f"Open Mods and confirm {source_name or source_id or '<mod>'} appears; enable it.",
