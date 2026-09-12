@@ -6074,3 +6074,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 .lex-toggle-row { display:flex; flex-wrap:wrap; }
 .lex-toggle-row > .lex-toggle { width:max-content; max-width:100%; }
+
+.lex-ui-scale {display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;margin:0 7px 0 0;color:var(--lex-text);font:12px/1 system-ui,sans-serif;text-shadow:none;}
+.lex-ui-scale input[type="range"] {width:64px;min-width:0;max-width:64px;height:18px;min-height:0;margin:0;padding:0;accent-color:var(--lex-accent);border:0;box-shadow:none;}
+.lex-ui-scale output {width:4ch;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:right;}

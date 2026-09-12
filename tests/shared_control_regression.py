@@ -31,6 +31,15 @@ def main():
    page.add_init_script(STUB+"window.pywebview.api.github_repository=async()=>({repository:'Lexer-Lux/Lexeditor',login:'Lexer-Lux'});window.pywebview.api.open_plugin_repository=async id=>{window.__calls.push({openRepository:id});return{opened:true};};")
    page.goto(f'http://127.0.0.1:{server.server_port}/games/blank/editor.html')
    page.wait_for_selector('button[data-tab=three]');page.wait_for_timeout(400)
+   page.evaluate("window.pywebview.api.ui_scale=async percent=>{window.__calls.push({scale:percent});return{percent};}")
+   scale=page.get_by_role('slider',name='UI scale',exact=True)
+   assert scale.get_attribute('min')=='50' and scale.get_attribute('max')=='150'
+   for percent in (50,150,100):
+    scale.fill(str(percent))
+    assert page.locator('.lex-ui-scale output').inner_text()==f'{percent}%'
+    assert page.evaluate('window.__calls.at(-1).scale')==percent
+   assert page.evaluate("!document.dispatchEvent(new WheelEvent('wheel',{ctrlKey:true,deltaY:100,bubbles:true,cancelable:true}))")
+   assert page.evaluate("document.dispatchEvent(new WheelEvent('wheel',{deltaY:100,bubbles:true,cancelable:true}))")
    assert page.get_by_role('button',name='Editable Table',exact=True).count()==0
    page.locator('#plugin-github').click(button='right');assert page.evaluate('window.__calls.some(row=>row.openRepository==="blank")')
    page.locator('button[data-tab=three]').click();page.wait_for_timeout(400)

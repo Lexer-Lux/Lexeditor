@@ -146,6 +146,7 @@
     #app-update{position:fixed;right:18px;bottom:18px;z-index:20;padding:10px 18px;border:1px solid var(--lex-border);border-radius:4px;background:var(--lex-panel-2);color:var(--lex-text);font:inherit;font-weight:700;cursor:pointer}
     #app-update:hover{background:var(--lex-border)}
     #app-update:disabled{opacity:.6;cursor:wait}
+    #chooser-window-header>.lex-ui-scale{margin-left:auto;align-self:center}
   </style>
 </head>
 <body>
@@ -186,6 +187,7 @@
   <script>
     const games=document.querySelector("#games"),surface=document.querySelector("#chooser-surface"),residentHandle=document.querySelector("#resident-handle"),loadingScreen=document.querySelector("#loading-screen"),loadingQuote=document.querySelector("#loading-quote");
     const modal=document.querySelector("#modal"),dialogTitle=document.querySelector("#dialog-title"),dialogMessage=document.querySelector("#dialog-message"),dialogProblems=document.querySelector("#dialog-problems"),dialogProgress=document.querySelector("#dialog-progress"),dialogActions=document.querySelector("#dialog-actions");
+    document.querySelector("#chooser-window-controls").before(LexeditorUI.uiScaleControl());
     const chooser={plugins:[],active:null,timer:null,loading:false,deferredRender:false,settingsLoaded:false,menuReady:false,menuStarted:Date.now(),quoteRequested:false};
     const updateButton=document.querySelector("#app-update");
     updateButton.onclick=async()=>{

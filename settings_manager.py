@@ -131,7 +131,8 @@ class SettingsStore:
             for key, value in raw_preferences.items()
             if isinstance(key, str) and isinstance(value, int) and (
                 (key.startswith("rows:") and 5 <= value <= 80) or
-                (not key.startswith("rows:") and 1 <= value <= 6)
+                (key == "ui-scale" and 50 <= value <= 150) or
+                (key != "ui-scale" and not key.startswith("rows:") and 1 <= value <= 6)
             )
         } if isinstance(raw_preferences, dict) else {}
         return {
@@ -271,7 +272,7 @@ class SettingsStore:
                 for character in key):
             raise ValueError("Invalid view preference key")
         value = int(value)
-        minimum, maximum = (5, 80) if key.startswith("rows:") else (1, 6)
+        minimum, maximum = (50, 150) if key == "ui-scale" else (5, 80) if key.startswith("rows:") else (1, 6)
         if not minimum <= value <= maximum:
             raise ValueError(f"View preference must be from {minimum} through {maximum}")
         with self._lock:

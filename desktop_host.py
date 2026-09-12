@@ -25,7 +25,7 @@ from settings_manager import SettingsStore
 from windows_host import (
     begin_window_resize, configure_process_identity, configure_window_icon, maximize_to_work_area,
     install_mouse_navigation, native_window_metrics, resize_window_by, restore_from_work_area,
-    square_window_edges,
+    square_window_edges, set_ui_scale,
 )
 
 
@@ -535,6 +535,18 @@ class HostApi:
                 "coverArt": self._cover_art.snapshot(plugin.plugin_id),
             })
         return rows
+
+    def ui_scale(self, percent=None) -> dict:
+        """Apply the saved scale, or save a scale selected in the menu bar."""
+        if percent is None:
+            percent = self._settings.snapshot().get("viewPreferences", {}).get("ui-scale", 100)
+        else:
+            percent = int(percent)
+            if not 50 <= percent <= 150:
+                raise ValueError("UI scale must be from 50% to 150%")
+        set_ui_scale(self._bound_window(), percent)
+        self._settings.save_view_preference("ui-scale", percent)
+        return {"percent": percent}
 
     def lexeditor_settings(self) -> dict:
         """Return shared settings; Developer Mode is owner-authenticated."""

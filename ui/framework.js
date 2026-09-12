@@ -147,6 +147,10 @@
     });
   }
 
+  document.addEventListener("wheel", event => {
+    if (event.ctrlKey) { event.preventDefault(); event.stopImmediatePropagation(); }
+  }, {capture:true, passive:false});
+
   const element = (tag, attrs = {}, ...children) => {
     const node = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) {
@@ -161,6 +165,26 @@
       if (child !== null && child !== undefined && child !== false) node.append(child);
     }
     return node;
+  };
+
+  const uiScaleControl = () => {
+    const value = element("output", {}, "100%");
+    const slider = element("input", {type:"range", min:50, max:150, step:1, value:100,
+      "aria-label":"UI scale", "aria-valuetext":"100%"});
+    let pending = null, running = false;
+    const show = percent => { slider.value=percent; value.textContent=`${percent}%`; slider.setAttribute("aria-valuetext",`${percent}%`); };
+    const apply = async () => {
+      if(running)return;
+      running=true;
+      try {
+        while(pending!==null){const percent=pending;pending=null;await callWindow("ui_scale",percent);}
+      } catch(error){showToast(`Could not change UI scale: ${error.message||error}`,true);}
+      finally{running=false;}
+    };
+    slider.addEventListener("input",()=>{show(Number(slider.value));pending=Number(slider.value);apply();});
+    const initialize=async()=>{try{const result=await callWindow("ui_scale");if(result?.percent&&!running)show(result.percent);}catch(_error){}};
+    if(window.pywebview?.api)initialize();else window.addEventListener("pywebviewready",initialize,{once:true});
+    return element("label",{class:"lex-ui-scale",title:"UI scale", "data-lex-history-control":true},slider,value);
   };
 
   let pluginLoadingScreen = null;
@@ -4254,7 +4278,7 @@ ${contents.path}`});
     const brandSlot = element("div", {class: "lex-brand-slot"}, brand);
     const leftActions = element("div", {class: "lex-shell-left-actions"}, context);
     const centerActions = element("div", {class: "lex-shell-center-actions"}, undo, save, game, redo);
-    const rightActions = element("div", {class: "lex-shell-right-actions"}, settings, shortcuts, help, info);
+    const rightActions = element("div", {class: "lex-shell-right-actions"}, uiScaleControl(), settings, shortcuts, help, info);
     // Restart acts on the window, so it sits with the window controls and is
     // shaped like them. Parked at the end of the developer group it read as a
     // developer toggle with a gap between it and the controls it belongs to.
@@ -6681,7 +6705,7 @@ ${contents.path}`});
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {element, el: element, confirmAction, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {uiScaleControl, element, el: element, confirmAction, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
