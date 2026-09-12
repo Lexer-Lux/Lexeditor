@@ -38,6 +38,8 @@ jobs:
           python-version: '3.12'
       - name: Project Zomboid regressions
         run: python -m unittest discover -v -s tests -p 'test_project_zomboid*.py'
+      - name: Project Zomboid service smoke
+        run: python app.py --game project-zomboid --smoke
       - name: Python syntax
         run: python -m compileall -q games/project_zomboid tests
       - name: Plugin metadata
