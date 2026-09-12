@@ -307,9 +307,14 @@ def run(output: Path, executable: str | None) -> None:
 
                 page.locator('[data-view="ffx2-jobs"]').click()
                 expect(page.locator('[data-panel="ffx2-jobs"]')).to_be_visible()
-                expect(page.get_by_label("Dressphere 0 ability 1 requirement")).to_have_value(str(0x4000))
-                expect(page.get_by_label("Dressphere 0 ability 1")).to_have_value(str(0x5000))
-                page.get_by_label("Dressphere 0 ability 1").fill(str(0x5ABC))
+                expect(page.get_by_label("Dressphere 0 ability 1 requirement")).to_have_value(f"{0x4000:,}")
+                ability = page.get_by_label("Dressphere 0 ability 1")
+                expect(ability).to_have_value(f"{0x5000:,}")
+                ability.click()
+                ability.press("ControlOrMeta+A")
+                ability.press_sequentially(str(0x5ABC), delay=20)
+                expect(ability).to_be_focused()
+                expect(ability).to_have_value(str(0x5ABC))
                 expect(page.locator("#x2-job-save")).to_be_enabled()
 
                 geometry = page.evaluate("""() => ({
