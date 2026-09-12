@@ -39,7 +39,7 @@ jobs:
       - name: Project Zomboid regressions
         run: python -m unittest discover -v -s tests -p 'test_project_zomboid*.py'
       - name: Python syntax
-        run: python -m compileall -q games/project_zomboid
+        run: python -m compileall -q games/project_zomboid tests
       - name: Plugin metadata
         run: python plugin_metadata.py
       - name: Offline credits are current
