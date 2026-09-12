@@ -240,6 +240,11 @@
           "name": "Pathoschild / SMAPI contributors",
           "role": "Established Stardew Valley mod loader and content-pack runtime targeted by deployment.",
           "url": "https://github.com/Pathoschild/SMAPI"
+        },
+        {
+          "name": "Pathoschild / StardewXnbHack contributors",
+          "role": "Reference for typed Stardew XNB unpacking and the read-only Content (unpacked) data layout consumed by Lexeditor.",
+          "url": "https://github.com/Pathoschild/StardewXnbHack"
         }
       ],
       "thanks": [],
