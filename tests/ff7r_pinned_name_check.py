@@ -38,6 +38,13 @@ def main():
     assert bounds and all(abs(b['head']-b['row'])<1 for b in bounds),bounds
    table.evaluate("e=>e.style.removeProperty('font-size')")
    page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff7r-pinned-name.png'))
+   page.evaluate("""()=>{
+    const row={id:0,tag:'EB0000_00_GuardScorpion_Standard',values:{}};
+    state.loot={groups:[]};
+    document.querySelector('#main').replaceChildren(lootRecordPanel(row));
+   }""")
+   assert page.locator('.lex-detail-panel-id').count()==0
+   assert 'EB0000_00_GuardScorpion_Standard' in page.locator('#main').inner_text()
    browser.close()
  finally:server.shutdown();server.server_close();thread.join(timeout=2)
  print('Pinned Name shows Target Scanner after ID; raw keys remain searchable.')

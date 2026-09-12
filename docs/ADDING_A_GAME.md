@@ -285,6 +285,11 @@ states. Put necessary explanations in the relevant `infoHelp` bubble. Use a
 visible warning only for a specific problem that affects the current action.
 
 Keep record identity in the master list and editable properties in the detail pane.
+Default identity columns to real numeric ID, readable name, then internal name.
+Omit fields the source does not have; do not invent names or numeric IDs. Never
+label a parser row index, list position, or generated counter as an ID or show it
+as a detail badge. Internal selection and save keys can use row indices without
+showing them to the user. Preserve saved pin and column-order choices.
 Use semantic controls: checkbox/toggle for booleans, selects for known enums,
 bounded number/range controls for real numeric limits, and decomposed bitflags when
 possible. Help text should explain effect, unit, special values and restart/runtime
