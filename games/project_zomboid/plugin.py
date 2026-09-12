@@ -79,6 +79,15 @@ def smoke() -> list[str]:
         script.write_text(
             "module LexSmoke\n"
             "{\n"
+            " animationsMesh TestAnimationMesh\n"
+            " {\n"
+            "  animationDirectory = media/anims_X/LexSmoke,\n"
+            "  animationDirectory = media/anims_X/Common,\n"
+            "  animationPrefix = Lex_,\n"
+            "  keepMeshAnimations = true,\n"
+            "  meshFile = Skinned/LexSmoke,\n"
+            "  postProcess = +TRIANGULATE,\n"
+            " }\n"
             " item TestItem\n"
             " {\n"
             "  DisplayCategory = Tool,\n"
@@ -179,7 +188,7 @@ def smoke() -> list[str]:
         env = {"LEXEDITOR_PROJECT_ZOMBOID_PROJECT": str(project), "LEXEDITOR_PROJECT_ZOMBOID_USER_ROOT": str(user_root)}
         with ProjectZomboidSession(env) as session:
             identity = request_json(session.url + "api/plugin")
-            required = {"build42-items", "build42-evolvedrecipes", "build42-craftrecipes", "build42-fixings", "build42-fluids", "build42-vehicles", "build42-sounds", "build42-models", "build42-mannequins", "build42-timedactions", "local-deploy"}
+            required = {"build42-animation-meshes", "build42-items", "build42-evolvedrecipes", "build42-craftrecipes", "build42-fixings", "build42-fluids", "build42-vehicles", "build42-sounds", "build42-models", "build42-mannequins", "build42-timedactions", "local-deploy"}
             if identity.get("pluginId") != "project-zomboid" or required - set(identity.get("capabilities", [])):
                 raise RuntimeError("Project Zomboid service reported an incomplete plugin contract")
             metadata = request_json(session.url + "api/mod-info")
@@ -187,6 +196,7 @@ def smoke() -> list[str]:
                 raise RuntimeError("Synthetic Build 42 mod.info was not initialized")
 
             adapters = [
+                ("animationmeshes", "animationmeshes/save", {"keepMeshAnimations": "false", "meshFile": "Skinned/LexSmokeV2"}, "meshFile", "Skinned/LexSmokeV2"),
                 ("items", "items/save", {"Weight": "0.5"}, "Weight", "0.5"),
                 ("evolvedrecipes", "evolvedrecipes/save", {"MaxItems": "6"}, "MaxItems", "6"),
                 ("craftrecipes", "craftrecipes/save", {"time": "75", "SkillRequired": "Woodwork:4;Carving:2", "Tooltip": "SmokeRecipeTooltipUpdated"}, "SkillRequired", "Woodwork:4;Carving:2"),
@@ -221,12 +231,29 @@ def smoke() -> list[str]:
             ):
                 if expected_craft not in text:
                     raise RuntimeError("craftRecipe typed edit or documented key preservation failed")
-            for preserved in ("UnknownFutureField = KeepMe", "inputs { item 1 [Base.Plank], }", "Require = Base.Hammer,", "Fixer = Base.DuctTape=2;Woodwork=1,", "Properties { HungerChange = -5, }", "part Engine { category = engine, }", "clip { file = media/sound/test.ogg, volume = 0.7, }", "mesh = LexSmoke/TestModel,", "attachment Grip { offset = 0.0 0.0 0.0, }", "model = FemaleBody,", "completionSound = BuildFence,", "muscleStrainParts = Neck;Torso_Upper,", "prop1 = Base.HammerModel,"):
+            for preserved in (
+                "animationDirectory = media/anims_X/LexSmoke,",
+                "animationDirectory = media/anims_X/Common,",
+                "animationPrefix = Lex_,",
+                "UnknownFutureField = KeepMe",
+                "inputs { item 1 [Base.Plank], }",
+                "Require = Base.Hammer,",
+                "Fixer = Base.DuctTape=2;Woodwork=1,",
+                "Properties { HungerChange = -5, }",
+                "part Engine { category = engine, }",
+                "clip { file = media/sound/test.ogg, volume = 0.7, }",
+                "mesh = LexSmoke/TestModel,",
+                "attachment Grip { offset = 0.0 0.0 0.0, }",
+                "model = FemaleBody,",
+                "completionSound = BuildFence,",
+                "muscleStrainParts = Neck;Torso_Upper,",
+                "prop1 = Base.HammerModel,",
+            ):
                 if preserved not in text:
                     raise RuntimeError("Structured writes did not preserve unknown/nested script data")
             mapped = request_json(session.url + "api/datamap").get("rows", [])
             mapped_script = next((row for row in mapped if row.get("filename") == "42/media/scripts/smoke.txt"), None)
-            expected_editors = {"Items", "Evolved Recipes", "Craft Recipes", "Fixing", "Fluids", "Vehicles", "Sounds", "Models", "Mannequins", "Timed Actions"}
+            expected_editors = {"Animation Meshes", "Items", "Evolved Recipes", "Craft Recipes", "Fixing", "Fluids", "Vehicles", "Sounds", "Models", "Mannequins", "Timed Actions"}
             if not mapped_script or expected_editors - {part.strip() for part in mapped_script.get("editor", "").split(",") if part.strip()}:
                 raise RuntimeError("Data Map omitted structured script coverage")
             deployed = request_json(session.url + "api/deploy", {})
@@ -242,8 +269,8 @@ def smoke() -> list[str]:
             raise RuntimeError("Project Zomboid child port is still open after host shutdown")
     return [
         "Project Zomboid plugin identity and structured capabilities confirmed",
-        "item, evolvedrecipe, craftRecipe, fixing, fluid, vehicle, sound, model, mannequin and timedAction edits round-tripped",
-        "unknown and nested Build 42 script data remained intact",
+        "animationsMesh, item, evolvedrecipe, craftRecipe, fixing, fluid, vehicle, sound, model, mannequin and timedAction edits round-tripped",
+        "unknown, repeated and nested Build 42 script data remained intact",
         "Data Map exposed all structured script editors",
         "local native-mod deployment and ownership-safe revert succeeded",
         "host-owned child service stopped cleanly",
