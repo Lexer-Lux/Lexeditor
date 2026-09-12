@@ -5,7 +5,7 @@ on:
     branches: [master]
     paths:
       - 'games/project_zomboid/**'
-      - 'tests/test_project_zomboid.py'
+      - 'tests/test_project_zomboid*.py'
       - 'runtime_bootstrap.py'
       - 'ui/credits-sources.json'
       - 'ui/credits.json'
@@ -14,7 +14,7 @@ on:
   pull_request:
     paths:
       - 'games/project_zomboid/**'
-      - 'tests/test_project_zomboid.py'
+      - 'tests/test_project_zomboid*.py'
       - 'runtime_bootstrap.py'
       - 'ui/credits-sources.json'
       - 'ui/credits.json'
@@ -37,8 +37,8 @@ jobs:
         with:
           python-version: '3.12'
       - name: Project Zomboid regressions
-        run: python -m unittest -v tests.test_project_zomboid
+        run: python -m unittest discover -v -s tests -p 'test_project_zomboid*.py'
       - name: Python syntax
-        run: python -m py_compile games/project_zomboid/__init__.py games/project_zomboid/core.py games/project_zomboid/plugin.py games/project_zomboid/server.py tests/test_project_zomboid.py
+        run: python -m py_compile games/project_zomboid/__init__.py games/project_zomboid/core.py games/project_zomboid/zedscript.py games/project_zomboid/plugin.py games/project_zomboid/server.py tests/test_project_zomboid.py tests/test_project_zomboid_zedscript.py
       - name: Plugin metadata
         run: python plugin_metadata.py
