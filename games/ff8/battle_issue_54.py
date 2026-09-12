@@ -64,9 +64,9 @@ CARD_FILTER_CAVE = 0x027A1380
 
 BLOCKERS = (
     "GF Magic still needs the verified Magic-list builder and a defined GF-to-spell map.",
-    "Greying Summon needs the GF command's id, and the menu pass that sets its "
-    "disabled flag. The entry layout, the flag and both behaviours it drives "
-    "are recorded above and asserted against the installed executable.",
+    "Greying Summon needs the runtime hook that walks the command entries and "
+    "applies command_flags to each one. The id, the entry layout, the flag and "
+    "both behaviours it drives are settled and asserted above.",
 )
 
 
@@ -404,6 +404,34 @@ COMMAND_ENTRY_SITES = {
     0x004BCEFC: bytes.fromhex("8A 03"),
     0x004BC7C4: bytes.fromhex("8A 03 84 C0"),
 }
+
+# Which command is Summon. The name lookup indexes an eight-byte table and
+# reads a word at +0 for the name string; that table is kernel.bin's battle
+# command section loaded into memory, so a command's runtime id is its index
+# there and the names can be read without the game running. Reading the
+# installed kernel gives: 1 Attack, 2 Magic, 3 GF, 4 Item, 5 Renzokuken,
+# 6 Draw, 7 Devour. Summon is the GF command.
+GF_COMMAND_ID = 3
+KERNEL_COMMAND_SECTION = 0        # section 1, the first offset in kernel.bin
+KERNEL_COMMAND_TEXT_SECTION = 31  # its linked text, section 32
+KERNEL_COMMAND_STRIDE = 8
+
+
+def command_flags(*, command_id: int, flags: int, junctioned_gf_count: int) -> int:
+    """The flags this command entry should carry, given the character.
+
+    Summon is the only one this touches, and only its disabled bit: everything
+    else in the byte belongs to the game. A character with a GF gets the bit
+    cleared rather than left alone, so junctioning one during a battle takes
+    the greying off again.
+    """
+    flags = int(flags) & 0xFF
+    if int(command_id) != GF_COMMAND_ID:
+        return flags
+    if summon_command_available(junctioned_gf_count=junctioned_gf_count):
+        return flags & ~COMMAND_FLAG_DISABLED
+    return flags | COMMAND_FLAG_DISABLED
+
 
 # Not the command list: the jump table at 004BC704 is the battle menu's own
 # state machine, dispatched on [1D7685B] and bounded to 0x18. Recorded so the

@@ -100,3 +100,57 @@ class DisabledCommandMechanism(unittest.TestCase):
         self.assertEqual(battle.BATTLE_MENU_STATE_TABLE, 0x004BC704)
         self.assertNotEqual(battle.BATTLE_MENU_STATE_TABLE,
                             battle.COMMAND_ENTRY_POINTER)
+
+
+class CommandFlags(unittest.TestCase):
+    """Only Summon's disabled bit, and only when the character has no GF."""
+
+    def test_summon_is_disabled_without_a_gf(self):
+        self.assertEqual(
+            battle.command_flags(command_id=battle.GF_COMMAND_ID, flags=0,
+                                 junctioned_gf_count=0),
+            battle.COMMAND_FLAG_DISABLED)
+
+    def test_junctioning_one_during_a_battle_takes_the_greying_off(self):
+        self.assertEqual(
+            battle.command_flags(command_id=battle.GF_COMMAND_ID,
+                                 flags=battle.COMMAND_FLAG_DISABLED,
+                                 junctioned_gf_count=1), 0)
+
+    def test_every_other_flag_in_the_byte_belongs_to_the_game(self):
+        for count in (0, 1):
+            result = battle.command_flags(command_id=battle.GF_COMMAND_ID,
+                                          flags=0xFD, junctioned_gf_count=count)
+            self.assertEqual(result & ~battle.COMMAND_FLAG_DISABLED, 0xFD & ~battle.COMMAND_FLAG_DISABLED)
+
+    def test_no_other_command_is_touched(self):
+        for command in (1, 2, 4, 5, 6, 7):
+            for flags in (0, battle.COMMAND_FLAG_DISABLED, 0xFF):
+                self.assertEqual(
+                    battle.command_flags(command_id=command, flags=flags,
+                                         junctioned_gf_count=0), flags)
+
+
+class CommandIdentity(unittest.TestCase):
+    def _kernel(self):
+        root = os.environ.get("LEXEDITOR_FF8_DATA_ROOT")
+        if not root:
+            self.skipTest("Final Fantasy VIII data has not been prepared here")
+        path = Path(root) / "baseline" / "en" / "main" / "kernel.bin"
+        if not path.is_file():
+            self.skipTest("kernel.bin is not in the prepared data")
+        return path.read_bytes()
+
+    def test_gf_is_the_third_battle_command_in_the_kernel(self):
+        import struct
+        data = self._kernel()
+        offsets = [struct.unpack_from("<I", data, 4 + 4 * i)[0]
+                   for i in range(struct.unpack_from("<I", data, 0)[0])]
+        commands = offsets[battle.KERNEL_COMMAND_SECTION]
+        text = offsets[battle.KERNEL_COMMAND_TEXT_SECTION]
+        pointer = struct.unpack_from(
+            "<H", data, commands + battle.GF_COMMAND_ID * battle.KERNEL_COMMAND_STRIDE)[0]
+        raw = data[text + pointer:data.index(b"\x00", text + pointer)]
+        # 'A' sits at 0x45 in FF8's font table.
+        name = "".join(chr(ord("A") + b - 0x45) for b in raw)
+        self.assertEqual(name, "GF")

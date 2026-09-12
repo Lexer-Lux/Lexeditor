@@ -251,9 +251,20 @@
   * Recorded as a dead end so nobody repeats it: the jump table at 004BC704 is
     the battle menu's own state machine, dispatched on the byte at 1D7685B and
     bounded to 0x18. It is not the command list.
-  * What is left: the GF command's id, and the pass over the menu that sets the
-    flag when the acting character has no junctioned GF. Putting the sentence
-    on the refusal, rather than only the sound, is the last piece.
+  * The id is settled too, from kernel.bin rather than from memory. The name
+    lookup indexes an eight-byte table and reads a word at +0; that table is
+    kernel.bin's battle command section loaded into memory, so a command's
+    runtime id is its index there. The installed kernel reads 1 Attack,
+    2 Magic, 3 GF, 4 Item, 5 Renzokuken, 6 Draw, 7 Devour. Summon is 3, and a
+    test re-reads that name out of the prepared data rather than trusting the
+    number.
+  * command_flags() decides the byte: Summon's disabled bit only, set when the
+    character has no junctioned GF and cleared when they have one, so
+    junctioning during a battle takes the greying off again. Every other bit
+    and every other command is left alone. Ten tests.
+  * What is left: the runtime hook that walks the command entries each menu
+    pass and applies it, and putting the sentence on the refusal rather than
+    only the denied sound.
 
 ## Loot Tables
 
