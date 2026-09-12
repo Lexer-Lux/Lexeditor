@@ -6026,3 +6026,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-dialog:not(.lex-global-settings) {text-align:center;}
 .lex-dialog:not(.lex-global-settings) .lex-dialog-actions {justify-content:stretch;}
 .lex-dialog:not(.lex-global-settings) .lex-dialog-actions > button {flex:1 1 0;min-width:0;}
+
+/* Multi-row fields supply their own copy buttons in the shared copy lane. */
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > .lex-multi-number {
+  grid-column:1 / -1;
+}

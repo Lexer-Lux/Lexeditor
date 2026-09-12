@@ -89,6 +89,13 @@ def main():
    page.locator('button[data-tab=one]').click();page.wait_for_timeout(400)
    gaps=page.locator('.lex-toggle').evaluate_all("""nodes=>nodes.map(e=>{const box=e.getBoundingClientRect(),rail=e.querySelector('.lex-toggle-rail')?.getBoundingClientRect(),name=e.querySelector('.lex-toggle-name');if(!rail||!name)return null;const range=document.createRange();range.selectNodeContents(name);const right=Math.max(...[...range.getClientRects()].map(r=>r.right));return {left:rail.left-box.left,right:box.right-right}}).filter(Boolean)""")
    assert gaps and all(abs(row['left']-row['right'])<3 for row in gaps),gaps
+   copy_edges=page.evaluate("""()=>{
+    const multi=document.querySelector('.lex-multi-number');
+    const field=multi.closest('.lex-detail-field');
+    const sibling=[...field.parentElement.querySelectorAll('.lex-detail-field')].find(e=>e!==field&&e.querySelector(':scope > .lex-detail-field-control > .lex-copy-value'));
+    return [multi.querySelector('.lex-copy-value').getBoundingClientRect().left,sibling.querySelector(':scope > .lex-detail-field-control > .lex-copy-value').getBoundingClientRect().left];
+   }""")
+   assert abs(copy_edges[0]-copy_edges[1])<1,copy_edges
    page.screenshot(path=str(OUT/'controls.png'),animations='disabled')
    marker=page.locator('.lex-info-help').first
    marker.click(force=True);page.mouse.move(1400,880)

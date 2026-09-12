@@ -1336,7 +1336,7 @@
       : 0;
     if (declared) node.querySelector(".lex-detail-field-control")?.prepend(
       copyValueButton(() => declared.lexCopyValue(), "Copy this property"));
-    else if (input && inputType !== "checkbox" && variables <= 1) {
+    else if (input && inputType !== "checkbox" && variables <= 1 && !control?.classList?.contains("lex-multi-number")) {
       node.querySelector(".lex-detail-field-control")?.prepend(copyValueButton(() => input.tagName === "SELECT"
         ? (input.selectedOptions[0]?.textContent || input.value)
         : input.value));
