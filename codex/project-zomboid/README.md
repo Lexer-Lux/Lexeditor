@@ -24,7 +24,7 @@ Unknown keys, repeated non-edited keys, comments and other unmodeled lines must 
 
 The current `pz-scripts-data` registry identifies these Build 42 script families at module level: `animationsMesh`, `craftRecipe`, `entity`, `evolvedrecipe`, `fixing`, `fluid`, `item`, `mannequin`, `model`, `sound`, `timedAction`, and `vehicle`. Lexeditor structurally inventories these top-level records while deliberately ignoring similarly shaped text inside comments, quoted strings, and nested blocks.
 
-Recognition is not the same as editability. Items, evolved recipes, conservative craft-recipe scalars, `fixing`'s typed `ConditionModifier`, top-level fluid scalars, a conservative vehicle scalar subset, conservative module-level sound scalars, conservative module-level model scalars, conservative module-level mannequin scalars, and `timedAction`'s independently typed `actionAnim` are currently structured. Only `animationsMesh` and `entity` remain family-level read-only because their current schema does not type their fields strongly enough to justify a non-speculative writer; nested and compound substructures in otherwise structured families also remain read-only. The narrow `fixing`, `mannequin`, and `timedAction` boundaries are documented separately in this codex.
+Recognition is not the same as editability. Items, evolved recipes, conservative typed craft-recipe fields, `fixing`'s typed `ConditionModifier`, top-level fluid scalars, a conservative vehicle scalar subset, conservative module-level sound scalars, conservative module-level model scalars, conservative module-level mannequin scalars, and `timedAction`'s independently typed `actionAnim` are currently structured. Only `animationsMesh` and `entity` remain family-level read-only because their current schema does not type their fields strongly enough to justify a non-speculative writer; nested and compound substructures in otherwise structured families also remain read-only. The narrow `fixing`, `mannequin`, and `timedAction` boundaries are documented separately in this codex.
 
 ## Item blocks
 
@@ -58,14 +58,18 @@ Lexeditor patches only properties that already exist. `AddIngredientIfCooked` an
 
 ## `craftRecipe`
 
-Build 42's current crafting family is `craftRecipe`, not the older legacy `recipe` shape. A craft recipe commonly contains nested `inputs` and `outputs` blocks. Lexeditor preserves those blocks byte-for-byte in the first writer and edits only existing primitive fields whose current schema is explicit:
+Build 42's current crafting family is `craftRecipe`, not the older legacy `recipe` shape. A craft recipe commonly contains nested `inputs` and `outputs` blocks. Lexeditor preserves those blocks byte-for-byte and edits only existing top-level fields whose current schema supplies enough type information to validate independently:
 
 - `AllowBatchCraft` and `CanWalk` — booleans;
 - `ResearchSkillLevel` and `time` — integers;
 - `tags` — semicolon-separated tag names;
-- `category`, `Icon`, and `timedAction` — scalar identifiers/text.
+- `AutoLearnAll`, `AutoLearnAny`, and `SkillRequired` — semicolon-separated `skill:integer` maps;
+- `category` and `Tooltip` — translation-backed scalar keys;
+- `Icon` and `timedAction` — scalar identifiers/references.
 
-Callbacks, `AutoLearn*`, `SkillRequired`, `inputs`, `outputs`, mappers and other structured/nested data remain read-only until their mutation grammar is implemented independently. A file containing these fields can still be edited safely because all unmodeled bytes/text are preserved and writes target only one existing top-level property span.
+The skill-map writer validates pair syntax and integer values and rejects duplicate skill keys case-insensitively. Documented property-name casing variants such as `Time`/`time` and `Tags`/`tags` are recognized without rewriting the spelling already present in the source. Duplicate editable properties—including case-only or same-line duplicates—fail closed.
+
+Callbacks, `inputs`, `outputs`, mappers, `xpAward`, and other under-typed or compound data remain read-only until their mutation grammar is independently grounded. A file containing those fields can still be edited safely because all unmodeled bytes/text are preserved and writes target only existing top-level property spans.
 
 ## `fluid`
 
