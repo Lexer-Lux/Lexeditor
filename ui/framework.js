@@ -5251,8 +5251,8 @@ ${contents.path}`});
         } catch (_error) {}
       }
     };
-    const resizePair = (index, delta, persist = false, edge = "") => {
-      const widths = nodes.map(node => node.getBoundingClientRect().width);
+    const resizePair = (index, delta, persist = false, edge = "", initialWidths = null) => {
+      const widths = initialWidths ? [...initialWidths] : nodes.map(node => node.getBoundingClientRect().width);
       const pairWidth = Math.max(1, widths[index] + widths[index + 1]);
       const requestedMinimum = minSizes[index] + minSizes[index + 1];
       // When the window is narrower than both requested minimums, preserve
@@ -5269,24 +5269,25 @@ ${contents.path}`});
       if (edge === "home") left = low;
       if (edge === "end") left = high;
       left = Math.max(low, Math.min(high, left));
-      if (Math.abs(left - widths[index]) < .25) return false;
+      if (!initialWidths && Math.abs(left - widths[index]) < .25) return false;
       widths[index] = left;
       widths[index + 1] = pairWidth - left;
       setSizes(widths, persist);
       return true;
     };
-    let dragFrame = 0, pendingDrag = null;
+    let dragFrame = 0, pendingDrag = null, dragStart = null;
     const flushDrag = () => {
       dragFrame = 0;
       const pending = pendingDrag; pendingDrag = null;
       if (!pending || !root.isConnected) return;
-      const box = pending.divider.getBoundingClientRect();
-      resizePair(pending.index, pending.x - (box.left + box.width / 2));
+      if (!dragStart) return;
+      resizePair(pending.index, pending.x - dragStart.x, false, "", dragStart.widths);
     };
     const finishDrag = (divider, event) => {
       if (!divider.classList.contains("dragging")) return;
       if (dragFrame) cancelAnimationFrame(dragFrame);
       flushDrag();
+      dragStart = null;
       divider.classList.remove("dragging");
       document.body.classList.remove("lex-panel-layout-dragging");
       try {
@@ -5302,6 +5303,7 @@ ${contents.path}`});
         // pointer made the shared Barrels buttons appear live but do nothing.
         if (event.target.closest?.("button,input,select,textarea,[role=button]")) return;
         event.preventDefault();
+        dragStart = {x:event.clientX, widths:nodes.map(node => node.getBoundingClientRect().width)};
         divider.classList.add("dragging");
         document.body.classList.add("lex-panel-layout-dragging");
         try { divider.setPointerCapture?.(event.pointerId); } catch (_error) {}

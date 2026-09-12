@@ -31,6 +31,16 @@ def main():
    page.add_init_script(STUB+"window.pywebview.api.github_repository=async()=>({repository:'Lexer-Lux/Lexeditor',login:'Lexer-Lux'});window.pywebview.api.open_plugin_repository=async id=>{window.__calls.push({openRepository:id});return{opened:true};};")
    page.goto(f'http://127.0.0.1:{server.server_port}/games/blank/editor.html')
    page.wait_for_selector('button[data-tab=three]');page.wait_for_timeout(400)
+   page.locator('#plugin-data-map').click();page.wait_for_timeout(300)
+   divider=page.locator('.lex-data-map-view .lex-panel-layout-divider')
+   box=divider.bounding_box();x=box['x']+box['width']*.25;y=box['y']+box['height']/2
+   page.mouse.move(x,y);page.mouse.down()
+   for delta in (10,40,80,120,80,40,10,0,-40,0):
+    page.mouse.move(x+delta,y);page.wait_for_timeout(40)
+    moved=divider.bounding_box()['x']-box['x']
+    assert abs(moved-delta)<2,{'pointer':delta,'divider':moved}
+   page.mouse.up()
+   page.get_by_role('button',name='2 Panels',exact=True).click()
    page.evaluate("window.pywebview.api.ui_scale=async percent=>{window.__calls.push({scale:percent});return{percent};}")
    scale=page.get_by_role('slider',name='UI scale',exact=True)
    assert scale.get_attribute('min')=='50' and scale.get_attribute('max')=='150'
