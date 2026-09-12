@@ -122,7 +122,7 @@ def placeholder_png(size: int = 16, height: int | None = None) -> bytes:
     """Generate a valid visible checker texture that is intentionally replaceable."""
     width = size
     height = width if height is None else height
-    if width < 1 or width > 256 or height < 1 or height > 256:
+    if width < 1 or width > 512 or height < 1 or height > 512:
         raise ValueError("Placeholder texture size is out of range")
     rows = []
     for y in range(height):

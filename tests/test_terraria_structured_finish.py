@@ -50,6 +50,20 @@ class TerrariaStructuredFinishTests(unittest.TestCase):
             self.assertIn("Update(Dust dust) => false",source)
             self.assertIn("GetAlpha(Dust dust, Color lightColor) => Color.White",source)
 
+    def test_native_placeholder_geometry_for_frames_tiles_and_walls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)/"ExampleMod"; root.mkdir()
+            npc_values=default_values("npc"); npc_values["frames"]=4
+            npc=create_structured_content(root,"npc","FourFrameNPC",npc_values)
+            projectile_values=default_values("projectile"); projectile_values["frames"]=3
+            projectile=create_structured_content(root,"projectile","ThreeFrameProjectile",projectile_values)
+            tile=create_structured_content(root,"tile","BasicBlock",{})
+            wall=create_structured_content(root,"wall","BasicWall",{})
+            self.assertEqual((npc["texture"]["width"],npc["texture"]["height"]),(16,64))
+            self.assertEqual((projectile["texture"]["width"],projectile["texture"]["height"]),(16,48))
+            self.assertEqual((tile["texture"]["width"],tile["texture"]["height"]),(288,270))
+            self.assertEqual((wall["texture"]["width"],wall["texture"]["height"]),(468,180))
+
     def test_global_buff_tile_and_wall_are_target_bounded(self):
         buff=default_values("globalBuff"); buff.update({"targetId":24,"defenseBonus":8,"moveSpeedBonus":0.1,"allowCancel":False})
         buff_source=render_structured_source("ExampleMod","globalBuff","BuffRules",buff)

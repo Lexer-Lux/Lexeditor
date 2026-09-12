@@ -111,7 +111,7 @@ SCHEMAS: dict[str, tuple[Field, ...]] = {
         Field("zone", "Vanilla biome condition", "enum", "Any", "ACTIVATION", options=("Any","Forest","Jungle","Snow","Desert","Beach","Dungeon","Corruption","Crimson","Hallow","Glowshroom")),
         Field("depth", "Depth condition", "enum", "Any", "ACTIVATION", options=("Any","Sky","Overworld","DirtLayer","RockLayer","Underworld")),
         Field("time", "Time condition", "enum", "Any", "ACTIVATION", options=("Any","Day","Night")), Field("hardmode", "Hardmode condition", "enum", "Any", "ACTIVATION", options=("Any","PreHardmode","Hardmode")), Field("rain", "Rain condition", "enum", "Any", "ACTIVATION", options=("Any","Raining","Dry")),
-        Field("music", "Music ID (-1 inherit)", "int", -1, "SCENE", -1, 100000), Field("priority", "Scene priority", "enum", "BiomeLow", "SCENE", options=("None","BiomeLow","BiomeMedium","BiomeHigh","Environment","Event","BossLow","BossMedium","BossHigh")), Field("mapBackground", "Use bestiary background on map", "bool", True, "SCENE"),
+        Field("music", "Music ID (-1 inherit)", "int", -1, "SCENE", -1, 100000), Field("priority", "Scene priority", "enum", "BiomeLow", "SCENE", options=("None","BiomeLow","BiomeMedium","BiomeHigh","Environment","Event","BossLow","BossMedium","BossHigh")), Field("mapBackground", "Generate 115×65 map background", "bool", True, "SCENE"),
         Field("torchItemType", "Biome torch item ID (-1 none)", "int", -1, "ITEMS", -1, 100000), Field("campfireItemType", "Biome campfire item ID (-1 none)", "int", -1, "ITEMS", -1, 100000),
         Field("backgroundColorEnabled", "Tint bestiary background", "bool", False, "COLOR"), Field("backgroundR", "Background red", "int", 255, "COLOR", 0, 255), Field("backgroundG", "Background green", "int", 255, "COLOR", 0, 255), Field("backgroundB", "Background blue", "int", 255, "COLOR", 0, 255),
     ),
@@ -473,7 +473,7 @@ def _biome_condition(v):
 
 def _render_biome(v):
     out=[f"public override int Music => {v['music']};",f"public override SceneEffectPriority Priority => SceneEffectPriority.{v['priority']};",f"public override int BiomeTorchItemType => {v['torchItemType']};",f"public override int BiomeCampfireItemType => {v['campfireItemType']};"]
-    if v["mapBackground"]: out.append("public override string MapBackground => BackgroundPath;")
+    if v["mapBackground"]: out.append("public override string MapBackground => (GetType().Namespace + \".\" + Name + \"_MapBackground\").Replace('.', '/');")
     if v["backgroundColorEnabled"]: out.append(f"public override Color? BackgroundColor => new Color({v['backgroundR']}, {v['backgroundG']}, {v['backgroundB']});")
     out += ["",f"public override bool IsBiomeActive(Player player) => {_biome_condition(v)};"]
     return out
@@ -630,9 +630,14 @@ def create_structured_content(root,kind,name,values,display_name='',description=
     primary_texture=kind in {'item','npc','projectile','buff','tile','wall','dust'}
     asset_specs=[]
     if kind=='dust': asset_specs.append((source_relative[:-3]+'.png',10,30))
+    elif kind=='tile': asset_specs.append((source_relative[:-3]+'.png',288,270))
+    elif kind=='wall': asset_specs.append((source_relative[:-3]+'.png',468,180))
+    elif kind in {'npc','projectile'}: asset_specs.append((source_relative[:-3]+'.png',16,16*v['frames']))
     elif primary_texture:
         size=32 if kind=='buff' else 16; asset_specs.append((source_relative[:-3]+'.png',size,size))
-    if kind=='biome': asset_specs += [(f'Content/Biomes/{name}_Icon.png',30,30),(f'Content/Biomes/{name}_Background.png',64,64)]
+    if kind=='biome':
+        asset_specs += [(f'Content/Biomes/{name}_Icon.png',30,30),(f'Content/Biomes/{name}_Background.png',64,64)]
+        if v['mapBackground']: asset_specs.append((f'Content/Biomes/{name}_MapBackground.png',115,65))
     for asset_relative,_width,_height in asset_specs:
         if (project/asset_relative).exists(): raise ValueError(f"Asset file already exists: {asset_relative}")
     loc_target=project/'Localization'/'en-US.hjson'; creates=_loc_plan(mod,kind,name,display,desc); loc_existed=loc_target.is_file(); loc_original=loc_target.read_bytes() if loc_existed else b''; loc_written=src_written=False; created_assets=[]; texture_state=None

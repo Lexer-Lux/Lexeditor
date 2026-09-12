@@ -36,8 +36,13 @@ class TerrariaStructuredSystemsTests(unittest.TestCase):
             root=Path(directory)/"ExampleMod"; root.mkdir()
             result=create_structured_content(root,"biome","StormForest",{},"Storm Forest","")
             self.assertIsNone(result["texture"])
-            self.assertEqual({asset["path"] for asset in result["assets"]},{"Content/Biomes/StormForest_Icon.png","Content/Biomes/StormForest_Background.png"})
-            self.assertEqual((root/"Content/Biomes/StormForest_Icon.png").read_bytes()[16:20],(30).to_bytes(4,"big"))
+            self.assertEqual({asset["path"] for asset in result["assets"]},{"Content/Biomes/StormForest_Icon.png","Content/Biomes/StormForest_Background.png","Content/Biomes/StormForest_MapBackground.png"})
+            dimensions={asset["path"]:(asset["width"],asset["height"]) for asset in result["assets"]}
+            self.assertEqual(dimensions["Content/Biomes/StormForest_Icon.png"],(30,30))
+            self.assertEqual(dimensions["Content/Biomes/StormForest_Background.png"],(64,64))
+            self.assertEqual(dimensions["Content/Biomes/StormForest_MapBackground.png"],(115,65))
+            source=(root/result["path"]).read_text(encoding="utf-8")
+            self.assertIn('_MapBackground").Replace(\'.\', \'/\')',source)
             values={entry.key:entry.value for entry in parse_localization_text((root/"Localization/en-US.hjson").read_text(encoding="utf-8")).entries}
             self.assertEqual(values["Mods.ExampleMod.Biomes.StormForest.DisplayName"],"Storm Forest")
 
