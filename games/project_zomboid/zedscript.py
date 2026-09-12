@@ -72,7 +72,7 @@ def inventory_file(path: Path, root: Path) -> dict:
                     "sha256": core.sha256_bytes(data),
                     "start": match.start(),
                     "end": close_brace + 1,
-                    "editable": kind in {"item", "evolvedrecipe", "craftRecipe", "fluid"},
+                    "editable": kind in {"item", "evolvedrecipe", "craftRecipe", "fluid", "vehicle"},
                 })
                 cursor = close_brace + 1
     except core.ProjectZomboidError as error:
