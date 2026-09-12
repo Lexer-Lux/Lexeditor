@@ -6,6 +6,8 @@ import tempfile
 import unittest
 
 from games.terraria.localization import (
+    append_localization_entry,
+    apply_localization_changes,
     parse_localization_text,
     try_get_culture_and_prefix,
     update_localization_text,
@@ -159,6 +161,50 @@ class TerrariaLocalizationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "one line"):
             update_localization_text(text, {"Mods.ExampleMod.Greeting": "Hello\nWorld"})
 
+    def test_appends_new_dotted_key_without_reserializing_implicit_root(self):
+        text = (
+            "# keep this comment\r\n"
+            "Items: {\r\n"
+            "\tSword.DisplayName: Existing Sword\r\n"
+            "}\r\n"
+        )
+        changed = append_localization_entry(
+            text,
+            "Mods.ExampleMod.Custom.Greeting",
+            "Hello, world",
+            prefix="Mods.ExampleMod",
+        )
+        self.assertTrue(changed.startswith(text))
+        self.assertTrue(changed.endswith('"Custom.Greeting": "Hello, world"\r\n'))
+        document = parse_localization_text(changed, prefix="Mods.ExampleMod")
+        created = next(entry for entry in document.entries if entry.key == "Mods.ExampleMod.Custom.Greeting")
+        self.assertEqual(created.value, "Hello, world")
+        self.assertTrue(created.editable)
+
+    def test_appends_inside_explicit_root_and_applies_edit_plus_create(self):
+        text = "{\n\tExisting: Old\n}\n"
+        changed = apply_localization_changes(
+            text,
+            {"Existing": "New"},
+            {"New.Key": "Added"},
+        )
+        self.assertEqual(
+            changed,
+            '{\n\tExisting: New\n\t"New.Key": "Added"\n}\n',
+        )
+
+    def test_new_key_creation_rejects_duplicate_and_wrong_prefix(self):
+        text = "Greeting: Hello\n"
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            append_localization_entry(text, "Greeting", "Again")
+        with self.assertRaisesRegex(ValueError, "prefix"):
+            append_localization_entry(
+                text,
+                "Mods.Other.Greeting",
+                "Nope",
+                prefix="Mods.ExampleMod",
+            )
+
     def test_shared_project_creation_renders_localization_starter(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
@@ -180,7 +226,7 @@ class TerrariaLocalizationTests(unittest.TestCase):
             self.assertIn("Mods: {", text)
             self.assertIn("\tExample_Mod: {", text)
 
-            localization = server.parse_localization_text(text)
+            localization = parse_localization_text(text)
             self.assertEqual(localization.entries, ())
             self.assertEqual(localization.duplicates, ())
             self.assertEqual(localization.unsupported, 0)
