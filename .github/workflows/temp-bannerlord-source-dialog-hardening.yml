@@ -27,6 +27,8 @@ jobs:
         run: python tools/temp_fix_bannerlord_source_dialog_hardening.py
       - name: Apply hardening patch
         run: python tools/temp_bannerlord_source_dialog_hardening.py
+      - name: Correct source encoding preservation
+        run: python tools/temp_bannerlord_source_encoding_fix.py
       - name: Focused validation
         run: |
           python -m py_compile games/bannerlord/project_data.py games/bannerlord/server.py tests/test_bannerlord_source_safety.py
@@ -109,6 +111,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/temp-bannerlord-source-dialog-hardening.yml tools/temp_bannerlord_source_dialog_hardening.py tools/temp_fix_bannerlord_source_dialog_hardening.py
+          git rm .github/workflows/temp-bannerlord-source-dialog-hardening.yml tools/temp_bannerlord_source_dialog_hardening.py tools/temp_fix_bannerlord_source_dialog_hardening.py tools/temp_bannerlord_source_encoding_fix.py
           git commit -m "Clean Bannerlord source hardening harness"
           git push origin HEAD:feature/bannerlord-plugin
