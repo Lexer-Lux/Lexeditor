@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from games.stardew_valley.acceptance import acceptance_status, begin_acceptance
 from games.stardew_valley.content_pack import (
     ContentPackStore, deploy, deployment_status, initialize_project, revert,
 )
@@ -88,6 +90,53 @@ class StardewContentPackTests(unittest.TestCase):
         self.assertTrue(deployment_status(game, self.project)["externallyChanged"])
         with self.assertRaises(RuntimeError): deploy(game, self.project)
         with self.assertRaises(RuntimeError): revert(game, self.project)
+
+    def test_installed_acceptance_requires_new_smapi_evidence_and_unchanged_xnb(self):
+        game = self.root / "game"
+        data = game / "Content" / "Data"; data.mkdir(parents=True)
+        xnb = data / "Objects.xnb"; xnb.write_bytes(b"installed-objects")
+        (game / "Stardew Valley.exe").write_bytes(b"game")
+        (game / "StardewModdingAPI.exe").write_bytes(b"smapi")
+        cp = game / "Mods" / "Content Patcher"; cp.mkdir(parents=True)
+        (cp / "manifest.json").write_text(json.dumps({
+            "Name": "Content Patcher",
+            "UniqueID": "Pathoschild.ContentPatcher",
+            "Version": "2.9.1",
+            "MinimumApiVersion": "4.4.0",
+        }) + "\n", encoding="utf-8")
+        store = ContentPackStore(self.project)
+        opened = store.objects()
+        store.save_objects(opened["sha256"], [{"id": "390", "fields": {"Price": 77}}])
+        deploy(game, self.project)
+        manifest = json.loads((self.project / "manifest.json").read_text(encoding="utf-8"))
+        log = self.root / "SMAPI-latest.txt"
+        log.write_text("old session\n", encoding="utf-8")
+
+        with patch.dict(os.environ, {"LEXEDITOR_STARDEW_SMAPI_LOG": str(log)}):
+            waiting = begin_acceptance(game, self.project)
+            self.assertEqual(waiting["state"], "waiting-for-run")
+            self.assertFalse(waiting["accepted"])
+            self.assertTrue(waiting["objectsXnbUnchanged"])
+            log.write_text(
+                "[SMAPI] SMAPI 4.5.2 with Stardew Valley 1.6.15 build 24354 on Windows 11\n"
+                "[SMAPI] Loaded 2 mods:\n"
+                "[SMAPI] Content Patcher 2.9.1 by Pathoschild\n"
+                f"[Content Patcher] Loaded content pack {manifest['Name']} ({manifest['UniqueID']}).\n",
+                encoding="utf-8",
+            )
+            accepted = acceptance_status(game, self.project)
+            self.assertTrue(accepted["accepted"])
+            self.assertEqual(accepted["smapiVersion"], "4.5.2")
+            self.assertEqual(accepted["gameVersion"], "1.6.15")
+            self.assertTrue(accepted["contentPatcherSeen"])
+            self.assertTrue(accepted["projectMentioned"])
+            self.assertTrue(accepted["objectsXnbUnchanged"])
+
+            xnb.write_bytes(b"mutated-installed-objects")
+            changed = acceptance_status(game, self.project)
+            self.assertFalse(changed["accepted"])
+            self.assertFalse(changed["objectsXnbUnchanged"])
+            self.assertTrue(any("Objects.xnb changed" in value for value in changed["blockers"]))
 
 
 if __name__ == "__main__": unittest.main()
