@@ -108,20 +108,34 @@
     const reason=blockedByDirty
       ?"Save or discard metadata edits before building."
       :(buildInfo.reason||"Ready to invoke tModLoader's native -build path.");
+    const packageLabel=buildInfo.artifactExists?"Package built":"Package missing";
+    const enabledLabel=!buildInfo.enabledStateValid
+      ?"Enabled state unknown"
+      :(buildInfo.enabled?"Enabled":"Disabled");
     const card=el("div",{class:"terraria-note terraria-build-card"},
       el("div",{class:"terraria-build-row"},
         el("button",{class:"terraria-build-button",disabled:building||blockedByDirty||!buildInfo.available,onclick:buildMod},
           building?"BUILDING…":"BUILD MOD"),
         el("strong",{},buildInfo.available&&!blockedByDirty?"Native build ready":"Native build unavailable")),
       el("div",{},reason),
-      el("div",{class:"terraria-build-path"},`Expected package: ${buildInfo.expectedArtifact}`));
+      el("div",{class:"terraria-build-row"},
+        el("span",{class:"terraria-status"},packageLabel),
+        el("span",{class:"terraria-status"},enabledLabel)),
+      el("div",{class:"terraria-build-path"},`Expected package: ${buildInfo.expectedArtifact}`),
+      el("div",{class:"terraria-build-path"},`tModLoader state: ${buildInfo.enabledStatePath}`));
+    if(!buildInfo.enabledStateValid&&buildInfo.enabledStateError){
+      card.append(el("div",{class:"terraria-error"},buildInfo.enabledStateError));
+    }
     if(buildResult){
       const success=buildResult.ok;
       card.classList.add(success?"terraria-success":"terraria-error");
       const summary=success
-        ?`Build succeeded${buildResult.artifactExists?" and produced the expected .tmod.":"."}`
+        ?`Build succeeded${buildResult.artifactExists?" and produced the expected .tmod":""}${buildResult.enabled?"; tModLoader reports it enabled.":"."}`
         :(buildResult.error||`Build failed with exit code ${buildResult.exitCode??"unknown"}.`);
       card.append(el("strong",{},summary));
+      if(success&&buildResult.enabledStateValid&&!buildResult.enabled){
+        card.append(el("div",{},"The package was built, but enabled.json does not currently list this mod as enabled."));
+      }
       const log=[
         buildResult.stdout&&`STDOUT\n${buildResult.stdout}`,
         buildResult.stderr&&`STDERR\n${buildResult.stderr}`,
@@ -148,7 +162,7 @@
       ]}),
     ]});
     return el("div",{class:"terraria-page"},...warnings(),panel,buildCard(),
-      el("div",{class:"terraria-note"},"Strong and weak references must not repeat the same mod name. A strong mod reference also cannot duplicate a DLL reference. Version-qualified mod references use ModName@1.2 style syntax."));
+      el("div",{class:"terraria-note"},"Strong and weak references must not repeat the same mod name. A strong mod reference also cannot duplicate a DLL reference. Version-qualified mod references use ModName@1.2 style syntax. Lexeditor reads tModLoader's local enabled state but does not rewrite enabled.json."));
   }
   function dataMapPanel(){
     const table=el("table",{class:"terraria-map"},
