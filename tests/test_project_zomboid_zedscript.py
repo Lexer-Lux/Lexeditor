@@ -45,7 +45,7 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             self.assertEqual(result["counts"]["craftRecipe"], 1)
             self.assertTrue(next(row for row in result["rows"] if row["name"] == "Hammer")["editable"])
             self.assertTrue(next(row for row in result["rows"] if row["name"] == "Sandwich")["editable"])
-            self.assertFalse(next(row for row in result["rows"] if row["name"] == "MakeThing")["editable"])
+            self.assertTrue(next(row for row in result["rows"] if row["name"] == "MakeThing")["editable"])
 
     def test_comments_strings_and_nested_blocks_do_not_create_records(self):
         with tempfile.TemporaryDirectory() as name:
