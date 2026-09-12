@@ -4924,12 +4924,17 @@ ${contents.path}`});
       node.classList.toggle("lex-column-lit", lit);
     }
   };
-  // Apply the same bottom placement to plugin panels built with subtabBar.
+  // Only tabs inside a detail panel belong at its bottom. Page-level dataset
+  // and language bars must keep their place above the complete list/detail view.
   const bottomPanelTabs = () => {
     for (const bar of document.querySelectorAll('.lex-subtab-bar:not([hidden])')) {
       const parent = bar.parentElement;
       if (!parent || parent.children.length < 2 || parent.closest('.lex-shell-header,[role="dialog"]')) continue;
       if (parent.matches('.lex-tabbed-panel,.lex-settings-columns')) continue;
+      if (!parent.closest('.lex-detail-panel')) {
+        parent.classList.remove('lex-bottom-tab-panel');
+        continue;
+      }
       parent.classList.add('lex-bottom-tab-panel');
     }
   };

@@ -21,6 +21,16 @@ def main():
   p.evaluate("""()=>{const U=LexeditorUI;window.active={a:'one',b:'one'};window.draw=id=>document.getElementById(id).replaceChildren(U.tabbedPanel({label:id,active:active[id],tabs:[{id:'one',label:'One'},{id:'two',label:'Two'}],change:value=>{active[id]=value;draw(id)},content:U.el('input',{'aria-label':id+' input'})}));draw('a');draw('b')}""")
   p.wait_for_timeout(100)
   assert p.locator('#a .lex-subtab-bar').bounding_box()['y']>p.locator('#a .lex-tabbed-panel-content').bounding_box()['y']
+  p.evaluate("""()=>{const U=LexeditorUI;
+   const page=U.el('div',{id:'page-tabs',style:'display:flex;flex-direction:column;height:200px'},
+    U.subtabBar({label:'Abilities tables',active:'general',tabs:[{id:'general',label:'General'},{id:'map',label:'Map'}]}),
+    U.el('div',{id:'page-content'},'List and detail panels'));
+   document.body.append(page);
+  }""")
+  p.wait_for_timeout(50)
+  assert not p.locator('#page-tabs').evaluate("e=>e.classList.contains('lex-bottom-tab-panel')")
+  assert p.locator('#page-tabs .lex-subtab-bar').bounding_box()['y']<p.locator('#page-content').bounding_box()['y']
+  p.locator('#page-tabs').evaluate('e=>e.remove()')
   p.locator('#b input').focus();p.locator('#a .lex-tabbed-panel-content').hover()
   p.keyboard.press('Tab');assert p.evaluate('active.a')=='two';assert p.evaluate('active.b')=='one'
   p.keyboard.press('Tab');assert p.evaluate('active.a')=='one'
