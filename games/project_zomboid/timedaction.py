@@ -13,6 +13,7 @@ import re
 from . import core
 
 EDITABLE_FIELDS = ("actionAnim",)
+_ACTION_ANIM_RE = re.compile(r"\bactionAnim\s*=", re.IGNORECASE)
 
 
 def _blocks(text: str) -> list[tuple[core.Block, core.Block]]:
@@ -44,6 +45,25 @@ def _blocks(text: str) -> list[tuple[core.Block, core.Block]]:
     return result
 
 
+def _top_level_action_anim_count(text: str, block: core.Block) -> int:
+    """Count actionAnim assignments even when multiple properties share a line."""
+    body = text[block.open_brace + 1:block.close_brace]
+    masked = core._masked_code(body)
+    depth = 0
+    cursor = 0
+    count = 0
+    for match in _ACTION_ANIM_RE.finditer(masked):
+        for char in masked[cursor:match.start()]:
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth = max(0, depth - 1)
+        cursor = match.end()
+        if depth == 0:
+            count += 1
+    return count
+
+
 def read(root: Path) -> dict:
     root = Path(root).resolve()
     rows, errors = [], []
@@ -57,6 +77,10 @@ def read(root: Path) -> dict:
             continue
         for module, block in pairs:
             values, duplicates = core._properties(text, block)
+            action_anim_count = _top_level_action_anim_count(text, block)
+            duplicate_keys = set(duplicates) & set(EDITABLE_FIELDS)
+            if action_anim_count > 1:
+                duplicate_keys.add("actionAnim")
             rows.append({
                 "key": f"{relative}:{module.name}.{block.name}",
                 "path": relative,
@@ -65,7 +89,7 @@ def read(root: Path) -> dict:
                 "fullType": f"{module.name}.{block.name}",
                 "sha256": core.sha256_bytes(data),
                 "fields": {"actionAnim": values.get("actionAnim", "")},
-                "duplicateKeys": sorted(set(duplicates) & set(EDITABLE_FIELDS)),
+                "duplicateKeys": sorted(duplicate_keys),
             })
     return {"rows": rows, "errors": errors}
 
@@ -96,7 +120,7 @@ def save(root: Path, relative: str, module_name: str, action_id: str,
         raise core.ProjectZomboidError("Timed action identity is missing or ambiguous")
     _module, block = matches[0]
     values, duplicates = core._properties(text, block)
-    if "actionAnim" in duplicates:
+    if "actionAnim" in duplicates or _top_level_action_anim_count(text, block) > 1:
         raise core.ProjectZomboidError("Cannot safely edit duplicated timedAction actionAnim")
     if "actionAnim" not in values:
         raise core.ProjectZomboidError("Writer changes existing properties only; missing: actionAnim")
