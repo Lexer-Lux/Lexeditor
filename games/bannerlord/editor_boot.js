@@ -8,7 +8,7 @@
         throw new Error("The same ModuleData XML has unsaved structured and raw-source edits. Save or discard one editing surface before saving the other.");
       }
       if(moduleDirty()){
-        const result=await post("/api/module/save",moduleEditable(state.module));
+        const result=await post("/api/module/save",moduleSavePayload(state.module,state.savedModule));
         state.module=result.module;state.savedModule=clone(result.module);
       }
       if(projectDirty()){

@@ -499,9 +499,32 @@ def _legacy_dependency_elements(root: ET.Element) -> dict[tuple[str, int], tuple
     return result
 
 
-def _edit_legacy_dependencies(root: ET.Element, rows: list[dict]) -> int:
-    """Edit/remove existing legacy launcher relations without inventing a legacy shape."""
+def _edit_legacy_dependencies(
+    root: ET.Element,
+    rows: list[dict],
+    baseline_rows: list[dict],
+) -> int:
+    """Edit/remove legacy rows only when their loaded identity set is still current."""
     existing = _legacy_dependency_elements(root)
+    baseline: dict[tuple[str, int], str] = {}
+    for position, row in enumerate(baseline_rows):
+        origin = str(row.get("origin") or "")
+        index = row.get("index")
+        module_id = str(row.get("id") or "").strip()
+        if origin not in _LEGACY_DEPENDENCY_ORIGINS or not isinstance(index, int) or not module_id:
+            raise ValueError(f"Legacy dependency baseline row {position + 1} is invalid; reload before saving")
+        key = (origin, index)
+        if key in baseline:
+            raise ValueError("Duplicate legacy dependency baseline row; reload before saving")
+        baseline[key] = module_id
+
+    if set(existing) != set(baseline):
+        raise ValueError("Legacy dependency set changed on disk; reload before saving")
+    for key, (_parent, element) in existing.items():
+        current_id = str(element.attrib.get("Id") or "").strip()
+        if current_id != baseline[key]:
+            raise ValueError("Legacy dependency changed on disk; reload before saving")
+
     requested: dict[tuple[str, int], str] = {}
     for position, row in enumerate(rows):
         module_id = str(row.get("id") or "").strip()
@@ -517,11 +540,11 @@ def _edit_legacy_dependencies(root: ET.Element, rows: list[dict]) -> int:
         key = (origin, index)
         if key not in existing:
             raise ValueError("Legacy dependency changed or no longer exists; reload before saving")
-        _parent, existing_element = existing[key]
-        current_id = str(existing_element.attrib.get("Id") or "").strip()
-        original_id = str((row.get("attributes") or {}).get("Id") or "").strip()
-        if original_id and current_id != original_id:
-            raise ValueError("Legacy dependency changed on disk; reload before saving")
+        if key not in baseline:
+            raise ValueError(
+                "Legacy dependency edits must reference a row from the loaded baseline; "
+                "create new legacy rows in source XML instead"
+            )
         if key in requested:
             raise ValueError("Duplicate legacy dependency edit")
         requested[key] = module_id
@@ -838,10 +861,12 @@ def _validate_relation_payload(path: Path, payload: dict) -> None:
 def save_module(path: Path, payload: dict) -> dict:
     path = Path(path)
     path = paths.contained_project_path(path.parent, path.name, require_file=True)
-    allowed = {"metadata", "dependencies", "communityDependencies", "legacyDependencies", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}
+    allowed = {"metadata", "dependencies", "communityDependencies", "legacyDependencies", "legacyDependenciesBaseline", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}
     unknown = set(payload) - allowed
     if unknown:
         raise ValueError(f"Unsupported SubModule.xml sections: {', '.join(sorted(unknown))}")
+    if "legacyDependencies" in payload and "legacyDependenciesBaseline" not in payload:
+        raise ValueError("Legacy dependency save requires the originally loaded row baseline; reload before saving")
     _validate_relation_payload(path, payload)
     tree = _parse_tree(path)
     root = tree.getroot()
@@ -855,7 +880,11 @@ def save_module(path: Path, payload: dict) -> dict:
     if "communityDependencies" in payload:
         changes += _edit_community_dependencies(root, list(payload.get("communityDependencies") or []))
     if "legacyDependencies" in payload:
-        changes += _edit_legacy_dependencies(root, list(payload.get("legacyDependencies") or []))
+        changes += _edit_legacy_dependencies(
+            root,
+            list(payload.get("legacyDependencies") or []),
+            list(payload.get("legacyDependenciesBaseline") or []),
+        )
     if "modulesToLoadAfterThis" in payload:
         changes += _edit_modules_to_load_after_this(root, list(payload.get("modulesToLoadAfterThis") or []))
     if "incompatibleModules" in payload:

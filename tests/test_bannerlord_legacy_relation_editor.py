@@ -69,7 +69,7 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
                     {**rows[0], "id": "LegacyAfterRenamed"},
                     {**rows[2], "id": "OptionalOneRenamed"},
                     rows[3],
-                ]},
+                ], "legacyDependenciesBaseline": rows},
             )
             self.assertGreater(result["saved"], 0)
             self.assertTrue(Path(result["backup"]).is_file())
@@ -96,7 +96,7 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
             before = source.read_bytes()
             row = next(row for row in read_submodule(source)["legacyDependencies"] if row["id"] == "OptionalOne")
             with self.assertRaisesRegex(ValueError, "loadable and incompatible"):
-                save_module(source, {"legacyDependencies": [{**row, "id": "Blocked"}]})
+                save_module(source, {"legacyDependencies": [{**row, "id": "Blocked"}], "legacyDependenciesBaseline": read_submodule(source)["legacyDependencies"]})
             self.assertEqual(source.read_bytes(), before)
             self.assertFalse(source.with_name(source.name + ".lexeditor.bak").exists())
             self.assertFalse(source.with_name(source.name + ".lexeditor.tmp").exists())
@@ -107,6 +107,7 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
         temporary, source = self.fixture()
         try:
             before = source.read_bytes()
+            baseline = read_submodule(source)["legacyDependencies"]
             with self.assertRaisesRegex(ValueError, "existing compatibility row"):
                 save_module(source, {"legacyDependencies": [{
                     "index": None,
@@ -114,7 +115,7 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
                     "origin": "OptionalDependModules/DependModule",
                     "optional": True,
                     "order": "",
-                }]})
+                }], "legacyDependenciesBaseline": baseline})
             self.assertEqual(source.read_bytes(), before)
         finally:
             temporary.cleanup()
@@ -154,7 +155,7 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
                     {**rows[0], "id": "ValidAfterRenamed"},
                     rows[1],
                     rows[2],
-                ]},
+                ], "legacyDependenciesBaseline": rows},
             )
             rewritten = source.read_text(encoding="utf-8")
             self.assertIn('Future="blank-after"', rewritten)
@@ -174,10 +175,42 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
             )
             before = source.read_bytes()
             with self.assertRaisesRegex(ValueError, "changed on disk"):
-                save_module(source, {"legacyDependencies": rows})
+                save_module(source, {"legacyDependencies": rows, "legacyDependenciesBaseline": rows})
             self.assertEqual(source.read_bytes(), before)
             self.assertFalse(source.with_name(source.name + ".lexeditor.bak").exists())
             self.assertFalse(source.with_name(source.name + ".lexeditor.tmp").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_external_legacy_addition_is_not_misread_as_user_deletion(self):
+        temporary, source = self.fixture()
+        try:
+            baseline = read_submodule(source)["legacyDependencies"]
+            source.write_text(
+                source.read_text(encoding="utf-8").replace(
+                    '<LoadAfterModule Id="LegacyAfter" Future="keep-after" />',
+                    '<LoadAfterModule Id="LegacyAfter" Future="keep-after" />\n    <LoadAfterModule Id="ExternallyAdded" Future="keep-external" />',
+                ),
+                encoding="utf-8",
+            )
+            before = source.read_bytes()
+            with self.assertRaisesRegex(ValueError, "set changed on disk"):
+                save_module(source, {"legacyDependencies": baseline, "legacyDependenciesBaseline": baseline})
+            self.assertEqual(source.read_bytes(), before)
+            self.assertIn(b'ExternallyAdded', before)
+            self.assertFalse(source.with_name(source.name + ".lexeditor.bak").exists())
+            self.assertFalse(source.with_name(source.name + ".lexeditor.tmp").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_legacy_save_without_loaded_baseline_is_rejected(self):
+        temporary, source = self.fixture()
+        try:
+            rows = read_submodule(source)["legacyDependencies"]
+            before = source.read_bytes()
+            with self.assertRaisesRegex(ValueError, "originally loaded row baseline"):
+                save_module(source, {"legacyDependencies": rows})
+            self.assertEqual(source.read_bytes(), before)
         finally:
             temporary.cleanup()
 
@@ -185,6 +218,7 @@ class BannerlordLegacyRelationEditorTests(unittest.TestCase):
         editor = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_core.js"
         text = editor.read_text(encoding="utf-8")
         self.assertIn("legacyDependencies:m.legacyDependencies||[]", text)
+        self.assertIn("legacyDependenciesBaseline", text)
         self.assertIn('selection.kind==="legacy"', text)
         self.assertIn("Creating a new legacy relation remains source-only", text)
 
