@@ -12,6 +12,22 @@ const runtimeDirty=()=>state.runtimeOverrides&&state.savedRuntimeOverrides&&!sam
 const dirtyCountWithoutRuntime=dirtyCount;
 dirtyCount=function(){return dirtyCountWithoutRuntime()+Number(runtimeDirty())};
 
+async function reloadRuntimeOverrides(ask=true){
+  if(ask&&runtimeDirty()){
+    const confirmed=await confirmAction({
+      title:"Reload runtime overrides?",
+      message:"Discard unsaved Runtime Override changes and reload the deployed JSON from disk?",
+      confirmLabel:"Reload"
+    });
+    if(!confirmed)return;
+  }
+  try{
+    const value=await api("/api/runtime-overrides");
+    state.runtimeOverrides=value;state.savedRuntimeOverrides=clone(value);
+    render();refresh();
+  }catch(error){showAlert?.(String(error.message||error),"Could not reload runtime overrides")}
+}
+
 function enableRuntimeOverride(row,enabled){
   row.overridden=enabled;
   if(!enabled){
@@ -26,7 +42,8 @@ function renderRuntimeOverrides(){
   const value=state.runtimeOverrides;
   if(!value?.available){
     main.replaceChildren(el("section",{class:"bl-card"},el("h2",{},"Runtime Overrides"),
-      el("div",{class:"bl-empty"},"The selected Bannerlord module must be deployed and contain supported custom effect/XP definitions before runtime overrides can be edited.")));return
+      el("div",{class:"bl-empty"},"The selected Bannerlord module must be deployed and contain supported custom effect/XP definitions before runtime overrides can be edited."),
+      el("button",{type:"button",onclick:()=>reloadRuntimeOverrides(false)},"Reload")));return
   }
   const effectMode=state.runtimeKind==="effects";
   const rows=effectMode?(value.effects||[]):(value.xpSources||[]);
@@ -36,7 +53,8 @@ function renderRuntimeOverrides(){
     el("div",{class:"bl-master-head"},
       el("strong",{},effectMode?`Runtime Effects (${rows.length})`:`Runtime XP (${rows.length})`),
       el("button",{type:"button",class:effectMode?"active":"",onclick:()=>{state.runtimeKind="effects";state.runtimeIndex=0;render()}},"Effects"),
-      el("button",{type:"button",class:!effectMode?"active":"",onclick:()=>{state.runtimeKind="xp";state.runtimeIndex=0;render()}},"XP")),
+      el("button",{type:"button",class:!effectMode?"active":"",onclick:()=>{state.runtimeKind="xp";state.runtimeIndex=0;render()}},"XP"),
+      el("button",{type:"button",onclick:()=>reloadRuntimeOverrides()},"Reload")),
     el("div",{class:"bl-list"},...rows.map((row,index)=>el("button",{
       type:"button",class:`bl-item${index===state.runtimeIndex?" active":""}`,onclick:()=>{state.runtimeIndex=index;render()}
     },row.label,el("small",{},`${row.skillId} · ${row.overridden?"override":"source default"}`))))

@@ -194,6 +194,118 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
         self.assertIn('effectsHash:state.savedRuntimeOverrides.effectsHash||""', text)
         self.assertIn('xpSourcesHash:state.savedRuntimeOverrides.xpSourcesHash||""', text)
 
+    def test_runtime_stage_failure_does_not_modify_either_file(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            xp_path = module_data / "custom_skill_xp_sources.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            xp_path.write_text("{}\n", encoding="utf-8")
+            current = read_runtime_overrides(project, game)
+            effect, xp = current["effects"][0], current["xpSources"][0]
+            effects_before, xp_before = effects_path.read_bytes(), xp_path.read_bytes()
+            real_write_bytes = Path.write_bytes
+
+            def fail_xp_stage(path, data):
+                if Path(path).name == "custom_skill_xp_sources.json.lexeditor.tmp":
+                    raise OSError("runtime stage failed")
+                return real_write_bytes(path, data)
+
+            with patch.object(Path, "write_bytes", new=fail_xp_stage):
+                with self.assertRaisesRegex(OSError, "runtime stage failed"):
+                    save_runtime_overrides(project, {
+                        "effects": [{"id": effect["id"], "overridden": True, "low": 100, "high": 50}],
+                        "xpSources": [{"id": xp["id"], "overridden": True, "amount": 9}],
+                        "effectsHash": current["effectsHash"],
+                        "xpSourcesHash": current["xpSourcesHash"],
+                    }, game)
+            self.assertEqual(effects_path.read_bytes(), effects_before)
+            self.assertEqual(xp_path.read_bytes(), xp_before)
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.bak").exists())
+            self.assertFalse(xp_path.with_name(xp_path.name + ".lexeditor.bak").exists())
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.tmp").exists())
+            self.assertFalse(xp_path.with_name(xp_path.name + ".lexeditor.tmp").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_late_runtime_commit_failure_restores_first_existing_file(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            xp_path = module_data / "custom_skill_xp_sources.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            xp_path.write_text("{}\n", encoding="utf-8")
+            current = read_runtime_overrides(project, game)
+            effect, xp = current["effects"][0], current["xpSources"][0]
+            effects_before, xp_before = effects_path.read_bytes(), xp_path.read_bytes()
+            real_replace = Path.replace
+
+            def fail_xp_commit(path, target):
+                if Path(path).name == "custom_skill_xp_sources.json.lexeditor.tmp":
+                    raise OSError("runtime commit failed")
+                return real_replace(path, target)
+
+            with patch.object(Path, "replace", new=fail_xp_commit):
+                with self.assertRaisesRegex(OSError, "runtime commit failed"):
+                    save_runtime_overrides(project, {
+                        "effects": [{"id": effect["id"], "overridden": True, "low": 100, "high": 50}],
+                        "xpSources": [{"id": xp["id"], "overridden": True, "amount": 9}],
+                        "effectsHash": current["effectsHash"],
+                        "xpSourcesHash": current["xpSourcesHash"],
+                    }, game)
+            self.assertEqual(effects_path.read_bytes(), effects_before)
+            self.assertEqual(xp_path.read_bytes(), xp_before)
+            self.assertEqual(effects_path.with_name(effects_path.name + ".lexeditor.bak").read_bytes(), effects_before)
+            self.assertEqual(xp_path.with_name(xp_path.name + ".lexeditor.bak").read_bytes(), xp_before)
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.tmp").exists())
+            self.assertFalse(xp_path.with_name(xp_path.name + ".lexeditor.tmp").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_late_runtime_commit_failure_removes_first_new_file(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            xp_path = module_data / "custom_skill_xp_sources.json"
+            xp_path.write_text("{}\n", encoding="utf-8")
+            current = read_runtime_overrides(project, game)
+            effect, xp = current["effects"][0], current["xpSources"][0]
+            xp_before = xp_path.read_bytes()
+            real_replace = Path.replace
+
+            def fail_xp_commit(path, target):
+                if Path(path).name == "custom_skill_xp_sources.json.lexeditor.tmp":
+                    raise OSError("runtime commit failed")
+                return real_replace(path, target)
+
+            with patch.object(Path, "replace", new=fail_xp_commit):
+                with self.assertRaisesRegex(OSError, "runtime commit failed"):
+                    save_runtime_overrides(project, {
+                        "effects": [{"id": effect["id"], "overridden": True, "low": 100, "high": 50}],
+                        "xpSources": [{"id": xp["id"], "overridden": True, "amount": 9}],
+                        "effectsHash": current["effectsHash"],
+                        "xpSourcesHash": current["xpSourcesHash"],
+                    }, game)
+            self.assertFalse(effects_path.exists())
+            self.assertEqual(xp_path.read_bytes(), xp_before)
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.tmp").exists())
+            self.assertFalse(xp_path.with_name(xp_path.name + ".lexeditor.tmp").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_runtime_editor_exposes_safe_reload(self):
+        editor = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_runtime.js"
+        text = editor.read_text(encoding="utf-8")
+        self.assertIn("async function reloadRuntimeOverrides", text)
+        self.assertIn("Discard unsaved Runtime Override changes", text)
+        self.assertIn('onclick:()=>reloadRuntimeOverrides()', text)
+
     def test_runtime_overrides_require_an_existing_deployed_module(self):
         temporary, project, game, deployed = self.fixture()
         try:

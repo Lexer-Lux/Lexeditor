@@ -121,17 +121,128 @@ def read_runtime_overrides(project: Path, game_root: Path | None = None) -> dict
     }
 
 
-def _write_json(path: Path, value: dict) -> str:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    backup = path.with_name(path.name + ".lexeditor.bak")
-    paths.clear_write_helper(backup)
-    if path.is_file():
-        shutil.copy2(path, backup)
-    temporary = path.with_name(path.name + ".lexeditor.tmp")
-    paths.clear_write_helper(temporary)
-    temporary.write_text(json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    temporary.replace(path)
-    return str(backup) if backup.is_file() else ""
+def _runtime_write_plan(entries: list[tuple[str, Path, dict, str]]) -> list[dict]:
+    plan = []
+    for key, destination, value, expected in entries:
+        if destination.exists() and not destination.is_file():
+            raise ValueError(f"Runtime override destination is not a file: {destination}")
+        backup = destination.with_name(destination.name + ".lexeditor.bak")
+        temporary = destination.with_name(destination.name + ".lexeditor.tmp")
+        for helper in (backup, temporary):
+            if helper.is_dir():
+                raise ValueError(f"Bannerlord write helper path is a directory: {helper}")
+        plan.append({
+            "key": key,
+            "destination": destination,
+            "backup": backup,
+            "temporary": temporary,
+            "hadDestination": destination.is_file(),
+            "expected": expected,
+            "content": (json.dumps(value, indent=2, ensure_ascii=False) + "\n").encode("utf-8"),
+        })
+    return plan
+
+
+def _cleanup_runtime_staged(rows: list[dict]) -> list[str]:
+    errors = []
+    for row in rows:
+        try:
+            row["temporary"].unlink(missing_ok=True)
+        except OSError as error:
+            errors.append(f"{row['temporary']}: {error}")
+    return errors
+
+
+def _rollback_runtime_committed(rows: list[dict]) -> list[str]:
+    errors = []
+    for row in reversed(rows):
+        destination = row["destination"]
+        try:
+            if row["hadDestination"]:
+                if not row["backup"].is_file():
+                    raise RuntimeError(f"Runtime rollback backup is missing: {row['backup']}")
+                paths.clear_write_helper(row["temporary"])
+                shutil.copy2(row["backup"], row["temporary"])
+                row["temporary"].replace(destination)
+            else:
+                destination.unlink(missing_ok=True)
+        except Exception as error:
+            errors.append(f"{row['key']}: {error}")
+    return errors
+
+
+def _write_json_transaction(entries: list[tuple[str, Path, dict, str]]) -> dict[str, str]:
+    plan = _runtime_write_plan(entries)
+    if not plan:
+        return {}
+
+    # Stage every candidate before touching a destination or backup.
+    try:
+        for row in plan:
+            row["destination"].parent.mkdir(parents=True, exist_ok=True)
+            paths.clear_write_helper(row["temporary"])
+            row["temporary"].write_bytes(row["content"])
+    except Exception as error:
+        cleanup_errors = _cleanup_runtime_staged(plan)
+        if cleanup_errors:
+            raise RuntimeError(
+                "Bannerlord runtime override staging failed and temporary files could not all be cleaned up: "
+                + "; ".join(cleanup_errors)
+            ) from error
+        raise
+
+    # A staged candidate may take non-trivial time on a slow disk. Revalidate
+    # the loaded versions before making backups or replacing either target.
+    try:
+        for row in plan:
+            require_optional_source_revision(row["destination"], row["expected"])
+    except Exception:
+        _cleanup_runtime_staged(plan)
+        raise
+
+    backups: dict[str, str] = {}
+    try:
+        for row in plan:
+            paths.clear_write_helper(row["backup"])
+            if row["hadDestination"]:
+                shutil.copy2(row["destination"], row["backup"])
+                backups[row["key"]] = str(row["backup"])
+            else:
+                backups[row["key"]] = ""
+    except Exception as error:
+        cleanup_errors = _cleanup_runtime_staged(plan)
+        if cleanup_errors:
+            raise RuntimeError(
+                "Bannerlord runtime override backup staging failed and temporary files could not all be cleaned up: "
+                + "; ".join(cleanup_errors)
+            ) from error
+        raise
+
+    # Detect edits that raced the backup phase itself. Destinations are still
+    # untouched, so a stale save can still abort cleanly here.
+    try:
+        for row in plan:
+            require_optional_source_revision(row["destination"], row["expected"])
+    except Exception:
+        _cleanup_runtime_staged(plan)
+        raise
+
+    committed = []
+    try:
+        for row in plan:
+            row["temporary"].replace(row["destination"])
+            committed.append(row)
+    except Exception as error:
+        rollback_errors = _rollback_runtime_committed(committed)
+        cleanup_errors = _cleanup_runtime_staged(plan)
+        problems = rollback_errors + cleanup_errors
+        if problems:
+            raise RuntimeError(
+                "Bannerlord runtime override commit failed and rollback was incomplete: "
+                + "; ".join(problems)
+            ) from error
+        raise
+    return backups
 
 
 def save_runtime_overrides(project: Path, payload: dict, game_root: Path | None = None) -> dict:
@@ -188,11 +299,12 @@ def save_runtime_overrides(project: Path, payload: dict, game_root: Path | None 
     if changed_xp:
         require_optional_source_revision(xp_path, payload.get("xpSourcesHash"))
 
-    backups = {}
+    writes = []
     if changed_effects:
-        backups["effects"] = _write_json(effects_path, effect_values)
+        writes.append(("effects", effects_path, effect_values, str(payload.get("effectsHash") or "")))
     if changed_xp:
-        backups["xpSources"] = _write_json(xp_path, xp_values)
+        writes.append(("xpSources", xp_path, xp_values, str(payload.get("xpSourcesHash") or "")))
+    backups = _write_json_transaction(writes)
     result = read_runtime_overrides(project, game_root)
     result.update({"saved": changed_effects + changed_xp, "backups": backups})
     return result
