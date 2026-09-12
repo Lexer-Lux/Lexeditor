@@ -8,7 +8,9 @@ import tempfile
 import unittest
 
 from games.terraria.build_metadata import parse_build_text, update_build_text
+from games.terraria import plugin as terraria_plugin
 from games.terraria import server
+from project_manager import ProjectManager
 
 
 class TerrariaBuildMetadataTests(unittest.TestCase):
@@ -137,6 +139,43 @@ class TerrariaBuildMetadataTests(unittest.TestCase):
             update_build_text("", {"author": "one\ntwo"})
         with self.assertRaisesRegex(ValueError, "Unsupported"):
             update_build_text("", {"futureStructured": "ExampleMod"})
+
+    def test_shared_project_creation_renders_and_validates_tmodloader_name(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            parent = base / "ModSources"
+            parent.mkdir()
+            manager = ProjectManager(
+                {"terraria": terraria_plugin.PLUGIN},
+                path=base / "projects.json",
+            )
+
+            state = manager.create("terraria", str(parent), "Example_Mod")
+            root = (parent / "Example_Mod").resolve()
+            self.assertEqual(Path(state["current"]), root)
+            self.assertTrue((root / "Example_Mod.csproj").is_file())
+            self.assertTrue((root / "Example_Mod.cs").is_file())
+            self.assertFalse((root / "LexeditorTerrariaMod.csproj").exists())
+            self.assertFalse((root / "LexeditorTerrariaMod.cs").exists())
+
+            rendered = "\n".join(
+                (root / name).read_text(encoding="utf-8")
+                for name in ("build.txt", "Example_Mod.csproj", "Example_Mod.cs")
+            )
+            self.assertNotIn("__LEXEDITOR_", rendered)
+            self.assertIn("displayName = Example_Mod", rendered)
+            self.assertIn("<AssemblyName>Example_Mod</AssemblyName>", rendered)
+            self.assertIn("namespace Example_Mod;", rendered)
+
+            for invalid in ("Bad Mod", "123Mod", "class", "Mod", "ModLoader", "tModLoader"):
+                with self.subTest(invalid=invalid):
+                    with self.assertRaises(ValueError):
+                        manager.create("terraria", str(parent), invalid)
+                    self.assertFalse((parent / invalid).exists())
+
+            with self.assertRaises(ValueError):
+                manager.rename("terraria", str(root), "Bad Mod")
+            self.assertTrue(root.is_dir())
 
     def test_service_preserves_bom_and_refuses_stale_writes(self):
         previous = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
