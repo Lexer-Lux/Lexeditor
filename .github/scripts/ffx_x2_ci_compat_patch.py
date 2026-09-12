@@ -26,11 +26,3 @@ new_assertions = '''            assert y_name.evaluate("e=>getComputedStyle(e).w
 if visual.count(old_assertions) != 1:
     raise RuntimeError(f'graph assertion anchor count: {visual.count(old_assertions)}')
 visual_path.write_text(visual.replace(old_assertions, new_assertions, 1), encoding='utf-8')
-
-workflow_path = Path('.github/workflows/ff7r-checks.yml')
-workflow = workflow_path.read_text(encoding='utf-8')
-old_dependency = '        run: python -m pip install pytest Pillow==12.3.0 texfury==1.6.2\n'
-new_dependency = '        run: python -m pip install pytest Pillow==12.3.0 texfury==1.6.2 cryptography\n'
-if workflow.count(old_dependency) != 1:
-    raise RuntimeError(f'FF7R dependency anchor count: {workflow.count(old_dependency)}')
-workflow_path.write_text(workflow.replace(old_dependency, new_dependency, 1), encoding='utf-8')
