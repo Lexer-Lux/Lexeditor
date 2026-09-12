@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -82,7 +83,7 @@ def test_windows_launch_uses_no_console_creation_flag(monkeypatch: pytest.Monkey
     class Process:
         pid = 4321
 
-    monkeypatch.setattr(launch.os, "name", "nt")
+    monkeypatch.setattr(launch, "os", SimpleNamespace(name="nt"))
     monkeypatch.setattr(launch, "command", lambda _root, _game: (argv, cwd))
     monkeypatch.setattr(launch.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
 
@@ -92,7 +93,7 @@ def test_windows_launch_uses_no_console_creation_flag(monkeypatch: pytest.Monkey
         return Process()
 
     monkeypatch.setattr(launch.subprocess, "Popen", fake_popen)
-    result = launch.launch(Path("fixture"), "x")
+    result = launch.launch("fixture", "x")
 
     assert captured["args"] == argv
     assert captured["kwargs"] == {
