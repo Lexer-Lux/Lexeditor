@@ -1,0 +1,32 @@
+name: Temporary Bannerlord master merge probe
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-master-merge-probe.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+          fetch-depth: 0
+      - name: Probe merge without pushing
+        run: |
+          git fetch origin master
+          set +e
+          git merge --no-commit --no-ff origin/master
+          code=$?
+          echo "merge_exit=$code"
+          echo "unresolved_paths:"
+          git diff --name-only --diff-filter=U || true
+          echo "status:"
+          git status --short
+          exit $code
