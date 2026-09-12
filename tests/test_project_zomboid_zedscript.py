@@ -20,6 +20,7 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
                 '''  evolvedrecipe Sandwich { BaseItem = Base.BreadSlices, MaxItems = 4, }\n'''
                 '''  fixing RepairHammer { Require : Hammer, }\n'''
                 '''  fluid CustomWater { color = 1, }\n'''
+                '''  mannequin StoreDisplay { female = true, }\n'''
                 '''  model FancyModel { mesh = WorldItems/Hammer, }\n'''
                 '''  sound TestSound { category = Item, }\n'''
                 '''  timedAction Making { anim = Craft, }\n'''
@@ -35,6 +36,7 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             self.assertIn(("evolvedrecipe", "Sandwich"), names)
             self.assertIn(("fixing", "RepairHammer"), names)
             self.assertIn(("fluid", "CustomWater"), names)
+            self.assertIn(("mannequin", "StoreDisplay"), names)
             self.assertIn(("model", "FancyModel"), names)
             self.assertIn(("sound", "TestSound"), names)
             self.assertIn(("timedAction", "Making"), names)
@@ -43,7 +45,7 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             self.assertNotIn(("craftRecipe", "Fake"), names)
             self.assertEqual(result["errors"], [])
             self.assertEqual(result["counts"]["craftRecipe"], 1)
-            for editable_name in ("Hammer", "Sandwich", "MakeThing", "CustomWater", "TestCar", "TestSound", "FancyModel"):
+            for editable_name in ("Hammer", "Sandwich", "MakeThing", "CustomWater", "TestCar", "TestSound", "FancyModel", "StoreDisplay"):
                 with self.subTest(editable_name=editable_name):
                     self.assertTrue(next(row for row in result["rows"] if row["name"] == editable_name)["editable"])
 
