@@ -14,11 +14,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
+from games.warband import paths  # noqa: E402
 from games.warband.plugin import WarbandSession  # noqa: E402
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 
 
 def main() -> int:
+    module_troops = Path(paths.MODULE_SYSTEM) / "module_troops.py"
+    if not module_troops.is_file():
+        # The verifier runner already recognizes explicit WinError-2 missing
+        # prerequisites. State this before an empty API payload is mistaken for
+        # a broken hoverable renderer.
+        raise FileNotFoundError(
+            f"[WinError 2] Missing Warband Module System source: {module_troops}"
+        )
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-warband-hover-edge-", ignore_cleanup_errors=True)
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
