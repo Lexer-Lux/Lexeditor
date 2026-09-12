@@ -88,7 +88,7 @@ def main():
    assert field.locator('.lex-column-pin').bounding_box()['y']<checkbox.bounding_box()['y']
    text=field.locator('.lex-detail-field-label-text').bounding_box();arrow=field.locator('.lex-field-boolean-arrow').bounding_box();box=checkbox.bounding_box()
    assert arrow['x']-text['x']-text['width']>=12
-   assert box['x']-arrow['x']-arrow['width']>=12
+   assert 0 <= box['x']-arrow['x']-arrow['width'] <= 5
    page.screenshot(path=str(OUT/'three-panels.png'),animations='disabled')
    for width in (900,1600):
     page.set_viewport_size({'width':width,'height':900});page.wait_for_timeout(250)

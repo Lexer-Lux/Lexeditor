@@ -6085,3 +6085,25 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   left:auto;
   transform:none;
 }
+
+/* Provenance checkboxes keep the ordinary property label track. The arrow
+   and checkbox share the remaining track, with a fixed gap at the tip. */
+.lex-detail-field.lex-boolean-field:has(> .lex-detail-field-control > .lex-source-control) {
+  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr);
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  column-gap:4px;
+  padding-left:12px;
+}
+.lex-boolean-field .lex-source-control > .lex-field-boolean-arrow {
+  background:currentColor;
+  opacity:.65;
+}
+.lex-detail-field.lex-boolean-field .lex-column-pin {
+  overflow:visible;
+}
+
+.lex-detail-field.lex-boolean-field > .lex-column-pin {
+  top:2px!important;
+  right:28px!important;
+}

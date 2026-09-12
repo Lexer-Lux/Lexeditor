@@ -992,6 +992,15 @@
       const target = input.getBoundingClientRect();
       const icon = pin.getBoundingClientRect();
       if (!owner.width || !target.height || !icon.width) return;
+      if (input.matches('input[type="checkbox"]')) {
+        // Keep the whole icon inside the row, above the leader near the box.
+        // Rectangles include UI zoom; positioned offsets use unscaled pixels.
+        const scale = owner.width / control.offsetWidth || 1;
+        pin.style.setProperty("left", `${(target.left - owner.left - icon.width - 6 * scale) / scale}px`, "important");
+        pin.style.setProperty("top", `${(target.top - owner.top - icon.height / 2) / scale}px`, "important");
+        pin.style.setProperty("right", "auto", "important");
+        return;
+      }
       const inset = target.height * .1;
       // The Boxicons pin tip is at 3.71,21.71 in its 24-by-24 view box.
       const tipX = icon.width * 3.71 / 24;
