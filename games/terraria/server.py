@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_BODY = 64 * 1024
+UTF8_BOM = b"\xef\xbb\xbf"
 
 
 def project_root() -> Path:
@@ -72,7 +73,7 @@ def save_build(updates: dict[str, object], expected_sha256: str) -> dict:
     if changed == text:
         return build_state()
 
-    encoded = changed.encode("utf-8")
+    encoded = (UTF8_BOM if data.startswith(UTF8_BOM) else b"") + changed.encode("utf-8")
     temp_path: Path | None = None
     try:
         with tempfile.NamedTemporaryFile("wb", dir=target.parent, prefix=".lexeditor-build-", delete=False) as handle:
