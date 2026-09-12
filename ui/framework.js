@@ -4162,7 +4162,7 @@ ${contents.path}`});
       const leftSettings = isSpecialTab(left);
       const rightSettings = isSpecialTab(right);
       if (leftSettings !== rightSettings) return leftSettings ? 1 : -1;
-      const rank = tab => tab.id === "tweaks" ? 2 : tab.id === "misc" ? 1 : 0;
+      const rank = tab => tab.id === "tweaks" ? 2 : (tab.id === "misc" || /^misc\.?$/i.test(String(tab.label))) ? 1 : 0;
       return rank(left) - rank(right) || String(left.label).localeCompare(String(right.label), undefined, {sensitivity: "base"});
     });
     for (const [tabIndex, tab] of orderedTabs.entries()) {

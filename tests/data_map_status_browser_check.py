@@ -15,12 +15,12 @@ def main():
    browser=pw.chromium.launch(headless=True);page=browser.new_page(viewport={'width':1440,'height':900});page.add_init_script(STUB)
    def fixture(route):
     response=route.fetch()
-    route.fulfill(response=response,body=response.text().replace('{id:"graphs",label:"Graphs"}','{id:"misc",label:"Misc."},{id:"graphs",label:"Graphs"}'))
+    route.fulfill(response=response,body=response.text().replace('{id:"graphs",label:"Graphs"}','{id:"data",label:"Misc."},{id:"graphs",label:"Graphs"}'))
    page.route('**/games/blank/editor.html',fixture)
    page.goto(f'http://127.0.0.1:{server.server_port}/games/blank/editor.html')
-   page.wait_for_selector('button[data-tab=misc]')
+   page.wait_for_selector('button[data-tab=data]')
    tabs=page.locator('button[data-tab]').evaluate_all('(es)=>es.map(e=>e.dataset.tab)')
-   assert tabs[-2:]==['misc','tweaks'],tabs
+   assert tabs[-2:]==['data','tweaks'],tabs
    store=SimpleNamespace(archive=SimpleNamespace(entries=[SimpleNamespace(path='Game/common/bankc6.bin')]))
    rows=augment_data_map(store,{'rows':[], 'counts':{}})['rows']
    rows += [{'filename':'text.txt','controls':'Dialogue','status':'integrated','coverage':'structured','notes':'Edit all text.'}]
