@@ -118,18 +118,20 @@ def _png_chunk(kind: bytes, payload: bytes) -> bytes:
     return struct.pack(">I", len(payload)) + body + struct.pack(">I", binascii.crc32(body) & 0xFFFFFFFF)
 
 
-def placeholder_png(size: int = 16) -> bytes:
+def placeholder_png(size: int = 16, height: int | None = None) -> bytes:
     """Generate a valid visible checker texture that is intentionally replaceable."""
-    if size < 1 or size > 256:
+    width = size
+    height = width if height is None else height
+    if width < 1 or width > 256 or height < 1 or height > 256:
         raise ValueError("Placeholder texture size is out of range")
     rows = []
-    for y in range(size):
+    for y in range(height):
         row = bytearray([0])
-        for x in range(size):
+        for x in range(width):
             bright = ((x // 4) + (y // 4)) % 2 == 0
             row.extend((255, 0 if bright else 64, 255, 255))
         rows.append(bytes(row))
-    ihdr = struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
     return (
         b"\x89PNG\r\n\x1a\n"
         + _png_chunk(b"IHDR", ihdr)

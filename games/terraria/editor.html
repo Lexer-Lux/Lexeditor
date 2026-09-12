@@ -90,8 +90,10 @@
     return el("textarea",{class:"terraria-list",value:values.join("\n"),placeholder,disabled:!current.editable,oninput:event=>{current.values[key]=event.target.value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean);shell?.refresh?.()}});
   }
   function boolControl(key){
-    if(!(key in current.values))return readonlyField("Not declared in build.txt");
-    return el("input",{type:"checkbox",checked:!!current.values[key],disabled:!current.editable,onchange:event=>setValue(key,event.target.checked)});
+    const declared=key in current.values;
+    const checkbox=el("input",{type:"checkbox",checked:declared?!!current.values[key]:false,disabled:!current.editable,onchange:event=>setValue(key,event.target.checked)});
+    if(declared)return checkbox;
+    return el("span",{class:"terraria-build-row"},checkbox,el("span",{class:"terraria-build-path"},"Not declared — check to add"));
   }
   function sideControl(){
     const select=el("select",{disabled:!current.editable,onchange:event=>setValue("side",event.target.value)});
@@ -119,6 +121,9 @@
         detailField({label:"HIDE CODE",control:boolControl("hideCode"),dataType:"BOOL"}),
         detailField({label:"HIDE RESOURCES",control:boolControl("hideResources"),dataType:"BOOL"}),
         detailField({label:"INCLUDE SOURCE",control:boolControl("includeSource"),dataType:"BOOL"}),
+        detailField({label:"NO COMPILE",control:boolControl("noCompile"),dataType:"BOOL"}),
+        detailField({label:"PLAYABLE ON PREVIEW",control:boolControl("playableOnPreview"),dataType:"BOOL"}),
+        detailField({label:"TRANSLATION MOD",control:boolControl("translationMod"),dataType:"BOOL"}),
       ]}),
     ]});
     return el("div",{class:"terraria-page"},...warnings(),panel,el("div",{class:"terraria-note"},"Lexeditor rewrites only modeled properties. Comments, unknown/future keys, localized display-name lines, and unrelated formatting remain untouched."));

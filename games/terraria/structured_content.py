@@ -58,8 +58,12 @@ SCHEMAS: dict[str, tuple[Field, ...]] = {
         Field("aiStyle", "AI style", "int", -1, "AI", -1, 10000), Field("aiType", "Vanilla AI type ID", "int", -1, "AI", -1, 100000), Field("animationType", "Vanilla animation type ID", "int", -1, "AI", -1, 100000),
         Field("friendly", "Friendly", "bool", False, "FLAGS"), Field("townNPC", "Town NPC", "bool", False, "FLAGS"), Field("boss", "Boss", "bool", False, "FLAGS"), Field("dontTakeDamage", "Invulnerable", "bool", False, "FLAGS"), Field("lavaImmune", "Lava immune", "bool", False, "FLAGS"), Field("noGravity", "No gravity", "bool", False, "FLAGS"), Field("noTileCollide", "No tile collision", "bool", False, "FLAGS"), Field("netAlways", "Always network-sync", "bool", False, "FLAGS"),
         Field("npcSlots", "Spawn slot cost", "float", 1.0, "SPAWN", 0, 1000), Field("catchItem", "Catch item ID (0 none)", "int", 0, "SPAWN", 0, 100000),
-        Field("spawnChance", "Constant spawn chance", "float", 0.0, "SPAWN", 0, 1, help="0 leaves natural spawning undefined; positive emits a constant SpawnChance."),
-        Field("lootKind", "Simple loot type", "enum", "none", "LOOT", options=("none", "vanilla", "modItem")), Field("lootItemId", "Vanilla loot item ID", "int", 0, "LOOT", 0, 100000), Field("lootItemName", "Mod loot item class", "identifier", "", "LOOT"), Field("lootChance", "Loot chance denominator", "int", 1, "LOOT", 1, 1_000_000), Field("lootMin", "Loot minimum stack", "int", 1, "LOOT", 1, 9999), Field("lootMax", "Loot maximum stack", "int", 1, "LOOT", 1, 9999),
+        Field("spawnChance", "Base spawn chance", "float", 0.0, "SPAWN", 0, 1, help="0 leaves natural spawning undefined; positive enables the structured spawn rules below."),
+        Field("spawnZone", "Player biome", "enum", "Any", "SPAWN CONDITIONS", options=("Any","Forest","Jungle","Snow","Desert","Beach","Dungeon","Corruption","Crimson","Hallow","Glowshroom")),
+        Field("spawnDepth", "Depth", "enum", "Any", "SPAWN CONDITIONS", options=("Any","Sky","Overworld","DirtLayer","RockLayer","Underworld")), Field("spawnTime", "Time", "enum", "Any", "SPAWN CONDITIONS", options=("Any","Day","Night")), Field("spawnHardmode", "World mode", "enum", "Any", "SPAWN CONDITIONS", options=("Any","PreHardmode","Hardmode")), Field("spawnRain", "Weather", "enum", "Any", "SPAWN CONDITIONS", options=("Any","Raining","Dry")),
+        Field("spawnWater", "Spawn tile water", "enum", "Any", "SPAWN CONTEXT", options=("Any","Water","Dry")), Field("spawnSafety", "Player safety", "enum", "Any", "SPAWN CONTEXT", options=("Any","Safe","Unsafe")), Field("spawnTown", "Town state", "enum", "Any", "SPAWN CONTEXT", options=("Any","InTown","OutsideTown")), Field("spawnInvasion", "Invasion state", "enum", "Any", "SPAWN CONTEXT", options=("Any","Invasion","NoInvasion")), Field("spawnSpecial", "Special spawn area", "enum", "Any", "SPAWN CONTEXT", options=("Any","Granite","Marble","DesertCave","SpiderCave","Lihzahrd")),
+        Field("lootKind", "Primary loot type", "enum", "none", "LOOT", options=("none", "vanilla", "modItem")), Field("lootItemId", "Vanilla loot item ID", "int", 0, "LOOT", 0, 100000), Field("lootItemName", "Mod loot item class", "identifier", "", "LOOT"), Field("lootChance", "Loot chance denominator", "int", 1, "LOOT", 1, 1_000_000), Field("lootMin", "Loot minimum stack", "int", 1, "LOOT", 1, 9999), Field("lootMax", "Loot maximum stack", "int", 1, "LOOT", 1, 9999),
+        Field("lootRules", "Additional loot rules", "lines", "", "LOOT", help="One per line: vanilla:<id>,<chance denominator>,<min>,<max> or mod:<ClassName>,<chance>,<min>,<max>. Missing numeric columns default to 1."),
     ),
     "projectile": (
         Field("width", "Width", "int", 8, "HITBOX", 1, 4000), Field("height", "Height", "int", 8, "HITBOX", 1, 4000), Field("frames", "Sprite frames", "int", 1, "VISUAL", 1, 1000), Field("scale", "Scale", "float", 1.0, "VISUAL", 0.01, 100), Field("alpha", "Alpha", "int", 0, "VISUAL", 0, 255), Field("light", "Light", "float", 0.0, "VISUAL", 0, 10),
@@ -119,13 +123,30 @@ SCHEMAS: dict[str, tuple[Field, ...]] = {
         Field("command", "Command text", "text", "example", "COMMAND", help="Without the leading slash and without whitespace."), Field("commandType", "Command context", "enum", "Chat", "COMMAND", options=("Chat","Server","Console","World")), Field("caseSensitive", "Case sensitive arguments", "bool", False, "COMMAND"),
         Field("usage", "Usage text (blank = automatic)", "text", "", "HELP"), Field("description", "Description", "text", "", "HELP"), Field("replyText", "Fixed reply text", "text", "", "ACTION"), Field("echoArguments", "Echo arguments", "bool", False, "ACTION"),
     ),
+    "sceneEffect": (
+        Field("enabled", "Enable scene condition", "bool", False, "ACTIVATION", help="Disabled scene effects never activate until configured and enabled."), Field("zone", "Player biome", "enum", "Any", "ACTIVATION", options=("Any","Forest","Jungle","Snow","Desert","Beach","Dungeon","Corruption","Crimson","Hallow","Glowshroom")), Field("depth", "Depth", "enum", "Any", "ACTIVATION", options=("Any","Sky","Overworld","DirtLayer","RockLayer","Underworld")), Field("time", "Time", "enum", "Any", "ACTIVATION", options=("Any","Day","Night")), Field("hardmode", "World mode", "enum", "Any", "ACTIVATION", options=("Any","PreHardmode","Hardmode")), Field("rain", "Weather", "enum", "Any", "ACTIVATION", options=("Any","Raining","Dry")),
+        Field("music", "Music ID (-1 inherit)", "int", -1, "SCENE", -1, 100000), Field("priority", "Scene priority", "enum", "None", "SCENE", options=("None","BiomeLow","BiomeMedium","BiomeHigh","Environment","Event","BossLow","BossMedium","BossHigh")), Field("weight", "Priority weight", "float", 0.5, "SCENE", 0, 1),
+    ),
+    "dust": (
+        Field("updateType", "Copy vanilla dust behavior (-1 none)", "int", -1, "BEHAVIOR", -1, 100000), Field("vanillaUpdate", "Run vanilla dust update", "bool", True, "BEHAVIOR"), Field("midUpdateOwnBehavior", "Handle MidUpdate behavior", "bool", False, "BEHAVIOR"),
+        Field("noGravity", "No gravity", "bool", False, "SPAWN"), Field("noLight", "Ignore lighting flag", "bool", False, "SPAWN"), Field("fadeIn", "Fade-in value", "float", 0.0, "SPAWN", 0, 1000), Field("scaleMultiplier", "Scale multiplier", "float", 1.0, "SPAWN", 0.01, 1000), Field("velocityMultiplier", "Velocity multiplier", "float", 1.0, "SPAWN", 0, 1000), Field("fullbright", "Draw fullbright", "bool", False, "DRAW"),
+    ),
+    "globalBuff": (
+        Field("targetId", "Target buff ID", "int", 0, "TARGET", 0, 100000), Field("defenseBonus", "Player defense bonus", "int", 0, "PLAYER EFFECT", -10000, 10000), Field("moveSpeedBonus", "Move speed bonus", "float", 0.0, "PLAYER EFFECT", -10, 100), Field("lifeRegenBonus", "Life regen bonus", "int", 0, "PLAYER EFFECT", -100000, 100000), Field("allowCancel", "Allow right-click cancel", "bool", True, "BEHAVIOR"),
+    ),
+    "globalTile": (
+        Field("targetId", "Target tile ID", "int", 0, "TARGET", 0, 100000), Field("allowDrop", "Allow default drop", "bool", True, "BEHAVIOR"), Field("dangerous", "Dangersense override", "enum", "unchanged", "SENSES", options=("unchanged","true","false")), Field("spelunkable", "Spelunker override", "enum", "unchanged", "SENSES", options=("unchanged","true","false")),
+    ),
+    "globalWall": (
+        Field("targetId", "Target wall ID", "int", 0, "TARGET", 0, 100000), Field("allowDefaultDrop", "Allow default drop", "bool", True, "DROP"), Field("dropOverride", "Drop item ID (-1 unchanged)", "int", -1, "DROP", -1, 100000), Field("allowTeleport", "Allow teleport destination", "bool", True, "BEHAVIOR"),
+    ),
     "recipe": (
         Field("resultKind", "Result type", "enum", "modItem", "RESULT", options=("modItem", "vanilla")), Field("resultName", "Result mod item class", "identifier", "", "RESULT"), Field("resultId", "Result vanilla item ID", "int", 0, "RESULT", 0, 100000), Field("resultStack", "Result stack", "int", 1, "RESULT", 1, 9999),
         Field("ingredients", "Ingredients", "lines", "", "RECIPE", help="One per line: vanilla:<id>=<stack> or mod:<ClassName>=<stack>."), Field("stations", "Crafting stations", "lines", "", "RECIPE", help="One per line: vanilla:<tileId> or mod:<TileClassName>."),
     ),
 }
 
-_LABELS = {"item":"ModItem","npc":"ModNPC","projectile":"ModProjectile","buff":"ModBuff","tile":"ModTile (simple 1×1)","wall":"ModWall","globalItem":"GlobalItem (vanilla modifier)","globalNPC":"GlobalNPC (vanilla modifier)","globalProjectile":"GlobalProjectile (vanilla modifier)","prefix":"ModPrefix","rarity":"ModRarity","biome":"ModBiome","config":"ModConfig","command":"ModCommand","recipe":"Recipe"}
+_LABELS = {"item":"ModItem","npc":"ModNPC","projectile":"ModProjectile","buff":"ModBuff","tile":"ModTile (simple 1×1)","wall":"ModWall","globalItem":"GlobalItem (vanilla modifier)","globalNPC":"GlobalNPC (vanilla modifier)","globalProjectile":"GlobalProjectile (vanilla modifier)","prefix":"ModPrefix","rarity":"ModRarity","biome":"ModBiome","config":"ModConfig","command":"ModCommand","sceneEffect":"ModSceneEffect","dust":"ModDust","globalBuff":"GlobalBuff","globalTile":"GlobalTile","globalWall":"GlobalWall","recipe":"Recipe"}
 
 def schemas_public() -> dict:
     return {"kinds":[{"kind":k,"label":_LABELS[k],"fields":[f.public() for f in v]} for k,v in SCHEMAS.items()]}
@@ -164,6 +185,7 @@ def validate_values(kind: str, values: object) -> dict[str, Any]:
     if kind=="npc":
         if out["lootMin"]>out["lootMax"]: raise ValueError("Loot minimum stack cannot exceed maximum stack")
         if out["lootKind"]=="modItem" and not out["lootItemName"]: raise ValueError("Mod loot item class is required")
+        _parse_loot_rules(out["lootRules"])
     if kind in {"tile","wall"} and out["dropKind"]=="modItem" and not out["dropItemName"]: raise ValueError("Mod drop item class is required")
     if kind=="projectile" and out["usesLocalNPCImmunity"] and out["usesIDStaticNPCImmunity"]: raise ValueError("Projectile cannot use local and shared ID-static NPC immunity at the same time")
     if kind=="recipe":
@@ -185,6 +207,19 @@ def _managed(lines): return "\n".join([BEGIN_MARKER,*(("    "+x) if x else "" fo
 def _render_item(v):
     return ["public override void SetDefaults()","{",f"    Item.width = {v['width']};",f"    Item.height = {v['height']};",f"    Item.maxStack = {v['maxStack']};",f"    Item.value = {v['value']};",f"    Item.rare = {v['rare']};",f"    Item.damage = {v['damage']};",f"    Item.DamageType = DamageClass.{v['damageClass']};",f"    Item.knockBack = {_f(v['knockBack'])};",f"    Item.crit = {v['crit']};",f"    Item.defense = {v['defense']};",f"    Item.useTime = {v['useTime']};",f"    Item.useAnimation = {v['useAnimation']};",f"    Item.useStyle = {v['useStyle']};",f"    Item.useTurn = {_b(v['useTurn'])};",f"    Item.autoReuse = {_b(v['autoReuse'])};",f"    Item.channel = {_b(v['channel'])};",f"    Item.noMelee = {_b(v['noMelee'])};",f"    Item.consumable = {_b(v['consumable'])};",f"    Item.accessory = {_b(v['accessory'])};",f"    Item.shootSpeed = {_f(v['shootSpeed'])};",f"    Item.mana = {v['mana']};",f"    Item.healLife = {v['healLife']};",f"    Item.healMana = {v['healMana']};",f"    Item.pick = {v['pick']};",f"    Item.axe = {v['axe']};",f"    Item.hammer = {v['hammer']};",f"    Item.ammo = {v['ammo']};",f"    Item.useAmmo = {v['useAmmo']};",f"    Item.shoot = {v['shoot']};",f"    Item.createTile = {v['createTile']};",f"    Item.createWall = {v['createWall']};",f"    Item.placeStyle = {v['placeStyle']};","}"]
 
+def _npc_spawn_condition(v):
+    zone={"Any":None,"Forest":"spawnInfo.Player.ZoneForest","Jungle":"spawnInfo.Player.ZoneJungle","Snow":"spawnInfo.Player.ZoneSnow","Desert":"spawnInfo.Player.ZoneDesert","Beach":"spawnInfo.Player.ZoneBeach","Dungeon":"spawnInfo.Player.ZoneDungeon","Corruption":"spawnInfo.Player.ZoneCorrupt","Crimson":"spawnInfo.Player.ZoneCrimson","Hallow":"spawnInfo.Player.ZoneHallow","Glowshroom":"spawnInfo.Player.ZoneGlowshroom"}[v["spawnZone"]]
+    depth={"Any":None,"Sky":"spawnInfo.Sky","Overworld":"spawnInfo.Player.ZoneOverworldHeight","DirtLayer":"spawnInfo.Player.ZoneDirtLayerHeight","RockLayer":"spawnInfo.Player.ZoneRockLayerHeight","Underworld":"spawnInfo.Player.ZoneUnderworldHeight"}[v["spawnDepth"]]
+    time={"Any":None,"Day":"Main.dayTime","Night":"!Main.dayTime"}[v["spawnTime"]]
+    hardmode={"Any":None,"PreHardmode":"!Main.hardMode","Hardmode":"Main.hardMode"}[v["spawnHardmode"]]
+    rain={"Any":None,"Raining":"Main.raining","Dry":"!Main.raining"}[v["spawnRain"]]
+    water={"Any":None,"Water":"spawnInfo.Water","Dry":"!spawnInfo.Water"}[v["spawnWater"]]
+    safety={"Any":None,"Safe":"spawnInfo.PlayerSafe","Unsafe":"!spawnInfo.PlayerSafe"}[v["spawnSafety"]]
+    town={"Any":None,"InTown":"spawnInfo.PlayerInTown","OutsideTown":"!spawnInfo.PlayerInTown"}[v["spawnTown"]]
+    invasion={"Any":None,"Invasion":"spawnInfo.Invasion","NoInvasion":"!spawnInfo.Invasion"}[v["spawnInvasion"]]
+    special={"Any":None,"Granite":"spawnInfo.Granite","Marble":"spawnInfo.Marble","DesertCave":"spawnInfo.DesertCave","SpiderCave":"spawnInfo.SpiderCave","Lihzahrd":"spawnInfo.Lihzahrd"}[v["spawnSpecial"]]
+    return " && ".join(part for part in (zone,depth,time,hardmode,rain,water,safety,town,invasion,special) if part) or "true"
+
 def _render_npc(mod,v):
     out=[]
     if v['frames']!=1: out += ["public override void SetStaticDefaults()","{",f"    Main.npcFrameCount[Type] = {v['frames']};","}",""]
@@ -192,10 +227,18 @@ def _render_npc(mod,v):
     if v['aiType']>=0: out.append(f"    AIType = {v['aiType']};")
     if v['animationType']>=0: out.append(f"    AnimationType = {v['animationType']};")
     out += ["}"]
-    if v['spawnChance']>0: out += ["",f"public override float SpawnChance(NPCSpawnInfo spawnInfo) => {_f(v['spawnChance'])};"]
+    if v['spawnChance']>0:
+        condition=_npc_spawn_condition(v)
+        spawn=f"public override float SpawnChance(NPCSpawnInfo spawnInfo) => {_f(v['spawnChance'])};" if condition=='true' else f"public override float SpawnChance(NPCSpawnInfo spawnInfo) => ({condition}) ? {_f(v['spawnChance'])} : 0f;"
+        out += ["",spawn]
+    loot=[]
     if v['lootKind']!='none':
         item=str(v['lootItemId']) if v['lootKind']=='vanilla' else f"ModContent.ItemType<global::{mod}.Content.Items.{v['lootItemName']}>()"
-        out += ["","public override void ModifyNPCLoot(NPCLoot npcLoot)","{",f"    npcLoot.Add(ItemDropRule.Common({item}, {v['lootChance']}, {v['lootMin']}, {v['lootMax']}));","}"]
+        loot.append(f"npcLoot.Add(ItemDropRule.Common({item}, {v['lootChance']}, {v['lootMin']}, {v['lootMax']}));")
+    for kind,value,chance,minimum,maximum in _parse_loot_rules(v['lootRules']):
+        item=str(value) if kind=='vanilla' else f"ModContent.ItemType<global::{mod}.Content.Items.{value}>()"
+        loot.append(f"npcLoot.Add(ItemDropRule.Common({item}, {chance}, {minimum}, {maximum}));")
+    if loot: out += ["","public override void ModifyNPCLoot(NPCLoot npcLoot)","{",*("    "+line for line in loot),"}"]
     return out
 
 def _render_projectile(v):
@@ -270,6 +313,33 @@ def _render_prefix(v):
     if v['valueMult']!=1: out += ["","public override void ModifyValue(ref float valueMult)","{",f"    valueMult *= {_f(v['valueMult'])};","}"]
     return out
 
+def _parse_loot_rules(text):
+    rows=[]
+    for n,raw in enumerate(text.splitlines(),1):
+        line=raw.strip()
+        if not line: continue
+        parts=[part.strip() for part in line.split(',')]
+        if len(parts)>4 or ':' not in parts[0]: raise ValueError(f"Loot rule line {n} must use kind:value[,chance[,min[,max]]]")
+        kind,value=(part.strip() for part in parts[0].split(':',1))
+        if kind=='vanilla':
+            try: value=int(value)
+            except ValueError as e: raise ValueError(f"Loot rule line {n} vanilla ID is invalid") from e
+            if value<0: raise ValueError(f"Loot rule line {n} vanilla ID is invalid")
+        elif kind=='mod': value=validate_content_name(value)
+        else: raise ValueError(f"Loot rule line {n} must start with vanilla: or mod:")
+        numbers=[]
+        for i,default in enumerate((1,1,1),1):
+            if len(parts)>i and parts[i]:
+                try: number=int(parts[i])
+                except ValueError as e: raise ValueError(f"Loot rule line {n} numeric column is invalid") from e
+            else: number=default
+            numbers.append(number)
+        chance,minimum,maximum=numbers
+        if chance<1: raise ValueError(f"Loot rule line {n} chance denominator must be at least 1")
+        if minimum<1 or maximum<minimum or maximum>9999: raise ValueError(f"Loot rule line {n} stack range is invalid")
+        rows.append((kind,value,chance,minimum,maximum))
+    return rows
+
 def _parse_config_fields(text):
     rows=[]
     for n,raw in enumerate(text.splitlines(),1):
@@ -331,6 +401,62 @@ def _parse_stations(text):
         rows.append((kind,value))
     return rows
 
+def _scene_effect_condition(v):
+    if not v["enabled"]: return "false"
+    zone={"Any":None,"Forest":"player.ZoneForest","Jungle":"player.ZoneJungle","Snow":"player.ZoneSnow","Desert":"player.ZoneDesert","Beach":"player.ZoneBeach","Dungeon":"player.ZoneDungeon","Corruption":"player.ZoneCorrupt","Crimson":"player.ZoneCrimson","Hallow":"player.ZoneHallow","Glowshroom":"player.ZoneGlowshroom"}[v["zone"]]
+    depth={"Any":None,"Sky":"player.ZoneSkyHeight","Overworld":"player.ZoneOverworldHeight","DirtLayer":"player.ZoneDirtLayerHeight","RockLayer":"player.ZoneRockLayerHeight","Underworld":"player.ZoneUnderworldHeight"}[v["depth"]]
+    time={"Any":None,"Day":"Main.dayTime","Night":"!Main.dayTime"}[v["time"]]
+    hardmode={"Any":None,"PreHardmode":"!Main.hardMode","Hardmode":"Main.hardMode"}[v["hardmode"]]
+    rain={"Any":None,"Raining":"Main.raining","Dry":"!Main.raining"}[v["rain"]]
+    parts=[part for part in (zone,depth,time,hardmode,rain) if part]
+    parts.append("AdditionalCondition(player)")
+    return " && ".join(parts)
+
+def _render_scene_effect(v):
+    return [f"public override int Music => {v['music']};",f"public override SceneEffectPriority Priority => SceneEffectPriority.{v['priority']};",f"public override float GetWeight(Player player) => {_f(v['weight'])};","",f"public override bool IsSceneEffectActive(Player player) => {_scene_effect_condition(v)};"]
+
+def _render_dust(v):
+    out=[]
+    if v['updateType']>=0: out += ["public override void SetStaticDefaults()","{",f"    UpdateType = {v['updateType']};","}"]
+    spawn=v['noGravity'] or v['noLight'] or v['fadeIn']!=0 or v['scaleMultiplier']!=1 or v['velocityMultiplier']!=1
+    if spawn:
+        if out: out.append("")
+        out += ["public override void OnSpawn(Dust dust)","{"]
+        if v['noGravity']: out.append("    dust.noGravity = true;")
+        if v['noLight']: out.append("    dust.noLight = true;")
+        if v['fadeIn']!=0: out.append(f"    dust.fadeIn = {_f(v['fadeIn'])};")
+        if v['scaleMultiplier']!=1: out.append(f"    dust.scale *= {_f(v['scaleMultiplier'])};")
+        if v['velocityMultiplier']!=1: out.append(f"    dust.velocity *= {_f(v['velocityMultiplier'])};")
+        out += ["}"]
+    if not v['vanillaUpdate']: out += ([""] if out else []) + ["public override bool Update(Dust dust) => false;"]
+    if v['midUpdateOwnBehavior']: out += ([""] if out else []) + ["public override bool MidUpdate(Dust dust) => true;"]
+    if v['fullbright']: out += ([""] if out else []) + ["public override Color? GetAlpha(Dust dust, Color lightColor) => Color.White;"]
+    return out
+
+def _render_global_buff(v):
+    out=[]
+    if v['defenseBonus'] or v['moveSpeedBonus'] or v['lifeRegenBonus']:
+        out += ["public override void Update(int type, Player player, ref int buffIndex)","{",f"    if (type != {v['targetId']}) return;"]
+        if v['defenseBonus']: out.append(f"    player.statDefense += {v['defenseBonus']};")
+        if v['moveSpeedBonus']: out.append(f"    player.moveSpeed += {_f(v['moveSpeedBonus'])};")
+        if v['lifeRegenBonus']: out.append(f"    player.lifeRegen += {v['lifeRegenBonus']};")
+        out += ["}"]
+    if not v['allowCancel']: out += ([""] if out else []) + [f"public override bool RightClick(int type, int buffIndex) => type != {v['targetId']};"]
+    return out
+
+def _render_global_tile(v):
+    out=[f"public override bool CanDrop(int i, int j, int type) => type != {v['targetId']} || {_b(v['allowDrop'])};"]
+    if v['dangerous']!='unchanged': out += ["", "public override bool? IsTileDangerous(int i, int j, int type, Player player)", "{", f"    if (type != {v['targetId']}) return null;", f"    return {v['dangerous']};", "}"]
+    if v['spelunkable']!='unchanged': out += ["", "public override bool? IsTileSpelunkable(int i, int j, int type)", "{", f"    if (type != {v['targetId']}) return null;", f"    return {v['spelunkable']};", "}"]
+    return out
+
+def _render_global_wall(v):
+    out=["public override bool Drop(int i, int j, int type, ref int dropType)","{",f"    if (type != {v['targetId']}) return true;"]
+    if v['dropOverride']>=0: out.append(f"    dropType = {v['dropOverride']};")
+    out += [f"    return {_b(v['allowDefaultDrop'])};","}"]
+    if not v['allowTeleport']: out += ["",f"public override bool CanBeTeleportedTo(int i, int j, int type, Player player, string context) => type != {v['targetId']};"]
+    return out
+
 def _render_rarity(v):
     return [f"public override Color RarityColor => new Color({v['colorR']}, {v['colorG']}, {v['colorB']});"]
 
@@ -389,7 +515,7 @@ def _render_recipe(mod,v):
     out += ["    recipe.Register();","}"]; return out
 
 def _render_region(mod,kind,v):
-    return {'item':lambda:_render_item(v),'npc':lambda:_render_npc(mod,v),'projectile':lambda:_render_projectile(v),'buff':lambda:_render_buff(v),'tile':lambda:_render_tile(mod,v),'wall':lambda:_render_wall(mod,v),'globalItem':lambda:_render_global_item(v),'globalNPC':lambda:_render_global_npc(v),'globalProjectile':lambda:_render_global_projectile(v),'prefix':lambda:_render_prefix(v),'rarity':lambda:_render_rarity(v),'biome':lambda:_render_biome(v),'config':lambda:_render_config(v),'command':lambda:_render_command(v),'recipe':lambda:_render_recipe(mod,v)}[kind]()
+    return {'item':lambda:_render_item(v),'npc':lambda:_render_npc(mod,v),'projectile':lambda:_render_projectile(v),'buff':lambda:_render_buff(v),'tile':lambda:_render_tile(mod,v),'wall':lambda:_render_wall(mod,v),'globalItem':lambda:_render_global_item(v),'globalNPC':lambda:_render_global_npc(v),'globalProjectile':lambda:_render_global_projectile(v),'prefix':lambda:_render_prefix(v),'rarity':lambda:_render_rarity(v),'biome':lambda:_render_biome(v),'config':lambda:_render_config(v),'command':lambda:_render_command(v),'sceneEffect':lambda:_render_scene_effect(v),'dust':lambda:_render_dust(v),'globalBuff':lambda:_render_global_buff(v),'globalTile':lambda:_render_global_tile(v),'globalWall':lambda:_render_global_wall(v),'recipe':lambda:_render_recipe(mod,v)}[kind]()
 
 def _kind_spec(kind,name):
     return {
@@ -407,14 +533,19 @@ def _kind_spec(kind,name):
         'biome':(f"Content/Biomes/{name}.cs",'ModBiome',('Microsoft.Xna.Framework','Terraria','Terraria.ModLoader')),
         'config':(f"Common/Configs/{name}.cs",'ModConfig',('System.ComponentModel','Terraria.ModLoader.Config')),
         'command':(f"Common/Commands/{name}.cs",'ModCommand',('Terraria.ModLoader',)),
+        'sceneEffect':(f"Content/SceneEffects/{name}.cs",'ModSceneEffect',('Terraria','Terraria.ModLoader')),
+        'dust':(f"Content/Dusts/{name}.cs",'ModDust',('Microsoft.Xna.Framework','Terraria','Terraria.ModLoader')),
+        'globalBuff':(f"Common/GlobalBuffs/{name}.cs",'GlobalBuff',('Terraria','Terraria.ModLoader')),
+        'globalTile':(f"Common/GlobalTiles/{name}.cs",'GlobalTile',('Terraria','Terraria.ModLoader')),
+        'globalWall':(f"Common/GlobalWalls/{name}.cs",'GlobalWall',('Terraria','Terraria.ModLoader')),
         'recipe':(f"Common/Recipes/{name}.cs",'ModSystem',('Terraria','Terraria.ModLoader')),
     }[kind]
 
 def _namespace(mod,kind):
-    return {'item':f'{mod}.Content.Items','npc':f'{mod}.Content.NPCs','projectile':f'{mod}.Content.Projectiles','buff':f'{mod}.Content.Buffs','tile':f'{mod}.Content.Tiles','wall':f'{mod}.Content.Walls','globalItem':f'{mod}.Common.GlobalItems','globalNPC':f'{mod}.Common.GlobalNPCs','globalProjectile':f'{mod}.Common.GlobalProjectiles','prefix':f'{mod}.Content.Prefixes','rarity':f'{mod}.Content.Rarities','biome':f'{mod}.Content.Biomes','config':f'{mod}.Common.Configs','command':f'{mod}.Common.Commands','recipe':f'{mod}.Common.Recipes'}[kind]
+    return {'item':f'{mod}.Content.Items','npc':f'{mod}.Content.NPCs','projectile':f'{mod}.Content.Projectiles','buff':f'{mod}.Content.Buffs','tile':f'{mod}.Content.Tiles','wall':f'{mod}.Content.Walls','globalItem':f'{mod}.Common.GlobalItems','globalNPC':f'{mod}.Common.GlobalNPCs','globalProjectile':f'{mod}.Common.GlobalProjectiles','prefix':f'{mod}.Content.Prefixes','rarity':f'{mod}.Content.Rarities','biome':f'{mod}.Content.Biomes','config':f'{mod}.Common.Configs','command':f'{mod}.Common.Commands','sceneEffect':f'{mod}.Content.SceneEffects','dust':f'{mod}.Content.Dusts','globalBuff':f'{mod}.Common.GlobalBuffs','globalTile':f'{mod}.Common.GlobalTiles','globalWall':f'{mod}.Common.GlobalWalls','recipe':f'{mod}.Common.Recipes'}[kind]
 
 def _custom_tail(kind):
-    if kind=="biome": return "    private bool AdditionalCondition(Player player) => true;"
+    if kind in {"biome","sceneEffect"}: return "    private bool AdditionalCondition(Player player) => true;"
     if kind=="command": return "    private void CustomAction(CommandCaller caller, string input, string[] args)\n    {\n    }"
     return ""
 
@@ -496,11 +627,13 @@ def create_structured_content(root,kind,name,values,display_name='',description=
     if not isinstance(description,str) or any(c in description for c in '\r\n\x00'): raise ValueError("Description must fit on one line")
     display=display_name.strip() or default_display_name(name); desc=description.strip(); v=validate_values(kind,values); source_relative,_,_=_kind_spec(kind,name); source_target=project/source_relative
     if source_target.exists(): raise ValueError(f"C# source file already exists: {source_relative}")
-    primary_texture=kind in {'item','npc','projectile','buff','tile','wall'}
+    primary_texture=kind in {'item','npc','projectile','buff','tile','wall','dust'}
     asset_specs=[]
-    if primary_texture: asset_specs.append((source_relative[:-3]+'.png',32 if kind=='buff' else 16))
-    if kind=='biome': asset_specs += [(f'Content/Biomes/{name}_Icon.png',30),(f'Content/Biomes/{name}_Background.png',64)]
-    for asset_relative,_size in asset_specs:
+    if kind=='dust': asset_specs.append((source_relative[:-3]+'.png',10,30))
+    elif primary_texture:
+        size=32 if kind=='buff' else 16; asset_specs.append((source_relative[:-3]+'.png',size,size))
+    if kind=='biome': asset_specs += [(f'Content/Biomes/{name}_Icon.png',30,30),(f'Content/Biomes/{name}_Background.png',64,64)]
+    for asset_relative,_width,_height in asset_specs:
         if (project/asset_relative).exists(): raise ValueError(f"Asset file already exists: {asset_relative}")
     loc_target=project/'Localization'/'en-US.hjson'; creates=_loc_plan(mod,kind,name,display,desc); loc_existed=loc_target.is_file(); loc_original=loc_target.read_bytes() if loc_existed else b''; loc_written=src_written=False; created_assets=[]; texture_state=None
     if creates:
@@ -513,8 +646,8 @@ def create_structured_content(root,kind,name,values,display_name='',description=
         changed=apply_localization_changes(loc_text,{},creates); loc_bytes=(UTF8_BOM if bom else b'')+changed.encode('utf-8')
     try:
         source_state=create_source(project,source_relative,render_structured_source(mod,kind,name,v)); src_written=True
-        for asset_relative,size in asset_specs:
-            created_assets.append(create_asset(project,asset_relative,placeholder_png(size)))
+        for asset_relative,width,height in asset_specs:
+            created_assets.append(create_asset(project,asset_relative,placeholder_png(width,height)))
         if primary_texture and created_assets: texture_state=created_assets[0]
         if creates:
             if loc_existed: _atomic(loc_target,loc_bytes)

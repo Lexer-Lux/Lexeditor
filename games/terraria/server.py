@@ -408,9 +408,11 @@ def local_mod_state(project: Path | None = None) -> dict:
         state["enabledStateValid"] = False
         state["enabledStateError"] = f"Could not parse tModLoader enabled.json: {error}"
         return state
-    if not isinstance(payload, list) or any(not isinstance(value, str) for value in payload):
+    if payload is None:
+        payload = []
+    elif not isinstance(payload, list) or any(not isinstance(value, str) for value in payload):
         state["enabledStateValid"] = False
-        state["enabledStateError"] = "tModLoader enabled.json must contain a JSON array of mod names"
+        state["enabledStateError"] = "tModLoader enabled.json must contain a JSON array of mod names or null"
         return state
     state["enabled"] = selected.name in set(payload)
     return state
