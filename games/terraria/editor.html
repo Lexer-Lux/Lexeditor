@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - Terraria</title>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    *{box-sizing:border-box}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
+    :root{--lex-accent:#77b255;--lex-highlight:#36502c}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:auto}
+    .terraria-page{max-width:1100px;margin:0 auto;display:grid;gap:var(--lex-panel-gap)}
+    .terraria-note{padding:10px 12px;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .terraria-error{border-color:#a84d4d}
+    .terraria-map{width:100%;border-collapse:collapse;background:var(--lex-panel)}
+    .terraria-map th,.terraria-map td{padding:8px 10px;border:1px solid var(--lex-border);text-align:left;vertical-align:top}
+    .terraria-map th{background:var(--lex-panel-muted,#eceff1)}
+    .terraria-status{font-weight:700;text-transform:uppercase;font-size:.8em;letter-spacing:.04em}
+  </style>
+</head>
+<body>
+  <header id="lexeditor-shell"></header>
+  <main id="main"></main>
+  <script src="/shared/framework.js"></script>
+  <script>
+  "use strict";
+  const {el,detailPanel,detailSection,detailField,readonlyField,panelLayout}=LexeditorUI;
+  let tab="metadata",saved=null,current=null,mapRows=[],error="";
+
+  const clone=value=>JSON.parse(JSON.stringify(value));
+  async function request(path,options={}){
+    const response=await fetch(path,{headers:{"Content-Type":"application/json"},...options});
+    const payload=await response.json();
+    if(!response.ok)throw new Error(payload.error||`Request failed (${response.status})`);
+    return payload;
+  }
+  function dirtyKeys(){
+    if(!saved||!current)return [];
+    return Object.keys(current.values).filter(key=>JSON.stringify(current.values[key])!==JSON.stringify(saved.values[key]));
+  }
+  const dirtyCount=()=>dirtyKeys().length;
+  function setValue(key,value){current.values[key]=value;render();shell?.refresh?.()}
+  function textControl(key,{placeholder=""}={}){
+    const input=el("input",{type:"text",value:current.values[key]??"",placeholder,
+      disabled:!current.editable,oninput:event=>{current.values[key]=event.target.value;shell?.refresh?.()}});
+    return input;
+  }
+  function boolControl(key){
+    if(!(key in current.values))return readonlyField("Not declared in build.txt");
+    return el("input",{type:"checkbox",checked:!!current.values[key],disabled:!current.editable,
+      onchange:event=>setValue(key,event.target.checked)});
+  }
+  function sideControl(){
+    const select=el("select",{disabled:!current.editable,onchange:event=>setValue("side",event.target.value)});
+    for(const value of ["Both","Client","Server","NoSync"]){
+      const option=el("option",{value},value);option.selected=current.values.side===value;select.append(option);
+    }
+    return select;
+  }
+  function metadataPanel(){
+    if(!current)return el("div",{class:"terraria-note"},"Loading build.txt…");
+    const warnings=[];
+    if(current.duplicates.length)warnings.push(el("div",{class:"terraria-note terraria-error"},`Structured saving is disabled because build.txt repeats: ${current.duplicates.join(", ")}. Remove the ambiguity in source first.`));
+    if(error)warnings.push(el("div",{class:"terraria-note terraria-error"},error));
+    const panel=detailPanel({title:"build.txt",identity:"TMOD",meta:"tModLoader package metadata",body:[
+      detailSection({title:"IDENTITY",body:[
+        detailField({label:"DISPLAY NAME",control:textControl("displayName"),dataType:"STRING"}),
+        detailField({label:"AUTHOR",control:textControl("author"),dataType:"STRING"}),
+        detailField({label:"VERSION",control:textControl("version",{placeholder:"1.0"}),dataType:"VERSION"}),
+        detailField({label:"HOMEPAGE",control:textControl("homepage",{placeholder:"Not declared"}),dataType:"STRING"}),
+      ]}),
+      detailSection({title:"RUNTIME",body:[
+        detailField({label:"SIDE",control:sideControl(),dataType:"ENUM"}),
+      ]}),
+      detailSection({title:"PACKAGE",body:[
+        detailField({label:"HIDE CODE",control:boolControl("hideCode"),dataType:"BOOL"}),
+        detailField({label:"HIDE RESOURCES",control:boolControl("hideResources"),dataType:"BOOL"}),
+        detailField({label:"INCLUDE SOURCE",control:boolControl("includeSource"),dataType:"BOOL"}),
+      ]}),
+    ]});
+    return el("div",{class:"terraria-page"},...warnings,panel,
+      el("div",{class:"terraria-note"},"Lexeditor edits only modeled scalar properties. References, buildIgnore, comments, unknown/future keys, and unrelated formatting are preserved verbatim."));
+  }
+  function dataMapPanel(){
+    const table=el("table",{class:"terraria-map"},
+      el("thead",{},el("tr",{},...['PATH','FAMILY','COVERAGE'].map(label=>el("th",{},label)))),
+      el("tbody",{},...mapRows.map(row=>el("tr",{},
+        el("td",{},row.path),el("td",{},row.family),el("td",{class:"terraria-status"},row.status))));
+    return el("div",{class:"terraria-page"},
+      el("div",{class:"terraria-note"},"Structured means Lexeditor has a format-aware editor. Recognized means the file family is known but remains outside the current structured editing surface."),table);
+  }
+  function render(){
+    const content=tab==="datamap"?dataMapPanel():metadataPanel();
+    document.querySelector("#main").replaceChildren(content);
+    shell?.refresh?.();
+  }
+  async function load(){
+    try{
+      const [metadata,map]=await Promise.all([request("/api/build-metadata"),request("/api/data-map")]);
+      saved=clone(metadata);current=clone(metadata);mapRows=map.rows;error="";
+    }catch(exc){error=String(exc.message||exc)}
+    render();
+  }
+  async function save(){
+    if(!saved||!current||!dirtyCount())return;
+    const updates={};
+    for(const key of dirtyKeys()){
+      const value=current.values[key];
+      if(value===""&&!(key in saved.values))continue;
+      updates[key]=value;
+    }
+    if(!Object.keys(updates).length){saved=clone(current);shell?.refresh?.();return}
+    try{
+      const result=await request("/api/build-metadata",{method:"POST",body:JSON.stringify({updates,expectedSha256:saved.sha256})});
+      saved=clone(result);current=clone(result);error="";
+    }catch(exc){error=String(exc.message||exc)}
+    render();
+  }
+  async function discard(){current=clone(saved);error="";render()}
+  function navigate(value){tab=value;render()}
+  const shell=LexeditorUI.mountShell({
+    host:"#lexeditor-shell",brand:"LEXEDITOR",
+    plugin:{id:"terraria",name:"Terraria",themeName:"terraria",theme:{accent:"#77b255"}},
+    tabs:[{id:"metadata",label:"Mod Metadata"}],activeTab:()=>tab,navigate,
+    help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Terraria Data Map",
+    dirtyCount,readonly:()=>!current?.editable,save,discard,
+  });
+  load().finally(()=>LexeditorUI.finishPluginLoading());
+  </script>
+</body>
+</html>
