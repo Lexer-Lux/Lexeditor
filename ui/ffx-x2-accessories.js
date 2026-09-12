@@ -184,4 +184,11 @@
   };
 
   refresh().catch(showError);
+
+  if (!document.querySelector('script[data-ffx2-jobs]')) {
+    const jobsScript = document.createElement('script');
+    jobsScript.src = '/shared/ffx-x2-jobs.js';
+    jobsScript.dataset.ffx2Jobs = '1';
+    document.head.appendChild(jobsScript);
+  }
 })();

@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlparse
 
 from . import (
     auto_ability_prices, ctb_base, deployment, ffx_auto_abilities, ffx_commands,
-    ffx_player_stats, ffx2_accessories, ffx2_abilities, gear_shops, item_prices,
+    ffx_player_stats, ffx2_accessories, ffx2_abilities, ffx2_jobs, gear_shops, item_prices,
     item_shops, launch as fahrenheit_launch, mix_table, paths, theme, treasures,
 )
 from .vbf import VBFError, VBFIndex, extract_to, read_entry, read_index
@@ -27,7 +27,7 @@ POST_ROUTES = {
     "/api/auto-ability-prices/save", "/api/ffx-auto-abilities/save",
     "/api/ffx-player-stats/save", "/api/ctb-base/save", "/api/mix-table/save",
     "/api/item-shops/save", "/api/gear-shops/save", "/api/ffx-commands/save",
-    "/api/ffx2-abilities/save", "/api/ffx2-accessories/save",
+    "/api/ffx2-abilities/save", "/api/ffx2-accessories/save", "/api/ffx2-jobs/save",
     "/api/deployment/deploy", "/api/deployment/revert", "/api/play",
 }
 _INDEX_CACHE: dict[str, tuple[tuple[int, int], VBFIndex]] = {}
@@ -336,6 +336,17 @@ def save_ffx2_accessories(request: dict) -> dict:
     )
 
 
+def ffx2_job_catalog() -> dict:
+    return _structured_payload_for("x2", ffx2_jobs.ARCHIVE_PATH, ffx2_jobs.payload)
+
+
+def save_ffx2_jobs(request: dict) -> dict:
+    return _structured_save_for(
+        "x2", request, ffx2_jobs.ARCHIVE_PATH, ffx2_jobs.apply_edits,
+        ffx2_jobs.payload, "FFX-2 Dressphere Ability Trees",
+    )
+
+
 def _map_structured_row(game: str, archive_path: str, controls: str, builder, notes) -> dict:
     key = _game_key(game)
     try:
@@ -426,6 +437,17 @@ def data_map() -> dict:
     )
     x2_accessory_row["target"] = "ffx2-accessories"
     rows.append(x2_accessory_row)
+    x2_job_row = _map_structured_row(
+        "x2", ffx2_jobs.ARCHIVE_PATH,
+        "Conservative FFX-2 dressphere ability-tree editor",
+        ffx2_jobs.payload,
+        lambda s: (
+            f"{len(s['rows'])} English/US 0xE4-byte dressphere records. Lexeditor edits only the sixteen "
+            "required-ability / ability-ID pairs at +0x3C..+0x7B; growth, weapon, creature, flag and string data are preserved."
+        ),
+    )
+    x2_job_row["target"] = "ffx2-jobs"
+    rows.append(x2_job_row)
     themed = theme_status()
     theme_parts = []
     if themed.get("background", {}).get("ready"): theme_parts.append("title/menu PNG active")
@@ -508,7 +530,7 @@ class Handler(BaseHTTPRequestHandler):
                         "ffx-item-price-editor", "ffx-auto-ability-price-editor", "ffx-auto-ability-elements-editor",
                         "ffx-player-base-stats-editor", "ffx-ctb-base-editor", "ffx-mix-editor", "ffx-item-shop-editor",
                         "ffx-gear-shop-editor", "ffx-command-animation-editor", "ffx-ability-animation-editor",
-                        "ffx2-ability-animation-editor", "ffx2-accessory-editor", "installed-game-theme",
+                        "ffx2-ability-animation-editor", "ffx2-accessory-editor", "ffx2-dressphere-ability-tree-editor", "installed-game-theme",
                         "fahrenheit-deploy", "fahrenheit-launch"]})
             elif route == "/api/dashboard": self.json_response(dashboard())
             elif route == "/api/datamap": self.json_response(data_map())
@@ -527,6 +549,7 @@ class Handler(BaseHTTPRequestHandler):
                 q = parse_qs(parsed.query); self.json_response(ffx_command_catalog(q.get("table", ["command"])[0]))
             elif route == "/api/ffx2-abilities": self.json_response(ffx2_ability_catalog())
             elif route == "/api/ffx2-accessories": self.json_response(ffx2_accessory_catalog())
+            elif route == "/api/ffx2-jobs": self.json_response(ffx2_job_catalog())
             elif route == "/api/archive":
                 q = parse_qs(parsed.query); self.json_response(archive_catalog(q.get("game", ["x"])[0], q.get("q", [""])[0], int(q.get("offset", ["0"])[0]), int(q.get("limit", ["100"])[0])))
             elif route == "/api/deployment": self.json_response(deployment.status(paths.GAME_ROOT, paths.PROJECT_ROOT))
@@ -562,6 +585,7 @@ class Handler(BaseHTTPRequestHandler):
             elif route == "/api/ffx-commands/save": result = save_ffx_commands(request)
             elif route == "/api/ffx2-abilities/save": result = save_ffx2_abilities(request)
             elif route == "/api/ffx2-accessories/save": result = save_ffx2_accessories(request)
+            elif route == "/api/ffx2-jobs/save": result = save_ffx2_jobs(request)
             elif route == "/api/deployment/deploy": result = deployment.deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
             elif route == "/api/deployment/revert": result = deployment.revert(paths.GAME_ROOT, paths.PROJECT_ROOT)
             else: result = play_game(request)

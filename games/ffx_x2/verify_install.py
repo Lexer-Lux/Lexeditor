@@ -16,7 +16,7 @@ from typing import Callable, Iterable
 
 from . import (
     auto_ability_prices, ctb_base, ffx_auto_abilities, ffx_commands,
-    ffx_player_stats, ffx2_accessories, ffx2_abilities, gear_shops, item_prices,
+    ffx_player_stats, ffx2_accessories, ffx2_abilities, ffx2_jobs, gear_shops, item_prices,
     item_shops, launch, mix_table, paths, treasures,
 )
 from .vbf import VBFError, VBFIndex, read_entry, read_index
@@ -48,6 +48,7 @@ STRUCTURED_SPECS = (
      "builder": lambda data: ffx_commands.payload_for(data, "monmagic2")},
     {"game": "x2", "key": "ffx2-abilities", "archivePath": ffx2_abilities.ARCHIVE_PATH, "builder": ffx2_abilities.payload},
     {"game": "x2", "key": "ffx2-accessories", "archivePath": ffx2_accessories.ARCHIVE_PATH, "builder": ffx2_accessories.payload},
+    {"game": "x2", "key": "ffx2-dressphere-abilities", "archivePath": ffx2_jobs.ARCHIVE_PATH, "builder": ffx2_jobs.payload},
 )
 EXPECTED_STRUCTURED_KEYS = tuple(str(spec["key"]) for spec in STRUCTURED_SPECS)
 

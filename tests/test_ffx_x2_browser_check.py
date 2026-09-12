@@ -141,6 +141,18 @@ def responses() -> dict[str, object]:
                 "abilityIds": [0x8000, 0x8001, 0, 0],
             }],
         ),
+        "/api/ffx2-jobs": _state(
+            "FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/job.bin",
+            recordSize=0xE4, abilityCount=16, abilityOffset=0x3C,
+            rows=[{
+                "id": 0, "icon": 9, "berserkAction": 0x3000,
+                "nameOffset": 1, "nameKey": 2, "helpOffset": 3, "helpKey": 4,
+                "abilities": [
+                    {"requirementId": 0x4000 + slot, "abilityId": 0x5000 + slot}
+                    for slot in range(16)
+                ],
+            }],
+        ),
         "/api/launch": {
             "platformSupported": True,
             "stage0Ready": True,
@@ -229,6 +241,7 @@ window.fetch=async function(url,options={}) {
 
 SHARED_SCRIPTS = {
     "/shared/ffx-x2-accessories.js": ROOT / "ui/ffx-x2-accessories.js",
+    "/shared/ffx-x2-jobs.js": ROOT / "ui/ffx-x2-jobs.js",
     "/shared/ffx-x2-launch.js": ROOT / "ui/ffx-x2-launch.js",
     "/shared/ffx-commands.js": ROOT / "ui/ffx-commands.js",
     "/shared/ffx-auto-abilities.js": ROOT / "ui/ffx-auto-abilities.js",
@@ -260,7 +273,7 @@ def run(output: Path, executable: str | None) -> None:
                 page.route("**/*", serve_shared)
                 page.set_content(document(), wait_until="domcontentloaded")
 
-                expect(page.locator(".ffxx2-nav [data-view]")).to_have_count(16)
+                expect(page.locator(".ffxx2-nav [data-view]")).to_have_count(17)
                 expect(page.locator("#ffxx2-play-controls")).to_have_count(1)
                 expect(page.locator("#ffxx2-mod-loader .lex-detail-field")).to_have_count(5)
                 expect(page.locator("#ffxx2-mod-loader")).to_contain_text("MOD LOADER")
@@ -269,6 +282,7 @@ def run(output: Path, executable: str | None) -> None:
                 expect(page.locator("#ffx-auto-ability-fields [data-element-group]")).to_have_count(5)
                 expect(page.locator("#ffx-player-fields .ffxx2-slot")).to_have_count(10)
                 expect(page.locator("#x2-accessory-fields .ffxx2-slot")).to_have_count(5)
+                expect(page.locator("#x2-job-fields .ffxx2-slot")).to_have_count(16)
                 expect(page.locator("#error")).to_have_text("")
                 assert not errors, errors
 
@@ -291,11 +305,18 @@ def run(output: Path, executable: str | None) -> None:
                 expect(page.locator('[data-panel="ffx2-accessories"]')).to_be_visible()
                 expect(page.get_by_label("Accessory 0 price")).to_have_value("500")
 
+                page.locator('[data-view="ffx2-jobs"]').click()
+                expect(page.locator('[data-panel="ffx2-jobs"]')).to_be_visible()
+                expect(page.get_by_label("Dressphere 0 ability 1 requirement")).to_have_value(str(0x4000))
+                expect(page.get_by_label("Dressphere 0 ability 1")).to_have_value(str(0x5000))
+                page.get_by_label("Dressphere 0 ability 1").fill(str(0x5ABC))
+                expect(page.locator("#x2-job-save")).to_be_enabled()
+
                 geometry = page.evaluate("""() => ({
                   viewport: innerWidth,
                   document: document.documentElement.scrollWidth,
                   workspace: document.querySelector('.ffxx2-workspace').getBoundingClientRect().width,
-                  panel: document.querySelector('[data-panel="ffx2-accessories"]').getBoundingClientRect().width,
+                  panel: document.querySelector('[data-panel="ffx2-jobs"]').getBoundingClientRect().width,
                 })""")
                 assert geometry["document"] <= geometry["viewport"] + 1, (width, "document overflow", geometry)
                 assert geometry["workspace"] <= geometry["viewport"] + 1, (width, "workspace overflow", geometry)
