@@ -2,7 +2,7 @@
 
 ## Supported boundary
 
-Lexeditor's Terraria plugin targets the current **tModLoader 1.4.4 stable** line rather than rewriting vanilla Terraria files directly. The Steam tModLoader application is app `1281930`; vanilla Terraria remains a separate read-only dependency/runtime source.
+Lexeditor's Terraria plugin targets **tModLoader 1.4.4 stable v2026.07.3.0** (the latest stable release as of 2026-09-12) rather than rewriting vanilla Terraria files directly. The Steam tModLoader application is app `1281930`; vanilla Terraria remains a separate read-only dependency/runtime source.
 
 Current stable tModLoader is the loader, build system, source-project workflow, local package format and Workshop path. Lexeditor therefore authors native tModLoader projects and hands compilation/loading back to tModLoader instead of inventing a parallel Terraria mod format.
 
