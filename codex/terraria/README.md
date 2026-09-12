@@ -62,6 +62,14 @@ Existing localization-key deletion is not implemented yet. Duplicate effective k
 
 This parser is deliberately a preservation-safe editor boundary, **not** a replacement for tModLoader's HJSON parser. Final build/load validation remains authoritative for the complete HJSON grammar.
 
+## C# source editing boundary
+
+Lexeditor exposes project `.cs` files in a raw Source editor so a Terraria mod can be authored without leaving the application. This is deliberately **text editing, not structured C# editing**: Lexeditor does not claim to parse types, methods, hooks, symbols, or tModLoader semantics in this slice.
+
+Source discovery stays inside the selected project and ignores common generated/cache trees such as `obj`, `bin`, `.vs`, `.git`, `out`, and `__pycache__`. Only UTF-8 `.cs` files are opened. Writes are guarded by the SHA observed when the file was loaded, preserve UTF-8 BOM state, preserve an existing all-CRLF newline style even though browser textareas normalize to LF, and replace the file atomically. Path traversal, non-C# paths, NUL content, oversized files, malformed UTF-8, and stale writes fail closed.
+
+The Source editor participates in the same Save/Discard state as metadata and localization. A native Build Mod action is blocked while any source edit is unsaved, and tModLoader's compiler remains authoritative for C# syntax and semantics after saving. Source-file creation/deletion/rename and syntax-aware editing are not implemented yet.
+
 ## Native build handoff
 
 tModLoader exposes a command-line `-build <modFolder>` path that runs its own `ModCompile.BuildModCommandLine` pipeline. Lexeditor uses that path instead of trying to reproduce compilation or packaging itself.
@@ -88,6 +96,7 @@ Lexeditor currently treats `enabled.json` as **read-only**. Native `-build` rema
 - **Authoring:** edit a source project under `ModSources`.
 - **Metadata:** structured preservation-safe `build.txt` editing.
 - **Localization:** structured editing of safe existing single-line HJSON strings plus preservation-safe creation of new dotted string keys; complex constructs remain untouched.
+- **C# source:** project-bounded raw UTF-8 text editing with stale-write/BOM/newline preservation; tModLoader owns compilation and semantic validation.
 - **Build:** invoke tModLoader's native `-build` command through its installed bootstrap.
 - **Runtime:** tModLoader loads enabled `.tmod` packages; Workshop remains owned by tModLoader/Steam.
 - **State inspection:** report the native local `.tmod` and `Mods/enabled.json` state without rewriting enabled state.
@@ -105,9 +114,10 @@ Lexeditor currently treats `enabled.json` as **read-only**. Native `-build` rema
 2. discover/create a valid source mod in `ModSources`;
 3. structured `build.txt` inspection/editing with preservation of unknown keys and formatting;
 4. structured preservation-safe editing and creation of supported HJSON localization strings;
-5. Data Map inventory of source code, localization and assets;
-6. invoke the supported build path without modifying the installed game;
-7. report the resulting local package and tModLoader enabled-state record;
-8. verify the resulting local mod is visible/loadable in a real tModLoader install.
+5. raw project-bounded C# source editing;
+6. Data Map inventory of source code, localization and assets;
+7. invoke the supported build path without modifying the installed game;
+8. report the resulting local package and tModLoader enabled-state record;
+9. verify the resulting local mod is visible/loadable in a real tModLoader install.
 
 Native in-game acceptance is intentionally separate from parser/service/browser checks.
