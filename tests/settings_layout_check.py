@@ -14,6 +14,18 @@ def main():
             browser=pw.chromium.launch(headless=True)
             page=browser.new_page();page.add_init_script(STUB)
             page.goto(f'http://127.0.0.1:{server.server_port}/ui/chooser.html')
+            page.evaluate("activate({id:'palworld',name:'Palworld',status:'not-added'})")
+            assert not page.locator('#dialog-title').is_visible()
+            assert page.locator('#dialog-actions button').all_text_contents()==['YES','NO']
+            widths=page.locator('#dialog-actions button').evaluate_all('nodes=>nodes.map(e=>e.getBoundingClientRect().width)')
+            assert abs(widths[0]-widths[1])<1
+            page.get_by_role('button',name='NO',exact=True).click()
+            assert page.locator('#dialog-message').inner_text()=='why tf u tryna open a Palworld file editor then?????? bruh'
+            page.get_by_role('button',name='wait, let me change my answer',exact=True).click()
+            assert page.locator('#dialog-actions button').all_text_contents()==['YES','NO']
+            page.get_by_role('button',name='NO',exact=True).click()
+            page.get_by_role('button',name='close',exact=True).click()
+            assert not page.locator('#modal').is_visible()
             page.evaluate('LexeditorUI.openSettings()')
             page.wait_for_selector('.lex-global-setting input')
             assert page.get_by_role('checkbox',name='Wrap around at the ends',exact=True).count()==2

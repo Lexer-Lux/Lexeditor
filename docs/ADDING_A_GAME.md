@@ -279,6 +279,9 @@ For localized text, use one subtab per language, with its flag before its name.
 List that language's text entries across resource files. Show the resource path
 as a property; do not make users select a file before they can find text.
 
+Center popup-modal contents and make action buttons share the full available
+horizontal space. Use only the actions the question needs.
+
 Do not add general disclaimer banners about implementation, evidence, read-only
 data or safe writes. Disabled controls and source selection already show those
 states. Put necessary explanations in the relevant `infoHelp` bubble. Use a

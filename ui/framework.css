@@ -6021,3 +6021,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 @media (max-width:700px) {
   .lex-global-settings .lex-settings-lane {grid-template-columns:minmax(0,1fr);}
 }
+
+/* Popup copy is centered; each action shares the full button row. */
+.lex-dialog:not(.lex-global-settings) {text-align:center;}
+.lex-dialog:not(.lex-global-settings) .lex-dialog-actions {justify-content:stretch;}
+.lex-dialog:not(.lex-global-settings) .lex-dialog-actions > button {flex:1 1 0;min-width:0;}
