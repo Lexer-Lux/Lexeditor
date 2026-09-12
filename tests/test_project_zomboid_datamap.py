@@ -22,6 +22,7 @@ class ProjectZomboidDataMapTests(unittest.TestCase):
                 '''  fluid CustomWater { ColorReference = Azure, DisplayName = Fluid_Name_CustomWater, }\n'''
                 '''  vehicle Car { mechanicType = 1, }\n'''
                 '''  sound Bell { category = Item, loop = false, clip { file = media/sound/bell.ogg, } }\n'''
+                '''  model HammerModel { scale = 1.0, shader = vehicle, attachment Grip { offset = 0 0 0, } }\n'''
                 '''}\n''', encoding="utf-8")
             result = datamap.read(root)
             row = next(row for row in result["rows"] if row["filename"] == "42/media/scripts/mixed.txt")
@@ -32,6 +33,7 @@ class ProjectZomboidDataMapTests(unittest.TestCase):
             self.assertIn("Fluids", row["editor"])
             self.assertIn("Vehicles", row["editor"])
             self.assertIn("Sounds", row["editor"])
+            self.assertIn("Models", row["editor"])
             self.assertIn("unmodeled fields are preserved", row["notes"])
 
 
