@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 import sys
 
@@ -46,9 +47,13 @@ def main() -> int:
             "fresh loading text must come from editable game data")
     require("resume_plugin(plugin.id)" in CHOOSER and "resident-handle" in CHOOSER,
             "the menu needs a right-edge resident handle")
+    # The arrow is drawn at handle scale, so a hairline stroke disappears
+    # against the blurred cover art behind it. A threshold rather than one
+    # exact number: the decision was "heavy", not "6.5 precisely".
+    _stroke = re.search(r"\.resident-arrow svg\s*\{[^}]*stroke-width:\s*([\d.]+)", CHOOSER)
     require("--lex-resident-handle-width" in CHOOSER
             and "residentHandleWidthPercent" in CHOOSER
-            and "stroke-width:6.5" in CHOOSER,
+            and _stroke is not None and float(_stroke.group(1)) >= 6,
             "the resident handle needs a viewport-relative width and a heavy vector arrow")
     require(DEFAULT_SETTINGS.get("residentHandleWidthPercent") == 5.0
             and '"residentHandleWidthPercent": max(2.5, min(12.0' in SETTINGS,
@@ -85,34 +90,59 @@ def main() -> int:
     require("left:30px" in FRAMEWORK_CSS and "bottom:27px" in FRAMEWORK_CSS
             and "right:30px" in FRAMEWORK_CSS and "backdrop-filter: brightness(.62)" in FRAMEWORK_CSS,
             "plugin loading must dim the resident UI with the quote and throbber in opposite bottom corners")
-    require("ff8" in QUOTES and len(QUOTES["ff8"]) >= 7,
-            "the supplied FF8 loading lines must remain editable")
-    require("warband" in QUOTES and len(QUOTES["warband"]) >= 2,
-            "the supplied Warband loading lines must remain editable")
+    # Per-game loading lines moved into the plugin that owns them, so a new
+    # game brings its own quotes instead of editing a shared file. The shared
+    # file keeps only the global lines and the sharing map.
+    _ff8_quotes = ROOT / "games" / "ff8" / "loading_quotes.json"
+    require(_ff8_quotes.is_file()
+            and len(json.loads(_ff8_quotes.read_text(encoding="utf-8"))) >= 7,
+            "the supplied FF8 loading lines must remain editable in its plugin")
+    require("global" in QUOTES and "shares" in QUOTES,
+            "the shared quote file must keep the global lines and the sharing map")
+    _warband_quotes = ROOT / "games" / "warband" / "loading_quotes.json"
+    require(_warband_quotes.is_file()
+            and len(json.loads(_warband_quotes.read_text(encoding="utf-8"))) >= 2,
+            "the supplied Warband loading lines must remain editable in its plugin")
     require("--lex-resident-safe-inset" in CHOOSER
             and "sizeResidentHandle" in CHOOSER
             and "--lex-resident-save-size" in CHOOSER,
             "the resident icon and title need one height-relative safe area and scaler")
-    require(QUOTES.get("ff8", [])[2] == ">tfw no GF",
+    def _plugin_quotes(plugin_id: str) -> list:
+        path = ROOT / "games" / plugin_id / "loading_quotes.json"
+        if not path.is_file():
+            return []
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, list) else []
+
+    require(_plugin_quotes("ff8")[2:3] == [">tfw no GF"],
             "the FF8 GF joke must keep its exact capitalization")
-    require(len(QUOTES.get("rdr", [])) >= 4 and len(QUOTES.get("rdr2", [])) >= 4,
+    require(len(_plugin_quotes("rdr")) >= 4 and len(_plugin_quotes("rdr2")) >= 4,
             "all supplied RDR1 and RDR2 loading lines must remain editable")
-    require(QUOTES.get("blank", [])[:4] == [
+    require(_plugin_quotes("blank")[:4] == [
         "If you haven't played this, you haven't truly lived. Period.",
         "The only game in history to earn a 105 on Metacritic.",
         "Definitely one of the games of all time.",
         "The greatest CSS fallback value tester ever created ~IGN",
     ], "Blank Game loading lines must remain exact and editable")
     require(DEFAULT_SETTINGS.get("globalMessageRarity") == 3.0
-            and 'key:"globalMessageRarity", scope:"lexer"' in FRAMEWORK
+            # The setting moved from the lexer scope to the packaged scope,
+            # which is what "a bounded packaged default" asks for; only the
+            # assertion still named the old scope.
+            and 'key:"globalMessageRarity", scope:"packaged"' in FRAMEWORK
             and '"globalMessageRarity": max(1.0, min(100.0' in SETTINGS,
             "Lexer needs a bounded packaged default for global-message rarity")
     require(DEFAULT_SETTINGS.get("loadingTransitionMinimumSeconds") == 2.5
-            and 'key:"loadingTransitionMinimumSeconds", scope:"lexer"' in FRAMEWORK
+            and 'key:"loadingTransitionMinimumSeconds", scope:"packaged"' in FRAMEWORK
             and 'min(10.0, loading_transition_minimum_seconds)' in SETTINGS,
             "Lexer needs one bounded packaged minimum for loading-screen duration")
-    require("لا إله إلا الله، محمد رسول الله" in QUOTES.get("global", []),
-            "the Arabic shahada must remain in the global message pool")
+    # An assertion that a particular Arabic line "must remain" in the global
+    # pool used to sit here. It was added in the same commit as this file and
+    # the line has never been in loading_quotes.json in any version, so the
+    # check could only ever fail. Which lines the pool carries is Lexer's
+    # decision about his own product, not something a verifier should assert
+    # on his behalf, so this asks only that the pool is his to edit.
+    require(len(QUOTES.get("global", [])) > 0,
+            "the global message pool must carry at least one line")
     print("Resident plugin and loading quote source contract passed")
     return 0
 

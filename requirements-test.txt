@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest>=8,<10
+playwright>=1.50,<2
+# The browser verifiers speak CDP over a websocket (tools/cdp.py).
+websocket-client>=1.7,<2

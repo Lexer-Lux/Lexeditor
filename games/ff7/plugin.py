@@ -197,6 +197,13 @@ PLUGIN = GamePlugin(
         default_root=paths.PROJECT_ROOT,
         required_paths=(paths.PROJECT_KERNEL_PATH.as_posix(),),
         template_root=paths.PROJECT_TEMPLATE_ROOT,
+        content_types=(
+            ("Kernel data", (".bin",)),
+            ("Field and world data", (".lgp", ".flevel", ".tex")),
+            ("Textures", (".png", ".dds")),
+            ("Audio", (".ogg", ".wav")),
+            ("Executable text", (".exe",)),
+        ),
     ),
     installation=GameInstallSpec(
         root_env="LEXEDITOR_FF7_ROOT",

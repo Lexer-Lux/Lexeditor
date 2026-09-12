@@ -47,7 +47,8 @@ def apply(root: Path, *, check_revision: bool = True) -> None:
                 raise RuntimeError(f'Unexpected or already patched Modern Controls source: {name}')
             content = content.replace(old, new, 1)
         outputs[path] = content.encode().replace(b'\n', newline)
-    for name in ('camera_axis.h', 'battle_camera.h', 'lexeditor_ff8_modern_controls.h', 'lexeditor_ff8_modern_controls.cpp'):
+    for name in ('camera_axis.h', 'battle_camera.h', 'vehicle_drive.h',
+                 'lexeditor_ff8_modern_controls.h', 'lexeditor_ff8_modern_controls.cpp'):
         target = root / 'src' / name
         if target.exists():
             raise RuntimeError(f'Refusing to replace existing source: {target}')

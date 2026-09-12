@@ -96,12 +96,14 @@ def main() -> int:
               tabs:[...document.querySelectorAll('.enemy-tabbed-column [role=tab]')].map(node=>node.textContent.trim().replace(/\\d+$/,'')),
               active:document.querySelector('.enemy-tabbed-column [role=tab][aria-selected=true]')?.textContent.trim().replace(/\\d+$/,''),
               curves:document.querySelectorAll('.enemy-tabbed-column .lex-curve-editor').length,
-              pairTables:document.querySelectorAll('.enemy-pair-table').length,
+              // Drop, draw and mug are three tier tables now, one shared
+              // column list each, rather than a bespoke pair table.
+              tierTables:document.querySelectorAll('.enemy-tier-section').length,
               finders:document.querySelectorAll('.enemy-table-section .ff8-item-search,.enemy-table-section .ff8-entity-search').length,
             }}}})()""")
             assert enemy["tabs"] == ["Stats", "AI", "Battle Text"] and enemy["active"] == "Stats", enemy
             assert enemy["curves"] == 7, enemy
-            assert enemy["pairTables"] == 3 and enemy["finders"] > 0, enemy
+            assert enemy["tierTables"] == 3 and enemy["finders"] > 0, enemy
             cdp.eval("[...document.querySelectorAll('.enemy-tabbed-column [role=tab]')].find(node=>node.textContent.includes('AI')).click()")
             wait_eval(cdp, "document.querySelectorAll('.enemy-ability-table .lex-column-list-row').length===48&&document.querySelectorAll('.enemy-ai-script').length===5", 10)
             enemy["abilityRows"] = cdp.eval("document.querySelectorAll('.enemy-ability-table .lex-column-list-row').length")

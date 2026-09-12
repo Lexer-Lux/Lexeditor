@@ -45,8 +45,13 @@ PRODUCTS = (
 editor = (ROOT / "games" / "ff7" / "editor.html").read_text(encoding="utf-8")
 framework = (ROOT / "ui" / "framework.js").read_text(encoding="utf-8")
 assert "projectSnapshot:" not in editor, "FF7 bypasses the shared project manager"
-for required in ('"New Mod"', '"Find a Mod"', 'callWindow("select_mod_project"'):
-    assert required in framework, required
+# The menu offers one action to create a mod and one to point at an existing
+# folder. The create action was relabelled from "New Mod" to "Add a Mod", which
+# is what it does; the contract is about the two actions existing, not their
+# wording, so both spellings are accepted.
+assert "Add a Mod" in framework or "New Mod" in framework, "no create-a-mod action"
+assert "Find a Mod" in framework, "no find-a-mod action"
+assert 'callWindow("select_mod_project"' in framework, "mods are not selected through the host"
 
 with tempfile.TemporaryDirectory(prefix="lexeditor-ff7-projects-", ignore_cleanup_errors=True) as temp_name:
     temp = Path(temp_name)

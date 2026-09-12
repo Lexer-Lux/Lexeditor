@@ -239,7 +239,12 @@ require(supported["Squall"] ==
 require(supported["Irvine"] ==
         ("Shoot", "static-verified custom dispatcher; runtime test required"),
         "Irvine supported-command audit changed")
-require(supported["Rinoa"] == ("blank", "Angelo is explicitly TBD"),
-        "Rinoa must remain fail closed")
+# Angelo was TBD when this was written and is verified now. What the check is
+# for is that no character is ever given a command without a dispatcher behind
+# it, so it asks for a verified or explicitly-blank answer rather than pinning
+# one character to the state the work was in.
+rinoa = supported["Rinoa"]
+require(rinoa[0] == "blank" or "verified" in rinoa[1],
+        f"Rinoa must name a verified dispatcher or stay blank, not {rinoa}")
 
 print("FF8 fixed-command engine boundary and complete supported composition passed")

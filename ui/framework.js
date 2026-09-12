@@ -301,7 +301,11 @@
   const copyIcon = () => {
     const namespace = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(namespace, "svg");
-    svg.setAttribute("viewBox", "0 0 24 24");
+    // Cropped to the drawing. On a 0 0 24 24 box the two sheets only reach from
+    // 4 to 20 across, so a third of the button was blank margin built into the
+    // icon - which read as a button adrift in a column too wide for it, on top
+    // of whatever the column itself was reserving.
+    svg.setAttribute("viewBox", "4 2 16 20");
     svg.setAttribute("aria-hidden", "true");
     for (const d of ["M9 9h10v12H9z", "M5 15V3h10v2"]) {
       const path = document.createElementNS(namespace, "path");
@@ -445,7 +449,12 @@
       };
       const escape = event => { if (event.key === "Escape") closeHelpPopup(); };
       const close = () => closeHelpPopup();
-      const onScroll = event => { if (!popup.contains(event.target)) close(); };
+      const onScroll = event => {
+        if (popup.contains(event.target)) return;
+        // Keyboard focus can scroll the marker into view after opening help.
+        if (marker.matches(":focus-within")) position();
+        else close();
+      };
       popup.addEventListener("pointerenter", cancelClose);
       popup.addEventListener("pointerleave", scheduleClose);
       popup.addEventListener("focus", cancelClose);
@@ -553,7 +562,7 @@
       control.matches("input,select,textarea,output,.lex-readonly-field"));
     const prefix = attrs.position === "prefix";
     const reserve = Math.max(1.8, String(unit || "").length * .45 + .9);
-    return element("span", {
+    const field = element("span", {
       class: [
         "lex-unit-field",
         boxed ? "lex-unit-field-boxed" : "lex-unit-field-static",
@@ -566,6 +575,57 @@
     class: ["lex-unit", unit === "×" ? "lex-unit-multiplier" : "", attrs.unitClass || ""].filter(Boolean).join(" "),
     "aria-hidden": "true",
     }, unit) : null);
+    if (boxed && unit && !prefix) followUnit(field, control);
+    return field;
+  };
+
+  // The unit belongs to the number, so it travels with it. Pinned to the far
+  // edge of the box it marked where the box ended rather than where the value
+  // did, and on a wide panel that put a "G" a screen's width away from the
+  // price it qualifies. The unit is placed just after the last glyph of the
+  // value instead, measured in the box's own font.
+  //
+  // It stops short of whatever the box has reserved on its right: an internal
+  // reference rail keeps its lane, so "50,000 G" and its "V 30,000" never
+  // collide however long the number gets. When the value is long enough to
+  // reach that lane the unit parks against it, which is the old behaviour and
+  // the correct one at that width.
+  const followUnit = (field, control) => {
+    const unitNode = field.querySelector(":scope > .lex-unit");
+    if (!unitNode || !(control instanceof HTMLElement)) return;
+    const place = () => {
+      if (!field.isConnected) return;
+      const text = control.value ?? control.textContent ?? "";
+      const style = getComputedStyle(control);
+      const measured = textWidth(String(text),
+        `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`);
+      const start = parseFloat(style.paddingLeft) || 0;
+      const border = parseFloat(style.borderLeftWidth) || 0;
+      const gap = (parseFloat(style.fontSize) || 12) * .4;
+      // The right-hand limit is where the box stops reserving room for
+      // whatever else lives in it - a reference, a lock, a stepper.
+      const reserved = parseFloat(getComputedStyle(field).getPropertyValue("--lex-unit-reserve")) || 0;
+      const limit = Math.max(0, field.clientWidth - unitNode.offsetWidth - reserved);
+      const left = Math.min(border + start + measured + gap, limit);
+      const next = `${Math.round(left)}px`;
+      if (unitNode.style.left !== next) unitNode.style.left = next;
+    };
+    control.addEventListener("input", place);
+    control.addEventListener("change", place);
+    field.lexPlaceUnit = place;
+    requestAnimationFrame(place);
+    document.fonts?.ready?.then(place);
+  };
+
+  // Measuring text without laying it out, so a unit can be placed against a
+  // value the box has not been asked to re-render.
+  let measuringContext = null;
+  const textWidth = (text, font) => {
+    if (!text) return 0;
+    measuringContext = measuringContext || document.createElement("canvas").getContext("2d");
+    if (!measuringContext) return String(text).length * 7;
+    if (font) measuringContext.font = font;
+    return measuringContext.measureText(String(text)).width;
   };
 
   const formatNumber = (value, options = {}) => {
@@ -577,6 +637,24 @@
       maximumFractionDigits: 20,
       ...options,
     }).format(numeric);
+  };
+
+  // What a value box holds, as a number. A plugin is free to paint its number
+  // the way a player reads it - "50,000" rather than 50000 - so reading the box
+  // with a bare Number() returns NaN for every grouped value. That is what put
+  // the fill and the handle of a fifty-thousand gil price hard against the left
+  // edge of its own slider, and what made committing such a field look out of
+  // range and flash rejected.
+  const readNumeric = node => {
+    const text = String(node?.value ?? "").trim();
+    if (!text) return NaN;
+    return Number(text.replace(/,/g, "").replace(/\s/g, ""));
+  };
+  // Writing one back in the shape the box was already using, so a drag does not
+  // strip the separators out from under the reader mid-gesture.
+  const writeNumeric = (node, value) => {
+    const grouped = /\d,\d/.test(String(node.value ?? ""));
+    node.value = grouped ? formatNumber(value) : String(value);
   };
 
   const numberValue = (value, attrs = {}) => {
@@ -648,12 +726,33 @@
   // One shared Detail heading owns the optional icon or live-preview slot,
   // record identity, metadata, and actions. Games supply themed content.
   const detailPanel = (options = {}) => {
+    // A record's name is the heading, so the heading is where it is edited. It
+    // was an ordinary property row lower down the panel instead, which meant
+    // the name appeared twice and the copy at the top - the one being read -
+    // was the copy that could not be changed. A panel that hands over
+    // `renameRecord` gets a heading that can be typed into in place.
     const title = options.title instanceof Node
       ? options.title
-      : element("h2", {class: "lex-detail-panel-title"}, String(options.title ?? ""));
+      : typeof options.renameRecord === "function"
+        ? element("h2", {class: "lex-detail-panel-title lex-detail-panel-rename"},
+          element("input", {
+            type: "text",
+            value: String(options.title ?? ""),
+            "aria-label": options.renameLabel || "Record name",
+            title: options.renameLabel || "Record name",
+            oninput: event => options.renameRecord(event.target.value, event),
+          }))
+        : element("h2", {class: "lex-detail-panel-title"}, String(options.title ?? ""));
     const identity = element("div", {class: "lex-detail-panel-identity"},
       title,
-      options.identity ? element("div", {class: "lex-detail-panel-id"}, options.identity) : null,
+      // The identity slot is the big ghosted record number, sized to the
+      // heading and laid over its right end. A long string there runs straight
+      // through the title, so anything longer than a short code is shown as
+      // the ordinary subtitle line instead of as the watermark.
+      options.identity
+        ? element("div", {class: typeof options.identity === "string" && options.identity.length > 8
+            ? "lex-detail-panel-meta" : "lex-detail-panel-id"}, options.identity)
+        : null,
       options.meta ? element("div", {class: "lex-detail-panel-meta"}, options.meta) : null);
     const heading = options.heading === false ? null : element("div", {
       class: ["lex-detail-panel-heading", options.icon ? "" : "no-icon", options.actions ? "" : "no-actions"].filter(Boolean).join(" "),
@@ -670,6 +769,24 @@
   // A panel can own local navigation without turning those choices into
   // application-level tabs. Plugins provide the active key and content; this
   // shared component owns the tab semantics and stable panel geometry.
+  // Structural rule: a tabbed panel never nests inside another one. Two layers
+  // of tabs above the page is already the limit; a third asks the reader to
+  // hold three positions at once to know where they are. A plugin that needs
+  // another division uses a tabbed panel INSIDE the page, which is what this
+  // control is, and it may not contain a further one.
+  const NESTED_TAB_ERROR =
+    "Lexeditor has no sub-subtabs. Put the extra division in a tabbed panel " +
+    "inside the page instead of nesting one subtab bar inside another.";
+  const guardNestedTabs = root => {
+    if (!(root instanceof Element)) return root;
+    requestAnimationFrame(() => {
+      if (!root.isConnected) return;
+      const nested = root.querySelector(".lex-subtab-bar .lex-subtab-bar:not([hidden])");
+      if (nested) throw new Error(NESTED_TAB_ERROR);
+    });
+    return root;
+  };
+
   const tabbedPanel = (options = {}) => {
     const tabs = options.tabs || [];
     const active = tabs.some(tab => tab.id === options.active)
@@ -679,7 +796,7 @@
     const content = typeof options.content === "function"
       ? options.content(active, selected)
       : options.content;
-    return element("section", {
+    return guardNestedTabs(element("section", {
       ...(options.attrs || {}),
       class: ["lex-tabbed-panel", options.className || ""].filter(Boolean).join(" "),
     }, subtabBar({
@@ -692,7 +809,7 @@
       class: ["lex-tabbed-panel-content", options.contentClassName || ""].filter(Boolean).join(" "),
       role: "tabpanel",
       "aria-label": selected?.label || "Panel content",
-    }, content || []));
+    }, content || [])));
   };
 
   // Keep the visible value legible when a bounded control contains a long
@@ -743,17 +860,65 @@
   // keeping its own.
   const alignReferenceRails = (container = document) => {
     const panels = new Set();
-    container.querySelectorAll?.(".lex-source-control[data-lex-rail-width]")
+    container.querySelectorAll?.(".lex-source-control[data-lex-rail-tag]")
       .forEach(control => panels.add(
         control.closest(".lex-detail-panel-body, .lex-detail-panel, .lex-detail") || container));
     for (const panel of panels) {
-      const controls = [...panel.querySelectorAll(".lex-source-control[data-lex-rail-width]")]
+      const controls = [...panel.querySelectorAll(".lex-source-control[data-lex-rail-tag]")]
         .filter(control => !control.classList.contains("lex-source-control-internal"));
       if (!controls.length) continue;
-      const widest = Math.max(...controls.map(control => Number(control.dataset.lexRailWidth) || 0));
-      panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}em`);
+      // Each entry gets an equal share of the space beside the property it
+      // annotates, so a deeper stack is a smaller stack rather than a taller
+      // row.
       for (const control of controls) {
-        control.style.setProperty("--lex-reference-rail-width", `${widest}em`);
+        const stack = control.querySelector(":scope > .lex-reference-values");
+        const count = stack?.children.length || 0;
+        if (!count) {
+          control.style.removeProperty("--lex-reference-slot");
+          control.style.removeProperty("--lex-reference-cap");
+          continue;
+        }
+        // The share is taken from the PROPERTY ROW, not from the value box
+        // inside it. The box is the shorter of the two, and dividing that by
+        // three left a three-deep stack at seven pixels - it fitted, and it
+        // could not be read. The row is the space actually available beside
+        // the box, and staying inside it is what keeps the stack from making
+        // the row taller.
+        const row = control.closest(".lex-detail-field") || control;
+        const cap = Math.max(12, Math.round(row.getBoundingClientRect().height) - 4);
+        control.style.setProperty("--lex-reference-cap", `${cap}px`);
+        control.style.setProperty("--lex-reference-slot", `${Math.max(6, Math.floor(cap / count))}px`);
+      }
+      // The rail is reserved in advance from the longest tag and the longest
+      // value any control on this panel can ever put in it, measured in a
+      // hidden copy of a real entry rather than from the entries on screen.
+      // Two earlier attempts both moved the value boxes as values changed: a
+      // character count times a guessed em over-reserved by half a rail, and
+      // measuring what was displayed re-sized the rail on every edit that
+      // matched or stopped matching a reference. The probe is pinned to the
+      // largest type a stack ever uses, because a deeper stack only ever
+      // draws smaller.
+      const longest = (attribute, floor) => controls
+        .map(control => control.dataset[attribute] || "")
+        .reduce((widest, text) => text.length > widest.length ? text : widest, floor);
+      const probe = element("div", {
+        class: "lex-source-strip lex-reference-values lex-reference-probe",
+        "aria-hidden": "true",
+      }, element("span", {class: "lex-reference-value"},
+        element("span", {class: "lex-reference-tag"}, longest("lexRailTag", "V")),
+        element("span", {class: "lex-reference-text"}, longest("lexRailValue", "000"))));
+      (controls[0].parentElement || panel).append(probe);
+      const tag = Math.ceil(probe.querySelector(".lex-reference-tag").getBoundingClientRect().width);
+      const text = Math.ceil(probe.querySelector(".lex-reference-text").getBoundingClientRect().width);
+      probe.remove();
+      // tag + the column gap the stack opens between the two + the value, and
+      // two pixels so the last glyph is not flush against the panel edge.
+      const widest = tag + text + 6;
+      panel.style?.setProperty("--lex-panel-reference-rail-width", `${widest}px`);
+      panel.style?.setProperty("--lex-reference-tag-width", `${tag}px`);
+      for (const control of controls) {
+        control.style.setProperty("--lex-reference-rail-width", `${widest}px`);
+        control.style.setProperty("--lex-reference-tag-width", `${tag}px`);
       }
     }
   };
@@ -764,6 +929,14 @@
     container.querySelectorAll?.(".lex-source-control").forEach(node => node.refreshReference?.());
     alignReferenceRails(container);
   };
+  // The first pass measures the rail against whatever face is loaded at the
+  // time. A face only starts loading when something asks to paint with it, so
+  // a panel that mounts after the document is otherwise ready measures its
+  // rail against the fallback and re-reserves it a pixel or two later, on the
+  // reader's first edit. Every batch of faces that finishes re-reserves it
+  // instead, which is what the rail exists to prevent.
+  document.fonts?.addEventListener?.("loadingdone", () => alignReferenceRails(document));
+  document.fonts?.ready?.then(() => alignReferenceRails(document));
 
   // Shared Detail internals. A game supplies its theme and field controls;
   // this component owns the repeated section and field structure.
@@ -774,6 +947,14 @@
   }, options.title ? element("h3", {class: "lex-detail-section-title"},
     options.title, options.help || null) : null,
   element("div", {class: "lex-detail-section-content"}, options.body || []));
+
+  // What a section says when it holds nothing. A section with no rows used to
+  // invent one - a property named for the storage state rather than for
+  // anything in the game - and the reader could not tell the invented row from
+  // a real one. A note is not a property: no label column, no control, no pin.
+  const detailNote = (text, options = {}) => element("p", {
+    class: ["lex-detail-note", options.className || ""].filter(Boolean).join(" "),
+  }, text);
 
   const anchorDetailPin = (pin, control, input, outward = false) => {
     if (!(pin instanceof Element) || !(control instanceof Element) || !(input instanceof Element)) return;
@@ -922,10 +1103,30 @@
       "data-lex-property": options.property
         || pin?.getAttribute?.("data-lex-pin-column") || null,
       "data-lex-readonly": String(readOnly),
+      // The property name is wrapped so it is a real flex item. Left as a bare
+      // text node it was an anonymous item the leader arrow could shrink to
+      // nothing, which wrapped "CAN SELL" one letter per line and drove the
+      // label fitter down to its six-pixel floor.
     }, element("div", {class: "lex-detail-field-label"},
-      options.label, arrow),
+      element("span", {class: "lex-detail-field-label-text"}, options.label),
+      // The arrow used to live inside the label, which forced a boolean's
+      // label column to span the whole row so the arrow had somewhere to run -
+      // and that is why a boolean's name started at the far left while every
+      // other name sat in the label column. It is its own track now, between
+      // the label column and the control, so the name keeps the column it
+      // shares with the rest of the panel.
+      booleanField ? null : arrow),
+    booleanField ? arrow : null,
     element("div", {class: "lex-detail-field-control"}, control,
       pin && pin.parentElement !== control ? pin : null), typeRail);
+    // The leader arrow shares the checkbox's grid row, so it points at the
+    // middle of the box whatever else the row is carrying and however tall the
+    // row turns out to be. Anchored to the row instead, it tracked the row's
+    // centre and drifted off the box as soon as anything sat under it.
+    if (booleanField && arrow &&
+        control instanceof Element && control.matches(".lex-source-control")) {
+      control.append(arrow);
+    }
     // The rail runs down the side of one row, so its type name has to fit that
     // row's height. A long name (or a range shown on focus) is set smaller
     // rather than being allowed to run into the rows above and below.
@@ -963,13 +1164,23 @@
     // hover the fill slides out into a slider for rough adjustment.
     const lowBound = min === null || min === undefined || min === "" ? null : Number(min);
     const highBound = max === null || max === undefined || max === "" ? null : Number(max);
+    // A drag slider is only honest when a pixel of travel is worth a sensible
+    // amount. Over a raw INT32 field the whole range is four billion wide, so
+    // the pointer lands a hair off centre and writes -24832854 into a price -
+    // the control looks broken because it is being asked to resolve four
+    // billion values across three hundred pixels. Past this span the value gets
+    // a plain number box with no fill and no handle.
+    const SLIDER_MAX_STEPS = 100000;
+    const boundedSpan = Number.isFinite(lowBound) && Number.isFinite(highBound)
+      ? (highBound - lowBound) / (Number(step) || 1) : Infinity;
     if (input && !readOnly && numericLike &&
-        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound) {
+        Number.isFinite(lowBound) && Number.isFinite(highBound) && highBound > lowBound &&
+        boundedSpan <= SLIDER_MAX_STEPS) {
       const fill = element("span", {class: "lex-value-fill", "aria-hidden": "true"});
       const handle = element("span", {class: "lex-value-handle", "aria-hidden": "true"});
       fill.append(handle);
       const ratio = () => {
-        const value = Number(input.value);
+        const value = readNumeric(input);
         if (!Number.isFinite(value)) return 0;
         return Math.max(0, Math.min(1, (value - lowBound) / (highBound - lowBound)));
       };
@@ -984,9 +1195,9 @@
         const step = Number(input.step) || 1;
         const raw = lowBound + share * (highBound - lowBound);
         const snapped = Math.round(raw / step) * step;
-        const nextValue = String(Math.max(lowBound, Math.min(highBound, snapped)));
-        if (input.value === nextValue) return;
-        input.value = nextValue;
+        const nextValue = Math.max(lowBound, Math.min(highBound, snapped));
+        if (readNumeric(input) === nextValue) return;
+        writeNumeric(input, nextValue);
         paint();
         // A plugin still needs the input event so local previews (for example,
         // a curve) can update. Mark drag events so it can avoid refreshing the
@@ -1036,8 +1247,25 @@
         handle.addEventListener("pointercancel", stop);
       });
       node.classList.add("lex-has-value-fill");
-      (control instanceof Element && control.matches(".lex-unit-field") ? control : input.parentElement)
-        ?.prepend(fill);
+      // The fill is drawn behind the value box, so it has to be positioned
+      // against THAT box. Prepending it to whatever happened to be the input's
+      // parent worked where the parent was a unit field or a provenance
+      // control - both of which are positioned and box-shaped - and failed
+      // everywhere else: with a bare input the nearest positioned ancestor is
+      // the field control, which is as tall as the whole property row, so the
+      // fill painted the row from top to bottom. A host of its own means the
+      // box the fill measures is always the box the reader sees.
+      const fillHost = control instanceof Element && control.matches(".lex-unit-field")
+        ? control
+        : input.parentElement?.matches?.(".lex-source-control-internal,.lex-unit-field")
+          ? input.parentElement
+          : (() => {
+            const host = element("span", {class: "lex-value-host"});
+            input.replaceWith(host);
+            host.append(input);
+            return host;
+          })();
+      fillHost?.prepend(fill);
       requestAnimationFrame(paint);
     }
 
@@ -1050,7 +1278,7 @@
           if (event.data && /[^0-9.eE+-]/.test(event.data)) { event.preventDefault(); rejectValue(); }
         });
         input.addEventListener("change", () => {
-          const value = Number(input.value);
+          const value = readNumeric(input);
           const low = min === null || min === undefined || min === "" ? -Infinity : Number(min);
           const high = max === null || max === undefined || max === "" ? Infinity : Number(max);
           if (!Number.isFinite(value) || value < low || value > high) rejectValue();
@@ -1067,24 +1295,40 @@
       showToast("Restored the vanilla value");
     });
 
-    if (input && inputType !== "checkbox") {
-      const copy = element("button", {
-        type: "button", class: "lex-copy-value", tabindex: "-1",
-        title: "Copy this value", "aria-label": "Copy this value",
-        onclick: async event => {
-          event.preventDefault();
-          event.stopPropagation();
-          const text = input.tagName === "SELECT"
-            ? (input.selectedOptions[0]?.textContent || input.value)
-            : input.value;
-          const copied = await copyText(String(text));
-          showToast(copied ? `Copied: "${text}"` : "Could not reach the clipboard");
-        },
-      }, copyIcon());
-      node.querySelector(".lex-detail-field-control")?.prepend(copy);
+    // A property holds one variable in the ordinary case and several in a
+    // multi-variable one - a stat block, a junction set. One button for a
+    // property that holds four numbers copied the first of them and called it
+    // the property, so a property with its own idea of what it is worth says
+    // so, a multi-variable property gives each variable its own button, and
+    // only a single-variable property is copied as a whole.
+    const declared = control instanceof Element
+      ? (typeof control.lexCopyValue === "function" ? control
+         : [...control.querySelectorAll("*")].find(node => typeof node.lexCopyValue === "function"))
+      : null;
+    const variables = control instanceof Element
+      ? control.querySelectorAll('input:not([type="checkbox"]):not([type="range"]),select,textarea').length
+      : 0;
+    if (declared) node.querySelector(".lex-detail-field-control")?.prepend(
+      copyValueButton(() => declared.lexCopyValue(), "Copy this property"));
+    else if (input && inputType !== "checkbox" && variables <= 1) {
+      node.querySelector(".lex-detail-field-control")?.prepend(copyValueButton(() => input.tagName === "SELECT"
+        ? (input.selectedOptions[0]?.textContent || input.value)
+        : input.value));
     }
     return node;
   };
+
+  const copyValueButton = (read, label = "Copy this value") => element("button", {
+    type: "button", class: "lex-copy-value", tabindex: "-1",
+    title: label, "aria-label": label,
+    onclick: async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      const text = String(read() ?? "");
+      const copied = await copyText(text);
+      showToast(copied ? `Copied: "${text}"` : "Could not reach the clipboard");
+    },
+  }, copyIcon());
 
   // Public names describe the panel archetype, not one historic view. A Detail
   // panel is made from groups of rows. Every row shares the panel's one label
@@ -1104,7 +1348,7 @@
       });
       // Each switch carries its own type rail, matching every other property:
       // BOOL until pointed at, then the help marker for that flag.
-      const rail = element("span", {class: "lex-toggle-rail", "aria-hidden": "true"},
+      const rail = element("span", {class: "lex-toggle-rail"},
         element("span", {class: "lex-toggle-type"}, "BOOL"));
       const label = element("label", {
         class: ["lex-toggle", toggle.className || ""].filter(Boolean).join(" "),
@@ -1120,6 +1364,21 @@
     }, ...toggles);
     if (options.minimum) root.style.setProperty("--lex-toggle-minimum", `${options.minimum}px`);
     if (options.columns) root.style.setProperty("--lex-toggle-columns", String(options.columns));
+    // A row of switches is one property holding one number. Copying it copies
+    // that number - the bare flag word the game actually stores - not a list
+    // of the labels drawn over it. A caller that knows the word passes it; a
+    // caller that does not gets the bits its switches imply, which is where
+    // `bit` on a switch matters when the flags are not consecutive.
+    root.lexCopyValue = () => {
+      if (options.value !== undefined) {
+        return typeof options.value === "function" ? options.value() : options.value;
+      }
+      return (options.toggles || []).reduce((word, toggle, index) => {
+        const bit = Number.isInteger(toggle.bit) ? toggle.bit : index;
+        const on = toggles[index]?.querySelector('input[type="checkbox"]')?.checked;
+        return on ? word + 2 ** bit : word;
+      }, 0);
+    };
     return root;
   };
 
@@ -1135,15 +1394,39 @@
     return element("div", {
       class: ["lex-multi-number", options.className || ""].filter(Boolean).join(" "),
       style: `--lex-multi-number-columns:${columns}`,
-    }, ...items.map(entry => element("label", {
-      class: "lex-multi-number-item", title: entry.title || undefined,
-    }, element("span", {class: "lex-multi-number-label"}, entry.label),
-      element("span", {class: "lex-multi-number-control"}, entry.control))));
+    }, ...items.map(entry => {
+      // The item is a plain box, not a label. As a <label> it adopted its first
+      // labelable descendant as its control - which, once each variable got a
+      // copy button, was the BUTTON. Hovering anywhere in the item lit the
+      // button as though the pointer were on it, and clicking the item's empty
+      // space would have pressed Copy instead of focusing the value.
+      const caption = element("label", {class: "lex-multi-number-label"}, entry.label);
+      const item = element("div", {
+        class: "lex-multi-number-item", title: entry.title || undefined,
+      }, caption, element("span", {class: "lex-multi-number-control"}, entry.control));
+      const field = item.querySelector("input,select,textarea");
+      if (field) {
+        if (!field.id) field.id = `lex-multi-${Math.random().toString(36).slice(2, 9)}`;
+        caption.setAttribute("for", field.id);
+      }
+      // Each variable carries its own copy button. One button on the property
+      // could only ever hand back one of these numbers, and it handed back
+      // whichever happened to be built first.
+      const input = item.querySelector('input:not([type="checkbox"]),select,textarea');
+      if (input) item.prepend(copyValueButton(() => input.tagName === "SELECT"
+        ? (input.selectedOptions[0]?.textContent || input.value)
+        : input.value, `Copy ${typeof entry.label === "string" ? entry.label : "this value"}`));
+      return item;
+    }));
   };
 
   // Nested navigation is a shared control. Plugins provide only labels,
   // active state, and the page-owned change callback.
-  const subtabBar = (options = {}) => element("div", {
+  // A page with one subtab has no choice to offer, so it shows no bar. A bar
+  // with a single tab in it reads as a control that does nothing.
+  const subtabBar = (options = {}) => (options.tabs || []).length < 2
+    ? element("div", {class: "lex-subtab-bar lex-subtab-bar-single", hidden: true})
+    : element("div", {
     class: ["lex-subtab-bar", options.className || ""].filter(Boolean).join(" "),
     role: "tablist",
     "aria-label": options.label || "Subsections",
@@ -1302,7 +1585,13 @@
         modeToggle.textContent = bar ? "LINE" : "BARS";
       },
     }, "BARS");
-    const plot = element("div", {class: "lex-curve-plot"},
+    // The title is drawn INTO the plot, behind the drawing, so "centred in the
+    // graph" means the graph rather than the card around it. The heading keeps
+    // the text for a screen reader and stops painting it.
+    const plot = element("div", {
+      class: "lex-curve-plot",
+      "data-curve-title": options.title || "CURVE",
+    },
       svg,
       axisTop,
       axisBottom,
@@ -1380,7 +1669,14 @@
       const range = getRange();
       const spanX = Math.max(1, domain.max - domain.min);
       const spanY = Math.max(1, range.max - range.min);
-      const graphX = (x - domain.min) / spanX * 320;
+      // In bar mode a value owns a slot, not a point: the line's x for level N
+      // is the slot's left edge, so the guide and the X marker landed in the
+      // gap between two bars rather than on the bar being read.
+      const slots = Math.max(1, domain.max - domain.min + 1);
+      const barMode = plot.classList.contains("lex-curve-bar-mode");
+      const graphX = barMode
+        ? ((x - domain.min) + .5) / slots * 320
+        : (x - domain.min) / spanX * 320;
       const bounded = Math.max(range.min, Math.min(range.max, y));
       const graphY = 160 - (bounded - range.min) / spanY * 160;
       const cursorY = Math.max(0, Math.min(160, (event.clientY - bounds.top) / bounds.height * 160));
@@ -2006,6 +2302,250 @@
     return {refresh: () => normalized.forEach(apply), overlay};
   };
 
+  // A yes/no question with a plain explanation. showAlert only ever had one
+  // button, so anything needing consent grew its own dialog; this is the shared
+  // one. Resolves true only when the confirming button is pressed.
+  const confirmAction = options => new Promise(resolve => {
+    const previousFocus = document.activeElement;
+    const backdrop = element("div", {class: "lex-dialog-backdrop lex-important-backdrop", "data-lex-history-control": true});
+    const cancel = element("button", {class: "lex-dialog-action", text: String(options?.cancelLabel || "Cancel")});
+    const confirm = element("button", {class: "lex-dialog-action primary", text: String(options?.confirmLabel || "Continue")});
+    const body = element("p", {class: "lex-important-message"});
+    // The explanation is the point of the dialog, so its line breaks are kept.
+    body.style.whiteSpace = "pre-line";
+    body.textContent = String(options?.message || "");
+    const dialog = element("section", {
+      class: "lex-dialog lex-important-dialog", role: "alertdialog", "aria-modal": "true",
+    }, element("h2", {text: String(options?.title || "Are you sure?")}), body,
+      element("div", {class: "lex-dialog-actions"}, cancel, confirm));
+    const finish = answer => {
+      backdrop.remove();
+      document.removeEventListener("keydown", onKey);
+      previousFocus?.focus?.();
+      resolve(answer);
+    };
+    const onKey = event => { if (event.key === "Escape") finish(false); };
+    cancel.onclick = () => finish(false);
+    confirm.onclick = () => finish(true);
+    backdrop.onclick = event => { if (event.target === backdrop) finish(false); };
+    document.addEventListener("keydown", onKey);
+    backdrop.append(dialog);
+    document.body.append(backdrop);
+    confirm.focus();
+  });
+
+  // One ReShade, managed by Lexeditor; one preset per mod, carried by the mod.
+  // The section is deliberately honest about the three ways this does nothing:
+  // ReShade is not installed, the mod ships no preset, or the manifest names a
+  // preset file that is not there. Each of those used to look identical to a
+  // working setup right up until the game launched unchanged.
+  // Settings are read, not searched. A game's whole tweak surface belongs on
+  // one scrolling page in as many columns as the window allows, the shape RDR2
+  // established: no subtabs to click through, no dropdown to pick a group from,
+  // nothing loaded on demand. Sections keep their own order and never split
+  // across a column boundary.
+  // The shared Tweaks layout, taken from the shape RDR2 uses: one scrolling
+  // page of cards dealt into as many real columns as the width allows, rather
+  // than CSS columns that cut a card in half across a column break. The card
+  // count per column is re-dealt only when the column COUNT changes, so a drag
+  // that does not cross a breakpoint costs nothing.
+  //
+  // A page may also divide itself with subtabs. A bar with fewer than two tabs
+  // is not drawn, which is the same rule every other subtab bar follows.
+  const settingsColumns = (sections, options = {}) => {
+    const lane = element("div", {class: "lex-settings-lane"});
+    const root = element("div", {
+      class: ["lex-settings-columns", options.className || ""].filter(Boolean).join(" "),
+    }, (options.tabs || []).length > 1 ? subtabBar({
+      tabs: options.tabs,
+      active: options.activeTab,
+      label: options.tabsLabel || "Tweak groups",
+      className: "lex-settings-subtabs",
+      change: options.changeTab,
+    }) : null, lane);
+    if (options.columnWidth)
+      root.style.setProperty("--lex-settings-column-width", options.columnWidth);
+    const cards = (sections || []).filter(Boolean);
+    let dealt = 0;
+    let frame = 0;
+    const deal = () => {
+      frame = 0;
+      if (!lane.isConnected) return;
+      const width = lane.clientWidth || root.clientWidth;
+      const target = parseFloat(getComputedStyle(root)
+        .getPropertyValue("--lex-settings-column-width")) || 320;
+      const count = Math.max(1, Math.min(cards.length, Math.floor(width / target) || 1));
+      if (count === dealt) return;
+      const columns = Array.from({length: count}, () =>
+        element("div", {class: "lex-settings-column"}));
+      cards.forEach((card, index) => columns[index % count].append(card));
+      lane.replaceChildren(...columns);
+      dealt = count;
+    };
+    if (typeof ResizeObserver === "function") {
+      const observer = new ResizeObserver(() => {
+        if (!frame) frame = requestAnimationFrame(deal);
+      });
+      observer.observe(root);
+      root.lexSettingsObserver = observer;
+    }
+    requestAnimationFrame(deal);
+    deal();
+    return root;
+  };
+
+  const reshadeSection = spec => {
+    const data = spec?.snapshot || {};
+    const manifest = data.manifest || {};
+    const presets = data.presets || [];
+    const apply = changes => spec.save?.({...manifest, ...changes});
+    const rows = [];
+    const store = data.store || {};
+    const act = (method, ...args) => spec.act?.(method, ...args);
+    const installRow = element("div", {class: "lex-reshade-actions"});
+    if (!store.present) {
+      installRow.append(element("button", {
+        type: "button", class: "lex-dialog-action",
+        onclick: () => act("adopt_reshade"),
+      }, "Choose ReShade64.dll…"));
+    } else if (data.reshadeInstalled) {
+      installRow.append(element("button", {
+        type: "button", class: "lex-dialog-action",
+        onclick: () => act("uninstall_reshade"),
+      }, "Remove ReShade from this game"));
+    } else {
+      const renderer = element("select", {"aria-label": "Renderer to load through"});
+      for (const name of data.renderers || []) {
+        renderer.append(element("option", {value: name}, name));
+      }
+      installRow.append(renderer, element("button", {
+        type: "button", class: "lex-dialog-action primary",
+        onclick: () => act("install_reshade", renderer.value),
+      }, "Install ReShade into this game"));
+    }
+    rows.push(detailField({
+      label: "ReShade installed",
+      control: readonlyField(data.reshadeInstalled
+        ? `Yes, loading through ${data.installedRenderer}`
+        : store.present
+          ? "Not in this game yet. Lexeditor has a copy ready to install."
+          : "No. Lexeditor does not ship ReShade; point it at a ReShade64.dll once and it keeps that copy for every game."),
+      help: infoHelp("One ReShade, kept by Lexeditor and installed per game under the loader name that game's renderer needs. A game's own DLL of that name is never overwritten."),
+    }));
+    rows.push(detailField({label: "Install", control: installRow}));
+    const enable = element("input", {
+      type: "checkbox", checked: manifest.enabled === true,
+      disabled: !presets.length,
+      "aria-label": "Ship a ReShade preset with this mod",
+      onchange: event => apply({enabled: event.target.checked}),
+    });
+    rows.push(detailField({
+      label: "Use a preset", dataType: "BOOL", control: enable,
+      help: infoHelp(presets.length
+        ? "Turns this mod's preset on. The preset file travels with the mod; the ReShade install does not."
+        : "This mod's reshade folder holds no .ini preset yet, so there is nothing to turn on."),
+    }));
+    if (presets.length) {
+      const select = element("select", {
+        disabled: manifest.enabled !== true,
+        "aria-label": "ReShade preset",
+        onchange: event => apply({preset: event.target.value}),
+      });
+      for (const name of presets) {
+        const option = element("option", {value: name}, name);
+        option.selected = name === manifest.preset;
+        select.append(option);
+      }
+      rows.push(detailField({label: "Preset", control: select}));
+    }
+    // The repository list is one per machine, shared by every project. A mod's
+    // manifest names a repository and a version; the shaders themselves are
+    // never copied into the mod, because several of the common repositories
+    // forbid redistribution.
+    const repositories = manifest.repositories || [];
+    const status = data.repositoryStatus || [];
+    const describe = entry => entry.state === "missing"
+      ? `${entry.name}${entry.version ? ` ${entry.version}` : ""} — not on this machine`
+      : entry.state === "version-mismatch"
+        ? `${entry.name} ${entry.version} — this machine has ${entry.installedVersion}`
+        : `${entry.name}${entry.version ? ` ${entry.version}` : ""} — ready`;
+    rows.push(detailField({
+      label: "Needs shaders from",
+      control: readonlyField(status.length
+        ? status.map(describe).join("; ")
+        : repositories.length
+          ? repositories.map(entry =>
+              entry.version ? `${entry.name} ${entry.version}` : entry.name).join(", ")
+          : "No repositories declared."),
+      help: infoHelp("Shader repositories are named here, never copied into the mod: several of them forbid redistribution. Anyone installing this mod by hand installs the repositories named here."),
+    }));
+    const known = data.repositories || [];
+    rows.push(detailField({
+      label: "On this machine",
+      control: readonlyField(known.length
+        ? known.map(entry => entry.version ? `${entry.name} ${entry.version}` : entry.name).join(", ")
+        : "No shader repositories added yet."),
+      help: infoHelp("One list for the whole machine, not one per mod. Every project's preset resolves its repositories against this list."),
+    }));
+    const repositoryName = element("input", {type: "text", placeholder: "Repository name",
+      "aria-label": "Shader repository name"});
+    const repositoryVersion = element("input", {type: "text", placeholder: "Version",
+      "aria-label": "Shader repository version"});
+    const repositoryUrl = element("input", {type: "text", placeholder: "URL (optional)",
+      "aria-label": "Shader repository URL"});
+    rows.push(detailField({
+      label: "Add a repository",
+      control: element("div", {class: "lex-reshade-actions"},
+        repositoryName, repositoryVersion, repositoryUrl,
+        element("button", {type: "button", class: "lex-dialog-action primary",
+          onclick: () => {
+            const name = repositoryName.value.trim();
+            if (!name) return;
+            act("add_reshade_repository", name, repositoryVersion.value.trim(),
+              repositoryUrl.value.trim());
+            repositoryName.value = repositoryVersion.value = repositoryUrl.value = "";
+          }}, "Add")),
+    }));
+    if (known.length) {
+      const forget = element("select", {"aria-label": "Repository to forget"});
+      for (const entry of known) forget.append(element("option", {value: entry.name}, entry.name));
+      rows.push(detailField({
+        label: "Forget one",
+        control: element("div", {class: "lex-reshade-actions"}, forget,
+          element("button", {type: "button", class: "lex-dialog-action",
+            onclick: () => act("remove_reshade_repository", forget.value)},
+            "Remove from this machine")),
+        help: infoHelp("Removes it from this machine's list. Mods that name it still name it, and will report it missing until it is added again."),
+      }));
+    }
+    // Someone who downloads this mod may never have used Lexeditor. The note
+    // tells them what to install and where to put the preset, in plain text,
+    // beside the preset itself.
+    rows.push(detailField({
+      label: "By-hand install note",
+      control: element("div", {class: "lex-reshade-actions"},
+        element("button", {type: "button", class: "lex-dialog-action",
+          onclick: () => act("write_reshade_note")},
+          `Write ${data.exportNote || "INSTALL-RESHADE.txt"}`)),
+      help: infoHelp("Writes a plain-text note into the mod's reshade folder naming the loader DLL, every shader repository with its version, and where the preset goes. It never mentions Lexeditor, because the reader may not have it."),
+    }));
+    rows.push(detailField({
+      label: "Status",
+      control: readonlyField(data.ready
+        ? "Ready. This mod's preset will be applied."
+        : !data.reshadeInstalled ? "ReShade is not installed for this game."
+        : manifest.enabled !== true ? "Turned off for this mod."
+        : !manifest.preset ? "No preset chosen."
+        : !presets.includes(manifest.preset)
+          ? `The manifest names ${manifest.preset}, which is not in the mod's reshade folder.`
+        : "Not ready."),
+    }));
+    rows.push(detailField({
+      label: "Folder", control: readonlyField(data.path || "No mod project selected"),
+    }));
+    return detailSection({title: "RESHADE", body: rows});
+  };
+
   const showAlert = options => {
     const title = String(options?.title || "Lexeditor message");
     const message = String(options?.message || "An important event needs your attention.");
@@ -2056,7 +2596,10 @@
 
   const confirmUnsavedExit = (options, exit, copy = {}) => {
     const dirty = options.dirtyCount?.() || 0;
-    if (!dirty) return exit();
+    if (!dirty) return Promise.resolve().then(exit).catch(error => {
+      showAlert({title: copy.exitError || "Could not exit", message: error.message || String(error)});
+      return false;
+    });
     const existing = document.querySelector(".lex-exit-dialog");
     if (existing) {
       existing.querySelector(".lex-dialog-action")?.focus();
@@ -2068,21 +2611,26 @@
     const discard = element("button", {class: "lex-dialog-action", text: copy.discardLabel || "Exit Without Saving"});
     const save = element("button", {class: "lex-dialog-action primary", text: copy.saveLabel || "Save and Exit"});
     const buttons = [cancel, discard, save];
-    const setBusy = busy => buttons.forEach(button => { button.disabled = busy; });
-    const dismiss = () => backdrop.remove();
+    let busy = false;
+    const setBusy = value => { busy = value; buttons.forEach(button => { button.disabled = value; }); };
+    const dismiss = () => { if (!busy) backdrop.remove(); };
     cancel.onclick = dismiss;
     discard.onclick = async () => {
       setBusy(true);
+      status.textContent = copy.pendingLabel || "Please wait…";
       try {
-        if (await exit()) dismiss();
+        if (await exit()) backdrop.remove();
+        else status.textContent = "The action did not complete. Try again or cancel.";
       } catch (error) {
         status.textContent = `${copy.exitError || "Could not exit"}: ${error.message || error}`;
+      } finally {
         setBusy(false);
       }
     };
     save.onclick = async () => {
       setBusy(true);
       status.textContent = "Saving changes…";
+      let saved = false;
       try {
         await options.save?.();
         const remaining = options.dirtyCount?.() || 0;
@@ -2091,9 +2639,13 @@
           setBusy(false);
           return;
         }
-        if (await exit()) dismiss();
+        saved = true;
+        status.textContent = copy.pendingLabel || "Please wait…";
+        if (await exit()) backdrop.remove();
+        else status.textContent = "Saved, but the action did not complete. Try again or cancel.";
       } catch (error) {
-        status.textContent = `Save failed: ${error.message || error}`;
+        status.textContent = `${saved ? (copy.exitError || "Could not exit") : "Save failed"}: ${error.message || error}`;
+      } finally {
         setBusy(false);
       }
     };
@@ -2174,6 +2726,10 @@
     if (settings.soundEnabled === false || themeSoundGain(settings.soundVolumePercent) <= 0) stopThemeSounds();
     document.documentElement.dataset.lexHoverableAltClick = settings.hoverableAltClick ? "true" : "false";
     document.documentElement.style.setProperty("--lex-panel-gap", `${Number(settings.panelGapPercent || 1)}vw`);
+    // The pagination bar is one height on every page, and that height is a
+    // setting rather than a number buried in the stylesheet.
+    document.documentElement.style.setProperty("--lex-pager-bar-height",
+      `${Math.max(36, Math.min(80, Number(settings.pagerBarHeight) || 52))}px`);
     document.documentElement.style.setProperty("--lex-command-row-height", `${Math.max(3, Math.min(20, Number(settings.mainMenuHeightPercent) || 9))}vh`);
     window.dispatchEvent(new CustomEvent("lexeditor-view-preferences-ready", {detail: settings.viewPreferences || {}}));
     window.dispatchEvent(new CustomEvent("lexeditor-settings-ready", {detail: settings}));
@@ -2579,7 +3135,7 @@
     const input = element("input", {type: "text", maxlength: "80", value: suggested, placeholder: `${pluginName} mod name`, "aria-label": options.rename ? "Mod name" : "New mod name"});
     const message = element("div", {class: "lex-dialog-status", "aria-live": "polite"});
     const cancel = element("button", {class: "lex-dialog-action"}, "Cancel");
-    const create = element("button", {class: "lex-dialog-action primary"}, options.rename ? "Rename" : "Choose Location…");
+    const create = element("button", {class: "lex-dialog-action primary"}, options.rename ? "Rename" : (options.createLabel || "Choose Location…"));
     const close = value => { backdrop.remove(); resolve(value); };
     cancel.onclick = () => close("");
     create.onclick = () => {
@@ -2593,10 +3149,53 @@
     });
     backdrop.append(element("section", {class: "lex-dialog lex-project-dialog", role: "dialog", "aria-modal": "true"},
       element("h2", {}, options.rename ? "Rename Mod" : "Create New Mod"),
-      element("p", {}, options.rename ? "Change the mod project folder name." : "Lexeditor will create a new editable project from this game's working template."),
+      element("p", {}, options.rename ? "Change the mod project folder name." : (options.description || "Lexeditor will create a new editable project from this game's working template.")),
       input, message, element("div", {class: "lex-dialog-actions"}, cancel, create)));
     document.body.append(backdrop); input.focus(); input.select();
     });
+  };
+
+  // "Did it actually pick anything up?" is the first thing a player wants to
+  // know after pointing Lexeditor at a mod folder, and the answer used to be
+  // silence. This turns one scan into a plain report: what the loader
+  // recognised, and how much it will ignore.
+  const modContentsReport = (contents, title) => {
+    if (!contents) return;
+    if (!contents.exists) {
+      showAlert({title, message: `Nothing is there to read yet:
+${contents.path}`});
+      return;
+    }
+    if (!contents.declared) {
+      showAlert({title, message:
+        `${contents.files} file${contents.files === 1 ? "" : "s"} in ${contents.path}.
+
+`
+        + "This game's plugin has not declared which file types its loader recognises, "
+        + "so Lexeditor cannot break that down yet."});
+      return;
+    }
+    const found = contents.categories.filter(row => row.count > 0);
+    const items = found.map(row => ({
+      item: row.label,
+      issue: `${row.count} file${row.count === 1 ? "" : "s"} (${row.suffixes.join(", ")})`,
+    }));
+    if (!items.length) {
+      showAlert({title, message:
+        `Lexeditor recognised none of the ${contents.files} file`
+        + `${contents.files === 1 ? "" : "s"} in ${contents.path}.
+
+`
+        + "This mod will load nothing. Check that you pointed at the mod's own folder "
+        + "rather than a folder above it."});
+      return;
+    }
+    if (contents.unrecognized) {
+      items.push({item: "Not recognised",
+        issue: `${contents.unrecognized} file${contents.unrecognized === 1 ? "" : "s"} `
+          + "this game's loader will ignore"});
+    }
+    showAlert({title, items, message: contents.path});
   };
 
   const mountProjectControl = (options, host) => {
@@ -2613,11 +3212,25 @@
     host.append(box);
     let snapshot = null;
     const closeMenu = () => { menu.hidden = true; trigger.setAttribute("aria-expanded", "false"); };
+    // One name column for the whole menu, taken from the longest name in it, so
+    // every row's description starts on the same edge. Measured rather than
+    // guessed: a mod is named by the person using it, and "Vanilla" is not the
+    // longest thing this list ever holds. A hidden menu measures as nothing, so
+    // this runs once it is actually on screen as well as on every render.
+    const measureNameColumn = () => {
+      if (menu.hidden) return;
+      menu.style.removeProperty("--lex-project-name-width");
+      const names = [...menu.querySelectorAll(".lex-project-menu-name")];
+      if (!names.length) return;
+      const widest = Math.ceil(Math.max(...names.map(node => node.getBoundingClientRect().width)));
+      if (widest > 0) menu.style.setProperty("--lex-project-name-width", `${widest}px`);
+    };
     const toggleMenu = () => {
       const open = menu.hidden;
       if (open && snapshot) render(snapshot);
       menu.hidden = !open;
       trigger.setAttribute("aria-expanded", String(open));
+      if (open) measureNameColumn();
     };
     const openResult = result => {
       if (!result || result.cancelled) { render(snapshot); return false; }
@@ -2626,11 +3239,13 @@
         location.href = result.url;
         return true;
       }
-      snapshot = result; render(snapshot); return false;
+      snapshot = result; render(snapshot); return true;
     };
     const guarded = operation => confirmUnsavedExit(options, async () => {
       try { return openResult(await operation()); }
-      catch (error) { window.alert(String(error?.message || error)); return false; }
+      // A browser alert is an OS dialog wearing the WebView's clothes. Every
+      // message Lexeditor shows is its own.
+      catch (error) { showAlert({title: "Could not switch mod project", message: String(error?.message || error)}); return false; }
     }, {question: "Save before switching mod projects?", exitError: "Could not switch mod projects"});
     const render = value => {
       snapshot = value;
@@ -2687,7 +3302,31 @@
             catch (error) { showAlert({title: "Could not open the mod folder", message: error.message || String(error)}); }
           },
         }, folderIcon());
-        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`}, select, rename, folder);
+        // "What did Lexeditor find in this mod?" belongs to a mod, so it is a
+        // button on that mod's row beside its pencil and its folder. It used
+        // to be a lone circle crammed in beside the mod name in the command
+        // row, where it annotated whichever mod happened to be loaded.
+        const about = element("button", {
+          class: "lex-project-about", type: "button",
+          title: `What did Lexeditor find in ${row.name}?`,
+          "aria-label": `What did Lexeditor find in ${row.name}?`,
+          onclick: async event => {
+            event.preventDefault();
+            event.stopPropagation();
+            closeMenu();
+            try {
+              const contents = await callWindow("mod_project_contents", options.plugin.id, row.path);
+              modContentsReport(contents, `${row.name} contents`);
+            } catch (error) {
+              showAlert({title: "Could not read the mod folder",
+                         message: error.message || String(error)});
+            }
+          },
+        }, infoIcon());
+        return element("div", {class:`lex-project-menu-item${row.current&&activeSource==="mine"?" active":""}`},
+          select,
+          element("span", {class: "lex-project-menu-item-actions"}, rename, folder, about),
+          select.querySelector(".lex-project-source-status"));
       });
       const sourceRows = sources.map(row => element("button", {
         class: `lex-project-menu-item-select lex-project-menu-item lex-project-reference${String(row.key) === activeSource ? " active" : ""}`,
@@ -2702,19 +3341,35 @@
       }, element("span", {class: "lex-project-source-mode", "aria-label":row.readOnly === false ? "Editable" : "Read only"}, row.readOnly === false ? "📝" : "🔒"),
       element("span", {class: "lex-project-menu-name"}, row.label),
       element("span", {class: "lex-project-menu-path"}, row.path || "Read-only reference"),
+      // A reference has no folder of its own to rename, open or report on, but
+      // it holds the lane those buttons occupy so that every row in the menu
+      // puts its name, its description and its tick in the same place.
+      element("span", {class: "lex-project-menu-item-actions", "aria-hidden": "true"}),
       element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`, "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓")));
       const create = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
         hidden: !value.canCreate, onclick: async () => {
           closeMenu();
-          const projectName = await askProjectName(options.plugin.name || options.plugin.id);
-          if (projectName) guarded(() => callWindow("create_mod_project", options.plugin.id, projectName));
+          const projectName = await askProjectName(options.plugin.name || options.plugin.id, options.projectCreatePrompt || {});
+          if (projectName) guarded(async () => {
+            const result = options.createProject
+              ? await options.createProject(projectName)
+              : await callWindow("create_mod_project", options.plugin.id, projectName);
+            if (result?.contents && !result.cancelled) modContentsReport(result.contents, `Added ${projectName}`);
+            return result;
+          });
         },
-      }, "New Mod");
+      }, "➕ Add a Mod");
       const browse = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
-        onclick: () => { closeMenu(); guarded(() => callWindow("browse_mod_project", options.plugin.id)); },
-      }, "Find a Mod");
+        onclick: () => { closeMenu(); guarded(async () => {
+          const result = options.browseProject
+            ? await options.browseProject()
+            : await callWindow("browse_mod_project", options.plugin.id);
+          if (result?.contents && !result.cancelled) modContentsReport(result.contents, "Added mod");
+          return result;
+        }); },
+      }, "🔍 Find a Mod");
       const manage = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
         hidden: !options.manageProjectSources,
@@ -2722,6 +3377,7 @@
       }, "Load Order…");
       menu.replaceChildren(...sourceRows, ...projects,
         element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, create, browse, manage));
+      measureNameColumn();
     };
     trigger.onclick = event => { event.stopPropagation(); toggleMenu(); };
     menu.onclick = event => event.stopPropagation();
@@ -2746,7 +3402,7 @@
     if (options.projectSnapshot) load();
     else if (window.pywebview?.api) load();
     else window.addEventListener("pywebviewready", load, {once: true});
-    box.refresh = () => { if (snapshot) render(snapshot); };
+    box.refresh = () => { if (options.projectSnapshot) load(); else if (snapshot) render(snapshot); };
     return box;
   };
 
@@ -2796,8 +3452,10 @@
         {key:"updateCheckFrequency", scope:"user", title:"Update check frequency", description:"Used by LEXEDITOR and managed helpers such as FFNx.", type:"select", choices:settings.updateCheckChoices || []},
         {key:"hoverableAltClick", scope:"user", title:"Alt + Click hoverable linking", description:"When enabled, ordinary clicks do not follow linked record mentions. Alt+Click opens them.", type:"checkbox"},
         {key:"selectionHoldMs", scope:"user", title:"Searcher hold time", description:"How long a record must be held before a Searcher selects it.", type:"number", min:150, max:2000, step:50, unit:"ms"},
+        {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"boolean"},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
+        {key:"pagerBarHeight", scope:"user", title:"Pagination bar height", description:"How tall the bar along the bottom of a table page is. One height on every page, whether or not that page's bar carries a search box.", type:"number", min:36, max:80, step:1, unit:"px"},
         {key:"mainMenuHeightPercent", scope:"user", title:"Menu bar height", description:"Height of the menu bar in the Home screen and every game plugin, as a percentage of the screen.", type:"number", min:3, max:20, step:.25, unit:"%"},
         {key:"soundEnabled", scope:"user", title:"Sound", description:"Play game-themed interface sounds when the active plugin supplies them.", type:"checkbox"},
         {key:"soundVolumePercent", scope:"packaged", title:"Volume level", description:"Attenuates all menu sound effects for every user.", type:"number", min:0, max:100, step:1, unit:"%"},
@@ -3464,7 +4122,10 @@
     };
     if (window.pywebview?.api) installPackagedDefaults().catch(() => {});
     else window.addEventListener("pywebviewready", () => installPackagedDefaults().catch(() => {}), {once:true});
-    const isSpecialTab = tab => tab.special === true || ["settings", "tweaks"].includes(tab.id);
+    // Tweaks is an ordinary page. It was grouped with Settings, which pushed it
+    // out of the run of tabs and gave it a paler fill, so a page the reader
+    // uses constantly read as chrome. Settings is the only tab that sits apart.
+    const isSpecialTab = tab => tab.special === true || tab.id === "settings";
     const orderedTabs = [...options.tabs].sort((left, right) => {
       const leftSettings = isSpecialTab(left);
       const rightSettings = isSpecialTab(right);
@@ -3487,7 +4148,9 @@
       };
       const button = element("button", {
         "data-tab": tab.id,
-        class: [tab.id === options.activeTab() ? "active" : "", isSpecialTab(tab) ? "lex-settings-tab" : ""].filter(Boolean).join(" "),
+        class: [tab.id === options.activeTab() ? "active" : "",
+        isSpecialTab(tab) ? "lex-settings-tab" : "",
+        tab.id === "tweaks" ? "lex-tweaks-tab" : ""].filter(Boolean).join(" "),
         onclick: () => {
           playThemeSound("confirm");
           githubWorkspace?.hide();
@@ -3588,7 +4251,13 @@
     const leftActions = element("div", {class: "lex-shell-left-actions"}, context);
     const centerActions = element("div", {class: "lex-shell-center-actions"}, undo, save, game, redo);
     const rightActions = element("div", {class: "lex-shell-right-actions"}, settings, shortcuts, help, info);
-    const developerActions = element("div", {class: "lex-developer-actions"}, github, restart);
+    // Restart acts on the window, so it sits with the window controls and is
+    // shaped like them. Parked at the end of the developer group it read as a
+    // developer toggle with a gap between it and the controls it belongs to.
+    restart.classList.remove("lex-developer-button");
+    restart.classList.add("lex-window-button", "lex-window-restart");
+    const developerActions = element("div", {class: "lex-developer-actions"}, github);
+    windowControls.root?.prepend?.(restart);
     const commandRow = element("div", {class: "lex-shell-command-row"},
       brandSlot, leftActions, centerActions, rightActions, developerActions, windowControls.root);
     const header = element("header", {class: "lex-shell-header"}, commandRow, navFrame);
@@ -3669,16 +4338,14 @@
     brand.onclick = () => { playThemeSound("exit"); return returnToMainMenu(options, leaveForMainMenu); };
     const restartPlugin = async () => {
       const opened = await callWindow("restart_plugin", options.plugin.id);
-      if (!opened?.url) return false;
+      if (!opened?.url) throw new Error("The desktop host did not return a restart address. Close and reopen Lexeditor if this continues.");
       window.__lexeditorNavigating = true;
       // A restart is still a load, so it gets a real loading message rather
       // than dropping through to the fallback text.
       const destination = new URL(opened.url, location.href);
-      let quote = "";
-      try { quote = (await callWindow("loading_quote", options.plugin.id))?.quote || ""; }
-      catch (_error) {}
+      // The old service has stopped. Navigate immediately; optional quote
+      // retrieval must never keep the discard dialog waiting on another bridge call.
       destination.searchParams.set("lexTransition", "load");
-      if (quote) destination.searchParams.set("lexQuote", quote);
       destination.searchParams.set("lexLoadStarted", String(Date.now()));
       location.href = destination.href;
       return true;
@@ -3689,6 +4356,7 @@
       discardLabel: "Restart Without Saving",
       saveLabel: "Save and Restart",
       exitError: "Could not restart the plugin",
+      pendingLabel: "Restarting plugin…",
     });
     const closeLexeditor = () => callWindow("window_close");
     const requestWindowClose = () => confirmUnsavedExit(options, closeLexeditor);
@@ -3937,7 +4605,13 @@
     return columns.map((column, index) => {
       if (column.width) return column.width;
       const grow = Number(column.grow) || (!declaredGrow && index === automaticGrow ? 1 : 0);
-      return grow > 0 ? `minmax(0, ${grow}fr)` : "max-content";
+      if (grow > 0) return `minmax(0, ${grow}fr)`;
+      // A max-content track is still squeezed when the wider columns beside it
+      // want the space, and a squeezed number is not a shortened number - it is
+      // a different one. "5,000" cut to "5,00" reads as five hundred. Text may
+      // truncate; a numeric column is floored at its own content and never
+      // does.
+      return column.numeric === true ? "minmax(min-content, max-content)" : "max-content";
     }).join(" ");
   };
 
@@ -4076,7 +4750,12 @@
           "aria-pressed": String(pinned),
           onpointerenter: () => setColumnLit(value, true),
           onpointerleave: () => setColumnLit(value, false),
-          onclick: event => { event.preventDefault(); event.stopPropagation(); api.toggle(value); },
+          onclick: event => {
+            event.preventDefault();
+            event.stopPropagation();
+            api.toggle(value);
+            markArrivingColumn(document, value);
+          },
         }, icon);
       },
     };
@@ -4087,6 +4766,21 @@
   // whole column and the matching property in the detail pane, so the reader
   // can see what a table column and a detail row have to do with each other.
   const litColumns = new Set();
+  // A column that has just been pinned or unpinned announces itself once, so
+  // the table does not simply have a different shape the next time you look
+  // at it.
+  const markArrivingColumn = (root, key) => {
+    if (!root || !key) return;
+    requestAnimationFrame(() => {
+      root.querySelectorAll?.(`[data-column-key="${CSS.escape(String(key))}"]`)
+        .forEach(node => {
+          node.classList.add("lex-column-arriving");
+          node.addEventListener("animationend",
+            () => node.classList.remove("lex-column-arriving"), {once: true});
+        });
+    });
+  };
+
   const setColumnLit = (key, lit) => {
     if (!key) return;
     if (lit) litColumns.add(key); else litColumns.delete(key);
@@ -4130,8 +4824,13 @@
     }
   };
 
+  // Only a column's own header lights it. Binding this to a cell lit the whole
+  // column whenever the pointer crossed any row of it, so simply reading down
+  // a table flashed columns on and off.
   const bindColumnHighlight = (node, key) => {
     if (!node || !key) return node;
+    if (!node.classList?.contains("lex-column-list-head-cell") &&
+        !node.classList?.contains("lex-column-heading")) return node;
     node.addEventListener("pointerenter", () => setColumnLit(key, true));
     node.addEventListener("pointerleave", () => setColumnLit(key, false));
     return node;
@@ -4363,11 +5062,20 @@
             column.edit ? "lex-cell-editable" : "",
             column.key === pointerColumn ? "lex-column-pointer-cell" : "",
             isNumbered ? "lex-numbered-id-cell" : "",
+            column.numeric === true ? "lex-numeric-cell" : "",
             alignmentClass(column),
             typeof column.cellClass === "function" ? column.cellClass(row) : column.cellClass || ""].filter(Boolean).join(" "),
           role: "cell",
           "data-column-key": column.key,
-        }, element("span", {class: "lex-column-cell-content"}, content));
+        // A bare string handed straight to the flex content span cannot be
+        // ellipsised: text-overflow does nothing on a flex container, so a long
+        // value was hard-cut mid-character. Wrapping plain text in its own
+        // block gives the existing single-line truncation something to act on,
+        // and the title keeps the full value reachable.
+        }, element("span", {class: "lex-column-cell-content"},
+          (typeof content === "string" || typeof content === "number")
+            ? element("span", {class: "lex-column-cell-text", title: String(content)}, String(content))
+            : content));
         if (column.edit) {
           cell.addEventListener("dblclick", event => {
             event.preventDefault();
@@ -4561,7 +5269,10 @@
         event.preventDefault();
         setSizes(defaults, true);
       };
-      divider.addEventListener("dblclick", reset);
+      // Right-click resets a split; double-click does not. A divider is
+      // dragged, and a drag that starts with two quick presses would otherwise
+      // throw the layout away instead of moving it. Two separate contracts
+      // record this decision.
       divider.addEventListener("contextmenu", reset);
     });
 
@@ -4652,12 +5363,19 @@
       const listStyle = getComputedStyle(listNode);
       const borderHeight = (parseFloat(listStyle.borderTopWidth) || 0) +
         (parseFloat(listStyle.borderBottomWidth) || 0);
-      // availableNode is the complete paged view. Its bottom pager occupies
-      // real height in the second grid row; counting it as list space is what
-      // produced one clipped row plus a vertical scrollbar on Tweaks/tables.
+      // availableNode is the complete paged view. A pager that sits IN that
+      // view occupies real height in its second grid row, and counting that as
+      // list space produced one clipped row plus a vertical scrollbar. A pager
+      // pinned to the window occupies none: the page already reserves its
+      // height as padding under #main, so subtracting it here reserved the
+      // same band twice and left exactly one pager's worth of empty ground
+      // between the last row and the bar.
       const pagerNode = availableNode.querySelector?.(":scope > .lex-pager");
-      const pagerHeight = pagerNode?.getBoundingClientRect().height ||
-        parseFloat(getComputedStyle(availableNode).getPropertyValue("--lex-pager-height")) || 0;
+      const pagerInFlow = pagerNode && getComputedStyle(pagerNode).position !== "fixed";
+      const pagerHeight = pagerInFlow
+        ? pagerNode.getBoundingClientRect().height
+        : pagerNode ? 0
+        : parseFloat(getComputedStyle(availableNode).getPropertyValue("--lex-pager-height")) || 0;
       const availableHeight = Math.max(0, availableNode.clientHeight - pagerHeight);
       const available = Math.max(0, availableHeight - borderHeight - headerHeight);
       const minimumRowHeight = Math.max(0, Number(options.minRowHeight) || 0);
@@ -4850,6 +5568,38 @@
     return element("label", {class: "lex-pager-search"}, searchIcon(), control);
   };
 
+  // The pager's right-hand side is where filters live. These are the two shapes
+  // a plugin needs, so every game's filters look and behave the same instead of
+  // each one growing its own strip above the table.
+  const pagerToggle = spec => {
+    const input = element("input", {
+      type: "checkbox", checked: spec.checked === true, disabled: spec.disabled === true,
+      "aria-label": String(spec.label || "Filter"),
+      onchange: event => spec.change?.(event.target.checked),
+    });
+    return element("label", {
+      class: `lex-pager-filter lex-pager-toggle${spec.disabled ? " disabled" : ""}`,
+      title: String(spec.title || spec.label || ""),
+    }, input, element("span", {}, String(spec.label || "Filter")));
+  };
+
+  const pagerSelect = spec => {
+    const select = element("select", {
+      disabled: spec.disabled === true,
+      "aria-label": String(spec.label || "Filter"),
+      onchange: event => spec.change?.(event.target.value),
+    });
+    for (const option of spec.options || []) {
+      const node = element("option", {value: String(option.id)}, String(option.label));
+      node.selected = String(option.id) === String(spec.value);
+      select.append(node);
+    }
+    return element("label", {
+      class: "lex-pager-filter lex-pager-select",
+      title: String(spec.title || spec.label || ""),
+    }, spec.label ? element("span", {}, String(spec.label)) : null, select);
+  };
+
   const pager = options => {
     const pages = Math.max(1, Number(options.pages) || 1);
     const page = Math.max(0, Math.min(Number(options.page) || 0, pages - 1));
@@ -5026,6 +5776,9 @@
   };
   const tableCapacityCache = new Map();
   const tableFitCapacityCache = new Map();
+  // Which page each table last drew, so a page the reader asked for can be
+  // told apart from the page a stale selection would pull it back to.
+  const lastRenderedPage = new Map();
   let openBarrelControlKey = "";
   const fitBarrelTableColumns = node => {
     const template = node?.style?.getPropertyValue("--lex-column-list-template");
@@ -5090,7 +5843,17 @@
     const emptyRow = slotBased && typeof options.empty === "function" ? options.empty : null;
     const hideEmptyKey = slotTablePreferenceKey(options);
     const hideEmpty = Boolean(emptyRow) && readHideEmpty(hideEmptyKey);
-    const suppliedRows = Array.isArray(options.rows) ? options.rows : [];
+    const allRows = Array.isArray(options.rows) ? options.rows : [];
+    // "Mod contents only" belongs to the shared table, not to each plugin.
+    // A plugin says whether it can tell (it needs a vanilla baseline loaded)
+    // and how to tell for one record; the toggle, its placement on the
+    // pagination bar, the filtering and the page reset are handled here, so
+    // adopting it is one option rather than a reimplementation per game.
+    const modOnly = options.modOnly && typeof options.modOnly.changed === "function"
+      ? options.modOnly : null;
+    const modOnlyOn = Boolean(modOnly && modOnly.value && modOnly.available !== false);
+    const suppliedRows = modOnlyOn
+      ? allRows.filter(row => modOnly.changed(row)) : allRows;
     const records = hideEmpty ? suppliedRows.filter(record => !emptyRow(record)) : suppliedRows;
     const emptyCount = emptyRow ? suppliedRows.reduce(
       (count, record) => count + (emptyRow(record) ? 1 : 0), 0) : 0;
@@ -5123,9 +5886,19 @@
     const pages = Math.max(1, Math.ceil(records.length / barrelSize));
     let page = Math.max(0, Math.min(Number(options.page) || 0, pages - 1));
     const requestedIndex = records.findIndex(record => keyOf(record) === requestedSelection);
-    if (options.revealSelected !== false && requestedIndex >= 0 &&
+    // The reveal exists for a selection that arrived from somewhere else - a
+    // search hit, a link followed - and it must not fight the reader. Paging
+    // forward leaves the selection on the page you left, so the reveal dragged
+    // the table straight back to it and pagination looked dead: every press of
+    // Next re-rendered page one. A page the reader asked for wins; the reveal
+    // applies when the PAGE did not change and the selection did.
+    const pagedDeliberately = lastRenderedPage.get(rowPreferenceKey) !== undefined &&
+      lastRenderedPage.get(rowPreferenceKey) !== page;
+    lastRenderedPage.set(rowPreferenceKey, page);
+    if (options.revealSelected !== false && !pagedDeliberately && requestedIndex >= 0 &&
         (requestedIndex < page * barrelSize || requestedIndex >= (page + 1) * barrelSize)) {
       page = Math.floor(requestedIndex / barrelSize);
+      lastRenderedPage.set(rowPreferenceKey, page);
     }
     const groupStart = page * barrelSize;
     const barrelRows = records.length ? Array.from({length: barrels}, (_unused, index) =>
@@ -5137,7 +5910,13 @@
       page, pageSize, selected, reason, ...patch,
     });
     const changePage = target => {
-      const targetPage = Math.max(0, Math.min(Number(target) || 0, pages - 1));
+      const requested = Number(target) || 0;
+      // Paging past either end wraps to the other, so a wheel at the last page
+      // does something instead of silently re-rendering the same page.
+      const wraps = sharedSettingsSnapshot?.pageWrapAround !== false;
+      const targetPage = wraps && pages > 1
+        ? ((requested % pages) + pages) % pages
+        : Math.max(0, Math.min(requested, pages - 1));
       if (targetPage === page) return false;
       const first = records[targetPage * barrelSize] || null;
       change("page", {page: targetPage, selected: first ? keyOf(first) : null});
@@ -5198,9 +5977,16 @@
       fitBarrelTableColumns(node);
       // Filler rows exist to square off a growable list. A slot table shows one
       // row per real slot, so a short last page simply ends.
-      if (!slotBased) padBarrelTable(node, pageSize);
+      // Pad to the track count this table actually declares. Padding to the
+      // page size instead put forty rows into a ten-track grid whenever a
+      // table held less than one page: the ten declared tracks collapsed to
+      // zero and every real record painted on top of the others in one band.
+      if (!slotBased) padBarrelTable(node, rowCapacity);
       node.classList.add("lex-page-sized-table");
-      node.style.setProperty("--lex-page-row-count", String(rowCapacity));
+      // The track count is read back from the rows that are really there, so
+      // a padding rule and a capacity rule can never disagree again.
+      node.style.setProperty("--lex-page-row-count",
+        String(Math.max(1, node.querySelectorAll(":scope > .lex-column-list-row").length || rowCapacity)));
       node.dataset.lexBarrel = String(index + 1);
       if (index) node.classList.add("lex-fitted-page");
       return node;
@@ -5282,6 +6068,18 @@
     root.dataset.lexPage = String(page);
     root.dataset.lexPageSize = String(pageSize);
     const bottomTools = [...(options.filters || [])];
+    if (modOnly) {
+      bottomTools.unshift(pagerToggle({
+        label: modOnly.label || "Mod contents only",
+        title: modOnly.available === false
+          ? (modOnly.unavailableTitle
+            || "Available once an editable mod and its vanilla baseline are both loaded.")
+          : (modOnly.title || "Show only the records this mod changes."),
+        checked: modOnlyOn,
+        disabled: modOnly.available === false,
+        change: value => modOnly.change?.(value),
+      }));
+    }
     if (!slotBased && typeof options.add === "function") {
       bottomTools.push(newButton({
         class: "lex-pager-add",
@@ -5444,6 +6242,38 @@
     return String(source.name || "").slice(0, 5).toLocaleUpperCase();
   };
 
+  // A reference rail is a narrow, fixed lane. A value that does not fit it is
+  // shortened rather than allowed to widen the lane, because the lane widening
+  // moves every value box on the panel. Thousands become 12K, millions 3.4M,
+  // billions 1.2B; the exact number stays on the entry's tooltip.
+  const REFERENCE_VALUE_CHARACTERS = 6;
+  // Words get more room than digits: a number past six digits says as much
+  // shortened to 1.2M, while "default" cut to "defau…" says nothing.
+  const REFERENCE_WORD_CHARACTERS = 10;
+  const compactReferenceNumber = value => {
+    const numeric = typeof value === "number" ? value : Number(value);
+    if (!Number.isFinite(numeric)) return String(value);
+    const plain = formatNumber(numeric);
+    if (plain.replace("-", "").length <= REFERENCE_VALUE_CHARACTERS) return plain;
+    const sign = numeric < 0 ? "-" : "";
+    const size = Math.abs(numeric);
+    for (const [limit, suffix] of [[1e12, "T"], [1e9, "B"], [1e6, "M"], [1e3, "K"]]) {
+      if (size < limit) continue;
+      const scaled = size / limit;
+      // One decimal while it earns its place: 1.2M says more than 1M, 340M
+      // needs no decimal and has no room for one.
+      const text = scaled < 10 ? scaled.toFixed(1).replace(/\.0$/, "") : String(Math.round(scaled));
+      return `${sign}${text}${suffix}`;
+    }
+    // A long decimal is trimmed from the right, where the least of it lives.
+    return plain.slice(0, REFERENCE_VALUE_CHARACTERS + sign.length);
+  };
+  const compactReferenceText = value => {
+    const text = String(value);
+    return text.length <= REFERENCE_WORD_CHARACTERS
+      ? text : `${text.slice(0, REFERENCE_WORD_CHARACTERS - 1)}…`;
+  };
+
   const booleanMark = value => element("span", {
     class: `lex-boolean-mark ${value ? "true" : "false"}`,
     "aria-label": value ? "Yes" : "No",
@@ -5455,9 +6285,9 @@
   const referenceDisplay = options => {
     const format = options.format || (value => {
       if (typeof value === "boolean") return booleanMark(value);
-      if (typeof value === "number") return formatNumber(value);
-      if (typeof value === "string" && /^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim())) return formatNumber(value);
-      return String(value);
+      if (typeof value === "number") return compactReferenceNumber(value);
+      if (typeof value === "string" && /^-?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value.trim())) return compactReferenceNumber(value);
+      return compactReferenceText(value);
     });
     const same = options.same || ((left, right) => JSON.stringify(left) === JSON.stringify(right));
     const configuredSources = options.sources || [];
@@ -5475,12 +6305,16 @@
       "data-reference-count": String(sources.length),
     }, ...sources.map(source => {
       const formatted = format(source.value, source);
-      const description = formatted instanceof Node ? formatted.textContent : String(formatted);
+      // The rail may have shortened what it paints; the tooltip says the whole
+      // value, because that is what pressing the entry writes into the box.
+      const exact = typeof source.value === "boolean"
+        ? (source.value ? "Yes" : "No")
+        : typeof source.value === "number" ? formatNumber(source.value) : String(source.value);
       return element("button", {
         type: "button",
         class: ["lex-reference-value", `lex-reference-slot-${source.referenceIndex}`, source.className || ""].filter(Boolean).join(" "),
         "data-reference-index": String(source.referenceIndex),
-        title: `Use ${source.name}: ${description}`,
+        title: `Use ${source.name}: ${exact}`,
         onclick: event => options.apply?.(clone(source.value), event, source),
       },
       element("span", {class: `lex-reference-tag${shortReferenceName(source) === "LL" ? " lex-reference-ll" : ""}`}, shortReferenceName(source)),
@@ -5495,15 +6329,39 @@
       {name: options.vanillaName || "Vanilla", shortName: options.vanillaShortName || "V", value: options.vanilla},
       ...(options.references || []),
     ];
+    // References live INSIDE the value box by default. An outside pillar
+    // reserves a lane on the right of every box on the panel, which is a band
+    // of empty ground on every property that has nothing to compare. A caller
+    // that wants the outside pillar asks for it with internal:false; a control
+    // with no box to put a reference in - a checkbox - never gets one.
+    const boxed = options.control instanceof Element &&
+      options.control.matches?.("input:not([type=checkbox]):not([type=range]),select,textarea,output,.lex-unit-field,.lex-readonly-field");
+    const internal = options.internal === undefined ? boxed : options.internal !== false;
     const root = element("div", {
-      class: ["lex-source-control", options.internal ? "lex-source-control-internal" : ""].filter(Boolean).join(" "),
+      class: ["lex-source-control", internal ? "lex-source-control-internal" : ""].filter(Boolean).join(" "),
     }, options.control);
-    const referenceCharacters = Math.max(1, ...sources.map(source => {
-      const formatted = (options.format || (value => typeof value === "number" ? formatNumber(value) : String(value ?? "")))(source.value, source);
-      const value = formatted instanceof Node ? formatted.textContent : String(formatted);
-      return shortReferenceName(source).length + value.length + 1;
-    }));
-    if (options.internal) {
+    // What the rail must hold is decided by the sources, which do not change
+    // while a value is edited - not by which of them happen to differ from the
+    // value right now. Measuring the visible entries instead made the rail
+    // breathe every time an edit matched or stopped matching vanilla, and the
+    // whole column of value boxes moved with it.
+    const painted = source => {
+      // What the entry PAINTS, which for a boolean is one tick rather than
+      // the word "true". Reserving for the word made every rail on a panel
+      // holding one boolean four characters wider than anything in it.
+      const formatted = (options.format || (value => typeof value === "boolean"
+        ? booleanMark(value)
+        : typeof value === "number" ? compactReferenceNumber(value)
+        : compactReferenceText(value ?? "")))(source.value, source);
+      return formatted instanceof Node ? formatted.textContent : String(formatted);
+    };
+    const widestOf = pick => sources.map(pick).reduce((longest, text) =>
+      text.length > longest.length ? text : longest, "");
+    const canReference = sources.some(source => source.value !== undefined);
+    const widestTag = widestOf(shortReferenceName);
+    const widestValue = widestOf(painted);
+    const referenceCharacters = Math.max(1, widestTag.length + widestValue.length + 1);
+    if (internal) {
       // Internal references share the live control's box. Size the reserved
       // lane from the actual tag+value character count with enough average
       // glyph width for game fonts; the old .38em estimate clipped values such
@@ -5511,13 +6369,13 @@
       const reserve = Math.max(2.75, Math.min(8.5, referenceCharacters * .58 + .65));
       root.style.setProperty("--lex-internal-reference-width", `${reserve}em`);
     } else {
-      const reserve = Math.max(2.35, Math.min(6.25, referenceCharacters * .44 + .45));
-      // Sizing the rail per control makes value boxes on the same panel end
-      // at different edges, because one reference reading "V25" needs less
-      // room than one reading "R130". The requirement is recorded here and a
-      // single widest value is applied across the panel below.
-      root.dataset.lexRailWidth = String(reserve);
-      root.style.setProperty("--lex-reference-rail-width", `${reserve}em`);
+      // Sizing the rail per control makes value boxes on the same panel end at
+      // different edges, because one reference reading "V 25" needs less room
+      // than one reading "R1 130". The requirement is recorded here as the
+      // longest tag and the longest value this control can ever show, and the
+      // panel-wide pass below turns the widest of those into one rail.
+      root.dataset.lexRailTag = widestTag;
+      root.dataset.lexRailValue = widestValue;
     }
     const currentValue = () => typeof options.current === "function" ? options.current() : options.current;
     root.lexVanillaValue = () => options.vanilla;
@@ -5592,7 +6450,12 @@
         class: "lex-source-strip lex-reference-placeholder",
         "aria-hidden": "true",
       }));
-      root.classList.toggle("no-reference", !reference);
+      // The rail belongs to the control, not to today's values. Dropping the
+      // column the moment every reference matched was what made a value box
+      // jump wider the instant an edit landed on vanilla and snap back on the
+      // next keystroke. A control with nothing to compare against still
+      // collapses, because it has no rail to hold.
+      root.classList.toggle("no-reference", !canReference);
     };
     // Run after the game-owned listener has updated its model, but do not wait
     // for a new frame or a tab rebuild. Waiting caused editable tables to show
@@ -5619,6 +6482,25 @@
 
   // One fitted Table + Detail map for every plugin. Coverage is an explicit
   // user-interface claim, never inferred from a parser or a legacy green badge.
+  // Every plugin states the same five things about its mod loader, in the same
+  // order, in the same words. Left to each plugin these went missing entirely:
+  // five of eight editors said nothing at all about how their output is loaded.
+  const MOD_LOADER_FIELDS = [
+    ["LOADER", "loader", "Which loader or mechanism the game uses to read this plugin's output."],
+    ["OUTPUT", "output", "Where Lexeditor writes, and what the game reads."],
+    ["LOAD ORDER", "order", "How this output orders against other mods."],
+    ["SAFETY", "safety", "What Lexeditor never modifies in the installed game."],
+    ["REMOVING", "removal", "How to take the changes back out."],
+  ];
+  const modLoaderSection = (spec = {}) => detailSection({
+    title: "MOD LOADER",
+    body: MOD_LOADER_FIELDS.map(([label, key, fallback]) => detailField({
+      label,
+      control: readonlyField(String(spec[key] || "").trim() || fallback),
+      help: infoHelp(fallback),
+    })),
+  });
+
   const dataMapState = new Map();
   const dataMap = options => {
     const plugin = document.body.dataset.lexPlugin || "plugin";
@@ -5626,6 +6508,10 @@
     const saved = dataMapState.get(stateKey) || {pageSize:15, selected:null};
     dataMapState.set(stateKey, saved);
     const labels = {structured:"Structured editable", view:"Read-only view", source:"Source only", unavailable:"Unavailable"};
+    // A glyph per coverage state, so the column reads at a glance instead of
+    // being four columns of similar words. The word stays beside it: state is
+    // never carried by colour alone.
+    const glyphs = {structured:"◉", view:"◎", source:"○", unavailable:"✕"};
     const coverage = row => Object.hasOwn(labels, row.coverage) ? row.coverage : "unavailable";
     const label = row => labels[coverage(row)] + (coverage(row)==="structured" && row.status==="partial" ? " (partial)" : "");
     const keyOf = row => row.id || `${row.filename}\u001f${row.controls || ""}`;
@@ -5644,7 +6530,9 @@
       }));
     const detail = row => {
       const body = [element("p",{class:"lex-data-map-scope"},row.controls || "No mapped interface"),
-        element("p",{class:`lex-data-map-coverage ${coverage(row)}`},label(row)),
+        element("p",{class:`lex-data-map-coverage ${coverage(row)}`},
+          element("span",{class:"lex-coverage-icon","aria-hidden":"true"},glyphs[coverage(row)]),
+          element("span",{},label(row))),
         element("p",{class:"lex-data-map-notes"},row.notes || "No further notes.")];
       const actions=[];
       const targets = row.targets || (row.target || row.view ? [{id:row.target || row.view,label:row.target || row.view}] : []);
@@ -5681,7 +6569,10 @@
         sortState:{key:sortKey,dir:direction},sort:options.changeSort,
         columns:[{key:"filename",label:"Filename",sortable:true,align:"start"},
           {key:"controls",label:"What it controls",sortable:true,align:"start"},
-          {key:"status",label:"Coverage",sortable:true,align:"start",render:row=>element("span",{title:label(row)},label(row))}]}),
+          {key:"status",label:"Coverage",sortable:true,align:"start",
+            render:row=>element("span",{class:`lex-coverage-cell ${coverage(row)}`,title:label(row)},
+              element("span",{class:"lex-coverage-icon","aria-hidden":"true"},glyphs[coverage(row)]),
+              element("span",{class:"lex-coverage-text"},label(row)))}]}),
       detail,
     });
     return {controls:[],content,page,pages:Math.max(1,Math.ceil(filtered.length/saved.pageSize)),filtered};
@@ -5752,7 +6643,7 @@
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {element, el: element, newButton, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {element, el: element, confirmAction, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
@@ -5767,7 +6658,12 @@
     const heading = panel.querySelector(':scope > .lex-detail-panel-heading');
     const icon = heading?.querySelector('.lex-detail-panel-icon');
     if (!heading || !icon) return panel;
-    const getContent = typeof spec === 'function' ? spec : () => spec.content;
+    // The content may be a node or a factory. A preview that has to read a
+    // mesh out of a game archive should not pay for that until someone opens
+    // the drawer, and a factory is how a plugin says so.
+    const getContent = typeof spec === 'function' ? spec
+      : typeof spec.content === 'function' ? spec.content
+      : () => spec.content;
     const onOpen = typeof spec === 'object' ? spec.onOpen : null;
     const onClose = typeof spec === 'object' ? spec.onClose : null;
     const openLabel = typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview';
@@ -5902,6 +6798,13 @@
     const node = event.target.closest?.('.lex-detail-field,[data-column-key]');
     if (!node) return;
     node.classList.add('lex-self-hover');
+    // A column lights from its HEADER, not from anywhere inside it. Lighting
+    // it from any cell meant reading down a table lit and unlit whole columns
+    // under the pointer, which is motion the reader did not ask for.
+    const fromHeader = node.classList.contains('lex-column-list-head-cell') ||
+      node.classList.contains('lex-detail-field') ||
+      Boolean(event.target.closest?.('.lex-column-pin,.lex-column-list-head-cell'));
+    if (!fromHeader) return;
     const key = hoverKey(node);
     if (!key) return;
     const escaped = CSS.escape(String(key));
@@ -5951,6 +6854,68 @@
     }));
   }, true);
 
+  // A tab bar that has to wrap splits evenly between its rows. Left alone,
+  // flex packs the first row full and strands whichever tabs are left over on
+  // a second row of one or two, which reads as a mistake rather than a layout.
+  // The natural row count is measured with the balancing removed, then each
+  // row is given its equal share.
+  const balanceTabRows = () => {
+    for (const bar of document.querySelectorAll('.lex-shell-header nav, .lex-subtab-bar')) {
+      const tabs = [...bar.children].filter(node =>
+        node instanceof HTMLElement && node.offsetParent !== null);
+      if (tabs.length < 2) { bar.removeAttribute('data-lex-tab-rows'); continue; }
+      bar.removeAttribute('data-lex-tab-rows');
+      bar.removeAttribute('data-lex-tab-tight');
+      bar.style.removeProperty('--lex-tab-columns');
+      tabs.forEach(tab => tab.style.removeProperty('--lex-tab-span'));
+      const rowCount = () => new Set(tabs.map(tab => Math.round(tab.offsetTop))).size;
+      if (rowCount() < 2) continue;
+      // Wrapping is the last resort, so the bar tightens first and is measured
+      // again: a bar that now fits on one line keeps its tabs full size and
+      // needs no balancing at all.
+      bar.dataset.lexTabTight = "";
+      const rows = rowCount();
+      if (rows < 2) continue;
+      // As even as the count allows: seven tabs over three rows is three, two
+      // and two, never three, three and one. The bar becomes a grid of as many
+      // columns as every row divides into, and each tab spans its own row's
+      // share of them.
+      const counts = Array.from({length: rows}, (_, index) =>
+        Math.floor(tabs.length / rows) + (index < tabs.length % rows ? 1 : 0));
+      const divisor = (a, b) => b ? divisor(b, a % b) : a;
+      const columns = counts.reduce((carry, count) => carry * count / divisor(carry, count), 1);
+      bar.dataset.lexTabRows = String(rows);
+      bar.style.setProperty('--lex-tab-columns', String(columns));
+      let index = 0;
+      counts.forEach(count => {
+        for (let seat = 0; seat < count; seat += 1) {
+          tabs[index]?.style.setProperty('--lex-tab-span', String(columns / count));
+          index += 1;
+        }
+      });
+    }
+  };
+  let balancePending = false;
+  const scheduleBalance = () => {
+    if (balancePending) return;
+    balancePending = true;
+    requestAnimationFrame(() => { balancePending = false; balanceTabRows(); });
+  };
+  window.addEventListener('resize', scheduleBalance);
+  document.fonts?.ready?.then(scheduleBalance).catch(() => {});
+  new MutationObserver(records => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node instanceof Element &&
+            (node.matches?.('nav,.lex-subtab-bar') || node.querySelector?.('nav,.lex-subtab-bar'))) {
+          scheduleBalance();
+          return;
+        }
+      }
+    }
+  }).observe(document.documentElement, {childList: true, subtree: true});
+  scheduleBalance();
+
   const dedupeShortcuts = root => root.querySelectorAll?.('nav button[data-tab]').forEach(button => {
     if (button.querySelector('.lex-tab-shortcut')) {
       button.querySelectorAll('.lex-tab-ordinal').forEach(node => node.remove());
@@ -5961,24 +6926,79 @@
   }))).observe(document.documentElement, {childList: true, subtree: true});
   dedupeShortcuts(document);
 
+  // Fitting a label is a read, a write and a read again, which forces the
+  // browser to re-lay-out the page between every pair. Doing that to every
+  // label in the document on every DOM change cost a third of a second per
+  // keystroke on a panel of four hundred properties - the reported lag between
+  // ticking a box and seeing it tick. A label whose box and text have not
+  // moved since it was last fitted is already fitted, and the check for that
+  // reads without writing, so nothing is invalidated and the browser answers
+  // the whole sweep from one layout.
+  const fitted = new WeakMap();
+  const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}`;
   const fitLabel = label => {
     if (!(label instanceof HTMLElement)) return;
+    const key = fitKey(label);
+    if (fitted.get(label) === key) return;
     label.style.fontSize = '';
     let size = parseFloat(getComputedStyle(label).fontSize) || 12;
     while (size > 6 && (label.scrollHeight > label.clientHeight + 1 || label.scrollWidth > label.clientWidth + 1)) {
       size -= .5;
       label.style.fontSize = `${size}px`;
     }
+    // `contain:size` keeps the font size out of the box's own measurements, so
+    // the key is the same one computed above and the label settles in one pass.
+    fitted.set(label, key);
   };
-  const fitAllLabels = root => root.querySelectorAll?.(
-    '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label',
-  ).forEach(fitLabel);
-  const labelObserver = new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
-    if (node instanceof Element) fitAllLabels(node);
-  })));
+  const LABEL_SELECTOR = '.lex-detail-field-label,.lex-toggle-label,.lex-flag-label';
+  const fitAllLabels = root => {
+    if (root instanceof Element && root.matches?.(LABEL_SELECTOR)) fitLabel(root);
+    root.querySelectorAll?.(LABEL_SELECTOR).forEach(fitLabel);
+  };
+  // Measuring inside the mutation callback reads a layout that is not final:
+  // the label's own height comes from the row, and the row is sized by a
+  // control that has not been laid out yet. Every label measured that way keeps
+  // its full size and then clips once the row settles, which is where the
+  // sweep's list of cut-off property names came from. Batch the pass into the
+  // next frame instead, when the row heights are real.
+  //
+  // Re-fitting cannot feed back into layout: `contain:size` on the label means
+  // its font size cannot change the row's height, so this settles in one pass.
+  let fitPending = false;
+  let fitRoots = null;
+  // A rebuilt reference stack is not a reason to re-measure the property names
+  // three panels away. Only what was just added is fitted; a resize or a font
+  // arriving is what re-fits the page.
+  const scheduleFit = roots => {
+    if (!Array.isArray(roots)) fitRoots = null;
+    else if (fitRoots) for (const root of roots) fitRoots.add(root);
+    if (fitPending) return;
+    fitPending = true;
+    requestAnimationFrame(() => {
+      fitPending = false;
+      const targets = fitRoots;
+      fitRoots = new Set();
+      if (targets === null || !targets.size) fitAllLabels(document);
+      else for (const root of targets) if (root.isConnected) fitAllLabels(root);
+    });
+  };
+  const labelObserver = new MutationObserver(records => {
+    const added = [];
+    for (const record of records) {
+      for (const node of record.addedNodes) if (node instanceof Element) added.push(node);
+    }
+    if (added.length) scheduleFit(added);
+  });
   labelObserver.observe(document.documentElement, {childList: true, subtree: true});
-  window.addEventListener('resize', () => fitAllLabels(document));
-  requestAnimationFrame(() => fitAllLabels(document));
+  window.addEventListener('resize', () => scheduleFit());
+  // A panel split drag resizes the lane without adding a node or resizing the
+  // window, so watch the region the fields actually live in as well.
+  new ResizeObserver(() => scheduleFit()).observe(document.documentElement);
+  // A label measured against the fallback font is re-laid-out when the real
+  // face arrives, and the few extra pixels that brings are enough to clip a
+  // line that had just fitted. Re-fit once the fonts are actually in.
+  document.fonts?.ready?.then(() => scheduleFit());
+  scheduleFit();
 })();
 
 
@@ -5987,13 +7007,31 @@
   const alignFieldMetadata = root => {
     const fields = root?.matches?.('.lex-detail-field')
       ? [root] : [...(root?.querySelectorAll?.('.lex-detail-field') || [])];
+    // Every measurement first, every write afterwards. Interleaving them made
+    // each field's style write invalidate the layout that the next field's
+    // measurement then had to rebuild, so a panel of four hundred properties
+    // spent a third of a second re-laying itself out behind every keystroke.
+    const placements = [];
     for (const field of fields) {
-      if (field.classList.contains('lex-boolean-field')) continue;
       const rail = field.querySelector(':scope > .lex-field-type-rail');
-      const help = rail?.querySelector('.lex-info-help');
       const label = field.querySelector(':scope > .lex-detail-field-label');
-      if (!rail || !help || !label) continue;
-      const text = [...label.childNodes].find(node =>
+      // Every property's rail sits in the same place beside its name, whether
+      // or not the property also carries authored help. Requiring a ? here
+      // left every plain property's rail parked in the far-left gutter, so no
+      // two rows in a panel annotated their names from the same place.
+      if (!rail || !label) continue;
+      if (field.hasAttribute("data-lex-sort")) { placements.push([rail, "0px"]); continue; }
+      // The property name is wrapped in its own span so the boolean leader
+      // arrow cannot squeeze it, so look inside that wrapper first. Searching
+      // only the label's direct children left the rail parked at the far left
+      // of the lane, a hundred and eighty pixels from the name it annotates.
+      const holder = label.querySelector(":scope > .lex-detail-field-label-text") || label;
+      // The label fitter shrinks a long name after this pass has already
+      // measured it, which left the rail sitting where the name used to start
+      // and, on the longest names, painted over the name itself. Watching the
+      // name means the rail follows every re-fit.
+      nameObserver?.observe(holder);
+      const text = [...holder.childNodes].find(node =>
         node.nodeType === Node.TEXT_NODE && node.textContent.trim());
       if (!text) continue;
       const range = document.createRange();
@@ -6002,16 +7040,119 @@
       const textBox = range.getBoundingClientRect();
       const railBox = rail.getBoundingClientRect();
       if (!fieldBox.width || !textBox.width || !railBox.width) continue;
-      // User-facing contract: the info bubble/type rail is centred between the
-      // panel-side edge of the property row and the RIGHT edge of its label.
-      const centre = (fieldBox.left + textBox.right) / 2;
-      rail.style.left = `${Math.max(0, centre - fieldBox.left - railBox.width / 2)}px`;
+      // User-facing contract: the info bubble sits JUST LEFT of the property
+      // name it annotates, not centred in the empty lane beside it. Centring
+      // put it a hundred and eighty pixels away in a wide panel, where it read
+      // as belonging to nothing. It stays inside the row when the name runs
+      // long enough to leave no room.
+      const gap = 8;
+      const wanted = textBox.left - gap - railBox.width - fieldBox.left;
+      placements.push([rail, `${Math.max(0, wanted)}px`]);
+    }
+    for (const [rail, left] of placements) {
+      if (rail.style.left !== left) rail.style.left = left;
     }
   };
-  const schedule = root => requestAnimationFrame(() => alignFieldMetadata(root || document));
+  // Grouping separators in the boxes a reader types into. Everything the
+  // framework PAINTS is already grouped - table cells, readonly fields,
+  // reference readings - but a plugin's own input[type=number] cannot hold a
+  // comma at all: assigning "50,000" to one leaves it empty. So the box is
+  // rebuilt as a text box that carries the number, groups it while the reader
+  // is looking at it, and shows the bare digits the moment they start typing.
+  //
+  // Two things keep this safe for plugins that never asked for it. Only boxes
+  // that can actually hold a big number are touched - a 0-100 percentage gains
+  // nothing from a separator - and the grouped form only ever exists while the
+  // box is NOT focused, so every input and change event a plugin listens for
+  // still reports plain digits.
+  const GROUPING_FLOOR = 10000;
+  const groupedBoxes = new WeakSet();
+  const wantsGrouping = input => {
+    const max = Number(input.max);
+    if (Number.isFinite(max)) return Math.abs(max) >= GROUPING_FLOOR;
+    const value = Number(input.value);
+    return Number.isFinite(value) && Math.abs(value) >= GROUPING_FLOOR;
+  };
+  const groupNumberBoxes = root => {
+    const scope = root instanceof Element || root instanceof Document ? root : document;
+    const inputs = [...scope.querySelectorAll('input[type="number"]')];
+    if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
+    for (const input of inputs) {
+      if (groupedBoxes.has(input) || !wantsGrouping(input)) continue;
+      groupedBoxes.add(input);
+      const plain = () => String(input.value ?? "").replace(/,/g, "");
+      // A text box does not enforce min and max the way a number box does, so
+      // the bounds the plugin declared are applied here instead of quietly
+      // going away with the spinner.
+      const floor = input.min === "" ? NaN : Number(input.min);
+      const ceiling = input.max === "" ? NaN : Number(input.max);
+      const clamp = value => {
+        let bounded = value;
+        if (Number.isFinite(floor)) bounded = Math.max(floor, bounded);
+        if (Number.isFinite(ceiling)) bounded = Math.min(ceiling, bounded);
+        return bounded;
+      };
+      const show = () => {
+        if (input === document.activeElement) return;
+        const value = Number(plain());
+        if (plain() === "" || !Number.isFinite(value)) return;
+        const bounded = clamp(value);
+        if (bounded !== value) {
+          input.value = String(bounded);
+          input.dispatchEvent(new Event("input", {bubbles: true}));
+        }
+        input.value = window.LexeditorUI.formatNumber(bounded);
+      };
+      input.type = "text";
+      input.inputMode = "decimal";
+      input.autocomplete = "off";
+      input.addEventListener("focus", () => { input.value = plain(); });
+      input.addEventListener("blur", show);
+      // A plugin that writes a fresh value into the box while it sits unfocused
+      // re-groups it; while it is focused the reader's own digits stand.
+      input.addEventListener("change", show);
+      show();
+    }
+  };
+
+  let pending = false;
+  const schedule = root => {
+    groupNumberBoxes(root && root !== document ? root : document);
+    if (root && root !== document) { requestAnimationFrame(() => alignFieldMetadata(root)); return; }
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => { pending = false; alignFieldMetadata(document); });
+  };
+  // Editing a value re-sizes the row, and a taller row re-sizes the label box
+  // inside it, which used to re-run the whole pass twice per keystroke. Only a
+  // name that changed WIDTH can have moved where it starts.
+  const nameWidths = new WeakMap();
+  const nameObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(entries => {
+    let moved = false;
+    for (const entry of entries) {
+      const width = Math.round(entry.contentRect.width);
+      if (nameWidths.get(entry.target) === width) continue;
+      nameWidths.set(entry.target, width);
+      moved = true;
+    }
+    if (moved) schedule(document);
+  });
   new MutationObserver(records => records.forEach(record => record.addedNodes.forEach(node => {
     if (node instanceof Element) schedule(node);
   }))).observe(document.documentElement, {childList:true, subtree:true});
   window.addEventListener('resize', () => schedule(document));
+  // The rail is placed against the measured left edge of the property name, so
+  // anything that moves that name has to move the rail with it: a pane drag,
+  // the label fitter's own re-wrap, and the real font face arriving after the
+  // first measurement was taken against the fallback.
+  // Width only: a page that merely got taller moved nothing sideways.
+  let pageWidth = 0;
+  new ResizeObserver(entries => {
+    const width = Math.round(entries[0]?.contentRect.width || 0);
+    if (width === pageWidth) return;
+    pageWidth = width;
+    schedule(document);
+  }).observe(document.documentElement);
+  document.fonts?.ready?.then(() => schedule(document));
   schedule(document);
 })();

@@ -67,29 +67,43 @@ def main() -> int:
             wait_eval(cdp, "document.fonts.check('16px \\\"FF8 Menu\\\"')", 30)
             result = cdp.eval("""(()=>{
               const cell=document.querySelector('.lex-data-map-table .lex-column-list-cell:first-child');
-              const filename=cell?.querySelector('code,.lex-data-map-link');
+              const filename=cell?.querySelector('code,.lex-data-map-link,.lex-column-cell-text');
               const text=document.querySelector('.lex-data-map-table')?.textContent||'';
               const pager=document.querySelector('.lex-data-map-view>.lex-pager');
-              const statuses=[...document.querySelectorAll('.lex-data-map-table .lex-integration-status')];
+              // The map states coverage now, not a yes/no integration badge:
+              // one glyph plus the word, in its own column.
+              const statuses=[...document.querySelectorAll('.lex-data-map-table .lex-coverage-cell')];
               return {rows:document.querySelectorAll('.lex-data-map-table .lex-column-list-row').length,
                 font:filename?getComputedStyle(filename).fontFamily:'',
                 removed:!text.includes('Models and textures')&&!text.includes('Music and audio'),
                 bottomSearch:!!pager?.querySelector('.lex-pager-left .lex-pager-search input[type=search]'),
-                bottomStatus:!!pager?.querySelector('.lex-pager-right select[aria-label="Filter files by integration status"]'),
+                bottomStatus:!!pager?.querySelector('.lex-pager-right select[aria-label="Filter files by coverage"]'),
                 obsoleteToolbarControls:document.querySelectorAll('#toolbar input[type=search],#toolbar select').length,
                 statusIcons:statuses.length,
-                statusLabels:statuses.map(node=>node.getAttribute('aria-label')),
-                statusText:statuses.map(node=>node.textContent.trim()),errors:window.__testErrors};
+                statusLabels:statuses.map(node=>node.getAttribute('title')),
+                statusIconCount:statuses.filter(node=>node.querySelector('.lex-coverage-icon')).length,
+                statusText:statuses.map(node=>node.querySelector('.lex-coverage-text')?.textContent.trim()),
+                errors:window.__testErrors};
             })()""")
-            assert result["rows"] == len(rows), result
-            assert "FF8 Menu" in result["font"] and result["removed"], result
+            # The map is a fitted page now, so it shows as many rows as the
+            # window holds rather than the whole list. What matters is that it
+            # shows some of them and never invents any.
+            assert 0 < result["rows"] <= len(rows), (len(rows), result)
+            assert "FF8 Menu" in result["font"], result
+            assert result["removed"], result
             assert result["bottomSearch"] and result["bottomStatus"], result
             assert result["obsoleteToolbarControls"] == 0, result
-            assert result["statusIcons"] == len(rows), result
-            assert all(label in {"Integrated", "Partial", "Not integrated"}
-                       for label in result["statusLabels"]), result
-            assert all(text not in {"Integrated", "Partial", "Not integrated"}
-                       for text in result["statusText"]), result
+            # Every row states its coverage, and every statement carries a
+            # glyph as well as the word. The word alone was four columns of
+            # similar text; the glyph alone said nothing to a reader who had
+            # not learnt it.
+            assert result["statusIcons"] == result["rows"], result
+            assert result["statusIconCount"] == result["rows"], result
+            COVERAGE = {"Structured editable", "Structured editable (partial)",
+                        "Read-only view", "Source only", "Unavailable"}
+            unknown = sorted({text for text in result["statusText"] if text not in COVERAGE})
+            assert not unknown, (unknown, result)
+            assert all(label for label in result["statusLabels"]), result
             assert not result["errors"], result
             shot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,

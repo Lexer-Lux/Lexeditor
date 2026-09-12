@@ -33,9 +33,12 @@
     .blank-subtab-panel{display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
     .blank-table .lex-boolean-mark{display:block;font-size:1.45em;text-align:center}
     .blank-tweaks{height:100%}
+    .blank-paged-pane{display:grid;grid-template-rows:minmax(0,1fr) auto;min-height:0;gap:var(--lex-panel-gap)}
     .blank-graphs{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,600px),1fr));align-content:start;gap:16px;height:100%;overflow:auto}
     .blank-graphs .lex-curve-editor{display:block;min-width:0}
-    .blank-graphs .lex-curve-plot{height:330px;aspect-ratio:auto}
+    /* The drawing is 2:1; a fixed height gave it a differently shaped box, which
+       letterboxed the graph and stranded the right-hand axis. */
+    .blank-graphs .lex-curve-plot{height:auto}
     .blank-graphs .lex-curve-path-formula{display:block;filter:drop-shadow(1px 1px 1px var(--lex-panel))}
     .blank-graphs .lex-curve-formula{display:none}
   </style>
@@ -46,7 +49,7 @@
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
-  const {el,columnList,columnPreferences,detailPanel,tabbedPanel,detailSection,detailField,multiNumberRow,unitField,readonlyField,recordId,infoHelp,hoverable,panelLayout,provenanceControl,referenceDisplay,integrationStatus,pagedListDetail,booleanMark,clone,EditHistory,toggleRow,infoIcon}=LexeditorUI;
+  const {el,columnList,columnPreferences,detailPanel,tabbedPanel,detailSection,detailField,multiNumberRow,unitField,readonlyField,recordId,infoHelp,hoverable,panelLayout,provenanceControl,referenceDisplay,integrationStatus,pagedListDetail,pager,booleanMark,clone,EditHistory,toggleRow,infoIcon}=LexeditorUI;
   const categories=["Common","Rare","Weapon","Armor"];
   const seed=[["Example Item","Common",25,true],["Second Item","Rare",100,false],["Fallback Potion","Common",50,true],["Null Sword","Weapon",255,false],["Default Hat","Armor",10,true],["CSS Crystal","Rare",75,true]];
   const vanillaRows=Array.from({length:48},(_unused,id)=>{const sample=seed[id%seed.length];return{id,name:id<seed.length?sample[0]:`Sample Record ${String(id+1).padStart(2,"0")}`,category:sample[1],value:(sample[2]+id*7)%256,enabled:id<seed.length?sample[3]:id%3!==0}});
@@ -54,6 +57,7 @@
   const vanillaStats={HP:2400,STR:24,MAG:31,SPD:18};
   let demo={text:"Blank value",value:25,floatValue:.9999,enabled:false,choice:"alternate",refValues:[40,40,40,40],flags:{menu:true,gf:true},stats:{HP:2400,STR:30,MAG:31,SPD:18}};
   let saved={rows:clone(rows),demo:clone(demo)};
+  let modOnly=false;
   const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,edit:(row,value)=>{row.name=String(value)}},{key:"category",label:"Category",sortable:true,edit:(row,value)=>{row.category=String(value)}},{key:"value",label:"Value",numeric:true,sortable:true,edit:(row,value)=>{row.value=Math.max(0,Math.min(255,Number(value)||0))}}];
   let tab="one",subtab="controls",selected=0,sort={key:"name",dir:1},query="",page=0,pageSize=12,activeSource="mine";
   const prefs=columnPreferences("blank-records",columns,()=>render());
@@ -106,6 +110,13 @@
         detailField({label:"MOD",control:row("My Mod")}),
         detailField({label:"RECORDS",control:row(String(rows.length))}),
       ]}),
+      LexeditorUI.modLoaderSection({
+        loader:"None. Blank is the reference plugin and has no game behind it, so nothing loads its output.",
+        output:"Saved sample projects live under Lexeditor's own project folder. Nothing is written to any game.",
+        order:"Not applicable; there is no game to order against.",
+        safety:"Blank never touches an installed game, because it is not attached to one.",
+        removal:"Delete the sample project from the project folder.",
+      }),
     ]});
   }
   function galleryPanel(title="Shared Control Gallery"){
@@ -140,6 +151,55 @@
     const wrapped=sourceControl({control:unit?unitField(control,unit):control,current:()=>row[key],vanilla:base[key],internal:type==="number",apply:value=>{row[key]=value;if(type==="checkbox")control.checked=!!value;else control.value=value}});
     return{control:wrapped,dataType:dataType||(type==="checkbox"?"BOOL":type==="number"?"INT":type==="select"?"ENUM":"STRING"),min,max,help};
   }
+  // The three-panel example needs a table that is its own pane, so it uses the
+  // shared pager directly rather than borrowing the one inside the paged
+  // list-detail. A record table always has a pager; the sweep enforces that,
+  // and it caught this example the moment it did not.
+  let threePage=0;
+  function pagedTablePane(){
+    const all=sortedRows(),size=12;
+    const pages=Math.max(1,Math.ceil(all.length/size));
+    threePage=Math.max(0,Math.min(threePage,pages-1));
+    const shown=all.slice(threePage*size,threePage*size+size);
+    return el("div",{class:"blank-paged-pane"},
+      tablePanel(shown),
+      pager({page:threePage,pages,total:all.length,pageSize:size,noun:"records",
+        change:next=>{threePage=next;render()}}));
+  }
+  // In-cell editing: a table whose cells hold the controls themselves rather
+  // than opening a detail panel. A plugin author needs to see this shape, and
+  // it is the one Lexeditor uses wherever a record is small enough to edit in
+  // place. A row switched off keeps its own switch live and dims the rest.
+  function editableTablePanel(){
+    const cellInput=(row,key)=>el("input",{type:"text",value:row[key],
+      disabled:activeSource!=="mine","aria-label":`${key} for ${row.name}`,
+      oninput:event=>{row[key]=event.target.value;refreshShell()}});
+    const cellSelect=row=>el("select",{disabled:activeSource!=="mine",
+      "aria-label":`Category for ${row.name}`,
+      onchange:event=>{row.category=event.target.value;refreshShell()}},
+      ...categories.map(value=>{const option=el("option",{value},value);
+        option.selected=value===row.category;return option;}));
+    const cellNumber=row=>el("input",{type:"number",min:0,max:255,step:1,value:row.value,
+      disabled:activeSource!=="mine","aria-label":`Value for ${row.name}`,
+      oninput:event=>{if(event.target.value!=="")row.value=Number(event.target.value);refreshShell()}});
+    const editableColumns=[
+      {key:"enabled",label:"On",width:"48px",
+       render:row=>el("input",{type:"checkbox",checked:row.enabled,
+         "aria-label":`Enable ${row.name}`,
+         onchange:event=>{row.enabled=event.target.checked;render();refreshShell()}})},
+      {key:"name",label:"Name",sortable:true,width:"minmax(9em,1.3fr)",
+       render:row=>cellInput(row,"name")},
+      {key:"category",label:"Category",sortable:true,width:"minmax(8em,1fr)",
+       render:cellSelect},
+      {key:"value",label:"Value",sortable:true,numeric:true,width:"minmax(6em,.8fr)",
+       render:cellNumber},
+    ];
+    return columnList({rows:sortedRows(),key:value=>value.id,
+      sortState:sort,sort:key=>{sort=sort.key===key?{key,dir:-sort.dir}:{key,dir:1};render()},
+      columns:editableColumns,editable:true,
+      class:"blank-table blank-editable-table",
+      "aria-label":"Blank Game editable table"});
+  }
   function recordPanel(withPins=true,row=selectedRow()){
     const fields={name:editableField(row,"name"),category:editableField(row,"category",{type:"select"}),value:editableField(row,"value",{type:"number",min:0,max:255,step:1,unit:"units",dataType:"INT",help:infoHelp("This sample record demonstrates a numeric property with a Vanilla reference; it has no game-specific meaning.")}),enabled:editableField(row,"enabled",{type:"checkbox"})};
     const sortMarker=property=>sort.key===property?{"data-lex-sort":sort.dir>0?"asc":"desc"}:{};
@@ -147,7 +207,84 @@
   }
   function inspectorPanel(){const row=selectedRow();return detailPanel({className:"blank-detail",title:"Inspector",identity:"LIVE",meta:"Third shared pane",body:[detailSection({title:"SELECTION",body:[detailField({label:"RECORD",control:readonlyField(row.name)}),detailField({label:"VALUE",control:readonlyField(String(row.value))})]}),detailSection({title:"INTEGRATION STATES",body:[el("div",{class:"blank-statuses"},integrationStatus("integrated"),integrationStatus("partial"),integrationStatus("not-integrated"))]}),detailSection({title:"REFERENCE DISPLAY",body:[referenceDisplay({current:row.value,sources:[{name:"Vanilla",value:vanillaRow(row.id).value}],apply:()=>{}})]})]})}
   function subtabPanel(){const tabs=[{id:"controls",label:"Controls"},{id:"references",label:"References"},{id:"states",label:"States"}];let content;if(subtab==="references")content=detailSection({title:"REFERENCE VALUES",body:[detailField({label:"NUMBER",control:numericReferenceControl(),dataType:"INT",min:0,max:255}),detailField({label:"BOOLEAN",control:booleanReferenceControl(),dataType:"BOOL"})]});else if(subtab==="states")content=detailSection({title:"STATUS TOKENS",body:[el("div",{class:"blank-statuses"},integrationStatus("integrated"),integrationStatus("partial"),integrationStatus("not-integrated"))]});else content=detailSection({title:"STANDARD CONTROLS",body:[detailField({label:"TEXT",control:el("input",{type:"text",value:demo.text,disabled:activeSource!=="mine",oninput:event=>{demo.text=event.target.value;refreshShell()}})}),detailField({label:"NUMBER",control:numericReferenceControl(),dataType:"INT",min:0,max:255}),detailField({label:"TOGGLE",control:booleanReferenceControl(),dataType:"BOOL"})]});return tabbedPanel({className:"blank-subtab-panel",tabs,active:subtab,label:"Blank Game tabbed-panel example",change:value=>{subtab=value;render()},content})}
-  function tweaksPanel(){return detailPanel({className:"blank-detail blank-tweaks",title:"Tweaks",icon:blankIcon(),identity:"OFF",meta:"Plugin tweak controls",body:[detailSection({title:"TWEAKS",body:[detailField({label:"EXAMPLE TWEAK",help:infoHelp("Blank demonstrates the shared Tweaks layout. Real tweaks remain disabled until a mod enables them."),control:el("input",{type:"checkbox",checked:false})}),detailField({label:"TWEAK VALUE",control:el("input",{type:"number",min:0,max:100,step:1,value:50}),dataType:"INT",min:0,max:100})]})]})}
+  // The reference Tweaks page. A plugin's tweak surface is a settings page,
+  // not a record table: groups of switches and bounded values, with dependent
+  // controls disabled until their parent switch is on. Copy this shape.
+  const tweaks={enabled:false,difficulty:"normal",damage:120,speed:1.5,bounty:12500,label:"My preset",
+    flags:{fastTravel:true,autoLoot:false,hardcore:false,permadeath:false}};
+  function tweakSwitch(key,label,help){
+    return detailField({label,help:help?infoHelp(help):null,dataType:"BOOL",
+      control:el("input",{type:"checkbox",checked:tweaks[key],disabled:activeSource!=="mine",
+        "aria-label":label,onchange:event=>{tweaks[key]=event.target.checked;render();refreshShell()}})});
+  }
+  function tweaksPanel(){
+    const gate=!tweaks.enabled||activeSource!=="mine";
+    return detailPanel({className:"blank-detail blank-tweaks",title:"Tweaks",icon:blankIcon(),
+      identity:tweaks.enabled?"ON":"OFF",meta:"Reference tweak page: switches, bounded values and dependent controls",
+      body:[
+        detailSection({title:"MASTER",body:[
+          tweakSwitch("enabled","ENABLED","Everything below is inert until this is on. A tweak page always has one switch that owns the rest."),
+        ]}),
+        detailSection({title:"BEHAVIOUR",body:[
+          detailField({label:"DIFFICULTY",dataType:"ENUM",
+            help:infoHelp("A fixed set of choices is a select, never a free number."),
+            control:el("select",{disabled:gate,"aria-label":"Difficulty",
+              onchange:event=>{tweaks.difficulty=event.target.value;refreshShell()}},
+              ...[["easy","Easy"],["normal","Normal"],["hard","Hard"]].map(([value,text])=>{
+                const option=el("option",{value},text);option.selected=tweaks.difficulty===value;return option;}))}),
+          detailField({label:"DAMAGE",dataType:"INT",min:0,max:400,
+            help:infoHelp("A bounded number draws its own value behind the box and can be dragged."),
+            control:unitField(el("input",{type:"number",min:0,max:400,step:1,value:tweaks.damage,disabled:gate,
+              "aria-label":"Damage percent",oninput:event=>{tweaks.damage=Number(event.target.value);refreshShell()}}),"%")}),
+          detailField({label:"SPEED",dataType:"FLOAT",min:0.25,max:4,
+            control:unitField(el("input",{type:"number",min:0.25,max:4,step:.05,value:tweaks.speed,disabled:gate,
+              "aria-label":"Speed multiplier",oninput:event=>{tweaks.speed=Number(event.target.value);refreshShell()}}),"x")}),
+          detailField({label:"BOUNTY",dataType:"INT",min:0,max:9999999,
+            help:infoHelp("A number this large is grouped in the box you type into. The separators appear while nobody is typing and the bare digits come back the moment you are."),
+            control:unitField(el("input",{type:"number",min:0,max:9999999,step:1,value:tweaks.bounty,disabled:gate,
+              "aria-label":"Bounty",oninput:event=>{tweaks.bounty=Number(event.target.value);refreshShell()}}),"$")}),
+          detailField({label:"PRESET NAME",dataType:"STRING",
+            control:el("input",{type:"text",value:tweaks.label,disabled:gate,"aria-label":"Preset name",
+              oninput:event=>{tweaks.label=event.target.value;refreshShell()}})}),
+        ]}),
+        detailSection({title:"OPTIONS",body:[
+          detailField({label:"FLAGS",dataType:"BOOL",
+            help:infoHelp("Several related switches are one property, not one row each."),
+            control:toggleRow({label:"Blank tweak flags",columns:2,
+              toggles:Object.entries({fastTravel:"Fast travel",autoLoot:"Auto loot",
+                hardcore:"Hardcore",permadeath:"Permadeath"}).map(([key,label])=>({
+                key,label,checked:tweaks.flags[key],disabled:gate,
+                help:`Blank sample flag: ${label}.`,
+                change:value=>{tweaks.flags[key]=value;refreshShell()}}))})}),
+        ]}),
+        // Every game's Tweaks page offers the same ReShade section. Lexeditor
+        // keeps one ReShade; the mod carries only its preset and any shaders
+        // its author wrote, so the mod stays installable by hand.
+        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade}),
+      ]});
+  }
+  let reshade={manifest:{enabled:false,preset:"",repositories:[]},presets:[],shaders:[],
+    reshadeInstalled:false,installedRenderer:"",path:"",hasFolder:false,ready:false};
+  async function loadReshade(){
+    try{reshade=await LexeditorUI.callWindow?.("mod_reshade","blank")||reshade}
+    catch(_error){/* the browser preview has no desktop host; the section still renders */}
+  }
+  // Install, remove and "choose the DLL" each answer with a fresh snapshot.
+  async function actReshade(method,...args){
+    try{
+      const value=method==="adopt_reshade"
+        ? await LexeditorUI.callWindow?.(method)
+        : await LexeditorUI.callWindow?.(method,"blank",...args);
+      if(value&&value.manifest)reshade=value;else await loadReshade();
+    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
+    render();
+  }
+  async function saveReshade(manifest){
+    try{reshade=await LexeditorUI.callWindow?.("save_mod_reshade","blank",manifest)||reshade}
+    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
+    render();
+  }
+
   function graphsPanel(){
     const cards=[['Linear',level=>level],['Quadratic',level=>level*level/100]].map(([title,evaluate])=>{
       const scale=el("input",{type:"number",min:0,max:5,step:.1,value:1,"aria-label":`${title} multiplier`});
@@ -156,18 +293,78 @@
     return el("div",{class:"blank-graphs"},...cards);
   }
   function addRecord(){const id=activeRows().reduce((highest,row)=>Math.max(highest,row.id),-1)+1;rows.push({id,name:`New Record ${String(id+1).padStart(2,"0")}`,category:categories[0],value:0,enabled:true});selected=id;render();refreshShell()}
-  function pagedTwoPanel(){const records=sortedRows();return pagedListDetail({rows:records,key:row=>row.id,slots:false,add:addRecord,addTitle:"Add a Blank record",addDisabled:activeSource!=="mine",selected,page,pageSize,noun:"records",className:"blank-layout",splitKey:"blank-two",rowsKey:"blank-two",defaultSplit:50,minLeft:320,minRight:360,search:{key:"blank-records",value:query,label:"Search Blank records",change:value=>{query=value;page=0;render()}},sync:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected},change:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected;render()},master:state=>tablePanel(state.rows,state.selected,state.select),detail:row=>recordPanel(true,row)})}
+  // "Mod contents only" hides every record this project has not touched, which
+  // is the same comparison a save makes: the live record against the copy the
+  // project was last saved as.
+  function modOnlySpec(){
+    const base=new Map((saved?.rows||[]).map(row=>[row.id,row]));
+    return {available:activeSource==="mine"&&base.size>0,value:modOnly===true,
+      changed:row=>{const was=base.get(row.id);
+        return !was||JSON.stringify(row)!==JSON.stringify(was)},
+      change:value=>{modOnly=value;page=0;render()}};
+  }
+  function pagedTwoPanel(){const records=sortedRows();return pagedListDetail({modOnly:modOnlySpec(),rows:records,key:row=>row.id,slots:false,add:addRecord,addTitle:"Add a Blank record",addDisabled:activeSource!=="mine",selected,page,pageSize,noun:"records",className:"blank-layout",splitKey:"blank-two",rowsKey:"blank-two",defaultSplit:50,minLeft:320,minRight:360,search:{key:"blank-records",value:query,label:"Search Blank records",change:value=>{query=value;page=0;render()}},sync:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected},change:next=>{page=next.page;pageSize=next.pageSize;if(next.selected!==null)selected=next.selected;render()},master:state=>tablePanel(state.rows,state.selected,state.select),detail:row=>recordPanel(true,row)})}
   const mapState={page:0,query:"",status:"",sort:["filename",1]};
   function dataMapPanel(){return LexeditorUI.dataMap({
     rows:[{filename:"No installed game files",controls:"Blank is an in-memory UI demonstration",notes:"Sample records demonstrate shared controls only. They do not read or save game data.",coverage:"unavailable",status:"not-integrated"}],
     page:mapState.page,query:mapState.query,status:mapState.status,sort:mapState.sort,
     changePage:value=>{mapState.page=value;render()},changeQuery:value=>{mapState.query=value;mapState.page=0;render()},
     changeStatus:value=>{mapState.status=value;mapState.page=0;render()},changeSort:key=>{mapState.sort=[key,-mapState.sort[1]];render()}}).content}
-  function render(){let layout;if(tab==="datamap")layout=dataMapPanel();else if(tab==="info")layout=panelLayout([informationPanel()],"blank-layout",{layoutKey:"blank-info",defaultSizes:[100]});else if(tab==="graphs")layout=panelLayout([graphsPanel()],"blank-layout",{layoutKey:"blank-graphs",defaultSizes:[100]});else if(tab==="one")layout=panelLayout([galleryPanel()],"blank-layout",{layoutKey:"blank-one",defaultSizes:[100]});else if(tab==="three")layout=panelLayout([pagedTwoPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-three",defaultSizes:[72,28],minSizes:[620,260],stackAt:980});else if(tab==="subtabs")layout=panelLayout([subtabPanel()],"blank-layout",{layoutKey:"blank-subtabs",defaultSizes:[100]});else if(tab==="tweaks")layout=panelLayout([tweaksPanel()],"blank-layout",{layoutKey:"blank-tweaks",defaultSizes:[100]});else layout=pagedTwoPanel();document.querySelector("#main").replaceChildren(layout);refreshShell()}
+  function render(){let layout;if(tab==="datamap")layout=dataMapPanel();else if(tab==="info")layout=panelLayout([informationPanel()],"blank-layout",{layoutKey:"blank-info",defaultSizes:[100]});else if(tab==="graphs")layout=panelLayout([graphsPanel()],"blank-layout",{layoutKey:"blank-graphs",defaultSizes:[100]});else if(tab==="one")layout=panelLayout([galleryPanel()],"blank-layout",{layoutKey:"blank-one",defaultSizes:[100]});else if(tab==="three")layout=panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980});else if(tab==="editable")layout=panelLayout([editableTablePanel()],"blank-layout blank-editable-layout",{layoutKey:"blank-editable",defaultSizes:[100]});else if(tab==="subtabs")layout=panelLayout([subtabPanel()],"blank-layout",{layoutKey:"blank-subtabs",defaultSizes:[100]});else if(tab==="tweaks")layout=panelLayout([tweaksPanel()],"blank-layout",{layoutKey:"blank-tweaks",defaultSizes:[100]});else layout=pagedTwoPanel();document.querySelector("#main").replaceChildren(layout);refreshShell()}
   function navigate(value){tab=value;render()}
   const editHistory=new EditHistory({capture:()=>({rows,demo}),restore:snapshot=>{rows=clone(snapshot.rows);demo=clone(snapshot.demo)},render:async()=>render(),enabled:()=>activeSource==="mine",changed:()=>refreshShell()});
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"one",label:"1 Panel"},{id:"two",label:"2 Panels"},{id:"three",label:"3 Panels"},{id:"subtabs",label:"Tabbed Panel"},{id:"tweaks",label:"Tweaks"},{id:"graphs",label:"Graphs"}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot:()=>({canCreate:false,projects:[{name:"My Mod",path:"In-memory Blank project",valid:true,current:true}]}),projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
-  editHistory.observe(document);render();LexeditorUI.finishPluginLoading();
+  // Saved samples belong to the user data store, not the service's changing port.
+  let projectName="My Mod";
+  const projectStore="lexeditor:blank:projects";
+  let projects={}, browserOnly=false, projectsReady=false;
+  const storedProjects=()=>projects;
+  const projectSnapshot=()=>({canCreate:true,projects:[{name:projectName,path:"Saved Blank samples",valid:true,current:true}]});
+  const persistProjects=async(all,current)=>{
+    if(!projectsReady)throw new Error("Saved samples could not be loaded. Reopen Blank before saving.");
+    if(browserOnly)localStorage.setItem(projectStore,JSON.stringify(all));
+    else{
+      const response=await fetch("/api/projects",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({current,projects:all})});
+      const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not save Blank samples");
+    }
+    projects=all;
+  };
+  const saveSample=async()=>{const all={...storedProjects(),[projectName]:{rows:clone(rows),demo:clone(demo)}};await persistProjects(all,projectName)};
+  const createSample=async name=>{
+    if(Object.hasOwn(storedProjects(),name))throw new Error("A sample with this name already exists.");
+    const sample={rows:clone(vanillaRows),demo:clone(saved.demo)};
+    await persistProjects({...projects,[name]:sample},name);
+    projectName=name;rows=clone(sample.rows);demo=clone(sample.demo);saved=clone(sample);activeSource="mine";selected=0;page=0;editHistory.clear();render();return projectSnapshot();
+  };
+  const browseSamples=()=>new Promise(resolve=>{
+    const all=storedProjects(), names=Object.keys(all);
+    const dialog=el("dialog",{class:"lex-project-dialog"});
+    const close=result=>{dialog.close();dialog.remove();resolve(result)};
+    dialog.addEventListener("cancel",event=>{event.preventDefault();close({cancelled:true})});
+    dialog.append(el("h2",{},"Find a Mod"),el("p",{},"Blank sample projects saved on this computer."));
+    if(!names.length)dialog.append(el("p",{},"No saved samples. Use Add a Mod to create one."));
+    for(const name of names)dialog.append(el("button",{type:"button",onclick:async()=>{
+      try{await persistProjects(all,name)}catch(error){LexeditorUI.showAlert({title:"Could not open sample",message:error.message});return}
+      projectName=name;rows=clone(all[name].rows);demo=clone(all[name].demo);saved=clone(all[name]);activeSource="mine";selected=0;page=0;editHistory.clear();render();close(projectSnapshot());
+    }},name));
+    dialog.append(el("button",{type:"button",onclick:()=>close({cancelled:true})},"Cancel"));
+    document.body.append(dialog);dialog.showModal();
+  });
+  void loadReshade().then(()=>render());
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"one",label:"1 Panel"},{id:"two",label:"2 Panels"},{id:"three",label:"3 Panels"},{id:"editable",label:"Editable Table"},{id:"subtabs",label:"Tabbed Panel"},{id:"tweaks",label:"Tweaks"},{id:"graphs",label:"Graphs"}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{await saveSample();saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot,projectCreatePrompt:{createLabel:"Create Sample",description:"Save a Blank sample project on this computer."},createProject:createSample,browseProject:browseSamples,projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
+  async function restoreSample(){
+    try{
+      const response=await fetch("/api/projects");
+      if(response.status===404){browserOnly=true;projects=JSON.parse(localStorage.getItem(projectStore)||"{}");}
+      else{
+        const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not load Blank samples");
+        projects=result.projects;
+        if(result.current){projectName=result.current;rows=clone(projects[projectName].rows);demo=clone(projects[projectName].demo);saved={rows:clone(rows),demo:clone(demo)};}
+      }
+      projectsReady=true;
+    }catch(error){LexeditorUI.showAlert({title:"Could not load Blank samples",message:error.message});}
+    editHistory.observe(document);render();LexeditorUI.finishPluginLoading();
+  }
+  restoreSample();
   </script>
 </body>
 </html>

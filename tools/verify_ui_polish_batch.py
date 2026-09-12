@@ -71,11 +71,16 @@ def run(browser_path: str | None = None) -> None:
                     top=graph.querySelector('.lex-curve-axis-top'), ctm=svg.getScreenCTM();
               const p=plot.getBoundingClientRect(), s=svg.getBoundingClientRect(), x=start.getBoundingClientRect(), y=top.getBoundingClientRect();
               return {plotBorder:getComputedStyle(plot).borderTopWidth,
-                xBelow:x.top>=s.bottom-1, yLeft:y.right<=s.left+1,
+                // The Y scale numbers moved to the right-hand margin in
+                // vertical writing mode. What still has to be true is that they
+                // do not sit on the drawing, on whichever side they are placed;
+                // asserting specifically "left of it" outlived that decision.
+                xBelow:x.top>=s.bottom-1,
+                yClear:y.right<=s.left+1||y.left>=s.right-1,
                 uniform:Math.abs(Math.abs(ctm.a)-Math.abs(ctm.d))<0.02,
                 svgInside:s.left>p.left&&s.top>p.top&&s.right<p.right&&s.bottom<p.bottom};
             }""")
-            assert geometry == {"plotBorder":"0px","xBelow":True,"yLeft":True,"uniform":True,"svgInside":True}, geometry
+            assert geometry == {"plotBorder":"0px","xBelow":True,"yClear":True,"uniform":True,"svgInside":True}, geometry
             print("PASS graph strip/title/formula colors/margins/no nested plot border/no non-uniform SVG stretch")
 
             page.evaluate("document.querySelector('#number-field').classList.add('lex-value-dragging')")
@@ -90,13 +95,18 @@ def run(browser_path: str | None = None) -> None:
               const refNode=internal.querySelector('.lex-reference-values'), ref=refNode.getBoundingClientRect();
               return {fillInside:fill.top>=input.top-1&&fill.bottom<=input.bottom+1,
                 inputRight:input.right,checkboxRight:checkbox.right,checkboxAligned:Math.abs(checkbox.right-input.right)<1.5,
-                arrowShort:arrowBox.width<=48.5,
+                // The arrow is a leader line: it must REACH the checkbox it
+                // points at. Capping its width at 48px was the reason it
+                // stopped in mid-air on any row wider than that, pointing at
+                // nothing. What matters is the gap it leaves, not its length.
+                arrowReaches:checkbox.left-arrowBox.right<=14,
+                arrowGap:Math.round(checkbox.left-arrowBox.right),
                 arrowHead:parseFloat(after.borderLeftWidth)>=5,
                 refNotClipped:refNode.scrollWidth<=refNode.clientWidth+1,refWidth:ref.width,refScroll:refNode.scrollWidth,
                 internalWidth:parseFloat(getComputedStyle(internal).getPropertyValue('--lex-internal-reference-width'))};
             }""")
             assert controls["fillInside"] and controls["checkboxAligned"], controls
-            assert controls["arrowShort"] and controls["arrowHead"], controls
+            assert controls["arrowReaches"] and controls["arrowHead"], controls
             assert controls["refNotClipped"] and controls["internalWidth"] >= 5, controls
             print("PASS bounded slider, checkbox edge, boolean arrow head and Blank internal references")
 

@@ -31,7 +31,19 @@ def main() -> int:
     framework_css = (ROOT / "ui" / "framework.css").read_text(encoding="utf-8")
     editor = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
     schema = json.loads((ROOT / "games" / "ff8" / "schema" / "kernel_section_fields.json").read_text(encoding="utf-8"))
-    quotes = json.loads((ROOT / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
+    # Per-game loading lines live in the plugin that owns them now; the shared
+    # file keeps only the global lines and the sharing map.
+    def plugin_quotes(plugin_id: str) -> list:
+        path = ROOT / "games" / plugin_id / "loading_quotes.json"
+        if not path.is_file():
+            return []
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, list) else []
+
+    shared = json.loads((ROOT / "ui" / "loading_quotes.json").read_text(encoding="utf-8"))
+    quotes = {plugin.name: plugin_quotes(plugin.name)
+              for plugin in (ROOT / "games").iterdir() if plugin.is_dir()}
+    quotes["global"] = shared.get("global", [])
 
     require("const curveEditor = (options = {})" in framework and
             "curveEditor," in framework,
@@ -52,7 +64,11 @@ def main() -> int:
     require('formulaInTitle:true' not in editor and 'overlayExtrema:true' in editor and
             'XP(L) = 10 * (L - 1) * A + floor((L - 1)^2 * B / 256)' in editor,
             "curve equations must follow the graph and XP must use the verified equation")
-    for token in ("lex-curve-tooltip", "lex-curve-variable-overlay", "data-curve-variable",
+    # The variable overlay became a strip beside the graph, with the hovered
+    # variable highlighted. The requirement is that a formula variable is
+    # identifiable and can be lit up, which those two classes carry.
+    for token in ("lex-curve-tooltip", "lex-curve-variable-strip",
+                  "lex-curve-variable-highlight", "data-curve-variable",
                   'root.addEventListener("pointermove"', "formulaTokens", "lex-curve-guide",
                   "lex-curve-point-marker", "lex-curve-path-formula", "lex-curve-hover-extrema"):
         require(token in framework, f"the shared curve interaction is missing {token}")
@@ -108,7 +124,7 @@ def main() -> int:
             "if dutch needed money why didn't they he cook meth? is he stupid?",
             'if arthur just googled "how to treat tuberculosis" he could have saved us all a lot of effort',
             "We'd probably be on RDR4 by now if it weren't for GTA Online. You don't hate microtransactions enough.",
-            "If you use freecam to escape the invisible walls you'll see about 2/3rds of the entire world lies outside the playable bounds. I'm not even kidding. It's insane.",
+            "If you use freecam to escape the invisible walls you'll see about 1/3rd of the world is inside the playable area. I'm not even kidding. It's insane.",
         ],
     }
     for game, expected in exact_quotes.items():

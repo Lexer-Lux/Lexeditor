@@ -157,7 +157,7 @@ def category_metadata():
         for f in INITIAL_FIELDS + LIMIT_FIELDS]
     result.append({"id": "characters", "label": "Characters", "note": CHARACTER_NOTE,
         "fields": semantics.apply("characters", character_fields)})
-    result.extend(dict(id=key, label=spec['label'], fields=spec['fields'])
+    result.extend(dict(id=key, label=spec['label'], fields=semantics.apply(key, spec['fields']))
                   for key, spec in kernel_extra.EXTRAS.items())
     return result
 

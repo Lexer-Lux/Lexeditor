@@ -115,6 +115,7 @@ class ArchiveTests(unittest.TestCase):
         self.assertEqual(obj.to_bytes(),raw)
         obj.changes[0]=b'a longer replacement';out=obj.to_bytes();saved=archives.LGP(out)
         self.assertEqual(saved.member(0),b'a longer replacement');self.assertEqual(saved.member(1),b'beta')
+        self.assertEqual(len(out),len(raw)+24+len(b'a longer replacement'))
         self.assertEqual(out[16+27:16+54+3602],raw[16+27:16+54+3602])
         alias=bytearray(raw);struct.pack_into('<I',alias,16+27+20,struct.unpack_from('<I',raw,36)[0])
         obj=archives.LGP(bytes(alias));obj.changes[0]=b'edited'
@@ -270,7 +271,7 @@ class IntegrationTests(unittest.TestCase):
             report=check_installation(game)
             self.assertTrue(report['installedFilesUnchanged'])
             self.assertEqual(report['datasets']['characterAI']['readback'],'passed')
-            self.assertIn('scene',report['errors']);self.assertFalse(report['passed'])
+            self.assertIn('source:scene',report['errors']);self.assertFalse(report['passed'])
             self.assertEqual(source.read_bytes(),before)
             self.assertEqual([p for p in game.rglob('*') if p.is_file()],[source])
 

@@ -1,0 +1,17 @@
+{
+  "ModName": "LexeditorPalworldMod",
+  "PackageName": "LexeditorPalworldMod",
+  "Version": "0.1.0",
+  "DebugMode": true,
+  "Author": "",
+  "Dependencies": [],
+  "Tags": [],
+  "InstallRule": [
+    {
+      "Type": "Paks",
+      "Targets": [
+        "./Paks/"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+name: Verifier sweep
+
+# The full sweep is 292 checks and takes the best part of an hour on one
+# machine, because most of them start a headless browser. Eight runners take an
+# interleaved slice each, so the whole suite finishes in about the time the
+# slowest shard takes rather than the sum of all of them.
+#
+# What this cannot do: about thirty checks read an installed copy of a game
+# (FF7, FF8, FF9, RDR, RDR2, Warband) from the machine they run on. A GitHub
+# runner has none of those, so verify_all reports them as SKIPPED with the
+# reason rather than as failures. Running those still needs a machine with the
+# games on it.
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      patterns:
+        description: 'Optional name substrings; blank runs everything'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-all-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sweep:
+    name: Shard ${{ matrix.shard }} of 8
+    runs-on: windows-2022
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-test.txt
+
+      - name: Install the browser Playwright checks use
+        run: python -m playwright install chromium
+
+      - name: Run this shard
+        shell: bash
+        run: |
+          python tools/verify_all.py ${{ github.event.inputs.patterns }} \
+            --shard ${{ matrix.shard }}/8 --jobs 2 --timeout 300 \
+            --output "_scratch/verify-results"
+
+      - name: Keep the logs from whatever failed
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-shard-${{ matrix.shard }}
+          path: _scratch/verify-results
+          retention-days: 7
+          if-no-files-found: ignore

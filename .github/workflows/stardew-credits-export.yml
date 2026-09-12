@@ -1,0 +1,25 @@
+name: Stardew credits export
+
+on:
+  push:
+    branches: [stardew-valley-plugin]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate offline credits
+        run: python tools/generate_credits.py
+      - name: Upload generated credits
+        uses: actions/upload-artifact@v4
+        with:
+          name: stardew-generated-credits
+          path: ui/credits.json
+          if-no-files-found: error

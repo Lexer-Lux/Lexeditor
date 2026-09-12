@@ -363,5 +363,10 @@ def open_settings(game_root: Path, *, runner=None) -> dict:
             raise FileNotFoundError("The Memoria settings launcher is missing")
         if os.name != "nt" and runner is None:
             raise RuntimeError("The Memoria settings launcher requires Windows")
-        (runner or (lambda argv, cwd: subprocess.Popen(argv, cwd=str(cwd))))([str(target)], root)
+        # CREATE_NO_WINDOW suppresses a console for the child; the launcher's
+        # own window is unaffected. Every helper Lexeditor starts passes it, so
+        # none of them can flash a console box over the editor.
+        (runner or (lambda argv, cwd: subprocess.Popen(
+            argv, cwd=str(cwd),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))))([str(target)], root)
     return {"opened": True, "path": str(target)}

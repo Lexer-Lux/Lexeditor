@@ -151,8 +151,20 @@ class Category:
 
 CATEGORIES = {
     category.key: category for category in (
-        Category("items", "Items", 5, 20, 12, 28, (
-            Field("cameraMovementId", "Camera movement ID", 0x08, "H", maximum=65535),
+        Category("commands", "Commands", 1, 18, 10, 8, (
+            Field("initialCursorAction", "Command action", 0x00),
+            Field("targetData", "Target flags", 0x01),
+            Field("cameraMovementIdSingle", "Single-target camera ID", 0x04, "H", maximum=65535),
+            Field("cameraMovementIdMulti", "Multi-target camera ID", 0x06, "H", maximum=65535),
+        )),
+        Category("playerAttacks", "Player attacks", 2, 19, 11, 28, (
+            Field("accuracyRate", "Accuracy", 0x00),
+            Field("impactEffectId", "Impact effect ID", 0x01),
+            Field("targetHurtActionIndex", "Target hurt action ID", 0x02),
+            Field("mpCost", "MP cost", 0x04, "H", maximum=65535),
+            Field("impactSound", "Impact sound ID", 0x06, "H", maximum=65535),
+            Field("cameraMovementIdSingle", "Single-target camera ID", 0x08, "H", maximum=65535),
+            Field("cameraMovementIdMulti", "Multi-target camera ID", 0x0A, "H", maximum=65535),
             Field("targetData", "Target flags", 0x0C),
             Field("attackEffectId", "Attack effect ID", 0x0D),
             Field("damageCalculationId", "Damage calculation ID", 0x0E),
@@ -163,6 +175,22 @@ CATEGORIES = {
             Field("additionalEffectsModifier", "Effect modifier", 0x13),
             Field("statusFlags", "Status flags", 0x14, "I", maximum=0xFFFFFFFF),
             Field("elementFlags", "Element flags", 0x18, "H", maximum=0xFFFF),
+            Field("specialAttackFlags", "Special attack flags", 0x1A, "H", maximum=0xFFFF),
+        )),
+        Category("items", "Items", 5, 20, 12, 28, (
+            Field("cameraMovementId", "Camera movement ID", 0x08, "H", maximum=65535),
+            Field("restrictions", "Usage restrictions", 0x0A, "H", maximum=0xFFFF),
+            Field("targetData", "Target flags", 0x0C),
+            Field("attackEffectId", "Attack effect ID", 0x0D),
+            Field("damageCalculationId", "Damage calculation ID", 0x0E),
+            Field("attackPower", "Attack power", 0x0F),
+            Field("conditionSubmenu", "Condition submenu", 0x10),
+            Field("statusChange", "Status change", 0x11),
+            Field("additionalEffects", "Additional effects", 0x12),
+            Field("additionalEffectsModifier", "Effect modifier", 0x13),
+            Field("statusFlags", "Status flags", 0x14, "I", maximum=0xFFFFFFFF),
+            Field("elementFlags", "Element flags", 0x18, "H", maximum=0xFFFF),
+            Field("specialAttackFlags", "Special attack flags", 0x1A, "H", maximum=0xFFFF),
         )),
         Category("weapons", "Weapons", 6, 21, 13, 44, (
             Field("targetData", "Target flags", 0x00),
@@ -173,8 +201,17 @@ CATEGORIES = {
             Field("criticalRate", "Critical rate", 0x07),
             Field("accuracyRate", "Accuracy rate", 0x08),
             Field("weaponModelId", "Weapon model ID", 0x09),
+            Field("highSoundIdMask", "High sound ID mask", 0x0B),
             Field("equipableBy", "Equipable-by flags", 0x0E, "H", maximum=0xFFFF),
             Field("attackElements", "Attack element flags", 0x10, "H", maximum=0xFFFF),
+            *(Field(f"boostedStat{i}", f"Boosted stat {i}", 0x13 + i) for i in range(1, 5)),
+            *(Field(f"boostedStat{i}Bonus", f"Stat {i} bonus", 0x17 + i) for i in range(1, 5)),
+            *(Field(f"materiaSlot{i}", f"Materia slot {i}", 0x1B + i) for i in range(1, 9)),
+            Field("normalHitSoundId", "Normal hit sound ID", 0x24),
+            Field("criticalHitSoundId", "Critical hit sound ID", 0x25),
+            Field("missedAttackSoundId", "Missed attack sound ID", 0x26),
+            Field("impactEffectId", "Impact effect ID", 0x27),
+            Field("restrictions", "Usage restrictions", 0x2A, "H", maximum=0xFFFF),
         )),
         Category("armor", "Armor", 7, 22, 14, 36, (
             Field("elementDamageModifier", "Element damage modifier", 0x01),
@@ -183,9 +220,13 @@ CATEGORIES = {
             Field("evade", "Evade", 0x04),
             Field("magicEvade", "Magic evade", 0x05),
             Field("status", "Equipment status", 0x06),
+            *(Field(f"materiaSlot{i}", f"Materia slot {i}", 0x08 + i) for i in range(1, 9)),
             Field("growthRate", "Materia growth rate", 0x11),
             Field("equipableBy", "Equipable-by flags", 0x12, "H", maximum=0xFFFF),
             Field("elementalDefense", "Element defense flags", 0x14, "H", maximum=0xFFFF),
+            *(Field(f"boostedStat{i}", f"Boosted stat {i}", 0x17 + i) for i in range(1, 5)),
+            *(Field(f"boostedStat{i}Bonus", f"Stat {i} bonus", 0x1B + i) for i in range(1, 5)),
+            Field("restrictions", "Usage restrictions", 0x20, "H", maximum=0xFFFF),
         )),
         Category("accessories", "Accessories", 8, 23, 15, 16, (
             Field("boostedStat1", "Boosted stat 1", 0x00),
@@ -197,6 +238,7 @@ CATEGORIES = {
             Field("elementalDefense", "Element defense flags", 0x06, "H", maximum=0xFFFF),
             Field("statusDefense", "Status defense flags", 0x08, "I", maximum=0xFFFFFFFF),
             Field("equipableBy", "Equipable-by flags", 0x0C, "H", maximum=0xFFFF),
+            Field("restrictions", "Usage restrictions", 0x0E, "H", maximum=0xFFFF),
         )),
         Category("materia", "Materia", 9, 24, 16, 20, (
             Field("level2Ap", "Level 2 AP", 0x00, "H", maximum=6_553_500, scale=100),
@@ -349,6 +391,9 @@ class Kernel:
             self.file_types.append(file_type)
             offset = end
         self.trailer = self.original[offset:]
+        self.original_sections = tuple(bytes(section) for section in self.sections)
+        self.original_file_types = tuple(self.file_types)
+        self.original_trailer = self.trailer
 
     @property
     def sha256(self) -> str:
@@ -416,6 +461,13 @@ class Kernel:
             self.sections[description_index] = bytearray(packed_descriptions)
 
     def to_bytes(self) -> bytes:
+        # A no-op save must preserve the installed container byte-for-byte.
+        # Recompress only after modeled content actually changes; compressor
+        # provenance/header differences are otherwise meaningless churn.
+        if (tuple(self.file_types) == self.original_file_types
+                and self.trailer == self.original_trailer
+                and all(bytes(current) == original for current, original in zip(self.sections, self.original_sections))):
+            return self.original
         output = bytearray()
         for raw, file_type in zip(self.sections, self.file_types):
             compressed = gzip.compress(bytes(raw), compresslevel=9, mtime=0)

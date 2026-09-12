@@ -1,0 +1,449 @@
+# LexEditor Change / Problem Log
+
+> Some of these may already have been fixed indirectly while other work was happening. Remove items from this list as they are verified complete.
+> Answers to every question below live on one page:
+> https://claude.ai/code/artifact/386b1d20-f8d9-4556-a982-2674f0ae3494
+> Each is marked answered, needs-the-game, or your-call.
+
+## GLOBAL / LEXEDITOR CORE
+
+### UI / Layout Bugs
+
+* [x] Fix recurring vertical text-alignment problems when custom fonts are used.
+  * Cells centre by the glyphs now, not by the line box, so a font's own ascent
+    and descent cannot push a column off-centre. Not reproduced in RDR1 itself,
+    which needs game data to render here; the mechanism is fixed globally.
+* [x] Table columns should highlight only when the **column header** is hovered, not whenever the mouse is anywhere inside that column.
+* [x] Pagination bars must have a **fixed height**, regardless of whether a search bar is present.
+* [x] Hoverable/clickable text should have a visually distinct color, comparable to a web link.
+* [x] Pin/unpin animation should visually slide/pull the panel in and out instead of instantly jumping.
+* [x] Slow down and reduce the intensity of the pin/wiggle animation.
+* [x] Panel header/name text should retain normal left padding even when no preview icon is present.
+* [x] Large numbers should use thousands separators/commas.
+  * It turned out to be a framework switch after all. A number box whose range
+    can actually reach five figures is rebuilt as a text box that groups its
+    value; a box capped at 255 is left alone, because a separator adds nothing
+    there. The grouped form exists only while the box is NOT focused, so every
+    input and change event a plugin listens for still reports bare digits and
+    no plugin needed changing. FF9's 6,000 gil prices are grouped in the boxes
+    you type into; typing 12345 and tabbing away leaves 12,345 and one pending
+    edit.
+* [x] Properties containing names should generally allow the name to be edited directly from the detail-panel header rather than exposing a redundant `Name` property.
+  * `detailPanel({renameRecord})` makes the heading the field. FF8's cards tab
+    uses it and its `NAME` property is gone. The rule is in the manual and the
+    layout check refuses a `NAME` property in the shared demo.
+* [x] Properties should have useful, human-readable names rather than raw/generated labels such as `State`.
+  * In the manual, and the layout check rejects storage labels - `State`,
+    `Param1`, `Field03`, `Unknown` and the like - in the shared demo.
+
+### Tabs
+
+* [x] Tabs should behave visually like actual **folder tabs**.
+  * The selected tab still lifts, and now carries a band of the page's own
+    surface down to meet it, so the grey strip the lift used to open is gone.
+* [x] Tween/animate tab movement instead of snapping abruptly.
+* [x] Tweaks should remain part of the normal tab system rather than being visually segregated as a completely separate thing.
+  * It was grouped with Settings, which pushed it out of the run and gave it
+    the paler fill. Only Settings sits apart now; Tweaks keeps a little extra
+    letter-spacing so it is still findable.
+* [x] **Never create sub-subtabs.**
+  * `tabbedPanel` throws if a subtab bar ends up inside another one, so a
+    plugin cannot ship the nesting rather than merely being asked not to.
+* [x] Optional subtabs:
+  * A bar with fewer than two tabs renders hidden.
+
+### Detail Panels / Property Presentation
+
+* [x] Do **not** require every property to belong to a category.
+  * In the manual, with RDR2 named as the reference for grouping that earns
+    its place.
+* [x] Use `?` information tooltips more widely where properties need explanation.
+  * They are help pips, and the manual says which properties owe one and what
+    a pip may not say. RDR1's loot page moved its wall of text into one.
+* [x] Property/info text should be present where the meaning of an input isn't self-evident.
+* [x] Remove unnecessary disclaimers such as `Read only` when the UI state itself already makes that obvious.
+  * RDR1's toolbar banner is gone; Warband's troop panel says where the record
+    is edited instead of that it is not editable here.
+* [x] Standardize the Details-panel 3D Viewer control:
+  * The last plugin that was not using it is now. RDR2 owned the whole thing:
+    a separate eye button in the item's name line opening a page-wide modal,
+    so a reader moving between games met a different control in the same
+    situation. Its item panel has a real shared heading now, the heading icon
+    is the trigger and turns into the close mark, and the model appears in the
+    shared drawer. Micah's Revolver reads out of packs_1.rpf and draws at
+    17,060 vertices in the drawer.
+  * The private part stayed private, which is the point: which archive holds
+    the mesh, whether this machine can read it, and how the geometry is fetched
+    and drawn are all still the plugin's own. Every game needs some of that.
+  * Two things had to give. The framework only understood a ready-made node as
+    drawer content, so a preview that has to read a mesh out of a game archive
+    had no way to defer that cost - it takes a factory now. And the inventory
+    icon is a button of its own; left in the trigger slot one click opened both
+    the icon picker and the drawer, so in the detail panel it is shown rather
+    than clicked and its action moved to the actions column.
+
+### Menu Bar / Window Chrome
+
+* [x] Standardize the design of the icons on the right side of the menu bar.
+* [x] Use the circular design for these menu icons.
+  * One size, border and fill for all of them, and the size follows the command
+    row's height so they stay circles rather than flattening to ovals.
+* [x] GitHub button should use the standardized circular shape.
+* [x] Restart should instead visually belong to the window-control group:
+  * It is a window button now, first in that group, 29px like its neighbours
+    and on the same 30px spacing, so there is no gap.
+
+### Tweaks UI
+
+* [x] Use the general **RDR2 Tweaks layout** as the structural model, but neutralize all game-specific styling.
+  * `settingsColumns()` deals its cards into real columns the way RDR2's own
+    arranger does, re-dealing only when the column count changes. CSS columns
+    cut a card in half across a break; these cannot. None of RDR2's styling
+    came with it - the spacing is the shared panel gap.
+* [x] Support optional subtabs inside Tweaks using the global single-subtab rule above.
+  * `settingsColumns({tabs, activeTab, changeTab})`. Fewer than two tabs draws
+    no bar, same rule as everywhere else.
+
+### Developer Settings / Manual
+
+* [x] Pagination-bar height should be configurable/documented as a developer setting.
+  * `pagerBarHeight`, 36 to 80 pixels, default 52.
+* [x] Document **input sliders** as the official term for sliders embedded inside input boxes.
+* [x] Document the no-sub-subtabs rule.
+* [x] Document that categories are optional and should exist only when useful to humans.
+* [x] Document that properties should have meaningful human-readable names.
+* [x] Document/reinforce standard table column ordering.
+* [x] Consider some form of verifier/enforcement for global UI conventions so these problems do not have to be fixed independently in every plugin.
+  * `tests/control_layout_browser_check.py` is that verifier, run against the
+    shared demo. It now refuses: a nested subtab bar, a one-tab bar, a name
+    column before a numeric ID, a `NAME` property, a storage-label property
+    name, a clipped switch, a lopsided copy button, a boolean row out of line,
+    a rounded value box, a fill taller than its box, a panel that does not sit
+    on the pagination bar, and a rail that is not beside its property.
+
+### ReShade / Mod Architecture — Questions
+
+* [x] Why does LexEditor not ship ReShade? - answered on the answers page.
+* [x] Is licensing/open-source status actually preventing that? - the shaders, not ReShade itself.
+* [x] Would it make more sense for LexEditor to maintain one centralized ReShade installation? - that is what is built.
+* [x] Architectural requirement: Lexer's Mods should still work without LexEditor installed. - they do, by design.
+* [~] Determine whether **not shipping ReShade at all** is therefore still the preferred solution.
+  * Your call. Nothing has changed to reopen it; the answers page says what would.
+
+### Unclear Global Setting
+
+* [x] Transcript says something approximately like **“wraparound of the ads”** is currently a free-text developer-setting field even though it appears to be a boolean.
+  * It is `pageWrapAround`, "Wrap around at the ends", already declared boolean.
+    What it was missing is a default in `ui/default_settings.json`, so its value
+    came from a fallback in code rather than the file every other setting uses.
+    It has one now.
+
+---
+
+# BLANK / BASELINE PLUGIN
+
+### Three Panels
+
+* [x] `Enabled` text in the Three Panels tab is vertically/mutually misaligned with the surrounding content.
+  * Fixed by the boolean-row work: every name in that panel now ends on the
+    same edge, measured at 694px across all four.
+
+### Graphs
+
+* [x] Remove the strange white strips at the sides of graphs that are outside the intended margin.
+  * The drawing's own fill was painting over the card; it is transparent now,
+    and the uneven margin that made the left band read as a strip is gone.
+* [x] Reduce graph margins substantially.
+* [x] Use equal margin sizes on all sides.
+  * One value, 26px, where it had been 46 left, 22 right, 28 top, 30 bottom.
+* [x] Move numeric/axis-label text to the **left** side rather than the right.
+* [x] Redesign the variables display above the graph to follow the general arrangement used by FF8's graph UI.
+  * The variable strip sits above the plot and rises into place on hover or
+    focus, which is FF8's arrangement without FF8's type.
+* [x] Graph title:
+  * Drawn into the plot itself rather than stacked above the card, so it is
+    centred in the graph, huge, and recessed behind the drawing while still in
+    front of the graph's own background.
+* [x] Reduce the gap between formula text and the actual graph, perhaps roughly by half.
+* [x] Bar-chart hover marker/dotted line/X marker should land in the **center of each bar**, not in the gaps between bars.
+  * In bar mode a value owns a slot rather than a point, so the marker uses the
+    slot's centre.
+
+### Data Map
+
+* [x] If Data Map really only has three possible values, show the corresponding icon directly in the Detail panel.
+* [x] Include the human-readable text associated with the icon/value.
+  * Both already shipped: the detail's coverage line carries the glyph and the
+    label together. Verified in the data-map check.
+
+### Baseline Concern
+
+* [x] Blank itself sometimes exhibits the panel→pagination empty-space bug, suggesting the problem is in shared layout code rather than individual plugins.
+  * You were right that it was shared code. The bar's height was reserved twice,
+    once as padding under #main and again by the row fitter. Fixed globally.
+
+---
+
+# RED DEAD REDEMPTION 2
+
+### Reference Role
+
+* RDR2's Tweaks layout should be used as the basis for the neutral global Tweaks layout.
+* RDR2's detail-panel category organization is also a reasonable general reference for optional human-oriented property grouping.
+
+---
+
+# RED DEAD REDEMPTION 1
+
+## Items
+
+* [-] Most properties lack useful info/help text. Dropped on Lexer's call.
+  * Not a mechanism problem: the rule and the reasoning are in the manual and
+    every property row can carry a pip. It is authoring, and the volume is the
+    obstacle. One FF7R ability record is sixty-one properties read straight out
+    of the game's schema, and a real pip for something like Target Correction
+    Direction Angle means knowing what the engine does with it.
+* [x] Item names should be editable directly from the Detail-panel header rather than as a separate Name property.
+  * Done against the installed game. RDR1's item panel was its own hand-rolled
+    div with NAME and FRIENDLYNAME as ordinary rows, so the name at the top was
+    the one copy that could not be changed. It is a shared panel now: the
+    heading is the editable friendly name, NAME is the read-only key on the
+    line below, and both rows are gone from the property list.
+  * Two things fell out of that. The identity slot is the big ghosted record
+    number, and a long string in it ran straight through the title - it now
+    degrades to the subtitle line instead of overlapping. And the shared panel
+    was quietly overriding the ten-percent label lane with an 18% clamp, so the
+    same property row was one width in a shared panel and another in a
+    plugin's own div.
+
+## Loot Tables
+
+* [x] Remove/rethink the `Installed Script Evidence` block; its purpose is unclear.
+  * It is what proves the override is talking to the script actually installed,
+    so it says that - "Which script this is reading" - and folds away.
+* [x] Remove the large explanatory block at the top of the Loot Tables page.
+  * Now a help pip on the heading it belongs to.
+* [x] Inputs need clearer descriptions/help text.
+  * Every input on the page carries a pip now, written from what the patched
+    script actually does: what the bonus roll chance changes, what the base
+    range is before multipliers, and what each of the three multiplier switches
+    turns on. The page also opens by saying what it covers, because the two
+    questions below were really the same question.
+
+### Questions
+
+* [x] What exactly do the Loot Tables inputs do? - answered on the answers page.
+* [x] Where are ordinary enemy/item drops edited?
+* [x] Do enemies have separate drop definitions elsewhere?
+  * Confirmed against the installed game: nowhere, because Red Dead Redemption
+    has no per-enemy drop table in its data files. What a body yields is script
+    logic - one function rolls the bonus item, another decides the money - and
+    the ASI patches those two. That is why the tab has two cards and no enemy
+    list, and the tab now says so at the top instead of leaving the reader to
+    infer it from an absence.
+
+## Missions
+
+* [x] Remove the unnecessary `Read only` disclaimer from the Extracted Mission Table.
+  * The toolbar banner is gone; the lock marks already say it.
+
+## Tables
+
+* [x] Fix vertical alignment of Type / Source / Name columns.
+  * Seen in RDR1 itself now. Its list is hand-rolled, not the shared table, and
+    it centred each cell's line box: four cells in one row carrying a 14px
+    serif name, a 10px monospace id and two 10.5px sans columns, so the boxes
+    lined up and the letters sat at four heights. Text on one row shares a
+    baseline, and the row aligns on that.
+* [x] Fix the panel→pagination blank-space bug here, unless resolved globally.
+  * Resolved globally.
+
+---
+
+# FINAL FANTASY IX
+
+* [x] Fix input sliders occupying the entire vertical height of their containers.
+* [x] Investigate why this happens even in a page/control that seemingly has **no plugin overrides**.
+  * It was the shared baseline, and the absence of overrides is what exposed it:
+    the fill is positioned against the nearest positioned ancestor, which for a
+    bare input is the field control - the height of the whole row. A plugin that
+    wraps its values never hit it. A bare input gets its own box now.
+
+---
+
+# FINAL FANTASY VII REMAKE INTERGRADE
+
+## General / Tables
+
+* [x] ID column is absurdly wide; size it appropriately.
+  * 74px on both FF7R tables, and the shared style caps any numbered ID column
+    at eleven characters so a plugin that sets no width cannot repeat it.
+* [x] Fix panel→pagination empty-space bug if not solved globally.
+  * Solved globally: the bar's height was being reserved twice.
+* [x] Add property pinning support; FF7 Intergrade currently appears not to have pins.
+  * Every one of the sixty-one properties has a pin now. The table declares a
+    column for each property in the loaded table's own schema rather than a
+    fixed list - the curated set is what starts pinned and the rest are
+    declared unpinned, so a pin has a column to bring in. Preferences are keyed
+    per asset. Pinning MP on Abilities puts an MP column in the table.
+* [x] Enforce sensible table column ordering globally:
+  * In the manual, and the layout check fails a table whose name column comes
+    before a numeric ID.
+
+## Enemies
+
+* [x] Enemies tab currently contains essentially one thing; investigate whether content is missing.
+  * Content was missing. FF7R ships one EnemyParameter table per field map -
+    eight of them - and the tab took the first match and hid the rest, so it
+    showed one enemy. The tables are a subtab bar now, so all eight are
+    reachable and the reader can see how many there are.
+
+## Characters
+
+* [x] Mouse-wheel scrolling still does not work.
+* [x] Pagination buttons also do not work.
+* [x] Treat this as a major functionality bug.
+  * One cause for both, in the shared baseline: the selection reveal was
+    dragging the table back. Paging forward leaves the selected record on the
+    page you left, and the reveal snapped straight back to it, so every press
+    of Next re-rendered page one - 1-40 of 693, forever. A page the reader
+    asked for now wins over the reveal. Characters pages properly (41-80/693)
+    and wheel paging works through the same path.
+
+## Abilities
+
+* [x] Name should be the second column after a numeric ID.
+  * Checked against both installed games. FF7R's ability table already reads ID
+    then Record. RDR1's mission list did not - it led with the name over a real
+    numeric ID, so that one is reordered. RDR1's items and shops keep the name
+    first on purpose: their ID is itself a name-shaped string, and the manual's
+    rule allows that because two name-shaped columns in the other order read as
+    the same column printed twice.
+* [x] Investigate malformed/tiny properties such as the field transcribed approximately as `council number`.
+  * It is `Cancel Number`, and fifteen of the sixty-one ability properties are
+    like it: array properties - STRING[], BYTE[], FLOAT[] - that are empty on
+    this record. An empty array rendered an empty box, so the property was a
+    sixteen-pixel sliver with a name and no control, which reads as broken
+    rather than empty. They say "None" now.
+
+## Enemy Loot
+
+* [x] Properties are generically named `State`.
+  * Found the actual source with the game loaded, and it was not a fallback
+    label: two panels invented a property row named STATE to say a section was
+    empty. A section that holds nothing is not a property, so it says so as a
+    note - no label column, no control, no pin - and the reader can no longer
+    mistake the invented row for a real one.
+* [x] Reconsider/remove the repeated subtitle `Battle Item Possession`.
+  * Removed. It was the same string under every single record, so it said
+    nothing about the record it sat under. The table is named once instead, on
+    the section, where it answers where the numbers come from.
+
+### Question
+
+* [x] What does `Battle Item Possession` actually signify?
+  * Read from the installed game: it is the name of the FF7R table this tab
+    edits, one row per battle, keyed by the Data ID. That sentence is now the
+    help pip on the BATTLE section rather than a bare string repeated under
+    every record.
+
+## Equipment / Items / Materia
+
+* [x] Equipment, Item, and Materia should be full normal tabs rather than subtabs.
+  * The set turned out to be known at build time - three names the plugin
+    already declares - so no guessing was needed. They are three top-level tabs
+    with no subtab bar under them, each opening its own table.
+
+## Tweaks
+
+* [x] Tweaks tab appears nonfunctional.
+* [x] It remains indefinitely/for an extremely long time on `Reading every LexEditor tweak group`.
+  * Five of the six groups come back in under a second; NoMoreCheats takes
+    thirty-eight. The page waited for all of them, so one slow archive held
+    the whole tab. Each group appears as it arrives now, and the card that
+    replaces the missing ones says how many are still reading. The tab is
+    usable in one second.
+
+---
+
+# MOUNT & BLADE: WARBAND
+
+## Baseline / Architecture
+
+### Questions
+
+* [x] Is Warband actually running against the same current shared UI baseline as Blank? - yes, one copy of the shared UI.
+* [x] Why are bugs that were already fixed in Blank/shared UI reappearing in older plugins? - plugin overrides landing after the shared fix.
+* [x] Are these old-plugin overrides, stale baseline code, or genuine technical limitations? - overrides, not stale code.
+* [x] Would reducing plugin-specific overrides and moving Warband closer to Blank eliminate a large class of these problems? - yes; the answers page says which overrides are worth keeping.
+
+## Details Panel
+
+* [x] Restore the standardized Details-panel 3D Viewer header control.
+  * Warband's item panel had the renderer and the heading icon but never the
+    control between them. The icon opens the model now and the same slot
+    carries the close mark.
+* [x] Details-panel header is much too tall.
+  * Warband's own rule was adding 10/12px on top of the shared padding; 4/5 now.
+* [x] Fix alignment of property-type text.
+  * Fixed globally: every rail sits eight pixels left of its property's name.
+
+## Tabs
+
+* [x] Tab text is too small / aliased / difficult to read.
+* [x] Increase legibility.
+  * The bitmap face was being rendered at 18px; 26px now.
+
+## Troop Trees
+
+* [x] Each troop tree should be its own subtab.
+  * The tree dropdown is a subtab bar. A faction with one tree shows no bar,
+    which the shared control already handles.
+* [x] Remove unnecessary instructional text:
+  * Both lines gone. The cyclic-links warning stays, because that one says
+    something the reader cannot see.
+* [x] Troops should at minimum be openable in the 3D Viewer.
+  * A troop has no mesh of its own, so the viewer opens its EQUIPMENT, which
+    is the 3D data a troop actually has. Three things had to change: the
+    troop parser now reads the itm_ references out of module_troops.py (1,140
+    of 1,178 troops carry some), the panel got a heading icon because the
+    shared control lives in that slot, and the ids had to be matched across
+    the itm_ prefix - troops say `itm_leather_cap`, the item table says
+    `leather_cap`, which is why nothing matched at first. Bandit opens twelve
+    pieces of gear, named.
+
+### Troop Icon Question
+
+* [x] If LexEditor can generate/create icons or renders for inventory items, can equivalent icons/renders be generated for troops?
+* [x] If not, explain the technical difference.
+  * The difference stands and the answer is yes, by paying for it. An item icon
+    is one mesh with a fixed camera; a troop is a body, a morph-built face and
+    equipment resolved at runtime, so a troop render is a scene somebody has to
+    assemble first. The troop panel assembles the part that actually exists in
+    the files - the equipment - and renders each piece, named. Bandit opens
+    twelve. What is still missing for a single portrait is the body and the
+    morph-built face, which the module files do not carry as meshes.
+
+### Editing Question
+
+* [x] Why does the UI say `Read only troop details`? - it no longer does; it says where a troop is edited instead.
+* [x] Why can't troop properties be edited? - troops live in module_troops.py, Python source compiled into the game's data.
+* [x] Is this a genuine technical limitation of Warband's formats? - yes. Writing a troop back means editing source and keeping it compilable.
+
+## Tweaks
+
+* [x] Remove the plugin-specific Save button from the bar at the top.
+  * Gone. The shell's own Save owns every unsaved change in the editor.
+
+  * Saving should use the normal LexEditor mechanism.
+
+---
+
+# FINAL FANTASY VIII
+
+## Formulae
+
+* [x] Use proper mathematical typesetting for formulas.
+  * Set in a math serif with lining tabular figures; asterisks become
+    multiplication dots, slashes get air, trunc() becomes a floor bracket, and
+    the variables stay coloured but italic.

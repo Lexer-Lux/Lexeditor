@@ -33,7 +33,9 @@ def main() -> int:
             "the shared helper must prevent duplicate ID prefixes")
     require("const preferredColumns = options.columnPreferences?.active?.();" in framework
             and "const columns = preferredColumns" in framework
-            and "withEnabledColumn(preferredColumns, options.rows, options.enabledChange)" in framework
+            # No closing paren: the helper gained a fourth argument, which does
+            # not change the requirement that it is fed the PREFERRED columns.
+            and "withEnabledColumn(preferredColumns, options.rows, options.enabledChange" in framework
             and "numberedIdColumns(" in framework,
             "columnList must apply the global ID order after column preferences")
     require("numberedColumn(column) ? \"start\"" in framework and
@@ -42,7 +44,10 @@ def main() -> int:
             "numbered table IDs must align their # prefixes on one left edge")
     require("sortState =" in framework and "sortState.key === column.key" in framework,
             "display order must not replace the requested sort state")
-    require("numberedId:column.key===\"id\"" in ff8,
+    # A column may now declare numberedId itself, falling back to the id
+    # convention; the fallback is the part this contract is about.
+    require('numberedId:column.numberedId??column.key==="id"' in ff8
+            or 'numberedId:column.key==="id"' in ff8,
             "FF8 numeric ID columns must remain stable when a filtered list is empty")
     require('recordId(row.id)' in ff8 and 'recordId(active?.id,{class:"ff8-portrait-selected-id"})' in ff8,
             "FF8 detail headings must use the shared numbered-ID presentation")
@@ -55,8 +60,11 @@ def main() -> int:
     ]
     for contract in expected:
         require(contract in ff8, f"FF8 numeric list does not declare ID before Name: {contract}")
-    require('sorts:{items:["name",1],shops:["name",1],weapons:["name",1],magic:["name",1]' in ff8,
-            "FF8 numbered lists must keep Name as the default ascending sort")
+    # A `cards` list was added ahead of `items` in the same declaration, so
+    # anchoring on the opening brace broke. Each list is checked on its own.
+    for view in ("items", "shops", "weapons", "magic"):
+        require(f'{view}:["name",1]' in ff8,
+                f"FF8 {view} must keep Name as the default ascending sort")
     print("Shared numbered-ID order and FF8 Name-sort contracts passed")
     return 0
 

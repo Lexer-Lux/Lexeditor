@@ -129,9 +129,17 @@ def list_pak(pak: Path) -> list[str]:
 
 
 def get_file(pak: Path, internal_path: str) -> bytes:
-    result = _command("get", "--strip-prefix", FF7R_MOUNT_POINT,
-                      str(Path(pak)), internal_path, binary=True)
-    return bytes(result.stdout)
+    # repak cannot read this game's compressed entries; see pak_reader for the
+    # defect. Read directly, and keep repak as the fallback so an archive shape
+    # the reader rejects still has its original path.
+    from .pak_reader import PakError, read_file
+
+    try:
+        return read_file(Path(pak), internal_path)
+    except PakError:
+        result = _command("get", "--strip-prefix", FF7R_MOUNT_POINT,
+                          str(Path(pak)), internal_path, binary=True)
+        return bytes(result.stdout)
 
 
 def pak_info(pak: Path) -> dict:
