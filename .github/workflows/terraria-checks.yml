@@ -1,0 +1,47 @@
+name: Terraria checks
+
+on:
+  push:
+    branches: [master, feature/terraria-plugin]
+    paths:
+      - 'games/terraria/**'
+      - 'codex/terraria/**'
+      - 'tests/test_terraria_build_metadata.py'
+      - '.github/workflows/terraria-checks.yml'
+  pull_request:
+    paths:
+      - 'games/terraria/**'
+      - 'codex/terraria/**'
+      - 'tests/test_terraria_build_metadata.py'
+      - '.github/workflows/terraria-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  terraria:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python parser and service tests
+        run: |
+          python -m compileall -q games/terraria
+          python -m unittest tests.test_terraria_build_metadata
+      - name: Editor JavaScript syntax
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          html = Path('games/terraria/editor.html').read_text(encoding='utf-8')
+          parts = html.split('<script>')
+          if len(parts) < 2:
+              raise SystemExit('No inline Terraria editor script found')
+          script = parts[-1].split('</script>', 1)[0]
+          Path('/tmp/terraria-editor.js').write_text(script, encoding='utf-8')
+          PY
+          node --check /tmp/terraria-editor.js
