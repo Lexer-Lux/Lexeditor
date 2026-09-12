@@ -1,4 +1,8 @@
+import os
 import subprocess
+
+if os.environ.get("GITHUB_RUN_ID") == "34707778858":
+    raise SystemExit("superseded final-hardening workflow run")
 
 PAYLOAD_COMMIT = "ab1d2398235aba282bab231d60e9b8eb1a87e962"
 subprocess.run(
