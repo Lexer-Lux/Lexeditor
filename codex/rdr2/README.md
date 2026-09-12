@@ -2,6 +2,10 @@
 
 Canonical game knowledge belongs here; issue progress belongs in `worklog/issues/`. Root `AGENTS.md` governs over imported historical policy.
 
+## Current verified topics
+
+- [Horse feeding and bonding](horse-feeding.md)
+
 <!-- generated-import-index -->
 
 ## Imported source knowledge

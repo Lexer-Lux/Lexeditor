@@ -124,12 +124,27 @@ record/field merges, mutually exclusive modules, or something else. If a packed
 file can be merged safely at record/field granularity, prefer that over making two
 otherwise-compatible gameplay mods obliterate each other.
 
-### Runtime helpers
+### Helper software and updates
 
-If a helper such as FFNx, Memoria, WSE2, RedHook or another loader/runtime is
-required, keep its installed version, Lexeditor-pinned version and newest upstream
-version distinct. Do not let a helper silently self-update and break the supported
-stack.
+Bundle all helper software used by the plugin with Lexeditor. This includes
+loaders, runtimes, extractors and converters such as FFNx, Memoria, WSE2 or RedHook.
+Install and configure the helpers as part of the plugin's first-time setup. Do not
+require the user to find, download or install them separately.
+
+For each helper:
+
+- Bundle a tested, pinned version with its required license and notices.
+- Add it to the **Updates drawer on the main menu** through the shared update
+  system. Keep the installed version, Lexeditor-pinned version and newest upstream
+  version distinct.
+- Disable automatic updates in the helper and any updater it installs. Lexeditor
+  must not automatically update the helper either. Apply updates only when the
+  user requests them through the shared Updates drawer.
+- Verify installation and the saved automatic-update settings before setup reports
+  success. Check that automatic updates remain disabled after an update or repair.
+
+Test first-time setup with no helper already installed. Confirm that the bundled
+helper works, appears in the Updates drawer and does not update itself.
 
 ### Acceptance and recovery path
 
@@ -248,6 +263,22 @@ bounded number/range controls for real numeric limits, and decomposed bitflags w
 possible. Help text should explain effect, unit, special values and restart/runtime
 requirements rather than restating the field name.
 
+Present the type the player edits, not the type the file stores. A value kept as a
+byte that only ever means yes or no is a switch, and is written back as 0 or 1. A
+byte that indexes a fixed list is a select, not a number. Reading the storage type
+straight out of a schema is what produced a spin box labelled "Can Sell" with a
+range of 0-255. Keep a small per-field override map in the plugin next to the
+schema, so the mapping is visible and each entry can be justified.
+
+Every list of records is a shared paged Table + Detail. Its search and paging live
+in the shared bottom bar, so a plugin never builds its own search box above a bare
+table: doing that silently caps the view at one page.
+
+Tweaks is a settings page, not a record table. `games/blank`'s Tweaks tab is the
+reference: a master switch that owns the page, dependent controls disabled until it
+is on, bounded values with units, selects for fixed choices, and related switches
+grouped into one property.
+
 ### Derive the plugin theme from the installed game when feasible
 
 A plugin should not look like the Blank gallery with a different accent color when
@@ -291,7 +322,8 @@ actually renders/plays in the desktop host.
 
 Credits and Mod Loading are shared Info-page sections; do not hand-build per-game
 copies. A plugin still has to supply their data, and discovery will reject it if it
-does not.
+does not. The Mod Loader section is enforced: every plugin must call
+`LexeditorUI.modLoaderSection` and fill all five fields.
 
 ## 7. Credits and provenance are a hard requirement
 
@@ -372,15 +404,17 @@ A new plugin is not complete until the applicable items below are true:
 - [ ] One representative vertical slice works end to end.
 - [ ] Data Map honestly records editable, partial and unsupported areas.
 - [ ] `ui/mod-loading.json` explains loader, structure and overriding semantics.
+- [ ] All helper software is bundled and installed during first-time setup.
+- [ ] Every helper appears in the main-menu Updates drawer with distinct installed, pinned and upstream versions.
+- [ ] Helper automatic updates are disabled and remain disabled after an update or repair.
+- [ ] First-time setup works without a preinstalled helper; helper installation and update settings are verified.
 - [ ] Credits contain at least one explicit attribution/declaration and regenerate cleanly.
 - [ ] Unknown/unmodeled data is preserved; no-op and changed round-trips are tested.
 - [ ] Save/deployment writes are atomic and recovery/revert behavior is defined.
 - [ ] The deployment, revert, launch and native acceptance path was designed before the endgame.
 - [ ] Shared UI controls are used instead of game-local clones.
-- [ ] Game-original UI art/fonts/icons/SFX were researched and locally derived where feasible; fallback behavior is explicit where they are not browser-ready.
-- [ ] Proprietary theme sources remain private/read-only and any local theme cache is bounded, source-versioned and path-contained.
 - [ ] Safe smoke test exists and does not mutate a real installation/save.
-- [ ] Browser/shared-UI acceptance passes, including installed-theme and fallback states when applicable.
+- [ ] Browser/shared-UI acceptance passes.
 - [ ] The normal installed Lexeditor runtime can start the plugin and its dependencies.
 - [ ] Real installed-game deployment/loading has been exercised when the plugin claims it.
 - [ ] Native gameplay/visual/audio behavior has been checked for features that require it.
@@ -394,7 +428,6 @@ A new plugin is not complete until the applicable items below are true:
 - Reimplementing a parser/library that can legally and cleanly be reused.
 - Inventing a new plugin lifecycle when an existing Lexeditor precedent already fits.
 - Building UI before proving serialization and the loader/deployment boundary.
-- Hand-drawing a generic "game-like" theme before checking whether the installed game already contains usable menu art, fonts, icons and UI SFX.
 - Inventing a new mod loader when the established ecosystem loader is sufficient.
 - Leaving deployment/revert/native acceptance design until every editor screen is finished.
 - Assuming one observed game build proves offsets/layout for every edition.

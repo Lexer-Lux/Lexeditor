@@ -57,7 +57,12 @@ def test_rdr2_setting_help_does_not_append_visible_metadata():
 def test_rdr_uses_shared_detail_fields_and_semantic_reward_help():
     rdr = text("games/rdr/editor.html")
     helper = rdr[rdr.index("function detailField"):rdr.index("function applyControlValue")]
-    assert "LexeditorUI.detailField({label,control,description:help||\"\"})" in helper
+    # RDR's rows now also carry the shared info bubble, so the helper forwards
+    # both `description` (prose under the row) and `help` (the bubble). The
+    # requirement is that it delegates to the shared field, not that it passes
+    # exactly one argument.
+    assert "LexeditorUI.detailField({label,control,description:help||\"\"" in helper
+    assert "LexeditorUI.infoHelp(" in helper
     assert 'class:"detail-field"' not in helper
     assert "XML value attribute" not in rdr
     assert '"XML text"' not in rdr

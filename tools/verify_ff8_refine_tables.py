@@ -304,7 +304,9 @@ def verify_rendered() -> dict:
             rendered = cdp.eval("""(()=>({
               tabs:[...document.querySelectorAll('.refine-tabs [role=tab]')].map(node=>node.textContent.trim().replace(/\\d+$/,'')),
               rows:document.querySelectorAll('.refine-view .lex-column-list-row').length,
-              sources:document.querySelectorAll('.refine-view .lex-source-control').length,
+              sources:document.querySelectorAll('.refine-detail .lex-source-control').length,
+              listEditors:document.querySelectorAll('.refine-view .lex-list :is(input,select,textarea)').length,
+              quantityWidths:[...document.querySelectorAll('.refine-detail input[aria-label$="quantity for refine recipe"]')].map(node=>node.getBoundingClientRect().width),
               textareas:document.querySelectorAll('.refine-detail textarea').length,
               redundantLabel:[...document.querySelectorAll('.refine-detail .lex-detail-field-label')].some(node=>node.textContent.trim()==='DISPLAYED TEXT'),
               rightGap:Math.abs(document.querySelector('#main').getBoundingClientRect().right-document.querySelector('.refine-view').getBoundingClientRect().right),
@@ -315,7 +317,9 @@ def verify_rendered() -> dict:
             assert rendered["tabs"] == [
                 "Magic Refine", "Tool/Medicine Refine", "Magic Upgrade", "Med LV Up", "Card Mod",
             ], rendered
-            assert rendered["rows"] == 15 and rendered["sources"] >= 60, rendered
+            assert rendered["rows"] == 15 and rendered["sources"] >= 5, rendered
+            assert rendered["listEditors"] == 0 and len(rendered["quantityWidths"]) == 2, rendered
+            assert min(rendered["quantityWidths"]) >= 80, rendered
             assert rendered["textareas"] == 1 and not rendered["errors"], rendered
             assert not rendered["redundantLabel"], rendered
             assert rendered["rightGap"] <= rendered["mainPaddingRight"] + 1, rendered
@@ -345,7 +349,7 @@ def verify_rendered() -> dict:
                        for item in five_barrels["lists"] for header in item["headers"]), five_barrels
             assert not five_barrels["errors"], five_barrels
 
-            changed = cdp.eval("""(()=>{const input=document.querySelector('.refine-view input[data-min]'),before=Number(input.value.replaceAll(',',''));input.value=String(before+1);input.dispatchEvent(new Event('input',{bubbles:true}));const text=document.querySelector('.refine-detail textarea');text.value+='!';text.dispatchEvent(new Event('input',{bubbles:true}));return{before,after:Number(input.value),dirty:dirtyCount()}})()""")
+            changed = cdp.eval("""(()=>{const input=document.querySelector('.refine-detail input[aria-label=\"input quantity for refine recipe\"]'),before=Number(input.value.replaceAll(',',''));input.value=String(before+1);input.dispatchEvent(new Event('input',{bubbles:true}));const text=document.querySelector('.refine-detail textarea');text.value+='!';text.dispatchEvent(new Event('input',{bubbles:true}));return{before,after:Number(input.value),dirty:dirtyCount()}})()""")
             assert changed["after"] == changed["before"] + 1 and changed["dirty"] >= 1, changed
             cdp.eval("saveAll().then(()=>true)", await_promise=True)
             assert cdp.eval("dirtyCount()") == 0

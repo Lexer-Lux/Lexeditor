@@ -54,10 +54,13 @@ class GitHubIntegration:
             login = None
             if self._executable:
                 try:
+                    # The token usually comes from the OS keyring, which can be
+                    # slow while the machine is busy. Eight seconds turned a
+                    # cold read into a permanent authorization failure.
                     result = self._run([
                         "auth", "status", "--active", "--hostname", "github.com",
                         "--json", "hosts",
-                    ], timeout=8)
+                    ], timeout=20)
                     if result.returncode == 0:
                         payload = json.loads(result.stdout)
                         accounts = payload.get("hosts", {}).get("github.com", [])
@@ -67,7 +70,11 @@ class GitHubIntegration:
                         login = value or None
                 except (OSError, subprocess.SubprocessError, ValueError, TypeError):
                     login = None
-            self._cached_login = login
+            # Only a resolved identity is remembered. Caching the failure made a
+            # single slow or interrupted probe look like a revoked account for
+            # the rest of the session, with no way back except a restart.
+            if login:
+                self._cached_login = login
             return login
 
     @staticmethod
@@ -80,7 +87,19 @@ class GitHubIntegration:
                             refresh: bool = False) -> str:
         login = self.active_login(refresh=refresh)
         if not self._authorized(repository, login):
-            raise PermissionError("The authorized GitHub owner account is not active")
+            # Say which of the three states actually applies; "not active" read
+            # as a revoked account when the usual cause is a missing CLI or a
+            # probe that did not answer in time.
+            if not self._executable:
+                raise PermissionError(
+                    "GitHub CLI is not installed, so the owner workspace cannot sign in")
+            if not login:
+                raise PermissionError(
+                    "GitHub CLI did not report a signed-in account. Run 'gh auth status' "
+                    "to check, then try again")
+            raise PermissionError(
+                f"GitHub account '{login}' is signed in but is not an authorized owner "
+                f"of {repository.full_name}")
         return str(login)
 
     def _json(self, arguments: list[str], timeout: int = 20) -> object:

@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import threading
+import urllib.error
 import urllib.request
 
 from . import paths
@@ -86,6 +87,14 @@ def ensure(root: Path | None = None, downloader=_download, force: bool = False) 
         if root is None and _last is not None and not force and _last.get("ready"):
             return _last
         prepared, problems = 0, []
+        # One unreachable host must not become one timeout per file. Fetching
+        # every pinned CSV in turn behind a twelve-second timeout meant a
+        # machine that is offline - or a test fixture that has no business
+        # downloading anything - spent the better part of a minute inside a
+        # request handler before answering. After the first failure the rest are
+        # reported as unavailable immediately, and the caller sees a baseline
+        # that is not ready rather than a page that hangs.
+        offline = False
         for relative, expected in FILES.items():
             target = baseline / Path(relative)
             try:
@@ -93,6 +102,8 @@ def ensure(root: Path | None = None, downloader=_download, force: bool = False) 
                 if current and _hash(current) == expected:
                     prepared += 1
                     continue
+                if offline:
+                    raise RuntimeError("the Memoria baseline source is unreachable")
                 data = downloader(relative)
                 if _hash(data) != expected:
                     raise RuntimeError(f"Official Memoria baseline checksum failed: {relative}")
@@ -102,6 +113,8 @@ def ensure(root: Path | None = None, downloader=_download, force: bool = False) 
                 temporary.replace(target)
                 prepared += 1
             except Exception as error:
+                if isinstance(error, (OSError, urllib.error.URLError)):
+                    offline = True
                 problems.append(f"{relative}: {error}")
         manifest = {
             "release": RELEASE, "source": SOURCE, "prepared": prepared,

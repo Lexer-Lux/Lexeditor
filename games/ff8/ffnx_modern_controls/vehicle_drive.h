@@ -21,10 +21,13 @@ inline bool supported_state(unsigned state) {
 // are digital fallbacks, so keyboard users get the same controls.
 inline int axis(float left_trigger, float right_trigger,
                 bool left_digital = false, bool right_digital = false) {
-    float left = std::clamp(left_trigger, 0.0f, 1.0f);
-    float right = std::clamp(right_trigger, 0.0f, 1.0f);
-    if (left_digital) left = 1.0f;
-    if (right_digital) right = 1.0f;
+    float left = std::isfinite(left_trigger) ? std::clamp(left_trigger, 0.0f, 1.0f) : 0.0f;
+    float right = std::isfinite(right_trigger) ? std::clamp(right_trigger, 0.0f, 1.0f) : 0.0f;
+    // A physical trigger can also set its logical L2/R2 bit. Do not let that
+    // alias turn a partial trigger pull into full throttle. Digital-only
+    // keyboard input still supplies the complete axis range.
+    if (left_digital && left == 0.0f) left = 1.0f;
+    if (right_digital && right == 0.0f) right = 1.0f;
     const float drive = right - left;
     if (std::abs(drive) < 0.02f) return 128;
     const float scale = drive > 0.0f ? 127.0f : 128.0f;

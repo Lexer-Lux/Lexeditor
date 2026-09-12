@@ -57,7 +57,7 @@ STUB = """
 """
 
 
-def session_for(plugin_id: str, project: str):
+def session_for(plugin_id: str, project: str | None):
     """Return the plugin's own session class, not the shared base class."""
     module = __import__(f"games.{plugin_id}.plugin", fromlist=["PLUGIN"])
     from service_session import LocalPluginSession
@@ -74,8 +74,10 @@ def session_for(plugin_id: str, project: str):
         "ff9": "LEXEDITOR_FF9_PROJECT", "rdr2": "LEXEDITOR_RDR2_PROJECT",
         "rdr": "LEXEDITOR_RDR_PROJECT", "warband": "LEXEDITOR_WARBAND_PROJECT",
     }.get(plugin_id)
+    # --live passes no project, so the plugin resolves its own real one from the
+    # environment the desktop shell would give it.
     try:
-        return session_class({variable: project} if variable else {})
+        return session_class({variable: project} if variable and project else {})
     except TypeError:
         return session_class()
 
@@ -87,6 +89,9 @@ def main() -> int:
     parser.add_argument("--step", action="append", default=[])
     parser.add_argument("--size", default="1600x1000")
     parser.add_argument("--eval", dest="expression")
+    parser.add_argument("--wait", help="JS condition to wait for after the steps")
+    parser.add_argument("--ready", help="JS condition to wait for BEFORE the steps run")
+    parser.add_argument("--wait-seconds", type=int, default=180)
     parser.add_argument("--live", action="store_true",
                         help="use the real project instead of a temporary one")
     args = parser.parse_args()
@@ -97,7 +102,7 @@ def main() -> int:
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     browser = None
     try:
-        with session_for(args.plugin, project.name) as session:
+        with session_for(args.plugin, None if args.live else project.name) as session:
             port = free_port()
             browser = subprocess.Popen([
                 str(EDGE), "--headless=new", "--no-first-run", "--no-default-browser-check",
@@ -120,9 +125,15 @@ def main() -> int:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state==='undefined'||!state.booting", 90)
             time.sleep(1.2)
+            if args.ready:
+                wait_eval(cdp, args.ready, args.wait_seconds)
+                time.sleep(.8)
             for step in args.step:
                 cdp.eval(step)
                 time.sleep(.45)
+            if args.wait:
+                wait_eval(cdp, args.wait, args.wait_seconds)
+                time.sleep(.8)
             shot = cdp.call("Page.captureScreenshot", {
                 "format": "png", "captureBeyondViewport": False, "fromSurface": True,
             })

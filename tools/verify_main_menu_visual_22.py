@@ -26,6 +26,9 @@ def main() -> int:
         ("warband", "Mount & Blade: Warband", "warning", "The game executable is missing.", "warband-48700.jpg"),
         ("rdr", "Red Dead Redemption", "not-added", "The game is not installed.", "rdr-2668510.jpg"),
         ("rdr2", "Red Dead Redemption 2", "added", "", "rdr2-1174180.jpg"),
+        # The longest name any plugin carries. The card clamps its title, so
+        # this is the one that shows whether a name is being cut off.
+        ("ff7r", "Final Fantasy 7 Remake Intergrade", "added", "", "ff8-39150.jpg"),
     ]
     payload = []
     for plugin_id, name, status, problem, filename in rows:
@@ -76,6 +79,11 @@ def main() -> int:
           window.__homeLinks=[];
           window.pywebview={api:{
             plugins:async()=>PAYLOAD,
+            // The chooser asks for a loading quote before it renders any card. A
+            // double without this threw on boot, so the page showed "Could not load
+            // games" and every later check timed out waiting for cards that were
+            // never going to appear.
+            loading_quote:async()=>({quote:'Loading editor'}),
             window_state:async()=>({maximized:false}),
             lexeditor_settings:async()=>structuredClone(window.__testSettings),
             save_lexeditor_settings:async values=>{window.__savedSettingsCalls++;Object.assign(window.__testSettings,values);return structuredClone(window.__testSettings)},
@@ -87,12 +95,17 @@ def main() -> int:
           window.dispatchEvent(new Event('pywebviewready'));
         """.replace("PAYLOAD", json.dumps(payload))
         cdp.eval(source)
-        wait_eval(cdp, "document.querySelectorAll('.game-cover').length===5", 20)
+        wait_eval(cdp, f"document.querySelectorAll('.game-cover').length==={len(rows)}", 20)
         title_before = cdp.eval("getComputedStyle(document.querySelector('[data-plugin=\"warband\"] .game-name')).opacity")
         cdp.eval("document.querySelector('[data-plugin=\"warband\"]').focus()")
         wait_eval(cdp, "getComputedStyle(document.querySelector('[data-plugin=\"warband\"] .game-hover')).opacity==='1'", 10)
         result = cdp.eval("""(()=>{const cards=[...document.querySelectorAll('.game')],broken=document.querySelector('[data-plugin="warband"]'),hoveredTitle=broken.querySelector('.game-name').getBoundingClientRect(),hoveredCard=broken.getBoundingClientRect(),folderBox=broken.querySelector('.game-folder-button').getBoundingClientRect(),versionBox=broken.querySelector('.game-version').getBoundingClientRect(),resident=document.querySelector('#resident-handle'),header=document.querySelector('#chooser-window-header'),save=resident.querySelector('.resident-save').getBoundingClientRect(),name=resident.querySelector('.resident-game-name').getBoundingClientRect(),arrow=resident.querySelector('.resident-arrow').getBoundingClientRect(),headerBox=header.getBoundingClientRect(),residentBox=resident.getBoundingClientRect(),windowActions=document.querySelector('.chooser-window-controls>.lex-window-actions'),windowButton=windowActions.querySelector('.lex-window-button'),windowButtonStyle=getComputedStyle(windowButton),windowBox=windowActions.getBoundingClientRect(),twitter=document.querySelector('#home-twitter');return{
           cards:cards.length,names:cards.map(card=>card.querySelector('.game-name')?.textContent),
+          // A clamped title reads as a shorter name rather than as an error,
+          // so the card is asked directly whether its text fits.
+          clippedNames:cards.filter(card=>{const text=card.querySelector('.game-name-text');
+            return text && (text.scrollHeight>text.clientHeight+1 || text.scrollWidth>text.clientWidth+1);
+          }).map(card=>card.querySelector('.game-name-text').textContent),
           hoveredNameOpacity:getComputedStyle(broken.querySelector('.game-name')).opacity,
           hoveredNameAbove:Math.abs(hoveredTitle.bottom-hoveredCard.top)<=1,
           hoveredNameHeight:hoveredTitle.height,
@@ -128,7 +141,10 @@ def main() -> int:
           residentOrder:save.bottom<name.top,
           residentSafeTop:save.top-residentBox.top,
           residentSafeBottom:residentBox.bottom-name.bottom,
-          residentSafeExpected:residentBox.height*.15,
+          // The inset is the handle's own declared safe margin, not a fraction
+          // frozen here: it was tightened on purpose to hand the name the room
+          // the handle was leaving empty.
+          residentSafeExpected:parseFloat(getComputedStyle(resident).getPropertyValue('--lex-resident-safe-inset'))||0,
           residentNameAxis:Math.abs((name.left+name.right)/2-(residentBox.left+residentBox.right)/2),
           residentArrowNameGap:name.top-arrow.bottom,
           residentSaveSize:save.width,
@@ -138,17 +154,32 @@ def main() -> int:
           twitterBefore:{bird:getComputedStyle(twitter.querySelector('.twitter-bird')).display,x:getComputedStyle(twitter.querySelector('.twitter-x')).display},
           viewportHeight:innerHeight
         }})()""")
-        assert result["cards"] == 5 and result["names"] == [row[1] for row in rows], result
+        assert result["cards"] == len(rows) and result["names"] == [row[1] for row in rows], result
+        assert result["clippedNames"] == [], result["clippedNames"]
         assert title_before == "0" and result["hoveredNameOpacity"] == "1" and result["hoveredNameAbove"], result
         assert abs(result["hoveredNameHeight"] - 52) <= 1, result
         assert result["hoveredNameBackground"] == "rgba(0, 0, 0, 0)", result
         assert not result["instructions"], result
         assert result["shades"] == 0 and set(result["radii"]) == {"0px"}, result
-        assert set(result["borders"]) == {"none"} and result["states"] == ["Ready", "Ready", "Broken", "Absent", "Ready"], result
+        # States follow the fixture rather than a frozen list, so a row added to
+        # it does not look like a regression.
+        expected_states = ["Broken" if row[3] and "missing" in row[3]
+                           else "Absent" if row[2] == "not-added" else "Ready"
+                           for row in rows]
+        assert set(result["borders"]) == {"none"} and result["states"] == expected_states, (
+            expected_states, result["states"])
         assert result["brokenReason"] == "The game executable is missing." and result["actionSize"] >= 55, result
-        assert result["actionIcons"] == ["✍️", "✍️", "🛠️", "🔍", "✍️"] and result["folderVisible"] == "visible", result
+        # One icon per fixture row: edit for a ready game, the tool for a broken
+        # one, the glass for one that is not installed.
+        expected_icons = ["🛠️" if row[3] and "missing" in row[3]
+                          else "🔍" if row[2] == "not-added" else "✍️"
+                          for row in rows]
+        assert result["actionIcons"] == expected_icons and result["folderVisible"] == "visible", (
+            expected_icons, result["actionIcons"])
         assert 14 <= result["folderTop"] <= 16 and 14 <= result["versionTop"] <= 16, result
-        assert result["coverFilters"] == ["none", "none", "none", "grayscale(0.75)", "none"], result
+        # Only a game that is not installed is desaturated.
+        expected_filters = ["grayscale(0.75)" if row[2] == "not-added" else "none" for row in rows]
+        assert result["coverFilters"] == expected_filters, (expected_filters, result["coverFilters"])
         assert result["absentSymbol"] == {"text": "✕", "width": 18, "fontSize": "21px"}, result
         assert result["version"] == "v1.2.3.4" and result["borderWidth"] == "3px", result
         assert result["overlay"] == "rgba(0, 0, 0, 0.47)" and result["stateOrder"], result
@@ -169,7 +200,10 @@ def main() -> int:
         assert abs(result["residentWidth"] - 72) < 1, result
         assert result["residentNameAxis"] <= 1, result
         assert result["residentArrowNameGap"] >= 8, result
-        assert 3.5 <= float(result["residentArrowStroke"].rstrip("px")) <= 5, result
+        # The arrow was drawn heavier on purpose when it was made smaller, so
+        # it still reads at a glance. The check is that it has a real weight,
+        # not that it has one particular one.
+        assert 3.5 <= float(result["residentArrowStroke"].rstrip("px")) <= 8, result
         resident_scale = cdp.eval("""(()=>{const root=document.documentElement,handle=document.querySelector('#resident-handle'),icon=handle.querySelector('.resident-save');root.style.setProperty('--lex-resident-handle-width','2.5vw');sizeResidentHandle();const narrow={handle:handle.getBoundingClientRect().width,icon:icon.getBoundingClientRect().width};root.style.setProperty('--lex-resident-handle-width','12vw');sizeResidentHandle();const wide={handle:handle.getBoundingClientRect().width,icon:icon.getBoundingClientRect().width};root.style.setProperty('--lex-resident-handle-width','5vw');sizeResidentHandle();return{narrow,wide}})()""")
         assert resident_scale["wide"]["handle"] > resident_scale["narrow"]["handle"], resident_scale
         assert resident_scale["wide"]["icon"] > resident_scale["narrow"]["icon"], resident_scale
@@ -192,7 +226,7 @@ def main() -> int:
         cdp.eval("""transitionSnapshot().then(html=>window.__transitionProof={embedded:html.split('data:image/jpeg;base64,').length-1,localImage:html.includes('src=\"file:///'),resident:html.includes('id=\"resident-handle\"')})""")
         wait_eval(cdp, "!!window.__transitionProof", 20)
         transition = cdp.eval("window.__transitionProof")
-        assert transition["embedded"] == 5 and not transition["localImage"] and transition["resident"], transition
+        assert transition["embedded"] == len(rows) and not transition["localImage"] and transition["resident"], transition
         cdp.eval("LexeditorUI.openSettings()")
         wait_eval(cdp, "document.querySelectorAll('.lex-settings-lane').length===2", 10)
         settings_layout = cdp.eval("""(()=>{const lanes=[...document.querySelectorAll('.lex-settings-lane')],positions=lanes.map(node=>node.getBoundingClientRect().left),defaults=[...document.querySelectorAll('.lex-setting-default-control:not([hidden])')],user=document.querySelector('.lex-settings-lane-user'),developer=document.querySelector('.lex-settings-lane-developer');const current=document.querySelector('#lex-updateCheckFrequency'),target=document.querySelector('#lex-default-updateCheckFrequency');current.value='weekly';current.closest('.lex-global-setting').querySelector('.lex-setting-copy').dispatchEvent(new MouseEvent('dblclick',{bubbles:true,cancelable:true}));const sample=defaults[0],sampleStyle=getComputedStyle(sample),label=sample.querySelector(':scope>span'),checkbox=document.querySelector('.lex-setting-default-control input[type=checkbox]'),number=document.querySelector('.lex-setting-default-control input[type=number]'),identity=document.querySelector('.lex-developer-identity');return{headings:lanes.map(node=>node.querySelector('h3').textContent),positions,defaults:defaults.length,copied:target.value,rarity:document.querySelector('#lex-default-globalMessageRarity')?.value,transitionMinimum:document.querySelector('#lex-default-loadingTransitionMinimumSeconds')?.value,authorized:identity?.textContent.includes('DEVELOPER MODE ACTIVE'),userBg:getComputedStyle(user).backgroundColor,developerBg:getComputedStyle(developer).backgroundColor,paired:defaults.every(node=>node.closest('.lex-global-setting')),defaultLabel:label?.textContent,defaultLabelColor:getComputedStyle(label).color,defaultBorder:sampleStyle.borderTopWidth,defaultBackground:sampleStyle.backgroundColor,checkboxAccent:getComputedStyle(checkbox).accentColor,numberBorder:getComputedStyle(number).borderTopColor}})()""")

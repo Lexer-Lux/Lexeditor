@@ -72,8 +72,16 @@ def smoke() -> list[str]:
             identity = request_json(session.url + "api/plugin")
             if identity.get("pluginId") != "ff9" or identity.get("windowHost") != "webview2":
                 raise RuntimeError("FF9 plugin returned the wrong managed identity")
-            if identity.get("capabilities") != ["data-map", "memoria-csv", "read", "save"]:
-                raise RuntimeError("FF9 plugin advertised the wrong capabilities")
+            # The four the smoke test depends on must be there. Requiring the
+            # list to match EXACTLY meant every capability FF9 gained - battle
+            # scenes, its runtime features, deployment - broke the plugin's own
+            # startup check, which is the opposite of what a guard is for.
+            required = {"data-map", "memoria-csv", "read", "save"}
+            advertised = set(identity.get("capabilities") or [])
+            if not required <= advertised:
+                raise RuntimeError(
+                    "FF9 plugin advertised the wrong capabilities: missing "
+                    + ", ".join(sorted(required - advertised)))
             data_map = request_json(session.url + "api/datamap")
             rows = data_map.get("rows", [])
             if not rows or not any(row.get("status") == "integrated" for row in rows):

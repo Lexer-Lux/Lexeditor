@@ -13,6 +13,37 @@ ROOT=Path(__file__).resolve().parents[1]
 BASE='c056db2783f376a340fcefa6a48cc33618998876'
 
 
+def integrate_flare_owner(source: Path, *, startup: bool = False) -> None:
+    """Wire only FF8 gates; preserve native encounter/music handling afterward."""
+    changes = {
+        'src/common.cpp': [
+            ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_flare_owner.h"'),
+            ('\tlexeditor_ff8_party_switch_tick();', '\tlexeditor_ff8_party_switch_tick();\n\tlexeditor_ff8_flare_tick();\n\tlexeditor_ff8_flare_service_stationary_field();'),
+        ],
+        'src/ff8_opengl.cpp': [
+            ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_flare_owner.h"'),
+            ('\tif (gamehacks.wantsBattle()) ret = ff8_externals.sub_47CA90();',
+             '\tret = lexeditor_ff8_flare_field_gate(gamehacks.wantsBattle());\n\tif (ret < 0) ret = gamehacks.wantsBattle() ? ff8_externals.sub_47CA90() : 0;'),
+            ('\tif (gamehacks.wantsBattle()) ret = ff8_externals.sub_541C80(battle_id);',
+             '\tret = lexeditor_ff8_flare_world_gate(battle_id, gamehacks.wantsBattle());\n\tif (ret < 0) ret = gamehacks.wantsBattle() ? ff8_externals.sub_541C80(battle_id) : 0;'),
+        ],
+    }
+    if startup:
+        changes['src/ff8_opengl.cpp'].append(('\tlexeditor_ff8_modern_controls_install();',
+            '\tlexeditor_ff8_modern_controls_install();\n\tlexeditor_ff8_flare_owner_install();'))
+    prepared = {}
+    for relative, pairs in changes.items():
+        path=source/relative; text=path.read_text(encoding='utf-8')
+        if relative=='src/common.cpp' and 'lexeditor_ff8_flare_service_stationary_field();' not in text:
+            text=text.replace('\tlexeditor_ff8_flare_tick();', '\tlexeditor_ff8_flare_tick();\n\tlexeditor_ff8_flare_service_stationary_field();')
+        for old,new in pairs:
+            if new in text: continue
+            if text.count(old)!=1: raise RuntimeError(f'Signal Flare integration anchor changed: {relative}: {old}')
+            text=text.replace(old,new,1)
+        prepared[path]=text
+    for path,text in prepared.items(): path.write_text(text,encoding='utf-8')
+
+
 def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> None:
     source=source.resolve();patch_output=patch_output.resolve()
     if verify_revision:
@@ -43,6 +74,9 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     ):
         shutil.copyfile(ROOT/'games/ff8/ffnx_modern_controls'/name, source/'src'/name)
     extension_files = [
+        'flare_encounter.h', 'lexeditor_ff8_flare.cpp',
+        'flare_request.h', 'lexeditor_ff8_flare_owner.h', 'lexeditor_ff8_flare_owner.cpp',
+        'flare_item.h', 'flare_shop.h', 'lexeditor_ff8_flare_item.cpp', 'lexeditor_ff8_flare_shop.cpp', 'lexeditor_ff8_flare_menu.cpp',
         'lexeditor_ff8_shared_party.h', 'lexeditor_ff8_shared_party.inc',
         'lexeditor_ff8_stock_tweaks.h', 'lexeditor_ff8_stock_tweaks.cpp',
         'lexeditor_ff8_gf_spellbooks.h', 'lexeditor_ff8_gf_spellbooks.cpp',
@@ -109,6 +143,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             if text.count(old)!=1:raise RuntimeError(f'Integration anchor changed: {relative}: {old}')
             text=text.replace(old,new,1)
         path.write_bytes(text.replace('\n',newline).encode('utf-8'))
+    integrate_flare_owner(source, startup=True)
     # git apply leaves new files untracked. Include EVERY file introduced by
     # the derivative, not just src/: otherwise the published patch silently
     # loses its tests, artifact verifier and reproducible-build entry point.

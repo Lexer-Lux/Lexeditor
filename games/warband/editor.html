@@ -26,10 +26,10 @@
     .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.card{padding:16px;border:1px solid var(--lex-border);border-radius:5px;background:#f5e9c9}.card h2{margin:0 0 12px;color:#651919;font:700 20px var(--lex-heading-font)}.path-row{display:grid;grid-template-columns:150px 1fr;gap:10px;padding:6px 0;border-bottom:1px solid #d9c69b}.path-row code{overflow:hidden;text-overflow:ellipsis}.ok{color:#45631e}.error{color:#9d2424}
     .build-log{max-height:42vh;overflow:auto;padding:12px;color:#d8dee9;border:1px solid #444;background:#101216;font:13px/1.4 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
     .warband-bitmap-text{display:inline-flex;align-items:flex-start;vertical-align:middle;white-space:nowrap}.warband-glyph-slot{position:relative;display:inline-block;flex:none;height:var(--wb-line-height)}.warband-glyph{position:absolute;display:block;background-color:currentColor;-webkit-mask-image:url('/api/warband-font/atlas');mask-image:url('/api/warband-font/atlas');-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
-    .warband-item-detail{--lex-detail-icon-size:96px;display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;border:1px solid var(--lex-border);background:#f7edcf}.warband-item-detail>.lex-detail-panel-heading{padding:10px 10px 12px;border-bottom:1px solid #c8ae78}.warband-item-detail .lex-detail-panel-title{color:#651919;font:700 24px/1.1 var(--lex-heading-font)}.warband-item-detail .lex-detail-panel-id{margin-top:4px;color:var(--lex-muted);font:11px Consolas,monospace}.warband-item-detail .lex-detail-panel-icon{width:auto;height:100%;max-height:100%;aspect-ratio:1;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-item-thumbnail{position:relative;width:100%;height:100%;overflow:hidden}.warband-item-thumbnail canvas{display:block;width:100%;height:100%;pointer-events:none}.warband-item-thumbnail .warband-preview-message{padding:8px}.warband-mesh-list{padding:9px 2px;color:var(--lex-muted)}.warband-mesh-list b{color:#651919}.warband-item-detail .lex-detail-panel-body{overflow:auto}.warband-item-expression{min-height:72px!important;resize:vertical!important;font:12px/1.35 "Cascadia Mono",Consolas,monospace!important}.warband-preview-stage{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-preview-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.warband-preview-stage canvas.dragging{cursor:grabbing}.warband-preview-message{position:absolute;inset:0;display:grid;place-items:center;padding:28px;color:#ead8ac;text-align:center}.warband-preview-facts{display:flex;gap:16px;padding:8px 2px 0;color:var(--lex-muted);font:11px Consolas,monospace}.warband-preview-spin{width:22px;height:22px;border:3px solid #d5b46955;border-top-color:#d5b469;border-radius:50%;animation:warband-spin .7s linear infinite}@keyframes warband-spin{to{transform:rotate(360deg)}}
+    .warband-item-detail{--lex-detail-icon-size:96px;display:flex;flex-direction:column;min-width:0;min-height:0;padding:14px;border:1px solid var(--lex-border);background:#f7edcf}.warband-item-detail>.lex-detail-panel-heading{padding:4px 10px 5px;border-bottom:1px solid #c8ae78}.warband-item-detail .lex-detail-panel-title{color:#651919;font:700 24px/1.1 var(--lex-heading-font)}.warband-item-detail .lex-detail-panel-id{margin-top:4px;color:var(--lex-muted);font:11px Consolas,monospace}.warband-item-detail .lex-detail-panel-icon{width:auto;height:100%;max-height:100%;aspect-ratio:1;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-item-thumbnail{position:relative;width:100%;height:100%;overflow:hidden}.warband-item-thumbnail canvas{display:block;width:100%;height:100%;pointer-events:none}.warband-item-thumbnail .warband-preview-message{padding:8px}.warband-mesh-list{padding:9px 2px;color:var(--lex-muted)}.warband-mesh-list b{color:#651919}.warband-item-detail .lex-detail-panel-body{overflow:auto}.warband-item-expression{min-height:72px!important;resize:vertical!important;font:12px/1.35 "Cascadia Mono",Consolas,monospace!important}.warband-preview-stage{position:relative;flex:1 1 auto;min-height:320px;overflow:hidden;border:1px solid #8b6b39;background:radial-gradient(circle at 50% 42%,#605039,#251d13 67%,#120e09)}.warband-preview-stage canvas{display:block;width:100%;height:100%;cursor:grab;touch-action:none}.warband-preview-stage canvas.dragging{cursor:grabbing}.warband-preview-message{position:absolute;inset:0;display:grid;place-items:center;padding:28px;color:#ead8ac;text-align:center}.warband-preview-facts{display:flex;gap:16px;padding:8px 2px 0;color:var(--lex-muted);font:11px Consolas,monospace}.warband-preview-spin{width:22px;height:22px;border:3px solid #d5b46955;border-top-color:#d5b469;border-radius:50%;animation:warband-spin .7s linear infinite}@keyframes warband-spin{to{transform:rotate(360deg)}}
     .warband-cell-text{min-width:0;max-width:100%;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     [hidden]{display:none!important}.warband-item-thumbnail img{width:100%;height:100%;object-fit:contain;display:block}.warband-icon-message{padding:8px;color:var(--lex-text);background:var(--lex-panel);font-size:11px}
-    .warband-trees{align-items:stretch;grid-template-rows:minmax(0,1fr)}.warband-trees>.lex-panel-layout-pane{align-self:stretch;height:100%;min-height:0}
+    .warband-trees{align-items:stretch;grid-template-rows:minmax(0,1fr)}.warband-tree-page{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;height:100%}.warband-troop-gear{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:8px}.warband-troop-gear figure{margin:0;display:grid;gap:5px}.warband-troop-gear .warband-preview-stage{min-height:150px}.warband-troop-gear figcaption{color:var(--lex-muted);font-size:12px;text-align:center}.warband-trees>.lex-panel-layout-pane{align-self:stretch;height:100%;min-height:0}
     .warband-tree-scroll{overflow:auto;min-width:0;min-height:0;background:var(--lex-panel)}
     .warband-tree-scroll>p{padding:0 12px}.warband-tree-stage{position:relative;margin:auto;min-width:100%}
     .warband-tree-stage svg{position:absolute;inset:0;pointer-events:none}.warband-tree-stage path{fill:none;stroke:var(--lex-accent);stroke-width:2}
@@ -50,7 +50,7 @@
   const {el,columnList,list,masterDetail,pagedListDetail,pager,clone,showAlert,hoverable,detailPanel,detailField,detailGroup}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
   const state={
-    booting:true,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
+    booting:true,modOnly:false,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
     manual:null,font:null,selectedModule:"",selectedSetting:"",selectedItem:"",selectedTroop:"",selectedUpgrade:"",selectedFile:"",catalogFile:null,catalogDraft:"",
     settingEdits:{},itemEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
     pages:{items:0,troops:0,upgrades:0,datamap:0},pageSizes:{items:20,troops:20,upgrades:20},sorts:{items:["name",1],troops:["name",1],upgrades:["from",1],datamap:["filename",1]},
@@ -58,6 +58,16 @@
   };
 
   async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(value.error)throw new Error(value.error);return value;}
+  // "Mod contents only" keeps the records this project has actually changed.
+  // Warband records edits against the record itself, so the filter is the set
+  // of records that carry one. A view whose records this editor cannot change
+  // says so rather than offering a switch that would hide everything.
+  function modOnlySpec(view,changed){
+    return {available:state.activeSource==="mine"&&typeof changed==="function",
+      value:state.modOnly===true,changed:changed||(()=>true),
+      unavailableTitle:"This view has no editable records to filter by.",
+      change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
+  }
   function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Object.keys(row.fields||{}).length,0);}
   function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
   function historyCapture(){return {settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
@@ -76,7 +86,7 @@
   }
   function applyInstalledWarbandFont(){
     const brand=document.querySelector(".lex-brand-button");if(brand&&!brand.dataset.bitmapFont){brand.dataset.bitmapFont="1";brand.replaceChildren(bitmapText("LEXEDITOR",24));}
-    document.querySelectorAll("nav button").forEach(button=>{if(button.dataset.bitmapFont)return;const target=button.querySelector(".lex-tab-label-text");if(!target)return;const label=target.textContent;button.dataset.bitmapFont="1";button.setAttribute("aria-label",label);target.replaceChildren(bitmapText(label,18));});
+    document.querySelectorAll("nav button").forEach(button=>{if(button.dataset.bitmapFont)return;const target=button.querySelector(".lex-tab-label-text");if(!target)return;const label=target.textContent;button.dataset.bitmapFont="1";button.setAttribute("aria-label",label);target.replaceChildren(bitmapText(label,26));});
   }
   function search(rows,query,fields){const needle=query.trim().toLowerCase();return needle?rows.filter(row=>fields.some(field=>String(row[field]??"").toLowerCase().includes(needle))):rows;}
   function sorted(rows,view){const [key,direction]=state.sorts[view];return [...rows].sort((a,b)=>direction*String(a[key]??"").localeCompare(String(b[key]??""),undefined,{numeric:true}));}
@@ -88,7 +98,7 @@
     const detail=row=>row?el("div",{class:"lex-detail detail"},el("h2",{},row.name||(row.from&&row.to?`${row.from} → ${row.to}`:String(keyOf(row)))),
       el("div",{class:"detail-grid"},...columns.flatMap(column=>[el("div",{class:"label"},typeof column.label==="string"?column.label:column.key),el("div",{},String(row[column.key]??"—"))]))):el("div",{class:"lex-detail detail"},"No matching records.");
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(view,options.changed),rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
       search:{key:`warband-${view}`,value:query,placeholder:`Search ${view}…`,change:value=>{state.filters[view]=value;state.pages[view]=0;render();}},filters:options.filters||[],
       master:({rows,selected,select})=>columnList({rows,key:keyOf,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,class:"warband-record-list", "aria-label":`${view} records`}),
       detail,sync:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");},change:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");render();}}));
@@ -104,12 +114,15 @@
     return hoverable({targetType:"warband-troop",targetId:troopId,targetLabel:label,label,activate:()=>openTroop(troopId)});
   }
 
-  function itemColumns(){return [{key:"name",label:"Name",render:row=>el("span",{class:"warband-cell-text",title:row.name},row.name)},{key:"id",label:"ID"},{key:"type",label:"Type"},{key:"inventoryMesh",label:"Inventory mesh"}];}
+  // Undeclared columns size to their longest value, and Warband's ids and mesh
+  // names are long enough to push the table past its panel and cut the last
+  // column in half. Bounded widths let the long ones ellipsise instead.
+  function itemColumns(){return [{key:"name",label:"Name",width:"minmax(9em,1.4fr)",render:row=>el("span",{class:"warband-cell-text",title:row.name},row.name)},{key:"id",label:"ID",width:"minmax(6em,.8fr)"},{key:"type",label:"Type",width:"minmax(6em,.7fr)"},{key:"inventoryMesh",label:"Inventory mesh",width:"minmax(7em,1fr)"}];}
   function renderItems(){
     const view="items",columns=itemColumns(),query=state.filters.items||"";
     const filtered=sorted(search(state.items.rows,query,["name","id","type","inventoryMesh"]),view);
     $("#toolbar").replaceChildren();
-    $("#main").replaceChildren(pagedListDetail({rows:filtered,key:row=>row.id,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec("items",item=>Object.keys(state.itemEdits[itemEditKey(item)]?.fields||{}).length>0),rows:filtered,key:row=>row.id,slots:false,fit:{minRowHeight:36},page:state.pages.items,pageSize:state.pageSizes.items,selected:state.selectedItem,noun:"items",splitKey:"warband-items",className:"warband-paged-table warband-items",defaultSplit:43,
       search:{key:"warband-items",value:query,placeholder:"Search items…",change:value=>{state.filters.items=value;state.pages.items=0;renderItems();}},
       master:({rows,selected,select})=>columnList({rows,key:row=>row.id,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts.items[0],dir:state.sorts.items[1]},sort:key=>sort("items",key),selected,selectedClass:"selected",select,class:"warband-record-list","aria-label":"Warband items"}),
       detail:()=>warbandItemDetail(state.items.rows.find(row=>row.id===state.selectedItem)),sync:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";},change:next=>{state.pages.items=next.page;state.pageSizes.items=next.pageSize;state.selectedItem=next.selected||"";renderItems();}}));
@@ -172,10 +185,30 @@
     ]});
     const sourceFields=(item.fieldOrder||[]).filter(key=>!["id","name","value"].includes(key));
     const source=detailGroup({title:"Module System fields",body:sourceFields.map(key=>detailField({label:itemFieldLabel(key),property:key,dataType:"EXPR",description:ITEM_HELP[key]||"",control:(()=>{const control=itemExpressionControl(item,key);control.disabled=readOnly;return control;})()}))});
-    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,body:[core,source]});
+    // The heading icon is the shared 3D viewer control: pressing it slides the
+    // model out of the panel, and the same slot carries the close mark. The
+    // panel had the icon and the renderer but never the control, so the viewer
+    // was there and unreachable.
+    const detail=detailPanel({className:"warband-item-detail",icon:thumbnail,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(item.name,24)),identity:item.id,body:[core,source],
+      modelPreview:item.inventoryMesh?{
+        label:`${item.name} model`,
+        openLabel:`Open the ${item.name} model`,
+        closeLabel:`Close the ${item.name} model`,
+        content:warbandPreviewStage(item),
+      }:null});
     if(item.inventoryMesh)requestAnimationFrame(()=>loadWarbandIcon(item,detail,thumbnail,thumbnailMessage));
     return detail;
   }
+  // The drawer's own stage. The icon in the heading stays a still thumbnail;
+  // this is the turnable model behind it.
+  function warbandPreviewStage(item){
+    const message=el("div",{class:"warband-preview-message"},
+      item.inventoryMesh?el("div",{class:"warband-preview-spin","aria-hidden":"true"}):"This item has no inventory mesh.");
+    const stage=el("div",{class:"warband-preview-stage"},message);
+    if(item.inventoryMesh)requestAnimationFrame(()=>loadWarbandIcon(item,stage,stage,message));
+    return stage;
+  }
+
   async function loadWarbandIcon(item,detail,thumbnail,message){
     const url=`/api/item-icon?mesh=${encodeURIComponent(item.inventoryMesh)}`;
     try{
@@ -215,11 +248,37 @@
   }
   function troopTreeDetail(node){
     if(!node)return detailPanel({title:"Select a troop"});
-    return detailPanel({className:"detail",title:el("h2",{class:"lex-detail-panel-title"},bitmapText(node.name||node.id,24)),identity:node.id,
+    // A troop has no mesh of its own: it is a body, a face built from morph
+    // keys and a list of equipment. The equipment is the part that resolves to
+    // meshes, so the viewer opens the troop's gear - which is what there is to
+    // look at - rather than staying shut because a troop is not one model.
+    // The tree node carries only the upgrade graph, so the troop's own record
+    // is what holds its equipment.
+    const record=state.troops?.rows?.find(row=>row.id===node.id)||node;
+    // module_troops.py names an item "itm_leather_cap"; the item table's own id
+    // is "leather_cap". Matching the two without stripping the prefix found
+    // nothing, so the viewer stayed shut on every troop in the game.
+    const gear=(record.items||[])
+      .map(id=>{const bare=String(id).replace(/^itm_/,"");
+        return state.items?.rows?.find(row=>row.id===bare||row.id===id);})
+      .filter(item=>item&&item.inventoryMesh)
+      .slice(0,12);
+    // The shared viewer control lives in the heading's icon slot, so a panel
+    // without an icon has nowhere to put it. A troop's icon is the first piece
+    // of equipment it carries, which is also the first thing the drawer shows.
+    const icon=gear.length?el("div",{class:"warband-item-thumbnail"},warbandPreviewStage(gear[0])):null;
+    return detailPanel({className:"detail warband-troop-detail",icon,title:el("h2",{class:"lex-detail-panel-title"},bitmapText(node.name||node.id,24)),identity:node.id,
+      modelPreview:gear.length?{
+        label:`${node.name||node.id} equipment`,
+        openLabel:`Open ${node.name||node.id}'s equipment`,
+        closeLabel:`Close ${node.name||node.id}'s equipment`,
+        content:el("div",{class:"warband-troop-gear"},...gear.map(item=>
+          el("figure",{},warbandPreviewStage(item),el("figcaption",{},item.name||item.id)))),
+      }:null,
       body:node.missing?[el("p",{class:"error"},"This upgrade refers to a troop missing from the parsed active source.")]:[
         el("div",{class:"detail-grid"},...["plural","level","faction","flags","status","line"].flatMap(key=>[
           el("div",{class:"label"},key),el("div",{},String(node[key]??"—"))])),
-        el("p",{},"Read-only troop details. Edit module_troops.py through the Data Map to change this record.")]});
+        el("p",{},"Troop records live in module_troops.py; open it in the Data Map to change one.")]});
   }
   function renderUpgrades(){
     const all=WarbandTroopTrees.build(state.troops.rows,state.upgrades.rows);
@@ -229,9 +288,16 @@
     const tree=trees.find(t=>t.id===state.treeId)||trees[0];state.treeId=tree?.id||"";
     const factionSelect=el("select",{"aria-label":"Troop tree faction",onchange:e=>{state.treeFaction=e.target.value;state.treeId="";renderUpgrades();}},
       ...factions.map(f=>el("option",{value:f,selected:f===state.treeFaction},f)));
-    const treeSelect=el("select",{"aria-label":"Troop tree",onchange:e=>{state.treeId=e.target.value;renderUpgrades();}},
-      ...trees.map(t=>el("option",{value:t.id,selected:t===tree},t.label)));
-    $("#toolbar").replaceChildren(el("label",{},"Faction ",factionSelect),el("label",{},"Tree ",treeSelect));
+    // Each tree is its own subtab. A dropdown hid how many trees a faction has
+    // and made moving between two of them a two-step gesture; a bar shows the
+    // whole set and switches in one press. A faction with a single tree shows
+    // no bar at all, which the shared control handles.
+    const treeTabs=LexeditorUI.subtabBar({
+      tabs:trees.map(t=>({id:t.id,label:t.label})),
+      active:tree?.id,label:"Troop trees",
+      change:value=>{state.treeId=value;renderUpgrades();},
+    });
+    $("#toolbar").replaceChildren(el("label",{},"Faction ",factionSelect));
     if(!tree){$("#main").replaceChildren(el("section",{class:"card"},"No upgrade trees are available in the selected project's Module System source."));return;}
     const graph=WarbandTroopTrees.layout(tree), byId=new Map(graph.nodes.map(n=>[n.id,n]));
     let selected=byId.get(state.selectedUpgrade)||byId.get(tree.roots[0])||graph.nodes[0];state.selectedUpgrade=selected.id;
@@ -248,8 +314,9 @@
       onclick:()=>{state.selectedUpgrade=node.id;stage.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.troop===node.id)));details.replaceChildren(troopTreeDetail(node));}},
       el("strong",{},node.name||node.id),el("small",{},node.id));stage.append(button);}
     const master=el("div",{class:"warband-tree-scroll","aria-label":"Bottom-up troop upgrade tree"},
-      graph.cyclic?el("p",{class:"error"},"Cyclic upgrade links detected. Cycle members share a row; arrows preserve the source links."):el("p",{},"Upgrades grow upward. Select a troop to see its details."),stage);
-    $("#main").replaceChildren(masterDetail(master,details,"warband-trees",{splitKey:"warband-troop-trees",defaultSplit:65}));
+      graph.cyclic?el("p",{class:"error"},"Cyclic upgrade links detected. Cycle members share a row; arrows preserve the source links."):null,stage);
+    $("#main").replaceChildren(el("div",{class:"warband-tree-page"},treeTabs,
+      masterDetail(master,details,"warband-trees",{splitKey:"warband-troop-trees",defaultSplit:65})));
     requestAnimationFrame(()=>{if(master.isConnected)master.scrollTop=master.scrollHeight;});
   }
 
@@ -270,7 +337,10 @@
   function discardSettings(){state.settingEdits={};setStatus("Restored the last saved settings");renderSettings();shell.refresh()}
   function renderSettings(){
     const rows=settingRows(),selected=rows.find(row=>String(row.line)===state.selectedSetting)||rows[0];if(selected)state.selectedSetting=String(selected.line);
-    $("#toolbar").replaceChildren(LexeditorUI.settingsSaveControl({dirtyCount:()=>Object.keys(state.settingEdits).length,save:saveSettings,discard:discardSettings}));
+    // No plugin Save button in the bar: the shell's own Save owns every
+    // unsaved change in the editor, and a second one beside it asks the reader
+    // which of the two they meant.
+    $("#toolbar").replaceChildren();
     const master=list({rows,key:row=>String(row.line),selected:state.selectedSetting,select:selectSetting,render:row=>el("div",{},el("b",{},row.key),el("div",{class:"sub"},row.section))});
     const detail=el("div",{class:"lex-detail detail"},selected?el("div",{},el("h2",{},selected.key),el("div",{class:"detail-grid"},el("div",{class:"label"},"Section"),el("div",{},selected.section),el("div",{class:"label"},"Value"),el("input",{value:effectiveSetting(selected),oninput:event=>{if(event.target.value===selected.value)delete state.settingEdits[selected.line];else state.settingEdits[selected.line]=event.target.value;shell.refresh();}}),el("div",{class:"label"},"Description"),el("div",{},selected.description||"No description."))):"No matching setting.");
     const layout=masterDetail(master,detail,"",{splitKey:"warband-settings",defaultSplit:38});
@@ -315,6 +385,13 @@
     const health=el("section",{class:"card"},el("h2",{},"Status"),state.dashboard.problems.length?el("div",{class:"error"},...state.dashboard.problems.map(problem=>el("div",{},problem))):el("div",{class:"ok"},"All configured paths found."));
     const log=el("section",{class:"card"},el("h2",{},"Log"),el("pre",{class:"build-log"},state.build.lines.join("")||"No save or build has run in this session."));
     const manuals=el("section",{class:"card"},el("h2",{},"Mod manuals"),el("button",{type:"button",onclick:()=>navigate("manuals")},"Read installed mod manuals"));$("#main").replaceChildren(el("div",{class:"cards"},health,manuals,log));
+    $("#main").append(LexeditorUI.modLoaderSection({
+      loader:"Warband loads a module folder chosen in its own launcher. There is no separate mod loader.",
+      output:"Lexeditor builds a saved module folder under the game's Modules directory; the launcher lists it as its own entry.",
+      order:"Only one module runs at a time, so modules do not stack or conflict. Combining changes means building them into one module.",
+      safety:"The Native module and the installed game files are never written. A build only ever creates or updates its own module folder.",
+      removal:"Pick a different module in the launcher, and delete the generated module folder to remove it entirely.",
+    }));
   }
 
   async function buildSavedModule(){

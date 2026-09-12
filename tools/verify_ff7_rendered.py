@@ -80,12 +80,12 @@ class RenderedTests(unittest.TestCase):
         (game/'FFNx.toml').write_bytes(fixtures.CONFIG)
     def open(self,edition='ff7'):
         self.page.goto('about:blank')
-        html=(ROOT/'games/ff7/editor.html').read_text()
+        html=(ROOT/'games/ff7/editor.html').read_text(encoding='utf-8')
         # framework.js resolves optional shared assets relative to document.baseURI.
         # Synthetic set_content() pages otherwise use the non-hierarchical about:blank URL.
         html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
-        html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text()+'</style>')
-        code=HOST+'\nwindow.__lexeditorPlugin='+json.dumps({'id':edition,'name':'FF7 fixture','edition':edition})+';\n'+(ROOT/'ui/framework.js').read_text()
+        html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding='utf-8')+'</style>')
+        code=HOST+'\nwindow.__lexeditorPlugin='+json.dumps({'id':edition,'name':'FF7 fixture','edition':edition})+';\n'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')
         html=html.replace('<script src="/shared/framework.js"></script>','<script>'+code+'</script>')
         self.page.set_content(html,wait_until='domcontentloaded')
         self.page.wait_for_function('state.loaded === true')
@@ -96,6 +96,10 @@ class RenderedTests(unittest.TestCase):
         self.assertTrue(self.page.locator('.ff7-detail').count()>0,group)
     def control(self,group,key):
         self.navigate(group)
+        row_name=self.page.evaluate('(group)=>state.records[group].find(r=>r.id===state.selected[group]).name',group)
+        if group in ("characterAI","enemyAI","formationAI") and key.startswith("script"):
+            self.page.get_by_label(f"AI event for {row_name}",exact=True).select_option(key[6:])
+            self.page.wait_for_timeout(20)
         name=self.page.evaluate('([group,key])=>{const row=state.records[group].find(r=>r.id===state.selected[group]);return state.data.categories.find(c=>c.id===group).fields.find(f=>f.key===key).label+" for "+row.name}',[group,key])
         return self.page.get_by_label(name,exact=True).first
     def save(self):
@@ -141,9 +145,9 @@ class RenderedTests(unittest.TestCase):
             for width,height in ((900,620),(1200,800),(1600,1000)):
                 self.page.set_viewport_size({'width':width,'height':height})
                 self.navigate('characters')
-                self.page.get_by_role('tab',name='Growth curves',exact=True).click()
+                self.page.get_by_role('tab',name='Curves',exact=True).click()
                 self.assertEqual(self.page.evaluate('state.tab'),'growthCurves')
-                self.assertEqual(self.page.get_by_role('tab',name='Growth curves',exact=True).get_attribute('aria-selected'),'true')
+                self.assertEqual(self.page.get_by_role('tab',name='Curves',exact=True).get_attribute('aria-selected'),'true')
                 self.navigate('characterAI')
                 self.page.wait_for_timeout(80)
                 metrics=self.page.evaluate('''()=>{const r=document.querySelector('.ff7-detail').getBoundingClientRect();return{body:document.body.scrollHeight,right:r.right,bottom:r.bottom}}''')
@@ -155,7 +159,7 @@ class RenderedTests(unittest.TestCase):
                 self.assertTrue(all(a['right']<=b['left']+1 for a,b in zip(cells,cells[1:])),(edition,cells))
                 self.page.screenshot(path=str(OUT/f'{edition}-{width}.png'))
             self.navigate('fieldEncounters')
-            self.assertEqual(self.page.get_by_role('tab',name='Field encounters',exact=True).get_attribute('aria-selected'),'true')
+            self.assertEqual(self.page.get_by_role('tab',name='Field',exact=True).get_attribute('aria-selected'),'true')
         self.assertEqual(self.errors,[])
 
     def test_interface_sounds_once_and_sound_off_stops_playback(self):
@@ -163,14 +167,14 @@ class RenderedTests(unittest.TestCase):
         self.page.evaluate('''()=>{LexeditorUI.configureThemeSounds(['move','confirm','save','back'].map(slot=>({slot,available:true,url:'fixture:'+slot})));audioPlayed=[]}''')
         self.page.locator('.ff7-table .lex-list-row[data-key="1"]').click()
         self.assertEqual(self.page.evaluate('audioPlayed.map(a=>a.url)'),['fixture:move'])
-        self.page.get_by_role('tab',name='Growth curves',exact=True).click()
+        self.page.get_by_role('tab',name='Curves',exact=True).click()
         self.assertEqual(self.page.evaluate('audioPlayed.map(a=>a.url)'),['fixture:move','fixture:confirm'])
         self.control('growthCurves','gradient0').fill('81');self.save()
         self.assertEqual(self.page.evaluate('audioPlayed.filter(a=>a.url==="fixture:save").length'),1)
         self.assertTrue(self.page.evaluate('audioPlayed.every(a=>a.volume===0.25)'))
         self.page.evaluate('''()=>{window.dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{soundEnabled:false,soundVolumePercent:50}}));audioPlayed=[]}''')
         self.assertGreater(self.page.evaluate('audioPaused.length'),0)
-        self.page.get_by_role('tab',name='Growth bonuses',exact=True).click()
+        self.page.get_by_role('tab',name='Bonuses',exact=True).click()
         self.control('growthBonuses','bonus0').fill('3');self.save()
         self.page.evaluate('LexeditorUI.playThemeSound("back")')
         self.assertEqual(self.page.evaluate('audioPlayed'),[])

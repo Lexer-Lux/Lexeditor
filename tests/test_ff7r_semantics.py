@@ -187,7 +187,12 @@ def test_loot_keeps_normal_rare_and_steal_semantics_separate(tmp_path):
         "chance": 50, "quantity": None,
     }
     assert groups["rare"]["slots"][0]["chance"] == 5
-    assert groups["steal"]["slots"][0]["quantity"] == 2
+    # StealItemQuantity_Array is a steal rate, not a count. Measured over every
+    # populated steal slot in the installed vanilla table, the only values that
+    # occur are 5, 10, 12, 15, 25 and 100, and no FF7R enemy yields a hundred of
+    # anything. It is read as the percent it is.
+    assert groups["steal"]["slots"][0]["chance"] == 2
+    assert groups["steal"]["slots"][0]["quantity"] is None
     choices = {choice["id"] for choice in payload["itemChoices"]}
     assert {"POTION", "WEP_CLOUD_01"} <= choices
 
@@ -259,7 +264,7 @@ def test_loot_semantic_save_preserves_group_meaning_and_validates_chance(tmp_pat
             {"entry": 0, "kind": "normal", "index": 0,
              "field": "chance", "value": 75},
             {"entry": 0, "kind": "steal", "index": 0,
-             "field": "quantity", "value": 3},
+             "field": "chance", "value": 3},
         ],
     )
     assert result["surface"] == "enemy-loot"
@@ -269,7 +274,7 @@ def test_loot_semantic_save_preserves_group_meaning_and_validates_chance(tmp_pat
     groups = {group["kind"]: group for group in after["rows"][0]["groups"]}
     assert groups["normal"]["slots"][0]["item"] == "WEP_CLOUD_01"
     assert groups["normal"]["slots"][0]["chance"] == 75
-    assert groups["steal"]["slots"][0]["quantity"] == 3
+    assert groups["steal"]["slots"][0]["chance"] == 3
 
     with pytest.raises(ValueError, match="integer from 0 to 100"):
         save_loot_edits(
@@ -279,11 +284,21 @@ def test_loot_semantic_save_preserves_group_meaning_and_validates_chance(tmp_pat
             edits=[{"entry": 0, "kind": "normal", "index": 0,
                     "field": "chance", "value": 101}],
         )
-    with pytest.raises(ValueError, match="does not expose a chance"):
+    # Steal exposes a chance and no quantity, which is the whole correction:
+    # the array the table calls Quantity is the steal rate.
+    with pytest.raises(ValueError, match="does not expose a quantity"):
         save_loot_edits(
             tmp_path, tmp_path / "cache", project, index, after["asset"],
             source_sha256=after["sourceSha256"],
             active_sha256=after["activeSha256"],
             edits=[{"entry": 0, "kind": "steal", "index": 0,
-                    "field": "chance", "value": 50}],
+                    "field": "quantity", "value": 50}],
+        )
+    with pytest.raises(ValueError, match="integer from 0 to 100"):
+        save_loot_edits(
+            tmp_path, tmp_path / "cache", project, index, after["asset"],
+            source_sha256=after["sourceSha256"],
+            active_sha256=after["activeSha256"],
+            edits=[{"entry": 0, "kind": "steal", "index": 0,
+                    "field": "chance", "value": 250}],
         )

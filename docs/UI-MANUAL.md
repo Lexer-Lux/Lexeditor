@@ -24,12 +24,36 @@ before adding or changing a game-specific override.
 
 ## Subtabs
 
+A page may divide itself with **subtabs**. A bar with fewer than two tabs in it
+is not shown at all: a control that offers no choice is not a control.
+
+**There are no sub-subtabs.** Two layers of tabs above the page is the limit.
+Where a plugin needs a further division it uses a tabbed panel inside the page,
+and a tabbed panel may not contain another one. This is enforced rather than
+asked for: `tabbedPanel()` throws when a subtab bar ends up nested inside
+another, so the nesting cannot ship.
+
+A selected tab is a **folder tab**. It lifts, and it carries a band of the
+page's own surface down with it, so the page reads as hanging off the tab
+rather than sitting behind a gap. Tab movement is tweened, never snapped.
+
+Tweaks is an ordinary page with an ordinary tab. Settings is the only tab that
+sits apart from the run.
+
 A **subtab bar** navigates related views inside one top-level tab. It uses the
 shared `subtabBar()` control, keyboard focus, selected state, and theme tokens.
 A plugin supplies only the labels, current subtab, and change callback. It must
 not copy a top-level tab bar or create unrelated private button styling.
 
 ## Table panels
+
+**Column order is fixed.** A numeric ID is the first column and the record's
+name is the second. Where the ID is itself a name-like string, the name may
+come first, because two name-shaped columns in the other order read as a
+duplicate. Everything else follows.
+
+A column lights when its **header** is hovered. A cell lights itself and its
+matching property in the detail panel, not the whole column.
 
 A **Table panel** is a record list with columns. It supplies:
 
@@ -51,21 +75,72 @@ decimal boundary instead of using simple right alignment.
 
 ## Detail panels
 
+**Categories are optional.** A group exists when it helps a person find
+something, not because every property must belong to one. A panel of eight
+properties with no natural division is eight properties, not eight properties
+under a heading. RDR2's detail panels are the reference for grouping that earns
+its place.
+
+A **?** beside a property is a **help pip**, and a property whose meaning is not
+obvious from its name and its control should carry one. A pip explains what the
+value does to the game. It never restates the label, the storage type, the
+bounds, the step or the unit - all of which the property already shows.
+
+**No disclaimers for what the controls already say.** A read-only value carries
+the shared lock mark and cannot be typed into; a banner saying "read only"
+above it is the same fact in words. Say the thing the reader cannot see -
+where the value is edited instead, for example - or say nothing.
+
 A **Detail panel** edits one selected record. It has one identity heading and
 groups of rows. Every row uses the same label-to-value division. A plugin can
 change that division for a page, but individual rows do not choose unrelated
 positions.
 
-A **property** is one labeled row in a Detail panel. A property can contain one
-variable or several tightly related variables. Related booleans that together
-describe one concept belong in one multi-boolean property row (the shared
-`toggleRow()` control); they are not split into a stack of separate properties
-just because the source format stores them as separate bits or columns.
+A **property** is one labeled row in a Detail panel. A property holds one
+**variable** in the ordinary case and several tightly related variables in a
+**multi-variable property** - a stat block, a junction set, a pair of linked
+readings. Related booleans that together describe one concept belong in one
+multi-boolean property row (the shared `toggleRow()` control); they are not
+split into a stack of separate properties just because the source format stores
+them as separate bits or columns.
+
+Copying follows the variable, not the row. A single-variable property has one
+copy button and copies its value. A multi-variable property gives **each
+variable its own copy button**; it never offers one button that silently hands
+back the first variable it finds. A property whose switches are one stored
+word - a bitflag row - copies the bare word, because the word is what the
+property really is; the switches drawn over it are how it is read, not what it
+holds.
 
 A group title is an in-flow divider in the neutral shared theme. A game theme
 can deliberately overlap it with the group border, as FF8 does, without
 changing the shared structure. Fields can contain text, numbers, booleans,
 flags, references, Thing Selectors, or compact custom controls.
+
+A record's **name is its heading**, and the heading is where it is edited. A
+detail panel that can rename its record types into the heading in place, and
+the record's name column in the master table is editable too. A name is never
+also an ordinary property row: that showed the name twice and made the copy
+being read the copy that could not be changed.
+
+An **empty section says so in prose, not as a property.** A group that holds
+nothing does not invent a row to carry the sentence; a row named for the
+storage state reads as a real property with a missing value. The note takes the
+section's full width, with no label column, no control and no pin.
+
+The heading's **identity slot is a short code** - a record number, a two or
+three character key. It is drawn large and ghosted across the right end of the
+heading, so a long string there runs through the title. Anything longer becomes
+the ordinary subtitle line instead. A subtitle that is the same on every record
+is not identity and does not belong in the heading at all: name the table once,
+on the section that reads from it.
+
+**Numbers are grouped in the boxes you type into**, not only in the ones the
+editor paints. A value box whose range can reach five figures shows its
+thousands separators while it sits unfocused and bare digits the moment the
+reader starts typing. A box that cannot exceed a few hundred is left alone,
+because a separator there is noise. Plugins get this without asking and without
+changing: every input and change event still reports a plain number.
 
 Each pinnable field has a pin at the top-right of its control. A filled pin
 means that the field is visible as a Table column. Clicking it removes the
@@ -74,35 +149,71 @@ re-fit the Table and panel divider.
 
 ## Vanilla and reference values
 
-A **ref rail** shows only values that differ from the current value.
-`V` means Vanilla. Other short tags name reference mods. Clicking a reference
-restores that displayed value. Booleans display a check or an X, not their raw
-stored number or the words `true` and `false`.
+A **ref rail** is one source's reading of a property: a short tag and that
+source's value. A **ref pillar** is the stack of rails beside a property. The
+pillar shows only the sources that differ from the current value, so a rail
+appears when an edit moves away from its source and disappears when the edit
+lands back on it. `V` means Vanilla; other short tags name reference mods.
+Clicking a rail restores that source's value. Booleans display a check or an
+X, not their raw stored number or the words `true` and `false`.
 
-A ref rail is a vertical stack with at most four sources. Vanilla is
-always first and green. At most three reference mods can follow it: the first
-is red, the second is blue, and the third is yellow. A plugin must reject a
-fourth active reference mod instead of clipping, wrapping, or hiding it.
+A pillar holds at most four rails. Vanilla is always first and green. At most
+three reference mods can follow it: the first is red, the second is blue, and
+the third is yellow. A plugin must reject a fourth active reference mod
+instead of clipping, wrapping, or hiding it.
 
-The ordinary rail reserves space to the right of a field. It does not move the
-field when a reference appears.
+**A pillar never moves anything.** Its width is reserved before any value is
+known, from the longest tag and the longest value the panel's sources can ever
+produce, and every value box on that panel ends at that one edge. Nothing the
+reader types may change it: a rail appearing, a rail disappearing, or a value
+growing by three digits all leave every box exactly where it was. A value too
+long for the reserved width is shortened rather than allowed to widen it -
+thousands to `12K`, millions to `3.4M`, billions to `1.2B`, a long word to its
+first characters and an ellipsis. The rail's tooltip carries the exact value,
+and clicking it still writes the exact value.
 
-An **internal-ref box** puts the rail inside the field's right edge. The field
-is wider and reserves that internal space from the start. A unit suffix moves
-left when the rail is visible, so the reference remains to the right of the
-unit. Multiple reference values become smaller and can stack within the same
-reserved area. FF8 Hit Rate uses two linked internal-ref boxes: percent and
-raw value out of 255.
+**A pillar never changes its property's height.** It is capped at the row it
+annotates, and its rails share that height between them, so a three-deep
+pillar is a smaller pillar rather than a taller row.
 
-Ref-rail values always use the same player-facing format as the live value.
-An enum shows its name. An item shows its icon and name. A boolean shows a
-check or X. A transformed number shows its transformed unit.
+Within a pillar the tag and the value are two columns. Every tag starts on one
+edge and every value on another, so a pillar mixing `V` with `R1` does not
+step its numbers sideways by the width of the tag in front of them.
+
+An **internal-ref box** puts the pillar inside the field's right edge. The
+field is wider and reserves that internal space from the start. A unit suffix
+moves left when the pillar is visible, so the reference remains to the right of
+the unit. Multiple rails become smaller and stack within the same reserved
+area. FF8 Hit Rate uses two linked internal-ref boxes: percent and raw value
+out of 255.
+
+Rail values always use the same player-facing format as the live value, subject
+to the shortening above. An enum shows its name. An item shows its icon and
+name. A boolean shows a check or X. A transformed number shows its transformed
+unit.
 
 ## Units and booleans
 
-A unit is part of its field. It can be a suffix such as `%`, `/255`, `G`, or
-`×`, or a prefix when the game requires one. Unit placement is shared so game
-fonts cannot create local alignment errors.
+A bounded number draws its own value as a fill behind its box, and on hover
+that fill offers a drag handle. The fill and the handle together are an
+**input slider**: a slider living inside a value box, not a separate control
+beside one. It is drawn against the box, never against the property row.
+
+A unit is part of its field, and it belongs to the **number**, not to the box.
+It can be a suffix such as `%`, `/255`, `G`, or `×`, or a prefix when the game
+requires one. A suffix sits immediately after the last digit of the value and
+travels with it as the value is typed, measured in the box's own font. Pinning
+it to the far edge of the box marked where the box ended rather than where the
+value did, which on a wide panel put a `G` most of a screen away from the price
+it qualifies.
+
+This holds inside an **internal-ref box** too. The unit stops short of whatever
+that box reserves on its right, so the unit and the reference never collide
+however long the number grows; when the value is long enough to reach the
+reserved lane the unit parks against it. So `50,000 G` reads as one thing, and
+its `V 30,000` keeps its own lane to the right of it.
+
+Unit placement is shared so game fonts cannot create local alignment errors.
 
 Every variable uses the most human-friendly semantic control available; its raw
 storage representation is an implementation detail, not UI. Booleans are normally
@@ -127,6 +238,18 @@ field. Cancel returns without a change. The context control can move between
 the source and target while Searcher mode stays active.
 
 ## Hoverables and help
+
+The small circle carrying a question mark beside a property is a **help pip**.
+It is the one name for it: in the code it is `infoHelp()` and the
+`lex-info-help` class, and everywhere else it is a help pip. A pip carries
+authored semantic help and nothing else - never a restatement of the label, the
+storage type, the bounds, the step, the unit, or the edit operation, all of
+which the property already says elsewhere.
+
+A pip lives on a rail and replaces that rail's type code while the rail is
+pointed at. Its glyph is shared chrome: it keeps one size relative to its own
+circle in every plugin theme, so a game font cannot crowd the question mark
+against the ring around it.
 
 A **hoverable** looks and behaves like a link to another editable record. The
 same linked record has the same hover behavior in every list, Table, Detail
@@ -154,7 +277,9 @@ bubble rather than filling it with tautological or storage-level text.
 The project selector lists Vanilla first, then editable mods. Vanilla is the
 unchanged extracted baseline and is read-only. The first save from Vanilla asks
 to create an editable mod. A new mod name can use a suggestion from
-`ui/assets/mod_names.json`. Each editable mod has a rename action.
+`ui/assets/mod_names.json`. Each editable mod row carries its own rename, open
+folder and "what did Lexeditor find in this mod?" buttons; that report belongs
+to the mod being pointed at, not to whichever mod happens to be loaded.
 
 This workflow needs a game-specific baseline adapter because each game stores
 and builds mods differently. A plugin must not call an editable working folder
@@ -190,3 +315,77 @@ A dependent that the user turned off manually stays off.
 Hovering either related setting draws a semi-transparent flowing arrow from the
 requirement control to its dependent control. This shows both what the setting
 controls and what it requires without permanent connector clutter.
+
+
+### Shared control spacing and hover behavior
+
+- Every property carries a **type rail** just left of its name, whether or not
+  it also has authored help. Pointing at the property brings its type code up;
+  pointing at the rail itself replaces that code with the help marker, and only
+  where there is one. A row of switches follows the same rule per switch.
+- Revealing help is a pointer or keyboard-focus state, never a click state. A
+  click that leaves focus on the marker must not hold the swap open after the
+  pointer has left.
+- A boolean's pin annotates the row, not the checkbox. It sits in the row's own
+  right-hand corner, clear of the checkbox and of the reference mark beside it.
+- The copy button is the whole width of its lane, so it centres by filling it.
+  The lane is the button plus even air, never a wide column with the button
+  pushed to one side of it.
+- The divider between two panels is an edge, not a thumb in a track. At rest it
+  is the hairline between the panels; pointing at it lights the whole edge and
+  shows a pair of arrows saying which way it moves.
+- A tab bar wraps only after tightening its tabs, and a bar that does wrap
+  splits them as evenly as the count allows: seven tabs over three rows is
+  three, two and two, never three, three and one.
+- **A property's name is written for a person.** `State`, `Param1`, `Field03`
+  and `Unknown` are storage labels, not names. A property whose only available
+  name is the field it came from is a property nobody has finished yet; name it
+  for what it does to the game.
+- **A record's name is never also a property.** It is edited in the panel
+  heading and in the table's own name column. A `NAME` row under a heading that
+  already shows the name is the same value twice, and the copy being read is
+  the one that cannot be changed.
+- A column lights when its **header** is hovered. Hovering a cell lights that
+  cell and its matching property, not the whole column: lighting the column
+  from any row made simply reading down a table flash columns on and off.
+- The pagination bar is one height on every page, whether or not it carries a
+  search box.
+- Text that can be followed is coloured like a link at rest, not only once the
+  pointer is on it.
+- A table cell centres its text by the glyphs, not by the line box, so a game
+  font's own ascent and descent cannot push a column off-centre.
+- Value boxes are square. One box shape for names and numbers alike, and a
+  plugin theme may restyle it but never round only one kind.
+- A panel ends where the pagination bar begins. The bar reserves its own
+  measured height and nothing more, so the same bar sits the same way in every
+  plugin.
+- A value box holds a number even when it paints that number the way a player
+  reads it. A box showing `50,000` is fifty thousand to its own slider, its
+  bounds check and anything else that reads it.
+- A flag box is as wide as the flag in it, so the space inside it is the same
+  on the left and the right. The boxes sit on a column grid; the track decides
+  where a box starts, not how wide it is.
+- The grip between two panels is one slim bar that grows and takes the accent
+  under the pointer.
+- Responding to an edit costs the same on a large panel as on a small one.
+  Work that reacts to a change is scoped to what changed: a rebuilt reference
+  pillar is not a reason to re-measure the property names three panels away.
+- Tab shortcut badges fit the tab height with a margin. The title reserves space
+  on both sides, so the badge cannot cover the text.
+- The detail sort marker stays centered in the left gutter. Boolean arrows keep
+  their arrowhead attached to the line in both ordinary and tabbed panels, and
+  the arrowhead sits inside the label so nothing clips its tip.
+- Copy buttons occupy a grid column between the label and the value control.
+  Every property control reserves that column, including the ones with nothing
+  to put in it, so no control starts left of the column its neighbours start on.
+- Every row of the mod menu uses one set of columns: mode, name, description,
+  buttons, status. The name column is one width for the whole menu, so every
+  description starts on the same edge and every status mark ends on the same
+  one. A reference row holds the button lane it does not fill.
+- Each mod row carries its rename, folder and contents-report buttons. They show
+  a colored rounded hit area on hover or keyboard focus.
+- Project actions read “➕ Add a Mod” and “🔍 Find a Mod”. Blank stores sample
+  projects in browser storage; game plugins use their existing folder workflow.
+
+Run `tests/control_layout_browser_check.py` for these rendered regressions at
+1600, 1000, and 700 pixels. Routine pytest discovery is limited to `tests/`.

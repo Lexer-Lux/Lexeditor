@@ -1,0 +1,160 @@
+name: Chrono Trigger checks
+
+on:
+  push:
+    paths:
+      - 'games/chrono_trigger/**'
+      - 'tests/test_chrono_trigger_*.py'
+      - 'tests/chrono_trigger_browser_check.py'
+      - 'tests/chrono_trigger_bit_browser_check.py'
+      - 'tests/chrono_trigger_pc_extended_browser_check.py'
+      - 'tests/chrono_trigger_event_control_browser_check.py'
+      - 'tests/chrono_trigger_event_audit_browser_check.py'
+      - 'tests/chrono_trigger_bank7f_browser_check.py'
+      - 'tests/chrono_trigger_segment_memory_browser_check.py'
+      - 'tools/chrono_trigger_*.py'
+      - 'runtime_bootstrap.py'
+      - '.github/workflows/chrono-trigger-checks.yml'
+  pull_request:
+    paths:
+      - 'games/chrono_trigger/**'
+      - 'tests/test_chrono_trigger_*.py'
+      - 'tests/chrono_trigger_browser_check.py'
+      - 'tests/chrono_trigger_bit_browser_check.py'
+      - 'tests/chrono_trigger_pc_extended_browser_check.py'
+      - 'tests/chrono_trigger_event_control_browser_check.py'
+      - 'tests/chrono_trigger_event_audit_browser_check.py'
+      - 'tests/chrono_trigger_bank7f_browser_check.py'
+      - 'tests/chrono_trigger_segment_memory_browser_check.py'
+      - 'tools/chrono_trigger_*.py'
+      - 'runtime_bootstrap.py'
+      - '.github/workflows/chrono-trigger-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Host smoke import dependencies
+        run: python -m pip install 'Pillow==12.3.0' 'fonttools>=4.59,<5' playwright
+      - name: Python syntax
+        run: >-
+          python -m py_compile
+          runtime_bootstrap.py
+          games/chrono_trigger/plugin.py
+          games/chrono_trigger/paths.py
+          games/chrono_trigger/resources.py
+          games/chrono_trigger/resource_view.py
+          games/chrono_trigger/inventory.py
+          games/chrono_trigger/probe.py
+          games/chrono_trigger/coverage.py
+          games/chrono_trigger/data.py
+          games/chrono_trigger/labels.py
+          games/chrono_trigger/events.py
+          games/chrono_trigger/event_audit.py
+          games/chrono_trigger/field_commands.py
+          games/chrono_trigger/field_semantics.py
+          games/chrono_trigger/comparisons.py
+          games/chrono_trigger/memory_ops.py
+          games/chrono_trigger/segment_memory_ops.py
+          games/chrono_trigger/bit_ops.py
+          games/chrono_trigger/movement_ops.py
+          games/chrono_trigger/call_ops.py
+          games/chrono_trigger/object_ops.py
+          games/chrono_trigger/facing_target_ops.py
+          games/chrono_trigger/property_ops.py
+          games/chrono_trigger/scene_event_ops.py
+          games/chrono_trigger/audio_ops.py
+          games/chrono_trigger/misc_ops.py
+          games/chrono_trigger/pc_extended_ops.py
+          games/chrono_trigger/target_only_ops.py
+          games/chrono_trigger/mode7_ops.py
+          games/chrono_trigger/jump_ops.py
+          games/chrono_trigger/event_flow.py
+          games/chrono_trigger/event_edit.py
+          games/chrono_trigger/field_editors.py
+          games/chrono_trigger/editor_registry.py
+          games/chrono_trigger/palettes.py
+          games/chrono_trigger/scene_tables.py
+          games/chrono_trigger/scene_animations.py
+          games/chrono_trigger/scene_maps.py
+          games/chrono_trigger/scene_render.py
+          games/chrono_trigger/worlds.py
+          games/chrono_trigger/world_tables.py
+          games/chrono_trigger/world_scripts.py
+          games/chrono_trigger/world_render.py
+          games/chrono_trigger/changes.py
+          games/chrono_trigger/ctp.py
+          games/chrono_trigger/ctext_manager.py
+          games/chrono_trigger/deployment.py
+          games/chrono_trigger/integrity.py
+          games/chrono_trigger/server.py
+          tools/chrono_trigger_ctext.py
+          tools/chrono_trigger_project.py
+          tools/chrono_trigger_map.py
+          tools/chrono_trigger_inventory.py
+          tools/chrono_trigger_probe.py
+          tools/chrono_trigger_event.py
+          tools/chrono_trigger_event_audit.py
+          tools/chrono_trigger_palette.py
+          tests/chrono_trigger_browser_check.py
+          tests/chrono_trigger_bit_browser_check.py
+          tests/chrono_trigger_pc_extended_browser_check.py
+          tests/chrono_trigger_event_control_browser_check.py
+          tests/chrono_trigger_event_audit_browser_check.py
+          tests/chrono_trigger_bank7f_browser_check.py
+          tests/chrono_trigger_segment_memory_browser_check.py
+      - name: Plugin descriptor
+        run: python -c "from plugin_api import validate_plugin; from games.chrono_trigger.plugin import PLUGIN; validate_plugin(PLUGIN); assert PLUGIN.plugin_id == 'chrono-trigger'"
+      - name: Chrono Trigger regressions
+        run: python -m unittest discover -s tests -p 'test_chrono_trigger_*.py'
+      - name: Managed plugin smoke
+        run: python app.py --game chrono-trigger --smoke
+      - name: Editor JavaScript syntax
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          html = Path('games/chrono_trigger/editor.html').read_text(encoding='utf-8')
+          start = html.rfind('<script>')
+          end = html.find('</script>', start)
+          if start < 0 or end < 0:
+              raise SystemExit('Chrono Trigger editor inline script was not found')
+          Path('/tmp/chrono-trigger-editor.js').write_text(html[start + len('<script>'):end], encoding='utf-8')
+          PY
+          node --check /tmp/chrono-trigger-editor.js
+          node --check games/chrono_trigger/event_editor.js
+          node --check games/chrono_trigger/map_previews.js
+      - name: Browser dependencies
+        run: python -m playwright install --with-deps chromium
+      - name: Desktop browser regression
+        run: python tests/chrono_trigger_browser_check.py out/chrono-trigger-browser
+      - name: Bit editor browser regression
+        run: python tests/chrono_trigger_bit_browser_check.py out/chrono-trigger-bit-browser
+      - name: PC extended editor browser regression
+        run: python tests/chrono_trigger_pc_extended_browser_check.py out/chrono-trigger-pc-extended-browser
+      - name: Event control browser regression
+        run: python tests/chrono_trigger_event_control_browser_check.py out/chrono-trigger-event-control-browser
+      - name: Event audit browser regression
+        run: python tests/chrono_trigger_event_audit_browser_check.py out/chrono-trigger-event-audit-browser
+      - name: Bank-7F editor browser regression
+        run: python tests/chrono_trigger_bank7f_browser_check.py out/chrono-trigger-bank7f-browser
+      - name: Segment-memory editor browser regression
+        run: python tests/chrono_trigger_segment_memory_browser_check.py out/chrono-trigger-segment-memory-browser
+      - name: Upload browser artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrono-trigger-browser
+          path: |
+            out/chrono-trigger-browser
+            out/chrono-trigger-bit-browser
+            out/chrono-trigger-pc-extended-browser
+            out/chrono-trigger-event-control-browser
+            out/chrono-trigger-event-audit-browser
+            out/chrono-trigger-bank7f-browser
+            out/chrono-trigger-segment-memory-browser
+          if-no-files-found: ignore

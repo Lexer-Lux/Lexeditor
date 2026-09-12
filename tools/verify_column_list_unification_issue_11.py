@@ -34,7 +34,10 @@ require(RDR2.count("LexeditorUI.pagedListDetail({") >= 5,
         "Effects and Behaviors must join the shared paged list-detail preset")
 require("columnList" in WARBAND and "table" not in WARBAND.split("const {", 1)[1].split("}=LexeditorUI", 1)[0],
         "Warband must consume the column-list replacement")
-require(re.search(r"const\s+\w+\s*=\s*columnList\(\{[\s\S]*?class:\s*[\"']lex-data-map-table", FRAMEWORK_JS) is not None,
+# The Data Map builds its table inline as the paged list's master rather than
+# assigning it to a const first, and its class is composed with the caller's
+# own. What the contract is about is that the Data Map's table IS a columnList.
+require(re.search(r"columnList\(\{[\s\S]{0,400}?lex-data-map-table", FRAMEWORK_JS) is not None,
         "Data Map must use the column-list replacement")
 require('sort={key:"name",dir:1}' in BLANK and "sortState:sort" in BLANK and "sort:key=>" in BLANK,
         "Blank Game must demonstrate persistent default shared sorting")

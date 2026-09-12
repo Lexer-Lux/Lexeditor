@@ -12,11 +12,9 @@ reader.  Its writer rebuilds only the selected map's offset table and payload.
 
 from __future__ import annotations
 
-from datetime import datetime
 import hashlib
 import json
 from pathlib import Path, PureWindowsPath
-import shutil
 import struct
 import tempfile
 
@@ -700,11 +698,16 @@ def background_png(key: str, dataset: str = "current", edits: list[dict] | None 
         hide_background=hide_background, highlight_tile=highlight_tile)
 
 
-def _write_atomic(destination: Path, raw: bytes) -> None:
+def _write_atomic(destination: Path, raw: bytes, *, backup: bool = True) -> None:
+    previous = destination.read_bytes() if destination.is_file() else None
+    if previous == raw:
+        return
     destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.is_file():
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-        shutil.copy2(destination, destination.with_name(f"{destination.name}.{stamp}.bak"))
+    if backup and previous is not None:
+        # One latest automatic backup per field file. Historical timestamp
+        # backups remain untouched; repeated saves must not grow their count.
+        backup_path = destination.with_name(f"{destination.name}.lexeditor-auto.bak")
+        _write_atomic(backup_path, previous, backup=False)
     handle, temporary = tempfile.mkstemp(prefix=f".{destination.name}.", suffix=".tmp",
                                          dir=destination.parent)
     try:
@@ -713,6 +716,33 @@ def _write_atomic(destination: Path, raw: bytes) -> None:
         Path(temporary).replace(destination)
     finally:
         Path(temporary).unlink(missing_ok=True)
+
+
+def _write_batch(prepared: list[tuple[Path, bytes]]) -> None:
+    """Restore earlier files if a save fails; this is not crash recovery."""
+    destinations = [destination for destination, _ in prepared]
+    if len(set(destinations)) != len(destinations):
+        raise ValueError("Field save contains duplicate destinations")
+    previous = {path: path.read_bytes() if path.exists() else None for path in destinations}
+    written = []
+    try:
+        for destination, raw in prepared:
+            _write_atomic(destination, raw)
+            written.append(destination)
+    except Exception as save_error:
+        failures = []
+        for destination in reversed(written):
+            try:
+                original = previous[destination]
+                if original is None:
+                    destination.unlink(missing_ok=True)
+                else:
+                    _write_atomic(destination, original, backup=False)
+            except OSError:
+                failures.append(str(destination))
+        if failures:
+            raise OSError("Field save failed and could not restore: " + ", ".join(failures)) from save_error
+        raise
 
 
 def _edit_inf_bytes(source: bytes, edits: list[dict]) -> bytes:
@@ -867,6 +897,7 @@ def save(edits: list[dict]) -> dict:
         by_map.setdefault(str(edit.get("map", "")), []).append(edit)
     written = 0
     inf_written = 0
+    prepared_files = []
     for key, map_edits in by_map.items():
         script_edits = [edit for edit in map_edits if edit.get("type", "card") == "card"]
         script_documents = [edit for edit in map_edits if edit.get("type") == "script"]
@@ -936,21 +967,22 @@ def save(edits: list[dict]) -> dict:
                                 (prepared_scripts[2] if prepared_scripts else 0) +
                                 len(script_edits))
         if prepared_inf:
-            _write_atomic(*prepared_inf)
+            prepared_files.append(prepared_inf)
             inf_written += len(entrance_edits)
         if prepared_dialogue:
-            _write_atomic(prepared_dialogue[0], prepared_dialogue[1])
+            prepared_files.append(prepared_dialogue[:2])
             written += prepared_dialogue[2]
         if prepared_scripts:
-            _write_atomic(prepared_scripts[0], prepared_scripts[1])
+            prepared_files.append(prepared_scripts[:2])
             written += prepared_scripts[2]
         if prepared_walkmesh:
-            _write_atomic(prepared_walkmesh[0], prepared_walkmesh[1])
+            prepared_files.append(prepared_walkmesh[:2])
             written += prepared_walkmesh[2]
         if prepared_background:
-            _write_atomic(prepared_background[0], prepared_background[1])
+            prepared_files.append(prepared_background[:2])
             written += prepared_background[2]
         for destination, raw, changed in prepared_encounters:
-            _write_atomic(destination, raw)
+            prepared_files.append((destination, raw))
             written += changed
+    _write_batch(prepared_files)
     return {"saved": written + inf_written, "maps": len(by_map)}

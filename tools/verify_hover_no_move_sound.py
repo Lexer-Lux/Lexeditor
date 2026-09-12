@@ -102,6 +102,10 @@ def check(plugin: str) -> dict:
             assert cdp.eval(INSTRUMENT) == "ready", f"{plugin}: could not instrument the sound slots"
             targets = json.loads(cdp.eval(TARGETS))
             assert targets, f"{plugin}: found nothing to hover"
+            # Finishing the plugin load plays the launch sound. That is not a
+            # hover, and counting it made this check blame the pointer for a
+            # sound that had already fired before the pointer moved.
+            cdp.eval("window.__sounds=[]")
             hover(cdp, targets)
             cold = json.loads(cdp.eval("JSON.stringify(window.__sounds)"))
             # A real keyboard move still plays it, which also proves the slot works.
@@ -135,6 +139,10 @@ def main() -> int:
         result = check(plugin)
         report.append(result)
         for state in ("hoverCold", "hoverAfterKey"):
+            # The launch sound belongs to the loading screen finishing, not to
+            # the pointer. FF8 finishes late enough to land inside the hover
+            # window, and blaming the pointer for it made this check unusable.
+            result[state] = [sound for sound in result[state] if sound != "slot:launch"]
             assert "slot:move" not in result[state], (
                 f"{plugin}: hovering played the move sound ({state}: {result[state]})")
             assert not result[state], f"{plugin}: hovering played {result[state]}"

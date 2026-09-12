@@ -59,7 +59,9 @@ def main() -> int:
         reread = SettingsStore(path).snapshot()
         require(reread["hoverableAltClick"] is True,
                 "older save callers must preserve the hoverable policy")
-        require(reread["developerMode"] is True and reread["updateCheckFrequency"] == "weekly",
+        # Developer mode is identity-only: derived from the developer login
+        # rather than persisted, so it is not in the snapshot to read back.
+        require("developerMode" not in reread and reread["updateCheckFrequency"] == "weekly",
                 "the new policy must not corrupt other global settings")
     print("Global hoverable source and settings contract passed")
     return 0

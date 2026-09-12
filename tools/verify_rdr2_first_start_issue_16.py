@@ -72,7 +72,11 @@ def verify_copied_clean_install() -> None:
         copied_plugin.mkdir(parents=True)
         copied_tools.mkdir(parents=True)
 
-        for relative in ("plugin_api.py", "service_session.py", "game_installation.py"):
+        # service_session imports runtime_bootstrap, so a "minimum install"
+        # without it is not one: the probe died on the import rather than on
+        # anything this check is about.
+        for relative in ("plugin_api.py", "service_session.py", "game_installation.py",
+                         "runtime_bootstrap.py"):
             shutil.copy2(ROOT / relative, copied_root / relative)
         (copied_root / "games").mkdir(exist_ok=True)
         shutil.copy2(ROOT / "games" / "__init__.py", copied_root / "games" / "__init__.py")
