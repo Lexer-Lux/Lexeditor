@@ -40,6 +40,10 @@ def main():
     assert page.evaluate('window.__calls.at(-1).scale')==percent
    assert page.evaluate("!document.dispatchEvent(new WheelEvent('wheel',{ctrlKey:true,deltaY:100,bubbles:true,cancelable:true}))")
    assert page.evaluate("document.dispatchEvent(new WheelEvent('wheel',{deltaY:100,bubbles:true,cancelable:true}))")
+   assert page.locator('#plugin-restart').is_visible()
+   page.evaluate("dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{developerMode:false}}))")
+   assert page.locator('#plugin-restart').is_visible()
+   page.evaluate("dispatchEvent(new CustomEvent('lexeditor-settings-changed',{detail:{developerMode:true}}))")
    assert page.get_by_role('button',name='Editable Table',exact=True).count()==0
    page.locator('#plugin-github').click(button='right');assert page.evaluate('window.__calls.some(row=>row.openRepository==="blank")')
    page.locator('button[data-tab=three]').click();page.wait_for_timeout(400)

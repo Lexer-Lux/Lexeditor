@@ -4270,7 +4270,7 @@ ${contents.path}`});
       "aria-pressed": "false", "data-lex-history-control": true,
     }, githubLogo());
     const restart = element("button", {
-      id: "plugin-restart", class: "lex-developer-button", hidden: true,
+      id: "plugin-restart", class: "lex-window-button",
       title: "Restart this plugin", "aria-label": "Restart this plugin",
       "data-lex-history-control": true,
     }, restartIcon());
@@ -4326,7 +4326,6 @@ ${contents.path}`});
     };
     const setDeveloperMode = enabled => {
       developerMode = !!enabled;
-      restart.hidden = !developerMode;
       if (!developerMode) {
         githubWorkspace?.hide();
         github.hidden = true;
