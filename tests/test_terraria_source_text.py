@@ -7,7 +7,7 @@ import tempfile
 import unittest
 
 from games.terraria import server
-from games.terraria.source_text import UTF8_BOM, save_source, source_file_state, source_index
+from games.terraria.source_text import UTF8_BOM, create_source, save_source, source_file_state, source_index
 
 
 class TerrariaSourceTextTests(unittest.TestCase):
@@ -26,6 +26,30 @@ class TerrariaSourceTextTests(unittest.TestCase):
                 ["Content/Item.cs", "Main.cs"],
             )
             self.assertTrue(all(row["editable"] for row in index["files"]))
+
+    def test_create_source_makes_parent_folders_and_never_overwrites(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            created = create_source(
+                root,
+                "Content/Items/NewItem.cs",
+                "namespace Example.Content.Items;\n\npublic class NewItem {}\n",
+            )
+            target = root / "Content" / "Items" / "NewItem.cs"
+            self.assertTrue(target.is_file())
+            self.assertEqual(created["path"], "Content/Items/NewItem.cs")
+            self.assertEqual(
+                target.read_text(encoding="utf-8"),
+                "namespace Example.Content.Items;\n\npublic class NewItem {}\n",
+            )
+
+            with self.assertRaisesRegex(ValueError, "already exists"):
+                create_source(root, "Content/Items/NewItem.cs", "overwrite")
+            self.assertNotEqual(target.read_text(encoding="utf-8"), "overwrite")
+            with self.assertRaisesRegex(ValueError, "ignored/generated"):
+                create_source(root, "obj/Generated.cs", "class Generated {}")
+            with self.assertRaisesRegex(ValueError, "Invalid C# source path"):
+                create_source(root, "../Outside.cs", "class Outside {}")
 
     def test_save_preserves_bom_and_original_crlf_style(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -86,7 +110,7 @@ class TerrariaSourceTextTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "NUL"):
                 source_file_state(root, "Bad.cs")
 
-    def test_service_index_read_save_and_stale_refusal_use_selected_project(self):
+    def test_service_index_read_save_create_and_stale_refusal_use_selected_project(self):
         previous_project = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
         try:
             with tempfile.TemporaryDirectory() as directory:
@@ -114,6 +138,17 @@ class TerrariaSourceTextTests(unittest.TestCase):
                 self.assertTrue(raw.startswith(UTF8_BOM))
                 self.assertIn(b"Value = 1; }\r\n", raw)
                 self.assertEqual(saved["sha256"], sha256(raw).hexdigest())
+
+                created = server.create_source_file(
+                    "Content/NewThing.cs",
+                    "namespace ExampleMod.Content;\n\npublic class NewThing {}\n",
+                )
+                self.assertEqual(created["path"], "Content/NewThing.cs")
+                self.assertTrue((content / "NewThing.cs").is_file())
+                self.assertEqual(
+                    [row["path"] for row in server.source_state()["files"]],
+                    ["Content/ExampleItem.cs", "Content/NewThing.cs"],
+                )
 
                 with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
                     server.save_source_file(state["path"], state["text"], state["sha256"])
