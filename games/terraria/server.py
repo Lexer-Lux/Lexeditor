@@ -11,9 +11,10 @@ from pathlib import Path
 import subprocess
 import tempfile
 import threading
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text
+from .localization import parse_localization_text, try_get_culture_and_prefix, update_localization_text
 from .plugin import DEFAULT_PROJECT_ROOT, TMODLOADER_SAVE_ROOT
 
 
@@ -21,6 +22,8 @@ ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_BODY = 64 * 1024
+MAX_REQUEST_BODY = 512 * 1024
+MAX_LOCALIZATION = 2 * 1024 * 1024
 MAX_BUILD_OUTPUT = 64 * 1024
 MAX_ENABLED_STATE = 1024 * 1024
 BUILD_TIMEOUT_SECONDS = 15 * 60
@@ -68,6 +71,21 @@ def build_state() -> dict:
     }
 
 
+def _atomic_replace(target: Path, data: bytes) -> None:
+    temp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile("wb", dir=target.parent, prefix=".lexeditor-", delete=False) as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+            temp_path = Path(handle.name)
+        os.replace(temp_path, target)
+        temp_path = None
+    finally:
+        if temp_path is not None:
+            temp_path.unlink(missing_ok=True)
+
+
 def save_build(updates: dict[str, object], expected_sha256: str) -> dict:
     target = _build_file()
     data, text = _read_build()
@@ -80,19 +98,118 @@ def save_build(updates: dict[str, object], expected_sha256: str) -> dict:
         return build_state()
 
     encoded = (UTF8_BOM if data.startswith(UTF8_BOM) else b"") + changed.encode("utf-8")
-    temp_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile("wb", dir=target.parent, prefix=".lexeditor-build-", delete=False) as handle:
-            handle.write(encoded)
-            handle.flush()
-            os.fsync(handle.fileno())
-            temp_path = Path(handle.name)
-        os.replace(temp_path, target)
-        temp_path = None
-    finally:
-        if temp_path is not None:
-            temp_path.unlink(missing_ok=True)
+    _atomic_replace(target, encoded)
     return build_state()
+
+
+def _localization_target(relative: str) -> Path:
+    if not isinstance(relative, str) or not relative.strip():
+        raise ValueError("Localization path is required")
+    root = project_root()
+    target = (root / relative).resolve()
+    if target == root or root not in target.parents or target.suffix.casefold() != ".hjson":
+        raise ValueError("Invalid localization path")
+    return target
+
+
+def _read_localization(relative: str) -> tuple[Path, bytes, str, str, str | None, str]:
+    root = project_root()
+    target = _localization_target(relative)
+    if not target.is_file():
+        raise ValueError("Localization file does not exist")
+    data = target.read_bytes()
+    if len(data) > MAX_LOCALIZATION:
+        raise ValueError("Localization file is too large for structured editing")
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError as error:
+        raise ValueError("Localization file is not UTF-8 text") from error
+    canonical = target.relative_to(root).as_posix()
+    culture_info = try_get_culture_and_prefix(canonical)
+    culture, prefix = culture_info if culture_info is not None else (None, "")
+    return target, data, text, canonical, culture, prefix
+
+
+def localization_file_state(relative: str) -> dict:
+    _target, data, text, canonical, culture, prefix = _read_localization(relative)
+    document = parse_localization_text(text, prefix)
+    file_editable = culture is not None and not document.duplicates
+    entries = []
+    for entry in document.entries:
+        payload = entry.public()
+        payload["editable"] = bool(payload["editable"] and file_editable)
+        entries.append(payload)
+    return {
+        "path": canonical,
+        "sha256": sha256(data).hexdigest(),
+        "culture": culture,
+        "prefix": prefix,
+        "loadable": culture is not None,
+        "editable": file_editable,
+        "duplicates": list(document.duplicates),
+        "unsupported": document.unsupported,
+        "entries": entries,
+    }
+
+
+def localization_index() -> dict:
+    root = project_root()
+    files: list[dict] = []
+    if not root.is_dir():
+        return {"root": str(root), "files": files}
+    ignored = {".git", ".pytest_cache", "__pycache__", "out", "obj", "bin"}
+    candidates = sorted(
+        (
+            path for path in root.rglob("*.hjson")
+            if path.is_file() and not ignored.intersection(path.relative_to(root).parts)
+        ),
+        key=lambda path: path.relative_to(root).as_posix().casefold(),
+    )
+    for path in candidates:
+        relative = path.relative_to(root).as_posix()
+        try:
+            state = localization_file_state(relative)
+            files.append({
+                "path": state["path"],
+                "culture": state["culture"],
+                "prefix": state["prefix"],
+                "loadable": state["loadable"],
+                "editable": state["editable"],
+                "entries": len(state["entries"]),
+                "editableEntries": sum(1 for entry in state["entries"] if entry["editable"]),
+                "duplicates": state["duplicates"],
+                "unsupported": state["unsupported"],
+                "error": "",
+            })
+        except (OSError, ValueError) as error:
+            files.append({
+                "path": relative,
+                "culture": None,
+                "prefix": "",
+                "loadable": False,
+                "editable": False,
+                "entries": 0,
+                "editableEntries": 0,
+                "duplicates": [],
+                "unsupported": 0,
+                "error": str(error),
+            })
+    return {"root": str(root), "files": files}
+
+
+def save_localization(relative: str, updates: dict[str, object], expected_sha256: str) -> dict:
+    target, data, text, canonical, culture, prefix = _read_localization(relative)
+    if culture is None:
+        raise ValueError("Localization filename does not identify a tModLoader culture")
+    current_sha = sha256(data).hexdigest()
+    if expected_sha256 != current_sha:
+        raise ValueError(f"{canonical} changed outside Lexeditor; reload before saving")
+    changed = update_localization_text(text, updates, prefix)
+    if changed == text:
+        return localization_file_state(canonical)
+    encoded = (UTF8_BOM if data.startswith(UTF8_BOM) else b"") + changed.encode("utf-8")
+    _atomic_replace(target, encoded)
+    return localization_file_state(canonical)
 
 
 def _installation_root() -> Path:
@@ -310,7 +427,7 @@ def data_map() -> dict:
         elif suffix == ".cs":
             status, family = "recognized", "C# source"
         elif suffix == ".hjson":
-            status, family = "recognized", "Localization"
+            status, family = "structured", "Localization"
         elif relative.startswith("Content/"):
             status, family = "recognized", "Content asset"
         elif suffix == ".csproj":
@@ -347,15 +464,23 @@ class Handler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError as error:
             raise ValueError("Invalid Content-Length") from error
-        if length <= 0 or length > MAX_BODY:
+        if length <= 0 or length > MAX_REQUEST_BODY:
             raise ValueError("Invalid request size")
         try:
             return json.loads(self.rfile.read(length))
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
             raise ValueError("Invalid JSON") from error
 
+    @staticmethod
+    def _query_path(parsed) -> str:
+        values = parse_qs(parsed.query, keep_blank_values=True).get("path", [])
+        if len(values) != 1 or not values[0]:
+            raise ValueError("Localization path query is required")
+        return values[0]
+
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
         try:
             if path == "/":
                 self.send_file(PLUGIN_ROOT / "editor.html")
@@ -373,10 +498,17 @@ class Handler(BaseHTTPRequestHandler):
                     "name": "Terraria",
                     "hosted": True,
                     "windowHost": "webview2",
-                    "capabilities": ["build-metadata", "native-build", "local-mod-status", "data-map"],
+                    "capabilities": [
+                        "build-metadata", "localization", "native-build",
+                        "local-mod-status", "data-map",
+                    ],
                 })
             elif path == "/api/build-metadata":
                 self.send_json(build_state())
+            elif path == "/api/localization":
+                self.send_json(localization_index())
+            elif path == "/api/localization/file":
+                self.send_json(localization_file_state(self._query_path(parsed)))
             elif path == "/api/build":
                 self.send_json(build_status())
             elif path == "/api/data-map":
@@ -387,13 +519,25 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": str(error)}, 400)
 
     def do_POST(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
         try:
             if path == "/api/build":
                 payload = self.read_json()
                 if payload != {}:
                     raise ValueError("Terraria build request must be an empty object")
                 self.send_json(build_project())
+                return
+            if path == "/api/localization/file":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "updates", "expectedSha256"}:
+                    raise ValueError("Expected path, updates and expectedSha256 only")
+                relative = payload["path"]
+                updates = payload["updates"]
+                expected = payload["expectedSha256"]
+                if not isinstance(relative, str) or not isinstance(updates, dict) or not isinstance(expected, str):
+                    raise ValueError("Invalid localization request")
+                self.send_json(save_localization(relative, updates, expected))
                 return
             if path != "/api/build-metadata":
                 self.send_json({"error": "Not found"}, 404)
