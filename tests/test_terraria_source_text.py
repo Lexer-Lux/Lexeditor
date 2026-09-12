@@ -7,7 +7,15 @@ import tempfile
 import unittest
 
 from games.terraria import server
-from games.terraria.source_text import UTF8_BOM, create_source, save_source, source_file_state, source_index
+from games.terraria.source_text import (
+    UTF8_BOM,
+    create_source,
+    delete_source,
+    rename_source,
+    save_source,
+    source_file_state,
+    source_index,
+)
 
 
 class TerrariaSourceTextTests(unittest.TestCase):
@@ -16,9 +24,11 @@ class TerrariaSourceTextTests(unittest.TestCase):
             root = Path(directory)
             (root / "Content").mkdir()
             (root / "obj").mkdir()
+            (root / ".hidden").mkdir()
             (root / "Main.cs").write_text("namespace Example;\n", encoding="utf-8")
             (root / "Content" / "Item.cs").write_text("class Item {}\n", encoding="utf-8")
             (root / "obj" / "Generated.cs").write_text("class Generated {}\n", encoding="utf-8")
+            (root / ".hidden" / "Hidden.cs").write_text("class Hidden {}\n", encoding="utf-8")
 
             index = source_index(root)
             self.assertEqual(
@@ -26,6 +36,10 @@ class TerrariaSourceTextTests(unittest.TestCase):
                 ["Content/Item.cs", "Main.cs"],
             )
             self.assertTrue(all(row["editable"] for row in index["files"]))
+            with self.assertRaisesRegex(ValueError, "ignored/generated"):
+                source_file_state(root, "obj/Generated.cs")
+            with self.assertRaisesRegex(ValueError, "ignored/generated"):
+                source_file_state(root, ".hidden/Hidden.cs")
 
     def test_create_source_makes_parent_folders_and_never_overwrites(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -82,6 +96,37 @@ class TerrariaSourceTextTests(unittest.TestCase):
             saved = save_source(root, "Example.cs", "line one\nline two\n", state["sha256"])
             self.assertEqual(target.read_bytes(), original)
             self.assertEqual(saved["sha256"], state["sha256"])
+
+    def test_rename_and_delete_are_sha_guarded_and_never_overwrite(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "Old.cs"
+            source.write_bytes(UTF8_BOM + b"class Old {}\r\n")
+            state = source_file_state(root, "Old.cs")
+
+            renamed = rename_source(root, "Old.cs", "Content/New.cs", state["sha256"])
+            target = root / "Content" / "New.cs"
+            self.assertFalse(source.exists())
+            self.assertTrue(target.is_file())
+            self.assertEqual(renamed["path"], "Content/New.cs")
+            self.assertTrue(target.read_bytes().startswith(UTF8_BOM))
+
+            occupied = root / "Occupied.cs"
+            occupied.write_text("class Occupied {}\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "already exists"):
+                rename_source(root, "Content/New.cs", "Occupied.cs", renamed["sha256"])
+            self.assertTrue(target.exists())
+            self.assertEqual(occupied.read_text(encoding="utf-8"), "class Occupied {}\n")
+
+            target.write_text("class Changed {}\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
+                delete_source(root, "Content/New.cs", renamed["sha256"])
+            self.assertTrue(target.exists())
+
+            fresh = source_file_state(root, "Content/New.cs")
+            result = delete_source(root, "Content/New.cs", fresh["sha256"])
+            self.assertTrue(result["deleted"])
+            self.assertFalse(target.exists())
 
     def test_stale_write_and_path_escape_fail_closed(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -145,10 +190,15 @@ class TerrariaSourceTextTests(unittest.TestCase):
                 )
                 self.assertEqual(created["path"], "Content/NewThing.cs")
                 self.assertTrue((content / "NewThing.cs").is_file())
-                self.assertEqual(
-                    [row["path"] for row in server.source_state()["files"]],
-                    ["Content/ExampleItem.cs", "Content/NewThing.cs"],
-                )
+
+                renamed = server.rename_source_file("Content/NewThing.cs", "Common/NewThing.cs", created["sha256"])
+                self.assertEqual(renamed["path"], "Common/NewThing.cs")
+                self.assertFalse((content / "NewThing.cs").exists())
+                self.assertTrue((root / "Common" / "NewThing.cs").exists())
+
+                deleted = server.delete_source_file("Common/NewThing.cs", renamed["sha256"])
+                self.assertTrue(deleted["deleted"])
+                self.assertFalse((root / "Common" / "NewThing.cs").exists())
 
                 with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
                     server.save_source_file(state["path"], state["text"], state["sha256"])
