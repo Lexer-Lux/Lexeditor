@@ -102,8 +102,8 @@ def smoke() -> list[str]:
             "  category = General,\n"
             "  Icon = Radio,\n"
             "  ResearchSkillLevel = -1,\n"
-            "  tags = InHandCraft,\n"
-            "  time = 50,\n"
+            "  Tags = InHandCraft,\n"
+            "  Time = 50,\n"
             "  timedAction = Craft,\n"
             "  inputs { item 1 [Base.Plank], }\n"
             " }\n"
@@ -207,6 +207,8 @@ def smoke() -> list[str]:
                     raise RuntimeError(f"Synthetic {get_endpoint} edit did not read back")
 
             text = script.read_text(encoding="utf-8")
+            if "  Time = 75," not in text or "  Tags = InHandCraft," not in text:
+                raise RuntimeError("craftRecipe documented key casing was not preserved")
             for preserved in ("UnknownFutureField = KeepMe", "inputs { item 1 [Base.Plank], }", "Require = Base.Hammer,", "Fixer = Base.DuctTape=2;Woodwork=1,", "Properties { HungerChange = -5, }", "part Engine { category = engine, }", "clip { file = media/sound/test.ogg, volume = 0.7, }", "mesh = LexSmoke/TestModel,", "attachment Grip { offset = 0.0 0.0 0.0, }", "model = FemaleBody,", "completionSound = BuildFence,", "muscleStrainParts = Neck;Torso_Upper,", "prop1 = Base.HammerModel,"):
                 if preserved not in text:
                     raise RuntimeError("Structured writes did not preserve unknown/nested script data")
