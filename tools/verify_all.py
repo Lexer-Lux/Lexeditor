@@ -126,7 +126,11 @@ _EXTERNAL_REQUIREMENT_MESSAGES = (
 def _unrunnable(tail: str) -> str:
     lowered = tail.lower()
     lines = [line.strip() for line in lowered.splitlines() if line.strip()]
-    last = lines[-1] if lines else ""
+    # Tracebacks usually render Path values through repr(), so a Windows path
+    # appears with doubled backslashes in the log. Collapse those only for the
+    # final-line prerequisite match; keep the original context for the older
+    # shell/missing-module checks above and for the user-visible report.
+    last = (lines[-1] if lines else "").replace("\\\\", "\\")
     if "error: the following arguments are required" in lowered:
         return "needs command-line arguments"
     if "modulenotfounderror" in lowered:
