@@ -233,7 +233,7 @@
 ### Questions
 
 * [x] What exactly do the Loot Tables inputs do? - answered on the answers page.
-* [~] Edit RDR1's corpse loot in the script that holds it.
+* [x] Edit RDR1's corpse loot in the script that holds it.
   * The archive was searched properly rather than assumed about. There is no
     drops table: a body's items are a switch on a LootType decorator inside
     content/release64/scripting/gringo/commonscripts/lootcorpsegenericnoanim.wsc,
@@ -254,9 +254,11 @@
     different build and editing on a guess would land a byte in the middle of
     an unrelated instruction. An edit never changes the script's length,
     because growing a push would move every address after it.
-  * What is left: the Loot page has to show the per-LootType table and write
-    the patched script to the mod folder, where the game already picks up loose
-    overrides by archive path.
+  * The page shows it. Twenty-seven branches with their vanilla values, each
+    bounded by what its own push can hold, and one button that writes the
+    patched script into the mod folder as a loose override. Verified against
+    the installed game: the override is the same length as the original and
+    differs by exactly one byte.
 * [x] Where are ordinary enemy/item drops edited?
 * [x] Do enemies have separate drop definitions elsewhere?
   * Confirmed against the installed game: nowhere, because Red Dead Redemption
