@@ -3,12 +3,21 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from games.bannerlord import paths
 from games.bannerlord.gauntlet_data import list_prefabs
 from games.bannerlord.module_data import data_map
 from games.bannerlord.module_xml_data import list_documents
 
 
 class BannerlordDiscoveryContainmentTests(unittest.TestCase):
+    def test_contained_file_helper_keeps_real_project_files(self):
+        with tempfile.TemporaryDirectory() as name:
+            project = Path(name)
+            source = project / "inside.xml"
+            source.write_text("<Inside />", encoding="utf-8")
+            self.assertTrue(paths.is_contained_file(project, source))
+            self.assertFalse(paths.is_contained_file(project, project / "missing.xml"))
+
     def test_discovery_suppresses_files_resolving_outside_project(self):
         with tempfile.TemporaryDirectory() as name:
             root = Path(name)
