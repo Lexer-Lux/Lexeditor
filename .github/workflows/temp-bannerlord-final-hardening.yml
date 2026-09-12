@@ -27,8 +27,8 @@ jobs:
         run: python tools/temp_bannerlord_final_hardening.py
       - name: Focused validation
         run: |
-          python -m py_compile games/bannerlord/source_revision.py games/bannerlord/gauntlet_data.py games/bannerlord/module_xml_data.py games/bannerlord/module_data.py games/bannerlord/project_data.py games/bannerlord/skill_data.py games/bannerlord/perk_data.py games/bannerlord/settings_data.py games/bannerlord/server.py
-          python -m unittest tests.test_bannerlord_source_revision tests.test_bannerlord_gauntlet tests.test_bannerlord_moduledata tests.test_bannerlord_xsd tests.test_bannerlord_plugin tests.test_bannerlord_perks_runtime tests.test_bannerlord_settings tests.test_bannerlord_ui_contract -v
+          python -m py_compile games/bannerlord/source_revision.py games/bannerlord/gauntlet_data.py games/bannerlord/module_xml_data.py games/bannerlord/module_data.py games/bannerlord/project_data.py games/bannerlord/skill_data.py games/bannerlord/perk_data.py games/bannerlord/settings_data.py games/bannerlord/server.py tests/test_bannerlord_source_safety.py
+          python -m unittest tests.test_bannerlord_source_revision tests.test_bannerlord_source_safety tests.test_bannerlord_gauntlet tests.test_bannerlord_moduledata tests.test_bannerlord_xsd tests.test_bannerlord_plugin tests.test_bannerlord_perks_runtime tests.test_bannerlord_settings tests.test_bannerlord_ui_contract -v
           python -c "from games.bannerlord.plugin import smoke; print(smoke())"
           python tools/verify_shared_ui_contract.py
           python -c "import glob, subprocess; [subprocess.run(['node','--check',path], check=True) for path in glob.glob('games/bannerlord/editor*.js')]"
@@ -37,7 +37,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add games/bannerlord/source_revision.py games/bannerlord/gauntlet_data.py games/bannerlord/module_xml_data.py games/bannerlord/module_data.py games/bannerlord/project_data.py games/bannerlord/skill_data.py games/bannerlord/perk_data.py games/bannerlord/settings_data.py games/bannerlord/server.py games/bannerlord/editor_gauntlet.js games/bannerlord/editor_moduledata.js tests/test_bannerlord_source_revision.py tests/test_bannerlord_gauntlet.py tests/test_bannerlord_moduledata.py tests/test_bannerlord_plugin.py tests/test_bannerlord_perks_runtime.py tests/test_bannerlord_settings.py
+          git add games/bannerlord/source_revision.py games/bannerlord/gauntlet_data.py games/bannerlord/module_xml_data.py games/bannerlord/module_data.py games/bannerlord/project_data.py games/bannerlord/skill_data.py games/bannerlord/perk_data.py games/bannerlord/settings_data.py games/bannerlord/server.py games/bannerlord/editor_boot.js games/bannerlord/editor_gauntlet.js games/bannerlord/editor_moduledata.js tests/test_bannerlord_source_revision.py tests/test_bannerlord_source_safety.py tests/test_bannerlord_gauntlet.py tests/test_bannerlord_moduledata.py tests/test_bannerlord_plugin.py tests/test_bannerlord_perks_runtime.py tests/test_bannerlord_settings.py
           git commit -m "Harden Bannerlord structured source writes"
           git push origin HEAD:feature/bannerlord-plugin
 
