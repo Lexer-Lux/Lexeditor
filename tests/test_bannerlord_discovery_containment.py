@@ -45,15 +45,21 @@ class BannerlordDiscoveryContainmentTests(unittest.TestCase):
             ):
                 target = outside / relative.replace("/", "-")
                 target.write_text("outside", encoding="utf-8")
-                outside_targets[project_root / relative] = target.resolve()
+                outside_targets[Path(relative).as_posix()] = target.resolve()
 
             real_resolve = Path.resolve
 
             def fake_resolve(path, *args, **kwargs):
-                redirected = outside_targets.get(Path(path))
-                if redirected is not None:
-                    return redirected
-                return real_resolve(path, *args, **kwargs)
+                candidate = Path(path)
+                for base in (project, project_root):
+                    try:
+                        relative = candidate.relative_to(base).as_posix()
+                    except ValueError:
+                        continue
+                    redirected = outside_targets.get(relative)
+                    if redirected is not None:
+                        return redirected
+                return real_resolve(candidate, *args, **kwargs)
 
             with patch.object(Path, "resolve", new=fake_resolve):
                 rows = {row["filename"]: row for row in data_map(project)["rows"]}
