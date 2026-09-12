@@ -41,6 +41,11 @@
       "structure": "Lexeditor edits one EasyInstall folder (C:\\RDR2Mod\\MyOverhaul by default) whose install.xml maps each GamePath to a package FilePath. To run it with LML, place or copy the whole install.xml mod folder under <RDR2>\\lml\\<mod>\\.",
       "overriding": "LML owns enabled state and load order. If separate LML packages replace the same GamePath, the later/higher-priority replacement wins as a complete file; Lexeditor does not semantically merge records across separate LML mods."
     },
+    "stardew-valley": {
+      "loader": "SMAPI with Content Patcher. Lexeditor keeps the installed Content XNB files read-only and deploys the selected project as a normal Content Patcher content pack under Stardew Valley's Mods folder.",
+      "structure": "One selected Lexeditor project is a Content Patcher pack with manifest.json and content.json. Deploy Project copies that project into a Lexeditor-owned [CP] folder under <Stardew Valley>\\Mods after confirming SMAPI and Pathoschild.ContentPatcher are installed.",
+      "overriding": "Content Patcher owns cross-mod ordering and conflict resolution. Lexeditor emits field-level EditData patches where supported so unrelated field edits can coexist instead of replacing an entire Data asset; it does not rewrite or merge other installed content packs."
+    },
     "warband": {
       "loader": "Warband's native module system. WSE2 is Lexeditor's optional enhanced runtime helper, not a multi-mod overlay loader.",
       "structure": "Each installed mod is its own folder under <Warband>\\Modules\\ with module.ini. Lexeditor can also edit and build a Module System source project before it becomes an installed module.",
