@@ -1,0 +1,105 @@
+name: FFX-X2 dressphere integration
+
+on:
+  push:
+    branches: [feature/ffx-x2-plugin]
+    paths:
+      - '.github/workflows/ffx-x2-jobs-integrate.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Patch integration surfaces
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              target = Path(path)
+              text = target.read_text(encoding='utf-8')
+              found = text.count(old)
+              if found != count:
+                  raise RuntimeError(f'{path}: expected {count} anchor(s), found {found}: {old[:80]!r}')
+              target.write_text(text.replace(old, new, count), encoding='utf-8')
+
+          # Service imports/routes/catalog + Data Map.
+          replace('games/ffx_x2/server.py',
+              'ffx_player_stats, ffx2_accessories, ffx2_abilities, gear_shops, item_prices,',
+              'ffx_player_stats, ffx2_accessories, ffx2_abilities, ffx2_jobs, gear_shops, item_prices,')
+          replace('games/ffx_x2/server.py',
+              '"/api/ffx2-abilities/save", "/api/ffx2-accessories/save",',
+              '"/api/ffx2-abilities/save", "/api/ffx2-accessories/save", "/api/ffx2-jobs/save",')
+          replace('games/ffx_x2/server.py',
+              '''def save_ffx2_accessories(request: dict) -> dict:\n    return _structured_save_for(\n        "x2", request, ffx2_accessories.ARCHIVE_PATH, ffx2_accessories.apply_edits,\n        ffx2_accessories.payload, "FFX-2 Accessories",\n    )\n\n\ndef _map_structured_row''',
+              '''def save_ffx2_accessories(request: dict) -> dict:\n    return _structured_save_for(\n        "x2", request, ffx2_accessories.ARCHIVE_PATH, ffx2_accessories.apply_edits,\n        ffx2_accessories.payload, "FFX-2 Accessories",\n    )\n\n\ndef ffx2_job_catalog() -> dict:\n    return _structured_payload_for("x2", ffx2_jobs.ARCHIVE_PATH, ffx2_jobs.payload)\n\n\ndef save_ffx2_jobs(request: dict) -> dict:\n    return _structured_save_for(\n        "x2", request, ffx2_jobs.ARCHIVE_PATH, ffx2_jobs.apply_edits,\n        ffx2_jobs.payload, "FFX-2 Dressphere Ability Trees",\n    )\n\n\ndef _map_structured_row''')
+          replace('games/ffx_x2/server.py',
+              '''    x2_accessory_row["target"] = "ffx2-accessories"\n    rows.append(x2_accessory_row)\n    themed = theme_status()''',
+              '''    x2_accessory_row["target"] = "ffx2-accessories"\n    rows.append(x2_accessory_row)\n    x2_job_row = _map_structured_row(\n        "x2", ffx2_jobs.ARCHIVE_PATH,\n        "Conservative FFX-2 dressphere ability-tree editor",\n        ffx2_jobs.payload,\n        lambda s: (\n            f"{len(s['rows'])} English/US 0xE4-byte dressphere records. Lexeditor edits only the sixteen "\n            "required-ability / ability-ID pairs at +0x3C..+0x7B; growth, weapon, creature, flag and string data are preserved."\n        ),\n    )\n    x2_job_row["target"] = "ffx2-jobs"\n    rows.append(x2_job_row)\n    themed = theme_status()''')
+          replace('games/ffx_x2/server.py',
+              '"ffx2-ability-animation-editor", "ffx2-accessory-editor", "installed-game-theme",',
+              '"ffx2-ability-animation-editor", "ffx2-accessory-editor", "ffx2-dressphere-ability-tree-editor", "installed-game-theme",')
+          replace('games/ffx_x2/server.py',
+              '''            elif route == "/api/ffx2-accessories": self.json_response(ffx2_accessory_catalog())\n            elif route == "/api/archive":''',
+              '''            elif route == "/api/ffx2-accessories": self.json_response(ffx2_accessory_catalog())\n            elif route == "/api/ffx2-jobs": self.json_response(ffx2_job_catalog())\n            elif route == "/api/archive":''')
+          replace('games/ffx_x2/server.py',
+              '''            elif route == "/api/ffx2-accessories/save": result = save_ffx2_accessories(request)\n            elif route == "/api/deployment/deploy":''',
+              '''            elif route == "/api/ffx2-accessories/save": result = save_ffx2_accessories(request)\n            elif route == "/api/ffx2-jobs/save": result = save_ffx2_jobs(request)\n            elif route == "/api/deployment/deploy":''')
+
+          # Strict real-install verifier now includes the 16th structured table.
+          replace('games/ffx_x2/verify_install.py',
+              'ffx_player_stats, ffx2_accessories, ffx2_abilities, gear_shops, item_prices,',
+              'ffx_player_stats, ffx2_accessories, ffx2_abilities, ffx2_jobs, gear_shops, item_prices,')
+          replace('games/ffx_x2/verify_install.py',
+              '''    {"game": "x2", "key": "ffx2-accessories", "archivePath": ffx2_accessories.ARCHIVE_PATH, "builder": ffx2_accessories.payload},\n)''',
+              '''    {"game": "x2", "key": "ffx2-accessories", "archivePath": ffx2_accessories.ARCHIVE_PATH, "builder": ffx2_accessories.payload},\n    {"game": "x2", "key": "ffx2-dressphere-abilities", "archivePath": ffx2_jobs.ARCHIVE_PATH, "builder": ffx2_jobs.payload},\n)''')
+
+          # Load the new composition module after the accessory UI initializes.
+          replace('ui/ffx-x2-accessories.js',
+              '''  refresh().catch(showError);\n})();''',
+              '''  refresh().catch(showError);\n\n  if (!document.querySelector('script[data-ffx2-jobs]')) {\n    const jobsScript = document.createElement('script');\n    jobsScript.src = '/shared/ffx-x2-jobs.js';\n    jobsScript.dataset.ffx2Jobs = '1';\n    document.head.appendChild(jobsScript);\n  }\n})();''')
+
+          # Synthetic rendered acceptance composes and opens the new panel.
+          replace('tests/test_ffx_x2_browser_check.py',
+              '''        "/api/launch": {''',
+              '''        "/api/ffx2-jobs": _state(\n            "FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/job.bin",\n            recordSize=0xE4, abilityCount=16, abilityOffset=0x3C,\n            rows=[{\n                "id": 0, "icon": 9, "berserkAction": 0x3000,\n                "nameOffset": 1, "nameKey": 2, "helpOffset": 3, "helpKey": 4,\n                "abilities": [\n                    {"requirementId": 0x4000 + slot, "abilityId": 0x5000 + slot}\n                    for slot in range(16)\n                ],\n            }],\n        ),\n        "/api/launch": {''')
+          replace('tests/test_ffx_x2_browser_check.py',
+              '''    "/shared/ffx-x2-accessories.js": ROOT / "ui/ffx-x2-accessories.js",''',
+              '''    "/shared/ffx-x2-accessories.js": ROOT / "ui/ffx-x2-accessories.js",\n    "/shared/ffx-x2-jobs.js": ROOT / "ui/ffx-x2-jobs.js",''')
+          replace('tests/test_ffx_x2_browser_check.py',
+              'expect(page.locator(".ffxx2-nav [data-view]")).to_have_count(16)',
+              'expect(page.locator(".ffxx2-nav [data-view]")).to_have_count(17)')
+          replace('tests/test_ffx_x2_browser_check.py',
+              '''                expect(page.locator("#x2-accessory-fields .ffxx2-slot")).to_have_count(5)\n                expect(page.locator("#error")).to_have_text("")''',
+              '''                expect(page.locator("#x2-accessory-fields .ffxx2-slot")).to_have_count(5)\n                expect(page.locator("#x2-job-fields .ffxx2-slot")).to_have_count(16)\n                expect(page.locator("#error")).to_have_text("")''')
+          replace('tests/test_ffx_x2_browser_check.py',
+              '''                expect(page.get_by_label("Accessory 0 price")).to_have_value("500")\n\n                geometry = page.evaluate''',
+              '''                expect(page.get_by_label("Accessory 0 price")).to_have_value("500")\n\n                page.locator('[data-view="ffx2-jobs"]').click()\n                expect(page.locator('[data-panel="ffx2-jobs"]')).to_be_visible()\n                expect(page.get_by_label("Dressphere 0 ability 1 requirement")).to_have_value(str(0x4000))\n                expect(page.get_by_label("Dressphere 0 ability 1")).to_have_value(str(0x5000))\n                page.get_by_label("Dressphere 0 ability 1").fill(str(0x5ABC))\n                expect(page.locator("#x2-job-save")).to_be_enabled()\n\n                geometry = page.evaluate''')
+          replace('tests/test_ffx_x2_browser_check.py',
+              '''                  panel: document.querySelector('[data-panel="ffx2-accessories"]').getBoundingClientRect().width,''',
+              '''                  panel: document.querySelector('[data-panel="ffx2-jobs"]').getBoundingClientRect().width,''')
+          PY
+
+          python -m pip install pytest
+          python -m py_compile games/ffx_x2/ffx2_jobs.py games/ffx_x2/server.py games/ffx_x2/verify_install.py tests/test_ffx_x2_ffx2_jobs.py tests/test_ffx_x2_verify_install.py tests/test_ffx_x2_browser_check.py
+          node --check ui/ffx-x2-jobs.js
+          node --check ui/ffx-x2-accessories.js
+          python -m pytest -q tests/test_ffx_x2_ffx2_jobs.py tests/test_ffx_x2_verify_install.py
+          git diff --check
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/ffx_x2/server.py games/ffx_x2/verify_install.py ui/ffx-x2-accessories.js tests/test_ffx_x2_browser_check.py
+          git commit -m "Integrate FFX-2 dressphere ability trees"
+          git push origin HEAD:feature/ffx-x2-plugin
