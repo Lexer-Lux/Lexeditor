@@ -31,7 +31,9 @@ class FollowupTests(unittest.TestCase):
         plugin=GamePlugin(
             plugin_id='windows-project-fixture',name='Fixture',subtitle='Fixture',description='Fixture',accent='#fff',
             check=_noop,launch=_launch,
-            projects=ModProjectSpec(root_env='LEXEDITOR_FIXTURE_PROJECT',default_root=Path('C:/FixtureMod')),
+            projects=ModProjectSpec(
+                root_env='LEXEDITOR_FIXTURE_PROJECT',default_root=Path('C:/FixtureMod'),template_root=ROOT,
+            ),
         )
         validate_plugin(plugin)
     def test_obsolete_camera_clamps_not_reintroduced_in_help(self):
