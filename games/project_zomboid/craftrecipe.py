@@ -1,8 +1,8 @@
-"""Conservative structured editor for current Build 42 craftRecipe scalars.
+"""Conservative structured editor for current Build 42 craftRecipe fields.
 
-Only schema fields with explicit primitive types in the current pz-scripts-data
-craftRecipe definition are writable here. Nested inputs/outputs and callbacks stay
-read-only and byte-preserved.
+Only fields with explicit primitive or simple object types in the current
+pz-scripts-data craftRecipe definition are writable here. Nested inputs/outputs,
+callbacks and under-typed properties stay read-only and byte-preserved.
 """
 from __future__ import annotations
 
@@ -14,16 +14,21 @@ from . import core
 
 EDITABLE_FIELDS = (
     "AllowBatchCraft",
+    "AutoLearnAll",
+    "AutoLearnAny",
     "CanWalk",
     "category",
     "Icon",
     "ResearchSkillLevel",
+    "SkillRequired",
     "tags",
     "time",
     "timedAction",
+    "Tooltip",
 )
 BOOLEAN_FIELDS = {"AllowBatchCraft", "CanWalk"}
 INTEGER_FIELDS = {"ResearchSkillLevel", "time"}
+SKILL_MAP_FIELDS = {"AutoLearnAll", "AutoLearnAny", "SkillRequired"}
 _FIELD_BY_CASEFOLD = {key.casefold(): key for key in EDITABLE_FIELDS}
 _TRUE_FALSE = {"true", "false"}
 _EDITABLE_ASSIGNMENT_RE = re.compile(
@@ -92,12 +97,7 @@ def _top_level_editable_counts(text: str, block: core.Block) -> dict[str, int]:
 
 
 def _editable_properties(text: str, block: core.Block) -> tuple[dict[str, str], set[str]]:
-    """Read known top-level properties case-insensitively.
-
-    Current Build 42 documentation uses both ``Time``/``Tags`` and
-    ``time``/``tags`` in valid craftRecipe examples. Normalize only the known
-    editable field identities while leaving the source spelling untouched.
-    """
+    """Read known top-level properties case-insensitively while preserving spelling."""
     body = text[block.open_brace + 1:block.close_brace]
     masked = core._masked_code(body)
     values: dict[str, str] = {}
@@ -153,6 +153,30 @@ def read(root: Path) -> dict:
     return {"rows": rows, "errors": errors}
 
 
+def _validate_skill_map(key: str, clean: str) -> str:
+    if not clean:
+        raise core.ProjectZomboidError(f"{key} cannot be empty")
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for raw_pair in clean.split(";"):
+        pair = raw_pair.strip()
+        if not pair or pair.count(":") != 1:
+            raise core.ProjectZomboidError(f"{key} must use Skill:level;Skill:level syntax")
+        skill, raw_level = (part.strip() for part in pair.split(":", 1))
+        if not skill or any(char in skill for char in ":;,{}="):
+            raise core.ProjectZomboidError(f"{key} contains an invalid skill name")
+        identity = skill.casefold()
+        if identity in seen:
+            raise core.ProjectZomboidError(f"{key} contains duplicate skill {skill}")
+        seen.add(identity)
+        try:
+            level = int(raw_level)
+        except ValueError as error:
+            raise core.ProjectZomboidError(f"{key} levels must be integers") from error
+        normalized.append(f"{skill}:{level}")
+    return ";".join(normalized)
+
+
 def _validate(key: str, value: object) -> str:
     clean = core._clean_scalar(value, key)
     if any(char in clean for char in ",{}"):
@@ -168,6 +192,8 @@ def _validate(key: str, value: object) -> str:
         except ValueError as error:
             raise core.ProjectZomboidError(f"{key} must be an integer") from error
         return str(number)
+    if key in SKILL_MAP_FIELDS:
+        return _validate_skill_map(key, clean)
     if key == "tags":
         tags = [part.strip() for part in clean.split(";") if part.strip()]
         if not tags:
