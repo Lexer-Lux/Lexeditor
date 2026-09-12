@@ -1017,6 +1017,10 @@
 .enemy-tier-entry .lex-unit-field:has(.enemy-quantity-unit){display:flex;align-items:center;gap:4px}
 .enemy-tier-entry .enemy-quantity-unit{position:static;transform:none;font-size:14px;flex:0 0 auto}
 .enemy-tier-entry .lex-unit-field:has(.enemy-quantity-unit)>input{min-width:0;width:100%;padding-right:3px}
+    .world-visual-panel{position:relative;overflow:hidden}
+    .world-map-marker{z-index:5;pointer-events:auto;cursor:pointer;width:10px;height:10px;min-width:0;min-height:0;padding:0}
+    .world-map-marker:hover,.world-map-marker:focus-visible{outline:2px solid white}
+    .world-map-help{position:absolute;z-index:6;top:8px;right:8px}
 </style>
 </head>
 <body>
@@ -1758,8 +1762,29 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const metadata=el("div",{class:"world-texture-metadata"},el("span",{},`${row.width} \u00d7 ${row.height}`),el("span",{},`${row.depth}-bit indexed`),el("span",{},`${row.paletteCount} palettes`),el("span",{},`${formatNumber(row.timBytes)} TIM bytes`)),controls=el("div",{class:"world-texture-controls"},detailField({label:"PREVIEW PALETTE",control:paletteSelect}),metadata,el("div",{class:"world-texture-actions"},exportLink,replace,upload),pending);
     return sharedDetail(row,prefs,[detailSection({className:"world-texture-section",title:"WORLD TEXTURE",body:[el("div",{class:"world-texture-body"},preview,controls)]})],"world-map-detail world-texture");
   }
+  // Packed block coordinates: FF8UltimateEditor/Cid/drawmapwidget.py.
+  function worldDrawPosition(point){return {x:point.x&127,y:2*point.y+(point.x>>7)}}
+  function worldDrawBytes(x,y){return {x:(x&127)|((y&1)<<7),y:y>>1}}
+  const worldVisualView={scale:1,x:0,y:0};
+  function worldMapNavigation(panel,stage){
+    const view=worldVisualView,apply=()=>{stage.style.transform=`translate(${view.x}px,${view.y}px) scale(${view.scale})`};apply();
+    panel.addEventListener('wheel',event=>{
+      event.preventDefault();event.stopPropagation();
+      const box=panel.getBoundingClientRect(),ratio=box.width/panel.offsetWidth;
+      const x=(event.clientX-box.left)/ratio-panel.clientWidth/2,y=(event.clientY-box.top)/ratio-panel.clientHeight/2;
+      const next=Math.max(1,Math.min(8,view.scale*Math.exp(-event.deltaY*.0015))),factor=next/view.scale;
+      view.x=x-(x-view.x)*factor;view.y=y-(y-view.y)*factor;view.scale=next;
+      if(next===1){view.x=0;view.y=0}apply();
+    },{passive:false});
+    let drag=null;
+    panel.addEventListener('pointerdown',event=>{if(event.button!==1)return;event.preventDefault();panel.setPointerCapture(event.pointerId);drag={x:event.clientX,y:event.clientY}});
+    panel.addEventListener('pointermove',event=>{if(!drag)return;const ratio=panel.getBoundingClientRect().width/panel.offsetWidth;view.x+=(event.clientX-drag.x)/ratio;view.y+=(event.clientY-drag.y)/ratio;drag={x:event.clientX,y:event.clientY};apply()});
+    panel.addEventListener('pointerup',()=>{drag=null});panel.addEventListener('pointercancel',()=>{drag=null});
+    panel.addEventListener('auxclick',event=>{if(event.button===1)event.preventDefault()});
+    panel.addEventListener('dblclick',()=>{Object.assign(view,{scale:1,x:0,y:0});apply()});
+  }
   function worldDrawPointDetail(row,prefs){
-    const marker=el("span",{class:"world-draw-marker",style:`left:${row.x/255*100}%;top:${row.y/255*100}%`}),map=el("button",{type:"button",class:"world-draw-map","aria-label":`Set Draw Point ${row.drawId} position`,onclick:event=>{const box=event.currentTarget.getBoundingClientRect();row.x=Math.max(0,Math.min(255,Math.round((event.clientX-box.left)/box.width*255)));row.y=Math.max(0,Math.min(255,Math.round((event.clientY-box.top)/box.height*255)));rerenderWorldMap();shell.refresh()}},marker,el("span",{class:"world-draw-map-axis y"},"Y 0–255"),el("span",{class:"world-draw-map-axis x"},"X 0–255"));
+    const position=worldDrawPosition(row),marker=el("span",{class:"world-draw-marker",style:`left:${position.x/128*100}%;top:${position.y/96*100}%`}),map=el("button",{type:"button",class:"world-draw-map","aria-label":`Set Draw Point ${row.drawId} position`,onclick:event=>{const box=event.currentTarget.getBoundingClientRect();Object.assign(row,worldDrawBytes(Math.max(0,Math.min(127,Math.round((event.clientX-box.left)/box.width*128))),Math.max(0,Math.min(95,Math.round((event.clientY-box.top)/box.height*96)))));rerenderWorldMap();shell.refresh()}},marker,el("span",{class:"world-draw-map-axis y"},"96 BLOCK ROWS"),el("span",{class:"world-draw-map-axis x"},"128 BLOCK COLUMNS"));
     return sharedDetail({...row,name:`DRAW POINT ${row.drawId}`},prefs,[detailSection({className:"world-draw-position",title:"WORLD POSITION",help:infoHelp("Section 34 stores only this world Draw Point's X, Y, and sub-ID bytes. Its magic, quantity, and refill behavior live in FF8_EN.exe and are not invented here."),body:[map,el("p",{class:"world-draw-help"},"Click the grid to place the point, or enter exact byte coordinates."),detailField({label:"X",control:worldNumber(row,"x",0,255,`Draw Point ${row.drawId} X`)}),detailField({label:"Y",control:worldNumber(row,"y",0,255,`Draw Point ${row.drawId} Y`)}),detailField({label:"SUB-ID",help:infoHelp("The exact third byte in this world-position record. FF8 Ultimate Editor names it sub_id; its finer gameplay meaning is not proved, so Lexeditor does not assign a speculative label."),control:worldNumber(row,"subId",0,255,`Draw Point ${row.drawId} sub-ID`)})]})],"world-map-detail world-draw-point");
   }
   function worldFieldReturnDetail(row,prefs){return sharedDetail({...row,name:`FIELD RETURN ${row.id}`},prefs,[detailSection({title:"FIELD → WORLD POSITION",help:infoHelp("OpenVIII proves this as one entry in wmset section 9's field-to-world coordinate table. The entry index is a transition-location index, not a field ID. Lexeditor preserves the unresolved fourth word."),body:[detailField({label:"X",control:worldNumber(row,"x",-2147483648,2147483647,`Field return ${row.id} X`)}),detailField({label:"Y",control:worldNumber(row,"y",-32768,32767,`Field return ${row.id} Y`)}),detailField({label:"Z",control:worldNumber(row,"z",-2147483648,2147483647,`Field return ${row.id} Z`)}),detailField({label:"UNRESOLVED WORD",help:infoHelp("The final signed 16-bit word in this record has no proved gameplay name. It remains visible and byte-preserved, but cannot be edited as a guessed property."),control:readonlyField(row.unknown)})]})],"world-map-detail world-field-return")}
@@ -1768,17 +1793,22 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const region=worldRow(state.data,"region",row.id),blocks=el("div",{class:"world-segment-blocks"},...row.blocks.map(block=>el("div",{class:"world-segment-block"},`BLOCK ${block.id}`,el("small",{},`${block.polygonCount} polygons · ${block.vertexCount} vertices`))));
     return sharedDetail({...row,name:`WORLD SEGMENT ${row.id}`},null,[
       detailSection({title:"MAP POSITION",body:[detailField({label:"X",control:readonlyField(row.x)}),detailField({label:"Y",control:readonlyField(row.y)}),detailField({label:"REGION ID",help:infoHelp("This region combines with the segment's ground type to choose which world-map encounter rule and encounter group apply here."),control:worldNumber(region,"regionId",0,255,`World segment ${row.id} region ID`)})]}),
-      detailSection({title:"WMX GEOMETRY",help:infoHelp("Deling proves the group ID at the start of each 0x9000-byte WMX segment. Lexeditor changes only that value and preserves all polygon topology and unknown bytes."),body:[detailField({label:"GROUP ID",control:worldNumber(row,"groupId",0,4294967295,`World segment ${row.id} group ID`)}),detailField({label:"POLYGONS",control:readonlyField(row.polygonCount)}),detailField({label:"GROUND TYPES",control:el("span",{class:"world-ground-list"},row.groundTypes.join(", ")||"None")})]}),
-      detailSection({title:"BLOCKS",body:[blocks]})
+      detailSection({title:"WMX GEOMETRY",help:infoHelp("Deling proves the group ID at the start of each 0x9000-byte WMX segment. Lexeditor changes only that value and preserves all polygon topology and unknown bytes."),body:[detailField({label:"GROUP ID",control:worldNumber(row,"groupId",0,4294967295,`World segment ${row.id} group ID`)}),detailField({label:"POLYGONS",control:readonlyField(row.polygonCount)}),detailField({label:"GROUND TYPES",help:infoHelp("Terrain codes used by the polygons in this segment. A ground code and the region ID select an encounter rule. These are stored codes, not counts."),control:el("span",{class:"world-ground-list"},row.groundTypes.join(", ")||"None")})]}),
+      detailSection({title:"BLOCKS",help:infoHelp("Each world segment contains 16 smaller terrain blocks. Polygons are the faces that form the terrain; vertices are the points at their corners. These counts describe the stored geometry."),body:[blocks]})
     ],"world-map-detail world-segment-detail");
   }
   function renderWorldVisual(){
     const segments=state.data.world.rows.filter(row=>row.kind==="worldSegment").slice(0,32*24),selected=Math.max(0,Math.min(segments.length-1,Number(state.selected.world??0))),row=segments[selected];state.selected.world=selected;
     const dataset=worldTextureDataset(),image=el("img",{class:"world-visual-image",src:`/assets/world-map.png?dataset=${encodeURIComponent(dataset)}&v=${encodeURIComponent(state.data.world.sha256)}`,alt:"Rendered Final Fantasy VIII world map"});
     const cells=segments.map(segment=>{const region=worldRow(state.data,"region",segment.id);return el("button",{type:"button",class:`world-segment-cell${segment.id===selected?" selected":""}`,title:`Segment ${segment.id} · region ${region?.regionId??"?"} · group ${segment.groupId}`,"aria-label":`Select world segment ${segment.id}`,onclick:()=>{state.selected.world=segment.id;rerenderWorldMap()}})});
-    const markers=state.data.world.drawPoints.map(point=>el("span",{class:"world-map-marker",style:`left:${point.x/255*100}%;top:${point.y/255*100}%`,title:`Draw Point ${point.drawId}`}));
+    const markers=state.data.world.drawPoints.filter(point=>point.x!==0||point.y!==0).map(point=>{
+      const position=worldDrawPosition(point);if(position.y>=96)return null;
+      return el("button",{type:"button",class:"world-map-marker",style:`left:${position.x/128*100}%;top:${position.y/96*100}%`,title:`Draw Point ${point.drawId} · click to edit`,"aria-label":`Open Draw Point ${point.drawId}`,onclick:event=>{event.stopPropagation();state.worldTab="drawPoints";state.selected.world=point.id;state.pages.world=0;state.filters.world="";state.modOnly=false;rerenderWorldMap()}});
+    }).filter(Boolean);
     const stage=el("div",{class:"world-visual-stage"},image,...markers,el("div",{class:"world-segment-grid"},...cells));
-    return el("div",{class:"world-visual-layout"},el("section",{class:"world-visual-panel","aria-label":"FF8 world map"},stage),worldSegmentDetail(row));
+    const panel=el("section",{class:"world-visual-panel","aria-label":"FF8 world map"},stage,el("div",{class:"world-map-help"},infoHelp("Red dots are world Draw Points. Click a dot to edit it. Use the mouse wheel to zoom, hold the middle mouse button to pan, and double-click to fit the map.")));
+    worldMapNavigation(panel,stage);
+    return el("div",{class:"world-visual-layout"},panel,worldSegmentDetail(row));
   }
   function worldDetail(row,prefs){
     if(row.kind==="region")return sharedDetail({...row,name:`REGION CELL ${row.id}`},prefs,[detailSection({title:"WORLD REGION",body:[detailField({label:"X",control:readonlyField(row.x)}),detailField({label:"Y",control:readonlyField(row.y)}),detailField({label:"REGION ID",help:infoHelp("This region combines with ground type to choose which world-map encounter rule and encounter group apply in this segment."),control:worldNumber(row,"regionId",0,255,"World region ID")})]})],"world-map-detail");

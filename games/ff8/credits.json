@@ -2,7 +2,7 @@
   "contributions": [
     {
       "name": "HobbitDur",
-      "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas and editor references.",
+      "role": "FF8 Ultimate Editor and FF8GameData: LZS code, format schemas, editor references, and Cid packed world Draw Point coordinate conversion.",
       "url": "https://github.com/HobbitDur/FF8UltimateEditor"
     },
     {
