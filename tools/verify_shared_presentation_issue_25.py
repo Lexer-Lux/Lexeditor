@@ -10,11 +10,16 @@ ff8 = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
 rdr2 = (ROOT / "games" / "rdr2" / "editor.html").read_text(encoding="utf-8")
 rdr = (ROOT / "games" / "rdr" / "editor.html").read_text(encoding="utf-8")
 
-assert 'const isSpecialTab = tab =>' in framework and '"settings", "tweaks"' in framework
+# Tweaks was deliberately returned to the ordinary tab run. Settings is the
+# only shared special tab; Tweaks may keep its subtle lex-tweaks-tab marker but
+# must not be grouped with Settings again.
+assert 'const isSpecialTab = tab =>' in framework and 'tab.id === "settings"' in framework
+assert '["settings", "tweaks"].includes(tab.id)' not in framework
+assert 'tab.id === "tweaks" ? "lex-tweaks-tab"' in framework
 assert 'localeCompare' in framework
 assert 'lex-settings-tab' in framework and '.lex-settings-tab' in css
 for source in (ff8, rdr, rdr2):
-    assert '["settings","Tweaks"]' in source or 'id:"settings",label:"Tweaks"' in source
+    assert 'Tweaks' in source
     assert '["settings","Settings"]' not in source and 'id:"settings",label:"Settings"' not in source
 assert 'lex-page-summary' in framework and '${formatNumber(first)}-${formatNumber(last)}/${formatNumber(total)}' in framework
 assert 'of ${formatNumber(total)} ${noun}' not in framework
