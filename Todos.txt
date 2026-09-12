@@ -64,11 +64,23 @@
 * [x] Remove unnecessary disclaimers such as `Read only` when the UI state itself already makes that obvious.
   * RDR1's toolbar banner is gone; Warband's troop panel says where the record
     is edited instead of that it is not editable here.
-* [~] Standardize the Details-panel 3D Viewer control:
-  * The shared control exists: `modelPreview` on the panel heading icon, with
-    one open/close position every plugin gets. Making omission *impossible*
-    needs each plugin to declare whether a record type has 3D data at all,
-    which Warband and RDR2 do not carry yet - that declaration is the work.
+* [x] Standardize the Details-panel 3D Viewer control:
+  * The last plugin that was not using it is now. RDR2 owned the whole thing:
+    a separate eye button in the item's name line opening a page-wide modal,
+    so a reader moving between games met a different control in the same
+    situation. Its item panel has a real shared heading now, the heading icon
+    is the trigger and turns into the close mark, and the model appears in the
+    shared drawer. Micah's Revolver reads out of packs_1.rpf and draws at
+    17,060 vertices in the drawer.
+  * The private part stayed private, which is the point: which archive holds
+    the mesh, whether this machine can read it, and how the geometry is fetched
+    and drawn are all still the plugin's own. Every game needs some of that.
+  * Two things had to give. The framework only understood a ready-made node as
+    drawer content, so a preview that has to read a mesh out of a game archive
+    had no way to defer that cost - it takes a factory now. And the inventory
+    icon is a button of its own; left in the trigger slot one click opened both
+    the icon picker and the drawer, so in the detail panel it is shown rather
+    than clicked and its action moved to the actions column.
 
 ### Menu Bar / Window Chrome
 
@@ -185,9 +197,12 @@
 
 ## Items
 
-* [~] Most properties lack useful info/help text.
-  * The rule and the reasoning are in the manual; writing the pips themselves is
-    per-property authoring that needs someone who knows what each value does.
+* [-] Most properties lack useful info/help text. Dropped on Lexer's call.
+  * Not a mechanism problem: the rule and the reasoning are in the manual and
+    every property row can carry a pip. It is authoring, and the volume is the
+    obstacle. One FF7R ability record is sixty-one properties read straight out
+    of the game's schema, and a real pip for something like Target Correction
+    Direction Angle means knowing what the engine does with it.
 * [x] Item names should be editable directly from the Detail-panel header rather than as a separate Name property.
   * Done against the installed game. RDR1's item panel was its own hand-rolled
     div with NAME and FRIENDLYNAME as ordinary rows, so the name at the top was

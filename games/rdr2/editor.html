@@ -766,10 +766,6 @@
   .name-line .special-info { grid-column:1; grid-row:1; color:#fff; font-size:14px; cursor:help; text-align:center; }
   .name-line .icon-link { width:26px; height:26px; padding:0; }
   .item-identity-actions { grid-column:3; grid-row:1 / span 2; display:grid; grid-template-rows:repeat(2,26px); gap:5px; align-self:start; }
-  .name-line .model-eye { display:inline-grid; place-items:center; color:var(--accent2); }
-  .name-line .model-eye svg { display:block; width:17px; height:17px; }
-  .name-line .model-eye:disabled { color:var(--dim); opacity:.35; cursor:help; }
-  .name-line .model-eye.loading:disabled { color:var(--accent2); opacity:1; }
   .model-eye-throbber { width:15px; height:15px; border:2px solid color-mix(in srgb,var(--accent2) 28%,transparent);
     border-top-color:var(--accent2); border-radius:50%; animation:model-eye-spin .72s linear infinite; }
   @keyframes model-eye-spin { to { transform:rotate(360deg); } }
@@ -787,6 +783,7 @@
   .item-icon img { width:100%; height:100%; object-fit:contain; display:block; }
   .item-icon.loading,.item-icon.missing { display:grid; place-items:center; cursor:help; }
   .item-icon.loading:disabled,.item-icon.missing:disabled { opacity:1; }
+  .item-icon.item-icon-shown:disabled { opacity:1; cursor:inherit; pointer-events:none; }
   .item-icon.loading .model-eye-throbber { width:22px; height:22px; }
   .item-icon.missing { color:#c77269; background:#15110f; border-color:#65423e; }
   .item-icon.missing svg { width:62%; height:62%; display:block; }
@@ -803,7 +800,13 @@
   .model-preview-title { min-width:0; }
   .model-preview-title .record-name { font-size:23px; }
   .model-preview-title .key { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .model-preview-stage { position:relative; flex:1 1 auto; min-height:360px; overflow:hidden; background:radial-gradient(circle at 50% 42%,#292620 0,#141310 58%,#090908 100%); }
+  /* The preview lives in the shared drawer now, so it fills the drawer rather
+     than sizing a modal. The message is what the stage says before the mesh is
+     read out of the archive, and it becomes the drag/zoom hint afterwards. */
+  .model-preview-drawer-body { display:flex; flex-direction:column; gap:8px; height:100%; min-height:0; padding:10px 12px 12px; }
+  .model-preview-message { position:absolute; inset:0; display:grid; place-items:center; padding:24px;
+    color:#b5ac9d; text-align:center; font-size:12px; pointer-events:none; }
+  .model-preview-stage { position:relative; flex:1 1 auto; min-height:0; overflow:hidden; background:radial-gradient(circle at 50% 42%,#292620 0,#141310 58%,#090908 100%); }
   .model-preview-stage canvas { display:block; width:100%; height:100%; cursor:grab; touch-action:none; }
   .model-preview-stage canvas.dragging { cursor:grabbing; }
   .model-preview-loading,.model-preview-error { position:absolute; inset:0; display:grid; place-items:center; padding:40px; text-align:center; color:var(--dim); }
@@ -952,7 +955,6 @@
 const $ = s => document.querySelector(s);
 const el = window.LexeditorUI.el;
 const newButton=window.LexeditorUI.newButton;
-const standardCloseButton=window.LexeditorUI.closeButton;
 function showSaveFailure(error){const message=error?.message||String(error);toast("Save failed",true);LexeditorUI.showAlert({title:"Save failed",items:[{item:"Save",issue:message}],closeLabel:"Confirm and Close"});return error instanceof Error?error:new Error(message)}
 
 const state = {
@@ -2532,8 +2534,7 @@ function itemRow(it, asDetail=false) {
         relationshipTitle?el("span",{class:"special-info",title:relationshipTitle},"⚠"):"",
         localizationInput(it.nameKey),
         el("div",{class:"item-identity-actions"},
-          el("button",{class:"icon-link item-sources",title:"Show acquisition sources",onclick:()=>showItemSources(it)},"⌕"),
-          modelPreviewButton(it)),
+          el("button",{class:"icon-link item-sources",title:"Show acquisition sources",onclick:()=>showItemSources(it)},"⌕")),
         el("div",{class: "item-meta-line"},
           el("span",{class:"key item-meta-id"},it.key),
           el("span",{class: "item-meta-taxonomy"},
@@ -2541,7 +2542,14 @@ function itemRow(it, asDetail=false) {
             el("span",{class:"item-meta-separator","aria-hidden":"true"}),
             el("span",{class:"item-meta-category"},it.category.replace("CI_CATEGORY_","")))),
         nameReference));
-  const identity=el("div",{class:"item-identity"},itemIcon(texture,it),identityMain);
+  const iconOptions=asDetail?{showAt:(open,name)=>{
+    const actions=identityMain.querySelector(".item-identity-actions");
+    if(!actions||actions.querySelector(".item-icon-view"))return;
+    actions.append(el("button",{class:"icon-link item-icon-view",
+      title:"View the inventory icon at full size",
+      "aria-label":`View the ${name} inventory icon at full size`,onclick:open},"\u26f6"));
+  }}:{};
+  const identity=el("div",{class:"item-identity"},itemIcon(texture,it,iconOptions),identityMain);
   sizeItemIdentityIcon(identity,identityMain);
   const identityCell = el("td", {},identity);
   const usedInCell = (() => { const uses = recipesUsing(it.key); return el("td", {}, uses.length ?
@@ -2564,7 +2572,12 @@ function itemRow(it, asDetail=false) {
 // full-width labelled rows so each field has room for its input + beside refs
 // (reuses every cell builder; the <td> children are just moved into a div).
 function itemDetailPane(it, cells){
-  const pane = el("div",{class:"loot-detail-pane lex-detail item-detail"});
+  // The identity is the panel's HEADING, in the shared shape every other
+  // plugin uses: an icon slot on the left and the record's names beside it.
+  // It used to be the first ordinary field in the scrolling body, which is
+  // why this plugin also had to grow its own preview button - there was no
+  // heading icon for the shared control to take over.
+  const pane = el("section",{class:"lex-detail-panel loot-detail-pane lex-detail item-detail"});
   const controlFor=cell=>{
     // Carry the cell's own class (price-cell/purchase-output = flex row for
     // input + beside refs; plain cells stay block) so each field keeps the
@@ -2578,9 +2591,15 @@ function itemDetailPane(it, cells){
     return el("div",{class:"detail-field"},
       el("div",{class:"detail-label"},label,help?fieldHelp(help):""),control);
   };
-  const identityField=cell=>el("div",{class: "detail-field item-name-field"},controlFor(cell));
-  pane.append(
-    identityField(cells.identity),
+  const identity=cells.identity.querySelector(".item-identity");
+  const identityIcon=identity?.querySelector(".item-icon");
+  const identityMain=identity?.querySelector(".item-identity-main");
+  const heading=el("div",{class:"lex-detail-panel-heading no-actions"},
+    el("div",{class:"lex-detail-panel-icon"},identityIcon||""),
+    el("div",{class:"lex-detail-panel-identity"},identityMain||""));
+  const body=el("div",{class:"lex-detail-panel-body"});
+  pane.append(heading,body);
+  body.append(
     field("Description",cells.description),
     field("Buy price",cells.buy),
     field("Purchase output",cells.purchase,"What one purchase ultimately provides."),
@@ -2591,7 +2610,7 @@ function itemDetailPane(it, cells){
     field("Used in recipes",cells.usedIn),
     field("Effects",cells.effects),
     field("Tags",cells.tags,"Catalog tags. Use + to select a named tag from the full grouped list. Free-entry hashes are not supported."));
-  return pane;
+  return attachItemModelPreview(pane,it);
 }
 
 const inventoryIconLoads=new Map();
@@ -2655,16 +2674,25 @@ function markInventoryIconMissing(button,title){
   button.setAttribute("aria-label","Inventory icon is unavailable");button.replaceChildren(brokenImageIcon());
 }
 
-function itemIcon(texture,it){
+function itemIcon(texture,it,options={}){
   const title=texture?`${texture.dict} / ${texture.id}\nType: ${texture.type||"(none)"}`:"No texture reference on this catalog item";
   const button=el("button",{class:"item-icon loading",title,disabled:"","aria-label":"Checking inventory icon"},modelEyeThrobber());
   if(!inventoryIconCandidates(texture).length){markInventoryIconMissing(button,title);return button;}
   loadInventoryIcon(texture).then(src=>{
     if(!src){markInventoryIconMissing(button,title);return;}
     const img=el("img",{src,alt:`${localizedValue(it.nameKey)||it.key} icon`});
-    button.className="item-icon";button.disabled=false;button.title=title;
+    button.className="item-icon";button.title=title;button.replaceChildren(img);
+    if(options.showAt){
+      // Shown, not clicked: the click on this slot belongs to the shared model
+      // preview. The action it used to carry is handed to options.showAt.
+      button.disabled=true;button.classList.add("item-icon-shown");
+      button.setAttribute("aria-hidden","true");button.tabIndex=-1;
+      options.showAt(()=>showItemIcon(texture,it,src),localizedValue(it.nameKey)||it.key);
+      return;
+    }
+    button.disabled=false;
     button.setAttribute("aria-label",`View ${localizedValue(it.nameKey)||it.key} inventory icon`);
-    button.onclick=()=>showItemIcon(texture,it,src);button.replaceChildren(img);
+    button.onclick=()=>showItemIcon(texture,it,src);
   });
   return button;
 }
@@ -2682,46 +2710,24 @@ function showItemIcon(texture,it,src){
     el("div",{class:"dialog-actions"},el("button",{onclick:()=>{picker.classList.add("hidden");picker.replaceChildren();}},"Close"))));
 }
 
-function eyeIcon(){
-  const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");
-  svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("aria-hidden","true");
-  const path=document.createElementNS(ns,"path");path.setAttribute("fill","none");path.setAttribute("stroke","currentColor");
-  path.setAttribute("stroke-width","1.8");path.setAttribute("stroke-linecap","round");path.setAttribute("stroke-linejoin","round");
-  path.setAttribute("d","M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z M12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6Z");
-  svg.append(path);return svg;
-}
-
 function modelPreviewKey(it){return `${state.ds}|${it.key}|${it.model||""}`;}
 
 function modelEyeThrobber(){return el("span",{class:"model-eye-throbber","aria-hidden":"true"});}
 
-function markModelPreviewButtonLoading(button,it){
-  button.classList.add("loading");button.replaceChildren(modelEyeThrobber());button.disabled=true;
-  button.title=`Preparing the real ${it.model} model in the background…`;
-  button.setAttribute("aria-label",`Preparing ${it.model} model`);button.onclick=null;
-}
-
-function applyModelPreviewButton(button,it,status){
-  const load=state.modelPreviewLoads[modelPreviewKey(it)];
-  const available=!!it.model&&status?.available===true;
-  const checking=!!it.model&&status?.checking===true;
-  const loading=checking||load?.status==="loading";
-  button.classList.toggle("loading",loading);
-  button.replaceChildren(loading?modelEyeThrobber():eyeIcon());
-  button.disabled=!available||loading;
-  button.title=!it.model?"This catalog item does not name a model asset":
-    checking?`Checking the installed ${it.model} asset…`:
-    load?.status==="loading"?`Preparing the real ${it.model} model in the background…`:
-    available?`View the real ${it.model} model`:
-    status?.reason||"This installed model is not previewable";
-  button.setAttribute("aria-label",loading?`Preparing ${it.model} model`:available?`View ${it.model} model`:button.title);
-  button.onclick=available&&!loading?()=>requestModelPreview(it,button):null;
-}
-
-function modelPreviewButton(it){
+// The shared model-preview control: the panel's heading icon is the trigger,
+// it turns into the close mark while open, and the model appears in the drawer
+// that slides over the editing surface. Every plugin gets that same control
+// from the framework. What stays private here is the part that has to be:
+// which archive holds the mesh, whether this machine can read it, and how the
+// geometry is fetched and drawn. This plugin used to own the whole thing - a
+// separate eye button in the name line opening a page-wide modal - so a reader
+// moving between games met a different control in the same situation.
+function attachItemModelPreview(pane,it){
+  const icon=pane.querySelector(".lex-detail-panel-icon");
+  if(!icon)return pane;
+  const describe=text=>{icon.title=text;icon.setAttribute("aria-label",text);};
+  if(!it.model){describe("This catalog item does not name a model asset");return pane;}
   const key=modelPreviewKey(it);
-  const button=el("button",{class:"icon-link model-eye"},eyeIcon());
-  if(!it.model){applyModelPreviewButton(button,it,{available:false});return button;}
   let status=state.modelPreviewAvailability[key];
   if(!status){
     const promise=api(`/api/model-preview/availability?item=${encodeURIComponent(it.key)}`)
@@ -2729,13 +2735,69 @@ function modelPreviewButton(it){
       .catch(error=>{const result={available:false,reason:`Model check failed: ${error.message}`};state.modelPreviewAvailability[key]=result;return result;});
     status={checking:true,promise};state.modelPreviewAvailability[key]=status;
   }
-  applyModelPreviewButton(button,it,status);
-  if(status.promise)status.promise.then(result=>{if(button.isConnected)applyModelPreviewButton(button,it,result);});
-  const load=state.modelPreviewLoads[key];
-  if(load?.status==="loading")load.promise.then(
-    ()=>{if(button.isConnected)applyModelPreviewButton(button,it,state.modelPreviewAvailability[key]);},
-    ()=>{if(button.isConnected)applyModelPreviewButton(button,it,state.modelPreviewAvailability[key]);});
-  return button;
+  const settle=result=>{
+    if(!icon.isConnected)return;
+    if(result?.available!==true){
+      describe(result?.reason||"This installed model is not previewable");
+      return;
+    }
+    armItemModelPreview(pane,it);
+  };
+  if(status.checking&&status.promise){
+    describe(`Checking the installed ${it.model} asset\u2026`);
+    status.promise.then(settle,()=>settle(null));
+  }else settle(status);
+  return pane;
+}
+
+// The drawer's contents. It opens immediately saying what it is doing, because
+// reading a mesh out of the installed archives is not instant and a control
+// that does nothing for four seconds reads as broken.
+function armItemModelPreview(pane,it){
+  const name=localizedValue(it.nameKey)||it.key;
+  let controller=null;
+  LexeditorUI.attachModelPreview(pane,{
+    label:`${name} model`,
+    openLabel:`View the real ${it.model} model`,
+    closeLabel:`Close the ${it.model} model`,
+    content:()=>{
+      const canvas=el("canvas",{"aria-label":`Interactive 3D preview of ${it.model}`});
+      const message=el("div",{class:"model-preview-message"},`Preparing the real ${it.model} model\u2026`);
+      const stage=el("div",{class:"model-preview-stage"},canvas,message);
+      const facts=el("div",{class:"model-preview-facts"});
+      const drawer=el("div",{class:"model-preview-drawer-body"},stage,facts);
+      canvas.hidden=true;
+      prepareModelPreview(it).promise.then(async task=>{
+        if(!drawer.isConnected)return;
+        const preview=task.preview,geometry=task.geometry;
+        controller=await createModelRenderer(canvas,geometry);
+        if(!drawer.isConnected){controller.dispose();controller=null;return;}
+        canvas.hidden=false;
+        message.replaceChildren(el("span",{},"Drag to rotate \u00b7 Wheel to zoom \u00b7 Double-click to reset"));
+        // It stops being the stage's whole message and becomes the corner
+        // hint, so it swaps class rather than wearing both.
+        message.classList.remove("model-preview-message");
+        message.classList.add("model-preview-help");
+        facts.append(
+          el("span",{},`${preview.format} \u00b7 LOD ${geometry.lod}`),
+          el("span",{},`${preview.summary.vertices.toLocaleString()} vertices`),
+          el("span",{},`${preview.summary.triangles.toLocaleString()} triangles`),
+          el("span",{title:`${preview.source.outerArchive} \u2192 ${preview.source.archiveChain.join(" \u2192 ")} \u2192 ${preview.source.entry}`},
+            `${preview.source.outerArchive} \u2192 ${preview.source.entry}`),
+          el("span",{},preview.limitations.join(" ")));
+        window.__lexModelPreview={item:it.key,model:it.model,preview,geometry,canvas,controller};
+        requestAnimationFrame(controller.draw);
+      }).catch(error=>{
+        delete state.modelPreviewLoads[modelPreviewKey(it)];
+        if(drawer.isConnected)message.replaceChildren(el("span",{},error.message));
+      });
+      return drawer;
+    },
+    onClose:()=>{
+      controller?.dispose();controller=null;
+      delete window.__lexModelPreview;
+    },
+  });
 }
 
 function prepareModelPreview(it){
@@ -2750,27 +2812,7 @@ function prepareModelPreview(it){
   state.modelPreviewLoads[key]=task;return task;
 }
 
-function modelPreviewContextCurrent(button,it,context){
-  return button.isConnected&&state.tab==="items"&&state.ds===context.ds&&state.filters.itemSel===it.key&&$("#picker").classList.contains("hidden");
-}
-
-async function requestModelPreview(it,button){
-  const key=modelPreviewKey(it),context={ds:state.ds};
-  let task=prepareModelPreview(it);
-  markModelPreviewButtonLoading(button,it);
-  try{
-    task=await task.promise;
-    if(!modelPreviewContextCurrent(button,it,context))return;
-    await openPreparedModelPreview(it,task,button,context);
-  }catch(error){
-    delete state.modelPreviewLoads[key];
-    if(modelPreviewContextCurrent(button,it,context))toast(error.message,true);
-  }finally{
-    if(button.isConnected)applyModelPreviewButton(button,it,state.modelPreviewAvailability[key]);
-  }
-}
-
-function formatFileSize(value){
+async function formatFileSize(value){
   const bytes=Math.max(0,Number(value)||0);if(bytes<1024)return `${bytes} B`;
   const units=["KB","MB","GB"],power=Math.min(units.length,Math.floor(Math.log(bytes)/Math.log(1024)));
   return `${(bytes/1024**power).toFixed(power>1?2:1)} ${units[power-1]}`;
@@ -2923,29 +2965,7 @@ async function createModelRenderer(canvas,geometry){
   return{reset,draw,state:()=>({yaw,pitch,zoom}),dispose:()=>{disposed=true;observer.disconnect();canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);canvas.removeEventListener("wheel",wheel);canvas.removeEventListener("dblclick",reset);for(const resource of resources){if(resource.kind==="vao")gl.deleteVertexArray(resource.value);else if(resource.kind==="texture")gl.deleteTexture(resource.value);else gl.deleteBuffer(resource.value);}gl.deleteProgram(program);}};
 }
 
-async function openPreparedModelPreview(it,task,button,context){
-  const picker=$("#picker");let controller=null;
-  const panel=el("section",{class:"picker-panel model-preview-panel",role:"dialog","aria-modal":"true","aria-label":`${localizedValue(it.nameKey)||it.key} model preview`});
-  const canvas=el("canvas",{"aria-label":`Interactive 3D preview of ${it.model}`});
-  const stage=el("div",{class:"model-preview-stage"},canvas,el("div",{class:"model-preview-help"},"Drag to rotate · Wheel to zoom · Double-click to reset"));
-  const preview=task.preview,geometry=task.geometry;
-  const facts=el("div",{class:"model-preview-facts"},el("span",{},`${preview.format} · LOD ${geometry.lod}`),el("span",{},`${preview.summary.vertices.toLocaleString()} vertices`),el("span",{},`${preview.summary.triangles.toLocaleString()} triangles`),
-    el("span",{title:`${preview.source.outerArchive} → ${preview.source.archiveChain.join(" → ")} → ${preview.source.entry}`},`${preview.source.outerArchive} → ${preview.source.entry}`),
-    el("span",{},preview.limitations.join(" ")));
-  let onKey=null;
-  const close=()=>{controller?.dispose();controller=null;delete window.__lexModelPreview;if(onKey)document.removeEventListener("keydown",onKey);picker.classList.add("hidden");picker.replaceChildren();};
-  const dismiss=standardCloseButton({title:"Close model viewer","aria-label":"Close model viewer",onclick:close});
-  panel.append(el("div",{class:"model-preview-head"},el("div",{class:"model-preview-title"},el("span",{class:"record-name"},localizedValue(it.nameKey)||it.key),el("div",{class:"key"},it.model)),dismiss),stage,
-    el("div",{class:"model-preview-foot"},facts));
-  controller=await createModelRenderer(canvas,geometry);
-  if(!modelPreviewContextCurrent(button,it,context)){controller.dispose();return false;}
-  picker.replaceChildren(panel);picker.onclick=event=>{if(event.target===picker)close();};
-  onKey=event=>{if(event.key==="Escape")close();};document.addEventListener("keydown",onKey);
-  window.__lexModelPreview={item:it.key,model:it.model,preview,geometry,canvas,controller};
-  picker.classList.remove("hidden");requestAnimationFrame(controller.draw);return true;
-}
-
-function itemDescriptionCell(it){
+async function itemDescriptionCell(it){
   if(isRO()&&!it.descriptionKey){const area=el("textarea",{readonly:"readonly",title:"This catalog record has no description field."});area.value="N/A";return el("td",{},area);}
   const shared=it.descriptionKey&&state.catalog.items.filter(x=>x.descriptionKey===it.descriptionKey).length>1;
   const generatedDescriptionKey=/^0x[0-9a-f]{8}$/i.test(it.key)

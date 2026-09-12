@@ -27,7 +27,11 @@ PYTHON = str(ROOT / ".venv" / "Scripts" / "python.exe")
 
 
 def _once(tool: Path, timeout: float = 180, output: Path | None = None,
-          attempt: int = 1, max_log_bytes: int = 8 * 1024 * 1024) -> tuple[int, str]:
+          attempt: int = 1, max_log_bytes: int = 8 * 1024 * 1024
+          ) -> tuple[int, str, str]:
+    """Run one verifier once. Returns its exit code, the last line of its
+    output, and the last six lines. The six are what tells a check that
+    could not run here apart from one that ran and found a problem."""
     output = output or ROOT / "_scratch" / "verify-results"
     output.mkdir(parents=True, exist_ok=True)
     log = output / f"{tool.stem}.attempt-{attempt}.log"

@@ -6658,7 +6658,12 @@ ${contents.path}`});
     const heading = panel.querySelector(':scope > .lex-detail-panel-heading');
     const icon = heading?.querySelector('.lex-detail-panel-icon');
     if (!heading || !icon) return panel;
-    const getContent = typeof spec === 'function' ? spec : () => spec.content;
+    // The content may be a node or a factory. A preview that has to read a
+    // mesh out of a game archive should not pay for that until someone opens
+    // the drawer, and a factory is how a plugin says so.
+    const getContent = typeof spec === 'function' ? spec
+      : typeof spec.content === 'function' ? spec.content
+      : () => spec.content;
     const onOpen = typeof spec === 'object' ? spec.onOpen : null;
     const onClose = typeof spec === 'object' ? spec.onClose : null;
     const openLabel = typeof spec === 'object' && spec.openLabel ? spec.openLabel : 'Open model preview';
