@@ -103,7 +103,13 @@ Representative structured behavior includes:
 
 Where a common advanced hook cannot be represented safely as simple fields, selected generators expose a preserved custom hook outside the managed region (for example biome/scene extra conditions and command actions) rather than accepting arbitrary C# inside structured values.
 
-Creation is no-overwrite and generates localization/assets where the native content type needs them. Biomes receive replaceable `_Icon` and `_Background` placeholders at their tModLoader default paths; ordinary textured content receives replaceable placeholders appropriate to its managed type.
+Creation is no-overwrite and generates localization/assets where the native content type needs them. Generated placeholders follow the native contracts used by the managed type rather than pretending every texture is a square icon:
+
+- Items and ordinary one-frame content start with replaceable 16×16 placeholders.
+- NPC and projectile placeholders are vertical 16-pixel frame strips whose height follows the structured `frames` value.
+- `ModDust` receives a 10×30 three-frame dust sheet.
+- The simple 1×1 tile editor receives a 288×270 block framing sheet and the wall editor a 468×180 wall framing sheet, matching current basic tModLoader/ExampleMod framing layouts.
+- Biomes receive replaceable 30×30 bestiary icons, 64×64 bestiary backgrounds, and—when map background generation is enabled—a separate 115×65 `_MapBackground` texture as required by `ModSceneEffect.MapBackground`.
 
 The earlier one-click **ModSystem** and **ModPlayer** empty scaffolds remain available. Raw Source remains available for everything else.
 
@@ -148,6 +154,29 @@ Raw logs remain available because tModLoader can emit useful non-compiler diagno
 
 Synthetic command/diagnostic tests do **not** count as installed-game acceptance.
 
+## Native acceptance harness
+
+`tools/terraria_acceptance.py` turns the remaining installed-runtime check into a repeatable local test instead of a hand-written throwaway mod. It creates a new timestamped native source project, generates one conservative representative of **all 20 managed Content families**, and can invoke the same real Windows tModLoader build service Lexeditor uses.
+
+Typical Windows invocation from the repository root:
+
+```powershell
+python tools/terraria_acceptance.py `
+  --install-root "C:\Program Files (x86)\Steam\steamapps\common\tModLoader" `
+  --save-root "$env:USERPROFILE\Documents\My Games\Terraria\tModLoader"
+```
+
+`--generate-only` creates the representative project without attempting the native build and is also usable on non-Windows systems. The harness refuses to overwrite an existing acceptance project, leaves the generated project/package in place for inspection, and reports PASS only when the native tModLoader build succeeds and the expected `.tmod` artifact exists.
+
+The representative mod also provides two simple in-game smoke checks:
+
+1. `/lexaccept` must reply `Lexeditor Terraria acceptance mod loaded.`
+2. One Dirt Block must be craftable by hand into the checker-textured `Acceptance Item`.
+
+Those checks exercise real mod loading plus a generated command, recipe, item and packaged texture. The mod also contains representatives of the other managed families so tModLoader's content loader must accept their generated C#/assets during the same load.
+
+Running the harness in generic CI or with `--generate-only` still does **not** satisfy installed-game acceptance. The final pass requires the harness to run against the intended Windows tModLoader installation and the generated mod to load in game.
+
 ## Local package and enabled state
 
 tModLoader stores local packages under `<save-root>/Mods` and mirrors its enabled-mod set in `<save-root>/Mods/enabled.json`. Lexeditor reports the expected local `.tmod` and whether the selected mod name is present in that native enabled set.
@@ -164,6 +193,7 @@ Missing `enabled.json` **or the JSON literal `null`** is treated as an empty ena
 - **Content:** 20-family preservation-bounded structured Content editor, ModSystem/ModPlayer scaffolds, and raw Source for behavior outside the model.
 - **Assets:** known-format import/replace/rename/delete with preview where practical.
 - **Build:** native tModLoader `-build` with structured C# diagnostics plus raw logs.
+- **Acceptance:** repeatable 20-family local native-build harness plus explicit in-game smoke checks.
 - **Runtime state:** report local package and native enabled state without rewriting it.
 - **Vanilla Terraria install:** read-only.
 
@@ -178,10 +208,11 @@ Missing `enabled.json` **or the JSON literal `null`** is treated as an empty ena
 
 ## Acceptance boundary
 
-Automated parser/service/editor tests and synthetic native-build handoff tests are not installed-game acceptance. Final acceptance requires a real current **Windows tModLoader 1.4.4 stable** installation to:
+Automated parser/service/editor tests, synthetic native-build handoff tests, and acceptance-project generation are not installed-game acceptance. Final acceptance requires a real current **Windows tModLoader 1.4.4 stable** installation to:
 
-1. build a Lexeditor-created source project through the actual installed bootstrap;
-2. produce/expose the local `.tmod` in tModLoader;
-3. load representative Lexeditor-authored metadata, localization, C#, managed Content and asset changes in game.
+1. run `tools/terraria_acceptance.py` through the actual installed bootstrap and produce the expected local `.tmod`;
+2. load the generated acceptance mod in tModLoader without content/asset errors;
+3. run `/lexaccept` successfully;
+4. craft the generated `Acceptance Item` from one Dirt Block.
 
-That installed-runtime acceptance is intentionally the remaining hard boundary.
+That installed-runtime/in-game run is intentionally the remaining hard boundary.
