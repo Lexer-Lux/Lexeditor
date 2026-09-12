@@ -68,7 +68,7 @@
         <article class="ffxx2-dashboard-card"><h3>Structured FFX-2 data</h3><p>The first X-2 write path is deliberately narrow: command animation IDs only, with all text references and unknown bytes preserved.</p><div class="big">1 editor</div></article>
         <article class="ffxx2-dashboard-card"><h3>Game-derived theme</h3><p id="theme-detail">Looking for original menu art, font atlases, textures and UI sound banks in your installed copy…</p><div id="theme-big" class="big">Scanning</div></article>
         <article class="ffxx2-dashboard-card"><h3>Deployment boundary</h3><p>Project files remain separate until you explicitly deploy one Lexeditor-owned, file-only Fahrenheit mod.</p><div id="deploy-big" class="big">Checking</div></article>
-      </div><div class="ffxx2-flow"><span>Installed VBF</span><i></i><span>Structured edit / extraction</span><i></i><span>Project EFL overlay</span><i></i><span>Fahrenheit</span></div></div>
+      </div><div class="ffxx2-flow"><span>Installed VBF</span><i></i><span>Structured edit / extraction</span><i></i><span>Project EFL overlay</span><i></i><span>Fahrenheit</span></div><div id="ffxx2-mod-loader" style="margin-top:12px"></div></div>
     </main>
     <main class="ffxx2-panel" data-panel="treasures" hidden>
       <div class="ffxx2-panel-head"><div class="ffxx2-panel-title"><h2>FFX Treasure Rewards</h2><p><span class="ffxx2-path">takara.bin</span> · reward kind, quantity and type ID only; opaque bytes preserved.</p></div><button id="treasure-save" class="ffxx2-button save" type="button" disabled>Save edits</button></div>
@@ -130,6 +130,18 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 async function api(url,options){const r=await fetch(url,options),j=await r.json();if(!r.ok)throw new Error(j.error||`${r.status}`);return j}
 function bytes(n){if(n==null)return'—';const u=['B','KiB','MiB','GiB'];let i=0,v=Number(n);while(v>=1024&&i<u.length-1){v/=1024;i++}return`${v.toFixed(i?1:0)} ${u[i]}`}
 function hex(n,width=4){return`0x${Number(n).toString(16).toUpperCase().padStart(width,'0')}`}
+function renderModLoaderInfo(){
+  const host=$('ffxx2-mod-loader');
+  if(!host||host.childElementCount)return;
+  host.append(LexeditorUI.modLoaderSection({
+    loader:"Fahrenheit's External File Loader (EFL) loads this plugin's file-only overlay.",
+    output:"Project files mirror Fahrenheit virtual paths under <project>/efl/x/ and <project>/efl/x2/, then deploy under <game>/fahrenheit/mods/lexeditor-ffx-x2/.",
+    order:"Fahrenheit load order applies; when two mods provide the same virtual path, the later entry wins.",
+    safety:"Lexeditor never patches or rebuilds the installed FFX/FFX-2 VBF archives. It owns only its deployment folder and exact load-order entry.",
+    removal:"Use Revert to remove the Lexeditor-owned deployment. Revert refuses if the deployed state changed outside Lexeditor.",
+  }));
+}
+renderModLoaderInfo();
 function showError(error){$('error').textContent=error?String(error.message||error):''}
 function showView(name){document.querySelectorAll('[data-panel]').forEach(panel=>panel.hidden=panel.dataset.panel!==name);document.querySelectorAll('[data-view]').forEach(button=>{const active=button.dataset.view===name;button.classList.toggle('active',active);button.setAttribute('aria-selected',String(active))})}
 function themeChips(t){const chips=[],bg=t?.background||{},font=t?.font||{},textures=t?.textures||{},sfx=t?.sfx||{};chips.push(`<span class="ffxx2-chip ${bg.ready?'ready':'partial'}">ART ${bg.ready?'ACTIVE':'FALLBACK'}</span>`);if(font.webReady)chips.push('<span class="ffxx2-chip ready">FONT ACTIVE</span>');else if(font.atlasRecognized)chips.push(`<span class="ffxx2-chip partial">FONT ATLAS ${font.atlasCached}/${font.atlasRecognized}</span>`);if(textures.recognized)chips.push(`<span class="ffxx2-chip ${textures.cached?'ready':'partial'}">UI TEX ${textures.cached}/${textures.recognized}</span>`);if(sfx.webReady)chips.push('<span class="ffxx2-chip ready">UI SFX ACTIVE</span>');else if(sfx.recognizedBanks)chips.push(`<span class="ffxx2-chip partial">SFX BANK ${sfx.cachedBanks}/${sfx.recognizedBanks}</span>`);return chips.join('')}
