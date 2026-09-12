@@ -13,6 +13,7 @@ OBJECT_TARGET = "Data/Objects"
 OBJECT_FIELDS = {"Price", "Edibility", "IsDrink"}
 DEPLOY_MARKER = ".lexeditor-deployment.json"
 ACCEPTANCE_MARKER = ".lexeditor-stardew-acceptance.json"
+MIN_CONTENT_PATCHER_VERSION = "2.9.0"
 MAX_JSON_BYTES = 8 * 1024 * 1024
 
 
@@ -40,6 +41,24 @@ def _atomic_json(path: Path, value: dict) -> None:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _version_tuple(value: str | None) -> tuple[int, ...] | None:
+    if not value:
+        return None
+    match = re.match(r"^(\d+(?:\.\d+){1,3})", str(value).strip())
+    if not match:
+        return None
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def _version_at_least(actual: str | None, minimum: str) -> bool:
+    actual_parts = _version_tuple(actual)
+    minimum_parts = _version_tuple(minimum)
+    if actual_parts is None or minimum_parts is None:
+        return False
+    width = max(len(actual_parts), len(minimum_parts))
+    return actual_parts + (0,) * (width - len(actual_parts)) >= minimum_parts + (0,) * (width - len(minimum_parts))
 
 
 def _object_change(payload: dict, *, create: bool) -> dict | None:
@@ -167,7 +186,7 @@ def initialize_project(root: Path) -> None:
     _atomic_json(manifest_path, manifest)
 
 
-def _find_mod(game_root: Path, unique_id: str) -> Path | None:
+def _find_mod_manifest(game_root: Path, unique_id: str) -> tuple[Path, dict] | None:
     mods = Path(game_root) / "Mods"
     if not mods.is_dir():
         return None
@@ -177,20 +196,29 @@ def _find_mod(game_root: Path, unique_id: str) -> Path | None:
         except (OSError, ValueError, json.JSONDecodeError):
             continue
         if manifest.get("UniqueID") == unique_id:
-            return manifest_path.parent
+            return manifest_path.parent, manifest
     return None
 
 
 def loader_status(game_root: Path) -> dict:
     root = Path(game_root).resolve()
     smapi = root / "StardewModdingAPI.exe"
-    content_patcher = _find_mod(root, "Pathoschild.ContentPatcher")
+    found = _find_mod_manifest(root, "Pathoschild.ContentPatcher")
+    content_patcher = found[0] if found else None
+    manifest = found[1] if found else {}
+    version = str(manifest.get("Version")) if manifest.get("Version") is not None else None
+    compatible = content_patcher is not None and _version_at_least(version, MIN_CONTENT_PATCHER_VERSION)
     return {
         "smapi": smapi.is_file(),
         "smapiExecutable": str(smapi),
         "contentPatcher": content_patcher is not None,
         "contentPatcherRoot": str(content_patcher) if content_patcher else None,
-        "ready": smapi.is_file() and content_patcher is not None,
+        "contentPatcherManifest": str(content_patcher / "manifest.json") if content_patcher else None,
+        "contentPatcherVersion": version,
+        "contentPatcherMinimumApiVersion": str(manifest.get("MinimumApiVersion")) if manifest.get("MinimumApiVersion") is not None else None,
+        "contentPatcherCompatible": compatible,
+        "requiredContentPatcherVersion": MIN_CONTENT_PATCHER_VERSION,
+        "ready": smapi.is_file() and compatible,
     }
 
 
@@ -238,8 +266,15 @@ def deploy(game_root: Path, project_root: Path) -> dict:
     game = Path(game_root).resolve(); project = Path(project_root).resolve()
     ContentPackStore(project).validate()
     loader = loader_status(game)
-    if not loader["ready"]:
-        raise RuntimeError("Install SMAPI and Content Patcher before deploying this project")
+    if not loader["smapi"]:
+        raise RuntimeError("Install SMAPI before deploying this project")
+    if not loader["contentPatcher"]:
+        raise RuntimeError("Install Content Patcher before deploying this project")
+    if not loader["contentPatcherCompatible"]:
+        raise RuntimeError(
+            f"Content Patcher {loader['contentPatcherVersion'] or 'unknown'} is installed; "
+            f"Lexeditor requires {MIN_CONTENT_PATCHER_VERSION} or newer"
+        )
     target = deployment_target(game, project)
     target.parent.mkdir(parents=True, exist_ok=True)
     status = deployment_status(game, project)
