@@ -1,0 +1,68 @@
+name: FFX-X2 post-sync CI compatibility
+
+on:
+  push:
+    branches: [feature/ffx-x2-plugin]
+    paths:
+      - '.github/workflows/ffx-x2-ci-compat.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch stale shared acceptance and FF7R test dependency
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          visual_path = Path('.github/scripts/ui_visual_acceptance.py')
+          visual = visual_path.read_text(encoding='utf-8')
+          old = '''            # string (name + range endpoints) rotated in the graph margin.
+            page.evaluate("navigate('graphs')"); page.wait_for_timeout(180)
+'''
+          new = '''            # The Y-axis name stays vertical while the range endpoints sit
+            # horizontally in the left graph margin.
+            page.evaluate("navigate('graphs')"); page.wait_for_timeout(180)
+'''
+          if visual.count(old) != 1:
+              raise RuntimeError(f'graph comment anchor count: {visual.count(old)}')
+          visual = visual.replace(old, new, 1)
+          old = '''            for node in (y_name, axis_top, axis_bottom):
+                assert node.evaluate("e=>getComputedStyle(e).writingMode").startswith('vertical'), (width, 'right-axis text is not vertical', node.get_attribute('class'))
+            for node in (axis_top, axis_bottom, y_name):
+                nb = node.bounding_box(); assert nb['x'] + nb['width'] >= svg_box['x'] + svg_box['width'] - 2, (width, 'right-axis text is not in right margin', node.get_attribute('class'), nb, svg_box)
+'''
+          new = '''            assert y_name.evaluate("e=>getComputedStyle(e).writingMode").startswith('vertical'), (width, 'y-axis name is not vertical')
+            for node in (axis_top, axis_bottom):
+                assert node.evaluate("e=>getComputedStyle(e).writingMode") == 'horizontal-tb', (width, 'y-scale number is not horizontal', node.get_attribute('class'))
+            for node in (axis_top, axis_bottom, y_name):
+                nb = node.bounding_box(); assert nb['x'] <= svg_box['x'] + 2, (width, 'y-axis text is not in left margin', node.get_attribute('class'), nb, svg_box)
+'''
+          if visual.count(old) != 1:
+              raise RuntimeError(f'graph assertion anchor count: {visual.count(old)}')
+          visual_path.write_text(visual.replace(old, new, 1), encoding='utf-8')
+
+          workflow_path = Path('.github/workflows/ff7r-checks.yml')
+          workflow = workflow_path.read_text(encoding='utf-8')
+          old = '        run: python -m pip install pytest Pillow==12.3.0 texfury==1.6.2\n'
+          new = '        run: python -m pip install pytest Pillow==12.3.0 texfury==1.6.2 cryptography\n'
+          if workflow.count(old) != 1:
+              raise RuntimeError(f'FF7R dependency anchor count: {workflow.count(old)}')
+          workflow_path.write_text(workflow.replace(old, new, 1), encoding='utf-8')
+          PY
+          python -m py_compile .github/scripts/ui_visual_acceptance.py
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/ffx-x2-ci-compat.yml
+          git add .github/scripts/ui_visual_acceptance.py .github/workflows/ff7r-checks.yml
+          git commit -m "Fix post-sync shared CI drift"
+          git push origin HEAD:feature/ffx-x2-plugin
