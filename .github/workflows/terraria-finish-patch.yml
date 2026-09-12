@@ -1,4 +1,5 @@
 name: Finish Terraria structured editor pass
+# retry with compatibility repair
 
 on:
   push:
@@ -21,7 +22,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Apply final structured pass
-        run: python .github/scripts/terraria_finish_patch.py
+        run: |
+          python .github/scripts/terraria_finish_patch.py
+          python .github/scripts/terraria_finish_repair.py
       - name: Verify Terraria
         run: |
           python -m compileall -q games/terraria plugin_api.py project_manager.py
@@ -33,7 +36,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm -f .github/workflows/terraria-finish-patch.yml .github/scripts/terraria_finish_patch.py
-          git add games/terraria/content_wizard.py games/terraria/structured_content.py games/terraria/server.py games/terraria/editor.html tests/test_terraria_structured_finish.py
+          git rm -f .github/workflows/terraria-finish-patch.yml .github/scripts/terraria_finish_patch.py .github/scripts/terraria_finish_repair.py
+          git add games/terraria/content_wizard.py games/terraria/structured_content.py games/terraria/server.py games/terraria/editor.html tests/test_terraria_structured_content.py tests/test_terraria_structured_finish.py
           git commit -m 'Finish Terraria structured content editors'
           git push origin HEAD:feature/terraria-plugin
