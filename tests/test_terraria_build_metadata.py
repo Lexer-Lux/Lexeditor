@@ -24,9 +24,35 @@ class TerrariaBuildMetadataTests(unittest.TestCase):
         self.assertEqual(metadata.duplicates, ("author",))
         self.assertNotIn("futureThing", metadata.values)
 
+    def test_reads_tmodloader_list_properties(self):
+        metadata = parse_build_text(
+            "modReferences = MagicStorage@0.6.0, RecipeBrowser, , BossChecklist\n"
+            "weakReferences = Census\n"
+            "dllReferences = NativeLibrary\n"
+            "sortAfter = MagicStorage, RecipeBrowser\n"
+            "sortBefore = BossChecklist\n"
+            "buildIgnore = obj/*, bin/*\n"
+        )
+        self.assertEqual(
+            metadata.values["modReferences"],
+            ["MagicStorage@0.6.0", "RecipeBrowser", "BossChecklist"],
+        )
+        self.assertEqual(metadata.values["weakReferences"], ["Census"])
+        self.assertEqual(metadata.values["dllReferences"], ["NativeLibrary"])
+        self.assertEqual(metadata.values["sortAfter"], ["MagicStorage", "RecipeBrowser"])
+        self.assertEqual(metadata.values["sortBefore"], ["BossChecklist"])
+        self.assertEqual(metadata.values["buildIgnore"], ["obj/*", "bin/*"])
+
     def test_noop_is_byte_exact(self):
         text = "displayName   =   Example Mod  \r\nfuture = untouched\r\n"
         self.assertEqual(update_build_text(text, {"displayName": "Example Mod"}), text)
+
+    def test_list_semantic_noop_is_byte_exact(self):
+        text = "modReferences=One,Two\r\nfuture = untouched\r\n"
+        self.assertEqual(
+            update_build_text(text, {"modReferences": ["One", "Two"]}),
+            text,
+        )
 
     def test_changed_write_preserves_unknown_lines_and_spacing(self):
         text = (
@@ -44,14 +70,36 @@ class TerrariaBuildMetadataTests(unittest.TestCase):
             "side = NoSync\n",
         )
 
+    def test_list_write_and_clear_preserve_unrelated_content(self):
+        text = (
+            "modReferences = One, Two\n"
+            "futureKey = keep\n"
+            "sortAfter = Old\n"
+        )
+        changed = update_build_text(
+            text,
+            {
+                "modReferences": ["One@1.2", "Three"],
+                "sortAfter": [],
+                "buildIgnore": ["obj/*", "bin/*"],
+            },
+        )
+        self.assertEqual(
+            changed,
+            "modReferences = One@1.2, Three\n"
+            "futureKey = keep\n"
+            "buildIgnore = obj/*, bin/*\n",
+        )
+
     def test_missing_key_appends_without_rewriting_existing_content(self):
         text = "author = Lexer\r\nunknown = preserve"
         changed = update_build_text(text, {"version": "1.2.3"})
         self.assertEqual(changed, "author = Lexer\r\nunknown = preserve\r\nversion = 1.2.3\r\n")
 
-    def test_duplicate_target_refuses_structured_write(self):
+    def test_duplicate_key_refuses_all_structured_writes(self):
+        text = "author = One\nauthor = Two\nside = Both\n"
         with self.assertRaisesRegex(ValueError, "duplicate"):
-            update_build_text("side = Both\nside = Client\n", {"side": "Server"})
+            update_build_text(text, {"side": "Server"})
 
     def test_boolean_and_side_validation(self):
         self.assertEqual(update_build_text("", {"hideCode": True}), "hideCode = true\n")
@@ -67,11 +115,27 @@ class TerrariaBuildMetadataTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     update_build_text("", {"version": invalid})
 
+    def test_reference_list_validation_matches_tmodloader_constraints(self):
+        with self.assertRaisesRegex(ValueError, "2 to 4"):
+            update_build_text("", {"modReferences": ["ExampleMod@1"]})
+        with self.assertRaisesRegex(ValueError, "Duplicate mod/weak reference"):
+            update_build_text(
+                "",
+                {"modReferences": ["ExampleMod"], "weakReferences": ["ExampleMod@1.2"]},
+            )
+        with self.assertRaisesRegex(ValueError, "dllReferences"):
+            update_build_text(
+                "",
+                {"modReferences": ["ExampleMod"], "dllReferences": ["ExampleMod"]},
+            )
+        with self.assertRaisesRegex(ValueError, "must be a list"):
+            update_build_text("", {"modReferences": "ExampleMod"})
+
     def test_multiline_and_unknown_structured_fields_are_rejected(self):
         with self.assertRaises(ValueError):
             update_build_text("", {"author": "one\ntwo"})
         with self.assertRaisesRegex(ValueError, "Unsupported"):
-            update_build_text("", {"modReferences": "ExampleMod"})
+            update_build_text("", {"futureStructured": "ExampleMod"})
 
     def test_service_preserves_bom_and_refuses_stale_writes(self):
         previous = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")

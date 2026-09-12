@@ -19,6 +19,19 @@ A modern source mod uses:
 
 The `..\tModLoader.targets` contract is why Lexeditor-created source projects should default to the real `ModSources` tree instead of inventing an incompatible project layout elsewhere.
 
+## `build.txt` editing boundary
+
+Lexeditor models tModLoader's scalar metadata plus these comma-delimited list properties:
+
+- `modReferences` and `weakReferences`, including `ModName@1.2` version-qualified references;
+- `dllReferences`;
+- `sortAfter` and `sortBefore`;
+- `buildIgnore`.
+
+Structured writes preserve comments/no-equals lines, unknown or future properties, unrelated formatting, BOM state and line endings. Duplicate modeled keys fail closed instead of guessing which occurrence to rewrite. Reference edits also enforce tModLoader's duplicate strong/weak reference rule and the prohibition on duplicating a strong mod reference in `dllReferences`.
+
+Localized `displayName.<culture>` entries remain preservation-only for now.
+
 ## Loader / deployment model
 
 - **Loader:** tModLoader itself. Lexeditor does not ship a second Terraria loader.
@@ -37,7 +50,7 @@ The `..\tModLoader.targets` contract is why Lexeditor-created source projects sh
 
 1. detect the Steam tModLoader install;
 2. discover/create a valid source mod in `ModSources`;
-3. structured `build.txt` inspection/editing with preservation of unknown keys;
+3. structured `build.txt` inspection/editing with preservation of unknown keys and formatting;
 4. Data Map inventory of source code, localization and assets;
 5. invoke the supported build path without modifying the installed game;
 6. verify the resulting local mod is visible/loadable in a real tModLoader install.
