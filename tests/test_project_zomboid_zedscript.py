@@ -43,10 +43,9 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             self.assertNotIn(("craftRecipe", "Fake"), names)
             self.assertEqual(result["errors"], [])
             self.assertEqual(result["counts"]["craftRecipe"], 1)
-            self.assertTrue(next(row for row in result["rows"] if row["name"] == "Hammer")["editable"])
-            self.assertTrue(next(row for row in result["rows"] if row["name"] == "Sandwich")["editable"])
-            self.assertTrue(next(row for row in result["rows"] if row["name"] == "MakeThing")["editable"])
-            self.assertTrue(next(row for row in result["rows"] if row["name"] == "CustomWater")["editable"])
+            for editable_name in ("Hammer", "Sandwich", "MakeThing", "CustomWater", "TestCar", "TestSound"):
+                with self.subTest(editable_name=editable_name):
+                    self.assertTrue(next(row for row in result["rows"] if row["name"] == editable_name)["editable"])
 
     def test_comments_strings_and_nested_blocks_do_not_create_records(self):
         with tempfile.TemporaryDirectory() as name:
