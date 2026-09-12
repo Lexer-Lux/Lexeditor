@@ -1,0 +1,242 @@
+name: Temporary Bannerlord master sync
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-master-sync.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preserve Bannerlord shared metadata
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          saved = {}
+          for filename in ("ui/mod-loading.json", "ui/credits-sources.json", "ui/credits.json"):
+              data = json.loads(Path(filename).read_text(encoding="utf-8"))
+              bannerlord = (data.get("plugins") or {}).get("bannerlord")
+              if bannerlord is None:
+                  raise SystemExit(f"Bannerlord metadata missing from {filename}")
+              saved[filename] = bannerlord
+          Path("/tmp/bannerlord-shared-metadata.json").write_text(json.dumps(saved), encoding="utf-8")
+          PY
+      - name: Merge current master and resolve mapped shared files
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin master
+          set +e
+          git merge --no-commit --no-ff origin/master
+          merge_code=$?
+          set -e
+          echo "initial merge exit: $merge_code"
+          echo "initial unresolved paths:"
+          git diff --name-only --diff-filter=U || true
+
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import subprocess
+
+          known = {
+              "plugin_api.py",
+              "project_manager.py",
+              "runtime_bootstrap.py",
+              "tests/test_data_map_coverage.py",
+              "ui/credits-sources.json",
+              "ui/credits.json",
+              "ui/mod-loading.json",
+          }
+          unresolved = set(filter(None, subprocess.check_output(
+              ["git", "diff", "--name-only", "--diff-filter=U"], text=True
+          ).splitlines()))
+          unknown = sorted(unresolved - known)
+          if unknown:
+              raise SystemExit("Unmapped master conflicts: " + ", ".join(unknown))
+          for path in sorted(unresolved):
+              subprocess.run(["git", "checkout", "--theirs", "--", path], check=True)
+
+          # plugin_api.py: keep current-master plugin contract and reapply the
+          # Bannerlord branch's cross-platform root + required_any validation.
+          path = Path("plugin_api.py")
+          text = path.read_text(encoding="utf-8")
+          if "def _absolute_for_host_or_windows" not in text:
+              marker = "\n\ndef validate_plugin(plugin: GamePlugin) -> None:\n"
+              helper = '''\n\ndef _absolute_for_host_or_windows(path: Path) -> bool:\n    """Accept native absolute paths plus Windows drive/UNC paths on non-Windows CI."""\n    return path.is_absolute() or (os.name != "nt" and PureWindowsPath(str(path)).is_absolute())\n\n\ndef validate_plugin(plugin: GamePlugin) -> None:\n'''
+              if marker not in text:
+                  raise SystemExit("plugin_api validate_plugin insertion point changed")
+              text = text.replace(marker, helper, 1)
+          text = text.replace(
+              'if any(not path.is_absolute() and not (os.name != "nt" and PureWindowsPath(str(path)).is_absolute()) for path in spec.default_roots):',
+              'if any(not _absolute_for_host_or_windows(path) for path in spec.default_roots):',
+          )
+          text = text.replace(
+              'if not projects.root_env or not projects.default_root.is_absolute():',
+              'if not projects.root_env or not _absolute_for_host_or_windows(projects.default_root):',
+          )
+          text = text.replace(
+              'if projects.template_root and not projects.template_root.is_absolute():',
+              'if projects.template_root and not _absolute_for_host_or_windows(projects.template_root):',
+          )
+          if "for group in projects.required_any:" not in text:
+              marker = '''        for relative in projects.required_paths:\n            path = Path(relative)\n            if path.is_absolute() or ".." in path.parts:\n                raise ValueError(f"{plugin.plugin_id} has an unsafe required project path: {relative}")\n'''
+              addition = marker + '''        for group in projects.required_any:\n            if not group:\n                raise ValueError(f"{plugin.plugin_id} has an empty project requirement group")\n            for relative in group:\n                path = Path(relative)\n                if path.is_absolute() or ".." in path.parts:\n                    raise ValueError(f"{plugin.plugin_id} has an unsafe alternate project path: {relative}")\n'''
+              if text.count(marker) != 1:
+                  raise SystemExit("plugin_api required_paths block changed")
+              text = text.replace(marker, addition, 1)
+          path.write_text(text, encoding="utf-8")
+
+          # project_manager.py: current master owns forgotten/content behavior;
+          # reapply Bannerlord's portable naming + transactional write/create/rename hardening.
+          path = Path("project_manager.py")
+          text = path.read_text(encoding="utf-8")
+          if "_WINDOWS_RESERVED_STEMS" not in text:
+              marker = 'IGNORED_NAMES = {".git", ".pytest_cache", "__pycache__", "out"}\n'
+              hardening = marker + '''_INVALID_FOLDER_CHARS = '<>:"/\\\\|?*'\n_WINDOWS_RESERVED_STEMS = {\n    "con", "prn", "aux", "nul", "clock$", "conin$", "conout$",\n    *(f"com{index}" for index in range(1, 10)),\n    *(f"lpt{index}" for index in range(1, 10)),\n    "com¹", "com²", "com³", "lpt¹", "lpt²", "lpt³",\n}\n\n\ndef _project_folder_name(name: str) -> str:\n    """Return a portable Windows-safe project folder name or reject it."""\n    clean_name = str(name).strip()\n    stem = clean_name.split(".", 1)[0].rstrip(" .").casefold()\n    invalid = (\n        not clean_name\n        or clean_name in {".", ".."}\n        or clean_name.endswith(".")\n        or any(char in clean_name for char in _INVALID_FOLDER_CHARS)\n        or any(ord(char) < 32 for char in clean_name)\n        or stem in _WINDOWS_RESERVED_STEMS\n    )\n    if invalid:\n        raise ValueError("Enter a valid folder name")\n    return clean_name\n'''
+              if text.count(marker) != 1:
+                  raise SystemExit("project_manager constants changed")
+              text = text.replace(marker, hardening, 1)
+          if "Cannot safely clear project registry helper" not in text:
+              marker = '''        temporary = self.path.with_suffix(self.path.suffix + ".tmp")\n        temporary.write_text(json.dumps(payload, indent=2) + "\\n", encoding="utf-8")\n        temporary.replace(self.path)\n'''
+              hardened = '''        temporary = self.path.with_suffix(self.path.suffix + ".tmp")\n        try:\n            temporary.unlink(missing_ok=True)\n        except OSError as error:\n            raise RuntimeError(f"Cannot safely clear project registry helper: {temporary}") from error\n        temporary.write_text(json.dumps(payload, indent=2) + "\\n", encoding="utf-8")\n        temporary.replace(self.path)\n'''
+              if text.count(marker) != 1:
+                  raise SystemExit("project_manager _write block changed")
+              text = text.replace(marker, hardened, 1)
+          create_start = text.index("    def create(self, plugin_id: str, parent_value: str, name: str) -> dict:\n")
+          rename_start = text.index("    def rename(self, plugin_id: str, root_value: str, name: str) -> dict:\n", create_start)
+          create_block = '''    def create(self, plugin_id: str, parent_value: str, name: str) -> dict:\n        _plugin, spec = self._spec(plugin_id)\n        clean_name = _project_folder_name(name)\n        parent = Path(parent_value).expanduser().resolve()\n        if not parent.is_dir():\n            raise ValueError(f"Parent folder does not exist: {parent}")\n        target = parent / clean_name\n        if target.exists():\n            raise ValueError(f"A file or folder already exists: {target}")\n        try:\n            shutil.copytree(\n                spec.template_root, target,\n                ignore=lambda _root, names: [name for name in names if name in IGNORED_NAMES],\n            )\n            if spec.initialize is not None:\n                spec.initialize(target)\n            return self.select(plugin_id, str(target))\n        except Exception as error:\n            if target.exists():\n                try:\n                    shutil.rmtree(target)\n                except Exception as cleanup_error:\n                    raise RuntimeError(\n                        f"Project creation failed and the new folder could not be cleaned up: {cleanup_error}"\n                    ) from error\n            raise\n\n'''
+          text = text[:create_start] + create_block + text[rename_start:]
+          rename_start = text.index("    def rename(self, plugin_id: str, root_value: str, name: str) -> dict:\n")
+          contents_start = text.index("    def contents(self, plugin_id: str, root_value: str = \"\") -> dict:\n", rename_start)
+          rename_block = '''    def rename(self, plugin_id: str, root_value: str, name: str) -> dict:\n        """Rename one known project folder and keep its selection stable."""\n        _plugin, spec = self._spec(plugin_id)\n        root = Path(root_value).expanduser().resolve()\n        problems = self._problems(root, spec.required_paths, spec.required_any)\n        if problems:\n            raise ValueError("\\n".join(problems))\n        clean_name = _project_folder_name(name)\n        target = root.with_name(clean_name)\n        if target.exists():\n            raise ValueError(f"A file or folder already exists: {target}")\n        root.rename(target)\n        try:\n            with self._lock:\n                payload = self._read()\n                entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}\n                current = Path(entry.get("current") or spec.default_root).expanduser().resolve()\n                known = [str(target) if os.path.normcase(str(Path(value).expanduser().resolve())) == os.path.normcase(str(root)) else value\n                         for value in entry.get("known", []) if isinstance(value, str)]\n                if os.path.normcase(str(current)) == os.path.normcase(str(root)):\n                    current = target\n                payload[plugin_id] = {"current": str(current), "known": known,\n                                      "forgotten": entry.get("forgotten", [])}\n                self._write(payload)\n        except Exception as error:\n            try:\n                if target.exists() and not root.exists():\n                    target.rename(root)\n            except Exception as rollback_error:\n                raise RuntimeError(\n                    f"Project rename failed and the original folder could not be restored: {rollback_error}"\n                ) from error\n            raise\n        return self.snapshot(plugin_id)\n\n'''
+          text = text[:rename_start] + rename_block + text[contents_start:]
+          path.write_text(text, encoding="utf-8")
+
+          # runtime_bootstrap.py: retain newer master services and add Bannerlord.
+          path = Path("runtime_bootstrap.py")
+          text = path.read_text(encoding="utf-8")
+          if "'games.bannerlord.server'" not in text:
+              marker = "SERVICE_MODULES = frozenset({\n    'games.blank.server'"
+              replacement = "SERVICE_MODULES = frozenset({\n    'games.bannerlord.server', 'games.blank.server'"
+              if marker not in text:
+                  raise SystemExit("runtime_bootstrap service set changed")
+              text = text.replace(marker, replacement, 1)
+          path.write_text(text, encoding="utf-8")
+
+          # Restore Bannerlord metadata into master-current registries without
+          # dropping Palworld/Chrono Trigger or any other newly-added plugin.
+          saved = json.loads(Path("/tmp/bannerlord-shared-metadata.json").read_text(encoding="utf-8"))
+          for filename, bannerlord in saved.items():
+              path = Path(filename)
+              data = json.loads(path.read_text(encoding="utf-8"))
+              plugins = data.setdefault("plugins", {})
+              rebuilt = {}
+              inserted = False
+              for key, value in plugins.items():
+                  rebuilt[key] = value
+                  if key == "blank":
+                      rebuilt["bannerlord"] = bannerlord
+                      inserted = True
+              if not inserted:
+                  rebuilt = {"bannerlord": bannerlord, **rebuilt}
+              data["plugins"] = rebuilt
+              path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+          # Keep master-current Data Map test coverage and include split Bannerlord JS.
+          path = Path("tests/test_data_map_coverage.py")
+          text = path.read_text(encoding="utf-8")
+          if "'bannerlord'" not in text[text.find("def test_all_plugins_use_shared_data_map"):]:
+              old = '''        for game in ('blank','warband','ff7','ff8','ff9','rdr','rdr2'):\n            text=(root/'games'/game/'editor.html').read_text(encoding='utf-8')\n            self.assertIn('LexeditorUI.dataMap(',text,game)\n'''
+              new = '''        for game in ('blank','warband','ff7','ff8','ff9','rdr','rdr2','bannerlord'):\n            game_root=root/'games'/game\n            text=(game_root/'editor.html').read_text(encoding='utf-8')\n            for script in sorted(game_root.glob('editor*.js')):\n                text+=script.read_text(encoding='utf-8')\n            self.assertIn('LexeditorUI.dataMap(',text,game)\n'''
+              if text.count(old) != 1:
+                  raise SystemExit("Data Map shared-plugin test changed on master")
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8")
+
+          subprocess.run(["git", "add", "plugin_api.py", "project_manager.py", "runtime_bootstrap.py",
+                          "tests/test_data_map_coverage.py", "ui/credits-sources.json", "ui/credits.json",
+                          "ui/mod-loading.json"], check=True)
+          remaining = set(filter(None, subprocess.check_output(
+              ["git", "diff", "--name-only", "--diff-filter=U"], text=True
+          ).splitlines()))
+          if remaining:
+              raise SystemExit("Unresolved conflicts after mapped resolution: " + ", ".join(sorted(remaining)))
+          PY
+
+          # Exercise the new legacy dependency surface against the post-merge UI.
+          python tools/temp_bannerlord_legacy_browser_coverage.py
+          git rm --ignore-unmatch tools/temp_bannerlord_legacy_browser_coverage.py
+          git rm --ignore-unmatch .github/workflows/temp-bannerlord-master-merge-probe.yml
+          git rm --ignore-unmatch .github/workflows/temp-bannerlord-master-sync.yml
+          git add -A
+          git status --short
+      - name: Focused pre-push verification
+        run: |
+          python -m pip install Pillow 'fonttools>=4.59,<5'
+          python -m compileall -q games/bannerlord desktop_host.py service_session.py plugin_api.py project_manager.py runtime_bootstrap.py
+          python -m unittest discover -s tests -p 'test_bannerlord*.py' -v
+          python -m unittest discover -s tests -p 'test_project*.py' -v
+          python -m unittest discover -s tests -p test_data_map_coverage.py -v
+          python -c "import glob, subprocess; [subprocess.run(['node','--check',path], check=True) for path in glob.glob('games/bannerlord/*.js')]"
+      - name: Commit merged master
+        run: |
+          git commit -m "Merge master into Bannerlord plugin"
+          git push origin HEAD:feature/bannerlord-plugin
+
+  regression:
+    needs: sync
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install Pillow 'fonttools>=4.59,<5'
+      - run: python -m compileall -q games/bannerlord desktop_host.py service_session.py plugin_api.py project_manager.py runtime_bootstrap.py
+      - run: python -m unittest discover -s tests -p 'test_bannerlord*.py' -v
+      - run: python -m unittest discover -s tests -p 'test_project*.py' -v
+      - run: python -m unittest discover -s tests -p test_data_map_coverage.py -v
+      - run: python -c "import glob, subprocess; [subprocess.run(['node','--check',path], check=True) for path in glob.glob('games/bannerlord/*.js')]"
+
+  browser:
+    needs: sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/bannerlord_browser_check.py out/bannerlord-master-sync
