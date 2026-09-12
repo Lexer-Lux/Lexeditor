@@ -6,7 +6,7 @@ import struct
 
 from games.ffx_x2 import treasures
 from games.ffx_x2.plugin import _write_fixture_vbf
-from games.ffx_x2.verify_install import inspect_install
+from games.ffx_x2.verify_install import finalize_report, inspect_install
 
 
 def _treasure_table() -> bytes:
@@ -38,6 +38,15 @@ def _touch_launch_files(game_root: Path) -> None:
         target.write_bytes(b"fixture")
 
 
+def _treasure_spec() -> tuple[dict, ...]:
+    return ({
+        "game": "x",
+        "key": "treasures",
+        "archivePath": treasures.ARCHIVE_PATH,
+        "builder": treasures.payload,
+    },)
+
+
 def test_verify_install_validates_raw_vbf_path_and_structured_table(tmp_path: Path):
     game_root = tmp_path / "game"
     source = _treasure_table()
@@ -45,12 +54,7 @@ def test_verify_install_validates_raw_vbf_path_and_structured_table(tmp_path: Pa
     _write_collection(game_root, [(raw_path, source)])
     _touch_launch_files(game_root)
 
-    report = inspect_install(game_root, specs=({
-        "game": "x",
-        "key": "treasures",
-        "archivePath": treasures.ARCHIVE_PATH,
-        "builder": treasures.payload,
-    },))
+    report = inspect_install(game_root, specs=_treasure_spec())
 
     assert report["ok"] is True
     assert report["contract"] == "Lexeditor.ffx-x2-install-verification"
@@ -75,12 +79,7 @@ def test_verify_install_optionally_hashes_complete_vbfs(tmp_path: Path):
     raw_path = treasures.ARCHIVE_PATH.removeprefix("FFX_Data/")
     _write_collection(game_root, [(raw_path, source)])
 
-    report = inspect_install(game_root, specs=({
-        "game": "x",
-        "key": "treasures",
-        "archivePath": treasures.ARCHIVE_PATH,
-        "builder": treasures.payload,
-    },), hash_archives=True)
+    report = inspect_install(game_root, specs=_treasure_spec(), hash_archives=True)
 
     assert report["ok"] is True
     assert report["archiveHashesIncluded"] is True
@@ -89,16 +88,49 @@ def test_verify_install_optionally_hashes_complete_vbfs(tmp_path: Path):
         assert report["archives"][game]["sha256"] == hashlib.sha256(target.read_bytes()).hexdigest()
 
 
+def test_draft_exit_readiness_requires_hashes_and_fahrenheit(tmp_path: Path):
+    game_root = tmp_path / "game"
+    source = _treasure_table()
+    raw_path = treasures.ARCHIVE_PATH.removeprefix("FFX_Data/")
+    _write_collection(game_root, [(raw_path, source)])
+    _touch_launch_files(game_root)
+
+    unhashed = finalize_report(
+        inspect_install(game_root, specs=_treasure_spec(), hash_archives=False),
+        require_fahrenheit=True,
+    )
+    assert unhashed["verificationPassed"] is True
+    assert unhashed["acceptanceReady"] is False
+    assert unhashed["acceptanceChecks"] == {
+        "archivesAndStructuredValidated": True,
+        "archiveHashesReady": False,
+        "fahrenheitReady": True,
+    }
+
+    hashed = finalize_report(
+        inspect_install(game_root, specs=_treasure_spec(), hash_archives=True),
+        require_fahrenheit=True,
+    )
+    assert hashed["verificationPassed"] is True
+    assert hashed["acceptanceReady"] is True
+    assert all(hashed["acceptanceChecks"].values())
+
+    (game_root / "fahrenheit" / "bin" / "fhstage1.dll").unlink()
+    missing_loader = finalize_report(
+        inspect_install(game_root, specs=_treasure_spec(), hash_archives=True),
+        require_fahrenheit=False,
+    )
+    assert missing_loader["verificationPassed"] is True
+    assert missing_loader["acceptanceReady"] is False
+    assert missing_loader["acceptanceChecks"]["archiveHashesReady"] is True
+    assert missing_loader["acceptanceChecks"]["fahrenheitReady"] is False
+
+
 def test_verify_install_fails_closed_when_claimed_table_is_missing(tmp_path: Path):
     game_root = tmp_path / "game"
     _write_collection(game_root, [("ffx_ps2/ffx/master/new_uspc/battle/kernel/other.bin", b"fixture")])
 
-    report = inspect_install(game_root, specs=({
-        "game": "x",
-        "key": "treasures",
-        "archivePath": treasures.ARCHIVE_PATH,
-        "builder": treasures.payload,
-    },))
+    report = inspect_install(game_root, specs=_treasure_spec())
 
     assert report["ok"] is False
     row = report["structured"][0]
@@ -116,12 +148,7 @@ def test_verify_install_reports_invalid_archive_without_parsing_tables(tmp_path:
         [("ffx_ps2/ffx2/master/test.bin", b"X2 fixture")],
     )
 
-    report = inspect_install(game_root, specs=({
-        "game": "x",
-        "key": "treasures",
-        "archivePath": treasures.ARCHIVE_PATH,
-        "builder": treasures.payload,
-    },))
+    report = inspect_install(game_root, specs=_treasure_spec())
 
     assert report["ok"] is False
     assert report["archives"]["x"]["ready"] is False
