@@ -111,6 +111,17 @@ def _effective_key(prefix: str, source_key: str) -> str:
     return f"{prefix}.{value}" if prefix else value
 
 
+def _source_key_for_effective(prefix: str, effective_key: str) -> str:
+    if not effective_key or any(character in effective_key for character in ("\r", "\n", "\x00")):
+        raise ValueError("Localization key must be non-empty single-line text")
+    if not prefix:
+        return effective_key
+    marker = prefix + "."
+    if not effective_key.startswith(marker) or len(effective_key) == len(marker):
+        raise ValueError(f"Localization key must begin with this file's prefix: {marker}")
+    return effective_key[len(marker):]
+
+
 def _bare_safe(value: str) -> bool:
     if not value or value != value.strip() or "\r" in value or "\n" in value or "\x00" in value:
         return False
@@ -373,3 +384,73 @@ def update_localization_text(text: str, updates: dict[str, object], prefix: str 
         )
         changed = True
     return "".join(lines) if changed else text
+
+
+def append_localization_entry(text: str, key: str, value: object, prefix: str = "") -> str:
+    """Append one new effective localization key without reserializing HJSON."""
+    if not isinstance(value, str):
+        raise ValueError(f"Localization value for {key} must be text")
+    if "\r" in value or "\n" in value or "\x00" in value:
+        raise ValueError(f"Localization value for {key} must fit on one line")
+
+    document = parse_localization_text(text, prefix)
+    if document.duplicates:
+        raise ValueError("Ambiguous duplicate localization keys: " + ", ".join(document.duplicates))
+    if key in {entry.key for entry in document.entries}:
+        raise ValueError(f"Localization key already exists: {key}")
+    source_key = _source_key_for_effective(prefix, key)
+
+    newline = "\r\n" if "\r\n" in text else "\n"
+    new_line = f"{json.dumps(source_key, ensure_ascii=False)}: {json.dumps(value, ensure_ascii=False)}{newline}"
+    lines = text.splitlines(keepends=True)
+
+    first_code = next(
+        (index for index, line in enumerate(lines) if _without_comment(_line_ending(line)[0])),
+        None,
+    )
+    root_braced = (
+        first_code is not None
+        and _without_comment(_line_ending(lines[first_code])[0]) == "{"
+    )
+    if root_braced:
+        last_close = next(
+            (
+                index for index in range(len(lines) - 1, -1, -1)
+                if _without_comment(_line_ending(lines[index])[0]) == "}"
+            ),
+            None,
+        )
+        if last_close is None or last_close <= first_code:
+            raise ValueError("Explicit-root localization file has no safe closing brace")
+        indent = "\t"
+        lines.insert(last_close, indent + new_line)
+        changed = "".join(lines)
+    else:
+        if lines and not lines[-1].endswith(("\n", "\r")):
+            lines[-1] += newline
+        lines.append(new_line)
+        changed = "".join(lines)
+
+    result = parse_localization_text(changed, prefix)
+    matches = [entry for entry in result.entries if entry.key == key]
+    if len(matches) != 1 or not matches[0].editable or matches[0].value != value:
+        raise ValueError(f"Could not safely create localization key: {key}")
+    return changed
+
+
+def apply_localization_changes(
+    text: str,
+    updates: dict[str, object],
+    creates: dict[str, object],
+    prefix: str = "",
+) -> str:
+    """Apply existing-value edits and new dotted keys as one in-memory transaction."""
+    if not isinstance(creates, dict):
+        raise ValueError("Localization creates must be an object")
+    overlap = set(updates).intersection(creates)
+    if overlap:
+        raise ValueError("Localization keys cannot be both updated and created: " + ", ".join(sorted(overlap)))
+    changed = update_localization_text(text, updates, prefix)
+    for key, value in creates.items():
+        changed = append_localization_entry(changed, key, value, prefix)
+    return changed
