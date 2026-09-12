@@ -43,7 +43,7 @@ Acceptance requirements:
 - `acceptanceReady` is `true`.
 - `archiveHashesIncluded` is `true`.
 - Both `archives.x.ready` and `archives.x2.ready` are `true` and each has a full-file `sha256`.
-- Every one of the 15 `structured[]` rows has `status: "validated"`.
+- Every one of the 16 `structured[]` rows has `status: "validated"`.
 - FFX `a_ability.bin` reports `0x6C` records.
 - FFX `ply_save.bin` reports `0x94` records.
 - The four FFX animation tables report:
@@ -53,6 +53,7 @@ Acceptance requirements:
   - `monmagic2`: `0x5C` records.
 - FFX-2 command reports `0x8C` records.
 - FFX-2 accessory reports `0x54` records and a zero-based range as required by its parser.
+- FFX-2 dressphere `job.bin` reports `0xE4` records and sixteen ability-tree pairs per row.
 - Fahrenheit Stage 0, Stage 1, FFX.exe and FFX-2.exe all report ready.
 
 Attach or transcribe the JSON results into this acceptance folder before taking the PR out of draft. The report contains paths/hashes/record metadata, not proprietary game payload bytes.
@@ -70,6 +71,7 @@ Acceptance requirements:
 - **FFX Abilities** can switch among Commands, Items, Monster Magic 1 and Monster Magic 2 and shows the expected record size for each.
 - **FFX Auto-Abilities** opens `a_ability.bin`, shows Fire/Ice/Thunder/Water/Holy controls for Strike/Absorb/Immune/Resist/Weak, and does not expose SOS/status/effect/icon/group fields.
 - **FFX Base Stats** opens `ply_save.bin` and exposes only base HP, base MP, Strength, Defense, Magic, Magic Defense, Agility, Luck, Evasion and Accuracy. It must not expose text/name metadata, AP, current HP/MP, current stats or any field at/after record `+0x14`.
+- **X-2 Dresspheres** opens `job.bin` and exposes exactly sixteen required-ability / ability-ID pairs per record. Stat-growth coefficients, weapon/creature data, flags and strings must remain uneditable.
 - No project file is created merely by browsing/refreshing.
 
 Record any unexpectedly large table or UI delay before changing data.

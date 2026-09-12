@@ -1,6 +1,6 @@
 # #461 — Steam collection plugin
 
-Status: actionable. One branch/PR: `feature/ffx-x2-plugin` / draft PR #462.
+Status: awaiting real-install acceptance. One branch/PR: `feature/ffx-x2-plugin` / draft PR #462.
 
 ## Proven inputs
 
@@ -14,7 +14,7 @@ Status: actionable. One branch/PR: `feature/ffx-x2-plugin` / draft PR #462.
 - Fahrenheit independently asserts `FFX.AutoAbility` is `0x6C` for `a_ability.bin`; its sequential struct places SOS at `+0x10` followed by the same five element fields, and its `ElementFlags` defines Fire/Ice/Thunder/Water/Holy as bits 0..4.
 - FFXDataParser defines `PlayerCharStatDataObject.LENGTH = 0x94` for localized `battle/kernel/ply_save.bin`, reading base HP/MP at `+0x04/+0x08` and STR/DEF/MAG/MDF/AGI/LCK/EVA/ACC at `+0x0C..+0x13`.
 - Fahrenheit independently asserts `FFX.PlySave` is `0x94` for `ply_save.bin`; its sequential struct places one four-byte text offset first, then the same base HP, base MP and eight base-stat fields in the same order. The references diverge/identify later bytes differently enough that Lexeditor stops at `+0x13`.
-- `HeartlessSeph/FFX2-010-Templates` independently establishes the FFX-2 `accessory.bin` `0x54` record layout.
+- `HeartlessSeph/FFX2-010-Templates` independently establishes the FFX-2 `accessory.bin` `0x54` layout and the sixteen required-ability / ability pairs in `job.bin`; Fahrenheit independently fixes `Job` at `0xE4` bytes with the same 32-u16 ability-tree region after its 46-byte stat-growth block.
 - Fahrenheit Stage 0 accepts `fhstage0.exe {EXECUTABLE_TO_LAUNCH} {ARGS}`. Fahrenheit's docs launch FFX as `fhstage0.exe ..\..\FFX.exe`; Stage 0 resolves `fhstage1.dll` by relative name, so cwd must be `<game>/fahrenheit/bin`.
 
 The reverse-engineering projects are factual format cross-checks; their source is not copied into the structured editor implementations.
@@ -41,10 +41,11 @@ The reverse-engineering projects are factual format cross-checks; their source i
 - The four FFX ability-animation tables share one strict implementation and one fixed UI selector. Unknown table names and extra edit fields are rejected.
 - The auto-ability element editor exposes only five known element bits per behavior. Save logic preserves the upper three unknown bits of each source byte.
 - The player base-stat editor accepts only the ten independently agreed values; there is no character-name mapping, AP/current-state editor, or access to the disputed/later `ply_save.bin` region.
-- **Two conservative FFX-2 structured tables**:
+- **Three conservative FFX-2 structured tables**:
   - `new_uspc/battle/kernel/command.bin` — animation IDs only at `+0x08/+0x0A`.
   - `new_uspc/battle/kernel/accessory.bin` — four base ability IDs at `+0x18..+0x1F` and u32 price at `+0x20`; creature extension and strings remain opaque.
-- All **15 structured tables** use exact VBF-header MD5 plus exact table SHA-256 stale-write protection.
+  - `new_uspc/battle/kernel/job.bin` — sixteen required-ability / learned-ability pairs at `+0x3C..+0x7B`; stat growth, weapons, creature data, flags and strings remain opaque.
+- All **16 structured tables** use exact VBF-header MD5 plus exact table SHA-256 stale-write protection.
 - Structured saves are game-keyed and project-only: FFX -> `efl/x/FFX_Data/...`; FFX-2 -> `efl/x2/FFX2_Data/...`. Installed VBFs are never rewritten.
 - Reversible Lexeditor-owned Fahrenheit file-only deployment with foreign/external-change guards and unrelated loadorder preservation.
 - Private installed-game theme extraction/cache with fallback; no proprietary game assets are committed.
@@ -76,6 +77,7 @@ The reverse-engineering projects are factual format cross-checks; their source i
 - Managed auto-ability and player-stat coverage save only to canonical `efl/x/FFX_Data/...` project paths and verify the installed VBF SHA-256 is unchanged.
 - Managed tests save each of the four FFX animation tables through its canonical project path and likewise leave the source VBF unchanged.
 - FFX-2 accessory regressions compare all bytes outside the six writable fields and preserve the complete creature extension and trailing strings.
+- FFX-2 dressphere regressions constrain changes to selected four-byte ability-tree pairs and preserve stat-growth bytes, post-tree data, other records and trailing strings byte-for-byte.
 - FFX-2 ability managed coverage proves project save -> `efl/x2` deploy -> loadorder preservation -> revert while the source VBF remains byte-identical.
 - Play API tests patch only the process-execution boundary and reject generic commands, paths, args, aliases, extra keys, wrong types and non-object bodies without spawning a game.
 - Stage 0 launch tests assert the fixed argv/cwd and Windows no-console process creation flag without launching the game.

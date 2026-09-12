@@ -210,9 +210,21 @@ Path:
 
 The `+0x24..+0x53` creature extension, string references, unknown bytes and trailing strings remain opaque.
 
+### FFX-2 `job.bin` — dressphere ability trees
+
+Path:
+
+`FFX2_Data/ffx_ps2/ffx2/master/new_uspc/battle/kernel/job.bin`
+
+Fahrenheit independently defines each FFX-2 `Job` record as `0xE4` bytes. Its 46-byte stat-growth block is followed by 32 `u16` values. `HeartlessSeph/FFX2-010-Templates` independently models the same region as sixteen records containing a required ability followed by the learned ability. Lexeditor therefore writes only:
+
+- sixteen required-ability IDs and ability IDs at `+0x3C..+0x7B`.
+
+Stat-growth coefficients, weapon references, creature-extension data, flags, text references, unknown bytes and trailing strings remain opaque.
+
 ## Structured write guarantees
 
-The plugin currently exposes **15 proved structured tables**: thirteen FFX tables and two FFX-2 tables.
+The plugin currently exposes **16 proved structured tables**: thirteen FFX tables and three FFX-2 tables.
 
 Every structured save is guarded by:
 
@@ -261,7 +273,7 @@ The verifier:
 
 - validates both installed VBF indexes;
 - resolves raw/virtual path spellings;
-- reads and validates all 15 currently supported structured tables with the production parsers;
+- reads and validates all 16 currently supported structured tables with the production parsers;
 - reports source paths, table SHA-256 values, record counts/sizes and VBF header metadata;
 - optionally streams each complete VBF through SHA-256 with `--hash-archives`;
 - reports Fahrenheit launch prerequisites;
@@ -282,7 +294,7 @@ Integrated:
 - Raw VBF path → canonical Fahrenheit EFL normalization.
 - Searchable archive browser and byte-exact project extraction.
 - Thirteen FFX structured tables: treasure rewards, two price tables, auto-ability elemental masks, player base stats, CTB timing, Mix results, two shop tables, and four ability-animation tables.
-- Two FFX-2 structured tables: command animation IDs and accessory base abilities/price.
+- Three FFX-2 structured tables: command animation IDs, accessory base abilities/price, and dressphere ability prerequisites/IDs.
 - Exact VBF/table stale-write guards and project-only saves.
 - Reversible Fahrenheit file-only deployment.
 - Fixed collection-aware Stage 0 Play actions.
