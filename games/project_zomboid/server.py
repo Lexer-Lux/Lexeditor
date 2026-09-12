@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import core, craftrecipe, evolvedrecipe, zedscript
+from . import core, craftrecipe, datamap, evolvedrecipe, zedscript
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -96,7 +96,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/zedscript":
                 self.send_json(zedscript.inventory(self.project()))
             elif path == "/api/datamap":
-                self.send_json(core.data_map(self.project()))
+                self.send_json(datamap.read(self.project()))
             elif path == "/api/deployment":
                 self.send_json(core.deployment_state(self.project()))
             else:
