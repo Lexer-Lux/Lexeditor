@@ -56,6 +56,23 @@ def _version_at_least(actual: str | None, minimum: str | None) -> bool | None:
     return actual_parts + (0,) * (width - len(actual_parts)) >= minimum_parts + (0,) * (width - len(minimum_parts))
 
 
+def _loader_evidence(game_root: Path) -> dict:
+    """Add manifest-declared Content Patcher versions without changing deployment semantics."""
+    loader = dict(loader_status(game_root))
+    root = loader.get("contentPatcherRoot")
+    if root:
+        try:
+            manifest = _json(Path(root) / "manifest.json")
+            loader["contentPatcherVersion"] = str(manifest.get("Version")) if manifest.get("Version") is not None else None
+            loader["contentPatcherMinimumApiVersion"] = (
+                str(manifest.get("MinimumApiVersion")) if manifest.get("MinimumApiVersion") is not None else None
+            )
+        except (OSError, ValueError, json.JSONDecodeError):
+            loader["contentPatcherVersion"] = None
+            loader["contentPatcherMinimumApiVersion"] = None
+    return loader
+
+
 def smapi_log_path() -> Path:
     """Return the canonical SMAPI latest-log path, with an environment override for tests/support."""
     override = os.environ.get("LEXEDITOR_STARDEW_SMAPI_LOG")
@@ -129,13 +146,22 @@ def begin_acceptance(game_root: Path, project_root: Path, *, log_path: Path | No
     """Snapshot immutable game data and the current SMAPI log before a real runtime test."""
     game = Path(game_root).expanduser().resolve()
     project = Path(project_root).expanduser().resolve()
-    ContentPackStore(project).validate()
+    store = ContentPackStore(project)
+    store.validate()
+    if not any(row.get("fields") for row in store.objects()["rows"]):
+        raise RuntimeError("Add and save at least one supported Data/Objects field override before acceptance")
     deployment = deployment_status(game, project)
     if not deployment["deployed"] or not deployment["managed"]:
         raise RuntimeError("Deploy this project with Lexeditor before beginning installed-game acceptance")
     if deployment["externallyChanged"]:
         raise RuntimeError("The deployed content pack changed outside Lexeditor; reconcile it before acceptance")
-    loader = loader_status(game)
+    deployed_root = Path(deployment["target"])
+    for relative in ("manifest.json", "content.json"):
+        source_file = project / relative
+        deployed_file = deployed_root / relative
+        if not deployed_file.is_file() or _sha256(source_file) != _sha256(deployed_file):
+            raise RuntimeError("The deployed pack is older than the current project; redeploy before acceptance")
+    loader = _loader_evidence(game)
     if not loader["ready"]:
         raise RuntimeError("SMAPI and Content Patcher must both be installed before acceptance")
     xnb_path = game / "Content" / "Data" / "Objects.xnb"
@@ -168,7 +194,7 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
     game = Path(game_root).expanduser().resolve()
     project = Path(project_root).expanduser().resolve()
     marker_path = _marker_path(project)
-    loader = loader_status(game)
+    loader = _loader_evidence(game)
     deployment = deployment_status(game, project)
     if not marker_path.is_file():
         return {
@@ -278,6 +304,7 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
         "gameVersionMatches": game_version_matches,
         "contentPatcherVersionFromLog": evidence["contentPatcherVersion"],
         "contentPatcherSeen": evidence["contentPatcherSeen"],
+        "contentPatcherVersionInstalled": loader.get("contentPatcherVersion"),
         "contentPatcherMinimumApiVersion": minimum_api,
         "smapiMeetsContentPatcherMinimum": api_compatible,
         "projectMentioned": evidence["projectMentioned"],
