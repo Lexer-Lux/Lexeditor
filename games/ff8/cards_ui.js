@@ -14,14 +14,14 @@
 window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
   detailSection, detailField, numberControl, selectControl, sourceControl,
   referenceValues, infoHelp, shell, noteFieldEdit, subtabBar, detailPanel,
-  recordId, columnList, conceptIcon}) => {
+  recordId, columnList, conceptIcon, ensureFieldDetail}) => {
   // The card's own four sides, in the order Triple Triad draws them.
   const sides = ["top", "left", "right", "bottom"];
   const fields = [...sides, "element", "power"];
   const labels = {top:"Top", bottom:"Bottom", left:"Left", right:"Right", element:"Element", power:"Selection power"};
   const clone = value => JSON.parse(JSON.stringify(value));
-  let mode = "cards", playerMap = "", playerData = null, playerBase = null,
-      playerLoading = false, playerError = "", playerStatus = "";
+  let mode = "cards";
+  const playerView = {query:"",page:0,selected:null};
   if (!document.getElementById("ff8-card-redesign-style")) {
     const style = document.createElement("style");
     style.id = "ff8-card-redesign-style";
@@ -90,14 +90,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       .ff8-card-element-picker img,.ff8-card-element-empty{width:22px;height:22px;object-fit:contain}
 
 
-      /* Players. A field, its card-game opponents, and the seven values each
-         CARDGAME call pushes - as one table, not a wall of loose boxes. */
-      .ff8-card-players{display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px;min-height:0;height:100%}
-      .ff8-card-player-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-      .ff8-card-player-toolbar select{min-width:min(430px,60vw)}
-      .ff8-card-player-note{margin:0;color:var(--lex-muted);font-size:.92em;max-width:90ch}
-      .ff8-card-player-state{margin:0;color:var(--lex-muted)}
-      .ff8-card-player-state.error{color:#d64b4b}
+      .ff8-card-player-detail .lex-detail-panel-body{padding:var(--lex-panel-gap);gap:var(--lex-panel-gap)}
     `;
     document.head.append(style);
   }
@@ -217,89 +210,40 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     ...fields.map(field => ({key: field, label: labels[field], pinned: false, numeric: true}))
   ], detail, "74px minmax(240px,1fr)", {}, false);
   let render = () => null;
-  const loadPlayerMap = async key => {
-    if (!key || playerLoading) return;
-    playerLoading = true;playerError = "";playerStatus = "";
-    try {
-      const response = await fetch(`/api/field?map=${encodeURIComponent(key)}&dataset=current`);
-      const payload = await response.json();
-      if (!response.ok || payload.error) throw new Error(payload.error || `HTTP ${response.status}`);
-      if (playerMap !== key) return;
-      playerData = payload;playerBase = clone(payload);
-    } catch (error) {if (playerMap === key) playerError = error.message;}
-    finally {playerLoading = false;if (state.tab === "cards") render();}
-  };
-  const savePlayers = async () => {
-    if (!playerData || !playerBase) return;
-    const edits = [];
-    for (const player of playerData.players || []) for (const param of player.params || []) {
-      const before = playerBase.players?.[player.id]?.params?.[param.id];
-      if (before && Number(before.value) !== Number(param.value)) {
-        edits.push({map: playerData.key, player: player.id, param: param.id, value: Number(param.value)});
-      }
-    }
-    if (!edits.length) {playerStatus = "No player changes to save.";render();return;}
-    try {
-      const response = await fetch("/api/field/save", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({edits})});
-      const payload = await response.json();
-      if (!response.ok || payload.error) throw new Error(payload.error || `HTTP ${response.status}`);
-      playerBase = clone(playerData);
-      playerStatus = `Saved ${edits.length} CARDGAME parameter change${edits.length === 1 ? "" : "s"}.`;
-    } catch (error) {playerStatus = error.message;}
-    render();
-  };
   const renderPlayers = () => {
     const maps = state.data.fields?.rows || [];
-    if (!playerMap && maps.length) playerMap = maps[0].key;
-    if (playerMap && !playerData && !playerLoading) queueMicrotask(() => loadPlayerMap(playerMap));
-    const selector = el("select", {value: playerMap, "aria-label": "Field", onchange: event => {
-      playerMap = event.target.value;playerData = null;playerBase = null;playerError = "";playerStatus = "";render();
-    }}, ...maps.map(row => el("option", {value: row.key, selected: row.key === playerMap}, `${row.name} — ${row.key}`)));
-    const toolbar = el("div", {class: "ff8-card-player-toolbar"},
-      el("strong", {}, "FIELD"), selector,
-      playerData ? el("button", {type: "button", onclick: savePlayers}, "SAVE PLAYERS") : null);
-    // Every opponent on the field is a row, and every value it pushes is a
-    // column of that row's own table - the same list control the rest of the
-    // editor uses, rather than a grid of loose boxes under a bold heading.
-    let content;
-    if (!maps.length) content = el("p", {class: "ff8-card-player-state"},
-      "Field data has not been read yet. Open the FIELDS tab once and the opponents appear here.");
-    else if (playerLoading) content = el("p", {class: "ff8-card-player-state"}, "Reading this field's card players…");
-    else if (playerError) content = el("p", {class: "ff8-card-player-state error"},
-      `This field could not be read: ${playerError}`);
-    else if (!playerData) content = el("p", {class: "ff8-card-player-state"}, "Choose a field to inspect its Triple Triad opponents.");
-    else if (!(playerData.players || []).length) content = el("p", {class: "ff8-card-player-state"},
-      "No entity on this field calls CARDGAME, so it has no Triple Triad opponent.");
-    else {
-      const entries = (playerData.players || []).flatMap(player =>
-        (player.params || []).map(param => ({id: `${player.id}-${param.id}`, player, param})));
-      content = columnList({
-        rows: entries, key: entry => entry.id, localSort: false,
-        class: "ff8-record-list",
-        columns: [
-          {key: "entity", label: "Opponent", render: entry => entry.player.entity},
-          {key: "script", label: "Script", render: entry => entry.player.script},
-          {key: "parameter", label: "Value", render: entry => entry.param.name},
-          {key: "mode", label: "Source",
-            help: "Literal stores the number in the script. Savemap reads the numbered runtime variable. Editing keeps whichever it already is.",
-            render: entry => entry.param.mode === "literal" ? "Literal"
-              : entry.param.mode === "variable" ? "Savemap" : "Unsupported"},
-          {key: "value", label: "Stored", numeric: true,
-            help: "The exact 24-bit literal, or the savemap variable number, this push instruction holds.",
-            render: entry => el("input", {type: "number", min: 0, max: 16777215, step: 1,
-              value: entry.param.value, disabled: !entry.param.editable,
-              "aria-label": `${entry.player.entity} ${entry.param.name}`,
-              oninput: event => {
-                entry.param.value = Number(event.target.value);
-                playerStatus = "Unsaved player changes.";
-              }})},
-        ]});
-    }
-    return el("div", {class: "ff8-card-players"}, toolbar,
-      el("p", {class: "ff8-card-player-note"},
-        "An opponent's deck comes from the seven values pushed immediately before the field's CARDGAME call. A value stored as a savemap variable stays a variable; only the number it holds changes."),
-      content,
-      playerStatus ? el("p", {class: "ff8-card-player-state"}, playerStatus) : null);
+    const query = playerView.query.toLocaleLowerCase();
+    const rows = maps.filter(row => `${row.name} ${row.key}`.toLocaleLowerCase().includes(query));
+    const detail = row => {
+      if (!row._loaded && !row._loading && !row._error) {
+        queueMicrotask(async()=>{await ensureFieldDetail(row);if(state.tab === "cards" && mode === "players") render();});
+      }
+      let body;
+      if (row._error) body=[el("p",{},`Could not load this area: ${row._error}`)];
+      else if (!row._loaded) body=[el("p",{},"Loading card players…")];
+      else if (!row.players?.length) body=[el("p",{},"There are no Triple Triad players in this area.")];
+      else body=row.players.map(player=>detailSection({
+        title:player.entity || `Opponent ${player.id}`,
+        body:(player.params || []).map(param=>{
+          const before=state.vanilla?.fields?.rows?.find(value=>value.key===row.key)?.players?.find(value=>value.id===player.id)?.params?.find(value=>value.id===param.id);
+          const update=value=>{param.value=Number(value);noteFieldEdit("fields",{field:param.name});shell.refresh();};
+          const input=numberControl(param.value,0,0xFFFFFF,1,update,{"aria-label":`${player.entity} ${param.name}`});
+          input.disabled=!param.editable || state.activeSource!=="mine";
+          return detailField({label:param.name,dataType:"INT",min:0,max:0xFFFFFF,
+            help:infoHelp(param.mode==="variable" ? "This value selects a game variable. Its value during play controls this choice." : "This value is stored directly in the opponent's card-game settings."),
+            control:sourceControl(input,()=>param.value,before?.value,[],update)});
+        })}));
+      return detailPanel({className:"ff8-card-player-detail",title:row.name,meta:row.key,body});
+    };
+    return LexeditorUI.pagedListDetail({rows,key:row=>row.key,selected:playerView.selected,
+      page:playerView.page,pageSize:40,noun:"areas",maxBarrels:1,slots:true,fit:{minRowHeight:28},
+      className:"ff8-card-players",splitKey:"ff8-card-players",rowsKey:"ff8-card-players",
+      search:{key:"ff8-card-players",value:playerView.query,label:"Search card-player areas",change:value=>{playerView.query=value;playerView.page=0;render();}},
+      sync:next=>Object.assign(playerView,next),change:next=>{Object.assign(playerView,next);render();},
+      master:({rows,selected,select})=>columnList({rows,key:row=>row.key,selected,select,
+        class:"ff8-record-list",template:"minmax(120px,1fr) minmax(90px,.7fr)",
+        columns:[{key:"name",label:"Area"},{key:"key",label:"File"}]}),
+      detail,emptyDetail:()=>detailPanel({className:"ff8-card-player-detail",title:"Card players",body:[el("p",{},"No areas match this search.")]})});
   };
   render = () => {
     if (state.tab !== "cards") return null;
