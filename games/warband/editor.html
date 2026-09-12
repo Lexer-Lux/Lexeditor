@@ -278,7 +278,7 @@
       body:node.missing?[el("p",{class:"error"},"This upgrade refers to a troop missing from the parsed active source.")]:[
         el("div",{class:"detail-grid"},...["plural","level","faction","flags","status","line"].flatMap(key=>[
           el("div",{class:"label"},key),el("div",{},String(node[key]??"—"))])),
-        el("p",{},"Troop records live in module_troops.py; open it in the Data Map to change one.")]});
+        el("p",{},"This page reads Module System source. Troop editing is not implemented here. Building that source writes troops.txt into the selected mod module, not the base game.")]});
   }
   function renderUpgrades(){
     const all=WarbandTroopTrees.build(state.troops.rows,state.upgrades.rows);

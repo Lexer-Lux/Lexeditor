@@ -6470,9 +6470,17 @@ ${contents.path}`});
   const integrationStatus = status => {
     const normalized = status === "integrated" || status === "partial" ? status : "not-integrated";
     const labels = {integrated: "Integrated", partial: "Partial", "not-integrated": "Not integrated"};
-    const icon = normalized === "partial"
-      ? element("span", {class: "lex-mixture-mark", "aria-hidden": "true"})
-      : element("span", {class: "lex-status-mark lex-ui-symbol", "aria-hidden": "true"}, normalized === "integrated" ? "✓" : "×");
+    const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("viewBox", "0 0 24 24");
+    icon.setAttribute("width", "20");
+    icon.setAttribute("height", "20");
+    icon.setAttribute("aria-hidden", "true");
+    icon.classList.add("lex-status-mark");
+    icon.innerHTML = normalized === "integrated"
+      ? '<path d="m4 12 5 5L20 6" fill="none" stroke="currentColor" stroke-width="3"/>'
+      : normalized === "partial"
+        ? '<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor"/>'
+        : '<path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="3"/>';
     return element("span", {
       class: `lex-integration-status ${normalized}`,
       title: labels[normalized],
@@ -6565,10 +6573,11 @@ ${contents.path}`});
       emptyDetail:()=>detailPanel({className:"lex-data-map-detail",title:"Data Map",body:[element("p",{},"No files match this filter.")]}),
       master:({rows,selected,select})=>columnList({rows,key:keyOf,selected,select,
         class:`lex-data-map-table ${options.tableClass || ""}`,
-        template:"minmax(100px,1.2fr) minmax(80px,1fr) minmax(90px,.9fr)",
+        template:"minmax(100px,1.2fr) minmax(80px,1fr) 130px minmax(90px,.9fr)",
         sortState:{key:sortKey,dir:direction},sort:options.changeSort,
         columns:[{key:"filename",label:"Filename",sortable:true,align:"start"},
           {key:"controls",label:"What it controls",sortable:true,align:"start"},
+          {key:"integration",label:"Integration",align:"center",render:row=>integrationStatus(row.status)},
           {key:"status",label:"Coverage",sortable:true,align:"start",
             render:row=>element("span",{class:`lex-coverage-cell ${coverage(row)}`,title:label(row)},
               element("span",{class:"lex-coverage-icon","aria-hidden":"true"},glyphs[coverage(row)]),

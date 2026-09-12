@@ -11,6 +11,7 @@ from games.chrono_trigger.data import (
     classify_resource,
     data_map,
     load_message_table,
+    load_language_messages,
     load_scenes,
     save_message_table,
     save_scene,
@@ -75,6 +76,38 @@ def _field_event() -> bytes:
 
 
 class ResourceArchiveTests(unittest.TestCase):
+    def test_language_rows_keep_file_identity_and_save_only_selected_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            archive = root / "resources.bin"
+            first, second = "Localize/en/msg/a.txt", "Localize/en/msg/b.txt"
+            _build_archive(archive, [(first, b"hello,Hello\n"), (second, b"hello,Welcome\n"),
+                                     ("Localize/fr/msg/a.txt", b"hello,Bonjour\n")])
+            original = archive.read_bytes()
+            store = OverlayStore(archive, root / "project")
+            data = load_language_messages(store, "en")
+            self.assertEqual(len(data["rows"]), 2)
+            self.assertEqual(len({row["id"] for row in data["rows"]}), 2)
+            save_message_table(store, second, data["tables"][second]["sha256"], [{"id": 0, "text": "Changed"}])
+            updated = load_language_messages(store, "en")
+            self.assertEqual([row["text"] for row in updated["rows"]], ["Hello", "Changed"])
+            self.assertEqual(archive.read_bytes(), original)
+            with self.assertRaises(RuntimeError):
+                save_message_table(store, second, data["tables"][second]["sha256"], [{"id": 0, "text": "Stale"}])
+            with self.assertRaises(ValueError):
+                load_language_messages(store, "missing")
+
+    def test_bad_event_does_not_hide_valid_events(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            archive = root / "resources.bin"
+            _build_archive(archive, [("Game/field/atel/Atel_0000.dat", b"\xff"),
+                                     ("Game/field/atel/Atel_0001.dat", _field_event())])
+            rows = load_events(OverlayStore(archive, root / "project"))["rows"]
+            self.assertEqual(len(rows), 2)
+            self.assertIn("problem", rows[0])
+            self.assertNotIn("problem", rows[1])
+
     def test_lists_and_extracts_synthetic_archive(self):
         with tempfile.TemporaryDirectory(prefix="lexeditor-chrono-trigger-") as temp_name:
             archive_path = Path(temp_name) / "resources.bin"

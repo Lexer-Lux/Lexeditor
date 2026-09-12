@@ -257,6 +257,28 @@ Start with `games/blank` as the shared-control gallery, not as markup to copy.
 Load `/shared/framework.css` and `/shared/framework.js` and use the common controls
 in `docs/UI-MANUAL.md`.
 
+Use the shell's **Info button** for setup, deployment, runtime status, Credits and
+project-file management. Use its **Data Map button** for the shared Data Map.
+Wire both actions through `mountShell`. Do not add Data Map, Info, Deployment or
+Changes as normal content tabs. Show a loading state as soon as navigation starts;
+never leave the previous page visible under the newly selected tab.
+
+Use `LexeditorUI.dataMap` for the Data Map, including its integration icons.
+Use `pagedListDetail` and `columnList` for record lists. Search and pagination
+belong in the shared bottom bar. Do not substitute a scrolling HTML table,
+dropdown file picker or custom Next/Previous controls. Check this with enough
+records to fill several pages. Editable values belong in the selected record's
+Detail pane. Related file names can be properties or list columns.
+
+For localized text, use one subtab per language, with its flag before its name.
+List that language's text entries across resource files. Show the resource path
+as a property; do not make users select a file before they can find text.
+
+Do not add general disclaimer banners about implementation, evidence, read-only
+data or safe writes. Disabled controls and source selection already show those
+states. Put necessary explanations in the relevant `infoHelp` bubble. Use a
+visible warning only for a specific problem that affects the current action.
+
 Keep record identity in the master list and editable properties in the detail pane.
 Use semantic controls: checkbox/toggle for booleans, selects for known enums,
 bounded number/range controls for real numeric limits, and decomposed bitflags when
@@ -372,6 +394,11 @@ A new plugin is not complete until the applicable items below are true:
 - [ ] Save/deployment writes are atomic and recovery/revert behavior is defined.
 - [ ] The deployment, revert, launch and native acceptance path was designed before the endgame.
 - [ ] Shared UI controls are used instead of game-local clones.
+- [ ] Info and Data Map use the shell buttons, with no duplicate content tabs.
+- [ ] Record lists use shared search and pagination, verified across several pages.
+- [ ] Integration icons are visible in the rendered Data Map.
+- [ ] Loading a page cannot leave the previous page under the new tab selection.
+- [ ] Necessary help uses info bubbles; generic disclaimer banners are absent.
 - [ ] Safe smoke test exists and does not mutate a real installation/save.
 - [ ] Browser/shared-UI acceptance passes.
 - [ ] The normal installed Lexeditor runtime can start the plugin and its dependencies.

@@ -40,6 +40,9 @@ def html_for(game):
     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding='utf-8')+'</script>')
     if '<script src="/cards_ui.js"></script>' in html:
         html=html.replace('<script src="/cards_ui.js"></script>','<script>'+(ROOT/'games/ff8/cards_ui.js').read_text(encoding='utf-8')+'</script>')
+    if game == 'chrono_trigger':
+        for name in ('event_editor.js', 'map_previews.js', 'ui-integration.js'):
+            html=html.replace(f'<script src="/{name}"></script>', '<script>'+(ROOT/'games/chrono_trigger'/name).read_text(encoding='utf-8')+'</script>')
     # No third-party requests are made by these HTML documents in this harness.
     return html
 
@@ -66,6 +69,8 @@ with sync_playwright() as p:
                       if(typeof state.config!=="undefined")state.config={datasets:{mine:{readonly:false,label:"My Mod"}}};
                       navigate("datamap");
                     }''',ROWS)
+                if game == 'chrono_trigger':
+                    page.evaluate('state.busy=false;render();refreshShell();')
                 page.wait_for_selector('.lex-data-map-table')
                 page.wait_for_timeout(600)
                 # A preview/source/parser does not produce an editable badge.

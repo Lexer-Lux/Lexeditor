@@ -6100,3 +6100,5 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   font-size:12px;
   line-height:1.45;
 }
+
+.lex-integration-status.partial .lex-status-mark { background:#9a6818; }

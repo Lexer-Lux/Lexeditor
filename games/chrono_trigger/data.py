@@ -189,6 +189,23 @@ def load_message_table(store: OverlayStore, virtual_path: str, source: str = "mi
     }
 
 
+def load_language_messages(store: OverlayStore, language: str, source: str = "mine") -> dict:
+    files = [row for row in store.localization_files() if row["language"] == language]
+    if not files:
+        raise ValueError("Unknown message language")
+    rows, tables, problems = [], {}, []
+    for file in files:
+        try:
+            table = load_message_table(store, file["path"], source)
+        except (ValueError, OSError) as error:
+            problems.append({"path": file["path"], "error": str(error)})
+            continue
+        tables[file["path"]] = {"sha256": table["sha256"], "source": table["source"]}
+        rows.extend({**row, "id": f"{file['path']}:{row['id']}", "line": row["id"],
+                     "path": file["path"], "file": file["file"]} for row in table["rows"])
+    return {"language": language, "rows": rows, "tables": tables, "problems": problems}
+
+
 def save_message_table(store: OverlayStore, virtual_path: str, expected_sha256: str,
                        changes: list[dict]) -> dict:
     virtual = normalize_virtual_path(virtual_path)
