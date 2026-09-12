@@ -10,7 +10,8 @@ from unittest.mock import patch
 
 from games.stardew_valley.acceptance import acceptance_status, begin_acceptance
 from games.stardew_valley.content_pack import (
-    ACCEPTANCE_MARKER, ContentPackStore, deploy, deployment_status, initialize_project, loader_status, revert,
+    ACCEPTANCE_MARKER, OBJECT_PATCH_LOG_NAME, ContentPackStore, deploy, deployment_status,
+    initialize_project, loader_status, revert,
 )
 from games.stardew_valley import paths, server
 from games.stardew_valley.source_data import load_base_objects, objects_source_path
@@ -67,8 +68,33 @@ class StardewContentPackTests(unittest.TestCase):
         raw = json.loads((self.project / "content.json").read_text(encoding="utf-8"))
         self.assertEqual(raw["CustomRoot"], {"keep": True})
         self.assertEqual(raw["Changes"][0]["Fields"]["390"]["Description"], "keep me")
+        self.assertEqual(raw["Changes"][0]["LogName"], OBJECT_PATCH_LOG_NAME)
         with self.assertRaises(RuntimeError):
             store.save_objects(opened["sha256"], [{"id": "390", "fields": {"Price": 26}}])
+
+    def test_object_editor_does_not_hijack_ambiguous_or_conditional_patches(self):
+        content = json.loads((self.project / "content.json").read_text(encoding="utf-8"))
+        content["Changes"] = [
+            {
+                "Action": "EditData", "Target": "Data/Objects", "When": {"Season": "spring"},
+                "Fields": {"390": {"Price": 1}},
+            },
+            {
+                "Action": "EditData", "Target": "Data/Objects",
+                "Fields": {"388": {"Price": 5}},
+            },
+        ]
+        before = json.loads(json.dumps(content["Changes"]))
+        (self.project / "content.json").write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8")
+        store = ContentPackStore(self.project)
+        opened = store.objects()
+        self.assertEqual(opened["rows"], [])
+        saved = store.save_objects(opened["sha256"], [{"id": "390", "fields": {"Price": 25}}])
+        raw = json.loads((self.project / "content.json").read_text(encoding="utf-8"))
+        self.assertEqual(raw["Changes"][:2], before)
+        self.assertEqual(raw["Changes"][2]["LogName"], OBJECT_PATCH_LOG_NAME)
+        self.assertEqual(raw["Changes"][2]["Fields"], {"390": {"Price": 25}})
+        self.assertEqual(saved["rows"][0]["fields"]["Price"], 25)
 
     def test_unpacked_objects_are_read_only_and_merge_with_project_overrides(self):
         game = self.root / "game"
