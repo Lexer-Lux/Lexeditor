@@ -112,6 +112,16 @@ _EXTERNAL_DATA_MARKERS = (
     "c:\\rdrmod",
     "c:\\rdr2mod",
 )
+# Some reverse-engineering verifiers are intentionally run against local source
+# snapshots/build trees under _scratch. Hosted CI does not manufacture those
+# trees. Only classify the exact missing-path final line, so a verifier that has
+# the source and finds a real defect remains red.
+_PREPARED_SOURCE_MARKERS = (
+    "\\_scratch\\ffnx-upstream\\",
+    "/_scratch/ffnx-upstream/",
+    "\\_scratch\\issue51-ffnx-build-",
+    "/_scratch/issue51-ffnx-build-",
+)
 _EXTERNAL_REQUIREMENT_MESSAGES = (
     "no ff7 installation found",
     "the supported installed ff8 executable is missing",
@@ -146,6 +156,8 @@ def _unrunnable(tail: str) -> str:
         return "needs a program that is not installed"
     if any(marker in last for marker in _EXTERNAL_DATA_MARKERS):
         return "needs installed game/project data"
+    if any(marker in last for marker in _PREPARED_SOURCE_MARKERS):
+        return "needs prepared reverse-engineering source data"
     if any(message in last for message in _EXTERNAL_REQUIREMENT_MESSAGES):
         return "needs installed game/project data"
     return ""
