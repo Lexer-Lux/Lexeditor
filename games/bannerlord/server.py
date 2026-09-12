@@ -414,6 +414,7 @@ class Handler(BaseHTTPRequestHandler):
                         PROJECT,
                         str(payload.get("path") or ""),
                         str(payload.get("text") or ""),
+                        payload.get("originalText") if "originalText" in payload else None,
                     )
                 )
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:

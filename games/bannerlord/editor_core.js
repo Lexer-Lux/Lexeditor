@@ -1,6 +1,6 @@
 
   "use strict";
-  const {el,clone,showAlert}=LexeditorUI;
+  const {el,clone,showAlert,confirmAction}=LexeditorUI;
   const main=document.querySelector("#main");
   const state={
     tab:"module",module:null,savedModule:null,project:null,savedProject:null,
@@ -37,6 +37,24 @@
   const perksDirty=()=>state.perks?.available&&state.savedPerks?.available&&!same(perksEditable(state.perks),perksEditable(state.savedPerks));
   const xpSourcesDirty=()=>state.xpSources?.available&&state.savedXpSources?.available&&!same(xpSourcesEditable(state.xpSources),xpSourcesEditable(state.savedXpSources));
   const sourceDirty=()=>state.source&&state.savedSourceText!==null&&state.source.text!==state.savedSourceText;
+  const normalizedFilePath=value=>String(value||"").replace(/\\/g,"/").replace(/\/{2,}/g,"/").toLocaleLowerCase();
+  const sameFilePath=(left,right)=>{const a=normalizedFilePath(left),b=normalizedFilePath(right);return !!a&&!!b&&a===b};
+  function structuredSourceConflict(){
+    if(!sourceDirty())return "";
+    const sourcePath=state.source?.absolutePath||state.source?.path||"";
+    const candidates=[
+      ["SubModule.xml",moduleDirty(),state.module?.path],
+      ["project file",projectDirty(),state.project?.projectFile?.path],
+      ["custom skill definitions",skillsDirty(),state.skills?.path],
+      ["effect definitions",effectsDirty(),state.effects?.path],
+      ["perk definitions",perksDirty(),state.perks?.path],
+      ["XP source definitions",xpSourcesDirty(),state.xpSources?.path],
+      ["MCM defaults",mcmDirty(),state.mcmDefaults?.path],
+      ["Gauntlet prefab",gauntletDirty(),state.gauntlet?.path],
+      ["ModuleData XML",moduleDataDirty(),state.moduleData?.path],
+    ];
+    return candidates.find(([_label,dirty,path])=>dirty&&sameFilePath(sourcePath,path))?.[0]||"";
+  }
   function dirtyCount(){return Number(moduleDirty())+Number(projectDirty())+Number(skillsDirty())+Number(effectsDirty())+Number(perksDirty())+Number(xpSourcesDirty())+Number(sourceDirty())}
 
   function fieldRow(label,control){return [el("div",{class:"bl-label"},label),el("div",{class:"bl-control"},control)]}

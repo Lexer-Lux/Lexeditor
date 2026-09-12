@@ -31,7 +31,13 @@ async function ensureGauntletFiles(){
 
 async function loadGauntlet(path,ask=true){
   if(!path)return;
-  if(ask&&gauntletDirty()&&!window.confirm("Discard unsaved Gauntlet prefab changes?"))return;
+  if(ask&&gauntletDirty()){
+    const confirmed=await confirmAction({
+      title:"Discard unsaved Gauntlet changes?",
+      message:"Discard unsaved Gauntlet prefab changes?",confirmLabel:"Discard"
+    });
+    if(!confirmed)return;
+  }
   try{
     const value=await api(`/api/gauntlet?path=${encodeURIComponent(path)}`);
     state.gauntlet=value;state.savedGauntlet=clone(value);

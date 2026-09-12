@@ -136,6 +136,11 @@ window.fetch=async function(input,options={{}}){{
         submodules:body.submodules??current.submodules,xmls:body.xmls??current.xmls}};
       return new Response(JSON.stringify({{saved:1,module}}),{{status:200}});
     }}
+    if(path==="/api/source/save"){{
+      return new Response(JSON.stringify({{
+        path:body.path,absolutePath:`C:/fixture/${{body.path}}`,encoding:"utf-8",text:body.text,size:body.text.length,saved:1,backup:`C:/fixture/${{body.path}}.lexeditor.bak`
+      }}),{{status:200}});
+    }}
     if(path==="/api/module-data/save")return new Response(JSON.stringify(__moduleDataFixed),{{status:200}});
     if(path==="/api/gauntlet/save")return new Response(JSON.stringify(__gauntlet),{{status:200}});
     if(path==="/api/deploy-assets"){{
@@ -194,6 +199,17 @@ def main() -> None:
             assert request["body"]["legacyDependenciesBaseline"][0]["attributes"]["Future"] == "keep-browser"
             assert page.evaluate("state.savedModule.legacyDependencies[0].id") == "LegacyBrowserRenamed"
 
+            page.evaluate("""
+                window.__bannerlordRequests=[];
+                state.source={path:"src/Notes.cs",absolutePath:"C:/fixture/src/Notes.cs",encoding:"utf-8",text:"after"};
+                state.savedSourceText="before";
+            """)
+            page.evaluate("save()")
+            page.wait_for_function("!sourceDirty()")
+            source_request = page.evaluate("window.__bannerlordRequests.find(row=>row.path==='/api/source/save')")
+            assert source_request["body"]["text"] == "after"
+            assert source_request["body"]["originalText"] == "before"
+
             page.evaluate('navigate("deployment")')
             deployment_text = page.locator("#main").inner_text()
             assert "MOD LOADER" in deployment_text
@@ -250,6 +266,18 @@ def main() -> None:
             assert "GUI/Prefabs/Test.xml" in filenames
 
             page.screenshot(path=str(ARTIFACTS / "bannerlord-editor.png"), full_page=True)
+
+            page.evaluate("""
+                window.__bannerlordRequests=[];
+                state.source={path:"SubModule.xml",absolutePath:"C:/fixture/SubModule.xml",encoding:"utf-8",text:"raw changed"};
+                state.savedSourceText="raw before";
+                state.module.name="Structured changed";
+            """)
+            page.evaluate("save()")
+            page.wait_for_timeout(100)
+            conflicting_requests = page.evaluate("window.__bannerlordRequests.filter(row=>row.path==='/api/module/save'||row.path==='/api/source/save')")
+            assert conflicting_requests == [], conflicting_requests
+
             results.append({"viewport": [1280, 820], "status": "passed"})
             page.close()
         finally:

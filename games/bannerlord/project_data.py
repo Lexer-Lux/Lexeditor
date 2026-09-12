@@ -309,7 +309,11 @@ def _safe_project_path(project: Path, requested: str) -> Path:
 
 
 def _decode_source(raw: bytes) -> tuple[str, str]:
-    for encoding in ("utf-8-sig", "utf-8", "cp1252"):
+    # utf-8-sig also decodes ordinary UTF-8, so trying it first would classify
+    # every UTF-8 file as BOM-bearing and add a BOM on the next write.
+    if raw.startswith(b"\xef\xbb\xbf"):
+        return raw.decode("utf-8-sig"), "utf-8-sig"
+    for encoding in ("utf-8", "cp1252"):
         try:
             return raw.decode(encoding), encoding
         except UnicodeDecodeError:
@@ -329,9 +333,18 @@ def read_source(project: Path, requested: str) -> dict:
     }
 
 
-def save_source(project: Path, requested: str, text: str) -> dict:
+def save_source(
+    project: Path,
+    requested: str,
+    text: str,
+    original_text: str | None = None,
+) -> dict:
     target = _safe_project_path(project, requested)
-    _old_text, encoding = _decode_source(target.read_bytes())
+    current_text, encoding = _decode_source(target.read_bytes())
+    if original_text is None:
+        raise ValueError("Source save requires the originally loaded text; reload before saving")
+    if current_text != str(original_text):
+        raise ValueError("Source file changed on disk; reload before saving")
     candidate = str(text)
     if target.suffix.casefold() in {".xml", ".csproj", ".props", ".targets"}:
         try:

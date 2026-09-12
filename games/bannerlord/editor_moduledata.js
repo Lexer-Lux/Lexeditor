@@ -61,7 +61,13 @@ async function ensureModuleDataFiles(){
 
 async function loadModuleData(path,ask=true){
   if(!path)return;
-  if(ask&&moduleDataDirty()&&!window.confirm("Discard unsaved ModuleData changes?"))return;
+  if(ask&&moduleDataDirty()){
+    const confirmed=await confirmAction({
+      title:"Discard unsaved ModuleData changes?",
+      message:"Discard unsaved ModuleData changes?",confirmLabel:"Discard"
+    });
+    if(!confirmed)return;
+  }
   try{
     const value=prepareModuleData(await api(`/api/module-data?path=${encodeURIComponent(path)}`));
     state.moduleData=value;state.savedModuleData=clone(value);
@@ -135,7 +141,14 @@ async function runModuleDataRecordAction(action,record){
     showAlert?.("Save or discard this ModuleData file's pending attribute edits before duplicating or deleting a record.","Unsaved ModuleData edits");
     return;
   }
-  if(action==="delete"&&!window.confirm(`Delete ${moduleDataRecordLabel(record)} from ${state.moduleData.relativePath}? A .lexeditor.bak backup will be created.`))return;
+  if(action==="delete"){
+    const confirmed=await confirmAction({
+      title:"Delete ModuleData record?",
+      message:`Delete ${moduleDataRecordLabel(record)} from ${state.moduleData.relativePath}? A .lexeditor.bak backup will be created.`,
+      confirmLabel:"Delete"
+    });
+    if(!confirmed)return;
+  }
   const newId=state.moduleDataNewId.trim();
   if(action==="duplicate"&&record.id&&!newId){showAlert?.("Enter a new record ID before duplicating this record.","New ID required");return}
   try{

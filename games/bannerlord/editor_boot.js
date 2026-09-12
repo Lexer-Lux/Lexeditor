@@ -1,11 +1,33 @@
 "use strict";
+  async function reloadStructuredSource(absolutePath){
+    if(sameFilePath(absolutePath,state.module?.path)){
+      const value=await api("/api/module");state.module=value;state.savedModule=clone(value);return;
+    }
+    if(sameFilePath(absolutePath,state.project?.projectFile?.path)){
+      const selected=state.project?.projectFile?.name||"";
+      const value=await api(`/api/project${selected?`?project=${encodeURIComponent(selected)}`:""}`);
+      state.project=value;state.savedProject=clone(value);return;
+    }
+    if(sameFilePath(absolutePath,state.skills?.path)){const value=await api("/api/skills");state.skills=value;state.savedSkills=clone(value);return}
+    if(sameFilePath(absolutePath,state.effects?.path)){const value=await api("/api/effects");state.effects=value;state.savedEffects=clone(value);return}
+    if(sameFilePath(absolutePath,state.perks?.path)){const value=await api("/api/perks");state.perks=value;state.savedPerks=clone(value);return}
+    if(sameFilePath(absolutePath,state.xpSources?.path)){const value=await api("/api/xp-sources");state.xpSources=value;state.savedXpSources=clone(value);return}
+    if(sameFilePath(absolutePath,state.mcmDefaults?.path)){const value=await api("/api/settings-defaults");state.mcmDefaults=value;state.savedMcmDefaults=clone(value);return}
+    if(sameFilePath(absolutePath,state.gauntlet?.path)){
+      const value=await api(`/api/gauntlet?path=${encodeURIComponent(state.gauntlet.relativePath)}`);
+      state.gauntlet=value;state.savedGauntlet=clone(value);return;
+    }
+    if(sameFilePath(absolutePath,state.moduleData?.path)){
+      const value=prepareModuleData(await api(`/api/module-data?path=${encodeURIComponent(state.moduleData.relativePath)}`));
+      state.moduleData=value;state.savedModuleData=clone(value);return;
+    }
+  }
+
   async function save(){
     try{
-      if(gauntletDirty()&&sourceDirty()&&state.source?.path===state.gauntlet?.relativePath){
-        throw new Error("The same Gauntlet prefab has unsaved structured and raw-source edits. Save or discard one editing surface before saving the other.");
-      }
-      if(moduleDataDirty()&&sourceDirty()&&state.source?.path===state.moduleData?.relativePath){
-        throw new Error("The same ModuleData XML has unsaved structured and raw-source edits. Save or discard one editing surface before saving the other.");
+      const sourceConflict=structuredSourceConflict();
+      if(sourceConflict){
+        throw new Error(`The same ${sourceConflict} file has unsaved structured and raw-source edits. Save or discard one editing surface before saving the other.`);
       }
       if(moduleDirty()){
         const result=await post("/api/module/save",moduleSavePayload(state.module,state.savedModule));
@@ -89,11 +111,11 @@
       if(gauntletDirty())await saveGauntlet();
       if(moduleDataDirty())await saveModuleData();
       if(sourceDirty()){
-        const result=await post("/api/source/save",{path:state.source.path,text:state.source.text});
+        const result=await post("/api/source/save",{
+          path:state.source.path,text:state.source.text,originalText:state.savedSourceText
+        });
         state.source=result;state.savedSourceText=result.text;
-        if(state.source.path.toLowerCase().endsWith(".csproj")){
-          state.project=await api("/api/project");state.savedProject=clone(state.project);
-        }
+        await reloadStructuredSource(result.absolutePath||result.path);
       }
       state.datamap=await api("/api/datamap");
       state.deployment=await api("/api/deployment").catch(()=>state.deployment);
