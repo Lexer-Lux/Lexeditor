@@ -24,7 +24,7 @@ Unknown keys, repeated non-edited keys, comments and other unmodeled lines must 
 
 The current `pz-scripts-data` registry identifies these Build 42 script families at module level: `animationsMesh`, `craftRecipe`, `entity`, `evolvedrecipe`, `fixing`, `fluid`, `item`, `mannequin`, `model`, `sound`, `timedAction`, and `vehicle`. Lexeditor structurally inventories these top-level records while deliberately ignoring similarly shaped text inside comments, quoted strings, and nested blocks.
 
-Recognition is not the same as editability. Items, evolved recipes, conservative craft-recipe scalars, top-level fluid scalars, a conservative vehicle scalar subset, and conservative module-level sound scalars are currently structured. The remaining families and nested substructures stay read-only until their current Build 42 fields and mutation rules are independently grounded.
+Recognition is not the same as editability. Items, evolved recipes, conservative craft-recipe scalars, top-level fluid scalars, a conservative vehicle scalar subset, conservative module-level sound scalars, and conservative module-level model scalars are currently structured. The remaining families and nested substructures stay read-only until their current Build 42 fields and mutation rules are independently grounded.
 
 ## Item blocks
 
@@ -96,6 +96,19 @@ Module-level Build 42 `sound` records expose a small typed scalar surface that c
 Audio sources and playback details live in nested `clip` blocks, including fields such as file path, minimum/maximum distance, reverb factor, and volume. Those clip blocks remain read-only and are preserved verbatim. The structured editor is deliberately limited to module-level `sound` records; sound-shaped child blocks inside vehicles or templates are not promoted to independent editable records.
 
 As elsewhere, the writer changes only properties already present. Stale files, missing properties, duplicate edited properties, invalid booleans, undocumented `master` values, and malformed integers fail closed rather than causing structural insertion or normalization of unrelated sound data.
+
+## `model`
+
+Build 42 models can exist at module level and as nested vehicle/part structures. Lexeditor deliberately structures only module-level model records and only the explicitly typed scalar properties that can be validated without interpreting model assets:
+
+- `cullFace` — `Back`, `Front`, or `None`;
+- `invertX`, `static`, and `undoCoreScale` — booleans;
+- `scale` — finite float;
+- `postProcess` and `shader` — scalar strings.
+
+Mesh and texture paths, model/animation block references, colors, transforms, bone weights, vehicle/part-local model blocks, and nested attachment blocks remain read-only. In particular, an attachment's offsets and rotations are preserved byte-for-byte when a top-level model scalar changes.
+
+The model writer only replaces existing top-level property spans. Missing or duplicated edited properties, stale files, malformed booleans, invalid culling modes, non-finite scales, and script punctuation fail closed; Lexeditor does not synthesize model structure or normalize unmodeled asset references.
 
 ## Filesystem portability
 
