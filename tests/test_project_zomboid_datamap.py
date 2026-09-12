@@ -19,6 +19,7 @@ class ProjectZomboidDataMapTests(unittest.TestCase):
                 '''  item Hammer { ItemType = base:weapon, Weight = 1, Icon = Hammer, DisplayCategory = Tool, }\n'''
                 '''  evolvedrecipe Sandwich { BaseItem = Base.Bread, MaxItems = 4, ResultItem = Base.Sandwich, Name = Sandwich, }\n'''
                 '''  craftRecipe SawLogs { tags = InHandCraft, time = 50, inputs { item 1 [Base.Log], } }\n'''
+                '''  fixing RepairHammer { Require = Base.Hammer, ConditionModifier = 1.0, }\n'''
                 '''  fluid CustomWater { ColorReference = Azure, DisplayName = Fluid_Name_CustomWater, }\n'''
                 '''  vehicle Car { mechanicType = 1, }\n'''
                 '''  sound Bell { category = Item, loop = false, clip { file = media/sound/bell.ogg, } }\n'''
@@ -31,6 +32,7 @@ class ProjectZomboidDataMapTests(unittest.TestCase):
             self.assertIn("Items", row["editor"])
             self.assertIn("Evolved Recipes", row["editor"])
             self.assertIn("Craft Recipes", row["editor"])
+            self.assertIn("Fixing", row["editor"])
             self.assertIn("Fluids", row["editor"])
             self.assertIn("Vehicles", row["editor"])
             self.assertIn("Sounds", row["editor"])
