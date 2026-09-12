@@ -17,7 +17,9 @@ from .tooling import REPAK_TAG, helper_install, helper_status
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 USER_ROOT = user_data_dir()
-DEFAULT_PROJECT = USER_ROOT / "projects" / "ff7r"
+# Lexer's FF7R mod lives outside Lexeditor's own data, beside the other
+# per-game mod repositories, so the mod can be worked on without Lexeditor.
+DEFAULT_PROJECT = Path(r"C:/FF7RMod")
 DISPLAY_NAME = "FINAL FANTASY VII REMAKE INTERGRADE"
 
 
@@ -249,6 +251,13 @@ PLUGIN = GamePlugin(
         default_root=DEFAULT_PROJECT,
         required_paths=(),
         template_root=PLUGIN_ROOT / "_no_project_template",
+        content_types=(
+            ("DataObject tables", (".uasset", ".uexp")),
+            ("Packaged archives", (".pak", ".ucas", ".utoc")),
+            ("Textures", (".ubulk", ".dds", ".png")),
+            ("Audio", (".bnk", ".wem")),
+            ("ReShade presets", (".ini", ".fx")),
+        ),
     ),
     installation=GameInstallSpec(
         root_env="LEXEDITOR_FF7R_ROOT",

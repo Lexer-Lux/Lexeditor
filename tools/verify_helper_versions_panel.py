@@ -45,6 +45,11 @@ STUB = """
   window.__helperCalls=[];
   window.pywebview={api:{
     plugins:async()=>PLUGINS,
+    // The chooser asks for a loading quote before it renders any card. A
+    // double without this threw on boot, so the page showed "Could not load
+    // games" and every later check timed out waiting for cards that were
+    // never going to appear.
+    loading_quote:async()=>({quote:'Loading editor'}),
     window_state:async()=>({maximized:false}),
     lexeditor_settings:async()=>structuredClone(window.__testSettings),
     save_lexeditor_settings:async values=>{Object.assign(window.__testSettings,values);return structuredClone(window.__testSettings)},

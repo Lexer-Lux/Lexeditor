@@ -1,0 +1,75 @@
+name: Move merged issues to Needs Testing
+
+# A merged pull request means an implemented candidate exists, not that the
+# work is accepted. Issues it closes move from "actionable" to "untested" so
+# the board stops showing delivered work as outstanding, and never shows
+# unverified work as done.
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  issues: write
+  contents: read
+
+concurrency:
+  group: issue-status-on-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  relabel:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Move each closed issue to Needs Testing
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          # Ask GitHub which issues the merge actually closed rather than
+          # re-implementing keyword parsing over the body.
+          issues=$(gh api graphql -f query='
+            query($owner:String!,$name:String!,$number:Int!){
+              repository(owner:$owner,name:$name){
+                pullRequest(number:$number){
+                  closingIssuesReferences(first:50){ nodes{ number } }
+                }
+              }
+            }' \
+            -F owner="${REPOSITORY%/*}" -F name="${REPOSITORY#*/}" -F number="$PR_NUMBER" \
+            --jq '.data.repository.pullRequest.closingIssuesReferences.nodes[].number')
+
+          if [ -z "$issues" ]; then
+            echo "No issue is closed by this pull request; nothing to relabel."
+            exit 0
+          fi
+
+          for issue in $issues; do
+            labels=$(gh issue view "$issue" --repo "$REPOSITORY" --json labels --jq '[.labels[].name]|join(",")')
+            echo "Issue #$issue has labels: ${labels:-none}"
+
+            # "waiting" and "unfeasible" describe a human decision or a proven
+            # block. A merge does not resolve either, so those are left alone.
+            case ",$labels," in
+              *,waiting,*|*,unfeasible,*)
+                echo "  left as is: needs a human decision rather than a test"
+                continue
+                ;;
+            esac
+
+            if [ "${labels#*untested}" != "$labels" ]; then
+              echo "  already awaiting testing"
+              continue
+            fi
+
+            gh issue edit "$issue" --repo "$REPOSITORY" \
+              --add-label untested --remove-label actionable
+            gh issue comment "$issue" --repo "$REPOSITORY" --body \
+              "Moved to Needs Testing: pull request #${PR_NUMBER} merged, so an implemented candidate is available. This is not acceptance; the change still needs its human test pass."
+            echo "  moved to untested"
+          done

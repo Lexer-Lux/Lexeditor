@@ -278,9 +278,20 @@ class HostApi:
     def restart_lexeditor(self) -> dict:
         """Close the current window and replace this desktop-host process."""
         with self._lock:
+            if self._dirty_count:
+                raise RuntimeError("Return to the editor and save or discard its changes before restarting Lexeditor.")
+            if self._restart_requested:
+                return {"restarting": True}
+            previous_close_authorized = self._close_authorized
             self._restart_requested = True
             self._close_authorized = True
-        self._bound_window().destroy()
+        try:
+            self._bound_window().destroy()
+        except Exception:
+            with self._lock:
+                self._restart_requested = False
+                self._close_authorized = previous_close_authorized
+            raise
         return {"restarting": True}
 
     def window_closing(self) -> bool:
@@ -348,10 +359,22 @@ class HostApi:
         """Choose one editable game or down-weighted global line."""
         if plugin_id != "__home__" and plugin_id not in self._plugins:
             raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
+        # Global and shared lines stay in one file; a game's own lines live with
+        # its plugin, so adding a plugin does not mean editing a shared list.
         try:
             payload = json.loads(LOADING_QUOTES.read_text(encoding="utf-8"))
         except (OSError, ValueError, TypeError):
             payload = {}
+        if not isinstance(payload, dict):
+            payload = {}
+        if plugin_id != "__home__":
+            try:
+                own = json.loads((ROOT / "games" / plugin_id / "loading_quotes.json")
+                                 .read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError):
+                own = None
+            if isinstance(own, list):
+                payload = {**payload, plugin_id: own}
         rarity = self._settings.snapshot().get("globalMessageRarity", 3.0)
         return {
             "pluginId": plugin_id,
@@ -507,6 +530,7 @@ class HostApi:
             payload.get("mainMenuHeightPercent"),
             None if "soundEnabled" not in payload else bool(payload["soundEnabled"]),
             payload.get("soundVolumePercent"),
+            None if "pageWrapAround" not in payload else bool(payload["pageWrapAround"]),
         )
         return self.lexeditor_settings()
 
@@ -981,7 +1005,8 @@ class HostApi:
         if not selected:
             return {**current, "cancelled": True}
         project = self._projects.select(plugin_id, selected)
-        return self._restart_for_project(plugin_id, project)
+        return {**self._restart_for_project(plugin_id, project),
+                "contents": self._projects.contents(plugin_id, selected)}
 
     def create_mod_project(self, plugin_id: str, name: str) -> dict:
         """Clone the plugin's valid starter into a new selected folder."""
@@ -990,7 +1015,110 @@ class HostApi:
         if not selected:
             return {**self._projects.snapshot(plugin_id), "cancelled": True}
         project = self._projects.create(plugin_id, selected, name)
-        return self._restart_for_project(plugin_id, project)
+        return {**self._restart_for_project(plugin_id, project),
+                "contents": self._projects.contents(plugin_id, str(Path(selected) / name))}
+
+    def mod_reshade(self, plugin_id: str) -> dict:
+        """Report the ReShade preset the current mod ships, if it ships one."""
+        import reshade_projects
+
+        snapshot = self._projects.snapshot(plugin_id)
+        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
+        return reshade_projects.snapshot(
+            Path(snapshot["current"]), Path(game_root) if game_root else None)
+
+    def save_mod_reshade(self, plugin_id: str, manifest: dict) -> dict:
+        """Write the mod's ReShade manifest and report the new state."""
+        import reshade_projects
+
+        snapshot = self._projects.snapshot(plugin_id)
+        root = Path(snapshot["current"])
+        reshade_projects.write_manifest(root, manifest or {})
+        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
+        return reshade_projects.snapshot(
+            root, Path(game_root) if game_root else None)
+
+    def install_reshade(self, plugin_id: str, renderer: str) -> dict:
+        """Put Lexeditor's one ReShade into this game, under its loader name."""
+        import reshade_projects
+
+        root = self._installations.snapshot(plugin_id).get("root")
+        if not root:
+            raise ValueError("Add this game before installing ReShade for it.")
+        reshade_projects.install(Path(root), renderer)
+        return self.mod_reshade(plugin_id)
+
+    def uninstall_reshade(self, plugin_id: str) -> dict:
+        """Remove ReShade from this game. A game's own loader is left alone."""
+        import reshade_projects
+
+        root = self._installations.snapshot(plugin_id).get("root")
+        if not root:
+            raise ValueError("This game has no folder to remove ReShade from.")
+        reshade_projects.uninstall(Path(root))
+        return self.mod_reshade(plugin_id)
+
+    def reshade_repositories(self) -> list:
+        """The shader repositories this machine has, shared by every project."""
+        import reshade_projects
+
+        return reshade_projects.repositories()
+
+    def add_reshade_repository(self, plugin_id: str, name: str,
+                               version: str = "", url: str = "") -> dict:
+        """Record one repository for the machine, then restate this mod."""
+        import reshade_projects
+
+        reshade_projects.add_repository(name, version, url)
+        return self.mod_reshade(plugin_id)
+
+    def remove_reshade_repository(self, plugin_id: str, name: str) -> dict:
+        """Forget one repository. Mods that name it still name it."""
+        import reshade_projects
+
+        reshade_projects.remove_repository(name)
+        return self.mod_reshade(plugin_id)
+
+    def write_reshade_note(self, plugin_id: str) -> dict:
+        """Write the by-hand install note into the mod's reshade folder."""
+        import reshade_projects
+
+        snapshot = self._projects.snapshot(plugin_id)
+        root = Path(snapshot["current"])
+        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
+        path = reshade_projects.write_export_note(
+            root, Path(game_root) if game_root else None)
+        return {**self.mod_reshade(plugin_id), "notePath": path}
+
+    def adopt_reshade(self) -> dict:
+        """Take a ReShade DLL the user picks as Lexeditor's one copy."""
+        import reshade_projects
+
+        selected = self._choose_file("Choose ReShade64.dll")
+        if not selected:
+            return {**reshade_projects.store_state(), "cancelled": True}
+        return reshade_projects.adopt(Path(selected))
+
+    def _choose_file(self, _title: str = "") -> str:
+        import webview
+
+        selection = self._bound_window().create_file_dialog(
+            webview.OPEN_DIALOG, allow_multiple=False,
+            file_types=("ReShade DLL (*.dll)",))
+        if not selection:
+            return ""
+        return str(selection[0] if isinstance(selection, (list, tuple)) else selection)
+
+    def mod_project_contents(self, plugin_id: str, path: str = "") -> dict:
+        """Report what this game's loader recognises inside one mod folder."""
+        return self._projects.contents(plugin_id, path)
+
+    def remove_mod_project(self, plugin_id: str, path: str) -> dict:
+        """Stop listing one mod. The folder and its files are left alone."""
+        before = self._projects.snapshot(plugin_id)
+        was_current = os.path.normcase(before.get("current", "")) == os.path.normcase(str(Path(path).resolve()))
+        project = self._projects.forget(plugin_id, path)
+        return self._restart_for_project(plugin_id, project) if was_current else project
 
     def rename_mod_project(self, plugin_id: str, path: str, name: str) -> dict:
         """Rename one editable project and restart it when it is active."""
@@ -1252,7 +1380,7 @@ def smoke_host_switch(plugins: dict[str, GamePlugin], first: str, second: str) -
                 if (last and last.get("plugin") == plugin_id and last.get("ready")
                         and (not project_required or (
                             last.get("project") and
-                            last.get("projectActions") == ["New Mod", "Find a Mod"]
+                            last.get("projectActions") == ["➕ Add a Mod", "🔍 Find a Mod"]
                         ))):
                     return last
             except Exception:
@@ -1644,7 +1772,7 @@ def smoke_host_switch(plugins: dict[str, GamePlugin], first: str, second: str) -
         expected_with_settings.insert(4, "lexeditor-settings")
         if result["commandOrder"] not in (expected_order, expected_with_settings):
             raise RuntimeError(f"The shared two-row command order is wrong: {result}")
-        if (result["projectActions"] != ["New Mod", "Find a Mod"] or
+        if (result["projectActions"] != ["➕ Add a Mod", "🔍 Find a Mod"] or
                 result["separateProjectActions"]):
             raise RuntimeError(f"The project selector actions are wrong: {result}")
         geometry = result.get("projectGeometry") or {}

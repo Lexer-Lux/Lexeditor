@@ -56,8 +56,16 @@ def text_fixture():
 
 
 def exe_fixture(shift=0x400):
-    data = bytearray(0x525000)
+    data = bytearray(0x57C000)
     data[:2] = b'MZ'; data[shift:shift+4]=b'\x55\x8b\xec\xc7'
+    for spec in ex.EXE_TEXT_RECORDS:
+        at=spec['offset']+shift;data[at:at+spec['size']]=codec.encode_text('X').ljust(spec['size'],b'\xff')
+    for i in range(320):struct.pack_into('<H',data,0x51FB48+shift+i*2,i)
+    for i in range(96):data[0x51FDC8+shift+i]=i
+    data[0x31ED4F+shift]=data[0x31ED9E+shift]=2
+    for i in range(128):
+        struct.pack_into('<i',data,0x565C60+shift+i*4,i)
+        struct.pack_into('<i',data,0x565E60+shift+i*4,-i)
     for i in range(10):
         at=0x5202B8+shift+i*12;data[at:at+12]=codec.encode_text(f'Name{i}').ljust(12,b'\xff')
     for i in range(2):
@@ -167,6 +175,39 @@ class BinaryTests(unittest.TestCase):
                 bad=bytearray(saved);bad[100]=1
                 with self.assertRaises(ValueError):ex.ShopExecutable(bytes(bad),source)
         with self.assertRaisesRegex(ValueError,'Unsupported'):ex.ShopExecutable(source,source)
+
+
+    def test_exe_named_surface_roundtrip_and_isolation(self):
+        source=exe_fixture();sha=hashlib.sha1(source).hexdigest().upper();shift=0x400
+        with patch.dict(ex.EXE_PROFILES,{sha:shift}):
+            obj=ex.ShopExecutable(source,source)
+            expected={'limitBreaks':71,'materiaEquipEffects':21,'exeText':476,'itemSortOrder':320,
+                      'materiaPriority':96,'audioMixing':128,'apMultiplier':1}
+            self.assertEqual({key:len(obj.records(key)) for key in expected},expected)
+            for key in expected:obj.apply(key,obj.records(key))
+            self.assertEqual(obj.to_bytes(),source)
+
+            rows=obj.records('limitBreaks');rows[0]['values']['attackPower']=77;obj.apply('limitBreaks',rows)
+            rows=obj.records('materiaEquipEffects');rows[0]['values']['strength']=-7;obj.apply('materiaEquipEffects',rows)
+            rows=obj.records('exeText');rows[0]['values']['text']='Quit';obj.apply('exeText',rows)
+            rows=obj.records('itemSortOrder');rows[319]['values']['position']=7;obj.apply('itemSortOrder',rows)
+            rows=obj.records('materiaPriority');rows[95]['values']['priority']=1;obj.apply('materiaPriority',rows)
+            rows=obj.records('audioMixing');rows[0]['values']['volume']=-123;rows[0]['values']['pan']=456;obj.apply('audioMixing',rows)
+            rows=obj.records('apMultiplier');rows[0]['values']['multiplier']=3;obj.apply('apMultiplier',rows)
+            saved=obj.to_bytes(); reread=ex.ShopExecutable(saved,source)
+            self.assertEqual(reread.records('limitBreaks')[0]['values']['attackPower'],77)
+            self.assertEqual(reread.records('materiaEquipEffects')[0]['values']['strength'],-7)
+            self.assertEqual(reread.records('exeText')[0]['values']['text'],'Quit')
+            self.assertEqual(reread.records('itemSortOrder')[319]['values']['position'],7)
+            self.assertEqual(reread.records('materiaPriority')[95]['values']['priority'],1)
+            self.assertEqual(reread.records('audioMixing')[0]['values'],{'volume':-123,'pan':456})
+            self.assertEqual(reread.records('apMultiplier')[0]['values']['multiplier'],3)
+            self.assertEqual(saved[0x31ED4F+shift],3);self.assertEqual(saved[0x31ED9E+shift],3)
+
+            bad=bytearray(saved);bad[0x51CF40+shift]^=1
+            with self.assertRaisesRegex(ValueError,'outside supported data'):ex.ShopExecutable(bytes(bad),source)
+            rows=reread.records('exeText');rows[0]['values']['text']='x'*100
+            with self.assertRaises(ValueError):reread.apply('exeText',rows)
 
 
 class SaveTests(unittest.TestCase):

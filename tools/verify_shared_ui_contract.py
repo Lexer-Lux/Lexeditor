@@ -95,18 +95,25 @@ require("developerAuthorized" in host,
 
 # Blank is the canonical gallery, not a second implementation surface.
 require("design-review" not in blank.lower(), "Blank still references Design Review")
-require("Editable Table" not in blank, "Blank still exposes a separate Editable Table type/demo")
+# The rule is that Blank must not be a SECOND IMPLEMENTATION - it demonstrates
+# the shared components rather than growing its own. In-cell editing is one of
+# those shared components, and showing it is exactly the gallery's job: the
+# panel-layout acceptance test drives that example in detail, and deleting it
+# left that whole block asserting nothing. So what is forbidden is Blank
+# building a table of its own, not Blank showing the shared one being edited.
+require("lex-column-list-row" not in blank and "<table" not in blank,
+        "Blank builds its own table markup instead of using the shared one")
+require(blank.count("columnList({") >= 1,
+        "Blank no longer demonstrates the shared table")
 require(not (ROOT / "ui/design-review.js").exists() and not (ROOT / "ui/design-review.css").exists(),
         "Design Review implementation files still exist")
 
-# The shared model-preview drawer remains a reusable Detail capability, but the
-# Warband Items detail is now the actual record editor rather than a preview
-# surface. Do not regress it back into a model viewer just because the shared
-# framework still supports model previews elsewhere.
+# Warband keeps editable properties in Detail and opens models through the
+# shared drawer. The optional viewer must not replace the record fields.
 require("modelPreview" in framework and "lex-model-preview-drawer" in framework,
         "shared Detail-panel model preview drawer is missing")
-require("modelPreview:" not in warband and "Open model preview" not in warband,
-        "Warband Items regressed back to a model-preview detail pane")
+require("modelPreview:item.inventoryMesh?" in warband and "body:[core,source]" in warband,
+        "Warband Items must keep its fields alongside the optional shared model drawer")
 require("detailField" in warband and "/api/items/save" in warband,
         "Warband Items is not using structured editable Detail properties")
 require("warband-item-preview-action" not in warband,
@@ -116,9 +123,68 @@ require("warband-item-preview-action" not in warband,
 for phrase in ("most human-friendly semantic control", "checkless toggle", "Bitflags", "info bubble", "ref rail"):
     require(phrase.casefold() in manual.casefold(), f"UI manual is missing: {phrase}")
 
+# Every plugin explains its mod loader, in the same five fields, in the same
+# words. Five of the eight editors previously said nothing about how their
+# output is loaded, which is the first thing anyone installing a mod needs.
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not (plugin / "editor.html").is_file():
+        continue
+    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    require("modLoaderSection(" in editor,
+            f"{plugin.name} does not render the shared MOD LOADER section")
+    for field in ("loader:", "output:", "order:", "safety:", "removal:"):
+        require(field in editor,
+                f"{plugin.name} mod loader section is missing {field.rstrip(':')}")
+require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
+        "the shared mod loader section is not defined in the framework")
+
+# One ReShade lives in Lexeditor; a mod carries only its own preset. Every game
+# that offers a Tweaks page offers it the same way, so a player learns the
+# control once. Games without a Tweaks page yet are not held to it.
+# Lexeditor never shows a browser dialog. window.confirm and window.alert are
+# OS dialogs wearing the WebView's clothes: they ignore the theme, cannot say
+# more than one line, and are the reason "I get this browser message" was a bug
+# report. Every question and every message is Lexeditor's own.
+for source_path in [ROOT / "ui" / "framework.js", ROOT / "ui" / "chooser.html"] + [
+        plugin / "editor.html" for plugin in sorted((ROOT / "games").iterdir())
+        if (plugin / "editor.html").is_file()]:
+    text = source_path.read_text(encoding="utf-8")
+    for banned in ("window.confirm(", "window.alert(", "window.prompt("):
+        require(banned not in text,
+                f"{source_path.name} uses {banned.rstrip('(')}; use the shared "
+                "confirmAction or showAlert instead")
+require("const confirmAction = options =>" in framework,
+        "the shared confirm dialog is not defined in the framework")
+
+require("reshadeSection" in framework,
+        "the shared ReShade section is not defined in the framework")
+require("reshadeSection(" in (ROOT / "games" / "blank" / "editor.html").read_text(encoding="utf-8"),
+        "games/blank does not demonstrate the shared ReShade section")
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not (plugin / "editor.html").is_file():
+        continue
+    editor = (plugin / "editor.html").read_text(encoding="utf-8")
+    if 'id:"tweaks"' not in editor and "id: \"tweaks\"" not in editor:
+        continue
+    require("reshadeSection(" in editor,
+            f"{plugin.name} has a Tweaks page but does not offer the shared "
+            "ReShade section")
+
 # Property geometry / labels / metadata.
-require("--lex-detail-label-width:10%" in css.replace(" ", ""),
-        "Detail property-name lane is not standardized to 10%")
+# Pin the single definition, not the number. Three separate declarations of
+# this width existed at once and only the last one was live, so edits to the
+# others silently did nothing.
+# The lane is still ten percent wherever ten percent is wide enough to hold a
+# property name. It now carries a font-relative floor as well, because ten
+# percent of a narrow detail panel is a twenty-pixel column that cuts every
+# label off. Both halves are required: the floor without the percentage would
+# let the lane grow without limit.
+flat = css.replace(" ", "")
+require("--lex-detail-label-width:minmax(var(--lex-detail-label-floor),10%)" in flat,
+        "Detail property-name lane is not standardized to the shared 10% lane "
+        "with its font-relative floor")
+require("--lex-detail-label-floor:" in flat,
+        "Detail property-name lane has no font-relative minimum width")
 require("lex-info-help" in css and "place-items:center" in css.replace(" ", ""),
         "info bubble glyph centering is not defined")
 require("lex-toggle-name" in css and "writing-mode:horizontal-tb" in css,

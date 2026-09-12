@@ -8,14 +8,14 @@ import verify_ff7_rendered as target
 
 def open_with_neutral(self, edition="ff7"):
     self.page.goto("about:blank")
-    html = (target.ROOT / "games/ff7/editor.html").read_text()
+    html = (target.ROOT / "games/ff7/editor.html").read_text(encoding="utf-8")
     # framework.js resolves optional shared assets relative to document.baseURI.
     # Synthetic set_content() pages otherwise use the non-hierarchical about:blank URL.
     html = html.replace("<head>", '<head><base href="http://127.0.0.1:9/">', 1)
-    shared_css = (target.ROOT / "ui/framework.css").read_text() + "\n" + (target.ROOT / "ui/neutral.css").read_text()
+    shared_css = (target.ROOT / "ui/framework.css").read_text(encoding="utf-8") + "\n" + (target.ROOT / "ui/neutral.css").read_text(encoding="utf-8")
     html = html.replace('<link rel="stylesheet" href="/shared/framework.css">', "<style>" + shared_css + "</style>")
     html = html.replace('<link rel="stylesheet" href="/shared/neutral.css">', "")
-    code = target.HOST + "\nwindow.__lexeditorPlugin=" + json.dumps({"id":edition,"name":"FF7 fixture","edition":edition}) + ";\n" + (target.ROOT / "ui/framework.js").read_text()
+    code = target.HOST + "\nwindow.__lexeditorPlugin=" + json.dumps({"id":edition,"name":"FF7 fixture","edition":edition}) + ";\n" + (target.ROOT / "ui/framework.js").read_text(encoding="utf-8")
     html = html.replace('<script src="/shared/framework.js"></script>', "<script>" + code + "</script>")
     self.page.set_content(html, wait_until="domcontentloaded")
     self.page.wait_for_function("state.loaded === true")
@@ -168,10 +168,163 @@ def test_full_ff7_surface_uses_human_controls(self):
     self.assertTrue(data['records']['enemyAttacks'][0]['values']['specialFlags'] & 0x2000)
     self.originals_unchanged()
 
+
+
+def test_holistic_ff7_concept_views_and_new_game_data(self):
+    self.install(); self.open()
+    self.navigate("initialState")
+    self.assertEqual(self.page.get_by_label("Party member 1 for New game defaults", exact=True).evaluate("e=>e.tagName"), "SELECT")
+    self.navigate("initialInventory")
+    self.assertEqual(self.page.get_by_label("Item / equipment for Slot 1 — Unknown item 421", exact=True).evaluate("e=>e.tagName"), "SELECT")
+    self.navigate("magicOrder")
+    self.assertEqual(self.page.get_by_label("Magic-menu section for Record0", exact=True).evaluate("e=>e.tagName"), "SELECT")
+
+    for tab, concept in (("growthCurves","growth-curve"),("growthBonuses","growth-bonuses"),("characters","character-growth-curves"),("weapons","equipment-materia-slots"),("enemies","enemy-loot"),("encounters","formation-slots"),("shops","shop-inventory"),("fieldEncounters","weighted-encounters")):
+        self.navigate(tab)
+        self.assertEqual(self.page.locator(f'[data-concept="{concept}"]').count(),1,(tab,concept))
+
+    self.navigate("growthCurves")
+    self.assertEqual(self.page.get_by_role("img", name="Primary stat curve 0 curve preview").count(),1)
+    self.assertEqual(self.page.get_by_label("Growth curve brackets").locator("input").count(),16)
+    self.navigate("enemies")
+    self.assertEqual(self.page.get_by_label("Loot slot 1 method / chance for Enemy0", exact=True).evaluate("e=>e.tagName"),"SELECT")
+    self.assertEqual(self.page.get_by_label("Back-attack damage multiplier for Enemy0", exact=True).get_attribute("step"),"0.125")
+    self.originals_unchanged()
+
+
+def test_refined_master_and_detail_ux(self):
+    self.install(); self.open()
+
+    self.navigate("materia")
+    progression = self.page.get_by_label("Materia AP level progression", exact=True)
+    self.assertEqual(progression.count(), 1)
+    self.assertEqual(progression.locator('input[type="number"]').count(), 4)
+    self.assertEqual(self.page.locator('[data-concept="editable-description"] textarea').count(), 1)
+
+    self.navigate("items")
+    self.assertGreaterEqual(self.page.get_by_text("Power", exact=True).count(), 1)
+    self.assertGreaterEqual(self.page.get_by_text("CALC", exact=True).count(), 1)
+
+    self.navigate("characterAI")
+    row_name = self.page.evaluate("state.records.characterAI.find(r=>r.id===state.selected.characterAI).name")
+    event = self.page.get_by_label(f"AI event for {row_name}", exact=True)
+    self.assertEqual(event.evaluate("e=>e.tagName"), "SELECT")
+    self.assertEqual(event.locator("option").count(), 16)
+    self.assertEqual(self.page.locator(".ff7-detail textarea").count(), 1)
+    self.assertEqual(self.page.locator('[data-concept="ai-event-editor"]').count(), 1)
+    self.assertIn("Cloud AI", self.page.locator("main").inner_text())
+    self.assertGreaterEqual(self.page.get_by_text("AI", exact=True).count(), 1)
+    self.assertEqual(self.page.get_by_text("EVENTS", exact=True).count(), 1)
+    event.select_option("1")
+    main_label = self.page.evaluate("state.data.categories.find(c=>c.id==='characterAI').fields.find(f=>f.key==='script1').label")
+    self.assertEqual(self.page.get_by_label(f"{main_label} for {row_name}", exact=True).count(), 1)
+    self.assertEqual(self.page.locator(".ff7-detail textarea").count(), 1)
+
+    self.navigate("encounters")
+    self.assertEqual(self.page.evaluate("state.sort.encounters || null"), None)
+    main_text = self.page.locator("main").inner_text()
+    self.assertIn("Battle 2", main_text)
+    self.assertLess(main_text.find("Battle 2"), main_text.find("Battle 10"))
+    self.originals_unchanged()
+
+def test_finished_high_value_detail_views(self):
+    self.install(); self.open()
+
+    self.navigate("initialState")
+    self.assertEqual(self.page.locator('[data-concept="new-game-setup"]').count(),1)
+    self.assertEqual(self.page.get_by_label("New-game party", exact=True).locator("select").count(),3)
+
+    for group in ("playerAttacks","limitBreaks","enemyAttacks"):
+        with self.subTest(group=group):
+            self.navigate(group)
+            self.assertEqual(self.page.locator('[data-concept="attack-core"]').count(),1)
+            self.assertEqual(self.page.locator('[data-concept="attack-effects"]').count(),1)
+
+    self.navigate("materiaEquipEffects")
+    self.assertEqual(self.page.locator('[data-concept="materia-equip-effect"]').count(),1)
+    self.assertEqual(self.page.get_by_label("Materia equip-effect stat changes", exact=True).locator('input[type="number"]').count(),6)
+
+    self.navigate("recruits")
+    self.assertEqual(self.page.locator('[data-concept="recruit-loadout"]').count(),1)
+    self.assertEqual(self.page.locator('[data-concept="recruit-stats"]').count(),1)
+    self.assertEqual(self.page.get_by_label("Recruit core stats", exact=True).locator('input[type="number"]').count(),12)
+
+    for group in ("texts","exeText"):
+        with self.subTest(group=group):
+            self.navigate(group)
+            self.assertEqual(self.page.locator('[data-concept="text-editor"]').count(),1)
+            area=self.page.locator('[data-concept="text-editor"] textarea')
+            self.assertEqual(area.count(),1)
+            self.assertGreaterEqual(int(area.get_attribute("rows")),10)
+
+    self.originals_unchanged()
+
+
+def test_dense_custom_views_fit_narrow_detail_pane(self):
+    self.install(); self.open()
+    self.page.set_viewport_size({"width":900,"height":620})
+    for group in ("characters","playerAttacks","encounters","shops"):
+        with self.subTest(group=group):
+            self.navigate(group); self.page.wait_for_timeout(50)
+            metrics=self.page.evaluate("""()=>{
+              const detail=document.querySelector('.ff7-detail'),dr=detail.getBoundingClientRect();
+              const visible=node=>{const r=node.getBoundingClientRect();return r.width>0&&r.height>0};
+              const clipped=[...detail.querySelectorAll('input,select,textarea,button')].filter(visible).filter(node=>{const r=node.getBoundingClientRect();return r.left<dr.left-2||r.right>dr.right+2}).length;
+              const tableOverflow=[...detail.querySelectorAll('.ff7-concept-table')].filter(table=>table.scrollWidth>table.clientWidth+1).length;
+              const subtabOverflow=[...document.querySelectorAll('.lex-subtab-button .lex-tab-label-text')].filter(label=>label.scrollWidth>label.clientWidth+1).length;
+              return {clipped,tableOverflow,subtabOverflow,documentWidth:document.documentElement.scrollWidth};
+            }""")
+            self.assertEqual(metrics["clipped"],0,(group,metrics))
+            self.assertEqual(metrics["tableOverflow"],0,(group,metrics))
+            self.assertEqual(metrics["subtabOverflow"],0,(group,metrics))
+            self.assertLessEqual(metrics["documentWidth"],902,(group,metrics))
+    self.originals_unchanged()
+
+
+def test_small_fixed_datasets_do_not_stretch_or_overlap(self):
+    self.install(); self.open(); self.page.set_viewport_size({"width":900,"height":620})
+
+    # Single-record datasets use the whole editing surface instead of wasting
+    # half of it on a one-row master table.
+    for group in ("initialState","apMultiplier"):
+        with self.subTest(single=group):
+            self.navigate(group)
+            self.assertEqual(self.page.locator('.ff7-detail').count(),1)
+            self.assertEqual(self.page.locator('.ff7-table').count(),0)
+
+    # Tiny multi-record datasets keep ordinary list rows. This guards the old
+    # Cait Sith/Vincent overlay where both names occupied the same giant row.
+    for group,count in (("recruits",2),("growthBonuses",3)):
+        with self.subTest(tiny=group):
+            self.navigate(group); self.page.wait_for_timeout(50)
+            rows=self.page.locator('.ff7-compact-master .lex-column-list-row')
+            self.assertEqual(rows.count(),count)
+            boxes=rows.evaluate_all('(rows)=>rows.map(row=>{const r=row.getBoundingClientRect();return{top:r.top,bottom:r.bottom,height:r.height}})')
+            self.assertTrue(all(20<=box['height']<=60 for box in boxes),(group,boxes))
+            self.assertTrue(all(left['bottom']<=right['top']+1 for left,right in zip(boxes,boxes[1:])),(group,boxes))
+    self.originals_unchanged()
+
+
+def test_master_summary_headers_stay_single_line_at_narrow_width(self):
+    self.install(); self.open(); self.page.set_viewport_size({"width":900,"height":620})
+    for group in ("characters","items","weapons","armor","materia","playerAttacks","enemies","encounters"):
+        with self.subTest(group=group):
+            self.navigate(group); self.page.wait_for_timeout(40)
+            clipped=self.page.locator('.ff7-table .lex-column-list-head-cell .header-label').evaluate_all("""labels=>labels.filter(label=>label.scrollWidth>label.clientWidth+1).map(label=>label.textContent.trim())""")
+            self.assertEqual(clipped,[],(group,clipped))
+    self.originals_unchanged()
+
+
 target.RenderedTests.open = open_with_neutral
 target.RenderedTests.test_materia_uses_human_semantic_controls = test_materia_uses_human_semantic_controls
 target.RenderedTests.test_full_ff7_surface_uses_human_controls = test_full_ff7_surface_uses_human_controls
 target.RenderedTests.test_accessory_description_is_editable_game_text = test_accessory_description_is_editable_game_text
+target.RenderedTests.test_holistic_ff7_concept_views_and_new_game_data = test_holistic_ff7_concept_views_and_new_game_data
+target.RenderedTests.test_refined_master_and_detail_ux = test_refined_master_and_detail_ux
+target.RenderedTests.test_finished_high_value_detail_views = test_finished_high_value_detail_views
+target.RenderedTests.test_dense_custom_views_fit_narrow_detail_pane = test_dense_custom_views_fit_narrow_detail_pane
+target.RenderedTests.test_small_fixed_datasets_do_not_stretch_or_overlap = test_small_fixed_datasets_do_not_stretch_or_overlap
+target.RenderedTests.test_master_summary_headers_stay_single_line_at_narrow_width = test_master_summary_headers_stay_single_line_at_narrow_width
 
 if __name__ == "__main__":
     unittest.main(module=target, verbosity=2)

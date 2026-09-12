@@ -65,6 +65,8 @@ def _pso(
 
 
 ENTRIES = (
+    _xml("update_1.rpf", "common/data/ai/looting/loot_sounds.meta",
+         "loot_sounds.meta", "CLootSoundsMapCollection", 10_000),
     _xml("common_0.rpf", "data/pedperception.meta",
          "common_0_data/pedperception.meta", "CPedPerceptionInfoManager", 25_000),
     _xml("update_1.rpf", "common/data/ai/combatbehaviour.meta",

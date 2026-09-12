@@ -639,7 +639,11 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   transform:translateY(-3px);
 }
 
+/* The settings tab is set apart by a paler fill, so it must never stretch.
+   On a nav that wraps, flex:1 handed the last row's spare width to this one
+   button and the paler fill became a grey slab across half the row. */
 .lex-shell-header nav button.lex-settings-tab {
+  flex: 0 1 auto;
   margin-left: 10px;
   background: color-mix(in srgb, var(--lex-panel-2) 72%, var(--lex-bg));
 }
@@ -731,6 +735,28 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   text-align: left;
   cursor: pointer;
 }
+/* The selector and its info button sit side by side; the button never steals
+   width from the mod name. */
+.lex-project-control { display:flex; align-items:center; gap:6px; min-width:0; }
+.lex-project-control > .lex-project-select { flex:1 1 auto; min-width:0; }
+/* The mod report button sits on the mod's own row, shaped like the pencil and
+   the folder next to it. As a lone bordered circle in the command row it was a
+   squashed letter in a ring, and it reported on whichever mod was loaded
+   rather than the one being pointed at. */
+.lex-project-about {
+  display:grid;
+  place-items:center;
+  width:34px;
+  height:28px;
+  padding:0;
+  border:0;
+  color:var(--lex-muted);
+  background:transparent;
+  font:inherit;
+  cursor:pointer;
+}
+.lex-project-about > svg { width:17px;height:17px; }
+
 .lex-project-name { flex: 0 0 auto; color: var(--lex-highlight); white-space: nowrap; }
 .lex-project-path {
   align-self:center;flex:0 1 auto;min-width:0;overflow:hidden;color:var(--lex-muted);
@@ -762,11 +788,24 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   box-shadow: 0 10px 28px #0008;
   font-family: var(--lex-font);
 }
+/* Every row in the mod menu - an editable mod or a read-only reference - is
+   the same five columns: mode, name, description, buttons, tick. Each kind of
+   row used to size its own columns, so "Packaged unchanged sample data" and
+   "Saved Blank samples" began a hundred pixels apart and the two ticks sat on
+   different edges. The name column is one width for the whole menu, measured
+   from the longest name in it. */
 .lex-project-menu-item {
   display: grid;
-  grid-template-columns:minmax(0,1fr) 34px 34px;
+  grid-template-columns:
+    auto
+    var(--lex-project-name-width, max-content)
+    minmax(40px,1fr)
+    var(--lex-project-actions-width, 106px)
+    26px;
+  align-items:center;
+  gap:9px;
   width: 100%;
-  padding:0;
+  padding:7px 9px;
   border: 0;
   border-radius: 2px;
   color: var(--lex-text);
@@ -774,22 +813,36 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   text-align: left;
   font: inherit;
 }
+/* An editable mod's row wraps its mode, name and description in the button
+   that selects it. The button dissolves into the row's own grid so those three
+   land in the same columns a reference row puts them in. */
+.lex-project-menu-item > .lex-project-menu-item-select { display:contents; }
 .lex-project-menu-item-select {
   display:grid;
-  grid-template-columns:auto minmax(40px,1fr);
+  align-items:center;
   gap:9px;
   min-width:0;
-  padding:7px 9px;
   border:0;
   color:inherit;
   background:transparent;
   text-align:left;
   font:inherit;
+  cursor:pointer;
+}
+.lex-project-menu-item-actions {
+  display:grid;
+  min-height:28px;
+  grid-auto-flow:column;
+  justify-content:end;
+  align-items:center;
+  gap:2px;
+  min-width:var(--lex-project-actions-width, 106px);
 }
 .lex-project-rename {
   display:grid;
   place-items:center;
   width:34px;
+  height:28px;
   border:0;
   color:var(--lex-muted);
   background:transparent;
@@ -834,9 +887,6 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   min-width:14px;
   height:14px;
   transform:translateY(-50%);
-}
-.lex-project-reference.lex-project-menu-item-select {
-  grid-template-columns:auto auto minmax(40px,1fr) auto;
 }
 .lex-project-source-mode,
 .lex-project-source-status {
@@ -890,6 +940,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   padding-inline:var(--lex-unit-reserve) .65em !important;
 }
 
+/* The unit travels with the number it qualifies; the left offset is measured
+   and written by the framework. The end offset is the resting place before
+   that measurement lands and the fallback wherever a unit has no value box to
+   follow. */
 .lex-unit-field-boxed > .lex-unit {
   position:absolute;
   z-index:1;
@@ -897,6 +951,9 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   top:50%;
   transform:translateY(-50%);
   pointer-events:none;
+}
+.lex-unit-field-boxed.lex-unit-field-suffix > .lex-unit[style*="left"] {
+  inset-inline-end:auto;
 }
 
 .lex-unit-field-prefix.lex-unit-field-boxed > .lex-unit {
@@ -924,12 +981,20 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 
 .lex-detail-panel {
-  --lex-detail-label-width:clamp(125px, 18%, 230px);
+  /* No label lane of its own. This clamp predates the shared ten-percent rule
+     and quietly exempted every panel built through detailPanel() from it, so
+     the same property row was one width in a shared panel and another in a
+     plugin's hand-rolled div. The lane comes from :root now, like everywhere. */
   display:grid !important;
   /* Every Detail reserves the same top tenth for identity. Plugins may scale
      the contents inside it, but they must not make the heading consume more
-     of the editing surface. */
-  grid-template-rows:10% minmax(0,1fr) !important;
+     of the editing surface.
+     A flat 10% is a promise the panel cannot always keep: in a short panel the
+     tenth is thinner than the record name plus its source line, and the two
+     lines were sliced through the middle. min-content is the heading's own
+     honest minimum - a title line and a meta line - so the tenth still governs
+     wherever a tenth is enough, and the row grows only when it is not. */
+  grid-template-rows:minmax(min-content, 10%) minmax(0,1fr) !important;
   min-width: 0;
   min-height: 0;
 }
@@ -942,7 +1007,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   align-items: center;
   gap: 12px;
   min-height:0;
-  height:100%;
+  /* No height:100% here. A grid item already stretches to its row, and forcing
+     the percentage against a row that is itself sized from this item's
+     min-content made the browser resolve the two against each other and drop
+     the bottom padding - two pixels of every heading, clipped. */
   padding: 10px 14px 10px 10px;
   overflow:hidden;
 }
@@ -971,12 +1039,22 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
   gap:6px 14px;
   min-width:0;
 }
-.lex-detail-panel-identity:has(> .lex-detail-panel-id) { padding-right:clamp(50px,10%,120px); }
+/* The big record number is absolutely positioned, so it contributes nothing to
+   the heading's intrinsic height and the heading - which clips - shaved a few
+   pixels off the top and bottom of the numeral. Reserving its own height here
+   puts it back into the min-content the heading row is sized from. */
+.lex-detail-panel-identity:has(> .lex-detail-panel-id) {
+  padding-right:clamp(50px,10%,120px);
+  min-height:var(--lex-detail-id-size);
+}
 .lex-detail-panel-title { min-width:0;margin:0;font-size:clamp(21px,2.5vw,32px);line-height:1.1; }
 .lex-detail-panel-meta { font-size:clamp(15px,1.45vw,20px); }
 .lex-detail-panel-meta { color: var(--lex-muted); }
 .lex-detail-panel-id { color:color-mix(in srgb,var(--lex-muted) 42%,var(--lex-panel)); }
-.lex-detail-panel-id { position:absolute;top:calc(50% - 2px);right:0;display:flex;align-items:center;justify-self:end;margin-left:auto;font-size:clamp(30px,3.6vw,48px);font-weight:300;line-height:1;text-align:right;transform:translateY(-50%); }
+/* Centred on its identity block, with no nudge: the two-pixel lift was tuned
+   against a heading that was a flat tenth of the panel, and now that the
+   heading is sized from its own content it just puts the number off centre. */
+.lex-detail-panel-id { position:absolute;top:50%;right:0;display:flex;align-items:center;justify-self:end;margin-left:auto;font-size:var(--lex-detail-id-size);font-weight:300;line-height:1;text-align:right;transform:translateY(-50%); }
 .lex-detail-panel-id .lex-record-id { align-items:center;line-height:1; }
 .lex-detail-panel-meta { grid-column:1 / -1; }
 .lex-detail-panel-actions {
@@ -1130,31 +1208,65 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 .lex-detail-field:not(:focus-within) .lex-field-type-range { display:block;opacity:0; }
 .lex-field-type-rail:hover { z-index:6; }
-.lex-field-type-rail:hover > span { font-size:13px !important; }
+/* Pointing at the rail enlarges the TYPE CODE, which is text. The help pip is
+   a fixed circle, and growing its glyph to the type code's hover size left the
+   question mark crowding the ring around it. */
+/* The type code does not grow when it is pointed at. Growing it moved the
+   text inside its own rail, which is what kept shaving a glyph against an edge
+   that had nothing on the other side of it. */
+.lex-field-type-rail:hover > span:not(.lex-info-help) { font-size:inherit; }
 .lex-detail-field:focus-within:has(.lex-field-type-range) .lex-field-type-name { left:25%; }
 .lex-detail-field:focus-within .lex-field-type-range { left:75%;opacity:1; }
 
 .lex-detail-field.lex-boolean-field {
-  grid-template-columns:minmax(0,1fr) auto;
+  /* The same label column as every other property, then the leader arrow's own
+     track, then the checkbox. The label used to take the whole row so the
+     arrow had room to run inside it, which started a boolean's name at the far
+     left while every other name sat in the label column. */
+  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr) auto;
+  /* A checkbox is shorter than a text box, so a boolean row collapsed to the
+     checkbox's height and the label fitter then shrank "CAN SELL" to a few
+     pixels to fit it. Booleans keep the same row height as every other
+     property, measured in ems so it follows the type. */
+  min-height:2.4em;
 }
 /* The arrow has to reach the box it points at, so the two insets between the
    label column and the checkbox are removed for boolean rows only. */
 .lex-boolean-field > .lex-detail-field-label { padding-right:0; }
-.lex-boolean-field > .lex-detail-field-control { padding-left:0; }
+/* The leader arrow ends where this box begins, so any left padding here is a
+   gap the arrow cannot cross. A plugin stylesheet that pads all its field
+   controls must not reopen it, which is why this one insists. */
+.lex-boolean-field > .lex-detail-field-control { padding-left:0 !important; }
 .lex-boolean-field .lex-detail-field-label { min-width:0; }
+/* The name takes the width it needs; the arrow spans whatever is left. */
+.lex-detail-field-label-text { flex:0 1 auto;min-width:0; }
+.lex-boolean-field > .lex-detail-field-label > .lex-detail-field-label-text {
+  flex:0 0 auto;
+}
+
 .lex-field-boolean-arrow {
   position:relative;
-  flex:0 1 48px;
+  /* The arrow is a leader line: it has to span whatever gap the row leaves
+     between the property name and the checkbox it points at. Capped at 48px it
+     stopped in mid-air on any row wider than that, pointing at nothing. */
+  flex:1 1 0;
   min-width:12px;
-  max-width:48px;
   height:1px;
   margin-left:4px;
-  margin-right:-6px;
+  /* No negative margin. Overhanging the label box made the label report seven
+     pixels of overflow at every font size, so the label fitter shrank every
+     boolean property name to its six-pixel floor trying to fix an overflow the
+     font was not causing. The arrow reaches the checkbox by the control column
+     no longer reserving slack instead. */
   background:color-mix(in srgb,var(--lex-border) 72%,transparent);
 }
 .lex-field-boolean-arrow::after {
   position:absolute;
-  right:-1px;
+  /* Flush with the end of the line, not a pixel past it. The label clips what
+     overflows it, and the label ends exactly where this line does, so that one
+     pixel of overhang was the arrowhead's own tip being sliced off against an
+     edge with nothing on the other side of it. */
+  right:0;
   top:-4px;
   width:0;
   height:0;
@@ -1165,14 +1277,17 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 .lex-boolean-field .lex-detail-field-control {
   display:flex;
-  min-width:58px;
+  /* No reserved width. A minimum here is slack the leader arrow cannot cross,
+     and the arrow then stopped short of the checkbox it points at. */
+  min-width:0;
+  width:max-content;
   justify-content:flex-end;
 }
 .lex-boolean-field .lex-detail-field-control > .lex-source-control { width:auto; }
 /* A normal provenance field ends its live input before the five-em reference
    rail. Put boolean checkboxes on that same vertical edge instead of at the
    far edge of the whole row. */
-.lex-boolean-field:has(.lex-source-control:not(.no-reference)) > .lex-detail-field-control {
+.lex-boolean-field:has(.lex-source-control:not(.lex-source-control-internal):not(.no-reference)) > .lex-detail-field-control {
   padding-right:calc(var(--lex-panel-reference-rail-width,5em) + 18px);
 }
 input[type="checkbox"] { accent-color:var(--lex-accent); }
@@ -1198,13 +1313,19 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   display:flex;
   flex:0 0 auto;
   min-width:0;
+  /* Buttons keep their content width. Where they no longer fit on one line the
+     bar wraps onto a second, the way the main nav does - scrolling hid whole
+     tabs behind an edge and cut the label of the one straddling it. */
+  flex-wrap:wrap;
+  overflow-x:visible;
   border-bottom:1px solid var(--lex-border);
   background:var(--lex-panel-2);
 }
 
 .lex-subtab-button {
+  /* Equal widths while they fit, never narrower than the label needs. */
   flex:1 1 0;
-  min-width:0;
+  min-width:max-content;
   box-sizing:border-box;
   height:min(31px, calc(var(--lex-command-row-height) * .6667));
   min-height:min(31px, calc(var(--lex-command-row-height) * .6667));
@@ -1334,6 +1455,8 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   --lex-curve-margin-right:22px;
 }
 .lex-curve-axis { position:absolute;color:var(--lex-muted);font-size:.72em;line-height:1;white-space:nowrap; }
+/* Base placement only. A later block moves the scale numbers to the right-hand
+   margin in vertical writing mode, which is the layout that ships. */
 .lex-curve-axis-top {
   top:var(--lex-curve-margin-top);left:7px;transform:translateY(-50%);
 }
@@ -2401,6 +2524,22 @@ body.lex-panel-layout-dragging * {
   overflow:visible;
 }
 
+/* A number is never abbreviated. The grid track is floored at the cell's own
+   content, so a busy table steals width from the label columns instead of
+   turning 5,000 into 5,00. */
+.lex-numeric-cell { min-width:max-content; }
+.lex-numeric-cell > .lex-column-cell-content { min-width:max-content;overflow:visible; }
+.lex-numeric-cell > .lex-column-cell-content > * { overflow:visible;text-overflow:clip; }
+
+.lex-column-cell-text {
+  display:block;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
 .lex-column-cell-content > :not(input):not(select):not(textarea) {
   min-width:0;
   overflow:hidden;
@@ -2418,7 +2557,12 @@ body.lex-panel-layout-dragging * {
 /* Editable table controls occupy the complete cell. Their compact provenance
    lane overlays the right edge instead of shortening the input or select. */
 .lex-column-list .lex-source-control {
-  --lex-reference-rail-width:clamp(1.8em,20%,3.2em) !important;
+  /* The rail overlays the right edge of the control, and the control reserves
+     that much padding for it. A clamp whose MINIMUM is 1.8em reserved more
+     than a narrow cell has, so the value itself was pushed out of its own box:
+     a 44px cell kept 37px of padding and showed no digits. min() lets the
+     reservation shrink with the cell and still caps it in a wide one. */
+  --lex-reference-rail-width:min(3.2em, 34%) !important;
   position:relative;
   display:block;
   width:100%;
@@ -2651,8 +2795,13 @@ body.lex-panel-layout-dragging * {
   display: none !important;
 }
 
+/* The panel ends where the pagination bar begins. The extra panel gap here
+   left a band of dead ground above the bar on every page that has one, while
+   the data-map view - which reserves the bar's height and nothing else - had
+   none, so the same bar sat differently from one plugin to the next. One rule,
+   and it is the bar's own measured height. */
 body:has(.lex-pager) #main {
-  padding-bottom: calc(var(--lex-pager-height, 56px) + var(--lex-panel-gap, 14px)) !important;
+  padding-bottom: var(--lex-pager-height, 56px) !important;
 }
 
 .lex-pager-left,
@@ -2725,6 +2874,23 @@ body:has(.lex-pager) #main {
 }
 
 .lex-pager-right select,
+.lex-reshade-actions { display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0; }
+.lex-reshade-actions select { min-width:0;max-width:10em; }
+
+.lex-pager-filter {
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  padding:0 8px;
+  color:var(--lex-muted);
+  white-space:nowrap;
+  font-size:.92em;
+}
+.lex-pager-filter > span { letter-spacing:.04em;text-transform:uppercase; }
+.lex-pager-filter.disabled { opacity:.45; }
+.lex-pager-select select { min-width:0;max-width:16em; }
+
 .lex-pager-right button {
   min-height: 32px;
 }
@@ -3683,10 +3849,10 @@ body:has(.lex-data-map-table) #main {
 
 /* ---- Copy affordance ------------------------------------------------ */
 .lex-copy-value {
-  position:absolute;
+  position:relative;
   z-index:4;
-  top:50%;
-  left:-2px;
+  top:auto;
+  left:auto;
   display:grid;
   width:19px;
   height:19px;
@@ -3697,7 +3863,7 @@ body:has(.lex-data-map-table) #main {
   background:transparent;
   opacity:0;
   cursor:pointer;
-  transform:translate(-100%,-50%);
+  transform:none;
   transition:opacity .12s ease,color .12s ease;
 }
 .lex-copy-value > svg { width:100%;height:100%; }
@@ -3975,11 +4141,12 @@ body:has(.lex-data-map-table) #main {
 }
 
 /* A reference row is a whole row like any mod, not a bare label. */
-.lex-project-reference { grid-column:1 / -1;align-items:center; }
+.lex-project-reference { align-items:center; }
 .lex-project-folder {
   display:grid;
   place-items:center;
   width:34px;
+  height:28px;
   border:0;
   color:var(--lex-muted);
   background:transparent;
@@ -4291,9 +4458,16 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   pointer-events:auto;
   cursor:pointer;
 }
-.lex-field-type-rail:hover > .lex-field-type-name,
-.lex-field-type-rail:hover > .lex-field-type-range { opacity:0 !important; }
-.lex-field-type-rail:hover > .lex-info-help { opacity:1 !important; }
+/* Only a rail that HAS a help mark may blank its type: on a property without
+   one this hid the type code and put nothing in its place, so pointing at the
+   rail of a plain property emptied it. Tabbing to the mark reveals it the same
+   way pointing at the rail does; clicking it does not, because a click that
+   leaves focus behind would hold the swap open after the pointer had left. */
+.lex-field-type-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-field-type-name,
+.lex-field-type-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-field-type-range {
+  opacity:0 !important;
+}
+.lex-field-type-rail:is(:hover,:has(:focus-visible)) > .lex-info-help { opacity:1 !important; }
 /* A sorted field uses the same centre point as its type/help marker. */
 .lex-detail-field[data-lex-sort] .lex-field-type-rail::after {
   position:absolute;
@@ -4313,14 +4487,13 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
 .lex-detail-field[data-lex-sort] .lex-field-type-rail > :is(.lex-field-type-name,.lex-field-type-range) { opacity:0; }
 .lex-detail-field[data-lex-sort]:hover .lex-field-type-rail::after,
 .lex-detail-field[data-lex-sort]:focus-within .lex-field-type-rail::after { opacity:0; }
-/* Reference markers share one label column, so V, R1, and R2 values start
-   on the same x-coordinate in every stack depth. */
+/* Reference markers use only their text width, with a small gap to the value. */
 .lex-reference-values .lex-reference-value { align-items:center; }
 .lex-reference-values .lex-reference-tag {
-  flex:0 0 22px;
-  width:22px;
-  min-width:22px;
-  max-width:22px;
+  flex:0 0 auto;
+  width:auto;
+  min-width:0;
+  max-width:none;
   margin-right:0;
   text-align:left;
 }
@@ -4337,10 +4510,14 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
 .lex-curve-plot > .lex-curve-svg {
   position:absolute;
   top:var(--lex-curve-margin-top);
-  left:var(--lex-curve-margin);
+  /* --lex-curve-margin-left, not --lex-curve-margin: the shorter name is not
+     defined anywhere, so `left` fell back to auto and the width calc was
+     invalid. The SVG then started at the plot's left edge and drew straight
+     over the Y-axis scale numbers that live in that margin. */
+  left:var(--lex-curve-margin-left);
   /* An SVG is a replaced element, so width:auto would take its intrinsic
      size and leave the inset over-constrained. The box is stated outright. */
-  width:calc(100% - var(--lex-curve-margin) - var(--lex-curve-margin-right));
+  width:calc(100% - var(--lex-curve-margin-left) - var(--lex-curve-margin-right));
   height:calc(100% - var(--lex-curve-margin-top) - var(--lex-curve-margin-bottom));
   z-index:1;
 }
@@ -4385,20 +4562,20 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
      a pixel. The badge rides at the right edge instead of taking flow. */
   position:absolute;
   top:50%;
-  right:1px;
+  right:6px;
   transform:translateY(-50%);
   display:grid;
   place-items:center;
   box-sizing:border-box;
-  min-width:10px;
-  width:10px;
-  height:14px;
+  min-width:20px;
+  width:var(--lex-tab-badge-size,24px);
+  height:var(--lex-tab-badge-size,24px);
   padding:0;
   border:1px solid color-mix(in srgb,var(--lex-border) 70%,transparent);
   border-radius:38% / 30%;
   background:color-mix(in srgb,var(--lex-bg) 55%,transparent);
   color:var(--lex-muted);
-  font-size:8px;
+  font-size:calc(var(--lex-tab-badge-size,24px) * .6);
   font-variant-numeric:tabular-nums;
   line-height:1;
   visibility:hidden;
@@ -4421,12 +4598,30 @@ nav button.active:focus-visible .lex-tab-shortcut,
   color:var(--lex-text);
 }
 
-/* The badge is positioned against its own tab. Reserve the same space on
-   both sides, so the label stays centred and the badge never covers it. */
+/* The badge is positioned against its own tab. It sits at the trailing edge,
+   so only that side reserves its width and the badge never covers the label.
+   Reserving the badge width on both sides costs more than half of a narrow
+   subtab and truncates ordinary labels, so the leading side keeps a plain
+   margin instead. */
 .lex-shell-header nav button[data-tab]:has(> .lex-tab-shortcut),
 .lex-subtab-button:has(> .lex-tab-shortcut) {
   position:relative;
-  padding-inline:12px;
+  /* Sized in em so the reservation tracks the label it must not cover: the
+     tab font is em-based, so fixed padding would clip the text as soon as the
+     font scales up. The px term is only an upper clamp, keeping the badge
+     inside a short command row. */
+  --lex-tab-badge-size:min(1.6em,calc(min(46px,var(--lex-command-row-height)) - 12px));
+  --lex-tab-badge-gap:.4em;
+  /* Reserved on BOTH sides. Two things have to be true at once: the label is
+     centred in its button, and the badge never covers it. Reserving only the
+     badge's own side satisfies the second and breaks the first, because the
+     label then centres inside an off-centre content box. The symmetric
+     reservation is the only arrangement that holds both.
+     It is !important because this is what keeps the badge off the label, and a
+     plugin's blanket nav-button padding must not quietly remove it - FF8 set
+     six pixels on both sides and the badge sat on top of "Abilities". */
+  padding-inline:calc(var(--lex-tab-badge-size) + var(--lex-tab-badge-gap) * 2)
+                 !important;
 }
 .lex-shell-header nav button[data-tab] > .lex-tab-label,
 .lex-subtab-button > .lex-tab-label {
@@ -4470,6 +4665,12 @@ nav button.active:focus-visible .lex-tab-shortcut,
 .lex-data-map-detail{min-width:0;overflow:auto;overflow-wrap:anywhere}
 .lex-data-map-detail .lex-data-map-notes{white-space:pre-wrap}
 .lex-data-map-actions{display:flex;flex-wrap:wrap;gap:8px}
+.lex-data-map-actions > .lex-data-map-location {
+  display:inline-flex;align-items:center;justify-content:center;gap:.4em;
+  flex:0 0 auto;width:auto;height:auto;min-height:1.6em;
+  white-space:nowrap;padding:.2em .5em;
+}
+.lex-data-map-actions > .lex-data-map-location svg { width:1em;height:1em;flex:0 0 1em; }
 .lex-data-map-coverage{font-weight:bold}
 body:has(.lex-data-map-view){display:flex;flex-direction:column;height:100vh;min-height:0;overflow:hidden}
 body:has(.lex-data-map-view)>#lexeditor-shell,body:has(.lex-data-map-view)>#toolbar{flex:0 0 auto}
@@ -4480,7 +4681,25 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_SHARED_UI_STANDARDIZATION_20260906 */
-:root { --lex-detail-label-width:10%; }
+/* Ten percent of a narrow detail panel is a twenty-pixel column, and no amount
+   of font shrinking fits "WEAPON HIT RATE" into twenty pixels - it just wraps
+   into a tower that the row then cuts off. The lane keeps its ten percent
+   wherever ten percent is actually usable and otherwise falls back to a floor
+   measured in ems, so it tracks the reader's font rather than their screen.
+   The min() stops the floor from eating a genuinely cramped panel. */
+:root {
+  /* One name for the big record number's size, used both to draw it and to
+     reserve room for it. A plugin that wants a smaller number overrides this
+     rather than the font-size, so the reservation shrinks with it - overriding
+     only the font left the reservation at the shared size and pushed the
+     heading past what its container would give it. */
+  --lex-detail-id-size:clamp(30px, 3.6vw, 48px);
+  /* Just enough to hold a short property name. Six and a half ems was more
+     than the tenth it was meant to rescue, so it took over lanes that were
+     perfectly usable and the shared ten-percent rule stopped being the rule. */
+  --lex-detail-label-floor:min(4.2em, 26%);
+  --lex-detail-label-width:minmax(var(--lex-detail-label-floor), 10%);
+}
 .lex-detail-field { grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr); }
 .lex-detail-field-label {
   min-width:0; min-height:0; height:100%; overflow:hidden;
@@ -4523,7 +4742,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-unit-field { min-width:0; max-width:100%; box-sizing:border-box; }
 .lex-detail-field-control input[type="range"] { width:100%; }
 .lex-boolean-field .lex-field-boolean-arrow {
-  position:static !important; align-self:center; transform:none !important;
+  position:relative !important; align-self:center; transform:none !important;
 }
 .lex-paged-list-detail,.lex-barrelled-master,.lex-barrel-grid { min-height:0; }
 .lex-paged-list-detail:not(.lex-full-table-page) .lex-barrelled-master,
@@ -4581,12 +4800,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_SHARED_UI_STANDARDIZATION_FOLLOWUP_20260906 */
-.lex-detail-field[data-lex-sort] .lex-field-type-rail > .lex-info-help {
-  display:inline-grid !important; opacity:1 !important;
-}
 .lex-detail-field[data-lex-sort] .lex-field-type-rail::after {
-  top:auto !important; bottom:2px !important; left:50% !important;
-  transform:translateX(-50%) !important;
+  top:50% !important; bottom:auto !important; left:50% !important;
+  transform:translate(-50%,-50%) !important;
 }
 .lex-detail-field[data-lex-sort] > .lex-detail-field-label {
   display:flex !important; visibility:visible !important; opacity:1 !important;
@@ -4617,9 +4833,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-curve-axis-start,.lex-curve-axis-end,.lex-curve-axis-name-x {
   top:auto !important; bottom:4px !important;
-}
-.lex-project-menu-item-select {
-  grid-template-columns:auto minmax(0,1fr) minmax(0,1fr) auto;
 }
 .lex-project-menu-item:has(.lex-project-source-status.disabled),
 .lex-project-reference:has(.lex-project-source-status.disabled) {
@@ -4677,9 +4890,12 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    the metadata space to its left and is positioned by framework.js from the
    actually rendered text width. */
 .lex-detail-field:not(.lex-boolean-field) {
-  grid-template-columns:10% minmax(0,1fr) !important;
+  grid-template-columns:var(--lex-detail-label-width) minmax(0,1fr) !important;
 }
-.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label {
+/* Every property name ends on the same edge, booleans included. They were
+   excluded because the leader arrow shared the label box and needed the room;
+   the arrow has its own track now. */
+.lex-detail-field > .lex-detail-field-label {
   justify-content:flex-end;
   text-align:right;
 }
@@ -4705,10 +4921,14 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-model-preview-drawer {
   position:absolute;
   z-index:3;
-  left:0;
-  right:0;
-  top:10%;
-  bottom:0;
+  /* The drawer covers the editing surface and stops at the heading. It used to
+     start at a flat 10%, which is the heading's share only while the heading
+     fits in a tenth; a heading with a subtitle grows past it and the drawer
+     then slid up over the icon that closes it. Taking the panel's second grid
+     row as the containing block puts the drawer's top edge on the heading's
+     real bottom edge, whatever height the heading turned out to need. */
+  grid-area:2 / 1 / 3 / -1;
+  inset:0;
   min-height:0;
   background:var(--lex-panel);
 }
@@ -4788,4 +5008,1095 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   contain:size;
   min-block-size:0;
   overflow:hidden;
+}
+
+/* Controls reserve their own space at every panel width. */
+.lex-detail-field-control:has(> .lex-copy-value) {
+  display:grid; grid-template-columns:19px minmax(0,1fr); gap:6px; align-items:center;
+}
+.lex-copy-value:focus-visible { opacity:1; }
+.lex-project-menu-item > .lex-project-source-status { align-self:center; }
+.lex-project-rename,.lex-project-folder,.lex-project-about { border-radius:8px; }
+.lex-project-rename:is(:hover,:focus-visible),
+.lex-project-folder:is(:hover,:focus-visible),
+.lex-project-about:is(:hover,:focus-visible) {
+  color:var(--lex-highlight);
+  background:color-mix(in srgb,var(--lex-accent) 28%,var(--lex-panel));
+}
+.lex-toggle-rail { position:relative; align-self:stretch; opacity:1; }
+.lex-toggle-type { writing-mode:horizontal-tb; text-orientation:mixed; transform:rotate(-90deg); white-space:nowrap; }
+.lex-toggle-rail > .lex-info-help { display:none !important; }
+/* Pointing at the switch brings its rail up; the swap to the help mark is the
+   RAIL's own business and lives with the rest of that contract further down.
+   Keying the swap to the whole switch here meant a flag never showed the type
+   code its rail exists to show. */
+.lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail > .lex-toggle-type { display:block; }
+
+
+.lex-subtab-button:has(> .lex-tab-shortcut) {
+  /* Same em-first rule as the header tabs; the px term only clamps the badge
+     into the shorter subtab row. */
+  --lex-tab-badge-size:min(1.6em,calc(min(31px,var(--lex-command-row-height) * .6667) - 8px));
+}
+.lex-project-name { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+@media (max-width:800px) {
+  .lex-shell-command-row { grid-template-columns:140px minmax(0,1fr) auto auto auto; }
+  .lex-shell-command-row .lex-brand { font-size:20px; }
+}
+
+/* Tab content fills the main region. A plugin whose view wrapper does not set
+   its own height sized to content instead, so a Table + Detail inside it got a
+   fraction of the window: the list ended up 81px tall, every row collapsed to
+   one pixel on top of the next, and the rest of the page was empty. Plugins
+   that already manage their own height are unaffected, because filling is what
+   they ask for anyway. */
+#main {
+  display:flex;
+  flex-direction:column;
+  min-height:0;
+}
+#main > * {
+  flex:1 1 auto;
+  min-height:0;
+}
+
+/* Coverage reads as a coloured glyph plus its word. */
+.lex-coverage-cell { display:inline-flex; min-width:0; align-items:center; gap:6px; }
+.lex-coverage-text { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.lex-coverage-icon { flex:0 0 auto; font-family:var(--lex-symbol-font); font-size:1.05em; line-height:1; }
+.lex-data-map-coverage { display:flex; align-items:center; gap:6px; }
+.lex-coverage-cell.structured .lex-coverage-icon,
+.lex-data-map-coverage.structured .lex-coverage-icon { color:#3fa45b; }
+.lex-coverage-cell.view .lex-coverage-icon,
+.lex-data-map-coverage.view .lex-coverage-icon { color:#4f8fe8; }
+.lex-coverage-cell.source .lex-coverage-icon,
+.lex-data-map-coverage.source .lex-coverage-icon { color:#d6a936; }
+.lex-coverage-cell.unavailable .lex-coverage-icon,
+.lex-data-map-coverage.unavailable .lex-coverage-icon { color:#b74a42; }
+
+
+
+/* LEXEDITOR_TOGGLE_RAIL_CONTRACT_20260910 */
+/* One contract for every type rail in the editor, flags included. Pointing at
+   the PROPERTY brings its type codes up; pointing at an individual RAIL swaps
+   that one code for its help mark. A row of flags used to paint eight
+   permanent "BOOL" labels, and the pass that fixed that overcorrected: the
+   rail stayed dark until a switch was pointed at and then went straight to the
+   question mark, so the type code it is there to show was never readable. */
+.lex-toggle-rail { opacity:0; cursor:help; }
+.lex-detail-field:is(:hover,:focus-within) .lex-toggle-rail,
+.lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail { opacity:1; }
+/* The code is the rail's resting content, whatever the switch around it is
+   doing. */
+.lex-toggle > .lex-toggle-rail > .lex-toggle-type { display:block !important; }
+.lex-toggle > .lex-toggle-rail > .lex-info-help { display:none !important; }
+/* ...and the mark replaces it only while the rail itself is pointed at, and
+   only where there is a mark to replace it with. The keyboard half is
+   :focus-visible, not :focus-within: the mark is a focusable span, so clicking
+   it left focus sitting there and the swap stayed up long after the pointer
+   had gone somewhere else. A click no longer holds the rail open; tabbing to
+   the mark still does. */
+.lex-toggle > .lex-toggle-rail:is(:hover,:has(:focus-visible)):has(> .lex-info-help) > .lex-toggle-type {
+  display:none !important;
+}
+.lex-toggle > .lex-toggle-rail:is(:hover,:has(:focus-visible)) > .lex-info-help {
+  display:inline-grid !important;
+  width:18px; min-width:18px; height:18px; min-height:18px;
+}
+
+
+/* LEXEDITOR_BOOLEAN_REFERENCE_INLINE_20260910 */
+/* Provenance for a boolean used to hang below its checkbox on an absolute
+   offset. It cleared the row's own bottom border, so it read as a stray mark
+   floating between two properties and it was centred on nothing. It now sits
+   in a real rail column to the right of the checkbox, vertically centred, the
+   same place the rail occupies on every non-boolean property. */
+.lex-boolean-field { --lex-boolean-reference-width:3.4em; }
+.lex-boolean-field:has(.lex-source-control > .lex-reference-values) {
+  padding-bottom:0;
+  margin-bottom:0;
+}
+/* The rail is a grid track now, so the row no longer needs padding standing in
+   for it. */
+.lex-boolean-field:has(.lex-source-control:not(.no-reference)) > .lex-detail-field-control {
+  padding-right:0;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  display:grid;
+  grid-template-columns:auto var(--lex-boolean-reference-width);
+  gap:8px;
+  align-items:center;
+  justify-items:center;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control.no-reference {
+  grid-template-columns:auto;
+}
+.lex-boolean-field .lex-source-control > .lex-reference-values {
+  position:static;
+  top:auto;
+  right:auto;
+  bottom:auto;
+  left:auto;
+  width:auto;
+  min-width:0;
+  align-self:center;
+  align-content:center;
+  justify-items:start;
+  transform:none;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  align-items:center;
+  justify-content:flex-start;
+  padding-block:0;
+  line-height:1;
+}
+.lex-boolean-field .lex-reference-values .lex-boolean-mark { align-self:center;line-height:1; }
+
+
+/* LEXEDITOR_VALUE_BOX_ONE_SHAPE_20260910 */
+/* A number box and a name box are one box. An earlier pass split them - square
+   corners and an accent tick for a number against a softer round for a name -
+   which is the opposite of what was asked for, and it made a single column of
+   properties read as two different kinds of control. The rail beside the name
+   already says which type a property holds, so the box itself says nothing
+   about it and carries the shared radius and alignment. Numbers keep tabular
+   figures, which lines digits up without changing the box around them. */
+.lex-detail-field[data-lex-type="INT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]),
+.lex-detail-field[data-lex-type="FLOAT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]),
+.lex-detail-field[data-lex-type="STRING"] :is(input,textarea,.lex-readonly-field),
+.lex-detail-field[data-lex-type="TEXT"] :is(input,textarea,.lex-readonly-field) {
+  border-radius:0;
+  box-shadow:none;
+  text-align:left;
+}
+.lex-detail-field[data-lex-type="INT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]),
+.lex-detail-field[data-lex-type="FLOAT"] :is(input,output,.lex-readonly-field):not([type="checkbox"]):not([type="range"]) {
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
+}
+
+
+/* LEXEDITOR_SETTINGS_COLUMNS_20260910 */
+/* One scrolling settings page in as many columns as the window allows. CSS
+   columns rather than a resize observer rebuilding lanes: a section never
+   splits across a boundary, and the count follows the panel with no script. */
+.lex-settings-columns {
+  columns:var(--lex-settings-column-width,30em);
+  column-gap:var(--lex-panel-gap,10px);
+  height:100%;
+  padding:0;
+  overflow-y:auto;
+}
+.lex-settings-columns > * {
+  break-inside:avoid;
+  margin:0 0 var(--lex-panel-gap,10px);
+}
+
+
+/* A settings column is narrow and its property names are long, so the tenth of
+   the row that a wide Detail panel gives a label is not enough here: it wrapped
+   "Resident Parameter ID" into three lines. */
+.lex-settings-columns { --lex-detail-label-width:minmax(min(9em,34%),30%); }
+
+
+/* LEXEDITOR_NESTED_SETTINGS_SECTION_20260910 */
+/* A section inside a section is a record inside a settings group. It reads as
+   a subheading, not as a second card: no frame of its own, a quieter title,
+   and its properties indented under it. */
+.lex-detail-section .lex-detail-section {
+  border:0;
+  border-radius:0;
+  background:transparent;
+}
+.lex-detail-section .lex-detail-section > .lex-detail-section-title {
+  padding-block:6px;
+  color:var(--lex-muted);
+  border-bottom:1px dashed color-mix(in srgb,var(--lex-border) 60%,transparent);
+  font-size:.78em;
+}
+
+
+/* LEXEDITOR_RESHADE_REPOSITORY_ROW_20260910 */
+/* The repository row holds three text boxes and a button. Left to the generic
+   action row they each took a third of the panel and the button wrapped alone
+   onto a second line. */
+.lex-reshade-actions { display:flex;flex-wrap:wrap;align-items:center;gap:6px; }
+.lex-reshade-actions > input[type="text"] { flex:1 1 8em;min-width:6em; }
+.lex-reshade-actions > select { flex:0 1 auto;min-width:0; }
+.lex-reshade-actions > button { flex:0 0 auto; }
+
+
+/* LEXEDITOR_CONTROL_LANE_20260910 */
+/* Only a property that offered a copy button reserved a lane for it, so the
+   properties without one - a row of flags, a button pair, a hoverable - began
+   twenty-five pixels left of every value box above them and hung past the line
+   the rest of the column starts on. The lane is part of the control column
+   now, held whether or not this particular property fills it. */
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control {
+  display:grid;
+  grid-template-columns:19px minmax(0,1fr);
+  gap:6px;
+  align-items:center;
+}
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > .lex-copy-value {
+  grid-column:1;
+}
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > *:not(.lex-copy-value) {
+  grid-column:2;
+}
+
+
+/* LEXEDITOR_REFERENCE_PILLAR_20260910 */
+/* Three things the reference pillar was getting wrong.
+   It may not drive the height of the property it annotates: it is pinned to
+   the middle of the value box, capped at that box, and each entry takes an
+   equal share of it, so a three-deep stack is a smaller stack rather than a
+   taller row.
+   Its numbers now start on one edge. Tag and value are two columns, not a
+   sentence, so "V 25" and "R1 130" no longer step their values sideways by the
+   width of the tag in front of them.
+   Its width is measured from what the stack actually paints. It used to be a
+   character count times a guessed em, and the stack draws at about two thirds
+   of the control's type, so every value box on the panel ended early to make
+   room for space nothing was ever going to fill. */
+.lex-source-control:not(.lex-source-control-internal) > .lex-reference-values {
+  /* The cap is the property row, measured per control; the fallback keeps a
+     stack inside its own box wherever no measurement has run yet. */
+  max-height:var(--lex-reference-cap,100%);
+  grid-auto-rows:minmax(0,1fr);
+  overflow:hidden;
+}
+.lex-reference-values .lex-reference-value {
+  display:grid;
+  grid-template-columns:var(--lex-reference-tag-width,auto) minmax(0,1fr);
+  align-items:center;
+  justify-items:start;
+  column-gap:.3em;
+  min-height:0;
+  /* The slot is an equal share of the value box, set per control from the box
+     that is actually there; the 11px ceiling keeps a lone reference from
+     growing to fill a tall row. */
+  font-size:min(11px, max(6px, calc(var(--lex-reference-slot,11px) - 1px)));
+  line-height:1;
+}
+.lex-reference-values .lex-reference-tag { margin-right:0; }
+.lex-reference-values .lex-reference-text {
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+
+/* LEXEDITOR_BOOLEAN_REFERENCE_TIGHT_20260910 */
+/* A boolean's reference does not live in the panel-edge rail; it sits in its
+   own track beside the checkbox. Holding the panel's tag column there put a
+   gap the width of an "R1" between a lone "V" and its tick, and the track was
+   reserved at three and a half em for two glyphs. Both are taken from what
+   this one mark actually needs. */
+.lex-boolean-field { --lex-boolean-reference-width:max-content; }
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  grid-template-columns:auto auto;
+  column-gap:.35em;
+}
+.lex-boolean-field .lex-source-control > .lex-reference-values {
+  width:max-content;
+  min-width:0;
+}
+
+
+/* LEXEDITOR_REFERENCE_PROBE_20260910 */
+/* A hidden copy of the longest entry a panel can ever show. The rail is
+   reserved from this rather than from the entries on screen, so editing a
+   value into or out of agreement with a reference cannot resize the rail and
+   move every value box on the panel. It is pinned to the largest type a stack
+   uses, because a deeper stack only ever draws smaller. */
+.lex-reference-probe {
+  position:absolute;
+  top:0;
+  left:0;
+  visibility:hidden;
+  width:max-content;
+  max-height:none;
+  pointer-events:none;
+  --lex-reference-slot:11px;
+}
+.lex-reference-probe .lex-reference-value { grid-template-columns:auto auto; }
+
+
+/* LEXEDITOR_VARIABLE_COPY_20260910 */
+/* A multi-variable property gives each variable its own copy button, so the
+   item is three columns: button, name, box. The button holds its lane whether
+   or not it is being pointed at, the same way the property-level one does, so
+   no box moves when the pointer crosses the row. */
+.lex-multi-number-item {
+  grid-template-columns:19px minmax(2.6em,auto) minmax(0,1fr);
+}
+.lex-multi-number-item > .lex-copy-value { grid-column:1; }
+.lex-detail-field:hover .lex-multi-number-item > .lex-copy-value { opacity:.7; }
+.lex-multi-number-item > .lex-copy-value:hover { opacity:1; }
+
+
+/* LEXEDITOR_FLAG_BOX_EVEN_20260910 */
+/* Each flag box is as wide as the flag in it. The boxes sit on a column grid
+   so their left edges line up, but the box was taking the whole track, so a
+   short name left up to forty pixels of dead space inside the box on the right
+   against nine on the left. The track still sets where a box starts; the box
+   no longer has to fill it. */
+.lex-toggle-row > .lex-toggle {
+  width:max-content;
+  max-width:100%;
+  justify-self:start;
+}
+
+
+/* LEXEDITOR_DIVIDER_GRIP_20260910 */
+/* The grip between two panels is one slim bar, not a field of dots. The dot
+   grid read as a texture rather than a control: it said "something is here"
+   without saying "take hold of this". A bar says which way the thing moves,
+   and it grows and takes the accent under the pointer so the target is
+   unmistakable before the drag starts. */
+.lex-panel-layout-divider::before {
+  width:4px;
+  height:38px;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--lex-border) 88%,var(--lex-text));
+  transition:width .12s ease,height .12s ease,background-color .12s ease;
+}
+.lex-panel-layout-divider:hover::before,
+.lex-panel-layout-divider:focus-visible::before,
+.lex-panel-layout-divider.dragging::before,
+.lex-panel-layout-dragging .lex-panel-layout-divider::before {
+  width:6px;
+  height:52px;
+  background:var(--lex-accent);
+}
+
+
+/* LEXEDITOR_HEADING_RENAME_20260910 */
+/* The record name is edited where it is read: in the panel heading. The box is
+   the heading, not a box drawn around it, so the panel looks the same until it
+   is pointed at and the field only declares itself when it can be used. */
+.lex-detail-panel-rename { display:block;min-width:0; }
+.lex-detail-panel-rename > input {
+  box-sizing:border-box;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:2px 6px;
+  border:1px solid transparent;
+  border-radius:var(--lex-radius);
+  background:transparent;
+  color:inherit;
+  font:inherit;
+  letter-spacing:inherit;
+}
+.lex-detail-panel-rename > input:hover { border-color:color-mix(in srgb,var(--lex-border) 70%,transparent); }
+.lex-detail-panel-rename > input:focus {
+  border-color:var(--lex-accent);
+  background:color-mix(in srgb,var(--lex-panel-2) 60%,transparent);
+  outline:none;
+}
+
+
+/* LEXEDITOR_HELP_PIP_20260910 */
+/* The help pip is the small circle carrying a question mark beside a property.
+   Its glyph is shared chrome, so it keeps one size relative to its own circle
+   whatever a plugin theme says: FF8 forces every pip's type to thirteen pixels
+   with !important, which in an eighteen-pixel circle left the question mark
+   crowding its own edge. The circle is a circle at any size, so the glyph is
+   sized from the circle rather than from the page.
+   The half-pixel is optical, not arithmetic: a question mark's ink sits high
+   in its em box, so a mathematically centred one reads as sitting high. */
+.lex-info-help {
+  font-family: var(--lex-symbol-font) !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  font-variant-numeric: normal;
+  text-shadow: none !important;
+}
+.lex-info-help > * { transform: translateY(.5px); }
+/* Two classes deep, because a plugin theme reaching for .lex-info-help with
+   !important is one class deep and loads after this file. */
+.lex-field-type-rail > .lex-info-help,
+.lex-toggle-rail > .lex-info-help,
+.lex-detail-field-label > .lex-info-help,
+.lex-column-heading > .lex-info-help {
+  font-family: var(--lex-symbol-font) !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+}
+
+
+/* LEXEDITOR_INTERNAL_RAIL_NO_OUTER_RESERVE_20260910 */
+/* A panel whose references live INSIDE their value boxes has no outside rail,
+   so nothing on it should reserve room for one. The boolean rule above holds
+   five em plus eighteen pixels on the right of every checkbox, from a
+   panel-wide measurement that an internal rail never contributes to - so on
+   FF8's items panel it was reserving a rail that is never drawn, and every
+   property on the panel ended early with a band of empty space beside it. */
+.lex-detail-panel-body:not(:has(.lex-source-control:not(.lex-source-control-internal))) {
+  --lex-panel-reference-rail-width:0px;
+}
+
+
+/* LEXEDITOR_BOOLEAN_PIN_CLEAR_20260911 */
+/* A boolean's source control is only as wide as its checkbox, and the pin was
+   placed inside it - so the pin sat on the corner of the box it was supposed
+   to annotate. It belongs to the row, in the row's own top-right corner, and
+   the row keeps enough room on the right that it never reaches the checkbox
+   or the reference mark beside it. */
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control {
+  padding-right:26px !important;
+}
+/* The pin is a child of the ROW for booleans, so the row is what it is
+   positioned against; anything still inside the control is pulled out to the
+   same edge. */
+.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
+  position:absolute !important;
+  /* The row is taller than the checkbox, so the pin sits in the air above it
+     rather than beside it: inside the panel, clear of the box, and on the same
+     corner every other property puts its pin. */
+  top:2px !important;
+  right:3px !important;
+  bottom:auto !important;
+  left:auto !important;
+  transform:none !important;
+}
+
+
+/* LEXEDITOR_COPY_LANE_20260911 */
+/* The copy button is the whole of its lane, so it centres by being the lane's
+   width; it was carrying a six-pixel gap that sat entirely on its right, which
+   read as a button pushed left in a column too wide for it. The lane is the
+   button plus even air on both sides. */
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control,
+.lex-multi-number-item {
+  --lex-copy-lane:12px;
+}
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control {
+  grid-template-columns:var(--lex-copy-lane) minmax(0,1fr);
+  /* Even air on both sides of the button: the same six pixels between the
+     property name and the button as between the button and the value box. The
+     control's own ten-pixel inset put ten on one side and four on the other,
+     which is what read as a button sitting off to one side of its column. */
+  gap:6px;
+  padding-left:6px;
+}
+.lex-multi-number-item {
+  grid-template-columns:var(--lex-copy-lane) minmax(2.6em,auto) minmax(0,1fr);
+}
+.lex-copy-value {
+  display:grid;
+  place-items:center;
+  box-sizing:border-box;
+  width:var(--lex-copy-lane,12px);
+  height:calc(var(--lex-copy-lane,12px) * 1.25);
+  justify-self:center;
+  padding:0;
+}
+.lex-copy-value > svg { display:block;width:100%;height:100%; }
+
+
+/* LEXEDITOR_DIVIDER_EDGE_20260911 */
+/* Not a thumb in a track. A thumb is what a scrollbar has, and a scrollbar is
+   what the last one looked like. The divider is an EDGE: at rest it is the
+   hairline between two panels, and pointing at it lights the whole edge in the
+   accent and puts a pair of arrows at the middle to say which way it moves. */
+.lex-panel-layout-divider::before {
+  top:0;
+  left:50%;
+  width:1px;
+  height:100%;
+  border-radius:0;
+  background:var(--lex-border);
+  transform:translateX(-50%);
+  transition:width .1s ease,background-color .1s ease;
+}
+.lex-panel-layout-divider:hover::before,
+.lex-panel-layout-divider:focus-visible::before,
+.lex-panel-layout-divider.dragging::before,
+.lex-panel-layout-dragging .lex-panel-layout-divider::before {
+  width:2px;
+  background:var(--lex-accent);
+}
+.lex-panel-layout-divider::after {
+  position:absolute;
+  top:50%;
+  left:50%;
+  content:"\2039\203A";
+  color:var(--lex-accent);
+  font:700 13px/1 var(--lex-symbol-font);
+  letter-spacing:-1px;
+  opacity:0;
+  transform:translate(-50%,-50%);
+  transition:opacity .1s ease;
+  pointer-events:none;
+}
+.lex-panel-layout-divider:hover::after,
+.lex-panel-layout-divider:focus-visible::after,
+.lex-panel-layout-divider.dragging::after,
+.lex-panel-layout-dragging .lex-panel-layout-divider::after { opacity:1; }
+
+
+/* LEXEDITOR_TAB_ROWS_EVEN_20260911 */
+/* A bar that has to wrap splits its tabs evenly between the rows, rather than
+   packing the first row full and leaving one tab alone on the second. The row
+   count is measured and written back as --lex-tab-rows. */
+.lex-shell-header nav[data-lex-tab-rows],
+.lex-subtab-bar[data-lex-tab-rows] {
+  display:grid;
+  grid-template-columns:repeat(var(--lex-tab-columns, 1), minmax(0, 1fr));
+}
+.lex-shell-header nav[data-lex-tab-rows] > *,
+.lex-subtab-bar[data-lex-tab-rows] > * {
+  grid-column:span var(--lex-tab-span, 1);
+  min-width:0;
+  max-width:none;
+}
+
+
+/* LEXEDITOR_TAB_ROWS_FIT_20260911 */
+/* A bar that wrapped is a bar asking for less padding before it asks for a
+   second row. The measuring pass runs again after this lands, so a bar that
+   now fits on one line drops the attribute and its tabs go back to full size. */
+.lex-shell-header nav[data-lex-tab-tight] > button,
+.lex-subtab-bar[data-lex-tab-tight] > .lex-subtab-button {
+  padding-inline:6px;
+  letter-spacing:0;
+}
+
+
+/* LEXEDITOR_BOOLEAN_ROW_ALIGN_20260911 */
+/* A boolean reads across the row like every other property: its name in the
+   shared label column, a leader arrow spanning the gap, and its checkbox
+   ending on the same edge as every value box above it. */
+.lex-boolean-field > .lex-detail-field-label { padding-right:10px; }
+.lex-boolean-field > .lex-field-boolean-arrow {
+  position:relative;
+  align-self:center;
+  width:auto;
+  min-width:12px;
+  height:1px;
+  margin:0;
+}
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control {
+  display:flex;
+  width:auto;
+  justify-content:flex-end;
+  padding-left:0 !important;
+  padding-right:10px !important;
+}
+
+
+
+/* LEXEDITOR_BOOLEAN_BOX_EDGE_20260911 */
+/* A checkbox ends on the same edge as every value box above it. Its reference
+   mark used to sit to its right, which pushed the box in by the width of the
+   mark, so the one control on the panel that could not hold its reference
+   inside itself was also the one that did not line up. The mark moves to the
+   left of the box, where it has the same room and costs the edge nothing. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  grid-template-columns:var(--lex-boolean-reference-width) auto;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control > input[type="checkbox"] {
+  order:2;
+}
+.lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  order:1;
+  justify-items:end;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value { justify-content:end; }
+
+
+/* LEXEDITOR_VALUE_FILL_HOST_20260911 */
+/* The box the fill is drawn behind. A bare input has no positioned box of its
+   own, so the fill fell back to the nearest positioned ancestor - the field
+   control, which is the height of the whole property row - and painted the row
+   top to bottom instead of filling the box. */
+.lex-value-host {
+  position:relative;
+  display:block;
+  min-width:0;
+  width:100%;
+}
+.lex-value-host > :is(input,select,textarea) { width:100%;box-sizing:border-box; }
+
+
+/* LEXEDITOR_COPY_AIR_EVEN_20260911 */
+/* Measured from the property NAME, not from the label's box: the label keeps a
+   ten-pixel inset of its own, so six pixels of grid gap on the right of the
+   button sat against sixteen on its left. The label gives its inset up to the
+   lane, which owns the spacing on both sides now. */
+.lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-label { padding-right:0; }
+
+
+
+/* LEXEDITOR_BOOLEAN_REFERENCE_UNDER_20260911 */
+/* The reference row belongs UNDER the checkbox: the width of the box, no
+   horizontal margin, sitting in the space between the bottom of the box and
+   the bottom of the row with equal air above and below it. Nothing then stands
+   between the leader arrow and the box it points at, and the box keeps the
+   edge every value box on the panel ends on. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  position:relative;
+  display:grid !important;
+  grid-template-columns:max-content;
+  grid-template-rows:max-content max-content;
+  justify-content:end;
+  /* The box and the reading under it are one stack, centred in the row: the
+     gap above the reading and the padding below it are the same three pixels,
+     so the air on both sides of it matches. */
+  align-content:center;
+  gap:0;
+  width:auto;
+  height:100%;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control > input[type="checkbox"] {
+  grid-row:1;
+  grid-column:1;
+  /* No stray margin: the box is the column, so the reading under it is exactly
+     as wide as the box and lines up with both of its edges. */
+  justify-self:stretch;
+  margin:0 !important;
+}
+.lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  position:static;
+  grid-row:2;
+  grid-column:1;
+  align-self:center;
+  justify-self:stretch;
+  width:100%;
+  min-width:0;
+  margin:0;
+  padding:0;
+  transform:none;
+  font-size:9px;
+  line-height:1;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  grid-template-columns:auto auto;
+  justify-content:center;
+  column-gap:.25em;
+  padding:0;
+}
+/* The row is tall enough to hold a box and a reading under it, and the air
+   above the reading matches the air below it. */
+.lex-detail-field.lex-boolean-field { min-height:3em; }
+.lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  margin-block:auto !important;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  padding-block:3px;
+  row-gap:3px;
+}
+/* The pin stands off the box, on the line the arrow runs along, where there is
+   nothing else in the row. */
+.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
+  position:absolute !important;
+  top:9px !important;
+  right:28px !important;
+  bottom:auto !important;
+  left:auto !important;
+  transform:none !important;
+}
+
+
+/* LEXEDITOR_BOOLEAN_ROW_GRID_20260911 */
+/* One grid holds the whole right-hand end of a boolean row. Row one is the
+   leader arrow and the checkbox it points at, so the arrow is centred on the
+   BOX rather than on the row and cannot drift when the row grows. Row two is
+   the reading, in the box's column, exactly the box's width. */
+.lex-boolean-field > .lex-detail-field-label { padding-right:0 !important; }
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  display:grid !important;
+  /* Column two is the checkbox's own size, so the reading under it can never
+     be wider than the box it reads for. Left to max-content the column grew to
+     whichever of the two was wider, and a two-glyph reading pushed its own
+     left edge nine pixels past the box. */
+  --lex-boolean-box:19px;
+  grid-template-columns:minmax(12px,1fr) var(--lex-boolean-box);
+  grid-template-rows:max-content max-content;
+  align-content:center;
+  justify-items:end;
+  column-gap:3px;
+  row-gap:3px;
+  padding-block:3px;
+  width:100%;
+  height:auto;
+}
+.lex-boolean-field .lex-source-control > .lex-field-boolean-arrow {
+  grid-area:1 / 1 / 2 / 2;
+  align-self:center;
+  justify-self:stretch;
+  width:auto;
+  min-width:12px;
+  margin:0;
+}
+.lex-boolean-field .lex-detail-field-control > .lex-source-control > input[type="checkbox"] {
+  /* Explicit areas, because an auto-placed sibling (the pin) was enough to
+     open an implicit column and slide the reading out from under the box. */
+  grid-area:1 / 2 / 2 / 3;
+  box-sizing:border-box;
+  width:var(--lex-boolean-box);
+  height:var(--lex-boolean-box);
+  margin:0 !important;
+}
+.lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
+  position:static !important;
+  grid-area:2 / 2 / 3 / 3;
+  justify-self:stretch;
+  align-self:center;
+  width:100% !important;
+  min-width:0;
+  max-width:100%;
+  overflow:hidden;
+  margin:0 !important;
+  padding:0;
+  transform:none;
+  /* `translate` is its own property now, so `transform:none` does not clear
+     it. A stray -50% left over from the old centred rail was sliding the
+     reading half its own width off the box it reads for. */
+  translate:none !important;
+  font-size:9px;
+  line-height:1;
+}
+.lex-boolean-field .lex-reference-values .lex-reference-value {
+  grid-template-columns:auto auto;
+  justify-content:center;
+  column-gap:.25em;
+  padding:0;
+}
+/* The pin rides the row's own right margin - the band the row already keeps
+   clear past every value box - and it takes the checkbox's grid row, so it
+   lines up with the box without being told a pixel offset. Anywhere inside the
+   control it lands ON the checkbox, which is small enough that a pin covers it
+   whole. */
+.lex-boolean-field .lex-detail-field-control > .lex-source-control {
+  grid-template-columns:minmax(12px,1fr) var(--lex-boolean-box) 0;
+  column-gap:0;
+}
+.lex-boolean-field .lex-source-control > .lex-field-boolean-arrow { margin-right:3px; }
+.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
+  grid-area:1 / 3 / 2 / 4;
+  position:static !important;
+  align-self:center;
+  justify-self:start;
+  margin-left:2px;
+  inset:auto !important;
+  transform:none !important;
+}
+
+
+/* LEXEDITOR_FLAG_BOX_FILL_20260911 */
+/* The flag boxes use the whole width of the row. They were shrinking to their
+   own content inside equal tracks, so the space between them was whatever each
+   name happened to leave - ragged, and short of the right-hand edge. Each box
+   fills its track and centres what is in it, which keeps the air on its two
+   sides equal without leaving the row half empty. */
+.lex-toggle-row > .lex-toggle {
+  width:auto;
+  max-width:none;
+  justify-self:stretch;
+  justify-content:center;
+}
+/* The lane in front of the checkbox is the type code and its help pip, and it
+   was twenty-one pixels of the box before the box's own content began. Eleven
+   now, which is what the rotated code actually needs. */
+.lex-toggle { gap:5px; }
+.lex-toggle-rail { width:11px;min-width:11px;overflow:visible; }
+.lex-toggle-type { font-size:8px; }
+.lex-toggle > .lex-toggle-rail > .lex-info-help { --lex-help-pip-size:14px; }
+.lex-toggle-rail > .lex-info-help { width:14px;min-width:14px;height:14px;min-height:14px; }
+/* Nothing on this row clips: a rotated code and a tick both draw past the box
+   the layout gives them, and there is nothing beside them to protect. */
+.lex-toggle,
+.lex-toggle-rail,
+.lex-toggle > .lex-toggle-name { overflow:visible; }
+
+
+/* LEXEDITOR_TODO_UI_LAYOUT_20260911 */
+
+/* The pagination bar is one height whatever it is carrying. A page with a
+   search box had a taller bar than a page without one, so the same bar sat at
+   two different heights depending on which view you were in. */
+.lex-pager {
+  box-sizing:border-box;
+  min-height:var(--lex-pager-bar-height, 52px);
+  height:var(--lex-pager-bar-height, 52px);
+}
+.lex-pager > * { min-height:0; }
+.lex-pager-search { height:32px; }
+
+/* Text you can follow says so at rest, the way a link does, rather than only
+   admitting it once the pointer is already on it. */
+.lex-hoverable {
+  color:var(--lex-link, color-mix(in srgb, var(--lex-accent) 72%, var(--lex-text)));
+  text-decoration-color:color-mix(in srgb, currentColor 45%, transparent);
+  text-underline-offset:.16em;
+}
+.lex-hoverable:hover,
+.lex-hoverable:focus-visible { text-decoration-color:currentColor; }
+
+/* A pin is a small marker, not a metronome. Half the swing, twice as slow, and
+   it settles instead of running forever. */
+.lex-column-pin:hover > svg { animation-duration:1.1s; }
+@keyframes lex-pin-wiggle-stuck {
+  0%,100% { rotate:0deg } 25% { rotate:-4deg } 75% { rotate:4deg }
+}
+@keyframes lex-pin-wiggle {
+  0%,100% { rotate:0deg } 25% { rotate:-5deg } 75% { rotate:5deg }
+}
+
+/* A column arriving or leaving slides in rather than appearing mid-table. */
+@keyframes lex-column-arrive {
+  from { opacity:0; transform:translateX(-6px); }
+  to { opacity:1; transform:none; }
+}
+.lex-column-list-cell.lex-column-arriving,
+.lex-column-list-head-cell.lex-column-arriving {
+  animation:lex-column-arrive .18s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lex-column-list-cell.lex-column-arriving,
+  .lex-column-list-head-cell.lex-column-arriving { animation:none; }
+  .lex-column-pin:hover > svg { animation:none; }
+}
+
+/* A panel heading keeps its left inset whether or not a preview icon sits in
+   front of it. Without the icon the name was flush against the panel edge. */
+.lex-detail-panel-heading.no-icon .lex-detail-panel-identity { padding-left:10px; }
+
+/* A cell centres the LINE BOX, and a font with a tall ascent or a deep descent
+   sits off-centre inside its own line box - which is why the Name, Type and
+   Source columns drift vertically under a game font and not under the shared
+   one. Hugging the glyphs with line-height:1 and centring the box that results
+   takes the font's own metrics out of the sum. */
+.lex-column-list-cell > .lex-column-cell-content,
+.lex-column-list-head-cell > .lex-column-cell-content {
+  display:flex;
+  align-items:center;
+  line-height:1;
+}
+.lex-column-cell-text {
+  display:block;
+  line-height:1;
+  padding-block:.14em;
+}
+
+
+/* LEXEDITOR_FOLDER_TABS_20260911 */
+/* A tab is a folder tab: the page hangs off the one that is selected. The
+   selected tab lifted three pixels and left a grey strip under it, because the
+   lift was the only thing joining it to the page and nothing filled the gap it
+   opened. It still lifts, but it carries the page's own surface down to meet
+   it, so the two read as one piece of card. */
+.lex-shell-header nav button {
+  transition:transform .14s ease, background-color .14s ease, color .14s ease,
+    border-radius .14s ease;
+}
+.lex-shell-header nav button.active,
+.lex-shell-header nav button:hover {
+  transform:translateY(-3px);
+}
+.lex-shell-header nav button.active::after {
+  position:absolute;
+  right:0;
+  bottom:-3px;
+  left:0;
+  height:4px;
+  content:"";
+  background:var(--lex-accent);
+}
+.lex-shell-header nav button.lex-settings-tab.active::after {
+  background:color-mix(in srgb, var(--lex-accent) 72%, var(--lex-panel-2));
+}
+/* Tweaks is an ordinary page with an ordinary tab. It keeps a hint of its own
+   so it is findable, and nothing else. */
+.lex-shell-header nav button.lex-tweaks-tab { flex:1 1 0;margin-left:0; }
+.lex-shell-header nav button.lex-tweaks-tab .lex-tab-label-text { letter-spacing:.09em; }
+
+/* A bar with one tab in it is not a bar. */
+.lex-subtab-bar-single { display:none !important; }
+
+
+/* LEXEDITOR_MENU_ICONS_20260911 */
+/* One shape for every icon on the right of the menu bar: a circle of the same
+   size with the same border and fill, whatever the icon inside it is. They had
+   been drifting - some circular, some not, the GitHub mark square against its
+   neighbours - so the row read as a collection rather than a set. The size
+   follows the command row's height so the circles stay circles rather than
+   flattening into ovals on a short bar. */
+.lex-shell-command-row :is(.lex-settings-button, .lex-help-button,
+  .lex-developer-button, .lex-shortcuts-button, .lex-info-button, .lex-github-tab) {
+  --lex-menu-icon:min(34px, calc(var(--lex-command-row-height) - 6px));
+  box-sizing:border-box;
+  display:inline-grid;
+  width:var(--lex-menu-icon);
+  min-width:var(--lex-menu-icon);
+  height:var(--lex-menu-icon);
+  padding:0;
+  place-items:center;
+  color:var(--lex-highlight);
+  border:1px solid var(--lex-border);
+  border-radius:50%;
+  background:var(--lex-panel-2);
+  cursor:pointer;
+}
+.lex-shell-command-row :is(.lex-settings-button, .lex-help-button,
+  .lex-developer-button, .lex-shortcuts-button, .lex-info-button, .lex-github-tab) > svg {
+  display:block;
+  width:19px;
+  height:19px;
+}
+.lex-shell-command-row :is(.lex-settings-button, .lex-help-button,
+  .lex-developer-button, .lex-shortcuts-button, .lex-info-button,
+  .lex-github-tab):is(:hover, .active) {
+  color:var(--lex-accent-text);
+  border-color:var(--lex-accent);
+  background:var(--lex-accent);
+}
+
+/* Restart acts on the window, so it is one of the window controls: same square
+   shape, same size, and no gap between it and Minimize. */
+.lex-window-restart {
+  display:inline-grid;
+  place-items:center;
+  border-radius:2px;
+}
+.lex-window-restart > svg { width:17px;height:17px;fill:currentColor; }
+
+
+/* LEXEDITOR_GRAPH_LAYOUT_20260911 */
+/* One margin on all four sides, and a much smaller one. The plot carried
+   46/22/28/30 - a different number on every side - so the drawing sat off
+   centre in its own card and the wide left band read as a white strip beside
+   the graph rather than as the axis margin it was. */
+.lex-curve-plot {
+  --lex-curve-margin:26px;
+  --lex-curve-margin-left:var(--lex-curve-margin);
+  --lex-curve-margin-right:var(--lex-curve-margin);
+  --lex-curve-margin-top:var(--lex-curve-margin);
+  --lex-curve-margin-bottom:var(--lex-curve-margin);
+  padding:var(--lex-curve-margin);
+}
+/* The scale reads down the LEFT of the graph, which is the side a reader looks
+   to for it. */
+.lex-curve-axis-top,
+.lex-curve-axis-bottom,
+.lex-curve-axis-right,
+.lex-curve-y-axis-right,
+.lex-curve-right-axis :is(.lex-curve-axis,.lex-curve-axis-label,.lex-curve-axis-number) {
+  right:auto !important;
+  left:2px !important;
+  writing-mode:horizontal-tb !important;
+  transform:none !important;
+  text-align:left;
+}
+.lex-curve-axis-name:not(.lex-curve-axis-name-x) {
+  right:auto !important;
+  left:2px !important;
+  writing-mode:vertical-rl !important;
+  transform:rotate(180deg) !important;
+}
+/* The title is the graph's own nameplate: huge, centred in the drawing, and
+   set into the background behind it. It was a heading stacked above the card
+   in ordinary heading type; as a nameplate it says which graph this is without
+   taking a line of the card to do it. */
+.lex-curve-editor { position:relative; }
+.lex-curve-plot { container-type:inline-size; }
+.lex-curve-plot::before {
+  position:absolute;
+  z-index:0;
+  top:50%;
+  left:50%;
+  content:attr(data-curve-title);
+  color:color-mix(in srgb, var(--lex-text) 12%, transparent);
+  font:800 clamp(34px, 17cqw, 110px)/1 var(--lex-heading-font);
+  letter-spacing:.05em;
+  text-transform:uppercase;
+  white-space:nowrap;
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+}
+.lex-curve-heading {
+  position:absolute;
+  width:1px;
+  height:1px;
+  margin:-1px;
+  padding:0;
+  overflow:hidden;
+  clip-path:inset(50%);
+  white-space:nowrap;
+}
+.lex-curve-svg { background:transparent; }
+.lex-curve-formula { margin-top:-4px;height:2.2em; }
+
+
+/* LEXEDITOR_ID_COLUMN_WIDTH_20260911 */
+/* An ID column holds four or five digits, so it takes four or five digits of
+   the table. Left to share the grid it took a fifth of the width on a
+   two-column table and squeezed the name it sits in front of. A plugin can
+   still set its own width; this is the floor for one that does not. */
+.lex-column-list-head-cell.lex-numbered-id-cell,
+.lex-column-list-cell.lex-numbered-id-cell { max-width:11ch; }
+
+
+/* LEXEDITOR_FORMULA_TYPESETTING_20260911 */
+/* A formula is mathematics, so it is set like mathematics: an italic serif for
+   the letters, upright for the numbers and operators, and figures that line up
+   in a column. It had been set in the interface face, where a formula reads as
+   a line of source code. */
+.lex-curve-formula,
+.lex-curve-path-formula,
+.lex-curve-heading-formula {
+  font-family:"Cambria Math", "Latin Modern Math", Cambria, Georgia, serif;
+  font-variant-numeric:lining-nums tabular-nums;
+  font-feature-settings:"lnum" 1, "tnum" 1;
+  letter-spacing:.01em;
+}
+.lex-curve-formula :is(.lex-curve-variable-a,.lex-curve-variable-b,
+  .lex-curve-variable-c,.lex-curve-variable-d) { font-style:italic;font-weight:600; }
+
+
+/* LEXEDITOR_TWEAKS_LAYOUT_20260911 */
+/* The shared Tweaks layout, in RDR2's shape with none of RDR2's styling: real
+   columns dealt by the framework, so a card is never cut in half across a
+   column break the way CSS columns do it. */
+.lex-settings-lane {
+  display:grid;
+  grid-auto-flow:column;
+  grid-auto-columns:minmax(0,1fr);
+  align-items:start;
+  gap:var(--lex-panel-gap, 12px);
+  width:100%;
+  min-width:0;
+}
+.lex-settings-column {
+  display:flex;
+  flex-direction:column;
+  gap:var(--lex-panel-gap, 12px);
+  min-width:0;
+}
+.lex-settings-columns:has(> .lex-settings-lane) {
+  display:block;
+  column-count:auto;
+}
+.lex-settings-subtabs { margin-bottom:var(--lex-panel-gap, 12px); }
+
+
+/* LEXEDITOR_DETAIL_NOTE_20260912
+   A section that holds nothing says so in its own voice. It is prose, not a
+   property row, so it takes the section's full width and none of the label
+   column's alignment. */
+.lex-detail-note {
+  margin:0;
+  padding:4px 2px;
+  color:var(--lex-muted);
+  font-size:12px;
+  line-height:1.45;
 }

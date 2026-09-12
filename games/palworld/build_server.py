@@ -1,0 +1,134 @@
+"""Palworld service extension for clean builds and owned local-test deployment."""
+
+from __future__ import annotations
+
+from http.server import ThreadingHTTPServer
+from urllib.parse import urlparse
+
+from . import build as package_build
+from . import workshop
+from .package import PackageValidationError
+from .server import Handler as EditorHandler, PLUGIN_ROOT, PORT, palschema_catalog_payload, project_root
+
+
+def _validate_known_payloads() -> None:
+    """Block packaging/deployment when an integrated payload family is known invalid."""
+    catalog = palschema_catalog_payload()
+    broken = [row.get("path", row.get("name", "unknown")) for row in catalog.get("patches", []) if row.get("errors")]
+    if broken:
+        raise RuntimeError(
+            "PalSchema raw patch validation failed; repair these files before building/deploying: "
+            + ", ".join(str(value) for value in broken)
+        )
+
+
+class Handler(EditorHandler):
+    def _same_editor_request(self) -> bool:
+        port = self.server.server_address[1]
+        host = self.headers.get("Host", "").casefold()
+        allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
+        origin = self.headers.get("Origin")
+        return host in allowed_hosts and (origin is None or origin.casefold() == f"http://{host}")
+
+    def _action_payload(self) -> None:
+        payload = self.read_json()
+        if payload:
+            raise ValueError("Palworld build/deployment actions do not accept parameters")
+
+    def do_GET(self):
+        path = urlparse(self.path).path
+        if path == "/build-ui-pre.js":
+            self.send_file(PLUGIN_ROOT / "build-ui-pre.js")
+            return
+        if path == "/build-ui.js":
+            self.send_file(PLUGIN_ROOT / "build-ui.js")
+            return
+        if path == "/api/plugin":
+            self.send_json({
+                "apiVersion": 1,
+                "pluginId": "palworld",
+                "name": "Palworld",
+                "hosted": True,
+                "windowHost": "webview2",
+                "capabilities": [
+                    "official-package-info",
+                    "palschema-raw-patches",
+                    "palschema-generated-schemas",
+                    "palschema-add-existing-row-fields",
+                    "official-package-build",
+                    "official-local-workshop-deploy",
+                    "data-map",
+                ],
+            })
+            return
+        if path == "/api/build":
+            try:
+                _validate_known_payloads()
+                payload = package_build.status(project_root())
+                payload["ready"] = True
+                self.send_json(payload)
+            except Exception as error:
+                self.send_json({
+                    "ready": False,
+                    "error": str(error),
+                    "projectPath": str(project_root()),
+                })
+            return
+        if path == "/api/workshop":
+            try:
+                payload = workshop.status(project_root())
+                payload["ready"] = True
+                self.send_json(payload)
+            except Exception as error:
+                self.send_json({
+                    "ready": False,
+                    "error": str(error),
+                    "projectPath": str(project_root()),
+                })
+            return
+        super().do_GET()
+
+    def do_POST(self):
+        path = urlparse(self.path).path
+        actions = {
+            "/api/build/create",
+            "/api/build/revert",
+            "/api/workshop/deploy",
+            "/api/workshop/remove",
+        }
+        if path not in actions:
+            super().do_POST()
+            return
+        if not self._same_editor_request():
+            self.send_json({"error": "Only this editor may change the Palworld build/deployment"}, 403)
+            return
+        try:
+            self._action_payload()
+            if path == "/api/build/create":
+                _validate_known_payloads()
+                result = package_build.build(project_root())
+            elif path == "/api/build/revert":
+                result = package_build.revert(project_root())
+            elif path == "/api/workshop/deploy":
+                _validate_known_payloads()
+                result = workshop.deploy(project_root())
+            else:
+                result = workshop.remove(project_root())
+            result["ready"] = True
+            self.send_json(result)
+        except (
+            package_build.BuildOwnershipError,
+            package_build.BuildChangedError,
+            workshop.WorkshopOwnershipError,
+            workshop.WorkshopChangedError,
+            workshop.PackageNameCollisionError,
+        ) as error:
+            self.send_json({"error": str(error)}, 409)
+        except (PackageValidationError, workshop.WorkshopUnavailableError) as error:
+            self.send_json({"error": str(error)}, 400)
+        except (OSError, RuntimeError, ValueError) as error:
+            self.send_json({"error": str(error)}, 400)
+
+
+if __name__ == "__main__":
+    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

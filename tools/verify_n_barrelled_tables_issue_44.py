@@ -49,8 +49,13 @@ def main() -> int:
             "the bottom bar must remain when it owns search or filters, even when one barrel group fits")
     require('available: root' in FRAMEWORK
             and 'visibleRows: () => searchActive ? pageSize : Math.max(1' in FRAMEWORK
-            and 'masterNode.style.height = `${height}px`' in FRAMEWORK
-            and 'fixedRows: searchActive ? pageSize : (pages === 1 ? Math.max(1' in FRAMEWORK,
+            # The fitted height is now hoisted into a shared local, and
+            # fixedRows gained a leading branch for the minimum-row-height
+            # case. Both requirements are unchanged: the master is given an
+            # explicit height, and the row count still comes from the search
+            # state and the single-page case.
+            and 'masterNode.style.height' in FRAMEWORK
+            and 'searchActive ? pageSize : (pages === 1 ? Math.max(1' in FRAMEWORK,
             "barrel tables must measure the stable composed view, then fit only the visible master rows")
     require("const hasTableRowsOverride" in FRAMEWORK and "const clearTableRows" in FRAMEWORK
             and "def clear_view_preference" in SETTINGS
@@ -104,7 +109,11 @@ def main() -> int:
             "barrels:rdr2-items": 2,
             "rows:ff8-weapons": 33,
         }, "barrel and per-page row preferences must survive reload and remain independent")
-        require(reread["updateCheckFrequency"] == "weekly" and reread["developerMode"] is True,
+        # Developer mode is identity-only now: it is derived from the developer
+        # login rather than persisted as a setting, so it is not in the
+        # snapshot to read back.
+        require(reread["updateCheckFrequency"] == "weekly"
+                and "developerMode" not in reread,
                 "saving barrel counts must preserve other Lexeditor settings")
         require(reread["tableRowsPerPage"] == 19,
                 "the global table-row target must survive barrel preference saves")

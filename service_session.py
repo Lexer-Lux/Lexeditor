@@ -36,7 +36,10 @@ def request_json(url: str, body: dict | None = None) -> dict:
         method="GET" if body is None else "POST",
         headers={"Content-Type": "application/json"},
     )
-    with urllib.request.urlopen(request, timeout=10) as response:
+    # A data-map scan over an installed game takes longer than ten seconds on a
+    # loaded machine, and the timeout surfaced as a bare socket error that said
+    # nothing about which request gave up.
+    with urllib.request.urlopen(request, timeout=45) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
@@ -56,6 +59,8 @@ class LocalPluginSession:
         self.process: subprocess.Popen[str] | None = None
 
     def start(self) -> dict:
+        if self.process is not None and self.process.poll() is None:
+            raise RuntimeError(f"{self.plugin_id} service is already running")
         problems = self.check()
         if problems:
             raise RuntimeError("\n".join(problems))
@@ -64,17 +69,20 @@ class LocalPluginSession:
         environment["LEXEDITOR_PORT"] = str(self.port)
         environment["LEXEDITOR_PLUGIN_HOSTED"] = "1"
         environment["LEXEDITOR_WINDOW_HOST"] = "webview2"
+        environment["LEXEDITOR_SERVICE_PIPE"] = "1"
         creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         self.process = subprocess.Popen(
-            service_command(self.module),
+            service_command(self.module, owned=True),
             cwd=str(self.app_root),
             env=environment,
+            stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             encoding="utf-8",
             errors="replace",
             creationflags=creation_flags,
+            start_new_session=os.name != "nt",
         )
         deadline = time.monotonic() + 15.0
         last_error = "service did not answer"
@@ -97,8 +105,9 @@ class LocalPluginSession:
         if not self.process:
             return
         try:
+            if self.process.stdin is not None and not self.process.stdin.closed:
+                self.process.stdin.close()
             if self.process.poll() is None:
-                self.process.terminate()
                 try:
                     self.process.wait(timeout=5)
                 except subprocess.TimeoutExpired:
