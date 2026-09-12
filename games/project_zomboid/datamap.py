@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import core, craftrecipe, evolvedrecipe, fixing, fluid, mannequin, model, sound, timedaction, vehicle, zedscript
+from . import animationsmesh, core, craftrecipe, evolvedrecipe, fixing, fluid, mannequin, model, sound, timedaction, vehicle, zedscript
 
 
 def read(root: Path) -> dict:
@@ -11,6 +11,7 @@ def read(root: Path) -> dict:
     base = core.data_map(root)
     rows = [row for row in base.get("rows", []) if not row.get("filename", "").endswith(".txt")]
 
+    animation_meshes = animationsmesh.read(root)
     items = core.read_items(root)
     evolved = evolvedrecipe.read(root)
     crafts = craftrecipe.read(root)
@@ -25,6 +26,7 @@ def read(root: Path) -> dict:
     by_path: dict[str, set[str]] = {}
     for row in inventory["rows"]:
         by_path.setdefault(row["path"], set()).add(row["kind"])
+    animation_mesh_paths = {row["path"] for row in animation_meshes["rows"]}
     item_paths = {row["path"] for row in items["rows"]}
     evolved_paths = {row["path"] for row in evolved["rows"]}
     craft_paths = {row["path"] for row in crafts["rows"]}
@@ -36,13 +38,18 @@ def read(root: Path) -> dict:
     mannequin_paths = {row["path"] for row in mannequins["rows"]}
     timed_action_paths = {row["path"] for row in timed_actions["rows"]}
     errors = {
-        row["path"] for result in (items, evolved, crafts, fixings, fluids, vehicles, sounds, models, mannequins, timed_actions, inventory)
+        row["path"] for result in (
+            animation_meshes, items, evolved, crafts, fixings, fluids, vehicles,
+            sounds, models, mannequins, timed_actions, inventory,
+        )
         for row in result.get("errors", []) if isinstance(row, dict) and row.get("path")
     }
 
     for path in core.script_paths(root):
         relative = path.relative_to(root).as_posix()
         editors = []
+        if relative in animation_mesh_paths:
+            editors.append("Animation Meshes")
         if relative in item_paths:
             editors.append("Items")
         if relative in evolved_paths:
