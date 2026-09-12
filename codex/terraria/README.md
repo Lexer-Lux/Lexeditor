@@ -19,6 +19,8 @@ A modern source mod uses:
 
 The `..\tModLoader.targets` contract is why Lexeditor-created source projects should default to the real `ModSources` tree instead of inventing an incompatible project layout elsewhere.
 
+The source-folder name is also tModLoader's internal mod name. Lexeditor therefore validates creation and rename **before filesystem mutation** rather than silently sanitizing one generated filename while leaving a different internal name behind. Created names use the exact project folder name for the generated namespace, assembly and source filenames. Lexeditor conservatively accepts ASCII C# identifiers and rejects C# keywords plus tModLoader's reserved `Mod`, `ModLoader` and `tModLoader` names.
+
 ## `build.txt` editing boundary
 
 Lexeditor models tModLoader's scalar metadata plus these comma-delimited list properties:
@@ -46,12 +48,19 @@ The service does not accept an arbitrary executable or command line: the install
 
 A successful synthetic handoff/exit-code test is **not** installed-game acceptance. Final acceptance still requires a real current tModLoader installation to produce and load the package.
 
+## Local package and enabled state
+
+tModLoader stores local packages directly under `<save-root>/Mods` and mirrors its enabled-mod set in `<save-root>/Mods/enabled.json`. Lexeditor reports both the expected local `.tmod` package and whether the selected mod name is present in that native enabled set. Missing `enabled.json` is treated as an empty enabled set, matching tModLoader's loader behavior; malformed or unreadable state is surfaced explicitly instead of guessed.
+
+Lexeditor currently treats `enabled.json` as **read-only**. Native `-build` remains responsible for tModLoader's normal post-build enabling behavior. Lexeditor does not yet expose an independent enable/disable mutation because writing the file behind a running tModLoader process could diverge from tModLoader's cached enabled set.
+
 ## Loader / deployment model
 
 - **Loader:** tModLoader itself. Lexeditor does not ship a second Terraria loader.
 - **Authoring:** edit a source project under `ModSources`.
 - **Build:** invoke tModLoader's native `-build` command through its installed bootstrap.
 - **Runtime:** tModLoader loads enabled `.tmod` packages; Workshop remains owned by tModLoader/Steam.
+- **State inspection:** report the native local `.tmod` and `Mods/enabled.json` state without rewriting enabled state.
 - **Vanilla install:** read-only. Lexeditor must not patch `Terraria.exe` or vanilla content as its normal workflow.
 
 ## Research sources
@@ -67,6 +76,7 @@ A successful synthetic handoff/exit-code test is **not** installed-game acceptan
 3. structured `build.txt` inspection/editing with preservation of unknown keys and formatting;
 4. Data Map inventory of source code, localization and assets;
 5. invoke the supported build path without modifying the installed game;
-6. verify the resulting local mod is visible/loadable in a real tModLoader install.
+6. report the resulting local package and tModLoader enabled-state record;
+7. verify the resulting local mod is visible/loadable in a real tModLoader install.
 
 Native in-game acceptance is intentionally separate from parser/service/browser checks.
