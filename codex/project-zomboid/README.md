@@ -16,17 +16,17 @@ Project Zomboid itself owns activation and ordering. `mod.info` exposes dependen
 
 ## `mod.info`
 
-The first editor models scalar fields documented for Build 42, including `name`, `id`, `author`, `modversion`, `description`, `icon`, `url`, `versionMin`, `versionMax`, dependency/order fields, and `category`.
+The editor models scalar fields documented for Build 42, including `name`, `id`, `author`, `modversion`, `description`, `icon`, `url`, `versionMin`, `versionMax`, dependency/order fields, and `category`.
 
 Unknown keys, repeated non-edited keys, comments and other unmodeled lines must be preserved. A write is rejected if the file hash changed after it was read. `name` and `id` are treated as required for Lexeditor-created projects. Version bounds use explicit build-major forms such as `42.20` or `42.20.4`.
 
-## ZedScript structure
+## Current ZedScript families
 
-Current Build 42 script files place authorable records under a top-level `module` block. Lexeditor's structural inventory recognizes top-level records for `item`, `recipe`, `evolvedrecipe`, `fixing`, `vehicle`, `template`, `model`, `sound`, `animation`, and `mannequin` while deliberately ignoring similarly shaped text inside comments, quoted strings, and nested component blocks.
+The current `pz-scripts-data` registry identifies these Build 42 script families at module level: `animationsMesh`, `craftRecipe`, `entity`, `evolvedrecipe`, `fixing`, `fluid`, `item`, `mannequin`, `model`, `sound`, `timedAction`, and `vehicle`. Lexeditor structurally inventories these top-level records while deliberately ignoring similarly shaped text inside comments, quoted strings, and nested blocks.
 
-Recognition is not the same as editability. The broader families remain read-only until their current Build 42 fields and mutation rules are grounded independently. This lets the Data Map and research tooling report real project coverage without pretending unknown record schemas are safe to rewrite.
+Recognition is not the same as editability. Items, evolved recipes and the conservative scalar surface of craft recipes are currently structured. The remaining families stay read-only until their current Build 42 fields and mutation rules are independently grounded.
 
-## ZedScript item blocks
+## Item blocks
 
 Build 42 items use required `ItemType` values from this finite set:
 
@@ -46,9 +46,26 @@ Build 42 items use required `ItemType` values from this finite set:
 - `base:weapon`
 - `base:weaponpart`
 
-The first item writer edits only existing top-level scalar properties that are firmly documented and can be patched without rebuilding the block: `ItemType`, `Weight`, `Icon`, and `DisplayCategory`. `Weight` is a float with a documented minimum of `0.0`. `Icon` names resolve to item textures under `media/textures/` according to Project Zomboid's item-icon conventions. `DisplayCategory` is a translation-backed inventory category.
+The item writer edits only existing top-level scalar properties that are firmly documented and can be patched without rebuilding the block: `ItemType`, `Weight`, `Icon`, and `DisplayCategory`. `Weight` is a float with a documented minimum of `0.0`. `Icon` names resolve to item textures under `media/textures/` according to Project Zomboid's item-icon conventions. `DisplayCategory` is a translation-backed inventory category.
 
-Nested `component` blocks and unknown item properties are preserved. Comments and quoted strings are ignored when locating structural braces. If an edited property is duplicated or missing, the first writer refuses the change rather than guessing where to insert/resolve it.
+Nested `component` blocks and unknown item properties are preserved. Comments and quoted strings are ignored when locating structural braces. If an edited property is duplicated or missing, the writer refuses the change rather than guessing where to insert/resolve it.
+
+## `evolvedrecipe`
+
+The current Build 42 schema documents `AddIngredientIfCooked`, `AddIngredientSound`, `BaseItem`, `CanAddSpicesEmpty`, `Cookable`, `MaxItems`, `MinimumWater`, `Name`, `ResultItem`, and `Template`.
+
+Lexeditor patches only properties that already exist. `AddIngredientIfCooked` and `CanAddSpicesEmpty` are booleans. `MaxItems` is an integer with minimum 1. `MinimumWater` is finite numeric data. `BaseItem` and `ResultItem` use full item references. `Cookable` is unusual: the current schema documents it as presence-only, and explicitly notes that `Cookable = false` does not disable it. Therefore Lexeditor never writes false into that property; removing the property would need a separate structural operation.
+
+## `craftRecipe`
+
+Build 42's current crafting family is `craftRecipe`, not the older legacy `recipe` shape. A craft recipe commonly contains nested `inputs` and `outputs` blocks. Lexeditor preserves those blocks byte-for-byte in the first writer and edits only existing primitive fields whose current schema is explicit:
+
+- `AllowBatchCraft` and `CanWalk` — booleans;
+- `ResearchSkillLevel` and `time` — integers;
+- `tags` — semicolon-separated tag names;
+- `category`, `Icon`, and `timedAction` — scalar identifiers/text.
+
+Callbacks, `AutoLearn*`, `SkillRequired`, `inputs`, `outputs`, mappers and other structured/nested data remain read-only until their mutation grammar is implemented independently. A file containing these fields can still be edited safely because all unmodeled bytes/text are preserved and writes target only one existing top-level property span.
 
 ## Filesystem portability
 
@@ -56,9 +73,9 @@ Project APIs expose project-relative paths with forward slashes. On Windows the 
 
 ## Deployment safety
 
-Lexeditor stages a full local-mod copy before replacing an existing Lexeditor-owned deployment. The project records hashes of every deployed file. Redeploy/remove is allowed only while the target still exactly matches the recorded deployment. An unowned folder or any external modification causes a refusal instead of overwrite/removal.
+Lexeditor stages a full local-mod copy before replacing an existing Lexeditor-owned deployment. The project records hashes of every deployed file. Redeploy/remove is allowed only while the target still exactly matches the recorded deployment. An unowned folder or any external modification—including an added foreign file—causes refusal instead of overwrite/removal.
 
-Symlinks are refused in this first deployment path, and Lexeditor state/temp files are not copied into the game-visible mod.
+Symlinks are refused in this deployment path, and Lexeditor state/temp files are not copied into the game-visible mod. Clean owned deployments can be replaced transactionally and removed completely; foreign or changed deployments are deliberately left untouched for the user to reconcile.
 
 ## Research references
 
@@ -67,4 +84,4 @@ Symlinks are refused in this first deployment path, and Lexeditor state/temp fil
 - PZ Wiki Modding / ZedScripts: <https://github.com/PZ-Wiki-Modding/ZedScripts>
 - PZ Wiki Modding / pz-scripts-data: <https://github.com/PZ-Wiki-Modding/pz-scripts-data>
 
-These references supplied format/schema knowledge only in the first slice; no third-party parser source or schema dataset is vendored into Lexeditor.
+These references supply format/schema knowledge; no third-party parser source or schema dataset is vendored into Lexeditor.
