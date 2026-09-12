@@ -152,7 +152,7 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
         },
     ]
     rows[insertion:insertion] = additions
-    result["rows"] = rows
+    result["rows"] = human_data_map_rows(rows)
     counts = dict(payload.get("counts", {}))
     counts.update({
         "worldHeaders": 8 if has_bank else 0,
@@ -167,4 +167,36 @@ def augment_data_map(store: OverlayStore, payload: dict) -> dict:
         "worldPalettes": world_palettes,
     })
     result["counts"] = counts
+    return result
+
+
+def human_data_map_rows(rows: list[dict]) -> list[dict]:
+    """Describe the desktop editor, not parser or command-line capabilities."""
+    descriptions = [
+        ("resources.bin", "Original game files", "Browse and extract the game files. Only the data listed below has an editor.", "partial"),
+        ("Localize/", "Dialogue and menu text", "Edit the text in each language. Changes are saved in your mod project.", "integrated"),
+        ("Game/field/Mapinfo/", "Area settings", "Edit music, tilesets, colors, map and event references, and scrolling limits.", "integrated"),
+        ("Game/common/MapJump", "Area exits", "Change where an exit is and where it leads. You cannot add or remove exits yet.", "partial"),
+        ("Game/common/Takara", "Treasure chests", "Change chest positions and contents. You cannot add or remove chests yet; some fields still have no known meaning.", "partial"),
+        ("Game/field/atel/", "Events and cutscenes", "Read event commands and edit supported values, such as movement, dialogue, and sound settings. Some commands are read-only. You cannot add or remove commands yet.", "partial"),
+        ("Game/field/MapTable/", "Area maps", "Preview the map layers and inspect tile and collision data. Map painting, animation playback, and some layer effects are not available.", "partial"),
+        ("Game/field/BGAnime/", "Animated map tiles", "Inspect animation frames and timing. Animation editing and playback are not available.", "partial"),
+        ("Game/field/weather_bin/", "Extra map layers", "Preview the extra map layer, including weather graphics. There is no graphics or tile-layout editor yet.", "partial"),
+        ("Game/field/palette_bin/", "Map colors", "There is no color editor in Lexeditor yet. A separate command-line tool can change these colors.", "not-integrated"),
+        (WORLD_BANK, "World map settings", "Edit world settings and preview map layers. Other data in this file has no editor; map painting and animation playback are not available.", "partial"),
+        ("Game/world/EventTable/", "World map exits and triggers", "Edit existing exits and triggers. You cannot add or remove entries yet.", "partial"),
+        ("Game/world/esl/", "World map events", "Read supported event commands. Editing is not available, and some commands cannot yet be read.", "partial"),
+        ("Game/field/*", "Other maps, sprites, and graphics", "Browse the files. Most do not yet have a suitable viewer or editor.", "partial"),
+        ("Individual resources", "Other game files", "Preview supported images and text, or extract a file. Unknown file types have no viewer or editor.", "partial"),
+    ]
+    result = []
+    for row in rows:
+        match = next((entry for entry in descriptions if row["filename"].startswith(entry[0])), None)
+        if match is None:
+            # Export, deployment, project changes and research tools belong in Info.
+            continue
+        _, controls, notes, status = match
+        if row.get("openable") is False and status == "integrated":
+            status = "not-integrated"
+        result.append({**row, "controls": controls, "notes": notes, "status": status})
     return result

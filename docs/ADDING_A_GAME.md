@@ -264,6 +264,23 @@ Changes as normal content tabs. Show a loading state as soon as navigation start
 never leave the previous page visible under the newly selected tab.
 
 Use `LexeditorUI.dataMap` for the Data Map, including its integration icons.
+Use one **Integration** column; do not add a separate Coverage column.
+- **Integrated:** all of the represented data can be viewed and edited in Lexeditor.
+- **Partial:** only part can be viewed or edited, or the viewer has no editor yet.
+- **Not integrated:** there is no usable viewer or editor.
+A parser, file download, or command-line tool alone does not make data integrated.
+Describe what players can change and what is missing in plain language. Keep
+format research in Codex, and export/deployment instructions in Info.
+
+An optional **Misc.** tab holds editable data that does not need a dedicated page.
+Use the tab ID `misc`. The shell places it after all other regular tabs and before
+**Tweaks**. Omit it if there is no suitable data. Use the shared searchable,
+paginated tables and detail controls, with readable names and schema limits.
+Misc. must save real edits through the plugin's normal save path. A file list,
+hex dump, or read-only preview does not count as an editor. List these files in
+Data Map and link them to Misc.; use Partial when any represented fields remain
+unsupported. Give frequently used or complex data a dedicated editor when needed.
+
 There is no separate editable-table mode. All record tables use the shared cell
 editors. Supply each editable column's `edit` callback and its schema controls
 (`choices`, numeric bounds, or `editor`) so a double-click edits the same value
