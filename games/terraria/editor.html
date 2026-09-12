@@ -15,17 +15,21 @@
     .terraria-error{border-color:#a84d4d}
     .terraria-success{border-color:var(--lex-success)}
     .terraria-list{width:100%;min-width:320px;min-height:88px;resize:vertical}
-    .terraria-map{width:100%;border-collapse:collapse;background:var(--lex-panel)}
-    .terraria-map th,.terraria-map td{padding:8px 10px;border:1px solid var(--lex-border);text-align:left;vertical-align:top}
-    .terraria-map th{background:var(--lex-panel-muted,#eceff1)}
+    .terraria-map,.terraria-localization-table{width:100%;border-collapse:collapse;background:var(--lex-panel)}
+    .terraria-map th,.terraria-map td,.terraria-localization-table th,.terraria-localization-table td{padding:8px 10px;border:1px solid var(--lex-border);text-align:left;vertical-align:top}
+    .terraria-map th,.terraria-localization-table th{background:var(--lex-panel-muted,#eceff1)}
     .terraria-status{font-weight:700;text-transform:uppercase;font-size:.8em;letter-spacing:.04em}
     .terraria-build-card{display:grid;gap:9px}
-    .terraria-build-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .terraria-build-row,.terraria-localization-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .terraria-build-button{padding:8px 14px;border:1px solid var(--lex-border);border-radius:var(--lex-radius);color:var(--lex-text);background:var(--lex-panel-2);font:700 13px/1 var(--lex-font);cursor:pointer}
     .terraria-build-button:hover:not(:disabled){color:var(--lex-accent-text);border-color:var(--lex-accent);background:var(--lex-accent)}
     .terraria-build-button:disabled{opacity:.45;cursor:default}
     .terraria-build-path{overflow-wrap:anywhere;color:var(--lex-muted);font-size:.9em}
     .terraria-build-log{max-height:260px;margin:0;padding:10px;overflow:auto;white-space:pre-wrap;background:var(--lex-bg);border:1px solid var(--lex-border);font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
+    .terraria-localization-toolbar select{min-width:320px;max-width:100%}
+    .terraria-localization-table input{width:100%;min-width:260px}
+    .terraria-localization-key{max-width:430px;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
+    .terraria-readonly-value{max-width:470px;max-height:110px;overflow:auto;white-space:pre-wrap;color:var(--lex-muted)}
   </style>
 </head>
 <body>
@@ -35,7 +39,8 @@
   <script>
   "use strict";
   const {el,detailPanel,detailSection,detailField,readonlyField}=LexeditorUI;
-  let tab="metadata",saved=null,current=null,mapRows=[],buildInfo=null,buildResult=null,building=false,error="";
+  let tab="metadata",saved=null,current=null,mapRows=[],buildInfo=null,buildResult=null,building=false;
+  let localizationFiles=[],locSaved=null,locCurrent=null,locLoading=false,error="";
 
   const clone=value=>JSON.parse(JSON.stringify(value));
   async function request(path,options={}){
@@ -48,7 +53,12 @@
     if(!saved||!current)return [];
     return Object.keys(current.values).filter(key=>JSON.stringify(current.values[key])!==JSON.stringify(saved.values[key]));
   }
-  const dirtyCount=()=>dirtyKeys().length;
+  function localizationDirtyEntries(){
+    if(!locSaved||!locCurrent)return [];
+    const original=new Map(locSaved.entries.map(entry=>[entry.key,entry.value]));
+    return locCurrent.entries.filter(entry=>entry.editable&&entry.value!==original.get(entry.key));
+  }
+  const dirtyCount=()=>dirtyKeys().length+localizationDirtyEntries().length;
   function setValue(key,value){current.values[key]=value;render();shell?.refresh?.()}
   function textControl(key,{placeholder=""}={}){
     return el("input",{type:"text",value:current.values[key]??"",placeholder,
@@ -106,7 +116,7 @@
     if(!buildInfo)return el("div",{class:"terraria-note"},"Checking native tModLoader build handoff…");
     const blockedByDirty=dirtyCount()>0;
     const reason=blockedByDirty
-      ?"Save or discard metadata edits before building."
+      ?"Save or discard edits before building."
       :(buildInfo.reason||"Ready to invoke tModLoader's native -build path.");
     const packageLabel=buildInfo.artifactExists?"Package built":"Package missing";
     const enabledLabel=!buildInfo.enabledStateValid
@@ -164,6 +174,47 @@
     return el("div",{class:"terraria-page"},...warnings(),panel,buildCard(),
       el("div",{class:"terraria-note"},"Strong and weak references must not repeat the same mod name. A strong mod reference also cannot duplicate a DLL reference. Version-qualified mod references use ModName@1.2 style syntax. Lexeditor reads tModLoader's local enabled state but does not rewrite enabled.json."));
   }
+  function localizationPanel(){
+    if(!localizationFiles.length){
+      return el("div",{class:"terraria-page"},...warnings(),
+        el("div",{class:"terraria-note"},"No .hjson localization files are present in this source project yet. tModLoader can generate localization entries after a local build/reload as content is added."));
+    }
+    const selectedPath=locCurrent?.path||localizationFiles[0].path;
+    const selector=el("select",{disabled:locLoading||localizationDirtyEntries().length>0,onchange:event=>loadLocalizationFile(event.target.value)});
+    for(const file of localizationFiles){
+      const label=`${file.culture||"ignored"} · ${file.path}${file.error?" · error":""}`;
+      const option=el("option",{value:file.path},label);option.selected=file.path===selectedPath;selector.append(option);
+    }
+    const toolbar=el("div",{class:"terraria-note terraria-localization-toolbar"},
+      el("strong",{},"Localization file"),selector,
+      locLoading?el("span",{},"Loading…"):el("span",{class:"terraria-status"},locCurrent?.culture||"NOT LOADABLE"));
+    if(!locCurrent){
+      return el("div",{class:"terraria-page"},...warnings(),toolbar,
+        el("div",{class:"terraria-note"},"Select a loadable localization file."));
+    }
+    const notes=[];
+    if(!locCurrent.loadable)notes.push(el("div",{class:"terraria-note terraria-error"},"tModLoader will ignore this file because its path does not identify a known culture."));
+    if(locCurrent.duplicates.length)notes.push(el("div",{class:"terraria-note terraria-error"},`Structured saving is disabled because effective localization keys repeat: ${locCurrent.duplicates.join(", ")}.`));
+    if(locCurrent.unsupported)notes.push(el("div",{class:"terraria-note"},`${locCurrent.unsupported} construct(s) are preservation-only in this first editor slice. Multiline strings, arrays, typed values and other complex HJSON remain read-only.`));
+    const rows=locCurrent.entries.map((entry,index)=>{
+      const control=entry.editable
+        ?el("input",{type:"text",value:entry.value,oninput:event=>{locCurrent.entries[index].value=event.target.value;shell?.refresh?.()}})
+        :el("div",{class:"terraria-readonly-value"},entry.value||`[${entry.kind}]`);
+      return el("tr",{},
+        el("td",{class:"terraria-localization-key"},entry.key),
+        el("td",{},control),
+        el("td",{},String(entry.line)),
+        el("td",{class:"terraria-status"},entry.editable?"EDITABLE":entry.kind));
+    });
+    const table=el("table",{class:"terraria-localization-table"},
+      el("thead",{},el("tr",{},...['KEY','VALUE','LINE','MODE'].map(label=>el("th",{},label)))),
+      el("tbody",{},...rows));
+    const meta=`${locCurrent.culture||"unknown culture"}${locCurrent.prefix?` · prefix ${locCurrent.prefix}`:""} · ${locCurrent.entries.length} flattened leaves`;
+    return el("div",{class:"terraria-page"},...warnings(),toolbar,...notes,
+      el("div",{class:"terraria-note"},meta),
+      locCurrent.entries.length?table:el("div",{class:"terraria-note"},"This localization file currently has no scalar leaf entries."),
+      el("div",{class:"terraria-note"},"Lexeditor edits only existing single-line string leaves. It preserves comments, object nesting, dotted source keys, whitespace, line endings and untouched HJSON verbatim; it does not reserialize the file."));
+  }
   function dataMapPanel(){
     const table=el("table",{class:"terraria-map"},
       el("thead",{},el("tr",{},...["PATH","FAMILY","COVERAGE"].map(label=>el("th",{},label)))),
@@ -173,32 +224,59 @@
       el("div",{class:"terraria-note"},"Structured means Lexeditor has a format-aware editor. Recognized means the file family is known but remains outside the current structured editing surface."),table);
   }
   function render(){
-    const content=tab==="datamap"?dataMapPanel():tab==="dependencies"?dependenciesPanel():metadataPanel();
+    const content=tab==="datamap"?dataMapPanel():tab==="localization"?localizationPanel():tab==="dependencies"?dependenciesPanel():metadataPanel();
     document.querySelector("#main").replaceChildren(content);
     shell?.refresh?.();
   }
+  async function loadLocalizationFile(path){
+    if(!path||localizationDirtyEntries().length)return;
+    locLoading=true;error="";render();
+    try{
+      const state=await request(`/api/localization/file?path=${encodeURIComponent(path)}`);
+      locSaved=clone(state);locCurrent=clone(state);
+    }catch(exc){locSaved=null;locCurrent=null;error=String(exc.message||exc)}
+    locLoading=false;render();
+  }
   async function load(){
     try{
-      const [metadata,map,build]=await Promise.all([
-        request("/api/build-metadata"),request("/api/data-map"),request("/api/build"),
+      const [metadata,map,build,localization]=await Promise.all([
+        request("/api/build-metadata"),request("/api/data-map"),request("/api/build"),request("/api/localization"),
       ]);
-      saved=clone(metadata);current=clone(metadata);mapRows=map.rows;buildInfo=build;error="";
+      saved=clone(metadata);current=clone(metadata);mapRows=map.rows;buildInfo=build;localizationFiles=localization.files;error="";
+      const first=localizationFiles.find(file=>!file.error)?.path;
+      if(first){
+        const state=await request(`/api/localization/file?path=${encodeURIComponent(first)}`);
+        locSaved=clone(state);locCurrent=clone(state);
+      }
     }catch(exc){error=String(exc.message||exc)}
     render();
   }
   async function save(){
-    if(!saved||!current||!dirtyCount())return;
-    const updates={};
-    for(const key of dirtyKeys()){
-      const value=current.values[key];
-      if(value===""&&!(key in saved.values))continue;
-      if(Array.isArray(value)&&!value.length&&!(key in saved.values))continue;
-      updates[key]=value;
-    }
-    if(!Object.keys(updates).length){saved=clone(current);shell?.refresh?.();return}
+    if(!dirtyCount())return;
+    error="";
     try{
-      const result=await request("/api/build-metadata",{method:"POST",body:JSON.stringify({updates,expectedSha256:saved.sha256})});
-      saved=clone(result);current=clone(result);error="";
+      if(saved&&current&&dirtyKeys().length){
+        const updates={};
+        for(const key of dirtyKeys()){
+          const value=current.values[key];
+          if(value===""&&!(key in saved.values))continue;
+          if(Array.isArray(value)&&!value.length&&!(key in saved.values))continue;
+          updates[key]=value;
+        }
+        if(Object.keys(updates).length){
+          const result=await request("/api/build-metadata",{method:"POST",body:JSON.stringify({updates,expectedSha256:saved.sha256})});
+          saved=clone(result);current=clone(result);
+        }else{
+          saved=clone(current);
+        }
+      }
+      const changedLocalization=localizationDirtyEntries();
+      if(locSaved&&locCurrent&&changedLocalization.length){
+        const updates={};
+        for(const entry of changedLocalization)updates[entry.key]=entry.value;
+        const result=await request("/api/localization/file",{method:"POST",body:JSON.stringify({path:locCurrent.path,updates,expectedSha256:locSaved.sha256})});
+        locSaved=clone(result);locCurrent=clone(result);
+      }
     }catch(exc){error=String(exc.message||exc)}
     render();
   }
@@ -215,12 +293,14 @@
       building=false;render();
     }
   }
-  async function discard(){current=clone(saved);error="";render()}
+  async function discard(){
+    current=clone(saved);locCurrent=clone(locSaved);error="";render();
+  }
   function navigate(value){tab=value;render()}
   const shell=LexeditorUI.mountShell({
     host:"#lexeditor-shell",brand:"LEXEDITOR",
     plugin:{id:"terraria",name:"Terraria",themeName:"terraria",theme:{accent:"#77b255"}},
-    tabs:[{id:"metadata",label:"Mod Metadata"},{id:"dependencies",label:"Dependencies & Build"}],activeTab:()=>tab,navigate,
+    tabs:[{id:"metadata",label:"Mod Metadata"},{id:"dependencies",label:"Dependencies & Build"},{id:"localization",label:"Localization"}],activeTab:()=>tab,navigate,
     help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Terraria Data Map",
     dirtyCount,readonly:()=>!current?.editable,save,discard,
   });
