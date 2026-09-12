@@ -207,7 +207,7 @@
     .encounter-slot-table .lex-source-control{--lex-reference-rail-width:1.4em;gap:2px}
     .encounter-slot-table .lex-source-control>input:not([type="checkbox"]){width:100%;min-width:0}
     .encounter-slot-table :is(.lex-column-list-header,.lex-column-list-row){grid-template-columns:minmax(150px,1.2fr) repeat(3,minmax(95px,.8fr)) minmax(120px,1fr) repeat(4,minmax(75px,.7fr))!important}
-    .magic-detail{max-height:calc(100vh - 180px)!important;overflow-y:auto!important}
+    .magic-detail{height:100%;max-height:100%!important;overflow:hidden!important}
     .character-detail>.field-groups{grid-template-columns:1fr}.character-stat-growth{margin-top:20px!important}.character-stat-growth>.lex-detail-section-content{padding:14px 10px 10px}.character-curve-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(520px,1fr));gap:10px}.ff8-character-curve{border:0;background:transparent}.ff8-character-curve:not(.ff8-enemy-curve){grid-template-columns:minmax(0,1fr) minmax(150px,16%)}.ff8-character-curve .lex-curve-heading h4{display:flex;min-width:0;align-items:baseline;gap:.35em;flex-wrap:wrap;color:#fff;font-size:22px}.ff8-character-curve .lex-curve-heading-formula{margin:0;color:#e1e1e1;font-size:14px}.ff8-character-curve .lex-curve-heading h4 output{color:#fff;font:inherit;font-variant-numeric:tabular-nums}.ff8-character-curve .lex-curve-extrema{color:#d0d0d0}.ff8-character-curve .lex-curve-extrema output{color:#fff}.ff8-character-curve .lex-curve-svg{border:2px solid;border-color:#292929 #a5a5a5 #a5a5a5 #292929;background:#303030}.ff8-character-curve .lex-curve-grid-lines{stroke:#ffffff25}.ff8-character-curve .lex-curve-line{stroke:#fff;filter:drop-shadow(2px 2px #222)}.ff8-character-curve .lex-curve-fill{fill:#aa243266}.ff8-character-curve .lex-curve-variable>span{color:#e0e0e0}.ff8-character-curve .lex-curve-variable :is(input,.lex-source-control){min-width:0}.ff8-character-curve .lex-curve-variable input{width:100%;min-height:32px;padding:4px 7px;color:#fff;border:2px solid;border-color:#292929 #a5a5a5 #a5a5a5 #292929;background:#3b3b3b}.ff8-character-curve .lex-curve-formula{display:none}.ff8-character-curve .lex-curve-status{color:#ffb0aa}.ff8-character-curve .lex-source-control{--lex-reference-rail-width:2.35em;gap:4px;min-width:0}.ff8-character-curve .lex-reference-text{font-size:12px}.enemy-scan-section textarea{display:block;min-height:132px;resize:vertical;padding:9px 11px;color:#fff;border:2px solid;border-color:#292929 #a5a5a5 #a5a5a5 #292929;background:#3b3b3b;font:inherit;line-height:1.35}.enemy-scan-section .lex-source-control{align-items:start}@media(max-width:1120px){.character-curve-grid{grid-template-columns:1fr}}
     .kernel-text-editor textarea{display:block;width:100%;min-height:180px;resize:vertical;padding:9px 11px;color:#fff;border:2px solid;border-color:#292929 #a5a5a5 #a5a5a5 #292929;background:#3b3b3b;font:inherit;line-height:1.35}.kernel-text-editor .lex-source-control{align-items:start}
     .lex-column-list-cell :is(.ff8-item-search,.ff8-entity-search){width:100%;min-width:0;height:100%;min-height:0;padding:0;border:0!important;background:transparent!important;box-shadow:none!important;text-shadow:inherit}
@@ -1021,7 +1021,10 @@
     .world-map-marker{z-index:5;pointer-events:auto;cursor:pointer;width:10px;height:10px;min-width:0;min-height:0;padding:0}
     .world-map-marker:hover,.world-map-marker:focus-visible{outline:2px solid white}
     .world-map-help{position:absolute;z-index:6;top:8px;right:8px}
-</style>
+.magic-detail > .lex-detail-panel-body{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+    .magic-detail-tabs{flex:1;min-height:0;height:100%}
+    .magic-detail-tabs > .lex-tabbed-panel-content{overflow:auto}
+  </style>
 </head>
 <body>
   <header id="lexeditor-shell"></header>
@@ -1226,7 +1229,7 @@
       detailField({label:"J-STATUS (DEFENSE)",control:magicComposite(take("j_status_defense_value"),take("j_status_defend"),row.id)}),
     ];
     const compat=row.fields.filter(field=>field.group==="GF Compatibility");compat.forEach(field=>used.add(field.field));
-    const body=[detailSection({title:"GENERAL",body:generalRows}),detailSection({title:"JUNCTIONING",body:junctionRows})];
+    const body=tabbedPanel({className:"magic-detail-tabs",tabs:[{id:"attack",label:"Attack Data",help:"Change what this spell does when cast: damage, targets, elements, and status effects."},{id:"junction",label:"Junction",help:"Change the stat bonuses and attack or defence effects granted when this spell is junctioned."}],active:state.magicDetailTab||"attack",label:"Magic details",change:value=>{state.magicDetailTab=value;renderKernel("magic","Magic")},content:state.magicDetailTab==="junction"?junctionRows:generalRows});
     const detail=sharedDetail({...row,titleContent:magicLabel(row)},prefs,body,"magic-detail");
     return detail;
   }

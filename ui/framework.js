@@ -3509,6 +3509,7 @@ ${contents.path}`});
         {key:"hoverableAltClick", scope:"user", title:"Alt + Click hoverable linking", description:"When enabled, ordinary clicks do not follow linked record mentions. Alt+Click opens them.", type:"checkbox"},
         {key:"selectionHoldMs", scope:"user", title:"Searcher hold time", description:"How long a record must be held before a Searcher selects it.", type:"number", min:150, max:2000, step:50, unit:"ms"},
         {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"checkbox"},
+        {key:"panelTabTarget", scope:"user", title:"Tab key panel", description:"Tab opens the next panel tab. Shift+Tab opens the previous tab. Choose the panel under the mouse or the panel with keyboard focus.", type:"select", choices:[{value:"hover",label:"Hovered panel"},{value:"focus",label:"Focused panel"}]},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
         {key:"pagerBarHeight", scope:"user", title:"Pagination bar height", description:"How tall the bar along the bottom of a table page is. One height on every page, whether or not that page's bar carries a search box.", type:"number", min:36, max:80, step:1, unit:"px"},
@@ -4862,26 +4863,45 @@ ${contents.path}`});
       node.classList.toggle("lex-column-lit", lit);
     }
   };
-  // Tab is a property-level move inside a detail pane. Stepping through every
-  // focusable control in a row makes a long pane unusable with the keyboard.
-  const propertyTabNavigation = event => {
-    if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
-    const field = event.target?.closest?.(".lex-detail-field");
-    if (!field) return;
-    const pane = field.closest(".lex-detail-panel-body") || field.closest(".lex-detail");
-    if (!pane) return;
-    const fields = [...pane.querySelectorAll(".lex-detail-field")];
-    const index = fields.indexOf(field);
-    const next = fields[index + (event.shiftKey ? -1 : 1)];
-    if (!next) return;
-    const target = next.querySelector(
-      "input:not([type='hidden']):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]):not([tabindex='-1'])");
-    if (!target) return;
-    event.preventDefault();
-    target.focus();
-    target.select?.();
+  // Apply the same bottom placement to plugin panels built with subtabBar.
+  const bottomPanelTabs = () => {
+    for (const bar of document.querySelectorAll('.lex-subtab-bar:not([hidden])')) {
+      const parent = bar.parentElement;
+      if (!parent || parent.children.length < 2 || parent.closest('.lex-shell-header,[role="dialog"]')) continue;
+      if (parent.matches('.lex-tabbed-panel,.lex-settings-columns')) continue;
+      parent.classList.add('lex-bottom-tab-panel');
+    }
   };
-  document.addEventListener("keydown", propertyTabNavigation);
+  new MutationObserver(bottomPanelTabs).observe(document.documentElement,{childList:true,subtree:true});
+  let panelTabTarget = sharedSettings()?.panelTabTarget || "hover";
+  window.addEventListener("lexeditor-settings-ready",event=>{panelTabTarget=event.detail?.panelTabTarget||"hover"});
+  let panelPointer = null;
+  document.addEventListener("pointermove", event => { panelPointer = {x:event.clientX,y:event.clientY}; }, true);
+  const panelTabNavigation = event => {
+    if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return;
+    // Dialog controls retain normal keyboard navigation.
+    if (event.target?.closest?.('[role="dialog"],.lex-dialog-backdrop')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    let node = panelTabTarget === "focus" ? document.activeElement
+      : panelPointer ? document.elementFromPoint(panelPointer.x,panelPointer.y) : null;
+    for (; node && node !== document.body; node = node.parentElement) {
+      const bar = node.matches?.('.lex-subtab-bar') ? node : node.querySelector?.(':scope > .lex-subtab-bar:not([hidden])');
+      if (!bar) continue;
+      const tabs = [...bar.querySelectorAll(':scope > [role="tab"]:not([disabled])')];
+      if (tabs.length < 2) continue;
+      const index = Math.max(0,tabs.findIndex(tab=>tab.getAttribute('aria-selected')==='true'));
+      const label = bar.getAttribute("aria-label");
+      const next = (index + (event.shiftKey ? -1 : 1) + tabs.length) % tabs.length;
+      tabs[next].click();
+      if (panelTabTarget === "focus") requestAnimationFrame(()=>{
+        const replacement=[...document.querySelectorAll('.lex-subtab-bar')].find(value=>value.getAttribute('aria-label')===label);
+        replacement?.querySelector('[aria-selected="true"]')?.focus({preventScroll:true});
+      });
+      return;
+    }
+  };
+  document.addEventListener("keydown", panelTabNavigation, true);
 
   // The rail doubles as the sort indicator when its row is not hovered.
   const setColumnSort = (key, direction) => {

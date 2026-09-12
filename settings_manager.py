@@ -25,6 +25,7 @@ DEFAULTS = {
     "pageWrapAround": True,
     "selectionHoldMs": 650,
     "tableRowsPerPage": 15,
+    "panelTabTarget": "hover",
     "panelGapPercent": 1.0,
     "residentHandleWidthPercent": 5.0,
     "mainMenuHeightPercent": 9.0,
@@ -138,6 +139,7 @@ class SettingsStore:
         return {
             "updateCheckFrequency": frequency,
             "hoverableAltClick": payload.get("hoverableAltClick", defaults["hoverableAltClick"]) is True,
+            "panelTabTarget": "focus" if payload.get("panelTabTarget", defaults["panelTabTarget"]) == "focus" else "hover",
             "pageWrapAround": payload.get("pageWrapAround", defaults["pageWrapAround"]) is not False,
             "selectionHoldMs": max(150, min(2000, selection_hold_ms)),
             "tableRowsPerPage": max(5, min(40, table_rows_per_page)),
@@ -182,11 +184,16 @@ class SettingsStore:
              main_menu_height_percent: float | None = None,
              sound_enabled: bool | None = None,
              sound_volume_percent: float | None = None,
-             page_wrap_around: bool | None = None) -> dict:
+             page_wrap_around: bool | None = None,
+             panel_tab_target: str | None = None) -> dict:
         """Save per-user preferences. Authenticated authoring state is never persisted."""
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
         current = self.snapshot()
+        if panel_tab_target is None:
+            panel_tab_target = current["panelTabTarget"]
+        if panel_tab_target not in ("hover", "focus"):
+            raise ValueError("Choose hovered or focused panel")
         if hoverable_alt_click is None:
             hoverable_alt_click = current["hoverableAltClick"]
         if page_wrap_around is None:
@@ -212,6 +219,7 @@ class SettingsStore:
                 "updateCheckFrequency": update_check_frequency,
                 "hoverableAltClick": bool(hoverable_alt_click),
                 "pageWrapAround": bool(page_wrap_around),
+                "panelTabTarget": panel_tab_target,
                 "selectionHoldMs": selection_hold_ms,
                 "tableRowsPerPage": table_rows_per_page,
                 "panelGapPercent": panel_gap_percent,
@@ -240,6 +248,7 @@ class SettingsStore:
             "updateCheckFrequency": frequency,
             "hoverableAltClick": bool(current["hoverableAltClick"]),
             "pageWrapAround": bool(current["pageWrapAround"]),
+            "panelTabTarget": "focus" if current["panelTabTarget"] == "focus" else "hover",
             "selectionHoldMs": max(150, min(2000, int(current["selectionHoldMs"]))),
             "tableRowsPerPage": max(5, min(40, int(current["tableRowsPerPage"]))),
             "panelGapPercent": max(0.25, min(4.0, float(current["panelGapPercent"]))),

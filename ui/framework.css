@@ -6107,3 +6107,11 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   top:2px!important;
   right:28px!important;
 }
+
+/* Panel tabs occupy the bottom edge. Page navigation stays in the shell. */
+.lex-tabbed-panel > .lex-subtab-bar,
+.lex-settings-columns > .lex-subtab-bar { order:100; margin-top:auto; margin-bottom:0; }
+.lex-bottom-tab-panel { display:flex!important;flex-direction:column!important;min-height:0; }
+.lex-bottom-tab-panel > .lex-subtab-bar { order:100;flex:0 0 auto;margin-top:auto; }
+.lex-bottom-tab-panel > :not(.lex-subtab-bar) { min-height:0; }
+.lex-bottom-tab-panel > :not(.lex-subtab-bar):last-child { flex:1;overflow:auto; }

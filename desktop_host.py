@@ -579,6 +579,7 @@ class HostApi:
             None if "soundEnabled" not in payload else bool(payload["soundEnabled"]),
             payload.get("soundVolumePercent"),
             None if "pageWrapAround" not in payload else bool(payload["pageWrapAround"]),
+            payload.get("panelTabTarget"),
         )
         return self.lexeditor_settings()
 
