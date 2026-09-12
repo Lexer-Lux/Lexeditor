@@ -12,7 +12,7 @@ permissions:
 jobs:
   patch:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,25 +23,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Correct harness quoting
-        run: python tools/temp_fix_bannerlord_source_dialog_hardening.py
-      - name: Apply hardening patch
-        run: python tools/temp_bannerlord_source_dialog_hardening.py
-      - name: Correct source encoding preservation
-        run: python tools/temp_bannerlord_source_encoding_fix.py
+      - name: Apply Windows source fidelity fix
+        run: python tools/temp_bannerlord_source_windows_fix.py
       - name: Focused validation
         run: |
-          python -m py_compile games/bannerlord/project_data.py games/bannerlord/server.py tests/test_bannerlord_source_safety.py
+          python -m py_compile games/bannerlord/project_data.py tests/test_bannerlord_source_safety.py tests/test_bannerlord_plugin.py
           python -m unittest tests.test_bannerlord_source_safety tests.test_bannerlord_ui_contract -v
           python tools/verify_shared_ui_contract.py
           python -c "import glob, subprocess; [subprocess.run(['node','--check',path], check=True) for path in glob.glob('games/bannerlord/editor*.js')]"
           git diff --check
-      - name: Commit hardening
+      - name: Commit source fidelity fix
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add games/bannerlord/project_data.py games/bannerlord/server.py games/bannerlord/editor_core.js games/bannerlord/editor_boot.js games/bannerlord/editor_gauntlet.js games/bannerlord/editor_moduledata.js tools/verify_shared_ui_contract.py tests/test_bannerlord_source_safety.py tests/bannerlord_browser_check.py
-          git commit -m "Harden Bannerlord source saves and dialogs"
+          git add games/bannerlord/project_data.py tests/test_bannerlord_plugin.py
+          git commit -m "Preserve Bannerlord raw source bytes"
           git push origin HEAD:feature/bannerlord-plugin
 
   regression:
@@ -111,6 +107,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/temp-bannerlord-source-dialog-hardening.yml tools/temp_bannerlord_source_dialog_hardening.py tools/temp_fix_bannerlord_source_dialog_hardening.py tools/temp_bannerlord_source_encoding_fix.py
+          git rm .github/workflows/temp-bannerlord-source-dialog-hardening.yml tools/temp_bannerlord_source_dialog_hardening.py tools/temp_fix_bannerlord_source_dialog_hardening.py tools/temp_bannerlord_source_encoding_fix.py tools/temp_bannerlord_source_windows_fix.py
           git commit -m "Clean Bannerlord source hardening harness"
           git push origin HEAD:feature/bannerlord-plugin
