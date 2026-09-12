@@ -28,7 +28,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     // No white slabs, no black text on them and no drop shadows. Every colour
     // here is the plugin's own theme token or the card's own blue.
     style.textContent = `
-      .ff8-card-root{display:grid;grid-template-rows:auto minmax(0,1fr);min-height:0;height:100%}
+      .ff8-card-root{display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:var(--lex-panel-gap);min-height:0;height:100%}
       .ff8-card-root > .lex-subtab-bar{margin:0}
 
       /* One row: the card on the left, everything you can change on its right.

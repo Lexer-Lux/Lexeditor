@@ -41,6 +41,11 @@ def main():
   boxes=page.locator('.ff8-card-preview').evaluate('e=>{const a=e.getBoundingClientRect(),b=e.querySelector(":scope > img").getBoundingClientRect();return [a.width-b.width,a.height-b.height,getComputedStyle(e).borderWidth]}')
   assert boxes==[0,0,'0px'],boxes
   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-card-preview.png'))
+  page.evaluate("""()=>{const root=document.createElement('div');root.className='ff8-card-root';root.style.height='300px';root.innerHTML='<div class="lex-subtab-bar" style="height:30px">Cards / Players</div><div class="panels">Panels</div>';document.body.append(root)}""")
+  for gap in (5,16,24):
+   actual=page.evaluate("""gap=>{document.documentElement.style.setProperty('--lex-panel-gap',gap+'px');const root=document.querySelector('.ff8-card-root');return root.lastElementChild.getBoundingClientRect().top-root.firstElementChild.getBoundingClientRect().bottom}""",gap)
+   assert abs(actual-gap)<1,(actual,gap)
+
   browser.close()
   print('Card artwork bounds, empty hover, single-click icon choices, Holy=128, and removal passed.')
 if __name__=='__main__':main()
