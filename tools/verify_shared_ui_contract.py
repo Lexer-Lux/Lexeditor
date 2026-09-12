@@ -108,14 +108,12 @@ require(blank.count("columnList({") >= 1,
 require(not (ROOT / "ui/design-review.js").exists() and not (ROOT / "ui/design-review.css").exists(),
         "Design Review implementation files still exist")
 
-# The shared model-preview drawer remains a reusable Detail capability, but the
-# Warband Items detail is now the actual record editor rather than a preview
-# surface. Do not regress it back into a model viewer just because the shared
-# framework still supports model previews elsewhere.
+# Warband keeps editable properties in Detail and opens models through the
+# shared drawer. The optional viewer must not replace the record fields.
 require("modelPreview" in framework and "lex-model-preview-drawer" in framework,
         "shared Detail-panel model preview drawer is missing")
-require("modelPreview:" not in warband and "Open model preview" not in warband,
-        "Warband Items regressed back to a model-preview detail pane")
+require("modelPreview:item.inventoryMesh?" in warband and "body:[core,source]" in warband,
+        "Warband Items must keep its fields alongside the optional shared model drawer")
 require("detailField" in warband and "/api/items/save" in warband,
         "Warband Items is not using structured editable Detail properties")
 require("warband-item-preview-action" not in warband,
