@@ -3497,8 +3497,9 @@ body:has(.lex-data-map-table) #main {
 .lex-settings-lane-user>h3,
 .lex-settings-lane-lexer>h3 { grid-column:1 / -1; }
 
-.lex-settings-lane-lexer {
-  grid-template-columns:repeat(2,minmax(200px,1fr));
+.lex-settings-lane-lexer,
+.lex-settings-lane-developer {
+  grid-template-columns:repeat(2,minmax(0,1fr));
 }
 
 .lex-settings-lane {
@@ -3528,6 +3529,7 @@ body:has(.lex-data-map-table) #main {
 }
 
 .lex-global-setting {
+  min-width:0;
   margin-top: 0;
   padding: 10px;
   border: 1px solid var(--lex-border);
@@ -5180,14 +5182,14 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 /* One scrolling settings page in as many columns as the window allows. CSS
    columns rather than a resize observer rebuilding lanes: a section never
    splits across a boundary, and the count follows the panel with no script. */
-.lex-settings-columns {
+.lex-tweaks-columns {
   columns:var(--lex-settings-column-width,30em);
   column-gap:var(--lex-panel-gap,10px);
   height:100%;
   padding:0;
   overflow-y:auto;
 }
-.lex-settings-columns > * {
+.lex-tweaks-columns > * {
   break-inside:avoid;
   margin:0 0 var(--lex-panel-gap,10px);
 }
@@ -5196,7 +5198,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 /* A settings column is narrow and its property names are long, so the tenth of
    the row that a wide Detail panel gives a label is not enough here: it wrapped
    "Resident Parameter ID" into three lines. */
-.lex-settings-columns { --lex-detail-label-width:minmax(min(9em,34%),30%); }
+.lex-tweaks-columns { --lex-detail-label-width:minmax(min(9em,34%),30%); }
 
 
 /* LEXEDITOR_NESTED_SETTINGS_SECTION_20260910 */
@@ -6019,7 +6021,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 /* The shared Tweaks layout, in RDR2's shape with none of RDR2's styling: real
    columns dealt by the framework, so a card is never cut in half across a
    column break the way CSS columns do it. */
-.lex-settings-lane {
+.lex-tweaks-columns > .lex-settings-lane {
   display:grid;
   grid-auto-flow:column;
   grid-auto-columns:minmax(0,1fr);
@@ -6034,7 +6036,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   gap:var(--lex-panel-gap, 12px);
   min-width:0;
 }
-.lex-settings-columns:has(> .lex-settings-lane) {
+.lex-tweaks-columns:has(> .lex-settings-lane) {
   display:block;
   column-count:auto;
 }
@@ -6078,3 +6080,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-ui-scale {display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;margin:0 7px 0 0;color:var(--lex-text);font:12px/1 system-ui,sans-serif;text-shadow:none;}
 .lex-ui-scale input[type="range"] {width:64px;min-width:0;max-width:64px;height:18px;min-height:0;margin:0;padding:0;accent-color:var(--lex-accent);border:0;box-shadow:none;}
 .lex-ui-scale output {width:4ch;padding:0;border:0;background:transparent;color:inherit;font:inherit;text-align:right;}
+
+@media (max-width:700px) {
+  .lex-global-settings .lex-settings-lane {grid-template-columns:minmax(0,1fr);}
+}

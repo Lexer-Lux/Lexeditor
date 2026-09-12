@@ -2383,7 +2383,7 @@
   const settingsColumns = (sections, options = {}) => {
     const lane = element("div", {class: "lex-settings-lane"});
     const root = element("div", {
-      class: ["lex-settings-columns", options.className || ""].filter(Boolean).join(" "),
+      class: ["lex-settings-columns", "lex-tweaks-columns", options.className || ""].filter(Boolean).join(" "),
     }, (options.tabs || []).length > 1 ? subtabBar({
       tabs: options.tabs,
       active: options.activeTab,
@@ -3480,7 +3480,7 @@ ${contents.path}`});
         {key:"updateCheckFrequency", scope:"user", title:"Update check frequency", description:"Used by LEXEDITOR and managed helpers such as FFNx.", type:"select", choices:settings.updateCheckChoices || []},
         {key:"hoverableAltClick", scope:"user", title:"Alt + Click hoverable linking", description:"When enabled, ordinary clicks do not follow linked record mentions. Alt+Click opens them.", type:"checkbox"},
         {key:"selectionHoldMs", scope:"user", title:"Searcher hold time", description:"How long a record must be held before a Searcher selects it.", type:"number", min:150, max:2000, step:50, unit:"ms"},
-        {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"boolean"},
+        {key:"pageWrapAround", scope:"user", title:"Wrap around at the ends", description:"Paging past the last page returns to the first, and paging back from the first goes to the last.", type:"checkbox"},
         {key:"tableRowsPerPage", scope:"user", title:"Table rows per page", description:"A full table page stretches this many rows to use the exact available panel height.", type:"number", min:5, max:40, step:1},
         {key:"panelGapPercent", scope:"user", title:"Panel spacing", description:"The same responsive gap surrounds panels and separates adjacent panels.", type:"number", min:.25, max:4, step:.05, unit:"%"},
         {key:"pagerBarHeight", scope:"user", title:"Pagination bar height", description:"How tall the bar along the bottom of a table page is. One height on every page, whether or not that page's bar carries a search box.", type:"number", min:36, max:80, step:1, unit:"px"},
