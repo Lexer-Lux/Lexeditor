@@ -3,22 +3,22 @@ from pathlib import Path
 
 path = Path("tests/bannerlord_browser_check.py")
 text = path.read_text(encoding="utf-8")
-old = '''    if(path==="/api/module-data/save")return new Response(JSON.stringify(__moduleDataFixed),{status:200});
-    if(path==="/api/gauntlet/save")return new Response(JSON.stringify(__gauntlet),{status:200});
+old = '''    if(path==="/api/module-data/save")return new Response(JSON.stringify(__moduleDataFixed),{{status:200}});
+    if(path==="/api/gauntlet/save")return new Response(JSON.stringify(__gauntlet),{{status:200}});
 '''
-new = '''    if(path==="/api/module/save"){
-      const current=__fixtures["/api/module"],metadata=body.metadata||{};
-      const module={...current,...metadata,
+new = '''    if(path==="/api/module/save"){{
+      const current=__fixtures["/api/module"],metadata=body.metadata||{{}};
+      const module={{...current,...metadata,
         dependencies:body.dependencies??current.dependencies,
         communityDependencies:body.communityDependencies??current.communityDependencies,
         legacyDependencies:body.legacyDependencies??current.legacyDependencies,
         modulesToLoadAfterThis:body.modulesToLoadAfterThis??current.modulesToLoadAfterThis,
         incompatibleModules:body.incompatibleModules??current.incompatibleModules,
-        submodules:body.submodules??current.submodules,xmls:body.xmls??current.xmls};
-      return new Response(JSON.stringify({saved:1,module}),{status:200});
-    }
-    if(path==="/api/module-data/save")return new Response(JSON.stringify(__moduleDataFixed),{status:200});
-    if(path==="/api/gauntlet/save")return new Response(JSON.stringify(__gauntlet),{status:200});
+        submodules:body.submodules??current.submodules,xmls:body.xmls??current.xmls}};
+      return new Response(JSON.stringify({{saved:1,module}}),{{status:200}});
+    }}
+    if(path==="/api/module-data/save")return new Response(JSON.stringify(__moduleDataFixed),{{status:200}});
+    if(path==="/api/gauntlet/save")return new Response(JSON.stringify(__gauntlet),{{status:200}});
 '''
 if text.count(old) != 1:
     raise SystemExit(f"Expected one POST fixture insertion point, found {text.count(old)}")
