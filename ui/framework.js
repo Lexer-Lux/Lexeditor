@@ -6487,6 +6487,7 @@ ${contents.path}`});
       return true;
     };
     const refresh = () => {
+      root.classList.toggle("lex-value-modified", options.vanilla !== undefined && !(options.same || ((a,b)=>JSON.stringify(a)===JSON.stringify(b)))(currentValue(),options.vanilla));
       root.querySelector(":scope > :is(.lex-reference-values,.lex-reference-placeholder)")?.remove();
       const reference = referenceDisplay({
         current: currentValue(), sources, format: options.format, same: options.same,

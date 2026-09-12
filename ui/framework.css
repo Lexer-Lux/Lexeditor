@@ -6022,3 +6022,7 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-hoverable { max-width:100%; }
 .lex-hoverable-label { display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
 .lex-hoverable > :is(img,svg) { flex-shrink:0; }
+
+.lex-value-modified > :is(input,select,textarea,output),
+.lex-value-modified > .lex-unit-field > :is(input,select,output),
+.lex-value-modified > :not(.lex-reference-values):not(.lex-reference-placeholder) .lex-hoverable { color:var(--lex-accent)!important; }
