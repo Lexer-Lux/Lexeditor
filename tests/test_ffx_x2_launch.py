@@ -72,3 +72,33 @@ def test_non_windows_launch_refuses_before_spawning(tmp_path: Path):
     root = _installation(tmp_path)
     with pytest.raises(launch.LaunchError, match="only on Windows"):
         launch.launch(root, "x")
+
+
+def test_windows_launch_uses_no_console_creation_flag(monkeypatch: pytest.MonkeyPatch):
+    argv = [r"C:\Fixture\fahrenheit\bin\fhstage0.exe", r"..\..\FFX.exe"]
+    cwd = Path(r"C:\Fixture\fahrenheit\bin")
+    captured = {}
+
+    class Process:
+        pid = 4321
+
+    monkeypatch.setattr(launch.os, "name", "nt")
+    monkeypatch.setattr(launch, "command", lambda _root, _game: (argv, cwd))
+    monkeypatch.setattr(launch.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+
+    def fake_popen(args, **kwargs):
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return Process()
+
+    monkeypatch.setattr(launch.subprocess, "Popen", fake_popen)
+    result = launch.launch(Path("fixture"), "x")
+
+    assert captured["args"] == argv
+    assert captured["kwargs"] == {
+        "cwd": str(cwd),
+        "close_fds": True,
+        "creationflags": 0x08000000,
+    }
+    assert result["pid"] == 4321
+    assert result["target"] == "FFX.exe"
