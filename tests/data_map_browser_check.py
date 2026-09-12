@@ -25,6 +25,10 @@ ROWS=[{'id':str(i),'filename':f'file-{i:03}.dat','controls':f'Interface {i:03}',
        'status':'partial' if i%4<3 else 'not-integrated', 'notes':('Long scoped explanation. '*40),
        'target':'items','dataset':'fixture-data','datasetKey':'fixture-data','openable':i%4<3} for i in range(100)]
 ROWS[0]['filename']='same-file.dat';ROWS[4]['filename']='same-file.dat'  # IDs must not collapse sections.
+# The fixture should exercise each plugin's real navigation adapter, not force a
+# made-up universal tab name. Stardew's first slice is Data/Objects; the older
+# editors used by this sweep route their synthetic row through Items.
+OPEN_TARGETS={'stardew_valley':'objects'}
 
 def html_for(game):
     source_game='ff7' if game=='ff7_2013' else game
@@ -64,6 +68,8 @@ with sync_playwright() as p:
                 page.set_content(html_for(game),wait_until='domcontentloaded')
                 if page.evaluate('typeof state') == 'undefined' and game not in ('blank','palworld'):
                     raise AssertionError((game,width,height,'plugin state missing',errors,page.locator('body').inner_text()[:1200]))
+                target=OPEN_TARGETS.get(game,'items')
+                fixture_rows=[{**row,'target':target} for row in ROWS]
                 if game=='blank':
                     page.evaluate('navigate("datamap")')
                 elif game=='palworld':
@@ -78,7 +84,7 @@ with sync_playwright() as p:
                       mapRows=rows;info={project:'fixture'};
                       model={ModName:'Fixture',PackageName:'Fixture',Version:'1',Author:'Fixture',Dependencies:[],Tags:[],InstallRule:[]};
                       savedModel=clone(model);tab='datamap';render();
-                    }''',ROWS)
+                    }''',fixture_rows)
                 else:
                     page.evaluate('''rows=>{
                       const mapPayload={rows};
@@ -91,7 +97,7 @@ with sync_playwright() as p:
                       if(typeof state.data!=="object" || !state.data)state.data={};
                       if(typeof state.config!=="undefined")state.config={datasets:{mine:{readonly:false,label:"My Mod"}}};
                       navigate("datamap");
-                    }''',ROWS)
+                    }''',fixture_rows)
                 page.wait_for_selector('.lex-data-map-table, .ct-view table')
                 page.wait_for_timeout(600)
                 shared=page.locator('.lex-data-map-table').count()>0
@@ -102,10 +108,10 @@ with sync_playwright() as p:
                     # rather than pretending it has shared filter controls.
                     assert game=='chrono_trigger',(game,'unexpected bespoke Data Map')
                     table=page.locator('.ct-view table').first
-                    assert table.locator('tbody tr').count()==len(ROWS),(game,'fixture rows missing')
+                    assert table.locator('tbody tr').count()==len(fixture_rows),(game,'fixture rows missing')
                     page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
                     table.locator('tbody tr').first.click()
-                    assert page.evaluate('mapOpened.target')=='items',game
+                    assert page.evaluate('mapOpened.target')==target,game
                     page.screenshot(path=str(OUT/f'{game}-{width}.png'),full_page=True)
                     assert not errors,(game,errors)
                     results.append({'game':game,'width':width,'height':height,'layout':'plugin-native','status':'passed'})
@@ -148,7 +154,7 @@ with sync_playwright() as p:
                     if page.locator('.lex-data-map-open').count():
                         page.evaluate('navigate=(target,filters)=>{window.mapOpened={target,filters}}')
                         page.locator('.lex-data-map-open').first.click()
-                        assert page.evaluate('mapOpened.target')=='items',game
+                        assert page.evaluate('mapOpened.target')==target,game
                         if game=='ff9':assert page.evaluate('state.datasetChoice.items')=='fixture-data'
                     else:
                         assert game=='palworld',(game,'openable fixture rows lost their navigation adapter')
