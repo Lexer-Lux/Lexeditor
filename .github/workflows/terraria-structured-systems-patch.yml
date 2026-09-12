@@ -1,5 +1,5 @@
 name: Integrate Terraria structured systems editors
-# retry after raw-string escape repair
+# retry after structural patch repair
 
 on:
   push:
