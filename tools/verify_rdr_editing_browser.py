@@ -56,6 +56,12 @@ def main():
                     page.evaluate('navigate("items")')
                     page.locator('.item-detail input[type=number]').first.fill('9')
                     page.evaluate('navigate("missions")')
+                    # Navigation intentionally preserves "no selection" until a
+                    # row is chosen. Select the first synthetic mission before
+                    # testing the invalid-number save preflight; otherwise this
+                    # waits forever on an empty detail panel instead of testing
+                    # validation at all.
+                    page.evaluate('state.missionSelected=state.missions.missions[0].id;renderMissions()')
                     page.locator('.mission-detail input[type=number]').first.fill('')
                     requests = []
                     page.on('request', lambda request: requests.append(request.url) if request.method == 'POST' else None)
