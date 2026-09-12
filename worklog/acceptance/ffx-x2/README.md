@@ -26,6 +26,16 @@ The recommended shortcut runs that strict command and writes the report directly
 
 Use the actual Steam library path if different. `run-verifier.ps1` writes `worklog/acceptance/ffx-x2/install-verification.json` by default and exits with an error unless the report has the expected contract and `acceptanceReady: true`. `--hash-archives` deliberately reads the complete large VBF files, so it is optional during ordinary development but required for the draft-exit baseline.
 
+For automatic before/after immutability proof, keep the baseline and current report separate:
+
+```powershell
+.\worklog\acceptance\ffx-x2\run-verifier.ps1 -GameRoot "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" -OutputPath ".\worklog\acceptance\ffx-x2\baseline.json"
+
+.\worklog\acceptance\ffx-x2\run-verifier.ps1 -GameRoot "D:\SteamLibrary\steamapps\common\FINAL FANTASY FFX&FFX-2 HD Remaster" -BaselinePath ".\worklog\acceptance\ffx-x2\baseline.json" -OutputPath ".\worklog\acceptance\ffx-x2\after.json"
+```
+
+The second command fails if either installed VBF's header MD5 or full SHA-256 differs from the baseline. It also refuses to use the same path for baseline and output, so the baseline cannot be overwritten accidentally.
+
 `verificationPassed` describes the requested verifier invocation; ordinary read-only verification can pass without full archive hashing. `acceptanceReady` is deliberately stricter: it requires validated structured/archive coverage, full SHA-256 values for both installed VBFs, and ready Fahrenheit Stage 0/Stage 1 plus both fixed game executables.
 
 Acceptance requirements:
