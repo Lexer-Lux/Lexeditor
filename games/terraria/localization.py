@@ -189,6 +189,7 @@ def parse_localization_text(text: str, prefix: str = "") -> LocalizationDocument
     multiline_lines: list[str] = []
     pending_key: tuple[str, int] | None = None
     complex_depth = 0
+    explicit_root = False
 
     for index, line in enumerate(lines):
         body, _ending = _line_ending(line)
@@ -211,6 +212,7 @@ def parse_localization_text(text: str, prefix: str = "") -> LocalizationDocument
                 ))
                 multiline_key = None
                 multiline_lines = []
+                unsupported += 1
             else:
                 multiline_lines.append(body)
             continue
@@ -234,10 +236,15 @@ def parse_localization_text(text: str, prefix: str = "") -> LocalizationDocument
             pending_key = None
 
         structural = _without_comment(stripped)
+        if structural == "{" and not stack and not explicit_root:
+            explicit_root = True
+            continue
         if structural and set(structural) <= {"}"}:
             for _ in structural:
                 if stack:
                     stack.pop()
+                elif explicit_root:
+                    explicit_root = False
                 else:
                     unsupported += 1
             continue
@@ -281,6 +288,10 @@ def parse_localization_text(text: str, prefix: str = "") -> LocalizationDocument
                 - structural_rhs.count("]") - structural_rhs.count("}"),
             )
             unsupported += 1
+            continue
+        if structural_rhs == "'''":
+            multiline_key = (source_key, index + 1)
+            multiline_lines = []
             continue
         if structural_rhs.startswith("'''"):
             entries.append(LocalizationEntry(
@@ -330,7 +341,7 @@ def parse_localization_text(text: str, prefix: str = "") -> LocalizationDocument
         if not editable:
             unsupported += 1
 
-    if multiline_key is not None or pending_key is not None or stack:
+    if multiline_key is not None or pending_key is not None or stack or explicit_root:
         unsupported += 1
 
     counts: dict[str, int] = {}
@@ -422,8 +433,7 @@ def append_localization_entry(text: str, key: str, value: object, prefix: str = 
         )
         if last_close is None or last_close <= first_code:
             raise ValueError("Explicit-root localization file has no safe closing brace")
-        indent = "\t"
-        lines.insert(last_close, indent + new_line)
+        lines.insert(last_close, "\t" + new_line)
         changed = "".join(lines)
     else:
         if lines and not lines[-1].endswith(("\n", "\r")):
