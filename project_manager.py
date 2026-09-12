@@ -43,7 +43,7 @@ class ProjectManager:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
         temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        temporary.replace(self.path)
+        temporary.replace(target := self.path)
 
     @staticmethod
     def _problems(root: Path, required_paths: tuple[str, ...],
@@ -63,6 +63,15 @@ class ProjectManager:
                 return []
             failures.append(missing)
         return min(failures, key=len) if failures else []
+
+    @staticmethod
+    def _clean_project_name(spec, name: str) -> str:
+        clean_name = name.strip()
+        if not clean_name or clean_name in {".", ".."} or any(char in clean_name for char in '<>:"/\\|?*'):
+            raise ValueError("Enter a valid folder name")
+        if spec.validate_name is not None:
+            spec.validate_name(clean_name)
+        return clean_name
 
     def snapshot(self, plugin_id: str) -> dict:
         plugin, spec = self._spec(plugin_id)
@@ -132,9 +141,7 @@ class ProjectManager:
 
     def create(self, plugin_id: str, parent_value: str, name: str) -> dict:
         _plugin, spec = self._spec(plugin_id)
-        clean_name = name.strip()
-        if not clean_name or clean_name in {".", ".."} or any(char in clean_name for char in '<>:"/\\|?*'):
-            raise ValueError("Enter a valid folder name")
+        clean_name = self._clean_project_name(spec, name)
         parent = Path(parent_value).expanduser().resolve()
         if not parent.is_dir():
             raise ValueError(f"Parent folder does not exist: {parent}")
@@ -156,9 +163,7 @@ class ProjectManager:
         problems = self._problems(root, spec.required_paths, spec.required_any)
         if problems:
             raise ValueError("\n".join(problems))
-        clean_name = name.strip()
-        if not clean_name or clean_name in {".", ".."} or any(char in clean_name for char in '<>:"/\\|?*'):
-            raise ValueError("Enter a valid folder name")
+        clean_name = self._clean_project_name(spec, name)
         target = root.with_name(clean_name)
         if target.exists():
             raise ValueError(f"A file or folder already exists: {target}")
