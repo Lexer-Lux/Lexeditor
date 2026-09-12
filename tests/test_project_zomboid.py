@@ -78,6 +78,29 @@ class ProjectZomboidCoreTests(unittest.TestCase):
             self.assertIn("Weight = 99,", text)
             self.assertEqual(text.count("Weight = 0.5,"), 1)
 
+    def test_item_same_line_duplicate_fails_closed_without_counting_nested_property(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = self.make_project(Path(temp))
+            script = root / "42" / "media" / "scripts" / "items.txt"
+            original = script.read_text(encoding="utf-8").replace(
+                "        Weight = 0.3,\n",
+                "        Weight = 0.3, Weight = 0.7,\n",
+            )
+            script.write_text(original, encoding="utf-8")
+            row = core.read_items(root)["rows"][0]
+            self.assertIn("Weight", row["duplicateKeys"])
+            with self.assertRaisesRegex(core.ProjectZomboidError, "duplicated item properties: Weight"):
+                core.save_item(
+                    root, row["path"], row["module"], row["id"], row["sha256"],
+                    {"Weight": "0.5"},
+                )
+            self.assertEqual(script.read_text(encoding="utf-8"), original)
+
+            script.write_text(SCRIPT, encoding="utf-8")
+            clean = core.read_items(root)["rows"][0]
+            self.assertNotIn("Weight", clean["duplicateKeys"])
+            self.assertEqual(clean["fields"]["Weight"], "0.3")
+
     def test_item_writer_rejects_missing_property_and_invalid_item_type(self):
         with tempfile.TemporaryDirectory() as temp:
             root = self.make_project(Path(temp))
