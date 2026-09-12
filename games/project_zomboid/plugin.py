@@ -98,13 +98,17 @@ def smoke() -> list[str]:
             " craftRecipe MakeTestThing\n"
             " {\n"
             "  AllowBatchCraft = true,\n"
+            "  AutoLearnAll = Woodwork:2;Maintenance:1,\n"
+            "  AutoLearnAny = Woodwork:5;Carving:4,\n"
             "  CanWalk = false,\n"
             "  category = General,\n"
             "  Icon = Radio,\n"
             "  ResearchSkillLevel = -1,\n"
+            "  SkillRequired = Woodwork:3,\n"
             "  Tags = InHandCraft,\n"
             "  Time = 50,\n"
             "  timedAction = Craft,\n"
+            "  Tooltip = SmokeRecipeTooltip,\n"
             "  inputs { item 1 [Base.Plank], }\n"
             " }\n"
             " fixing RepairTestThing\n"
@@ -185,7 +189,7 @@ def smoke() -> list[str]:
             adapters = [
                 ("items", "items/save", {"Weight": "0.5"}, "Weight", "0.5"),
                 ("evolvedrecipes", "evolvedrecipes/save", {"MaxItems": "6"}, "MaxItems", "6"),
-                ("craftrecipes", "craftrecipes/save", {"time": "75"}, "time", "75"),
+                ("craftrecipes", "craftrecipes/save", {"time": "75", "SkillRequired": "Woodwork:4;Carving:2", "Tooltip": "SmokeRecipeTooltipUpdated"}, "SkillRequired", "Woodwork:4;Carving:2"),
                 ("fixings", "fixings/save", {"ConditionModifier": "0.8"}, "ConditionModifier", "0.8"),
                 ("fluids", "fluids/save", {"ColorReference": "Red"}, "ColorReference", "Red"),
                 ("vehicles", "vehicles/save", {"engineForce": "4200"}, "engineForce", "4200"),
@@ -207,8 +211,16 @@ def smoke() -> list[str]:
                     raise RuntimeError(f"Synthetic {get_endpoint} edit did not read back")
 
             text = script.read_text(encoding="utf-8")
-            if "  Time = 75," not in text or "  Tags = InHandCraft," not in text:
-                raise RuntimeError("craftRecipe documented key casing was not preserved")
+            for expected_craft in (
+                "  Time = 75,",
+                "  Tags = InHandCraft,",
+                "  SkillRequired = Woodwork:4;Carving:2,",
+                "  Tooltip = SmokeRecipeTooltipUpdated,",
+                "  AutoLearnAll = Woodwork:2;Maintenance:1,",
+                "  AutoLearnAny = Woodwork:5;Carving:4,",
+            ):
+                if expected_craft not in text:
+                    raise RuntimeError("craftRecipe typed edit or documented key preservation failed")
             for preserved in ("UnknownFutureField = KeepMe", "inputs { item 1 [Base.Plank], }", "Require = Base.Hammer,", "Fixer = Base.DuctTape=2;Woodwork=1,", "Properties { HungerChange = -5, }", "part Engine { category = engine, }", "clip { file = media/sound/test.ogg, volume = 0.7, }", "mesh = LexSmoke/TestModel,", "attachment Grip { offset = 0.0 0.0 0.0, }", "model = FemaleBody,", "completionSound = BuildFence,", "muscleStrainParts = Neck;Torso_Upper,", "prop1 = Base.HammerModel,"):
                 if preserved not in text:
                     raise RuntimeError("Structured writes did not preserve unknown/nested script data")
