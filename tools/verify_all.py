@@ -96,8 +96,37 @@ def timeout_for(tool: Path, default: float) -> float:
     return max(default, SLOW.get(tool.stem, 0))
 
 
+# The verifier-sweep workflow runs on a clean hosted runner and explicitly
+# documents that checks needing a private installed game/project are SKIPPED.
+# Many legacy checks don't raise WinError 2; they assert on a hard-coded Steam
+# path or on Lexeditor's machine-local extracted baseline instead. Classify
+# those only when the *final failure line itself* names the external prerequisite.
+# That last-line rule is deliberate: aggregate checks can mention a missing RDR
+# project and then go on to report a genuine Stardew/UI failure, which must stay
+# red rather than being swallowed as an environmental skip.
+_EXTERNAL_DATA_MARKERS = (
+    "\\steamapps\\common\\",
+    "/steamapps/common/",
+    "\\appdata\\local\\lexeditor\\game-data\\",
+    "/appdata/local/lexeditor/game-data/",
+    "c:\\rdrmod",
+    "c:\\rdr2mod",
+)
+_EXTERNAL_REQUIREMENT_MESSAGES = (
+    "no ff7 installation found",
+    "the supported installed ff8 executable is missing",
+    "installed mitem.bin",
+    "installed mngrp.bin",
+    "ff8 menu font has not been extracted yet",
+    "missing rdr project:",
+    "missing rdr2 project:",
+)
+
+
 def _unrunnable(tail: str) -> str:
     lowered = tail.lower()
+    lines = [line.strip() for line in lowered.splitlines() if line.strip()]
+    last = lines[-1] if lines else ""
     if "error: the following arguments are required" in lowered:
         return "needs command-line arguments"
     if "modulenotfounderror" in lowered:
@@ -111,6 +140,10 @@ def _unrunnable(tail: str) -> str:
         return "needs a program that is not installed"
     if "command not found" in lowered:
         return "needs a program that is not installed"
+    if any(marker in last for marker in _EXTERNAL_DATA_MARKERS):
+        return "needs installed game/project data"
+    if any(message in last for message in _EXTERNAL_REQUIREMENT_MESSAGES):
+        return "needs installed game/project data"
     return ""
 
 
@@ -138,7 +171,10 @@ def run(tool: Path, timeout: float = 180, output: Path | None = None,
         return tool, 0, time.time() - started, f"SKIPPED ({reason}): {tail}"
     if code and code not in (124, 125) and retries:
         time.sleep(2)
-        second, second_tail, _second_context = _once(tool, timeout, output, 2)
+        second, second_tail, second_context = _once(tool, timeout, output, 2)
+        second_reason = _unrunnable(second_context)
+        if second and second_reason:
+            return tool, 0, time.time() - started, f"SKIPPED ({second_reason}): {second_tail}"
         if not second:
             return tool, 0, time.time() - started, f"FLAKY (passed on retry): {tail}"
         code, tail = second, second_tail
@@ -231,7 +267,8 @@ def main() -> int:
                 tool = tools[pending.index(future)]
                 code, seconds, tail = 1, 0, f"Runner error: {type(error).__name__}: {error}"
             done += 1
-            label = 'FAIL' if code else ('FLAKY' if tail.startswith('FLAKY') else 'PASS')
+            label = ('FAIL' if code else 'FLAKY' if tail.startswith('FLAKY')
+                     else 'SKIPPED' if tail.startswith('SKIPPED') else 'PASS')
             print(f"[{done}/{len(tools)}] {label} {tool.name} ({seconds:.1f}s) {tail}",
                   flush=True)
             measured[tool.name] = round(seconds, 1)
