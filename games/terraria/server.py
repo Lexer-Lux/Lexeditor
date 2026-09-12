@@ -31,6 +31,12 @@ from .content_wizard import create_mod_item, create_mod_player, create_mod_syste
 from .localization import parse_localization_text, try_get_culture_and_prefix
 from .localization_lifecycle import apply_localization_transaction
 from .plugin import DEFAULT_PROJECT_ROOT, TMODLOADER_SAVE_ROOT
+from .structured_content import (
+    create_structured_content,
+    structured_content_index,
+    structured_content_state,
+    update_structured_content,
+)
 from .source_text import (
     create_source,
     delete_source,
@@ -304,6 +310,22 @@ def _decode_asset_data(value: object) -> bytes:
         return base64.b64decode(value, validate=True)
     except (binascii.Error, ValueError) as error:
         raise ValueError("Asset dataBase64 is invalid") from error
+
+
+def structured_content_catalog() -> dict:
+    return structured_content_index(project_root())
+
+
+def structured_content_file(relative: str) -> dict:
+    return structured_content_state(project_root(), relative)
+
+
+def create_structured_content_file(kind: object, name: object, values: object, display_name: object = "", description: object = "") -> dict:
+    return create_structured_content(project_root(), kind, name, values, display_name, description)
+
+
+def save_structured_content_file(relative: str, values: object, expected_sha256: str) -> dict:
+    return update_structured_content(project_root(), relative, values, expected_sha256)
 
 
 def create_content_item(name: object, display_name: object = "", tooltip: object = "") -> dict:
@@ -614,7 +636,7 @@ class Handler(BaseHTTPRequestHandler):
                     "hosted": True,
                     "windowHost": "webview2",
                     "capabilities": [
-                        "build-metadata", "localization", "source-text", "assets", "content-wizard",
+                        "build-metadata", "localization", "source-text", "assets", "content-wizard", "structured-content",
                         "native-build", "local-mod-status", "data-map",
                     ],
                 })
@@ -624,6 +646,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(localization_index())
             elif path == "/api/localization/file":
                 self.send_json(localization_file_state(self._query_path(parsed, "Localization")))
+            elif path == "/api/content":
+                self.send_json(structured_content_catalog())
+            elif path == "/api/content/file":
+                self.send_json(structured_content_file(self._query_path(parsed, "Structured content")))
             elif path == "/api/source":
                 self.send_json(source_state())
             elif path == "/api/source/file":
@@ -653,6 +679,22 @@ class Handler(BaseHTTPRequestHandler):
                 if payload != {}:
                     raise ValueError("Terraria build request must be an empty object")
                 self.send_json(build_project())
+                return
+            if path == "/api/content/create":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"kind", "name", "values", "displayName", "description"}:
+                    raise ValueError("Expected kind, name, values, displayName and description only")
+                if not isinstance(payload["kind"], str) or not isinstance(payload["name"], str) or not isinstance(payload["values"], dict) or not isinstance(payload["displayName"], str) or not isinstance(payload["description"], str):
+                    raise ValueError("Invalid structured content create request")
+                self.send_json(create_structured_content_file(payload["kind"], payload["name"], payload["values"], payload["displayName"], payload["description"]))
+                return
+            if path == "/api/content/file":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "values", "expectedSha256"}:
+                    raise ValueError("Expected path, values and expectedSha256 only")
+                if not isinstance(payload["path"], str) or not isinstance(payload["values"], dict) or not isinstance(payload["expectedSha256"], str):
+                    raise ValueError("Invalid structured content save request")
+                self.send_json(save_structured_content_file(payload["path"], payload["values"], payload["expectedSha256"]))
                 return
             if path == "/api/content/system":
                 payload = self.read_json()
