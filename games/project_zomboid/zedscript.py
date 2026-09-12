@@ -1,7 +1,7 @@
 """Read-only Build 42 ZedScript structural inventory.
 
-This module deliberately stops at block discovery. It does not assign semantics to
-properties that have not yet been grounded in current Build 42 documentation.
+The recognized families mirror the current pz-scripts-data block registry. A family
+being recognized here does not make it writable; mutation remains separately gated.
 """
 from __future__ import annotations
 
@@ -11,24 +11,25 @@ import re
 from . import core
 
 BLOCK_KINDS = (
-    "item",
-    "recipe",
+    "animationsMesh",
+    "craftRecipe",
+    "entity",
     "evolvedrecipe",
     "fixing",
-    "vehicle",
-    "template",
+    "fluid",
+    "item",
+    "mannequin",
     "model",
     "sound",
-    "animation",
-    "mannequin",
+    "timedAction",
+    "vehicle",
 )
-
+_CANONICAL = {value.casefold(): value for value in BLOCK_KINDS}
 _BLOCK_RE = re.compile(
-    r"\b(?P<kind>item|recipe|evolvedrecipe|fixing|vehicle|template|model|sound|animation|mannequin)"
-    r"\s+(?P<name>[A-Za-z0-9_.-]+)\s*\{",
+    r"\b(?P<kind>animationsMesh|craftRecipe|entity|evolvedrecipe|fixing|fluid|item|mannequin|model|sound|timedAction|vehicle)"
+    r"\s+(?P<name>[^\s{]+(?:\s+[^\s{]+)*)\s*\{",
     re.IGNORECASE,
 )
-_MODULE_RE = re.compile(r"\bmodule\s+(?P<name>[A-Za-z0-9_.-]+)\s*\{", re.IGNORECASE)
 
 
 def _brace_depth(masked: str, start: int, end: int) -> int:
@@ -42,6 +43,8 @@ def _brace_depth(masked: str, start: int, end: int) -> int:
 
 
 def inventory_file(path: Path, root: Path) -> dict:
+    root = root.resolve()
+    path = path.resolve()
     data, text = core._read_utf8(path)
     masked = core._masked_code(text)
     rows = []
@@ -60,16 +63,16 @@ def inventory_file(path: Path, root: Path) -> dict:
                     continue
                 open_brace = masked.find("{", match.start(), match.end())
                 close_brace = core._matching_brace(masked, open_brace, module.close_brace)
-                kind = match.group("kind").lower()
+                kind = _CANONICAL[match.group("kind").casefold()]
                 rows.append({
                     "path": path.relative_to(root).as_posix(),
                     "module": module.name,
                     "kind": kind,
-                    "name": match.group("name"),
+                    "name": match.group("name").strip(),
                     "sha256": core.sha256_bytes(data),
                     "start": match.start(),
                     "end": close_brace + 1,
-                    "editable": kind == "item",
+                    "editable": kind in {"item", "evolvedrecipe"},
                 })
                 cursor = close_brace + 1
     except core.ProjectZomboidError as error:
@@ -78,6 +81,7 @@ def inventory_file(path: Path, root: Path) -> dict:
 
 
 def inventory(root: Path) -> dict:
+    root = root.resolve()
     rows = []
     errors = []
     for path in core.script_paths(root):
