@@ -24,7 +24,7 @@ Unknown keys, repeated non-edited keys, comments and other unmodeled lines must 
 
 The current `pz-scripts-data` registry identifies these Build 42 script families at module level: `animationsMesh`, `craftRecipe`, `entity`, `evolvedrecipe`, `fixing`, `fluid`, `item`, `mannequin`, `model`, `sound`, `timedAction`, and `vehicle`. Lexeditor structurally inventories these top-level records while deliberately ignoring similarly shaped text inside comments, quoted strings, and nested blocks.
 
-Recognition is not the same as editability. Items, evolved recipes and the conservative scalar surface of craft recipes are currently structured. The remaining families stay read-only until their current Build 42 fields and mutation rules are independently grounded.
+Recognition is not the same as editability. Items, evolved recipes, conservative craft-recipe scalars, top-level fluid scalars, and a conservative vehicle scalar subset are currently structured. The remaining families and nested substructures stay read-only until their current Build 42 fields and mutation rules are independently grounded.
 
 ## Item blocks
 
@@ -66,6 +66,23 @@ Build 42's current crafting family is `craftRecipe`, not the older legacy `recip
 - `category`, `Icon`, and `timedAction` — scalar identifiers/text.
 
 Callbacks, `AutoLearn*`, `SkillRequired`, `inputs`, `outputs`, mappers and other structured/nested data remain read-only until their mutation grammar is implemented independently. A file containing these fields can still be edited safely because all unmodeled bytes/text are preserved and writes target only one existing top-level property span.
+
+## `fluid`
+
+The current Build 42 `fluid` schema has two simple module-level scalar properties suitable for surgical editing: `ColorReference` and `DisplayName`. `DisplayName` is a translation key; `ColorReference` names the color reference used by the fluid.
+
+The behavior-bearing fluid data is nested in child blocks such as `Properties`, `Categories`, `BlendWhiteList`, `BlendBlackList`, and `Poison`. Those child blocks are deliberately read-only. The fluid writer changes only an existing top-level scalar property span, rejects missing or duplicated edited properties, and preserves every child block and unknown field verbatim.
+
+## `vehicle`
+
+Vehicle scripts combine a large top-level parameter surface with substantial nested structure (`part`, model/area/passenger/wheel-style blocks and related data). Lexeditor therefore exposes only a small current-schema subset that can be validated and patched without rebuilding the vehicle:
+
+- floats: `animalTrailerSize`, `engineForce`, `engineIdleSpeed`;
+- integers: `engineLoudness`, `engineQuality`, `engineRepairLevel`, `gearRatioCount`;
+- booleans: `hasLighter`, `isSmallVehicle`;
+- scalar identifiers/text: `carMechanicsOverlay`, `carModelName`, `engineRPMType`.
+
+All nested vehicle blocks, array-valued fields, templates, textures, physics geometry, ratios beyond the explicitly modeled count, and other unmodeled parameters remain read-only and byte-preserved. As with the other script adapters, Lexeditor only edits properties already present and rejects stale, missing, duplicated, malformed, or out-of-scope edits instead of synthesizing structure.
 
 ## Filesystem portability
 
