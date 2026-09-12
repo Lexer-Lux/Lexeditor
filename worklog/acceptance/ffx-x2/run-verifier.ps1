@@ -33,6 +33,12 @@ if (-not [string]::IsNullOrWhiteSpace($BaselinePath)) {
     if ($baseline.contract -ne "Lexeditor.ffx-x2-install-verification") {
         throw "Unexpected baseline verifier contract '$($baseline.contract)': $resolvedBaseline"
     }
+    if (-not [bool]$baseline.acceptanceReady) {
+        throw "Baseline report did not pass the strict real-install verifier baseline: $resolvedBaseline"
+    }
+    if (-not [System.StringComparer]::OrdinalIgnoreCase.Equals([string]$baseline.gameRoot, $resolvedGameRoot)) {
+        throw "Baseline report belongs to a different game root ('$($baseline.gameRoot)'): $resolvedBaseline"
+    }
 }
 
 Push-Location $repoRoot
