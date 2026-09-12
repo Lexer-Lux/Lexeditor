@@ -103,8 +103,8 @@ def _validate(key: str, value: object) -> str:
             number = float(clean)
         except ValueError as error:
             raise core.ProjectZomboidError("scale must be a number") from error
-        if not math.isfinite(number) or number <= 0:
-            raise core.ProjectZomboidError("scale must be a finite number > 0")
+        if not math.isfinite(number):
+            raise core.ProjectZomboidError("scale must be finite")
         return clean
     return clean
 
