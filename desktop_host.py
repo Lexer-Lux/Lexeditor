@@ -1421,6 +1421,24 @@ class HostApi:
         reshade_projects.add_repository(name, version, url)
         return self.mod_reshade(plugin_id)
 
+    def install_reshade_shaders(self, plugin_id: str, name: str = "") -> dict:
+        """Download the shader collection, or one package of it, then restate.
+
+        Registering a repository by name leaves ReShade with nothing to search,
+        which is why a game could load the overlay and show an empty effect
+        list. This fetches the files and records where they landed.
+        """
+        import reshade_projects
+
+        try:
+            if str(name or "").strip():
+                installed = [reshade_projects.install_repository(name)]
+            else:
+                installed = reshade_projects.install_collection()
+        except Exception as error:
+            return {**self.mod_reshade(plugin_id), "error": str(error)}
+        return {**self.mod_reshade(plugin_id), "installed": installed}
+
     def remove_reshade_repository(self, plugin_id: str, name: str) -> dict:
         """Forget one repository. Mods that name it still name it."""
         import reshade_projects

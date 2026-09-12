@@ -6,6 +6,8 @@ import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import pytest
+
 import reshade_projects as rp
 
 
@@ -242,3 +244,81 @@ def test_configure_keeps_settings_it_does_not_own(tmp_path, monkeypatch):
     assert "PerformanceMode=1" in ini
     assert "EffectSearchPaths=old" not in ini
     assert str(shaders) in ini
+
+
+def _archive(files):
+    """A GitHub-shaped zip: everything under one top folder."""
+    import io as _io
+    import zipfile
+    buffer = _io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, payload in files.items():
+            archive.writestr(f"repo-master/{name}", payload)
+    return buffer.getvalue()
+
+
+def test_the_collection_covers_every_effect_it_promises():
+    """Each listed effect names a package, and every package is fetchable."""
+    for row in rp.coverage():
+        assert row["packages"], f"{row['label']} has no package"
+        assert row["shaders"], f"{row['label']} names no shader"
+    named = {package["name"] for package in rp.CATALOGUE}
+    for row in rp.coverage():
+        assert set(row["packages"]) <= named
+
+
+def test_the_collection_names_only_redistributable_packages():
+    """The reason these packages and not the usual ones: we may ship them.
+
+    qUINT, Depth3D and iMMERSE are what a preset author reaches for first and
+    none of them may be redistributed, so a substitute was found for each role
+    instead. A package with no licence recorded here would quietly undo that.
+    """
+    allowed = ("MIT", "BSD", "CC0")
+    for package in rp.CATALOGUE:
+        assert package["licence"].startswith(allowed), package["name"]
+        assert package["download"].endswith(".zip")
+
+
+def test_installing_a_package_puts_the_shaders_where_reshade_looks(tmp_path, monkeypatch):
+    store = tmp_path/"store"; store.mkdir()
+    monkeypatch.setattr(rp, "STORE", store)
+    payload = _archive({"Shaders/SMAA.fx": "// smaa",
+                        "Textures/noise.png": "png",
+                        "README.md": "read me"})
+    result = rp.install_repository("SweetFX", fetch=lambda url: payload)
+    installed = Path(result["path"])
+    assert (installed/"Shaders"/"SMAA.fx").is_file()
+    assert (installed/"Textures"/"noise.png").is_file()
+    # And the machine's list now carries a folder, not just a name.
+    entry = next(row for row in rp.repositories() if row["name"] == "SweetFX")
+    assert entry["path"] == str(installed)
+    game = tmp_path/"game"; game.mkdir()
+    ini = rp.configure(game)
+    assert str(installed/"Shaders") in ini["effectPaths"]
+
+
+def test_installing_replaces_an_older_copy(tmp_path, monkeypatch):
+    store = tmp_path/"store"; store.mkdir()
+    monkeypatch.setattr(rp, "STORE", store)
+    rp.install_repository("SweetFX", fetch=lambda url: _archive({"Shaders/Old.fx": "old"}))
+    result = rp.install_repository("SweetFX", fetch=lambda url: _archive({"Shaders/New.fx": "new"}))
+    installed = Path(result["path"])
+    assert not (installed/"Shaders"/"Old.fx").exists()
+    assert (installed/"Shaders"/"New.fx").is_file()
+
+
+def test_an_unknown_package_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path/"store")
+    with pytest.raises(ValueError):
+        rp.install_repository("iMMERSE", fetch=lambda url: b"")
+
+
+def test_coverage_reports_what_is_missing(tmp_path, monkeypatch):
+    store = tmp_path/"store"; store.mkdir()
+    monkeypatch.setattr(rp, "STORE", store)
+    assert not any(row["installed"] for row in rp.coverage())
+    rp.install_repository("SweetFX", fetch=lambda url: _archive({"Shaders/SMAA.fx": "x"}))
+    covered = {row["label"]: row["installed"] for row in rp.coverage()}
+    assert covered["SMAA"]
+    assert not covered["Ambient occlusion"]

@@ -6227,3 +6227,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   transform:none !important;
   font-size:inherit !important;
 }
+
+/* The ReShade effect coverage table: one row per effect the collection
+   promises, so a missing package reads as a missing effect. */
+.lex-reshade-coverage { width: 100%; border-collapse: collapse; font-size: 0.92em; }
+.lex-reshade-coverage th,
+.lex-reshade-coverage td { text-align: left; padding: 0.25em 0.6em 0.25em 0; vertical-align: top; }
+.lex-reshade-coverage thead th { font-weight: 600; opacity: 0.75; }
+.lex-reshade-coverage tbody tr + tr td { border-top: 1px solid var(--lex-border, rgba(128,128,128,0.25)); }
+.lex-reshade-coverage td:last-child { white-space: nowrap; opacity: 0.8; }

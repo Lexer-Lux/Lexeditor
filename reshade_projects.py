@@ -232,6 +232,208 @@ def repository_status(manifest: dict) -> list[dict]:
     return status
 
 
+# The shader collection Lexeditor knows how to fetch.
+#
+# Every package here is redistributable: MIT, BSD or CC0. That rules out the
+# three the community reaches for first - qUINT, Depth3D and iMMERSE carry no
+# licence or forbid it outright - so an equivalent was found for each effect
+# rather than naming something we have no right to fetch. The roles below are
+# what a preset author actually needs; nothing is here to pad the list out.
+EFFECT_ROLES = [
+    ("color-grading", "Color grading", "Tune colours, contrast, exposure and black levels"),
+    ("sharpening", "Sharpening", "Reduce softness"),
+    ("debanding", "Debanding", "Smooth visible bands in skies and shadows"),
+    ("smaa", "SMAA", "Reduce jagged edges"),
+    ("bloom", "Bloom", "Add glow around bright areas"),
+    ("ambient-occlusion", "Ambient occlusion", "Add contact shadows and depth"),
+    ("depth-of-field", "Depth of field", "Optional focus and background blur"),
+    ("film-grain", "Film grain", "Optional film texture"),
+    ("vignette", "Vignette", "Optional darkening toward the edges"),
+    ("before-after", "Before/after split", "Compare the preset against the raw frame"),
+    ("depth-viewer", "Depth buffer viewer", "Set up ambient occlusion and depth of field"),
+]
+
+CATALOGUE = [
+    {
+        "name": "Standard effects",
+        "url": "https://github.com/crosire/reshade-shaders/tree/slim",
+        "download": "https://github.com/crosire/reshade-shaders/archive/slim.zip",
+        "repository": "crosire/reshade-shaders",
+        "branch": "slim",
+        "licence": "MIT (per file)",
+        "effects": {"debanding": "Deband.fx", "depth-viewer": "DisplayDepth.fx"},
+    },
+    {
+        "name": "SweetFX",
+        "url": "https://github.com/CeeJayDK/SweetFX",
+        "download": "https://github.com/CeeJayDK/SweetFX/archive/master.zip",
+        "repository": "CeeJayDK/SweetFX",
+        "branch": "master",
+        "licence": "MIT",
+        "effects": {
+            "color-grading": "Curves.fx, Levels.fx, LiftGammaGain.fx, Tonemap.fx, Vibrance.fx",
+            "sharpening": "LumaSharpen.fx, CAS.fx",
+            "smaa": "SMAA.fx",
+            "film-grain": "FilmGrain.fx",
+            "vignette": "Vignette.fx",
+            "before-after": "Splitscreen.fx, Compare.fx",
+        },
+    },
+    {
+        "name": "FXShaders",
+        "url": "https://github.com/luluco250/FXShaders",
+        "download": "https://github.com/luluco250/FXShaders/archive/master.zip",
+        "repository": "luluco250/FXShaders",
+        "branch": "master",
+        "licence": "MIT",
+        "effects": {"bloom": "NeoBloom.fx", "depth-of-field": "FocalDOF.fx"},
+    },
+    {
+        # The one hard role. Every well known ambient occlusion shader for
+        # ReShade is unlicensed; this one is CC0, and does screen-space
+        # occlusion and lighting together.
+        "name": "NiceGuy Shaders",
+        "url": "https://github.com/mj-ehsan/NiceGuy-Shaders",
+        "download": "https://github.com/mj-ehsan/NiceGuy-Shaders/archive/main.zip",
+        "repository": "mj-ehsan/NiceGuy-Shaders",
+        "branch": "main",
+        "licence": "CC0-1.0",
+        "effects": {"ambient-occlusion": "NGLighting.fx"},
+    },
+    {
+        # Not needed for any role: colour grading is covered above. This is the
+        # deep set, for an author who wants per-channel control.
+        "name": "prod80 colour effects",
+        "url": "https://github.com/prod80/prod80-ReShade-Repository",
+        "download": "https://github.com/prod80/prod80-ReShade-Repository/archive/master.zip",
+        "repository": "prod80/prod80-ReShade-Repository",
+        "branch": "master",
+        "licence": "MIT",
+        "optional": True,
+        "effects": {"color-grading": "PD80_*.fx, an extensive set"},
+    },
+]
+
+ARCHIVE_SUFFIXES = (".fx", ".fxh", ".png", ".jpg", ".jpeg", ".bmp", ".dds", ".txt", ".md")
+
+
+def _slug(name: str) -> str:
+    return "".join(character if character.isalnum() else "-"
+                   for character in str(name).lower()).strip("-")
+
+
+def shaders_root() -> Path:
+    """Where installed shader repositories live. One per machine, not per mod."""
+    return STORE / "shaders"
+
+
+def catalogue() -> list[dict]:
+    """The collection, each package saying whether this machine has it."""
+    have = {entry["name"].lower(): entry for entry in repositories()}
+    listed = []
+    for package in CATALOGUE:
+        mine = have.get(package["name"].lower())
+        folder = Path(mine["path"]) if mine and mine.get("path") else None
+        listed.append({
+            **{key: value for key, value in package.items() if key != "effects"},
+            "optional": bool(package.get("optional")),
+            "effects": dict(package["effects"]),
+            "installed": bool(folder and folder.is_dir()),
+            "path": str(folder) if folder else "",
+            "version": mine["version"] if mine else "",
+        })
+    return listed
+
+
+def coverage() -> list[dict]:
+    """Per effect the collection promises: which shader, and is it here yet.
+
+    A role with no installed package is the reason ReShade can load and do
+    nothing, so it gets its own line rather than being left to be inferred
+    from the repository list.
+    """
+    installed = {package["name"]: package["installed"] for package in catalogue()}
+    rows = []
+    for role, label, purpose in EFFECT_ROLES:
+        providers = [package for package in CATALOGUE
+                     if role in package["effects"] and not package.get("optional")]
+        extra = [package for package in CATALOGUE
+                 if role in package["effects"] and package.get("optional")]
+        rows.append({
+            "role": role,
+            "label": label,
+            "purpose": purpose,
+            "shaders": "; ".join(package["effects"][role] for package in providers),
+            "packages": [package["name"] for package in providers],
+            "alsoIn": [package["name"] for package in extra],
+            "installed": any(installed.get(package["name"]) for package in providers),
+        })
+    return rows
+
+
+def _fetch(url: str, timeout: int = 120) -> bytes:
+    import urllib.request
+    request = urllib.request.Request(url, headers={"User-Agent": "Lexeditor"})
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return response.read()
+
+
+def install_repository(name: str, *, fetch=_fetch) -> dict:
+    """Download one catalogued package and register where its shaders landed.
+
+    Naming a repository was never enough: ReShade needs a folder to search, and
+    a name with no folder is exactly the state that produces a loader with an
+    empty effect list. This puts the files on disk and writes the path into the
+    machine's repository list in one step.
+    """
+    import io as _io
+    import zipfile
+
+    wanted = str(name or "").strip().lower()
+    package = next((entry for entry in CATALOGUE
+                    if entry["name"].lower() == wanted), None)
+    if package is None:
+        raise ValueError(f"No catalogued shader package called {name!r}")
+    payload = fetch(package["download"])
+    target = shaders_root() / _slug(package["name"])
+    if target.exists():
+        shutil.rmtree(target, ignore_errors=True)
+    target.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(_io.BytesIO(payload)) as archive:
+        for member in archive.infolist():
+            if member.is_dir():
+                continue
+            parts = Path(member.filename).parts
+            if len(parts) < 2:
+                continue
+            # Drop the archive's own top folder and keep the rest of the tree,
+            # so Shaders/ and Textures/ land where configure() looks for them.
+            relative = Path(*parts[1:])
+            if relative.suffix.lower() not in ARCHIVE_SUFFIXES:
+                continue
+            destination = target / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(archive.read(member))
+    write_repositories([*repositories(), {
+        "name": package["name"],
+        "version": package.get("branch", ""),
+        "url": package["url"],
+        "path": str(target),
+    }])
+    return {"name": package["name"], "path": str(target),
+            "shaders": len(_listing(target, SHADER_SUFFIXES))}
+
+
+def install_collection(*, fetch=_fetch, include_optional: bool = False) -> list[dict]:
+    """Install every package a listed effect depends on."""
+    done = []
+    for package in CATALOGUE:
+        if package.get("optional") and not include_optional:
+            continue
+        done.append(install_repository(package["name"], fetch=fetch))
+    return done
+
+
 EXPORT_NOTE_NAME = "INSTALL-RESHADE.txt"
 
 
@@ -465,6 +667,8 @@ def snapshot(project_root: Path, game_root: Path | None = None) -> dict:
         "renderers": sorted(RENDERER_DLLS),
         "repositories": repositories(),
         "repositoryStatus": repository_status(manifest),
+        "catalogue": catalogue(),
+        "coverage": coverage(),
         "exportNote": EXPORT_NOTE_NAME,
         # A preset that names no file, or names one that is not there, would
         # silently do nothing at play time. Say so instead.

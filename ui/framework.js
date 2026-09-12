@@ -2651,6 +2651,40 @@
         : "No shader repositories added yet."),
       help: infoHelp("One list for the whole machine, not one per mod. Every project's preset resolves its repositories against this list."),
     }));
+    // The collection Lexeditor knows how to fetch. Every package in it is
+    // redistributable, and each line says which effect it supplies, because a
+    // missing package is the reason ReShade can load and render nothing.
+    const collection = data.catalogue || [];
+    const coverage = data.coverage || [];
+    if (coverage.length) {
+      const table = element("table", {class: "lex-reshade-coverage"},
+        element("thead", {}, element("tr", {},
+          element("th", {}, "Effect"), element("th", {}, "Purpose"),
+          element("th", {}, "Shader"), element("th", {}, "State"))));
+      const body = element("tbody");
+      for (const row of coverage) {
+        body.append(element("tr", {}, element("td", {}, row.label),
+          element("td", {}, row.purpose), element("td", {}, row.shaders),
+          element("td", {}, row.installed ? "installed" : "not downloaded")));
+      }
+      table.append(body);
+      rows.push(detailField({label: "Effects", control: table,
+        help: infoHelp("What the bundled collection covers. Nothing here is copied into a published mod: the mod names the packages and this list says which ones this machine has.")}));
+    }
+    const short = collection.filter(entry => !entry.installed && !entry.optional);
+    rows.push(detailField({
+      label: "Shader collection",
+      control: element("div", {class: "lex-reshade-actions"},
+        readonlyField(collection.length
+          ? collection.map(entry =>
+              `${entry.name} (${entry.licence})${entry.installed ? "" : " — not downloaded"}`).join("; ")
+          : "No collection."),
+        element("button", {type: "button", class: "lex-dialog-action primary",
+          onclick: () => act("install_reshade_shaders", "")},
+          short.length ? `Download ${short.length} missing package${short.length === 1 ? "" : "s"}`
+            : "Re-download the collection")),
+      help: infoHelp("Downloads the shader packages from their own repositories into this machine's ReShade folder. They are MIT, BSD or CC0, which is why these ones and not qUINT, Depth3D or iMMERSE: those forbid redistribution or name no licence at all."),
+    }));
     const repositoryName = element("input", {type: "text", placeholder: "Repository name",
       "aria-label": "Shader repository name"});
     const repositoryVersion = element("input", {type: "text", placeholder: "Version",
