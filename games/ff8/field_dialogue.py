@@ -13,10 +13,15 @@ from __future__ import annotations
 
 import struct
 
-from . import kernel_text
+from . import kernel_text, japanese_text
 
 
-def _layout(raw: bytes) -> dict:
+def _codec(map_name: str):
+    # This unused map retains Japanese developer dialogue in the English archive.
+    return japanese_text if map_name.casefold() == "bccent12" else kernel_text
+
+
+def _layout(raw: bytes, map_name: str = "") -> dict:
     if not raw:
         return {"lines": [], "headerSize": 0}
     if len(raw) < 4:
@@ -44,7 +49,7 @@ def _layout(raw: bytes) -> dict:
             raise ValueError("Field dialogue MSD has data after a string terminator")
         lines.append({
             "id": line_id,
-            "text": kernel_text.decode(text_raw),
+            "text": _codec(map_name).decode(text_raw),
             "rawText": text_raw.hex(),
             "terminated": terminated,
             "offset": start,
@@ -53,12 +58,12 @@ def _layout(raw: bytes) -> dict:
     return {"lines": lines, "headerSize": first}
 
 
-def read(raw: bytes) -> dict:
-    return _layout(raw)
+def read(raw: bytes, *, map_name: str = "") -> dict:
+    return _layout(raw, map_name)
 
 
-def apply_edits(raw: bytes, edits: list[dict]) -> tuple[bytes, int]:
-    document = _layout(raw)
+def apply_edits(raw: bytes, edits: list[dict], *, map_name: str = "") -> tuple[bytes, int]:
+    document = _layout(raw, map_name)
     lines = document["lines"]
     if not edits:
         return raw, 0
@@ -78,7 +83,7 @@ def apply_edits(raw: bytes, edits: list[dict]) -> tuple[bytes, int]:
     for line in lines:
         replacement = replacements.get(line["id"])
         if replacement is not None and replacement != line["text"]:
-            encoded = kernel_text.encode(replacement)
+            encoded = _codec(map_name).encode(replacement)
             changed += 1
         else:
             encoded = bytes.fromhex(line["rawText"])
@@ -94,7 +99,7 @@ def apply_edits(raw: bytes, edits: list[dict]) -> tuple[bytes, int]:
         if cursor > 0xFFFFFFFF:
             raise ValueError("Field dialogue MSD exceeds its 32-bit offset range")
     rebuilt = struct.pack(f"<{len(offsets)}I", *offsets) + b"".join(payloads)
-    reparsed = _layout(rebuilt)
+    reparsed = _layout(rebuilt, map_name)
     if len(reparsed["lines"]) != len(lines):
         raise ValueError("Field dialogue line count changed during save")
     return rebuilt, changed

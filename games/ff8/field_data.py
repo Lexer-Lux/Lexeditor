@@ -634,7 +634,7 @@ def map_rows(key: str, dataset: str = "current") -> dict:
             if raw is not None else [],
             "scripts": scripts,
             "entrances": entrances,
-            "dialogue": field_dialogue.read(dialogue_raw)["lines"]
+            "dialogue": field_dialogue.read(dialogue_raw, map_name=row["name"])["lines"]
             if dialogue_raw is not None else [],
             "source": str(jsm) if jsm is not None else None,
             "sha256": hashlib.sha256(raw).hexdigest() if raw is not None else None,
@@ -803,7 +803,7 @@ def _prepare_dialogue_edits(key: str, edits: list[dict]) -> tuple[Path, bytes, i
     raw, changed = field_dialogue.apply_edits(source.read_bytes(), [
         {"id": int(edit.get("line", -1)), "text": str(edit.get("text", ""))}
         for edit in edits
-    ])
+    ], map_name=row["name"])
     destination = (paths.DIRECT_ROOT / DIRECT_SUBDIR / row["group"] / row["name"] /
                    f"{row['name']}.msd")
     return destination, raw, changed
