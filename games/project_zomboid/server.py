@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import core, craftrecipe, datamap, evolvedrecipe, fluid, model, sound, vehicle, zedscript
+from . import core, craftrecipe, datamap, evolvedrecipe, fluid, mannequin, model, sound, vehicle, zedscript
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -118,8 +118,8 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": [
                         "mod-info", "build42-items", "build42-evolvedrecipes",
                         "build42-craftrecipes", "build42-fluids", "build42-vehicles",
-                        "build42-sounds", "build42-models", "build42-zedscript-inventory",
-                        "data-map", "local-deploy",
+                        "build42-sounds", "build42-models", "build42-mannequins",
+                        "build42-zedscript-inventory", "data-map", "local-deploy",
                     ],
                     "editorRoot": str(PLUGIN_ROOT),
                 })
@@ -139,6 +139,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(sound.read(self.project()))
             elif path == "/api/models":
                 self.send_json(model.read(self.project()))
+            elif path == "/api/mannequins":
+                self.send_json(mannequin.read(self.project()))
             elif path == "/api/zedscript":
                 self.send_json(zedscript.inventory(self.project()))
             elif path == "/api/datamap":
@@ -216,6 +218,12 @@ class Handler(BaseHTTPRequestHandler):
                 })
                 result = model.save(root, str(payload["path"]), str(payload["module"]),
                                     str(payload["id"]), str(payload["sha256"]), payload["edits"])
+            elif path == "/api/mannequins/save":
+                if set(payload) != identity:
+                    raise core.ProjectZomboidError("Mannequin save requires path, module, id, sha256 and edits")
+                _guard_known_select_values(root, payload, mannequin.read, {"female": _TRUE_FALSE})
+                result = mannequin.save(root, str(payload["path"]), str(payload["module"]),
+                                        str(payload["id"]), str(payload["sha256"]), payload["edits"])
             elif path == "/api/deploy":
                 if payload:
                     raise core.ProjectZomboidError("Deploy does not accept arguments")
