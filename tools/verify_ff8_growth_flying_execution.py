@@ -49,7 +49,7 @@ for stat in range(1,5):
 for flying,melee,floating,hit,bonus,expected in [(1,1,0,255,100,0),(1,1,0,255,25,191),(1,1,0,90,25,165),(0,1,0,255,100,650),(1,0,0,255,100,650),(1,1,1,255,100,650)]:
  v=machine();v.reg_write(UC_X86_REG_ESP,STACK);v.reg_write(UC_X86_REG_EAX,0);v.reg_write(UC_X86_REG_ECX,0);v.reg_write(UC_X86_REG_ESI,0);v.reg_write(UC_X86_REG_EBP,0x270)
  v.mem_write(0x1D27B10+0x270,struct.pack('<I',0x2700000));v.mem_write(0x2700000,struct.pack('<I',0x2710000));v.mem_write(0x27100F7,bytes([2*flying]))
- v.mem_write(0x1D27B8C,struct.pack('<I',0x100*melee));v.mem_write(0x1D27B18,struct.pack('<I',0x2000*floating));v.mem_write(0x1D2A238,bytes([hit]));v.mem_write(0x1D27BD2+0x270,b'\0')
+ v.mem_write(0x1D27B8C,struct.pack('<I',0x1000*melee));v.mem_write(0x1D27B18,struct.pack('<I',0x2000*floating));v.mem_write(0x1D2A238,bytes([hit]));v.mem_write(0x1D27BD2+0x270,b'\0')
  v.mem_write(flying_eva.CAVE,flying_eva.build_payload(bonus));v.emu_start(flying_eva.CAVE,0x492F29,count=100)
  assert v.reg_read(UC_X86_REG_EDI)==expected,(flying,melee,floating,hit,bonus,v.reg_read(UC_X86_REG_EDI))
 print('Native SPR/SPD zero across 11 characters x100 levels; bonus preservation; Flying EVA255 and exceptions passed')

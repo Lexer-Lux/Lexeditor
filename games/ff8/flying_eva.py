@@ -11,7 +11,9 @@ def build_payload(bonus: int) -> bytes:
     code.extend(bytes.fromhex('81 FD 70 02 00 00')); branch(0x72)
     code.extend(bytes.fromhex('8B 95 10 7B D2 01 85 D2')); branch(0x74)
     code.extend(bytes.fromhex('8B 12 F6 82 F7 00 00 00 02')); branch(0x74)
-    code.extend(bytes.fromhex('F7 86 8C 7B D2 01 00 01 00 00')); branch(0x74)
+    # 0048B661 tests weapon flag bit 0; 0048B670 sets battle bit 0x1000.
+    # 0x0100 is a separate character-kernel flag, not the equipped weapon.
+    code.extend(bytes.fromhex('F7 86 8C 7B D2 01 00 10 00 00')); branch(0x74)
     code.extend(bytes.fromhex('F7 86 18 7B D2 01 00 20 00 00')); branch(0x75)
     # EAX is attacker LUCK/2 - target LUCK; ECX is target EVA. No globals change.
     code.extend(bytes.fromhex('2B C1 0F B6 15 38 A2 D2 01 03 C2 83 F8 64 7E 05 B8 64 00 00 00'))
