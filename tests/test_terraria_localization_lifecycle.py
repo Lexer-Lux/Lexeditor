@@ -80,7 +80,7 @@ class TerrariaLocalizationLifecycleTests(unittest.TestCase):
         )
         self.assertIn("Keep: New\n", changed)
         self.assertNotIn("Remove:", changed)
-        self.assertIn('"Added": Fresh\n', changed)
+        self.assertIn('"Added": "Fresh"\n', changed)
 
 
 if __name__ == "__main__":
