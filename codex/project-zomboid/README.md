@@ -24,7 +24,7 @@ Unknown keys, repeated non-edited keys, comments and other unmodeled lines must 
 
 The current `pz-scripts-data` registry identifies these Build 42 script families at module level: `animationsMesh`, `craftRecipe`, `entity`, `evolvedrecipe`, `fixing`, `fluid`, `item`, `mannequin`, `model`, `sound`, `timedAction`, and `vehicle`. Lexeditor structurally inventories these top-level records while deliberately ignoring similarly shaped text inside comments, quoted strings, and nested blocks.
 
-Recognition is not the same as editability. Items, evolved recipes, conservative craft-recipe scalars, top-level fluid scalars, a conservative vehicle scalar subset, conservative module-level sound scalars, and conservative module-level model scalars are currently structured. The remaining families and nested substructures stay read-only until their current Build 42 fields and mutation rules are independently grounded.
+Recognition is not the same as editability. Items, evolved recipes, conservative craft-recipe scalars, `fixing`'s typed `ConditionModifier`, top-level fluid scalars, a conservative vehicle scalar subset, conservative module-level sound scalars, conservative module-level model scalars, and conservative module-level mannequin scalars are currently structured. The remaining families and nested substructures stay read-only until their current Build 42 fields and mutation rules are independently grounded. The narrow `fixing` and `mannequin` boundaries are documented separately in this codex.
 
 ## Item blocks
 
