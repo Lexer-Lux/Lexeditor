@@ -6,6 +6,8 @@ on:
     paths:
       - 'games/terraria/**'
       - 'codex/terraria/**'
+      - 'plugin_api.py'
+      - 'project_manager.py'
       - 'tests/test_terraria_build_metadata.py'
       - 'tests/test_terraria_local_mod_state.py'
       - '.github/workflows/terraria-checks.yml'
@@ -13,6 +15,8 @@ on:
     paths:
       - 'games/terraria/**'
       - 'codex/terraria/**'
+      - 'plugin_api.py'
+      - 'project_manager.py'
       - 'tests/test_terraria_build_metadata.py'
       - 'tests/test_terraria_local_mod_state.py'
       - '.github/workflows/terraria-checks.yml'
@@ -31,7 +35,7 @@ jobs:
           python-version: '3.12'
       - name: Python parser and service tests
         run: |
-          python -m compileall -q games/terraria
+          python -m compileall -q games/terraria plugin_api.py project_manager.py
           python -m unittest tests.test_terraria_build_metadata tests.test_terraria_local_mod_state
       - name: Editor JavaScript syntax
         shell: bash
