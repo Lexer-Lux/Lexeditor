@@ -4312,8 +4312,7 @@ body:has(.lex-data-map-table) #main {
 /* Toggle rails follow the same rule as every other type label: hidden until
    the property is pointed at. */
 .lex-toggle-rail { opacity: 0; transition: opacity .12s ease; }
-.lex-detail-field:hover .lex-toggle-rail,
-.lex-detail-field:focus-within .lex-toggle-rail { opacity: 1; }
+
 
 /* Column highlighting is a hint, not a repaint. */
 .lex-column-list-cell,
@@ -5009,7 +5008,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   color:var(--lex-highlight);
   background:color-mix(in srgb,var(--lex-accent) 28%,var(--lex-panel));
 }
-.lex-toggle-rail { position:relative; align-self:stretch; opacity:1; }
+.lex-toggle-rail { position:relative; align-self:stretch; }
 .lex-toggle-type { writing-mode:horizontal-tb; text-orientation:mixed; transform:rotate(-90deg); white-space:nowrap; }
 .lex-toggle-rail > .lex-info-help { display:none !important; }
 /* Pointing at the switch brings its rail up; the swap to the help mark is the
@@ -5063,11 +5062,10 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_TOGGLE_RAIL_CONTRACT_20260910 */
-/* Keep the type marker visible so its reserved width is not an empty left
-   margin. Pointing at the marker swaps its type for the available help. */
-.lex-toggle-rail { opacity:1; cursor:help; }
-.lex-detail-field:is(:hover,:focus-within) .lex-toggle-rail,
-.lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail { opacity:1; }
+/* Reserve the rail without showing it until this flag is hovered or reached
+   with the keyboard. Mouse focus must not leave the type visible. */
+.lex-toggle-rail { opacity:0; cursor:help; }
+.lex-toggle:is(:hover,:has(:focus-visible)) > .lex-toggle-rail { opacity:1; }
 /* The code is the rail's resting content, whatever the switch around it is
    doing. */
 .lex-toggle > .lex-toggle-rail > .lex-toggle-type { display:block !important; }

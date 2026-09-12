@@ -118,7 +118,27 @@ def main():
    assert page.locator('#plugin-data-map').evaluate('(e)=>e.classList.contains("active")')
    page.locator('button[data-tab=one]').click();page.wait_for_timeout(400)
    page.mouse.move(1400,880)
-   assert page.locator('.lex-toggle-rail').evaluate_all('nodes=>nodes.every(e=>getComputedStyle(e).opacity==="1")')
+   page.wait_for_timeout(180)
+   rails=page.locator('.lex-toggle-rail')
+   assert rails.count()>1
+   assert rails.evaluate_all('nodes=>nodes.every(e=>getComputedStyle(e).opacity==="0")')
+   flag=page.locator('.lex-toggle').first
+   original=flag.bounding_box()
+   flag.locator('input').hover();page.wait_for_timeout(180)
+   assert rails.first.evaluate('e=>getComputedStyle(e).opacity')=='1'
+   assert rails.nth(1).evaluate('e=>getComputedStyle(e).opacity')=='0'
+   rail=rails.first
+   rail.hover();page.wait_for_timeout(180)
+   assert rail.locator('.lex-info-help').evaluate('e=>getComputedStyle(e).display')!='none'
+   assert rail.locator('.lex-toggle-type').evaluate('e=>getComputedStyle(e).display')=='none'
+   flag.locator('input').click()
+   page.mouse.move(1400,880);page.wait_for_timeout(180)
+   assert rails.evaluate_all('nodes=>nodes.every(e=>getComputedStyle(e).opacity==="0")')
+   assert flag.bounding_box()==original
+   page.keyboard.press('Tab');flag.locator('input').focus();page.wait_for_timeout(180)
+   assert rail.evaluate('e=>getComputedStyle(e).opacity')=='1'
+   page.locator('button[data-tab=one]').focus();page.wait_for_timeout(180)
+   assert rails.evaluate_all('nodes=>nodes.every(e=>getComputedStyle(e).opacity==="0")')
    gaps=page.locator('.lex-toggle').evaluate_all("""nodes=>nodes.map(e=>{const box=e.getBoundingClientRect(),rail=e.querySelector('.lex-toggle-rail')?.getBoundingClientRect(),name=e.querySelector('.lex-toggle-name');if(!rail||!name)return null;const range=document.createRange();range.selectNodeContents(name);const right=Math.max(...[...range.getClientRects()].map(r=>r.right));return {left:rail.left-box.left,right:box.right-right}}).filter(Boolean)""")
    assert gaps and all(abs(row['left']-row['right'])<3 for row in gaps),gaps
    copy_edges=page.evaluate("""()=>{
