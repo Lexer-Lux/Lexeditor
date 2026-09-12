@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - Final Fantasy VII Rebirth</title>
+  <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    *{box-sizing:border-box}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
+    :root{--lex-accent:#3f7fd0;--lex-accent-text:#f2f7ff;--lex-highlight:#2a4a72}
+    .ff7r2-tweaks{height:100%}
+    /* One card per row: the page has two cards and no reason to squeeze
+       them into the two-lane grid the busier plugins need. */
+    .ff7r2-tweaks.lex-settings-columns{grid-template-columns:minmax(0,1fr)}
+    .ff7r2-tweaks{--lex-detail-label-width:clamp(130px,15%,240px)}
+  </style>
+</head>
+<body>
+  <header id="lexeditor-shell"></header>
+  <main id="main"></main>
+  <script src="/shared/framework.js"></script>
+  <script>
+  "use strict";
+  const {el,detailField,readonlyField,infoHelp,detailSection}=LexeditorUI;
+  const PLUGIN="ff7r2";
+  let tab="tweaks";
+  let game={found:false,root:"",renderer:"dxgi",binaries:""};
+  let reshade={manifest:{enabled:false,preset:"",repositories:[]},presets:[],shaders:[],
+    reshadeInstalled:false,installedRenderer:"",path:"",hasFolder:false,ready:false};
+
+  async function loadGame(){
+    try{const response=await fetch("/api/game");if(response.ok)game=await response.json()}
+    catch(_error){/* the browser preview has no service; the page still renders */}
+  }
+  async function loadReshade(){
+    try{reshade=await LexeditorUI.callWindow?.("mod_reshade",PLUGIN)||reshade}
+    catch(_error){/* the browser preview has no desktop host */}
+  }
+  // Install, remove, download and "choose the DLL" each answer with a fresh
+  // snapshot, except adopt, which is about the machine rather than this game.
+  async function actReshade(method,...args){
+    try{
+      const value=method==="adopt_reshade"
+        ? await LexeditorUI.callWindow?.(method)
+        : await LexeditorUI.callWindow?.(method,PLUGIN,...args);
+      if(value&&value.error)throw new Error(value.error);
+      if(value&&value.manifest)reshade=value;else await loadReshade();
+    }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
+    render();
+  }
+  async function saveReshade(manifest){
+    try{const value=await LexeditorUI.callWindow?.("save_mod_reshade",PLUGIN,manifest);
+      if(value)reshade=value}
+    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
+    render();
+  }
+
+  function whereCard(){
+    // Rebirth's own d3d12.dll is the Agility SDK's. Lexeditor refuses to
+    // overwrite a DLL that is not ReShade, so this says which loader to pick
+    // before the refusal has to.
+    return LexeditorUI.detailPanel({title:"THE GAME",body:[
+      detailSection({title:"INSTALLATION",body:[
+        detailField({label:"FOLDER",control:readonlyField(
+          game.found?game.root:"Not located yet. Find Final Fantasy VII Rebirth from the main menu.")}),
+        detailField({label:"LOADER",control:readonlyField("DXGI"),
+          help:infoHelp("Rebirth already has a d3d12.dll of its own, the Agility SDK's, and Lexeditor will not overwrite a DLL that is not ReShade. Install through dxgi.")}),
+        detailField({label:"COVERAGE",control:readonlyField(
+          "Presentation only. Rebirth's packages are not read here."),
+          help:infoHelp("This plugin exists so ReShade presets can be built and installed for Rebirth. Nothing claims to edit the game's data.")}),
+      ]}),
+    ]});
+  }
+
+  function tweaks(){
+    return LexeditorUI.settingsColumns([
+      whereCard(),
+      // Every game's Tweaks page offers the same ReShade section: one ReShade
+      // kept by Lexeditor, the shader collection shared by every game, and a
+      // preset that travels with the mod.
+      LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade}),
+    ],{className:"ff7r2-tweaks",columns:1});
+  }
+
+  function render(){
+    const main=document.querySelector("#main");
+    main.replaceChildren(tweaks());
+    shell.refresh?.();
+  }
+  function navigate(value){tab=String(value||"tweaks");render()}
+
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",
+    plugin:{id:PLUGIN,name:"Final Fantasy VII Rebirth",themeName:"ff7r2",
+      theme:{accent:"#3f7fd0","accent-text":"#f2f7ff"}},
+    tabs:[{id:"tweaks",label:"Tweaks"}],
+    activeTab:()=>tab,navigate,dirtyCount:()=>0});
+
+  (async()=>{
+    await Promise.all([loadGame(),loadReshade()]);
+    render();
+    LexeditorUI.finishPluginLoading();
+  })();
+  </script>
+</body>
+</html>

@@ -541,6 +541,30 @@
       ],
       "thanks": [],
       "licenses": []
+    },
+    "ff7r2": {
+      "contributions": [
+        {
+          "name": "crosire / ReShade",
+          "role": "The post-processing loader Lexeditor installs for Rebirth.",
+          "url": "https://github.com/crosire/reshade"
+        },
+        {
+          "name": "CeeJayDK / SweetFX",
+          "role": "Colour grading, sharpening, SMAA, grain and vignette in the bundled shader collection.",
+          "url": "https://github.com/CeeJayDK/SweetFX"
+        },
+        {
+          "name": "luluco250 / FXShaders",
+          "role": "Bloom and depth of field in the bundled shader collection.",
+          "url": "https://github.com/luluco250/FXShaders"
+        },
+        {
+          "name": "mj-ehsan / NiceGuy Shaders",
+          "role": "Screen-space ambient occlusion in the bundled shader collection.",
+          "url": "https://github.com/mj-ehsan/NiceGuy-Shaders"
+        }
+      ]
     }
   }
 }
