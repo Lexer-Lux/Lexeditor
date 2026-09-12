@@ -44,6 +44,7 @@ from .runtime_overrides import (
     save_runtime_overrides,
 )
 from .settings_data import read_mcm_defaults, save_mcm_defaults
+from .source_revision import attach_source_revision, require_source_revision
 from .project_data import (
     project_files,
     read_project_file,
@@ -76,7 +77,7 @@ def project_summary(requested: str | None = None) -> dict:
     return {
         "root": str(PROJECT),
         "projectFiles": [path.name for path in files],
-        "projectFile": read_project_file(selected) if selected else None,
+        "projectFile": attach_source_revision(read_project_file(selected), selected) if selected else None,
         "projectError": project_error,
     }
 
@@ -174,7 +175,7 @@ class Handler(BaseHTTPRequestHandler):
                 if not source.is_file():
                     self.send_json({"error": f"SubModule.xml not found: {source}"}, 404)
                     return
-                self.send_json(read_submodule(source))
+                self.send_json(attach_source_revision(read_submodule(source), source))
             except ValueError as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -201,31 +202,31 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/skills":
             try:
-                self.send_json(read_skill_definitions(PROJECT))
+                self.send_json(attach_source_revision(read_skill_definitions(PROJECT)))
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
         if path == "/api/effects":
             try:
-                self.send_json(read_effect_definitions(PROJECT))
+                self.send_json(attach_source_revision(read_effect_definitions(PROJECT)))
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
         if path == "/api/perks":
             try:
-                self.send_json(read_perk_definitions(PROJECT))
+                self.send_json(attach_source_revision(read_perk_definitions(PROJECT)))
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
         if path == "/api/xp-sources":
             try:
-                self.send_json(read_xp_source_definitions(PROJECT))
+                self.send_json(attach_source_revision(read_xp_source_definitions(PROJECT)))
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
         if path == "/api/settings-defaults":
             try:
-                self.send_json(read_mcm_defaults(PROJECT))
+                self.send_json(attach_source_revision(read_mcm_defaults(PROJECT)))
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
@@ -300,7 +301,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not source.is_file():
                     self.send_json({"error": f"SubModule.xml not found: {source}"}, 404)
                     return
-                self.send_json(save_module(source, self.read_json()))
+                payload = self.read_json()
+                require_source_revision(source, payload.pop("sourceHash", None))
+                result = save_module(source, payload)
+                result["module"] = attach_source_revision(result["module"], source)
+                self.send_json(result)
             except (ValueError, TypeError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -308,7 +313,11 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/skills/save":
             try:
-                self.send_json(save_skill_definitions(PROJECT, self.read_json()))
+                payload = self.read_json()
+                snapshot = read_skill_definitions(PROJECT)
+                source = Path(str(snapshot.get("path") or ""))
+                require_source_revision(source, payload.pop("sourceHash", None))
+                self.send_json(attach_source_revision(save_skill_definitions(PROJECT, payload)))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -317,7 +326,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/effects/save":
             try:
                 payload = self.read_json()
-                self.send_json(save_effect_definitions(PROJECT, list(payload.get("edits") or [])))
+                snapshot = read_effect_definitions(PROJECT)
+                source = Path(str(snapshot.get("path") or ""))
+                require_source_revision(source, payload.pop("sourceHash", None))
+                self.send_json(attach_source_revision(save_effect_definitions(PROJECT, list(payload.get("edits") or []))))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -326,7 +338,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/perks/save":
             try:
                 payload = self.read_json()
-                self.send_json(save_perk_definitions(PROJECT, list(payload.get("edits") or [])))
+                snapshot = read_perk_definitions(PROJECT)
+                source = Path(str(snapshot.get("path") or ""))
+                require_source_revision(source, payload.pop("sourceHash", None))
+                self.send_json(attach_source_revision(save_perk_definitions(PROJECT, list(payload.get("edits") or []))))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -335,7 +350,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/xp-sources/save":
             try:
                 payload = self.read_json()
-                self.send_json(save_xp_source_definitions(PROJECT, list(payload.get("edits") or [])))
+                snapshot = read_xp_source_definitions(PROJECT)
+                source = Path(str(snapshot.get("path") or ""))
+                require_source_revision(source, payload.pop("sourceHash", None))
+                self.send_json(attach_source_revision(save_xp_source_definitions(PROJECT, list(payload.get("edits") or []))))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -344,7 +362,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/settings-defaults/save":
             try:
                 payload = self.read_json()
-                self.send_json(save_mcm_defaults(PROJECT, list(payload.get("edits") or [])))
+                snapshot = read_mcm_defaults(PROJECT)
+                source = Path(str(snapshot.get("path") or ""))
+                require_source_revision(source, payload.pop("sourceHash", None))
+                self.send_json(attach_source_revision(save_mcm_defaults(PROJECT, list(payload.get("edits") or []))))
             except (ValueError, TypeError, FileNotFoundError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:
@@ -398,9 +419,10 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 payload = self.read_json()
                 project_file = resolve_project_file(PROJECT, payload.get("project"))
-                self.send_json(
-                    save_project_properties(project_file, dict(payload.get("edits") or {}))
-                )
+                require_source_revision(project_file, payload.pop("sourceHash", None))
+                result = save_project_properties(project_file, dict(payload.get("edits") or {}))
+                result["project"] = attach_source_revision(result["project"], project_file)
+                self.send_json(result)
             except (ValueError, TypeError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)
             except Exception as error:

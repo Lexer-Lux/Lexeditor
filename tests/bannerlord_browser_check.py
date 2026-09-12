@@ -15,6 +15,7 @@ ARTIFACTS.mkdir(parents=True, exist_ok=True)
 MODULE = {
     "path": "C:/fixture/SubModule.xml", "name": "Fixture Module", "id": "FixtureMod",
     "version": "v1.0.0", "defaultModule": False, "singleplayer": True, "multiplayer": False,
+    "sourceHash": "module-hash",
     "dependencies": [], "communityDependencies": [],
     "legacyDependencies": [{
         "index": 0, "id": "LegacyBrowserDep", "order": "LoadAfterThis",
@@ -127,7 +128,7 @@ window.fetch=async function(input,options={{}}){{
     const body=options.body?JSON.parse(options.body):{{}};window.__bannerlordRequests.push({{path,body}});
     if(path==="/api/module/save"){{
       const current=__fixtures["/api/module"],metadata=body.metadata||{{}};
-      const module={{...current,...metadata,
+      const module={{...current,...metadata,sourceHash:"module-hash-after",
         dependencies:body.dependencies??current.dependencies,
         communityDependencies:body.communityDependencies??current.communityDependencies,
         legacyDependencies:body.legacyDependencies??current.legacyDependencies,
@@ -197,7 +198,9 @@ def main() -> None:
             assert request["body"]["legacyDependencies"][0]["id"] == "LegacyBrowserRenamed"
             assert request["body"]["legacyDependenciesBaseline"][0]["id"] == "LegacyBrowserDep"
             assert request["body"]["legacyDependenciesBaseline"][0]["attributes"]["Future"] == "keep-browser"
+            assert request["body"]["sourceHash"] == "module-hash"
             assert page.evaluate("state.savedModule.legacyDependencies[0].id") == "LegacyBrowserRenamed"
+            assert page.evaluate("state.savedModule.sourceHash") == "module-hash-after"
 
             page.evaluate("""
                 window.__bannerlordRequests=[];

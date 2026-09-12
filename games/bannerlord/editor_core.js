@@ -25,7 +25,7 @@
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   const metadata=m=>({name:m.name,id:m.id,version:m.version,moduleCategory:m.moduleCategory||"",moduleType:m.moduleType||"",url:m.url||"",updateInfo:m.updateInfo||"",defaultModule:!!m.defaultModule,singleplayer:!!m.singleplayer,multiplayer:!!m.multiplayer});
   const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],communityDependencies:m.communityDependencies||[],legacyDependencies:m.legacyDependencies||[],modulesToLoadAfterThis:m.modulesToLoadAfterThis||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;
-  const moduleSavePayload=(m,baseline)=>({...moduleEditable(m),legacyDependenciesBaseline:clone(baseline?.legacyDependencies||[])});
+  const moduleSavePayload=(m,baseline)=>({...moduleEditable(m),legacyDependenciesBaseline:clone(baseline?.legacyDependencies||[]),sourceHash:baseline?.sourceHash||""});
   const moduleDirty=()=>state.module&&state.savedModule&&!same(moduleEditable(state.module),moduleEditable(state.savedModule));
   const projectDirty=()=>state.project?.projectFile&&state.savedProject?.projectFile&&!same(state.project.projectFile.properties,state.savedProject.projectFile.properties);
   const skillsEditable=value=>value?{attributes:value.attributes||[],skills:value.skills||[]}:null;

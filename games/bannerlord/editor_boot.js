@@ -39,7 +39,7 @@
         const edits=Object.fromEntries((state.project.projectFile.editableProperties||[])
           .filter(name=>current[name]!==before[name]).map(name=>[name,current[name]]));
         if(Object.keys(edits).length){
-          const result=await post("/api/project/save",{project:state.project.projectFile?.name||null,edits});
+          const result=await post("/api/project/save",{project:state.project.projectFile?.name||null,edits,sourceHash:state.savedProject.projectFile?.sourceHash||""});
           state.project.projectFile=result.project;
           state.savedProject=clone(state.project);
         }
@@ -54,7 +54,8 @@
         });
         const result=await post("/api/skills/save",{
           attributes:makeEdits(state.skills.attributes,state.savedSkills.attributes,attributeFields),
-          skills:makeEdits(state.skills.skills,state.savedSkills.skills,skillFields)
+          skills:makeEdits(state.skills.skills,state.savedSkills.skills,skillFields),
+          sourceHash:state.savedSkills.sourceHash||""
         });
         state.skills=result;state.savedSkills=clone(result);
       }
@@ -66,7 +67,7 @@
           if(row.defaultHigh!==old.defaultHigh)fields.defaultHigh=row.defaultHigh;
           return Object.keys(fields).length?[{index:row.index,originalId:old.id,fields}]:[];
         });
-        const result=await post("/api/effects/save",{edits});
+        const result=await post("/api/effects/save",{edits,sourceHash:state.savedEffects.sourceHash||""});
         state.effects=result;state.savedEffects=clone(result);
       }
       if(perksDirty()){
@@ -77,7 +78,7 @@
           if(row.description!==old.description)fields.description=row.description;
           return Object.keys(fields).length?[{index:row.index,originalId:old.id,fields}]:[];
         });
-        const result=await post("/api/perks/save",{edits});
+        const result=await post("/api/perks/save",{edits,sourceHash:state.savedPerks.sourceHash||""});
         state.perks=result;state.savedPerks=clone(result);
       }
       if(xpSourcesDirty()){
@@ -85,7 +86,7 @@
           const old=state.savedXpSources.sources[index];if(!old)return [];
           return row.defaultAmount!==old.defaultAmount?[{index:row.index,originalId:old.id,fields:{defaultAmount:row.defaultAmount}}]:[];
         });
-        const result=await post("/api/xp-sources/save",{edits});
+        const result=await post("/api/xp-sources/save",{edits,sourceHash:state.savedXpSources.sourceHash||""});
         state.xpSources=result;state.savedXpSources=clone(result);
       }
       if(mcmDirty()){
@@ -93,7 +94,7 @@
           const old=state.savedMcmDefaults.settings[index];if(!old)return [];
           return row.default!==old.default?[{property:row.property,value:row.default}]:[];
         });
-        const result=await post("/api/settings-defaults/save",{edits});
+        const result=await post("/api/settings-defaults/save",{edits,sourceHash:state.savedMcmDefaults.sourceHash||""});
         state.mcmDefaults=result;state.savedMcmDefaults=clone(result);
       }
       if(runtimeDirty()){

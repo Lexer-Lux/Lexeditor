@@ -88,7 +88,8 @@ def smoke() -> list[str]:
                 raise RuntimeError("Bannerlord Data Map did not expose structured module metadata")
 
             saved = request_json(session.url + "api/module/save", {
-                "metadata": {"name": "Smoke Module Edited"}
+                "metadata": {"name": "Smoke Module Edited"},
+                "sourceHash": module.get("sourceHash", ""),
             })
             if saved.get("saved", 0) < 1 or saved.get("module", {}).get("name") != "Smoke Module Edited":
                 raise RuntimeError("Bannerlord temporary module metadata did not save")
