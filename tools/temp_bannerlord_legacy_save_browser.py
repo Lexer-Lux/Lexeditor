@@ -1,0 +1,59 @@
+from pathlib import Path
+
+
+path = Path("tests/bannerlord_browser_check.py")
+text = path.read_text(encoding="utf-8")
+old = '''    if(path==="/api/module-data/save")return new Response(JSON.stringify(__moduleDataFixed),{status:200});
+    if(path==="/api/gauntlet/save")return new Response(JSON.stringify(__gauntlet),{status:200});
+'''
+new = '''    if(path==="/api/module/save"){
+      const current=__fixtures["/api/module"],metadata=body.metadata||{};
+      const module={...current,...metadata,
+        dependencies:body.dependencies??current.dependencies,
+        communityDependencies:body.communityDependencies??current.communityDependencies,
+        legacyDependencies:body.legacyDependencies??current.legacyDependencies,
+        modulesToLoadAfterThis:body.modulesToLoadAfterThis??current.modulesToLoadAfterThis,
+        incompatibleModules:body.incompatibleModules??current.incompatibleModules,
+        submodules:body.submodules??current.submodules,xmls:body.xmls??current.xmls};
+      return new Response(JSON.stringify({saved:1,module}),{status:200});
+    }
+    if(path==="/api/module-data/save")return new Response(JSON.stringify(__moduleDataFixed),{status:200});
+    if(path==="/api/gauntlet/save")return new Response(JSON.stringify(__gauntlet),{status:200});
+'''
+if text.count(old) != 1:
+    raise SystemExit(f"Expected one POST fixture insertion point, found {text.count(old)}")
+text = text.replace(old, new, 1)
+
+old = '''            legacy_id.fill("LegacyBrowserRenamed")
+            assert page.evaluate("moduleDirty()") is True
+            assert page.evaluate("state.module.legacyDependencies[0].id") == "LegacyBrowserRenamed"
+            legacy_id.fill("LegacyBrowserDep")
+            assert page.evaluate("moduleDirty()") is False
+'''
+new = '''            legacy_id.fill("LegacyBrowserRenamed")
+            assert page.evaluate("moduleDirty()") is True
+            assert page.evaluate("state.module.legacyDependencies[0].id") == "LegacyBrowserRenamed"
+            page.evaluate("save()")
+            page.wait_for_function("!moduleDirty()")
+            request = page.evaluate("window.__bannerlordRequests.find(row=>row.path==='/api/module/save')")
+            assert request["body"]["legacyDependencies"][0]["id"] == "LegacyBrowserRenamed"
+            assert request["body"]["legacyDependenciesBaseline"][0]["id"] == "LegacyBrowserDep"
+            assert request["body"]["legacyDependenciesBaseline"][0]["attributes"]["Future"] == "keep-browser"
+            assert page.evaluate("state.savedModule.legacyDependencies[0].id") == "LegacyBrowserRenamed"
+'''
+if text.count(old) != 1:
+    raise SystemExit(f"Expected one legacy dirty-state block, found {text.count(old)}")
+path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+memory = Path("codex/bannerlord/project-memory.md")
+text = memory.read_text(encoding="utf-8")
+text = text.replace(
+    "As of 2026-09-09, the Bannerlord plugin uses these conservative rules.",
+    "As of 2026-09-12, the Bannerlord plugin uses these conservative rules.",
+    1,
+)
+old = '- Normalize BLSE `DependedModuleMetadatas`, legacy `LoadAfterModules`, and optional dependency blocks before native dependency rows. For duplicate load relations, the first row for a module ID wins; incompatibility relations use a separate first-ID-wins set. Existing compatibility-only legacy rows are structured-editable by ID/removal while retaining their original element shape and unknown attributes; creating new legacy rows stays source-only so Lexeditor does not invent a historical schema.'
+new = old + ' Structured legacy saves carry the originally loaded valid-row identity baseline; if valid rows are added, removed, or renamed on disk, Lexeditor refuses the save until reload. Malformed blank-ID legacy elements remain unmanaged and preserved.'
+if text.count(old) != 1:
+    raise SystemExit("Project-memory legacy invariant changed")
+memory.write_text(text.replace(old, new, 1), encoding="utf-8")
