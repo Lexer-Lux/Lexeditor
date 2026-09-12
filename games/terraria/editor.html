@@ -20,19 +20,20 @@
     .terraria-map th,.terraria-localization-table th{background:var(--lex-panel-muted,#eceff1)}
     .terraria-status{font-weight:700;text-transform:uppercase;font-size:.8em;letter-spacing:.04em}
     .terraria-build-card{display:grid;gap:9px}
-    .terraria-build-row,.terraria-localization-toolbar,.terraria-localization-create{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .terraria-build-row,.terraria-localization-toolbar,.terraria-localization-create,.terraria-source-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .terraria-build-button{padding:8px 14px;border:1px solid var(--lex-border);border-radius:var(--lex-radius);color:var(--lex-text);background:var(--lex-panel-2);font:700 13px/1 var(--lex-font);cursor:pointer}
     .terraria-build-button:hover:not(:disabled){color:var(--lex-accent-text);border-color:var(--lex-accent);background:var(--lex-accent)}
     .terraria-build-button:disabled{opacity:.45;cursor:default}
     .terraria-build-path{overflow-wrap:anywhere;color:var(--lex-muted);font-size:.9em}
     .terraria-build-log{max-height:260px;margin:0;padding:10px;overflow:auto;white-space:pre-wrap;background:var(--lex-bg);border:1px solid var(--lex-border);font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
-    .terraria-localization-toolbar select{min-width:320px;max-width:100%}
+    .terraria-localization-toolbar select,.terraria-source-toolbar select{min-width:320px;max-width:100%}
     .terraria-localization-toolbar input{min-width:220px}
     .terraria-localization-create input{min-width:220px;flex:1}
     .terraria-localization-prefix{font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--lex-muted)}
     .terraria-localization-table input{width:100%;min-width:260px}
     .terraria-localization-key{max-width:430px;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
     .terraria-readonly-value{max-width:470px;max-height:110px;overflow:auto;white-space:pre-wrap;color:var(--lex-muted)}
+    .terraria-source-editor{width:100%;min-height:62vh;resize:vertical;padding:12px;border:1px solid var(--lex-border);background:var(--lex-bg);color:var(--lex-text);tab-size:4;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre}
   </style>
 </head>
 <body>
@@ -43,7 +44,8 @@
   "use strict";
   const {el,detailPanel,detailSection,detailField,readonlyField}=LexeditorUI;
   let tab="metadata",saved=null,current=null,mapRows=[],buildInfo=null,buildResult=null,building=false;
-  let localizationFiles=[],locSaved=null,locCurrent=null,locLoading=false,locFilter="",locNewKey="",locNewValue="",error="";
+  let localizationFiles=[],locSaved=null,locCurrent=null,locLoading=false,locFilter="",locNewKey="",locNewValue="";
+  let sourceFiles=[],sourceSaved=null,sourceCurrent=null,sourceLoading=false,error="";
 
   const clone=value=>JSON.parse(JSON.stringify(value));
   async function request(path,options={}){
@@ -56,18 +58,15 @@
     if(!saved||!current)return [];
     return Object.keys(current.values).filter(key=>JSON.stringify(current.values[key])!==JSON.stringify(saved.values[key]));
   }
-  function localizationCreatedEntries(){
-    return locCurrent?.entries?.filter(entry=>entry.isNew)??[];
-  }
+  function localizationCreatedEntries(){return locCurrent?.entries?.filter(entry=>entry.isNew)??[]}
   function localizationUpdatedEntries(){
     if(!locSaved||!locCurrent)return [];
     const original=new Map(locSaved.entries.map(entry=>[entry.key,entry.value]));
     return locCurrent.entries.filter(entry=>entry.editable&&!entry.isNew&&entry.value!==original.get(entry.key));
   }
-  function localizationDirtyEntries(){
-    return [...localizationUpdatedEntries(),...localizationCreatedEntries()];
-  }
-  const dirtyCount=()=>dirtyKeys().length+localizationDirtyEntries().length;
+  function localizationDirtyEntries(){return [...localizationUpdatedEntries(),...localizationCreatedEntries()]}
+  function sourceDirty(){return !!(sourceSaved&&sourceCurrent&&sourceCurrent.text!==sourceSaved.text)}
+  const dirtyCount=()=>dirtyKeys().length+localizationDirtyEntries().length+(sourceDirty()?1:0);
   function setValue(key,value){current.values[key]=value;render();shell?.refresh?.()}
   function textControl(key,{placeholder=""}={}){
     return el("input",{type:"text",value:current.values[key]??"",placeholder,
@@ -76,21 +75,15 @@
   function listControl(key,{placeholder=""}={}){
     const values=Array.isArray(current.values[key])?current.values[key]:[];
     return el("textarea",{class:"terraria-list",value:values.join("\n"),placeholder,disabled:!current.editable,
-      oninput:event=>{
-        current.values[key]=event.target.value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
-        shell?.refresh?.();
-      }});
+      oninput:event=>{current.values[key]=event.target.value.split(/\r?\n/).map(value=>value.trim()).filter(Boolean);shell?.refresh?.()}});
   }
   function boolControl(key){
     if(!(key in current.values))return readonlyField("Not declared in build.txt");
-    return el("input",{type:"checkbox",checked:!!current.values[key],disabled:!current.editable,
-      onchange:event=>setValue(key,event.target.checked)});
+    return el("input",{type:"checkbox",checked:!!current.values[key],disabled:!current.editable,onchange:event=>setValue(key,event.target.checked)});
   }
   function sideControl(){
     const select=el("select",{disabled:!current.editable,onchange:event=>setValue("side",event.target.value)});
-    for(const value of ["Both","Client","Server","NoSync"]){
-      const option=el("option",{value},value);option.selected=current.values.side===value;select.append(option);
-    }
+    for(const value of ["Both","Client","Server","NoSync"]){const option=el("option",{value},value);option.selected=current.values.side===value;select.append(option)}
     return select;
   }
   function warnings(){
@@ -109,57 +102,36 @@
         detailField({label:"VERSION",control:textControl("version",{placeholder:"1.0"}),dataType:"VERSION"}),
         detailField({label:"HOMEPAGE",control:textControl("homepage",{placeholder:"Not declared"}),dataType:"STRING"}),
       ]}),
-      detailSection({title:"RUNTIME",body:[
-        detailField({label:"SIDE",control:sideControl(),dataType:"ENUM"}),
-      ]}),
+      detailSection({title:"RUNTIME",body:[detailField({label:"SIDE",control:sideControl(),dataType:"ENUM"})]}),
       detailSection({title:"PACKAGE",body:[
         detailField({label:"HIDE CODE",control:boolControl("hideCode"),dataType:"BOOL"}),
         detailField({label:"HIDE RESOURCES",control:boolControl("hideResources"),dataType:"BOOL"}),
         detailField({label:"INCLUDE SOURCE",control:boolControl("includeSource"),dataType:"BOOL"}),
       ]}),
     ]});
-    return el("div",{class:"terraria-page"},...warnings(),panel,
-      el("div",{class:"terraria-note"},"Lexeditor rewrites only modeled properties. Comments, unknown/future keys, localized display-name lines, and unrelated formatting remain untouched."));
+    return el("div",{class:"terraria-page"},...warnings(),panel,el("div",{class:"terraria-note"},"Lexeditor rewrites only modeled properties. Comments, unknown/future keys, localized display-name lines, and unrelated formatting remain untouched."));
   }
   function buildCard(){
     if(!buildInfo)return el("div",{class:"terraria-note"},"Checking native tModLoader build handoff…");
     const blockedByDirty=dirtyCount()>0;
-    const reason=blockedByDirty
-      ?"Save or discard edits before building."
-      :(buildInfo.reason||"Ready to invoke tModLoader's native -build path.");
+    const reason=blockedByDirty?"Save or discard edits before building.":(buildInfo.reason||"Ready to invoke tModLoader's native -build path.");
     const packageLabel=buildInfo.artifactExists?"Package built":"Package missing";
-    const enabledLabel=!buildInfo.enabledStateValid
-      ?"Enabled state unknown"
-      :(buildInfo.enabled?"Enabled":"Disabled");
+    const enabledLabel=!buildInfo.enabledStateValid?"Enabled state unknown":(buildInfo.enabled?"Enabled":"Disabled");
     const card=el("div",{class:"terraria-note terraria-build-card"},
       el("div",{class:"terraria-build-row"},
-        el("button",{class:"terraria-build-button",disabled:building||blockedByDirty||!buildInfo.available,onclick:buildMod},
-          building?"BUILDING…":"BUILD MOD"),
+        el("button",{class:"terraria-build-button",disabled:building||blockedByDirty||!buildInfo.available,onclick:buildMod},building?"BUILDING…":"BUILD MOD"),
         el("strong",{},buildInfo.available&&!blockedByDirty?"Native build ready":"Native build unavailable")),
       el("div",{},reason),
-      el("div",{class:"terraria-build-row"},
-        el("span",{class:"terraria-status"},packageLabel),
-        el("span",{class:"terraria-status"},enabledLabel)),
+      el("div",{class:"terraria-build-row"},el("span",{class:"terraria-status"},packageLabel),el("span",{class:"terraria-status"},enabledLabel)),
       el("div",{class:"terraria-build-path"},`Expected package: ${buildInfo.expectedArtifact}`),
       el("div",{class:"terraria-build-path"},`tModLoader state: ${buildInfo.enabledStatePath}`));
-    if(!buildInfo.enabledStateValid&&buildInfo.enabledStateError){
-      card.append(el("div",{class:"terraria-error"},buildInfo.enabledStateError));
-    }
+    if(!buildInfo.enabledStateValid&&buildInfo.enabledStateError)card.append(el("div",{class:"terraria-error"},buildInfo.enabledStateError));
     if(buildResult){
-      const success=buildResult.ok;
-      card.classList.add(success?"terraria-success":"terraria-error");
-      const summary=success
-        ?`Build succeeded${buildResult.artifactExists?" and produced the expected .tmod":""}${buildResult.enabled?"; tModLoader reports it enabled.":"."}`
-        :(buildResult.error||`Build failed with exit code ${buildResult.exitCode??"unknown"}.`);
+      const success=buildResult.ok;card.classList.add(success?"terraria-success":"terraria-error");
+      const summary=success?`Build succeeded${buildResult.artifactExists?" and produced the expected .tmod":""}${buildResult.enabled?"; tModLoader reports it enabled.":"."}`:(buildResult.error||`Build failed with exit code ${buildResult.exitCode??"unknown"}.`);
       card.append(el("strong",{},summary));
-      if(success&&buildResult.enabledStateValid&&!buildResult.enabled){
-        card.append(el("div",{},"The package was built, but enabled.json does not currently list this mod as enabled."));
-      }
-      const log=[
-        buildResult.stdout&&`STDOUT\n${buildResult.stdout}`,
-        buildResult.stderr&&`STDERR\n${buildResult.stderr}`,
-        buildResult.nativeLog&&`TMODLOADER NATIVES LOG\n${buildResult.nativeLog}`,
-      ].filter(Boolean).join("\n\n");
+      if(success&&buildResult.enabledStateValid&&!buildResult.enabled)card.append(el("div",{},"The package was built, but enabled.json does not currently list this mod as enabled."));
+      const log=[buildResult.stdout&&`STDOUT\n${buildResult.stdout}`,buildResult.stderr&&`STDERR\n${buildResult.stderr}`,buildResult.nativeLog&&`TMODLOADER NATIVES LOG\n${buildResult.nativeLog}`].filter(Boolean).join("\n\n");
       if(log)card.append(el("pre",{class:"terraria-build-log"},log));
     }
     return card;
@@ -176,179 +148,114 @@
         detailField({label:"SORT AFTER",control:listControl("sortAfter",{placeholder:"ModName"}),dataType:"LIST"}),
         detailField({label:"SORT BEFORE",control:listControl("sortBefore",{placeholder:"ModName"}),dataType:"LIST"}),
       ]}),
-      detailSection({title:"BUILD FILTER",body:[
-        detailField({label:"BUILD IGNORE",control:listControl("buildIgnore",{placeholder:"Folder/*\nFile.ext"}),dataType:"LIST"}),
-      ]}),
+      detailSection({title:"BUILD FILTER",body:[detailField({label:"BUILD IGNORE",control:listControl("buildIgnore",{placeholder:"Folder/*\nFile.ext"}),dataType:"LIST"})]}),
     ]});
-    return el("div",{class:"terraria-page"},...warnings(),panel,buildCard(),
-      el("div",{class:"terraria-note"},"Strong and weak references must not repeat the same mod name. A strong mod reference also cannot duplicate a DLL reference. Version-qualified mod references use ModName@1.2 style syntax. Lexeditor reads tModLoader's local enabled state but does not rewrite enabled.json."));
+    return el("div",{class:"terraria-page"},...warnings(),panel,buildCard(),el("div",{class:"terraria-note"},"Strong and weak references must not repeat the same mod name. A strong mod reference also cannot duplicate a DLL reference. Version-qualified mod references use ModName@1.2 style syntax. Lexeditor reads tModLoader's local enabled state but does not rewrite enabled.json."));
   }
-  function projectName(){
-    const parts=String(buildInfo?.project||"").split(/[\\/]/).filter(Boolean);
-    return parts.at(-1)||"ExampleMod";
-  }
+  function projectName(){const parts=String(buildInfo?.project||"").split(/[\\/]/).filter(Boolean);return parts.at(-1)||"ExampleMod"}
   function addLocalizationEntry(){
     if(!locCurrent?.editable)return;
-    const suffix=locNewKey.trim();
-    if(!suffix){error="Enter a localization key.";render();return}
+    const suffix=locNewKey.trim();if(!suffix){error="Enter a localization key.";render();return}
     const key=locCurrent.prefix?`${locCurrent.prefix}.${suffix}`:suffix;
-    if(locCurrent.entries.some(entry=>entry.key===key)){
-      error=`Localization key already exists: ${key}`;render();return;
-    }
-    locCurrent.entries.push({key,sourceKey:suffix,value:locNewValue,line:null,editable:true,kind:"new",isNew:true});
-    locNewKey="";locNewValue="";error="";render();shell?.refresh?.();
+    if(locCurrent.entries.some(entry=>entry.key===key)){error=`Localization key already exists: ${key}`;render();return}
+    locCurrent.entries.push({key,sourceKey:suffix,value:locNewValue,line:null,editable:true,kind:"new",isNew:true});locNewKey="";locNewValue="";error="";render();shell?.refresh?.();
   }
-  function removeNewLocalizationEntry(index){
-    if(!locCurrent?.entries?.[index]?.isNew)return;
-    locCurrent.entries.splice(index,1);render();shell?.refresh?.();
-  }
+  function removeNewLocalizationEntry(index){if(!locCurrent?.entries?.[index]?.isNew)return;locCurrent.entries.splice(index,1);render();shell?.refresh?.()}
   function localizationPanel(){
-    if(!localizationFiles.length){
-      return el("div",{class:"terraria-page"},...warnings(),
-        el("div",{class:"terraria-note"},"No .hjson localization files are present in this source project yet. tModLoader can generate localization entries after a local build/reload as content is added."));
-    }
+    if(!localizationFiles.length)return el("div",{class:"terraria-page"},...warnings(),el("div",{class:"terraria-note"},"No .hjson localization files are present in this source project yet. tModLoader can generate localization entries after a local build/reload as content is added."));
     const selectedPath=locCurrent?.path||localizationFiles[0].path;
     const selector=el("select",{disabled:locLoading||localizationDirtyEntries().length>0,onchange:event=>loadLocalizationFile(event.target.value)});
-    for(const file of localizationFiles){
-      const label=`${file.culture||"ignored"} · ${file.path}${file.error?" · error":""}`;
-      const option=el("option",{value:file.path},label);option.selected=file.path===selectedPath;selector.append(option);
-    }
-    const toolbar=el("div",{class:"terraria-note terraria-localization-toolbar"},
-      el("strong",{},"Localization file"),selector,
-      locLoading?el("span",{},"Loading…"):el("span",{class:"terraria-status"},locCurrent?.culture||"NOT LOADABLE"),
-      el("input",{type:"search",value:locFilter,placeholder:"Filter keys or values",oninput:event=>{locFilter=event.target.value;render()}}));
-    if(!locCurrent){
-      return el("div",{class:"terraria-page"},...warnings(),toolbar,
-        el("div",{class:"terraria-note"},"Select a loadable localization file."));
-    }
+    for(const file of localizationFiles){const label=`${file.culture||"ignored"} · ${file.path}${file.error?" · error":""}`;const option=el("option",{value:file.path},label);option.selected=file.path===selectedPath;selector.append(option)}
+    const toolbar=el("div",{class:"terraria-note terraria-localization-toolbar"},el("strong",{},"Localization file"),selector,locLoading?el("span",{},"Loading…"):el("span",{class:"terraria-status"},locCurrent?.culture||"NOT LOADABLE"),el("input",{type:"search",value:locFilter,placeholder:"Filter keys or values",oninput:event=>{locFilter=event.target.value;render()}}));
+    if(!locCurrent)return el("div",{class:"terraria-page"},...warnings(),toolbar,el("div",{class:"terraria-note"},"Select a loadable localization file."));
     const notes=[];
     if(!locCurrent.loadable)notes.push(el("div",{class:"terraria-note terraria-error"},"tModLoader will ignore this file because its path does not identify a known culture."));
     if(locCurrent.duplicates.length)notes.push(el("div",{class:"terraria-note terraria-error"},`Structured saving is disabled because effective localization keys repeat: ${locCurrent.duplicates.join(", ")}.`));
     if(locCurrent.unsupported)notes.push(el("div",{class:"terraria-note"},`${locCurrent.unsupported} construct(s) are preservation-only. Multiline strings, arrays, typed values and other complex HJSON remain read-only.`));
-
-    const createForm=locCurrent.editable?el("div",{class:"terraria-note terraria-localization-create"},
-      el("strong",{},"Add key"),
-      locCurrent.prefix?el("span",{class:"terraria-localization-prefix"},`${locCurrent.prefix}.`):null,
-      el("input",{type:"text",value:locNewKey,placeholder:locCurrent.prefix?"Custom.Greeting":`Mods.${projectName()}.Custom.Greeting`,oninput:event=>{locNewKey=event.target.value}}),
-      el("input",{type:"text",value:locNewValue,placeholder:"Value",oninput:event=>{locNewValue=event.target.value}}),
-      el("button",{class:"terraria-build-button",type:"button",onclick:addLocalizationEntry},"ADD")) : null;
-
+    const createForm=locCurrent.editable?el("div",{class:"terraria-note terraria-localization-create"},el("strong",{},"Add key"),locCurrent.prefix?el("span",{class:"terraria-localization-prefix"},`${locCurrent.prefix}.`):null,el("input",{type:"text",value:locNewKey,placeholder:locCurrent.prefix?"Custom.Greeting":`Mods.${projectName()}.Custom.Greeting`,oninput:event=>{locNewKey=event.target.value}}),el("input",{type:"text",value:locNewValue,placeholder:"Value",oninput:event=>{locNewValue=event.target.value}}),el("button",{class:"terraria-build-button",type:"button",onclick:addLocalizationEntry},"ADD")):null;
     const query=locFilter.trim().toLocaleLowerCase();
-    const visible=locCurrent.entries.map((entry,index)=>({entry,index})).filter(({entry})=>
-      !query||entry.key.toLocaleLowerCase().includes(query)||String(entry.value??"").toLocaleLowerCase().includes(query));
+    const visible=locCurrent.entries.map((entry,index)=>({entry,index})).filter(({entry})=>!query||entry.key.toLocaleLowerCase().includes(query)||String(entry.value??"").toLocaleLowerCase().includes(query));
     const rows=visible.map(({entry,index})=>{
-      const control=entry.editable
-        ?el("input",{type:"text",value:entry.value,oninput:event=>{locCurrent.entries[index].value=event.target.value;shell?.refresh?.()}})
-        :el("div",{class:"terraria-readonly-value"},entry.value||`[${entry.kind}]`);
-      const mode=entry.isNew
-        ?el("button",{class:"terraria-build-button",type:"button",onclick:()=>removeNewLocalizationEntry(index)},"REMOVE")
-        :el("span",{class:"terraria-status"},entry.editable?"EDITABLE":entry.kind);
-      return el("tr",{},
-        el("td",{class:"terraria-localization-key"},entry.key),
-        el("td",{},control),
-        el("td",{},entry.isNew?"NEW":String(entry.line)),
-        el("td",{},mode));
+      const control=entry.editable?el("input",{type:"text",value:entry.value,oninput:event=>{locCurrent.entries[index].value=event.target.value;shell?.refresh?.()}}):el("div",{class:"terraria-readonly-value"},entry.value||`[${entry.kind}]`);
+      const mode=entry.isNew?el("button",{class:"terraria-build-button",type:"button",onclick:()=>removeNewLocalizationEntry(index)},"REMOVE"):el("span",{class:"terraria-status"},entry.editable?"EDITABLE":entry.kind);
+      return el("tr",{},el("td",{class:"terraria-localization-key"},entry.key),el("td",{},control),el("td",{},entry.isNew?"NEW":String(entry.line)),el("td",{},mode));
     });
-    const table=el("table",{class:"terraria-localization-table"},
-      el("thead",{},el("tr",{},...["KEY","VALUE","LINE","MODE"].map(label=>el("th",{},label)))),
-      el("tbody",{},...rows));
+    const table=el("table",{class:"terraria-localization-table"},el("thead",{},el("tr",{},...["KEY","VALUE","LINE","MODE"].map(label=>el("th",{},label)))),el("tbody",{},...rows));
     const meta=`${locCurrent.culture||"unknown culture"}${locCurrent.prefix?` · prefix ${locCurrent.prefix}`:""} · ${locCurrent.entries.length} flattened leaves${query?` · ${visible.length} shown`:""}`;
-    return el("div",{class:"terraria-page"},...warnings(),toolbar,...notes,createForm,
-      el("div",{class:"terraria-note"},meta),
-      visible.length?table:el("div",{class:"terraria-note"},query?"No localization entries match this filter.":"This localization file currently has no scalar leaf entries."),
-      el("div",{class:"terraria-note"},"Lexeditor edits existing single-line string leaves and can append new dotted string keys. It preserves comments, object nesting, dotted source keys, whitespace, line endings and untouched HJSON verbatim; multiline/complex HJSON and key deletion remain preservation-only."));
+    return el("div",{class:"terraria-page"},...warnings(),toolbar,...notes,createForm,el("div",{class:"terraria-note"},meta),visible.length?table:el("div",{class:"terraria-note"},query?"No localization entries match this filter.":"This localization file currently has no scalar leaf entries."),el("div",{class:"terraria-note"},"Lexeditor edits existing single-line string leaves and can append new dotted string keys. It preserves comments, object nesting, dotted source keys, whitespace, line endings and untouched HJSON verbatim; multiline/complex HJSON and key deletion remain preservation-only."));
+  }
+  function sourcePanel(){
+    if(!sourceFiles.length)return el("div",{class:"terraria-page"},...warnings(),el("div",{class:"terraria-note"},"No C# source files are present in this source project."));
+    const selectedPath=sourceCurrent?.path||sourceFiles[0].path;
+    const selector=el("select",{disabled:sourceLoading||sourceDirty(),onchange:event=>loadSourceFile(event.target.value)});
+    for(const file of sourceFiles){const label=`${file.path}${file.error?" · error":""}`;const option=el("option",{value:file.path},label);option.selected=file.path===selectedPath;selector.append(option)}
+    const toolbar=el("div",{class:"terraria-note terraria-source-toolbar"},el("strong",{},"C# source"),selector,sourceLoading?el("span",{},"Loading…"):el("span",{class:"terraria-status"},sourceCurrent?`${sourceCurrent.lines} lines · ${sourceCurrent.bytes} bytes`:"NO FILE"));
+    if(!sourceCurrent)return el("div",{class:"terraria-page"},...warnings(),toolbar,el("div",{class:"terraria-note"},"Select a readable UTF-8 .cs file."));
+    const editor=el("textarea",{class:"terraria-source-editor",spellcheck:false,value:sourceCurrent.text,oninput:event=>{sourceCurrent.text=event.target.value;shell?.refresh?.()},onkeydown:event=>{
+      if(event.key!=="Tab")return;event.preventDefault();const target=event.target,start=target.selectionStart,end=target.selectionEnd;target.setRangeText("\t",start,end,"end");sourceCurrent.text=target.value;shell?.refresh?.();
+    }});
+    return el("div",{class:"terraria-page"},...warnings(),toolbar,editor,el("div",{class:"terraria-note"},"This is a raw C# text editor, not a structured C# model. Lexeditor preserves UTF-8 BOM state and the file's existing newline style, refuses stale writes, and leaves syntax/semantic validation to tModLoader's compiler during Build Mod."));
   }
   function dataMapPanel(){
-    const table=el("table",{class:"terraria-map"},
-      el("thead",{},el("tr",{},...["PATH","FAMILY","COVERAGE"].map(label=>el("th",{},label)))),
-      el("tbody",{},...mapRows.map(row=>el("tr",{},
-        el("td",{},row.path),el("td",{},row.family),el("td",{class:"terraria-status"},row.status)))));
-    return el("div",{class:"terraria-page"},
-      el("div",{class:"terraria-note"},"Structured means Lexeditor has a format-aware editor. Recognized means the file family is known but remains outside the current structured editing surface."),table);
+    const table=el("table",{class:"terraria-map"},el("thead",{},el("tr",{},...["PATH","FAMILY","COVERAGE"].map(label=>el("th",{},label)))),el("tbody",{},...mapRows.map(row=>el("tr",{},el("td",{},row.path),el("td",{},row.family),el("td",{class:"terraria-status"},row.status)))));
+    return el("div",{class:"terraria-page"},el("div",{class:"terraria-note"},"Structured means Lexeditor has a format-aware editor. Recognized means the file family is known but remains outside the current structured editing surface; C# is currently raw-text editable but not structured."),table);
   }
   function render(){
-    const content=tab==="datamap"?dataMapPanel():tab==="localization"?localizationPanel():tab==="dependencies"?dependenciesPanel():metadataPanel();
-    document.querySelector("#main").replaceChildren(content);
-    shell?.refresh?.();
+    const content=tab==="datamap"?dataMapPanel():tab==="source"?sourcePanel():tab==="localization"?localizationPanel():tab==="dependencies"?dependenciesPanel():metadataPanel();
+    document.querySelector("#main").replaceChildren(content);shell?.refresh?.();
   }
   async function loadLocalizationFile(path){
-    if(!path||localizationDirtyEntries().length)return;
-    locLoading=true;error="";render();
-    try{
-      const state=await request(`/api/localization/file?path=${encodeURIComponent(path)}`);
-      locSaved=clone(state);locCurrent=clone(state);locNewKey="";locNewValue="";
-    }catch(exc){locSaved=null;locCurrent=null;error=String(exc.message||exc)}
+    if(!path||localizationDirtyEntries().length)return;locLoading=true;error="";render();
+    try{const state=await request(`/api/localization/file?path=${encodeURIComponent(path)}`);locSaved=clone(state);locCurrent=clone(state);locNewKey="";locNewValue=""}catch(exc){locSaved=null;locCurrent=null;error=String(exc.message||exc)}
     locLoading=false;render();
+  }
+  async function loadSourceFile(path){
+    if(!path||sourceDirty())return;sourceLoading=true;error="";render();
+    try{const state=await request(`/api/source/file?path=${encodeURIComponent(path)}`);sourceSaved=clone(state);sourceCurrent=clone(state)}catch(exc){sourceSaved=null;sourceCurrent=null;error=String(exc.message||exc)}
+    sourceLoading=false;render();
   }
   async function load(){
     try{
-      const [metadata,map,build,localization]=await Promise.all([
-        request("/api/build-metadata"),request("/api/data-map"),request("/api/build"),request("/api/localization"),
-      ]);
-      saved=clone(metadata);current=clone(metadata);mapRows=map.rows;buildInfo=build;localizationFiles=localization.files;error="";
-      const first=localizationFiles.find(file=>!file.error&&file.loadable)?.path||localizationFiles.find(file=>!file.error)?.path;
-      if(first){
-        const state=await request(`/api/localization/file?path=${encodeURIComponent(first)}`);
-        locSaved=clone(state);locCurrent=clone(state);
-      }
+      const [metadata,map,build,localization,source]=await Promise.all([request("/api/build-metadata"),request("/api/data-map"),request("/api/build"),request("/api/localization"),request("/api/source")]);
+      saved=clone(metadata);current=clone(metadata);mapRows=map.rows;buildInfo=build;localizationFiles=localization.files;sourceFiles=source.files;error="";
+      const firstLoc=localizationFiles.find(file=>!file.error&&file.loadable)?.path||localizationFiles.find(file=>!file.error)?.path;
+      const firstSource=sourceFiles.find(file=>!file.error&&file.editable)?.path;
+      const loads=[];
+      if(firstLoc)loads.push(request(`/api/localization/file?path=${encodeURIComponent(firstLoc)}`).then(state=>{locSaved=clone(state);locCurrent=clone(state)}));
+      if(firstSource)loads.push(request(`/api/source/file?path=${encodeURIComponent(firstSource)}`).then(state=>{sourceSaved=clone(state);sourceCurrent=clone(state)}));
+      await Promise.all(loads);
     }catch(exc){error=String(exc.message||exc)}
     render();
   }
   async function save(){
-    if(!dirtyCount())return;
-    error="";
+    if(!dirtyCount())return;error="";
     try{
       if(saved&&current&&dirtyKeys().length){
-        const updates={};
-        for(const key of dirtyKeys()){
-          const value=current.values[key];
-          if(value===""&&!(key in saved.values))continue;
-          if(Array.isArray(value)&&!value.length&&!(key in saved.values))continue;
-          updates[key]=value;
-        }
-        if(Object.keys(updates).length){
-          const result=await request("/api/build-metadata",{method:"POST",body:JSON.stringify({updates,expectedSha256:saved.sha256})});
-          saved=clone(result);current=clone(result);
-        }else{
-          saved=clone(current);
-        }
+        const updates={};for(const key of dirtyKeys()){const value=current.values[key];if(value===""&&!(key in saved.values))continue;if(Array.isArray(value)&&!value.length&&!(key in saved.values))continue;updates[key]=value}
+        if(Object.keys(updates).length){const result=await request("/api/build-metadata",{method:"POST",body:JSON.stringify({updates,expectedSha256:saved.sha256})});saved=clone(result);current=clone(result)}else saved=clone(current);
       }
-      const changedLocalization=localizationUpdatedEntries();
-      const createdLocalization=localizationCreatedEntries();
+      const changedLocalization=localizationUpdatedEntries(),createdLocalization=localizationCreatedEntries();
       if(locSaved&&locCurrent&&(changedLocalization.length||createdLocalization.length)){
-        const updates={},creates={};
-        for(const entry of changedLocalization)updates[entry.key]=entry.value;
-        for(const entry of createdLocalization)creates[entry.key]=entry.value;
-        const result=await request("/api/localization/file",{method:"POST",body:JSON.stringify({path:locCurrent.path,updates,creates,expectedSha256:locSaved.sha256})});
-        locSaved=clone(result);locCurrent=clone(result);locNewKey="";locNewValue="";
-        localizationFiles=(await request("/api/localization")).files;
+        const updates={},creates={};for(const entry of changedLocalization)updates[entry.key]=entry.value;for(const entry of createdLocalization)creates[entry.key]=entry.value;
+        const result=await request("/api/localization/file",{method:"POST",body:JSON.stringify({path:locCurrent.path,updates,creates,expectedSha256:locSaved.sha256})});locSaved=clone(result);locCurrent=clone(result);locNewKey="";locNewValue="";localizationFiles=(await request("/api/localization")).files;
+      }
+      if(sourceSaved&&sourceCurrent&&sourceDirty()){
+        const result=await request("/api/source/file",{method:"POST",body:JSON.stringify({path:sourceCurrent.path,text:sourceCurrent.text,expectedSha256:sourceSaved.sha256})});sourceSaved=clone(result);sourceCurrent=clone(result);sourceFiles=(await request("/api/source")).files;
       }
     }catch(exc){error=String(exc.message||exc)}
     render();
   }
   async function buildMod(){
-    if(building||dirtyCount()||!buildInfo?.available)return;
-    building=true;buildResult=null;error="";render();
-    try{
-      buildResult=await request("/api/build",{method:"POST",body:"{}"});
-      buildInfo=await request("/api/build");
-    }catch(exc){
-      error=String(exc.message||exc);
-      try{buildInfo=await request("/api/build")}catch(_ignored){}
-    }finally{
-      building=false;render();
-    }
+    if(building||dirtyCount()||!buildInfo?.available)return;building=true;buildResult=null;error="";render();
+    try{buildResult=await request("/api/build",{method:"POST",body:"{}"});buildInfo=await request("/api/build")}catch(exc){error=String(exc.message||exc);try{buildInfo=await request("/api/build")}catch(_ignored){}}finally{building=false;render()}
   }
-  async function discard(){
-    current=clone(saved);locCurrent=clone(locSaved);locNewKey="";locNewValue="";error="";render();
-  }
+  async function discard(){current=clone(saved);locCurrent=clone(locSaved);sourceCurrent=clone(sourceSaved);locNewKey="";locNewValue="";error="";render()}
   function navigate(value){tab=value;render()}
   const shell=LexeditorUI.mountShell({
-    host:"#lexeditor-shell",brand:"LEXEDITOR",
-    plugin:{id:"terraria",name:"Terraria",themeName:"terraria",theme:{accent:"#77b255"}},
-    tabs:[{id:"metadata",label:"Mod Metadata"},{id:"dependencies",label:"Dependencies & Build"},{id:"localization",label:"Localization"}],activeTab:()=>tab,navigate,
+    host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"terraria",name:"Terraria",themeName:"terraria",theme:{accent:"#77b255"}},
+    tabs:[{id:"metadata",label:"Mod Metadata"},{id:"dependencies",label:"Dependencies & Build"},{id:"localization",label:"Localization"},{id:"source",label:"Source"}],activeTab:()=>tab,navigate,
     help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Terraria Data Map",
-    dirtyCount,readonly:()=>!current?.editable&&!locCurrent?.editable,save,discard,
+    dirtyCount,readonly:()=>!current?.editable&&!locCurrent?.editable&&!sourceCurrent?.editable,save,discard,
   });
   load().finally(()=>LexeditorUI.finishPluginLoading());
   </script>
