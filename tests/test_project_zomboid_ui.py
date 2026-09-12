@@ -29,6 +29,13 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
                 self.assertIn(renderer, text)
                 self.assertIn(save, text)
 
+    def test_craft_recipe_ui_exposes_schema_typed_skill_fields(self):
+        text = EDITOR.read_text(encoding="utf-8")
+        for field_name in ("AutoLearnAll", "AutoLearnAny", "SkillRequired", "Tooltip"):
+            with self.subTest(field=field_name):
+                self.assertIn(f'"{field_name}"', text)
+        self.assertIn("Skill:level;Skill:level", text)
+
     def test_deployment_renders_shared_mod_loader_section(self):
         text = EDITOR.read_text(encoding="utf-8")
         self.assertIn("LexeditorUI.modLoaderSection(", text)
