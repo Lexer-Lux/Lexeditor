@@ -43,7 +43,7 @@ class ProjectManager:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
         temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-        temporary.replace(target := self.path)
+        temporary.replace(self.path)
 
     @staticmethod
     def _problems(root: Path, required_paths: tuple[str, ...],
