@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -13,6 +15,7 @@ import tempfile
 import threading
 from urllib.parse import parse_qs, urlparse
 
+from .assets import ASSET_TYPES, asset_index, asset_state, create_asset, read_asset, replace_asset
 from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text
 from .localization import apply_localization_changes, parse_localization_text, try_get_culture_and_prefix
 from .plugin import DEFAULT_PROJECT_ROOT, TMODLOADER_SAVE_ROOT
@@ -23,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_BODY = 64 * 1024
-MAX_REQUEST_BODY = 2 * 1024 * 1024 + 128 * 1024
+MAX_REQUEST_BODY = 24 * 1024 * 1024
 MAX_LOCALIZATION = 2 * 1024 * 1024
 MAX_BUILD_OUTPUT = 64 * 1024
 MAX_ENABLED_STATE = 1024 * 1024
@@ -232,6 +235,36 @@ def save_source_file(relative: str, text: object, expected_sha256: str) -> dict:
 
 def create_source_file(relative: str, text: object = "") -> dict:
     return create_source(project_root(), relative, text)
+
+
+def assets_state() -> dict:
+    return asset_index(project_root())
+
+
+def asset_file(relative: str) -> dict:
+    return asset_state(project_root(), relative)
+
+
+def asset_content(relative: str) -> tuple[bytes, dict]:
+    _target, data, state = read_asset(project_root(), relative)
+    return data, state
+
+
+def create_asset_file(relative: str, data: bytes) -> dict:
+    return create_asset(project_root(), relative, data)
+
+
+def replace_asset_file(relative: str, data: bytes, expected_sha256: str) -> dict:
+    return replace_asset(project_root(), relative, data, expected_sha256)
+
+
+def _decode_asset_data(value: object) -> bytes:
+    if not isinstance(value, str) or not value:
+        raise ValueError("Asset dataBase64 is required")
+    try:
+        return base64.b64decode(value, validate=True)
+    except (binascii.Error, ValueError) as error:
+        raise ValueError("Asset dataBase64 is invalid") from error
 
 
 def _installation_root() -> Path:
@@ -450,8 +483,10 @@ def data_map() -> dict:
             status, family = "recognized", "C# source (raw text editor)"
         elif suffix == ".hjson":
             status, family = "structured", "Localization"
+        elif suffix in ASSET_TYPES:
+            status, family = "recognized", "tModLoader asset"
         elif relative.startswith("Content/"):
-            status, family = "recognized", "Content asset"
+            status, family = "recognized", "Packaged resource"
         elif suffix == ".csproj":
             status, family = "recognized", "MSBuild project"
         else:
@@ -472,14 +507,17 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def send_file(self, target: Path):
-        data = target.read_bytes()
+    def send_bytes(self, data: bytes, content_type: str):
         self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(target.name)[0] or "application/octet-stream")
+        self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def send_file(self, target: Path):
+        data = target.read_bytes()
+        self.send_bytes(data, mimetypes.guess_type(target.name)[0] or "application/octet-stream")
 
     def read_json(self) -> object:
         try:
@@ -521,7 +559,7 @@ class Handler(BaseHTTPRequestHandler):
                     "hosted": True,
                     "windowHost": "webview2",
                     "capabilities": [
-                        "build-metadata", "localization", "source-text", "native-build",
+                        "build-metadata", "localization", "source-text", "assets", "native-build",
                         "local-mod-status", "data-map",
                     ],
                 })
@@ -535,6 +573,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(source_state())
             elif path == "/api/source/file":
                 self.send_json(source_file(self._query_path(parsed, "C# source")))
+            elif path == "/api/assets":
+                self.send_json(assets_state())
+            elif path == "/api/assets/file":
+                self.send_json(asset_file(self._query_path(parsed, "Asset")))
+            elif path == "/api/assets/raw":
+                data, state = asset_content(self._query_path(parsed, "Asset"))
+                self.send_bytes(data, state["mime"])
             elif path == "/api/build":
                 self.send_json(build_status())
             elif path == "/api/data-map":
@@ -595,6 +640,25 @@ class Handler(BaseHTTPRequestHandler):
                 if not isinstance(relative, str) or not isinstance(text, str) or not isinstance(expected, str):
                     raise ValueError("Invalid C# source request")
                 self.send_json(save_source_file(relative, text, expected))
+                return
+            if path == "/api/assets/create":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "dataBase64"}:
+                    raise ValueError("Expected path and dataBase64 only")
+                relative = payload["path"]
+                if not isinstance(relative, str):
+                    raise ValueError("Invalid asset create request")
+                self.send_json(create_asset_file(relative, _decode_asset_data(payload["dataBase64"])))
+                return
+            if path == "/api/assets/file":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "dataBase64", "expectedSha256"}:
+                    raise ValueError("Expected path, dataBase64 and expectedSha256 only")
+                relative = payload["path"]
+                expected = payload["expectedSha256"]
+                if not isinstance(relative, str) or not isinstance(expected, str):
+                    raise ValueError("Invalid asset replace request")
+                self.send_json(replace_asset_file(relative, _decode_asset_data(payload["dataBase64"]), expected))
                 return
             if path != "/api/build-metadata":
                 self.send_json({"error": "Not found"}, 404)
