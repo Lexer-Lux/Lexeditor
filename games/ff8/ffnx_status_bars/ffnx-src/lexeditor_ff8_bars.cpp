@@ -291,21 +291,27 @@ float xp_fraction(std::uint32_t exp, std::uint8_t character)
     return static_cast<float>(bounded - lower) / static_cast<float>(upper - lower);
 }
 
-void draw_main_menu_clock()
+// Native main-menu PLAY clock: renderer state, display list, packet cursor,
+// x, y, seconds, and playtime/countdown selector.
+using ClockRenderer = std::uint32_t(__cdecl *)(void *, std::uint32_t,
+    std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
+ClockRenderer g_clock_renderer = nullptr;
+
+std::uint32_t __cdecl main_menu_clock_hook(void *state, std::uint32_t display_list,
+    std::uint32_t cursor, std::uint32_t x, std::uint32_t y,
+    std::uint32_t seconds, std::uint32_t playtime)
 {
     const auto *mode = getmode_cached();
-    if (mode == nullptr || mode->driver_mode != MODE_MENU) return;
-    const std::time_t now = std::time(nullptr);
-    std::tm local{};
-    if (localtime_s(&local, &now) != 0) return;
-    char text[16]{};
-    std::snprintf(text, sizeof text, "LOCAL %02d:%02d", local.tm_hour, local.tm_min);
-    // The main menu is authored on FF8's 640x448 game surface. Keep the clock
-    // in the lower-right information area, next to rather than on top of the
-    // native PLAY/Gil block, and project it through FFNx's real viewport.
-    const ImVec2 position(scale_x(500.0f), scale_y(412.0f));
-    ImGui::GetForegroundDrawList()->AddText(
-        position, IM_COL32(255, 255, 255, 255), text);
+    if (enable_ff8_ingame_time && playtime != 0 && mode != nullptr &&
+        mode->driver_mode == MODE_MENU) {
+        const std::time_t now = std::time(nullptr);
+        std::tm local{};
+        if (localtime_s(&local, &now) == 0) {
+            seconds = static_cast<std::uint32_t>(
+                local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec);
+        }
+    }
+    return g_clock_renderer(state, display_list, cursor, x, y, seconds, playtime);
 }
 
 void draw_main_menu_xp()
@@ -437,11 +443,16 @@ void lexeditor_ff8_bars_install()
         replace_call(0x004B1100, reinterpret_cast<void *>(&hp_glyph_hook));
         replace_call(0x004B127B, reinterpret_cast<void *>(&atb_glyph_hook));
     }
-    if (!enable_ff8_xp_bars && !enable_ff8_ingame_time) return;
+    if (enable_ff8_ingame_time && FF8_US_VERSION &&
+        original_call(0x004C1C6E, 0x004BF020)) {
+        g_clock_renderer = reinterpret_cast<ClockRenderer>(get_relative_call(0x004C1C6E, 0));
+        replace_call(0x004C1C6E, reinterpret_cast<void *>(&main_menu_clock_hook));
+    }
+    if (!enable_ff8_xp_bars) return;
 
     // The callback entry contains a PUSH-immediate renderer pointer. The same
-    // guarded hook can identify the real main-menu frame for XP bars and the
-    // local clock; it explicitly excludes the title save-block browser.
+    // guarded hook identifies frames for XP bars. The clock uses its own
+    // native draw call above.
     const std::uint32_t main_callback = static_cast<std::uint32_t>(
         reinterpret_cast<std::uintptr_t>(ff8_externals.menu_callbacks[16].func));
     g_main_menu_renderer = reinterpret_cast<MenuRenderer>(
@@ -475,9 +486,6 @@ void lexeditor_ff8_bars_draw()
 {
     if (enable_ff8_hp_bars || enable_ff8_gf_hp_bars) {
         draw_battle_hp();
-    }
-    if (enable_ff8_ingame_time && g_capture.surface == XpSurface::main_menu) {
-        draw_main_menu_clock();
     }
     if (enable_ff8_xp_bars) {
         switch (g_capture.surface) {
