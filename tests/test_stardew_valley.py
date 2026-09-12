@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from games.stardew_valley.acceptance import acceptance_status, begin_acceptance
 from games.stardew_valley.content_pack import (
-    ContentPackStore, deploy, deployment_status, initialize_project, revert,
+    ACCEPTANCE_MARKER, ContentPackStore, deploy, deployment_status, initialize_project, revert,
 )
 from games.stardew_valley import paths, server
 from games.stardew_valley.source_data import load_base_objects, objects_source_path
@@ -95,9 +95,12 @@ class StardewContentPackTests(unittest.TestCase):
         (game / "StardewModdingAPI.exe").write_bytes(b"smapi")
         cp = game / "Mods" / "Content Patcher"; cp.mkdir(parents=True)
         (cp / "manifest.json").write_text('{"UniqueID":"Pathoschild.ContentPatcher"}\n', encoding="utf-8")
+        (self.project / ACCEPTANCE_MARKER).write_text('{"localOnly":true}\n', encoding="utf-8")
         status = deploy(game, self.project)
         self.assertTrue(status["managed"]); self.assertFalse(status["externallyChanged"])
-        target = Path(status["target"]); (target / "content.json").write_text("{}\n", encoding="utf-8")
+        target = Path(status["target"])
+        self.assertFalse((target / ACCEPTANCE_MARKER).exists())
+        (target / "content.json").write_text("{}\n", encoding="utf-8")
         self.assertTrue(deployment_status(game, self.project)["externallyChanged"])
         with self.assertRaises(RuntimeError): deploy(game, self.project)
         with self.assertRaises(RuntimeError): revert(game, self.project)
