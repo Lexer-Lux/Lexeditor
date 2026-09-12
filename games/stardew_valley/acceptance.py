@@ -16,6 +16,7 @@ from .content_pack import (
 )
 
 TARGET_GAME_VERSION = "1.6.15"
+TARGET_PLATFORM_PREFIX = "windows"
 ACCEPTANCE_MARKER = ".lexeditor-stardew-acceptance.json"
 MAX_LOG_BYTES = 16 * 1024 * 1024
 _RUNTIME_RE = re.compile(
@@ -185,6 +186,8 @@ def begin_acceptance(game_root: Path, project_root: Path, *, log_path: Path | No
         "projectRoot": str(project),
         "projectName": project_name,
         "projectUniqueID": project_unique_id,
+        "projectManifestSha256": _sha256(project / "manifest.json"),
+        "projectContentSha256": _sha256(project / "content.json"),
         "objectsXnbPath": str(xnb_path),
         "objectsXnbSha256": _sha256(xnb_path),
         "smapiLogPath": str(current_log),
@@ -234,6 +237,14 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
         blockers.append("Acceptance baseline belongs to a different game or project path; begin it again.")
     if not deployment_matches_project:
         blockers.append("The current project is no longer the same managed pack that was deployed; redeploy and reset acceptance.")
+    current_manifest_sha = _sha256(project / "manifest.json") if (project / "manifest.json").is_file() else None
+    current_content_sha = _sha256(project / "content.json") if (project / "content.json").is_file() else None
+    project_matches_baseline = (
+        current_manifest_sha == marker.get("projectManifestSha256")
+        and current_content_sha == marker.get("projectContentSha256")
+    )
+    if not project_matches_baseline:
+        blockers.append("The project changed after the acceptance baseline; redeploy and reset acceptance.")
 
     xnb_path = Path(str(marker.get("objectsXnbPath", game / "Content" / "Data" / "Objects.xnb")))
     current_xnb_sha = _sha256(xnb_path) if xnb_path.is_file() else None
@@ -260,17 +271,29 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
         blockers.append("Launch Stardew Valley through SMAPI after beginning acceptance, then verify again.")
 
     game_version_matches = evidence["gameVersion"] == str(marker.get("targetGameVersion") or TARGET_GAME_VERSION)
+    platform_matches = bool(evidence["platform"] and evidence["platform"].casefold().startswith(TARGET_PLATFORM_PREFIX))
     if fresh_runtime_log and evidence["gameVersion"] is None:
         blockers.append("The new log did not contain a recognizable SMAPI/Stardew runtime signature.")
     elif fresh_runtime_log and not game_version_matches:
         blockers.append(f"Runtime Stardew version is {evidence['gameVersion'] or 'unknown'}, expected {TARGET_GAME_VERSION}.")
-    if fresh_runtime_log and not evidence["contentPatcherSeen"]:
-        blockers.append("The new SMAPI log did not show Content Patcher loading.")
+    if fresh_runtime_log and evidence["platform"] and not platform_matches:
+        blockers.append(f"Runtime platform is {evidence['platform']}, but this acceptance target is Windows/Steam.")
+    if fresh_runtime_log and not evidence["contentPatcherVersion"]:
+        blockers.append("The new SMAPI log did not report a loaded Content Patcher version.")
     if fresh_runtime_log and not evidence["projectLoaded"]:
         blockers.append("The new SMAPI log did not list this project as a loaded Content Patcher content pack.")
     if evidence["projectErrors"]:
         blockers.append("SMAPI/Content Patcher reported an error for this Lexeditor content pack.")
 
+    installed_cp_version = loader.get("contentPatcherVersion")
+    cp_version_matches = bool(
+        evidence["contentPatcherVersion"]
+        and (not installed_cp_version or evidence["contentPatcherVersion"] == installed_cp_version)
+    )
+    if fresh_runtime_log and installed_cp_version and evidence["contentPatcherVersion"] and not cp_version_matches:
+        blockers.append(
+            f"SMAPI loaded Content Patcher {evidence['contentPatcherVersion']}, but the installed manifest reports {installed_cp_version}."
+        )
     minimum_api = loader.get("contentPatcherMinimumApiVersion")
     api_compatible = _version_at_least(evidence["smapiVersion"], minimum_api)
     if fresh_runtime_log and api_compatible is False:
@@ -283,9 +306,12 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
     accepted = bool(
         fresh_runtime_log
         and deployment_matches_project
+        and project_matches_baseline
         and xnb_unchanged
         and game_version_matches
-        and evidence["contentPatcherSeen"]
+        and platform_matches
+        and evidence["contentPatcherVersion"]
+        and cp_version_matches
         and evidence["projectLoaded"]
         and not evidence["projectErrors"]
         and api_compatible is not False
@@ -296,11 +322,17 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
         "state": "accepted" if accepted else ("failed" if fresh_runtime_log else "waiting-for-run"),
         "accepted": accepted,
         "targetGameVersion": str(marker.get("targetGameVersion") or TARGET_GAME_VERSION),
+        "targetPlatform": "Windows/Steam",
         "loader": loader,
         "deployment": deployment,
         "deploymentMatchesProject": deployment_matches_project,
+        "projectMatchesBaseline": project_matches_baseline,
         "projectName": marker.get("projectName"),
         "projectUniqueID": marker.get("projectUniqueID"),
+        "projectManifestBaselineSha256": marker.get("projectManifestSha256"),
+        "projectManifestCurrentSha256": current_manifest_sha,
+        "projectContentBaselineSha256": marker.get("projectContentSha256"),
+        "projectContentCurrentSha256": current_content_sha,
         "objectsXnbPath": str(xnb_path),
         "objectsXnbBaselineSha256": marker.get("objectsXnbSha256"),
         "objectsXnbCurrentSha256": current_xnb_sha,
@@ -313,10 +345,12 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
         "gameVersion": evidence["gameVersion"],
         "gameBuild": evidence["gameBuild"],
         "platform": evidence["platform"],
+        "platformMatchesTarget": platform_matches,
         "gameVersionMatches": game_version_matches,
         "contentPatcherVersionFromLog": evidence["contentPatcherVersion"],
         "contentPatcherSeen": evidence["contentPatcherSeen"],
-        "contentPatcherVersionInstalled": loader.get("contentPatcherVersion"),
+        "contentPatcherVersionInstalled": installed_cp_version,
+        "contentPatcherVersionMatches": cp_version_matches,
         "contentPatcherMinimumApiVersion": minimum_api,
         "smapiMeetsContentPatcherMinimum": api_compatible,
         "projectMentioned": evidence["projectMentioned"],
