@@ -14,7 +14,7 @@
 window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
   detailSection, detailField, numberControl, selectControl, sourceControl,
   referenceValues, infoHelp, shell, noteFieldEdit, subtabBar, detailPanel,
-  recordId, columnList}) => {
+  recordId, columnList, conceptIcon}) => {
   // The card's own four sides, in the order Triple Triad draws them.
   const sides = ["top", "left", "right", "bottom"];
   const fields = [...sides, "element", "power"];
@@ -50,13 +50,13 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       .ff8-card-preview{
         --ff8-card-width:clamp(150px,17vw,208px);
         position:relative;width:var(--ff8-card-width);aspect-ratio:3/4;
-        flex:0 0 auto;overflow:hidden;border-radius:4px;
-        border:2px solid #cfd8ef;
+        flex:0 0 auto;overflow:visible;border-radius:0;
+        border:0;
         background:
           radial-gradient(120% 95% at 50% 38%, #6f8fd8 0%, #3f61b4 46%, #22357e 78%, #16215a 100%);
         box-shadow:none}
-      .ff8-card-preview img{position:absolute;inset:0;width:100%;height:100%;display:block;
-        object-fit:contain;object-position:center 58%}
+      .ff8-card-preview > img{position:absolute;inset:0;width:100%;height:100%;display:block;
+        object-fit:fill;object-position:center}
       .ff8-card-ranks{
         position:absolute;top:5px;left:6px;display:grid;
         grid-template-areas:"top top" "left right" "bottom bottom";
@@ -74,14 +74,21 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
         font:700 10px/1 var(--lex-font,"FF8 Menu",Arial,sans-serif);cursor:pointer}
       .ff8-card-element:is(:hover,:focus-visible){background:#00000088;outline:none}
       .ff8-card-element.none{opacity:0}
-      .ff8-card-preview:is(:hover,:focus-within) .ff8-card-element.none{opacity:.5}
+      .ff8-card-element.none:is(:hover,:focus-visible){opacity:1}
+      .ff8-card-element img{width:22px;height:22px;object-fit:contain}
+      .ff8-card-element.none{border:1px solid currentColor;font-size:22px}
       .ff8-card-power{
         position:absolute;right:6px;bottom:4px;
         color:#fff;font:700 clamp(17px,1.7vw,22px)/1 var(--lex-font,"FF8 Menu",Arial,sans-serif)}
       .ff8-card-element-picker{
-        position:absolute;top:34px;right:6px;z-index:3;min-width:8.5em;
+        position:fixed;inset:auto;margin:0;padding:5px;z-index:1000;width:260px;
         color:var(--lex-text);border:1px solid var(--lex-border);
         background:var(--lex-panel);font:inherit}
+      .ff8-card-element-picker:popover-open{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+      .ff8-card-element-picker button{display:flex;align-items:center;gap:8px;padding:6px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
+      .ff8-card-element-picker button:is(:hover,:focus-visible){background:var(--lex-accent)}
+      .ff8-card-element-picker img,.ff8-card-element-empty{width:22px;height:22px;object-fit:contain}
+
 
       /* Players. A field, its card-game opponents, and the seven values each
          CARDGAME call pushes - as one table, not a wall of loose boxes. */
@@ -98,20 +105,19 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
   const elementOptions = () => state.data.cards.elements || [];
   const elementName = value => elementOptions()
     .find(entry => Number(entry.id) === Number(value))?.name || "";
-  // The element mark is a short tag rather than the whole word: the corner it
-  // sits in is twenty-six pixels wide, and "Thunder" is not.
-  const elementMark = value => {
-    const name = elementName(value);
-    return name ? name.slice(0, 2).toLocaleUpperCase() : "";
-  };
 
   // The card itself is the control. Every rank on it can be typed into and the
   // element corner opens its own list, so the values are edited where they are
   // read instead of only in a column of boxes beside the picture.
   const preview = (row, refresh) => {
     const update = (field, value) => {
-      const limit = field === "power" ? 255 : 10;
-      row[field] = Math.max(0, Math.min(limit, Number(value) || 0));
+      if (field === "element") {
+        if (!elementOptions().some(entry => Number(entry.id) === Number(value))) return;
+        row[field] = Number(value);
+      } else {
+        const limit = field === "power" ? 255 : 10;
+        row[field] = Math.max(0, Math.min(limit, Number(value) || 0));
+      }
       noteFieldEdit("cards", {field});
       refresh();
     };
@@ -124,21 +130,30 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       onclick: () => update(side, (Number(row[side]) % 10) + 1),
       oncontextmenu: event => {event.preventDefault();update(side, Number(row[side]) <= 1 ? 10 : Number(row[side]) - 1);},
     }, rank(row[side]));
-    const picker = el("select", {
-      class: "ff8-card-element-picker",
-      hidden: true,
-      "aria-label": "Element",
-      onchange: event => update("element", event.target.value),
-      onblur: event => {event.target.hidden = true;},
-    }, ...elementOptions().map(entry => el("option",
-      {value: entry.id, selected: Number(entry.id) === Number(row.element)}, entry.name)));
+    const picker = el("div", {class:"ff8-card-element-picker", popover:"auto", role:"group", "aria-label":"Choose card element"},
+      ...elementOptions().map(entry => el("button", {type:"button",
+        "aria-label":entry.name, onclick:()=>{picker.hidePopover();update("element",entry.id)}},
+        conceptIcon("element",entry.name) || el("span",{class:"ff8-card-element-empty","aria-hidden":"true"}),
+        el("span",{},entry.name))));
+    picker.addEventListener("keydown",event=>{
+      if (!["ArrowDown","ArrowUp","ArrowRight","ArrowLeft"].includes(event.key)) return;
+      event.preventDefault();const buttons=[...picker.querySelectorAll("button")];
+      const step=["ArrowDown","ArrowRight"].includes(event.key)?1:-1;
+      buttons[(buttons.indexOf(document.activeElement)+step+buttons.length)%buttons.length].focus();
+    });
+    const none = Number(row.element) === 0;
     const element = el("button", {
-      type: "button",
-      class: `ff8-card-element${Number(row.element) === 255 ? " none" : ""}`,
-      title: Number(row.element) === 255 ? "No element: click to set one" : `${elementName(row.element)}: click to change`,
-      "aria-label": `Element, currently ${Number(row.element) === 255 ? "none" : elementName(row.element)}`,
-      onclick: () => {picker.hidden = false;picker.focus();},
-    }, elementMark(row.element) || "–");
+      type:"button", class:`ff8-card-element${none ? " none" : ""}`,
+      disabled:state.activeSource !== "mine",
+      title:none ? "Add element" : `Change ${elementName(row.element)}`,
+      "aria-label":none ? "Add element" : `Change ${elementName(row.element)}`,
+      onclick:()=>{
+        const box=element.getBoundingClientRect();
+        picker.style.left=`${Math.max(4,Math.min(box.right-260,innerWidth-264))}px`;
+        picker.style.top=`${Math.max(4,Math.min(box.bottom+4,innerHeight-220))}px`;
+        picker.showPopover();picker.querySelector("button").focus();
+      },
+    }, none ? "+" : conceptIcon("element",elementName(row.element)));
     return el("div", {class: "ff8-card-preview"},
       // A card with no artwork on disk shows the plain blue card, not a broken
       // image icon and its alt text painted across the ranks.
