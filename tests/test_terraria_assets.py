@@ -7,7 +7,15 @@ import tempfile
 import unittest
 
 from games.terraria import server
-from games.terraria.assets import asset_index, asset_state, create_asset, read_asset, replace_asset
+from games.terraria.assets import (
+    asset_index,
+    asset_state,
+    create_asset,
+    delete_asset,
+    read_asset,
+    rename_asset,
+    replace_asset,
+)
 
 
 PNG_1X1 = base64.b64decode(
@@ -87,7 +95,30 @@ class TerrariaAssetTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Ogg"):
                 create_asset(root, "Bad.ogg", b"not-ogg")
 
-    def test_service_create_read_replace_and_stale_refusal_use_selected_project(self):
+    def test_rename_and_delete_are_sha_guarded_and_never_overwrite(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            created = create_asset(root, "Content/Old.png", PNG_1X1)
+            renamed = rename_asset(root, "Content/Old.png", "Content/New.png", created["sha256"])
+            self.assertEqual(renamed["path"], "Content/New.png")
+            self.assertFalse((root / "Content" / "Old.png").exists())
+            self.assertTrue((root / "Content" / "New.png").exists())
+
+            create_asset(root, "Content/Occupied.png", PNG_1X1_ALT)
+            with self.assertRaisesRegex(ValueError, "already exists"):
+                rename_asset(root, "Content/New.png", "Content/Occupied.png", renamed["sha256"])
+            with self.assertRaisesRegex(ValueError, "preserve the file extension"):
+                rename_asset(root, "Content/New.png", "Content/New.ogg", renamed["sha256"])
+
+            (root / "Content" / "New.png").write_bytes(PNG_1X1_ALT)
+            with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
+                delete_asset(root, "Content/New.png", renamed["sha256"])
+            fresh = asset_state(root, "Content/New.png")
+            result = delete_asset(root, "Content/New.png", fresh["sha256"])
+            self.assertTrue(result["deleted"])
+            self.assertFalse((root / "Content" / "New.png").exists())
+
+    def test_service_create_read_replace_rename_delete_use_selected_project(self):
         previous_project = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
         try:
             with tempfile.TemporaryDirectory() as directory:
@@ -111,8 +142,18 @@ class TerrariaAssetTests(unittest.TestCase):
                 self.assertNotEqual(replaced["sha256"], created["sha256"])
                 self.assertEqual(server.asset_file("Content/Sword.png")["sha256"], replaced["sha256"])
 
-                with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
-                    server.replace_asset_file("Content/Sword.png", PNG_1X1, created["sha256"])
+                renamed = server.rename_asset_file(
+                    "Content/Sword.png",
+                    "Content/RenamedSword.png",
+                    replaced["sha256"],
+                )
+                self.assertEqual(renamed["path"], "Content/RenamedSword.png")
+                self.assertFalse((root / "Content" / "Sword.png").exists())
+
+                deleted = server.delete_asset_file("Content/RenamedSword.png", renamed["sha256"])
+                self.assertTrue(deleted["deleted"])
+                self.assertFalse((root / "Content" / "RenamedSword.png").exists())
+
                 with self.assertRaisesRegex(ValueError, "Invalid tModLoader asset path"):
                     server.asset_file("../Outside.png")
         finally:
