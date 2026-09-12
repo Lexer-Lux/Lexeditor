@@ -16,6 +16,15 @@ if payload.count(old) != 1:
 payload = payload.replace(old, new, 1)
 exec(compile(payload, "temp_bannerlord_final_hardening_payload.py", "exec"))
 
+# A failed staging write must not leave a partial predictable temp file behind.
+revision = Path("games/bannerlord/source_revision.py")
+replace_once(
+    revision,
+    '''    paths.clear_write_helper(temporary)\n    temporary.write_bytes(bytes(data))\n    try:\n        require_source_revision(path, token)\n''',
+    '''    paths.clear_write_helper(temporary)\n    try:\n        temporary.write_bytes(bytes(data))\n        require_source_revision(path, token)\n''',
+    "staged source write cleanup",
+)
+
 # Raw Source also uses an exact-byte revision, not only decoded baseline text.
 project = Path("games/bannerlord/project_data.py")
 replace_once(
