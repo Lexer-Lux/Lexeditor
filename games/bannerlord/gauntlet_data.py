@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import xml.etree.ElementTree as ET
 
-from .paths import clear_write_helper, contained_project_path
+from .paths import clear_write_helper, contained_project_path, is_contained_file
 from .xml_patch import scan_xml_start_tags, serialize_attribute
 
 
@@ -26,7 +26,7 @@ def list_prefabs(project: Path) -> list[str]:
     return [
         path.relative_to(project.resolve()).as_posix()
         for path in sorted(root.rglob("*.xml"), key=lambda value: value.as_posix().casefold())
-        if path.is_file()
+        if is_contained_file(project, path)
     ]
 
 

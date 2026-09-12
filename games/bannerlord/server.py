@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from . import paths
 from .deploy_data import sync_project_assets
 from .gauntlet_data import (
     augment_data_map as augment_gauntlet_data_map,
@@ -168,12 +169,14 @@ class Handler(BaseHTTPRequestHandler):
             )
             return
         if path == "/api/module":
-            source = PROJECT / "SubModule.xml"
-            if not source.is_file():
-                self.send_json({"error": f"SubModule.xml not found: {source}"}, 404)
-                return
             try:
+                source = paths.contained_project_path(PROJECT, "SubModule.xml")
+                if not source.is_file():
+                    self.send_json({"error": f"SubModule.xml not found: {source}"}, 404)
+                    return
                 self.send_json(read_submodule(source))
+            except ValueError as error:
+                self.send_json({"error": str(error)}, 400)
             except Exception as error:
                 self.send_json({"error": str(error)}, 500)
             return
@@ -292,11 +295,11 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
 
         if path == "/api/module/save":
-            source = PROJECT / "SubModule.xml"
-            if not source.is_file():
-                self.send_json({"error": f"SubModule.xml not found: {source}"}, 404)
-                return
             try:
+                source = paths.contained_project_path(PROJECT, "SubModule.xml")
+                if not source.is_file():
+                    self.send_json({"error": f"SubModule.xml not found: {source}"}, 404)
+                    return
                 self.send_json(save_module(source, self.read_json()))
             except (ValueError, TypeError, json.JSONDecodeError) as error:
                 self.send_json({"error": str(error)}, 400)

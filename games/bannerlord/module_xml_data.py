@@ -18,7 +18,7 @@ def list_documents(project: Path) -> list[str]:
     return [
         path.relative_to(project.resolve()).as_posix()
         for path in sorted(root.rglob("*.xml"), key=lambda value: value.as_posix().casefold())
-        if path.is_file()
+        if paths.is_contained_file(project, path)
     ]
 
 

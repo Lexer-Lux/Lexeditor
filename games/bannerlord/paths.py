@@ -58,6 +58,16 @@ def contained_game_path(
     return target
 
 
+def is_contained_file(root: Path, path: Path) -> bool:
+    """Return whether an existing file resolves inside ``root``."""
+    root = Path(root).resolve()
+    try:
+        target = Path(path).resolve()
+    except OSError:
+        return False
+    return target.is_file() and (target == root or root in target.parents)
+
+
 def clear_write_helper(path: Path) -> None:
     """Remove a stale backup/temp entry without following file redirections.
 

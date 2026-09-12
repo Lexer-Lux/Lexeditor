@@ -805,7 +805,7 @@ def _source_rows(
     rows = []
     excluded = exclude or set()
     for path in sorted(project.glob(pattern)):
-        if not path.is_file():
+        if not paths.is_contained_file(project, path):
             continue
         relative = _relative(project, path)
         if relative in excluded:
@@ -833,30 +833,31 @@ def _source_rows(
 def data_map(project: Path) -> dict:
     rows = []
     submodule = project / "SubModule.xml"
+    submodule_available = paths.is_contained_file(project, submodule)
     rows.append(
         {
             "id": "bannerlord-submodule",
             "filename": "SubModule.xml",
             "area": "Module",
             "controls": "Module identity/category, native and BLSE dependency/load-order relations, incompatibilities, submodule DLL/class/assemblies/tags, and XML registrations",
-            "coverage": "structured" if submodule.is_file() else "unavailable",
-            "status": "integrated" if submodule.is_file() else "not-integrated",
-            "target": "module" if submodule.is_file() else "",
-            "targets": ["module"] if submodule.is_file() else [],
-            "openable": submodule.is_file(),
-            "sourceAvailable": submodule.is_file(),
+            "coverage": "structured" if submodule_available else "unavailable",
+            "status": "integrated" if submodule_available else "not-integrated",
+            "target": "module" if submodule_available else "",
+            "targets": ["module"] if submodule_available else [],
+            "openable": submodule_available,
+            "sourceAvailable": submodule_available,
             "sourcePath": str(submodule),
             "notes": (
                 "Structured editor for identity/category, dependency/load-order relations, incompatibilities, "
                 "submodule DLL/class/assemblies/tags, and XML registrations; unsupported or unknown nodes are "
                 "preserved and remain source-editable."
-                if submodule.is_file()
+                if submodule_available
                 else "SubModule.xml is required for a Bannerlord module project."
             ),
         }
     )
 
-    for index, path in enumerate(sorted(path for path in project.glob("*.csproj") if path.is_file())):
+    for index, path in enumerate(sorted(path for path in project.glob("*.csproj") if paths.is_contained_file(project, path))):
         relative = _relative(project, path)
         rows.append(
             {
@@ -892,7 +893,7 @@ def data_map(project: Path) -> dict:
     }
     for relative, (area, controls, target, notes) in structured_csharp.items():
         source = project / relative
-        if not source.is_file():
+        if not paths.is_contained_file(project, source):
             continue
         rows.append(
             {
@@ -940,7 +941,7 @@ def data_map(project: Path) -> dict:
             "Detected GUI XML. Files under GUI/Prefabs are promoted to the structured Gauntlet editor by the server.",
         )
     )
-    if (project / "Design.txt").is_file():
+    if paths.is_contained_file(project, project / "Design.txt"):
         rows.extend(
             _source_rows(
                 project,
