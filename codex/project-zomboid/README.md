@@ -24,7 +24,15 @@ Unknown keys, repeated non-edited keys, comments and other unmodeled lines must 
 
 The current `pz-scripts-data` registry identifies these Build 42 script families at module level: `animationsMesh`, `craftRecipe`, `entity`, `evolvedrecipe`, `fixing`, `fluid`, `item`, `mannequin`, `model`, `sound`, `timedAction`, and `vehicle`. Lexeditor structurally inventories these top-level records while deliberately ignoring similarly shaped text inside comments, quoted strings, and nested blocks.
 
-Recognition is not the same as editability. Items, evolved recipes, conservative typed craft-recipe fields, `fixing`'s typed `ConditionModifier`, top-level fluid scalars, a conservative vehicle scalar subset, conservative module-level sound scalars, conservative module-level model scalars, conservative module-level mannequin scalars, and `timedAction`'s independently typed `actionAnim` are currently structured. Only `animationsMesh` and `entity` remain family-level read-only because their current schema does not type their fields strongly enough to justify a non-speculative writer; nested and compound substructures in otherwise structured families also remain read-only. The narrow `fixing`, `mannequin`, and `timedAction` boundaries are documented separately in this codex.
+Recognition is not the same as editability. Animation meshes, items, evolved recipes, conservative typed craft-recipe fields, `fixing`'s typed `ConditionModifier`, top-level fluid scalars, a conservative vehicle scalar subset, conservative module-level sound scalars, conservative module-level model scalars, conservative module-level mannequin scalars, and `timedAction`'s independently typed `actionAnim` are currently structured. Only `entity` remains family-level read-only: its current schema leaves its scalar attributes untyped, and the current `GameEntityScript` Java API does not independently expose those attributes with enough type/semantic information to justify a writer. Nested, repeated-list, and compound substructures in otherwise structured families may also remain read-only. The narrow `fixing`, `mannequin`, and `timedAction` boundaries are documented separately in this codex.
+
+## `animationsMesh`
+
+The current script schema lists `animationDirectory`, `animationPrefix`, `keepMeshAnimations`, `meshFile`, and `postProcess` but leaves their types unspecified. Project Zomboid's current Java API provides the missing type evidence: `keepMeshAnimations` is a boolean, `meshFile` and `postProcess` are strings, while animation directories and prefixes are stored as repeated string lists.
+
+Lexeditor therefore edits only existing module-level `keepMeshAnimations`, `meshFile`, and `postProcess` properties. Repeated `animationDirectory` and `animationPrefix` entries remain read-only and byte-preserved rather than being flattened into a scalar field or rewritten with guessed list semantics. The editor reports their occurrence counts so the preserved list structure remains visible.
+
+As with the other conservative adapters, stale files, missing edited properties, duplicated editable properties—including same-line duplicates—and malformed boolean/script-punctuation values fail closed. Unknown fields and repeated animation source entries remain untouched.
 
 ## Item blocks
 
@@ -127,6 +135,8 @@ Symlinks are refused in this deployment path, and Lexeditor state/temp files are
 ## Research references
 
 - Official Project Zomboid release/status pages — current stable build boundary.
+- Official Project Zomboid Java API, including `zombie.scripting.objects.AnimationsMesh`: <https://projectzomboid.com/modding/zombie/scripting/objects/AnimationsMesh.html>
+- Official Project Zomboid Java API `GameEntityScript`: <https://projectzomboid.com/modding/zombie/scripting/entity/GameEntityScript.html>
 - PZ Wiki Modding / PZ API Docs: <https://github.com/PZ-Wiki-Modding/PZ-API-Docs>
 - PZ Wiki Modding / ZedScripts: <https://github.com/PZ-Wiki-Modding/ZedScripts>
 - PZ Wiki Modding / pz-scripts-data: <https://github.com/PZ-Wiki-Modding/pz-scripts-data>
