@@ -1,0 +1,117 @@
+name: Apply Terraria project-name fix
+
+on:
+  push:
+    branches: [feature/terraria-plugin]
+    paths:
+      - '.github/workflows/terraria-fix-project-names.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply guarded source changes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{path}: expected exactly one guarded replacement, found {text.count(old)}')
+              file.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          # Give project plugins an optional pre-filesystem name validator.
+          replace_once(
+              'plugin_api.py',
+              'InitializeProjectFunction = Callable[[Path], None]\n',
+              'InitializeProjectFunction = Callable[[Path], None]\nValidateProjectNameFunction = Callable[[str], None]\n',
+          )
+          replace_once(
+              'plugin_api.py',
+              '    initialize: InitializeProjectFunction | None = None\n    # Some games have more than one shape of editable thing. Warband has\n',
+              '    initialize: InitializeProjectFunction | None = None\n    validate_name: ValidateProjectNameFunction | None = None\n    # Some games have more than one shape of editable thing. Warband has\n',
+          )
+
+          manager = Path('project_manager.py')
+          text = manager.read_text(encoding='utf-8')
+          anchor = '    def create(self, plugin_id: str, parent_value: str, name: str) -> dict:\n'
+          if text.count(anchor) != 1:
+              raise SystemExit('project_manager.py: create anchor changed')
+          helper = '''    @staticmethod\n    def _clean_project_name(spec, name: str) -> str:\n        clean_name = name.strip()\n        if not clean_name or clean_name in {".", ".."} or any(char in clean_name for char in '<>:"/\\\\|?*'):\n            raise ValueError("Enter a valid folder name")\n        if spec.validate_name is not None:\n            spec.validate_name(clean_name)\n        return clean_name\n\n'''
+          text = text.replace(anchor, helper + anchor, 1)
+          old_validation = '''        clean_name = name.strip()\n        if not clean_name or clean_name in {".", ".."} or any(char in clean_name for char in '<>:"/\\\\|?*'):\n            raise ValueError("Enter a valid folder name")\n'''
+          if text.count(old_validation) != 2:
+              raise SystemExit(f'project_manager.py: expected 2 name-validation blocks, found {text.count(old_validation)}')
+          text = text.replace(old_validation, '        clean_name = self._clean_project_name(spec, name)\n')
+          manager.write_text(text, encoding='utf-8')
+
+          plugin = Path('games/terraria/plugin.py')
+          text = plugin.read_text(encoding='utf-8')
+          old_mod_id = '''def _mod_id(name: str) -> str:\n    value = re.sub(r"[^A-Za-z0-9_]", "", name.replace(" ", "_"))\n    if not value:\n        value = "LexeditorTerrariaMod"\n    if value[0].isdigit():\n        value = "Mod_" + value\n    return value\n\n\n'''
+          keywords = '''_CSHARP_KEYWORDS = frozenset({\n    "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char", "checked",\n    "class", "const", "continue", "decimal", "default", "delegate", "do", "double", "else",\n    "enum", "event", "explicit", "extern", "false", "finally", "fixed", "float", "for", "foreach",\n    "goto", "if", "implicit", "in", "int", "interface", "internal", "is", "lock", "long",\n    "namespace", "new", "null", "object", "operator", "out", "override", "params", "private",\n    "protected", "public", "readonly", "ref", "return", "sbyte", "sealed", "short", "sizeof",\n    "stackalloc", "static", "string", "struct", "switch", "this", "throw", "true", "try",\n    "typeof", "uint", "ulong", "unchecked", "unsafe", "ushort", "using", "virtual", "void",\n    "volatile", "while",\n})\n_TMODLOADER_RESERVED_NAMES = frozenset({"mod", "modloader", "tmodloader"})\n_MOD_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")\n\n\ndef validate_mod_name(name: str) -> None:\n    """Enforce the tModLoader source-folder/internal-name boundary before creation."""\n    if not _MOD_IDENTIFIER.fullmatch(name):\n        raise ValueError(\n            "tModLoader mod names must be C# identifiers: start with a letter or underscore "\n            "and use only ASCII letters, digits, or underscores"\n        )\n    if name in _CSHARP_KEYWORDS:\n        raise ValueError(f"tModLoader mod name cannot be the C# keyword {name}")\n    if name.casefold() in _TMODLOADER_RESERVED_NAMES:\n        raise ValueError(f"tModLoader reserves the mod name {name}")\n\n\n'''
+          if text.count(old_mod_id) != 1:
+              raise SystemExit('games/terraria/plugin.py: _mod_id block changed')
+          text = text.replace(old_mod_id, keywords, 1)
+          text = text.replace(
+              '    mod_id = _mod_id(root.name)\n',
+              '    validate_mod_name(root.name)\n    mod_id = root.name\n',
+              1,
+          )
+          spec_anchor = '        initialize=initialize_project,\n        discover=discover_projects,\n'
+          if text.count(spec_anchor) != 1:
+              raise SystemExit('games/terraria/plugin.py: project spec anchor changed')
+          text = text.replace(
+              spec_anchor,
+              '        initialize=initialize_project,\n        validate_name=validate_mod_name,\n        discover=discover_projects,\n',
+              1,
+          )
+          plugin.write_text(text, encoding='utf-8')
+
+          tests = Path('tests/test_terraria_build_metadata.py')
+          text = tests.read_text(encoding='utf-8')
+          import_anchor = 'from games.terraria import server\n'
+          if text.count(import_anchor) != 1:
+              raise SystemExit('Terraria test import anchor changed')
+          text = text.replace(
+              import_anchor,
+              'from games.terraria import server\nfrom games.terraria import plugin as terraria_plugin\nfrom project_manager import ProjectManager\n',
+              1,
+          )
+          test_anchor = '    def test_service_preserves_bom_and_refuses_stale_writes(self):\n'
+          if text.count(test_anchor) != 1:
+              raise SystemExit('Terraria test insertion anchor changed')
+          new_test = '''    def test_shared_project_creation_renders_and_validates_tmodloader_name(self):\n        with tempfile.TemporaryDirectory() as directory:\n            base = Path(directory)\n            parent = base / "ModSources"\n            parent.mkdir()\n            manager = ProjectManager(\n                {"terraria": terraria_plugin.PLUGIN},\n                path=base / "projects.json",\n            )\n\n            state = manager.create("terraria", str(parent), "Example_Mod")\n            root = (parent / "Example_Mod").resolve()\n            self.assertEqual(Path(state["current"]), root)\n            self.assertTrue((root / "Example_Mod.csproj").is_file())\n            self.assertTrue((root / "Example_Mod.cs").is_file())\n            self.assertFalse((root / "LexeditorTerrariaMod.csproj").exists())\n            self.assertFalse((root / "LexeditorTerrariaMod.cs").exists())\n\n            rendered = "\\n".join(\n                (root / name).read_text(encoding="utf-8")\n                for name in ("build.txt", "Example_Mod.csproj", "Example_Mod.cs")\n            )\n            self.assertNotIn("__LEXEDITOR_", rendered)\n            self.assertIn("displayName = Example_Mod", rendered)\n            self.assertIn("<AssemblyName>Example_Mod</AssemblyName>", rendered)\n            self.assertIn("namespace Example_Mod;", rendered)\n\n            for invalid in ("Bad Mod", "123Mod", "class", "Mod", "ModLoader", "tModLoader"):\n                with self.subTest(invalid=invalid):\n                    with self.assertRaises(ValueError):\n                        manager.create("terraria", str(parent), invalid)\n                    self.assertFalse((parent / invalid).exists())\n\n            with self.assertRaises(ValueError):\n                manager.rename("terraria", str(root), "Bad Mod")\n            self.assertTrue(root.is_dir())\n\n'''
+          text = text.replace(test_anchor, new_test + test_anchor, 1)
+          tests.write_text(text, encoding='utf-8')
+          PY
+
+          git diff --check
+          python -m compileall -q games/terraria plugin_api.py project_manager.py
+          python -m unittest tests.test_terraria_build_metadata
+          node --check <(python - <<'PY'
+          from pathlib import Path
+          html = Path('games/terraria/editor.html').read_text(encoding='utf-8')
+          print(html.split('<script>')[-1].split('</script>', 1)[0])
+          PY
+          )
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add plugin_api.py project_manager.py games/terraria/plugin.py tests/test_terraria_build_metadata.py
+          git commit -m 'Validate Terraria project internal names'
+          git push origin HEAD:feature/terraria-plugin
