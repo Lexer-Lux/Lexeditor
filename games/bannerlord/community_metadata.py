@@ -2,9 +2,9 @@
 
 This module normalizes the community metadata used by BLSE/BUTR plus the
 legacy/optional dependency tags that Bannerlord.ModuleManager folds into the
-same dependency model.  It is deliberately read-only: unknown XML attributes
-and structures remain untouched by Lexeditor until a structured writer has an
-explicit schema for them.
+same dependency model. Parsing itself is read-only. Structured writes for the
+known modern and legacy shapes live in ``module_data`` so this parser remains
+the single normalization source for Play, diagnostics, and editor readback.
 """
 from __future__ import annotations
 

@@ -24,7 +24,7 @@
   const refresh=()=>shell?.refresh?.();
   const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
   const metadata=m=>({name:m.name,id:m.id,version:m.version,moduleCategory:m.moduleCategory||"",moduleType:m.moduleType||"",url:m.url||"",updateInfo:m.updateInfo||"",defaultModule:!!m.defaultModule,singleplayer:!!m.singleplayer,multiplayer:!!m.multiplayer});
-  const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],communityDependencies:m.communityDependencies||[],modulesToLoadAfterThis:m.modulesToLoadAfterThis||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;
+  const moduleEditable=m=>m?{metadata:metadata(m),dependencies:m.dependencies||[],communityDependencies:m.communityDependencies||[],legacyDependencies:m.legacyDependencies||[],modulesToLoadAfterThis:m.modulesToLoadAfterThis||[],incompatibleModules:m.incompatibleModules||[],submodules:m.submodules||[],xmls:m.xmls||[]}:null;
   const moduleDirty=()=>state.module&&state.savedModule&&!same(moduleEditable(state.module),moduleEditable(state.savedModule));
   const projectDirty=()=>state.project?.projectFile&&state.savedProject?.projectFile&&!same(state.project.projectFile.properties,state.savedProject.projectFile.properties);
   const skillsEditable=value=>value?{attributes:value.attributes||[],skills:value.skills||[]}:null;
@@ -77,6 +77,7 @@
         ...fieldRow("SubModule.xml",el("code",{},m.path)),
         ...fieldRow("Native dependencies",String((m.dependencies||[]).length)),
         ...fieldRow("BLSE dependency metadata",String((m.communityDependencies||[]).length)),
+        ...fieldRow("Legacy launcher dependencies",String((m.legacyDependencies||[]).length)),
         ...fieldRow("Modules forced after this",String((m.modulesToLoadAfterThis||[]).length)),
         ...fieldRow("Incompatible modules",String((m.incompatibleModules||[]).length)),
         ...fieldRow("Submodules",String((m.submodules||[]).length)),
@@ -89,6 +90,7 @@
 
   function relationList(kind){
     if(kind==="community")return state.module.communityDependencies||[];
+    if(kind==="legacy")return state.module.legacyDependencies||[];
     if(kind==="incompatible")return state.module.incompatibleModules||[];
     if(kind==="loadAfter")return state.module.modulesToLoadAfterThis||[];
     return state.module.dependencies||[];
@@ -97,9 +99,15 @@
     return [
       ...(state.module.dependencies||[]).map((row,index)=>({kind:"dependency",index,row})),
       ...(state.module.communityDependencies||[]).map((row,index)=>({kind:"community",index,row})),
+      ...(state.module.legacyDependencies||[]).map((row,index)=>({kind:"legacy",index,row})),
       ...(state.module.modulesToLoadAfterThis||[]).map((row,index)=>({kind:"loadAfter",index,row})),
       ...(state.module.incompatibleModules||[]).map((row,index)=>({kind:"incompatible",index,row}))
     ];
+  }
+  function legacyRelationLabel(row){
+    if(row.origin==="LoadAfterModules")return "Legacy load-after";
+    if(row.origin==="DependedModules/OptionalDependModule")return "Legacy nested optional";
+    return "Legacy optional dependency";
   }
   function addDependency(kind){
     if(kind==="dependency"){
@@ -138,7 +146,7 @@
         el("button",{type:"button",onclick:()=>addDependency("incompatible"),title:"Add incompatible module"},"+ Inc")),
       el("div",{class:"bl-list"},...rows.map(item=>{
         const active=item.kind===selection.kind&&item.index===selection.index;
-        const label=item.kind==="dependency"?"Native dependency":item.kind==="community"?`BLSE ${item.row.order||"metadata"}`:item.kind==="loadAfter"?"Loads after this":"Incompatible";
+        const label=item.kind==="dependency"?"Native dependency":item.kind==="community"?`BLSE ${item.row.order||"metadata"}`:item.kind==="legacy"?legacyRelationLabel(item.row):item.kind==="loadAfter"?"Loads after this":"Incompatible";
         const version=item.row.dependentVersion||item.row.version||"";
         const flags=item.kind==="community"?[item.row.optional?"optional":"",item.row.incompatible?"incompatible":""].filter(Boolean).join(" · "):"";
         return el("button",{type:"button",class:`bl-item${active?" active":""}`,onclick:()=>{state.dependencySelection={kind:item.kind,index:item.index};render()}},
@@ -158,6 +166,15 @@
           ...fieldRow("Incompatible",checkbox(record.incompatible,value=>record.incompatible=value))
         ),
         el("div",{class:"bl-note"},"BLSE/BUTR community metadata is evaluated before duplicate native dependency rows. Required rows can load either before or after this module; optional rows constrain order only when otherwise enabled. Unknown attributes on existing rows are preserved.")));
+    else if(selection.kind==="legacy")detail=el("div",{class:"bl-detail"},
+      el("section",{class:"bl-panel"},el("h2",{},record.id||legacyRelationLabel(record)),
+        el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),
+        el("div",{class:"bl-grid"},
+          ...fieldRow("Module ID",textInput(record.id,value=>record.id=value)),
+          ...fieldRow("Legacy shape",el("code",{},record.origin||"legacy dependency"))
+        ),
+        el("div",{class:"bl-note"},record.order==="LoadAfterThis"?"This historical LoadAfterModules relation is required and orders the target after the current module.":"This historical optional-dependency relation never auto-enables its target; it only affects precedence when the module is otherwise enabled."),
+        el("div",{class:"bl-note"},"Lexeditor edits or removes existing legacy rows while preserving their original element shape and unknown attributes. Creating a new legacy relation remains source-only because several incompatible historical XML shapes exist.")));
     else if(selection.kind==="incompatible")detail=el("div",{class:"bl-detail"},
       el("section",{class:"bl-panel"},el("h2",{},record.id||"New incompatible module"),
         el("div",{class:"bl-actions"},el("button",{type:"button",class:"danger",onclick:removeDependency},"Remove")),

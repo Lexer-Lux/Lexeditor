@@ -153,9 +153,14 @@ def read_submodule(path: Path) -> dict:
                 }
             )
 
+    extended_dependencies = read_community_dependencies(path)
     community_dependencies = [
-        row for row in read_community_dependencies(path)
+        row for row in extended_dependencies
         if row.get("origin") == "DependedModuleMetadatas"
+    ]
+    legacy_dependencies = [
+        row for row in extended_dependencies
+        if row.get("origin") != "DependedModuleMetadatas"
     ]
 
     return {
@@ -172,6 +177,7 @@ def read_submodule(path: Path) -> dict:
         "multiplayer": _truth(_value(root, "MultiplayerModule")),
         "dependencies": dependencies,
         "communityDependencies": community_dependencies,
+        "legacyDependencies": legacy_dependencies,
         "modulesToLoadAfterThis": modules_to_load_after_this,
         "incompatibleModules": incompatible_modules,
         "submodules": submodules,
@@ -455,6 +461,74 @@ def _edit_community_dependencies(root: ET.Element, rows: list[dict]) -> int:
     return changes
 
 
+_LEGACY_DEPENDENCY_ORIGINS = {
+    "LoadAfterModules",
+    "DependedModules/OptionalDependModule",
+    "OptionalDependModules/OptionalDependModule",
+    "OptionalDependModules/DependModule",
+}
+
+
+def _legacy_dependency_elements(root: ET.Element) -> dict[tuple[str, int], tuple[ET.Element, ET.Element]]:
+    """Map normalized legacy origins/indexes back to their original XML elements."""
+    result: dict[tuple[str, int], tuple[ET.Element, ET.Element]] = {}
+    load_after = root.find("LoadAfterModules")
+    if load_after is not None:
+        for index, element in enumerate(_element_children(load_after, "LoadAfterModule")):
+            result[("LoadAfterModules", index)] = (load_after, element)
+
+    optional_index = 0
+    depended_modules = root.find("DependedModules")
+    if depended_modules is not None:
+        for element in _element_children(depended_modules, "OptionalDependModule"):
+            result[("DependedModules/OptionalDependModule", optional_index)] = (depended_modules, element)
+            optional_index += 1
+
+    optional_root = root.find("OptionalDependModules")
+    if optional_root is not None:
+        for element in list(optional_root):
+            if element.tag not in {"OptionalDependModule", "DependModule"}:
+                continue
+            origin = f"OptionalDependModules/{element.tag}"
+            result[(origin, optional_index)] = (optional_root, element)
+            optional_index += 1
+    return result
+
+
+def _edit_legacy_dependencies(root: ET.Element, rows: list[dict]) -> int:
+    """Edit/remove existing legacy launcher relations without inventing a legacy shape."""
+    existing = _legacy_dependency_elements(root)
+    requested: dict[tuple[str, int], str] = {}
+    for position, row in enumerate(rows):
+        module_id = str(row.get("id") or "").strip()
+        if not module_id:
+            raise ValueError(f"Legacy dependency {position + 1} needs an ID")
+        origin = str(row.get("origin") or "")
+        index = row.get("index")
+        if origin not in _LEGACY_DEPENDENCY_ORIGINS or not isinstance(index, int):
+            raise ValueError(
+                "Legacy dependency edits must reference an existing compatibility row; "
+                "create new legacy rows in source XML instead"
+            )
+        key = (origin, index)
+        if key not in existing:
+            raise ValueError("Legacy dependency changed or no longer exists; reload before saving")
+        if key in requested:
+            raise ValueError("Duplicate legacy dependency edit")
+        requested[key] = module_id
+
+    changes = 0
+    for key, (parent, element) in existing.items():
+        if key not in requested:
+            parent.remove(element)
+            changes += 1
+            continue
+        before = dict(element.attrib)
+        element.set("Id", requested[key])
+        changes += int(before != element.attrib)
+    return changes
+
+
 def _edit_module_id_rows(
     root: ET.Element,
     parent_tag: str,
@@ -698,6 +772,7 @@ def _validate_relation_payload(path: Path, payload: dict) -> None:
     relation_keys = {
         "dependencies",
         "communityDependencies",
+        "legacyDependencies",
         "modulesToLoadAfterThis",
         "incompatibleModules",
     }
@@ -723,18 +798,26 @@ def _validate_relation_payload(path: Path, payload: dict) -> None:
             else current.get("incompatibleModules", [])
         ),
     }
+    current_community = [
+        row for row in current_extended
+        if row.get("origin") == "DependedModuleMetadatas"
+    ]
+    current_legacy = [
+        row for row in current_extended
+        if row.get("origin") != "DependedModuleMetadatas"
+    ]
     if "communityDependencies" in payload:
         structured = [dict(row) for row in list(payload.get("communityDependencies") or [])]
         for row in structured:
             row.setdefault("origin", "DependedModuleMetadatas")
-        legacy = [
-            row
-            for row in current_extended
-            if row.get("origin") != "DependedModuleMetadatas"
-        ]
-        extended = structured + legacy
     else:
-        extended = current_extended
+        structured = current_community
+    legacy = (
+        [dict(row) for row in list(payload.get("legacyDependencies") or [])]
+        if "legacyDependencies" in payload
+        else current_legacy
+    )
+    extended = structured + legacy
 
     issues = dependency_declaration_conflicts(proposed, extended)
     if issues:
@@ -746,7 +829,7 @@ def _validate_relation_payload(path: Path, payload: dict) -> None:
 def save_module(path: Path, payload: dict) -> dict:
     path = Path(path)
     path = paths.contained_project_path(path.parent, path.name, require_file=True)
-    allowed = {"metadata", "dependencies", "communityDependencies", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}
+    allowed = {"metadata", "dependencies", "communityDependencies", "legacyDependencies", "modulesToLoadAfterThis", "incompatibleModules", "submodules", "xmls"}
     unknown = set(payload) - allowed
     if unknown:
         raise ValueError(f"Unsupported SubModule.xml sections: {', '.join(sorted(unknown))}")
@@ -762,6 +845,8 @@ def save_module(path: Path, payload: dict) -> dict:
         changes += _edit_dependencies(root, list(payload.get("dependencies") or []))
     if "communityDependencies" in payload:
         changes += _edit_community_dependencies(root, list(payload.get("communityDependencies") or []))
+    if "legacyDependencies" in payload:
+        changes += _edit_legacy_dependencies(root, list(payload.get("legacyDependencies") or []))
     if "modulesToLoadAfterThis" in payload:
         changes += _edit_modules_to_load_after_this(root, list(payload.get("modulesToLoadAfterThis") or []))
     if "incompatibleModules" in payload:
@@ -839,7 +924,7 @@ def data_map(project: Path) -> dict:
             "id": "bannerlord-submodule",
             "filename": "SubModule.xml",
             "area": "Module",
-            "controls": "Module identity/category, native and BLSE dependency/load-order relations, incompatibilities, submodule DLL/class/assemblies/tags, and XML registrations",
+            "controls": "Module identity/category, native, BLSE, and existing legacy launcher dependency/load-order relations, incompatibilities, submodule DLL/class/assemblies/tags, and XML registrations",
             "coverage": "structured" if submodule_available else "unavailable",
             "status": "integrated" if submodule_available else "not-integrated",
             "target": "module" if submodule_available else "",
@@ -848,7 +933,7 @@ def data_map(project: Path) -> dict:
             "sourceAvailable": submodule_available,
             "sourcePath": str(submodule),
             "notes": (
-                "Structured editor for identity/category, dependency/load-order relations, incompatibilities, "
+                "Structured editor for identity/category, dependency/load-order relations (including existing legacy launcher tags), incompatibilities, "
                 "submodule DLL/class/assemblies/tags, and XML registrations; unsupported or unknown nodes are "
                 "preserved and remain source-editable."
                 if submodule_available
