@@ -20,9 +20,15 @@ The first editor models scalar fields documented for Build 42, including `name`,
 
 Unknown keys, repeated non-edited keys, comments and other unmodeled lines must be preserved. A write is rejected if the file hash changed after it was read. `name` and `id` are treated as required for Lexeditor-created projects. Version bounds use explicit build-major forms such as `42.20` or `42.20.4`.
 
+## ZedScript structure
+
+Current Build 42 script files place authorable records under a top-level `module` block. Lexeditor's structural inventory recognizes top-level records for `item`, `recipe`, `evolvedrecipe`, `fixing`, `vehicle`, `template`, `model`, `sound`, `animation`, and `mannequin` while deliberately ignoring similarly shaped text inside comments, quoted strings, and nested component blocks.
+
+Recognition is not the same as editability. The broader families remain read-only until their current Build 42 fields and mutation rules are grounded independently. This lets the Data Map and research tooling report real project coverage without pretending unknown record schemas are safe to rewrite.
+
 ## ZedScript item blocks
 
-Item definitions are nested under a `module` block. Build 42 uses required `ItemType` values from this finite set:
+Build 42 items use required `ItemType` values from this finite set:
 
 - `base:alarmclock`
 - `base:alarmclockclothing`
@@ -43,6 +49,10 @@ Item definitions are nested under a `module` block. Build 42 uses required `Item
 The first item writer edits only existing top-level scalar properties that are firmly documented and can be patched without rebuilding the block: `ItemType`, `Weight`, `Icon`, and `DisplayCategory`. `Weight` is a float with a documented minimum of `0.0`. `Icon` names resolve to item textures under `media/textures/` according to Project Zomboid's item-icon conventions. `DisplayCategory` is a translation-backed inventory category.
 
 Nested `component` blocks and unknown item properties are preserved. Comments and quoted strings are ignored when locating structural braces. If an edited property is duplicated or missing, the first writer refuses the change rather than guessing where to insert/resolve it.
+
+## Filesystem portability
+
+Project APIs expose project-relative paths with forward slashes. On Windows the same file can be surfaced through case-insensitive or alias-equivalent filesystem spellings, so script discovery resolves paths and compares normalized filesystem identities before authorizing a save. Linux remains case-sensitive. The cross-platform CI matrix exists specifically to keep this containment behavior honest.
 
 ## Deployment safety
 
