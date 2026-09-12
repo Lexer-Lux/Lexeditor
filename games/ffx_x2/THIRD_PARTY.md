@@ -32,9 +32,14 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 Fahrenheit documents file-only mods, `<mod>.manifest.json`, `mods/loadorder`, and the External File Loader roots `efl/x` and `efl/x2`. No Fahrenheit source or binary is bundled by this plugin.
 
-## FFXDataParser and VBFTool
+Fahrenheit is also an independent data-layout cross-check. In particular its public FFX-2 `Job` structure is exactly `0xE4` bytes and places the 32-u16 ability-tree array after the 46-byte stat-growth block. Lexeditor interprets that array conservatively as sixteen `(required ability ID, ability ID)` pairs and leaves every other dressphere field opaque.
+
+## FFXDataParser, FFX2-010-Templates, and VBFTool
 
 The following public reverse-engineering projects were used as research cross-checks only; their code is not copied or distributed by Lexeditor:
 
 - https://github.com/Karifean/FFXDataParser
+- https://github.com/HeartlessSeph/FFX2-010-Templates
 - https://github.com/topher-au/VBFTool
+
+`HeartlessSeph/FFX2-010-Templates` independently identifies the same sixteen `job.bin` ability records as a required-ability field followed by an ability field. That agreement is the basis for the narrow FFX-2 dressphere ability-tree editor; stat growth, weapon data, creature data, flags, text references, and strings remain read-only.
