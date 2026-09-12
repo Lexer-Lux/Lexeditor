@@ -5715,10 +5715,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-pager > * { min-height:0; }
 .lex-pager-search { height:32px; }
 
-/* Text you can follow says so at rest, the way a link does, rather than only
-   admitting it once the pointer is already on it. */
+/* Record links keep the normal text color; hover and focus mark the action. */
 .lex-hoverable {
-  color:var(--lex-link, color-mix(in srgb, var(--lex-accent) 72%, var(--lex-text)));
+  color:inherit;
   text-decoration-color:color-mix(in srgb, currentColor 45%, transparent);
   text-underline-offset:.16em;
 }
