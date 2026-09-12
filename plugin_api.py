@@ -14,6 +14,7 @@ SmokeFunction = Callable[[], list[str]]
 ProgressFunction = Callable[[int, int, str], None]
 PrepareFunction = Callable[[Path, Path, ProgressFunction], object]
 InitializeProjectFunction = Callable[[Path], None]
+ValidateProjectNameFunction = Callable[[str], None]
 
 
 class PluginSession(Protocol):
@@ -45,6 +46,7 @@ class ModProjectSpec:
     required_paths: tuple[str, ...] = ()
     template_root: Path = Path()
     initialize: InitializeProjectFunction | None = None
+    validate_name: ValidateProjectNameFunction | None = None
     # Some games have more than one shape of editable thing. Warband has
     # Module System source projects and compiled installed modules, and a
     # root counts as valid when it satisfies any one group.

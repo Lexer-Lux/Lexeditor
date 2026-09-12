@@ -46,6 +46,11 @@
       "structure": "Lexeditor edits one EasyInstall folder (C:\\RDR2Mod\\MyOverhaul by default) whose install.xml maps each GamePath to a package FilePath. To run it with LML, place or copy the whole install.xml mod folder under <RDR2>\\lml\\<mod>\\.",
       "overriding": "LML owns enabled state and load order. If separate LML packages replace the same GamePath, the later/higher-priority replacement wins as a complete file; Lexeditor does not semantically merge records across separate LML mods."
     },
+    "terraria": {
+      "loader": "tModLoader 1.4.4 stable. Lexeditor targets tModLoader's native source-project, build, local-mod and Workshop ecosystem instead of patching vanilla Terraria or shipping another loader.",
+      "structure": "Editable source mods live under the tModLoader save root at ModSources/<ModName>/ with build.txt, a .csproj importing ..\\tModLoader.targets, C# source, localization and content assets. tModLoader owns compiled .tmod output and enabled-mod state.",
+      "overriding": "tModLoader loads multiple mods through its API/dependency model rather than whole-file replacement order. Lexeditor does not invent cross-mod file priority or semantically merge unrelated source projects; runtime interactions and conflicts follow tModLoader and the participating mods."
+    },
     "warband": {
       "loader": "Warband's native module system. WSE2 is Lexeditor's optional enhanced runtime helper, not a multi-mod overlay loader.",
       "structure": "Each installed mod is its own folder under <Warband>\\Modules\\ with module.ini. Lexeditor can also edit and build a Module System source project before it becomes an installed module.",

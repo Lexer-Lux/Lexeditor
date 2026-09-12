@@ -541,6 +541,17 @@
       ],
       "thanks": [],
       "licenses": []
+    },
+    "terraria": {
+      "contributions": [
+        {
+          "name": "tModLoader team / tModLoader",
+          "role": "Terraria mod loader, source-project/build conventions, ExampleMod, build.txt semantics and API reference.",
+          "url": "https://github.com/tModLoader/tModLoader"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
     }
   }
 }
