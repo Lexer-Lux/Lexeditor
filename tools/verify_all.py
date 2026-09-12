@@ -96,6 +96,62 @@ def timeout_for(tool: Path, default: float) -> float:
     return max(default, SLOW.get(tool.stem, 0))
 
 
+# These checks are rendered/data acceptance over the extracted FF8 baseline.
+# On a clean hosted runner the editor can still start, but its data payloads are
+# null; the old behavior then failed later with unrelated JavaScript TypeErrors,
+# HTTP 400s, empty-corpus assertions, or font timeouts. Keep this list exact so
+# self-contained FF8 source/unit verifiers still run in CI.
+_FF8_BASELINE_TOOLS = frozenset({
+    "verify_bottom_command_bar_visual",
+    "verify_ff8_cards_visual_91",
+    "verify_ff8_data_ui_completion",
+    "verify_ff8_datamap_issue_47",
+    "verify_ff8_encounter_levels_and_text_62",
+    "verify_ff8_enemies_editor_visual_39",
+    "verify_ff8_enemy_ai_source",
+    "verify_ff8_enemy_battle_text",
+    "verify_ff8_gameplay_settings_visual_50",
+    "verify_ff8_gf_compatibility_visual_32",
+    "verify_ff8_init_data_visual_21",
+    "verify_ff8_item_icons_visual_26",
+    "verify_ff8_math_visual",
+    "verify_ff8_maps_layout_stability",
+    "verify_ff8_mod_order_visual",
+    "verify_ff8_original_panels_visual",
+    "verify_ff8_portrait_tabs_visual_41",
+    "verify_ff8_shoot_visual_54",
+    "verify_ff8_shops_fit_visual_40",
+    "verify_ff8_tab_arrow_visual_42",
+    "verify_ff8_toolbar_source_labels_visual_38",
+    "verify_ff8_weapons_detail_visual_36",
+    "verify_grouped_numbers_visual_48",
+    "verify_important_error_modal_visual_37",
+    "verify_info_help_visual_56",
+    "verify_n_barrelled_tables_visual_44",
+    "verify_numbered_id_columns_visual_43",
+    "verify_numeric_slider",
+    "verify_tabbed_panels_visual_64",
+    "verify_curve_formula_glyphs",
+})
+
+
+def _ff8_baseline_sentinel() -> Path:
+    data_root = Path(os.environ.get(
+        "LEXEDITOR_FF8_DATA_ROOT",
+        str(Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) /
+            "Lexeditor" / "game-data" / "ff8"),
+    ))
+    return data_root / "baseline" / "en" / "main" / "kernel.bin"
+
+
+def _preflight_unrunnable(tool: Path) -> tuple[str, str]:
+    if tool.stem in _FF8_BASELINE_TOOLS:
+        sentinel = _ff8_baseline_sentinel()
+        if not sentinel.is_file():
+            return "needs installed game/project data", f"missing extracted FF8 baseline: {sentinel}"
+    return "", ""
+
+
 # The verifier-sweep workflow runs on a clean hosted runner and explicitly
 # documents that checks needing a private installed game/project are SKIPPED.
 # Many legacy checks don't raise WinError 2; they assert on a hard-coded Steam
@@ -175,6 +231,9 @@ def run(tool: Path, timeout: float = 180, output: Path | None = None,
     stays visible and fixable instead of being silently swallowed.
     """
     started = time.time()
+    preflight_reason, preflight_detail = _preflight_unrunnable(tool)
+    if preflight_reason:
+        return tool, 0, time.time() - started, f"SKIPPED ({preflight_reason}): {preflight_detail}"
     timeout = timeout_for(tool, timeout)
     code, tail, context = _once(tool, timeout, output)
     reason = _unrunnable(context)
