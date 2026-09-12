@@ -458,6 +458,7 @@ def _verify_executable(game_root: Path) -> Path:
         for address, original in (
             (inventory_auto_sort.BATTLE_CACHE_HOOK, inventory_auto_sort.BATTLE_CACHE_ORIGINAL),
             (character_growth.HOOK, character_growth.ORIGINAL),
+            (character_growth.ZERO_HOOK, character_growth.ZERO_ORIGINAL),
             (battle_issue_54.BATTLE_ENTER_HOOK, battle_issue_54.BATTLE_ENTER_ORIGINAL),
             (battle_issue_54.BATTLE_EXIT_HOOK, battle_issue_54.BATTLE_EXIT_ORIGINAL),
             (battle_issue_54.DRAW_RESULT_HOOK, battle_issue_54.DRAW_RESULT_ORIGINAL),

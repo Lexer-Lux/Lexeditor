@@ -1976,6 +1976,7 @@
       // nothing: a bar spanned three levels and its height was the mean of
       // them, so reading a level off the bar view was impossible. Each sample
       // is one level, so each level gets its own bar at its own height.
+      const zeroY = height - (Math.max(range.min, Math.min(range.max, 0)) - range.min) / spanY * height;
       const slotWidth = width / points.length;
       bars.replaceChildren(...points.map(([, y], index) => {
         const rect = document.createElementNS(svgNamespace, "rect");
@@ -1984,13 +1985,13 @@
         const gap = slotWidth > 2.5 ? slotWidth * .18 : 0;
         rect.setAttribute("x", (index * slotWidth + gap / 2).toFixed(2));
         rect.setAttribute("width", Math.max(.4, slotWidth - gap).toFixed(2));
-        rect.setAttribute("y", y.toFixed(2));
-        rect.setAttribute("height", Math.max(0, height - y).toFixed(2));
+        rect.setAttribute("y", Math.min(y, zeroY).toFixed(2));
+        rect.setAttribute("height", Math.abs(zeroY - y).toFixed(2));
         return rect;
       }));
       const path = points.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ");
       line.setAttribute("d", path);
-      fill.setAttribute("d", `${path} L${points.at(-1)[0].toFixed(2)} ${height} L${points[0][0].toFixed(2)} ${height} Z`);
+      fill.setAttribute("d", `${path} L${points.at(-1)[0].toFixed(2)} ${zeroY} L${points[0][0].toFixed(2)} ${zeroY} Z`);
       // The formula rides its own guide path, and a glyph on a textPath takes
       // the LOCAL slope of that path. Clamping the guide's steepest ANGLE was
       // not enough on its own: what makes letters collide is how fast the

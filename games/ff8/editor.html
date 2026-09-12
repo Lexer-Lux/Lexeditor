@@ -1286,23 +1286,26 @@
     const coefficients=[1,2,3,4].map(index=>Number(fields.find(field=>field.field===`${stat.toLocaleLowerCase()}_${index}`)?.value??0));
     const [A,B,C,D]=coefficients,kind=characterCurveKind[stat];
     if(kind==="hp")return level*A-integerDivision(10*level*level,B)+C;
-    if(kind==="standard"){const base=integerDivision(integerDivision(level*A,10)+integerDivision(level,B)-integerDivision(level*level,2*D)+C,4);return raw?base:Math.min(255,Math.max(0,base))}
-    return Math.min(255,level*A+integerDivision(level,B)-integerDivision(level,D)+C);
+    if(kind==="standard"){if(A===0&&B===1&&C===0&&D===1)return 0;const base=integerDivision(integerDivision(level*A,10)+integerDivision(level,B)-integerDivision(level*level,2*D)+C,4);return raw?base:Math.min(255,Math.max(0,base))}
+    const base=level*A+integerDivision(level,B)-integerDivision(level,D)+C;return raw?base:Math.min(255,base);
+  }
+  function characterCurveRange(stat,fields){
+    const values=Array.from({length:100},(_,i)=>characterCurveValue(stat,fields,i+1,true)).filter(Number.isFinite);
+    return {min:Math.min(0,...values),max:Math.max(stat==="HP"?9999:255,...values)};
   }
   function characterCurveFormula(stat){
     if(stat==="HP")return "HP(L)=L*A-trunc(10*L*L/B)+C";
-    if(["STR","VIT","MAG","SPR"].includes(stat))return `${stat}(L)=clamp(0,255,trunc((trunc(L*A/10)+trunc(L/B)-trunc(L*L/(2*D))+C)/4))`;
-    return `${stat}(L)=min(255,L*A+trunc(L/B)-trunc(L/D)+C)`;
+    if(["STR","VIT","MAG","SPR"].includes(stat))return `${stat}(L)=trunc((trunc(L*A/10)+trunc(L/B)-trunc(L*L/(2*D))+C)/4); 0 if A=C=0, B=D=1`;
+    return `${stat}(L)=L*A+trunc(L/B)-trunc(L/D)+C`;
   }
   // Formulas are set as mathematics rather than as source. A variable stays a
   // coloured letter, but the operators become the symbols a reader expects: a
   // multiplication dot instead of an asterisk, a division slash with air around
-  // it, and floor brackets instead of the word "trunc".
+  // it. Keep truncation explicit: negative values truncate toward zero.
   function mathText(part){
     return String(part)
       .replace(/\s*\*\s*/g, "\u00b7")
       .replace(/\s*\/\s*/g, " \u2215 ")
-      .replace(/\btrunc\(/g, "\u230a")
       .replace(/=/g, " = ")
       .replace(/\s{2,}/g, " ");
   }
@@ -1321,22 +1324,11 @@
     const cards=characterCurveOrder.map(stat=>{
       const statFields=fields.filter(field=>field.subgroup===stat).sort((left,right)=>left.field.localeCompare(right.field,undefined,{numeric:true}));
       const variables=statFields.filter(field=>!field.readonly).map((field,index)=>({label:"ABCD"[index],control:fieldSourceControl(field,"characters",rowId,{internal:true})}));
-            // The engine ceiling is 255 (9,999 for HP), but a stat that tops out at
-      // 41 then draws inside the bottom sixth of its box and the rest is dead
-      // space. The axis follows the data, with a little headroom, and the
-      // scale numbers still show the real values.
-      // The axis is the stat's own ceiling, so every character's curve is read
-      // against the same scale and a weak growth looks weak. Following the
-      // data instead re-scaled the box per character, which made every curve
-      // fill its card and told the reader nothing about how high the stat
-      // actually goes.
-      const ceiling=stat==="HP"?9999:255;
-      const axisMin=Math.min(0,...Array.from({length:100},(_,i)=>Number(characterCurveValue(stat,statFields,i+1))||0));
-      const axisMax=ceiling;
-      return curveEditor({title:stat,className:"ff8-character-curve",overlayExtrema:true,variables,domain:{min:1,max:100},range:{min:axisMin,max:axisMax},graphLabel:`${stat} base from level 1 to level 100. ${axisMin<0?"Negative growth can wrap to a high stat in the game; change these coefficients.":["STR","VIT","MAG","SPR"].includes(stat)?"Negative base growth is floored at zero before bonuses.":"Before junction and ability bonuses."}`,evaluate:level=>characterCurveValue(stat,statFields,level),formula:coloredCurveFormula(characterCurveFormula(stat)),invalidText:"A DIVISOR IS 0"});
+      // Show the signed formula result. Recompute the range after every edit.
+      return curveEditor({title:stat,className:"ff8-character-curve",overlayExtrema:true,variables,domain:{min:1,max:100},range:()=>characterCurveRange(stat,statFields),graphLabel:`${stat} raw base from level 1 to level 100, before limits, junctions and bonuses. Negative values are shown.`,evaluate:level=>characterCurveValue(stat,statFields,level,true),formula:coloredCurveFormula(characterCurveFormula(stat)),invalidText:"A DIVISOR IS 0"});
     });
     if(expFields.length)cards.push(curveEditor({title:"XP",className:"ff8-character-curve",overlayExtrema:true,variables:expFields.map((field,index)=>({label:"AB"[index],control:fieldSourceControl(field,"characters",rowId,{internal:true})})),domain:{min:1,max:100},range:()=>characterXpRange(expFields),graphLabel:"Cumulative experience required from level 1 to level 100",evaluate:level=>characterXpValue(expFields,level),formula:coloredCurveFormula("XP(L) = 10 * (L - 1) * A + floor((L - 1)^2 * B / 256)")}));
-    return detailSection({className:"character-stat-growth",title:"STAT GROWTH",help:infoHelp("Each card shows base growth before junctions and bonuses. Negative growth can wrap to a high stat in the game. STR, VIT, MAG and SPR are floored at zero before bonuses."),body:el("div",{class:"character-curve-grid"},...cards)});
+    return detailSection({className:"character-stat-growth",title:"STAT GROWTH",help:infoHelp("Each card shows the signed formula result before limits, junctions and bonuses, including negative values. For STR, VIT, MAG and SPR, A=0, B=1, C=0, D=1 selects exact zero growth in the runtime. Other negative bases are floored at zero in the game."),body:el("div",{class:"character-curve-grid"},...cards)});
   }
   // GF HP and next-level EXP, from the two routines that compute them:
   // getGFhpForLvl at 0x496120 reads the three HP modifiers out of the GF record

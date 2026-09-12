@@ -44,6 +44,65 @@ for stat in range(1,5):
  u.mem_write(address,bytes([12,5,100,100]))
  vanilla.mem_write(address,bytes([12,5,100,100]))
  for level in range(1,101): assert call(u,level,0,stat)==call(vanilla,level,0,stat)
+# Apply both patches in their actual load order. Max Spell must not erase the guard.
+from games.ff8 import max_spell
+for enabled in (False, True):
+ v=machine()
+ for patch in (growth.build_hext(),max_spell.build_hext(enabled,10)):
+  for line in patch.splitlines():
+   if ' = ' in line:
+    address,data=line.split(' = ');v.mem_write(int(address,16),bytes.fromhex(data))
+ for char in range(11):
+  v.mem_write(0x1CFE0F0+152*char,bytes([char]))
+  for stat in range(1,5):
+   address=0x1CF75F8+36*char+4*(stat-1)
+   for coefficients in ([0,2,0,1],[0,1,0,1]):
+    v.mem_write(address,bytes(coefficients))
+    for level in range(1,101):
+     assert call(v,level,char,stat)==0,(enabled,char,stat,level)
+# The explicit zero case bypasses only base growth, not bonuses.
+v=machine()
+for line in growth.build_hext().splitlines():
+ if ' = ' in line:
+  address,data=line.split(' = ');v.mem_write(int(address,16),bytes.fromhex(data))
+for stat in range(1,5):
+ v.mem_write(0x1CF75F8+4*(stat-1),bytes([0,1,0,1]))
+ for level in range(1,101):assert call(v,level,0,stat)==0
+# A full 10-spell junction adds the same bonus as vanilla 100, while a
+# negative base is floored before adding it. Check each standard stat.
+for stat in range(1,5):
+ v.mem_write(0x1CF75F8+4*(stat-1),bytes([0,1,0,1]))
+ v.mem_write(0x1CFE145+stat-1,b'\x01')
+ v.mem_write(0x1CFE0F8,bytes([1,100]))
+ v.mem_write(0x1CF407C+60+stat-1,b'\x28')
+ assert call(v,16,0,stat)==40
+ for patch in (growth.build_hext(),max_spell.build_hext(True,10)):
+  for line in patch.splitlines():
+   if ' = ' in line:
+    address,data=line.split(' = ');v.mem_write(int(address,16),bytes.fromhex(data))
+ v.ctl_remove_cache(0x496440,0x496800)
+ v.mem_write(0x1CF75F8+4*(stat-1),bytes([0,1,0,1]))
+ v.mem_write(0x1CFE0F8,bytes([1,10]))
+ assert call(v,16,0,stat)==40
+ v=machine()
+ for line in growth.build_hext().splitlines():
+  if ' = ' in line:
+   address,data=line.split(' = ');v.mem_write(int(address,16),bytes.fromhex(data))
+print('Combined Max Spell/guard, native exact-zero curves, and junction bonuses passed')
+# Saved nonzero growth must remain intact with Max Spell and the new guard.
+for coefficients in ([6,13,100,251],[7,80,148,253],[6,13,0,251],[7,80,48,253]):
+ for stat in (1,3):
+  native=machine();patched=machine()
+  for machine_ in (native,patched):machine_.mem_write(0x1CF75F8+4*(stat-1),bytes(coefficients))
+  for patch in (growth.build_hext(),max_spell.build_hext(True,10)):
+   for line in patch.splitlines():
+    if ' = ' in line:
+     address,data=line.split(' = ');patched.mem_write(int(address,16),bytes.fromhex(data))
+  for level in range(1,101):
+   expected=call(native,level,0,stat)
+   assert expected<256,(coefficients,stat,level,expected)
+   assert call(patched,level,0,stat)==expected
+print('Nonzero STR/MAG growth profiles preserved at all 100 levels')
 # Actual native accuracy tail after the classifier, before RNG. Full 255 hit
 # no longer swallows a 100-point penalty. Exceptions retain ordinary value.
 for flying,melee,floating,hit,bonus,expected in [(1,1,0,255,100,0),(1,1,0,255,25,191),(1,1,0,90,25,165),(0,1,0,255,100,650),(1,0,0,255,100,650),(1,1,1,255,100,650)]:
@@ -61,13 +120,19 @@ curve=editor[editor.index('  const characterCurveOrder='):editor.index('  functi
 js=curve+"""
 const fields=(stat,values)=>values.map((value,i)=>({field:stat.toLowerCase()+'_'+(i+1),value}));
 if(characterCurveValue('STR',fields('STR',[0,1,0,1]),16)!==0)throw Error('standard lower guard missing');
-if(characterCurveValue('VIT',fields('VIT',[0,1,0,1]),16,true)!==-28)throw Error('raw base lost');
+if(characterCurveValue('VIT',fields('VIT',[0,2,0,1]),16,true)!==-30)throw Error('raw base lost');
+const negative=fields('VIT',[0,2,0,1]);
+if(characterCurveRange('VIT',negative).min!==-1237)throw Error('negative axis clipped');
+negative[1].value=1;negative[3].value=1;
+if(characterCurveRange('VIT',negative).min!==0)throw Error('axis did not update');
 for(let level=1;level<=100;level++){
+ if(characterCurveValue('VIT',negative,level,true)!==0)throw Error('zero curve has negative base');
  if(characterCurveValue('SPR',fields('SPR',[0,255,0,255]),level)!==0)throw Error('SPR not zero');
  if(characterCurveValue('SPD',fields('SPD',[0,1,0,1]),level)!==0)throw Error('SPD not zero');
 }
 """
 node=shutil.which('node') or r'C:\Users\Lexer\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
 subprocess.run([node,'-e',js],check=True)
-assert 'range:{min:axisMin,max:axisMax}' in editor
+assert 'range:()=>characterCurveRange(stat,statFields)' in editor
+assert 'evaluate:level=>characterCurveValue(stat,statFields,level,true)' in editor
 print('Browser curve execution matches zero patch and exposes negative unpatched growth')
