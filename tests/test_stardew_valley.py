@@ -129,7 +129,10 @@ class StardewContentPackTests(unittest.TestCase):
             self.assertTrue(accepted["accepted"])
             self.assertEqual(accepted["smapiVersion"], "4.5.2")
             self.assertEqual(accepted["gameVersion"], "1.6.15")
+            self.assertTrue(accepted["platformMatchesTarget"])
             self.assertTrue(accepted["contentPatcherSeen"])
+            self.assertTrue(accepted["contentPatcherVersionMatches"])
+            self.assertTrue(accepted["smapiMeetsContentPatcherMinimum"])
             self.assertTrue(accepted["projectMentioned"])
             self.assertTrue(accepted["projectLoaded"])
             self.assertTrue(accepted["objectsXnbUnchanged"])
@@ -139,6 +142,16 @@ class StardewContentPackTests(unittest.TestCase):
             self.assertFalse(changed["accepted"])
             self.assertFalse(changed["objectsXnbUnchanged"])
             self.assertTrue(any("Objects.xnb changed" in value for value in changed["blockers"]))
+
+            xnb.write_bytes(b"installed-objects")
+            reopened = store.objects()
+            store.save_objects(reopened["sha256"], [{"id": "390", "fields": {"Price": 78}}])
+            deploy(game, self.project)
+            stale = acceptance_status(game, self.project)
+            self.assertFalse(stale["accepted"])
+            self.assertTrue(stale["deploymentMatchesProject"])
+            self.assertFalse(stale["projectMatchesBaseline"])
+            self.assertTrue(any("project changed" in value.casefold() for value in stale["blockers"]))
 
 
 if __name__ == "__main__": unittest.main()
