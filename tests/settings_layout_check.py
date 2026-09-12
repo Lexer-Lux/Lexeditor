@@ -27,6 +27,23 @@ def main():
                     for b in cards[i+1:]:
                         assert min(a['x']+a['w'],b['x']+b['w'])-max(a['x'],b['x'])<=1 or min(a['y']+a['h'],b['y']+b['h'])-max(a['y'],b['y'])<=1,metrics
                 page.screenshot(path=str(Path(tempfile.gettempdir())/f'lex-settings-{width}.png'))
+            page.evaluate("""()=>{
+                document.querySelector('.lex-global-settings-backdrop').remove();
+                const cards=Array.from({length:7},(_,i)=>LexeditorUI.detailSection({title:`Group ${i}`,body:Array.from({length:30},(_,j)=>LexeditorUI.detailField({label:`Property ${j}`,control:LexeditorUI.readonlyField(`Value ${j}`)}))}));
+                const main=document.querySelector('#games');
+                main.style.cssText='display:block;min-height:0;height:calc(100vh - 100px);padding:8px';
+                main.replaceChildren(LexeditorUI.settingsColumns(cards));
+            }""")
+            for width in (900,2048):
+                page.set_viewport_size({'width':width,'height':700});page.wait_for_timeout(300)
+                panel=page.locator('.lex-tweaks-columns')
+                metrics=panel.evaluate('e=>({w:e.clientWidth,sw:e.scrollWidth,h:e.clientHeight,sh:e.scrollHeight,fragments:[...e.querySelectorAll(".lex-settings-column > section")].map(c=>c.getClientRects().length)})')
+                assert metrics['sw']<=metrics['w']+1 and metrics['sh']>metrics['h'],metrics
+                assert all(n==1 for n in metrics['fragments']),metrics
+                panel.evaluate('e=>e.scrollTop=e.scrollHeight')
+                assert panel.evaluate('e=>e.scrollTop')>0
+                assert panel.locator('.lex-detail-field').last.evaluate('(e)=>{const a=e.getBoundingClientRect(),b=e.closest(".lex-tweaks-columns").getBoundingClientRect();return a.bottom<=b.bottom+1}')
+                page.screenshot(path=str(Path(tempfile.gettempdir())/f'lex-tweaks-scroll-{width}.png'))
             browser.close()
     finally:server.shutdown();server.server_close();thread.join(timeout=2)
     print('Settings cards fit without overlap at 2048, 900 and 600 pixels.')

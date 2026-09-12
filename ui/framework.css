@@ -5178,22 +5178,17 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 
 
-/* LEXEDITOR_SETTINGS_COLUMNS_20260910 */
-/* One scrolling settings page in as many columns as the window allows. CSS
-   columns rather than a resize observer rebuilding lanes: a section never
-   splits across a boundary, and the count follows the panel with no script. */
+/* The framework distributes whole sections into explicit columns. The outer
+   page owns vertical scrolling; CSS multicolumn flow must not fragment it. */
 .lex-tweaks-columns {
-  columns:var(--lex-settings-column-width,30em);
-  column-gap:var(--lex-panel-gap,10px);
+  columns:auto;
   height:100%;
+  min-height:0;
+  min-width:0;
   padding:0;
   overflow-y:auto;
 }
-.lex-tweaks-columns > * {
-  break-inside:avoid;
-  margin:0 0 var(--lex-panel-gap,10px);
-}
-
+.lex-tweaks-columns > * {margin:0;}
 
 /* A settings column is narrow and its property names are long, so the tenth of
    the row that a wide Detail panel gives a label is not enough here: it wrapped
@@ -6013,6 +6008,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
    columns dealt by the framework, so a card is never cut in half across a
    column break the way CSS columns do it. */
 .lex-tweaks-columns > .lex-settings-lane {
+  box-sizing:border-box;
   display:grid;
   grid-auto-flow:column;
   grid-auto-columns:minmax(0,1fr);
