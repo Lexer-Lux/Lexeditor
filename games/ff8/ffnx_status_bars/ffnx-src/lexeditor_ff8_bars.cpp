@@ -144,9 +144,11 @@ std::uint32_t __cdecl battle_row_hook(std::uint8_t *row, std::uint32_t a, std::u
     if (actor < 3) {
         auto &capture = g_hp_rows[actor];
         capture = {};
-        // Native name origin is row+8 (004B0C0B); HP comes from this same
-        // displayed row, not the stat editor's computed-stat scratch buffer.
-        capture.left = *reinterpret_cast<const std::int16_t *>(row + 8);
+        // 004B0C0B reads the name area's origin. 004B0CCF..004B0CF0
+        // right-aligns the name inside its 96-pixel area using row+0x4A.
+        // Use that visible name edge, not the empty area's left edge.
+        capture.left = *reinterpret_cast<const std::uint16_t *>(row + 8) + 96.0f
+            - *reinterpret_cast<const std::uint16_t *>(row + 0x4A);
         capture.top = *reinterpret_cast<const std::int16_t *>(row + 0xA);
         capture.maximum = *reinterpret_cast<const std::uint16_t *>(row + 0x1C);
         capture.current = *reinterpret_cast<const std::uint16_t *>(row + 0x1E);

@@ -195,6 +195,12 @@ def main() -> int:
     require(hashlib.sha256(EXE.read_bytes()).hexdigest() == EXE_SHA256,
             "installed FF8_EN.exe is not the supported Steam English build")
     pe = pefile.PE(str(EXE), fast_load=True)
+    require(image_bytes(pe, 0x004B0CCF, 4) == bytes.fromhex("66 8B 46 4A"),
+            "battle name width field changed")
+    require(image_bytes(pe, 0x004B0CDF, 5) == bytes.fromhex("B8 60 00 00 00")
+            and image_bytes(pe, 0x004B0CEA, 2) == bytes.fromhex("2B C1")
+            and image_bytes(pe, 0x004B0CF0, 2) == bytes.fromhex("03 C2"),
+            "battle name alignment is no longer origin + 96 - name width")
 
     # Native callback and renderer identities.
     require(struct.unpack("<I", image_bytes(pe, 0x00B87F00, 4))[0] == 0x004CDFA0,
