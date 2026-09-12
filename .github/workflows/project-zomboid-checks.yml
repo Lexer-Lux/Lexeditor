@@ -24,6 +24,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: project-zomboid-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   project-zomboid:
     strategy:
@@ -42,6 +46,10 @@ jobs:
         run: python -c "from games.project_zomboid.plugin import smoke; [print(line) for line in smoke()]"
       - name: Python syntax
         run: python -m compileall -q games/project_zomboid tests
+      - name: Editor JavaScript syntax
+        run: |
+          python -c "from pathlib import Path; text=Path('games/project_zomboid/editor.html').read_text(encoding='utf-8'); js=text.rsplit('<script>',1)[1].split('</script>',1)[0]; Path('.project-zomboid-editor.js').write_text(js,encoding='utf-8')"
+          node --check .project-zomboid-editor.js
       - name: Plugin metadata
         run: python plugin_metadata.py
       - name: Offline credits are current
