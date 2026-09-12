@@ -38,6 +38,17 @@ def main():
     scale.fill(str(percent))
     assert page.locator('.lex-ui-scale output').inner_text()==f'{percent}%'
     assert page.evaluate('window.__calls.at(-1).scale')==percent
+   calls_before=page.evaluate('window.__calls.filter(c=>c.scale!==undefined).length')
+   bounds=scale.bounding_box()
+   page.mouse.move(bounds['x']+bounds['width']/2,bounds['y']+bounds['height']/2)
+   page.mouse.down();page.mouse.move(bounds['x']+bounds['width']-3,bounds['y']+bounds['height']/2,steps=6)
+   assert page.evaluate('window.__calls.filter(c=>c.scale!==undefined).length')==calls_before
+   assert page.locator('.lex-ui-scale output').inner_text()!='100%'
+   page.mouse.up()
+   assert page.evaluate('window.__calls.filter(c=>c.scale!==undefined).length')==calls_before+1
+   scale.click(button='right')
+   assert page.locator('.lex-ui-scale output').inner_text()=='100%'
+   assert page.evaluate('window.__calls.at(-1).scale')==100
    assert page.evaluate("!document.dispatchEvent(new WheelEvent('wheel',{ctrlKey:true,deltaY:100,bubbles:true,cancelable:true}))")
    assert page.evaluate("document.dispatchEvent(new WheelEvent('wheel',{deltaY:100,bubbles:true,cancelable:true}))")
    assert page.locator('#plugin-restart').is_visible()

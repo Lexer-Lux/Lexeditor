@@ -181,10 +181,14 @@
       } catch(error){showToast(`Could not change UI scale: ${error.message||error}`,true);}
       finally{running=false;}
     };
-    slider.addEventListener("input",()=>{show(Number(slider.value));pending=Number(slider.value);apply();});
+    slider.addEventListener("input",()=>show(Number(slider.value)));
+    slider.addEventListener("change",()=>{pending=Number(slider.value);apply();});
     const initialize=async()=>{try{const result=await callWindow("ui_scale");if(result?.percent&&!running)show(result.percent);}catch(_error){}};
     if(window.pywebview?.api)initialize();else window.addEventListener("pywebviewready",initialize,{once:true});
-    return element("label",{class:"lex-ui-scale",title:"UI scale", "data-lex-history-control":true},slider,value);
+    return element("label",{class:"lex-ui-scale",title:"UI scale. Right-click to reset to 100%.",
+      "data-lex-history-control":true,oncontextmenu:event=>{
+        event.preventDefault();show(100);pending=100;apply();
+      }},slider,value);
   };
 
   let pluginLoadingScreen = null;
