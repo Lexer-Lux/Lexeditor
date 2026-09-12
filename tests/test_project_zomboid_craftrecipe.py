@@ -17,13 +17,17 @@ class ProjectZomboidCraftRecipeTests(unittest.TestCase):
             '''module Base\n{\n'''
             '''  craftRecipe SawLogs\n  {\n'''
             '''    AllowBatchCraft = true,\n'''
+            '''    AutoLearnAll = Woodwork:2;Maintenance:1,\n'''
+            '''    AutoLearnAny = Woodwork:5;Carving:4,\n'''
             '''    CanWalk = false,\n'''
             '''    category = Carpentry,\n'''
             '''    Icon = Item_Plank,\n'''
             '''    ResearchSkillLevel = -1,\n'''
+            '''    SkillRequired = Woodwork:3,\n'''
             '''    Tags = InHandCraft;CanBeDoneFromFloor,\n'''
             '''    Time = 230,\n'''
             '''    timedAction = SawLogs,\n'''
+            '''    Tooltip = SawLogsTooltip,\n'''
             '''    FutureField = KeepMe,\n'''
             '''    inputs\n    {\n      item 1 [Base.Log],\n    }\n'''
             '''    outputs\n    {\n      item 3 Base.Plank,\n    }\n'''
@@ -36,18 +40,28 @@ class ProjectZomboidCraftRecipeTests(unittest.TestCase):
             row = craftrecipe.read(root)["rows"][0]
             self.assertEqual(row["fields"]["time"], "230")
             self.assertEqual(row["fields"]["tags"], "InHandCraft;CanBeDoneFromFloor")
+            self.assertEqual(row["fields"]["SkillRequired"], "Woodwork:3")
             saved = craftrecipe.save(
                 root, row["path"], row["module"], row["id"], row["sha256"],
-                {"AllowBatchCraft": "false", "time": "120", "tags": "InHandCraft;CanBeDoneInDark"},
+                {
+                    "AllowBatchCraft": "false",
+                    "SkillRequired": " Woodwork:4 ; Carving:2 ",
+                    "Tooltip": "SawLogsTooltipUpdated",
+                    "time": "120",
+                    "tags": "InHandCraft;CanBeDoneInDark",
+                },
             )
             text = (root / row["path"]).read_text(encoding="utf-8")
             self.assertEqual(saved["fields"]["AllowBatchCraft"], "false")
+            self.assertEqual(saved["fields"]["SkillRequired"], "Woodwork:4;Carving:2")
+            self.assertEqual(saved["fields"]["Tooltip"], "SawLogsTooltipUpdated")
             self.assertEqual(saved["fields"]["time"], "120")
             self.assertEqual(saved["fields"]["tags"], "InHandCraft;CanBeDoneInDark")
             self.assertTrue(saved["hasInputs"])
             self.assertTrue(saved["hasOutputs"])
             self.assertIn("    Time = 120,", text)
             self.assertIn("    Tags = InHandCraft;CanBeDoneInDark,", text)
+            self.assertIn("    SkillRequired = Woodwork:4;Carving:2,", text)
             self.assertIn("item 1 [Base.Log]", text)
             self.assertIn("item 3 Base.Plank", text)
             self.assertIn("FutureField = KeepMe,", text)
@@ -105,6 +119,12 @@ class ProjectZomboidCraftRecipeTests(unittest.TestCase):
                 craftrecipe.save(root, row["path"], row["module"], row["id"], row["sha256"], {"time": "2.5"})
             with self.assertRaisesRegex(core.ProjectZomboidError, "tags cannot be empty"):
                 craftrecipe.save(root, row["path"], row["module"], row["id"], row["sha256"], {"tags": ""})
+            with self.assertRaisesRegex(core.ProjectZomboidError, "SkillRequired levels must be integers"):
+                craftrecipe.save(root, row["path"], row["module"], row["id"], row["sha256"], {"SkillRequired": "Woodwork:three"})
+            with self.assertRaisesRegex(core.ProjectZomboidError, "duplicate skill woodwork"):
+                craftrecipe.save(root, row["path"], row["module"], row["id"], row["sha256"], {"AutoLearnAll": "Woodwork:2;woodwork:4"})
+            with self.assertRaisesRegex(core.ProjectZomboidError, "Skill:level;Skill:level"):
+                craftrecipe.save(root, row["path"], row["module"], row["id"], row["sha256"], {"AutoLearnAny": "Woodwork"})
 
     def test_missing_fields_and_stale_hash_fail_closed(self):
         with tempfile.TemporaryDirectory() as name:
