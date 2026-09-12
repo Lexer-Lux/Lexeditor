@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from contextlib import redirect_stdout
+import io
+import json
 import os
 from pathlib import Path
 import tempfile
@@ -57,6 +60,30 @@ class ProjectZomboidAcceptanceTests(unittest.TestCase):
             self.assertEqual(report["scriptInventory"]["counts"]["item"], 1)
             self.assertIn("not that Project Zomboid loaded", report["acceptanceBoundary"])
             self.assertEqual(len(report["manualGameTest"]), 5)
+
+    def test_cli_emits_json_and_uses_exit_status_for_preflight_readiness(self):
+        with tempfile.TemporaryDirectory() as name:
+            game, project, user = self.make_fixture(Path(name))
+            args = [
+                "--game-root", str(game),
+                "--project-root", str(project),
+                "--user-root", str(user),
+            ]
+
+            output = io.StringIO()
+            with redirect_stdout(output):
+                result = acceptance.main(args)
+            payload = json.loads(output.getvalue())
+            self.assertEqual(result, 0)
+            self.assertTrue(payload["preflightReady"])
+
+            (game / "ProjectZomboid64.exe").unlink()
+            output = io.StringIO()
+            with redirect_stdout(output):
+                result = acceptance.main(args)
+            payload = json.loads(output.getvalue())
+            self.assertEqual(result, 1)
+            self.assertFalse(payload["preflightReady"])
 
     def test_missing_game_executable_fails_without_faking_deployment_failure(self):
         with tempfile.TemporaryDirectory() as name:
