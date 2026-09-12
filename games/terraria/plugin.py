@@ -59,7 +59,12 @@ def initialize_project(root: Path) -> None:
         "__LEXEDITOR_DISPLAY_NAME__": root.name,
         "__LEXEDITOR_ID__": mod_id,
     }
-    for filename in ("build.txt", "LexeditorTerrariaMod.csproj", "LexeditorTerrariaMod.cs"):
+    for filename in (
+        "build.txt",
+        "LexeditorTerrariaMod.csproj",
+        "LexeditorTerrariaMod.cs",
+        "Localization/en-US.hjson",
+    ):
         path = root / filename
         text = path.read_text(encoding="utf-8-sig")
         for old, new in replacements.items():
