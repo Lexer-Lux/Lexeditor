@@ -10,7 +10,9 @@ from games.terraria.localization import (
     try_get_culture_and_prefix,
     update_localization_text,
 )
+from games.terraria import plugin as terraria_plugin
 from games.terraria import server
+from project_manager import ProjectManager
 
 
 class TerrariaLocalizationTests(unittest.TestCase):
@@ -156,6 +158,32 @@ class TerrariaLocalizationTests(unittest.TestCase):
             update_localization_text(text, {"Mods.ExampleMod.Missing": "Nope"})
         with self.assertRaisesRegex(ValueError, "one line"):
             update_localization_text(text, {"Mods.ExampleMod.Greeting": "Hello\nWorld"})
+
+    def test_shared_project_creation_renders_localization_starter(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            parent = base / "ModSources"
+            parent.mkdir()
+            manager = ProjectManager(
+                {"terraria": terraria_plugin.PLUGIN},
+                path=base / "projects.json",
+            )
+
+            state = manager.create("terraria", str(parent), "Example_Mod")
+            root = (parent / "Example_Mod").resolve()
+            self.assertEqual(Path(state["current"]), root)
+
+            target = root / "Localization" / "en-US.hjson"
+            self.assertTrue(target.is_file())
+            text = target.read_text(encoding="utf-8")
+            self.assertNotIn("__LEXEDITOR_", text)
+            self.assertIn("Mods: {", text)
+            self.assertIn("\tExample_Mod: {", text)
+
+            localization = server.parse_localization_text(text)
+            self.assertEqual(localization.entries, ())
+            self.assertEqual(localization.duplicates, ())
+            self.assertEqual(localization.unsupported, 0)
 
     def test_service_discovers_saves_and_stale_checks_localization(self):
         previous_project = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
