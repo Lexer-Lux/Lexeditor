@@ -228,6 +228,8 @@ def update_build_text(text: str, updates: dict[str, object]) -> str:
             continue
 
         newline = "\r\n" if "\r\n" in text else "\n"
+        while lines and lines[-1] == "":
+            lines.pop()
         if lines and not lines[-1].endswith(("\n", "\r")):
             lines[-1] += newline
         lines.append(f"{key} = {serialized}{newline}")
