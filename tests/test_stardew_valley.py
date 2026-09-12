@@ -91,7 +91,7 @@ class StardewContentPackTests(unittest.TestCase):
         with self.assertRaises(RuntimeError): deploy(game, self.project)
         with self.assertRaises(RuntimeError): revert(game, self.project)
 
-    def test_installed_acceptance_requires_new_smapi_evidence_and_unchanged_xnb(self):
+    def test_installed_acceptance_requires_runtime_export_and_unchanged_xnb(self):
         game = self.root / "game"
         data = game / "Content" / "Data"; data.mkdir(parents=True)
         xnb = data / "Objects.xnb"; xnb.write_bytes(b"installed-objects")
@@ -111,6 +111,7 @@ class StardewContentPackTests(unittest.TestCase):
         manifest = json.loads((self.project / "manifest.json").read_text(encoding="utf-8"))
         log = self.root / "SMAPI-latest.txt"
         log.write_text("old session\n", encoding="utf-8")
+        exported = game / "patch export" / "Data_Objects.json"
 
         with patch.dict(os.environ, {"LEXEDITOR_STARDEW_SMAPI_LOG": str(log)}):
             waiting = begin_acceptance(game, self.project)
@@ -125,6 +126,20 @@ class StardewContentPackTests(unittest.TestCase):
                 f"[SMAPI]    {manifest['Name']} 1.0.0 by Lexer | for Content Patcher\n",
                 encoding="utf-8",
             )
+            no_export = acceptance_status(game, self.project)
+            self.assertFalse(no_export["accepted"])
+            self.assertFalse(no_export["freshObjectsExport"])
+            self.assertTrue(any("patch export" in value for value in no_export["blockers"]))
+
+            exported.parent.mkdir(parents=True)
+            exported.write_text(json.dumps({"390": {"Price": 76}}) + "\n", encoding="utf-8")
+            mismatch = acceptance_status(game, self.project)
+            self.assertFalse(mismatch["accepted"])
+            self.assertTrue(mismatch["freshObjectsExport"])
+            self.assertFalse(mismatch["objectsExportMatchesExpected"])
+            self.assertTrue(any("390.Price" in value for value in mismatch["objectsExportMismatches"]))
+
+            exported.write_text(json.dumps({"390": {"Price": 77}}) + "\n", encoding="utf-8")
             accepted = acceptance_status(game, self.project)
             self.assertTrue(accepted["accepted"])
             self.assertEqual(accepted["smapiVersion"], "4.5.2")
@@ -135,6 +150,7 @@ class StardewContentPackTests(unittest.TestCase):
             self.assertTrue(accepted["smapiMeetsContentPatcherMinimum"])
             self.assertTrue(accepted["projectMentioned"])
             self.assertTrue(accepted["projectLoaded"])
+            self.assertTrue(accepted["objectsExportMatchesExpected"])
             self.assertTrue(accepted["objectsXnbUnchanged"])
 
             xnb.write_bytes(b"mutated-installed-objects")
