@@ -17,6 +17,9 @@ MAX_SHOTS_PER_ATB = 10
 DRAW_STRENGTH = "vanilla"
 DRAW_SCOPE = "enemy instance in the current battle"
 DEFAULT_DRAW_ONCE_PER_ENEMY = False
+# On by default: a Summon slot that does nothing and never says why is the bug
+# this fixes, not a taste a player opts into.
+DEFAULT_SUMMON_GATE = True
 
 DRAW_COMMAND_ID = 6
 CARD_COMMAND_ID = 25
@@ -61,12 +64,23 @@ DRAW_SELECT_CAVE = 0x0279F140
 DRAW_RENDER_CAVE = 0x0279F300
 DRAW_STATE = 0x0279F2F0
 CARD_FILTER_CAVE = 0x027A1380
+# Free space between the render cave and the fixed-command menu's block.
+SUMMON_GATE_CAVE = 0x0279F400
+# One byte the gate raises when it refuses Summon, and the native driver lowers
+# after it has said why. A refusal that only plays the denied sound is what
+# made the greyed slot look broken in the first place.
+SUMMON_REFUSED_FLAG = 0x0279F4F0
+
+# Where a character's junctioned GFs live. Verified by the Single GF patch,
+# which normalizes this same mask on field and world-map entry.
+from .single_gf import (  # noqa: E402  (kept beside the addresses it explains)
+    GF_MASK_OFFSET, SAVEMAP_CHARACTER_BASE, SAVEMAP_CHARACTER_STRIDE,
+)
+CHARACTER_COUNT = 8
+LAST_PARTY_ACTOR = 2
 
 BLOCKERS = (
     "GF Magic still needs the verified Magic-list builder and a defined GF-to-spell map.",
-    "Greying Summon needs the runtime hook that walks the command entries and "
-    "applies command_flags to each one. The id, the entry layout, the flag and "
-    "both behaviours it drives are settled and asserted above.",
 )
 
 
@@ -165,6 +179,42 @@ def _draw_capture_payload() -> bytes:
     return code.finish()
 
 
+def _summon_gate_payload() -> bytes:
+    """Answer, in AL, whether the acting character has a GF to summon.
+
+    Reads the acting battle actor, its character id, and that character's
+    junctioned-GF mask in the savemap. Everything but EAX is preserved, because
+    both callers still need the registers the menu code left them.
+
+    Anything unexpected - an actor that is not one of the three party slots, a
+    character id outside the eight - answers "available". A gate that greys a
+    command because it could not identify the character would be worse than no
+    gate at all.
+    """
+    code = _MachineCode(SUMMON_GATE_CAVE)
+    code.add(bytes.fromhex("53 51 52"))                     # push ebx, ecx, edx
+    code.add(b"\x0F\xB6\x05" + ACTIVE_BATTLE_ACTOR.to_bytes(4, "little"))
+    code.add(bytes.fromhex("3C") + bytes((LAST_PARTY_ACTOR,)))
+    code.jump(bytes.fromhex("0F 87"), "available")          # ja available
+    code.add(bytes.fromhex("69 C0") + BATTLE_ACTOR_STRIDE.to_bytes(4, "little"))
+    character = BATTLE_ACTOR_BASE + BATTLE_ACTOR_CHARACTER_ID
+    code.add(b"\x0F\xB6\x80" + character.to_bytes(4, "little"))
+    code.add(bytes.fromhex("3C") + bytes((CHARACTER_COUNT - 1,)))
+    code.jump(bytes.fromhex("0F 87"), "available")
+    code.add(bytes.fromhex("69 C0") + SAVEMAP_CHARACTER_STRIDE.to_bytes(4, "little"))
+    mask = SAVEMAP_CHARACTER_BASE + GF_MASK_OFFSET
+    code.add(b"\x0F\xB7\x80" + mask.to_bytes(4, "little"))
+    code.add(bytes.fromhex("85 C0"))                        # test eax, eax
+    code.add(bytes.fromhex("0F 95 C0"))                     # setne al
+    code.add(bytes.fromhex("0F B6 C0"))                     # movzx eax, al
+    code.jump(bytes.fromhex("E9"), "done")
+    code.label("available")
+    code.add(bytes.fromhex("B8 01 00 00 00"))               # mov eax, 1
+    code.label("done")
+    code.add(bytes.fromhex("5A 59 5B C3"))                  # pop edx, ecx, ebx; ret
+    return code.finish()
+
+
 def _card_filter_payload() -> bytes:
     """Filter EAX's actor mask to enemies that have a Card result."""
     code = _MachineCode(CARD_FILTER_CAVE)
@@ -226,10 +276,25 @@ def _draw_target_mask_payload(*, draw_once: bool = True,
 
 def _draw_select_payload(*, draw_once: bool = True,
                          better_card: bool = False,
-                         streamlined_draw: bool = False) -> bytes:
+                         streamlined_draw: bool = False,
+                         summon_gate: bool = False) -> bytes:
     code = _MachineCode(DRAW_SELECT_CAVE)
     code.add(DRAW_SELECT_ORIGINAL)
     code.jump(bytes.fromhex("0F 85"), "disabled")
+    if summon_gate:
+        # EAX is dead here: the enabled branch reloads it from the entry. CL
+        # is not, so the gate leaves it alone.
+        code.add(bytes.fromhex("80 3B") + bytes((GF_COMMAND_ID,)))
+        code.jump(bytes.fromhex("0F 85"), "not_summon")
+        source = code.address + len(code.data)
+        code.add(_near_call(source, SUMMON_GATE_CAVE))
+        code.add(bytes.fromhex("84 C0"))
+        code.jump(bytes.fromhex("0F 85"), "enabled")
+        # Refused. Raise the flag so the reason can be said, then let FF8's own
+        # disabled branch play the denied sound and swallow the press.
+        code.add(b"\xC6\x05" + SUMMON_REFUSED_FLAG.to_bytes(4, "little") + b"\x01")
+        code.jump(bytes.fromhex("E9"), "disabled")
+        code.label("not_summon")
     if draw_once or streamlined_draw:
         code.add(bytes.fromhex("8B 44 24 14 80 38 06"))
         code.jump(bytes.fromhex("0F 85"), "card")
@@ -266,9 +331,25 @@ def _draw_select_payload(*, draw_once: bool = True,
 
 def _draw_render_payload(*, draw_once: bool = True,
                          better_card: bool = False,
-                         streamlined_draw: bool = False) -> bytes:
+                         streamlined_draw: bool = False,
+                         summon_gate: bool = False) -> bytes:
     code = _MachineCode(DRAW_RENDER_CAVE)
     code.add(bytes.fromhex("8A 59 03"))
+    if summon_gate:
+        # EAX holds the sprite state the displaced code reads at +0x34, so it
+        # is saved across the gate. Setting bit 1 is all the greying takes:
+        # FF8 draws any command with that bit in colour index zero.
+        code.add(bytes.fromhex("80 39") + bytes((GF_COMMAND_ID,)))
+        code.jump(bytes.fromhex("0F 85"), "not_summon_render")
+        code.add(bytes.fromhex("50"))
+        source = code.address + len(code.data)
+        code.add(_near_call(source, SUMMON_GATE_CAVE))
+        code.add(bytes.fromhex("84 C0"))
+        code.jump(bytes.fromhex("0F 85"), "summon_restore")
+        code.add(bytes.fromhex("80 CB 02"))
+        code.label("summon_restore")
+        code.add(bytes.fromhex("58"))
+        code.label("not_summon_render")
     if draw_once or streamlined_draw:
         code.add(bytes.fromhex("80 39 06"))
         code.jump(bytes.fromhex("0F 85"), "card")
@@ -461,13 +542,19 @@ def summon_unavailable_reason(*, junctioned_gf_count: int) -> str:
 
 def build_command_eligibility_patch(*, draw_once: bool = DEFAULT_DRAW_ONCE_PER_ENEMY,
                                     better_card: bool = False,
-                                    streamlined_draw: bool = False) -> str:
-    """Compose Draw and Card eligibility through their shared menu hooks."""
+                                    streamlined_draw: bool = False,
+                                    summon_gate: bool = DEFAULT_SUMMON_GATE) -> str:
+    """Compose Draw, Card and Summon eligibility through their shared hooks.
+
+    All four ride the same two menu sites, so they are one patch: the select
+    site that accepts or refuses a press, and the render site that decides a
+    command's colour.
+    """
     if not all(isinstance(value, bool) for value in (
-        draw_once, better_card, streamlined_draw,
+        draw_once, better_card, streamlined_draw, summon_gate,
     )):
         raise ValueError("Command eligibility settings must be true or false")
-    if not draw_once and not better_card and not streamlined_draw:
+    if not draw_once and not better_card and not streamlined_draw and not summon_gate:
         return ""
 
     caves = []
@@ -485,24 +572,30 @@ def build_command_eligibility_patch(*, draw_once: bool = DEFAULT_DRAW_ONCE_PER_E
             (DRAW_RESULT_HOOK, len(DRAW_RESULT_ORIGINAL), DRAW_RESULT_CAVE),
             (DRAW_CAPTURE_HOOK, len(DRAW_CAPTURE_ORIGINAL), DRAW_CAPTURE_CAVE),
         ))
-    caves.extend((
-        (DRAW_TARGET_MASK_CAVE, _draw_target_mask_payload(
+    # The target-mask hook belongs to the three that filter targets. Summon
+    # touches neither targets nor that site, so it does not drag the hook in.
+    if draw_once or better_card or streamlined_draw:
+        caves.append((DRAW_TARGET_MASK_CAVE, _draw_target_mask_payload(
             draw_once=draw_once, better_card=better_card,
             streamlined_draw=streamlined_draw,
-        )),
+        )))
+        hooks.append((DRAW_TARGET_MASK_HOOK, len(DRAW_TARGET_MASK_ORIGINAL),
+                      DRAW_TARGET_MASK_CAVE))
+    caves.extend((
         (DRAW_SELECT_CAVE, _draw_select_payload(
             draw_once=draw_once, better_card=better_card,
-            streamlined_draw=streamlined_draw,
+            streamlined_draw=streamlined_draw, summon_gate=summon_gate,
         )),
         (DRAW_RENDER_CAVE, _draw_render_payload(
             draw_once=draw_once, better_card=better_card,
-            streamlined_draw=streamlined_draw,
+            streamlined_draw=streamlined_draw, summon_gate=summon_gate,
         )),
     ))
     if better_card:
         caves.append((CARD_FILTER_CAVE, _card_filter_payload()))
+    if summon_gate:
+        caves.append((SUMMON_GATE_CAVE, _summon_gate_payload()))
     hooks.extend((
-        (DRAW_TARGET_MASK_HOOK, len(DRAW_TARGET_MASK_ORIGINAL), DRAW_TARGET_MASK_CAVE),
         (DRAW_SELECT_HOOK, len(DRAW_SELECT_ORIGINAL), DRAW_SELECT_CAVE),
         (DRAW_RENDER_HOOK, len(DRAW_RENDER_ORIGINAL), DRAW_RENDER_CAVE),
     ))
@@ -516,12 +609,16 @@ def build_command_eligibility_patch(*, draw_once: bool = DEFAULT_DRAW_ONCE_PER_E
         ))
     if better_card:
         lines.append("# Better Card: hide enemies whose common and rare Card results are both FF.")
+    if summon_gate:
+        lines.append("# Summon: grey the GF command when the acting character has no GF junctioned.")
     if streamlined_draw:
         lines.append("# Streamlined Draw: hide enemies whose valid spells are all at the stock limit.")
     for address, payload in caves:
         lines.append(f"{address:X}:{len(payload):X}")
     if draw_once:
         lines.append(f"{DRAW_STATE:X}:8")
+    if summon_gate:
+        lines.append(f"{SUMMON_REFUSED_FLAG:X}:4")
     for hook, length, cave in hooks:
         replacement = _near_jump(hook, cave) + b"\x90" * (length - 5)
         lines.append(f"{hook:X} = {replacement.hex(' ').upper()}")
@@ -536,7 +633,9 @@ def build_draw_patch(enabled: bool = DEFAULT_DRAW_ONCE_PER_ENEMY) -> str:
     """Compatibility wrapper for the Draw-only composition."""
     if not isinstance(enabled, bool):
         raise ValueError("Draw Once per Enemy must be true or false")
-    return build_command_eligibility_patch(draw_once=enabled, better_card=False)
+    # Draw only. Summon's gate is composed by the caller that wants both.
+    return build_command_eligibility_patch(
+        draw_once=enabled, better_card=False, summon_gate=False)
 
 
 def build_patch(*, enabled: bool, single_gf_enabled: bool,

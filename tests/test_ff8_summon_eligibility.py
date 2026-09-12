@@ -37,10 +37,12 @@ class SummonEligibility(unittest.TestCase):
     def test_a_usable_slot_says_nothing(self):
         self.assertEqual(battle.summon_unavailable_reason(junctioned_gf_count=1), "")
 
-    def test_the_missing_addresses_are_declared_rather_than_guessed(self):
-        # The grouped feature stays fail-closed until the GF slot's render and
-        # select addresses are verified against the running game.
-        self.assertTrue(any("Greying Summon" in blocker for blocker in battle.BLOCKERS))
+    def test_summon_is_no_longer_a_blocker(self):
+        # It was one while the rule existed and the hook did not. The gate now
+        # rides the two menu sites the Draw work already owns, so what remains
+        # blocked is GF Magic and nothing else.
+        self.assertFalse(any("Summon" in blocker for blocker in battle.BLOCKERS))
+        self.assertTrue(any("GF Magic" in blocker for blocker in battle.BLOCKERS))
 
 
 if __name__ == "__main__":
@@ -129,6 +131,89 @@ class CommandFlags(unittest.TestCase):
                 self.assertEqual(
                     battle.command_flags(command_id=command, flags=flags,
                                          junctioned_gf_count=0), flags)
+
+
+class SummonGate(unittest.TestCase):
+    """The machine code that greys Summon, checked without running the game."""
+
+    def _disassemble(self, payload, address):
+        try:
+            from capstone import Cs, CS_ARCH_X86, CS_MODE_32
+        except ImportError:  # pragma: no cover - capstone is a dev dependency
+            self.skipTest("capstone is not installed here")
+        engine = Cs(CS_ARCH_X86, CS_MODE_32)
+        return [f"{i.mnemonic} {i.op_str}".strip() for i in engine.disasm(payload, address)]
+
+    def test_the_gate_reads_the_acting_character_and_its_junctioned_gfs(self):
+        listing = self._disassemble(battle._summon_gate_payload(), battle.SUMMON_GATE_CAVE)
+        text = "\n".join(listing)
+        self.assertIn(f"movzx eax, byte ptr [{battle.ACTIVE_BATTLE_ACTOR:#x}]", text)
+        self.assertIn(f"imul eax, eax, {battle.BATTLE_ACTOR_STRIDE:#x}", text)
+        character = battle.BATTLE_ACTOR_BASE + battle.BATTLE_ACTOR_CHARACTER_ID
+        self.assertIn(f"movzx eax, byte ptr [eax + {character:#x}]", text)
+        self.assertIn(f"imul eax, eax, {battle.SAVEMAP_CHARACTER_STRIDE:#x}", text)
+        mask = battle.SAVEMAP_CHARACTER_BASE + battle.GF_MASK_OFFSET
+        self.assertIn(f"movzx eax, word ptr [eax + {mask:#x}]", text)
+
+    def test_the_gate_gives_every_register_back(self):
+        listing = self._disassemble(battle._summon_gate_payload(), battle.SUMMON_GATE_CAVE)
+        pushes = [line.split()[1] for line in listing if line.startswith("push ")]
+        pops = [line.split()[1] for line in listing if line.startswith("pop ")]
+        self.assertEqual(pushes, list(reversed(pops)))
+        self.assertNotIn("eax", pushes, "EAX is the answer, not something to restore")
+        self.assertEqual(listing[-1], "ret")
+
+    def test_an_unrecognizable_actor_leaves_the_command_alone(self):
+        # Both bounds checks jump to the same answer: available. A gate that
+        # greyed a command because it could not identify the character would
+        # be worse than no gate.
+        listing = self._disassemble(battle._summon_gate_payload(), battle.SUMMON_GATE_CAVE)
+        aboves = [line for line in listing if line.startswith("ja ")]
+        self.assertEqual(len(aboves), 2)
+        self.assertEqual(len(set(aboves)), 1, "both bounds checks answer the same way")
+        self.assertIn("mov eax, 1", listing)
+
+    def test_the_render_path_saves_what_the_displaced_code_needs(self):
+        listing = self._disassemble(
+            battle._draw_render_payload(draw_once=False, summon_gate=True),
+            battle.DRAW_RENDER_CAVE)
+        text = "\n".join(listing)
+        # EAX carries the sprite state the displaced instruction reads at +0x34.
+        self.assertLess(text.index("push eax"), text.index("call"))
+        self.assertLess(text.index("pop eax"), text.index("movsx esi, word ptr [eax + 0x34]"))
+        self.assertIn("or bl, 2", listing)
+
+    def test_the_select_path_raises_the_flag_that_says_why(self):
+        listing = self._disassemble(
+            battle._draw_select_payload(draw_once=False, summon_gate=True),
+            battle.DRAW_SELECT_CAVE)
+        text = "\n".join(listing)
+        self.assertIn(f"mov byte ptr [{battle.SUMMON_REFUSED_FLAG:#x}], 1", text)
+        # And then hands the press to FF8's own refusal, which makes the noise.
+        self.assertIn(f"jmp {battle.COMMAND_SELECT_DISABLED_BRANCH:#x}", text)
+
+    def test_both_paths_branch_on_the_gf_command_and_nothing_else(self):
+        select = self._disassemble(
+            battle._draw_select_payload(draw_once=False, summon_gate=True),
+            battle.DRAW_SELECT_CAVE)
+        render = self._disassemble(
+            battle._draw_render_payload(draw_once=False, summon_gate=True),
+            battle.DRAW_RENDER_CAVE)
+        self.assertIn(f"cmp byte ptr [ebx], {battle.GF_COMMAND_ID}", select)
+        self.assertIn(f"cmp byte ptr [ecx], {battle.GF_COMMAND_ID}", render)
+
+    def test_the_gate_is_absent_when_it_is_not_asked_for(self):
+        self.assertEqual(battle.build_command_eligibility_patch(
+            draw_once=False, summon_gate=False), "")
+        patch = battle.build_command_eligibility_patch(draw_once=True, summon_gate=False)
+        self.assertNotIn(f"{battle.SUMMON_GATE_CAVE:X}:", patch)
+
+    def test_the_gate_fits_between_the_caves_around_it(self):
+        gate = battle._summon_gate_payload()
+        render = battle._draw_render_payload(summon_gate=True)
+        self.assertLessEqual(battle.DRAW_RENDER_CAVE + len(render), battle.SUMMON_GATE_CAVE)
+        self.assertLessEqual(battle.SUMMON_GATE_CAVE + len(gate), battle.SUMMON_REFUSED_FLAG)
+        self.assertLessEqual(battle.SUMMON_REFUSED_FLAG + 4, 0x0279F600)
 
 
 class CommandIdentity(unittest.TestCase):

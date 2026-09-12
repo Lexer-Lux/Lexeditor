@@ -636,9 +636,12 @@ def build_hext(bonus: int, auto_sort: bool = DEFAULT_AUTO_SORT_INVENTORY,
         lines.append("# Enhanced Scan is disabled; camera and battle input remain vanilla.")
     if not party_switch:
         lines.append("# FF10-style Party Switch is disabled; Look Left keeps vanilla behavior.")
+    # Summon's gate is not a taste: a GF slot that does nothing and never says
+    # why reads as a broken game, so it rides along with every build.
     draw_patch = battle_issue_54.build_command_eligibility_patch(
         draw_once=draw_once_per_enemy, better_card=better_card_enabled,
         streamlined_draw=streamlined_draw_enabled,
+        summon_gate=battle_issue_54.DEFAULT_SUMMON_GATE,
     )
     if draw_patch:
         lines.extend(draw_patch.rstrip().splitlines())

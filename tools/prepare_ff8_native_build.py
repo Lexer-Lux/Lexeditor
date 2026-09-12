@@ -25,43 +25,31 @@ def integrate_shared_magic_notifications(source: Path) -> None:
     """
     path = source/'src/ff8/shared_magic_runtime.cpp'
     text = path.read_text(encoding='utf-8')
-    if 'g_lexeditor_toasts' in text:
+    if 'lexeditor_ff8_toast_push' in text:
         return
     declaration = (
-        "// Lexeditor's own in-game messages. The queue decides what is shown\n"
-        "// and for how long; the overlay below is only what draws it.\n"
-        "lexeditor_toast::Queue g_lexeditor_toasts;\n"
+        "// Lexeditor's own in-game messages go to the FF8-style box in\n"
+        "// lexeditor_ff8_toast.cpp, which owns the queue and the drawing.\n"
         "bool g_warning_started = false;"
     )
     queue_message = (
         "        {\n"
         "            const std::string message =\n"
         "                migration_warning_template(result.error, g_stock_limit);\n"
-        "            g_lexeditor_toasts.push(message, lexeditor_toast::Tone::warning);\n"
+        "            lexeditor_ff8_toast_push(message.c_str(), true);\n"
         "            append_runtime_log((message + \"\\n\").c_str());\n"
         "        }\n"
         "        g_requested = false;\n        g_warning = MergeError::none;"
     )
     heartbeat = (
         "void ff8_shared_magic_heartbeat()\n{\n"
-        "    // The loader has returned. Use the renderer overlay, never the menu controller.\n"
-        "    if (const auto *toast = g_lexeditor_toasts.update(\n"
-        "            static_cast<std::uint32_t>(GetTickCount64()))) {\n"
-        "        if (get_popup_time() == 0) {\n"
-        "            std::string body;\n"
-        "            for (const auto &line : toast->lines) {\n"
-        "                if (!body.empty()) body += \" \";\n"
-        "                body += line;\n"
-        "            }\n"
-        "            show_popup_msg(toast->tone == lexeditor_toast::Tone::warning\n"
-        "                               ? TEXTCOLOR_RED : TEXTCOLOR_WHITE,\n"
-        "                           \"%s\", body.c_str());\n"
-        "        }\n"
-        "    }"
+        "    // Nothing to drain here any more: the message box owns the queue,\n"
+        "    // holds each sentence long enough to read, and draws it the way FF8\n"
+        "    // draws its own. FFNx's popup fades on a decay tuned for one word.\n"
     )
     changes = [
         ('#include "../log.h"',
-         '#include "../log.h"\n#include "../common.h"\n#include "../toast_queue.h"'),
+         '#include "../log.h"\n#include "../common.h"\n#include "../lexeditor_ff8_toast.h"'),
         ('bool g_warning_started = false;', declaration),
         ('        g_requested = false;\n        g_warning = MergeError::none;', queue_message),
         ('void ff8_shared_magic_heartbeat()\n{', heartbeat),
@@ -135,10 +123,13 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         'lexeditor_ff8_modern_controls.h',
     ):
         shutil.copyfile(ROOT/'games/ff8/ffnx_modern_controls'/name, source/'src'/name)
-    # Lexeditor's own in-game messages: what is queued, how long it holds,
-    # and how it wraps into FF8's message width. Drawing stays separate.
-    shutil.copyfile(ROOT/'games/ff8/ffnx_toasts/toast_queue.h',
-                    source/'src/toast_queue.h')
+    # Lexeditor's own in-game messages. The queue decides what is shown and
+    # for how long, the layout decides where the box sits and how it fades,
+    # and the third file is the only part that touches a device.
+    for name in ('toast_queue.h', 'toast_layout.h'):
+        shutil.copyfile(ROOT/'games/ff8/ffnx_toasts'/name, source/'src'/name)
+    for name in ('lexeditor_ff8_toast.h', 'lexeditor_ff8_toast.cpp'):
+        shutil.copyfile(ROOT/'games/ff8/ffnx_toasts/ffnx-src'/name, source/'src'/name)
     extension_files = [
         'flare_encounter.h', 'lexeditor_ff8_flare.cpp',
         'flare_request.h', 'lexeditor_ff8_flare_owner.h', 'lexeditor_ff8_flare_owner.cpp',
@@ -177,6 +168,19 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             ('enable_ff8_gf_hp_bars = false','enable_ff8_gf_hp_bars = false\n\n# Show the computer local clock on FF8 main menu without changing PLAY time.\nenable_ff8_ingame_time = false'),
         ],
     }
+    # The message box draws in the same ImGui frame the status bars use, and
+    # keeps that frame alive on its own account: a toast must appear whether or
+    # not any bar is switched on.
+    changes['src/overlay.cpp'] = [
+        ('#include "lexeditor_ff8_bars.h"',
+         '#include "lexeditor_ff8_bars.h"\n#include "lexeditor_ff8_toast.h"'),
+        ('    lexeditor_ff8_bars_draw();',
+         '    lexeditor_ff8_bars_draw();\n    lexeditor_ff8_toast_draw();'),
+    ]
+    changes['src/renderer.cpp'] = [
+        ('#include "lexeditor_ff8_bars.h"',
+         '#include "lexeditor_ff8_bars.h"\n#include "lexeditor_ff8_toast.h"'),
+    ]
     changes['src/ff8_opengl.cpp'] = [
         ('#include "lexeditor_ff8_party_switch.h"', '#include "lexeditor_ff8_party_switch.h"\n#include "lexeditor_ff8_stock_tweaks.h"\n#include "lexeditor_ff8_gf_spellbooks.h"\n#include "lexeditor_ff8_reptile_atb.h"'),
         ('\tlexeditor_ff8_party_switch_install();', '\tlexeditor_ff8_party_switch_install();\n\tlexeditor_ff8_stock_tweaks_install();\n\tlexeditor_ff8_gf_spellbooks_install();\n\tlexeditor_ff8_reptile_atb_install();'),
@@ -209,6 +213,17 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
             if text.count(old)!=1:raise RuntimeError(f'Integration anchor changed: {relative}: {old}')
             text=text.replace(old,new,1)
         path.write_bytes(text.replace('\n',newline).encode('utf-8'))
+    for relative in ('src/renderer.cpp', 'src/overlay.cpp'):
+        path = source / relative
+        raw = path.read_bytes()
+        newline = '\r\n' if b'\r\n' in raw else '\n'
+        text = raw.decode('utf-8').replace('\r\n', '\n')
+        gate = 'if (enable_devtools || lexeditor_ff8_bars_enabled())'
+        wanted = ('if (enable_devtools || lexeditor_ff8_bars_enabled() || '
+                  'lexeditor_ff8_toast_enabled())')
+        if wanted not in text and gate in text:
+            text = text.replace(gate, wanted)
+            path.write_bytes(text.replace('\n', newline).encode('utf-8'))
     integrate_flare_owner(source, startup=True)
     # git apply leaves new files untracked. Include EVERY file introduced by
     # the derivative, not just src/: otherwise the published patch silently
@@ -216,6 +231,8 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     patch_paths = [line[6:] for line in patch.read_text(encoding="utf-8").splitlines()
                    if line.startswith("+++ b/")]
     patch_paths.extend('src/' + ('ff8/' if name.endswith('.inc') else '') + name for name in extension_files)
+    patch_paths.extend(('src/toast_layout.h', 'src/lexeditor_ff8_toast.h',
+                        'src/lexeditor_ff8_toast.cpp'))
     for relative in ('src/battle_camera.h', 'src/vehicle_drive.h'):
         if relative not in patch_paths:
             patch_paths.append(relative)
