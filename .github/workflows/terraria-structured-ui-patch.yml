@@ -20,37 +20,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Repair staged UI patch
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          path=Path('.github/scripts/terraria_structured_ui_patch.py')
-          text=path.read_text(encoding='utf-8')
-          old='    return el("div",{class:"terraria-content-grid"},...groups.map(group=>el("div",{class:"terraria-content-group"},el("strong",{},group.name),...group.fields.map(field=>el("label",{class:"terraria-content-field",title:field.help||""},el("span",{},field.label),schemaFieldControl(field,values,value=>{values[field.name]=value;onchange();},disabled)))));'
-          new='    const cards=groups.map(group=>el("div",{class:"terraria-content-group"},el("strong",{},group.name),...group.fields.map(field=>el("label",{class:"terraria-content-field",title:field.help||""},el("span",{},field.label),schemaFieldControl(field,values,value=>{values[field.name]=value;onchange();},disabled)))));\n    return el("div",{class:"terraria-content-grid"},...cards);'
-          if text.count(old)!=1: raise SystemExit('structured UI syntax repair anchor missing')
-          path.write_text(text.replace(old,new,1),encoding='utf-8')
-          PY
       - name: Apply structured UI patch
-        run: python .github/scripts/terraria_structured_ui_patch.py
+        run: |
+          python .github/scripts/terraria_structured_ui_repair.py
+          python .github/scripts/terraria_structured_ui_patch.py
       - name: Verify Terraria
-        shell: bash
         run: |
           python -m compileall -q games/terraria plugin_api.py project_manager.py
           python -m unittest discover -s tests -p 'test_terraria_*.py'
-          python - <<'PY'
-          from pathlib import Path
-          html=Path('games/terraria/editor.html').read_text(encoding='utf-8')
-          Path('/tmp/terraria-editor.js').write_text(html.split('<script>')[-1].split('</script>',1)[0],encoding='utf-8')
-          PY
+          python -c "from pathlib import Path; h=Path('games/terraria/editor.html').read_text(encoding='utf-8'); Path('/tmp/terraria-editor.js').write_text(h.split('<script>')[-1].split('</script>',1)[0],encoding='utf-8')"
           node --check /tmp/terraria-editor.js
           git diff --check
       - name: Commit structured UI
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/terraria-structured-ui-patch.yml .github/scripts/terraria_structured_ui_patch.py
+          git rm .github/workflows/terraria-structured-ui-patch.yml .github/scripts/terraria_structured_ui_patch.py .github/scripts/terraria_structured_ui_repair.py
           git add games/terraria/editor.html
           git commit -m 'Add Terraria structured content editor UI'
           git push origin HEAD:feature/terraria-plugin
