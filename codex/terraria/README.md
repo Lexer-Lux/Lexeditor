@@ -46,7 +46,9 @@ tModLoader reads localization from UTF-8 `.hjson` files and derives the culture 
 
 For inspection, Lexeditor flattens nested object paths and dotted source keys into the same effective dot-separated keys tModLoader consumes. The special `.$parentVal` component is removed from the effective key to match tModLoader's legacy-conversion behavior.
 
-The first structured editor intentionally supports **existing single-line string leaves only**. It does not reserialize the HJSON document. Editing one supported value preserves comments, object nesting, dotted source keys, whitespace, BOM state, line endings, and every untouched line. Values that would be unsafe as bare HJSON text are emitted as quoted JSON-compatible strings.
+The structured editor supports **existing single-line string leaves** without reserializing the HJSON document. Editing one supported value preserves comments, object nesting, dotted source keys, whitespace, BOM state, line endings, and every untouched line. Values that would be unsafe as bare HJSON text are emitted as quoted JSON-compatible strings.
+
+Lexeditor can also create a new single-line string key. Creation does not rebuild surrounding objects: it appends one quoted dotted source property at the document root (or immediately inside an explicit root `{ ... }`). Because tModLoader preserves dots in property names while flattening object paths, that dotted property resolves to the requested effective localization key. In prefix-named files such as `en-US_Mods.ExampleMod.hjson`, Lexeditor stores only the key suffix after that file prefix. Existing-value edits and new-key creation are applied in memory and written in one stale-SHA-guarded atomic transaction.
 
 These constructs remain preservation-only/read-only:
 
@@ -56,7 +58,7 @@ These constructs remain preservation-only/read-only:
 - unsupported or ambiguous HJSON expressions;
 - files whose path does not identify a known tModLoader culture.
 
-Duplicate effective keys fail closed instead of choosing one occurrence. Structured writes also require the source SHA observed by the editor, so an HJSON file changed by tModLoader, an IDE, or another process must be reloaded before Lexeditor writes it.
+Existing localization-key deletion is not implemented yet. Duplicate effective keys fail closed instead of choosing one occurrence. Structured writes also require the source SHA observed by the editor, so an HJSON file changed by tModLoader, an IDE, or another process must be reloaded before Lexeditor writes it.
 
 This parser is deliberately a preservation-safe editor boundary, **not** a replacement for tModLoader's HJSON parser. Final build/load validation remains authoritative for the complete HJSON grammar.
 
@@ -85,7 +87,7 @@ Lexeditor currently treats `enabled.json` as **read-only**. Native `-build` rema
 - **Loader:** tModLoader itself. Lexeditor does not ship a second Terraria loader.
 - **Authoring:** edit a source project under `ModSources`.
 - **Metadata:** structured preservation-safe `build.txt` editing.
-- **Localization:** structured editing of existing safe single-line HJSON string leaves, with complex constructs left untouched.
+- **Localization:** structured editing of safe existing single-line HJSON strings plus preservation-safe creation of new dotted string keys; complex constructs remain untouched.
 - **Build:** invoke tModLoader's native `-build` command through its installed bootstrap.
 - **Runtime:** tModLoader loads enabled `.tmod` packages; Workshop remains owned by tModLoader/Steam.
 - **State inspection:** report the native local `.tmod` and `Mods/enabled.json` state without rewriting enabled state.
@@ -102,7 +104,7 @@ Lexeditor currently treats `enabled.json` as **read-only**. Native `-build` rema
 1. detect the Steam tModLoader install;
 2. discover/create a valid source mod in `ModSources`;
 3. structured `build.txt` inspection/editing with preservation of unknown keys and formatting;
-4. structured preservation-safe editing of existing supported HJSON localization strings;
+4. structured preservation-safe editing and creation of supported HJSON localization strings;
 5. Data Map inventory of source code, localization and assets;
 6. invoke the supported build path without modifying the installed game;
 7. report the resulting local package and tModLoader enabled-state record;
