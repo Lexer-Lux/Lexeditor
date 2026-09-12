@@ -32,11 +32,25 @@ Structured writes preserve comments/no-equals lines, unknown or future propertie
 
 Localized `displayName.<culture>` entries remain preservation-only for now.
 
+## Native build handoff
+
+tModLoader exposes a command-line `-build <modFolder>` path that runs its own `ModCompile.BuildModCommandLine` pipeline. Lexeditor uses that path instead of trying to reproduce compilation or packaging itself.
+
+On Windows, the installed `start-tModLoader.bat` ultimately launches `busybox64.exe` with Windows `start`, which detaches the child process. For a synchronous editor build with a meaningful exit code, Lexeditor invokes the same installed bootstrap directly:
+
+`LaunchUtils/busybox64.exe bash ./LaunchUtils/ScriptCaller.sh -build <project> -tmlsavedirectory <save-root>`
+
+`ScriptCaller.sh` then performs tModLoader's normal .NET/bootstrap setup and `exec`s `tModLoader.dll` with those arguments. Passing `-tmlsavedirectory` keeps the build output and local mod state tied to the same save root that owns Lexeditor's `ModSources` project. The expected package is `<save-root>/Mods/<ModName>.tmod`.
+
+The service does not accept an arbitrary executable or command line: the installation root comes from Lexeditor's validated Terraria installation, the project comes from the selected Terraria project, and the remaining arguments are fixed.
+
+A successful synthetic handoff/exit-code test is **not** installed-game acceptance. Final acceptance still requires a real current tModLoader installation to produce and load the package.
+
 ## Loader / deployment model
 
 - **Loader:** tModLoader itself. Lexeditor does not ship a second Terraria loader.
 - **Authoring:** edit a source project under `ModSources`.
-- **Build:** use tModLoader's supported mod build pipeline / generated MSBuild targets.
+- **Build:** invoke tModLoader's native `-build` command through its installed bootstrap.
 - **Runtime:** tModLoader loads enabled `.tmod` packages; Workshop remains owned by tModLoader/Steam.
 - **Vanilla install:** read-only. Lexeditor must not patch `Terraria.exe` or vanilla content as its normal workflow.
 

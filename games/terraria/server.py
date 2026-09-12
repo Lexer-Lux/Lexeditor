@@ -8,18 +8,23 @@ import json
 import mimetypes
 import os
 from pathlib import Path
+import subprocess
 import tempfile
+import threading
 from urllib.parse import urlparse
 
 from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text
-from .plugin import DEFAULT_PROJECT_ROOT
+from .plugin import DEFAULT_PROJECT_ROOT, TMODLOADER_SAVE_ROOT
 
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 MAX_BODY = 64 * 1024
+MAX_BUILD_OUTPUT = 64 * 1024
+BUILD_TIMEOUT_SECONDS = 15 * 60
 UTF8_BOM = b"\xef\xbb\xbf"
+_BUILD_LOCK = threading.Lock()
 
 
 def project_root() -> Path:
@@ -87,6 +92,159 @@ def save_build(updates: dict[str, object], expected_sha256: str) -> dict:
         if temp_path is not None:
             temp_path.unlink(missing_ok=True)
     return build_state()
+
+
+def _installation_root() -> Path:
+    configured = os.environ.get("LEXEDITOR_TERRARIA_ROOT", "").strip()
+    if not configured:
+        raise ValueError("tModLoader installation is not configured")
+    root = Path(configured).resolve()
+    required = (
+        "tModLoader.dll",
+        "LaunchUtils/busybox64.exe",
+        "LaunchUtils/ScriptCaller.sh",
+    )
+    missing = [relative for relative in required if not (root / relative).is_file()]
+    if not root.is_dir() or missing:
+        detail = ", ".join(missing) if missing else str(root)
+        raise ValueError(f"tModLoader build bootstrap is incomplete: {detail}")
+    return root
+
+
+def _source_project_root() -> Path:
+    root = project_root()
+    if not root.is_dir() or not (root / "build.txt").is_file():
+        raise ValueError("The selected Terraria project is missing build.txt")
+    if not any(path.is_file() for path in root.glob("*.csproj")):
+        raise ValueError("The selected Terraria project has no .csproj file")
+    return root
+
+
+def _artifact_path(project: Path) -> Path:
+    return Path(TMODLOADER_SAVE_ROOT).resolve() / "Mods" / f"{project.name}.tmod"
+
+
+def _trim_output(value: object) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        text = value.decode("utf-8", errors="replace")
+    else:
+        text = str(value)
+    if len(text) <= MAX_BUILD_OUTPUT:
+        return text
+    return "[earlier output truncated]\n" + text[-MAX_BUILD_OUTPUT:]
+
+
+def _read_log_tail(path: Path) -> str:
+    try:
+        data = path.read_bytes()
+    except OSError:
+        return ""
+    if len(data) > MAX_BUILD_OUTPUT:
+        data = data[-MAX_BUILD_OUTPUT:]
+        prefix = b"[earlier output truncated]\n"
+    else:
+        prefix = b""
+    return (prefix + data).decode("utf-8", errors="replace")
+
+
+def build_status(platform_name: str | None = None) -> dict:
+    platform_name = os.name if platform_name is None else platform_name
+    project = project_root()
+    artifact = _artifact_path(project)
+    payload = {
+        "available": False,
+        "building": _BUILD_LOCK.locked(),
+        "project": str(project),
+        "saveRoot": str(Path(TMODLOADER_SAVE_ROOT).resolve()),
+        "expectedArtifact": str(artifact),
+        "artifactExists": artifact.is_file(),
+        "reason": "",
+    }
+    if platform_name != "nt":
+        payload["reason"] = "Native Terraria build handoff is supported on Windows only."
+        return payload
+    try:
+        install = _installation_root()
+        _source_project_root()
+    except ValueError as error:
+        payload["reason"] = str(error)
+        return payload
+    payload["installRoot"] = str(install)
+    if payload["building"]:
+        payload["reason"] = "A Terraria build is already running."
+        return payload
+    payload["available"] = True
+    return payload
+
+
+def build_project(run_command=None, platform_name: str | None = None) -> dict:
+    platform_name = os.name if platform_name is None else platform_name
+    if platform_name != "nt":
+        raise ValueError("Native Terraria build handoff is supported on Windows only.")
+
+    install = _installation_root()
+    project = _source_project_root()
+    save_root = Path(TMODLOADER_SAVE_ROOT).resolve()
+    artifact = _artifact_path(project)
+    runner = subprocess.run if run_command is None else run_command
+
+    if not _BUILD_LOCK.acquire(blocking=False):
+        raise ValueError("A Terraria build is already running.")
+    try:
+        command = [
+            str(install / "LaunchUtils" / "busybox64.exe"),
+            "bash",
+            "./LaunchUtils/ScriptCaller.sh",
+            "-build",
+            str(project),
+            "-tmlsavedirectory",
+            str(save_root),
+        ]
+        kwargs = {
+            "cwd": str(install),
+            "capture_output": True,
+            "text": True,
+            "encoding": "utf-8",
+            "errors": "replace",
+            "timeout": BUILD_TIMEOUT_SECONDS,
+            "check": False,
+            "creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        }
+        try:
+            completed = runner(command, **kwargs)
+            stdout = _trim_output(completed.stdout)
+            stderr = _trim_output(completed.stderr)
+            native_log = _read_log_tail(install / "tModLoader-Logs" / "Natives.log")
+            ok = completed.returncode == 0 and artifact.is_file()
+            result = {
+                "ok": ok,
+                "exitCode": int(completed.returncode),
+                "timedOut": False,
+                "artifact": str(artifact),
+                "artifactExists": artifact.is_file(),
+                "stdout": stdout,
+                "stderr": stderr,
+                "nativeLog": native_log,
+            }
+            if completed.returncode == 0 and not artifact.is_file():
+                result["error"] = "tModLoader exited successfully but the expected .tmod was not found."
+            return result
+        except subprocess.TimeoutExpired as error:
+            return {
+                "ok": False,
+                "exitCode": None,
+                "timedOut": True,
+                "artifact": str(artifact),
+                "artifactExists": artifact.is_file(),
+                "stdout": _trim_output(error.stdout),
+                "stderr": _trim_output(error.stderr),
+                "nativeLog": _read_log_tail(install / "tModLoader-Logs" / "Natives.log"),
+                "error": "tModLoader build exceeded Lexeditor's build timeout.",
+            }
+    finally:
+        _BUILD_LOCK.release()
 
 
 def data_map() -> dict:
@@ -165,10 +323,12 @@ class Handler(BaseHTTPRequestHandler):
                     "name": "Terraria",
                     "hosted": True,
                     "windowHost": "webview2",
-                    "capabilities": ["build-metadata", "data-map"],
+                    "capabilities": ["build-metadata", "native-build", "data-map"],
                 })
             elif path == "/api/build-metadata":
                 self.send_json(build_state())
+            elif path == "/api/build":
+                self.send_json(build_status())
             elif path == "/api/data-map":
                 self.send_json(data_map())
             else:
@@ -179,6 +339,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
+            if path == "/api/build":
+                payload = self.read_json()
+                if payload != {}:
+                    raise ValueError("Terraria build request must be an empty object")
+                self.send_json(build_project())
+                return
             if path != "/api/build-metadata":
                 self.send_json({"error": "Not found"}, 404)
                 return

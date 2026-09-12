@@ -13,11 +13,19 @@
     .terraria-page{max-width:1100px;margin:0 auto;display:grid;gap:var(--lex-panel-gap)}
     .terraria-note{padding:10px 12px;border:1px solid var(--lex-border);background:var(--lex-panel)}
     .terraria-error{border-color:#a84d4d}
+    .terraria-success{border-color:var(--lex-success)}
     .terraria-list{width:100%;min-width:320px;min-height:88px;resize:vertical}
     .terraria-map{width:100%;border-collapse:collapse;background:var(--lex-panel)}
     .terraria-map th,.terraria-map td{padding:8px 10px;border:1px solid var(--lex-border);text-align:left;vertical-align:top}
     .terraria-map th{background:var(--lex-panel-muted,#eceff1)}
     .terraria-status{font-weight:700;text-transform:uppercase;font-size:.8em;letter-spacing:.04em}
+    .terraria-build-card{display:grid;gap:9px}
+    .terraria-build-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .terraria-build-button{padding:8px 14px;border:1px solid var(--lex-border);border-radius:var(--lex-radius);color:var(--lex-text);background:var(--lex-panel-2);font:700 13px/1 var(--lex-font);cursor:pointer}
+    .terraria-build-button:hover:not(:disabled){color:var(--lex-accent-text);border-color:var(--lex-accent);background:var(--lex-accent)}
+    .terraria-build-button:disabled{opacity:.45;cursor:default}
+    .terraria-build-path{overflow-wrap:anywhere;color:var(--lex-muted);font-size:.9em}
+    .terraria-build-log{max-height:260px;margin:0;padding:10px;overflow:auto;white-space:pre-wrap;background:var(--lex-bg);border:1px solid var(--lex-border);font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
   </style>
 </head>
 <body>
@@ -26,8 +34,8 @@
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
-  const {el,detailPanel,detailSection,detailField,readonlyField,panelLayout}=LexeditorUI;
-  let tab="metadata",saved=null,current=null,mapRows=[],error="";
+  const {el,detailPanel,detailSection,detailField,readonlyField}=LexeditorUI;
+  let tab="metadata",saved=null,current=null,mapRows=[],buildInfo=null,buildResult=null,building=false,error="";
 
   const clone=value=>JSON.parse(JSON.stringify(value));
   async function request(path,options={}){
@@ -43,9 +51,8 @@
   const dirtyCount=()=>dirtyKeys().length;
   function setValue(key,value){current.values[key]=value;render();shell?.refresh?.()}
   function textControl(key,{placeholder=""}={}){
-    const input=el("input",{type:"text",value:current.values[key]??"",placeholder,
+    return el("input",{type:"text",value:current.values[key]??"",placeholder,
       disabled:!current.editable,oninput:event=>{current.values[key]=event.target.value;shell?.refresh?.()}});
-    return input;
   }
   function listControl(key,{placeholder=""}={}){
     const values=Array.isArray(current.values[key])?current.values[key]:[];
@@ -95,6 +102,35 @@
     return el("div",{class:"terraria-page"},...warnings(),panel,
       el("div",{class:"terraria-note"},"Lexeditor rewrites only modeled properties. Comments, unknown/future keys, localized display-name lines, and unrelated formatting remain untouched."));
   }
+  function buildCard(){
+    if(!buildInfo)return el("div",{class:"terraria-note"},"Checking native tModLoader build handoff…");
+    const blockedByDirty=dirtyCount()>0;
+    const reason=blockedByDirty
+      ?"Save or discard metadata edits before building."
+      :(buildInfo.reason||"Ready to invoke tModLoader's native -build path.");
+    const card=el("div",{class:"terraria-note terraria-build-card"},
+      el("div",{class:"terraria-build-row"},
+        el("button",{class:"terraria-build-button",disabled:building||blockedByDirty||!buildInfo.available,onclick:buildMod},
+          building?"BUILDING…":"BUILD MOD"),
+        el("strong",{},buildInfo.available&&!blockedByDirty?"Native build ready":"Native build unavailable")),
+      el("div",{},reason),
+      el("div",{class:"terraria-build-path"},`Expected package: ${buildInfo.expectedArtifact}`));
+    if(buildResult){
+      const success=buildResult.ok;
+      card.classList.add(success?"terraria-success":"terraria-error");
+      const summary=success
+        ?`Build succeeded${buildResult.artifactExists?" and produced the expected .tmod.":"."}`
+        :(buildResult.error||`Build failed with exit code ${buildResult.exitCode??"unknown"}.`);
+      card.append(el("strong",{},summary));
+      const log=[
+        buildResult.stdout&&`STDOUT\n${buildResult.stdout}`,
+        buildResult.stderr&&`STDERR\n${buildResult.stderr}`,
+        buildResult.nativeLog&&`TMODLOADER NATIVES LOG\n${buildResult.nativeLog}`,
+      ].filter(Boolean).join("\n\n");
+      if(log)card.append(el("pre",{class:"terraria-build-log"},log));
+    }
+    return card;
+  }
   function dependenciesPanel(){
     if(!current)return el("div",{class:"terraria-note"},"Loading build.txt…");
     const panel=detailPanel({title:"References & Build",identity:"TMOD",meta:"One entry per line; Lexeditor serializes tModLoader's comma-delimited build.txt lists.",body:[
@@ -111,12 +147,12 @@
         detailField({label:"BUILD IGNORE",control:listControl("buildIgnore",{placeholder:"Folder/*\nFile.ext"}),dataType:"LIST"}),
       ]}),
     ]});
-    return el("div",{class:"terraria-page"},...warnings(),panel,
+    return el("div",{class:"terraria-page"},...warnings(),panel,buildCard(),
       el("div",{class:"terraria-note"},"Strong and weak references must not repeat the same mod name. A strong mod reference also cannot duplicate a DLL reference. Version-qualified mod references use ModName@1.2 style syntax."));
   }
   function dataMapPanel(){
     const table=el("table",{class:"terraria-map"},
-      el("thead",{},el("tr",{},...['PATH','FAMILY','COVERAGE'].map(label=>el("th",{},label)))),
+      el("thead",{},el("tr",{},...["PATH","FAMILY","COVERAGE"].map(label=>el("th",{},label)))),
       el("tbody",{},...mapRows.map(row=>el("tr",{},
         el("td",{},row.path),el("td",{},row.family),el("td",{class:"terraria-status"},row.status)))));
     return el("div",{class:"terraria-page"},
@@ -129,8 +165,10 @@
   }
   async function load(){
     try{
-      const [metadata,map]=await Promise.all([request("/api/build-metadata"),request("/api/data-map")]);
-      saved=clone(metadata);current=clone(metadata);mapRows=map.rows;error="";
+      const [metadata,map,build]=await Promise.all([
+        request("/api/build-metadata"),request("/api/data-map"),request("/api/build"),
+      ]);
+      saved=clone(metadata);current=clone(metadata);mapRows=map.rows;buildInfo=build;error="";
     }catch(exc){error=String(exc.message||exc)}
     render();
   }
@@ -149,6 +187,19 @@
       saved=clone(result);current=clone(result);error="";
     }catch(exc){error=String(exc.message||exc)}
     render();
+  }
+  async function buildMod(){
+    if(building||dirtyCount()||!buildInfo?.available)return;
+    building=true;buildResult=null;error="";render();
+    try{
+      buildResult=await request("/api/build",{method:"POST",body:"{}"});
+      buildInfo=await request("/api/build");
+    }catch(exc){
+      error=String(exc.message||exc);
+      try{buildInfo=await request("/api/build")}catch(_ignored){}
+    }finally{
+      building=false;render();
+    }
   }
   async function discard(){current=clone(saved);error="";render()}
   function navigate(value){tab=value;render()}

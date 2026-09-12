@@ -3,6 +3,7 @@ from __future__ import annotations
 from hashlib import sha256
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -161,6 +162,93 @@ class TerrariaBuildMetadataTests(unittest.TestCase):
                 os.environ.pop("LEXEDITOR_TERRARIA_PROJECT", None)
             else:
                 os.environ["LEXEDITOR_TERRARIA_PROJECT"] = previous
+
+    def test_native_build_handoff_uses_tmodloader_bootstrap_and_custom_save_root(self):
+        previous_project = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
+        previous_install = os.environ.get("LEXEDITOR_TERRARIA_ROOT")
+        previous_save_root = server.TMODLOADER_SAVE_ROOT
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                base = Path(directory)
+                install = base / "tModLoader"
+                launch_utils = install / "LaunchUtils"
+                launch_utils.mkdir(parents=True)
+                (install / "tModLoader.dll").write_bytes(b"")
+                (launch_utils / "busybox64.exe").write_bytes(b"")
+                (launch_utils / "ScriptCaller.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+
+                project = base / "Save Data" / "ModSources" / "ExampleMod"
+                project.mkdir(parents=True)
+                (project / "build.txt").write_text("displayName = Example\n", encoding="utf-8")
+                (project / "ExampleMod.csproj").write_text("<Project />\n", encoding="utf-8")
+
+                save_root = base / "Save Data"
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = str(project)
+                os.environ["LEXEDITOR_TERRARIA_ROOT"] = str(install)
+                server.TMODLOADER_SAVE_ROOT = save_root
+                observed = {}
+
+                def fake_run(command, **kwargs):
+                    observed["command"] = command
+                    observed["kwargs"] = kwargs
+                    artifact = save_root / "Mods" / "ExampleMod.tmod"
+                    artifact.parent.mkdir(parents=True)
+                    artifact.write_bytes(b"TMOD")
+                    return subprocess.CompletedProcess(command, 0, stdout="Building ExampleMod\n", stderr="")
+
+                result = server.build_project(run_command=fake_run, platform_name="nt")
+                self.assertTrue(result["ok"])
+                self.assertTrue(result["artifactExists"])
+                self.assertEqual(
+                    observed["command"],
+                    [
+                        str(launch_utils / "busybox64.exe"),
+                        "bash",
+                        "./LaunchUtils/ScriptCaller.sh",
+                        "-build",
+                        str(project.resolve()),
+                        "-tmlsavedirectory",
+                        str(save_root.resolve()),
+                    ],
+                )
+                self.assertEqual(observed["kwargs"]["cwd"], str(install.resolve()))
+                self.assertTrue(observed["kwargs"]["capture_output"])
+                self.assertFalse(observed["kwargs"]["check"])
+                self.assertIn("Building ExampleMod", result["stdout"])
+        finally:
+            server.TMODLOADER_SAVE_ROOT = previous_save_root
+            if previous_project is None:
+                os.environ.pop("LEXEDITOR_TERRARIA_PROJECT", None)
+            else:
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = previous_project
+            if previous_install is None:
+                os.environ.pop("LEXEDITOR_TERRARIA_ROOT", None)
+            else:
+                os.environ["LEXEDITOR_TERRARIA_ROOT"] = previous_install
+
+    def test_native_build_status_fails_closed_without_bootstrap(self):
+        previous_project = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
+        previous_install = os.environ.get("LEXEDITOR_TERRARIA_ROOT")
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                project = Path(directory) / "ExampleMod"
+                project.mkdir()
+                (project / "build.txt").write_text("displayName = Example\n", encoding="utf-8")
+                (project / "ExampleMod.csproj").write_text("<Project />\n", encoding="utf-8")
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = str(project)
+                os.environ.pop("LEXEDITOR_TERRARIA_ROOT", None)
+                state = server.build_status(platform_name="nt")
+                self.assertFalse(state["available"])
+                self.assertIn("not configured", state["reason"])
+        finally:
+            if previous_project is None:
+                os.environ.pop("LEXEDITOR_TERRARIA_PROJECT", None)
+            else:
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = previous_project
+            if previous_install is None:
+                os.environ.pop("LEXEDITOR_TERRARIA_ROOT", None)
+            else:
+                os.environ["LEXEDITOR_TERRARIA_ROOT"] = previous_install
 
 
 if __name__ == "__main__":
