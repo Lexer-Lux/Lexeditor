@@ -15,11 +15,23 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
+from games.ff8 import paths  # noqa: E402
 from games.ff8.plugin import FF8Session  # noqa: E402
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 
 
 def main() -> int:
+    # Formulae renders real weapons/settings data. Without the extracted FF8
+    # baseline the editor can boot, but those payloads are null and a browser
+    # TypeError would misreport "no game data" as a UI regression.
+    required = (
+        paths.BASELINE_ROOT / "main" / "kernel.bin",
+        paths.BASELINE_ROOT / "menu" / "mitem.bin",
+    )
+    missing = next((path for path in required if not path.is_file()), None)
+    if missing:
+        raise FileNotFoundError(f"Installed FF8 extracted baseline is missing: {missing}")
+
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
     output = ROOT / "worklog" / "issues" / "rendered" / "github-31-ff8-formulae.png"
     output.parent.mkdir(parents=True, exist_ok=True)

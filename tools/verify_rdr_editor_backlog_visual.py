@@ -5,6 +5,9 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 from tools.verify_panel_layout_visual_46 import browser_session,close_browser,screenshot,wait_eval,Rdr2Session
 from games.rdr.plugin import RdrSession
+SOURCE_INI=Path(r'C:\RDR2Mod\GameplayTweaks\GameplayTweaks.ini')
+if not SOURCE_INI.is_file():
+ raise FileNotFoundError(f'Missing RDR2 project fixture: {SOURCE_INI}')
 BOUNDS="""(()=>{const list=document.querySelector('.effect-column-list,.behavior-column-list,.rdr-record-list');const rows=[...list.querySelectorAll('.effect-column-row,.behavior-column-row,.rdr-record-entry')];const rect=list.getBoundingClientRect();return {rows:rows.length,over:rows.filter(r=>r.getBoundingClientRect().bottom>rect.bottom+1).length,cut:rows.filter(r=>[...r.querySelectorAll('.lex-column-cell-content')].some(x=>x.getBoundingClientRect().bottom>r.getBoundingClientRect().bottom+1||x.scrollHeight>x.clientHeight+1)).length,detailOverflow:[...document.querySelectorAll('.effect-detail')].some(x=>x.scrollWidth>x.clientWidth+1),height:rect.height,scroll:list.scrollHeight>list.clientHeight+1}})()"""
 def dimensions(c,w,h):
  c.call('Emulation.setDeviceMetricsOverride',{'width':w,'height':h,'deviceScaleFactor':1,'mobile':False});time.sleep(1)
@@ -15,7 +18,7 @@ def check(c,label):
 p,b,c=browser_session()
 try:
  with tempfile.TemporaryDirectory() as tmp:
-  ini=Path(tmp)/'GameplayTweaks.ini';shutil.copy2(r'C:\RDR2Mod\GameplayTweaks\GameplayTweaks.ini',ini)
+  ini=Path(tmp)/'GameplayTweaks.ini';shutil.copy2(SOURCE_INI,ini)
   with Rdr2Session({'LEXEDITOR_GAMEPLAY_INI':str(ini),'RDR2_GAME_ROOT':str(Path(tmp)/'empty')}) as s:
    c.call('Page.navigate',{'url':s.url});wait_eval(c,"typeof state!=='undefined'&&!state.booting",90)
    for section in ['effects','behaviors']:

@@ -76,8 +76,16 @@ def main() -> int:
             state = cache.snapshot(plugin_id)
             assert state["state"] == "ready", state
             path = Path(state["uri"].removeprefix("file:///"))
-            expected_size = (1024, 1536) if plugin_id == "blank" else (600, 900)
-            assert path.is_file() and (state["width"], state["height"]) == expected_size
+            assert path.is_file(), (plugin_id, state)
+            if plugin_id == "blank":
+                # Blank is packaged art rather than the synthetic Steam JPEG.
+                # Its exact source resolution is not a chooser contract; the
+                # chooser deliberately owns a 2:3 box. Preserve that shape and
+                # minimum useful dimensions without freezing one historical PNG.
+                assert state["width"] >= 300 and state["height"] >= 450, state
+                assert abs(state["width"] / state["height"] - 2 / 3) < .01, state
+            else:
+                assert (state["width"], state["height"]) == (600, 900), (plugin_id, state)
 
     def offline(_url: str) -> bytes:
         raise OSError("offline")

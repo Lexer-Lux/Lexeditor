@@ -38,8 +38,14 @@ def editable_operand(parsed: dict) -> tuple[dict, dict, dict]:
 
 
 def main() -> int:
+    battle_files = sorted((paths.BASELINE_ROOT / "battle").glob("c0m*.dat"))
+    if not battle_files:
+        raise FileNotFoundError(
+            f"Installed FF8 enemy AI baseline is missing: {paths.BASELINE_ROOT / 'battle' / 'c0m000.dat'}"
+        )
+
     corpus = []
-    for path in sorted((paths.BASELINE_ROOT / "battle").glob("c0m*.dat")):
+    for path in battle_files:
         decoded = enemy_ai.read(path.read_bytes())
         if decoded["available"]:
             corpus.append(decoded)
@@ -51,7 +57,7 @@ def main() -> int:
     assert len(branches) == 3879 and all(instruction["targetValid"] for instruction in branches)
 
     # A full no-op rebuild must preserve every one of the 144 decoded DATs.
-    for path in sorted((paths.BASELINE_ROOT / "battle").glob("c0m*.dat")):
+    for path in battle_files:
         raw = path.read_bytes()
         document = enemy_ai.read(raw)
         if not document["available"]:
@@ -103,7 +109,6 @@ def main() -> int:
     assert old_section[old_text:] == new_section[new_text:]
     assert baseline[old_section_end:] == inserted[new_section_end:]
 
-    section_start = parsed["sectionOffset"]
     unknown = bytearray(baseline)
     unknown[script["offset"] + instruction["offset"]] = 0xFE
     unknown_parsed = enemy_ai.read(bytes(unknown))

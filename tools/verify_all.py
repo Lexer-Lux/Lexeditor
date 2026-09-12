@@ -96,8 +96,107 @@ def timeout_for(tool: Path, default: float) -> float:
     return max(default, SLOW.get(tool.stem, 0))
 
 
+# These checks are rendered/data acceptance over the extracted FF8 baseline.
+# On a clean hosted runner the editor can still start, but its data payloads are
+# null; the old behavior then failed later with unrelated JavaScript TypeErrors,
+# HTTP 400s, empty-corpus assertions, or font timeouts. Keep this list exact so
+# self-contained FF8 source/unit verifiers still run in CI.
+_FF8_BASELINE_TOOLS = frozenset({
+    "verify_bottom_command_bar_visual",
+    "verify_ff8_cards_visual_91",
+    "verify_ff8_data_ui_completion",
+    "verify_ff8_datamap_issue_47",
+    "verify_ff8_encounter_levels_and_text_62",
+    "verify_ff8_enemies_editor_visual_39",
+    "verify_ff8_enemy_ai_source",
+    "verify_ff8_enemy_battle_text",
+    "verify_ff8_gameplay_settings_visual_50",
+    "verify_ff8_gf_compatibility_visual_32",
+    "verify_ff8_init_data_visual_21",
+    "verify_ff8_item_icons_visual_26",
+    "verify_ff8_math_visual",
+    "verify_ff8_maps_layout_stability",
+    "verify_ff8_mod_order_visual",
+    "verify_ff8_original_panels_visual",
+    "verify_ff8_portrait_tabs_visual_41",
+    "verify_ff8_shoot_visual_54",
+    "verify_ff8_shops_fit_visual_40",
+    "verify_ff8_tab_arrow_visual_42",
+    "verify_ff8_toolbar_source_labels_visual_38",
+    "verify_ff8_weapons_detail_visual_36",
+    "verify_grouped_numbers_visual_48",
+    "verify_important_error_modal_visual_37",
+    "verify_info_help_visual_56",
+    "verify_n_barrelled_tables_visual_44",
+    "verify_numbered_id_columns_visual_43",
+    "verify_numeric_slider",
+    "verify_tabbed_panels_visual_64",
+    "verify_curve_formula_glyphs",
+})
+
+
+def _ff8_baseline_sentinel() -> Path:
+    data_root = Path(os.environ.get(
+        "LEXEDITOR_FF8_DATA_ROOT",
+        str(Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) /
+            "Lexeditor" / "game-data" / "ff8"),
+    ))
+    return data_root / "baseline" / "en" / "main" / "kernel.bin"
+
+
+def _preflight_unrunnable(tool: Path) -> tuple[str, str]:
+    if tool.stem in _FF8_BASELINE_TOOLS:
+        sentinel = _ff8_baseline_sentinel()
+        if not sentinel.is_file():
+            return "needs installed game/project data", f"missing extracted FF8 baseline: {sentinel}"
+    return "", ""
+
+
+# The verifier-sweep workflow runs on a clean hosted runner and explicitly
+# documents that checks needing a private installed game/project are SKIPPED.
+# Many legacy checks don't raise WinError 2; they assert on a hard-coded Steam
+# path or on Lexeditor's machine-local extracted baseline instead. Classify
+# those only when the *final failure line itself* names the external prerequisite.
+# That last-line rule is deliberate: aggregate checks can mention a missing RDR
+# project and then go on to report a genuine Stardew/UI failure, which must stay
+# red rather than being swallowed as an environmental skip.
+_EXTERNAL_DATA_MARKERS = (
+    "\\steamapps\\common\\",
+    "/steamapps/common/",
+    "\\appdata\\local\\lexeditor\\game-data\\",
+    "/appdata/local/lexeditor/game-data/",
+    "c:\\rdrmod",
+    "c:\\rdr2mod",
+)
+# Some reverse-engineering verifiers are intentionally run against local source
+# snapshots/build trees under _scratch. Hosted CI does not manufacture those
+# trees. Only classify the exact missing-path final line, so a verifier that has
+# the source and finds a real defect remains red.
+_PREPARED_SOURCE_MARKERS = (
+    "\\_scratch\\ffnx-upstream\\",
+    "/_scratch/ffnx-upstream/",
+    "\\_scratch\\issue51-ffnx-build-",
+    "/_scratch/issue51-ffnx-build-",
+)
+_EXTERNAL_REQUIREMENT_MESSAGES = (
+    "no ff7 installation found",
+    "the supported installed ff8 executable is missing",
+    "installed mitem.bin",
+    "installed mngrp.bin",
+    "ff8 menu font has not been extracted yet",
+    "missing rdr project:",
+    "missing rdr2 project:",
+)
+
+
 def _unrunnable(tail: str) -> str:
     lowered = tail.lower()
+    lines = [line.strip() for line in lowered.splitlines() if line.strip()]
+    # Tracebacks usually render Path values through repr(), so a Windows path
+    # appears with doubled backslashes in the log. Collapse those only for the
+    # final-line prerequisite match; keep the original context for the older
+    # shell/missing-module checks above and for the user-visible report.
+    last = (lines[-1] if lines else "").replace("\\\\", "\\")
     if "error: the following arguments are required" in lowered:
         return "needs command-line arguments"
     if "modulenotfounderror" in lowered:
@@ -111,6 +210,12 @@ def _unrunnable(tail: str) -> str:
         return "needs a program that is not installed"
     if "command not found" in lowered:
         return "needs a program that is not installed"
+    if any(marker in last for marker in _EXTERNAL_DATA_MARKERS):
+        return "needs installed game/project data"
+    if any(marker in last for marker in _PREPARED_SOURCE_MARKERS):
+        return "needs prepared reverse-engineering source data"
+    if any(message in last for message in _EXTERNAL_REQUIREMENT_MESSAGES):
+        return "needs installed game/project data"
     return ""
 
 
@@ -126,6 +231,9 @@ def run(tool: Path, timeout: float = 180, output: Path | None = None,
     stays visible and fixable instead of being silently swallowed.
     """
     started = time.time()
+    preflight_reason, preflight_detail = _preflight_unrunnable(tool)
+    if preflight_reason:
+        return tool, 0, time.time() - started, f"SKIPPED ({preflight_reason}): {preflight_detail}"
     timeout = timeout_for(tool, timeout)
     code, tail, context = _once(tool, timeout, output)
     reason = _unrunnable(context)
@@ -138,7 +246,10 @@ def run(tool: Path, timeout: float = 180, output: Path | None = None,
         return tool, 0, time.time() - started, f"SKIPPED ({reason}): {tail}"
     if code and code not in (124, 125) and retries:
         time.sleep(2)
-        second, second_tail, _second_context = _once(tool, timeout, output, 2)
+        second, second_tail, second_context = _once(tool, timeout, output, 2)
+        second_reason = _unrunnable(second_context)
+        if second and second_reason:
+            return tool, 0, time.time() - started, f"SKIPPED ({second_reason}): {second_tail}"
         if not second:
             return tool, 0, time.time() - started, f"FLAKY (passed on retry): {tail}"
         code, tail = second, second_tail
@@ -231,7 +342,8 @@ def main() -> int:
                 tool = tools[pending.index(future)]
                 code, seconds, tail = 1, 0, f"Runner error: {type(error).__name__}: {error}"
             done += 1
-            label = 'FAIL' if code else ('FLAKY' if tail.startswith('FLAKY') else 'PASS')
+            label = ('FAIL' if code else 'FLAKY' if tail.startswith('FLAKY')
+                     else 'SKIPPED' if tail.startswith('SKIPPED') else 'PASS')
             print(f"[{done}/{len(tools)}] {label} {tool.name} ({seconds:.1f}s) {tail}",
                   flush=True)
             measured[tool.name] = round(seconds, 1)

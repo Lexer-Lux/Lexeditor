@@ -24,7 +24,7 @@ def main() -> int:
     require('!column.render && typeof rendered === "number"' in framework
             and 'numberValue(rendered)' in framework,
             "shared tables must group plain numeric cells automatically")
-    require('if (typeof value === "number") return formatNumber(value)' in framework,
+    require('typeof source.value === "number" ? formatNumber(source.value)' in framework,
             "shared reference values must group numeric values automatically")
     require("font-kerning:none" in css and "font-variant-numeric:tabular-nums" in css,
             "the numeric component must stabilize digit spacing")

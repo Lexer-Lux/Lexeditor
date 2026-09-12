@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
+from games.ff8 import paths  # noqa: E402
 from games.ff8.plugin import FF8Session  # noqa: E402
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 
@@ -34,6 +35,18 @@ def mouse(cdp: Cdp, selector: str, modifiers: int = 0, click: bool = True) -> No
 
 
 def main() -> int:
+    # This rendered contract exercises real GFs and items. A clean hosted runner
+    # has neither dataset; letting the editor boot with null payloads turns the
+    # missing baseline into a JavaScript TypeError before hover behavior is ever
+    # tested. Name the prerequisite first so the sweep can skip it honestly.
+    required = (
+        paths.BASELINE_ROOT / "main" / "kernel.bin",
+        paths.BASELINE_ROOT / "menu" / "mitem.bin",
+    )
+    missing = next((path for path in required if not path.is_file()), None)
+    if missing:
+        raise FileNotFoundError(f"Installed FF8 extracted baseline is missing: {missing}")
+
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
     output_dir = ROOT / "worklog" / "issues" / "rendered"
     output_dir.mkdir(parents=True, exist_ok=True)

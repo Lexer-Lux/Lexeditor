@@ -37,6 +37,14 @@ assert '"icon.sp1", "icon.TEX"' in extractor
 assert "BASELINE_FORMAT = 3" in extractor
 assert "conceptIcon" in editor and "/assets/icons/" in editor
 
+# Everything below this point validates privately extracted FF8 assets. A clean
+# hosted runner has no icon atlas; report that prerequisite directly instead of
+# turning ensure_icons() returning unavailable into a provenance regression.
+for source in (paths.BASELINE_ROOT / "menu" / "icon.sp1",
+               paths.BASELINE_ROOT / "menu" / "icon.tex"):
+    if not source.is_file():
+        raise FileNotFoundError(f"Installed FF8 extracted baseline is missing: {source}")
+
 manifest = game_icons.ensure_icons()
 assert manifest["available"] and len(manifest["icons"]) == len(game_icons.ICON_NAMES)
 for icon_id in (272, 277, 278, 279, 280, 292):

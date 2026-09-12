@@ -85,7 +85,10 @@ def main() -> int:
               errors:window.__testErrors,
             }))()""")
             assert result["title"] == "Lexeditor - Final Fantasy 9", result
-            assert result["tabs"][-1] == "Tweaks" and len(result["tabs"]) > 1, result
+            # New top-level surfaces have been added after Tweaks. This contract
+            # is about a real multi-tab FF9 editor, not about freezing one tab at
+            # the final navigation position forever.
+            assert "Tweaks" in result["tabs"] and len(result["tabs"]) > 1, result
             assert {"Accessories", "Abilities", "Armor", "Items", "Magic", "Synthesis", "Weapons"}.issubset(result["tabs"]), result
             assert result["heading"] == "Dagger" or result["heading"] == "Hammer", result
             assert result["rows"] == 2, result

@@ -1,0 +1,57 @@
+name: Stardew Valley checks
+
+on:
+  push:
+    branches: [master, stardew-valley-plugin]
+    paths:
+      - 'games/stardew_valley/**'
+      - 'tests/test_stardew_valley.py'
+      - 'tests/test_data_map_coverage.py'
+      - 'runtime_bootstrap.py'
+      - '.github/workflows/stardew-valley-checks.yml'
+  pull_request:
+    paths:
+      - 'games/stardew_valley/**'
+      - 'tests/test_stardew_valley.py'
+      - 'tests/test_data_map_coverage.py'
+      - 'runtime_bootstrap.py'
+      - '.github/workflows/stardew-valley-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  plugin-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Stardew project and deployment regressions
+        run: python -m unittest tests.test_stardew_valley
+      - name: Stardew Data Map coverage contract
+        run: python -m unittest tests.test_data_map_coverage.CoverageTests.test_stardew_marks_project_patch_editor_partial_until_xnb_read_exists
+      - name: Stardew Python syntax
+        run: python -m compileall -q games/stardew_valley
+      - name: Stardew editor JavaScript syntax and shared controls
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('games/stardew_valley/editor.html').read_text(encoding='utf-8')
+          scripts = re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', text, flags=re.S | re.I)
+          Path('/tmp/stardew-editor.js').write_text('\n'.join(scripts), encoding='utf-8')
+          required = ('LexeditorUI.mountShell(', 'LexeditorUI.dataMap(', 'pagedListDetail(', 'type:"checkbox"')
+          missing = [token for token in required if token not in text]
+          if missing:
+              raise SystemExit(f'Missing required Stardew editor controls: {missing}')
+          PY
+          node --check /tmp/stardew-editor.js
+      - name: Managed plugin smoke path
+        run: python -c "from games.stardew_valley.plugin import smoke; print(*smoke(), sep='\n')"
