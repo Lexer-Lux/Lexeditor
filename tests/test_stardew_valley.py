@@ -37,6 +37,23 @@ class StardewContentPackTests(unittest.TestCase):
         })
         self.assertEqual(content["Format"], "2.9.0")
 
+    def test_project_identity_is_stable_and_distinguishes_same_named_projects(self):
+        first = self.root / "one" / "Same Name"
+        second = self.root / "two" / "Same Name"
+        first.parent.mkdir(); second.parent.mkdir()
+        shutil.copytree(paths.PROJECT_TEMPLATE_ROOT, first)
+        shutil.copytree(paths.PROJECT_TEMPLATE_ROOT, second)
+        initialize_project(first)
+        initialize_project(second)
+        first_manifest = json.loads((first / "manifest.json").read_text(encoding="utf-8"))
+        second_manifest = json.loads((second / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(first_manifest["Name"], "Same Name")
+        self.assertEqual(second_manifest["Name"], "Same Name")
+        self.assertNotEqual(first_manifest["UniqueID"], second_manifest["UniqueID"])
+        initialize_project(first)
+        stable_manifest = json.loads((first / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(stable_manifest["UniqueID"], first_manifest["UniqueID"])
+
     def test_object_edit_preserves_unknown_data_and_rejects_stale_save(self):
         content = json.loads((self.project / "content.json").read_text(encoding="utf-8"))
         content["CustomRoot"] = {"keep": True}
