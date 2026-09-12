@@ -202,7 +202,9 @@ def validate_plugin(plugin: GamePlugin) -> None:
             raise ValueError(f"{plugin.plugin_id} has invalid authorized GitHub logins")
     if plugin.projects is not None:
         projects = plugin.projects
-        if not projects.root_env or not projects.default_root.is_absolute():
+        if (not projects.root_env or
+                (not projects.default_root.is_absolute()
+                 and not (os.name != "nt" and PureWindowsPath(str(projects.default_root)).is_absolute()))):
             raise ValueError(f"{plugin.plugin_id} has an invalid project descriptor")
         if projects.template_root and not projects.template_root.is_absolute():
             raise ValueError(f"{plugin.plugin_id} has a relative project template")

@@ -1,0 +1,145 @@
+name: FFX-X2 checks
+
+on:
+  push:
+    branches: [master, feature/ffx-x2-plugin, 'work/ffx-x2-*']
+    paths:
+      - 'games/ffx_x2/**'
+      - 'tests/test_ffx_x2_*.py'
+      - 'worklog/acceptance/ffx-x2/**'
+      - 'runtime_bootstrap.py'
+      - 'plugin_api.py'
+      - 'service_session.py'
+      - 'ui/framework.js'
+      - 'ui/framework.css'
+      - 'ui/ffx-auto-abilities.js'
+      - 'ui/ffx-player-stats.js'
+      - 'ui/ffx-commands.js'
+      - 'ui/ffx-x2-accessories.js'
+      - 'ui/ffx-x2-jobs.js'
+      - 'ui/ffx-x2-launch.js'
+      - 'ui/credits-sources.json'
+      - 'ui/credits.json'
+      - 'ui/mod-loading.json'
+      - '.github/workflows/ffx-x2-checks.yml'
+  pull_request:
+    paths:
+      - 'games/ffx_x2/**'
+      - 'tests/test_ffx_x2_*.py'
+      - 'worklog/acceptance/ffx-x2/**'
+      - 'runtime_bootstrap.py'
+      - 'plugin_api.py'
+      - 'service_session.py'
+      - 'ui/framework.js'
+      - 'ui/framework.css'
+      - 'ui/ffx-auto-abilities.js'
+      - 'ui/ffx-player-stats.js'
+      - 'ui/ffx-commands.js'
+      - 'ui/ffx-x2-accessories.js'
+      - 'ui/ffx-x2-jobs.js'
+      - 'ui/ffx-x2-launch.js'
+      - 'ui/credits-sources.json'
+      - 'ui/credits.json'
+      - 'ui/mod-loading.json'
+      - '.github/workflows/ffx-x2-checks.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ffx-x2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  regression:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install tests
+        run: python -m pip install pytest
+      - name: Python syntax
+        run: python -m compileall -q games/ffx_x2
+      - name: Acceptance PowerShell syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          $path = (Resolve-Path 'worklog/acceptance/ffx-x2/run-verifier.ps1').Path
+          [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+          if ($errors.Count) {
+            $errors | Format-List
+            exit 1
+          }
+      - name: Editor JavaScript syntax
+        shell: bash
+        run: >-
+          python -c "from pathlib import Path; import re; s=Path('games/ffx_x2/editor.html').read_text(encoding='utf-8'); Path('ffx-x2-inline.js').write_text('\\n'.join(re.findall(r'<script(?![^>]*src=)[^>]*>(.*?)</script>', s, re.S)), encoding='utf-8')"
+          && node --check ffx-x2-inline.js
+          && node --check ui/ffx-auto-abilities.js
+          && node --check ui/ffx-player-stats.js
+          && node --check ui/ffx-commands.js
+          && node --check ui/ffx-x2-accessories.js
+          && node --check ui/ffx-x2-jobs.js
+          && node --check ui/ffx-x2-launch.js
+      - name: Plugin and metadata contracts
+        run: >-
+          python -c "from games.ffx_x2.plugin import PLUGIN; from plugin_api import validate_plugin; from runtime_bootstrap import SERVICE_MODULES; validate_plugin(PLUGIN); assert 'games.ffx_x2.server' in SERVICE_MODULES; print(PLUGIN.name)"
+          && python tools/generate_credits.py --check
+          && python plugin_metadata.py
+      - name: FFX-X2 regressions
+        run: >-
+          python -m pytest -q
+          tests/test_ffx_x2_vbf.py
+          tests/test_ffx_x2_paths.py
+          tests/test_ffx_x2_deployment.py
+          tests/test_ffx_x2_launch.py
+          tests/test_ffx_x2_play_api.py
+          tests/test_ffx_x2_verify_install.py
+          tests/test_ffx_x2_theme.py
+          tests/test_ffx_x2_treasures.py
+          tests/test_ffx_x2_item_prices.py
+          tests/test_ffx_x2_auto_ability_prices.py
+          tests/test_ffx_x2_ffx_auto_abilities.py
+          tests/test_ffx_x2_ffx_player_stats.py
+          tests/test_ffx_x2_ctb_base.py
+          tests/test_ffx_x2_mix_table.py
+          tests/test_ffx_x2_item_shops.py
+          tests/test_ffx_x2_gear_shops.py
+          tests/test_ffx_x2_ffx_commands.py
+          tests/test_ffx_x2_ffx2_abilities.py
+          tests/test_ffx_x2_ffx2_accessories.py
+          tests/test_ffx_x2_ffx2_jobs.py
+          tests/test_ffx_x2_ui_focus.py
+      - name: Managed service smoke
+        run: python -c "from games.ffx_x2.plugin import smoke; [print('PASS:', line) for line in smoke()]"
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install browser tools
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: FFX-X2 rendered acceptance
+        run: python tests/test_ffx_x2_browser_check.py --screenshots out/ffx-x2-browser
+      - name: Upload browser acceptance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffx-x2-browser-acceptance
+          path: out/ffx-x2-browser
+          if-no-files-found: warn

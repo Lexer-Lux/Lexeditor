@@ -270,6 +270,42 @@
       ],
       "thanks": [],
       "licenses": []
+    },
+    "ffx-x2": {
+      "contributions": [
+        {
+          "name": "Fahrenheit contributors",
+          "role": "FFX/X-2 runtime, file-only mod manifest/load-order contract, and External File Loader interoperability reference.",
+          "url": "https://github.com/fahrenheit-crew/fahrenheit"
+        },
+        {
+          "name": "Michivi / vbf-fs",
+          "role": "BSD-licensed reference for VBF archive headers, entries, block compression and validation.",
+          "url": "https://github.com/michivi/vbf-fs"
+        },
+        {
+          "name": "Karifean / FFXDataParser",
+          "role": "Research cross-check for extracted FFX data organization; no source copied.",
+          "url": "https://github.com/Karifean/FFXDataParser"
+        },
+        {
+          "name": "HeartlessSeph / FFX2-010-Templates",
+          "role": "Independent research cross-check for FFX-2 accessory and dressphere job.bin layouts; no source copied.",
+          "url": "https://github.com/HeartlessSeph/FFX2-010-Templates"
+        },
+        {
+          "name": "topher-au / VBFTool",
+          "role": "Historical VBF and Steam launcher-layout research cross-check; no source copied.",
+          "url": "https://github.com/topher-au/VBFTool"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "FFX/X-2 references — source and BSD notice",
+          "sourcePath": "games/ffx_x2/THIRD_PARTY.md"
+        }
+      ]
     }
   }
 }
