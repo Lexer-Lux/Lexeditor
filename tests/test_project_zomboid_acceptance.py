@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from games.project_zomboid import acceptance, core
+from games.project_zomboid.plugin import PLUGIN
 
 
 class ProjectZomboidAcceptanceTests(unittest.TestCase):
@@ -46,6 +47,10 @@ class ProjectZomboidAcceptanceTests(unittest.TestCase):
             deployed = core.deploy(project)
         self.assertTrue(deployed["owned"])
         return game, project, user
+
+    def test_install_descriptor_and_preflight_share_build42_sentinel(self):
+        self.assertIsNotNone(PLUGIN.installation)
+        self.assertIn("media/scripts/generated", PLUGIN.installation.required_paths)
 
     def test_real_install_preflight_is_ready_for_manual_game_test(self):
         with tempfile.TemporaryDirectory() as name:
