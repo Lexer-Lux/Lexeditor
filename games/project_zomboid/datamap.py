@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import core, craftrecipe, evolvedrecipe, fluid, zedscript
+from . import core, craftrecipe, evolvedrecipe, fluid, vehicle, zedscript
 
 
 def read(root: Path) -> dict:
@@ -15,6 +15,7 @@ def read(root: Path) -> dict:
     evolved = evolvedrecipe.read(root)
     crafts = craftrecipe.read(root)
     fluids = fluid.read(root)
+    vehicles = vehicle.read(root)
     inventory = zedscript.inventory(root)
     by_path: dict[str, set[str]] = {}
     for row in inventory["rows"]:
@@ -23,8 +24,9 @@ def read(root: Path) -> dict:
     evolved_paths = {row["path"] for row in evolved["rows"]}
     craft_paths = {row["path"] for row in crafts["rows"]}
     fluid_paths = {row["path"] for row in fluids["rows"]}
+    vehicle_paths = {row["path"] for row in vehicles["rows"]}
     errors = {
-        row["path"] for result in (items, evolved, crafts, fluids, inventory)
+        row["path"] for result in (items, evolved, crafts, fluids, vehicles, inventory)
         for row in result.get("errors", []) if isinstance(row, dict) and row.get("path")
     }
 
@@ -39,6 +41,8 @@ def read(root: Path) -> dict:
             editors.append("Craft Recipes")
         if relative in fluid_paths:
             editors.append("Fluids")
+        if relative in vehicle_paths:
+            editors.append("Vehicles")
         kinds = sorted(by_path.get(relative, set()), key=str.casefold)
         if relative in errors:
             status = "partial" if editors else "recognized"
