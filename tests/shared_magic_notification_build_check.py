@@ -40,9 +40,13 @@ with tempfile.TemporaryDirectory(prefix='lex-shared-toast-fresh-') as folder:
     path.write_text(''.join(fresh), encoding='utf-8')
     integrate_shared_magic_notifications(root)
     built = path.read_text(encoding='utf-8')
-    # Held long enough to read, not posted once into a fade.
-    assert 'g_activation_toast_until = GetTickCount64() + kActivationToastMs' in built
-    assert 'if (GetTickCount64() >= g_activation_toast_until)' in built
+    # The queue owns what is shown and for how long. FFNx's overlay fades on
+    # an accelerating decay, faster than a sentence can be read, so the message
+    # goes through the queue and the overlay is only the surface it lands on.
+    assert '#include "../toast_queue.h"' in built
+    assert 'lexeditor_toast::Queue g_lexeditor_toasts' in built
+    assert 'g_lexeditor_toasts.push(message, lexeditor_toast::Tone::warning)' in built
+    assert 'g_lexeditor_toasts.update(' in built
     heartbeat = built.split('void ff8_shared_magic_heartbeat()\n{', 1)[1]
     assert heartbeat.index('show_popup_msg(') < heartbeat.index('g_last_heartbeat_tick')
     integrate_shared_magic_notifications(root)

@@ -14,42 +14,64 @@ BASE='c056db2783f376a340fcefa6a48cc33618998876'
 
 
 def integrate_shared_magic_notifications(source: Path) -> None:
-    """Queue a non-modal FFNx message after a failed load-time migration."""
+    """Show a failed load-time migration through Lexeditor's message queue.
+
+    The queue owns what is shown and for how long: it holds the message long
+    enough to read, wraps it to FF8's message width, and refuses to restack it
+    when the per-frame heartbeat asks again. FFNx's overlay is only the surface
+    it is drawn on - it fades on an accelerating decay tuned for one-word
+    notices - so replacing that with a native message box later is one function
+    rather than a rewrite.
+    """
     path = source/'src/ff8/shared_magic_runtime.cpp'
     text = path.read_text(encoding='utf-8')
-    if 'g_activation_toast' in text:
+    if 'g_lexeditor_toasts' in text:
         return
+    declaration = (
+        "// Lexeditor's own in-game messages. The queue decides what is shown\n"
+        "// and for how long; the overlay below is only what draws it.\n"
+        "lexeditor_toast::Queue g_lexeditor_toasts;\n"
+        "bool g_warning_started = false;"
+    )
+    queue_message = (
+        "        {\n"
+        "            const std::string message =\n"
+        "                migration_warning_template(result.error, g_stock_limit);\n"
+        "            g_lexeditor_toasts.push(message, lexeditor_toast::Tone::warning);\n"
+        "            append_runtime_log((message + \"\\n\").c_str());\n"
+        "        }\n"
+        "        g_requested = false;\n        g_warning = MergeError::none;"
+    )
+    heartbeat = (
+        "void ff8_shared_magic_heartbeat()\n{\n"
+        "    // The loader has returned. Use the renderer overlay, never the menu controller.\n"
+        "    if (const auto *toast = g_lexeditor_toasts.update(\n"
+        "            static_cast<std::uint32_t>(GetTickCount64()))) {\n"
+        "        if (get_popup_time() == 0) {\n"
+        "            std::string body;\n"
+        "            for (const auto &line : toast->lines) {\n"
+        "                if (!body.empty()) body += \" \";\n"
+        "                body += line;\n"
+        "            }\n"
+        "            show_popup_msg(toast->tone == lexeditor_toast::Tone::warning\n"
+        "                               ? TEXTCOLOR_RED : TEXTCOLOR_WHITE,\n"
+        "                           \"%s\", body.c_str());\n"
+        "        }\n"
+        "    }"
+    )
     changes = [
-        ('#include "../log.h"', '#include "../log.h"\n#include "../common.h"'),
-        ('bool g_warning_started = false;',
-         'std::string g_activation_toast;\n'
-         '// FFNx fades a popup on an accelerating decay, far quicker than a\n'
-         '// sentence explaining a failed migration takes to read, so the message\n'
-         '// is re-issued until this deadline rather than posted once and lost.\n'
-         'ULONGLONG g_activation_toast_until = 0;\n'
-         'constexpr ULONGLONG kActivationToastMs = 9000ULL;\n'
-         'bool g_warning_started = false;'),
-        ('        g_requested = false;\n        g_warning = MergeError::none;',
-         '        g_activation_toast = migration_warning_template(result.error, g_stock_limit);\n'
-         '        g_activation_toast_until = GetTickCount64() + kActivationToastMs;\n'
-         '        append_runtime_log((g_activation_toast + "\\n").c_str());\n'
-         '        g_requested = false;\n        g_warning = MergeError::none;'),
-        ('void ff8_shared_magic_heartbeat()\n{',
-         'void ff8_shared_magic_heartbeat()\n{\n'
-         '    // The loader has returned. Use the renderer overlay, never the menu controller.\n'
-         '    if (!g_activation_toast.empty() && get_popup_time() == 0) {\n'
-         '        if (GetTickCount64() >= g_activation_toast_until) {\n'
-         '            g_activation_toast.clear();\n'
-         '        } else {\n'
-         '            show_popup_msg(TEXTCOLOR_RED, "%s", g_activation_toast.c_str());\n'
-         '        }\n'
-         '    }'),
+        ('#include "../log.h"',
+         '#include "../log.h"\n#include "../common.h"\n#include "../toast_queue.h"'),
+        ('bool g_warning_started = false;', declaration),
+        ('        g_requested = false;\n        g_warning = MergeError::none;', queue_message),
+        ('void ff8_shared_magic_heartbeat()\n{', heartbeat),
     ]
     for old, new in changes:
         if text.count(old) != 1:
             raise RuntimeError(f'Shared Magic notification anchor changed: {old}')
         text = text.replace(old, new, 1)
     path.write_text(text, encoding='utf-8')
+
 
 
 def integrate_flare_owner(source: Path, *, startup: bool = False) -> None:
@@ -113,6 +135,10 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
         'lexeditor_ff8_modern_controls.h',
     ):
         shutil.copyfile(ROOT/'games/ff8/ffnx_modern_controls'/name, source/'src'/name)
+    # Lexeditor's own in-game messages: what is queued, how long it holds,
+    # and how it wraps into FF8's message width. Drawing stays separate.
+    shutil.copyfile(ROOT/'games/ff8/ffnx_toasts/toast_queue.h',
+                    source/'src/toast_queue.h')
     extension_files = [
         'flare_encounter.h', 'lexeditor_ff8_flare.cpp',
         'flare_request.h', 'lexeditor_ff8_flare_owner.h', 'lexeditor_ff8_flare_owner.cpp',

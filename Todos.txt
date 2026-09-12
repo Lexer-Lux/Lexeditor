@@ -216,6 +216,20 @@
     same property row was one width in a shared panel and another in a
     plugin's own div.
 
+* [~] Custom in-game toasts, in FF8's own style rather than the host overlay.
+  * The part that can be built and checked without the game is built:
+    games/ff8/ffnx_toasts/toast_queue.h owns what is queued, how long each
+    message holds, how it wraps into the game's message width, and which one is
+    on screen at a given millisecond. Twelve cases cover wrapping on spaces,
+    cutting a word wider than the box, the fade fraction, ordering, a hook that
+    fires every frame not being able to restack one sentence, and a flood limit.
+  * Shared Magic's failed-migration message goes through it, so the next build
+    holds it long enough to read instead of losing it to FFNx's accelerating
+    fade. FFNx's overlay is still the surface it is drawn on.
+  * What is left is a native message box: drawing through FF8's own UI needs a
+    renderer hook, and swapping it in is one function because the queue already
+    decides everything except the pixels.
+
 ## Loot Tables
 
 * [x] Remove/rethink the `Installed Script Evidence` block; its purpose is unclear.
