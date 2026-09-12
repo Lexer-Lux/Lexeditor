@@ -244,6 +244,32 @@
           "sourcePath": "tools/rpf-cli/RAGELIB-LICENSE.txt"
         }
       ]
+    },
+    "chrono-trigger": {
+      "contributions": [
+        {
+          "name": "jimzrt / ChronoMod contributors",
+          "role": "Steam resources.bin ARC1 archive format reference.",
+          "url": "https://github.com/jimzrt/ChronoMod"
+        },
+        {
+          "name": "GitExl / CTViewer contributors",
+          "role": "Steam scene, overworld, map, tileset, palette and script format references.",
+          "url": "https://github.com/GitExl/CTViewer"
+        },
+        {
+          "name": "OnemusCT / Temporal Redux contributors",
+          "role": "PC Atel event command widths and behavior references.",
+          "url": "https://github.com/OnemusCT/temporal-redux"
+        },
+        {
+          "name": "TheRealBiggs / CTExt contributors",
+          "role": "Chrono Trigger Steam loose-file and CTP runtime loading model.",
+          "url": "https://github.com/TheRealBiggs/ctext"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
     }
   }
 }
