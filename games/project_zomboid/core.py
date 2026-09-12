@@ -57,6 +57,7 @@ _PROPERTY_RE = re.compile(
     r"(?P<space1>[ \t]*)=(?P<space2>[ \t]*)(?P<value>[^\r\n,{}]*?)"
     r"(?P<space3>[ \t]*),(?P<suffix>[^\r\n]*)(?P<ending>\r?\n|$)"
 )
+_ASSIGNMENT_RE = re.compile(r"\b(?P<key>[A-Za-z][A-Za-z0-9_]*)[ \t]*=")
 
 
 class ProjectZomboidError(ValueError):
@@ -338,6 +339,37 @@ def _module_item_blocks(text: str) -> list[tuple[Block, Block]]:
     return found
 
 
+def _top_level_property_counts(text: str, block: Block, keys: Iterable[str]) -> dict[str, int]:
+    """Count selected assignments regardless of line layout, ignoring nested grammar."""
+    wanted = set(keys)
+    counts = {key: 0 for key in wanted}
+    if not wanted:
+        return counts
+    body = text[block.open_brace + 1:block.close_brace]
+    masked = _masked_code(body)
+    curly = square = paren = 0
+    cursor = 0
+    for match in _ASSIGNMENT_RE.finditer(masked):
+        for c in masked[cursor:match.start()]:
+            if c == "{":
+                curly += 1
+            elif c == "}":
+                curly = max(0, curly - 1)
+            elif c == "[":
+                square += 1
+            elif c == "]":
+                square = max(0, square - 1)
+            elif c == "(":
+                paren += 1
+            elif c == ")":
+                paren = max(0, paren - 1)
+        cursor = match.end()
+        key = match.group("key")
+        if curly == 0 and square == 0 and paren == 0 and key in counts:
+            counts[key] += 1
+    return counts
+
+
 def _properties(text: str, block: Block) -> tuple[dict[str, str], set[str]]:
     body = text[block.open_brace + 1:block.close_brace]
     values: dict[str, str] = {}
@@ -360,6 +392,10 @@ def _properties(text: str, block: Block) -> tuple[dict[str, str], set[str]]:
             duplicates.add(key)
         else:
             values[key] = value
+    duplicates.update(
+        key for key, count in _top_level_property_counts(text, block, values).items()
+        if count > 1
+    )
     return values, duplicates
 
 
