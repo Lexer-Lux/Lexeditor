@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
+import json
 import struct
+import threading
+import urllib.error
+import urllib.request
 
 import pytest
 
-from games.ffx_x2 import ffx2_jobs
+from games.ffx_x2 import ffx2_jobs, server
 
 
 def _fixture(record_size: int = ffx2_jobs.RECORD_SIZE) -> bytes:
@@ -27,6 +32,34 @@ def _fixture(record_size: int = ffx2_jobs.RECORD_SIZE) -> bytes:
                 (0x30 + i + record_id) & 0xFF for i in range(record_size - 0x7C)
             )
     return bytes(header + records + b"opaque-job-strings")
+
+
+@contextmanager
+def _running_server():
+    httpd = server.create_server(0)
+    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{httpd.server_address[1]}"
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=5)
+
+
+def _request_json(base_url: str, path: str, payload=None) -> tuple[int, dict]:
+    data = None if payload is None else json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        base_url + path,
+        data=data,
+        method="GET" if data is None else "POST",
+        headers={} if data is None else {"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        return error.code, json.loads(error.read().decode("utf-8"))
 
 
 def test_job_payload_exposes_only_proved_tree_metadata():
@@ -119,3 +152,40 @@ def test_job_edits_reject_duplicate_records_and_slots():
 def test_job_parser_rejects_wrong_record_size():
     with pytest.raises(ffx2_jobs.FFX2JobError, match="0xE4-byte"):
         ffx2_jobs.payload(_fixture(0xE0))
+
+
+def test_job_http_routes_dispatch_to_production_helpers(monkeypatch: pytest.MonkeyPatch):
+    catalog = {
+        "archivePath": ffx2_jobs.ARCHIVE_PATH,
+        "recordSize": ffx2_jobs.RECORD_SIZE,
+        "abilityCount": ffx2_jobs.ABILITY_COUNT,
+        "rows": [{"id": 0, "abilities": []}],
+    }
+    saved = {**catalog, "saved": 1}
+    calls = []
+
+    monkeypatch.setattr(server, "ffx2_job_catalog", lambda: catalog)
+
+    def fake_save(request):
+        calls.append(request)
+        return saved
+
+    monkeypatch.setattr(server, "save_ffx2_jobs", fake_save)
+    with _running_server() as base_url:
+        status, result = _request_json(base_url, "/api/ffx2-jobs")
+        assert status == 200
+        assert result == catalog
+
+        payload = {
+            "headerMd5": "0" * 32,
+            "baselineSha256": "1" * 64,
+            "edits": [{
+                "id": 0,
+                "abilities": [{"slot": 0, "requirementId": 0x1234, "abilityId": 0x5678}],
+            }],
+        }
+        status, result = _request_json(base_url, "/api/ffx2-jobs/save", payload)
+        assert status == 200
+        assert result == saved
+
+    assert calls == [payload]
