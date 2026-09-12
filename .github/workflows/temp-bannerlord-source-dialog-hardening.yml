@@ -23,8 +23,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Apply Windows source fidelity fix
-        run: python tools/temp_bannerlord_source_windows_fix.py
+      - name: Apply Windows source follow-up
+        run: python tools/temp_bannerlord_source_windows_followup.py
       - name: Focused validation
         run: |
           python -m py_compile games/bannerlord/project_data.py tests/test_bannerlord_source_safety.py tests/test_bannerlord_plugin.py
@@ -32,12 +32,12 @@ jobs:
           python tools/verify_shared_ui_contract.py
           python -c "import glob, subprocess; [subprocess.run(['node','--check',path], check=True) for path in glob.glob('games/bannerlord/editor*.js')]"
           git diff --check
-      - name: Commit source fidelity fix
+      - name: Commit source fidelity follow-up
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add games/bannerlord/project_data.py tests/test_bannerlord_plugin.py
-          git commit -m "Preserve Bannerlord raw source bytes"
+          git commit -m "Finish Bannerlord raw source fidelity"
           git push origin HEAD:feature/bannerlord-plugin
 
   regression:
@@ -107,6 +107,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/temp-bannerlord-source-dialog-hardening.yml tools/temp_bannerlord_source_dialog_hardening.py tools/temp_fix_bannerlord_source_dialog_hardening.py tools/temp_bannerlord_source_encoding_fix.py tools/temp_bannerlord_source_windows_fix.py
+          git rm .github/workflows/temp-bannerlord-source-dialog-hardening.yml tools/temp_bannerlord_source_dialog_hardening.py tools/temp_fix_bannerlord_source_dialog_hardening.py tools/temp_bannerlord_source_encoding_fix.py tools/temp_bannerlord_source_windows_fix.py tools/temp_bannerlord_source_windows_followup.py
           git commit -m "Clean Bannerlord source hardening harness"
           git push origin HEAD:feature/bannerlord-plugin
