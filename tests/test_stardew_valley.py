@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 from games.stardew_valley.acceptance import acceptance_status, begin_acceptance
 from games.stardew_valley.content_pack import (
-    ACCEPTANCE_MARKER, ContentPackStore, deploy, deployment_status, initialize_project, revert,
+    ACCEPTANCE_MARKER, ContentPackStore, deploy, deployment_status, initialize_project, loader_status, revert,
 )
 from games.stardew_valley import paths, server
 from games.stardew_valley.source_data import load_base_objects, objects_source_path
@@ -89,12 +89,28 @@ class StardewContentPackTests(unittest.TestCase):
             self.assertTrue(merged["baseSource"]["available"])
         self.assertEqual(source.read_bytes(), source_before)
 
+    def test_deploy_rejects_old_content_patcher(self):
+        game = self.root / "game"; (game / "Content").mkdir(parents=True)
+        (game / "StardewModdingAPI.exe").write_bytes(b"smapi")
+        cp = game / "Mods" / "Content Patcher"; cp.mkdir(parents=True)
+        (cp / "manifest.json").write_text(json.dumps({
+            "UniqueID": "Pathoschild.ContentPatcher", "Version": "2.8.7",
+        }) + "\n", encoding="utf-8")
+        status = loader_status(game)
+        self.assertTrue(status["contentPatcher"])
+        self.assertFalse(status["contentPatcherCompatible"])
+        self.assertFalse(status["ready"])
+        with self.assertRaisesRegex(RuntimeError, r"requires 2\.9\.0 or newer"):
+            deploy(game, self.project)
+
     def test_deploy_and_revert_are_managed_and_refuse_external_changes(self):
         game = self.root / "game"; (game / "Content").mkdir(parents=True)
         (game / "Stardew Valley.exe").write_bytes(b"game")
         (game / "StardewModdingAPI.exe").write_bytes(b"smapi")
         cp = game / "Mods" / "Content Patcher"; cp.mkdir(parents=True)
-        (cp / "manifest.json").write_text('{"UniqueID":"Pathoschild.ContentPatcher"}\n', encoding="utf-8")
+        (cp / "manifest.json").write_text(json.dumps({
+            "UniqueID": "Pathoschild.ContentPatcher", "Version": "2.9.1",
+        }) + "\n", encoding="utf-8")
         (self.project / ACCEPTANCE_MARKER).write_text('{"localOnly":true}\n', encoding="utf-8")
         status = deploy(game, self.project)
         self.assertTrue(status["managed"]); self.assertFalse(status["externallyChanged"])
