@@ -113,6 +113,8 @@ def test_draft_exit_readiness_requires_hashes_and_fahrenheit(tmp_path: Path):
     )
     assert hashed["verificationPassed"] is True
     assert hashed["acceptanceReady"] is True
+    assert hashed["generatedAt"].endswith("Z")
+    assert "T" in hashed["generatedAt"]
     assert all(hashed["acceptanceChecks"].values())
 
     (game_root / "fahrenheit" / "bin" / "fhstage1.dll").unlink()
