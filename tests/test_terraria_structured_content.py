@@ -25,7 +25,7 @@ class TerrariaStructuredContentTests(unittest.TestCase):
         kinds = {row["kind"] for row in schemas_public()["kinds"]}
         self.assertEqual(
             kinds,
-            {"item", "npc", "projectile", "buff", "tile", "globalItem", "globalNPC", "recipe"},
+            {"item", "npc", "projectile", "buff", "tile", "wall", "globalItem", "globalNPC", "globalProjectile", "prefix", "recipe"},
         )
         npc_fields = {row["name"] for row in next(row for row in schemas_public()["kinds"] if row["kind"] == "npc")["fields"]}
         self.assertTrue({"lifeMax", "damage", "defense", "aiStyle", "spawnChance", "lootKind"}.issubset(npc_fields))

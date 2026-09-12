@@ -44,14 +44,20 @@ SCHEMAS: dict[str, tuple[Field, ...]] = {
         Field("width", "Width", "int", 20, "HITBOX", 1, 2000), Field("height", "Height", "int", 20, "HITBOX", 1, 2000),
         Field("maxStack", "Max stack", "int", 1, "INVENTORY", 1, 9999), Field("value", "Value (copper)", "int", 0, "INVENTORY", 0, 2_000_000_000), Field("rare", "Rarity ID", "int", 0, "INVENTORY", -13, 100),
         Field("damage", "Damage", "int", 0, "COMBAT", 0, 1_000_000), Field("damageClass", "Damage class", "enum", "Generic", "COMBAT", options=_DAMAGE_CLASSES), Field("knockBack", "Knockback", "float", 0.0, "COMBAT", 0, 1000), Field("crit", "Bonus crit", "int", 0, "COMBAT", -100, 1000),
-        Field("useTime", "Use time", "int", 0, "USE", 0, 10000), Field("useAnimation", "Use animation", "int", 0, "USE", 0, 10000), Field("autoReuse", "Auto reuse", "bool", False, "USE"), Field("consumable", "Consumable", "bool", False, "USE"), Field("accessory", "Accessory", "bool", False, "USE"), Field("shootSpeed", "Shoot speed", "float", 0.0, "USE", 0, 10000),
+        Field("useTime", "Use time", "int", 0, "USE", 0, 10000), Field("useAnimation", "Use animation", "int", 0, "USE", 0, 10000), Field("useStyle", "Use style ID", "int", 0, "USE", 0, 1000), Field("useTurn", "Turn while using", "bool", False, "USE"), Field("autoReuse", "Auto reuse", "bool", False, "USE"), Field("channel", "Channel", "bool", False, "USE"), Field("noMelee", "No melee hitbox", "bool", False, "USE"), Field("consumable", "Consumable", "bool", False, "USE"), Field("accessory", "Accessory", "bool", False, "USE"), Field("shootSpeed", "Shoot speed", "float", 0.0, "USE", 0, 10000),
+        Field("mana", "Mana cost", "int", 0, "CONSUMPTION", 0, 100000), Field("healLife", "Heal life", "int", 0, "CONSUMPTION", 0, 100000), Field("healMana", "Heal mana", "int", 0, "CONSUMPTION", 0, 100000),
+        Field("pick", "Pickaxe power", "int", 0, "TOOLS", 0, 100000), Field("axe", "Axe power", "int", 0, "TOOLS", 0, 100000), Field("hammer", "Hammer power", "int", 0, "TOOLS", 0, 100000),
+        Field("ammo", "Ammo category ID", "int", 0, "AMMO / PROJECTILE", 0, 100000), Field("useAmmo", "Consumes ammo category ID", "int", 0, "AMMO / PROJECTILE", 0, 100000), Field("shoot", "Projectile type ID", "int", 0, "AMMO / PROJECTILE", 0, 100000),
+        Field("createTile", "Places tile ID (-1 none)", "int", -1, "PLACEMENT", -1, 100000), Field("createWall", "Places wall ID (-1 none)", "int", -1, "PLACEMENT", -1, 100000), Field("placeStyle", "Placement style", "int", 0, "PLACEMENT", 0, 100000),
+        Field("defense", "Accessory defense", "int", 0, "EQUIP", -10000, 100000),
     ),
     "npc": (
         Field("width", "Width", "int", 18, "HITBOX", 1, 4000), Field("height", "Height", "int", 40, "HITBOX", 1, 4000),
         Field("lifeMax", "Max life", "int", 100, "COMBAT", 1, 2_000_000_000), Field("damage", "Contact damage", "int", 10, "COMBAT", 0, 1_000_000), Field("defense", "Defense", "int", 0, "COMBAT", -10000, 100000), Field("knockBackResist", "Knockback resistance", "float", 0.5, "COMBAT", 0, 100), Field("value", "Coin value", "float", 0.0, "COMBAT", 0, 2_000_000_000),
         Field("scale", "Scale", "float", 1.0, "VISUAL", 0.01, 100), Field("frames", "Sprite frames", "int", 1, "VISUAL", 1, 1000),
         Field("aiStyle", "AI style", "int", -1, "AI", -1, 10000), Field("aiType", "Vanilla AI type ID", "int", -1, "AI", -1, 100000), Field("animationType", "Vanilla animation type ID", "int", -1, "AI", -1, 100000),
-        Field("friendly", "Friendly", "bool", False, "FLAGS"), Field("boss", "Boss", "bool", False, "FLAGS"), Field("noGravity", "No gravity", "bool", False, "FLAGS"), Field("noTileCollide", "No tile collision", "bool", False, "FLAGS"),
+        Field("friendly", "Friendly", "bool", False, "FLAGS"), Field("townNPC", "Town NPC", "bool", False, "FLAGS"), Field("boss", "Boss", "bool", False, "FLAGS"), Field("dontTakeDamage", "Invulnerable", "bool", False, "FLAGS"), Field("lavaImmune", "Lava immune", "bool", False, "FLAGS"), Field("noGravity", "No gravity", "bool", False, "FLAGS"), Field("noTileCollide", "No tile collision", "bool", False, "FLAGS"), Field("netAlways", "Always network-sync", "bool", False, "FLAGS"),
+        Field("npcSlots", "Spawn slot cost", "float", 1.0, "SPAWN", 0, 1000), Field("catchItem", "Catch item ID (0 none)", "int", 0, "SPAWN", 0, 100000),
         Field("spawnChance", "Constant spawn chance", "float", 0.0, "SPAWN", 0, 1, help="0 leaves natural spawning undefined; positive emits a constant SpawnChance."),
         Field("lootKind", "Simple loot type", "enum", "none", "LOOT", options=("none", "vanilla", "modItem")), Field("lootItemId", "Vanilla loot item ID", "int", 0, "LOOT", 0, 100000), Field("lootItemName", "Mod loot item class", "identifier", "", "LOOT"), Field("lootChance", "Loot chance denominator", "int", 1, "LOOT", 1, 1_000_000), Field("lootMin", "Loot minimum stack", "int", 1, "LOOT", 1, 9999), Field("lootMax", "Loot maximum stack", "int", 1, "LOOT", 1, 9999),
     ),
@@ -59,6 +65,8 @@ SCHEMAS: dict[str, tuple[Field, ...]] = {
         Field("width", "Width", "int", 8, "HITBOX", 1, 4000), Field("height", "Height", "int", 8, "HITBOX", 1, 4000), Field("frames", "Sprite frames", "int", 1, "VISUAL", 1, 1000), Field("scale", "Scale", "float", 1.0, "VISUAL", 0.01, 100), Field("alpha", "Alpha", "int", 0, "VISUAL", 0, 255), Field("light", "Light", "float", 0.0, "VISUAL", 0, 10),
         Field("friendly", "Friendly", "bool", True, "COMBAT"), Field("hostile", "Hostile", "bool", False, "COMBAT"), Field("damageClass", "Damage class", "enum", "Generic", "COMBAT", options=_DAMAGE_CLASSES), Field("penetrate", "Penetration", "int", 1, "COMBAT", -1, 100000), Field("ownerHitCheck", "Owner line-of-sight check", "bool", False, "COMBAT"),
         Field("timeLeft", "Lifetime (ticks)", "int", 3600, "MOVEMENT", 1, 10_000_000), Field("tileCollide", "Collide with tiles", "bool", True, "MOVEMENT"), Field("ignoreWater", "Ignore water", "bool", False, "MOVEMENT"), Field("extraUpdates", "Extra updates", "int", 0, "MOVEMENT", 0, 100), Field("aiStyle", "AI style", "int", -1, "AI", -1, 10000), Field("aiType", "Vanilla AI type ID", "int", -1, "AI", -1, 100000),
+        Field("usesLocalNPCImmunity", "Per-projectile NPC immunity", "bool", False, "NPC IMMUNITY"), Field("localNPCHitCooldown", "Local hit cooldown (-1 once/NPC)", "int", -1, "NPC IMMUNITY", -1, 100000), Field("usesIDStaticNPCImmunity", "Shared type NPC immunity", "bool", False, "NPC IMMUNITY"), Field("idStaticNPCHitCooldown", "Shared hit cooldown", "int", 10, "NPC IMMUNITY", 1, 100000),
+        Field("minion", "Minion", "bool", False, "SPECIAL"), Field("minionSlots", "Minion slots", "float", 1.0, "SPECIAL", 0, 1000), Field("netImportant", "Sync to joining players", "bool", False, "SPECIAL"), Field("hide", "Hide normal draw", "bool", False, "SPECIAL"),
     ),
     "buff": (
         Field("debuff", "Debuff", "bool", False, "FLAGS"), Field("noTimeDisplay", "Hide time display", "bool", False, "FLAGS"), Field("pvpBuff", "PvP buff", "bool", False, "FLAGS"), Field("vanityPet", "Vanity pet", "bool", False, "FLAGS"), Field("lightPet", "Light pet", "bool", False, "FLAGS"),
@@ -76,13 +84,28 @@ SCHEMAS: dict[str, tuple[Field, ...]] = {
     "globalNPC": (
         Field("targetId", "Target vanilla NPC ID", "int", 0, "TARGET", 0, 100000), Field("lifeMultiplier", "Life multiplier", "float", 1.0, "MODIFIERS", 0.01, 1000), Field("damageMultiplier", "Damage multiplier", "float", 1.0, "MODIFIERS", 0, 1000), Field("defenseAdd", "Defense adjustment", "int", 0, "MODIFIERS", -100000, 100000), Field("valueMultiplier", "Value multiplier", "float", 1.0, "MODIFIERS", 0, 1000), Field("knockBackMultiplier", "Knockback resistance multiplier", "float", 1.0, "MODIFIERS", 0, 1000), Field("scaleMultiplier", "Scale multiplier", "float", 1.0, "MODIFIERS", 0.01, 1000),
     ),
+    "wall": (
+        Field("housingSafe", "Counts as housing wall", "bool", True, "WALL"), Field("dustType", "Dust ID", "int", 0, "WALL", -1, 100000),
+        Field("mapR", "Map red", "int", 180, "MAP", 0, 255), Field("mapG", "Map green", "int", 180, "MAP", 0, 255), Field("mapB", "Map blue", "int", 180, "MAP", 0, 255),
+        Field("dropKind", "Fallback drop type", "enum", "none", "DROP", options=("none", "vanilla", "modItem")), Field("dropItemId", "Vanilla drop item ID", "int", 0, "DROP", 0, 100000), Field("dropItemName", "Mod drop item class", "identifier", "", "DROP"),
+    ),
+    "globalProjectile": (
+        Field("targetId", "Target vanilla projectile ID", "int", 0, "TARGET", 0, 100000),
+        Field("friendlyOverride", "Friendly override", "enum", "unchanged", "FLAGS", options=("unchanged", "true", "false")), Field("hostileOverride", "Hostile override", "enum", "unchanged", "FLAGS", options=("unchanged", "true", "false")), Field("tileCollideOverride", "Tile collision override", "enum", "unchanged", "FLAGS", options=("unchanged", "true", "false")),
+        Field("damageClass", "Damage class override", "enum", "Unchanged", "COMBAT", options=("Unchanged",) + _DAMAGE_CLASSES), Field("penetrateOverride", "Penetration override (-999 unchanged)", "int", -999, "COMBAT", -999, 100000),
+        Field("timeLeftMultiplier", "Lifetime multiplier", "float", 1.0, "MODIFIERS", 0.01, 1000), Field("scaleMultiplier", "Scale multiplier", "float", 1.0, "MODIFIERS", 0.01, 1000), Field("extraUpdatesAdd", "Extra updates adjustment", "int", 0, "MODIFIERS", -100, 100),
+    ),
+    "prefix": (
+        Field("category", "Prefix category", "enum", "AnyWeapon", "ROLLING", options=("Melee", "Ranged", "Magic", "AnyWeapon", "Accessory", "Custom")), Field("rollChance", "Relative roll chance", "float", 1.0, "ROLLING", 0, 100000), Field("canRoll", "Can roll", "bool", True, "ROLLING"),
+        Field("damageMult", "Damage multiplier", "float", 1.0, "STATS", 0, 1000), Field("knockBackMult", "Knockback multiplier", "float", 1.0, "STATS", 0, 1000), Field("useTimeMult", "Use-time multiplier", "float", 1.0, "STATS", 0.01, 1000), Field("scaleMult", "Scale multiplier", "float", 1.0, "STATS", 0.01, 1000), Field("shootSpeedMult", "Shoot-speed multiplier", "float", 1.0, "STATS", 0, 1000), Field("manaMult", "Mana-cost multiplier", "float", 1.0, "STATS", 0, 1000), Field("critBonus", "Critical chance bonus", "int", 0, "STATS", -1000, 1000), Field("valueMult", "Value multiplier", "float", 1.0, "VALUE", 0, 1000),
+    ),
     "recipe": (
         Field("resultKind", "Result type", "enum", "modItem", "RESULT", options=("modItem", "vanilla")), Field("resultName", "Result mod item class", "identifier", "", "RESULT"), Field("resultId", "Result vanilla item ID", "int", 0, "RESULT", 0, 100000), Field("resultStack", "Result stack", "int", 1, "RESULT", 1, 9999),
         Field("ingredients", "Ingredients", "lines", "", "RECIPE", help="One per line: vanilla:<id>=<stack> or mod:<ClassName>=<stack>."), Field("stations", "Crafting stations", "lines", "", "RECIPE", help="One per line: vanilla:<tileId> or mod:<TileClassName>."),
     ),
 }
 
-_LABELS = {"item":"ModItem","npc":"ModNPC","projectile":"ModProjectile","buff":"ModBuff","tile":"ModTile (simple 1×1)","globalItem":"GlobalItem (vanilla modifier)","globalNPC":"GlobalNPC (vanilla modifier)","recipe":"Recipe"}
+_LABELS = {"item":"ModItem","npc":"ModNPC","projectile":"ModProjectile","buff":"ModBuff","tile":"ModTile (simple 1×1)","wall":"ModWall","globalItem":"GlobalItem (vanilla modifier)","globalNPC":"GlobalNPC (vanilla modifier)","globalProjectile":"GlobalProjectile (vanilla modifier)","prefix":"ModPrefix","recipe":"Recipe"}
 
 def schemas_public() -> dict:
     return {"kinds":[{"kind":k,"label":_LABELS[k],"fields":[f.public() for f in v]} for k,v in SCHEMAS.items()]}
@@ -121,7 +144,8 @@ def validate_values(kind: str, values: object) -> dict[str, Any]:
     if kind=="npc":
         if out["lootMin"]>out["lootMax"]: raise ValueError("Loot minimum stack cannot exceed maximum stack")
         if out["lootKind"]=="modItem" and not out["lootItemName"]: raise ValueError("Mod loot item class is required")
-    if kind=="tile" and out["dropKind"]=="modItem" and not out["dropItemName"]: raise ValueError("Mod drop item class is required")
+    if kind in {"tile","wall"} and out["dropKind"]=="modItem" and not out["dropItemName"]: raise ValueError("Mod drop item class is required")
+    if kind=="projectile" and out["usesLocalNPCImmunity"] and out["usesIDStaticNPCImmunity"]: raise ValueError("Projectile cannot use local and shared ID-static NPC immunity at the same time")
     if kind=="recipe":
         if out["resultKind"]=="modItem" and not out["resultName"]: raise ValueError("Result mod item class is required")
         _parse_ingredients(out["ingredients"]); _parse_stations(out["stations"])
@@ -133,12 +157,12 @@ def _meta(kind,name,values): return HEADER_PREFIX+json.dumps({"version":1,"kind"
 def _managed(lines): return "\n".join([BEGIN_MARKER,*(("    "+x) if x else "" for x in lines),END_MARKER])
 
 def _render_item(v):
-    return ["public override void SetDefaults()","{",f"    Item.width = {v['width']};",f"    Item.height = {v['height']};",f"    Item.maxStack = {v['maxStack']};",f"    Item.value = {v['value']};",f"    Item.rare = {v['rare']};",f"    Item.damage = {v['damage']};",f"    Item.DamageType = DamageClass.{v['damageClass']};",f"    Item.knockBack = {_f(v['knockBack'])};",f"    Item.crit = {v['crit']};",f"    Item.useTime = {v['useTime']};",f"    Item.useAnimation = {v['useAnimation']};",f"    Item.autoReuse = {_b(v['autoReuse'])};",f"    Item.consumable = {_b(v['consumable'])};",f"    Item.accessory = {_b(v['accessory'])};",f"    Item.shootSpeed = {_f(v['shootSpeed'])};","}"]
+    return ["public override void SetDefaults()","{",f"    Item.width = {v['width']};",f"    Item.height = {v['height']};",f"    Item.maxStack = {v['maxStack']};",f"    Item.value = {v['value']};",f"    Item.rare = {v['rare']};",f"    Item.damage = {v['damage']};",f"    Item.DamageType = DamageClass.{v['damageClass']};",f"    Item.knockBack = {_f(v['knockBack'])};",f"    Item.crit = {v['crit']};",f"    Item.defense = {v['defense']};",f"    Item.useTime = {v['useTime']};",f"    Item.useAnimation = {v['useAnimation']};",f"    Item.useStyle = {v['useStyle']};",f"    Item.useTurn = {_b(v['useTurn'])};",f"    Item.autoReuse = {_b(v['autoReuse'])};",f"    Item.channel = {_b(v['channel'])};",f"    Item.noMelee = {_b(v['noMelee'])};",f"    Item.consumable = {_b(v['consumable'])};",f"    Item.accessory = {_b(v['accessory'])};",f"    Item.shootSpeed = {_f(v['shootSpeed'])};",f"    Item.mana = {v['mana']};",f"    Item.healLife = {v['healLife']};",f"    Item.healMana = {v['healMana']};",f"    Item.pick = {v['pick']};",f"    Item.axe = {v['axe']};",f"    Item.hammer = {v['hammer']};",f"    Item.ammo = {v['ammo']};",f"    Item.useAmmo = {v['useAmmo']};",f"    Item.shoot = {v['shoot']};",f"    Item.createTile = {v['createTile']};",f"    Item.createWall = {v['createWall']};",f"    Item.placeStyle = {v['placeStyle']};","}"]
 
 def _render_npc(mod,v):
     out=[]
     if v['frames']!=1: out += ["public override void SetStaticDefaults()","{",f"    Main.npcFrameCount[Type] = {v['frames']};","}",""]
-    out += ["public override void SetDefaults()","{",f"    NPC.width = {v['width']};",f"    NPC.height = {v['height']};",f"    NPC.lifeMax = {v['lifeMax']};",f"    NPC.damage = {v['damage']};",f"    NPC.defense = {v['defense']};",f"    NPC.knockBackResist = {_f(v['knockBackResist'])};",f"    NPC.value = {_f(v['value'])};",f"    NPC.scale = {_f(v['scale'])};",f"    NPC.aiStyle = {v['aiStyle']};",f"    NPC.friendly = {_b(v['friendly'])};",f"    NPC.boss = {_b(v['boss'])};",f"    NPC.noGravity = {_b(v['noGravity'])};",f"    NPC.noTileCollide = {_b(v['noTileCollide'])};"]
+    out += ["public override void SetDefaults()","{",f"    NPC.width = {v['width']};",f"    NPC.height = {v['height']};",f"    NPC.lifeMax = {v['lifeMax']};",f"    NPC.damage = {v['damage']};",f"    NPC.defense = {v['defense']};",f"    NPC.knockBackResist = {_f(v['knockBackResist'])};",f"    NPC.value = {_f(v['value'])};",f"    NPC.scale = {_f(v['scale'])};",f"    NPC.aiStyle = {v['aiStyle']};",f"    NPC.npcSlots = {_f(v['npcSlots'])};",f"    NPC.catchItem = {v['catchItem']};",f"    NPC.friendly = {_b(v['friendly'])};",f"    NPC.townNPC = {_b(v['townNPC'])};",f"    NPC.boss = {_b(v['boss'])};",f"    NPC.dontTakeDamage = {_b(v['dontTakeDamage'])};",f"    NPC.lavaImmune = {_b(v['lavaImmune'])};",f"    NPC.noGravity = {_b(v['noGravity'])};",f"    NPC.noTileCollide = {_b(v['noTileCollide'])};",f"    NPC.netAlways = {_b(v['netAlways'])};"]
     if v['aiType']>=0: out.append(f"    AIType = {v['aiType']};")
     if v['animationType']>=0: out.append(f"    AnimationType = {v['animationType']};")
     out += ["}"]
@@ -153,6 +177,13 @@ def _render_projectile(v):
     if v['frames']!=1: out += ["public override void SetStaticDefaults()","{",f"    Main.projFrames[Type] = {v['frames']};","}",""]
     out += ["public override void SetDefaults()","{",f"    Projectile.width = {v['width']};",f"    Projectile.height = {v['height']};",f"    Projectile.scale = {_f(v['scale'])};",f"    Projectile.alpha = {v['alpha']};",f"    Projectile.light = {_f(v['light'])};",f"    Projectile.friendly = {_b(v['friendly'])};",f"    Projectile.hostile = {_b(v['hostile'])};",f"    Projectile.DamageType = DamageClass.{v['damageClass']};",f"    Projectile.penetrate = {v['penetrate']};",f"    Projectile.timeLeft = {v['timeLeft']};",f"    Projectile.tileCollide = {_b(v['tileCollide'])};",f"    Projectile.ignoreWater = {_b(v['ignoreWater'])};",f"    Projectile.extraUpdates = {v['extraUpdates']};",f"    Projectile.aiStyle = {v['aiStyle']};",f"    Projectile.ownerHitCheck = {_b(v['ownerHitCheck'])};"]
     if v['aiType']>=0: out.append(f"    AIType = {v['aiType']};")
+    out += [f"    Projectile.netImportant = {_b(v['netImportant'])};",f"    Projectile.hide = {_b(v['hide'])};"]
+    if v['usesLocalNPCImmunity']:
+        out += ["    Projectile.usesLocalNPCImmunity = true;",f"    Projectile.localNPCHitCooldown = {v['localNPCHitCooldown']};"]
+    if v['usesIDStaticNPCImmunity']:
+        out += ["    Projectile.usesIDStaticNPCImmunity = true;",f"    Projectile.idStaticNPCHitCooldown = {v['idStaticNPCHitCooldown']};"]
+    if v['minion']:
+        out += ["    Projectile.minion = true;",f"    Projectile.minionSlots = {_f(v['minionSlots'])};"]
     out += ["}"]; return out
 
 def _render_buff(v):
@@ -189,6 +220,29 @@ def _render_global_npc(v):
     if v['knockBackMultiplier']!=1: out.append(f"    entity.knockBackResist *= {_f(v['knockBackMultiplier'])};")
     if v['scaleMultiplier']!=1: out.append(f"    entity.scale *= {_f(v['scaleMultiplier'])};")
     out += ["}"]; return out
+
+def _render_wall(mod,v):
+    out=["public override void SetStaticDefaults()","{",f"    Main.wallHouse[Type] = {_b(v['housingSafe'])};",f"    DustType = {v['dustType']};",f"    AddMapEntry(new Color({v['mapR']}, {v['mapG']}, {v['mapB']}), CreateMapEntryName());"]
+    if v['dropKind']=='vanilla': out.append(f"    RegisterItemDrop({v['dropItemId']});")
+    elif v['dropKind']=='modItem': out.append(f"    RegisterItemDrop(ModContent.ItemType<global::{mod}.Content.Items.{v['dropItemName']}>());")
+    out += ["}"]; return out
+
+def _render_global_projectile(v):
+    out=[f"public override bool AppliesToEntity(Projectile entity, bool lateInstantiation) => entity.type == {v['targetId']};","","public override void SetDefaults(Projectile entity)","{"]
+    if v['friendlyOverride']!='unchanged': out.append(f"    entity.friendly = {v['friendlyOverride']};")
+    if v['hostileOverride']!='unchanged': out.append(f"    entity.hostile = {v['hostileOverride']};")
+    if v['tileCollideOverride']!='unchanged': out.append(f"    entity.tileCollide = {v['tileCollideOverride']};")
+    if v['damageClass']!='Unchanged': out.append(f"    entity.DamageType = DamageClass.{v['damageClass']};")
+    if v['penetrateOverride']!=-999: out.append(f"    entity.penetrate = {v['penetrateOverride']};")
+    if v['timeLeftMultiplier']!=1: out.append(f"    entity.timeLeft = (int)(entity.timeLeft * {_f(v['timeLeftMultiplier'])});")
+    if v['scaleMultiplier']!=1: out.append(f"    entity.scale *= {_f(v['scaleMultiplier'])};")
+    if v['extraUpdatesAdd']: out.append(f"    entity.extraUpdates += {v['extraUpdatesAdd']};")
+    out += ["}"]; return out
+
+def _render_prefix(v):
+    out=[f"public override PrefixCategory Category => PrefixCategory.{v['category']};",f"public override float RollChance(Item item) => {_f(v['rollChance'])};",f"public override bool CanRoll(Item item) => {_b(v['canRoll'])};","","public override void SetStats(ref float damageMult, ref float knockbackMult, ref float useTimeMult, ref float scaleMult, ref float shootSpeedMult, ref float manaMult, ref int critBonus)","{",f"    damageMult *= {_f(v['damageMult'])};",f"    knockbackMult *= {_f(v['knockBackMult'])};",f"    useTimeMult *= {_f(v['useTimeMult'])};",f"    scaleMult *= {_f(v['scaleMult'])};",f"    shootSpeedMult *= {_f(v['shootSpeedMult'])};",f"    manaMult *= {_f(v['manaMult'])};",f"    critBonus += {v['critBonus']};","}"]
+    if v['valueMult']!=1: out += ["","public override void ModifyValue(ref float valueMult)","{",f"    valueMult *= {_f(v['valueMult'])};","}"]
+    return out
 
 def _parse_ingredients(text):
     rows=[]
@@ -240,7 +294,7 @@ def _render_recipe(mod,v):
     out += ["    recipe.Register();","}"]; return out
 
 def _render_region(mod,kind,v):
-    return {'item':lambda:_render_item(v),'npc':lambda:_render_npc(mod,v),'projectile':lambda:_render_projectile(v),'buff':lambda:_render_buff(v),'tile':lambda:_render_tile(mod,v),'globalItem':lambda:_render_global_item(v),'globalNPC':lambda:_render_global_npc(v),'recipe':lambda:_render_recipe(mod,v)}[kind]()
+    return {'item':lambda:_render_item(v),'npc':lambda:_render_npc(mod,v),'projectile':lambda:_render_projectile(v),'buff':lambda:_render_buff(v),'tile':lambda:_render_tile(mod,v),'wall':lambda:_render_wall(mod,v),'globalItem':lambda:_render_global_item(v),'globalNPC':lambda:_render_global_npc(v),'globalProjectile':lambda:_render_global_projectile(v),'prefix':lambda:_render_prefix(v),'recipe':lambda:_render_recipe(mod,v)}[kind]()
 
 def _kind_spec(kind,name):
     return {
@@ -249,13 +303,16 @@ def _kind_spec(kind,name):
         'projectile':(f"Content/Projectiles/{name}.cs",'ModProjectile',('Terraria','Terraria.ModLoader')),
         'buff':(f"Content/Buffs/{name}.cs",'ModBuff',('Terraria','Terraria.ModLoader')),
         'tile':(f"Content/Tiles/{name}.cs",'ModTile',('Microsoft.Xna.Framework','Terraria','Terraria.ModLoader')),
+        'wall':(f"Content/Walls/{name}.cs",'ModWall',('Microsoft.Xna.Framework','Terraria','Terraria.ModLoader')),
         'globalItem':(f"Common/GlobalItems/{name}.cs",'GlobalItem',('Terraria','Terraria.ModLoader')),
         'globalNPC':(f"Common/GlobalNPCs/{name}.cs",'GlobalNPC',('Terraria','Terraria.ModLoader')),
+        'globalProjectile':(f"Common/GlobalProjectiles/{name}.cs",'GlobalProjectile',('Terraria','Terraria.ModLoader')),
+        'prefix':(f"Content/Prefixes/{name}.cs",'ModPrefix',('Terraria','Terraria.ModLoader')),
         'recipe':(f"Common/Recipes/{name}.cs",'ModSystem',('Terraria','Terraria.ModLoader')),
     }[kind]
 
 def _namespace(mod,kind):
-    return {'item':f'{mod}.Content.Items','npc':f'{mod}.Content.NPCs','projectile':f'{mod}.Content.Projectiles','buff':f'{mod}.Content.Buffs','tile':f'{mod}.Content.Tiles','globalItem':f'{mod}.Common.GlobalItems','globalNPC':f'{mod}.Common.GlobalNPCs','recipe':f'{mod}.Common.Recipes'}[kind]
+    return {'item':f'{mod}.Content.Items','npc':f'{mod}.Content.NPCs','projectile':f'{mod}.Content.Projectiles','buff':f'{mod}.Content.Buffs','tile':f'{mod}.Content.Tiles','wall':f'{mod}.Content.Walls','globalItem':f'{mod}.Common.GlobalItems','globalNPC':f'{mod}.Common.GlobalNPCs','globalProjectile':f'{mod}.Common.GlobalProjectiles','prefix':f'{mod}.Content.Prefixes','recipe':f'{mod}.Common.Recipes'}[kind]
 
 def render_structured_source(mod_name,kind,name,values):
     mod_name=validate_content_name(mod_name); name=validate_content_name(name); v=validate_values(kind,values); _,base,usings=_kind_spec(kind,name)
@@ -310,6 +367,8 @@ def _loc_plan(mod,kind,name,display,desc):
     if kind=='projectile': return {f"Mods.{mod}.Projectiles.{name}.DisplayName":display}
     if kind=='buff': return {f"Mods.{mod}.Buffs.{name}.DisplayName":display,f"Mods.{mod}.Buffs.{name}.Description":desc}
     if kind=='tile': return {f"Mods.{mod}.Tiles.{name}.MapEntry":display}
+    if kind=='wall': return {f"Mods.{mod}.Walls.{name}.MapEntry":display}
+    if kind=='prefix': return {f"Mods.{mod}.Prefixes.{name}.DisplayName":display}
     return {}
 
 def _initial_loc(mod): return f"# tModLoader may add generated localization entries here after build/reload.\nMods: {{\n\t{mod}: {{\n\t}}\n}}\n"
@@ -331,7 +390,7 @@ def create_structured_content(root,kind,name,values,display_name='',description=
     if not isinstance(description,str) or any(c in description for c in '\r\n\x00'): raise ValueError("Description must fit on one line")
     display=display_name.strip() or default_display_name(name); desc=description.strip(); v=validate_values(kind,values); source_relative,_,_=_kind_spec(kind,name); source_target=project/source_relative
     if source_target.exists(): raise ValueError(f"C# source file already exists: {source_relative}")
-    needs_texture=kind in {'item','npc','projectile','buff','tile'}; texture_relative=source_relative[:-3]+'.png'; texture_target=project/texture_relative
+    needs_texture=kind in {'item','npc','projectile','buff','tile','wall'}; texture_relative=source_relative[:-3]+'.png'; texture_target=project/texture_relative
     if needs_texture and texture_target.exists(): raise ValueError(f"Asset file already exists: {texture_relative}")
     loc_target=project/'Localization'/'en-US.hjson'; creates=_loc_plan(mod,kind,name,display,desc); loc_existed=loc_target.is_file(); loc_original=loc_target.read_bytes() if loc_existed else b''; loc_written=src_written=tex_written=False; texture_state=None
     if creates:
