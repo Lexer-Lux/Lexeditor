@@ -73,7 +73,15 @@ def launch(game_root: Path, game: str) -> dict:
         raise LaunchError("Fahrenheit game launch is available only on Windows")
     key = game_key(game)
     argv, cwd = command(game_root, key)
-    process = subprocess.Popen(argv, cwd=str(cwd), close_fds=True)
+    # Stage 0 is launched by Lexeditor as part of the desktop workflow. Keep it
+    # attached to no console window, matching the shared background-helper
+    # contract; Fahrenheit still starts the selected game normally.
+    process = subprocess.Popen(
+        argv,
+        cwd=str(cwd),
+        close_fds=True,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
     return {
         "launched": True,
         "game": key,
