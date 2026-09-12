@@ -19,6 +19,8 @@ The preflight is non-destructive. It verifies:
 - the deployed `mod.info` name/id match the source project;
 - the deployed ZedScript tree can still be inventoried without structural parse errors.
 
+The JSON report also reads Project Zomboid's existing activation lists without modifying them. It reports whether the mod ID is present in the current client-default `Zomboid/mods/default.txt` and in any `Zomboid/Saves/**/mods.txt` files, plus malformed-list diagnostics. Activation evidence is advisory: a newly deployed mod may legitimately be absent until the user enables it in the game's Build 42 mod manager, and a matching list entry still does not prove the game successfully loaded the mod.
+
 A successful preflight only means the filesystem/runtime handoff is ready for a human in-game test. It does **not** prove that Project Zomboid discovered, enabled, or loaded the mod.
 
 Final installed-game acceptance still requires:
