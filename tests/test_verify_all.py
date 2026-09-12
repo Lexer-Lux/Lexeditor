@@ -101,6 +101,26 @@ class RunnerTests(unittest.TestCase):
         self.assertIn("SKIPPED", report)
         once.assert_called_once()
 
+    def test_ff8_data_verifier_preflight_skips_before_browser_launch(self):
+        with tempfile.TemporaryDirectory() as name, \
+             patch.dict(os.environ, {"LEXEDITOR_FF8_DATA_ROOT": str(Path(name) / "missing")}), \
+             patch.object(verify_all, "_once") as once:
+            _tool, code, _seconds, report = verify_all.run(Path("verify_ff8_math_visual.py"))
+        self.assertEqual(code, 0)
+        self.assertIn("SKIPPED", report)
+        self.assertIn("extracted FF8 baseline", report)
+        once.assert_not_called()
+
+    def test_missing_prepared_reverse_engineering_tree_is_skipped(self):
+        tail = ("FileNotFoundError: [Errno 2] No such file or directory: "
+                "'D:\\\\a\\\\Lexeditor\\\\Lexeditor\\\\_scratch\\\\ffnx-upstream\\\\src\\\\cfg.cpp'")
+        with patch.object(verify_all, "_once", return_value=(1, tail, tail)) as once:
+            _tool, code, _seconds, report = verify_all.run(Path("fixture.py"))
+        self.assertEqual(code, 0)
+        self.assertIn("SKIPPED", report)
+        self.assertIn("prepared reverse-engineering source data", report)
+        once.assert_called_once()
+
     def test_aggregate_finding_is_not_skipped_because_one_plugin_is_missing(self):
         # Aggregate sweeps can mention an unavailable installed game and still
         # contain an actionable finding for another plugin. Only a direct final
