@@ -1,0 +1,44 @@
+name: Project Zomboid checks
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'games/project_zomboid/**'
+      - 'tests/test_project_zomboid.py'
+      - 'runtime_bootstrap.py'
+      - 'ui/credits-sources.json'
+      - 'ui/credits.json'
+      - 'ui/mod-loading.json'
+      - '.github/workflows/project-zomboid-checks.yml'
+  pull_request:
+    paths:
+      - 'games/project_zomboid/**'
+      - 'tests/test_project_zomboid.py'
+      - 'runtime_bootstrap.py'
+      - 'ui/credits-sources.json'
+      - 'ui/credits.json'
+      - 'ui/mod-loading.json'
+      - '.github/workflows/project-zomboid-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  project-zomboid:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Project Zomboid regressions
+        run: python -m unittest -v tests.test_project_zomboid
+      - name: Python syntax
+        run: python -m py_compile games/project_zomboid/__init__.py games/project_zomboid/core.py games/project_zomboid/plugin.py games/project_zomboid/server.py tests/test_project_zomboid.py
+      - name: Plugin metadata
+        run: python plugin_metadata.py
