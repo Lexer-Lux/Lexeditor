@@ -24,7 +24,7 @@ Unknown keys, repeated non-edited keys, comments and other unmodeled lines must 
 
 The current `pz-scripts-data` registry identifies these Build 42 script families at module level: `animationsMesh`, `craftRecipe`, `entity`, `evolvedrecipe`, `fixing`, `fluid`, `item`, `mannequin`, `model`, `sound`, `timedAction`, and `vehicle`. Lexeditor structurally inventories these top-level records while deliberately ignoring similarly shaped text inside comments, quoted strings, and nested blocks.
 
-Recognition is not the same as editability. Items, evolved recipes, conservative craft-recipe scalars, top-level fluid scalars, and a conservative vehicle scalar subset are currently structured. The remaining families and nested substructures stay read-only until their current Build 42 fields and mutation rules are independently grounded.
+Recognition is not the same as editability. Items, evolved recipes, conservative craft-recipe scalars, top-level fluid scalars, a conservative vehicle scalar subset, and conservative module-level sound scalars are currently structured. The remaining families and nested substructures stay read-only until their current Build 42 fields and mutation rules are independently grounded.
 
 ## Item blocks
 
@@ -83,6 +83,19 @@ Vehicle scripts combine a large top-level parameter surface with substantial nes
 - scalar identifiers/text: `carMechanicsOverlay`, `carModelName`, `engineRPMType`.
 
 All nested vehicle blocks, array-valued fields, templates, textures, physics geometry, ratios beyond the explicitly modeled count, and other unmodeled parameters remain read-only and byte-preserved. As with the other script adapters, Lexeditor only edits properties already present and rejects stale, missing, duplicated, malformed, or out-of-scope edits instead of synthesizing structure.
+
+## `sound`
+
+Module-level Build 42 `sound` records expose a small typed scalar surface that can be patched without rebuilding their clip data:
+
+- `category` — scalar text;
+- `is3D` and `loop` — booleans;
+- `master` — one of `Primary`, `Ambient`, `Music`, or `VehicleEngine`;
+- `maxInstancesPerEmitter` — integer.
+
+Audio sources and playback details live in nested `clip` blocks, including fields such as file path, minimum/maximum distance, reverb factor, and volume. Those clip blocks remain read-only and are preserved verbatim. The structured editor is deliberately limited to module-level `sound` records; sound-shaped child blocks inside vehicles or templates are not promoted to independent editable records.
+
+As elsewhere, the writer changes only properties already present. Stale files, missing properties, duplicate edited properties, invalid booleans, undocumented `master` values, and malformed integers fail closed rather than causing structural insertion or normalization of unrelated sound data.
 
 ## Filesystem portability
 
