@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlparse
 from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text
 from .localization import apply_localization_changes, parse_localization_text, try_get_culture_and_prefix
 from .plugin import DEFAULT_PROJECT_ROOT, TMODLOADER_SAVE_ROOT
-from .source_text import save_source, source_file_state, source_index
+from .source_text import create_source, save_source, source_file_state, source_index
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -228,6 +228,10 @@ def source_file(relative: str) -> dict:
 
 def save_source_file(relative: str, text: object, expected_sha256: str) -> dict:
     return save_source(project_root(), relative, text, expected_sha256)
+
+
+def create_source_file(relative: str, text: object = "") -> dict:
+    return create_source(project_root(), relative, text)
 
 
 def _installation_root() -> Path:
@@ -570,6 +574,16 @@ class Handler(BaseHTTPRequestHandler):
                 ):
                     raise ValueError("Invalid localization request")
                 self.send_json(save_localization(relative, updates, expected, creates))
+                return
+            if path == "/api/source/create":
+                payload = self.read_json()
+                if not isinstance(payload, dict) or set(payload) != {"path", "text"}:
+                    raise ValueError("Expected path and text only")
+                relative = payload["path"]
+                text = payload["text"]
+                if not isinstance(relative, str) or not isinstance(text, str):
+                    raise ValueError("Invalid C# source create request")
+                self.send_json(create_source_file(relative, text))
                 return
             if path == "/api/source/file":
                 payload = self.read_json()
