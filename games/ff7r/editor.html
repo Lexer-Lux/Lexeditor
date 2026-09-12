@@ -67,8 +67,8 @@
   const propertyColumnKey=prop=>`p:${prop.name}`;
   function propertyCellValue(row,prop){
     const value=row.values?.[prop.name];
-    if(Array.isArray(value))return value.length?value.join(", "):"—";
-    return value===undefined||value===null||value===""?"—":value;
+    if(Array.isArray(value))return value.length?value.map(item=>resolvedText(item)||item).join(", "):"—";
+    return value===undefined||value===null||value===""?"—":resolvedText(value)||value;
   }
   function dataTableColumns(){
     return [...dataColumns,...(state.data?.properties||[]).map(prop=>({
@@ -76,7 +76,7 @@
       width:"minmax(7em,1fr)",
       numeric:!prop.array&&["INT","FLOAT"].includes(semanticType(prop)),
       render:row=>propertyCellValue(row,prop),
-      sortValue:row=>{const value=row.values?.[prop.name];return Array.isArray(value)?value.length:value}}))];
+      sortValue:row=>propertyCellValue(row,prop)}))];
   }
   function dataPreferences(){
     const asset=state.data?.asset||state.asset||"none";
@@ -522,13 +522,11 @@
     const rows=records().map(record=>{
       const row={record,id:record.id,tag:record.tag};
       for(const prop of properties){
-        const value=record.values[prop.name];
-        row[propertyColumnKey(prop)]=Array.isArray(value)
-          ?(value.length?value.join(", "):"—"):value;
+        row[propertyColumnKey(prop)]=propertyCellValue(record,prop);
       }
       return row;
     });
-    const filtered=q?rows.filter(row=>`${row.id} ${row.tag}`.toLocaleLowerCase().includes(q)):rows;
+    const filtered=q?rows.filter(row=>`${Object.values(row).filter(value=>typeof value!=="object").join(" ")} ${flattenStrings(row.record.values).join(" ")}`.toLocaleLowerCase().includes(q)):rows;
     const key=state.curatedSort.key,dir=state.curatedSort.dir;
     return filtered.sort((a,b)=>compareValues(a[key],b[key])*dir);
   }

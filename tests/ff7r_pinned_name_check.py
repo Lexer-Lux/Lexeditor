@@ -1,0 +1,39 @@
+"""Pinning a resolved property must retain its visible name."""
+import functools, threading, tempfile
+from pathlib import Path
+from playwright.sync_api import sync_playwright
+from global_browser_check import Handler,ThreadingHTTPServer,STUB,ROOT
+
+def main():
+ server=ThreadingHTTPServer(('127.0.0.1',0),functools.partial(Handler,directory=str(ROOT)))
+ thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+ try:
+  with sync_playwright() as pw:
+   browser=pw.chromium.launch(headless=True);page=browser.new_page(viewport={'width':1500,'height':900});page.add_init_script(STUB)
+   page.route('**/api/**',lambda route:route.fulfill(json={}))
+   page.goto(f'http://127.0.0.1:{server.server_port}/games/ff7r/editor.html')
+   page.wait_for_function('!!state.error')
+   page.evaluate("""()=>{
+    state.error='';state.busy=false;state.tab='abilities';state.selected=0;
+    state.asset='BattleAbility.uasset';state.catalog={assets:[{asset:state.asset,name:'Abilities'}]};
+    state.data={asset:state.asset,properties:[{name:'Name',label:'Name',type:'STRING',editable:false}],records:[{id:0,tag:'GuardScorpion_Search',values:{Name:'$bt_GuardScorpion_Search'}}],textLookup:{'$bt_GuardScorpion_Search':'Target Scanner'}};
+    render();
+   }""")
+   page.get_by_role('button',name='Pin Name column',exact=True).click()
+   page.evaluate("curatedPrefs(curatedSpec('abilities')).move('p:Name','tag')")
+   page.wait_for_timeout(200)
+   table=page.locator('.ff7r-table')
+   assert 'Target Scanner' in table.inner_text()
+   assert '$bt_GuardScorpion_Search' not in table.inner_text()
+   assert page.evaluate("curatedPrefs(curatedSpec('abilities')).active().map(c=>c.key).filter(k=>k!=='enabled').slice(0,2)")==['id','p:Name']
+   assert page.evaluate("propertyCellValue({values:{Name:['$bt_GuardScorpion_Search','Unknown']}},{name:'Name'})")=='Target Scanner, Unknown'
+   assert page.evaluate("propertyCellValue({values:{Name:42}},{name:'Name'})")==42
+   page.evaluate("state.curatedQuery='Target Scanner'")
+   assert page.evaluate("curatedRows(curatedSpec('abilities')).length")==1
+   page.evaluate("state.curatedQuery='$bt_GuardScorpion_Search'")
+   assert page.evaluate("curatedRows(curatedSpec('abilities')).length")==1
+   page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff7r-pinned-name.png'))
+   browser.close()
+ finally:server.shutdown();server.server_close();thread.join(timeout=2)
+ print('Pinned Name shows Target Scanner after ID; raw keys remain searchable.')
+if __name__=='__main__':main()
