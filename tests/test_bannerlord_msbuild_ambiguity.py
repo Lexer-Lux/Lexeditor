@@ -1,0 +1,72 @@
+from pathlib import Path
+import tempfile
+import unittest
+
+from games.bannerlord.project_data import read_project_file, save_project_properties
+
+
+class BannerlordMsbuildAmbiguityTests(unittest.TestCase):
+    def write(self, root: Path, body: str) -> Path:
+        path = root / "Mod.csproj"
+        path.write_text(body, encoding="utf-8")
+        return path
+
+    def test_duplicate_editable_property_is_read_only_and_save_is_rejected_atomically(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            path = self.write(root, '''<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputPath>one\\</OutputPath></PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'"><OutputPath>two\\</OutputPath></PropertyGroup>
+</Project>''')
+            model = read_project_file(path)
+            self.assertNotIn("OutputPath", model["editableProperties"])
+            self.assertIn("defined 2 times", model["ambiguousProperties"]["OutputPath"])
+            original = path.read_text(encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "multiply-defined"):
+                save_project_properties(path, {"OutputPath": "three\\"})
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+            self.assertFalse(path.with_name(path.name + ".lexeditor.bak").exists())
+
+    def test_element_condition_is_read_only(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = self.write(Path(name), '''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><Nullable Condition="'$(Configuration)'=='Debug'">enable</Nullable></PropertyGroup></Project>''')
+            model = read_project_file(path)
+            self.assertNotIn("Nullable", model["editableProperties"])
+            self.assertEqual(model["ambiguousProperties"]["Nullable"], "defined under an MSBuild Condition")
+            row = next(row for row in model["propertyRows"] if row["name"] == "Nullable")
+            self.assertTrue(row["condition"])
+            self.assertEqual(row["groupCondition"], "")
+
+    def test_group_condition_is_read_only(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = self.write(Path(name), '''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup Condition="'$(Configuration)'=='Debug'"><LangVersion>latest</LangVersion></PropertyGroup></Project>''')
+            model = read_project_file(path)
+            self.assertNotIn("LangVersion", model["editableProperties"])
+            self.assertIn("Condition", model["ambiguousProperties"]["LangVersion"])
+            row = next(row for row in model["propertyRows"] if row["name"] == "LangVersion")
+            self.assertTrue(row["groupCondition"])
+
+    def test_absent_property_inserts_into_unconditional_group_not_conditioned_group(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = self.write(Path(name), '''<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'"><DefineConstants>DEBUG</DefineConstants></PropertyGroup>
+  <PropertyGroup><TargetFramework>net472</TargetFramework></PropertyGroup>
+</Project>''')
+            result = save_project_properties(path, {"AssemblyName": "Example.Mod"})
+            self.assertEqual(result["saved"], 1)
+            text = path.read_text(encoding="utf-8")
+            conditioned_end = text.index("</PropertyGroup>")
+            inserted = text.index("<AssemblyName>Example.Mod</AssemblyName>")
+            self.assertGreater(inserted, conditioned_end)
+
+    def test_absent_property_refuses_project_with_only_conditioned_groups(self):
+        with tempfile.TemporaryDirectory() as name:
+            path = self.write(Path(name), '''<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup Condition="'$(Configuration)'=='Debug'"><DefineConstants>DEBUG</DefineConstants></PropertyGroup></Project>''')
+            original = path.read_text(encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "no unconditional PropertyGroup"):
+                save_project_properties(path, {"AssemblyName": "Example.Mod"})
+            self.assertEqual(path.read_text(encoding="utf-8"), original)
+
+
+if __name__ == "__main__":
+    unittest.main()

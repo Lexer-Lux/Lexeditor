@@ -81,8 +81,11 @@ class CoverageTests(unittest.TestCase):
 
     def test_all_plugins_use_shared_data_map(self):
         root=Path(__file__).resolve().parents[1]
-        for game in ('blank','warband','ff7','ff8','ff9','rdr','rdr2'):
-            text=(root/'games'/game/'editor.html').read_text(encoding='utf-8')
+        for game in ('blank','warband','ff7','ff8','ff9','rdr','rdr2','bannerlord'):
+            game_root=root/'games'/game
+            text=(game_root/'editor.html').read_text(encoding='utf-8')
+            for script in sorted(game_root.glob('editor*.js')):
+                text+=script.read_text(encoding='utf-8')
             self.assertIn('LexeditorUI.dataMap(',text,game)
         self.assertIn('games.ff7.server',(root/'games/ff7_2013/plugin.py').read_text(encoding='utf-8'))
 

@@ -36,7 +36,7 @@ Build from `C:\Bannermod`:
 dotnet build
 ```
 
-The project file copies `SubModule.xml` and `GUI\Prefabs\**\*.*` into the deployed Bannerlord module folder after build.
+For an ordinary external `dotnet build`, the project file copies `SubModule.xml`, GUI assets, and non-runtime ModuleData assets into the deployed Bannerlord module folder after build. Lexeditor-hosted builds set `LexeditorSkipAssetDeploy=true`, so the cooperative template target skips those raw asset copies and Lexeditor performs non-binary deployment through its own staged/backup/rollback transaction instead.
 
 ## Dependencies
 
@@ -104,3 +104,57 @@ Prefer implementing changes as a normal Bannerlord module with C#, XML/data file
 - Use `dotnet build` for verification when code changes are made.
 - Be careful around deployed files in the Bannerlord install; do not delete user/game files unless explicitly asked.
 - Do not invent perk mechanics or XP-gain values without the user asking; those parts of the design are still open.
+
+## Lexeditor Bannerlord Integration Invariants
+
+As of 2026-09-12, the Bannerlord plugin uses these conservative rules. Keep them unless new game/upstream evidence establishes different behavior.
+
+### Module metadata and dependency resolution
+
+- Treat current BUTR `Bannerlord.ModuleManager` behavior as the interoperability reference for extended dependency metadata.
+- Normalize BLSE `DependedModuleMetadatas`, legacy `LoadAfterModules`, and optional dependency blocks before native dependency rows. For duplicate load relations, the first row for a module ID wins; incompatibility relations use a separate first-ID-wins set. Existing compatibility-only legacy rows are structured-editable by ID/removal while retaining their original element shape and unknown attributes; creating new legacy rows stays source-only so Lexeditor does not invent a historical schema. Structured legacy saves carry the originally loaded valid-row identity baseline; if valid rows are added, removed, or renamed on disk, Lexeditor refuses the save until reload. Malformed blank-ID legacy elements remain unmanaged and preserved.
+- Required extended dependencies may express `LoadBeforeThis` or `LoadAfterThis`; optional dependencies constrain ordering only when otherwise enabled and are not auto-enabled by Lexeditor Play.
+- Reject contradictory declarations before graph resolution: loadable + incompatible for the same ID, both before + after for the same ID, BLSE incompatible rows carrying an ordering edge, and direct circular declarations.
+- Native `DependentVersion` comparison follows TaleWorlds launcher semantics and ignores the changeset component. BLSE/BUTR community versions use minimum/wildcard/inclusive-range semantics.
+- `RequiredGameVersion` is deliberately not modeled yet. Current ModuleManager compatibility code contains a legacy `SandBox` versus modern `Sandbox` ID ambiguity; do not let it affect Play until modern-game evidence resolves that ambiguity.
+
+### Structured `SubModule.xml` writes
+
+- Preserve unknown attributes, comments, unrelated XML nodes, and already-existing unusual order whenever a structured edit does not require changing them.
+- When Lexeditor creates known structural sections, insert them in canonical relative order rather than appending after later sections.
+- Newly-created `SubModule` records must contain required `Assemblies` and `Tags` containers even when empty.
+- New modern `XmlNode` registrations require at least one `IncludedGameTypes/GameType`; never invent `Campaign` or another game type.
+- Relation edits are preflighted as one proposed set before XML mutation. Invalid saves create no backup/temp file and make no partial edit.
+- All structured writers remain contained to the selected project/module roots and detach predictable `.lexeditor.bak` / `.lexeditor.tmp` aliases before writing.
+
+### Build and project handling
+
+- Lexeditor-hosted builds pin `BannerlordDir`, `GameBin`, `ModuleDir`, and `OutputPath` to the selected Bannerlord installation/module so project-local values cannot redirect the standard hosted output paths.
+- Lexeditor-hosted builds also pass `LexeditorSkipAssetDeploy=true`. The packaged `CopyModuleFiles` target honors that flag so non-binary assets are not raw-copied by MSBuild before Lexeditor can back them up and commit them transactionally. External `dotnet build` does not set the flag and retains the template's normal asset-copy behavior.
+- This path pinning/skip convention is not a sandbox. `dotnet build` executes project-defined/imported MSBuild targets and tasks with the user's permissions. Build only trusted projects; arbitrary custom targets may ignore Lexeditor-specific properties.
+- Structured `.csproj` property editing is intentionally non-evaluating: only a uniquely-defined, unconditional property is editable. Duplicate or conditional definitions remain visible but read-only, and backend saves reject them.
+- Text-preserving `.csproj` edits ignore XML comments and CDATA when locating live property/`PropertyGroup` spans.
+- If a workspace contains multiple top-level `.csproj` files, do not pick alphabetically. Require an explicit project selection and pass that exact filename through Build/property-save APIs.
+- New Project creation is transactional across template copy, plugin initialization, and final project selection/validation. On failure, remove only the newly-created target directory and leave the registry/parent/siblings unchanged.
+- Project registry temporary writes detach predictable helper aliases before writing; Rename restores the original folder if registry persistence fails.
+- Create/Rename use portable Windows-safe folder-name rules even when Lexeditor runs on another platform.
+- Bannerlord template display names must be escaped for XML contexts independently from the sanitized module/C# identifier.
+
+### Editor concurrency and source integrity
+
+- Raw Source saves are compare-and-swap writes against the exact text loaded by the editor. If the file changed on disk, refuse before creating a backup or temp file. Preserve whether UTF-8 originally had a BOM and write encoded bytes so line endings are not silently translated by the host OS.
+- If Raw Source and a structured surface both have unsaved edits for the same file, refuse the combined Save before either surface writes. After a successful raw save, reload any matching structured surface so its in-memory baseline cannot remain stale.
+- Whole-file structured sources carry the SHA-256 revision loaded by the UI. `SubModule.xml`, the selected `.csproj`, custom skills, effects, perks, XP-source defaults, and MCM defaults all require that revision before their structured writer runs; an external file edit therefore cannot be overwritten merely because record identities stayed unchanged.
+- Gauntlet and ModuleData remain surgical editors: their writes carry the original path/value or record identity needed to reject stale managed spans while preserving unrelated external edits instead of imposing a whole-document lock.
+- Deployed Runtime Override JSON carries a per-file revision, using an explicit `missing` revision when a file did not exist at load time. Creating or changing one of those files externally invalidates the relevant Runtime save before mutation.
+- The Runtime page exposes an explicit Reload action. Reloading while dirty asks through Lexeditor's shared confirmation UI before discarding pending Runtime edits.
+
+### Deploy and runtime boundaries
+
+- Asset deployment is additive and never intentionally deletes pre-existing deployed files as part of a successful sync. Overwrites get backups.
+- Before the first deployed-file write, Lexeditor validates the complete source/destination/helper plan. All changed assets are staged to temporary files and all existing destinations are backed up before the first replacement.
+- If a late destination replacement fails, already-committed existing assets are restored from backups and already-committed newly-created assets are removed; staged temporary files are cleaned up. Incomplete rollback is surfaced as an explicit error rather than silently reported as success.
+- Runtime balancing files managed by the Runtime Overrides editor are excluded from ordinary build/deploy asset synchronization.
+- Effects and XP Runtime Override changes from one Save are one transaction: stage every changed JSON candidate first, create all required backups before replacing either destination, recheck loaded revisions before mutation, and roll back an already-committed existing file (or remove an already-created new file) if a later destination replacement fails. Report incomplete rollback explicitly.
+- Write-capable project/deploy paths reject resolved symlink/junction escapes. Read-only installed-module discovery remains compatible with legitimate mod-manager junctions where no write occurs.
+- CI and isolated smoke tests establish editor/build/deploy behavior only; they do not establish real in-game runtime or visual acceptance. A local Bannerlord launch remains required for that final acceptance step.

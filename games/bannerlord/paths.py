@@ -1,0 +1,127 @@
+"""Filesystem conventions for the Bannerlord plugin."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+
+LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
+PLUGIN_ROOT = Path(__file__).resolve().parent
+
+DEFAULT_GAME_ROOT = Path(
+    r"C:\Program Files (x86)\Steam\steamapps\common\Mount & Blade II Bannerlord"
+)
+DEFAULT_PROJECT_ROOT = Path(r"C:\Bannermod")
+
+
+def game_root() -> Path:
+    return Path(os.environ.get("LEXEDITOR_BANNERLORD_ROOT", str(DEFAULT_GAME_ROOT)))
+
+
+def project_root() -> Path:
+    return Path(
+        os.environ.get(
+            "LEXEDITOR_BANNERLORD_PROJECT",
+            os.environ.get("LEXEDITOR_MOD_ROOT", str(DEFAULT_PROJECT_ROOT)),
+        )
+    )
+
+
+def contained_project_path(
+    project: Path,
+    *parts: str | Path,
+    require_file: bool = False,
+) -> Path:
+    """Resolve a project path without allowing symlinks/junctions to escape the project."""
+    root = Path(project).resolve()
+    target = root.joinpath(*parts).resolve()
+    if target != root and root not in target.parents:
+        raise ValueError("Resolved Bannerlord project path escaped the selected project")
+    if require_file and not target.is_file():
+        raise FileNotFoundError(target)
+    return target
+
+
+def contained_game_path(
+    game: Path,
+    *parts: str | Path,
+    require_file: bool = False,
+) -> Path:
+    """Resolve a game path without allowing a nested junction/symlink to escape."""
+    root = Path(game).resolve()
+    target = root.joinpath(*parts).resolve()
+    if target != root and root not in target.parents:
+        raise ValueError("Resolved Bannerlord game path escaped the selected game root")
+    if require_file and not target.is_file():
+        raise FileNotFoundError(target)
+    return target
+
+
+def is_contained_file(root: Path, path: Path) -> bool:
+    """Return whether an existing file resolves inside ``root``."""
+    root = Path(root).resolve()
+    try:
+        target = Path(path).resolve()
+    except OSError:
+        return False
+    return target.is_file() and (target == root or root in target.parents)
+
+
+def clear_write_helper(path: Path) -> None:
+    """Remove a stale backup/temp entry without following file redirections.
+
+    Bannerlord editors intentionally reuse predictable ``.lexeditor.bak`` and
+    ``.lexeditor.tmp`` sibling names. A stale symlink or hard link at one of
+    those names must be detached before writing so the helper write cannot
+    mutate a file outside the contained destination. Directory-like entries
+    are rejected rather than traversed or recursively removed.
+    """
+    path = Path(path)
+    if path.is_dir():
+        raise ValueError(f"Bannerlord write helper path is a directory: {path}")
+    try:
+        path.unlink(missing_ok=True)
+    except OSError as error:
+        raise ValueError(f"Could not safely clear Bannerlord write helper path: {path}") from error
+
+
+def modules_root(root: Path | None = None) -> Path:
+    return (root or game_root()) / "Modules"
+
+
+def installed_modules(root: Path | None = None) -> list[Path]:
+    modules = modules_root(root)
+    if not modules.is_dir():
+        return []
+    return sorted(
+        entry
+        for entry in modules.iterdir()
+        if entry.is_dir() and (entry / "SubModule.xml").is_file()
+    )
+
+
+def check(project: Path | None = None, game: Path | None = None) -> list[str]:
+    """Validate an explicit session root when supplied, otherwise current defaults."""
+    problems: list[str] = []
+    game = Path(game or game_root()).resolve()
+    try:
+        executable = contained_game_path(game, "bin", "Win64_Shipping_Client", "Bannerlord.exe")
+        modules = contained_game_path(game, "Modules")
+    except ValueError as error:
+        problems.append(str(error))
+    else:
+        if not executable.is_file():
+            problems.append(f"Missing Bannerlord executable: {executable}")
+        if not modules.is_dir():
+            problems.append(f"Missing Bannerlord Modules directory: {modules}")
+
+    project = Path(project or project_root())
+    try:
+        descriptor = contained_project_path(project, "SubModule.xml")
+    except ValueError as error:
+        problems.append(str(error))
+    else:
+        if not descriptor.is_file():
+            problems.append(f"Missing Bannerlord project SubModule.xml: {descriptor}")
+    return problems

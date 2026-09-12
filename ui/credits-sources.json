@@ -61,6 +61,32 @@
       "thanks": [],
       "licenses": []
     },
+    "bannerlord": {
+      "contributions": [
+        {
+          "name": "Lexer / Lexers Mod for Bannerlord",
+          "role": "Source project, module fixtures, and compatibility behavior used to develop and validate the Bannerlord integration.",
+          "url": "https://github.com/Lexer-Lux/Lexers-Mod-For-Bannerlord"
+        },
+        {
+          "name": "BUTR / Bannerlord.BLSE",
+          "role": "Reference for community SubModule.xml dependency metadata and extended launcher behavior.",
+          "url": "https://github.com/BUTR/Bannerlord.BLSE"
+        },
+        {
+          "name": "BUTR / Bannerlord.ModuleManager",
+          "role": "Reference for community dependency normalization, load-order precedence, optional/incompatible handling, and version-range semantics.",
+          "url": "https://github.com/BUTR/Bannerlord.ModuleManager"
+        },
+        {
+          "name": "BUTR / Bannerlord.XmlSchemas",
+          "role": "Reference for SubModule.xml community metadata fields and UpdateInfo grammar.",
+          "url": "https://github.com/BUTR/Bannerlord.XmlSchemas"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
+    },
     "ff7": {
       "contributions": [
         {

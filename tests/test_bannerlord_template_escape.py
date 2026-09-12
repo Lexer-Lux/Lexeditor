@@ -1,0 +1,37 @@
+from pathlib import Path
+import shutil
+import tempfile
+import unittest
+import xml.etree.ElementTree as ET
+
+from games.bannerlord.project_template import initialize_project
+from games.bannerlord import paths
+
+
+class BannerlordTemplateEscapeTests(unittest.TestCase):
+    def test_xml_special_characters_in_folder_name_round_trip_as_display_name(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            target = root / "Smith & Wesson's Mod"
+            shutil.copytree(paths.PLUGIN_ROOT / "template", target)
+            initialize_project(target)
+            module = ET.parse(target / "SubModule.xml").getroot()
+            self.assertEqual(module.find("Name").attrib["value"], "Smith & Wesson's Mod")
+            self.assertEqual(module.find("Id").attrib["value"], "SmithWessonSMod")
+            raw = (target / "SubModule.xml").read_text(encoding="utf-8")
+            self.assertIn("Smith &amp; Wesson&#x27;s Mod", raw)
+            self.assertTrue((target / "SmithWessonSMod.csproj").is_file())
+
+    def test_csharp_identifier_remains_unescaped_and_sanitized(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            target = root / "A & B"
+            shutil.copytree(paths.PLUGIN_ROOT / "template", target)
+            initialize_project(target)
+            source = (target / "src" / "SubModule.cs").read_text(encoding="utf-8")
+            self.assertIn("namespace AB", source)
+            self.assertNotIn("&amp;", source)
+
+
+if __name__ == "__main__":
+    unittest.main()

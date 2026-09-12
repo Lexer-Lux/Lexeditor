@@ -14,6 +14,30 @@ from plugin_api import GamePlugin
 ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parent / "out")) / "Lexeditor"
 DEFAULT_PATH = ROOT / "projects.json"
 IGNORED_NAMES = {".git", ".pytest_cache", "__pycache__", "out"}
+_INVALID_FOLDER_CHARS = '<>:"/\\|?*'
+_WINDOWS_RESERVED_STEMS = {
+    "con", "prn", "aux", "nul", "clock$", "conin$", "conout$",
+    *(f"com{index}" for index in range(1, 10)),
+    *(f"lpt{index}" for index in range(1, 10)),
+    "com¹", "com²", "com³", "lpt¹", "lpt²", "lpt³",
+}
+
+
+def _project_folder_name(name: str) -> str:
+    """Return a portable Windows-safe project folder name or reject it."""
+    clean_name = str(name).strip()
+    stem = clean_name.split(".", 1)[0].rstrip(" .").casefold()
+    invalid = (
+        not clean_name
+        or clean_name in {".", ".."}
+        or clean_name.endswith(".")
+        or any(char in clean_name for char in _INVALID_FOLDER_CHARS)
+        or any(ord(char) < 32 for char in clean_name)
+        or stem in _WINDOWS_RESERVED_STEMS
+    )
+    if invalid:
+        raise ValueError("Enter a valid folder name")
+    return clean_name
 
 
 class ProjectManager:
@@ -42,6 +66,10 @@ class ProjectManager:
     def _write(self, payload: dict) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError as error:
+            raise RuntimeError(f"Cannot safely clear project registry helper: {temporary}") from error
         temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         temporary.replace(self.path)
 
@@ -132,22 +160,30 @@ class ProjectManager:
 
     def create(self, plugin_id: str, parent_value: str, name: str) -> dict:
         _plugin, spec = self._spec(plugin_id)
-        clean_name = name.strip()
-        if not clean_name or clean_name in {".", ".."} or any(char in clean_name for char in '<>:"/\\|?*'):
-            raise ValueError("Enter a valid folder name")
+        clean_name = _project_folder_name(name)
         parent = Path(parent_value).expanduser().resolve()
         if not parent.is_dir():
             raise ValueError(f"Parent folder does not exist: {parent}")
         target = parent / clean_name
         if target.exists():
             raise ValueError(f"A file or folder already exists: {target}")
-        shutil.copytree(
-            spec.template_root, target,
-            ignore=lambda _root, names: [name for name in names if name in IGNORED_NAMES],
-        )
-        if spec.initialize is not None:
-            spec.initialize(target)
-        return self.select(plugin_id, str(target))
+        try:
+            shutil.copytree(
+                spec.template_root, target,
+                ignore=lambda _root, names: [name for name in names if name in IGNORED_NAMES],
+            )
+            if spec.initialize is not None:
+                spec.initialize(target)
+            return self.select(plugin_id, str(target))
+        except Exception as error:
+            if target.exists():
+                try:
+                    shutil.rmtree(target)
+                except Exception as cleanup_error:
+                    raise RuntimeError(
+                        f"Project creation failed and the new folder could not be cleaned up: {cleanup_error}"
+                    ) from error
+            raise
 
     def rename(self, plugin_id: str, root_value: str, name: str) -> dict:
         """Rename one known project folder and keep its selection stable."""
@@ -156,24 +192,32 @@ class ProjectManager:
         problems = self._problems(root, spec.required_paths, spec.required_any)
         if problems:
             raise ValueError("\n".join(problems))
-        clean_name = name.strip()
-        if not clean_name or clean_name in {".", ".."} or any(char in clean_name for char in '<>:"/\\|?*'):
-            raise ValueError("Enter a valid folder name")
+        clean_name = _project_folder_name(name)
         target = root.with_name(clean_name)
         if target.exists():
             raise ValueError(f"A file or folder already exists: {target}")
         root.rename(target)
-        with self._lock:
-            payload = self._read()
-            entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
-            current = Path(entry.get("current") or spec.default_root).expanduser().resolve()
-            known = [str(target) if os.path.normcase(str(Path(value).expanduser().resolve())) == os.path.normcase(str(root)) else value
-                     for value in entry.get("known", []) if isinstance(value, str)]
-            if os.path.normcase(str(current)) == os.path.normcase(str(root)):
-                current = target
-            payload[plugin_id] = {"current": str(current), "known": known,
-                                  "forgotten": entry.get("forgotten", [])}
-            self._write(payload)
+        try:
+            with self._lock:
+                payload = self._read()
+                entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
+                current = Path(entry.get("current") or spec.default_root).expanduser().resolve()
+                known = [str(target) if os.path.normcase(str(Path(value).expanduser().resolve())) == os.path.normcase(str(root)) else value
+                         for value in entry.get("known", []) if isinstance(value, str)]
+                if os.path.normcase(str(current)) == os.path.normcase(str(root)):
+                    current = target
+                payload[plugin_id] = {"current": str(current), "known": known,
+                                      "forgotten": entry.get("forgotten", [])}
+                self._write(payload)
+        except Exception as error:
+            try:
+                if target.exists() and not root.exists():
+                    target.rename(root)
+            except Exception as rollback_error:
+                raise RuntimeError(
+                    f"Project rename failed and the original folder could not be restored: {rollback_error}"
+                ) from error
+            raise
         return self.snapshot(plugin_id)
 
     def contents(self, plugin_id: str, root_value: str = "") -> dict:

@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - Bannerlord</title>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    :root{--lex-accent:#8d2f25;--lex-highlight:#a56b34}
+    *{box-sizing:border-box}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:14px/1.4 var(--lex-font)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
+    button,input,select,textarea{font:inherit}
+    .bl-card{height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel);overflow:auto}
+    .bl-card>h2,.bl-panel h2{margin:0;padding:12px 16px;border-bottom:1px solid var(--lex-border);font-size:18px}
+    .bl-grid{display:grid;grid-template-columns:190px minmax(0,1fr)}
+    .bl-grid>*{padding:8px 12px;border-bottom:1px solid var(--lex-border)}
+    .bl-label{font-weight:700;color:var(--lex-muted)}
+    .bl-control{display:flex;align-items:center;gap:8px;min-width:0}
+    .bl-control input[type="text"],.bl-control input[type="number"],.bl-control select,.bl-control textarea{width:min(100%,760px);padding:6px 8px;color:var(--lex-text);border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bl-control textarea{min-height:90px;resize:vertical}
+    .bl-control input[type="checkbox"]{width:18px;height:18px}
+    .bl-split{display:grid;grid-template-columns:minmax(240px,340px) minmax(0,1fr);height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bl-master{min-height:0;overflow:auto;border-right:1px solid var(--lex-border)}
+    .bl-master-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:8px;padding:9px;border-bottom:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bl-master-head strong{margin-right:auto}
+    .bl-master-head button.active{color:var(--lex-accent-text);background:var(--lex-accent)}
+    .bl-list{display:flex;flex-direction:column}
+    .bl-item{display:block;width:100%;padding:9px 11px;border:0;border-bottom:1px solid var(--lex-border);color:var(--lex-text);background:transparent;text-align:left;cursor:pointer}
+    .bl-item:hover{background:var(--lex-panel-2)}
+    .bl-item.active{color:var(--lex-accent-text);background:var(--lex-accent)}
+    .bl-item small{display:block;overflow:hidden;color:inherit;opacity:.72;text-overflow:ellipsis;white-space:nowrap}
+    .bl-detail{min-width:0;min-height:0;overflow:auto}
+    .bl-panel{min-height:100%}
+    .bl-actions{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px;border-bottom:1px solid var(--lex-border)}
+    .bl-actions button,.bl-master-head button,.bl-build-button{padding:6px 10px;border:1px solid var(--lex-border);color:var(--lex-text);background:var(--lex-panel-2);cursor:pointer}
+    .bl-actions button.danger{color:#fff;background:#8d2f25}
+    .bl-empty{padding:18px;color:var(--lex-muted)}
+    .bl-tags{padding:10px 12px}
+    .bl-tag-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr) auto;gap:8px;margin-bottom:7px}
+    .bl-tag-row input{min-width:0;padding:6px 8px;border:1px solid var(--lex-border);color:var(--lex-text);background:var(--lex-panel)}
+    .bl-tag-row button{border:1px solid var(--lex-border);background:var(--lex-panel-2);cursor:pointer}
+    .bl-note{padding:10px 14px;color:var(--lex-muted)}
+    .bl-build-layout{display:grid;grid-template-columns:minmax(390px,.9fr) minmax(0,1.1fr);height:100%;min-height:0;gap:var(--lex-panel-gap)}
+    .bl-build-layout>.bl-card{min-width:0}
+    .bl-list-block{padding:10px 14px;border-bottom:1px solid var(--lex-border)}
+    .bl-list-block h3{margin:0 0 8px}
+    .bl-list-block ul{margin:0;padding-left:20px}
+    .bl-list-block select,.bl-list-block input{width:100%;min-width:0;padding:6px 8px;color:var(--lex-text);border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bl-build-toolbar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--lex-border)}
+    .bl-build-log{min-height:260px;margin:0;padding:12px;overflow:auto;color:#d8dee9;background:#101216;font:12px/1.45 "Cascadia Mono",Consolas,monospace;white-space:pre-wrap}
+    .bl-source{display:flex;flex-direction:column;height:100%;min-height:0;border:1px solid var(--lex-border);background:var(--lex-panel)}
+    .bl-source-head{display:flex;gap:10px;align-items:center;padding:9px 12px;border-bottom:1px solid var(--lex-border)}
+    .bl-source-head code{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .bl-source textarea{flex:1;min-height:0;width:100%;padding:12px;resize:none;border:0;outline:0;color:var(--lex-text);background:var(--lex-panel);font:12px/1.45 "Cascadia Mono",Consolas,monospace;tab-size:4}
+    code{overflow-wrap:anywhere}
+    @media(max-width:900px){.bl-split,.bl-build-layout{grid-template-columns:1fr}.bl-master{max-height:36vh;border-right:0;border-bottom:1px solid var(--lex-border)}}
+  </style>
+</head>
+<body>
+  <header id="lexeditor-shell"></header>
+  <main id="main"><div>Loading Bannerlord project…</div></main>
+  <script src="/shared/framework.js"></script>
+  <script>
+    function bannerlordModLoaderSection(){
+      return LexeditorUI.modLoaderSection({
+        loader:"Bannerlord's native module loader. Lexeditor deploys the selected project as one module and launches the game with an explicit /singleplayer _MODULES_*...*_MODULES_ loadout.",
+        output:"Build + deploy writes this project's module-owned files under Bannerlord/Modules/<SubModule ID>; binaries remain MSBuild output and XML/GUI/ModuleData assets are synchronized by Lexeditor.",
+        order:"Lexeditor resolves the selected module's required dependency closure and declared load-order relations. Optional dependencies are not auto-enabled merely because they are installed.",
+        safety:"Deployment is additive, backs up overwritten module-owned files, excludes runtime override JSON, and does not edit Bannerlord's base-game files. Custom MSBuild targets still run with your user permissions.",
+        removal:"Stop launching the module and remove its deployed Modules/<SubModule ID> folder to uninstall it; the separate source project remains untouched."
+      });
+    }
+  </script>
+  <script src="/bannerlord/editor_alerts.js"></script>
+  <script src="/bannerlord/editor_core.js"></script>
+  <script src="/bannerlord/editor_balancing.js"></script>
+  <script src="/bannerlord/editor_build.js"></script>
+  <script src="/bannerlord/editor_settings.js"></script>
+  <script src="/bannerlord/editor_runtime.js"></script>
+  <script src="/bannerlord/editor_gauntlet.js"></script>
+  <script src="/bannerlord/editor_moduledata.js"></script>
+  <script src="/bannerlord/editor_moduledata_validation.js"></script>
+  <script src="/bannerlord/editor_boot.js"></script>
+</body>
+</html>

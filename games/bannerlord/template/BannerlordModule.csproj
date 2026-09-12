@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>{{MODULE_ID}}</AssemblyName>
+    <RootNamespace>{{MODULE_ID}}</RootNamespace>
+    <BannerlordDir Condition="'$(BannerlordDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\Mount &amp; Blade II Bannerlord</BannerlordDir>
+    <GameBin>$(BannerlordDir)\bin\Win64_Shipping_Client</GameBin>
+    <ModuleDir>$(BannerlordDir)\Modules\{{MODULE_ID}}</ModuleDir>
+    <OutputPath>$(ModuleDir)\bin\Win64_Shipping_Client\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net472" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="TaleWorlds.Core">
+      <HintPath>$(GameBin)\TaleWorlds.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="TaleWorlds.Library">
+      <HintPath>$(GameBin)\TaleWorlds.Library.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade">
+      <HintPath>$(GameBin)\TaleWorlds.MountAndBlade.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="SubModule.xml" CopyToOutputDirectory="Never" />
+    <GuiPrefab Include="GUI\Prefabs\**\*.*" />
+    <ModuleDataAsset Include="ModuleData\**\*.*"
+                     Exclude="ModuleData\custom_skill_effects.json;ModuleData\custom_skill_xp_sources.json" />
+  </ItemGroup>
+
+  <Target Name="CopyModuleFiles" AfterTargets="Build" Condition="'$(LexeditorSkipAssetDeploy)' != 'true'">
+    <MakeDir Directories="$(ModuleDir)" />
+    <MakeDir Directories="$(ModuleDir)\ModuleData" Condition="'@(ModuleDataAsset)' != ''" />
+    <Copy SourceFiles="SubModule.xml" DestinationFolder="$(ModuleDir)" />
+    <Copy SourceFiles="@(GuiPrefab)"
+          DestinationFiles="@(GuiPrefab->'$(ModuleDir)\%(Identity)')"
+          Condition="'@(GuiPrefab)' != ''" />
+    <Copy SourceFiles="@(ModuleDataAsset)"
+          DestinationFiles="@(ModuleDataAsset->'$(ModuleDir)\%(Identity)')"
+          Condition="'@(ModuleDataAsset)' != ''" />
+  </Target>
+</Project>

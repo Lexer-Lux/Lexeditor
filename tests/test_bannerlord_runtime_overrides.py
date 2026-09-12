@@ -1,0 +1,349 @@
+from pathlib import Path
+import json
+import os
+import tempfile
+import unittest
+from unittest.mock import patch
+
+from games.bannerlord.runtime_overrides import read_runtime_overrides, save_runtime_overrides
+
+
+EFFECTS = r'''private static readonly List<EffectDefinition> Definitions = new List<EffectDefinition>{Effect("Tailoring","Light armor encumbrance",150f,50f,"%"),Effect("Medicine","Ally heal rate",2.5f,5f,"%")};'''
+XP = r'''private static readonly List<SourceDefinition> Definitions = new List<SourceDefinition>{Source("Tailoring","Craft cloth",12f),Source("Medicine","Heal ally",4.5f)};'''
+
+
+
+
+def with_runtime_revisions(project: Path, game: Path, payload: dict) -> dict:
+    current = read_runtime_overrides(project, game)
+    return {
+        **payload,
+        "effectsHash": current["effectsHash"],
+        "xpSourcesHash": current["xpSourcesHash"],
+    }
+
+def write_module(root: Path, module_id: str) -> Path:
+    module = root / "Modules" / module_id
+    module.mkdir(parents=True, exist_ok=True)
+    (module / "SubModule.xml").write_text(
+        f'<Module><Name value="{module_id}"/><Id value="{module_id}"/><DependedModules/></Module>',
+        encoding="utf-8",
+    )
+    return module
+
+
+class BannerlordRuntimeOverrideTests(unittest.TestCase):
+    def fixture(self):
+        temporary = tempfile.TemporaryDirectory()
+        root = Path(temporary.name)
+        project = root / "project"
+        game = root / "game"
+        (project / "src").mkdir(parents=True)
+        (project / "SubModule.xml").write_text(
+            '<Module><Id value="LexerSkillTweaks"/></Module>', encoding="utf-8"
+        )
+        (project / "src" / "CustomSkillEffectRanges.cs").write_text(EFFECTS, encoding="utf-8")
+        (project / "src" / "CustomSkillXpSourcesConfig.cs").write_text(XP, encoding="utf-8")
+        executable = game / "bin" / "Win64_Shipping_Client" / "Bannerlord.exe"
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"")
+        deployed = write_module(game, "LexerSkillTweaks")
+        return temporary, project, game, deployed
+
+    def test_missing_files_fall_back_to_source_defaults(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            data = read_runtime_overrides(project, game)
+            self.assertTrue(data["available"])
+            self.assertEqual(Path(data["deployedRoot"]).resolve(), deployed.resolve())
+            self.assertFalse(data["effects"][0]["overridden"])
+            self.assertEqual(data["effects"][0]["low"], 150)
+            self.assertEqual(data["effects"][0]["high"], 50)
+            self.assertFalse(data["xpSources"][0]["overridden"])
+            self.assertEqual(data["xpSources"][0]["amount"], 12)
+        finally:
+            temporary.cleanup()
+
+    def test_save_create_readback_and_revert_preserve_unknown_keys(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            xp_path = module_data / "custom_skill_xp_sources.json"
+            effects_path.write_text(json.dumps({"Future.Effect": {"low": 9, "high": 10}}), encoding="utf-8")
+            xp_path.write_text(json.dumps({"Future.XP": 99}), encoding="utf-8")
+
+            current = read_runtime_overrides(project, game)
+            effect = current["effects"][0]
+            xp = current["xpSources"][0]
+            saved = save_runtime_overrides(project, with_runtime_revisions(project, game, {
+                "effects": [{"id": effect["id"], "overridden": True, "low": 125, "high": 75}],
+                "xpSources": [{"id": xp["id"], "overridden": True, "amount": 22.5}],
+            }), game)
+            self.assertEqual(saved["saved"], 2)
+            self.assertTrue(Path(saved["backups"]["effects"]).is_file())
+            self.assertTrue(Path(saved["backups"]["xpSources"]).is_file())
+            self.assertEqual(saved["effects"][0]["low"], 125)
+            self.assertEqual(saved["xpSources"][0]["amount"], 22.5)
+            self.assertIn("Future.Effect", json.loads(effects_path.read_text()))
+            self.assertIn("Future.XP", json.loads(xp_path.read_text()))
+
+            reverted = save_runtime_overrides(project, with_runtime_revisions(project, game, {
+                "effects": [{"id": effect["id"], "overridden": False}],
+                "xpSources": [{"id": xp["id"], "overridden": False}],
+            }), game)
+            self.assertFalse(reverted["effects"][0]["overridden"])
+            self.assertEqual(reverted["effects"][0]["low"], 150)
+            self.assertFalse(reverted["xpSources"][0]["overridden"])
+            self.assertEqual(reverted["xpSources"][0]["amount"], 12)
+            self.assertIn("Future.Effect", json.loads(effects_path.read_text()))
+            self.assertIn("Future.XP", json.loads(xp_path.read_text()))
+        finally:
+            temporary.cleanup()
+
+    def test_runtime_write_helpers_do_not_follow_existing_hardlinks(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            backup_path = effects_path.with_name(effects_path.name + ".lexeditor.bak")
+            temporary_path = effects_path.with_name(effects_path.name + ".lexeditor.tmp")
+            outside_backup = project.parent / "outside-backup.txt"
+            outside_temporary = project.parent / "outside-temporary.txt"
+            outside_backup.write_text("backup sentinel", encoding="utf-8")
+            outside_temporary.write_text("temporary sentinel", encoding="utf-8")
+            os.link(outside_backup, backup_path)
+            os.link(outside_temporary, temporary_path)
+
+            effect = read_runtime_overrides(project, game)["effects"][0]
+            saved = save_runtime_overrides(project, with_runtime_revisions(project, game, {
+                "effects": [{"id": effect["id"], "overridden": True, "low": 125, "high": 75}],
+            }), game)
+
+            self.assertEqual(saved["saved"], 1)
+            self.assertEqual(outside_backup.read_text(encoding="utf-8"), "backup sentinel")
+            self.assertEqual(outside_temporary.read_text(encoding="utf-8"), "temporary sentinel")
+            self.assertEqual(json.loads(backup_path.read_text(encoding="utf-8")), {})
+            self.assertEqual(json.loads(effects_path.read_text(encoding="utf-8"))[effect["id"]], {"low": 125.0, "high": 75.0})
+        finally:
+            temporary.cleanup()
+
+    def test_unknown_edit_id_and_negative_xp_are_rejected(self):
+        temporary, project, game, _deployed = self.fixture()
+        try:
+            with self.assertRaisesRegex(ValueError, "Unknown runtime effect ID"):
+                save_runtime_overrides(project, with_runtime_revisions(project, game, {
+                    "effects": [{"id": "Nope", "overridden": True, "low": 1, "high": 2}]
+                }), game)
+            source = read_runtime_overrides(project, game)["xpSources"][0]
+            with self.assertRaisesRegex(ValueError, "cannot be negative"):
+                save_runtime_overrides(project, with_runtime_revisions(project, game, {
+                    "xpSources": [{"id": source["id"], "overridden": True, "amount": -1}]
+                }), game)
+        finally:
+            temporary.cleanup()
+
+    def test_external_runtime_file_creation_invalidates_missing_revision(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            current = read_runtime_overrides(project, game)
+            effect = current["effects"][0]
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            before = effects_path.read_bytes()
+            with self.assertRaisesRegex(ValueError, "changed on disk"):
+                save_runtime_overrides(project, {
+                    "effects": [{"id": effect["id"], "overridden": True, "low": 1, "high": 2}],
+                    "effectsHash": current["effectsHash"],
+                    "xpSourcesHash": current["xpSourcesHash"],
+                }, game)
+            self.assertEqual(effects_path.read_bytes(), before)
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.bak").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_external_runtime_value_change_is_rejected(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            current = read_runtime_overrides(project, game)
+            effect = current["effects"][0]
+            effects_path.write_text('{"external": 1}\n', encoding="utf-8")
+            before = effects_path.read_bytes()
+            with self.assertRaisesRegex(ValueError, "changed on disk"):
+                save_runtime_overrides(project, {
+                    "effects": [{"id": effect["id"], "overridden": True, "low": 1, "high": 2}],
+                    "effectsHash": current["effectsHash"],
+                    "xpSourcesHash": current["xpSourcesHash"],
+                }, game)
+            self.assertEqual(effects_path.read_bytes(), before)
+        finally:
+            temporary.cleanup()
+
+    def test_runtime_editor_sends_loaded_revisions(self):
+        boot = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_boot.js"
+        text = boot.read_text(encoding="utf-8")
+        self.assertIn('effectsHash:state.savedRuntimeOverrides.effectsHash||""', text)
+        self.assertIn('xpSourcesHash:state.savedRuntimeOverrides.xpSourcesHash||""', text)
+
+    def test_runtime_stage_failure_does_not_modify_either_file(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            xp_path = module_data / "custom_skill_xp_sources.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            xp_path.write_text("{}\n", encoding="utf-8")
+            current = read_runtime_overrides(project, game)
+            effect, xp = current["effects"][0], current["xpSources"][0]
+            effects_before, xp_before = effects_path.read_bytes(), xp_path.read_bytes()
+            real_write_bytes = Path.write_bytes
+
+            def fail_xp_stage(path, data):
+                if Path(path).name == "custom_skill_xp_sources.json.lexeditor.tmp":
+                    raise OSError("runtime stage failed")
+                return real_write_bytes(path, data)
+
+            with patch.object(Path, "write_bytes", new=fail_xp_stage):
+                with self.assertRaisesRegex(OSError, "runtime stage failed"):
+                    save_runtime_overrides(project, {
+                        "effects": [{"id": effect["id"], "overridden": True, "low": 100, "high": 50}],
+                        "xpSources": [{"id": xp["id"], "overridden": True, "amount": 9}],
+                        "effectsHash": current["effectsHash"],
+                        "xpSourcesHash": current["xpSourcesHash"],
+                    }, game)
+            self.assertEqual(effects_path.read_bytes(), effects_before)
+            self.assertEqual(xp_path.read_bytes(), xp_before)
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.bak").exists())
+            self.assertFalse(xp_path.with_name(xp_path.name + ".lexeditor.bak").exists())
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.tmp").exists())
+            self.assertFalse(xp_path.with_name(xp_path.name + ".lexeditor.tmp").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_late_runtime_commit_failure_restores_first_existing_file(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            xp_path = module_data / "custom_skill_xp_sources.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            xp_path.write_text("{}\n", encoding="utf-8")
+            current = read_runtime_overrides(project, game)
+            effect, xp = current["effects"][0], current["xpSources"][0]
+            effects_before, xp_before = effects_path.read_bytes(), xp_path.read_bytes()
+            real_replace = Path.replace
+
+            def fail_xp_commit(path, target):
+                if Path(path).name == "custom_skill_xp_sources.json.lexeditor.tmp":
+                    raise OSError("runtime commit failed")
+                return real_replace(path, target)
+
+            with patch.object(Path, "replace", new=fail_xp_commit):
+                with self.assertRaisesRegex(OSError, "runtime commit failed"):
+                    save_runtime_overrides(project, {
+                        "effects": [{"id": effect["id"], "overridden": True, "low": 100, "high": 50}],
+                        "xpSources": [{"id": xp["id"], "overridden": True, "amount": 9}],
+                        "effectsHash": current["effectsHash"],
+                        "xpSourcesHash": current["xpSourcesHash"],
+                    }, game)
+            self.assertEqual(effects_path.read_bytes(), effects_before)
+            self.assertEqual(xp_path.read_bytes(), xp_before)
+            self.assertEqual(effects_path.with_name(effects_path.name + ".lexeditor.bak").read_bytes(), effects_before)
+            self.assertEqual(xp_path.with_name(xp_path.name + ".lexeditor.bak").read_bytes(), xp_before)
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.tmp").exists())
+            self.assertFalse(xp_path.with_name(xp_path.name + ".lexeditor.tmp").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_late_runtime_commit_failure_removes_first_new_file(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            xp_path = module_data / "custom_skill_xp_sources.json"
+            xp_path.write_text("{}\n", encoding="utf-8")
+            current = read_runtime_overrides(project, game)
+            effect, xp = current["effects"][0], current["xpSources"][0]
+            xp_before = xp_path.read_bytes()
+            real_replace = Path.replace
+
+            def fail_xp_commit(path, target):
+                if Path(path).name == "custom_skill_xp_sources.json.lexeditor.tmp":
+                    raise OSError("runtime commit failed")
+                return real_replace(path, target)
+
+            with patch.object(Path, "replace", new=fail_xp_commit):
+                with self.assertRaisesRegex(OSError, "runtime commit failed"):
+                    save_runtime_overrides(project, {
+                        "effects": [{"id": effect["id"], "overridden": True, "low": 100, "high": 50}],
+                        "xpSources": [{"id": xp["id"], "overridden": True, "amount": 9}],
+                        "effectsHash": current["effectsHash"],
+                        "xpSourcesHash": current["xpSourcesHash"],
+                    }, game)
+            self.assertFalse(effects_path.exists())
+            self.assertEqual(xp_path.read_bytes(), xp_before)
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.tmp").exists())
+            self.assertFalse(xp_path.with_name(xp_path.name + ".lexeditor.tmp").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_runtime_editor_exposes_safe_reload(self):
+        editor = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_runtime.js"
+        text = editor.read_text(encoding="utf-8")
+        self.assertIn("async function reloadRuntimeOverrides", text)
+        self.assertIn("Discard unsaved Runtime Override changes", text)
+        self.assertIn('onclick:()=>reloadRuntimeOverrides()', text)
+
+    def test_runtime_overrides_require_an_existing_deployed_module(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            for path in sorted(deployed.rglob("*"), reverse=True):
+                if path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    path.rmdir()
+            deployed.rmdir()
+            with self.assertRaisesRegex(RuntimeError, "not deployed"):
+                read_runtime_overrides(project, game)
+        finally:
+            temporary.cleanup()
+
+    def test_runtime_moduledata_resolution_cannot_escape_deployed_module(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            outside = deployed.parent.parent / "outside-runtime"
+            outside.mkdir()
+            deployed_resolved = deployed.resolve()
+            module_data_path = deployed_resolved / "ModuleData"
+            outside_resolved = outside.resolve()
+            real_resolve = Path.resolve
+
+            def fake_resolve(path, *args, **kwargs):
+                if path == module_data_path:
+                    return outside_resolved
+                return real_resolve(path, *args, **kwargs)
+
+            with patch(
+                "games.bannerlord.runtime_overrides._deployed_module",
+                return_value=("LexerSkillTweaks", deployed_resolved),
+            ), patch.object(Path, "resolve", new=fake_resolve):
+                with self.assertRaisesRegex(ValueError, "ModuleData path escaped"):
+                    read_runtime_overrides(project, game)
+        finally:
+            temporary.cleanup()
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -145,9 +145,14 @@ require("MOD LOADER" in framework and "MOD_LOADER_FIELDS" in framework,
 # OS dialogs wearing the WebView's clothes: they ignore the theme, cannot say
 # more than one line, and are the reason "I get this browser message" was a bug
 # report. Every question and every message is Lexeditor's own.
-for source_path in [ROOT / "ui" / "framework.js", ROOT / "ui" / "chooser.html"] + [
-        plugin / "editor.html" for plugin in sorted((ROOT / "games").iterdir())
-        if (plugin / "editor.html").is_file()]:
+dialog_sources = [ROOT / "ui" / "framework.js", ROOT / "ui" / "chooser.html"]
+for plugin in sorted((ROOT / "games").iterdir()):
+    editor = plugin / "editor.html"
+    if not editor.is_file():
+        continue
+    dialog_sources.append(editor)
+    dialog_sources.extend(sorted(plugin.glob("editor*.js")))
+for source_path in dialog_sources:
     text = source_path.read_text(encoding="utf-8")
     for banned in ("window.confirm(", "window.alert(", "window.prompt("):
         require(banned not in text,
