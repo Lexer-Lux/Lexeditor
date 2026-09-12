@@ -14,7 +14,7 @@ import threading
 from urllib.parse import parse_qs, urlparse
 
 from .build_metadata import BOOLEAN_KEYS, parse_build_text, update_build_text
-from .localization import parse_localization_text, try_get_culture_and_prefix, update_localization_text
+from .localization import apply_localization_changes, parse_localization_text, try_get_culture_and_prefix
 from .plugin import DEFAULT_PROJECT_ROOT, TMODLOADER_SAVE_ROOT
 
 
@@ -197,14 +197,19 @@ def localization_index() -> dict:
     return {"root": str(root), "files": files}
 
 
-def save_localization(relative: str, updates: dict[str, object], expected_sha256: str) -> dict:
+def save_localization(
+    relative: str,
+    updates: dict[str, object],
+    expected_sha256: str,
+    creates: dict[str, object] | None = None,
+) -> dict:
     target, data, text, canonical, culture, prefix = _read_localization(relative)
     if culture is None:
         raise ValueError("Localization filename does not identify a tModLoader culture")
     current_sha = sha256(data).hexdigest()
     if expected_sha256 != current_sha:
         raise ValueError(f"{canonical} changed outside Lexeditor; reload before saving")
-    changed = update_localization_text(text, updates, prefix)
+    changed = apply_localization_changes(text, updates, creates or {}, prefix)
     if changed == text:
         return localization_file_state(canonical)
     encoded = (UTF8_BOM if data.startswith(UTF8_BOM) else b"") + changed.encode("utf-8")
@@ -530,14 +535,24 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if path == "/api/localization/file":
                 payload = self.read_json()
-                if not isinstance(payload, dict) or set(payload) != {"path", "updates", "expectedSha256"}:
-                    raise ValueError("Expected path, updates and expectedSha256 only")
+                if not isinstance(payload, dict):
+                    raise ValueError("Invalid localization request")
+                required = {"path", "updates", "expectedSha256"}
+                allowed = required | {"creates"}
+                if not required.issubset(payload) or not set(payload).issubset(allowed):
+                    raise ValueError("Expected path, updates, optional creates and expectedSha256 only")
                 relative = payload["path"]
                 updates = payload["updates"]
+                creates = payload.get("creates", {})
                 expected = payload["expectedSha256"]
-                if not isinstance(relative, str) or not isinstance(updates, dict) or not isinstance(expected, str):
+                if (
+                    not isinstance(relative, str)
+                    or not isinstance(updates, dict)
+                    or not isinstance(creates, dict)
+                    or not isinstance(expected, str)
+                ):
                     raise ValueError("Invalid localization request")
-                self.send_json(save_localization(relative, updates, expected))
+                self.send_json(save_localization(relative, updates, expected, creates))
                 return
             if path != "/api/build-metadata":
                 self.send_json({"error": "Not found"}, 404)
