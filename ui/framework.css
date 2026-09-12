@@ -6126,7 +6126,18 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 
 /* Panel tabs occupy the bottom edge. Page navigation stays in the shell. */
 .lex-tabbed-panel > .lex-subtab-bar,
-.lex-settings-columns > .lex-subtab-bar { order:100; margin-top:auto; margin-bottom:0; }
+/* The tweak page's own subtab bar sits where every other page's does: at
+   the top, full width. It was ordered last and pushed to the bottom, which
+   put the same control in a different place on this page than on all the
+   others and left it as a small strip beside the pager. */
+.lex-settings-columns > .lex-subtab-bar {
+  order:0; margin-top:0; margin-bottom:var(--lex-panel-gap,12px);
+  /* The bar spans the page and its groups share the width evenly, which
+     is how it read when it lived in the toolbar above. Left as content
+     width it becomes a small strip in the corner of a very wide page. */
+  align-self:stretch;
+}
+.lex-settings-columns > .lex-subtab-bar > button { flex:1 1 0; min-width:0; }
 .lex-bottom-tab-panel { display:flex!important;flex-direction:column!important;min-height:0; }
 .lex-bottom-tab-panel > .lex-subtab-bar { order:100;flex:0 0 auto;margin-top:auto; }
 .lex-bottom-tab-panel > :not(.lex-subtab-bar) { min-height:0; }

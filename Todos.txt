@@ -233,6 +233,21 @@
 ### Questions
 
 * [x] What exactly do the Loot Tables inputs do? - answered on the answers page.
+* [ ] Edit RDR1's corpse loot in the script that holds it.
+  * The archive was searched properly rather than assumed about. There is no
+    drops table: a body's items are a switch on a LootType decorator inside
+    content/release64/scripting/gringo/commonscripts/lootcorpsegenericnoanim.wsc,
+    in Function_90 at bytecode offset 0x36F4, and none of the 183 XML files in
+    content.rpf holds one.
+  * The write path exists and nobody has used it. The game loads loose
+    overrides by archive path for non-XML files - C:/RDRMod/mod already carries
+    camera/camera/default.ccm that way - so a modified copy of that script is
+    picked up without rebuilding the RPF. The RPF6 bridge decompiles the script
+    and reports bytecode offsets, so the opcode format is already understood in
+    tools/magic-rdr.
+  * What is left: locate the item-enum operands inside Function_90 and write
+    them back, then surface them as the per-LootType table the Loot page has
+    never been able to show.
 * [x] Where are ordinary enemy/item drops edited?
 * [x] Do enemies have separate drop definitions elsewhere?
   * Confirmed against the installed game: nowhere, because Red Dead Redemption
