@@ -1,0 +1,34 @@
+name: Refresh Terraria credits
+
+on:
+  push:
+    branches: [feature/terraria-plugin]
+    paths:
+      - '.github/workflows/terraria-refresh-credits.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Regenerate offline credits
+        run: python tools/generate_credits.py
+      - name: Commit generated bundle
+        shell: bash
+        run: |
+          if git diff --quiet -- ui/credits.json; then
+            echo 'Credits already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ui/credits.json
+          git commit -m 'Regenerate offline credits for Terraria'
+          git push origin HEAD:feature/terraria-plugin
