@@ -233,7 +233,7 @@
 ### Questions
 
 * [x] What exactly do the Loot Tables inputs do? - answered on the answers page.
-* [ ] Edit RDR1's corpse loot in the script that holds it.
+* [~] Edit RDR1's corpse loot in the script that holds it.
   * The archive was searched properly rather than assumed about. There is no
     drops table: a body's items are a switch on a LootType decorator inside
     content/release64/scripting/gringo/commonscripts/lootcorpsegenericnoanim.wsc,
@@ -245,9 +245,18 @@
     picked up without rebuilding the RPF. The RPF6 bridge decompiles the script
     and reports bytecode offsets, so the opcode format is already understood in
     tools/magic-rdr.
-  * What is left: locate the item-enum operands inside Function_90 and write
-    them back, then surface them as the per-LootType table the Loot page has
-    never been able to show.
+  * Reading and writing them is done, in games/rdr/loot_script.py. Three
+    opcodes were enough and each was confirmed against the decompiler rather
+    than assumed: 0x52 calls a big-endian address, 0x8B+n pushes n for n up to
+    15, and 0x25 pushes a byte. Decoding the installed script's twenty-seven
+    call sites reproduces the decompiler's argument list exactly, and that
+    equality is what the writer refuses to work without - a mismatch means a
+    different build and editing on a guess would land a byte in the middle of
+    an unrelated instruction. An edit never changes the script's length,
+    because growing a push would move every address after it.
+  * What is left: the Loot page has to show the per-LootType table and write
+    the patched script to the mod folder, where the game already picks up loose
+    overrides by archive path.
 * [x] Where are ordinary enemy/item drops edited?
 * [x] Do enemies have separate drop definitions elsewhere?
   * Confirmed against the installed game: nowhere, because Red Dead Redemption
