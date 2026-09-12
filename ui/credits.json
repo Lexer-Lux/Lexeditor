@@ -408,26 +408,27 @@
       "thanks": [],
       "licenses": []
     },
-    "project-zomboid": {
+    "palworld": {
       "contributions": [
         {
-          "name": "PZ Wiki Modding / PZ API Docs",
-          "role": "Build 42 mod.info and ZedScript schema reference used to define the first structured editor boundary.",
-          "url": "https://github.com/PZ-Wiki-Modding/PZ-API-Docs"
+          "name": "Pocketpair / Palworld Mod Uploader",
+          "role": "Official interoperability reference for Palworld v0.7+ mod packages, Info.json fields and loader InstallRule behavior.",
+          "url": "https://github.com/pocketpairjp/PalworldModUploader"
         },
         {
-          "name": "PZ Wiki Modding / ZedScripts",
-          "role": "Build 42 ZedScript validation and tooling reference.",
-          "url": "https://github.com/PZ-Wiki-Modding/ZedScripts"
-        },
-        {
-          "name": "PZ Wiki Modding / pz-scripts-data",
-          "role": "Current Build 42 script parameter and type-schema research reference.",
-          "url": "https://github.com/PZ-Wiki-Modding/pz-scripts-data"
+          "name": "Okaetsu / PalSchema",
+          "role": "Reference for PalSchema raw DataTable patch structure, JSONC parsing, wildcard/filter behavior and targeted field application.",
+          "url": "https://github.com/Okaetsu/PalSchema"
         }
       ],
       "thanks": [],
-      "licenses": []
+      "licenses": [
+        {
+          "name": "Palworld / PalSchema references — source and license notes",
+          "sourcePath": "games/palworld/THIRD_PARTY.md",
+          "text": "# Palworld references\n\nNo third-party code or proprietary Palworld data is bundled.\n\n## Pocketpair / Palworld Mod Uploader\n\nPrimary interoperability reference for the official Palworld v0.7+ mod loader and Steam Workshop package format:\n\n- https://github.com/pocketpairjp/PalworldModUploader\n- `docs/en/01-General.md` — official loader introduction and supported package types\n- `docs/en/02-Package.md` — `Info.json` package shape and fields\n- `docs/en/04-Tech.md` — `PalModSettings.ini`, package-name behavior, InstallRule destinations, DebugMode and Version semantics\n- `MainWindow.xaml.cs` — uploader validation and the default `./PalSchema/` target\n\nLexeditor's package implementation is independent and uses these files as behavioral/documentation references.\n\n## Okaetsu / PalSchema\n\nPrimary reference for PalSchema raw DataTable patch semantics:\n\n- https://github.com/Okaetsu/PalSchema\n- License: MIT\n- `website/docs/gettingstarted.md` — mod tree, raw patch shape, `.json`/`.jsonc`, targeted-field conflict behavior\n- `src/Loader/PalRawTableLoader.cpp` — table/row/property application, `Rows` rejection, wildcard/filter handling, row add/delete, existing-property edits\n- `src/Utility/JsonHelpers.cpp` — direct non-recursive raw-folder iteration and JSONC comment parsing\n- `src/Loader/WildcardFilter/*` — `$Filters` runtime behavior\n\nLexeditor does not copy PalSchema code. Its Python parser/writer is an independent implementation of the documented/runtime-observed format boundary. The upstream MIT license informs compatibility/provenance but no PalSchema binary, UE4SS binary, schema dump, or game data is redistributed.\n"
+        }
+      ]
     },
     "warband": {
       "contributions": [
@@ -514,6 +515,32 @@
           "text": "MIT License\n\nCopyright (c) 2021 WesternGamer\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
         }
       ]
+    },
+    "chrono-trigger": {
+      "contributions": [
+        {
+          "name": "jimzrt / ChronoMod contributors",
+          "role": "Steam resources.bin ARC1 archive format reference.",
+          "url": "https://github.com/jimzrt/ChronoMod"
+        },
+        {
+          "name": "GitExl / CTViewer contributors",
+          "role": "Steam scene, overworld, map, tileset, palette and script format references.",
+          "url": "https://github.com/GitExl/CTViewer"
+        },
+        {
+          "name": "OnemusCT / Temporal Redux contributors",
+          "role": "PC Atel event command widths and behavior references.",
+          "url": "https://github.com/OnemusCT/temporal-redux"
+        },
+        {
+          "name": "TheRealBiggs / CTExt contributors",
+          "role": "Chrono Trigger Steam loose-file and CTP runtime loading model.",
+          "url": "https://github.com/TheRealBiggs/ctext"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
     }
   }
 }
