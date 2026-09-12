@@ -123,6 +123,12 @@ def inspect(game_root: Path, project_root: Path, user_root: Path) -> dict:
         (game_root / "media" / "scripts").is_dir(),
         str(game_root / "media" / "scripts"),
     )
+    _check(
+        checks,
+        "build42-generated-scripts",
+        (game_root / "media" / "scripts" / "generated").is_dir(),
+        str(game_root / "media" / "scripts" / "generated"),
+    )
 
     source_id = ""
     source_name = ""
