@@ -65,6 +65,20 @@ class ProjectZomboidCraftRecipeTests(unittest.TestCase):
             with self.assertRaisesRegex(core.ProjectZomboidError, "duplicated craftRecipe properties: time"):
                 craftrecipe.save(root, row["path"], row["module"], row["id"], row["sha256"], {"time": "120"})
 
+    def test_same_line_duplicate_is_ambiguous(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = self.make_project(Path(name))
+            script = root / "42" / "media" / "scripts" / "craft.txt"
+            script.write_text(
+                script.read_text(encoding="utf-8").replace("    Time = 230,\n", "    Time = 230, time = 50,\n"),
+                encoding="utf-8",
+            )
+            row = craftrecipe.read(root)["rows"][0]
+            self.assertIn("time", row["duplicateKeys"])
+            with self.assertRaisesRegex(core.ProjectZomboidError, "duplicated craftRecipe properties: time"):
+                craftrecipe.save(root, row["path"], row["module"], row["id"], row["sha256"], {"time": "120"})
+            self.assertIn("Time = 230, time = 50,", script.read_text(encoding="utf-8"))
+
     def test_unknown_current_boolean_value_fails_closed(self):
         with tempfile.TemporaryDirectory() as name:
             root = self.make_project(Path(name))
