@@ -5664,7 +5664,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   width:19px !important;height:auto;min-width:0;max-width:none;
   display:flex;align-items:center;justify-content:center;
   overflow:visible;margin:0 !important;padding:0;transform:none;translate:none !important;
-  font:7px/1 "Segoe UI Symbol",sans-serif;
+  font:10px/1 var(--lex-symbol-font);
 }
 .lex-boolean-field .lex-reference-values .lex-reference-value {
   display:flex;align-items:center;justify-content:center;gap:2px;
@@ -5672,7 +5672,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 .lex-boolean-field .lex-reference-values :is(.lex-reference-tag,.lex-reference-text,.lex-boolean-mark) {
   display:block;overflow:visible;min-width:0;max-width:none;width:auto;
-  margin:0;padding:0;flex:none;font:inherit;text-overflow:clip;
+  margin:0;padding:0;flex:none;font-size:inherit;line-height:inherit;text-overflow:clip;
 }
 .lex-detail-field.lex-boolean-field .lex-column-pin {
   position:absolute !important;margin:0;bottom:auto !important;transform:none !important;
@@ -6104,15 +6104,17 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   clip-path:polygon(0 43.75%,calc(100% - 6px) 43.75%,calc(100% - 6px) 0,100% 50%,calc(100% - 6px) 100%,calc(100% - 6px) 56.25%,0 56.25%);
 }
 .lex-boolean-field .lex-source-control > .lex-field-boolean-arrow::after { content:none; }
-.lex-detail-field.lex-boolean-field > .lex-detail-field-control { padding-block:14px; }
+.lex-detail-field.lex-boolean-field > .lex-detail-field-control { padding-block:17px; }
 .lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
-  grid-area:auto;top:calc(50% + 11.5px);bottom:auto;height:9px;
+  grid-area:auto;top:calc(50% + 12.5px);bottom:auto;height:12px;
 }
 .lex-toggle-row > .lex-toggle { padding:5px 12px;gap:8px; }
-.lex-reference-value[data-reference-index="0"] .lex-reference-tag { color:color-mix(in srgb,#62b74f 25%,var(--lex-text) 75%) !important; }
-.lex-reference-value[data-reference-index="1"] .lex-reference-tag { color:color-mix(in srgb,#d64b4b 25%,var(--lex-text) 75%) !important; }
-.lex-reference-value[data-reference-index="2"] .lex-reference-tag { color:color-mix(in srgb,#4f8fe8 25%,var(--lex-text) 75%) !important; }
-.lex-reference-value[data-reference-index="3"] .lex-reference-tag { color:color-mix(in srgb,#d6b83f 25%,var(--lex-text) 75%) !important; }
+/* Reference colors identify sources. They are not the editable-value accent. */
+.lex-source-control-internal .lex-reference-value {
+  overflow:visible;
+  padding-inline:2px;
+}
+.lex-source-control-internal .lex-reference-text { overflow:visible; }
 .lex-detail-field.lex-boolean-field .lex-column-pin {
   overflow:visible;
 }
@@ -6145,7 +6147,11 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-tweaks-paged { display:flex !important; flex-direction:column; height:100%; min-height:0; min-width:0; overflow:hidden; }
 .lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .lex-tweaks-pages { flex:0 0 auto; min-width:0; }
-.lex-tweak-card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--lex-tweak-card-width,320px)),1fr)); gap:var(--lex-panel-gap,12px); align-items:start; }
+/* Dealt columns, not a grid: a grid row takes the height of its tallest
+   card and opens a band of empty panel across the rest of that row. Each
+   column here packs on its own. */
+.lex-tweak-card-grid { display:flex; align-items:flex-start; gap:var(--lex-panel-gap,12px); min-width:0; }
+.lex-tweak-column { display:flex; flex:1 1 0; flex-direction:column; gap:var(--lex-panel-gap,12px); min-width:0; }
 .lex-tweak-off-page { display:none !important; }
 .lex-tweaks-scroll > .settings-view { height:auto; overflow:visible; }
 .lex-platform-config:has(> .lex-tweaks-paged) { display:flex; flex-direction:column; height:100%; min-height:0; }
@@ -6153,3 +6159,42 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
 .lex-detail-panel > .lex-tweaks-paged { flex:1 1 0; }
 .lex-tweaks-scroll > .lex-detail-panel-body { height:auto; overflow:visible; }
+
+
+/* LEXEDITOR_PLATFORM_FIELD_STACK_20260912
+   These fields sit in cells about three hundred pixels wide. The shared
+   property row puts the name in a lane of about a tenth of the row, which here
+   is fifty pixels - not enough for "DISPLAY INDEX", so the name broke into a
+   vertical stack of two-letter fragments and the control beside it read as
+   belonging to nothing. In a column this narrow the name goes above its
+   control and both take the full width. Last in the file because the shared
+   row asserts its own two-column template with !important further up. */
+.lex-platform-config-field.lex-detail-field {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  gap:3px;
+  align-items:start;
+}
+.lex-platform-config-field.lex-detail-field > .lex-detail-field-label,
+.lex-platform-config-field.lex-detail-field > .lex-detail-field-control {
+  grid-column:1 !important;
+  justify-content:flex-start !important;
+  justify-self:stretch;
+  text-align:left !important;
+}
+.lex-platform-config-field.lex-detail-field > .lex-detail-field-label {
+  contain:none !important;
+  height:auto !important;
+  min-height:0;
+  padding-right:0 !important;
+  overflow:visible;
+}
+.lex-platform-config-field.lex-detail-field > .lex-detail-field-label
+  > .lex-detail-field-label-text {
+  overflow-wrap:break-word;
+  white-space:normal;
+  /* The label fitter scales a name down to fit a fixed lane. There is no fixed
+     lane here, so the name keeps its own size. */
+  transform:none !important;
+  font-size:inherit !important;
+}

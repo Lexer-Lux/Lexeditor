@@ -2012,6 +2012,11 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const fixedCommandMenu=el("input",{type:"checkbox",checked:settings.fixedCommandMenu,disabled:!settings.singleGf,"aria-label":"Command Menu Rework",onchange:event=>{settings.fixedCommandMenu=event.target.checked;shell.refresh()}});
     const trueAtbWait=el("input",{type:"checkbox",checked:settings.trueAtbWait,"aria-label":"True ATB Wait",onchange:event=>{settings.trueAtbWait=event.target.checked;shell.refresh()}});
     const modernControls=el("input",{type:"checkbox",checked:settings.modernControls,disabled:!settings.modernControlsAvailable,"aria-label":"Modern Controls",onchange:event=>{settings.modernControls=event.target.checked;shell.refresh()}});
+    // How fast the right stick turns the battle camera, as a multiple of the
+    // shipped rate. It belongs to this tweak, so it sits in this row rather
+    // than becoming a tweak of its own that does nothing on its own.
+    const cameraSpeed=numberControl(settings.cameraSpeed,settings.cameraSpeedMinimum,settings.cameraSpeedMaximum,0.1,value=>{settings.cameraSpeed=value},{"aria-label":"Battle camera speed"});
+    const modernControlsControl=el("span",{class:"tweak-value"},modernControls,unitField(cameraSpeed,"×"));
     const vibrationConsolidation=el("input",{type:"checkbox",checked:settings.vibrationConsolidation,"aria-label":"Vibration Rationalization",onchange:event=>{settings.vibrationConsolidation=event.target.checked;shell.refresh()}});
     const betterTargeting=el("input",{type:"checkbox",checked:settings.betterTargeting,"aria-label":"Better Targeting",onchange:event=>{settings.betterTargeting=event.target.checked;shell.refresh()}});
     const damageLimitRemoval=el("input",{type:"checkbox",checked:settings.damageLimitRemoval,"aria-label":"Remove Damage Limit",onchange:event=>{settings.damageLimitRemoval=event.target.checked;shell.refresh()}});
@@ -2055,7 +2060,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       row("HP BARS","Shows party HP bars at the bottom-right during battle.",hpBars,"boolean"),
       row("IN-GAME TIME","Replaces the main menu playtime display with your computer's local time. Saved playtime and timed-event countdowns are preserved.",inGameTime,"boolean"),
       row("MAX SPELL","Sets the maximum stock for each spell. A full stack keeps the same junction effect as 100 spells in vanilla.",maxSpellControl,"value-toggle"),
-      row("MODERN CONTROLS",settings.modernControlsBlocker||"Uses the right stick's horizontal magnitude for analog world-map camera rotation.",modernControls,"boolean"),
+      row("MODERN CONTROLS",settings.modernControlsBlocker||"Right stick turns the battle camera while the camera is idle, and gives the world map analog rotation. The number is the turn rate as a multiple of the shipped speed, from 0.2 to 4. The camera stops level with what it is looking at rather than dropping through the ground.",modernControlsControl,"value-toggle"),
       row("MONOGAMY","Allows one GF on each character. Warning: when gameplay starts, any character who already has several GFs junctioned will have all of those GFs unequipped.",singleGf,"boolean"),
       row("NO MAGIC CONSUMPTION","Casting spells in battle or from the field Magic menu keeps their stock. Items, discarding and other inventory operations are unchanged; works with Shared Magic and Max Spell.",noMagicConsumption,"boolean"),
       row("REMOVE DAMAGE LIMIT","Uses FF8's existing 60,000-damage path instead of the normal 9,999 cap.",damageLimitRemoval,"boolean"),
@@ -2065,7 +2070,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       row("UNIVERSAL ITEM","Look Right opens the normal battle Item menu without using an equipped command slot. The shortcut follows the configured input mapping.",universalItem,"boolean"),
       row("VIBRATION RATIONALIZATION","Start uses the normal field and battle pause behavior instead of FFNx's separate vibration screen.",vibrationConsolidation,"boolean"),
       row("XP BARS","Shows yellow XP bars under main-menu character names, under character and GF level rows, and on the post-battle report.",xpBars,"boolean"));
-    $("#main").replaceChildren(LexeditorUI.paginateSettings(view));
+    $("#main").replaceChildren(LexeditorUI.settingsColumns([...view.children],tweakTabProps()));
     bindSettingDependencies(view,[{
       key:"singleGf->fixedCommandMenu",
       dependency:singleGf,
@@ -2074,7 +2079,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
   }
 
   function renderPlatformSettings(){
-    $("#main").replaceChildren(platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
+    $("#main").replaceChildren(platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,...tweakTabProps(),disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
   }
   function dropChanceDescription(){
     const normal=[137,68,34,17],rare=[94,70,53,39];
@@ -2084,8 +2089,12 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
         el("thead",{},el("tr",{},...['Slot','Normal','Rare Item'].map(label=>el("th",{scope:"col"},label)))),
         el("tbody",{},...normal.map((value,index)=>el("tr",{},el("th",{scope:"row"},String(index+1)),chance(value),chance(rare[index]))))));
   }
+  const TWEAK_TABS=[{id:"gameplay",label:"Gameplay"},{id:"platform",label:"FFNx"}];
+  const tweakTabProps=()=>({tabs:TWEAK_TABS,activeTab:state.settingsTab,
+    tabsLabel:"Tweak settings",
+    changeTab:value=>{state.settingsTab=value;renderSettings()}});
   function renderSettings(){
-    const toolbar=$("#toolbar");toolbar.hidden=false;toolbar.replaceChildren(subtabBar({tabs:[{id:"gameplay",label:"Gameplay"},{id:"platform",label:"FFNx"}],active:state.settingsTab,label:"Tweak settings",change:value=>{state.settingsTab=value;renderSettings()}}));
+    const toolbar=$("#toolbar");toolbar.replaceChildren();toolbar.hidden=true;
     if(state.settingsTab==="platform")renderPlatformSettings();else renderGameplaySettings();
   }
 

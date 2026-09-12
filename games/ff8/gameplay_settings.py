@@ -54,6 +54,9 @@ DEFAULT_FIXED_COMMAND_MENU = False
 DEFAULT_TRUE_ATB_WAIT = true_atb_wait_issue_63.DEFAULT_TRUE_ATB_WAIT
 DEFAULT_FORMULAE_REWORK = False
 DEFAULT_MODERN_CONTROLS = modern_controls_issue_65.DEFAULT_MODERN_CONTROLS
+DEFAULT_CAMERA_SPEED = modern_controls_issue_65.DEFAULT_CAMERA_SPEED
+MINIMUM_CAMERA_SPEED = modern_controls_issue_65.MINIMUM_CAMERA_SPEED
+MAXIMUM_CAMERA_SPEED = modern_controls_issue_65.MAXIMUM_CAMERA_SPEED
 DEFAULT_VIBRATION_CONSOLIDATION = vibration_consolidation_issue_66.DEFAULT_VIBRATION_CONSOLIDATION
 DEFAULT_BETTER_TARGETING = better_targeting_issue_64.DEFAULT_BETTER_TARGETING
 DEFAULT_DAMAGE_LIMIT_REMOVAL = damage_limit.DEFAULT_DAMAGE_LIMIT_REMOVAL
@@ -319,6 +322,15 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         modern_controls = DEFAULT_MODERN_CONTROLS
     if not modern_controls_issue_65.MODERN_CONTROLS_AVAILABLE:
         modern_controls = False
+    camera_speed = data.get("cameraSpeed", DEFAULT_CAMERA_SPEED)
+    try:
+        camera_speed = float(camera_speed)
+    except (TypeError, ValueError):
+        camera_speed = DEFAULT_CAMERA_SPEED
+    if not camera_speed > 0:
+        camera_speed = DEFAULT_CAMERA_SPEED
+    camera_speed = round(
+        min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, camera_speed)), 2)
     vibration_consolidation = data.get(
         "vibrationConsolidation", DEFAULT_VIBRATION_CONSOLIDATION,
     )
@@ -393,6 +405,9 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "fixedCommandMenu": fixed_command_menu_enabled,
         "trueAtbWait": true_atb_wait,
         "modernControls": modern_controls,
+        "cameraSpeed": camera_speed,
+        "cameraSpeedMinimum": MINIMUM_CAMERA_SPEED,
+        "cameraSpeedMaximum": MAXIMUM_CAMERA_SPEED,
         "modernControlsAvailable": modern_controls_issue_65.MODERN_CONTROLS_AVAILABLE,
         "modernControlsBlocker": modern_controls_issue_65.MODERN_CONTROLS_BLOCKER,
         "vibrationConsolidation": vibration_consolidation,
@@ -727,7 +742,8 @@ def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
                              modern_controls: bool = False, party_switch: bool = False,
                              gf_hp_bars: bool = False,
                              in_game_time: bool = False,
-                             no_magic_consumption: bool = False) -> None:
+                             no_magic_consumption: bool = False,
+                             camera_speed: float = DEFAULT_CAMERA_SPEED) -> None:
     """Set derivative options without changing unrelated FFNx settings."""
     text = config.read_text(encoding="utf-8", errors="strict")
     for key, enabled in (
@@ -749,6 +765,16 @@ def _set_ffnx_runtime_tweaks(config: Path, *, xp_bars: bool, hp_bars: bool,
             text = pattern.sub(replacement, text, count=1)
         else:
             text = text.rstrip() + f"\n\n{replacement}\n"
+    # The camera turn rate is a number rather than a switch, so it needs its own
+    # pass; the runtime clamps whatever it reads to a usable range.
+    rate = min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, float(camera_speed)))
+    speed_pattern = re.compile(
+        r"(?m)^\s*ff8_modern_controls_camera_speed\s*=\s*[-+0-9.eE]+\s*$")
+    speed_line = f"ff8_modern_controls_camera_speed = {rate:g}"
+    if speed_pattern.search(text):
+        text = speed_pattern.sub(speed_line, text, count=1)
+    else:
+        text = text.rstrip() + f"\n\n{speed_line}\n"
     _atomic_text(config, text)
 
 
@@ -894,6 +920,16 @@ def save(data: dict, game_root: Path | None = None,
     modern_controls = _boolean(
         data.get("modernControls", DEFAULT_MODERN_CONTROLS), "Modern Controls",
     )
+    # The camera turn rate travels with the switch that uses it. A value the
+    # page never sent, or one outside the usable range, becomes the shipped
+    # rate rather than refusing the whole apply.
+    try:
+        camera_speed = float(data.get("cameraSpeed", DEFAULT_CAMERA_SPEED))
+    except (TypeError, ValueError):
+        camera_speed = DEFAULT_CAMERA_SPEED
+    if not camera_speed > 0:
+        camera_speed = DEFAULT_CAMERA_SPEED
+    camera_speed = min(MAXIMUM_CAMERA_SPEED, max(MINIMUM_CAMERA_SPEED, camera_speed))
     vibration_consolidation = _boolean(
         data.get("vibrationConsolidation", DEFAULT_VIBRATION_CONSOLIDATION),
         "Vibration Rationalization",
@@ -1099,6 +1135,7 @@ def save(data: dict, game_root: Path | None = None,
                 fast_start=fast_start_enabled,
                 modern_controls=modern_controls, party_switch=party_switch,
                 no_magic_consumption=no_magic_consumption,
+                camera_speed=camera_speed,
             )
     except Exception:
         _restore_files(snapshots)

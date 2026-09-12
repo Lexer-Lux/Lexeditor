@@ -247,8 +247,8 @@
     // the reader to conclude from the absence of a table.
     const scope=el("section",{class:"card"},
       el("h2",{},"What this tab covers",
-        infoHelp("Red Dead Redemption has no per-enemy drop table in its data files. What a body yields is decided in script: Function_117 rolls the bonus item and Function_123 decides the money. LexerRDR.asi patches those two functions, and the two cards on this page are their inputs. There is nowhere else an enemy's drops are defined, which is why there is no enemy list here.")),
-      el("p",{},"Loot in this game is script logic, not a data table. The two cards below are the inputs to the two script functions that decide what a body yields; there is no per-enemy drop list in the game's files to edit."));
+        infoHelp("Searched, not assumed. content.rpf holds the corpse loot logic at content/release64/scripting/gringo/commonscripts/lootcorpsegenericnoanim.wsc, and Lexeditor's RPF6 bridge decompiles it. What a body yields is a switch on a LootType decorator carried by the ped: each type adds a fixed item enum, written into the script rather than looked up from a table. There is no drops XML anywhere in the archive. The bridge reads and decompiles but cannot recompile a script, so patching the function while the game runs is the only way to change it, which is what the two cards below do.")),
+      el("p",{},"Loot here is compiled script, not a data table. A body's items come from a switch on its LootType, written into lootcorpsegenericnoanim.wsc inside content.rpf; the archive holds no drops table to edit. The two cards below are the inputs to the two functions the ASI patches at runtime, which is the only writable seam this game has."));
     $("#main").replaceChildren(el("div",{class:"stack"},scope,el("div",{class:"loot-layout"},source,moneyCard),evidence));shell.refresh();
   }
 

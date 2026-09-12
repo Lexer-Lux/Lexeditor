@@ -22,17 +22,27 @@ def integrate_shared_magic_notifications(source: Path) -> None:
     changes = [
         ('#include "../log.h"', '#include "../log.h"\n#include "../common.h"'),
         ('bool g_warning_started = false;',
-         'std::string g_activation_toast;\nbool g_warning_started = false;'),
+         'std::string g_activation_toast;\n'
+         '// FFNx fades a popup on an accelerating decay, far quicker than a\n'
+         '// sentence explaining a failed migration takes to read, so the message\n'
+         '// is re-issued until this deadline rather than posted once and lost.\n'
+         'ULONGLONG g_activation_toast_until = 0;\n'
+         'constexpr ULONGLONG kActivationToastMs = 9000ULL;\n'
+         'bool g_warning_started = false;'),
         ('        g_requested = false;\n        g_warning = MergeError::none;',
          '        g_activation_toast = migration_warning_template(result.error, g_stock_limit);\n'
+         '        g_activation_toast_until = GetTickCount64() + kActivationToastMs;\n'
          '        append_runtime_log((g_activation_toast + "\\n").c_str());\n'
          '        g_requested = false;\n        g_warning = MergeError::none;'),
         ('void ff8_shared_magic_heartbeat()\n{',
          'void ff8_shared_magic_heartbeat()\n{\n'
          '    // The loader has returned. Use the renderer overlay, never the menu controller.\n'
          '    if (!g_activation_toast.empty() && get_popup_time() == 0) {\n'
-         '        show_popup_msg(TEXTCOLOR_RED, "%s", g_activation_toast.c_str());\n'
-         '        g_activation_toast.clear();\n'
+         '        if (GetTickCount64() >= g_activation_toast_until) {\n'
+         '            g_activation_toast.clear();\n'
+         '        } else {\n'
+         '            show_popup_msg(TEXTCOLOR_RED, "%s", g_activation_toast.c_str());\n'
+         '        }\n'
          '    }'),
     ]
     for old, new in changes:

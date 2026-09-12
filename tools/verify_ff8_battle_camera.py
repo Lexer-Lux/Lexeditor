@@ -62,7 +62,37 @@ int main() {
     assert(displacement(adopted,handed_back) < 100.0);
     assert(displacement(adopted,start) > 100.0);
 
-    std::cout << "Battle camera policy: idle gate, zero-drift center/deadzone, proportional X/Y orbit, radius preservation and handed-back baseline passed\n";
+    // Camera speed. The same stick push turns further at a higher setting and
+    // less at a lower one, and a setting outside the usable range is brought
+    // back into it rather than obeyed.
+    Vec3s slow=start, normal=start, fast=start;
+    assert(orbit(slow,target,255,128,0.035f,0.025f,0.4f));
+    assert(orbit(normal,target,255,128));
+    assert(orbit(fast,target,255,128,0.035f,0.025f,2.5f));
+    assert(displacement(slow,start) < displacement(normal,start));
+    assert(displacement(normal,start) < displacement(fast,start));
+    Vec3s absurd=start, ceiling=start;
+    assert(orbit(absurd,target,255,128,0.035f,0.025f,900.0f));
+    assert(orbit(ceiling,target,255,128,0.035f,0.025f,MAX_SPEED_SCALE));
+    assert(displacement(absurd,ceiling) < 1.5);
+    Vec3s zero=start, floor_rate=start;
+    assert(orbit(zero,target,255,128,0.035f,0.025f,0.0f));
+    assert(orbit(floor_rate,target,255,128,0.035f,0.025f,DEFAULT_SPEED_SCALE));
+    assert(displacement(zero,floor_rate) < 1.5);
+
+    // The floor. Holding the stick down can bring the camera level with what it
+    // is looking at and no lower: below that it is inside the battlefield.
+    Vec3s sinking=start;
+    for (int i=0;i<600;++i) orbit(sinking,target,128,255);
+    assert(sinking.y >= target.y - 2);
+    // A pose FF8 hands back already below the floor is not yanked upward; the
+    // clamp only stops the reader driving further under.
+    Vec3s below{start.x,static_cast<std::int16_t>(target.y-300),start.z};
+    const std::int16_t before_y=below.y;
+    for (int i=0;i<60;++i) orbit(below,target,128,255);
+    assert(below.y <= before_y + 2);
+
+    std::cout << "Battle camera policy: idle gate, zero-drift center/deadzone, proportional X/Y orbit, radius preservation, speed scaling, ground floor and handed-back baseline passed\n";
 }
 '''
 

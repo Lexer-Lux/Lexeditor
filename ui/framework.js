@@ -2405,18 +2405,88 @@
   // A page may also divide itself with subtabs. A bar with fewer than two tabs
   // is not drawn, which is the same rule every other subtab bar follows.
   // Keep controls mounted so dependencies and unsaved values span pages.
+  // A page of tweaks is as many cards as the window can actually show. A fixed
+  // count cannot be right at two window sizes, and the one that was here put
+  // six cards on a screen with room for thirty - so a page of twenty-nine
+  // tweaks became five pages with the bottom half of the panel empty, which
+  // reads as most of the tweaks having gone missing.
+  //
+  // The fit is measured the way the row fitter measures a table: lay the cards
+  // out, read the grid, take as many whole grid rows as the box holds. A caller
+  // that genuinely wants a fixed count still passes pageSize.
   const paginateSettings = (content, options = {}) => {
-    const cards = [...content.children], size = options.pageSize || 6;
+    const cards = [...content.children];
+    let size = options.pageSize || cards.length || 1;
     let page = 0;
+    let measuring = false;
     const footer = element("div", {class:"lex-tweaks-pages"});
     const scroll = element("div", {class:"lex-tweaks-scroll", tabindex:"-1"}, content);
     const root = element("div", {class:"lex-tweaks-paged"}, scroll, footer);
+
+    // How many cards fit, with every card on screen so the grid reports its
+    // real column count and row heights. Cards differ in height, so the rows
+    // are measured rather than assumed: walk the laid-out cards and stop at
+    // the last one whose bottom still clears the box.
+    const measure = () => {
+      if (options.pageSize || measuring || !scroll.isConnected) return size;
+      measuring = true;
+      const visible = cards.filter(card => !card.hidden);
+      const box = scroll.clientHeight;
+      let fits = visible.length;
+      if (box > 0 && visible.length) {
+        // Deal the whole set, then read how many cards are above the fold.
+        // Columns pack independently, so this is a count of cards rather than
+        // of rows and there is no row boundary to respect.
+        deal(visible);
+        const top = content.getBoundingClientRect().top;
+        fits = visible.filter(card =>
+          card.getBoundingClientRect().bottom - top <= box + 0.5).length;
+      }
+      measuring = false;
+      return Math.max(1, fits);
+    };
+
+    // How many columns the width allows, and the deal itself. Cards go round
+    // the columns in order, then the tallest column hands its last card to the
+    // shortest for as long as that makes the page shorter - so a card carrying
+    // a table does not decide the height of four unrelated cards.
+    const columnTarget = () => parseFloat(getComputedStyle(content)
+      .getPropertyValue("--lex-tweak-card-width")) || 320;
+    const deal = onPage => {
+      const width = content.clientWidth || scroll.clientWidth;
+      const gap = parseFloat(getComputedStyle(content).columnGap) || 12;
+      const target = columnTarget();
+      const count = options.columns === 1 ? 1 : Math.max(1, Math.min(onPage.length,
+        Math.floor((width + gap) / (target + gap)) || 1));
+      const columns = Array.from({length: count}, () =>
+        element("div", {class: "lex-tweak-column"}));
+      onPage.forEach((card, index) => columns[index % count].append(card));
+      // Cards that are not on this page stay in the document, hidden. An edit
+      // typed into one and then paged away from is still there when the reader
+      // comes back, and it is still part of the form being saved; detaching
+      // them would take the control out of the page entirely.
+      const off = element("div", {class: "lex-tweak-off-page", hidden: "hidden"},
+        ...cards.filter(card => !onPage.includes(card)));
+      content.replaceChildren(...columns, off);
+      if (count < 2) return;
+      const heights = () => columns.map(column => column.getBoundingClientRect().height);
+      for (let guard = 0; guard < onPage.length; guard += 1) {
+        const tall = heights();
+        const from = tall.indexOf(Math.max(...tall));
+        const to = tall.indexOf(Math.min(...tall));
+        const moving = columns[from].lastElementChild;
+        if (from === to || !moving || columns[from].children.length < 2) break;
+        const before = Math.max(...tall);
+        columns[to].append(moving);
+        if (Math.max(...heights()) >= before) { columns[from].append(moving); break; }
+      }
+    };
+
     const render = () => {
       const visible = cards.filter(card => !card.hidden);
       const pages = Math.max(1, Math.ceil(visible.length / size));
       page = Math.min(page, pages - 1);
-      cards.forEach(card => card.classList.add("lex-tweak-off-page"));
-      visible.slice(page * size, (page + 1) * size).forEach(card => card.classList.remove("lex-tweak-off-page"));
+      deal(visible.slice(page * size, (page + 1) * size));
       const focused = footer.contains(document.activeElement) ? document.activeElement : null;
       const selection = focused && [focused.selectionStart, focused.selectionEnd];
       const label = focused?.getAttribute("aria-label");
@@ -2428,8 +2498,56 @@
         if (selection && selection[0] !== null) replacement?.setSelectionRange(...selection);
       }
     };
-    root.refreshPages = () => {page=0;render();};
-    render();return root;
+
+    const refit = () => {
+      let wanted = measure();
+      if (wanted !== size) {
+        const first = page * size;
+        size = wanted;
+        page = Math.floor(first / size);
+        render();
+      }
+      // The measurement is taken with every card laid out, and a grid row is
+      // as tall as its tallest card, so hiding the tail can leave the kept
+      // cards arranged differently. Correct against what is actually on
+      // screen rather than trusting the first estimate.
+      const total = () => cards.filter(card => !card.hidden).length;
+      const clampPage = () => {
+        page = Math.min(page, Math.max(0, Math.ceil(total() / size) - 1));
+      };
+      for (let guard = 0; guard < 8; guard += 1) {
+        if (scroll.scrollHeight <= scroll.clientHeight + 1 || size <= 1) break;
+        size -= 1; clampPage(); render();
+      }
+      // And the other direction: the estimate can be short by a row, which
+      // leaves a band of empty panel under the last card and an extra page
+      // that did not need to exist. Grow until one more card would overflow.
+      for (let guard = 0; guard < 8; guard += 1) {
+        if (size >= total()) break;
+        size += 1; clampPage(); render();
+        if (scroll.scrollHeight > scroll.clientHeight + 1) {
+          size -= 1; clampPage(); render();
+          break;
+        }
+      }
+    };
+    root.refreshPages = () => {page=0;refit();render();};
+    root.lexFitPage = refit;
+    render();
+    if ((options.tabs || []).length > 1) root.prepend(subtabBar({
+      tabs: options.tabs, active: options.activeTab,
+      label: options.tabsLabel || "Tweak groups", change: options.changeTab}));
+    if (typeof ResizeObserver === "function") {
+      let frame = 0;
+      const observer = new ResizeObserver(() => {
+        if (frame) return;
+        frame = requestAnimationFrame(() => {frame = 0; refit();});
+      });
+      observer.observe(scroll);
+      root.lexPageObserver = observer;
+    }
+    requestAnimationFrame(refit);
+    return root;
   };
   const settingsColumns = (sections, options = {}) => {
     const content = element("div", {class:"lex-tweak-card-grid"}, ...(sections || []).filter(Boolean));
@@ -2437,8 +2555,6 @@
     root.classList.add("lex-settings-columns");
     if(options.className) root.classList.add(...options.className.split(/\s+/));
     if(options.columnWidth) content.style.setProperty("--lex-tweak-card-width",options.columnWidth);
-    if((options.tabs || []).length > 1) root.prepend(subtabBar({tabs:options.tabs,active:options.activeTab,
-      label:options.tabsLabel || "Tweak groups",change:options.changeTab}));
     return root;
   };
 
@@ -6941,6 +7057,14 @@ ${contents.path}`});
       paged.refreshPages();
     };
     paged = paginateSettings(element("div", {class:"lex-platform-config-sections"}, ...sections), {
+      // One column: these cards are whole sections, each already holding a
+      // grid of fields. Dealing them side by side squeezes those inner grids
+      // to a single narrow lane.
+      columns: 1,
+      // A plugin whose Tweaks page divides into groups hands the bar down
+      // rather than drawing a second one above this view.
+      tabs: options.tabs, activeTab: options.activeTab,
+      tabsLabel: options.tabsLabel, changeTab: options.changeTab,
       search:{key:`platform-${config.runtime || "settings"}`,value:options.query || "",label:`Search ${config.runtime} settings`,change:applySearch},
     });
     return element("section", {class: "lex-platform-config"},
@@ -7244,6 +7368,13 @@ ${contents.path}`});
   const fitKey = label => `${label.clientWidth}x${label.clientHeight}|${label.textContent}`;
   const fitLabel = label => {
     if (!(label instanceof HTMLElement)) return;
+    // Some rows give the name its own line and let it wrap, so there is no
+    // fixed lane to shrink into. Shrinking anyway is how the platform page
+    // ended up with six-pixel labels beside full-size controls.
+    if (label.closest(".lex-platform-config-field")) {
+      if (label.style.fontSize) label.style.fontSize = "";
+      return;
+    }
     const key = fitKey(label);
     if (fitted.get(label) === key) return;
     label.style.fontSize = '';

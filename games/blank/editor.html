@@ -183,11 +183,18 @@
       control:el("input",{type:"checkbox",checked:tweaks[key],disabled:activeSource!=="mine",
         "aria-label":label,onchange:event=>{tweaks[key]=event.target.checked;render();refreshShell()}})});
   }
+  // Which group of tweaks is on screen. A tweak page divides with subtabs, the
+  // same control every other page divides with, and the bar is not drawn until
+  // there are at least two groups to choose between.
+  let tweakGroup="gameplay";
+  const TWEAK_GROUPS=[{id:"gameplay",label:"Gameplay"},{id:"presentation",label:"Presentation"}];
   function tweaksPanel(){
     const gate=!tweaks.enabled||activeSource!=="mine";
-    return detailPanel({paginate:true,className:"blank-detail blank-tweaks",title:"Tweaks",icon:blankIcon(),
-      identity:tweaks.enabled?"ON":"OFF",meta:"Reference tweak page: switches, bounded values and dependent controls",
-      body:[
+    // The reference shape, and the one to copy: a page of cards dealt into as
+    // many columns as the width allows, a subtab bar above them, and a pager
+    // below sized to what the window can actually show. Not one long scroll,
+    // and not a fixed number of cards per page.
+    const gameplay=[
         detailSection({title:"MASTER",body:[
           tweakSwitch("enabled","ENABLED","Everything below is inert until this is on. A tweak page always has one switch that owns the rest."),
         ]}),
@@ -222,12 +229,17 @@
                 key,label,checked:tweaks.flags[key],disabled:gate,
                 help:`Blank sample flag: ${label}.`,
                 change:value=>{tweaks.flags[key]=value;refreshShell()}}))})}),
-        ]}),
+        ]})];
+    const presentation=[
         // Every game's Tweaks page offers the same ReShade section. Lexeditor
         // keeps one ReShade; the mod carries only its preset and any shaders
         // its author wrote, so the mod stays installable by hand.
-        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade}),
-      ]});
+        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade})];
+    return LexeditorUI.settingsColumns(
+      tweakGroup==="presentation"?presentation:gameplay,
+      {className:"blank-tweaks",tabs:TWEAK_GROUPS,activeTab:tweakGroup,
+       tabsLabel:"Blank tweak groups",
+       changeTab:value=>{tweakGroup=value;render()}});
   }
   let reshade={manifest:{enabled:false,preset:"",repositories:[]},presets:[],shaders:[],
     reshadeInstalled:false,installedRenderer:"",path:"",hasFolder:false,ready:false};

@@ -27,4 +27,25 @@ with tempfile.TemporaryDirectory(prefix='lex-shared-toast-') as folder:
     assert 'write_saved(candidate)' not in activation.split('return;', 1)[0]
     integrate_shared_magic_notifications(root)
     assert path.read_text(encoding='utf-8') == result
-print('Notification integration passes: deferred, once only, existing popup preserved, failed stocks unchanged.')
+# The block above checks the PINNED patch, which is the source the shipped
+# driver was built from. This one checks what the integration does to a tree
+# that does not carry the message yet, which is what the next build compiles.
+with tempfile.TemporaryDirectory(prefix='lex-shared-toast-fresh-') as folder:
+    root = Path(folder)
+    path = root/'src/ff8/shared_magic_runtime.cpp'
+    path.parent.mkdir(parents=True)
+    fresh = [line for line in source.splitlines(keepends=True)
+             if 'g_activation_toast' not in line]
+    assert len(fresh) < len(source.splitlines())
+    path.write_text(''.join(fresh), encoding='utf-8')
+    integrate_shared_magic_notifications(root)
+    built = path.read_text(encoding='utf-8')
+    # Held long enough to read, not posted once into a fade.
+    assert 'g_activation_toast_until = GetTickCount64() + kActivationToastMs' in built
+    assert 'if (GetTickCount64() >= g_activation_toast_until)' in built
+    heartbeat = built.split('void ff8_shared_magic_heartbeat()\n{', 1)[1]
+    assert heartbeat.index('show_popup_msg(') < heartbeat.index('g_last_heartbeat_tick')
+    integrate_shared_magic_notifications(root)
+    assert path.read_text(encoding='utf-8') == built
+
+print('Notification integration passes: deferred, held long enough to read, existing popup preserved, failed stocks unchanged.')

@@ -64,6 +64,8 @@ CARD_FILTER_CAVE = 0x027A1380
 
 BLOCKERS = (
     "GF Magic still needs the verified Magic-list builder and a defined GF-to-spell map.",
+    "Greying Summon needs verified render and select addresses for the GF slot, "
+    "the pair Draw already has; the rule and its wording are settled above.",
 )
 
 
@@ -331,6 +333,36 @@ def draw_command_available(*, drawn_enemy_slots: set[int],
                            targetable_enemy_slots: set[int]) -> bool:
     """Draw is grey only when no current target remains eligible."""
     return any(slot not in drawn_enemy_slots for slot in targetable_enemy_slots)
+
+
+# The Summon slot in the fixed command menu. Monogamy gives each character one
+# GF, so a character with none has nothing to summon and the slot does nothing
+# when it is chosen. It reads as a bug rather than as a rule, which is why the
+# slot states its own eligibility here the same way Draw does above: the rule
+# and its wording are settled and testable before any menu hook exists.
+SUMMON_UNAVAILABLE_REASON = (
+    "No GF is junctioned to this character. Junction one on the Junction "
+    "screen to use Summon."
+)
+
+
+def summon_command_available(*, junctioned_gf_count: int) -> bool:
+    """Summon is grey when the acting character has no GF junctioned."""
+    count = int(junctioned_gf_count)
+    if count < 0:
+        raise ValueError("Junctioned GF count cannot be negative")
+    return count > 0
+
+
+def summon_unavailable_reason(*, junctioned_gf_count: int) -> str:
+    """What choosing a grey Summon says. Empty while Summon is usable.
+
+    A greyed command that says nothing is indistinguishable from a broken one,
+    so the slot answers the question it raises rather than only refusing.
+    """
+    if summon_command_available(junctioned_gf_count=junctioned_gf_count):
+        return ""
+    return SUMMON_UNAVAILABLE_REASON
 
 
 def build_command_eligibility_patch(*, draw_once: bool = DEFAULT_DRAW_ONCE_PER_ENEMY,
