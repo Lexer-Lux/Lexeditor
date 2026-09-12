@@ -260,6 +260,24 @@ def main():
             raw=[name for name in labels if STORAGE_LABEL.match(name.upper())]
             assert not raw,raw
             assert 'NAME' not in [name.upper() for name in labels],labels
+            # The big ghosted identity is drawn across the right end of the
+            # heading. A long string there runs through the title, so anything
+            # longer than a short code has to fall back to the subtitle line.
+            long_id=page.evaluate('''()=>[...document.querySelectorAll('.lex-detail-panel-id')]
+              .map(n=>n.textContent.trim()).filter(text=>text.length>8)''')
+            assert not long_id,long_id
+            # A number box that can hold five figures shows its separators while
+            # nobody is typing in it. One capped low is left as it is.
+            boxes=page.evaluate('''()=>[...document.querySelectorAll('input')]
+              .filter(i=>i!==document.activeElement)
+              .filter(i=>{const max=Number(i.max);return Number.isFinite(max)&&Math.abs(max)>=10000})
+              .map(i=>[i.type,i.value])''')
+            ungrouped=[box for box in boxes if box[0]=='number']
+            assert not ungrouped,ungrouped
+            grouped=[box for box in boxes
+                     if len(box[1].replace(',','').split('.')[0].lstrip('-'))>3
+                     and ',' not in box[1]]
+            assert not grouped,grouped
             # A column lights from its header, not from a cell.
             cell=page.locator('.lex-column-list-cell[data-column-key=name]').first
             head=page.locator('.lex-column-list-head-cell[data-column-key=name]').first

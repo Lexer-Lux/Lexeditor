@@ -745,7 +745,14 @@
         : element("h2", {class: "lex-detail-panel-title"}, String(options.title ?? ""));
     const identity = element("div", {class: "lex-detail-panel-identity"},
       title,
-      options.identity ? element("div", {class: "lex-detail-panel-id"}, options.identity) : null,
+      // The identity slot is the big ghosted record number, sized to the
+      // heading and laid over its right end. A long string there runs straight
+      // through the title, so anything longer than a short code is shown as
+      // the ordinary subtitle line instead of as the watermark.
+      options.identity
+        ? element("div", {class: typeof options.identity === "string" && options.identity.length > 8
+            ? "lex-detail-panel-meta" : "lex-detail-panel-id"}, options.identity)
+        : null,
       options.meta ? element("div", {class: "lex-detail-panel-meta"}, options.meta) : null);
     const heading = options.heading === false ? null : element("div", {
       class: ["lex-detail-panel-heading", options.icon ? "" : "no-icon", options.actions ? "" : "no-actions"].filter(Boolean).join(" "),
@@ -940,6 +947,14 @@
   }, options.title ? element("h3", {class: "lex-detail-section-title"},
     options.title, options.help || null) : null,
   element("div", {class: "lex-detail-section-content"}, options.body || []));
+
+  // What a section says when it holds nothing. A section with no rows used to
+  // invent one - a property named for the storage state rather than for
+  // anything in the game - and the reader could not tell the invented row from
+  // a real one. A note is not a property: no label column, no control, no pin.
+  const detailNote = (text, options = {}) => element("p", {
+    class: ["lex-detail-note", options.className || ""].filter(Boolean).join(" "),
+  }, text);
 
   const anchorDetailPin = (pin, control, input, outward = false) => {
     if (!(pin instanceof Element) || !(control instanceof Element) || !(input instanceof Element)) return;
@@ -6628,7 +6643,7 @@ ${contents.path}`});
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {element, el: element, confirmAction, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {element, el: element, confirmAction, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 
@@ -7033,8 +7048,70 @@ ${contents.path}`});
       if (rail.style.left !== left) rail.style.left = left;
     }
   };
+  // Grouping separators in the boxes a reader types into. Everything the
+  // framework PAINTS is already grouped - table cells, readonly fields,
+  // reference readings - but a plugin's own input[type=number] cannot hold a
+  // comma at all: assigning "50,000" to one leaves it empty. So the box is
+  // rebuilt as a text box that carries the number, groups it while the reader
+  // is looking at it, and shows the bare digits the moment they start typing.
+  //
+  // Two things keep this safe for plugins that never asked for it. Only boxes
+  // that can actually hold a big number are touched - a 0-100 percentage gains
+  // nothing from a separator - and the grouped form only ever exists while the
+  // box is NOT focused, so every input and change event a plugin listens for
+  // still reports plain digits.
+  const GROUPING_FLOOR = 10000;
+  const groupedBoxes = new WeakSet();
+  const wantsGrouping = input => {
+    const max = Number(input.max);
+    if (Number.isFinite(max)) return Math.abs(max) >= GROUPING_FLOOR;
+    const value = Number(input.value);
+    return Number.isFinite(value) && Math.abs(value) >= GROUPING_FLOOR;
+  };
+  const groupNumberBoxes = root => {
+    const scope = root instanceof Element || root instanceof Document ? root : document;
+    const inputs = [...scope.querySelectorAll('input[type="number"]')];
+    if (scope instanceof Element && scope.matches?.('input[type="number"]')) inputs.push(scope);
+    for (const input of inputs) {
+      if (groupedBoxes.has(input) || !wantsGrouping(input)) continue;
+      groupedBoxes.add(input);
+      const plain = () => String(input.value ?? "").replace(/,/g, "");
+      // A text box does not enforce min and max the way a number box does, so
+      // the bounds the plugin declared are applied here instead of quietly
+      // going away with the spinner.
+      const floor = Number(input.min), ceiling = Number(input.max);
+      const clamp = value => {
+        let bounded = value;
+        if (Number.isFinite(floor)) bounded = Math.max(floor, bounded);
+        if (Number.isFinite(ceiling)) bounded = Math.min(ceiling, bounded);
+        return bounded;
+      };
+      const show = () => {
+        if (input === document.activeElement) return;
+        const value = Number(plain());
+        if (plain() === "" || !Number.isFinite(value)) return;
+        const bounded = clamp(value);
+        if (bounded !== value) {
+          input.value = String(bounded);
+          input.dispatchEvent(new Event("input", {bubbles: true}));
+        }
+        input.value = window.LexeditorUI.formatNumber(bounded);
+      };
+      input.type = "text";
+      input.inputMode = "decimal";
+      input.autocomplete = "off";
+      input.addEventListener("focus", () => { input.value = plain(); });
+      input.addEventListener("blur", show);
+      // A plugin that writes a fresh value into the box while it sits unfocused
+      // re-groups it; while it is focused the reader's own digits stand.
+      input.addEventListener("change", show);
+      show();
+    }
+  };
+
   let pending = false;
   const schedule = root => {
+    groupNumberBoxes(root && root !== document ? root : document);
     if (root && root !== document) { requestAnimationFrame(() => alignFieldMetadata(root)); return; }
     if (pending) return;
     pending = true;

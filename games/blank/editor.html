@@ -210,7 +210,7 @@
   // The reference Tweaks page. A plugin's tweak surface is a settings page,
   // not a record table: groups of switches and bounded values, with dependent
   // controls disabled until their parent switch is on. Copy this shape.
-  const tweaks={enabled:false,difficulty:"normal",damage:120,speed:1.5,label:"My preset",
+  const tweaks={enabled:false,difficulty:"normal",damage:120,speed:1.5,bounty:12500,label:"My preset",
     flags:{fastTravel:true,autoLoot:false,hardcore:false,permadeath:false}};
   function tweakSwitch(key,label,help){
     return detailField({label,help:help?infoHelp(help):null,dataType:"BOOL",
@@ -239,6 +239,10 @@
           detailField({label:"SPEED",dataType:"FLOAT",min:0.25,max:4,
             control:unitField(el("input",{type:"number",min:0.25,max:4,step:.05,value:tweaks.speed,disabled:gate,
               "aria-label":"Speed multiplier",oninput:event=>{tweaks.speed=Number(event.target.value);refreshShell()}}),"x")}),
+          detailField({label:"BOUNTY",dataType:"INT",min:0,max:9999999,
+            help:infoHelp("A number this large is grouped in the box you type into. The separators appear while nobody is typing and the bare digits come back the moment you are."),
+            control:unitField(el("input",{type:"number",min:0,max:9999999,step:1,value:tweaks.bounty,disabled:gate,
+              "aria-label":"Bounty",oninput:event=>{tweaks.bounty=Number(event.target.value);refreshShell()}}),"$")}),
           detailField({label:"PRESET NAME",dataType:"STRING",
             control:el("input",{type:"text",value:tweaks.label,disabled:gate,"aria-label":"Preset name",
               oninput:event=>{tweaks.label=event.target.value;refreshShell()}})}),

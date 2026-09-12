@@ -123,6 +123,25 @@ the record's name column in the master table is editable too. A name is never
 also an ordinary property row: that showed the name twice and made the copy
 being read the copy that could not be changed.
 
+An **empty section says so in prose, not as a property.** A group that holds
+nothing does not invent a row to carry the sentence; a row named for the
+storage state reads as a real property with a missing value. The note takes the
+section's full width, with no label column, no control and no pin.
+
+The heading's **identity slot is a short code** - a record number, a two or
+three character key. It is drawn large and ghosted across the right end of the
+heading, so a long string there runs through the title. Anything longer becomes
+the ordinary subtitle line instead. A subtitle that is the same on every record
+is not identity and does not belong in the heading at all: name the table once,
+on the section that reads from it.
+
+**Numbers are grouped in the boxes you type into**, not only in the ones the
+editor paints. A value box whose range can reach five figures shows its
+thousands separators while it sits unfocused and bare digits the moment the
+reader starts typing. A box that cannot exceed a few hundred is left alone,
+because a separator there is noise. Plugins get this without asking and without
+changing: every input and change event still reports a plain number.
+
 Each pinnable field has a pin at the top-right of its control. A filled pin
 means that the field is visible as a Table column. Clicking it removes the
 column. Hovering an unpinned field shows the available pin. Column changes

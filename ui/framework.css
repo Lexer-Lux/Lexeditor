@@ -981,7 +981,10 @@ html[data-lex-hoverable-alt-click="true"] .lex-hoverable {
 }
 
 .lex-detail-panel {
-  --lex-detail-label-width:clamp(125px, 18%, 230px);
+  /* No label lane of its own. This clamp predates the shared ten-percent rule
+     and quietly exempted every panel built through detailPanel() from it, so
+     the same property row was one width in a shared panel and another in a
+     plugin's hand-rolled div. The lane comes from :root now, like everywhere. */
   display:grid !important;
   /* Every Detail reserves the same top tenth for identity. Plugins may scale
      the contents inside it, but they must not make the heading consume more
@@ -4918,10 +4921,14 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-model-preview-drawer {
   position:absolute;
   z-index:3;
-  left:0;
-  right:0;
-  top:10%;
-  bottom:0;
+  /* The drawer covers the editing surface and stops at the heading. It used to
+     start at a flat 10%, which is the heading's share only while the heading
+     fits in a tenth; a heading with a subtitle grows past it and the drawer
+     then slid up over the icon that closes it. Taking the panel's second grid
+     row as the containing block puts the drawer's top edge on the heading's
+     real bottom edge, whatever height the heading turned out to need. */
+  grid-area:2 / 1 / 3 / -1;
+  inset:0;
   min-height:0;
   background:var(--lex-panel);
 }
@@ -6080,3 +6087,16 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   column-count:auto;
 }
 .lex-settings-subtabs { margin-bottom:var(--lex-panel-gap, 12px); }
+
+
+/* LEXEDITOR_DETAIL_NOTE_20260912
+   A section that holds nothing says so in its own voice. It is prose, not a
+   property row, so it takes the section's full width and none of the label
+   column's alignment. */
+.lex-detail-note {
+  margin:0;
+  padding:4px 2px;
+  color:var(--lex-muted);
+  font-size:12px;
+  line-height:1.45;
+}

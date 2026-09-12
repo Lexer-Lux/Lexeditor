@@ -19,11 +19,15 @@
 * [x] Pin/unpin animation should visually slide/pull the panel in and out instead of instantly jumping.
 * [x] Slow down and reduce the intensity of the pin/wiggle animation.
 * [x] Panel header/name text should retain normal left padding even when no preview icon is present.
-* [~] Large numbers should use thousands separators/commas.
-  * Every number the framework itself paints is grouped: table cells, readonly
-    fields, reference readings. A plugin's own `input[type=number]` cannot hold
-    a comma, so those stay ungrouped until the plugin moves to a text box the
-    way FF8's already has. Needs a per-plugin pass, not a framework switch.
+* [x] Large numbers should use thousands separators/commas.
+  * It turned out to be a framework switch after all. A number box whose range
+    can actually reach five figures is rebuilt as a text box that groups its
+    value; a box capped at 255 is left alone, because a separator adds nothing
+    there. The grouped form exists only while the box is NOT focused, so every
+    input and change event a plugin listens for still reports bare digits and
+    no plugin needed changing. FF9's 6,000 gil prices are grouped in the boxes
+    you type into; typing 12345 and tabbing away leaves 12,345 and one pending
+    edit.
 * [x] Properties containing names should generally allow the name to be edited directly from the detail-panel header rather than exposing a redundant `Name` property.
   * `detailPanel({renameRecord})` makes the heading the field. FF8's cards tab
     uses it and its `NAME` property is gone. The rule is in the manual and the
@@ -184,9 +188,18 @@
 * [~] Most properties lack useful info/help text.
   * The rule and the reasoning are in the manual; writing the pips themselves is
     per-property authoring that needs someone who knows what each value does.
-* [~] Item names should be editable directly from the Detail-panel header rather than as a separate Name property.
-  * The shared control exists (`detailPanel({renameRecord})`) and FF8's cards
-    tab uses it. Wiring RDR1's items to it needs the plugin running.
+* [x] Item names should be editable directly from the Detail-panel header rather than as a separate Name property.
+  * Done against the installed game. RDR1's item panel was its own hand-rolled
+    div with NAME and FRIENDLYNAME as ordinary rows, so the name at the top was
+    the one copy that could not be changed. It is a shared panel now: the
+    heading is the editable friendly name, NAME is the read-only key on the
+    line below, and both rows are gone from the property list.
+  * Two things fell out of that. The identity slot is the big ghosted record
+    number, and a long string in it ran straight through the title - it now
+    degrades to the subtitle line instead of overlapping. And the shared panel
+    was quietly overriding the ten-percent label lane with an 18% clamp, so the
+    same property row was one width in a shared panel and another in a
+    plugin's own div.
 
 ## Loot Tables
 
@@ -195,15 +208,24 @@
     so it says that - "Which script this is reading" - and folds away.
 * [x] Remove the large explanatory block at the top of the Loot Tables page.
   * Now a help pip on the heading it belongs to.
-* [~] Inputs need clearer descriptions/help text.
-  * What each input does is on the answers page; turning that into per-input
-    pips is the remaining authoring.
+* [x] Inputs need clearer descriptions/help text.
+  * Every input on the page carries a pip now, written from what the patched
+    script actually does: what the bonus roll chance changes, what the base
+    range is before multipliers, and what each of the three multiplier switches
+    turns on. The page also opens by saying what it covers, because the two
+    questions below were really the same question.
 
 ### Questions
 
 * [x] What exactly do the Loot Tables inputs do? - answered on the answers page.
-* [~] Where are ordinary enemy/item drops edited? - not in Lexeditor; needs the game to confirm where they live.
-* [~] Do enemies have separate drop definitions elsewhere? - same check.
+* [x] Where are ordinary enemy/item drops edited?
+* [x] Do enemies have separate drop definitions elsewhere?
+  * Confirmed against the installed game: nowhere, because Red Dead Redemption
+    has no per-enemy drop table in its data files. What a body yields is script
+    logic - one function rolls the bonus item, another decides the money - and
+    the ASI patches those two. That is why the tab has two cards and no enemy
+    list, and the tab now says so at the top instead of leaving the reader to
+    infer it from an absence.
 
 ## Missions
 
@@ -212,9 +234,12 @@
 
 ## Tables
 
-* [~] Fix vertical alignment of Type / Source / Name columns.
-  * Cells centre by the glyphs rather than the line box now, which is the
-    mechanism. Not seen in RDR1 itself, which needs game data to render here.
+* [x] Fix vertical alignment of Type / Source / Name columns.
+  * Seen in RDR1 itself now. Its list is hand-rolled, not the shared table, and
+    it centred each cell's line box: four cells in one row carrying a 14px
+    serif name, a 10px monospace id and two 10.5px sans columns, so the boxes
+    lined up and the letters sat at four heights. Text on one row shares a
+    baseline, and the row aligns on that.
 * [x] Fix the panel→pagination blank-space bug here, unless resolved globally.
   * Resolved globally.
 
@@ -240,9 +265,12 @@
     at eleven characters so a plugin that sets no width cannot repeat it.
 * [x] Fix panel→pagination empty-space bug if not solved globally.
   * Solved globally: the bar's height was being reserved twice.
-* [~] Add property pinning support; FF7 Intergrade currently appears not to have pins.
-  * Its tables already carry column preferences, so the machinery is there; each
-    detail field has to ask for its pin. Needs the plugin running to wire up.
+* [x] Add property pinning support; FF7 Intergrade currently appears not to have pins.
+  * Every one of the sixty-one properties has a pin now. The table declares a
+    column for each property in the loaded table's own schema rather than a
+    fixed list - the curated set is what starts pinned and the rest are
+    declared unpinned, so a pin has a column to bring in. Preferences are keyed
+    per asset. Pinning MP on Abilities puts an MP column in the table.
 * [x] Enforce sensible table column ordering globally:
   * In the manual, and the layout check fails a table whose name column comes
     before a numeric ID.
@@ -269,9 +297,13 @@
 
 ## Abilities
 
-* [~] Name should be the second column after a numeric ID.
-  * The rule is enforced against the shared demo; FF7R's own ability table
-    needs the plugin running to check and reorder.
+* [x] Name should be the second column after a numeric ID.
+  * Checked against both installed games. FF7R's ability table already reads ID
+    then Record. RDR1's mission list did not - it led with the name over a real
+    numeric ID, so that one is reordered. RDR1's items and shops keep the name
+    first on purpose: their ID is itself a name-shaped string, and the manual's
+    rule allows that because two name-shaped columns in the other order read as
+    the same column printed twice.
 * [x] Investigate malformed/tiny properties such as the field transcribed approximately as `council number`.
   * It is `Cancel Number`, and fifteen of the sixty-one ability properties are
     like it: array properties - STRING[], BYTE[], FLOAT[] - that are empty on
@@ -281,26 +313,31 @@
 
 ## Enemy Loot
 
-* [~] Properties are generically named `State`.
-  * Same root cause as the question below it: the label falls back to the data
-    key when nothing has named the property. The rule is now in the manual and
-    the verifier rejects storage labels in the shared demo; naming FF7R's own
-    properties needs the tables loaded.
-* [~] Reconsider/remove the repeated subtitle `Battle Item Possession`.
+* [x] Properties are generically named `State`.
+  * Found the actual source with the game loaded, and it was not a fallback
+    label: two panels invented a property row named STATE to say a section was
+    empty. A section that holds nothing is not a property, so it says so as a
+    note - no label column, no control, no pin - and the reader can no longer
+    mistake the invented row for a real one.
+* [x] Reconsider/remove the repeated subtitle `Battle Item Possession`.
+  * Removed. It was the same string under every single record, so it said
+    nothing about the record it sat under. The table is named once instead, on
+    the section, where it answers where the numbers come from.
 
 ### Question
 
-* [~] What does `Battle Item Possession` actually signify?
-  * On the answers page: the name is coming from the data table rather than
-    from anything the plugin authored, which is the same reason its neighbours
-    are called `State`. Reading it needs the game's DataObject tables.
+* [x] What does `Battle Item Possession` actually signify?
+  * Read from the installed game: it is the name of the FF7R table this tab
+    edits, one row per battle, keyed by the Data ID. That sentence is now the
+    help pip on the BATTLE section rather than a bare string repeated under
+    every record.
 
 ## Equipment / Items / Materia
 
-* [~] Equipment, Item, and Materia should be full normal tabs rather than subtabs.
-  * Those subtabs are built from the item tables found in the game's assets, so
-    promoting them to top-level tabs means enumerating that set at build time.
-    Needs the game's data to do without guessing at the names.
+* [x] Equipment, Item, and Materia should be full normal tabs rather than subtabs.
+  * The set turned out to be known at build time - three names the plugin
+    already declares - so no guessing was needed. They are three top-level tabs
+    with no subtab bar under them, each opening its own table.
 
 ## Tweaks
 
@@ -362,11 +399,15 @@
 
 ### Troop Icon Question
 
-* [~] If LexEditor can generate/create icons or renders for inventory items, can equivalent icons/renders be generated for troops?
+* [x] If LexEditor can generate/create icons or renders for inventory items, can equivalent icons/renders be generated for troops?
 * [x] If not, explain the technical difference.
-  * On the answers page: an item icon is one mesh with a fixed camera; a troop
-    is a body, a morph-built face and runtime-resolved equipment, so the icon is
-    a scene that has to be assembled first.
+  * The difference stands and the answer is yes, by paying for it. An item icon
+    is one mesh with a fixed camera; a troop is a body, a morph-built face and
+    equipment resolved at runtime, so a troop render is a scene somebody has to
+    assemble first. The troop panel assembles the part that actually exists in
+    the files - the equipment - and renders each piece, named. Bandit opens
+    twelve. What is still missing for a single portrait is the body and the
+    morph-built face, which the module files do not carry as meshes.
 
 ### Editing Question
 
