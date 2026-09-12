@@ -294,6 +294,42 @@ class HostApi:
             raise
         return {"restarting": True}
 
+    def app_update_status(self) -> dict:
+        """Check the latest published release only when the user asks."""
+        import app_update
+        return app_update.check(ROOT)
+
+    def app_update_result(self) -> dict:
+        from runtime_bootstrap import user_data_dir
+        path = user_data_dir() / "updates" / "last-result.json"
+        if not path.is_file():
+            return {}
+        result = json.loads(path.read_text(encoding="utf-8"))
+        path.unlink()
+        return result
+
+    def install_app_update(self) -> dict:
+        import app_update
+        from runtime_bootstrap import user_data_dir
+        with self._lock:
+            if self._dirty_count:
+                raise RuntimeError("Save or discard editor changes before updating Lexeditor.")
+            if getattr(self, "_update_requested", False) or self._restart_requested:
+                raise RuntimeError("Lexeditor is already closing or updating.")
+            plan = app_update.prepare(ROOT, user_data_dir())
+            self._update_requested = True
+            previous = self._close_authorized
+            self._close_authorized = True
+            try:
+                app_update.launch(plan)
+                self._bound_window().destroy()
+            except Exception:
+                plan.with_suffix(".cancelled").touch()
+                self._update_requested = False
+                self._close_authorized = previous
+                raise
+        return {"updating": True}
+
     def window_closing(self) -> bool:
         """Cancel an unconfirmed native close while the editor is dirty."""
         with self._lock:
@@ -452,7 +488,7 @@ class HostApi:
                 continue
             installation = managed["installation"]
             problems = installation["problems"]
-            if plugin.projects is not None:
+            if plugin.projects is not None and installation["status"] != "not-added":
                 project = self._projects.snapshot(plugin.plugin_id)
                 selected = next((row for row in project["projects"] if row["current"]), None)
                 if selected and selected["problems"]:
