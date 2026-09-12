@@ -58,8 +58,73 @@ class ProjectZomboidAcceptanceTests(unittest.TestCase):
             self.assertEqual(report["modId"], "LexeditorAcceptance")
             self.assertEqual(report["scriptInventory"]["recordCount"], 1)
             self.assertEqual(report["scriptInventory"]["counts"]["item"], 1)
+            self.assertFalse(report["activationEvidence"]["enabledAnywhere"])
             self.assertIn("not that Project Zomboid loaded", report["acceptanceBoundary"])
             self.assertEqual(len(report["manualGameTest"]), 5)
+
+    def test_activation_evidence_reads_default_and_save_mod_lists(self):
+        with tempfile.TemporaryDirectory() as name:
+            game, project, user = self.make_fixture(Path(name))
+            (user / "mods" / "default.txt").write_text(
+                "VERSION = 1,\n"
+                "mods\n"
+                "{\n"
+                "mod = OtherMod,\n"
+                "mod = LexeditorAcceptance,\n"
+                "}\n"
+                "maps\n"
+                "{\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            save = user / "Saves" / "Sandbox" / "AcceptanceWorld"
+            save.mkdir(parents=True)
+            (save / "mods.txt").write_text(
+                "VERSION = 1,\n"
+                "mods\n"
+                "{\n"
+                "mod = LexeditorAcceptance,\n"
+                "}\n"
+                "maps\n"
+                "{\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            report = acceptance.inspect(game, project, user)
+            evidence = report["activationEvidence"]
+
+            self.assertTrue(report["preflightReady"])
+            self.assertTrue(evidence["enabledAnywhere"])
+            self.assertTrue(evidence["defaultList"]["enabled"])
+            self.assertEqual(
+                evidence["defaultList"]["modIds"],
+                ["OtherMod", "LexeditorAcceptance"],
+            )
+            self.assertEqual(evidence["saveListsScanned"], 1)
+            self.assertEqual(len(evidence["matchingSaves"]), 1)
+            self.assertEqual(
+                evidence["matchingSaves"][0]["path"],
+                "Saves/Sandbox/AcceptanceWorld/mods.txt",
+            )
+            self.assertFalse(evidence["parseErrors"])
+            self.assertIn("evidence only", evidence["boundary"])
+
+    def test_malformed_activation_list_is_reported_but_not_a_preflight_failure(self):
+        with tempfile.TemporaryDirectory() as name:
+            game, project, user = self.make_fixture(Path(name))
+            (user / "mods" / "default.txt").write_text(
+                "VERSION = 1,\nnot_the_mods_block { }\n",
+                encoding="utf-8",
+            )
+
+            report = acceptance.inspect(game, project, user)
+            evidence = report["activationEvidence"]
+
+            self.assertTrue(report["preflightReady"])
+            self.assertFalse(evidence["enabledAnywhere"])
+            self.assertEqual(len(evidence["parseErrors"]), 1)
+            self.assertIn("No mods", evidence["parseErrors"][0]["error"])
 
     def test_cli_emits_json_and_uses_exit_status_for_preflight_readiness(self):
         with tempfile.TemporaryDirectory() as name:
