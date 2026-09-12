@@ -11,13 +11,14 @@ EDITOR = ROOT / "games" / "project_zomboid" / "editor.html"
 class ProjectZomboidUiContractTests(unittest.TestCase):
     def test_editor_exposes_every_structured_script_adapter(self):
         text = EDITOR.read_text(encoding="utf-8")
-        for tab in ("items", "evolved", "crafts", "fixing", "fluids", "vehicles", "sounds", "models", "mannequins", "timedactions"):
+        for tab in ("animationmeshes", "items", "evolved", "crafts", "fixing", "fluids", "vehicles", "sounds", "models", "mannequins", "timedactions"):
             with self.subTest(tab=tab):
                 self.assertIn(f'data-tab="{tab}"', text)
-        for endpoint in ("/api/items", "/api/evolvedrecipes", "/api/craftrecipes", "/api/fixings", "/api/fluids", "/api/vehicles", "/api/sounds", "/api/models", "/api/mannequins", "/api/timedactions"):
+        for endpoint in ("/api/animationmeshes", "/api/items", "/api/evolvedrecipes", "/api/craftrecipes", "/api/fixings", "/api/fluids", "/api/vehicles", "/api/sounds", "/api/models", "/api/mannequins", "/api/timedactions"):
             with self.subTest(endpoint=endpoint):
                 self.assertIn(endpoint, text)
         for renderer, save in (
+            ("renderAnimationMeshes", "/api/animationmeshes/save"),
             ("renderFixings", "/api/fixings/save"),
             ("renderVehicles", "/api/vehicles/save"),
             ("renderSounds", "/api/sounds/save"),
@@ -28,6 +29,15 @@ class ProjectZomboidUiContractTests(unittest.TestCase):
             with self.subTest(renderer=renderer):
                 self.assertIn(renderer, text)
                 self.assertIn(save, text)
+
+    def test_animation_mesh_ui_exposes_only_single_value_typed_fields(self):
+        text = EDITOR.read_text(encoding="utf-8")
+        for field_name in ("keepMeshAnimations", "meshFile", "postProcess"):
+            with self.subTest(field=field_name):
+                self.assertIn(f'"{field_name}"', text)
+        self.assertIn("animationDirectoryCount", text)
+        self.assertIn("animationPrefixCount", text)
+        self.assertIn("Repeated animation source lists are preserved", text)
 
     def test_craft_recipe_ui_exposes_schema_typed_skill_fields(self):
         text = EDITOR.read_text(encoding="utf-8")
