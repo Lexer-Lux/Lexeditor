@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import base64
+import os
 from pathlib import Path
 import tempfile
 import unittest
 
+from games.terraria import server
 from games.terraria.assets import asset_index, asset_state, create_asset, read_asset, replace_asset
 
 
@@ -84,6 +86,40 @@ class TerrariaAssetTests(unittest.TestCase):
                 create_asset(root, "Bad.wav", b"not-wav")
             with self.assertRaisesRegex(ValueError, "Ogg"):
                 create_asset(root, "Bad.ogg", b"not-ogg")
+
+    def test_service_create_read_replace_and_stale_refusal_use_selected_project(self):
+        previous_project = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "ExampleMod"
+                root.mkdir()
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = str(root)
+
+                created = server.create_asset_file("Content/Sword.png", PNG_1X1)
+                self.assertEqual(created["path"], "Content/Sword.png")
+                self.assertEqual([row["path"] for row in server.assets_state()["files"]], ["Content/Sword.png"])
+
+                data, state = server.asset_content("Content/Sword.png")
+                self.assertEqual(data, PNG_1X1)
+                self.assertEqual(state["sha256"], created["sha256"])
+
+                replaced = server.replace_asset_file(
+                    "Content/Sword.png",
+                    PNG_1X1_ALT,
+                    created["sha256"],
+                )
+                self.assertNotEqual(replaced["sha256"], created["sha256"])
+                self.assertEqual(server.asset_file("Content/Sword.png")["sha256"], replaced["sha256"])
+
+                with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
+                    server.replace_asset_file("Content/Sword.png", PNG_1X1, created["sha256"])
+                with self.assertRaisesRegex(ValueError, "Invalid tModLoader asset path"):
+                    server.asset_file("../Outside.png")
+        finally:
+            if previous_project is None:
+                os.environ.pop("LEXEDITOR_TERRARIA_PROJECT", None)
+            else:
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = previous_project
 
 
 if __name__ == "__main__":
