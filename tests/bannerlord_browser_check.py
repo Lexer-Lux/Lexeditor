@@ -125,6 +125,17 @@ window.fetch=async function(input,options={{}}){{
   const method=String(options.method||"GET").toUpperCase();
   if(method==="POST"){{
     const body=options.body?JSON.parse(options.body):{{}};window.__bannerlordRequests.push({{path,body}});
+    if(path==="/api/module/save"){{
+      const current=__fixtures["/api/module"],metadata=body.metadata||{{}};
+      const module={{...current,...metadata,
+        dependencies:body.dependencies??current.dependencies,
+        communityDependencies:body.communityDependencies??current.communityDependencies,
+        legacyDependencies:body.legacyDependencies??current.legacyDependencies,
+        modulesToLoadAfterThis:body.modulesToLoadAfterThis??current.modulesToLoadAfterThis,
+        incompatibleModules:body.incompatibleModules??current.incompatibleModules,
+        submodules:body.submodules??current.submodules,xmls:body.xmls??current.xmls}};
+      return new Response(JSON.stringify({{saved:1,module}}),{{status:200}});
+    }}
     if(path==="/api/module-data/save")return new Response(JSON.stringify(__moduleDataFixed),{{status:200}});
     if(path==="/api/gauntlet/save")return new Response(JSON.stringify(__gauntlet),{{status:200}});
     if(path==="/api/deploy-assets"){{
@@ -175,8 +186,13 @@ def main() -> None:
             legacy_id.fill("LegacyBrowserRenamed")
             assert page.evaluate("moduleDirty()") is True
             assert page.evaluate("state.module.legacyDependencies[0].id") == "LegacyBrowserRenamed"
-            legacy_id.fill("LegacyBrowserDep")
-            assert page.evaluate("moduleDirty()") is False
+            page.evaluate("save()")
+            page.wait_for_function("!moduleDirty()")
+            request = page.evaluate("window.__bannerlordRequests.find(row=>row.path==='/api/module/save')")
+            assert request["body"]["legacyDependencies"][0]["id"] == "LegacyBrowserRenamed"
+            assert request["body"]["legacyDependenciesBaseline"][0]["id"] == "LegacyBrowserDep"
+            assert request["body"]["legacyDependenciesBaseline"][0]["attributes"]["Future"] == "keep-browser"
+            assert page.evaluate("state.savedModule.legacyDependencies[0].id") == "LegacyBrowserRenamed"
 
             page.evaluate('navigate("deployment")')
             deployment_text = page.locator("#main").inner_text()

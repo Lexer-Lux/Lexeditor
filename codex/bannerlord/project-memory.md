@@ -107,12 +107,12 @@ Prefer implementing changes as a normal Bannerlord module with C#, XML/data file
 
 ## Lexeditor Bannerlord Integration Invariants
 
-As of 2026-09-09, the Bannerlord plugin uses these conservative rules. Keep them unless new game/upstream evidence establishes different behavior.
+As of 2026-09-12, the Bannerlord plugin uses these conservative rules. Keep them unless new game/upstream evidence establishes different behavior.
 
 ### Module metadata and dependency resolution
 
 - Treat current BUTR `Bannerlord.ModuleManager` behavior as the interoperability reference for extended dependency metadata.
-- Normalize BLSE `DependedModuleMetadatas`, legacy `LoadAfterModules`, and optional dependency blocks before native dependency rows. For duplicate load relations, the first row for a module ID wins; incompatibility relations use a separate first-ID-wins set. Existing compatibility-only legacy rows are structured-editable by ID/removal while retaining their original element shape and unknown attributes; creating new legacy rows stays source-only so Lexeditor does not invent a historical schema.
+- Normalize BLSE `DependedModuleMetadatas`, legacy `LoadAfterModules`, and optional dependency blocks before native dependency rows. For duplicate load relations, the first row for a module ID wins; incompatibility relations use a separate first-ID-wins set. Existing compatibility-only legacy rows are structured-editable by ID/removal while retaining their original element shape and unknown attributes; creating new legacy rows stays source-only so Lexeditor does not invent a historical schema. Structured legacy saves carry the originally loaded valid-row identity baseline; if valid rows are added, removed, or renamed on disk, Lexeditor refuses the save until reload. Malformed blank-ID legacy elements remain unmanaged and preserved.
 - Required extended dependencies may express `LoadBeforeThis` or `LoadAfterThis`; optional dependencies constrain ordering only when otherwise enabled and are not auto-enabled by Lexeditor Play.
 - Reject contradictory declarations before graph resolution: loadable + incompatible for the same ID, both before + after for the same ID, BLSE incompatible rows carrying an ordering edge, and direct circular declarations.
 - Native `DependentVersion` comparison follows TaleWorlds launcher semantics and ignores the changeset component. BLSE/BUTR community versions use minimum/wildcard/inclusive-range semantics.
