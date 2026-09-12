@@ -1,0 +1,92 @@
+name: Integrate Terraria file lifecycle APIs
+
+on:
+  push:
+    branches: [feature/terraria-plugin]
+    paths:
+      - '.github/workflows/terraria-lifecycle-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply guarded lifecycle patch
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('games/terraria/server.py')
+          text = path.read_text(encoding='utf-8')
+
+          def one(old, new):
+              global text
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'Expected one server anchor, found {count}: {old[:80]!r}')
+              text = text.replace(old, new, 1)
+
+          one(
+              'from .assets import ASSET_TYPES, asset_index, asset_state, create_asset, read_asset, replace_asset\n',
+              'from .assets import (\n    ASSET_TYPES, asset_index, asset_state, create_asset, delete_asset, read_asset, rename_asset, replace_asset,\n)\n',
+          )
+          one(
+              'from .source_text import create_source, save_source, source_file_state, source_index\n',
+              'from .source_text import (\n    create_source, delete_source, rename_source, save_source, source_file_state, source_index,\n)\n',
+          )
+          one(
+              '    if target == root or root not in target.parents or target.suffix.casefold() != ".hjson":\n        raise ValueError("Invalid localization path")\n    return target\n',
+              '    if target == root or root not in target.parents or target.suffix.casefold() != ".hjson":\n        raise ValueError("Invalid localization path")\n    parts = target.relative_to(root).parts\n    ignored = {".git", ".pytest_cache", "__pycache__", "out", "obj", "bin", ".vs"}\n    if ignored.intersection(parts) or any(part.startswith(".") for part in parts):\n        raise ValueError("Localization path is inside an ignored/generated folder")\n    return target\n',
+          )
+          one(
+              '    ignored = {".git", ".pytest_cache", "__pycache__", "out", "obj", "bin"}\n    candidates = sorted(\n        (\n            path for path in root.rglob("*.hjson")\n            if path.is_file() and not ignored.intersection(path.relative_to(root).parts)\n        ),\n',
+              '    ignored = {".git", ".pytest_cache", "__pycache__", "out", "obj", "bin", ".vs"}\n    candidates = sorted(\n        (\n            path for path in root.rglob("*.hjson")\n            if path.is_file()\n            and not ignored.intersection(path.relative_to(root).parts)\n            and not any(part.startswith(".") for part in path.relative_to(root).parts)\n        ),\n',
+          )
+          one(
+              'def create_source_file(relative: str, text: object = "") -> dict:\n    return create_source(project_root(), relative, text)\n\n\ndef assets_state() -> dict:\n',
+              'def create_source_file(relative: str, text: object = "") -> dict:\n    return create_source(project_root(), relative, text)\n\n\ndef rename_source_file(relative: str, new_relative: str, expected_sha256: str) -> dict:\n    return rename_source(project_root(), relative, new_relative, expected_sha256)\n\n\ndef delete_source_file(relative: str, expected_sha256: str) -> dict:\n    return delete_source(project_root(), relative, expected_sha256)\n\n\ndef assets_state() -> dict:\n',
+          )
+          one(
+              'def replace_asset_file(relative: str, data: bytes, expected_sha256: str) -> dict:\n    return replace_asset(project_root(), relative, data, expected_sha256)\n\n\ndef _decode_asset_data(value: object) -> bytes:\n',
+              'def replace_asset_file(relative: str, data: bytes, expected_sha256: str) -> dict:\n    return replace_asset(project_root(), relative, data, expected_sha256)\n\n\ndef rename_asset_file(relative: str, new_relative: str, expected_sha256: str) -> dict:\n    return rename_asset(project_root(), relative, new_relative, expected_sha256)\n\n\ndef delete_asset_file(relative: str, expected_sha256: str) -> dict:\n    return delete_asset(project_root(), relative, expected_sha256)\n\n\ndef _decode_asset_data(value: object) -> bytes:\n',
+          )
+          one(
+              '            if path == "/api/source/create":\n',
+              '            if path == "/api/source/rename":\n                payload = self.read_json()\n                if not isinstance(payload, dict) or set(payload) != {"path", "newPath", "expectedSha256"}:\n                    raise ValueError("Expected path, newPath and expectedSha256 only")\n                relative = payload["path"]\n                new_relative = payload["newPath"]\n                expected = payload["expectedSha256"]\n                if not isinstance(relative, str) or not isinstance(new_relative, str) or not isinstance(expected, str):\n                    raise ValueError("Invalid C# source rename request")\n                self.send_json(rename_source_file(relative, new_relative, expected))\n                return\n            if path == "/api/source/delete":\n                payload = self.read_json()\n                if not isinstance(payload, dict) or set(payload) != {"path", "expectedSha256"}:\n                    raise ValueError("Expected path and expectedSha256 only")\n                relative = payload["path"]\n                expected = payload["expectedSha256"]\n                if not isinstance(relative, str) or not isinstance(expected, str):\n                    raise ValueError("Invalid C# source delete request")\n                self.send_json(delete_source_file(relative, expected))\n                return\n            if path == "/api/source/create":\n',
+          )
+          one(
+              '            if path == "/api/assets/create":\n',
+              '            if path == "/api/assets/rename":\n                payload = self.read_json()\n                if not isinstance(payload, dict) or set(payload) != {"path", "newPath", "expectedSha256"}:\n                    raise ValueError("Expected path, newPath and expectedSha256 only")\n                relative = payload["path"]\n                new_relative = payload["newPath"]\n                expected = payload["expectedSha256"]\n                if not isinstance(relative, str) or not isinstance(new_relative, str) or not isinstance(expected, str):\n                    raise ValueError("Invalid asset rename request")\n                self.send_json(rename_asset_file(relative, new_relative, expected))\n                return\n            if path == "/api/assets/delete":\n                payload = self.read_json()\n                if not isinstance(payload, dict) or set(payload) != {"path", "expectedSha256"}:\n                    raise ValueError("Expected path and expectedSha256 only")\n                relative = payload["path"]\n                expected = payload["expectedSha256"]\n                if not isinstance(relative, str) or not isinstance(expected, str):\n                    raise ValueError("Invalid asset delete request")\n                self.send_json(delete_asset_file(relative, expected))\n                return\n            if path == "/api/assets/create":\n',
+          )
+
+          path.write_text(text, encoding='utf-8')
+          Path('.github/workflows/terraria-lifecycle-patch.yml').unlink()
+          PY
+
+          python -m compileall -q games/terraria
+          python -m unittest discover -s tests -p 'test_terraria_*.py'
+          python - <<'PY'
+          from pathlib import Path
+          html = Path('games/terraria/editor.html').read_text(encoding='utf-8')
+          Path('/tmp/terraria-editor.js').write_text(html.split('<script>')[-1].split('</script>', 1)[0], encoding='utf-8')
+          PY
+          node --check /tmp/terraria-editor.js
+          git diff --check
+      - name: Commit lifecycle API
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Expose Terraria source and asset lifecycle APIs'
+          git push origin HEAD:feature/terraria-plugin
