@@ -1,0 +1,35 @@
+name: Regenerate Project Zomboid credits
+
+on:
+  push:
+    branches: [project-zomboid-plugin]
+    paths:
+      - '.github/workflows/project-zomboid-regenerate-credits.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: project-zomboid-plugin
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate offline credits
+        run: python tools/generate_credits.py
+      - name: Commit generated credits if needed
+        run: |
+          if git diff --quiet -- ui/credits.json; then
+            echo 'Credits already current.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add ui/credits.json
+          git commit -m 'Regenerate offline credits for Project Zomboid'
+          git push origin HEAD:project-zomboid-plugin
