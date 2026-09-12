@@ -60,8 +60,12 @@ def _complete_acceptance_report() -> dict:
             "x2": {"ready": True, "sha256": "b" * 64},
         },
         "structured": [
-            {"key": key, "status": "validated", "tableSha256": f"{index:x}" * 64}
-            for index, key in enumerate(EXPECTED_STRUCTURED_KEYS, 1)
+            {
+                "key": key,
+                "status": "validated",
+                "tableSha256": hashlib.sha256(key.encode("utf-8")).hexdigest(),
+            }
+            for key in EXPECTED_STRUCTURED_KEYS
         ],
         "launch": {
             "ready": True,
