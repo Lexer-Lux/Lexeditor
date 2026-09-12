@@ -140,11 +140,21 @@ As of 2026-09-12, the Bannerlord plugin uses these conservative rules. Keep them
 - Create/Rename use portable Windows-safe folder-name rules even when Lexeditor runs on another platform.
 - Bannerlord template display names must be escaped for XML contexts independently from the sanitized module/C# identifier.
 
+### Editor concurrency and source integrity
+
+- Raw Source saves are compare-and-swap writes against the exact text loaded by the editor. If the file changed on disk, refuse before creating a backup or temp file. Preserve whether UTF-8 originally had a BOM and write encoded bytes so line endings are not silently translated by the host OS.
+- If Raw Source and a structured surface both have unsaved edits for the same file, refuse the combined Save before either surface writes. After a successful raw save, reload any matching structured surface so its in-memory baseline cannot remain stale.
+- Whole-file structured sources carry the SHA-256 revision loaded by the UI. `SubModule.xml`, the selected `.csproj`, custom skills, effects, perks, XP-source defaults, and MCM defaults all require that revision before their structured writer runs; an external file edit therefore cannot be overwritten merely because record identities stayed unchanged.
+- Gauntlet and ModuleData remain surgical editors: their writes carry the original path/value or record identity needed to reject stale managed spans while preserving unrelated external edits instead of imposing a whole-document lock.
+- Deployed Runtime Override JSON carries a per-file revision, using an explicit `missing` revision when a file did not exist at load time. Creating or changing one of those files externally invalidates the relevant Runtime save before mutation.
+- The Runtime page exposes an explicit Reload action. Reloading while dirty asks through Lexeditor's shared confirmation UI before discarding pending Runtime edits.
+
 ### Deploy and runtime boundaries
 
 - Asset deployment is additive and never intentionally deletes pre-existing deployed files as part of a successful sync. Overwrites get backups.
 - Before the first deployed-file write, Lexeditor validates the complete source/destination/helper plan. All changed assets are staged to temporary files and all existing destinations are backed up before the first replacement.
 - If a late destination replacement fails, already-committed existing assets are restored from backups and already-committed newly-created assets are removed; staged temporary files are cleaned up. Incomplete rollback is surfaced as an explicit error rather than silently reported as success.
 - Runtime balancing files managed by the Runtime Overrides editor are excluded from ordinary build/deploy asset synchronization.
+- Effects and XP Runtime Override changes from one Save are one transaction: stage every changed JSON candidate first, create all required backups before replacing either destination, recheck loaded revisions before mutation, and roll back an already-committed existing file (or remove an already-created new file) if a later destination replacement fails. Report incomplete rollback explicitly.
 - Write-capable project/deploy paths reject resolved symlink/junction escapes. Read-only installed-module discovery remains compatible with legitimate mod-manager junctions where no write occurs.
 - CI and isolated smoke tests establish editor/build/deploy behavior only; they do not establish real in-game runtime or visual acceptance. A local Bannerlord launch remains required for that final acceptance step.
