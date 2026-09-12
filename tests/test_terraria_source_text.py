@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from hashlib import sha256
+import os
 from pathlib import Path
 import tempfile
 import unittest
 
+from games.terraria import server
 from games.terraria.source_text import UTF8_BOM, save_source, source_file_state, source_index
 
 
@@ -83,6 +85,45 @@ class TerrariaSourceTextTests(unittest.TestCase):
             target.write_bytes(b"class Bad {\x00}\n")
             with self.assertRaisesRegex(ValueError, "NUL"):
                 source_file_state(root, "Bad.cs")
+
+    def test_service_index_read_save_and_stale_refusal_use_selected_project(self):
+        previous_project = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "ExampleMod"
+                content = root / "Content"
+                content.mkdir(parents=True)
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = str(root)
+                target = content / "ExampleItem.cs"
+                original = UTF8_BOM + b"namespace ExampleMod.Content;\r\n\r\npublic class ExampleItem {}\r\n"
+                target.write_bytes(original)
+
+                index = server.source_state()
+                self.assertEqual([row["path"] for row in index["files"]], ["Content/ExampleItem.cs"])
+
+                state = server.source_file("Content/ExampleItem.cs")
+                self.assertEqual(state["sha256"], sha256(original).hexdigest())
+                self.assertIn("public class ExampleItem {}", state["text"])
+
+                saved = server.save_source_file(
+                    state["path"],
+                    state["text"].replace("ExampleItem {}", "ExampleItem { public int Value = 1; }"),
+                    state["sha256"],
+                )
+                raw = target.read_bytes()
+                self.assertTrue(raw.startswith(UTF8_BOM))
+                self.assertIn(b"Value = 1; }\r\n", raw)
+                self.assertEqual(saved["sha256"], sha256(raw).hexdigest())
+
+                with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
+                    server.save_source_file(state["path"], state["text"], state["sha256"])
+                with self.assertRaisesRegex(ValueError, "Invalid C# source path"):
+                    server.source_file("../Outside.cs")
+        finally:
+            if previous_project is None:
+                os.environ.pop("LEXEDITOR_TERRARIA_PROJECT", None)
+            else:
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = previous_project
 
 
 if __name__ == "__main__":
