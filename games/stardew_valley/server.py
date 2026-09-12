@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from . import paths
+from .acceptance import acceptance_status, begin_acceptance
 from .content_pack import ContentPackStore, deploy, deployment_status, loader_status, revert
 from .source_data import load_base_objects
 
@@ -18,7 +19,12 @@ PORT = int(os.environ.get("LEXEDITOR_PORT", "0"))
 HOSTED = os.environ.get("LEXEDITOR_PLUGIN_HOSTED") == "1"
 WINDOW_HOST = os.environ.get("LEXEDITOR_WINDOW_HOST", "browser")
 MAX_REQUEST_BYTES = 1024 * 1024
-POST_ROUTES = {"/api/objects/save", "/api/deployment/deploy", "/api/deployment/revert"}
+POST_ROUTES = {
+    "/api/objects/save",
+    "/api/deployment/deploy",
+    "/api/deployment/revert",
+    "/api/acceptance/begin",
+}
 
 
 def objects_dataset() -> dict:
@@ -90,6 +96,7 @@ def dashboard() -> dict:
         "loader": loader_status(paths.GAME_ROOT),
         "source": source,
         "deployment": deployment_status(paths.GAME_ROOT, paths.PROJECT_ROOT),
+        "acceptance": acceptance_status(paths.GAME_ROOT, paths.PROJECT_ROOT),
         "problems": paths.game_problems(),
         "scaffold": False,
     }
@@ -132,12 +139,15 @@ class Handler(BaseHTTPRequestHandler):
                     "edition": "PC 1.6 / SMAPI + Content Patcher", "hosted": HOSTED,
                     "windowHost": WINDOW_HOST, "projectRoot": str(paths.PROJECT_ROOT),
                     "editorRoot": str(PLUGIN_ROOT),
-                    "capabilities": ["data-map", "content-patcher", "objects", "deploy", "read", "save"],
+                    "capabilities": [
+                        "data-map", "content-patcher", "objects", "deploy", "read", "save", "installed-acceptance",
+                    ],
                 })
             elif path == "/api/dashboard": self.json_response(dashboard())
             elif path == "/api/datamap": self.json_response(data_map())
             elif path == "/api/objects": self.json_response(objects_dataset())
             elif path == "/api/deployment": self.json_response(deployment_status(paths.GAME_ROOT, paths.PROJECT_ROOT))
+            elif path == "/api/acceptance": self.json_response(acceptance_status(paths.GAME_ROOT, paths.PROJECT_ROOT))
             else: self.json_response({"error": "Not found"}, 404)
         except FileNotFoundError as error: self.json_response({"error": str(error)}, 409)
         except RuntimeError as error: self.json_response({"error": str(error)}, 409)
@@ -167,7 +177,8 @@ class Handler(BaseHTTPRequestHandler):
                     str(payload.get("sha256", "")), payload.get("edits", []))
                 result = objects_dataset()
             elif path == "/api/deployment/deploy": result = deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
-            else: result = revert(paths.GAME_ROOT, paths.PROJECT_ROOT)
+            elif path == "/api/deployment/revert": result = revert(paths.GAME_ROOT, paths.PROJECT_ROOT)
+            else: result = begin_acceptance(paths.GAME_ROOT, paths.PROJECT_ROOT)
             self.json_response(result)
         except FileNotFoundError as error: self.json_response({"error": str(error)}, 409)
         except RuntimeError as error: self.json_response({"error": str(error)}, 409)
