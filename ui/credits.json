@@ -493,6 +493,27 @@
           "text": "MIT License\n\nCopyright (c) 2021 WesternGamer\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
         }
       ]
+    },
+    "stardew-valley": {
+      "contributions": [
+        {
+          "name": "Stardew Valley Wiki contributors",
+          "role": "Reference for Content Patcher usage, Stardew Valley 1.6 data assets, and Data/Objects field semantics.",
+          "url": "https://stardewvalleywiki.com/Modding:Index"
+        },
+        {
+          "name": "Pathoschild / Content Patcher contributors",
+          "role": "Canonical Content Patcher content-pack and EditData behavior used by Stardew projects.",
+          "url": "https://github.com/Pathoschild/StardewMods"
+        },
+        {
+          "name": "Pathoschild / SMAPI contributors",
+          "role": "Established Stardew Valley mod loader and content-pack runtime targeted by deployment.",
+          "url": "https://github.com/Pathoschild/SMAPI"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
     }
   }
 }
