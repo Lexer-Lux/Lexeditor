@@ -161,11 +161,13 @@ def main() -> None:
             assert editors.count() == 2
 
             bit_editor = editors.nth(0)
-            bit_inputs = bit_editor.locator('input[type="number"]')
+            bit_inputs = bit_editor.locator('input:is([type="number"],[inputmode="decimal"])')
             assert bit_inputs.count() == 2
-            assert bit_inputs.nth(0).input_value() == str(0x7F0044)
-            assert bit_inputs.nth(1).input_value() == "3"
+            assert bit_inputs.nth(0).input_value().replace(",", "") == str(0x7F0044)
+            assert bit_inputs.nth(1).input_value().replace(",", "") == "3"
+            bit_inputs.nth(0).focus()
             bit_inputs.nth(0).fill(str(0x7F01AA))
+            bit_inputs.nth(1).focus()
             bit_inputs.nth(1).fill("7")
             bit_editor.get_by_role("button", name="Apply command", exact=True).click()
 
@@ -177,11 +179,14 @@ def main() -> None:
             assert first["values"] == {"memoryAddress": 0x7F01AA, "bitIndex": 7}
 
             compare_editor = page.locator(".ct-command-editor").nth(1)
-            compare_inputs = compare_editor.locator('input[type="number"]')
+            compare_inputs = compare_editor.locator('input:is([type="number"],[inputmode="decimal"])')
             assert compare_inputs.count() == 4
-            assert compare_inputs.nth(0).input_value() == str(0x7F0155)
+            assert compare_inputs.nth(0).input_value().replace(",", "") == str(0x7F0155)
+            compare_inputs.nth(0).focus()
             compare_inputs.nth(0).fill(str(0x7F0044))
+            compare_inputs.nth(1).focus()
             compare_inputs.nth(1).fill(str(0x7F))
+            compare_inputs.nth(2).focus()
             compare_inputs.nth(2).fill("2")
             compare_editor.get_by_role("button", name="Apply command", exact=True).click()
 

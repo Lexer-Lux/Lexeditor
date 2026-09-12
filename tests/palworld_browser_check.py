@@ -129,9 +129,9 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     values = selector.locator("option").evaluate_all("nodes=>nodes.map(n=>({value:n.value,text:n.textContent}))")
                     assert values[0]["value"].endswith("aaa_bad.json"), values
                     assert "1 error" in values[0]["text"], values
-                    assert selector.input_value().endswith("balance.json"), selector.input_value()
+                    assert selector.input_value().replace(",", "").endswith("balance.json"), selector.input_value().replace(",", "")
 
-                    numeric = page.locator('.pal-schema-columns .pal-detail input[type="number"]')
+                    numeric = page.locator('.pal-schema-columns .pal-detail input:is([type="number"],[inputmode="decimal"])')
                     assert numeric.count() >= 1
                     schema_record = page.evaluate("selectedPatchRecord()")
                     assert schema_record["schemaState"] == "matched"
@@ -156,11 +156,11 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     assert json.loads(good.read_text("utf-8"))["DT_PalMonsterParameter"]["Kitsunebi"]["Mode"] == "ModeB"
 
                     page.locator(".pal-patch-row").filter(has_text="WorkSuitability_EmitFlame").click()
-                    page.wait_for_selector(".pal-add-field-select")
+                    page.wait_for_function("palFieldChoices.some(field => field.name === 'AddedCount') && document.querySelector('.pal-patch-row.selected')?.textContent.includes('WorkSuitability_EmitFlame')")
                     add_select = page.locator(".pal-add-field-select")
                     assert "AddedCount" in add_select.locator("option").all_text_contents()
                     add_select.select_option("AddedCount")
-                    add_value = page.locator('.pal-detail input.pal-add-value[type="number"]')
+                    add_value = page.locator('.pal-detail input.pal-add-value:is([type="number"],[inputmode="decimal"])')
                     assert add_value.count() == 1
                     add_value.fill("11")
                     page.get_by_role("button", name="Add property", exact=True).click()
@@ -179,7 +179,7 @@ with tempfile.TemporaryDirectory(prefix="lexeditor-palworld-browser-") as temp_n
                     selector.select_option(jsonc_value)
                     page.wait_for_function("palPatch !== null && palPatch.writable === false")
                     assert "keep me" in commented.read_text("utf-8")
-                    assert page.locator('.pal-schema-columns .pal-detail input[type="number"]').count() == 0
+                    assert page.locator('.pal-schema-columns .pal-detail input:is([type="number"],[inputmode="decimal"])').count() == 0
 
                     page.evaluate('navigate("build")')
                     page.wait_for_function("typeof palBuildState === 'object' && palBuildState !== null && !palBuildLoading")

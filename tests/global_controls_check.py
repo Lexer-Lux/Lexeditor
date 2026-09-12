@@ -150,6 +150,15 @@ def main() -> None:
           return {cancel,error,current:h.current,canForward:h.canForward,visible};
         }''')
         assert result['cancel'] and result['error'] and not result['canForward'] and result['current']=='Data Map',result
+        # An omitted lower bound must not turn into zero during number formatting.
+        page.evaluate("document.querySelector('#main').append(LexeditorUI.el('input',{id:'no-lower-bound',type:'number',max:100000,value:-12}))")
+        number = page.locator('#no-lower-bound[inputmode="decimal"]')
+        number.wait_for()
+        assert number.input_value() == '-12'
+        number.focus()
+        number.fill('-20')
+        number.blur()
+        assert number.input_value() == '-20'
         assert not errors, errors
         results={'new_button':'pass','whole_header_sort':'pass','selection_retained':'pass',
           'divider_keyboard_persistence_doubleclick_contextmenu_stack':'pass','units_integer_bounds':'pass',

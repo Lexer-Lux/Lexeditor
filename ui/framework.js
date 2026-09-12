@@ -7084,7 +7084,8 @@ ${contents.path}`});
       // A text box does not enforce min and max the way a number box does, so
       // the bounds the plugin declared are applied here instead of quietly
       // going away with the spinner.
-      const floor = Number(input.min), ceiling = Number(input.max);
+      const floor = input.min === "" ? NaN : Number(input.min);
+      const ceiling = input.max === "" ? NaN : Number(input.max);
       const clamp = value => {
         let bounded = value;
         if (Number.isFinite(floor)) bounded = Math.max(floor, bounded);

@@ -115,11 +115,13 @@ def main() -> None:
             assert editor.count() == 1
             assert "Script-memory address" in editor.inner_text()
             assert "Bit mask" in editor.inner_text()
-            inputs = editor.locator('input[type="number"]')
+            inputs = editor.locator('input:is([type="number"],[inputmode="decimal"])')
             assert inputs.count() == 2
-            assert inputs.nth(0).input_value() == str(0x7F0220)
-            assert inputs.nth(1).input_value() == str(0x55)
+            assert inputs.nth(0).input_value().replace(",", "") == str(0x7F0220)
+            assert inputs.nth(1).input_value().replace(",", "") == str(0x55)
+            inputs.nth(0).focus()
             inputs.nth(0).fill(str(0x7F0240))
+            inputs.nth(1).focus()
             inputs.nth(1).fill(str(0xAA))
             editor.get_by_role("button", name="Apply command", exact=True).click()
 

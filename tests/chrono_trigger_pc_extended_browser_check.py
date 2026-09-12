@@ -162,11 +162,13 @@ def main() -> None:
             assert "Local-memory slot (raw)" in text
             assert "Extended-memory slot (raw)" in text
             assert "0x7F" not in text
-            inputs = copy_editor.locator('input[type="number"]')
+            inputs = copy_editor.locator('input:is([type="number"],[inputmode="decimal"])')
             assert inputs.count() == 2
-            assert inputs.nth(0).input_value() == str(0x11)
-            assert inputs.nth(1).input_value() == str(0x12)
+            assert inputs.nth(0).input_value().replace(",", "") == str(0x11)
+            assert inputs.nth(1).input_value().replace(",", "") == str(0x12)
+            inputs.nth(0).focus()
             inputs.nth(0).fill(str(0x22))
+            inputs.nth(1).focus()
             inputs.nth(1).fill(str(0x44))
             copy_editor.get_by_role("button", name="Apply command", exact=True).click()
 
@@ -184,10 +186,13 @@ def main() -> None:
             assert "Comparison value" in compare_text
             assert "Comparison operation" in compare_text
             assert "Jump bytes if false" in compare_text
-            compare_inputs = compare_editor.locator('input[type="number"]')
+            compare_inputs = compare_editor.locator('input:is([type="number"],[inputmode="decimal"])')
             assert compare_inputs.count() == 4
+            compare_inputs.nth(0).focus()
             compare_inputs.nth(0).fill(str(0x55))
+            compare_inputs.nth(1).focus()
             compare_inputs.nth(1).fill(str(0x2A))
+            compare_inputs.nth(2).focus()
             compare_inputs.nth(2).fill("5")
             compare_editor.get_by_role("button", name="Apply command", exact=True).click()
 

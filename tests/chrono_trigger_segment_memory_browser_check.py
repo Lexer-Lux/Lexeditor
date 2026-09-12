@@ -118,11 +118,13 @@ def main() -> None:
             assert "PC segment destination (raw)" in text
             assert "16-bit value" in text
             assert "0x7F" not in text
-            inputs = editor.locator('input[type="number"]')
+            inputs = editor.locator('input:is([type="number"],[inputmode="decimal"])')
             assert inputs.count() == 2
-            assert inputs.nth(0).input_value() == str(0x1234)
-            assert inputs.nth(1).input_value() == str(0x5678)
+            assert inputs.nth(0).input_value().replace(",", "") == str(0x1234)
+            assert inputs.nth(1).input_value().replace(",", "") == str(0x5678)
+            inputs.nth(0).focus()
             inputs.nth(0).fill(str(0xBEEF))
+            inputs.nth(1).focus()
             inputs.nth(1).fill(str(0xCAFE))
             editor.get_by_role("button", name="Apply command", exact=True).click()
 

@@ -300,8 +300,9 @@ def main() -> None:
 
             facing_editor = editors.nth(0)
             assert "Facing (0 up, 1 down, 2 left, 3 right)" in facing_editor.inner_text()
-            facing_input = facing_editor.locator('input[type="number"]')
-            assert facing_input.input_value() == "1"
+            facing_input = facing_editor.locator('input:is([type="number"],[inputmode="decimal"])')
+            assert facing_input.input_value().replace(",", "") == "1"
+            facing_input.focus()
             facing_input.fill("3")
             facing_editor.get_by_role("button", name="Apply command", exact=True).click()
             page.wait_for_function('state.events.detail?.objects?.[0]?.functions?.[0]?.commands?.[0]?.editor?.values?.facing === 3')
@@ -322,12 +323,13 @@ def main() -> None:
             assert "Comparison value" in comparison_text
             assert "Comparison operation (0–7)" in comparison_text
             assert "Jump bytes if false" in comparison_text
-            comparison_inputs = comparison_editor.locator('input[type="number"]')
+            comparison_inputs = comparison_editor.locator('input:is([type="number"],[inputmode="decimal"])')
             assert comparison_inputs.count() == 4
-            assert comparison_inputs.nth(0).input_value() == str(0x7F0220)
-            assert comparison_inputs.nth(1).input_value() == str(0x1234)
-            assert comparison_inputs.nth(2).input_value() == "3"
-            assert comparison_inputs.nth(3).input_value() == "1"
+            assert comparison_inputs.nth(0).input_value().replace(",", "") == str(0x7F0220)
+            assert comparison_inputs.nth(1).input_value().replace(",", "") == str(0x1234)
+            assert comparison_inputs.nth(2).input_value().replace(",", "") == "3"
+            assert comparison_inputs.nth(3).input_value().replace(",", "") == "1"
+            comparison_inputs.nth(1).focus()
             comparison_inputs.nth(1).fill(str(0xBEEF))
             comparison_editor.get_by_role("button", name="Apply command", exact=True).click()
             page.wait_for_function('state.events.detail?.objects?.[0]?.functions?.[0]?.commands?.[1]?.editor?.values?.value === 48879')

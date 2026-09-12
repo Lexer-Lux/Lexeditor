@@ -179,9 +179,11 @@ def main() -> None:
 
             facing = editors.nth(0)
             assert "Store facing at" in facing.inner_text()
-            facing_inputs = facing.locator('input[type="number"]')
+            facing_inputs = facing.locator('input:is([type="number"],[inputmode="decimal"])')
             assert facing_inputs.count() == 2
+            facing_inputs.nth(0).focus()
             facing_inputs.nth(0).fill("7")
+            facing_inputs.nth(1).focus()
             facing_inputs.nth(1).fill(str(0x7F0240))
             facing.get_by_role("button", name="Apply command", exact=True).click()
             page.wait_for_function('document.querySelectorAll(".ct-hex")[0]?.textContent === "0E 20"')
@@ -191,7 +193,8 @@ def main() -> None:
 
             editors = page.locator(".ct-command-editor")
             processing = editors.nth(1)
-            processing.locator('input[type="number"]').fill("9")
+            processing.locator('input:is([type="number"],[inputmode="decimal"])').focus()
+            processing.locator('input:is([type="number"],[inputmode="decimal"])').fill("9")
             processing.get_by_role("button", name="Apply command", exact=True).click()
             page.wait_for_function('document.querySelectorAll(".ct-hex")[1]?.textContent === "12"')
             page.wait_for_function('document.querySelectorAll(".ct-command-summary")[1]?.textContent === "Disable script processing for object 9"')
@@ -200,9 +203,11 @@ def main() -> None:
 
             editors = page.locator(".ct-command-editor")
             vector = editors.nth(2)
-            vector_inputs = vector.locator('input[type="number"]')
+            vector_inputs = vector.locator('input:is([type="number"],[inputmode="decimal"])')
             assert vector_inputs.count() == 2
+            vector_inputs.nth(0).focus()
             vector_inputs.nth(0).fill(str(0x7F0244))
+            vector_inputs.nth(1).focus()
             vector_inputs.nth(1).fill(str(0x7F0246))
             vector.get_by_role("button", name="Apply command", exact=True).click()
             page.wait_for_function('document.querySelectorAll(".ct-hex")[2]?.textContent === "22 23"')
