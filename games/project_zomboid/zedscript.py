@@ -30,6 +30,10 @@ _BLOCK_RE = re.compile(
     r"\s+(?P<name>[^\s{]+(?:\s+[^\s{]+)*)\s*\{",
     re.IGNORECASE,
 )
+_EDITABLE = {
+    "animationsMesh", "item", "evolvedrecipe", "craftRecipe", "fixing", "fluid",
+    "vehicle", "sound", "model", "mannequin", "timedAction",
+}
 
 
 def _brace_depth(masked: str, start: int, end: int) -> int:
@@ -72,7 +76,7 @@ def inventory_file(path: Path, root: Path) -> dict:
                     "sha256": core.sha256_bytes(data),
                     "start": match.start(),
                     "end": close_brace + 1,
-                    "editable": kind in {"item", "evolvedrecipe", "craftRecipe", "fixing", "fluid", "vehicle", "sound", "model", "mannequin", "timedAction"},
+                    "editable": kind in _EDITABLE,
                 })
                 cursor = close_brace + 1
     except core.ProjectZomboidError as error:
