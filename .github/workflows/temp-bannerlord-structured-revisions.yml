@@ -1,0 +1,112 @@
+name: Temporary Bannerlord structured source revisions
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-structured-revisions.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply structured revision patch
+        run: python tools/temp_bannerlord_structured_revisions.py
+      - name: Focused validation
+        run: |
+          python -m py_compile games/bannerlord/source_revision.py games/bannerlord/server.py games/bannerlord/plugin.py tests/test_bannerlord_source_revision.py
+          python -m unittest tests.test_bannerlord_source_revision tests.test_bannerlord_smoke tests.test_bannerlord_ui_contract -v
+          python tools/verify_shared_ui_contract.py
+          python -c "import glob, subprocess; [subprocess.run(['node','--check',path], check=True) for path in glob.glob('games/bannerlord/editor*.js')]"
+          git diff --check
+      - name: Commit structured revisions
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/bannerlord/source_revision.py games/bannerlord/server.py games/bannerlord/editor_core.js games/bannerlord/editor_boot.js games/bannerlord/plugin.py tests/test_bannerlord_source_revision.py tests/bannerlord_browser_check.py
+          git commit -m "Guard Bannerlord structured source revisions"
+          git push origin HEAD:feature/bannerlord-plugin
+
+  regression:
+    needs: patch
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install Pillow 'fonttools>=4.59,<5'
+      - run: python -m compileall -q games/bannerlord desktop_host.py service_session.py plugin_api.py project_manager.py runtime_bootstrap.py
+      - run: python -m unittest discover -s tests -p 'test_bannerlord*.py' -v
+      - run: python -m unittest discover -s tests -p 'test_project*.py' -v
+      - run: python -m unittest discover -s tests -p test_data_map_coverage.py -v
+      - run: python -c "import glob, subprocess; [subprocess.run(['node','--check',path], check=True) for path in glob.glob('games/bannerlord/editor*.js')]"
+
+  shared-contract:
+    needs: patch
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python tools/verify_shared_ui_contract.py
+      - run: python -m unittest tests.test_bannerlord_ui_contract -v
+
+  browser:
+    needs: patch
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python tests/bannerlord_browser_check.py out/bannerlord-structured-revisions
+
+  cleanup:
+    if: ${{ always() && needs.patch.result == 'success' && needs.regression.result == 'success' && needs.shared-contract.result == 'success' && needs.browser.result == 'success' }}
+    needs: [patch, regression, shared-contract, browser]
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - name: Remove temporary revision harness
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/temp-bannerlord-structured-revisions.yml tools/temp_bannerlord_structured_revisions.py
+          git commit -m "Clean Bannerlord structured revision harness"
+          git push origin HEAD:feature/bannerlord-plugin
