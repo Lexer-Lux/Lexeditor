@@ -18,7 +18,9 @@ Content Patcher is a SMAPI mod which applies content packs from the game's `Mods
 
 Stardew Valley 1.6 moved many formerly slash-delimited data tables to strongly typed models and added/expanded assets such as `Data/Objects`, `Data/BigCraftables`, `Data/Machines`, `Data/Fences`, and `Data/FloorsAndPaths`. This makes those assets the preferred Lexeditor coverage surface.
 
-StardewXnbHack is the canonical first read-side bridge because the Stardew modding documentation recommends it over xnbcli for typed game-data models. It loads assets through Stardew Valley's own content runtime and writes data assets as JSON. Its normal export root is `Content (unpacked)`. Lexeditor currently consumes an existing export rather than launching or redistributing the helper, which keeps source acquisition explicit and avoids silently generating a full unpack inside the game directory.
+StardewXnbHack is the canonical first read-side bridge because the Stardew modding documentation recommends it over xnbcli for typed game-data models. It loads assets through Stardew Valley's own content runtime and writes data assets as JSON. Its normal export root is `Content (unpacked)`.
+
+**Source-generation decision:** Lexeditor will not invoke StardewXnbHack automatically in this first slice. The helper's documented operation unpacks the full `Content` tree; it doesn't expose a documented single-asset `Data/Objects` command. Silently triggering a full unpack merely to populate one editor would be disproportionate and would create a large derived-data tree inside the installation. Lexeditor therefore consumes an existing export, reports clearly when it is absent, and keeps the source-generation step explicit until a genuinely narrow supported path exists.
 
 `Data/Objects` is a string-keyed model lookup. Useful schema facts for the first editor include:
 
@@ -32,21 +34,30 @@ StardewXnbHack is the canonical first read-side bridge because the Stardew moddi
 
 Content Patcher's documented `EditData` shape uses a `content.json` root with a `Format` version and `Changes` array. An object field edit targets `Data/Objects` and places per-record field edits under `Fields`; this is preferable to replacing a whole record when only a few fields changed. The first editor therefore keeps vanilla values separate from project overrides and only serializes fields whose **Override** control is enabled.
 
+## Installed acceptance contract
+
+The editor now has an explicit real-install acceptance flow instead of treating synthetic smoke tests as installation proof:
+
+1. Save at least one supported `Data/Objects` field override and deploy the current project through Lexeditor.
+2. **Begin Acceptance** verifies the deployed `manifest.json` and `content.json` match the current project, snapshots `Content/Data/Objects.xnb` by SHA-256, and snapshots the current `SMAPI-latest.txt` hash.
+3. Launch Stardew Valley through SMAPI and reach the title screen so SMAPI discovers the content pack.
+4. **Verify New SMAPI Run** requires a genuinely new log, parses SMAPI's own runtime signature, requires Stardew **1.6.15**, verifies Content Patcher was loaded, verifies this project appears in SMAPI's `Loaded ... content packs` section as `for Content Patcher`, rejects project-specific load errors, checks SMAPI against Content Patcher's manifest-declared minimum API version when available, and confirms `Objects.xnb` is still byte-identical to the baseline.
+
+The harness records evidence; it does not manufacture acceptance. The PR stays draft until this flow passes against a real Windows/Steam installation.
+
 ## Sources and licensing
 
 These sources materially inform the plugin and must stay represented in Lexeditor Credits:
 
 - Stardew Valley Wiki modding documentation — Content Patcher, XNB editing, Stardew Valley 1.6 migration, object/item data schemas. Documentation/reference only: <https://stardewvalleywiki.com/Modding:Content_Patcher>
 - Pathoschild / Content Patcher — canonical content-pack and `EditData` behavior. Source repository is MIT licensed: <https://github.com/Pathoschild/StardewMods>
-- Pathoschild / SMAPI — established Stardew Valley mod loader/runtime. Source repository is LGPL-3.0 licensed: <https://github.com/Pathoschild/SMAPI>
+- Pathoschild / SMAPI — established Stardew Valley mod loader/runtime, including the canonical runtime and loaded-content-pack log formats consumed by the acceptance harness. Source repository is LGPL-3.0 licensed: <https://github.com/Pathoschild/SMAPI>
 - Pathoschild / StardewXnbHack — canonical typed-asset unpacking behavior and `Content (unpacked)` layout. Source repository is MIT licensed: <https://github.com/Pathoschild/StardewXnbHack>
 
 No SMAPI, Content Patcher, or StardewXnbHack source code is copied into Lexeditor by this implementation; they are external runtime/reference projects.
 
 ## Open work
 
-- Verify exact Windows 1.6.15 installation signatures and SMAPI/Content Patcher installed-layout signatures against a real installation.
-- Decide whether Lexeditor should provide a managed, narrow source-generation helper so users do not need to run a full StardewXnbHack export manually. Do not regress to a generic XNB parser which cannot prove typed-model compatibility.
-- Broaden `Data/Objects` semantic fields only after the current vanilla-read/project-write path is accepted against a real installation.
+- Run the installed acceptance flow against a real Windows/Steam Stardew Valley 1.6.15 installation with current SMAPI + Content Patcher, including an in-game load of a representative `Data/Objects` edit.
+- Broaden `Data/Objects` semantic fields only after the current vanilla-read/project-write/deploy/load path is accepted against a real installation.
 - Expand Data Map coverage to the next typed assets after the Objects vertical slice is proven in-game.
-- Prove create/open/save/reopen/deploy/load for one `Data/Objects` field edit, with installed `Content` files byte-identical before and after.
