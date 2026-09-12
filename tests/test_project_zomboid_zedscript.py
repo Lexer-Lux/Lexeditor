@@ -15,6 +15,8 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             scripts.mkdir(parents=True)
             (scripts / "mixed.txt").write_text(
                 '''module LexTest\n{\n'''
+                '''  animationsMesh HumanAnims { animationDirectory = media/anims, }\n'''
+                '''  entity SpecialTile { DisplayName = Tile_Test, }\n'''
                 '''  item Hammer { ItemType = base:weapon, Weight = 1.0, }\n'''
                 '''  craftRecipe MakeThing { tags = AnySurfaceCraft, inputs { } }\n'''
                 '''  evolvedrecipe Sandwich { BaseItem = Base.BreadSlices, MaxItems = 4, }\n'''
@@ -31,6 +33,8 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             )
             result = zedscript.inventory(root)
             names = {(row["kind"], row["name"]) for row in result["rows"]}
+            self.assertIn(("animationsMesh", "HumanAnims"), names)
+            self.assertIn(("entity", "SpecialTile"), names)
             self.assertIn(("item", "Hammer"), names)
             self.assertIn(("craftRecipe", "MakeThing"), names)
             self.assertIn(("evolvedrecipe", "Sandwich"), names)
@@ -48,6 +52,9 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             for editable_name in ("Hammer", "Sandwich", "MakeThing", "RepairHammer", "CustomWater", "TestCar", "TestSound", "FancyModel", "StoreDisplay", "Making"):
                 with self.subTest(editable_name=editable_name):
                     self.assertTrue(next(row for row in result["rows"] if row["name"] == editable_name)["editable"])
+            for readonly_name in ("HumanAnims", "SpecialTile"):
+                with self.subTest(readonly_name=readonly_name):
+                    self.assertFalse(next(row for row in result["rows"] if row["name"] == readonly_name)["editable"])
 
     def test_comments_strings_and_nested_blocks_do_not_create_records(self):
         with tempfile.TemporaryDirectory() as name:
