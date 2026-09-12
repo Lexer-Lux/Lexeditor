@@ -32,6 +32,11 @@ def main():
    assert page.evaluate("curatedRows(curatedSpec('abilities')).length")==1
    page.evaluate("state.curatedQuery='$bt_GuardScorpion_Search'")
    assert page.evaluate("curatedRows(curatedSpec('abilities')).length")==1
+   for font_size in (10,14,18):
+    table.evaluate('(e,size)=>e.style.fontSize=`${size}px`',font_size)
+    bounds=table.evaluate("""e=>{const head=e.querySelector('.lex-column-list-head-cell[data-column-key="id"]').getBoundingClientRect();return [...e.querySelectorAll('.lex-column-list-cell[data-column-key="id"]')].map(c=>({head:head.right,row:c.getBoundingClientRect().right}))}""")
+    assert bounds and all(abs(b['head']-b['row'])<1 for b in bounds),bounds
+   table.evaluate("e=>e.style.removeProperty('font-size')")
    page.screenshot(path=str(Path(tempfile.gettempdir())/'lex-ff7r-pinned-name.png'))
    browser.close()
  finally:server.shutdown();server.server_close();thread.join(timeout=2)

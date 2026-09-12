@@ -5991,15 +5991,6 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-curve-formula { margin-top:-4px;height:2.2em; }
 
 
-/* LEXEDITOR_ID_COLUMN_WIDTH_20260911 */
-/* An ID column holds four or five digits, so it takes four or five digits of
-   the table. Left to share the grid it took a fifth of the width on a
-   two-column table and squeezed the name it sits in front of. A plugin can
-   still set its own width; this is the floor for one that does not. */
-.lex-column-list-head-cell.lex-numbered-id-cell,
-.lex-column-list-cell.lex-numbered-id-cell { max-width:11ch; }
-
-
 /* LEXEDITOR_FORMULA_TYPESETTING_20260911 */
 /* A formula is mathematics, so it is set like mathematics: an italic serif for
    the letters, upright for the numbers and operators, and figures that line up
