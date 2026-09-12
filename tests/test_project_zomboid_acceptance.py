@@ -15,7 +15,7 @@ from games.project_zomboid import acceptance, core
 class ProjectZomboidAcceptanceTests(unittest.TestCase):
     def make_fixture(self, root: Path) -> tuple[Path, Path, Path]:
         game = root / "ProjectZomboid"
-        (game / "media" / "scripts").mkdir(parents=True)
+        (game / "media" / "scripts" / "generated").mkdir(parents=True)
         (game / "ProjectZomboid64.exe").write_bytes(b"MZ")
 
         project = root / "Lexeditor Test Mod"
@@ -61,6 +61,19 @@ class ProjectZomboidAcceptanceTests(unittest.TestCase):
             self.assertFalse(report["activationEvidence"]["enabledAnywhere"])
             self.assertIn("not that Project Zomboid loaded", report["acceptanceBoundary"])
             self.assertEqual(len(report["manualGameTest"]), 5)
+
+    def test_build41_shape_without_generated_scripts_fails_build42_check(self):
+        with tempfile.TemporaryDirectory() as name:
+            game, project, user = self.make_fixture(Path(name))
+            (game / "media" / "scripts" / "generated").rmdir()
+
+            report = acceptance.inspect(game, project, user)
+            checks = {row["id"]: row for row in report["checks"]}
+
+            self.assertFalse(report["preflightReady"])
+            self.assertFalse(checks["build42-generated-scripts"]["ok"])
+            self.assertTrue(checks["game-executable"]["ok"])
+            self.assertTrue(checks["game-scripts"]["ok"])
 
     def test_activation_evidence_reads_default_and_save_mod_lists(self):
         with tempfile.TemporaryDirectory() as name:
