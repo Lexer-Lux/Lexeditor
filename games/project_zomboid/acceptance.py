@@ -152,44 +152,49 @@ def inspect(game_root: Path, project_root: Path, user_root: Path) -> dict:
     state = {}
     state_error = ""
     try:
-        state = core.deployment_state(project_root)
+        state = core.deployment_state(project_root, user_root=user_root)
     except (core.ProjectZomboidError, OSError) as error:
         state_error = str(error)
     target_value = state.get("target") if isinstance(state, dict) else ""
-    raw_target = Path(target_value).expanduser() if isinstance(target_value, str) and target_value else None
-    target = raw_target.resolve() if raw_target else None
-    target_is_link = bool(raw_target and raw_target.is_symlink())
+    recorded_target = (
+        Path(target_value).expanduser()
+        if isinstance(target_value, str) and target_value else None
+    )
+    deployed = bool(state.get("deployed")) if isinstance(state, dict) else False
+    target = recorded_target if deployed else None
     owned = bool(state.get("owned")) if isinstance(state, dict) else False
     _check(
         checks,
         "owned-deployment",
-        owned and not target_is_link,
+        owned,
         state_error or (
             f"{target} ({state.get('fileCount', 0)} files)"
-            if target else "No Lexeditor deployment record"
+            if target else "No safe Lexeditor-owned deployment"
         ),
     )
 
-    expected_target = (user_root / "mods" / project_root.name).resolve()
-    target_ok = bool(target and target == expected_target and not target_is_link)
+    expected_target = user_root / "mods" / project_root.name
     _check(
         checks,
         "deployment-target",
-        target_ok,
-        f"expected {expected_target}; actual {target if target else '<none>'}",
+        deployed,
+        (
+            f"expected {expected_target}; actual "
+            f"{recorded_target if recorded_target else '<none>'}"
+        ),
     )
 
     deployed_id = ""
     deployed_name = ""
-    deployed_detail = "Deployment target is unavailable"
-    if target and target.is_dir() and not target_is_link:
+    deployed_detail = "Deployment target is unavailable or unsafe"
+    if target:
         try:
-            deployed = core.read_mod_info(target)
-            deployed_fields = deployed.get("fields", {})
+            deployed_info = core.read_mod_info(target)
+            deployed_fields = deployed_info.get("fields", {})
             deployed_id = str(deployed_fields.get("id", "")).strip()
             deployed_name = str(deployed_fields.get("name", "")).strip()
             deployed_detail = (
-                f"{deployed.get('path', '')} name={deployed_name} id={deployed_id}"
+                f"{deployed_info.get('path', '')} name={deployed_name} id={deployed_id}"
             )
         except (core.ProjectZomboidError, OSError) as error:
             deployed_detail = str(error)
@@ -214,8 +219,8 @@ def inspect(game_root: Path, project_root: Path, user_root: Path) -> dict:
     )
 
     inventory = {"rows": [], "counts": {}, "errors": []}
-    inventory_detail = "Deployment target is unavailable"
-    if target and target.is_dir() and not target_is_link:
+    inventory_detail = "Deployment target is unavailable or unsafe"
+    if target:
         try:
             inventory = zedscript.inventory(target)
             errors = inventory.get("errors", [])
@@ -229,7 +234,7 @@ def inspect(game_root: Path, project_root: Path, user_root: Path) -> dict:
     _check(
         checks,
         "deployed-script-parse",
-        not inventory.get("errors"),
+        bool(target) and not inventory.get("errors"),
         inventory_detail,
     )
 
