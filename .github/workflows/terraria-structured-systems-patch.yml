@@ -21,7 +21,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Apply structured systems expansion
-        run: python .github/scripts/terraria_structured_systems_patch.py
+        run: |
+          python .github/scripts/terraria_structured_systems_repair.py
+          python .github/scripts/terraria_structured_systems_patch.py
       - name: Verify Terraria
         run: |
           python -m compileall -q games/terraria plugin_api.py project_manager.py
@@ -33,7 +35,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm -f .github/workflows/terraria-structured-systems-patch.yml .github/scripts/terraria_structured_systems_patch.py
+          git rm -f .github/workflows/terraria-structured-systems-patch.yml .github/scripts/terraria_structured_systems_patch.py .github/scripts/terraria_structured_systems_repair.py
           git add games/terraria/structured_content.py games/terraria/editor.html tests/test_terraria_structured_content.py tests/test_terraria_structured_systems.py
           git commit -m 'Add Terraria structured systems editors'
           git push origin HEAD:feature/terraria-plugin
