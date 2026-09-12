@@ -74,6 +74,45 @@ def render_mod_item_source(mod_name: str, class_name: str) -> str:
     )
 
 
+def render_mod_system_source(mod_name: str, class_name: str) -> str:
+    return (
+        "using Terraria.ModLoader;\n\n"
+        f"namespace {mod_name}.Common.Systems;\n\n"
+        f"public sealed class {class_name} : ModSystem\n"
+        "{\n"
+        "}\n"
+    )
+
+
+def render_mod_player_source(mod_name: str, class_name: str) -> str:
+    return (
+        "using Terraria.ModLoader;\n\n"
+        f"namespace {mod_name}.Common.Players;\n\n"
+        f"public sealed class {class_name} : ModPlayer\n"
+        "{\n"
+        "}\n"
+    )
+
+
+def _create_logic_type(root: Path, name: object, *, kind: str, folder: str, renderer) -> dict:
+    project = Path(root).resolve()
+    if not project.is_dir():
+        raise ValueError("Terraria source project does not exist")
+    mod_name = validate_content_name(project.name)
+    class_name = validate_content_name(name)
+    relative = f"Common/{folder}/{class_name}.cs"
+    source = create_source(project, relative, renderer(mod_name, class_name))
+    return {"kind": kind, "name": class_name, "source": source}
+
+
+def create_mod_system(root: Path, name: object) -> dict:
+    return _create_logic_type(root, name, kind="system", folder="Systems", renderer=render_mod_system_source)
+
+
+def create_mod_player(root: Path, name: object) -> dict:
+    return _create_logic_type(root, name, kind="player", folder="Players", renderer=render_mod_player_source)
+
+
 def _png_chunk(kind: bytes, payload: bytes) -> bytes:
     body = kind + payload
     return struct.pack(">I", len(payload)) + body + struct.pack(">I", binascii.crc32(body) & 0xFFFFFFFF)
