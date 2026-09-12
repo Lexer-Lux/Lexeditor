@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import core, craftrecipe, datamap, evolvedrecipe, zedscript
+from . import core, craftrecipe, datamap, evolvedrecipe, fluid, zedscript
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -80,8 +80,8 @@ class Handler(BaseHTTPRequestHandler):
                     "windowHost": "webview2",
                     "capabilities": [
                         "mod-info", "build42-items", "build42-evolvedrecipes",
-                        "build42-craftrecipes", "build42-zedscript-inventory",
-                        "data-map", "local-deploy",
+                        "build42-craftrecipes", "build42-fluids",
+                        "build42-zedscript-inventory", "data-map", "local-deploy",
                     ],
                     "editorRoot": str(PLUGIN_ROOT),
                 })
@@ -93,6 +93,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(evolvedrecipe.read(self.project()))
             elif path == "/api/craftrecipes":
                 self.send_json(craftrecipe.read(self.project()))
+            elif path == "/api/fluids":
+                self.send_json(fluid.read(self.project()))
             elif path == "/api/zedscript":
                 self.send_json(zedscript.inventory(self.project()))
             elif path == "/api/datamap":
@@ -129,6 +131,11 @@ class Handler(BaseHTTPRequestHandler):
                     raise core.ProjectZomboidError("Craft recipe save requires path, module, id, sha256 and edits")
                 result = craftrecipe.save(root, str(payload["path"]), str(payload["module"]),
                                            str(payload["id"]), str(payload["sha256"]), payload["edits"])
+            elif path == "/api/fluids/save":
+                if set(payload) != identity:
+                    raise core.ProjectZomboidError("Fluid save requires path, module, id, sha256 and edits")
+                result = fluid.save(root, str(payload["path"]), str(payload["module"]),
+                                    str(payload["id"]), str(payload["sha256"]), payload["edits"])
             elif path == "/api/deploy":
                 if payload:
                     raise core.ProjectZomboidError("Deploy does not accept arguments")
