@@ -159,9 +159,10 @@ def inspect_install(game_root: Path, specs: Iterable[dict] = STRUCTURED_SPECS,
 
 def _launch_ready(report: dict) -> bool:
     launch_state = report.get("launch", {})
+    games = launch_state.get("games", {})
     return bool(
         launch_state.get("ready")
-        and all(game.get("ready") for game in launch_state.get("games", {}).values())
+        and all(key in games and games[key].get("ready") for key in launch.TARGETS)
     )
 
 
@@ -169,10 +170,11 @@ def acceptance_checks(report: dict) -> dict[str, bool]:
     """Return the real-install evidence gates required before this PR leaves draft."""
     archives = report.get("archives", {})
     archive_hashes_ready = bool(report.get("archiveHashesIncluded")) and all(
-        state.get("ready")
-        and isinstance(state.get("sha256"), str)
-        and len(state["sha256"]) == 64
-        for state in archives.values()
+        game in archives
+        and archives[game].get("ready")
+        and isinstance(archives[game].get("sha256"), str)
+        and len(archives[game]["sha256"]) == 64
+        for game in ARCHIVE_FILES
     )
     return {
         "archivesAndStructuredValidated": bool(report.get("ok")),
