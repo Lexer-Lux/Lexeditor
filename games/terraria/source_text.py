@@ -24,11 +24,10 @@ def source_target(root: Path, relative: str) -> Path:
         or target.suffix.casefold() != ".cs"
     ):
         raise ValueError("Invalid C# source path")
+    parts = target.relative_to(project).parts
+    if IGNORED_PARTS.intersection(parts) or any(part.startswith(".") for part in parts):
+        raise ValueError("C# source path is inside an ignored/generated folder")
     return target
-
-
-def _relative_parts(root: Path, target: Path) -> tuple[str, ...]:
-    return target.relative_to(Path(root).resolve()).parts
 
 
 def _read_source(root: Path, relative: str) -> tuple[Path, bytes, str, str]:
@@ -56,7 +55,9 @@ def source_index(root: Path) -> dict:
     candidates = sorted(
         (
             path for path in project.rglob("*.cs")
-            if path.is_file() and not IGNORED_PARTS.intersection(path.relative_to(project).parts)
+            if path.is_file()
+            and not IGNORED_PARTS.intersection(path.relative_to(project).parts)
+            and not any(part.startswith(".") for part in path.relative_to(project).parts)
         ),
         key=lambda path: path.relative_to(project).as_posix().casefold(),
     )
@@ -111,9 +112,6 @@ def create_source(root: Path, relative: str, text: object = "") -> dict:
     if not project.is_dir():
         raise ValueError("Terraria source project does not exist")
     target = source_target(project, relative)
-    parts = _relative_parts(project, target)
-    if IGNORED_PARTS.intersection(parts):
-        raise ValueError("C# source path is inside an ignored/generated folder")
     normalized = _validate_source_text(text).replace("\r\n", "\n").replace("\r", "\n")
     target.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -163,3 +161,40 @@ def save_source(root: Path, relative: str, text: object, expected_sha256: str) -
         raise ValueError("C# source file is too large for text editing")
     _atomic_replace(target, encoded)
     return source_file_state(root, canonical)
+
+
+def rename_source(root: Path, relative: str, new_relative: str, expected_sha256: str) -> dict:
+    """Move one source file without overwriting and only if the observed source is current."""
+    project = Path(root).resolve()
+    source, data, _text, canonical = _read_source(project, relative)
+    current_sha = sha256(data).hexdigest()
+    if expected_sha256 != current_sha:
+        raise ValueError(f"{canonical} changed outside Lexeditor; reload before renaming")
+    destination = source_target(project, new_relative)
+    destination_relative = destination.relative_to(project).as_posix()
+    if destination == source:
+        return source_file_state(project, canonical)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with destination.open("xb") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError as error:
+        raise ValueError(f"C# source file already exists: {destination_relative}") from error
+    try:
+        source.unlink()
+    except OSError:
+        destination.unlink(missing_ok=True)
+        raise
+    return source_file_state(project, destination_relative)
+
+
+def delete_source(root: Path, relative: str, expected_sha256: str) -> dict:
+    """Delete one current source file under an explicit stale-source guard."""
+    target, data, _text, canonical = _read_source(root, relative)
+    current_sha = sha256(data).hexdigest()
+    if expected_sha256 != current_sha:
+        raise ValueError(f"{canonical} changed outside Lexeditor; reload before deleting")
+    target.unlink()
+    return {"path": canonical, "deleted": True}
