@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Lexeditor - Stardew Valley</title>
+  <script>(()=>{const p=new URLSearchParams(location.search),k=p.get("lexTransition");if(!["load","resume"].includes(k))return;const r=document.documentElement;r.classList.add("lex-transition-entry");if(k==="load"){r.dataset.lexQuote=p.get("lexQuote")||"Loading editor…";r.classList.add("lex-transition-loading")}})()</script>
+  <link rel="stylesheet" href="/shared/framework.css">
+  <style>
+    *{box-sizing:border-box}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
+    .sv-layout,.lex-paged-list-detail{height:100%}.sv-table,.sv-detail{height:100%;min-height:0}
+    .sv-detail .lex-detail-panel-body{padding:10px;gap:10px}
+    .sv-override{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center;width:100%}
+    .sv-override>label{display:flex;gap:5px;align-items:center;white-space:nowrap;color:var(--lex-muted)}
+    .sv-actions{display:flex;flex-wrap:wrap;gap:8px}.sv-actions button{padding:7px 12px}
+    .sv-warning{padding:8px 10px;border:1px solid var(--lex-border);background:var(--lex-panel);color:var(--lex-muted)}
+    .sv-error{color:#ffb0a8;white-space:pre-wrap}
+  </style>
+</head>
+<body>
+  <header id="lexeditor-shell"></header>
+  <main id="main"></main>
+  <script src="/shared/framework.js"></script>
+  <script>
+  "use strict";
+  const {el,columnList,columnPreferences,detailPanel,detailSection,detailField,readonlyField,recordId,infoHelp,infoIcon,pagedListDetail,clone}=LexeditorUI;
+  const $=selector=>document.querySelector(selector);
+  const FIELD_KEYS=["Price","Edibility","IsDrink"];
+  const state={tab:"objects",dashboard:null,dataMap:null,objects:null,rows:[],savedRows:[],selected:null,page:0,pageSize:30,query:"",sort:{key:"id",dir:1},mapPage:0,mapQuery:"",mapStatus:"",mapSort:["filename",1],busy:false,error:""};
+  const prefs=columnPreferences("stardew-objects",[
+    {key:"id",label:"Object ID",sortable:true,width:"minmax(9em,1fr)"},
+    {key:"Price",label:"Price",sortable:true,numeric:true,width:"8em"},
+    {key:"Edibility",label:"Edibility",sortable:true,numeric:true,width:"8em"},
+    {key:"IsDrink",label:"Drink",sortable:true,width:"6em"},
+  ],()=>render());
+  async function api(path,body){const response=await fetch(path,body===undefined?undefined:{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const payload=await response.json();if(!response.ok)throw new Error(payload.error||response.statusText);return payload}
+  const has=(row,key)=>Object.prototype.hasOwnProperty.call(row.fields,key);
+  const value=(row,key)=>has(row,key)?row.fields[key]:null;
+  function rowSignature(rows){return JSON.stringify([...rows].sort((a,b)=>a.id.localeCompare(b.id)).map(row=>({id:row.id,fields:row.fields})))}
+  function dirtyCount(){return state.objects&&rowSignature(state.rows)!==rowSignature(state.savedRows)?1:0}
+  function sortedRows(){const q=state.query.trim().toLocaleLowerCase();return [...state.rows].filter(row=>!q||row.id.toLocaleLowerCase().includes(q)).sort((a,b)=>{let left=state.sort.key==="id"?a.id:value(a,state.sort.key),right=state.sort.key==="id"?b.id:value(b,state.sort.key);if(left===null||left===undefined)left="";if(right===null||right===undefined)right="";const result=typeof left==="string"?left.localeCompare(String(right),undefined,{numeric:true}):Number(left)-Number(right);return result*state.sort.dir})}
+  function installObjects(payload){state.objects=payload;state.rows=clone(payload.rows);state.savedRows=clone(payload.rows);if(!state.rows.some(row=>row.id===state.selected))state.selected=state.rows[0]?.id??null;return payload}
+  function diffEdits(){const old=Object.fromEntries(state.savedRows.map(row=>[row.id,row])),current=Object.fromEntries(state.rows.map(row=>[row.id,row])),ids=new Set([...Object.keys(old),...Object.keys(current)]),edits=[];for(const id of ids){const before=old[id]?.fields||{},after=current[id]?.fields||{},fields={};for(const key of FIELD_KEYS){const beforeHas=Object.prototype.hasOwnProperty.call(before,key),afterHas=Object.prototype.hasOwnProperty.call(after,key);if(beforeHas!==afterHas||(afterHas&&JSON.stringify(before[key])!==JSON.stringify(after[key])))fields[key]=afterHas?after[key]:null}if(Object.keys(fields).length)edits.push({id,fields})}return edits}
+  function fieldControl(row,key,kind,min,max,help){const enabled=has(row,key);const input=el("input",kind==="boolean"?{type:"checkbox",checked:enabled?!!row.fields[key]:false,disabled:!enabled||state.busy,onchange:event=>{row.fields[key]=event.target.checked;shell.refresh()}}:{type:"number",min,max,step:1,value:enabled?row.fields[key]:kind==="price"?0:-300,disabled:!enabled||state.busy,oninput:event=>{if(event.target.value!=="")row.fields[key]=Number(event.target.value);shell.refresh()}});const override=el("input",{type:"checkbox",checked:enabled,disabled:state.busy,onchange:event=>{if(event.target.checked){row.fields[key]=kind==="boolean"?false:kind==="price"?0:-300}else delete row.fields[key];render();shell.refresh()}});return detailField({label:key.toUpperCase(),help:infoHelp(help),control:el("div",{class:"sv-override"},el("label",{},override,"Override"),input),dataType:kind==="boolean"?"BOOL":"INT",min,max})}
+  function tablePanel(rows=sortedRows(),picked=state.selected,select=row=>{state.selected=row.id;render()}){const columns=[
+    {key:"id",label:"Object ID",sortable:true,width:"minmax(9em,1fr)"},
+    {key:"Price",label:"Price",sortable:true,numeric:true,width:"8em",sortValue:row=>value(row,"Price")??-1,render:row=>has(row,"Price")?String(row.fields.Price):"—"},
+    {key:"Edibility",label:"Edibility",sortable:true,numeric:true,width:"8em",sortValue:row=>value(row,"Edibility")??-301,render:row=>has(row,"Edibility")?String(row.fields.Edibility):"—"},
+    {key:"IsDrink",label:"Drink",sortable:true,width:"6em",sortValue:row=>has(row,"IsDrink")?Number(row.fields.IsDrink):-1,render:row=>has(row,"IsDrink")?(row.fields.IsDrink?"Yes":"No"):"—"},
+  ];return columnList({rows,key:row=>row.id,selected:picked,select,sortState:state.sort,sort:key=>{state.sort=state.sort.key===key?{key,dir:-state.sort.dir}:{key,dir:1};state.page=0;render()},columnPreferences:prefs,columns,class:"sv-table","aria-label":"Stardew object overrides"})}
+  function detail(row){if(!row)return detailPanel({className:"sv-detail",title:"Data/Objects",meta:"No project overrides yet",body:[el("p",{class:"sv-warning"},"Add an object ID to create a field-level Content Patcher override. Vanilla Data/Objects decoding is not integrated yet, so Lexeditor does not invent base records.")]});const remove=el("button",{type:"button",disabled:state.busy,onclick:()=>{state.rows=state.rows.filter(candidate=>candidate.id!==row.id);state.selected=state.rows[0]?.id??null;render();shell.refresh()}},"Remove supported overrides");return detailPanel({className:"sv-detail",title:"Object override",identity:recordId(row.id),meta:`Data/Objects · ${row.unsupportedFieldCount||0} unsupported field(s) preserved`,body:[
+    detailSection({title:"ECONOMY & CONSUMPTION",body:[
+      fieldControl(row,"Price","price",0,2147483647,"Base sell price override. Disable Override to leave this field to vanilla or another content pack."),
+      fieldControl(row,"Edibility","integer",-300,2147483647,"Edibility override. -300 is Stardew's inedible sentinel; Lexeditor does not accept values below it."),
+      fieldControl(row,"IsDrink","boolean",null,null,"Whether the object is treated as a drink. Disable Override to omit this field from Lexeditor's patch."),
+    ]}),detailSection({title:"PATCH",body:[detailField({label:"ACTIONS",control:el("div",{class:"sv-actions"},remove)}),...(row.unsupportedFieldCount?[detailField({label:"PRESERVATION",control:readonlyField(`${row.unsupportedFieldCount} unsupported field(s) remain untouched in content.json`)})]:[])]}),
+  ]})}
+  function addRecord(){const id=window.prompt("Stardew Data/Objects ID to patch:","");if(id===null)return;const clean=id.trim();if(!clean)return;if(state.rows.some(row=>row.id===clean)){state.selected=clean;render();return}state.rows.push({id:clean,fields:{},present:[],unsupportedFieldCount:0});state.selected=clean;state.page=0;render();shell.refresh()}
+  function objectsPanel(){const records=sortedRows();return pagedListDetail({rows:records,key:row=>row.id,slots:false,add:addRecord,addTitle:"Add Data/Objects patch",addDisabled:state.busy,selected:state.selected,page:state.page,pageSize:state.pageSize,noun:"object overrides",className:"sv-layout",splitKey:"stardew-objects",rowsKey:"stardew-objects",defaultSplit:48,minLeft:320,minRight:380,search:{key:"stardew-objects-search",value:state.query,label:"Search object IDs",change:value=>{state.query=value;state.page=0;render()}},sync:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected},change:next=>{state.page=next.page;state.pageSize=next.pageSize;if(next.selected!==null)state.selected=next.selected;render()},master:view=>tablePanel(view.rows,view.selected,view.select),detail})}
+  function dataMapPanel(){const view=LexeditorUI.dataMap({rows:state.dataMap.rows,query:state.mapQuery,status:state.mapStatus,page:state.mapPage,sort:state.mapSort,pageSize:100,open:row=>{if(row.target==="objects")navigate("objects")},changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},changePage:page=>{state.mapPage=page;render()},changeSort:key=>{const [active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});state.mapPage=view.page;return view.content}
+  function infoPanel(){const d=state.dashboard,loader=d.loader,deployment=d.deployment;const read=value=>readonlyField(String(value??"—"),{format:false});const actions=el("div",{class:"sv-actions"},el("button",{type:"button",disabled:state.busy||dirtyCount()>0||!loader.ready,onclick:()=>deploymentAction("deploy")},deployment.deployed?"Redeploy Project":"Deploy Project"),el("button",{type:"button",disabled:state.busy||!deployment.managed||deployment.externallyChanged,onclick:()=>deploymentAction("revert")},"Revert Lexeditor Mod"));return detailPanel({className:"lex-information-panel sv-detail",icon:infoIcon(),title:"Information",meta:"Stardew Valley installation, loader, and project deployment",body:[
+    detailSection({title:"GAME",body:[detailField({label:"STATE",control:read(d.game.ready?"Ready":"Incomplete")}),detailField({label:"FOLDER",control:read(d.game.root)})]}),
+    detailSection({title:"MOD LOADER",body:[detailField({label:"SMAPI",control:read(loader.smapi?"Installed":"Not found")}),detailField({label:"CONTENT PATCHER",control:read(loader.contentPatcher?"Installed":"Not found")}),detailField({label:"NOTE",control:read("Lexeditor keeps Content/*.xnb read-only and deploys a normal Content Patcher pack.")})]}),
+    detailSection({title:"PROJECT",body:[detailField({label:"FOLDER",control:read(d.project.root)}),detailField({label:"DEPLOYMENT",control:read(deployment.externallyChanged?"Externally changed — blocked":deployment.managed?"Lexeditor-managed":deployment.deployed?"Unmanaged collision":"Not deployed")}),detailField({label:"TARGET",control:read(deployment.target)}),detailField({label:"ACTIONS",control:actions})]}),
+    detailSection({title:"CURRENT LIMIT",body:[detailField({label:"BASE DATA",control:read("Data/Objects XNB decoding not integrated yet"),help:infoHelp("The current editor operates only on explicit project overrides. Data Map marks this partial rather than claiming access to vanilla object records.")}),...(state.error?[el("p",{class:"sv-error",role:"alert"},state.error)]:[])]}),
+  ]})}
+  async function deploymentAction(action){if(state.busy||dirtyCount())return;if(action==="revert"&&!window.confirm("Remove only this Lexeditor-managed Content Patcher deployment?"))return;state.busy=true;state.error="";shell.refresh();try{state.dashboard.deployment=await api(`/api/deployment/${action}`,{});state.dashboard.loader=state.dashboard.deployment.loader}catch(error){state.error=error.message}finally{state.busy=false;render()}}
+  async function save(){if(state.busy||!state.objects)return;const edits=diffEdits();if(!edits.length)return;state.busy=true;shell.refresh();try{installObjects(await api("/api/objects/save",{sha256:state.objects.sha256,edits}));state.error=""}catch(error){state.error=error.message;throw error}finally{state.busy=false;render()}}
+  async function discard(){installObjects(await api("/api/objects"));state.error="";render()}
+  async function refresh(){const [dashboard,map,objects]=await Promise.all([api("/api/dashboard"),api("/api/datamap"),api("/api/objects")]);state.dashboard=dashboard;state.dataMap=map;installObjects(objects)}
+  async function render(){if(!state.dashboard)return;let content;if(state.tab==="datamap")content=dataMapPanel();else if(state.tab==="info")content=infoPanel();else content=objectsPanel();$("#main").replaceChildren(content);shell.refresh()}
+  function navigate(tab){state.tab=tab;render()}
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"stardew-valley",name:"Stardew Valley",themeName:"stardew-valley",theme:{accent:"#6cae43"}},tabs:[{id:"objects",label:"Objects"}],activeTab:()=>state.tab,navigate,help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the Stardew Valley Data Map",info:()=>navigate("info"),infoActive:()=>state.tab==="info",infoTitle:"Open Stardew Valley plugin information",dirtyCount,readonly:()=>state.busy,save,discard});
+  window.addEventListener("focus",()=>{if(state.dashboard&&!state.busy&&state.tab==="info")api("/api/dashboard").then(value=>{state.dashboard=value;render()}).catch(error=>{state.error=error.message;render()})});
+  refresh().then(()=>render()).then(()=>LexeditorUI.finishPluginLoading()).catch(error=>{$("#main").textContent=`Failed to load Stardew Valley project: ${error.message}`;LexeditorUI.finishPluginLoading()});
+  </script>
+</body>
+</html>
