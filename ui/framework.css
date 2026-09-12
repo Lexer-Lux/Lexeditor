@@ -6116,8 +6116,6 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-bottom-tab-panel > :not(.lex-subtab-bar) { min-height:0; }
 .lex-bottom-tab-panel > :not(.lex-subtab-bar):last-child { flex:1;overflow:auto; }
 
-.lex-project-control > .lex-project-contents { flex:0 0 28px; width:28px;min-width:28px;padding:4px; }
-.lex-project-contents > svg { display:block;width:100%;height:20px;fill:none;stroke:currentColor;stroke-width:1.8; }
 
 .lex-save-preview{width:max-content;max-width:min(620px,calc(100vw - 16px));max-height:min(480px,70vh);overflow:auto;white-space:normal;pointer-events:auto}
 .lex-save-preview ul{padding-left:20px;margin:8px 0}

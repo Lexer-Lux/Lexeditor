@@ -3295,23 +3295,7 @@ ${contents.path}`});
       title: "Choose a mod project", "aria-haspopup": "menu", "aria-expanded": "false",
     }, mode, name, path, status);
     const menu = element("div", {class: "lex-project-menu", role: "menu", hidden: true});
-    const contentsButton = element("button", {
-      class:"lex-project-contents", type:"button", disabled:true,
-      title:"Show current mod contents", "aria-label":"Show current mod contents",
-      onclick:async event=>{
-        event.stopPropagation();
-        closeMenu();
-        const current = snapshot?.projects?.find(row=>row.current);
-        if (!current) return;
-        try {
-          modContentsReport(await callWindow("mod_project_contents",options.plugin.id,current.path),`${current.name} contents`);
-        } catch(error) {
-          showAlert({title:"Could not read the mod folder",message:error.message||String(error)});
-        }
-      },
-    });
-    contentsButton.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>';
-    const box = element("div", {class: "lex-project-control", hidden: true}, trigger, contentsButton, menu);
+    const box = element("div", {class: "lex-project-control", hidden: true}, trigger, menu);
     host.append(box);
     let snapshot = null;
     const closeMenu = () => { menu.hidden = true; trigger.setAttribute("aria-expanded", "false"); };
@@ -3354,8 +3338,6 @@ ${contents.path}`});
       snapshot = value;
       const rows = value?.projects || [];
       const current = rows.find(row => row.current);
-      contentsButton.disabled = !current;
-      contentsButton.title = current ? `Show ${current.name} contents` : "Open a mod to view its contents";
       const sources = options.projectSources?.() || [];
       const activeSource = String(options.projectActiveSource?.() || "mine");
       const selectedReference = sources.find(row => String(row.key) === activeSource);
