@@ -223,6 +223,27 @@
           "sourcePath": "tools/rpf-cli/RAGELIB-LICENSE.txt"
         }
       ]
+    },
+    "stardew-valley": {
+      "contributions": [
+        {
+          "name": "Stardew Valley Wiki contributors",
+          "role": "Reference for Content Patcher usage, Stardew Valley 1.6 data assets, and Data/Objects field semantics.",
+          "url": "https://stardewvalleywiki.com/Modding:Index"
+        },
+        {
+          "name": "Pathoschild / Content Patcher contributors",
+          "role": "Canonical Content Patcher content-pack and EditData behavior used by Stardew projects.",
+          "url": "https://github.com/Pathoschild/StardewMods"
+        },
+        {
+          "name": "Pathoschild / SMAPI contributors",
+          "role": "Established Stardew Valley mod loader and content-pack runtime targeted by deployment.",
+          "url": "https://github.com/Pathoschild/SMAPI"
+        }
+      ],
+      "thanks": [],
+      "licenses": []
     }
   }
 }
