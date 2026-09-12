@@ -26,6 +26,10 @@ BOOLEAN_FIELDS = {"AllowBatchCraft", "CanWalk"}
 INTEGER_FIELDS = {"ResearchSkillLevel", "time"}
 _FIELD_BY_CASEFOLD = {key.casefold(): key for key in EDITABLE_FIELDS}
 _TRUE_FALSE = {"true", "false"}
+_EDITABLE_ASSIGNMENT_RE = re.compile(
+    r"(?m)(?:^|,)[ \t]*(?P<key>" + "|".join(re.escape(key) for key in EDITABLE_FIELDS) + r")[ \t]*=",
+    re.IGNORECASE,
+)
 
 
 def _module_blocks(text: str) -> list[tuple[core.Block, core.Block]]:
@@ -59,6 +63,34 @@ def _module_blocks(text: str) -> list[tuple[core.Block, core.Block]]:
     return found
 
 
+def _top_level_editable_counts(text: str, block: core.Block) -> dict[str, int]:
+    """Count known assignments, including multiple properties on one line."""
+    body = text[block.open_brace + 1:block.close_brace]
+    masked = core._masked_code(body)
+    counts = {key: 0 for key in EDITABLE_FIELDS}
+    curly = square = paren = 0
+    cursor = 0
+    for match in _EDITABLE_ASSIGNMENT_RE.finditer(masked):
+        for char in masked[cursor:match.start()]:
+            if char == "{":
+                curly += 1
+            elif char == "}":
+                curly = max(0, curly - 1)
+            elif char == "[":
+                square += 1
+            elif char == "]":
+                square = max(0, square - 1)
+            elif char == "(":
+                paren += 1
+            elif char == ")":
+                paren = max(0, paren - 1)
+        cursor = match.end()
+        canonical = _FIELD_BY_CASEFOLD[match.group("key").casefold()]
+        if curly == 0 and square == 0 and paren == 0:
+            counts[canonical] += 1
+    return counts
+
+
 def _editable_properties(text: str, block: core.Block) -> tuple[dict[str, str], set[str]]:
     """Read known top-level properties case-insensitively.
 
@@ -89,6 +121,7 @@ def _editable_properties(text: str, block: core.Block) -> tuple[dict[str, str], 
             duplicates.add(canonical)
         else:
             values[canonical] = value
+    duplicates.update(key for key, count in _top_level_editable_counts(text, block).items() if count > 1)
     return values, duplicates
 
 
