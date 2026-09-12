@@ -12,6 +12,7 @@ from pathlib import Path
 OBJECT_TARGET = "Data/Objects"
 OBJECT_FIELDS = {"Price", "Edibility", "IsDrink"}
 DEPLOY_MARKER = ".lexeditor-deployment.json"
+ACCEPTANCE_MARKER = ".lexeditor-stardew-acceptance.json"
 MAX_JSON_BYTES = 8 * 1024 * 1024
 
 
@@ -251,7 +252,11 @@ def deploy(game_root: Path, project_root: Path) -> dict:
     for stale in (temporary, backup):
         if stale.exists():
             shutil.rmtree(stale)
-    shutil.copytree(project, temporary, ignore=shutil.ignore_patterns(".git", "__pycache__", DEPLOY_MARKER))
+    shutil.copytree(
+        project,
+        temporary,
+        ignore=shutil.ignore_patterns(".git", "__pycache__", DEPLOY_MARKER, ACCEPTANCE_MARKER),
+    )
     content_hash = _tree_hash(temporary)
     _atomic_json(temporary / DEPLOY_MARKER, {
         "schema": 1, "sourceProject": str(project), "contentHash": content_hash,
