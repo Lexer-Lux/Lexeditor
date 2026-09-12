@@ -4377,18 +4377,6 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
   animation: lex-plugin-loading-spin .75s linear infinite !important;
 }
 
-/* ---- Page fit ------------------------------------------------------- */
-/* The fit deliberately waits two quiet layout frames before measuring, so a
-   freshly built table paints at the wrong row height until then. Holding the
-   rows back for those frames removes the resize flash on pin toggles and
-   re-renders; the header stays put so the panel never blanks. */
-.lex-column-list.lex-fitted-page:not([data-lex-fixed-rows]) > .lex-column-list-row {
-  visibility: visible;
-}
-.lex-column-list.lex-fitted-page[data-lex-fixed-rows] > .lex-column-list-row {
-  visibility: visible;
-}
-
 /* ---- Sort caret ------------------------------------------------------ */
 .lex-sort-indicator {
   /* Absolute, because font-size:0 below would collapse any em sizing. */

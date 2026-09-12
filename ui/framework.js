@@ -5389,6 +5389,7 @@ ${contents.path}`});
 
   // Fit a paged list to complete rendered rows. The caller owns the records and
   // pagination state; this shared measurement owns only visible capacity.
+  const fittedPageGeometry = new Map();
   const fitListPage = options => {
     const listNode = options.list;
     if (!listNode) return null;
@@ -5399,6 +5400,15 @@ ${contents.path}`});
     const fittedLists = (options.lists || [listNode]).filter(Boolean);
     let lastSize = Math.max(1, Number(options.pageSize) || 1);
     let waitingForDrag = false;
+    const geometryKey = options.cacheKey ? `${options.cacheKey}:${innerWidth}:${innerHeight}:${fixedRows}:${options.minRowHeight||0}` : null;
+    const cachedGeometry = geometryKey && fittedPageGeometry.get(geometryKey);
+    if (cachedGeometry) {
+      fittedLists.forEach(node => {
+        node.style.setProperty("--lex-fitted-row-height", `${cachedGeometry.rowHeight}px`);
+        node.dataset.lexFixedRows = String(cachedGeometry.pageSize);
+      });
+      options.resize?.(cachedGeometry.height, cachedGeometry);
+    }
     const measure = () => {
       frame = 0;
       if (!listNode.isConnected) return;
@@ -5460,7 +5470,9 @@ ${contents.path}`});
       const full = visibleRows >= pageSize;
       const fittedHeight = full ? availableHeight :
         Math.ceil(borderHeight + headerHeight + visibleRows * rowHeight);
-      options.resize?.(fittedHeight, {full, pageSize, visibleRows, rowHeight});
+      const geometry = {full, pageSize, visibleRows, rowHeight, height:fittedHeight};
+      if (geometryKey && fixedRows) fittedPageGeometry.set(geometryKey, geometry);
+      options.resize?.(fittedHeight, geometry);
       if ((!fixedRows || minimumRowHeight > 0) && pageSize !== lastSize) {
         lastSize = pageSize;
         options.change?.(pageSize);
@@ -6267,6 +6279,7 @@ ${contents.path}`});
       const fit = options.fit || {};
       const searchActive = Boolean(String(options.search?.value ?? options.search?.query ?? "").trim());
       fitListPage({
+        cacheKey:rowPreferenceKey,
         list: masterNodes[0],
         lists: masterNodes,
         available: root,

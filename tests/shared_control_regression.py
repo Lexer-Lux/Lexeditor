@@ -76,6 +76,13 @@ def main():
     name=field.locator('.lex-detail-field-label-text').bounding_box()
     assert name['x']>=field.bounding_box()['x']
    page.set_viewport_size({'width':1440,'height':900});page.wait_for_timeout(250)
+   positions=page.evaluate("""async()=>{
+    const top=()=>[...document.querySelectorAll('.blank-table .lex-column-list-row')].slice(0,5).flatMap(e=>[e.getBoundingClientRect().top,e.querySelector('.lex-column-cell-content').getBoundingClientRect().top]);
+    const samples=[top()];document.querySelector('.blank-table input[type=checkbox]').click();samples.push(top());
+    for(let i=0;i<8;i++){await new Promise(requestAnimationFrame);samples.push(top());}
+    return samples;
+   }""")
+   assert all(len(row)==len(positions[0]) and all(abs(a-b)<1 for a,b in zip(row,positions[0])) for row in positions),positions
    # A table toggle must not hide the new rows while their height is measured.
    page.locator('.blank-table input[type=checkbox]').first.click()
    assert page.locator('.blank-table .lex-column-list-row').evaluate_all('(rows)=>rows.every(r=>getComputedStyle(r).visibility!=="hidden")')
