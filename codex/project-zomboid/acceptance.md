@@ -13,6 +13,7 @@ python -m games.project_zomboid.acceptance --game-root "C:\\Program Files (x86)\
 The preflight is non-destructive. It verifies:
 
 - the selected game root exists and contains `ProjectZomboid64.exe` plus `media/scripts`;
+- the game root contains the Build 42 generated-script tree at `media/scripts/generated`; this is also part of the shared `GameInstallSpec`, so legacy installs are not accepted merely because the executable and old script directory exist;
 - the source project has a readable `mod.info` with non-empty `name` and `id`;
 - Lexeditor still owns the current deployment according to its recorded file hashes;
 - the recorded deployment target is exactly `<user-root>/mods/<project-folder-name>` and is not a symlink;
