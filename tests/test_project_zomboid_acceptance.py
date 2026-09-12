@@ -185,7 +185,7 @@ class ProjectZomboidAcceptanceTests(unittest.TestCase):
     def test_external_deployment_change_fails_owned_check(self):
         with tempfile.TemporaryDirectory() as name:
             game, project, user = self.make_fixture(Path(name))
-            target = Path(core.deployment_state(project)["target"])
+            target = Path(core.deployment_state(project, user_root=user)["target"])
             (target / "42" / "media" / "scripts" / "items.txt").write_text(
                 "// changed outside Lexeditor\n",
                 encoding="utf-8",
@@ -196,8 +196,9 @@ class ProjectZomboidAcceptanceTests(unittest.TestCase):
 
             self.assertFalse(report["preflightReady"])
             self.assertFalse(checks["owned-deployment"]["ok"])
+            self.assertTrue(checks["deployment-target"]["ok"])
 
-    def test_wrong_user_root_fails_target_check(self):
+    def test_wrong_user_root_fails_target_and_ownership_checks(self):
         with tempfile.TemporaryDirectory() as name:
             game, project, user = self.make_fixture(Path(name))
 
@@ -206,12 +207,54 @@ class ProjectZomboidAcceptanceTests(unittest.TestCase):
 
             self.assertFalse(report["preflightReady"])
             self.assertFalse(checks["deployment-target"]["ok"])
-            self.assertTrue(checks["owned-deployment"]["ok"])
+            self.assertFalse(checks["owned-deployment"]["ok"])
+            self.assertFalse(checks["deployed-mod-info"]["ok"])
+            self.assertFalse(checks["deployed-script-parse"]["ok"])
+
+    def test_tampered_external_deployment_target_is_not_read(self):
+        with tempfile.TemporaryDirectory() as name:
+            base = Path(name)
+            game, project, user = self.make_fixture(base)
+            fake = base / "LooksLikeAValidModButIsOutsideUserRoot"
+            scripts = fake / "42" / "media" / "scripts"
+            scripts.mkdir(parents=True)
+            (fake / "42" / "mod.info").write_text(
+                "name=Lexeditor Test\nid=LexeditorAcceptance\n",
+                encoding="utf-8",
+            )
+            (scripts / "items.txt").write_text(
+                "module LexAcceptance { item Fake { Weight = 9.0, } }\n",
+                encoding="utf-8",
+            )
+            state_path = project / ".lexeditor" / "project-zomboid-deployment.json"
+            state_path.write_text(
+                json.dumps({
+                    "schema": 1,
+                    "target": str(fake.resolve()),
+                    "files": {
+                        "42/mod.info": core.sha256_file(fake / "42" / "mod.info"),
+                        "42/media/scripts/items.txt": core.sha256_file(scripts / "items.txt"),
+                    },
+                }),
+                encoding="utf-8",
+            )
+
+            report = acceptance.inspect(game, project, user)
+            checks = {row["id"]: row for row in report["checks"]}
+
+            self.assertFalse(report["preflightReady"])
+            self.assertEqual(report["deploymentTarget"], "")
+            self.assertFalse(checks["owned-deployment"]["ok"])
+            self.assertFalse(checks["deployment-target"]["ok"])
+            self.assertFalse(checks["deployed-mod-info"]["ok"])
+            self.assertFalse(checks["mod-identity-match"]["ok"])
+            self.assertFalse(checks["deployed-script-parse"]["ok"])
+            self.assertEqual(report["scriptInventory"]["recordCount"], 0)
 
     def test_malformed_deployed_script_fails_parse_check(self):
         with tempfile.TemporaryDirectory() as name:
             game, project, user = self.make_fixture(Path(name))
-            target = Path(core.deployment_state(project)["target"])
+            target = Path(core.deployment_state(project, user_root=user)["target"])
             script = target / "42" / "media" / "scripts" / "items.txt"
             script.write_text(
                 "module Broken\n{\n item Widget\n {\n  Weight = 1.0,\n",
@@ -223,6 +266,7 @@ class ProjectZomboidAcceptanceTests(unittest.TestCase):
 
             self.assertFalse(report["preflightReady"])
             self.assertFalse(checks["owned-deployment"]["ok"])
+            self.assertTrue(checks["deployment-target"]["ok"])
             self.assertFalse(checks["deployed-script-parse"]["ok"])
             self.assertTrue(report["scriptInventory"]["errors"])
 
