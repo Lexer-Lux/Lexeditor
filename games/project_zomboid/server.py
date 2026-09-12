@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import core, craftrecipe, datamap, evolvedrecipe, fixing, fluid, mannequin, model, sound, timedaction, vehicle, zedscript
+from . import animationsmesh, core, craftrecipe, datamap, evolvedrecipe, fixing, fluid, mannequin, model, sound, timedaction, vehicle, zedscript
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -116,16 +116,18 @@ class Handler(BaseHTTPRequestHandler):
                     "hosted": True,
                     "windowHost": "webview2",
                     "capabilities": [
-                        "mod-info", "build42-items", "build42-evolvedrecipes",
-                        "build42-craftrecipes", "build42-fixings", "build42-fluids",
-                        "build42-vehicles", "build42-sounds", "build42-models",
-                        "build42-mannequins", "build42-timedactions",
+                        "mod-info", "build42-animation-meshes", "build42-items",
+                        "build42-evolvedrecipes", "build42-craftrecipes", "build42-fixings",
+                        "build42-fluids", "build42-vehicles", "build42-sounds",
+                        "build42-models", "build42-mannequins", "build42-timedactions",
                         "build42-zedscript-inventory", "data-map", "local-deploy",
                     ],
                     "editorRoot": str(PLUGIN_ROOT),
                 })
             elif path == "/api/mod-info":
                 self.send_json(core.read_mod_info(self.project()))
+            elif path == "/api/animationmeshes":
+                self.send_json(animationsmesh.read(self.project()))
             elif path == "/api/items":
                 self.send_json(core.read_items(self.project()))
             elif path == "/api/evolvedrecipes":
@@ -167,6 +169,16 @@ class Handler(BaseHTTPRequestHandler):
                 if set(payload) != {"sha256", "edits"}:
                     raise core.ProjectZomboidError("mod.info save requires sha256 and edits")
                 result = core.save_mod_info(root, payload["sha256"], payload["edits"])
+            elif path == "/api/animationmeshes/save":
+                if set(payload) != identity:
+                    raise core.ProjectZomboidError("Animation mesh save requires path, module, id, sha256 and edits")
+                _guard_known_select_values(root, payload, animationsmesh.read, {
+                    "keepMeshAnimations": _TRUE_FALSE,
+                })
+                result = animationsmesh.save(
+                    root, str(payload["path"]), str(payload["module"]),
+                    str(payload["id"]), str(payload["sha256"]), payload["edits"],
+                )
             elif path == "/api/items/save":
                 if set(payload) != identity:
                     raise core.ProjectZomboidError("Item save requires path, module, id, sha256 and edits")
@@ -186,6 +198,10 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/craftrecipes/save":
                 if set(payload) != identity:
                     raise core.ProjectZomboidError("Craft recipe save requires path, module, id, sha256 and edits")
+                _guard_known_select_values(root, payload, craftrecipe.read, {
+                    "AllowBatchCraft": _TRUE_FALSE,
+                    "CanWalk": _TRUE_FALSE,
+                })
                 result = craftrecipe.save(root, str(payload["path"]), str(payload["module"]),
                                            str(payload["id"]), str(payload["sha256"]), payload["edits"])
             elif path == "/api/fixings/save":
