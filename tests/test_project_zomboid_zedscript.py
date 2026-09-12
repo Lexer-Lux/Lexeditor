@@ -23,7 +23,7 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
                 '''  mannequin StoreDisplay { female = true, }\n'''
                 '''  model FancyModel { mesh = WorldItems/Hammer, }\n'''
                 '''  sound TestSound { category = Item, }\n'''
-                '''  timedAction Making { anim = Craft, }\n'''
+                '''  timedAction Making { actionAnim = Craft, }\n'''
                 '''  vehicle TestCar { mechanicType = 1, }\n'''
                 '''  item Container { component Nested { craftRecipe Fake { } } }\n'''
                 '''}\n''',
@@ -45,7 +45,7 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             self.assertNotIn(("craftRecipe", "Fake"), names)
             self.assertEqual(result["errors"], [])
             self.assertEqual(result["counts"]["craftRecipe"], 1)
-            for editable_name in ("Hammer", "Sandwich", "MakeThing", "RepairHammer", "CustomWater", "TestCar", "TestSound", "FancyModel", "StoreDisplay"):
+            for editable_name in ("Hammer", "Sandwich", "MakeThing", "RepairHammer", "CustomWater", "TestCar", "TestSound", "FancyModel", "StoreDisplay", "Making"):
                 with self.subTest(editable_name=editable_name):
                     self.assertTrue(next(row for row in result["rows"] if row["name"] == editable_name)["editable"])
 
