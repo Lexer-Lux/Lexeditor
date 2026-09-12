@@ -1,184 +1,196 @@
-"""Bannerlord project, MSBuild, source, and build helpers."""
+"""Inspect and safely edit Bannerlord C# project/source files."""
 
 from __future__ import annotations
 
 from pathlib import Path
-import html
-import os
 import re
 import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 
-from .module_data import read_submodule
-from .paths import clear_write_helper, contained_game_path, contained_project_path
+from .paths import clear_write_helper, contained_project_path
 
 
-EDITABLE_PROJECT_PROPERTIES = (
+_EDITABLE_PROPERTIES = {
     "TargetFramework",
-    "LangVersion",
-    "Nullable",
     "AssemblyName",
     "RootNamespace",
-    "BannerlordDir",
-    "GameBin",
-    "HarmonyBin",
-    "McmBin",
-    "ModuleDir",
+    "LangVersion",
+    "Nullable",
     "OutputPath",
     "AppendTargetFrameworkToOutputPath",
     "CopyLocalLockFileAssemblies",
-)
-
-_TEXT_SUFFIXES = {
-    ".cs", ".xml", ".txt", ".csproj", ".json", ".ini", ".config",
-    ".md", ".yml", ".yaml", ".props", ".targets",
+    "BannerlordDir",
+    "GameBin",
+    "ModuleDir",
 }
-_MODULE_ID = re.compile(r"[A-Za-z0-9_.-]+")
 
 
-def _local_name(tag: str) -> str:
-    return tag.rsplit("}", 1)[-1]
+_XML_TEXT_MASK = re.compile(r"(?s)<!--.*?-->|<!\[CDATA\[.*?\]\]>")
+_PROPERTY_GROUP = re.compile(
+    r"(?is)<(?:[A-Za-z_][\w.-]*:)?PropertyGroup\b(?P<attrs>[^>]*)>(?P<body>.*?)</(?:[A-Za-z_][\w.-]*:)?PropertyGroup\s*>"
+)
+_OPEN_PROPERTY_GROUP = re.compile(r"(?is)<(?:[A-Za-z_][\w.-]*:)?PropertyGroup\b(?P<attrs>[^>]*)>")
+_CONDITION = re.compile(r"(?is)\bCondition\s*=")
 
 
-def _mask_xml_non_markup(value: str) -> str:
-    """Blank comment/CDATA bodies while preserving all character offsets."""
-    pattern = re.compile(r"<!--.*?-->|<!\[CDATA\[.*?\]\]>", re.DOTALL)
-    def mask(match: re.Match) -> str:
-        return "".join("\n" if char == "\n" else "\r" if char == "\r" else " " for char in match.group(0))
-    return pattern.sub(mask, value)
+def _mask_xml_text(text: str) -> str:
+    return _XML_TEXT_MASK.sub(lambda match: " " * (match.end() - match.start()), text)
 
 
-def _project_files(project: Path) -> list[Path]:
-    return sorted(path for path in project.glob("*.csproj") if path.is_file())
+def _property_pattern(name: str) -> re.Pattern[str]:
+    escaped = re.escape(name)
+    return re.compile(
+        rf"(?is)<(?P<prefix>[A-Za-z_][\w.-]*:)?{escaped}\b(?P<attrs>[^>]*)>(?P<value>.*?)</(?P=prefix){escaped}\s*>"
+    )
 
 
-def project_files(project: Path) -> list[Path]:
-    """Return selectable top-level project files without following escapes."""
-    root = project.resolve()
+def _unconditional_property_groups(text: str) -> list[tuple[int, int, str]]:
+    masked = _mask_xml_text(text)
+    groups = []
+    for match in _PROPERTY_GROUP.finditer(masked):
+        if _CONDITION.search(match.group("attrs") or ""):
+            continue
+        body_start = match.start("body")
+        groups.append((body_start, match.end("body"), text[body_start:match.end("body")]))
+    return groups
+
+
+def _property_occurrences(text: str, name: str) -> list[dict]:
+    """Return live property occurrences with group/element condition metadata."""
+    masked = _mask_xml_text(text)
     result = []
-    for candidate in _project_files(root):
-        target = candidate.resolve()
-        if target != root and root not in target.parents:
-            raise ValueError("Project file must stay inside the selected Bannerlord project")
-        if target.suffix.casefold() != ".csproj" or not target.is_file():
-            raise FileNotFoundError(target)
-        result.append(target)
+    groups = list(_PROPERTY_GROUP.finditer(masked))
+    for match in _property_pattern(name).finditer(masked):
+        group = next((row for row in groups if row.start("body") <= match.start() < row.end("body")), None)
+        if group is None:
+            continue
+        result.append(
+            {
+                "value": text[match.start("value"):match.end("value")],
+                "span": match.span("value"),
+                "elementCondition": bool(_CONDITION.search(match.group("attrs") or "")),
+                "groupCondition": bool(_CONDITION.search(group.group("attrs") or "")),
+            }
+        )
     return result
 
 
-def primary_project_file(project: Path) -> Path | None:
-    files = project_files(project)
-    if not files:
-        return None
-    if len(files) > 1:
-        names = ", ".join(path.name for path in files)
-        raise ValueError(f"Several .csproj files exist; select one explicitly: {names}")
-    return files[0]
+def project_files(project: Path) -> list[Path]:
+    root = Path(project).resolve()
+    rows = []
+    for candidate in sorted(root.glob("*.csproj"), key=lambda value: value.name.casefold()):
+        try:
+            safe = contained_project_path(root, candidate.name, require_file=True)
+        except (ValueError, FileNotFoundError):
+            continue
+        rows.append(safe)
+    return rows
 
 
 def resolve_project_file(project: Path, requested: str | None = None) -> Path:
-    root = project.resolve()
+    files = project_files(project)
     if requested:
-        relative = Path(str(requested).replace("\\", "/"))
-        if relative.is_absolute() or ".." in relative.parts or len(relative.parts) != 1:
-            raise ValueError("Project file selection must be a top-level .csproj filename")
-        target = (root / relative).resolve()
-    else:
-        candidate = primary_project_file(project)
-        if candidate is None:
-            raise FileNotFoundError(f"No .csproj found in {project}")
-        target = candidate.resolve()
-    if target != root and root not in target.parents:
-        raise ValueError("Project file must stay inside the selected Bannerlord project")
-    if target.suffix.casefold() != ".csproj" or not target.is_file():
-        raise FileNotFoundError(target)
-    return target
+        candidate = contained_project_path(project, Path(str(requested)).name, require_file=True)
+        if candidate.suffix.casefold() != ".csproj" or candidate.parent != Path(project).resolve():
+            raise ValueError("Selected project must be a top-level .csproj file")
+        if candidate not in files:
+            raise ValueError(f"Unknown project file: {requested}")
+        return candidate
+    if not files:
+        raise FileNotFoundError("No .csproj exists in this project")
+    if len(files) > 1:
+        raise ValueError("Several .csproj files exist; choose which one to build or edit")
+    return files[0]
+
+
+def primary_project_file(project: Path) -> Path | None:
+    try:
+        return resolve_project_file(project)
+    except FileNotFoundError:
+        return None
+
+
+def _parse_project(path: Path) -> tuple[ET.ElementTree, ET.Element]:
+    tree = ET.parse(path)
+    root = tree.getroot()
+    return tree, root
+
+
+def _child_text(parent: ET.Element, name: str) -> str:
+    for child in list(parent):
+        if child.tag.rsplit("}", 1)[-1] == name:
+            return (child.text or "").strip()
+    return ""
+
+
+def _tag_name(element: ET.Element) -> str:
+    return element.tag.rsplit("}", 1)[-1]
 
 
 def read_project_file(path: Path) -> dict:
-    """Inspect an SDK-style or classic MSBuild project without evaluating it."""
-    tree = ET.parse(path)
-    root = tree.getroot()
-    properties: dict[str, str] = {}
+    path = Path(path)
+    tree, root = _parse_project(path)
+    properties = {}
     property_rows = []
+    ambiguous = {}
+    text = path.read_text(encoding="utf-8-sig")
+    for name in sorted(_EDITABLE_PROPERTIES):
+        occurrences = _property_occurrences(text, name)
+        if not occurrences:
+            continue
+        unconditional = [row for row in occurrences if not row["elementCondition"] and not row["groupCondition"]]
+        editable = len(occurrences) == 1 and len(unconditional) == 1
+        if editable:
+            properties[name] = unconditional[0]["value"].strip()
+        else:
+            ambiguous[name] = (
+                "multiple definitions" if len(occurrences) > 1 else "conditional definition"
+            )
+        for row in occurrences:
+            property_rows.append(
+                {
+                    "name": name,
+                    "value": row["value"].strip(),
+                    "editable": editable and row is unconditional[0] if unconditional else False,
+                    "conditioned": row["elementCondition"] or row["groupCondition"],
+                }
+            )
+    sdk = root.attrib.get("Sdk", "")
     references = []
     packages = []
     items = []
     targets = []
-
-    for group_index, group in enumerate(root):
-        name = _local_name(group.tag)
-        if name == "PropertyGroup":
-            group_condition = group.attrib.get("Condition", "")
-            for element in group:
-                property_name = _local_name(element.tag)
-                value = (element.text or "").strip()
-                if property_name not in properties:
-                    properties[property_name] = value
-                property_rows.append(
-                    {
-                        "group": group_index,
-                        "name": property_name,
-                        "value": value,
-                        "condition": element.attrib.get("Condition", ""),
-                        "groupCondition": group_condition,
-                        "editable": property_name in EDITABLE_PROJECT_PROPERTIES,
-                    }
-                )
-        elif name == "ItemGroup":
-            for element in group:
-                item_name = _local_name(element.tag)
-                row = {
-                    "type": item_name,
-                    "include": element.attrib.get("Include", ""),
-                    "remove": element.attrib.get("Remove", ""),
-                    "update": element.attrib.get("Update", ""),
-                    "condition": element.attrib.get("Condition", ""),
-                    "metadata": {
-                        _local_name(child.tag): (child.text or "").strip()
-                        for child in element
-                    },
-                }
+    for element in root.iter():
+        name = _tag_name(element)
+        if name in {"Reference", "PackageReference", "Content", "None", "Compile"}:
+            row = {"tag": name, "include": element.attrib.get("Include", ""), "metadata": {}}
+            for child in list(element):
+                row["metadata"][_tag_name(child)] = (child.text or "").strip()
+            if name == "Reference":
+                references.append(row)
+            elif name == "PackageReference":
+                packages.append(row)
+            else:
                 items.append(row)
-                if item_name == "Reference":
-                    references.append(row)
-                elif item_name == "PackageReference":
-                    packages.append(row)
         elif name == "Target":
             targets.append(
                 {
-                    "name": group.attrib.get("Name", ""),
-                    "afterTargets": group.attrib.get("AfterTargets", ""),
-                    "beforeTargets": group.attrib.get("BeforeTargets", ""),
-                    "condition": group.attrib.get("Condition", ""),
-                    "tasks": [_local_name(child.tag) for child in group],
+                    "name": element.attrib.get("Name", ""),
+                    "afterTargets": element.attrib.get("AfterTargets", ""),
+                    "beforeTargets": element.attrib.get("BeforeTargets", ""),
+                    "condition": element.attrib.get("Condition", ""),
+                    "tasks": [_tag_name(child) for child in list(element)],
                 }
             )
-
-    property_definitions: dict[str, list[dict]] = {}
-    for row in property_rows:
-        property_definitions.setdefault(row["name"], []).append(row)
-    ambiguous_properties: dict[str, str] = {}
-    editable_properties = []
-    for property_name in EDITABLE_PROJECT_PROPERTIES:
-        rows = property_definitions.get(property_name, [])
-        if len(rows) > 1:
-            ambiguous_properties[property_name] = f"defined {len(rows)} times in this project file"
-            continue
-        if rows and (rows[0].get("condition") or rows[0].get("groupCondition")):
-            ambiguous_properties[property_name] = "defined under an MSBuild Condition"
-            continue
-        editable_properties.append(property_name)
-
     return {
         "path": str(path),
         "name": path.name,
-        "sdk": root.attrib.get("Sdk", ""),
+        "sdk": sdk,
         "properties": properties,
         "propertyRows": property_rows,
-        "editableProperties": editable_properties,
-        "ambiguousProperties": ambiguous_properties,
+        "editableProperties": sorted(name for name in _EDITABLE_PROPERTIES if name not in ambiguous),
+        "ambiguousProperties": ambiguous,
         "references": references,
         "packages": packages,
         "items": items,
@@ -187,97 +199,45 @@ def read_project_file(path: Path) -> dict:
 
 
 def save_project_properties(path: Path, edits: dict) -> dict:
-    """Patch a conservative set of simple MSBuild properties with one backup."""
-    unknown = set(edits) - set(EDITABLE_PROJECT_PROPERTIES)
+    path = Path(path)
+    if path.suffix.casefold() != ".csproj":
+        raise ValueError("Project settings can only edit .csproj files")
+    unknown = set(edits) - _EDITABLE_PROPERTIES
     if unknown:
-        raise ValueError(f"Unsupported project properties: {', '.join(sorted(unknown))}")
-    model = read_project_file(path)
-    ambiguous = model.get("ambiguousProperties", {})
-    blocked = sorted(name for name in edits if name in ambiguous)
-    if blocked:
-        details = "; ".join(f"{name}: {ambiguous[name]}" for name in blocked)
-        raise ValueError(
-            "Lexeditor cannot safely edit conditional or multiply-defined MSBuild properties without evaluating MSBuild: "
-            + details
-        )
-
-    raw = path.read_text(encoding="utf-8-sig")
-    candidate = raw
-    saved = 0
-
-    for name, incoming in edits.items():
-        value = str(incoming).strip()
-        if not value:
-            raise ValueError(f"{name} cannot be empty")
-        escaped = html.escape(value, quote=False)
-        pattern = re.compile(
-            rf"(<{re.escape(name)}(?:\s+[^>]*)?>)(.*?)(</{re.escape(name)}>)",
-            re.IGNORECASE | re.DOTALL,
-        )
-        masked = _mask_xml_non_markup(candidate)
-        matches = list(pattern.finditer(masked))
-        parsed_count = sum(1 for row in model.get("propertyRows", []) if row.get("name") == name)
-        if parsed_count and len(matches) != parsed_count:
-            raise ValueError(
-                f"Cannot safely patch {name}: textual MSBuild spans do not match parsed property definitions"
-            )
-        match = matches[0] if matches else None
-        if match:
-            current = html.unescape(candidate[match.start(2):match.end(2)].strip())
-            if current == value:
+        raise ValueError(f"Unsupported MSBuild properties: {', '.join(sorted(unknown))}")
+    original = path.read_text(encoding="utf-8-sig")
+    candidate = original
+    changed = set()
+    for name, raw in edits.items():
+        value = str(raw)
+        occurrences = _property_occurrences(candidate, name)
+        if occurrences:
+            unconditional = [row for row in occurrences if not row["elementCondition"] and not row["groupCondition"]]
+            if len(occurrences) != 1 or len(unconditional) != 1:
+                raise ValueError(f"{name} is defined conditionally or more than once and is read-only")
+            row = unconditional[0]
+            old_value = candidate[row["span"][0]:row["span"][1]]
+            if old_value == value:
                 continue
-            candidate = (
-                candidate[:match.start(2)]
-                + escaped
-                + candidate[match.end(2):]
-            )
-            saved += 1
+            candidate = candidate[:row["span"][0]] + value + candidate[row["span"][1]:]
+            changed.add(name)
             continue
-
-        parsed = ET.fromstring(candidate)
-        unconditional_groups = [
-            group
-            for group in parsed
-            if _local_name(group.tag) == "PropertyGroup" and not group.attrib.get("Condition", "").strip()
-        ]
-        if not unconditional_groups:
-            raise ValueError(
-                f"Cannot add {name}: MSBuild project has no unconditional PropertyGroup"
-            )
-        # Use textual bounds for the first unconditional PropertyGroup so comments/formatting remain intact.
-        property_group_pattern = re.compile(
-            r"<PropertyGroup(?P<attrs>\s+[^>]*)?>.*?</PropertyGroup\s*>",
-            re.IGNORECASE | re.DOTALL,
-        )
-        group = None
-        masked = _mask_xml_non_markup(candidate)
-        parsed_groups = [group for group in parsed if _local_name(group.tag) == "PropertyGroup"]
-        textual_groups = list(property_group_pattern.finditer(masked))
-        if len(textual_groups) != len(parsed_groups):
-            raise ValueError(
-                f"Cannot add {name}: textual PropertyGroup spans do not match parsed MSBuild groups"
-            )
-        for candidate_group in textual_groups:
-            opening = candidate[candidate_group.start():candidate_group.end()].split(">", 1)[0]
-            if re.search(r"\bCondition\s*=", opening, re.IGNORECASE):
-                continue
-            group = candidate_group
-            break
-        if group is None:
-            raise ValueError(
-                f"Cannot add {name}: could not locate an unconditional PropertyGroup text span"
-            )
-        close = re.search(r"</PropertyGroup\s*>", group.group(0), re.IGNORECASE)
-        close_at = group.start() + close.start()
-        line_start = candidate.rfind("\n", 0, close_at) + 1
-        indentation = re.match(r"\s*", candidate[line_start:close_at]).group(0)
-        insertion = f"{indentation}  <{name}>{escaped}</{name}>\n"
-        candidate = candidate[:close_at] + insertion + candidate[close_at:]
-        saved += 1
-
-    backup = path.with_name(path.name + ".lexeditor.bak")
-    if saved:
+        groups = _unconditional_property_groups(candidate)
+        if not groups:
+            raise ValueError(f"Cannot insert {name}: project has no unconditional PropertyGroup")
+        _left, right, body = groups[0]
+        line_start = candidate.rfind("\n", 0, right) + 1
+        indent = re.match(r"[ \t]*", candidate[line_start:right]).group(0)
+        child_indent = indent + "  "
+        insertion = f"\n{child_indent}<{name}>{value}</{name}>"
+        candidate = candidate[:right] + insertion + candidate[right:]
+        changed.add(name)
+    try:
         ET.fromstring(candidate)
+    except ET.ParseError as error:
+        raise ValueError(f"Saving project properties produced invalid XML: {error}") from error
+    backup = path.with_name(path.name + ".lexeditor.bak")
+    if changed:
         clear_write_helper(backup)
         shutil.copy2(path, backup)
         temporary = path.with_name(path.name + ".lexeditor.tmp")
@@ -285,27 +245,16 @@ def save_project_properties(path: Path, edits: dict) -> dict:
         temporary.write_text(candidate, encoding="utf-8")
         temporary.replace(path)
     return {
-        "saved": saved,
-        "backup": str(backup) if saved else "",
+        "saved": len(changed),
+        "backup": str(backup) if changed else "",
         "project": read_project_file(path),
     }
 
 
 def _safe_project_path(project: Path, requested: str) -> Path:
-    relative = Path(str(requested).replace("\\", "/"))
-    if relative.is_absolute() or ".." in relative.parts:
-        raise ValueError("Source path must be relative to the selected project")
-    root = project.resolve()
-    target = (root / relative).resolve()
-    if target != root and root not in target.parents:
-        raise ValueError("Source path escaped the selected project")
-    if not target.is_file():
-        raise FileNotFoundError(target)
-    if target.suffix.casefold() not in _TEXT_SUFFIXES:
-        raise ValueError(f"Unsupported source file type: {target.suffix or '(none)'}")
-    if target.stat().st_size > 2_000_000:
-        raise ValueError("Source file is too large for the source-only editor")
-    return target
+    if not requested:
+        raise ValueError("Missing source path")
+    return contained_project_path(project, *Path(requested).parts, require_file=True)
 
 
 def _decode_source(raw: bytes) -> tuple[str, str]:
@@ -356,100 +305,92 @@ def save_source(
     shutil.copy2(target, backup)
     temporary = target.with_name(target.name + ".lexeditor.tmp")
     clear_write_helper(temporary)
-    temporary.write_text(candidate, encoding=encoding)
+    # Write encoded bytes so Python's platform newline translation cannot
+    # rewrite raw-source line endings on Windows. The selected codec still
+    # preserves an existing UTF-8 BOM when one was present on load.
+    temporary.write_bytes(candidate.encode(encoding))
     temporary.replace(target)
     result = read_source(project, requested)
     result.update({"saved": 1, "backup": str(backup)})
     return result
 
 
-def _selected_game_root(explicit: Path | None) -> Path | None:
-    if explicit is not None:
-        return Path(explicit).resolve()
-    configured = os.environ.get("LEXEDITOR_BANNERLORD_ROOT", "").strip()
-    return Path(configured).resolve() if configured else None
-
-
-def _build_path_overrides(project: Path, selected_game: Path) -> dict[str, str]:
+def _module_id(project: Path) -> str:
     descriptor = contained_project_path(project, "SubModule.xml", require_file=True)
-    module_id = str(read_submodule(descriptor).get("id") or "").strip()
-    if not module_id or not _MODULE_ID.fullmatch(module_id):
-        raise ValueError(f"Bannerlord project has an unsafe module Id: {module_id or '(missing)'}")
+    root = ET.parse(descriptor).getroot()
+    element = root.find("Id")
+    return "" if element is None else element.attrib.get("value", "")
 
-    selected_game = selected_game.resolve()
-    game_bin = contained_game_path(selected_game, "bin", "Win64_Shipping_Client")
-    modules_root = contained_game_path(selected_game, "Modules")
-    module_dir = (modules_root / module_id).resolve()
-    if modules_root not in module_dir.parents:
-        raise ValueError("Resolved Bannerlord build module path escaped the Modules folder")
-    output_path = (module_dir / "bin" / "Win64_Shipping_Client").resolve()
-    if module_dir not in output_path.parents:
-        raise ValueError("Resolved Bannerlord build output path escaped the module folder")
 
-    return {
-        "BannerlordDir": str(selected_game),
-        "GameBin": str(game_bin),
-        "ModuleDir": str(module_dir),
-        "OutputPath": str(output_path) + os.sep,
-        "LexeditorSkipAssetDeploy": "true",
-    }
+def _contained_game_destination(
+    game_root: Path,
+    *parts: str,
+    require_file: bool = False,
+    require_dir: bool = False,
+    allow_missing_leaf: bool = False,
+) -> Path:
+    from .paths import contained_game_path
+
+    return contained_game_path(
+        game_root,
+        *parts,
+        require_file=require_file,
+        require_dir=require_dir,
+        allow_missing_leaf=allow_missing_leaf,
+    )
 
 
 def run_build(
     project: Path,
-    requested: str | None = None,
     configuration: str = "Debug",
-    timeout: int = 300,
     game_root: Path | None = None,
+    *,
+    requested: str | None = None,
 ) -> dict:
-    """Run dotnet directly and pin build/deploy paths to Lexeditor's selected install."""
-    configuration = str(configuration or "Debug")
+    configuration = str(configuration).strip()
     if configuration not in {"Debug", "Release"}:
-        raise ValueError("Configuration must be Debug or Release")
+        raise ValueError("Build configuration must be Debug or Release")
     project_file = resolve_project_file(project, requested)
-    selected_game = _selected_game_root(game_root)
-    command = [
-        "dotnet",
-        "build",
-        str(project_file),
-        "--configuration",
-        configuration,
-        "--nologo",
-    ]
-    path_overrides: dict[str, str] = {}
-    if selected_game is not None:
-        # These global properties override project-local values. Pin all standard
-        # Bannerlord write/reference roots used by Lexeditor projects, not only
-        # BannerlordDir, so a stale or edited ModuleDir/OutputPath cannot redirect
-        # build output or AfterTargets deployment away from the selected install.
-        path_overrides = _build_path_overrides(project, selected_game)
-        command.extend(f"-p:{name}={value}" for name, value in path_overrides.items())
-    try:
-        completed = subprocess.run(
-            command,
-            cwd=str(project),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
+    command = ["dotnet", "build", str(project_file), "-c", configuration]
+    module_id = _module_id(project)
+    if game_root is None:
+        value = os.environ.get("LEXEDITOR_BANNERLORD_ROOT", "").strip()
+        game_root = Path(value) if value else None
+    if game_root is not None:
+        game_root = Path(game_root).resolve()
+        modules_root = _contained_game_destination(game_root, "Modules", require_dir=True)
+        game_bin = _contained_game_destination(game_root, "bin", "Win64_Shipping_Client", require_dir=True)
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+", module_id):
+            raise ValueError("Unsafe module ID in SubModule.xml")
+        module_root = _contained_game_destination(
+            game_root,
+            "Modules",
+            module_id,
+            allow_missing_leaf=True,
         )
-    except FileNotFoundError as error:
-        raise RuntimeError("dotnet was not found on PATH") from error
-    except subprocess.TimeoutExpired as error:
-        stdout = error.stdout or ""
-        stderr = error.stderr or ""
-        raise RuntimeError(
-            "dotnet build exceeded the 300 second safety timeout.\n"
-            + str(stdout)[-8000:] + "\n" + str(stderr)[-8000:]
-        ) from error
-    output = ((completed.stdout or "") + (completed.stderr or ""))[-500_000:]
+        output_dir = module_root / "bin" / "Win64_Shipping_Client"
+        if modules_root not in module_root.parents:
+            raise ValueError("Module output escaped the selected Bannerlord Modules folder")
+        command += [
+            f"-p:BannerlordDir={game_root}",
+            f"-p:GameBin={game_bin}",
+            f"-p:ModuleDir={module_root}",
+            f"-p:OutputPath={output_dir}{os.sep}",
+            "-p:LexeditorSkipAssetDeploy=true",
+        ]
+    completed = subprocess.run(
+        command,
+        cwd=project,
+        capture_output=True,
+        text=True,
+        shell=False,
+    )
+    output = (completed.stdout or "") + (completed.stderr or "")
     return {
+        "command": command,
         "returnCode": completed.returncode,
         "succeeded": completed.returncode == 0,
-        "configuration": configuration,
-        "project": project_file.name,
-        "command": command,
-        "gameRootOverride": str(selected_game) if selected_game is not None else "",
-        "pathOverrides": path_overrides,
         "output": output,
+        "project": project_file.name,
+        "moduleId": module_id,
     }
