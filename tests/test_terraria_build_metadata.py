@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from hashlib import sha256
+import os
+from pathlib import Path
+import tempfile
 import unittest
 
 from games.terraria.build_metadata import parse_build_text, update_build_text
+from games.terraria import server
 
 
 class TerrariaBuildMetadataTests(unittest.TestCase):
@@ -67,6 +72,31 @@ class TerrariaBuildMetadataTests(unittest.TestCase):
             update_build_text("", {"author": "one\ntwo"})
         with self.assertRaisesRegex(ValueError, "Unsupported"):
             update_build_text("", {"modReferences": "ExampleMod"})
+
+    def test_service_preserves_bom_and_refuses_stale_writes(self):
+        previous = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = directory
+                target = Path(directory) / "build.txt"
+                original = server.UTF8_BOM + b"author = Lexer\r\nunknown = preserve\r\n"
+                target.write_bytes(original)
+                original_sha = sha256(original).hexdigest()
+
+                state = server.save_build({"author": "Changed"}, original_sha)
+                saved = target.read_bytes()
+                self.assertTrue(saved.startswith(server.UTF8_BOM))
+                self.assertIn(b"author = Changed\r\n", saved)
+                self.assertIn(b"unknown = preserve\r\n", saved)
+                self.assertEqual(state["sha256"], sha256(saved).hexdigest())
+
+                with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
+                    server.save_build({"author": "Again"}, original_sha)
+        finally:
+            if previous is None:
+                os.environ.pop("LEXEDITOR_TERRARIA_PROJECT", None)
+            else:
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = previous
 
 
 if __name__ == "__main__":
