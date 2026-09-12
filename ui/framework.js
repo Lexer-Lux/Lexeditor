@@ -5271,13 +5271,25 @@ ${contents.path}`});
       setSizes(widths, persist);
       return true;
     };
+    let dragFrame = 0, pendingDrag = null;
+    const flushDrag = () => {
+      dragFrame = 0;
+      const pending = pendingDrag; pendingDrag = null;
+      if (!pending || !root.isConnected) return;
+      const box = pending.divider.getBoundingClientRect();
+      resizePair(pending.index, pending.x - (box.left + box.width / 2));
+    };
     const finishDrag = (divider, event) => {
+      if (!divider.classList.contains("dragging")) return;
+      if (dragFrame) cancelAnimationFrame(dragFrame);
+      flushDrag();
       divider.classList.remove("dragging");
       document.body.classList.remove("lex-panel-layout-dragging");
       try {
         if (divider.hasPointerCapture?.(event.pointerId)) divider.releasePointerCapture(event.pointerId);
       } catch (_error) {}
       setSizes(sizes, true);
+      document.dispatchEvent(new Event("lex-panel-drag-ended"));
     };
     dividers.forEach((divider, index) => {
       divider.addEventListener("pointerdown", event => {
@@ -5292,11 +5304,12 @@ ${contents.path}`});
       });
       divider.addEventListener("pointermove", event => {
         if (!divider.classList.contains("dragging")) return;
-        const box = divider.getBoundingClientRect();
-        resizePair(index, event.clientX - (box.left + box.width / 2));
+        pendingDrag = {divider, index, x:event.clientX};
+        if (!dragFrame) dragFrame = requestAnimationFrame(flushDrag);
       });
       divider.addEventListener("pointerup", event => finishDrag(divider, event));
       divider.addEventListener("pointercancel", event => finishDrag(divider, event));
+      divider.addEventListener("lostpointercapture", event => finishDrag(divider, event));
       divider.addEventListener("keydown", event => {
         const pairWidth = nodes[index].getBoundingClientRect().width +
           nodes[index + 1].getBoundingClientRect().width;
@@ -5385,9 +5398,17 @@ ${contents.path}`});
     const fixedRows = Math.max(0, Number(options.fixedRows) || 0);
     const fittedLists = (options.lists || [listNode]).filter(Boolean);
     let lastSize = Math.max(1, Number(options.pageSize) || 1);
+    let waitingForDrag = false;
     const measure = () => {
       frame = 0;
       if (!listNode.isConnected) return;
+      if (document.body.classList.contains("lex-panel-layout-dragging")) {
+        if (!waitingForDrag) {
+          waitingForDrag = true;
+          document.addEventListener("lex-panel-drag-ended", () => {waitingForDrag=false;schedule();}, {once:true});
+        }
+        return;
+      }
       const header = listNode.querySelector(options.headerSelector || ".lex-column-list-header, .loot-listhead, .rdr-listhead") ||
         (listNode.firstElementChild?.classList.contains("lex-list-row") ? null : listNode.firstElementChild);
       const rows = [...listNode.querySelectorAll(options.rowSelector || ".lex-list-row")];

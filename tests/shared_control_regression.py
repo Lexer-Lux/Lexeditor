@@ -47,6 +47,15 @@ def main():
    assert page.get_by_role('button',name='Editable Table',exact=True).count()==0
    page.locator('#plugin-github').click(button='right');assert page.evaluate('window.__calls.some(row=>row.openRepository==="blank")')
    page.locator('button[data-tab=three]').click();page.wait_for_timeout(400)
+   divider=page.locator('.lex-panel-layout-divider:visible').first
+   box=divider.bounding_box();start=divider.get_attribute('aria-valuenow')
+   page.mouse.move(box['x']+box['width']/2,box['y']+box['height']/2)
+   page.mouse.down();page.mouse.move(box['x']+100,box['y']+box['height']/2,steps=30);page.mouse.up()
+   page.wait_for_timeout(200)
+   assert not page.evaluate('document.body.classList.contains("lex-panel-layout-dragging")')
+   assert divider.get_attribute('aria-valuenow')!=start
+   assert divider.evaluate('e=>getComputedStyle(e,"::before").height')=='32px'
+   divider.click(button='right');page.wait_for_timeout(200)
    field=page.locator('.lex-boolean-field').first;checkbox=field.locator('input[type=checkbox]')
    before=field.bounding_box();checkbox.set_checked(not checkbox.is_checked());page.wait_for_timeout(250)
    assert abs(field.bounding_box()['height']-before['height'])<.5
