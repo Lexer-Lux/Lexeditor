@@ -49,7 +49,7 @@ def _looks_like_mod(root: Path) -> bool:
 
 
 def discover_projects() -> list[Path]:
-    """Find local test mods and authoring projects without touching Workshop downloads."""
+    """Find local test mods and Workshop authoring projects."""
     found: list[Path] = []
     local_mods = USER_ZOMBOID_ROOT / "mods"
     if local_mods.is_dir():
@@ -71,14 +71,13 @@ def check() -> list[str]:
 
 class ProjectZomboidSession(LocalPluginSession):
     def __init__(self, extra_env: dict[str, str] | None = None):
-        environment = dict(extra_env or {})
         super().__init__(
             module="games.project_zomboid.server",
             plugin_id="project-zomboid",
             app_root=ROOT,
             check=check,
             port_env="LEXEDITOR_PROJECT_ZOMBOID_PORT",
-            extra_env=environment,
+            extra_env=dict(extra_env or {}),
         )
 
 
@@ -88,7 +87,7 @@ def launch() -> int:
 
 
 def smoke() -> list[str]:
-    """Exercise one synthetic Build 42 edit/deploy slice without touching user data."""
+    """Exercise structured Build 42 edit/deploy paths without touching user data."""
     with tempfile.TemporaryDirectory(prefix="lexeditor-project-zomboid-") as temp_name:
         temp = Path(temp_name)
         project = temp / "Lexeditor Zomboid Smoke"
@@ -106,6 +105,26 @@ def smoke() -> list[str]:
             "        Icon = Radio,\n"
             "        UnknownFutureField = KeepMe,\n"
             "    }\n"
+            "    evolvedrecipe Test Soup\n"
+            "    {\n"
+            "        BaseItem = Base.PotOfSoup,\n"
+            "        ResultItem = Base.PotOfSoup,\n"
+            "        MaxItems = 4,\n"
+            "        CanAddSpicesEmpty = true,\n"
+            "        MinimumWater = 0.0,\n"
+            "    }\n"
+            "    craftRecipe Make Test Thing\n"
+            "    {\n"
+            "        AllowBatchCraft = true,\n"
+            "        CanWalk = false,\n"
+            "        category = General,\n"
+            "        Icon = Radio,\n"
+            "        ResearchSkillLevel = -1,\n"
+            "        tags = InHandCraft,\n"
+            "        time = 50,\n"
+            "        timedAction = Craft,\n"
+            "        inputs { item 1 [Base.Plank], }\n"
+            "    }\n"
             "}\n",
             encoding="utf-8",
         )
@@ -116,29 +135,53 @@ def smoke() -> list[str]:
         }
         with ProjectZomboidSession(environment) as session:
             identity = request_json(session.url + "api/plugin")
-            if identity.get("pluginId") != "project-zomboid":
-                raise RuntimeError("Project Zomboid service reported the wrong plugin identity")
+            required = {"build42-items", "build42-evolvedrecipes", "build42-craftrecipes", "local-deploy"}
+            if identity.get("pluginId") != "project-zomboid" or required - set(identity.get("capabilities", [])):
+                raise RuntimeError("Project Zomboid service reported an incomplete plugin contract")
             metadata = request_json(session.url + "api/mod-info")
             if metadata.get("fields", {}).get("id") != "Lexeditor_Zomboid_Smoke":
                 raise RuntimeError("Synthetic Build 42 mod.info was not initialized")
+
             items = request_json(session.url + "api/items").get("rows", [])
             if len(items) != 1 or items[0].get("fullType") != "LexSmoke.TestItem":
                 raise RuntimeError("Synthetic Build 42 item was not parsed")
-            row = items[0]
-            saved = request_json(session.url + "api/items/save", {
-                "path": row["path"],
-                "module": row["module"],
-                "id": row["id"],
-                "sha256": row["sha256"],
-                "edits": {"Weight": "0.5"},
+            item = items[0]
+            saved_item = request_json(session.url + "api/items/save", {
+                "path": item["path"], "module": item["module"], "id": item["id"],
+                "sha256": item["sha256"], "edits": {"Weight": "0.5"},
             })
-            if saved.get("fields", {}).get("Weight") != "0.5":
+            if saved_item.get("fields", {}).get("Weight") != "0.5":
                 raise RuntimeError("Synthetic item edit did not read back")
-            if "UnknownFutureField = KeepMe," not in script.read_text(encoding="utf-8"):
-                raise RuntimeError("Synthetic item edit did not preserve unknown script data")
+
+            evolved = request_json(session.url + "api/evolvedrecipes").get("rows", [])
+            if len(evolved) != 1:
+                raise RuntimeError("Synthetic evolved recipe was not parsed")
+            recipe = evolved[0]
+            saved_evolved = request_json(session.url + "api/evolvedrecipes/save", {
+                "path": recipe["path"], "module": recipe["module"], "id": recipe["id"],
+                "sha256": recipe["sha256"], "edits": {"MaxItems": "6"},
+            })
+            if saved_evolved.get("fields", {}).get("MaxItems") != "6":
+                raise RuntimeError("Synthetic evolved recipe edit did not read back")
+
+            crafts = request_json(session.url + "api/craftrecipes").get("rows", [])
+            if len(crafts) != 1:
+                raise RuntimeError("Synthetic craft recipe was not parsed")
+            craft = crafts[0]
+            saved_craft = request_json(session.url + "api/craftrecipes/save", {
+                "path": craft["path"], "module": craft["module"], "id": craft["id"],
+                "sha256": craft["sha256"], "edits": {"time": "75", "AllowBatchCraft": "false"},
+            })
+            if saved_craft.get("fields", {}).get("time") != "75":
+                raise RuntimeError("Synthetic craft recipe edit did not read back")
+
+            text = script.read_text(encoding="utf-8")
+            if "UnknownFutureField = KeepMe," not in text or "inputs { item 1 [Base.Plank], }" not in text:
+                raise RuntimeError("Structured writes did not preserve unknown/nested script data")
             mapped = request_json(session.url + "api/datamap").get("rows", [])
-            if not any(row.get("filename") == "42/media/scripts/smoke.txt" for row in mapped):
-                raise RuntimeError("Project Zomboid Data Map omitted the synthetic script")
+            mapped_script = next((row for row in mapped if row.get("filename") == "42/media/scripts/smoke.txt"), None)
+            if not mapped_script or "Craft Recipes" not in mapped_script.get("editor", ""):
+                raise RuntimeError("Data Map omitted structured recipe coverage")
             deployed = request_json(session.url + "api/deploy", {})
             target = Path(deployed.get("target", ""))
             if not deployed.get("owned") or not (target / "42" / "mod.info").is_file():
@@ -151,10 +194,10 @@ def smoke() -> list[str]:
         if not session.wait_closed():
             raise RuntimeError("Project Zomboid child port is still open after host shutdown")
     return [
-        "Project Zomboid plugin identity confirmed",
+        "Project Zomboid plugin identity and structured capabilities confirmed",
         "synthetic Build 42 mod.info initialized",
-        "Build 42 item parsed, edited and reopened with unknown data preserved",
-        "Data Map exposed the representative script",
+        "item, evolvedrecipe and craftRecipe edits round-tripped with unknown data preserved",
+        "Data Map exposed structured script coverage",
         "local native-mod deployment and ownership-safe revert succeeded",
         "host-owned child service stopped cleanly",
     ]
