@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from urllib.parse import urlparse
 
-from . import core, zedscript
+from . import core, evolvedrecipe, zedscript
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,6 +82,7 @@ class Handler(BaseHTTPRequestHandler):
                     "capabilities": [
                         "mod-info",
                         "build42-items",
+                        "build42-evolvedrecipes",
                         "build42-zedscript-inventory",
                         "data-map",
                         "local-deploy",
@@ -92,6 +93,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json(core.read_mod_info(self.project()))
             elif path == "/api/items":
                 self.send_json(core.read_items(self.project()))
+            elif path == "/api/evolvedrecipes":
+                self.send_json(evolvedrecipe.read(self.project()))
             elif path == "/api/zedscript":
                 self.send_json(zedscript.inventory(self.project()))
             elif path == "/api/datamap":
@@ -118,6 +121,19 @@ class Handler(BaseHTTPRequestHandler):
                         "Item save requires path, module, id, sha256 and edits"
                     )
                 result = core.save_item(
+                    root,
+                    str(payload["path"]),
+                    str(payload["module"]),
+                    str(payload["id"]),
+                    str(payload["sha256"]),
+                    payload["edits"],
+                )
+            elif path == "/api/evolvedrecipes/save":
+                if set(payload) != {"path", "module", "id", "sha256", "edits"}:
+                    raise core.ProjectZomboidError(
+                        "Evolved recipe save requires path, module, id, sha256 and edits"
+                    )
+                result = evolvedrecipe.save(
                     root,
                     str(payload["path"]),
                     str(payload["module"]),
