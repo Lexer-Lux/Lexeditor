@@ -6019,3 +6019,8 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-detail-field:not(.lex-boolean-field) > .lex-detail-field-control > .lex-multi-number {
   grid-column:1 / -1;
 }
+
+/* Desktop plugin pages scroll inside their panels, never at the viewport. */
+html:has(body > .lex-shell-header) {height:100%;overflow:hidden;}
+body:has(> .lex-shell-header) {height:100dvh;max-height:100dvh;min-height:0;overflow:hidden;}
+body:has(> .lex-shell-header) > main {min-height:0;}
