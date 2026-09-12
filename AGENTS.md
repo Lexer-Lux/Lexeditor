@@ -21,6 +21,9 @@
 - Keep list and detail views consistent with the RDR2 plugin: record identity
   stays in the master list, and all editable fields stay in the selected
   record's detail pane.
+- Give editor tabs, sections, and fields shared question-mark help. Explain the
+  gameplay effect, how to use the control, and any known limits in plain language.
+  File offsets and parser details are not a substitute for user instructions.
 - Do not claim visual acceptance from source, API, or smoke checks.
 
 ## GitHub issues are the source of truth

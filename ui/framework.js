@@ -1469,6 +1469,15 @@
     onclick: () => options.change?.(tab.id),
   }, element("span", {class: "lex-tab-label"},
     element("span", {class: "lex-tab-label-text"}, tab.label)),
+  tab.help ? (() => {
+    const help = infoHelp(tab.help);
+    help.addEventListener("click", event => event.stopPropagation());
+    help.addEventListener("keydown", event => {
+      event.stopPropagation();
+      if (event.key === "Enter" || event.key === " ") event.preventDefault();
+    });
+    return help;
+  })() : null,
   (key => key ? element("span", {
     class: "lex-tab-shortcut", "aria-hidden": "true",
   }, key) : "")(shortcutKeyFor(index + 1)))));

@@ -6030,3 +6030,8 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-value-modified > :is(input,select,textarea,output),
 .lex-value-modified > .lex-unit-field > :is(input,select,output),
 .lex-value-modified > :not(.lex-reference-values):not(.lex-reference-placeholder) .lex-hoverable { color:var(--lex-accent)!important; }
+
+/* Keep tab help beside its label at every navigation density. */
+.lex-subtab-button:has(> .lex-info-help) { display:flex;align-items:center;justify-content:center; }
+.lex-subtab-button > .lex-info-help { flex:0 0 18px;position:relative; }
+.lex-subtab-button:has(> .lex-info-help) > .lex-tab-label { flex:0 1 auto;min-width:0; }
