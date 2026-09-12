@@ -53,8 +53,12 @@ def native_layer() -> str:
 #include <cstdio>
 #include "shared_magic_core.h"
 #include "lexeditor_ff8_shared_party.h"
+#ifndef __cdecl
 #define __cdecl
+#endif
+#ifndef __declspec
 #define __declspec(x)
+#endif
 using namespace lexeditor::ff8::shared_magic;
 using ActorInventories=std::array<MagicInventory,3>;
 constexpr std::size_t kActorCount=3,kActorStride=0x1D0,kActorMagicOffset=0x82,kActorMagicStride=5;
