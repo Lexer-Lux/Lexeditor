@@ -38,4 +38,7 @@ for x,y in [(0,0),(31,19),(140,72)]:
  calls=widget(0x4D3E40,[1,2,x,y,3,10])
  level=next(args for target,args in calls if target==0x49F850)
  assert level[2:4]==(x+10,y+52)
+ calls=widget(0x4D41B0,[0x2000000,1,2,x,y,3])
+ level=next(args for target,args in calls if target==0x4BF330)
+ assert level[3:5]==(x+79,y+75),level
 print("PASS: 13 native call sites; shared character and GF list level coordinates at three offsets")
