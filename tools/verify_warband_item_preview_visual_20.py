@@ -14,11 +14,21 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(r"C:\RDR2Mod\tools\reverse-engineering")))
 
+from games.warband import paths  # noqa: E402
+from games.warband.game_font import FONT_TEXTURE  # noqa: E402
 from games.warband.plugin import WarbandSession  # noqa: E402
 from render_crime_editors_55_62 import Cdp, free_port, wait_eval, wait_json  # noqa: E402
 
 
 def main() -> int:
+    prerequisites = (
+        Path(paths.MODULE_SYSTEM) / "module_items.py",
+        Path(FONT_TEXTURE),
+        Path(paths.WARBAND_ROOT) / "CommonRes",
+    )
+    missing = next((path for path in prerequisites if not path.exists()), None)
+    if missing:
+        raise FileNotFoundError(f"[WinError 2] Missing Warband preview prerequisite: {missing}")
     edge = Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe")
     profile = tempfile.TemporaryDirectory(prefix="lexeditor-warband-item-edge-", ignore_cleanup_errors=True)
     hidden = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
