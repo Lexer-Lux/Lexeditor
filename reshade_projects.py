@@ -148,6 +148,10 @@ def _clean_repository(entry: dict) -> dict | None:
         "name": name,
         "version": str(entry.get("version", "") or "").strip(),
         "url": str(entry.get("url", "") or "").strip(),
+        # Where this machine keeps the repository's .fx files. Naming a
+        # repository is what a mod does; having the shaders on disk is what
+        # this machine does, and without it ReShade loads with nothing to run.
+        "path": str(entry.get("path", "") or "").strip(),
     }
 
 
@@ -302,6 +306,94 @@ def adopt(source: Path) -> dict:
     return store_state()
 
 
+RESHADE_INI = "ReShade.ini"
+
+
+def shader_paths(project_root: Path | None) -> tuple[list[Path], list[Path]]:
+    """Every folder ReShade should search for effects and for textures.
+
+    The repositories this machine has, plus the shaders the mod's own author
+    wrote. A repository entry with no folder contributes nothing, which is
+    exactly the state that makes ReShade start with an empty effect list.
+    """
+    effects: list[Path] = []
+    textures: list[Path] = []
+    for entry in repositories():
+        folder = entry.get("path") or ""
+        if not folder:
+            continue
+        root = Path(folder)
+        if not root.is_dir():
+            continue
+        effects.append(root)
+        for name in ("Shaders", "Textures"):
+            child = root / name
+            if child.is_dir():
+                (effects if name == "Shaders" else textures).append(child)
+    if project_root:
+        authored = Path(project_root) / RESHADE_DIR / "shaders"
+        if authored.is_dir():
+            effects.append(authored)
+    return effects, textures
+
+
+def configure(game_root: Path, project_root: Path | None = None) -> dict:
+    """Tell ReShade where the shaders are and which preset to load.
+
+    Installing the loader is not enough: ReShade reads its own ReShade.ini
+    beside the game and, with no search paths in it, compiles nothing and shows
+    an empty effect list. Only the keys Lexeditor owns are written; anything
+    else already in the file is left alone.
+    """
+    game_root = Path(game_root)
+    if not game_root.is_dir():
+        raise ValueError(f"No game folder at {game_root}")
+    effects, textures = shader_paths(project_root)
+    manifest = read_manifest(project_root) if project_root else {}
+    preset = ""
+    named = str(manifest.get("preset", "") or "")
+    if named and project_root:
+        candidate = Path(project_root) / RESHADE_DIR / named
+        if candidate.is_file():
+            preset = str(candidate)
+    wanted = {
+        "EffectSearchPaths": ",".join(str(path) for path in effects),
+        "TextureSearchPaths": ",".join(str(path) for path in textures or effects),
+    }
+    if preset:
+        wanted["PresetPath"] = preset
+    target = game_root / RESHADE_INI
+    lines = (target.read_text(encoding="utf-8", errors="replace").splitlines()
+             if target.is_file() else [])
+    if "[GENERAL]" not in [line.strip().upper() for line in lines]:
+        lines = (lines + [""] if lines else []) + ["[GENERAL]"]
+    written = set()
+    for index, line in enumerate(lines):
+        key = line.split("=", 1)[0].strip()
+        if key in wanted:
+            lines[index] = f"{key}={wanted[key]}"
+            written.add(key)
+    if written != set(wanted):
+        insert = next(index for index, line in enumerate(lines)
+                      if line.strip().upper() == "[GENERAL]") + 1
+        for key, value in wanted.items():
+            if key not in written:
+                lines.insert(insert, f"{key}={value}")
+                insert += 1
+    target.write_text(NEWLINE.join(lines) + NEWLINE, encoding="utf-8")
+    return {
+        "path": str(target),
+        "effectPaths": [str(path) for path in effects],
+        "preset": preset,
+        # The reason nothing happens when this is empty, said plainly.
+        "ready": bool(effects) and bool(preset),
+        "reason": ("" if effects and preset else
+                   "No shader folder is registered for any repository."
+                   if not effects else
+                   "This mod names no preset that is present."),
+    }
+
+
 def install(game_root: Path, renderer: str) -> dict:
     """Place Lexeditor's ReShade in one game, under the loader name it needs."""
     game_root = Path(game_root)
@@ -326,7 +418,13 @@ def install(game_root: Path, renderer: str) -> dict:
                 f"{dll_name} already exists in this game and is not ReShade. "
                 "Lexeditor will not overwrite it.")
     shutil.copy2(source, target)
-    return {"installed": True, "renderer": str(renderer).lower(), "path": str(target)}
+    result = {"installed": True, "renderer": str(renderer).lower(), "path": str(target)}
+    # A loader with no search paths compiles nothing, so the two steps are one.
+    try:
+        result["configured"] = configure(game_root)
+    except Exception as error:
+        result["configured"] = {"ready": False, "reason": str(error)}
+    return result
 
 
 def uninstall(game_root: Path) -> dict:

@@ -85,14 +85,30 @@ int main() {
     Vec3s sinking=start;
     for (int i=0;i<600;++i) orbit(sinking,target,128,255);
     assert(sinking.y >= target.y - 2);
-    // A pose FF8 hands back already below the floor is not yanked upward; the
-    // clamp only stops the reader driving further under.
-    Vec3s below{start.x,static_cast<std::int16_t>(target.y-300),start.z};
-    const std::int16_t before_y=below.y;
-    for (int i=0;i<60;++i) orbit(below,target,128,255);
-    assert(below.y <= before_y + 2);
+    // The floor a scene sets for itself. FF8 hands the camera back below level
+    // here, so that pose is this battle's floor: the reader can sink to it and
+    // no further, rather than being clamped up to level.
+    Floor floor;
+    Vec3s low{start.x,static_cast<std::int16_t>(target.y-300),start.z};
+    assert(!orbit(low,target,128,128,0.035f,0.025f,1.0f,&floor));  // centred: learn
+    assert(floor.known);
+    assert(floor.pitch < 0.0f);
+    const float learned=floor.pitch;
+    Vec3s driven=low;
+    for (int i=0;i<600;++i) orbit(driven,target,128,255,0.035f,0.025f,1.0f,&floor);
+    assert(driven.y <= target.y - 1);   // not lifted to level
+    assert(driven.y >= low.y - 2);      // and not driven below the scene's pose
 
-    std::cout << "Battle camera policy: idle gate, zero-drift center/deadzone, proportional X/Y orbit, radius preservation, speed scaling, ground floor and handed-back baseline passed\n";
+    // A different battle starts from its own pose, not the last one's.
+    Vec3s high{start.x,static_cast<std::int16_t>(target.y+400),start.z};
+    assert(!orbit(high,target,128,128,0.035f,0.025f,1.0f,&floor));
+    assert(floor.known && floor.pitch == 0.0f);
+    assert(learned < floor.pitch);
+    Vec3s again=high;
+    for (int i=0;i<600;++i) orbit(again,target,128,255,0.035f,0.025f,1.0f,&floor);
+    assert(again.y >= target.y - 2);
+
+    std::cout << "Battle camera policy: idle gate, zero-drift center/deadzone, proportional X/Y orbit, radius preservation, speed scaling, per-scene ground floor and handed-back baseline passed\n";
 }
 '''
 

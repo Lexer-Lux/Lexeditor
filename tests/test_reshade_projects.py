@@ -197,3 +197,48 @@ def test_snapshot_reports_repository_state_for_the_mods_manifest(tmp_path, monke
     state = rp.snapshot(project)
     assert [entry["state"] for entry in state["repositoryStatus"]] == ["present"]
     assert [entry["name"] for entry in state["repositories"]] == ["qUINT"]
+
+
+def test_installing_also_tells_reshade_where_the_shaders_are(tmp_path, monkeypatch):
+    # A loader with no search paths in ReShade.ini compiles nothing and shows an
+    # empty effect list, which is indistinguishable from the mod not working.
+    store = tmp_path/"store"; store.mkdir()
+    monkeypatch.setattr(rp, "STORE", store)
+    (store/rp.STORE_DLL).write_bytes(b"ReShade 6 loader")
+    game = tmp_path/"game"; game.mkdir()
+    shaders = tmp_path/"quint"; (shaders/"Shaders").mkdir(parents=True)
+    (shaders/"Textures").mkdir()
+    rp.write_repositories([
+        {"name": "qUINT", "version": "3.0", "path": str(shaders)}])
+    result = rp.install(game, "dx11")
+    ini = (game/rp.RESHADE_INI).read_text(encoding="utf-8")
+    assert "[GENERAL]" in ini
+    assert str(shaders/"Shaders") in ini
+    assert str(shaders/"Textures") in ini
+    assert result["configured"]["effectPaths"]
+
+
+def test_a_repository_with_no_folder_says_why_nothing_happens(tmp_path, monkeypatch):
+    store = tmp_path/"store"; store.mkdir()
+    monkeypatch.setattr(rp, "STORE", store)
+    game = tmp_path/"game"; game.mkdir()
+    # Named but never fetched: this is the state that leaves ReShade empty.
+    rp.write_repositories([{"name": "iMMERSE", "version": "1.2"}])
+    result = rp.configure(game)
+    assert not result["ready"]
+    assert "No shader folder" in result["reason"]
+
+
+def test_configure_keeps_settings_it_does_not_own(tmp_path, monkeypatch):
+    store = tmp_path/"store"; store.mkdir()
+    monkeypatch.setattr(rp, "STORE", store)
+    game = tmp_path/"game"; game.mkdir()
+    (game/rp.RESHADE_INI).write_text(
+        "[GENERAL]\nEffectSearchPaths=old\nPerformanceMode=1\n", encoding="utf-8")
+    shaders = tmp_path/"fx"; shaders.mkdir()
+    rp.write_repositories([{"name": "SweetFX", "path": str(shaders)}])
+    rp.configure(game)
+    ini = (game/rp.RESHADE_INI).read_text(encoding="utf-8")
+    assert "PerformanceMode=1" in ini
+    assert "EffectSearchPaths=old" not in ini
+    assert str(shaders) in ini

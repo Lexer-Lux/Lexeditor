@@ -45,22 +45,54 @@ inline float speed_scale(float value) {
     return std::clamp(value, MIN_SPEED_SCALE, MAX_SPEED_SCALE);
 }
 
-// How far below the look-at point the camera may swing. FF8's battlefield is a
-// plane with nothing under it: pitching past level put the camera below the
-// ground and the scene was drawn from inside the terrain. Level with what it
-// is looking at is as low as it goes.
+// How far the camera may swing. FF8's battlefield is a plane with nothing under
+// it, and the shipped clamp allowed seventy-seven degrees below level, so the
+// scene ended up drawn from inside the terrain.
+//
+// Level is the fallback floor, not the rule. The rule is the scene's own: FF8
+// hands the camera back at a pose it chose for this battle, and that pose is
+// the lowest angle the game itself considers correct here. Some scenes sit
+// slightly below level and clamping those to level would lift the camera off
+// the pose the game just set. So the floor is whichever is lower, level or the
+// pose FF8 last handed back, and it is re-learned every time the reader lets
+// go of the stick.
 constexpr float MIN_PITCH = 0.0f;
 constexpr float MAX_PITCH = 1.35f;
+
+// The floor this battle is using. The caller keeps one and passes it in; it
+// costs a float and a flag and it is what makes the clamp per-scene rather
+// than per-game.
+struct Floor {
+    float pitch = MIN_PITCH;
+    bool known = false;
+};
+
+inline float pitch_of(const Vec3s &position, const Vec3s &look_at) {
+    const float dy = static_cast<float>(position.y) - look_at.y;
+    const float horizontal = std::hypot(static_cast<float>(position.x) - look_at.x,
+                                        static_cast<float>(position.z) - look_at.z);
+    return std::atan2(dy, horizontal);
+}
 
 // Orbit position around the handed-back idle look-at point. There is no
 // persistent yaw/pitch state: every step starts from FF8's current idle pose,
 // so a native action camera can take ownership and return without a stale snap.
 inline bool orbit(Vec3s &position, const Vec3s &look_at, int raw_x, int raw_y,
                   float yaw_speed = 0.035f, float pitch_speed = 0.025f,
-                  float scale = DEFAULT_SPEED_SCALE) {
+                  float scale = DEFAULT_SPEED_SCALE, Floor *floor = nullptr) {
     const float input_x = axis(raw_x);
     const float input_y = axis(raw_y);
-    if (input_x == 0.0f && input_y == 0.0f) return false;
+    if (input_x == 0.0f && input_y == 0.0f) {
+        // Nobody is holding the stick, so this pose is FF8's own. Learn the
+        // scene's floor from it: whichever is lower, level or where the game
+        // put the camera.
+        if (floor) {
+            const float resting = pitch_of(position, look_at);
+            floor->pitch = std::min(MIN_PITCH, resting);
+            floor->known = true;
+        }
+        return false;
+    }
 
     const float dx = static_cast<float>(position.x) - look_at.x;
     const float dy = static_cast<float>(position.y) - look_at.y;
@@ -72,12 +104,12 @@ inline bool orbit(Vec3s &position, const Vec3s &look_at, int raw_x, int raw_y,
     const float rate = speed_scale(scale);
     float yaw = std::atan2(dx, dz) + input_x * yaw_speed * rate;
     float pitch = std::atan2(dy, horizontal) - input_y * pitch_speed * rate;
-    // A pose FF8 itself hands back below the floor is left where it is rather
-    // than lifted: from there the stick may raise the camera but not sink it
-    // further. The clamp stops the reader driving under the ground; it never
-    // moves the camera on its own.
+    // The scene's floor if one has been learned, level otherwise, and never
+    // above where the camera already is - a pose that is somehow lower still
+    // may be raised but is not yanked up on its own.
     const float current_pitch = std::atan2(dy, horizontal);
-    const float floor_pitch = current_pitch < MIN_PITCH ? current_pitch : MIN_PITCH;
+    const float scene_floor = (floor && floor->known) ? floor->pitch : MIN_PITCH;
+    const float floor_pitch = std::min(scene_floor, current_pitch);
     pitch = std::clamp(pitch, floor_pitch, MAX_PITCH);
 
     const float projected = radius * std::cos(pitch);
