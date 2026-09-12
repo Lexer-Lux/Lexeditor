@@ -1024,6 +1024,10 @@
 .magic-detail > .lex-detail-panel-body{display:flex;flex-direction:column;min-height:0;overflow:hidden}
     .magic-detail-tabs{flex:1;min-height:0;height:100%}
     .magic-detail-tabs > .lex-tabbed-panel-content{overflow:auto}
+      .drop-chance-table{width:100%;border-collapse:collapse;margin-top:6px;font:inherit}
+    .drop-chance-table th,.drop-chance-table td{padding:3px 5px;text-align:right;border-bottom:1px solid #ffffff28;white-space:nowrap}
+    .drop-chance-table th:first-child{text-align:left}
+    .drop-chance-table small{display:block;font-size:.8em;color:#ddd}
   </style>
 </head>
 <body>
@@ -2031,7 +2035,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const flatStatAbilities=el("input",{type:"checkbox",checked:settings.flatStatAbilities,"aria-label":"Flat +Stat Abilities",onchange:event=>{settings.flatStatAbilities=event.target.checked;shell.refresh()}});
     const maxSpellEnabled=el("input",{type:"checkbox",checked:settings.maxSpellEnabled,"aria-label":"Enable Max Spell",onchange:event=>{settings.maxSpellEnabled=event.target.checked;shell.refresh()}});
     const maxSpellValue=numberControl(settings.maxSpell,settings.maxSpellMinimum,settings.maxSpellMaximum,1,value=>settings.maxSpell=value,{"aria-label":"Maximum spell stock"});
-    const row=(title,description,control,className="")=>el("div",{class:"setting-row"},el("div",{class:"setting-copy"},el("strong",{},title),el("p",{},description)),el("label",{class:`setting-control ${className}`.trim()},control));
+    const row=(title,description,control,className="")=>el("div",{class:"setting-row"},el("div",{class:"setting-copy"},el("strong",{},title),description instanceof Element?description:el("p",{},description)),el("label",{class:`setting-control ${className}`.trim()},control));
     // The number is a percentage of effective EVA, so it carries its unit. A
     // bare number here reads as flat points and the row label alone does not
     // say which.
@@ -2048,7 +2052,7 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
       row("SHARED PARTY MAGIC INVENTORY","Uses one lossless 32-slot Magic pool for the party. Works with Party Switch and the selected Max Spell cap. If existing stocks cannot merge without loss, the game keeps them unchanged and disables sharing for that launch; details are written to FFNx.shared-magic.log.",sharedMagic,"boolean"),
       row("NO MAGIC CONSUMPTION","Casting spells in battle or from the field Magic menu keeps their stock. Items, discarding and other inventory operations are unchanged; works with Shared Magic and Max Spell.",noMagicConsumption,"boolean"),
       row("DROPS AFTER MUG","A successfully Mugged enemy still rolls its normal death drops. Mugging the same enemy twice remains prohibited; its item-slot distribution follows the current Drop Chance setting.",dropsAfterMug,"boolean"),
-      row("DROP CHANCE","Reweights all four item slots for both normal enemy drops and Mug. Normal: 137/256 (53.52%), 68/256 (26.56%), 34/256 (13.28%), 17/256 (6.64%). Rare Item: 94/256 (36.72%), 70/256 (27.34%), 53/256 (20.70%), 39/256 (15.23%).",dropChance,"boolean"),
+      row("DROP CHANCE",dropChanceDescription(),dropChance,"boolean"),
       row("MAX SPELL","Sets the maximum stock for each spell. A full stack keeps the same junction effect as 100 spells in vanilla.",maxSpellControl,"value-toggle"),
       row("FLAT +STAT ABILITIES","Changes +Stat% abilities into fixed-point +Stat abilities and updates their in-game names and descriptions.",flatStatAbilities,"boolean"),
       row("COMMAND MENU REWORK","Gives each character the fixed four-slot command layout. Requires Monogamy.",fixedCommandMenu,"boolean"),
@@ -2076,6 +2080,14 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
 
   function renderPlatformSettings(){
     $("#main").replaceChildren(platformConfigView({config:state.platformConfig,showHeader:false,query:state.platformQuery,disabled:state.activeSource!=="mine",search:value=>{state.platformQuery=value},change:(id,value)=>{const field=(state.platformConfig?.sections||[]).flatMap(section=>section.fields).find(candidate=>candidate.id===id);if(field){field.value=value;shell.refresh()}}}));
+  }
+  function dropChanceDescription(){
+    const normal=[137,68,34,17],rare=[94,70,53,39];
+    const chance=value=>el("td",{},`${(value/256*100).toFixed(2)}%`,el("small",{},`${value}/256`));
+    return el("div",{},el("p",{},"Reweights the four item slots for enemy drops and Mug. Values when enabled:"),
+      el("table",{class:"drop-chance-table","aria-label":"Drop Chance slot probabilities"},
+        el("thead",{},el("tr",{},...['Slot','Normal','Rare Item'].map(label=>el("th",{scope:"col"},label)))),
+        el("tbody",{},...normal.map((value,index)=>el("tr",{},el("th",{scope:"row"},String(index+1)),chance(value),chance(rare[index]))))));
   }
   function renderSettings(){
     const toolbar=$("#toolbar");toolbar.hidden=false;toolbar.replaceChildren(subtabBar({tabs:[{id:"gameplay",label:"Gameplay"},{id:"platform",label:"FFNx"}],active:state.settingsTab,label:"Tweak settings",change:value=>{state.settingsTab=value;renderSettings()}}));
