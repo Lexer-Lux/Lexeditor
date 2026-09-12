@@ -264,7 +264,7 @@ def run(output: Path, executable: str | None) -> None:
                 expect(page.locator("#ffxx2-play-controls")).to_have_count(1)
                 expect(page.locator("#ffxx2-mod-loader .lex-detail-field")).to_have_count(5)
                 expect(page.locator("#ffxx2-mod-loader")).to_contain_text("MOD LOADER")
-                expect(page.locator("#ffxx2-mod-loader")).to_contain_text("Fahrenheit")
+                expect(page.get_by_role("textbox", name="LOADER", exact=True)).to_have_value("Fahrenheit's External File Loader (EFL) loads this plugin's file-only overlay.")
                 expect(page.locator("#ffx-command-rows [data-ffx-command]")).to_have_count(1)
                 expect(page.locator("#ffx-auto-ability-fields [data-element-group]")).to_have_count(5)
                 expect(page.locator("#ffx-player-fields .ffxx2-slot")).to_have_count(10)
