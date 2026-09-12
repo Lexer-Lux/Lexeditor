@@ -8,6 +8,7 @@ report suitable for real-install testing that CI cannot provide.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
@@ -187,6 +188,7 @@ def finalize_report(report: dict, require_fahrenheit: bool) -> dict:
     """Add CLI/result state without weakening the strict real-install baseline flag."""
     result = dict(report)
     checks = acceptance_checks(result)
+    result["generatedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     result["acceptanceChecks"] = checks
     result["acceptanceReady"] = all(checks.values())
     result["fahrenheitRequired"] = bool(require_fahrenheit)
