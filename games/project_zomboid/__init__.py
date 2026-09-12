@@ -8,13 +8,12 @@ from pathlib import Path
 from . import core as core
 
 
-def _portable_script_paths(root: Path) -> list[Path]:
-    """Return supported script files with resolved, case-normalized identities.
+_original_read_items = core.read_items
+_original_data_map = core.data_map
 
-    Build 42 project APIs use forward-slash relative paths, while Windows may
-    resolve a temporary/project root with different case or alias spelling. Keep
-    enumeration canonical so save-time containment checks compare like with like.
-    """
+
+def _portable_script_paths(root: Path) -> list[Path]:
+    """Return supported script files with canonical filesystem identities."""
     root = Path(root).resolve()
     paths: dict[str, Path] = {}
     for relative in core.SCRIPT_ROOTS:
@@ -25,11 +24,25 @@ def _portable_script_paths(root: Path) -> list[Path]:
             if not path.is_file() or path.is_symlink():
                 continue
             resolved = path.resolve()
-            key = os.path.normcase(str(resolved))
-            paths[key] = resolved
-    return sorted(paths.values(), key=lambda path: path.relative_to(root).as_posix().casefold())
+            paths[os.path.normcase(str(resolved))] = resolved
+    return sorted(
+        paths.values(),
+        key=lambda path: path.relative_to(root).as_posix().casefold(),
+    )
 
 
-# Keep the canonical implementation in core while normalizing filesystem identity
-# at package load. This is intentionally narrow and covered on both Windows/Linux CI.
+def _portable_read_items(root: Path) -> dict:
+    """Avoid Windows 8.3-vs-long-name aliases breaking relative paths."""
+    return _original_read_items(Path(root).resolve())
+
+
+def _portable_data_map(root: Path) -> dict:
+    return _original_data_map(Path(root).resolve())
+
+
+# Windows CI exposes temporary roots through both RUNNER~1 and runneradmin.
+# Resolve the API root before any relative-path operation so these aliases compare
+# as one filesystem identity. Linux remains case-sensitive through normcase.
 core.script_paths = _portable_script_paths
+core.read_items = _portable_read_items
+core.data_map = _portable_data_map
