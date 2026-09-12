@@ -416,7 +416,7 @@
       cancelClose();
       closeTimer = setTimeout(() => {
         if (activeHelpPopup?.id === popupId &&
-            !marker.matches(":hover,:focus-within") &&
+            !marker.matches(":hover,:focus-visible") &&
             !activeHelpPopup.matches(":hover,:focus-within")) closeHelpPopup();
       }, 150);
     };
@@ -601,7 +601,7 @@
         `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`);
       const start = parseFloat(style.paddingLeft) || 0;
       const border = parseFloat(style.borderLeftWidth) || 0;
-      const gap = (parseFloat(style.fontSize) || 12) * .4;
+      const gap = (parseFloat(style.fontSize) || 12) * .12;
       // The right-hand limit is where the box stops reserving room for
       // whatever else lives in it - a reference, a lock, a stepper.
       const reserved = parseFloat(getComputedStyle(field).getPropertyValue("--lex-unit-reserve")) || 0;
@@ -970,9 +970,9 @@
       const tipY = icon.height * 21.71 / 24;
       const targetX = target.right + (outward ? inset : -inset);
       const targetY = target.top + (outward ? -inset : inset);
-      pin.style.left = `${targetX - owner.left - tipX}px`;
-      pin.style.top = `${targetY - owner.top - tipY}px`;
-      pin.style.right = "auto";
+      pin.style.setProperty("left", `${targetX - owner.left - tipX}px`, "important");
+      pin.style.setProperty("top", `${targetY - owner.top - tipY}px`, "important");
+      pin.style.setProperty("right", "auto", "important");
     };
     requestAnimationFrame(position);
     if (typeof ResizeObserver !== "undefined") {
@@ -983,7 +983,9 @@
   };
 
   const detailField = (options = {}) => {
-    const control = options.control;
+    const control = options.control instanceof Element && options.control.matches('input[type="checkbox"]')
+      ? element("div", {class:"lex-source-control no-reference"}, options.control)
+      : options.control;
     const pin = options.pin || null;
     const input = control instanceof Element
       ? (control.matches("input,select,textarea,output,.lex-readonly-field")
@@ -1466,7 +1468,7 @@
     // Formula glyphs and labels must never be non-uniformly stretched. The
     // graph owns a 2:1 user-space viewport; letterbox if a caller gives the
     // drawing a differently shaped box instead of distorting that viewport.
-    svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+    svg.setAttribute("preserveAspectRatio", "none");
     svg.setAttribute("role", "img");
     svg.setAttribute("aria-label", options.graphLabel || `${options.title || "Value"} curve`);
     const grid = document.createElementNS(svgNamespace, "path");
@@ -1591,6 +1593,7 @@
     const plot = element("div", {
       class: "lex-curve-plot",
       "data-curve-title": options.title || "CURVE",
+      style:`--lex-curve-title-chars:${Math.max(1,String(options.title||"CURVE").length)}`,
     },
       svg,
       axisTop,
@@ -1614,6 +1617,7 @@
     const root = element("article", {
       class: ["lex-curve-editor", options.className || ""].filter(Boolean).join(" "),
       "data-curve-title": options.title || "CURVE",
+      style:`--lex-curve-title-chars:${Math.max(1,String(options.title||"CURVE").length)}`,
       ...(options.attrs || {}),
     },
       element("header", {class: "lex-curve-heading"},
@@ -4291,6 +4295,7 @@ ${contents.path}`});
         github.setAttribute("aria-label", github.title);
         github.hidden = false;
         githubWorkspace = mountGitHubWorkspace(options, github, header, repository, () => refresh());
+        github.oncontextmenu=event=>{event.preventDefault();callWindow("open_plugin_repository",options.plugin.id).catch(error=>showToast(String(error.message||error),true));};
       } catch (_error) {
         github.hidden = true;
       }
@@ -4511,12 +4516,12 @@ ${contents.path}`});
         event.target.matches("input:not([type='checkbox']),textarea,select,[contenteditable='true']");
       if (editing && (action === "undo" || action === "redo")) return;
       const run = {
-        undo: () => history?.undo?.(),
-        redo: () => history?.redo?.(),
+        undo: () => undo.click(),
+        redo: () => redo.click(),
         save: () => save.click(),
         settings: () => settings.click(),
-        datamap: () => options.help?.(),
-        info: () => options.info?.(),
+        datamap: () => help?.click(),
+        info: () => info?.click(),
         launch: () => game.click(),
         restart: () => restart.click(),
         search: () => {
@@ -4537,6 +4542,19 @@ ${contents.path}`});
       flashShortcut(action);
       run();
     };
+    const shortcutButtons={undo,redo,save,settings,datamap:help,info,launch:game,restart};
+    for(const [action,button] of Object.entries(shortcutButtons)){
+      if(!button)continue;
+      button.dataset.shortcutKey=SHORTCUTS.find(row=>row.id===action)?.keys.filter(key=>key!=="Ctrl").join("+").replace("Shift+","⇧").replace("Enter","↵")||"";
+    }
+    const showShortcutKeys=event=>header.classList.toggle("lex-control-held",!!event.ctrlKey);
+    document.addEventListener("keydown",showShortcutKeys);
+    document.addEventListener("keyup",showShortcutKeys);
+    window.addEventListener("blur",()=>header.classList.remove("lex-control-held"));
+    header.addEventListener("click",event=>{
+      const button=event.target.closest("button");if(!button||button.disabled)return;
+      button.classList.add("lex-command-pressed");setTimeout(()=>button.classList.remove("lex-command-pressed"),180);
+    },true);
     document.addEventListener("keydown", shortcutHandler);
 
     // Hovering a tab reveals the number that jumps to it.
@@ -4845,7 +4863,9 @@ ${contents.path}`});
     const content = cell.querySelector(".lex-column-cell-content");
     if (!content) return;
     const original = [...content.childNodes];
+    let committed=false;
     const commit = value => {
+      if(committed)return;committed=true;
       cell.classList.remove("lex-cell-editing");
       content.replaceChildren(...original);
       if (value !== undefined) column.edit(row, value);
@@ -4854,10 +4874,11 @@ ${contents.path}`});
     const editor = column.editor
       ? column.editor(row, commit)
       : (() => {
-        const input = element("input", {
-          type: column.numeric ? "number" : "text",
-          value: column.editValue ? column.editValue(row) : (row?.[column.key] ?? ""),
-        });
+        const current=column.editValue ? column.editValue(row) : (row?.[column.key] ?? "");
+        const input = column.choices ? element("select", {}, ...column.choices.map(value=>element("option",{value},value)))
+          : element("input", {type:column.numeric?"number":"text",min:column.min,max:column.max,step:column.step,value:current});
+        input.value=String(current);
+        if(column.choices)input.addEventListener("change",()=>commit(input.value));
         input.addEventListener("keydown", event => {
           if (event.key === "Enter") { event.preventDefault(); commit(input.value); }
           if (event.key === "Escape") { event.preventDefault(); commit(undefined); }
@@ -6225,7 +6246,15 @@ ${contents.path}`});
           const nextBarrelSize = nextSize * barrels;
           const nextPages = Math.max(1, Math.ceil(records.length / nextBarrelSize));
           const nextPage = Math.max(0, Math.min(Math.floor(anchor / nextBarrelSize), nextPages - 1));
-          change("resize", {page: nextPage, pageSize: nextSize});
+          const applyResize = () => {
+            if (!root.isConnected) return;
+            if (detailNode.contains(document.activeElement)) {
+              detailNode.addEventListener("focusout", () => setTimeout(applyResize, 0), {once:true});
+              return;
+            }
+            change("resize", {page: nextPage, pageSize: nextSize});
+          };
+          applyResize();
         },
       });
     }

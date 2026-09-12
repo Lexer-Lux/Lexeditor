@@ -52,7 +52,7 @@
   const state={
     booting:true,modOnly:false,tab:"items",dashboard:null,settings:null,troops:null,items:null,upgrades:null,modules:null,datamap:null,activeSource:"mine",
     manual:null,font:null,selectedModule:"",selectedSetting:"",selectedItem:"",selectedTroop:"",selectedUpgrade:"",selectedFile:"",catalogFile:null,catalogDraft:"",
-    settingEdits:{},itemEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
+    settingEdits:{},itemEdits:{},troopEdits:{},filters:{items:"",troops:"",cut:false,upgrades:"",settings:"",datamap:"",mapStatus:""},
     pages:{items:0,troops:0,upgrades:0,datamap:0},pageSizes:{items:20,troops:20,upgrades:20},sorts:{items:["name",1],troops:["name",1],upgrades:["from",1],datamap:["filename",1]},
     build:{cursor:0,lines:[],running:false,returnCode:null},status:"Ready"
   };
@@ -69,9 +69,9 @@
       change:value=>{state.modOnly=value;state.pages[view]=0;render()}};
   }
   function itemDirtyCount(){return Object.values(state.itemEdits).reduce((total,row)=>total+Object.keys(row.fields||{}).length,0);}
-  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
-  function historyCapture(){return {settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
-  async function historyRestore(snapshot){state.settingEdits=clone(snapshot.settingEdits);state.itemEdits=clone(snapshot.itemEdits||{});state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
+  function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.settingEdits).length+itemDirtyCount()+Object.values(state.troopEdits).reduce((n,r)=>n+Object.keys(r.fields).length,0)+(state.catalogFile?.editable&&state.catalogDraft!==state.catalogFile.text?1:0):0;}
+  function historyCapture(){return {troopEdits:clone(state.troopEdits),settingEdits:clone(state.settingEdits),itemEdits:clone(state.itemEdits),catalogDraft:state.catalogDraft,selectedFile:state.selectedFile,catalogFile:clone(state.catalogFile)};}
+  async function historyRestore(snapshot){state.troopEdits=clone(snapshot.troopEdits||{});state.settingEdits=clone(snapshot.settingEdits);state.itemEdits=clone(snapshot.itemEdits||{});state.catalogDraft=snapshot.catalogDraft;state.selectedFile=snapshot.selectedFile;state.catalogFile=clone(snapshot.catalogFile);}
   function effectiveSetting(row){return state.settingEdits[row.line]??row.value;}
   function setStatus(text){state.status=text;const target=$("#plugin-status");if(target)target.textContent=text;}
   function bitmapText(text,pixels){
@@ -101,7 +101,7 @@
     $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(view,options.changed),rows:filtered,key:keyOf,slots:false,fit:{minRowHeight:36},page:state.pages[view],pageSize:state.pageSizes[view],selected,noun:view,splitKey:`warband-${view}`,className:"warband-paged-table",defaultSplit:58,
       search:{key:`warband-${view}`,value:query,placeholder:`Search ${view}…`,change:value=>{state.filters[view]=value;state.pages[view]=0;render();}},filters:options.filters||[],
       master:({rows,selected,select})=>columnList({rows,key:keyOf,columns:columns.map(column=>({...column,sortable:true})),sortState:{key:state.sorts[view][0],dir:state.sorts[view][1]},sort:key=>sort(view,key),selected,selectedClass:"selected",select,class:"warband-record-list", "aria-label":`${view} records`}),
-      detail,sync:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");},change:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");render();}}));
+      detail:options.detail||detail,sync:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");},change:next=>{state.pages[view]=next.page;state.pageSizes[view]=next.pageSize;setSelected(next.selected||"");render();}}));
   }
 
   function openTroop(troopId){
@@ -244,7 +244,7 @@
   function renderTroops(){
     const base=state.filters.cut?state.troops.rows.filter(row=>row.status==="CUT"):state.troops.rows;
     const cutFilter=el("label",{class:"lex-bottom-filter"},el("input",{type:"checkbox",checked:state.filters.cut,onchange:event=>{state.filters.cut=event.target.checked;state.pages.troops=0;render();}})," Cut only");
-    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{key:troop=>troop.id,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter]});
+    renderTableView("troops",base,[{key:"status",label:"State",render:row=>row.status==="CUT"?"Cut":"Active"},{key:"id",label:"ID"},{key:"name",label:"Name"},{key:"level",label:"Level"},{key:"faction",label:"Faction"},{key:"line",label:"Line"}],{key:troop=>troop.id,selected:()=>state.selectedTroop,setSelected:value=>{state.selectedTroop=value;},filters:[cutFilter],detail:troopEditorPanel});
   }
   function troopTreeDetail(node){
     if(!node)return detailPanel({title:"Select a troop"});
@@ -276,9 +276,8 @@
           el("figure",{},warbandPreviewStage(item),el("figcaption",{},item.name||item.id)))),
       }:null,
       body:node.missing?[el("p",{class:"error"},"This upgrade refers to a troop missing from the parsed active source.")]:[
-        el("div",{class:"detail-grid"},...["plural","level","faction","flags","status","line"].flatMap(key=>[
-          el("div",{class:"label"},key),el("div",{},String(node[key]??"—"))])),
-        el("p",{},"This page reads Module System source. Troop editing is not implemented here. Building that source writes troops.txt into the selected mod module, not the base game.")]});
+        ...troopFields(record)
+      ]});
   }
   function renderUpgrades(){
     const all=WarbandTroopTrees.build(state.troops.rows,state.upgrades.rows);
@@ -414,6 +413,13 @@
       const itemSourceDirty=state.catalogFile?.filename==="module_items.py"&&state.catalogFile.editable&&state.catalogDraft!==state.catalogFile.text;
       if(itemDirtyCount()&&itemSourceDirty)throw new Error("Items has structured edits while module_items.py also has unsaved source edits. Save or discard one editing path before using the other.");
       if(Object.keys(state.settingEdits).length){const edits=Object.entries(state.settingEdits).map(([line,value])=>({line:+line,value}));const result=await api("/api/settings/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.settings=await api("/api/settings");state.settingEdits={};setStatus(`Saved ${result.saved} settings`);}
+      const troopEdits=Object.values(state.troopEdits).filter(row=>Object.keys(row.fields).length);
+      if(troopEdits.length){
+        if(state.catalogFile?.filename==="module_troops.py"&&state.catalogDraft!==state.catalogFile.text)throw new Error("Save or discard the troop source draft first.");
+        await api("/api/troops/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sha256:state.troops.sha256,edits:troopEdits})});
+        state.troops=await api("/api/troops");state.troopEdits={};
+        if(state.catalogFile?.filename==="module_troops.py"){state.catalogFile=await api("/api/catalog/file?name=module_troops.py");state.catalogDraft=state.catalogFile.text;}
+      }
       if(itemDirtyCount()){
         const selectedRecord=state.items.rows.find(row=>row.id===state.selectedItem)?.recordIndex,edits=Object.values(state.itemEdits);
         const result=await api("/api/items/save",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({edits})});state.items=await api("/api/items");state.itemEdits={};
@@ -432,6 +438,7 @@
   function renderVanilla(){$("#toolbar").replaceChildren();$("#main").replaceChildren(el("section",{class:"card"},el("h2",{},"Vanilla"),el("p",{},"The installed Native module is read-only. Its generated text files do not contain the Module System source used by this editor."),el("p",{},"Select a mod to edit Items, Troops, Troop Trees, or Tweaks.")))}
   function render(){document.querySelectorAll("nav button").forEach(button=>button.classList.toggle("active",button.dataset.tab===state.tab));if(state.booting)return;if(state.activeSource!=="mine"&&!['manuals','datamap','dashboard'].includes(state.tab))renderVanilla();else views[state.tab]();shell.refresh();}
   async function switchProjectSource(value){state.activeSource=String(value||"mine")==="vanilla"?"vanilla":"mine";shell.history?.clear();render()}
+  </script><script src="/warband/troop_editor.js"></script><script>
   const shell=LexeditorUI.mountShell({
     host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"warband",themeName:"warband",theme:{bg:"#e8d9b4",panel:"#f4e7c5","panel-2":"#dcc99a",border:"#8b6b39",text:"#2b2114",muted:"#6e5b3d",accent:"#7a2020","accent-text":"#fff5d8",highlight:"#a8661c",success:"#556b2f",font:'"Segoe UI",system-ui,sans-serif',"heading-font":"Georgia,serif"}},
     tabs:[["items","Items"],["upgrades","Troop Trees"],["troops","Troops"],["tweaks","Tweaks"]].map(([id,label])=>({id,label})),

@@ -426,8 +426,8 @@
 
 ### Editing Question
 
-* [x] Why does the UI say `Read only troop details`? - it no longer does; it says where a troop is edited instead.
-* [x] Why can't troop properties be edited? - the current Lexeditor source reader has no troop writer. Module System builds export troops.txt into the selected mod module.
+* [x] Why does the UI say `Read only troop details`? - troop fields now have editing controls.
+* [x] Why can't troop properties be edited? - troop source editing is now implemented. Module System builds export troops.txt into the selected mod module.
 * [x] Is this a genuine technical limitation of Warband's formats? - no. It is a missing editor implementation. See codex/warband/module-layout.md.
 
 ## Tweaks

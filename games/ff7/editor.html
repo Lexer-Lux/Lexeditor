@@ -742,8 +742,8 @@
     const source=family?.sourceRelativePath||state.data.sourceRelativePath||metadata?.family||"";
     const usingProject=family?!!family.usingProject:!!state.data.usingProject;
     const dirty=JSON.stringify(rows)!==JSON.stringify(saved);
-    const status=dirty?"Unsaved changes":usingProject?"Project copy":"Vanilla source";
-    return el("span",{class:"lex-pager-filter ff7-dataset-status",
+    const status=dirty?"Unsaved changes":usingProject?"Mod data":"Vanilla data";
+    return el("span",{class:"ff7-dataset-status",style:"font-size:.75em;white-space:nowrap",
       title:String(source||"Loaded game data")},el("span",{},status));
   }
   // FF7 can tell what the mod changes by comparing each record with the saved

@@ -19,6 +19,7 @@ from .item_icons import CACHE as ICON_CACHE
 from .catalog import DATA_CATALOG
 from .dump_infopages import parse_info_pages
 from .dump_troops import parse_troops
+from .troop_editor import troop_data, save_troops
 from .game_font import atlas_path as font_atlas_path, manifest as font_manifest
 from .model_preview import PreviewUnavailable, preview as item_preview, texture_path as preview_texture_path
 
@@ -417,8 +418,8 @@ def data_map_rows() -> dict:
                 coverage, status, view = "structured", "integrated", "items"
                 notes = "Structured item records can be edited in Items. The complete Module System source remains available for fields Lexeditor does not interpret."
             elif filename in browsers and source_available:
-                coverage, status, view = "view", "partial", browsers[filename]
-                notes = "Read-only record browser. Changing records currently requires editing the Python source; this is not a structured data editor."
+                coverage, status, view = "structured", "partial", browsers[filename]
+                notes = "Troop names, factions, attributes, flags and equipment have controls. Advanced fields use source expressions. Saves preserve record IDs and upgrade code, then use the project build."
             elif source_available:
                 coverage, status = "source", "partial"
                 notes = "Source-only editing with a backup. No dedicated record editor. Python syntax validation requires the installed Python 2 validator."
@@ -577,6 +578,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
+            elif path == "/warband/troop_editor.js":
+                self.file_response(PLUGIN_ROOT / "troop_editor.js")
             elif path == "/warband/troop_trees.js":
                 self.file_response(PLUGIN_ROOT / "troop_trees.js")
             elif path.startswith("/shared/"):
@@ -593,7 +596,7 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/settings":
                 self.json_response({"file": str(SETTINGS), "rows": settings_rows()})
             elif path == "/api/troops":
-                self.json_response({"rows": (parse_troops(str(MODULE_SYSTEM / "module_troops.py")) if (MODULE_SYSTEM / "module_troops.py").is_file() else [])})
+                self.json_response(troop_data(MODULE_SYSTEM))
             elif path == "/api/items":
                 self.json_response({"rows": item_rows()})
             elif path == "/api/warband-font":
@@ -651,6 +654,8 @@ class Handler(BaseHTTPRequestHandler):
             body = self.body()
             if path == "/api/settings/save":
                 self.json_response(save_settings(body.get("edits", [])))
+            elif path == "/api/troops/save":
+                self.json_response(save_troops(MODULE_SYSTEM, body.get("sha256", ""), body.get("edits", [])))
             elif path == "/api/items/save":
                 self.json_response(save_item_edits(body.get("edits", [])))
             elif path == "/api/catalog/file/save":

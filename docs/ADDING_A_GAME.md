@@ -264,6 +264,11 @@ Changes as normal content tabs. Show a loading state as soon as navigation start
 never leave the previous page visible under the newly selected tab.
 
 Use `LexeditorUI.dataMap` for the Data Map, including its integration icons.
+There is no separate editable-table mode. All record tables use the shared cell
+editors. Supply each editable column's `edit` callback and its schema controls
+(`choices`, numeric bounds, or `editor`) so a double-click edits the same value
+shown in Detail. Do not build a second table example with permanent inputs.
+
 Use `pagedListDetail` and `columnList` for record lists. Search and pagination
 belong in the shared bottom bar. Do not substitute a scrolling HTML table,
 dropdown file picker or custom Next/Previous controls. Check this with enough

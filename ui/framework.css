@@ -4381,7 +4381,7 @@ html.lex-loading-live .lex-plugin-loading-screen .lex-plugin-loading-pulse {
    rows back for those frames removes the resize flash on pin toggles and
    re-renders; the header stays put so the panel never blanks. */
 .lex-column-list.lex-fitted-page:not([data-lex-fixed-rows]) > .lex-column-list-row {
-  visibility: hidden;
+  visibility: visible;
 }
 .lex-column-list.lex-fitted-page[data-lex-fixed-rows] > .lex-column-list-row {
   visibility: visible;
@@ -4818,7 +4818,7 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
   font-size:clamp(26px,3.2vw,46px) !important; line-height:1 !important;
   transform:none !important; font-stretch:normal !important; letter-spacing:.04em !important;
 }
-.lex-curve-plot { --lex-curve-margin-right:42px !important; }
+.lex-curve-plot { --lex-curve-margin-right:var(--lex-curve-margin,26px); }
 .lex-curve-axis-top,.lex-curve-axis-bottom {
   left:auto !important; right:7px !important;
   writing-mode:vertical-rl !important; text-orientation:mixed !important;
@@ -5705,92 +5705,44 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 
 
-/* LEXEDITOR_BOOLEAN_ROW_GRID_20260911 */
-/* One grid holds the whole right-hand end of a boolean row. Row one is the
-   leader arrow and the checkbox it points at, so the arrow is centred on the
-   BOX rather than on the row and cannot drift when the row grows. Row two is
-   the reading, in the box's column, exactly the box's width. */
-.lex-boolean-field > .lex-detail-field-label { padding-right:0 !important; }
+/* One fixed checkbox track and a reserved reference track. */
+.lex-boolean-field > .lex-detail-field-label { overflow:visible; padding-right:0 !important; }
 .lex-boolean-field .lex-detail-field-control > .lex-source-control {
-  display:grid !important;
-  /* Column two is the checkbox's own size, so the reading under it can never
-     be wider than the box it reads for. Left to max-content the column grew to
-     whichever of the two was wider, and a two-glyph reading pushed its own
-     left edge nine pixels past the box. */
   --lex-boolean-box:19px;
-  grid-template-columns:minmax(12px,1fr) var(--lex-boolean-box);
-  grid-template-rows:max-content max-content;
-  align-content:center;
-  justify-items:end;
-  column-gap:3px;
-  row-gap:3px;
-  padding-block:3px;
-  width:100%;
-  height:auto;
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) var(--lex-boolean-box);
+  grid-template-rows:var(--lex-boolean-box) minmax(12px,1fr);
+  gap:3px 1vw;
+  align-content:stretch;
+  align-items:center;
+  padding:4px 0 2px 1vw;
+  box-sizing:border-box;
+  width:100%; height:100%; min-height:38px;
+  position:relative; overflow:visible;
 }
 .lex-boolean-field .lex-source-control > .lex-field-boolean-arrow {
-  grid-area:1 / 1 / 2 / 2;
-  align-self:center;
-  justify-self:stretch;
-  width:auto;
-  min-width:12px;
-  margin:0;
+  grid-area:1/1; align-self:center; justify-self:stretch;
+  width:auto; min-width:0; margin:0;
 }
 .lex-boolean-field .lex-detail-field-control > .lex-source-control > input[type="checkbox"] {
-  /* Explicit areas, because an auto-placed sibling (the pin) was enough to
-     open an implicit column and slide the reading out from under the box. */
-  grid-area:1 / 2 / 2 / 3;
-  box-sizing:border-box;
-  width:var(--lex-boolean-box);
-  height:var(--lex-boolean-box);
-  margin:0 !important;
+  grid-area:1/2; width:var(--lex-boolean-box); height:var(--lex-boolean-box); margin:0 !important;
 }
 .lex-boolean-field .lex-source-control > :is(.lex-reference-values,.lex-reference-placeholder) {
-  position:static !important;
-  grid-area:2 / 2 / 3 / 3;
-  justify-self:stretch;
-  align-self:center;
-  width:100% !important;
-  min-width:0;
-  max-width:100%;
-  overflow:hidden;
-  margin:0 !important;
-  padding:0;
-  transform:none;
-  /* `translate` is its own property now, so `transform:none` does not clear
-     it. A stray -50% left over from the old centred rail was sliding the
-     reading half its own width off the box it reads for. */
-  translate:none !important;
-  font-size:9px;
-  line-height:1;
+  position:static !important; grid-area:2/2; align-self:stretch; justify-self:stretch;
+  width:100% !important; height:100%; min-width:0; max-width:none;
+  overflow:visible; margin:0 !important; padding:0; transform:none; translate:none !important;
+  font-size:9px; line-height:1;
 }
 .lex-boolean-field .lex-reference-values .lex-reference-value {
-  grid-template-columns:auto auto;
-  justify-content:center;
-  column-gap:.25em;
-  padding:0;
+  display:flex; align-items:center; justify-content:center; gap:2px;
+  padding:0; min-width:0; overflow:visible; width:100%; height:100%;
 }
-/* The pin rides the row's own right margin - the band the row already keeps
-   clear past every value box - and it takes the checkbox's grid row, so it
-   lines up with the box without being told a pixel offset. Anywhere inside the
-   control it lands ON the checkbox, which is small enough that a pin covers it
-   whole. */
-.lex-boolean-field .lex-detail-field-control > .lex-source-control {
-  grid-template-columns:minmax(12px,1fr) var(--lex-boolean-box) 0;
-  column-gap:0;
+.lex-boolean-field .lex-reference-values :is(.lex-reference-tag,.lex-boolean-mark) {
+  overflow:visible; min-width:0; flex:none; font-size:inherit;
 }
-.lex-boolean-field .lex-source-control > .lex-field-boolean-arrow { margin-right:3px; }
-.lex-detail-field.lex-boolean-field .lex-source-control > .lex-column-pin,
-.lex-detail-field.lex-boolean-field > .lex-detail-field-control > .lex-column-pin {
-  grid-area:1 / 3 / 2 / 4;
-  position:static !important;
-  align-self:center;
-  justify-self:start;
-  margin-left:2px;
-  inset:auto !important;
-  transform:none !important;
+.lex-detail-field.lex-boolean-field .lex-column-pin {
+  position:absolute !important; margin:0; bottom:auto !important; transform:none !important;
 }
-
 
 /* LEXEDITOR_FLAG_BOX_FILL_20260911 */
 /* The flag boxes use the whole width of the row. They were shrinking to their
@@ -6102,3 +6054,23 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 }
 
 .lex-integration-status.partial .lex-status-mark { background:#9a6818; }
+
+/* Shared interaction geometry. */
+.lex-detail-field-label { overflow:visible !important; }
+.lex-detail-field-label-text { overflow:visible; }
+.lex-toggle { justify-content:flex-start !important; gap:7px; padding-inline:7px; }
+.lex-toggle-row > .lex-toggle { width:fit-content; justify-self:start; }
+.lex-toggle-rail { flex:0 0 14px; width:14px; min-width:14px; }
+.lex-toggle-name { flex:0 1 auto; }
+.lex-reference-values .lex-boolean-mark { overflow:visible; }
+.lex-shell-header button:is(:active,.lex-command-pressed) { background:var(--lex-accent) !important; color:var(--lex-accent-text) !important; }
+.lex-control-held button[data-shortcut-key] { position:relative; }
+.lex-control-held button[data-shortcut-key] > * { visibility:hidden; }
+.lex-control-held button[data-shortcut-key]::after { content:attr(data-shortcut-key); position:absolute; inset:0; display:grid; place-items:center; color:inherit; font:700 13px/1 var(--lex-font); }
+.lex-control-held nav button:not(.active) .lex-tab-shortcut { opacity:1 !important; visibility:visible !important; display:block !important; }
+.lex-control-held nav button.active .lex-tab-shortcut { visibility:hidden !important; }
+
+.lex-curve-plot::before { font-size:clamp(24px,calc(110cqw / var(--lex-curve-title-chars,10)),110px); }
+
+.lex-toggle-row { display:flex; flex-wrap:wrap; }
+.lex-toggle-row > .lex-toggle { width:max-content; max-width:100%; }

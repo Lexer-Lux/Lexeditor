@@ -609,6 +609,18 @@ class HostApi:
         """Show the central game-filtered issue tracker to the owner."""
         return self._github.visible_repository(self._github_repository(plugin_id))
 
+    def open_plugin_repository(self, plugin_id: str) -> dict:
+        """Open the plugin's known GitHub tracker in the default browser."""
+        import re
+        repository = self.github_repository(plugin_id)
+        if not repository:
+            raise ValueError("No GitHub repository is available for this plugin")
+        name = repository["repository"]
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", name):
+            raise ValueError("Invalid GitHub repository")
+        url = f"https://github.com/{name}"
+        return {"opened": bool(webbrowser.open(url, new=2)), "url": url}
+
     def default_views(self, plugin_id: str) -> dict:
         """Return packaged view defaults for one plugin."""
         try:
