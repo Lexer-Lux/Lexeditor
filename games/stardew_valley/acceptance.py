@@ -5,11 +5,9 @@ import hashlib
 import json
 import os
 import re
-import sys
 from pathlib import Path
 
 from .content_pack import (
-    ACCEPTANCE_MARKER,
     ContentPackStore,
     _atomic_json,
     _json,
@@ -18,6 +16,7 @@ from .content_pack import (
 )
 
 TARGET_GAME_VERSION = "1.6.15"
+ACCEPTANCE_MARKER = ".lexeditor-stardew-acceptance.json"
 MAX_LOG_BYTES = 16 * 1024 * 1024
 _RUNTIME_RE = re.compile(
     r"\bSMAPI\s+(?P<smapi>\d+(?:\.\d+){1,3}(?:[-+][A-Za-z0-9.-]+)?)\s+with\s+"
