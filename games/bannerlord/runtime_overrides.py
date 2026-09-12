@@ -10,6 +10,7 @@ from . import paths
 from .deploy_data import deploy_target
 from .perk_data import read_xp_source_definitions
 from .skill_data import read_effect_definitions
+from .source_revision import optional_source_revision, require_optional_source_revision
 
 
 def _load_object(path: Path) -> dict:
@@ -111,6 +112,8 @@ def read_runtime_overrides(project: Path, game_root: Path | None = None) -> dict
         "moduleDataRoot": str(module_data),
         "effectsPath": str(effects_path),
         "xpSourcesPath": str(xp_path),
+        "effectsHash": optional_source_revision(effects_path),
+        "xpSourcesHash": optional_source_revision(xp_path),
         "effects": effects,
         "xpSources": xp_sources,
         "unknownEffectKeys": sorted(set(effects_json) - known_effects),
@@ -135,6 +138,12 @@ def save_runtime_overrides(project: Path, payload: dict, game_root: Path | None 
     """Replace only known override keys; preserve unknown keys written by other tools/versions."""
     _module_id, _deployed = _deployed_module(project, game_root)
     _module_data, effects_path, xp_path = _paths(project, game_root)
+    effect_edits = list(payload.get("effects") or [])
+    xp_edits = list(payload.get("xpSources") or [])
+    if effect_edits:
+        require_optional_source_revision(effects_path, payload.get("effectsHash"))
+    if xp_edits:
+        require_optional_source_revision(xp_path, payload.get("xpSourcesHash"))
     current = read_runtime_overrides(project, game_root)
     known_effects = {row["id"]: row for row in current["effects"]}
     known_xp = {row["id"]: row for row in current["xpSources"]}
@@ -143,7 +152,7 @@ def save_runtime_overrides(project: Path, payload: dict, game_root: Path | None 
     changed_effects = 0
     changed_xp = 0
 
-    for edit in list(payload.get("effects") or []):
+    for edit in effect_edits:
         effect_id = str(edit.get("id") or "")
         if effect_id not in known_effects:
             raise ValueError(f"Unknown runtime effect ID: {effect_id}")
@@ -159,7 +168,7 @@ def save_runtime_overrides(project: Path, payload: dict, game_root: Path | None 
             del effect_values[effect_id]
             changed_effects += 1
 
-    for edit in list(payload.get("xpSources") or []):
+    for edit in xp_edits:
         source_id = str(edit.get("id") or "")
         if source_id not in known_xp:
             raise ValueError(f"Unknown runtime XP source ID: {source_id}")
@@ -171,6 +180,13 @@ def save_runtime_overrides(project: Path, payload: dict, game_root: Path | None 
         elif source_id in xp_values:
             del xp_values[source_id]
             changed_xp += 1
+
+    # Narrow the external-write race: verify the loaded revision again
+    # immediately before the first backup/temp/target mutation.
+    if changed_effects:
+        require_optional_source_revision(effects_path, payload.get("effectsHash"))
+    if changed_xp:
+        require_optional_source_revision(xp_path, payload.get("xpSourcesHash"))
 
     backups = {}
     if changed_effects:

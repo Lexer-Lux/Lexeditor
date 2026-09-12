@@ -29,3 +29,21 @@ def require_source_revision(path: Path, expected) -> None:
         raise FileNotFoundError(path)
     if source_revision(path) != token:
         raise ValueError("Structured source changed on disk; reload before saving")
+
+MISSING_SOURCE_REVISION = "missing"
+
+def optional_source_revision(path: Path) -> str:
+    path = Path(path)
+    if not path.exists():
+        return MISSING_SOURCE_REVISION
+    if not path.is_file():
+        raise ValueError(f"Runtime source path is not a file: {path}")
+    return source_revision(path)
+
+
+def require_optional_source_revision(path: Path, expected) -> None:
+    token = str(expected or "").strip()
+    if not token:
+        raise ValueError("Runtime save requires the loaded source revision; reload before saving")
+    if optional_source_revision(path) != token:
+        raise ValueError("Runtime source changed on disk; reload before saving")

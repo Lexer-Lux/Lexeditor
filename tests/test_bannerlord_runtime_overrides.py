@@ -12,6 +12,16 @@ EFFECTS = r'''private static readonly List<EffectDefinition> Definitions = new L
 XP = r'''private static readonly List<SourceDefinition> Definitions = new List<SourceDefinition>{Source("Tailoring","Craft cloth",12f),Source("Medicine","Heal ally",4.5f)};'''
 
 
+
+
+def with_runtime_revisions(project: Path, game: Path, payload: dict) -> dict:
+    current = read_runtime_overrides(project, game)
+    return {
+        **payload,
+        "effectsHash": current["effectsHash"],
+        "xpSourcesHash": current["xpSourcesHash"],
+    }
+
 def write_module(root: Path, module_id: str) -> Path:
     module = root / "Modules" / module_id
     module.mkdir(parents=True, exist_ok=True)
@@ -67,10 +77,10 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
             current = read_runtime_overrides(project, game)
             effect = current["effects"][0]
             xp = current["xpSources"][0]
-            saved = save_runtime_overrides(project, {
+            saved = save_runtime_overrides(project, with_runtime_revisions(project, game, {
                 "effects": [{"id": effect["id"], "overridden": True, "low": 125, "high": 75}],
                 "xpSources": [{"id": xp["id"], "overridden": True, "amount": 22.5}],
-            }, game)
+            }), game)
             self.assertEqual(saved["saved"], 2)
             self.assertTrue(Path(saved["backups"]["effects"]).is_file())
             self.assertTrue(Path(saved["backups"]["xpSources"]).is_file())
@@ -79,10 +89,10 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
             self.assertIn("Future.Effect", json.loads(effects_path.read_text()))
             self.assertIn("Future.XP", json.loads(xp_path.read_text()))
 
-            reverted = save_runtime_overrides(project, {
+            reverted = save_runtime_overrides(project, with_runtime_revisions(project, game, {
                 "effects": [{"id": effect["id"], "overridden": False}],
                 "xpSources": [{"id": xp["id"], "overridden": False}],
-            }, game)
+            }), game)
             self.assertFalse(reverted["effects"][0]["overridden"])
             self.assertEqual(reverted["effects"][0]["low"], 150)
             self.assertFalse(reverted["xpSources"][0]["overridden"])
@@ -109,9 +119,9 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
             os.link(outside_temporary, temporary_path)
 
             effect = read_runtime_overrides(project, game)["effects"][0]
-            saved = save_runtime_overrides(project, {
+            saved = save_runtime_overrides(project, with_runtime_revisions(project, game, {
                 "effects": [{"id": effect["id"], "overridden": True, "low": 125, "high": 75}],
-            }, game)
+            }), game)
 
             self.assertEqual(saved["saved"], 1)
             self.assertEqual(outside_backup.read_text(encoding="utf-8"), "backup sentinel")
@@ -125,16 +135,64 @@ class BannerlordRuntimeOverrideTests(unittest.TestCase):
         temporary, project, game, _deployed = self.fixture()
         try:
             with self.assertRaisesRegex(ValueError, "Unknown runtime effect ID"):
-                save_runtime_overrides(project, {
+                save_runtime_overrides(project, with_runtime_revisions(project, game, {
                     "effects": [{"id": "Nope", "overridden": True, "low": 1, "high": 2}]
-                }, game)
+                }), game)
             source = read_runtime_overrides(project, game)["xpSources"][0]
             with self.assertRaisesRegex(ValueError, "cannot be negative"):
-                save_runtime_overrides(project, {
+                save_runtime_overrides(project, with_runtime_revisions(project, game, {
                     "xpSources": [{"id": source["id"], "overridden": True, "amount": -1}]
-                }, game)
+                }), game)
         finally:
             temporary.cleanup()
+
+    def test_external_runtime_file_creation_invalidates_missing_revision(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            current = read_runtime_overrides(project, game)
+            effect = current["effects"][0]
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            before = effects_path.read_bytes()
+            with self.assertRaisesRegex(ValueError, "changed on disk"):
+                save_runtime_overrides(project, {
+                    "effects": [{"id": effect["id"], "overridden": True, "low": 1, "high": 2}],
+                    "effectsHash": current["effectsHash"],
+                    "xpSourcesHash": current["xpSourcesHash"],
+                }, game)
+            self.assertEqual(effects_path.read_bytes(), before)
+            self.assertFalse(effects_path.with_name(effects_path.name + ".lexeditor.bak").exists())
+        finally:
+            temporary.cleanup()
+
+    def test_external_runtime_value_change_is_rejected(self):
+        temporary, project, game, deployed = self.fixture()
+        try:
+            module_data = deployed / "ModuleData"
+            module_data.mkdir()
+            effects_path = module_data / "custom_skill_effects.json"
+            effects_path.write_text("{}\n", encoding="utf-8")
+            current = read_runtime_overrides(project, game)
+            effect = current["effects"][0]
+            effects_path.write_text('{"external": 1}\n', encoding="utf-8")
+            before = effects_path.read_bytes()
+            with self.assertRaisesRegex(ValueError, "changed on disk"):
+                save_runtime_overrides(project, {
+                    "effects": [{"id": effect["id"], "overridden": True, "low": 1, "high": 2}],
+                    "effectsHash": current["effectsHash"],
+                    "xpSourcesHash": current["xpSourcesHash"],
+                }, game)
+            self.assertEqual(effects_path.read_bytes(), before)
+        finally:
+            temporary.cleanup()
+
+    def test_runtime_editor_sends_loaded_revisions(self):
+        boot = Path(__file__).resolve().parents[1] / "games" / "bannerlord" / "editor_boot.js"
+        text = boot.read_text(encoding="utf-8")
+        self.assertIn('effectsHash:state.savedRuntimeOverrides.effectsHash||""', text)
+        self.assertIn('xpSourcesHash:state.savedRuntimeOverrides.xpSourcesHash||""', text)
 
     def test_runtime_overrides_require_an_existing_deployed_module(self):
         temporary, project, game, deployed = self.fixture()

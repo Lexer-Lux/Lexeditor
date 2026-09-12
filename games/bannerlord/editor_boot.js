@@ -106,7 +106,11 @@
         const xpEdits=(state.runtimeOverrides.xpSources||[]).filter(row=>{
           const old=beforeXp[row.id];return !old||row.overridden!==old.overridden||Number(row.amount)!==Number(old.amount);
         }).map(row=>({id:row.id,overridden:!!row.overridden,amount:Number(row.amount)}));
-        const result=await post("/api/runtime-overrides/save",{effects:effectEdits,xpSources:xpEdits});
+        const result=await post("/api/runtime-overrides/save",{
+          effects:effectEdits,xpSources:xpEdits,
+          effectsHash:state.savedRuntimeOverrides.effectsHash||"",
+          xpSourcesHash:state.savedRuntimeOverrides.xpSourcesHash||""
+        });
         state.runtimeOverrides=result;state.savedRuntimeOverrides=clone(result);
       }
       if(gauntletDirty())await saveGauntlet();
