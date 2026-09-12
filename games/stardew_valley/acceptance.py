@@ -85,6 +85,7 @@ def _runtime_evidence(text: str, project_name: str, project_unique_id: str) -> d
     content_patcher_version = None
     project_lines: list[str] = []
     project_error_lines: list[str] = []
+    project_loaded_lines: list[str] = []
     name_key = project_name.casefold()
     id_key = project_unique_id.casefold()
     for raw_line in text.splitlines():
@@ -101,8 +102,11 @@ def _runtime_evidence(text: str, project_name: str, project_unique_id: str) -> d
         if cp_match:
             content_patcher_version = cp_match.group("version")
         folded = line.casefold()
-        if (id_key and id_key in folded) or (name_key and name_key in folded):
+        project_named = (id_key and id_key in folded) or (name_key and name_key in folded)
+        if project_named:
             project_lines.append(line[:1000])
+            if "| for content patcher" in folded:
+                project_loaded_lines.append(line[:1000])
             if any(word in folded for word in _ERROR_WORDS):
                 project_error_lines.append(line[:1000])
     return {
@@ -110,7 +114,9 @@ def _runtime_evidence(text: str, project_name: str, project_unique_id: str) -> d
         "contentPatcherVersion": content_patcher_version,
         "contentPatcherSeen": content_patcher_version is not None or "content patcher" in text.casefold(),
         "projectMentioned": bool(project_lines),
+        "projectLoaded": bool(project_loaded_lines),
         "projectLines": project_lines[:10],
+        "projectLoadedLines": project_loaded_lines[:10],
         "projectErrors": project_error_lines[:10],
     }
 
@@ -224,8 +230,8 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
         blockers.append(f"Runtime Stardew version is {evidence['gameVersion'] or 'unknown'}, expected {TARGET_GAME_VERSION}.")
     if fresh_runtime_log and not evidence["contentPatcherSeen"]:
         blockers.append("The new SMAPI log did not show Content Patcher loading.")
-    if fresh_runtime_log and not evidence["projectMentioned"]:
-        blockers.append("The new SMAPI log did not mention this Lexeditor content pack.")
+    if fresh_runtime_log and not evidence["projectLoaded"]:
+        blockers.append("The new SMAPI log did not list this project as a loaded Content Patcher content pack.")
     if evidence["projectErrors"]:
         blockers.append("SMAPI/Content Patcher reported an error for this Lexeditor content pack.")
 
@@ -243,7 +249,7 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
         and xnb_unchanged
         and game_version_matches
         and evidence["contentPatcherSeen"]
-        and evidence["projectMentioned"]
+        and evidence["projectLoaded"]
         and not evidence["projectErrors"]
         and api_compatible is not False
         and not blockers
@@ -275,7 +281,9 @@ def acceptance_status(game_root: Path, project_root: Path) -> dict:
         "contentPatcherMinimumApiVersion": minimum_api,
         "smapiMeetsContentPatcherMinimum": api_compatible,
         "projectMentioned": evidence["projectMentioned"],
+        "projectLoaded": evidence["projectLoaded"],
         "projectLogLines": evidence["projectLines"],
+        "projectLoadedLogLines": evidence["projectLoadedLines"],
         "projectErrors": evidence["projectErrors"],
         "blockers": blockers,
     }
