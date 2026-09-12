@@ -15,7 +15,14 @@ ARTIFACTS.mkdir(parents=True, exist_ok=True)
 MODULE = {
     "path": "C:/fixture/SubModule.xml", "name": "Fixture Module", "id": "FixtureMod",
     "version": "v1.0.0", "defaultModule": False, "singleplayer": True, "multiplayer": False,
-    "dependencies": [], "incompatibleModules": [],
+    "dependencies": [], "communityDependencies": [],
+    "legacyDependencies": [{
+        "index": 0, "id": "LegacyBrowserDep", "order": "LoadAfterThis",
+        "optional": False, "incompatible": False, "version": "",
+        "origin": "LoadAfterModules",
+        "attributes": {"Id": "LegacyBrowserDep", "Future": "keep-browser"},
+    }],
+    "modulesToLoadAfterThis": [], "incompatibleModules": [],
     "submodules": [{"index": 0, "name": "Fixture", "dllName": "Fixture.dll", "classType": "Fixture.SubModule", "tags": []}],
     "xmls": [{"index": 0, "id": "Items", "path": "items", "includedGameTypes": []}],
 }
@@ -154,6 +161,27 @@ def main() -> None:
             page.set_content(inline_editor(), wait_until="domcontentloaded")
             page.wait_for_function("state.module && state.project && state.datamap", timeout=8000)
             assert "Fixture Module" in page.locator("#main").inner_text()
+
+            page.evaluate('navigate("dependencies")')
+            legacy_row = page.locator("button.bl-item").filter(has_text="LegacyBrowserDep")
+            assert legacy_row.count() == 1
+            legacy_row.click()
+            detail_text = page.locator(".bl-detail").inner_text()
+            assert "Legacy shape" in detail_text
+            assert "LoadAfterModules" in detail_text
+            assert "historical LoadAfterModules relation is required" in detail_text
+            assert page.get_by_role("button", name="+ Legacy", exact=True).count() == 0
+            legacy_id = page.locator('.bl-detail .bl-grid input[type="text"]').first
+            legacy_id.fill("LegacyBrowserRenamed")
+            assert page.evaluate("moduleDirty()") is True
+            assert page.evaluate("state.module.legacyDependencies[0].id") == "LegacyBrowserRenamed"
+            legacy_id.fill("LegacyBrowserDep")
+            assert page.evaluate("moduleDirty()") is False
+
+            page.evaluate('navigate("deployment")')
+            deployment_text = page.locator("#main").inner_text()
+            assert "MOD LOADER" in deployment_text
+            assert "Bannerlord's native module loader" in deployment_text
 
             page.evaluate('navigate("moduledata")')
             page.wait_for_function("state.moduleData && state.moduleData.schemaIssueCount===1")

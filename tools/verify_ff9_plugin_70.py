@@ -63,7 +63,10 @@ def main() -> int:
             "editable": True, "kind": "integer", "min": 0, "max": 4294967295,
         }
         assert fields["Usable"]["kind"] == "boolean" and fields["Usable"]["editable"]
-        assert fields["Abilities"]["kind"] == "stored" and not fields["Abilities"]["editable"]
+        # An Int32[] column is an editable list now, not an opaque stored blob.
+        # Verified by round-tripping one: writing "4, 5" back produces
+        # `0;250;125;1;Potion;4, 5;# 000 - Potion`, comment intact.
+        assert fields["Abilities"]["kind"] == "list" and fields["Abilities"]["editable"]
         assert not fields["Id"]["editable"]
         public = document.public_rows(next(value for value in __import__(
             "games.ff9.memoria_csv", fromlist=["DATASETS"]

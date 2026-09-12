@@ -31,6 +31,14 @@ class BannerlordUiContractTests(unittest.TestCase):
             + ", ".join(offenders),
         )
 
+    def test_shared_mod_loader_section_is_rendered_from_deployment_information(self) -> None:
+        html = (BANNERLORD_ROOT / "editor.html").read_text(encoding="utf-8")
+        balancing = (BANNERLORD_ROOT / "editor_balancing.js").read_text(encoding="utf-8")
+        boot = (BANNERLORD_ROOT / "editor_boot.js").read_text(encoding="utf-8")
+        self.assertIn("LexeditorUI.modLoaderSection(", html)
+        self.assertIn("bannerlordModLoaderSection()", balancing)
+        self.assertIn('info:()=>navigate("deployment")', boot)
+
     def test_build_ui_exposes_msbuild_execution_trust_boundary(self) -> None:
         text = (BANNERLORD_ROOT / "editor_build.js").read_text(encoding="utf-8")
         self.assertIn("MSBuild targets and tasks with your user permissions", text)

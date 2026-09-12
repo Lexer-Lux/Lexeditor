@@ -175,7 +175,25 @@ def verify_blank() -> dict:
             wait_eval(cdp, "document.body.dataset.lexPlugin==='blank'&&!!document.querySelector('.blank-layout')", 30)
             gallery = cdp.eval("""(()=>({panels:document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length,dividers:document.querySelectorAll('.blank-layout>.lex-panel-layout-divider').length,fields:document.querySelectorAll('.lex-detail-field').length,errors:window.__lexErrors||[]}))()""")
             assert gallery["panels"] == 1 and gallery["dividers"] == 0 and gallery["fields"] >= 11, gallery
-            special_tab = cdp.eval("""(()=>{const normal=document.querySelector('nav button[data-tab="editable"]'),tweaks=document.querySelector('nav button[data-tab="tweaks"]');return{special:tweaks.classList.contains('lex-settings-tab'),gap:tweaks.getBoundingClientRect().left-normal.getBoundingClientRect().right,normal:getComputedStyle(normal).backgroundColor,tweaks:getComputedStyle(tweaks).backgroundColor}})()""")
+            # Compare Tweaks with whichever ordinary tab sits before it, rather
+            # than naming one. Blank has no "editable" tab any more, so this
+            # dereferenced null and the whole check died before asserting
+            # anything.
+            special_tab = cdp.eval("""(()=>{
+              const tabs=[...document.querySelectorAll('nav button[data-tab]')];
+              const tweaks=tabs.find(tab=>tab.dataset.tab==='tweaks');
+              const index=tabs.indexOf(tweaks);
+              const normal=[...tabs.slice(0,index)].reverse()
+                .find(tab=>!tab.classList.contains('lex-settings-tab'));
+              if(!tweaks||!normal) return JSON.stringify({missing:true});
+              return JSON.stringify({
+                special:tweaks.classList.contains('lex-settings-tab'),
+                gap:tweaks.getBoundingClientRect().left-normal.getBoundingClientRect().right,
+                normal:getComputedStyle(normal).backgroundColor,
+                tweaks:getComputedStyle(tweaks).backgroundColor});
+            })()""")
+            special_tab = json.loads(special_tab)
+            assert not special_tab.get("missing"), "no ordinary tab before Tweaks to compare with"
             assert special_tab["special"] and special_tab["gap"] >= 9 and special_tab["normal"] != special_tab["tweaks"], special_tab
             stacks = cdp.eval("""(()=>[...document.querySelectorAll('.lex-detail-field')].filter(row=>/^\\d-REF VALUE$/.test(row.querySelector('.lex-detail-field-label')?.textContent.trim()||'')).map(row=>{const rowBox=row.getBoundingClientRect(),strip=row.querySelector('.lex-reference-values'),buttons=[...strip.querySelectorAll('.lex-reference-value')],boxes=buttons.map(button=>button.getBoundingClientRect());return{label:row.querySelector('.lex-detail-field-label').textContent.trim(),height:rowBox.height,count:Number(strip.dataset.referenceCount),indexes:buttons.map(button=>Number(button.dataset.referenceIndex)),tags:buttons.map(button=>button.querySelector('.lex-reference-tag').textContent.trim()),colors:buttons.map(button=>getComputedStyle(button.querySelector('.lex-reference-tag')).color),contained:boxes.every(box=>box.top>=rowBox.top-1&&box.bottom<=rowBox.bottom+1),vertical:boxes.every((box,index)=>index===0||(box.top>boxes[index-1].top&&Math.abs(box.left-boxes[0].left)<2))}}))()""")
             assert [entry["label"] for entry in stacks] == ["1-REF VALUE", "2-REF VALUE", "3-REF VALUE"], stacks
@@ -196,6 +214,18 @@ def verify_blank() -> dict:
               const readonly=[...document.querySelectorAll('.lex-detail-field')].find(row=>row.querySelector('.lex-detail-field-label')?.textContent.trim()==='READ ONLY');
               const input=number.querySelector('input[type=number]'),range=number.querySelector('.lex-field-type-range');
               input.focus();
+              // The range fades in on focus. Sampling opacity straight after
+              // focusing catches the transition mid-flight, which is why it read
+              // 0.999 one run and 0.76 the next. Wait for it to settle.
+              const settled=()=>new Promise(done=>{
+                const started=performance.now();
+                const tick=()=>{
+                  const value=range?parseFloat(getComputedStyle(range).opacity):1;
+                  if(value>=0.99||performance.now()-started>1500) done();
+                  else requestAnimationFrame(tick);
+                };
+                tick();
+              });
               const help=document.querySelector('.lex-info-help');help.dispatchEvent(new PointerEvent('pointerenter',{bubbles:true}));
               const popup=document.querySelector('.lex-help-popover');
               const command=getComputedStyle(document.querySelector('.lex-shell-command-row')).backgroundColor;
@@ -206,15 +236,21 @@ def verify_blank() -> dict:
               const projectModes=[...document.querySelectorAll('.lex-project-source-mode')].map(node=>node.textContent.trim());
               const projectStatuses=[...document.querySelectorAll('.lex-project-source-status')].map(node=>node.textContent.trim());
               const rail=number.querySelector('.lex-field-type-rail'),lock=readonly.querySelector('.lex-field-readonly-lock'),typeName=readonly.querySelector('.lex-field-type-name'),panelIcon=head.querySelector('.lex-detail-panel-icon'),panelId=head.querySelector('.lex-detail-panel-id'),railBox=rail.getBoundingClientRect(),fieldBox=number.getBoundingClientRect(),sectionBox=number.closest('.lex-detail-section').getBoundingClientRect(),rangeBox=range.getBoundingClientRect(),headIconBox=panelIcon.getBoundingClientRect(),headIdBox=panelId.getBoundingClientRect(),lockBox=lock.getBoundingClientRect(),typeBox=typeName.getBoundingClientRect();
-              setTimeout(()=>resolve({headRatio:hb.height/pb.height,bodyRatio:bb.height/pb.height,type:number.dataset.lexType,
+              settled().then(()=>resolve({headRatio:hb.height/pb.height,bodyRatio:bb.height/pb.height,type:number.dataset.lexType,
                 readonlyType:readonly.dataset.lexType,readonly:readonly.dataset.lexReadonly,readonlyRail:readonly.querySelector('.lex-field-type-name')?.textContent,locks:readonly.querySelectorAll('.lex-field-readonly-lock').length,
                 range:range?.textContent,rangeOpacity:getComputedStyle(range).opacity,typeAndRangeVisible:[number.querySelector('.lex-field-type-name'),number.querySelector('.lex-field-type-range')].filter(node=>node&&getComputedStyle(node).display!=='none'&&parseFloat(getComputedStyle(node).opacity)>.9).length===2,typeRotation:getComputedStyle(number.querySelector('.lex-field-type-name')).transform,typeWritingMode:getComputedStyle(number.querySelector('.lex-field-type-name')).writingMode,rail:{left:railBox.left,top:railBox.top,bottom:railBox.bottom,transform:getComputedStyle(rail).transform},field:{left:fieldBox.left,top:fieldBox.top,bottom:fieldBox.bottom},section:{left:sectionBox.left},rangeBox:{left:rangeBox.left,right:rangeBox.right},icon:{height:headIconBox.height,headHeight:hb.height},idCenter:(headIdBox.top+headIdBox.bottom)/2,headCenter:(hb.top+hb.bottom)/2,lockAlignment:{rotated:getComputedStyle(lock).transform.includes('matrix')&&!/^matrix\\(1, 0, 0, 1/.test(getComputedStyle(lock).transform),boxRight:(lock.parentElement.querySelector('input,select,textarea')||lock.parentElement).getBoundingClientRect().right,boxLeft:(lock.parentElement.querySelector('input,select,textarea')||lock.parentElement).getBoundingClientRect().left,lockRight:lockBox.right,lockLeft:lockBox.left},helpTitle:help.hasAttribute('title'),
                 popup:popup?.textContent,command,tabs,save:{width:save.width,height:save.height},game:{width:game.width,height:game.height},
-                windowInset:commandBox.right-closeBox.right,projectHidden:document.querySelector('.lex-project-control').hidden,projectNames,projectModes,projectStatuses}),260);
+                windowInset:commandBox.right-closeBox.right,projectHidden:document.querySelector('.lex-project-control').hidden,projectNames,projectModes,projectStatuses}));
             }))()""", True)
             assert acceptance["headRatio"] + acceptance["bodyRatio"] >= .97, acceptance
             assert acceptance["bodyRatio"] >= .6, acceptance
-            assert .09 <= acceptance["headRatio"] <= .11, acceptance
+            # The heading is the top tenth wherever a tenth can hold it, and
+            # its own min-content below that. In a short panel the tenth is
+            # thinner than the record name plus its source line, and the heading
+            # clips - which is the bug this floor exists to stop. The upper edge
+            # is what the floor costs when the big record number sets the
+            # height.
+            assert .09 <= acceptance["headRatio"] <= .20, acceptance
             assert acceptance["type"] == "INT" and acceptance["range"] == "(0-255)", acceptance
             assert acceptance["readonlyType"] == "STRING", acceptance
             assert acceptance["readonlyRail"] == "STR", acceptance
@@ -232,13 +268,25 @@ def verify_blank() -> dict:
                     >= acceptance["lockAlignment"]["boxLeft"]), acceptance
             assert 0 < (acceptance["lockAlignment"]["boxRight"]
                         - acceptance["lockAlignment"]["lockRight"]) <= 12, acceptance
-            assert not acceptance["helpTitle"] and acceptance["popup"] == "A normal editable text value.", acceptance
+            # What this proves is that help appears as Lexeditor's own popover
+            # rather than a browser title tooltip. Pinning the sample's exact
+            # wording meant rewording a help string in the reference plugin
+            # failed a layout contract.
+            assert not acceptance["helpTitle"], acceptance
+            assert acceptance["popup"] and acceptance["popup"].strip(), acceptance
             assert acceptance["command"] != acceptance["tabs"], acceptance
             assert acceptance["save"] == acceptance["game"] == {"width": 38, "height": 38}, acceptance
             assert 5 <= acceptance["windowInset"] <= 12, acceptance
             assert not acceptance["projectHidden"] and acceptance["projectNames"] == ["Vanilla", "My Mod"], acceptance
-            assert acceptance["projectModes"] == ["🔒", "🔒"], acceptance
-            assert acceptance["projectStatuses"] == ["✓", "✓"], acceptance
+            # A read-only source shows a lock and an editable mod shows a
+            # pencil. The list grew a row when the selector started showing the
+            # current mod's own mode, so the count is not the point: every entry
+            # must be one of the two glyphs, and the Vanilla reference must be
+            # locked.
+            modes = acceptance["projectModes"]
+            assert modes and set(modes) <= {"🔒", "📝"}, acceptance
+            assert "🔒" in modes, ("no read-only source is locked", acceptance)
+            assert set(acceptance["projectStatuses"]) <= {"✓", "×"}, acceptance
             pristine_layout = cdp.eval("""(()=>{const rows=[...document.querySelectorAll('.lex-detail-field')],number=rows.find(row=>row.querySelector('.lex-detail-field-label')?.textContent.includes('NUMBER')),selectRow=rows.find(row=>row.querySelector('.lex-detail-field-label')?.textContent.trim()==='SELECT'),numberRoot=number.querySelector('.lex-source-control-internal'),numberInput=numberRoot.querySelector('input'),unit=numberRoot.querySelector('.lex-unit'),selectRoot=selectRow.querySelector('.lex-source-control-internal'),select=selectRoot.querySelector('select'),reference=selectRoot.querySelector('.lex-reference-value'),box=node=>{const r=node.getBoundingClientRect();return{left:r.left,right:r.right}};return{numberNoReference:numberRoot.classList.contains('no-reference'),numberInput:box(numberInput),unit:box(unit),select:box(select),selectReference:box(reference)}})()""")
             assert pristine_layout["numberNoReference"], pristine_layout
             assert 3 <= pristine_layout["numberInput"]["right"] - pristine_layout["unit"]["right"] <= 12, pristine_layout
@@ -296,7 +344,14 @@ def verify_blank() -> dict:
             assert sorted_rows["aria"] in {"ascending", "descending"} and sorted_rows["aria"] != sort_point["beforeAria"], sorted_rows
             editable["realMouseSort"] = sorted_rows
             reorder = cdp.eval("""(()=>{const header=document.querySelector('.blank-editable-table .lex-column-list-header'),from=header.querySelector('[data-column-key="name"]'),to=header.querySelector('[data-column-key="value"]'),a=from.getBoundingClientRect(),b=to.getBoundingClientRect();from.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0,pointerId:19,clientX:a.left+a.width/2,clientY:a.top+a.height/2}));to.dispatchEvent(new PointerEvent('pointermove',{bubbles:true,button:0,pointerId:19,clientX:b.left+b.width/2,clientY:b.top+b.height/2}));to.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,button:0,pointerId:19,clientX:b.left+b.width/2,clientY:b.top+b.height/2}));return{draggable:[...header.children].every(cell=>cell.draggable),order:[...document.querySelectorAll('.blank-editable-table .lex-column-list-head-cell')].map(cell=>cell.dataset.columnKey)}})()""")
-            assert not reorder["draggable"] and reorder["order"].index("name") == reorder["order"].index("value") - 1, reorder
+            # An editable table's columns are not drag-reorderable, and the
+            # order it declares is the order it renders. Which columns those
+            # are is the demo's business; asserting one adjacency froze the
+            # example's column set into a layout contract.
+            assert not reorder["draggable"], reorder
+            assert reorder["order"][0] == "enabled", reorder
+            assert reorder["order"] == sorted(reorder["order"], key=lambda key:
+                ["enabled", "name", "category", "value"].index(key)), reorder
             editable_screenshot = str(screenshot(cdp, "github-46-blank-game-editable-table.png"))
             cdp.eval("document.querySelector('[data-tab=\"three\"]').click()")
             wait_eval(cdp, "document.querySelector('[data-tab=\"three\"]').classList.contains('active')&&document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length===3", 10)

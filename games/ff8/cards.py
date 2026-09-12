@@ -10,6 +10,7 @@ import json
 import threading
 import os
 import tempfile
+import shutil
 from pathlib import Path
 
 from . import executable_text
@@ -128,6 +129,13 @@ def load(path: Path, names: list[str] | None = None) -> list[dict]:
 
 
 def project_edits(project: Path, exe: bytes) -> list[dict]:
+    with _LOCK:
+        if (Path(project) / ".cards-recovery").exists():
+            raise OSError(f"Card project has pending recovery at {Path(project) / '.cards-recovery'}")
+        return _project_edits_locked(project, exe)
+
+
+def _project_edits_locked(project: Path, exe: bytes) -> list[dict]:
     manifest = Path(project) / MANIFEST
     hext = Path(project) / HEXT
     if not manifest.exists():
@@ -157,6 +165,77 @@ def _write(path: Path, data: bytes) -> None:
         Path(temporary).unlink(missing_ok=True)
 
 
+def _commit_project_files(project: Path, pending: list, original: list) -> None:
+    """Keep one bounded recovery set until both files commit or restore."""
+    project = project.resolve()
+    project.mkdir(parents=True, exist_ok=True)
+    stage = project / ".cards-recovery"
+    try:
+        stage.mkdir()
+    except FileExistsError as error:
+        raise OSError(f"Card save has pending recovery at {stage}; resolve it before saving again") from error
+    retain = False
+    installed = []
+    try:
+        records = []
+        for index, ((path, value), (old_path, before)) in enumerate(zip(pending, original)):
+            assert path == old_path
+            relative = path.resolve().relative_to(project)
+            records.append({"path": relative.as_posix(), "before": None if before is None else f"{index}.before"})
+            if before is not None:
+                (stage / f"{index}.before").write_bytes(before)
+            (stage / f"{index}.after").write_bytes(value)
+        (stage / "files.json").write_text(json.dumps(records, indent=2), encoding="utf-8")
+        for path, before in original:
+            if (path.read_bytes() if path.exists() else None) != before:
+                raise ValueError("Card files changed during save; reload before retrying")
+        try:
+            for index, (path, value) in enumerate(pending):
+                before = original[index][1]
+                if (path.read_bytes() if path.exists() else None) != before:
+                    raise ValueError("Card files changed during save; reload before retrying")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(stage / f"{index}.after", path)
+                installed.append(index)
+        except Exception as save_error:
+            failures = []
+            for index in reversed(installed):
+                path, value = pending[index]
+                before = original[index][1]
+                try:
+                    if not path.exists() or path.read_bytes() != value:
+                        raise OSError("File changed after installation; refusing to overwrite it")
+                    if before is None:
+                        path.unlink()
+                    else:
+                        _write(path, before)
+                except Exception as error:
+                    failures.append(str(error))
+            if failures:
+                retain = True
+                raise OSError(f"Card save and restore failed. Originals are retained at {stage}") from save_error
+            raise
+    finally:
+        if not retain:
+            assert stage.resolve().parent == project
+            shutil.rmtree(stage)
+
+
+def _project_snapshot(path: Path) -> bytes | None:
+    if not path.exists():
+        return None
+    # Normalized edits contain at most 660 scalar fields. Do not copy a large,
+    # unrelated file into recovery merely because it has a generated filename.
+    limit = 1024 * 1024
+    if path.stat().st_size > limit:
+        raise ValueError(f"Card project file exceeds the 1 MiB limit: {path}")
+    with path.open("rb") as stream:
+        value = stream.read(limit + 1)
+    if len(value) > limit:
+        raise ValueError(f"Card project file exceeds the 1 MiB limit: {path}")
+    return value
+
+
 def save_project(project: Path, exe: bytes, edits: list[dict]) -> dict:
     """Merge field edits, normalize baseline resets, and retain editable state.
 
@@ -164,6 +243,11 @@ def save_project(project: Path, exe: bytes, edits: list[dict]) -> dict:
     composition. Externally changed generated patches are never overwritten.
     """
     with _LOCK:
+        project = Path(project)
+        if (project / ".cards-recovery").exists():
+            raise OSError(f"Card save has pending recovery at {project / '.cards-recovery'}; resolve it before saving again")
+        targets = [project / MANIFEST, project / HEXT]
+        old = [(p, _project_snapshot(p)) for p in targets]
         baseline = read_tables(exe)[0]
         existing = project_edits(project, exe)
         current = apply_edits(baseline, existing)[0]
@@ -175,17 +259,7 @@ def save_project(project: Path, exe: bytes, edits: list[dict]) -> dict:
                     "edits": normalized}
         pending = [(Path(project) / MANIFEST, (json.dumps(manifest, indent=2) + "\n").encode()),
                    (Path(project) / HEXT, build_hext(exe, normalized).encode())]
-        old = [(p, p.read_bytes() if p.exists() else None) for p, _ in pending]
-        try:
-            for path, value in pending:
-                _write(path, value)
-        except Exception:
-            for path, value in old:
-                if value is None:
-                    path.unlink(missing_ok=True)
-                else:
-                    _write(path, value)
-            raise
+        _commit_project_files(project, pending, old)
         return {"saved": changed, "files": [str(p) for p, _ in pending]}
 
 

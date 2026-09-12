@@ -184,7 +184,7 @@ def parse_script(source: str, script_id: int = 0, name: str | None = None) -> di
                "operands": operands, "size": 1 + sum(_operand_width(kind) for kind in types),
                "raw": "Rebuilt from source", "editable": True}
         if target_key is not None:
-            row["targetKey"] = target_key
+            row["targetKey"] = "end" if target_key == "END" else target_key
             pending_targets.append((row, target_key))
         rows.append(row)
     if not rows:
@@ -280,6 +280,9 @@ def instruction_template(opcode: int) -> dict:
     operands = []
     for index, kind in enumerate(types):
         operand = _control(kind, 0)
+        choices = operand.get("choices")
+        if choices and operand["value"] not in {choice["id"] for choice in choices}:
+            operand["value"] = choices[0]["id"]
         operand.update(index=index, size=_operand_width(kind))
         operands.append(operand)
     return {"opcode": int(opcode), "name": name, "operands": operands,
@@ -318,7 +321,8 @@ def _decode_instruction(code: bytes, position: int, base: int) -> tuple[dict, in
     if branch is not None:
         target = end + int(branch["value"])
         row["targetOffset"] = target
-        row["targetLabel"] = f"L{target:04X}" if 0 <= target <= len(code) else "Outside section"
+        row["targetLabel"] = ("END" if target == len(code) else
+                              f"L{target:04X}" if 0 <= target < len(code) else "Outside section")
     return row, end
 
 
@@ -375,7 +379,8 @@ def read(raw: bytes) -> dict:
                 row["targetKey"] = target["key"] if target else "end"
         script = {"id": index, "name": SCRIPT_NAMES[index], "offset": absolute,
                   "size": len(code), "instructions": instructions}
-        if all(row.get("editable", False) for row in instructions):
+        if all(row.get("editable", False) and row.get("targetValid", True)
+               for row in instructions):
             script["source"] = format_script(script)
         else:
             script["source"] = None
@@ -402,12 +407,20 @@ def apply_edits(raw: bytes, edits: list[dict]) -> tuple[bytes, int]:
             raise ValueError(f"Invalid, unsupported, or duplicate enemy AI operand: {key}")
         seen.add(key)
         operand = lookup[key]
-        value = int(edit["value"])
+        value = _validated_operand(operand["type"], edit["value"])
         if not int(operand["minimum"]) <= value <= int(operand["maximum"]):
             raise ValueError(f"Enemy AI {operand['type']} must be {operand['minimum']} to {operand['maximum']}")
         choices = operand.get("choices")
         if choices is not None and value not in {int(choice["id"]) for choice in choices}:
             raise ValueError(f"Enemy AI {operand['type']} value is not supported: {value}")
+        if operand["type"] in {"jump16", "skip16"}:
+            script = parsed["scripts"][key[0]]
+            instruction = next(row for row in script["instructions"] if row["offset"] == key[1])
+            target = instruction["offset"] + instruction["size"] + value
+            boundaries = {row["offset"] for row in script["instructions"]
+                          if row.get("editable", False)} | {script["size"]}
+            if target not in boundaries:
+                raise ValueError("Enemy AI branch must target an instruction or script end")
         size = int(operand["size"])
         encoded = value.to_bytes(size, "little", signed=operand["type"] == "jump16")
         start = int(operand["offset"])
@@ -420,6 +433,11 @@ def apply_edits(raw: bytes, edits: list[dict]) -> tuple[bytes, int]:
 
 
 def _validated_operand(kind: str, value: object) -> int:
+    if isinstance(value, bool) and kind != "bool":
+        raise ValueError(f"Enemy AI {kind} must be an integer")
+    if not isinstance(value, (int, str)) or (isinstance(value, str) and
+            not re.fullmatch(r"-?(?:0|[1-9][0-9]*)", value)):
+        raise ValueError(f"Enemy AI {kind} must be an integer")
     control = _control(kind, int(value))
     number = int(value)
     if not int(control["minimum"]) <= number <= int(control["maximum"]):
@@ -473,6 +491,7 @@ def _compile_script(script: dict) -> bytes:
         cursor += 1
 
     offsets = {row["key"]: row["offset"] for row in prepared}
+    boundaries = set(offsets.values()) | {cursor}
     result = bytearray()
     for row in prepared:
         result.append(row["opcode"])
@@ -489,6 +508,8 @@ def _compile_script(script: dict) -> bytes:
                 value = target - (row["offset"] + row["size"])
                 branch_used = True
             number = _validated_operand(kind, value)
+            if kind in {"jump16", "skip16"} and row["offset"] + row["size"] + number not in boundaries:
+                raise ValueError("Enemy AI branch must target an instruction or script end")
             result.extend(number.to_bytes(_operand_width(kind), "little",
                                           signed=kind == "jump16"))
     return bytes(result)

@@ -1,5 +1,6 @@
 """Shared multi-panel composition contract for Lexeditor issue 46."""
 
+import re
 from pathlib import Path
 
 
@@ -32,11 +33,16 @@ require('panelLayout([buys,picker,sells],"shop-workspace"' in rdr2,
         "RDR2 Shop panels must use the composer")
 for required in (
     'panelLayout([galleryPanel()],"blank-layout"',
-    'pagedListDetail({rows:records',
-    'panelLayout([tablePanel(),recordPanel(),inspectorPanel()],"blank-layout"',
+    # Matched as a pattern, not a prefix: which option comes first inside the
+    # call is not what this check is about.
+    re.compile(r"pagedListDetail\(\{[^}]*rows:records"),
+    # No closing quote: a layout is allowed to carry extra classes after the
+    # shared one, and the three-panel example does.
+    'panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout',
     'panelLayout([subtabPanel()],"blank-layout"',
 ):
-    require(required in blank, "Blank Game must demonstrate every shared panel count")
+    found = (required.search(blank) if hasattr(required, "search") else required in blank)
+    require(found, "Blank Game must demonstrate every shared panel count")
 require("const subtabBar = (options" in framework and "subtabBar," in framework,
         "nested navigation must use one exported shared subtab control")
 require("const tabbedPanel = (options" in framework and "tabbedPanel," in framework,

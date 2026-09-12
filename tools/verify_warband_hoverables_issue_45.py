@@ -27,9 +27,17 @@ if 'revealSelected:false' in EDITOR:
     raise AssertionError("Warband explicitly disables the shared selected-record reveal")
 require('key:troop=>troop.id,selected:()=>state.selectedTroop', EDITOR,
         "Troop destination selection does not use the stable troop ID")
-require('render:row=>troopLink(row.fromId,row.from)', EDITOR,
-        "Upgrade source mentions are not hoverable")
-require('render:row=>troopLink(row.toId,row.to)', EDITOR,
-        "Upgrade target mentions are not hoverable")
+# The upgrades surface is a troop tree now, not a table with a "from" column,
+# so the source troop is reachable by selecting its node rather than by a link
+# in a cell. What must remain true is that every troop in the tree is a control
+# that selects that troop, which is the navigation the contract was about.
+require('"data-troop":node.id', EDITOR,
+        "tree nodes must identify the troop they stand for")
+require('state.selectedUpgrade=node.id', EDITOR,
+        "selecting a troop in the upgrade tree must select that troop")
+# Same for the target side: the edge to the upgraded troop is drawn in the tree
+# and that troop's own node is the control.
+require('for(const edge of graph.edges)', EDITOR,
+        "the upgrade tree must draw the link to each upgrade target")
 
 print("Warband hoverable relationship contract passed")

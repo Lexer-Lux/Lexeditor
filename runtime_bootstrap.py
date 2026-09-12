@@ -7,10 +7,11 @@ import subprocess
 import sys
 
 SERVICE_MODULES = frozenset({
-    'games.bannerlord.server', 'games.blank.server', 'games.ff7.server', 'games.ff7r.server',
-    'games.ff7r.themed_server', 'games.ff8.server', 'games.ff9.server', 'games.rdr.server',
-    'games.rdr2.server', 'games.warband.server',
+    'games.bannerlord.server', 'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff7r.themed_server',
+    'games.ff8.server', 'games.ff9.server', 'games.palworld.full_server', 'games.rdr.server', 'games.rdr2.server',
+    'games.warband.server',
 })
+SERVICE_MODULES = SERVICE_MODULES | frozenset({'games.chrono_trigger.server'})
 
 
 def user_data_dir() -> Path:
@@ -39,11 +40,13 @@ def bootstrap_environment() -> None:
             os.environ.setdefault(key, str(root / 'projects' / game))
 
 
-def service_command(module: str) -> list[str]:
+def service_command(module: str, *, owned: bool = False) -> list[str]:
     if module not in SERVICE_MODULES:
         raise ValueError(f'Unsupported plugin service: {module}')
     if getattr(sys, 'frozen', False):
         return [sys.executable, '--plugin-service', module]
+    if owned:
+        return [sys.executable, '-m', 'runtime_bootstrap', '--plugin-service', module]
     return [sys.executable, '-m', module]
 
 
@@ -53,6 +56,9 @@ def dispatch_service(argv: list[str]) -> bool:
     if len(argv) != 2 or argv[1] not in SERVICE_MODULES:
         raise ValueError('A bundled plugin service must name an allowed module')
     module = argv[1]
+    if os.environ.get('LEXEDITOR_SERVICE_PIPE') == '1':
+        from service_lifetime import watch_host
+        watch_host()
     sys.argv = [module]
     runpy.run_module(module, run_name='__main__')
     return True
@@ -68,3 +74,8 @@ def open_path(path: Path) -> None:
         # Never pass a file path through a shell.
         subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(target)],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+if __name__ == '__main__':
+    if not dispatch_service(sys.argv[1:]):
+        raise SystemExit('An allowed plugin service is required.')

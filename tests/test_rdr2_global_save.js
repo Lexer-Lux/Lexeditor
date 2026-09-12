@@ -13,7 +13,7 @@ async function run(fail) {
   let saved = { available: true, vanilla: {CONSUMABLE_RUM: 0.17, CONSUMABLE_MOONSHINE: 0.3}, overrides: {CONSUMABLE_MOONSHINE: 1} };
   const context = vm.createContext({
     console, structuredClone, isRO: () => false, dirtyCount: () => 1,
-    saveLoot: async () => {}, saveLocalization: async () => 0,
+    saveLoot: async () => {}, saveLocalization: async () => 0, saveLootSounds: async () => 0,
     render() {}, refreshGlobalSave() {},
     rdr2Shell: { history: { clear() {} } },
     toast: message => messages.push(message),

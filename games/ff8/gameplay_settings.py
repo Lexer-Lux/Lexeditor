@@ -427,6 +427,9 @@ def effective_hit_value(hit_rate: int, bonus: int, *, target_flying: bool,
         attacker_melee=attacker_melee,
         attacker_float=attacker_float,
     ) else 0
+    # The clamp mirrors the shipped assembly, which does `cmp eax,0x64 / jle /
+    # mov eax,0x64` before subtracting the bonus, and only on the penalised
+    # branch. This model must agree with the bytes that actually run.
     return min(100, int(hit_rate)) - int(penalty) if penalty else int(hit_rate)
 
 

@@ -177,7 +177,8 @@
         ...fieldRow("Module root",el("code",{},d.deployedRoot||""))
       ),
       el("div",{class:"bl-list-block"},el("h3",{},"Issues"),
-        d.issues?.length?el("ul",{},...d.issues.map(value=>el("li",{},value))):el("div",{class:"bl-note"},"No deployment problems detected by the static checks."))
+        d.issues?.length?el("ul",{},...d.issues.map(value=>el("li",{},value))):el("div",{class:"bl-note"},"No deployment problems detected by the static checks.")),
+      bannerlordModLoaderSection()
     );
     const deps=d.dependencies||[],bins=d.binaries||[],assets=d.assets||{},overrides=d.runtimeOverrides||{};
     const legacyGui={source:assets.sourceGuiXml||0,deployed:assets.deployedGuiXml||0,missing:assets.missingGuiXml||[],different:assets.differentGuiXml||[],inSync:!(assets.missingGuiXml||[]).length&&!(assets.differentGuiXml||[]).length};

@@ -66,8 +66,17 @@ def main():
                     assert page.locator('.warband-item-detail [data-lex-property="name"] input').count()==1
                     assert page.locator('.warband-item-detail [data-lex-property="flags"] textarea').count()==1
                     assert page.locator('.warband-item-detail [data-lex-property="stats"] textarea').count()==1
-                    assert page.get_by_role('button',name='Open model preview',exact=True).count()==0
-                    assert page.locator('.lex-model-preview-drawer').count()==0
+                    # The heading icon is the shared 3D viewer control. It used
+                    # to be absent, so the renderer was there and unreachable.
+                    assert page.locator('.lex-model-preview-drawer').count()==1
+                    icon=page.locator('.warband-item-detail .lex-detail-panel-icon')
+                    assert icon.count()==1
+                    icon.click();page.wait_for_timeout(250)
+                    assert page.locator('.warband-item-detail.lex-model-preview-open').count()==1
+                    assert page.locator('.lex-model-preview-drawer .warband-preview-stage').count()==1
+                    page.locator('.warband-item-detail .lex-model-preview-close').click()
+                    page.wait_for_timeout(250)
+                    assert page.locator('.warband-item-detail.lex-model-preview-open').count()==0
                     name_field=page.locator('.warband-item-detail [data-lex-property="name"] input')
                     name_field.fill('Edited fixture name')
                     assert page.evaluate('itemDirtyCount()')==1
@@ -94,8 +103,9 @@ def main():
                     assert metrics['last']<=metrics['boxBottom']+1,metrics
                     page.screenshot(path=str(ARTIFACTS/f'datamap-{width}.png'),full_page=True)
                     page.evaluate('navigate("upgrades")');page.get_by_role('combobox',name='Troop tree faction',exact=True).select_option('fac_north')
-                    # Select the recruit component rather than the independent militia tree.
-                    page.select_option('select[aria-label="Troop tree"]',label='Recruit')
+                    # Each tree is a subtab now. Select the recruit component
+                    # rather than the independent militia tree.
+                    page.get_by_role('tab',name='Recruit',exact=True).click()
                     page.locator('button[data-troop="knight"]').click()
                     assert 'Knight' in page.locator('.warband-tree-detail').inner_text()
                     assert 'knight' in page.locator('.warband-tree-detail').inner_text()

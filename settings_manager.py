@@ -22,6 +22,7 @@ UPDATE_FREQUENCIES = {
 DEFAULTS = {
     "updateCheckFrequency": "daily",
     "hoverableAltClick": False,
+    "pageWrapAround": True,
     "selectionHoldMs": 650,
     "tableRowsPerPage": 15,
     "panelGapPercent": 1.0,
@@ -136,6 +137,7 @@ class SettingsStore:
         return {
             "updateCheckFrequency": frequency,
             "hoverableAltClick": payload.get("hoverableAltClick", defaults["hoverableAltClick"]) is True,
+            "pageWrapAround": payload.get("pageWrapAround", defaults["pageWrapAround"]) is not False,
             "selectionHoldMs": max(150, min(2000, selection_hold_ms)),
             "tableRowsPerPage": max(5, min(40, table_rows_per_page)),
             "panelGapPercent": max(0.25, min(4.0, panel_gap_percent)),
@@ -178,13 +180,16 @@ class SettingsStore:
              panel_gap_percent: float | None = None,
              main_menu_height_percent: float | None = None,
              sound_enabled: bool | None = None,
-             sound_volume_percent: float | None = None) -> dict:
+             sound_volume_percent: float | None = None,
+             page_wrap_around: bool | None = None) -> dict:
         """Save per-user preferences. Authenticated authoring state is never persisted."""
         if update_check_frequency not in UPDATE_FREQUENCIES:
             raise ValueError("Choose a listed update-check frequency")
         current = self.snapshot()
         if hoverable_alt_click is None:
             hoverable_alt_click = current["hoverableAltClick"]
+        if page_wrap_around is None:
+            page_wrap_around = current["pageWrapAround"]
         if selection_hold_ms is None:
             selection_hold_ms = current["selectionHoldMs"]
         if table_rows_per_page is None:
@@ -205,6 +210,7 @@ class SettingsStore:
                 "version": 8,
                 "updateCheckFrequency": update_check_frequency,
                 "hoverableAltClick": bool(hoverable_alt_click),
+                "pageWrapAround": bool(page_wrap_around),
                 "selectionHoldMs": selection_hold_ms,
                 "tableRowsPerPage": table_rows_per_page,
                 "panelGapPercent": panel_gap_percent,
@@ -232,6 +238,7 @@ class SettingsStore:
         clean = {
             "updateCheckFrequency": frequency,
             "hoverableAltClick": bool(current["hoverableAltClick"]),
+            "pageWrapAround": bool(current["pageWrapAround"]),
             "selectionHoldMs": max(150, min(2000, int(current["selectionHoldMs"]))),
             "tableRowsPerPage": max(5, min(40, int(current["tableRowsPerPage"]))),
             "panelGapPercent": max(0.25, min(4.0, float(current["panelGapPercent"]))),

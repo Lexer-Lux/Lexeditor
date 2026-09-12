@@ -61,6 +61,17 @@
   <header id="lexeditor-shell"></header>
   <main id="main"><div>Loading Bannerlord project…</div></main>
   <script src="/shared/framework.js"></script>
+  <script>
+    function bannerlordModLoaderSection(){
+      return LexeditorUI.modLoaderSection({
+        loader:"Bannerlord's native module loader. Lexeditor deploys the selected project as one module and launches the game with an explicit /singleplayer _MODULES_*...*_MODULES_ loadout.",
+        output:"Build + deploy writes this project's module-owned files under Bannerlord/Modules/<SubModule ID>; binaries remain MSBuild output and XML/GUI/ModuleData assets are synchronized by Lexeditor.",
+        order:"Lexeditor resolves the selected module's required dependency closure and declared load-order relations. Optional dependencies are not auto-enabled merely because they are installed.",
+        safety:"Deployment is additive, backs up overwritten module-owned files, excludes runtime override JSON, and does not edit Bannerlord's base-game files. Custom MSBuild targets still run with your user permissions.",
+        removal:"Stop launching the module and remove its deployed Modules/<SubModule ID> folder to uninstall it; the separate source project remains untouched."
+      });
+    }
+  </script>
   <script src="/bannerlord/editor_alerts.js"></script>
   <script src="/bannerlord/editor_core.js"></script>
   <script src="/bannerlord/editor_balancing.js"></script>

@@ -115,6 +115,7 @@
     ],
     activeTab:()=>state.tab,navigate,
     help:()=>navigate("datamap"),helpActive:()=>state.tab==="datamap",helpTitle:"Open the Bannerlord Data Map",
+    info:()=>navigate("deployment"),infoActive:()=>state.tab==="deployment",infoTitle:"Open Bannerlord deployment information",
     dirtyCount,readonly:()=>false,save
   });
 
