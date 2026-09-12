@@ -30,6 +30,8 @@ Lexeditor models tModLoader's scalar metadata plus these comma-delimited list pr
 - `sortAfter` and `sortBefore`;
 - `buildIgnore`.
 
+It also models the current boolean build switches `noCompile`, `playableOnPreview`, `translationMod`, `hideCode`, `hideResources` and `includeSource`. Missing boolean properties can be intentionally added from the editor instead of being permanently read-only.
+
 Structured writes preserve comments/no-equals lines, unknown or future properties, unrelated formatting, BOM state and line endings. Duplicate modeled keys fail closed. Reference edits enforce tModLoader's duplicate strong/weak-reference rule and the prohibition on duplicating a strong mod reference in `dllReferences`.
 
 Localized `displayName.<culture>` lines in `build.txt` remain preservation-only.
@@ -62,7 +64,7 @@ This editor is intentionally a preservation-safe subset, **not** a replacement f
 
 ## C# source editing
 
-The Source tab exposes project `.cs` files as raw UTF-8 text. It is deliberately **not a syntax-/semantic-aware C# model**: Lexeditor does not rewrite symbols, hooks, types or namespaces automatically.
+The Source tab exposes project `.cs` files as raw UTF-8 text. It remains the escape hatch for C# that is outside Lexeditor's structured model: Lexeditor does not attempt whole-file AST rewriting, symbol refactoring, hook migration or namespace refactoring.
 
 Source discovery and direct source API calls remain inside the selected project and reject generated/hidden trees. Reads reject malformed UTF-8, NUL content and oversized files. Saves use the SHA observed when the file was loaded, preserve UTF-8 BOM state, preserve an existing all-CRLF newline style despite browser textarea LF normalization, and replace atomically.
 
@@ -73,19 +75,39 @@ Lexeditor can:
 - rename/move a source file without overwrite and under a stale-SHA guard;
 - delete a source file under the same stale-SHA guard.
 
-Native Build Mod is blocked while metadata, localization or source text has unsaved changes.
+Native Build Mod is blocked while metadata, localization, source text or structured Content edits have unsaved changes.
 
-## Content scaffolds
+## Structured Content editor and scaffolds
 
-The Content tab provides deliberately conservative high-level starting points against the current stable tModLoader APIs:
+The Content tab is schema-driven and writes native tModLoader C#. Generated structured classes contain a clearly marked **Lexeditor-managed region**. Property edits regenerate only that region; author-written C# outside it is preserved. This gives common mod content a visual editor without claiming ownership of the entire C# file.
 
-- **ModItem** — creates `Content/Items/<Name>.cs`, standard en-US `DisplayName` and optional `Tooltip` localization, and a visible replaceable 16×16 PNG. Generated C# sets only `Item.width` and `Item.height`; damage, damage class, use behavior, rarity, value, recipes, sounds and other gameplay decisions are left to the author.
-- **ModSystem** — creates an empty `Common/Systems/<Name>.cs` class deriving from `ModSystem`.
-- **ModPlayer** — creates an empty `Common/Players/<Name>.cs` class deriving from `ModPlayer`.
+The managed editor currently supports **20 families**:
 
-Scaffolds never overwrite existing source/assets. The generated files immediately become ordinary Source/Localization/Assets entries for further editing.
+- **Core content:** `ModItem`, `ModNPC`, `ModProjectile`, `ModBuff`, simple 1×1 `ModTile`, and `ModWall`.
+- **Vanilla/global modifiers:** `GlobalItem`, `GlobalNPC`, `GlobalProjectile`, `GlobalBuff`, `GlobalTile`, and `GlobalWall`.
+- **Systems/content types:** `ModPrefix`, `ModRarity`, `ModBiome`, `ModSceneEffect`, `ModDust`, `ModConfig`, `ModCommand`, and recipe registration through a `ModSystem`.
 
-Gameplay-heavy structured generators such as ModNPC/ModProjectile/ModTile are intentionally not claimed yet; raw C# remains available for them.
+Representative structured behavior includes:
+
+- Item combat/use/tool/ammo/healing/placement/inventory fields.
+- NPC combat/AI/flags, structured natural-spawn conditions, and multiple simple vanilla/mod-item loot rules.
+- Projectile movement/combat/immunity/minion/network fields.
+- Buff player-stat effects and common static flags.
+- Tile/wall map, harvesting, drop and common behavior fields.
+- Target-bounded vanilla item/NPC/projectile/buff/tile/wall modifiers.
+- Prefix stat multipliers, rarity color, biome activation/music/priority/torch/campfire settings, and scene-effect activation/weight.
+- Typed `ModConfig` fields through a constrained `bool`/`int`/`float`/`string` DSL.
+- Commands with context/help/reply settings plus a preserved custom action hook.
+- `ModDust` behavior/spawn/draw settings with a replaceable native-shape 10×30 placeholder sprite sheet.
+- Recipe result/ingredient/station registration through a constrained safe DSL.
+
+Where a common advanced hook cannot be represented safely as simple fields, selected generators expose a preserved custom hook outside the managed region (for example biome/scene extra conditions and command actions) rather than accepting arbitrary C# inside structured values.
+
+Creation is no-overwrite and generates localization/assets where the native content type needs them. Biomes receive replaceable `_Icon` and `_Background` placeholders at their tModLoader default paths; ordinary textured content receives replaceable placeholders appropriate to its managed type.
+
+The earlier one-click **ModSystem** and **ModPlayer** empty scaffolds remain available. Raw Source remains available for everything else.
+
+Lexeditor intentionally does **not** pretend that all tModLoader behavior can be reduced to property forms. Custom AI/state machines, world generation, networking/packet protocols, complex multi-tiles/tile entities, mounts, accessory slots, custom draw layers, and interdependent water/background-style graphs remain author-controlled C# unless a future editor can model their lifecycle semantics safely.
 
 ## Asset management
 
@@ -130,7 +152,7 @@ Synthetic command/diagnostic tests do **not** count as installed-game acceptance
 
 tModLoader stores local packages under `<save-root>/Mods` and mirrors its enabled-mod set in `<save-root>/Mods/enabled.json`. Lexeditor reports the expected local `.tmod` and whether the selected mod name is present in that native enabled set.
 
-Missing `enabled.json` is treated as an empty enabled set, matching tModLoader behavior; malformed/unreadable state is surfaced rather than guessed. Lexeditor keeps `enabled.json` **read-only** because writing behind a running tModLoader process could diverge from tModLoader's cached state. Native `-build` remains responsible for normal post-build enabling.
+Missing `enabled.json` **or the JSON literal `null`** is treated as an empty enabled set, matching tModLoader behavior; malformed/unreadable state is surfaced rather than guessed. Lexeditor keeps `enabled.json` **read-only** because writing behind a running tModLoader process could diverge from tModLoader's cached state. Native `-build` remains responsible for normal post-build enabling.
 
 ## Loader / deployment model
 
@@ -139,7 +161,7 @@ Missing `enabled.json` is treated as an empty enabled set, matching tModLoader b
 - **Metadata:** preservation-safe structured `build.txt` editing.
 - **Localization:** supported single-line HJSON edit/create/delete subset, with complex grammar untouched.
 - **C# source:** project-bounded raw text create/edit/rename/delete.
-- **Content:** conservative ModItem/ModSystem/ModPlayer scaffolds plus raw Source for everything else.
+- **Content:** 20-family preservation-bounded structured Content editor, ModSystem/ModPlayer scaffolds, and raw Source for behavior outside the model.
 - **Assets:** known-format import/replace/rename/delete with preview where practical.
 - **Build:** native tModLoader `-build` with structured C# diagnostics plus raw logs.
 - **Runtime state:** report local package and native enabled state without rewriting it.
@@ -149,7 +171,7 @@ Missing `enabled.json` is treated as an empty enabled set, matching tModLoader b
 
 - `tModLoader/tModLoader` stable branch and ExampleMod — source/project/build/localization/content conventions (MIT).
 - tModLoader `LocalizationLoader` — culture/prefix inference and effective localization-key behavior.
-- tModLoader `ModItem`, `ModSystem` and `ModPlayer` APIs / ExampleMod — scaffold boundaries.
+- Current stable `ModItem`, `ModNPC`, `ModProjectile`, `ModBuff`, `ModTile`, `ModWall`, `GlobalItem`, `GlobalNPC`, `GlobalProjectile`, `GlobalBuff`, `GlobalTile`, `GlobalWall`, `ModPrefix`, `ModRarity`, `ModBiome`, `ModSceneEffect`, `ModDust`, `ModConfig`, `ModCommand`, `ModSystem` and `ModPlayer` APIs — structured/scaffold boundaries.
 - tModLoader `AssetInitializer` and `ContentConverters` — runtime asset readers/conversion behavior.
 - tModLoader `ModCompile` — resource packaging and native command-line build behavior.
 - tModLoader stable API docs/wiki — `ModSources`, localization and save-root conventions.
@@ -160,6 +182,6 @@ Automated parser/service/editor tests and synthetic native-build handoff tests a
 
 1. build a Lexeditor-created source project through the actual installed bootstrap;
 2. produce/expose the local `.tmod` in tModLoader;
-3. load representative Lexeditor-authored metadata, localization, C# and asset/content-scaffold changes in game.
+3. load representative Lexeditor-authored metadata, localization, C#, managed Content and asset changes in game.
 
 That installed-runtime acceptance is intentionally the remaining hard boundary.
