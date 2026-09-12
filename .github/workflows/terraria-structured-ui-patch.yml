@@ -35,7 +35,7 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git rm .github/workflows/terraria-structured-ui-patch.yml .github/scripts/terraria_structured_ui_patch.py .github/scripts/terraria_structured_ui_repair.py
+          git rm -f .github/workflows/terraria-structured-ui-patch.yml .github/scripts/terraria_structured_ui_patch.py .github/scripts/terraria_structured_ui_repair.py
           git add games/terraria/editor.html
           git commit -m 'Add Terraria structured content editor UI'
           git push origin HEAD:feature/terraria-plugin
