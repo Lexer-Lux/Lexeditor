@@ -2795,13 +2795,9 @@ body.lex-panel-layout-dragging * {
   display: none !important;
 }
 
-/* The panel ends where the pagination bar begins. The extra panel gap here
-   left a band of dead ground above the bar on every page that has one, while
-   the data-map view - which reserves the bar's height and nothing else - had
-   none, so the same bar sat differently from one plugin to the next. One rule,
-   and it is the bar's own measured height. */
+/* Reserve the fixed pagination bar and the same gap used beside panels. */
 body:has(.lex-pager) #main {
-  padding-bottom: var(--lex-pager-height, 56px) !important;
+  padding-bottom: calc(var(--lex-pager-height, 56px) + var(--lex-panel-gap)) !important;
 }
 
 .lex-pager-left,
