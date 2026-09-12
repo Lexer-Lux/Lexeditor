@@ -96,14 +96,6 @@ replace_once(
     "module POST containment",
 )
 
-memory = Path("codex/bannerlord/project-memory.md")
-replace_once(
-    memory,
-    '''- Read-only installed-module discovery remains compatible with legitimate mod-manager junctions where no write occurs.\n''',
-    '''- Read-only installed-module discovery remains compatible with legitimate mod-manager junctions where no write occurs. Project-source discovery is stricter: Data Map/file listings suppress individual source files that resolve outside the selected project, and the module API does not follow an out-of-root `SubModule.xml`.\n''',
-    "project-source discovery invariant",
-)
-
 Path("tests/test_bannerlord_discovery_containment.py").write_text(r'''from pathlib import Path
 import tempfile
 import unittest
