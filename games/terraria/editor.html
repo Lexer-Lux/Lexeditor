@@ -171,7 +171,7 @@
   function contentSchema(kind=contentKind){return contentSchemas.find(schema=>schema.kind===kind)||null}
   function schemaDefaults(kind){const schema=contentSchema(kind);return Object.fromEntries((schema?.fields||[]).map(field=>[field.name,clone(field.default)]))}
   function resetContentCreateValues(){contentCreateValues=schemaDefaults(contentKind)}
-  function localizedContentKind(kind){return ["item","npc","projectile","buff","tile","wall","prefix"].includes(kind)}
+  function localizedContentKind(kind){return ["item","npc","projectile","buff","tile","wall","prefix","biome"].includes(kind)}
   function describedContentKind(kind){return kind==="item"||kind==="buff"}
   function schemaFieldControl(field,values,onchange,disabled=false){
     const value=values[field.name]??field.default;

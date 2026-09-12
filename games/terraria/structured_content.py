@@ -99,13 +99,33 @@ SCHEMAS: dict[str, tuple[Field, ...]] = {
         Field("category", "Prefix category", "enum", "AnyWeapon", "ROLLING", options=("Melee", "Ranged", "Magic", "AnyWeapon", "Accessory", "Custom")), Field("rollChance", "Relative roll chance", "float", 1.0, "ROLLING", 0, 100000), Field("canRoll", "Can roll", "bool", True, "ROLLING"),
         Field("damageMult", "Damage multiplier", "float", 1.0, "STATS", 0, 1000), Field("knockBackMult", "Knockback multiplier", "float", 1.0, "STATS", 0, 1000), Field("useTimeMult", "Use-time multiplier", "float", 1.0, "STATS", 0.01, 1000), Field("scaleMult", "Scale multiplier", "float", 1.0, "STATS", 0.01, 1000), Field("shootSpeedMult", "Shoot-speed multiplier", "float", 1.0, "STATS", 0, 1000), Field("manaMult", "Mana-cost multiplier", "float", 1.0, "STATS", 0, 1000), Field("critBonus", "Critical chance bonus", "int", 0, "STATS", -1000, 1000), Field("valueMult", "Value multiplier", "float", 1.0, "VALUE", 0, 1000),
     ),
+    "rarity": (
+        Field("colorR", "Color red", "int", 255, "COLOR", 0, 255), Field("colorG", "Color green", "int", 255, "COLOR", 0, 255), Field("colorB", "Color blue", "int", 255, "COLOR", 0, 255),
+    ),
+    "biome": (
+        Field("enabled", "Enable biome condition", "bool", False, "ACTIVATION", help="Disabled biomes return false until you intentionally configure and enable them."),
+        Field("zone", "Vanilla biome condition", "enum", "Any", "ACTIVATION", options=("Any","Forest","Jungle","Snow","Desert","Beach","Dungeon","Corruption","Crimson","Hallow","Glowshroom")),
+        Field("depth", "Depth condition", "enum", "Any", "ACTIVATION", options=("Any","Sky","Overworld","DirtLayer","RockLayer","Underworld")),
+        Field("time", "Time condition", "enum", "Any", "ACTIVATION", options=("Any","Day","Night")), Field("hardmode", "Hardmode condition", "enum", "Any", "ACTIVATION", options=("Any","PreHardmode","Hardmode")), Field("rain", "Rain condition", "enum", "Any", "ACTIVATION", options=("Any","Raining","Dry")),
+        Field("music", "Music ID (-1 inherit)", "int", -1, "SCENE", -1, 100000), Field("priority", "Scene priority", "enum", "BiomeLow", "SCENE", options=("None","BiomeLow","BiomeMedium","BiomeHigh","Environment","Event","BossLow","BossMedium","BossHigh")), Field("mapBackground", "Use bestiary background on map", "bool", True, "SCENE"),
+        Field("torchItemType", "Biome torch item ID (-1 none)", "int", -1, "ITEMS", -1, 100000), Field("campfireItemType", "Biome campfire item ID (-1 none)", "int", -1, "ITEMS", -1, 100000),
+        Field("backgroundColorEnabled", "Tint bestiary background", "bool", False, "COLOR"), Field("backgroundR", "Background red", "int", 255, "COLOR", 0, 255), Field("backgroundG", "Background green", "int", 255, "COLOR", 0, 255), Field("backgroundB", "Background blue", "int", 255, "COLOR", 0, 255),
+    ),
+    "config": (
+        Field("scope", "Config scope", "enum", "ClientSide", "CONFIG", options=("ClientSide","ServerSide")), Field("reloadRequired", "All fields require reload", "bool", False, "CONFIG"),
+        Field("fields", "Config fields", "lines", "", "FIELDS", help="One per line: bool:EnableFeature=true, int:Count=5, float:Scale=1.25, string:Greeting=Hello."),
+    ),
+    "command": (
+        Field("command", "Command text", "text", "example", "COMMAND", help="Without the leading slash and without whitespace."), Field("commandType", "Command context", "enum", "Chat", "COMMAND", options=("Chat","Server","Console","World")), Field("caseSensitive", "Case sensitive arguments", "bool", False, "COMMAND"),
+        Field("usage", "Usage text (blank = automatic)", "text", "", "HELP"), Field("description", "Description", "text", "", "HELP"), Field("replyText", "Fixed reply text", "text", "", "ACTION"), Field("echoArguments", "Echo arguments", "bool", False, "ACTION"),
+    ),
     "recipe": (
         Field("resultKind", "Result type", "enum", "modItem", "RESULT", options=("modItem", "vanilla")), Field("resultName", "Result mod item class", "identifier", "", "RESULT"), Field("resultId", "Result vanilla item ID", "int", 0, "RESULT", 0, 100000), Field("resultStack", "Result stack", "int", 1, "RESULT", 1, 9999),
         Field("ingredients", "Ingredients", "lines", "", "RECIPE", help="One per line: vanilla:<id>=<stack> or mod:<ClassName>=<stack>."), Field("stations", "Crafting stations", "lines", "", "RECIPE", help="One per line: vanilla:<tileId> or mod:<TileClassName>."),
     ),
 }
 
-_LABELS = {"item":"ModItem","npc":"ModNPC","projectile":"ModProjectile","buff":"ModBuff","tile":"ModTile (simple 1×1)","wall":"ModWall","globalItem":"GlobalItem (vanilla modifier)","globalNPC":"GlobalNPC (vanilla modifier)","globalProjectile":"GlobalProjectile (vanilla modifier)","prefix":"ModPrefix","recipe":"Recipe"}
+_LABELS = {"item":"ModItem","npc":"ModNPC","projectile":"ModProjectile","buff":"ModBuff","tile":"ModTile (simple 1×1)","wall":"ModWall","globalItem":"GlobalItem (vanilla modifier)","globalNPC":"GlobalNPC (vanilla modifier)","globalProjectile":"GlobalProjectile (vanilla modifier)","prefix":"ModPrefix","rarity":"ModRarity","biome":"ModBiome","config":"ModConfig","command":"ModCommand","recipe":"Recipe"}
 
 def schemas_public() -> dict:
     return {"kinds":[{"kind":k,"label":_LABELS[k],"fields":[f.public() for f in v]} for k,v in SCHEMAS.items()]}
@@ -149,9 +169,15 @@ def validate_values(kind: str, values: object) -> dict[str, Any]:
     if kind=="recipe":
         if out["resultKind"]=="modItem" and not out["resultName"]: raise ValueError("Result mod item class is required")
         _parse_ingredients(out["ingredients"]); _parse_stations(out["stations"])
+    if kind=="config": _parse_config_fields(out["fields"])
+    if kind=="command":
+        out["command"]=out["command"].strip()
+        if not out["command"] or out["command"].startswith("/") or any(ch.isspace() for ch in out["command"]): raise ValueError("Command text must be non-empty, omit the slash, and contain no whitespace")
+        if any(ch in out[field] for field in ("usage","description","replyText") for ch in "\r\n\x00"): raise ValueError("Command help/reply text must fit on one line")
     return out
 
 def _b(v): return "true" if v else "false"
+def _cs(v): return json.dumps(str(v),ensure_ascii=False)
 def _f(v): return f"{int(v)}f" if v==int(v) else f"{v:.8g}f"
 def _meta(kind,name,values): return HEADER_PREFIX+json.dumps({"version":1,"kind":kind,"name":name,"values":values},sort_keys=True,separators=(",",":"))
 def _managed(lines): return "\n".join([BEGIN_MARKER,*(("    "+x) if x else "" for x in lines),END_MARKER])
@@ -244,6 +270,29 @@ def _render_prefix(v):
     if v['valueMult']!=1: out += ["","public override void ModifyValue(ref float valueMult)","{",f"    valueMult *= {_f(v['valueMult'])};","}"]
     return out
 
+def _parse_config_fields(text):
+    rows=[]
+    for n,raw in enumerate(text.splitlines(),1):
+        line=raw.strip()
+        if not line: continue
+        if ":" not in line or "=" not in line: raise ValueError(f"Config field line {n} must use type:Name=value")
+        type_name,rest=line.split(":",1); name,value=rest.split("=",1); type_name=type_name.strip(); name=validate_content_name(name.strip()); value=value.strip()
+        if type_name=="bool":
+            if value.casefold() not in {"true","false"}: raise ValueError(f"Config field line {n} bool default must be true or false")
+            parsed=value.casefold()=="true"
+        elif type_name=="int":
+            try: parsed=int(value)
+            except ValueError as e: raise ValueError(f"Config field line {n} integer default is invalid") from e
+        elif type_name=="float":
+            try: parsed=float(value)
+            except ValueError as e: raise ValueError(f"Config field line {n} float default is invalid") from e
+            if parsed!=parsed or parsed in (float("inf"),float("-inf")): raise ValueError(f"Config field line {n} float default must be finite")
+        elif type_name=="string": parsed=value
+        else: raise ValueError(f"Config field line {n} type must be bool, int, float, or string")
+        if any(existing[1]==name for existing in rows): raise ValueError(f"Config field name is duplicated: {name}")
+        rows.append((type_name,name,parsed))
+    return rows
+
 def _parse_ingredients(text):
     rows=[]
     for n,raw in enumerate(text.splitlines(),1):
@@ -282,6 +331,52 @@ def _parse_stations(text):
         rows.append((kind,value))
     return rows
 
+def _render_rarity(v):
+    return [f"public override Color RarityColor => new Color({v['colorR']}, {v['colorG']}, {v['colorB']});"]
+
+def _biome_condition(v):
+    if not v["enabled"]: return "false"
+    zone={"Any":None,"Forest":"player.ZoneForest","Jungle":"player.ZoneJungle","Snow":"player.ZoneSnow","Desert":"player.ZoneDesert","Beach":"player.ZoneBeach","Dungeon":"player.ZoneDungeon","Corruption":"player.ZoneCorrupt","Crimson":"player.ZoneCrimson","Hallow":"player.ZoneHallow","Glowshroom":"player.ZoneGlowshroom"}[v["zone"]]
+    depth={"Any":None,"Sky":"player.ZoneSkyHeight","Overworld":"player.ZoneOverworldHeight","DirtLayer":"player.ZoneDirtLayerHeight","RockLayer":"player.ZoneRockLayerHeight","Underworld":"player.ZoneUnderworldHeight"}[v["depth"]]
+    time={"Any":None,"Day":"Main.dayTime","Night":"!Main.dayTime"}[v["time"]]
+    hardmode={"Any":None,"PreHardmode":"!Main.hardMode","Hardmode":"Main.hardMode"}[v["hardmode"]]
+    rain={"Any":None,"Raining":"Main.raining","Dry":"!Main.raining"}[v["rain"]]
+    parts=[part for part in (zone,depth,time,hardmode,rain) if part]
+    parts.append("AdditionalCondition(player)")
+    return " && ".join(parts)
+
+def _render_biome(v):
+    out=[f"public override int Music => {v['music']};",f"public override SceneEffectPriority Priority => SceneEffectPriority.{v['priority']};",f"public override int BiomeTorchItemType => {v['torchItemType']};",f"public override int BiomeCampfireItemType => {v['campfireItemType']};"]
+    if v["mapBackground"]: out.append("public override string MapBackground => BackgroundPath;")
+    if v["backgroundColorEnabled"]: out.append(f"public override Color? BackgroundColor => new Color({v['backgroundR']}, {v['backgroundG']}, {v['backgroundB']});")
+    out += ["",f"public override bool IsBiomeActive(Player player) => {_biome_condition(v)};"]
+    return out
+
+def _config_literal(type_name,value):
+    if type_name=="bool": return _b(value)
+    if type_name=="int": return str(value)
+    if type_name=="float": return _f(value)
+    return _cs(value)
+
+def _render_config(v):
+    out=[f"public override ConfigScope Mode => ConfigScope.{v['scope']};"]
+    for type_name,name,value in _parse_config_fields(v["fields"]):
+        cs_type={"bool":"bool","int":"int","float":"float","string":"string"}[type_name]; literal=_config_literal(type_name,value)
+        out += [""]
+        if v["reloadRequired"]: out.append("[ReloadRequired]")
+        out += [f"[DefaultValue({literal})]",f"public {cs_type} {name} {{ get; set; }} = {literal};"]
+    return out
+
+def _render_command(v):
+    out=[f"public override string Command => {_cs(v['command'])};",f"public override CommandType Type => CommandType.{v['commandType']};",f"public override bool IsCaseSensitive => {_b(v['caseSensitive'])};"]
+    if v["usage"]: out.append(f"public override string Usage => {_cs(v['usage'])};")
+    if v["description"]: out.append(f"public override string Description => {_cs(v['description'])};")
+    out += ["","public override void Action(CommandCaller caller, string input, string[] args)","{"]
+    if v["replyText"]: out.append(f"    caller.Reply({_cs(v['replyText'])});")
+    if v["echoArguments"]: out.append('    caller.Reply(string.Join(" ", args));')
+    out.append("    CustomAction(caller, input, args);")
+    out += ["}"]; return out
+
 def _render_recipe(mod,v):
     result=str(v['resultId']) if v['resultKind']=='vanilla' else f"ModContent.ItemType<global::{mod}.Content.Items.{v['resultName']}>()"
     out=["public override void AddRecipes()","{",f"    Recipe recipe = Recipe.Create({result}, {v['resultStack']});"]
@@ -294,7 +389,7 @@ def _render_recipe(mod,v):
     out += ["    recipe.Register();","}"]; return out
 
 def _render_region(mod,kind,v):
-    return {'item':lambda:_render_item(v),'npc':lambda:_render_npc(mod,v),'projectile':lambda:_render_projectile(v),'buff':lambda:_render_buff(v),'tile':lambda:_render_tile(mod,v),'wall':lambda:_render_wall(mod,v),'globalItem':lambda:_render_global_item(v),'globalNPC':lambda:_render_global_npc(v),'globalProjectile':lambda:_render_global_projectile(v),'prefix':lambda:_render_prefix(v),'recipe':lambda:_render_recipe(mod,v)}[kind]()
+    return {'item':lambda:_render_item(v),'npc':lambda:_render_npc(mod,v),'projectile':lambda:_render_projectile(v),'buff':lambda:_render_buff(v),'tile':lambda:_render_tile(mod,v),'wall':lambda:_render_wall(mod,v),'globalItem':lambda:_render_global_item(v),'globalNPC':lambda:_render_global_npc(v),'globalProjectile':lambda:_render_global_projectile(v),'prefix':lambda:_render_prefix(v),'rarity':lambda:_render_rarity(v),'biome':lambda:_render_biome(v),'config':lambda:_render_config(v),'command':lambda:_render_command(v),'recipe':lambda:_render_recipe(mod,v)}[kind]()
 
 def _kind_spec(kind,name):
     return {
@@ -308,15 +403,25 @@ def _kind_spec(kind,name):
         'globalNPC':(f"Common/GlobalNPCs/{name}.cs",'GlobalNPC',('Terraria','Terraria.ModLoader')),
         'globalProjectile':(f"Common/GlobalProjectiles/{name}.cs",'GlobalProjectile',('Terraria','Terraria.ModLoader')),
         'prefix':(f"Content/Prefixes/{name}.cs",'ModPrefix',('Terraria','Terraria.ModLoader')),
+        'rarity':(f"Content/Rarities/{name}.cs",'ModRarity',('Microsoft.Xna.Framework','Terraria.ModLoader')),
+        'biome':(f"Content/Biomes/{name}.cs",'ModBiome',('Microsoft.Xna.Framework','Terraria','Terraria.ModLoader')),
+        'config':(f"Common/Configs/{name}.cs",'ModConfig',('System.ComponentModel','Terraria.ModLoader.Config')),
+        'command':(f"Common/Commands/{name}.cs",'ModCommand',('Terraria.ModLoader',)),
         'recipe':(f"Common/Recipes/{name}.cs",'ModSystem',('Terraria','Terraria.ModLoader')),
     }[kind]
 
 def _namespace(mod,kind):
-    return {'item':f'{mod}.Content.Items','npc':f'{mod}.Content.NPCs','projectile':f'{mod}.Content.Projectiles','buff':f'{mod}.Content.Buffs','tile':f'{mod}.Content.Tiles','wall':f'{mod}.Content.Walls','globalItem':f'{mod}.Common.GlobalItems','globalNPC':f'{mod}.Common.GlobalNPCs','globalProjectile':f'{mod}.Common.GlobalProjectiles','prefix':f'{mod}.Content.Prefixes','recipe':f'{mod}.Common.Recipes'}[kind]
+    return {'item':f'{mod}.Content.Items','npc':f'{mod}.Content.NPCs','projectile':f'{mod}.Content.Projectiles','buff':f'{mod}.Content.Buffs','tile':f'{mod}.Content.Tiles','wall':f'{mod}.Content.Walls','globalItem':f'{mod}.Common.GlobalItems','globalNPC':f'{mod}.Common.GlobalNPCs','globalProjectile':f'{mod}.Common.GlobalProjectiles','prefix':f'{mod}.Content.Prefixes','rarity':f'{mod}.Content.Rarities','biome':f'{mod}.Content.Biomes','config':f'{mod}.Common.Configs','command':f'{mod}.Common.Commands','recipe':f'{mod}.Common.Recipes'}[kind]
+
+def _custom_tail(kind):
+    if kind=="biome": return "    private bool AdditionalCondition(Player player) => true;"
+    if kind=="command": return "    private void CustomAction(CommandCaller caller, string input, string[] args)\n    {\n    }"
+    return ""
 
 def render_structured_source(mod_name,kind,name,values):
     mod_name=validate_content_name(mod_name); name=validate_content_name(name); v=validate_values(kind,values); _,base,usings=_kind_spec(kind,name)
-    return ''.join(f"using {x};\n" for x in usings)+"\n"+_meta(kind,name,v)+"\n"+f"namespace {_namespace(mod_name,kind)};\n\npublic sealed class {name} : {base}\n{{\n"+_managed(_render_region(mod_name,kind,v))+"\n}\n"
+    tail=_custom_tail(kind); suffix=("\n\n"+tail if tail else "")
+    return ''.join(f"using {x};\n" for x in usings)+"\n"+_meta(kind,name,v)+"\n"+f"namespace {_namespace(mod_name,kind)};\n\npublic sealed class {name} : {base}\n{{\n"+_managed(_render_region(mod_name,kind,v))+suffix+"\n}\n"
 
 def _parse_header(text):
     hits=[]
@@ -369,6 +474,7 @@ def _loc_plan(mod,kind,name,display,desc):
     if kind=='tile': return {f"Mods.{mod}.Tiles.{name}.MapEntry":display}
     if kind=='wall': return {f"Mods.{mod}.Walls.{name}.MapEntry":display}
     if kind=='prefix': return {f"Mods.{mod}.Prefixes.{name}.DisplayName":display}
+    if kind=='biome': return {f"Mods.{mod}.Biomes.{name}.DisplayName":display}
     return {}
 
 def _initial_loc(mod): return f"# tModLoader may add generated localization entries here after build/reload.\nMods: {{\n\t{mod}: {{\n\t}}\n}}\n"
@@ -390,9 +496,13 @@ def create_structured_content(root,kind,name,values,display_name='',description=
     if not isinstance(description,str) or any(c in description for c in '\r\n\x00'): raise ValueError("Description must fit on one line")
     display=display_name.strip() or default_display_name(name); desc=description.strip(); v=validate_values(kind,values); source_relative,_,_=_kind_spec(kind,name); source_target=project/source_relative
     if source_target.exists(): raise ValueError(f"C# source file already exists: {source_relative}")
-    needs_texture=kind in {'item','npc','projectile','buff','tile','wall'}; texture_relative=source_relative[:-3]+'.png'; texture_target=project/texture_relative
-    if needs_texture and texture_target.exists(): raise ValueError(f"Asset file already exists: {texture_relative}")
-    loc_target=project/'Localization'/'en-US.hjson'; creates=_loc_plan(mod,kind,name,display,desc); loc_existed=loc_target.is_file(); loc_original=loc_target.read_bytes() if loc_existed else b''; loc_written=src_written=tex_written=False; texture_state=None
+    primary_texture=kind in {'item','npc','projectile','buff','tile','wall'}
+    asset_specs=[]
+    if primary_texture: asset_specs.append((source_relative[:-3]+'.png',32 if kind=='buff' else 16))
+    if kind=='biome': asset_specs += [(f'Content/Biomes/{name}_Icon.png',30),(f'Content/Biomes/{name}_Background.png',64)]
+    for asset_relative,_size in asset_specs:
+        if (project/asset_relative).exists(): raise ValueError(f"Asset file already exists: {asset_relative}")
+    loc_target=project/'Localization'/'en-US.hjson'; creates=_loc_plan(mod,kind,name,display,desc); loc_existed=loc_target.is_file(); loc_original=loc_target.read_bytes() if loc_existed else b''; loc_written=src_written=False; created_assets=[]; texture_state=None
     if creates:
         loc_target.parent.mkdir(parents=True,exist_ok=True)
         if loc_existed:
@@ -403,8 +513,9 @@ def create_structured_content(root,kind,name,values,display_name='',description=
         changed=apply_localization_changes(loc_text,{},creates); loc_bytes=(UTF8_BOM if bom else b'')+changed.encode('utf-8')
     try:
         source_state=create_source(project,source_relative,render_structured_source(mod,kind,name,v)); src_written=True
-        if needs_texture:
-            texture_state=create_asset(project,texture_relative,placeholder_png(32 if kind=='buff' else 16)); tex_written=True
+        for asset_relative,size in asset_specs:
+            created_assets.append(create_asset(project,asset_relative,placeholder_png(size)))
+        if primary_texture and created_assets: texture_state=created_assets[0]
         if creates:
             if loc_existed: _atomic(loc_target,loc_bytes)
             else:
@@ -414,7 +525,7 @@ def create_structured_content(root,kind,name,values,display_name='',description=
         if loc_written:
             if loc_existed: _atomic(loc_target,loc_original)
             else: loc_target.unlink(missing_ok=True)
-        if tex_written: texture_target.unlink(missing_ok=True)
+        for asset in reversed(created_assets): (project/asset['path']).unlink(missing_ok=True)
         if src_written: source_target.unlink(missing_ok=True)
         raise
-    result=structured_content_state(project,source_relative); result.update({'displayName':display,'description':desc,'texture':texture_state,'localizationPath':'Localization/en-US.hjson' if creates else None,'localizationKeys':list(creates)}); return result
+    result=structured_content_state(project,source_relative); result.update({'displayName':display,'description':desc,'texture':texture_state,'assets':created_assets,'localizationPath':'Localization/en-US.hjson' if creates else None,'localizationKeys':list(creates)}); return result
