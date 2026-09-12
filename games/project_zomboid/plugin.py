@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
+import tempfile
 from pathlib import Path
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
-from service_session import LocalPluginSession
+from service_session import LocalPluginSession, request_json
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -85,6 +87,79 @@ def launch() -> int:
     return run_host({"project-zomboid": PLUGIN}, "project-zomboid")
 
 
+def smoke() -> list[str]:
+    """Exercise one synthetic Build 42 edit/deploy slice without touching user data."""
+    with tempfile.TemporaryDirectory(prefix="lexeditor-project-zomboid-") as temp_name:
+        temp = Path(temp_name)
+        project = temp / "Lexeditor Zomboid Smoke"
+        shutil.copytree(TEMPLATE_ROOT, project)
+        initialize_project(project)
+        script = project / "42" / "media" / "scripts" / "smoke.txt"
+        script.write_text(
+            "module LexSmoke\n"
+            "{\n"
+            "    item TestItem\n"
+            "    {\n"
+            "        DisplayCategory = Tool,\n"
+            "        ItemType = base:normal,\n"
+            "        Weight = 0.3,\n"
+            "        Icon = Radio,\n"
+            "        UnknownFutureField = KeepMe,\n"
+            "    }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        user_root = temp / "Zomboid"
+        environment = {
+            "LEXEDITOR_PROJECT_ZOMBOID_PROJECT": str(project),
+            "LEXEDITOR_PROJECT_ZOMBOID_USER_ROOT": str(user_root),
+        }
+        with ProjectZomboidSession(environment) as session:
+            identity = request_json(session.url + "api/plugin")
+            if identity.get("pluginId") != "project-zomboid":
+                raise RuntimeError("Project Zomboid service reported the wrong plugin identity")
+            metadata = request_json(session.url + "api/mod-info")
+            if metadata.get("fields", {}).get("id") != "Lexeditor_Zomboid_Smoke":
+                raise RuntimeError("Synthetic Build 42 mod.info was not initialized")
+            items = request_json(session.url + "api/items").get("rows", [])
+            if len(items) != 1 or items[0].get("fullType") != "LexSmoke.TestItem":
+                raise RuntimeError("Synthetic Build 42 item was not parsed")
+            row = items[0]
+            saved = request_json(session.url + "api/items/save", {
+                "path": row["path"],
+                "module": row["module"],
+                "id": row["id"],
+                "sha256": row["sha256"],
+                "edits": {"Weight": "0.5"},
+            })
+            if saved.get("fields", {}).get("Weight") != "0.5":
+                raise RuntimeError("Synthetic item edit did not read back")
+            if "UnknownFutureField = KeepMe," not in script.read_text(encoding="utf-8"):
+                raise RuntimeError("Synthetic item edit did not preserve unknown script data")
+            mapped = request_json(session.url + "api/datamap").get("rows", [])
+            if not any(row.get("filename") == "42/media/scripts/smoke.txt" for row in mapped):
+                raise RuntimeError("Project Zomboid Data Map omitted the synthetic script")
+            deployed = request_json(session.url + "api/deploy", {})
+            target = Path(deployed.get("target", ""))
+            if not deployed.get("owned") or not (target / "42" / "mod.info").is_file():
+                raise RuntimeError("Synthetic local mod deployment was not owned and readable")
+            removed = request_json(session.url + "api/undeploy", {})
+            if removed.get("deployed") or target.exists():
+                raise RuntimeError("Synthetic local mod deployment was not removed")
+        if not session.process or session.process.poll() is None:
+            raise RuntimeError("Project Zomboid child service still runs after host shutdown")
+        if not session.wait_closed():
+            raise RuntimeError("Project Zomboid child port is still open after host shutdown")
+    return [
+        "Project Zomboid plugin identity confirmed",
+        "synthetic Build 42 mod.info initialized",
+        "Build 42 item parsed, edited and reopened with unknown data preserved",
+        "Data Map exposed the representative script",
+        "local native-mod deployment and ownership-safe revert succeeded",
+        "host-owned child service stopped cleanly",
+    ]
+
+
 PLUGIN = GamePlugin(
     plugin_id="project-zomboid",
     name="Project Zomboid",
@@ -93,6 +168,7 @@ PLUGIN = GamePlugin(
     accent="#708057",
     check=check,
     launch=launch,
+    smoke=smoke,
     session_factory=ProjectZomboidSession,
     process_names=("ProjectZomboid64.exe",),
     projects=ModProjectSpec(
