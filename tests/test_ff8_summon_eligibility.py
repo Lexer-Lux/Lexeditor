@@ -79,3 +79,24 @@ class DisabledCommandMechanism(unittest.TestCase):
         self.assertEqual(battle.COMMAND_DENIED_SOUND, 5)
         self.assertEqual(battle.COMMAND_DISABLED_SITES[0x004BCA45],
                          bytes([0x6A, battle.COMMAND_DENIED_SOUND]))
+
+    def test_the_entry_layout_is_read_from_the_executable(self):
+        image = self._executable()
+        offset = lambda va: 0x1000 + (va - 0x401000)
+        for address, expected in battle.COMMAND_ENTRY_SITES.items():
+            actual = image[offset(address):offset(address) + len(expected)]
+            self.assertEqual(actual, expected, f"{address:08X}")
+
+    def test_the_entry_pointer_is_the_one_the_renderer_loads(self):
+        # 8B 1D <dword> is mov ebx, [address]; the dword is the entry pointer.
+        load = battle.COMMAND_ENTRY_SITES[0x004BCEE9]
+        self.assertEqual(load[:2], bytes([0x8B, 0x1D]))
+        self.assertEqual(int.from_bytes(load[2:6], "little"),
+                         battle.COMMAND_ENTRY_POINTER)
+
+    def test_the_menu_state_table_is_recorded_as_not_the_command_list(self):
+        # It dispatches on a state byte, not on a command, and reading it as a
+        # command table is the wrong turn this note exists to prevent.
+        self.assertEqual(battle.BATTLE_MENU_STATE_TABLE, 0x004BC704)
+        self.assertNotEqual(battle.BATTLE_MENU_STATE_TABLE,
+                            battle.COMMAND_ENTRY_POINTER)

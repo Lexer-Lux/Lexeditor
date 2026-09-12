@@ -243,9 +243,17 @@
     index 0 into the text renderer at 004A7250. Both behaviours the request
     asks for are already there for any command whose flag is set, and the bytes
     at all four sites are asserted against the installed executable.
-  * What is left: find the GF command entry as the menu builds it, set that bit
-    when the acting character has no junctioned GF, and put the sentence on the
-    refusal instead of only the sound.
+  * The entry layout is read out of the executable too. The renderer's caller
+    loads the current command from the pointer at 1D76838, reads its id from
+    the first byte and asks the name lookup at 0047EBD0 for a string, and the
+    select path refuses id zero as well as the flag. So an entry is an id at +0
+    and flags at +3.
+  * Recorded as a dead end so nobody repeats it: the jump table at 004BC704 is
+    the battle menu's own state machine, dispatched on the byte at 1D7685B and
+    bounded to 0x18. It is not the command list.
+  * What is left: the GF command's id, and the pass over the menu that sets the
+    flag when the acting character has no junctioned GF. Putting the sentence
+    on the refusal, rather than only the sound, is the last piece.
 
 ## Loot Tables
 

@@ -64,8 +64,9 @@ CARD_FILTER_CAVE = 0x027A1380
 
 BLOCKERS = (
     "GF Magic still needs the verified Magic-list builder and a defined GF-to-spell map.",
-    "Greying Summon needs the GF command entry found and its disabled flag set; "
-    "the greying and the refusal are FF8's own, at the addresses recorded above.",
+    "Greying Summon needs the GF command's id, and the menu pass that sets its "
+    "disabled flag. The entry layout, the flag and both behaviours it drives "
+    "are recorded above and asserted against the installed executable.",
 )
 
 
@@ -380,6 +381,35 @@ COMMAND_DISABLED_SITES = {
 COMMAND_DENIED_SOUND = 5
 COMMAND_TEXT_RENDERER = 0x004A7250
 COMMAND_SELECT_DISABLED_BRANCH = 0x004BCA45
+
+# The entry itself. The renderer's caller loads the current command from a
+# pointer in memory, reads its id from the first byte, and asks the name
+# lookup for a string:
+#
+#   004BCEE9  8B 1D 38 68 D7 01   mov ebx, [1D76838]      the entry
+#   004BCEFC  8A 03               mov al, [ebx]           its id
+#   004BCEFE  50 E8 ...           push eax; call 0047EBD0 its name
+#
+# and the select path refuses id zero as well as the disabled flag:
+#
+#   004BC7C4  8A 03 84 C0         mov al, [ebx]; test al, al
+#
+# So an entry is: id at +0, flags at +3, and bit 1 of those flags is what
+# greys it and refuses the press.
+COMMAND_ENTRY_POINTER = 0x01D76838
+COMMAND_ID_OFFSET = 0
+COMMAND_NAME_LOOKUP = 0x0047EBD0
+COMMAND_ENTRY_SITES = {
+    0x004BCEE9: bytes.fromhex("8B 1D 38 68 D7 01"),
+    0x004BCEFC: bytes.fromhex("8A 03"),
+    0x004BC7C4: bytes.fromhex("8A 03 84 C0"),
+}
+
+# Not the command list: the jump table at 004BC704 is the battle menu's own
+# state machine, dispatched on [1D7685B] and bounded to 0x18. Recorded so the
+# next person does not spend the afternoon reading it the way this one did.
+BATTLE_MENU_STATE_TABLE = 0x004BC704
+BATTLE_MENU_STATE_BYTE = 0x01D7685B
 
 
 def summon_command_available(*, junctioned_gf_count: int) -> bool:
