@@ -1,6 +1,7 @@
 """Stardew Valley PC / Content Patcher plugin lifecycle."""
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 from pathlib import Path
@@ -10,6 +11,7 @@ from service_session import LocalPluginSession, request_json
 
 from . import paths
 from .content_pack import ContentPackStore, deploy, initialize_project
+from .source_data import objects_source_path
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
 
@@ -38,12 +40,21 @@ def launch() -> int:
 
 
 def smoke() -> list[str]:
-    """Exercise project patch preservation, service identity, and safe deployment."""
+    """Exercise base-data reads, project preservation, service identity, and safe deployment."""
     with tempfile.TemporaryDirectory(prefix="lexeditor-stardew-") as name:
         root = Path(name); game = root / "game"; project = root / "project"
-        (game / "Content").mkdir(parents=True)
+        (game / "Content" / "Data").mkdir(parents=True)
+        (game / "Content" / "Data" / "Objects.xnb").write_bytes(b"read-only fixture")
         (game / "Stardew Valley.exe").write_bytes(b"fixture")
         (game / "StardewModdingAPI.exe").write_bytes(b"fixture")
+        source = objects_source_path(game); source.parent.mkdir(parents=True)
+        source.write_text(json.dumps({
+            "390": {
+                "Name": "Stone", "DisplayName": "Stone", "Description": "A useful material.",
+                "Price": 2, "Edibility": -300, "IsDrink": False,
+            }
+        }) + "\n", encoding="utf-8")
+        source_before = source.read_bytes()
         cp = game / "Mods" / "Content Patcher"; cp.mkdir(parents=True)
         (cp / "manifest.json").write_text('{"UniqueID":"Pathoschild.ContentPatcher"}\n', encoding="utf-8")
         shutil.copytree(paths.PROJECT_TEMPLATE_ROOT, project)
@@ -67,16 +78,22 @@ def smoke() -> list[str]:
             if "data-map" not in identity.get("capabilities", []):
                 raise RuntimeError("Stardew Valley service did not expose Data Map")
             objects = request_json(session.url + "api/objects")
-            if objects["rows"][0]["fields"]["Price"] != 77:
-                raise RuntimeError("Stardew Valley service did not reopen the object patch")
+            row = next((value for value in objects.get("rows", []) if value.get("id") == "390"), None)
+            if row is None or row["baseFields"]["Price"] != 2 or row["fields"]["Price"] != 77:
+                raise RuntimeError("Stardew Valley service did not merge vanilla values with the object patch")
+            if not objects.get("baseSource", {}).get("available"):
+                raise RuntimeError("Stardew Valley service did not expose the unpacked vanilla source")
             data_map = request_json(session.url + "api/datamap")
-            if not any(row.get("target") == "objects" and row.get("coverage") == "structured"
-                       for row in data_map.get("rows", [])):
-                raise RuntimeError("Stardew Valley Data Map omitted structured object patch coverage")
+            map_row = next((row for row in data_map.get("rows", []) if row.get("target") == "objects"), None)
+            if not map_row or map_row.get("coverage") != "structured" or not map_row.get("sourceAvailable"):
+                raise RuntimeError("Stardew Valley Data Map omitted evidence-backed object source coverage")
+        if source.read_bytes() != source_before:
+            raise RuntimeError("Stardew Valley vanilla source data changed during the smoke path")
         if not session.wait_closed():
             raise RuntimeError("Stardew Valley child port is still open after host shutdown")
     return [
         "Stardew Valley managed plugin identity confirmed",
+        "read-only StardewXnbHack Data/Objects source merged with project overrides",
         "Content Patcher Data/Objects field edit saved and reopened",
         "unknown content.json structure preserved by project-only editing",
         "SMAPI/Content Patcher deployment created a managed mod folder",
