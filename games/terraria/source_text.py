@@ -27,6 +27,10 @@ def source_target(root: Path, relative: str) -> Path:
     return target
 
 
+def _relative_parts(root: Path, target: Path) -> tuple[str, ...]:
+    return target.relative_to(Path(root).resolve()).parts
+
+
 def _read_source(root: Path, relative: str) -> tuple[Path, bytes, str, str]:
     project = Path(root).resolve()
     target = source_target(project, relative)
@@ -90,6 +94,38 @@ def source_file_state(root: Path, relative: str) -> dict:
     }
 
 
+def _validate_source_text(text: object) -> str:
+    if not isinstance(text, str):
+        raise ValueError("C# source content must be text")
+    if "\x00" in text:
+        raise ValueError("C# source content contains NUL bytes")
+    encoded = text.encode("utf-8")
+    if len(encoded) > MAX_SOURCE_FILE:
+        raise ValueError("C# source file is too large for text editing")
+    return text
+
+
+def create_source(root: Path, relative: str, text: object = "") -> dict:
+    """Create one new UTF-8 .cs file without overwriting existing project data."""
+    project = Path(root).resolve()
+    if not project.is_dir():
+        raise ValueError("Terraria source project does not exist")
+    target = source_target(project, relative)
+    parts = _relative_parts(project, target)
+    if IGNORED_PARTS.intersection(parts):
+        raise ValueError("C# source path is inside an ignored/generated folder")
+    normalized = _validate_source_text(text).replace("\r\n", "\n").replace("\r", "\n")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with target.open("xb") as handle:
+            handle.write(normalized.encode("utf-8"))
+            handle.flush()
+            os.fsync(handle.fileno())
+    except FileExistsError as error:
+        raise ValueError(f"C# source file already exists: {target.relative_to(project).as_posix()}") from error
+    return source_file_state(project, target.relative_to(project).as_posix())
+
+
 def _match_original_newlines(original: str, replacement: str) -> str:
     normalized = replacement.replace("\r\n", "\n").replace("\r", "\n")
     if "\r\n" in original and original.count("\n") == original.count("\r\n"):
@@ -117,12 +153,9 @@ def save_source(root: Path, relative: str, text: object, expected_sha256: str) -
     current_sha = sha256(data).hexdigest()
     if expected_sha256 != current_sha:
         raise ValueError(f"{canonical} changed outside Lexeditor; reload before saving")
-    if not isinstance(text, str):
-        raise ValueError("C# source content must be text")
-    if "\x00" in text:
-        raise ValueError("C# source content contains NUL bytes")
+    normalized = _validate_source_text(text)
 
-    changed = _match_original_newlines(original, text)
+    changed = _match_original_newlines(original, normalized)
     if changed == original:
         return source_file_state(root, canonical)
     encoded = (UTF8_BOM if data.startswith(UTF8_BOM) else b"") + changed.encode("utf-8")
