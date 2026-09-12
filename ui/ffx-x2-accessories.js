@@ -86,6 +86,15 @@
     }
   }
 
+  function renderSummary(row) {
+    const count = dirtyCount();
+    $('x2-accessory-save').disabled = count === 0;
+    $('x2-accessory-summary').textContent =
+      `Accessory ${row.id} (${hex(row.id)}) · icon ${row.icon} · ` +
+      `name ref ${hex(row.nameOffset)}/${hex(row.nameKey)} · help ref ${hex(row.helpOffset)}/${hex(row.helpKey)} · ` +
+      `${state.source === 'project' ? 'staged X-2 project override' : 'installed FFX-2 VBF'}${count ? ` · ${count} unsaved field(s)` : ''}`;
+  }
+
   function render() {
     const row = selected();
     if (!row) {
@@ -107,12 +116,7 @@
       )
     ];
     $('x2-accessory-fields').innerHTML = cards.join('');
-    const count = dirtyCount();
-    $('x2-accessory-save').disabled = count === 0;
-    $('x2-accessory-summary').textContent =
-      `Accessory ${row.id} (${hex(row.id)}) · icon ${row.icon} · ` +
-      `name ref ${hex(row.nameOffset)}/${hex(row.nameKey)} · help ref ${hex(row.helpOffset)}/${hex(row.helpKey)} · ` +
-      `${state.source === 'project' ? 'staged X-2 project override' : 'installed FFX-2 VBF'}${count ? ` · ${count} unsaved field(s)` : ''}`;
+    renderSummary(row);
   }
 
   async function refresh() {
@@ -143,8 +147,7 @@
       const label = abilityCard.querySelector('.ffxx2-hex');
       if (label) label.textContent = hex(row.abilityIds[slot]);
     }
-    $('x2-accessory-save').disabled = false;
-    render();
+    renderSummary(row);
   }
 
   async function save() {
