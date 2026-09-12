@@ -1847,12 +1847,12 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const label=`${state.data.refine.tables.find(table=>table.id===row.table)?.name||row.table} ${row.id+1}`;
     const recipeFields=["input","output"].flatMap(side=>{
       const field=`${side}Id`,quantity=`${side}Quantity`,apply=value=>setRefineEntity(row,side,value);
-      return [detailField({label:side==="input"?"INPUT":"OUTPUT",control:refineSource(refineEntityControl(row,side),row,field,apply,value=>refineChoice(row[`${side}Type`],value))}),detailField({label:side==="input"?"NEEDED":"RECEIVED",dataType:"INT",min:0,max:255,control:refineSource(numberControl(row[quantity],0,255,1,value=>{row[quantity]=value;shell.refresh()},{"aria-label":`${side} quantity for refine recipe`}),row,quantity,value=>{row[quantity]=Number(value);shell.refresh()})})];
+      return [detailField({label:side==="input"?"INPUT":"OUTPUT",pin:prefs?.pinButton(`${side}Name`,side==="input"?"Input":"Output"),control:refineSource(refineEntityControl(row,side),row,field,apply,value=>refineChoice(row[`${side}Type`],value))}),detailField({label:side==="input"?"NEEDED":"RECEIVED",pin:prefs?.pinButton(quantity,side==="input"?"Needed":"Received"),dataType:"INT",min:0,max:255,control:refineSource(numberControl(row[quantity],0,255,1,value=>{row[quantity]=value;shell.refresh()},{"aria-label":`${side} quantity for refine recipe`}),row,quantity,value=>{row[quantity]=Number(value);shell.refresh()})})];
     });
     return sharedDetail({...row,id:row.id+1,name:label},prefs,[
       ...recipeFields,
-      detailField({label:"RECIPE TEXT",help:infoHelp("Message shown in the game for this recipe. Update it when you change the ingredients or quantities; it does not set the conversion itself."),control:refineSource(text,row,"text",value=>row.text=String(value??""))}),
-      detailField({label:"UNKNOWN",help:infoHelp("This preserved 16-bit value has no proved gameplay meaning, so it is read-only."),control:readonlyField(row.unknown)})
+      detailField({label:"RECIPE TEXT",pin:prefs?.pinButton("text","Recipe text"),help:infoHelp("Message shown in the game for this recipe. Update it when you change the ingredients or quantities; it does not set the conversion itself."),control:refineSource(text,row,"text",value=>row.text=String(value??""))}),
+      detailField({label:"UNKNOWN",pin:prefs?.pinButton("unknown","Unknown"),help:infoHelp("This preserved 16-bit value has no proved gameplay meaning, so it is read-only."),control:readonlyField(row.unknown)})
     ],"refine-detail");
   }
   function renderRefine(){
@@ -1860,7 +1860,12 @@ template=tier?"40px minmax(62px,.72fr) minmax(96px,1.28fr) 60px":"90px 58px minm
     const columns=[
       {key:"id",label:"ID",width:"58px",render:row=>row.id+1},
       {key:"groupName",label:"ABILITY",width:"minmax(120px,.65fr)",headerTitle:"Refine ability",render:row=>el("span",{title:row.groupDescription},row.groupName)},
-      {key:"name",label:"RECIPE",width:"minmax(180px,1fr)",render:row=>el("span",{title:`${row.inputName} → ${row.outputName}`},`${row.inputName} → ${row.outputName}`)}
+      {key:"name",label:"RECIPE",width:"minmax(180px,1fr)",render:row=>el("span",{title:`${row.inputName} → ${row.outputName}`},`${row.inputName} → ${row.outputName}`)},
+      ...[
+        ["inputName","Input"],["inputQuantity","Needed"],
+        ["outputName","Output"],["outputQuantity","Received"],
+        ["text","Recipe text"],["unknown","Unknown"]
+      ].map(([key,label])=>({key,label,pinned:false,numeric:key.endsWith("Quantity")||key==="unknown",width:key.endsWith("Quantity")||key==="unknown"?"80px":"minmax(120px,1fr)"}))
     ];
     delete state.columnPrefs.refine;showPaged("refine",visible,columns,refineDetail,"36px minmax(50px,.65fr) minmax(60px,1fr)",{defaultSplit:55,minLeft:210,minRight:430,maxBarrels:5});
     const content=$("#main").firstElementChild,tabs=subtabBar({className:"refine-tabs",tabs:state.data.refine.tables.map(table=>({id:table.id,label:table.name})),active:state.refineTab,label:"Refine recipe tables",change:value=>{state.refineTab=value;state.pages.refine=0;state.selected.refine=null;renderRefine()}});$("#main").replaceChildren(el("div",{class:"refine-view"},tabs,content));

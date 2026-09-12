@@ -31,7 +31,26 @@ def main():
   assert len(boxes)==6 and max(boxes)-min(boxes)<2,boxes
   p.locator('textarea').fill('Changed recipe text')
   assert p.evaluate('row.text')=='Changed recipe text'
+  p.evaluate("""() => {
+    window.renderPins = () => {
+      window.prefs = LexeditorUI.columnPreferences('ff8-refine-fixture',columns,window.renderPins);
+      document.querySelector('#list').replaceChildren(columnList({rows:[row],columns,columnPreferences:window.prefs,key:r=>r.id}));
+      document.querySelector('#detail').replaceChildren(refineDetail(row,window.prefs));
+    };
+    window.renderPins();
+  }""")
+  for key in ['inputName','inputQuantity','outputName','outputQuantity','text','unknown']:
+   pin=p.locator(f'[data-lex-pin-column="{key}"]')
+   pin.focus()
+   pin.click()
+   assert p.locator(f'.lex-column-list-head-cell[data-column-key="{key}"]').count()==1,key
+   assert pin.get_attribute('aria-pressed')=='true'
+  p.evaluate('window.renderPins()')
+  for key in ['inputName','inputQuantity','outputName','outputQuantity','text','unknown']:
+   assert p.locator(f'.lex-column-list-head-cell[data-column-key="{key}"]').count()==1,key
+   pin=p.locator(f'[data-lex-pin-column="{key}"]');pin.focus();pin.click()
+   assert p.locator(f'.lex-column-list-head-cell[data-column-key="{key}"]').count()==0,key
   b.close()
- print('Refine reordered column widths, six aligned properties, and recipe text editing passed.')
+ print('Refine reordered column widths, six aligned properties, recipe text editing, and all six property pins with saved preferences passed.')
 if __name__=='__main__':main()
 
