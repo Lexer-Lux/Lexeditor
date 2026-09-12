@@ -118,6 +118,7 @@ jobs:
           tests/test_ffx_x2_ffx2_abilities.py
           tests/test_ffx_x2_ffx2_accessories.py
           tests/test_ffx_x2_ffx2_jobs.py
+          tests/test_ffx_x2_ui_focus.py
       - name: Managed service smoke
         run: python -c "from games.ffx_x2.plugin import smoke; [print('PASS:', line) for line in smoke()]"
 
