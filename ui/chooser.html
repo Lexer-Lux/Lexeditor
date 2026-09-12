@@ -244,6 +244,28 @@
         const line=document.createElement("div");line.textContent=text;versions.append(line);
       }
       row.append(versions);
+      // Every other helper here is a pinned fork: this panel reports and does
+      // not install, because updating one part on its own can break the
+      // program. ReShade is unmodified upstream and shared by every game, so
+      // it is the one row that carries an install action.
+      if(helper.installable){
+        const action=document.createElement("button");
+        action.type="button";action.className="lexer-helper-install";
+        action.textContent=helper.installed?(helper.behind?`Update to ${helper.latest}`:"Re-download"):`Download ${helper.latest||"ReShade"}`;
+        action.onclick=async()=>{
+          action.disabled=true;const was=action.textContent;action.textContent="Downloading…";
+          try{
+            const result=await window.pywebview.api.install_reshade_loader("","");
+            if(result?.error)throw new Error(result.error);
+            await loadHelperVersions(true);
+          }catch(error){
+            action.disabled=false;action.textContent=was;
+            const problem=document.createElement("div");problem.className="lexer-helper-error";
+            problem.textContent=String(error?.message||error);row.append(problem);
+          }
+        };
+        row.append(action);
+      }
       for(const error of [helper.error,helper.installedError]){
         if(!error)continue;
         const problem=document.createElement("div");problem.className="lexer-helper-error";problem.textContent=error;row.append(problem);
@@ -253,7 +275,7 @@
         try{const url=new URL(helper.releaseNotes);
           if(url.protocol==="https:"&&url.hostname==="github.com"&&/^\/[^/]+\/[^/]+\/releases\/tag\//.test(url.pathname)){
             const link=document.createElement("button");link.type="button";link.className="lexer-helper-source";link.textContent="Release notes ↗";
-            link.onclick=()=>window.pywebview.api.open_helper_release_notes(helper.pluginId).catch(error=>{
+            link.onclick=()=>window.pywebview.api.open_helper_release_notes(helper.pluginId||"").catch(error=>{
               const problem=document.createElement("div");problem.className="lexer-helper-error";problem.textContent=String(error);row.append(problem);
             });row.append(link);
           }

@@ -96,6 +96,19 @@ def _listing(root: Path, suffixes: tuple[str, ...]) -> list[str]:
     return sorted(found)
 
 
+def is_reshade(path: Path) -> bool:
+    """Is this file ReShade's loader?
+
+    ReShade's own DLL carries its name; a game's real d3d11.dll does not. The
+    whole file is searched, not a window at the front: in ReShade 6.8 the name
+    first appears 4.3 MB in, so a two-megabyte read rejected the real loader.
+    """
+    try:
+        return b"ReShade" in Path(path).read_bytes()
+    except OSError:
+        return False
+
+
 def installed_renderer(game_root: Path | None) -> str:
     """Name the ReShade loader already present in the game folder, if any."""
     if not game_root:
@@ -103,14 +116,7 @@ def installed_renderer(game_root: Path | None) -> str:
     root = Path(game_root)
     for renderer, dll in RENDERER_DLLS.items():
         candidate = root / dll
-        if not candidate.is_file():
-            continue
-        try:
-            head = candidate.read_bytes()[:2_000_000]
-        except OSError:
-            continue
-        # ReShade's own DLL carries its name; a game's real d3d11.dll does not.
-        if b"ReShade" in head:
+        if candidate.is_file() and is_reshade(candidate):
             return renderer
     return ""
 
@@ -126,10 +132,155 @@ def store_dll() -> Path:
     return STORE / STORE_DLL
 
 
+# ReShade itself. The binary is BSD-3, so Lexeditor may fetch and keep a copy;
+# what it must not do is fetch a different one than the user was told about,
+# which is why the version, the variant and the file's hash are all recorded.
+#
+# The download is the ordinary setup program from reshade.me. That program is
+# a small executable with a zip stuck on the end holding the two loader DLLs,
+# so the DLL is taken straight out of it rather than running an installer.
+LOADER_REPOSITORY = "crosire/reshade"
+LOADER_TAGS = "https://api.github.com/repos/crosire/reshade/tags"
+LOADER_SOURCE = "https://github.com/crosire/reshade"
+LOADER_DOWNLOAD = "https://reshade.me/downloads/ReShade_Setup_{version}{variant}.exe"
+LOADER_STATE = "loader.json"
+LOADER_LICENCE = "BSD-3-Clause"
+# The add-on build is the default: without it ReShade loads no .addon64, and a
+# preset that runs its passes through an add-on renders nothing at all.
+LOADER_VARIANTS = {"addon": "_Addon", "plain": ""}
+DEFAULT_LOADER_VARIANT = "addon"
+
+
+def loader_state() -> dict:
+    """What this machine's copy of ReShade is, as recorded when it arrived."""
+    path = STORE / LOADER_STATE
+    if not path.is_file():
+        return {}
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
 def store_state() -> dict:
     dll = store_dll()
+    recorded = loader_state()
     return {"path": str(dll), "present": dll.is_file(),
-            "bytes": dll.stat().st_size if dll.is_file() else 0}
+            "bytes": dll.stat().st_size if dll.is_file() else 0,
+            "version": str(recorded.get("version", "")),
+            "variant": str(recorded.get("variant", "")),
+            "sha256": str(recorded.get("sha256", "")),
+            "installedAt": str(recorded.get("installedAt", "")),
+            "source": LOADER_SOURCE, "licence": LOADER_LICENCE}
+
+
+def _version_key(version: str) -> tuple:
+    parts = str(version or "").lstrip("vV").split(".")
+    numbers = []
+    for part in parts:
+        digits = "".join(character for character in part if character.isdigit())
+        numbers.append(int(digits) if digits else 0)
+    return tuple(numbers)
+
+
+def latest_loader(*, fetch=None) -> dict:
+    """The newest ReShade upstream has tagged.
+
+    Upstream publishes no GitHub release for the binary, so the tag list is
+    the version and reshade.me is where the build comes from. Saying that out
+    loud matters: the panel reports one source and downloads from another.
+    """
+    fetch = fetch or _fetch
+    payload = json.loads(fetch(LOADER_TAGS).decode("utf-8"))
+    names = [str(entry.get("name", "")) for entry in payload if isinstance(entry, dict)]
+    names = [name for name in names if name]
+    if not names:
+        raise ValueError("Upstream listed no ReShade tags.")
+    newest = max(names, key=_version_key)
+    found = {"latest": newest.lstrip("vV"), "tag": newest, "source": LOADER_SOURCE}
+    # The panel shows a date beside every other helper. A tag carries none, so
+    # it comes from the commit the tag points at; failing to get it costs the
+    # date, never the check.
+    commit = next((entry.get("commit", {}).get("url", "") for entry in payload
+                   if isinstance(entry, dict) and entry.get("name") == newest), "")
+    if commit:
+        try:
+            detail = json.loads(fetch(commit).decode("utf-8"))
+            found["published"] = str(
+                detail.get("commit", {}).get("committer", {}).get("date", ""))
+        except Exception:
+            pass
+    return found
+
+
+def loader_upstream(*, fetch=None) -> dict:
+    """One helper row for ReShade: what is here, what is out there."""
+    mine = store_state()
+    row = {"helper": "ReShade", "plugin": "Every game", "pluginId": "",
+           "pinned": "", "licence": LOADER_LICENCE, "installable": True,
+           "variant": mine["variant"] or DEFAULT_LOADER_VARIANT,
+           "installed": mine["present"],
+           "installedVersion": mine["version"],
+           "installedStatus": ("installed" if mine["present"] else "not installed"),
+           "source": LOADER_SOURCE}
+    try:
+        upstream = latest_loader(fetch=fetch)
+    except Exception as error:
+        return {**row, "error": str(error), "behind": False}
+    row.update(upstream)
+    row["releaseNotes"] = f"{LOADER_SOURCE}/releases/tag/{upstream['tag']}"
+    row["behind"] = bool(mine["present"] and mine["version"]
+                         and _version_key(mine["version"]) < _version_key(upstream["latest"]))
+    if mine["present"] and not mine["version"]:
+        # Adopted by hand: there is a DLL but nothing said which build it is.
+        row["installedStatus"] = "installed, version unknown"
+    return row
+
+
+def install_loader(version: str = "", *, variant: str = DEFAULT_LOADER_VARIANT,
+                   fetch=None) -> dict:
+    """Fetch one ReShade build and make it Lexeditor's copy.
+
+    The setup program is a zip with an executable header, so the loader DLL is
+    read straight out of it. Nothing is run, and nothing is installed into a
+    game here: this only fills the store that install() copies from.
+    """
+    import hashlib
+    import io as _io
+    import zipfile
+    from datetime import datetime, timezone
+
+    fetch = fetch or _fetch
+    suffix = LOADER_VARIANTS.get(str(variant or "").lower())
+    if suffix is None:
+        raise ValueError(f"Unknown ReShade variant: {variant}")
+    wanted = str(version or "").lstrip("vV") or latest_loader(fetch=fetch)["latest"]
+    url = LOADER_DOWNLOAD.format(version=wanted, variant=suffix)
+    payload = fetch(url)
+    try:
+        with zipfile.ZipFile(_io.BytesIO(payload)) as archive:
+            dll = archive.read(STORE_DLL)
+    except (zipfile.BadZipFile, KeyError) as error:
+        raise ValueError(
+            f"{url} is not a ReShade setup carrying {STORE_DLL}: {error}") from error
+    if b"ReShade" not in dll:
+        raise ValueError(f"The file taken from {url} is not ReShade.")
+    STORE.mkdir(parents=True, exist_ok=True)
+    store_dll().write_bytes(dll)
+    recorded = {
+        "version": wanted,
+        "variant": str(variant).lower(),
+        "sha256": hashlib.sha256(dll).hexdigest(),
+        "bytes": len(dll),
+        "download": url,
+        "source": LOADER_SOURCE,
+        "licence": LOADER_LICENCE,
+        "installedAt": datetime.now(timezone.utc).isoformat(),
+    }
+    (STORE / LOADER_STATE).write_text(
+        json.dumps(recorded, indent=2) + NEWLINE, encoding="utf-8")
+    return {**store_state(), "installed": True}
 
 
 NEWLINE = chr(10)
@@ -497,11 +648,7 @@ def adopt(source: Path) -> dict:
     source = Path(source)
     if not source.is_file():
         raise ValueError(f"No file at {source}")
-    try:
-        head = source.read_bytes()[:2_000_000]
-    except OSError as error:
-        raise ValueError(f"Could not read {source}: {error}") from error
-    if b"ReShade" not in head:
+    if not is_reshade(source):
         raise ValueError(f"{source.name} does not look like a ReShade DLL")
     STORE.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source, store_dll())
@@ -611,11 +758,7 @@ def install(game_root: Path, renderer: str) -> dict:
     # A game's own d3d11.dll is not ours to replace. Only an existing ReShade
     # may be overwritten, and only by another ReShade.
     if target.is_file():
-        try:
-            existing = target.read_bytes()[:2_000_000]
-        except OSError as error:
-            raise ValueError(f"Could not read {target}: {error}") from error
-        if b"ReShade" not in existing:
+        if not is_reshade(target):
             raise ValueError(
                 f"{dll_name} already exists in this game and is not ReShade. "
                 "Lexeditor will not overwrite it.")
@@ -637,9 +780,9 @@ def uninstall(game_root: Path) -> dict:
         target = game_root / dll_name
         if not target.is_file():
             continue
+        if not is_reshade(target):
+            continue
         try:
-            if b"ReShade" not in target.read_bytes()[:2_000_000]:
-                continue
             target.unlink()
         except OSError:
             continue

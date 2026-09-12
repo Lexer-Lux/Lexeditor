@@ -6236,3 +6236,14 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-reshade-coverage thead th { font-weight: 600; opacity: 0.75; }
 .lex-reshade-coverage tbody tr + tr td { border-top: 1px solid var(--lex-border, rgba(128,128,128,0.25)); }
 .lex-reshade-coverage td:last-child { white-space: nowrap; opacity: 0.8; }
+
+/* ReShade is the one helper row that installs itself, so its control sits
+   beside the release-notes link rather than replacing it. */
+.lexer-helper-install {
+  margin-top: 0.5em; margin-right: 0.6em; padding: 0.32em 0.9em;
+  font: inherit; font-size: 0.85em; letter-spacing: 0.04em; text-transform: uppercase;
+  color: inherit; background: transparent; cursor: pointer;
+  border: 1px solid currentColor; border-radius: 2px; opacity: 0.85;
+}
+.lexer-helper-install:hover:not(:disabled) { opacity: 1; }
+.lexer-helper-install:disabled { opacity: 0.5; cursor: default; }

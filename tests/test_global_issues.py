@@ -58,10 +58,15 @@ class Helpers(unittest.TestCase):
         h._settings=Mock();h._github=Mock();h._github.visible_repository.return_value={'repository':'Lexer-Lux/Lexeditor','login':'Lexer-Lux'}
         h._installations=Mock()
         h._installations.snapshot.side_effect=lambda plugin_id:{'root':'/game','helper':{'installed':True,'version':'1.1','integrity':'ok'}}
+        # ReShade's row is shared by every game and checked over the network;
+        # this panel's behaviour is what is under test, not that download.
+        h._reshade_helper_row=Mock(return_value={'helper':'ReShade','pluginId':'','installable':True,'behind':False})
         return h
     def test_versions_independent_errors_retained_cache_and_refresh(self):
         h=self.host();result=h.helper_versions();rows=result['helpers']
-        self.assertEqual(len(rows),3)
+        # Three plugin helpers, plus ReShade, which belongs to all of them.
+        self.assertEqual(len(rows),4)
+        self.assertEqual(rows[3]['helper'],'ReShade')
         self.assertEqual((rows[0]['pinned'],rows[0]['installedVersion'],rows[0]['latest']),('1.0','1.1','1.2'))
         self.assertEqual(rows[1]['error'],'offline');self.assertEqual(rows[1]['installedVersion'],'1.1')
         self.assertIn('provider',rows[2]['error'])

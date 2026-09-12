@@ -2568,7 +2568,13 @@
     const act = (method, ...args) => spec.act?.(method, ...args);
     const installRow = element("div", {class: "lex-reshade-actions"});
     if (!store.present) {
+      // Lexeditor fetches ReShade itself now: the binary is BSD-3, so it may
+      // be downloaded and kept. Choosing a DLL by hand stays, for a build the
+      // user already trusts or a machine that cannot reach reshade.me.
       installRow.append(element("button", {
+        type: "button", class: "lex-dialog-action primary",
+        onclick: () => act("download_reshade"),
+      }, "Download ReShade"), element("button", {
         type: "button", class: "lex-dialog-action",
         onclick: () => act("adopt_reshade"),
       }, "Choose ReShade64.dll…"));
@@ -2592,9 +2598,11 @@
       control: readonlyField(data.reshadeInstalled
         ? `Yes, loading through ${data.installedRenderer}`
         : store.present
-          ? "Not in this game yet. Lexeditor has a copy ready to install."
-          : "No. Lexeditor does not ship ReShade; point it at a ReShade64.dll once and it keeps that copy for every game."),
-      help: infoHelp("One ReShade, kept by Lexeditor and installed per game under the loader name that game's renderer needs. A game's own DLL of that name is never overwritten."),
+          ? `Not in this game yet. Lexeditor has ${store.version
+              ? `ReShade ${store.version}${store.variant === "addon" ? " with add-on support" : ""}`
+              : "a copy"} ready to install.`
+          : "No. Lexeditor can download ReShade, or take a copy you already have."),
+      help: infoHelp("One ReShade, kept by Lexeditor and installed per game under the loader name that game's renderer needs. A game's own DLL of that name is never overwritten. The add-on build is the one fetched, because a preset whose passes run through an add-on renders nothing without it."),
     }));
     rows.push(detailField({label: "Install", control: installRow}));
     const enable = element("input", {

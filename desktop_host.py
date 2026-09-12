@@ -827,11 +827,17 @@ class HostApi:
                     from urllib.parse import quote
                     row["releaseNotes"] = source.rstrip("/") + "/releases/tag/" + quote(latest, safe="")
                 rows.append(row)
+            # ReShade is not a plugin's helper: it is one copy shared by every
+            # game. It is checked and cached with the rest all the same, so a
+            # refresh means the same thing for every row on the panel.
+            rows.append(self._reshade_helper_row())
             with self._lock:
                 self._helper_versions = [dict(row) for row in rows]
         # Installed state is always fresh even when upstream metadata is cached.
         # A failed remote lookup must never hide the pin or local install state.
         for row in rows:
+            if not row.get("pluginId"):
+                continue
             plugin = self._plugins[row["pluginId"]]
             try:
                 snapshot = self._installations.snapshot(row["pluginId"])
@@ -850,13 +856,63 @@ class HostApi:
                 row["installedError"] = str(error)
         return {"helpers": rows, "cached": reused}
 
+    def download_reshade(self, plugin_id: str) -> dict:
+        """Fetch ReShade from a game's own page, then restate that game.
+
+        Same store as the helper panel fills: one ReShade for the machine. The
+        panel is where it is updated; this is here so a first install does not
+        send the user to another screen to get started.
+        """
+        import reshade_projects
+
+        try:
+            reshade_projects.install_loader()
+        except Exception as error:
+            return {**self.mod_reshade(plugin_id), "error": str(error)}
+        return self.mod_reshade(plugin_id)
+
+    def _reshade_helper_row(self) -> dict:
+        """ReShade's row, never cached with the rest: it is one HTTP call."""
+        import reshade_projects
+
+        try:
+            return reshade_projects.loader_upstream()
+        except Exception as error:
+            return {"helper": "ReShade", "plugin": "Every game", "pluginId": "",
+                    "installable": True, "behind": False, "error": str(error)}
+
+    def install_reshade_loader(self, version: str = "", variant: str = "") -> dict:
+        """Fetch ReShade itself into Lexeditor's store.
+
+        Every other helper in this panel is a pinned fork and updating one on
+        its own can break the program, which is why the panel only reports.
+        ReShade is unmodified upstream and shared by every game, so it is the
+        one entry that may install itself.
+        """
+        import reshade_projects
+
+        if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
+            raise PermissionError("Developer Mode requires Lexer's active GitHub account")
+        try:
+            state = reshade_projects.install_loader(
+                version, variant=variant or reshade_projects.DEFAULT_LOADER_VARIANT)
+        except Exception as error:
+            return {"installed": False, "error": str(error),
+                    "helper": self._reshade_helper_row()}
+        return {"installed": True, "store": state,
+                "helper": self._reshade_helper_row()}
+
     def open_helper_release_notes(self, plugin_id: str) -> dict:
         """Open a known cached release in the external browser, never arbitrary URLs."""
         if not self._github.visible_repository(LEXEDITOR_REPOSITORY, refresh=True):
             raise PermissionError("Developer Mode requires Lexer's active GitHub account")
         from urllib.parse import urlsplit
-        with self._lock:
-            row = next((r for r in (self._helper_versions or []) if r["pluginId"] == plugin_id), None)
+        if not plugin_id:
+            row = self._reshade_helper_row()
+        else:
+            with self._lock:
+                row = next((r for r in (self._helper_versions or [])
+                            if r["pluginId"] == plugin_id), None)
         if row is None:
             raise ValueError("Check helper versions before opening release notes.")
         url = str(row.get("releaseNotes", ""))

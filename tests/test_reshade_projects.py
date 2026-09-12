@@ -322,3 +322,95 @@ def test_coverage_reports_what_is_missing(tmp_path, monkeypatch):
     covered = {row["label"]: row["installed"] for row in rp.coverage()}
     assert covered["SMAA"]
     assert not covered["Ambient occlusion"]
+
+
+def _setup_exe(files):
+    """A ReShade setup: a small executable with a zip stuck on the end."""
+    import io as _io
+    import zipfile
+    buffer = _io.BytesIO()
+    buffer.write(b"MZ" + b"\x00" * 4094)  # the installer's own program
+    with zipfile.ZipFile(buffer, "a") as archive:
+        for name, payload in files.items():
+            archive.writestr(name, payload)
+    return buffer.getvalue()
+
+
+def test_a_real_reshade_dll_is_recognised_past_two_megabytes(tmp_path):
+    """ReShade 6.8 names itself 4.3 MB in, which a windowed read missed.
+
+    That is not cosmetic: it made adopt() refuse the real loader, hid an
+    installed ReShade from the Tweaks page, and stopped uninstall() removing
+    one it had installed itself.
+    """
+    dll = tmp_path/"d3d11.dll"
+    dll.write_bytes(b"\x00" * 3_000_000 + b"ReShade 6.8" + b"\x00" * 1000)
+    assert rp.is_reshade(dll)
+    assert not rp.is_reshade(tmp_path/"missing.dll")
+    game = tmp_path/"game"; game.mkdir()
+    (game/"d3d11.dll").write_bytes(dll.read_bytes())
+    assert rp.installed_renderer(game) == "dx11"
+
+
+def test_the_loader_is_taken_out_of_the_setup_program(tmp_path, monkeypatch):
+    store = tmp_path/"store"
+    monkeypatch.setattr(rp, "STORE", store)
+    payload = _setup_exe({rp.STORE_DLL: b"ReShade loader bytes",
+                          "ReShade32.dll": b"ReShade 32"})
+    state = rp.install_loader("6.8.0", fetch=lambda url: payload)
+    assert state["present"] and state["version"] == "6.8.0"
+    assert state["variant"] == "addon"
+    assert rp.store_dll().read_bytes() == b"ReShade loader bytes"
+    # What arrived is recorded, so the next check can say whether it is behind.
+    recorded = rp.loader_state()
+    assert recorded["download"].endswith("ReShade_Setup_6.8.0_Addon.exe")
+    assert recorded["sha256"]
+
+
+def test_the_plain_build_is_a_deliberate_choice(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path/"store")
+    payload = _setup_exe({rp.STORE_DLL: b"ReShade loader"})
+    rp.install_loader("6.8.0", variant="plain", fetch=lambda url: payload)
+    assert rp.loader_state()["download"].endswith("ReShade_Setup_6.8.0.exe")
+    with pytest.raises(ValueError):
+        rp.install_loader("6.8.0", variant="nightly", fetch=lambda url: payload)
+
+
+def test_something_that_is_not_reshade_is_refused(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path/"store")
+    with pytest.raises(ValueError):
+        rp.install_loader("6.8.0", fetch=lambda url: b"not a zip at all")
+    with pytest.raises(ValueError):
+        rp.install_loader("6.8.0", fetch=lambda url: _setup_exe(
+            {rp.STORE_DLL: b"some other DLL entirely"}))
+    assert not rp.store_dll().is_file()
+
+
+def test_the_newest_tag_wins_not_the_first_one(monkeypatch):
+    listing = json.dumps([{"name": "v6.10.0"}, {"name": "v6.9.1"}, {"name": "v6.8.0"}])
+    latest = rp.latest_loader(fetch=lambda url: listing.encode("utf-8"))
+    assert latest["latest"] == "6.10.0"
+    assert latest["tag"] == "v6.10.0"
+
+
+def test_the_helper_row_says_when_the_copy_is_behind(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path/"store")
+    listing = json.dumps([{"name": "v6.9.0"}]).encode("utf-8")
+    row = rp.loader_upstream(fetch=lambda url: listing)
+    assert not row["installed"] and not row["behind"]
+    rp.install_loader("6.8.0", fetch=lambda url: _setup_exe({rp.STORE_DLL: b"ReShade"}))
+    row = rp.loader_upstream(fetch=lambda url: listing)
+    assert row["installed"] and row["behind"] and row["installedVersion"] == "6.8.0"
+    assert row["releaseNotes"] == "https://github.com/crosire/reshade/releases/tag/v6.9.0"
+
+
+def test_a_failed_upstream_check_still_reports_the_local_copy(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path/"store")
+    rp.install_loader("6.8.0", fetch=lambda url: _setup_exe({rp.STORE_DLL: b"ReShade"}))
+
+    def refuse(url):
+        raise OSError("no network")
+
+    row = rp.loader_upstream(fetch=refuse)
+    assert row["installed"] and row["installedVersion"] == "6.8.0"
+    assert row["error"] and not row["behind"]
