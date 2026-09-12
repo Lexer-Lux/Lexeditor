@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import os
+from pathlib import Path
+import tempfile
 import unittest
 
 from games.terraria.localization import (
@@ -7,6 +10,7 @@ from games.terraria.localization import (
     try_get_culture_and_prefix,
     update_localization_text,
 )
+from games.terraria import server
 
 
 class TerrariaLocalizationTests(unittest.TestCase):
@@ -152,6 +156,64 @@ class TerrariaLocalizationTests(unittest.TestCase):
             update_localization_text(text, {"Mods.ExampleMod.Missing": "Nope"})
         with self.assertRaisesRegex(ValueError, "one line"):
             update_localization_text(text, {"Mods.ExampleMod.Greeting": "Hello\nWorld"})
+
+    def test_service_discovers_saves_and_stale_checks_localization(self):
+        previous_project = os.environ.get("LEXEDITOR_TERRARIA_PROJECT")
+        try:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "ExampleMod"
+                localization = root / "Localization"
+                localization.mkdir(parents=True)
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = str(root)
+                target = localization / "en-US_Mods.ExampleMod.hjson"
+                original = server.UTF8_BOM + (
+                    "Items: {\r\n"
+                    "  Sword.DisplayName: Example Sword\r\n"
+                    "}\r\n"
+                ).encode("utf-8")
+                target.write_bytes(original)
+
+                index = server.localization_index()
+                self.assertEqual(len(index["files"]), 1)
+                summary = index["files"][0]
+                self.assertEqual(summary["culture"], "en-US")
+                self.assertEqual(summary["prefix"], "Mods.ExampleMod")
+                self.assertEqual(summary["editableEntries"], 1)
+
+                state = server.localization_file_state(summary["path"])
+                self.assertTrue(state["editable"])
+                self.assertEqual(
+                    state["entries"][0]["key"],
+                    "Mods.ExampleMod.Items.Sword.DisplayName",
+                )
+                original_sha = state["sha256"]
+                saved = server.save_localization(
+                    summary["path"],
+                    {"Mods.ExampleMod.Items.Sword.DisplayName": "Renamed Sword"},
+                    original_sha,
+                )
+                self.assertNotEqual(saved["sha256"], original_sha)
+                raw = target.read_bytes()
+                self.assertTrue(raw.startswith(server.UTF8_BOM))
+                self.assertIn(b"Sword.DisplayName: Renamed Sword\r\n", raw)
+
+                with self.assertRaisesRegex(ValueError, "changed outside Lexeditor"):
+                    server.save_localization(
+                        summary["path"],
+                        {"Mods.ExampleMod.Items.Sword.DisplayName": "Again"},
+                        original_sha,
+                    )
+                with self.assertRaisesRegex(ValueError, "Invalid localization path"):
+                    server.localization_file_state("../outside.hjson")
+
+                data_map = server.data_map()
+                row = next(row for row in data_map["rows"] if row["path"].endswith(".hjson"))
+                self.assertEqual(row["status"], "structured")
+        finally:
+            if previous_project is None:
+                os.environ.pop("LEXEDITOR_TERRARIA_PROJECT", None)
+            else:
+                os.environ["LEXEDITOR_TERRARIA_PROJECT"] = previous_project
 
 
 if __name__ == "__main__":
