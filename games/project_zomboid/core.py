@@ -602,6 +602,8 @@ def _iter_deploy_files(root: Path) -> Iterable[tuple[Path, Path]]:
 
 
 def _tree_digest(root: Path) -> dict[str, str]:
+    if root.is_symlink():
+        raise ProjectZomboidError("Deployed mod root is a link")
     if not root.is_dir():
         return {}
     result: dict[str, str] = {}
@@ -617,6 +619,16 @@ def _deployment_state_path(root: Path) -> Path:
     return root / ".lexeditor" / "project-zomboid-deployment.json"
 
 
+def _expected_recorded_target(root: Path, target: Path | None) -> bool:
+    if target is None:
+        return False
+    try:
+        expected_target = _local_target(root)
+    except ProjectZomboidError:
+        return False
+    return target == expected_target
+
+
 def deployment_state(root: Path) -> dict:
     state_path = _deployment_state_path(root)
     state = {}
@@ -627,14 +639,19 @@ def deployment_state(root: Path) -> dict:
             state = {}
     target_value = state.get("target") if isinstance(state, dict) else None
     target = Path(target_value) if isinstance(target_value, str) and target_value else None
-    current = _tree_digest(target) if target and target.is_dir() else {}
+    target_is_expected = _expected_recorded_target(root, target)
+    deployed = bool(
+        target_is_expected and target is not None
+        and not target.is_symlink() and target.is_dir()
+    )
+    current = _tree_digest(target) if deployed and target is not None else {}
     expected = state.get("files") if isinstance(state.get("files"), dict) else {}
-    owned = bool(target and target.is_dir() and current == expected)
+    owned = bool(deployed and current == expected)
     return {
         "target": str(target) if target else "",
-        "deployed": bool(target and target.is_dir()),
+        "deployed": deployed,
         "owned": owned,
-        "externalChanges": bool(target and target.is_dir() and expected and current != expected),
+        "externalChanges": bool(deployed and expected and current != expected),
         "fileCount": len(current),
     }
 
@@ -719,15 +736,17 @@ def undeploy(root: Path) -> dict:
         state = json.loads(state_path.read_text(encoding="utf-8"))
     except (OSError, ValueError, TypeError) as error:
         raise ProjectZomboidError("Deployment ownership state is invalid") from error
-    target = Path(state.get("target", ""))
+    target_value = state.get("target") if isinstance(state, dict) else None
+    target = Path(target_value) if isinstance(target_value, str) and target_value else None
+    if not _expected_recorded_target(root, target):
+        raise ProjectZomboidError("Recorded deployment target is outside the expected Zomboid/mods folder")
+    if target is None or target.is_symlink() or not target.is_dir():
+        raise ProjectZomboidError("Owned local deployment is missing or unsafe")
     expected = state.get("files")
-    if not target.is_dir() or not isinstance(expected, dict):
-        raise ProjectZomboidError("Owned local deployment is missing")
+    if not isinstance(expected, dict):
+        raise ProjectZomboidError("Deployment ownership state is invalid")
     if _tree_digest(target) != expected:
         raise ProjectZomboidError("Local mod changed externally; refusing to remove it")
-    local_root = user_zomboid_root() / "mods"
-    if not _inside(local_root, target):
-        raise ProjectZomboidError("Recorded deployment is outside Zomboid/mods")
     shutil.rmtree(target)
     state_path.unlink()
     return deployment_state(root)
