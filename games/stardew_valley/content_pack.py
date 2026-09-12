@@ -11,6 +11,7 @@ from pathlib import Path
 
 OBJECT_TARGET = "Data/Objects"
 OBJECT_FIELDS = {"Price", "Edibility", "IsDrink"}
+OBJECT_PATCH_LOG_NAME = "Lexeditor Data/Objects overrides"
 DEPLOY_MARKER = ".lexeditor-deployment.json"
 ACCEPTANCE_MARKER = ".lexeditor-stardew-acceptance.json"
 MIN_CONTENT_PATCHER_VERSION = "2.9.0"
@@ -61,24 +62,56 @@ def _version_at_least(actual: str | None, minimum: str) -> bool:
     return actual_parts + (0,) * (width - len(actual_parts)) >= minimum_parts + (0,) * (width - len(minimum_parts))
 
 
+def _is_object_field_change(change: object) -> bool:
+    if not isinstance(change, dict):
+        return False
+    return (
+        str(change.get("Action", "")).casefold() == "editdata"
+        and change.get("Target") == OBJECT_TARGET
+        and isinstance(change.get("Fields", {}), dict)
+    )
+
+
 def _object_change(payload: dict, *, create: bool) -> dict | None:
+    """Return Lexeditor's Data/Objects patch without hijacking unrelated patches.
+
+    A Content Patcher pack may legitimately contain several sequential EditData
+    patches for the same asset, including conditional ones. Lexeditor therefore
+    owns a named patch block. For backwards compatibility it adopts one lone,
+    simple pre-label patch; ambiguous or conditional existing patches are left
+    untouched and a dedicated Lexeditor block is appended instead.
+    """
     changes = payload.get("Changes")
     if changes is None and create:
         changes = []
         payload["Changes"] = changes
     if not isinstance(changes, list):
         raise ValueError("content.json Changes must be an array")
-    for change in changes:
-        if not isinstance(change, dict):
-            continue
-        action = str(change.get("Action", "")).casefold()
-        target = change.get("Target")
-        if action == "editdata" and target == OBJECT_TARGET and isinstance(change.get("Fields", {}), dict):
+
+    object_changes = [change for change in changes if _is_object_field_change(change)]
+    for change in object_changes:
+        if change.get("LogName") == OBJECT_PATCH_LOG_NAME:
             change.setdefault("Fields", {})
             return change
+
+    simple_legacy = [
+        change for change in object_changes
+        if set(change).issubset({"Action", "Target", "Fields"})
+    ]
+    if len(object_changes) == 1 and len(simple_legacy) == 1:
+        change = simple_legacy[0]
+        if create:
+            change["LogName"] = OBJECT_PATCH_LOG_NAME
+        return change
+
     if not create:
         return None
-    change = {"Action": "EditData", "Target": OBJECT_TARGET, "Fields": {}}
+    change = {
+        "LogName": OBJECT_PATCH_LOG_NAME,
+        "Action": "EditData",
+        "Target": OBJECT_TARGET,
+        "Fields": {},
+    }
     changes.append(change)
     return change
 
