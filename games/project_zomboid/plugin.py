@@ -107,6 +107,12 @@ def smoke() -> list[str]:
             "  timedAction = Craft,\n"
             "  inputs { item 1 [Base.Plank], }\n"
             " }\n"
+            " fixing RepairTestThing\n"
+            " {\n"
+            "  Require = Base.Hammer,\n"
+            "  Fixer = Base.DuctTape=2;Woodwork=1,\n"
+            "  ConditionModifier = 1.0,\n"
+            " }\n"
             " fluid TestFluid\n"
             " {\n"
             "  ColorReference = Azure,\n"
@@ -162,7 +168,7 @@ def smoke() -> list[str]:
         env = {"LEXEDITOR_PROJECT_ZOMBOID_PROJECT": str(project), "LEXEDITOR_PROJECT_ZOMBOID_USER_ROOT": str(user_root)}
         with ProjectZomboidSession(env) as session:
             identity = request_json(session.url + "api/plugin")
-            required = {"build42-items", "build42-evolvedrecipes", "build42-craftrecipes", "build42-fluids", "build42-vehicles", "build42-sounds", "build42-models", "build42-mannequins", "local-deploy"}
+            required = {"build42-items", "build42-evolvedrecipes", "build42-craftrecipes", "build42-fixings", "build42-fluids", "build42-vehicles", "build42-sounds", "build42-models", "build42-mannequins", "local-deploy"}
             if identity.get("pluginId") != "project-zomboid" or required - set(identity.get("capabilities", [])):
                 raise RuntimeError("Project Zomboid service reported an incomplete plugin contract")
             metadata = request_json(session.url + "api/mod-info")
@@ -173,6 +179,7 @@ def smoke() -> list[str]:
                 ("items", "items/save", {"Weight": "0.5"}, "Weight", "0.5"),
                 ("evolvedrecipes", "evolvedrecipes/save", {"MaxItems": "6"}, "MaxItems", "6"),
                 ("craftrecipes", "craftrecipes/save", {"time": "75"}, "time", "75"),
+                ("fixings", "fixings/save", {"ConditionModifier": "0.8"}, "ConditionModifier", "0.8"),
                 ("fluids", "fluids/save", {"ColorReference": "Red"}, "ColorReference", "Red"),
                 ("vehicles", "vehicles/save", {"engineForce": "4200"}, "engineForce", "4200"),
                 ("sounds", "sounds/save", {"loop": "true"}, "loop", "true"),
@@ -192,12 +199,12 @@ def smoke() -> list[str]:
                     raise RuntimeError(f"Synthetic {get_endpoint} edit did not read back")
 
             text = script.read_text(encoding="utf-8")
-            for preserved in ("UnknownFutureField = KeepMe", "inputs { item 1 [Base.Plank], }", "Properties { HungerChange = -5, }", "part Engine { category = engine, }", "clip { file = media/sound/test.ogg, volume = 0.7, }", "mesh = LexSmoke/TestModel,", "attachment Grip { offset = 0.0 0.0 0.0, }", "model = FemaleBody,"):
+            for preserved in ("UnknownFutureField = KeepMe", "inputs { item 1 [Base.Plank], }", "Require = Base.Hammer,", "Fixer = Base.DuctTape=2;Woodwork=1,", "Properties { HungerChange = -5, }", "part Engine { category = engine, }", "clip { file = media/sound/test.ogg, volume = 0.7, }", "mesh = LexSmoke/TestModel,", "attachment Grip { offset = 0.0 0.0 0.0, }", "model = FemaleBody,"):
                 if preserved not in text:
                     raise RuntimeError("Structured writes did not preserve unknown/nested script data")
             mapped = request_json(session.url + "api/datamap").get("rows", [])
             mapped_script = next((row for row in mapped if row.get("filename") == "42/media/scripts/smoke.txt"), None)
-            expected_editors = {"Items", "Evolved Recipes", "Craft Recipes", "Fluids", "Vehicles", "Sounds", "Models", "Mannequins"}
+            expected_editors = {"Items", "Evolved Recipes", "Craft Recipes", "Fixing", "Fluids", "Vehicles", "Sounds", "Models", "Mannequins"}
             if not mapped_script or expected_editors - {part.strip() for part in mapped_script.get("editor", "").split(",") if part.strip()}:
                 raise RuntimeError("Data Map omitted structured script coverage")
             deployed = request_json(session.url + "api/deploy", {})
@@ -213,7 +220,7 @@ def smoke() -> list[str]:
             raise RuntimeError("Project Zomboid child port is still open after host shutdown")
     return [
         "Project Zomboid plugin identity and structured capabilities confirmed",
-        "item, evolvedrecipe, craftRecipe, fluid, vehicle, sound, model and mannequin edits round-tripped",
+        "item, evolvedrecipe, craftRecipe, fixing, fluid, vehicle, sound, model and mannequin edits round-tripped",
         "unknown and nested Build 42 script data remained intact",
         "Data Map exposed all structured script editors",
         "local native-mod deployment and ownership-safe revert succeeded",
