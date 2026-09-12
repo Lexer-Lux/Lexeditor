@@ -18,7 +18,7 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
                 '''  item Hammer { ItemType = base:weapon, Weight = 1.0, }\n'''
                 '''  craftRecipe MakeThing { tags = AnySurfaceCraft, inputs { } }\n'''
                 '''  evolvedrecipe Sandwich { BaseItem = Base.BreadSlices, MaxItems = 4, }\n'''
-                '''  fixing RepairHammer { Require : Hammer, }\n'''
+                '''  fixing RepairHammer { Require : Hammer, ConditionModifier = 1.0, }\n'''
                 '''  fluid CustomWater { color = 1, }\n'''
                 '''  mannequin StoreDisplay { female = true, }\n'''
                 '''  model FancyModel { mesh = WorldItems/Hammer, }\n'''
@@ -45,7 +45,7 @@ class ProjectZomboidZedScriptTests(unittest.TestCase):
             self.assertNotIn(("craftRecipe", "Fake"), names)
             self.assertEqual(result["errors"], [])
             self.assertEqual(result["counts"]["craftRecipe"], 1)
-            for editable_name in ("Hammer", "Sandwich", "MakeThing", "CustomWater", "TestCar", "TestSound", "FancyModel", "StoreDisplay"):
+            for editable_name in ("Hammer", "Sandwich", "MakeThing", "RepairHammer", "CustomWater", "TestCar", "TestSound", "FancyModel", "StoreDisplay"):
                 with self.subTest(editable_name=editable_name):
                     self.assertTrue(next(row for row in result["rows"] if row["name"] == editable_name)["editable"])
 
