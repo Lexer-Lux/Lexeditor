@@ -3061,12 +3061,45 @@
   // Settings use the same visual and interaction contract as the command-row
   // save control, but their dirty count and restore operation stay scoped to
   // the settings surface that owns the button.
+  const pendingChangeList = (before, after, path = "", result = []) => {
+    if (Object.is(before,after)) return result;
+    if (before && after && typeof before === "object" && typeof after === "object") {
+      const identity = after.label || after.name || after.key;
+      const prefix = identity ? `${path} · ${identity}` : path;
+      for (const key of new Set([...Object.keys(before),...Object.keys(after)]))
+        pendingChangeList(before[key],after[key],`${prefix}${prefix?" / ":""}${key}`,result);
+    } else result.push({label:path || "Value",before,after});
+    return result;
+  };
+  const saveChangePreview = (button, changes, count) => {
+    let popup, timer;
+    const close=()=>{clearTimeout(timer);popup?.remove();popup=null;button.removeAttribute('aria-describedby')};
+    const leave=()=>{timer=setTimeout(close,180)};
+    const show=()=>{
+      clearTimeout(timer);if(popup)return;
+      const rows=count?.()?changes?.() || []:[];
+      const value=x=>x===undefined?"Not set":x===null?"None":typeof x==='boolean'?(x?'On':'Off'):typeof x==='object'?JSON.stringify(x):String(x);
+      popup=element('div',{class:'lex-help-popover lex-save-preview',role:'tooltip',id:`save-preview-${Math.random().toString(36).slice(2)}`},
+        element('strong',{},'Pending changes'),
+        rows.length?element('ul',{},...rows.map(row=>element('li',{},element('strong',{},row.label),element('div',{},element('span',{},value(row.before)), ' → ',element('span',{},value(row.after)))))):element('p',{},count?.()?'Change details are unavailable.':'No pending changes.'));
+      document.body.append(popup);button.setAttribute('aria-describedby',popup.id);
+      const r=button.getBoundingClientRect(),box=popup.getBoundingClientRect();
+      popup.style.left=`${Math.max(8,Math.min(r.left,innerWidth-box.width-8))}px`;
+      popup.style.top=`${Math.max(8,Math.min(r.bottom+8,innerHeight-box.height-8))}px`;
+      popup.addEventListener('mouseenter',()=>clearTimeout(timer));popup.addEventListener('mouseleave',leave);
+    };
+    button.addEventListener('mouseenter',show);button.addEventListener('mouseleave',leave);
+    button.addEventListener('focus',show);button.addEventListener('blur',leave);button.addEventListener('click',close);
+    document.addEventListener('keydown',event=>{if(event.key==='Escape')close()});
+  };
+
   const settingsSaveControl = (options = {}) => {
     const count = element("span", {class: "lex-save-count", hidden: true, "aria-hidden": "true"});
     const button = element("button", {
       type: "button", class: "save lex-save-icon lex-settings-save-control",
       title: "No unsaved settings changes", "aria-label": "Save settings", disabled: true,
     }, saveIcon(), count);
+    saveChangePreview(button,options.pendingChanges,options.dirtyCount);
     let busy = false;
     const dirtyCount = () => Math.max(0, Math.trunc(Number(options.dirtyCount?.()) || 0));
     const renderContents = () => {
@@ -3688,6 +3721,13 @@ ${contents.path}`});
       };
       const save = settingsSaveControl({
         dirtyCount: settingsDirtyCount,
+        pendingChanges:()=>[...supportedOrdinaryDefinitions.flatMap(definition=>{
+          const before=savedSettings[definition.key],after=readControl(definition,currentControls.get(definition.key));
+          return Object.is(before,after)?[]:[{label:definition.title,before,after}];
+        }),...(developerActive?supportedDefaultDefinitions.flatMap(definition=>{
+          const before=savedSettings.defaultValues?.[definition.key],after=readControl(definition,defaultControls.get(definition.key));
+          return Object.is(before,after)?[]:[{label:`Default: ${definition.title}`,before,after}];
+        }):[])],
         save: async () => {
           message.textContent = "Saving settings…";
           try {
@@ -4535,11 +4575,14 @@ ${contents.path}`});
       removeExtendedMouseHistory();
     }, {once: true});
 
+    let savedPreviewState;
+    saveChangePreview(save,()=>options.pendingChanges?.() || pendingChangeList(savedPreviewState,options.history?.capture?.()),options.dirtyCount);
     let lastReportedDirty = null;
     function refresh() {
       refreshReferences();
       projectControl.refresh?.();
       const dirty = options.dirtyCount?.() || 0;
+      if (!dirty && options.history?.capture) savedPreviewState=clone(options.history.capture());
       navigationHistory?.visit(githubWorkspace?.state.open ? "github" : `tab:${options.activeTab()}`);
       undo.disabled = !history?.canUndo;
       redo.disabled = !history?.canRedo;
@@ -6837,7 +6880,7 @@ ${contents.path}`});
       element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
   };
 
-  window.LexeditorUI = {uiScaleControl, element, el: element, confirmAction, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {pendingChangeList,uiScaleControl, element, el: element, confirmAction, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

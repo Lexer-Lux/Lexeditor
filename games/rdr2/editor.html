@@ -2844,6 +2844,7 @@ async function showLexeditorSettings(){
     };
     const save=LexeditorUI.settingsSaveControl({
       dirtyCount:()=>Number(size.value)!==savedCacheSize?1:0,
+      pendingChanges:()=>Number(size.value)===savedCacheSize?[]:[{label:"Model preview cache size (MB)",before:savedCacheSize,after:Number(size.value)}],
       save:async()=>{status.textContent="Saving settings…";const next=await api("/api/model-preview/settings",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({cacheSizeMb:Number(size.value)})});update(next);savedCacheSize=Number(next.cacheSizeMb);status.textContent="Cache settings saved.";},
       discard:()=>{size.value=String(savedCacheSize);status.textContent="Restored the last saved cache setting.";}
     });
