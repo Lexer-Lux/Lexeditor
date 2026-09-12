@@ -19,6 +19,10 @@ on:
       - 'tests/test_terraria_*.py'
       - '.github/workflows/terraria-checks.yml'
 
+concurrency:
+  group: terraria-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
