@@ -1,4 +1,5 @@
 name: Reconcile Terraria server implementation
+# retrigger after obsolete workflow cleanup
 
 on:
   push:
