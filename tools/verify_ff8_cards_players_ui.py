@@ -88,7 +88,8 @@ def run(browser_path: str | None) -> None:
             assert page.locator('.fake-paged').count() == 1
 
             page.evaluate('''() => {
-              const node=cardsContract.capturedDetail(cardsContract.state.data.cards.rows[0],{});
+              const prefs={pinButton:()=>null};
+              const node=cardsContract.capturedDetail(cardsContract.state.data.cards.rows[0],prefs);
               document.body.append(node);
             }''')
             assert page.locator('.ff8-card-preview').count() == 1
