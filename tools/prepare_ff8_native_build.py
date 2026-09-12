@@ -13,6 +13,35 @@ ROOT=Path(__file__).resolve().parents[1]
 BASE='c056db2783f376a340fcefa6a48cc33618998876'
 
 
+def integrate_shared_magic_notifications(source: Path) -> None:
+    """Queue a non-modal FFNx message after a failed load-time migration."""
+    path = source/'src/ff8/shared_magic_runtime.cpp'
+    text = path.read_text(encoding='utf-8')
+    if 'g_activation_toast' in text:
+        return
+    changes = [
+        ('#include "../log.h"', '#include "../log.h"\n#include "../common.h"'),
+        ('bool g_warning_started = false;',
+         'std::string g_activation_toast;\nbool g_warning_started = false;'),
+        ('        g_requested = false;\n        g_warning = MergeError::none;',
+         '        g_activation_toast = migration_warning_template(result.error, g_stock_limit);\n'
+         '        append_runtime_log((g_activation_toast + "\\n").c_str());\n'
+         '        g_requested = false;\n        g_warning = MergeError::none;'),
+        ('void ff8_shared_magic_heartbeat()\n{',
+         'void ff8_shared_magic_heartbeat()\n{\n'
+         '    // The loader has returned. Use the renderer overlay, never the menu controller.\n'
+         '    if (!g_activation_toast.empty() && get_popup_time() == 0) {\n'
+         '        show_popup_msg(TEXTCOLOR_RED, "%s", g_activation_toast.c_str());\n'
+         '        g_activation_toast.clear();\n'
+         '    }'),
+    ]
+    for old, new in changes:
+        if text.count(old) != 1:
+            raise RuntimeError(f'Shared Magic notification anchor changed: {old}')
+        text = text.replace(old, new, 1)
+    path.write_text(text, encoding='utf-8')
+
+
 def integrate_flare_owner(source: Path, *, startup: bool = False) -> None:
     """Wire only FF8 gates; preserve native encounter/music handling afterward."""
     changes = {
@@ -55,6 +84,7 @@ def prepare(source: Path, patch_output: Path, *, verify_revision: bool=True) -> 
     patch=ROOT/'games/ff8/ffnx_issue_51/package/ISSUE51_DERIVATIVE_SOURCE.patch'
     subprocess.run(['git','apply','--check','--ignore-space-change',str(patch)],cwd=source,check=True)
     subprocess.run(['git','apply','--ignore-space-change',str(patch)],cwd=source,check=True)
+    integrate_shared_magic_notifications(source)
     for folder,name in (
         ('ffnx_status_bars','lexeditor_ff8_bars.cpp'),
         ('ffnx_status_bars','lexeditor_ff8_bars.h'),
