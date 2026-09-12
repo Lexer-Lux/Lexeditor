@@ -1,3 +1,4 @@
+# Second pass after making the redirected-path regression portable on Windows.
 name: Temporary Bannerlord final validation
 
 on:
