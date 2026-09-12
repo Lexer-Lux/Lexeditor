@@ -311,7 +311,8 @@
   // per field map - eight of them - so taking the first match showed one
   // enemy and silently hid the rest.
   const curatedAssets=spec=>assets().filter(item=>
-    String(item.asset||"").split("/").pop().toLowerCase().replace(/\.uasset$/,"")===spec.basename);
+    String(item.asset||"").split("/").pop().toLowerCase().replace(/\.uasset$/,"")===spec.basename)
+    .sort((a,b)=>Number(/\/Resident\//i.test(b.asset))-Number(/\/Resident\//i.test(a.asset)));
   const curatedAsset=spec=>curatedAssets(spec)[0]||null;
   const SEMANTIC_TYPES={CanSale:"BOOL"};
   // The storage type is a signed 32-bit integer, so the schema's honest range is
@@ -544,7 +545,7 @@
       label:`${spec.label} tables`,
       active:state.data?.asset||siblings[0].asset,
       tabs:siblings.map(item=>({id:item.asset,
-        label:String(item.asset).split("/").slice(-2,-1)[0]||String(item.asset).split("/").pop()})),
+        label:/\/Resident\//i.test(item.asset)?"General":String(item.asset).split("/").slice(-2,-1)[0]||String(item.asset).split("/").pop()})),
       change:value=>{state.curatedAsset=value;state.selected=null;state.pages[spec.id]=0;
         state.asset=value;loadAsset(value).then(()=>render());},
     }):null;
