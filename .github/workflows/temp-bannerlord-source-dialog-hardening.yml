@@ -23,6 +23,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Correct harness quoting
+        run: python tools/temp_fix_bannerlord_source_dialog_hardening.py
       - name: Apply hardening patch
         run: python tools/temp_bannerlord_source_dialog_hardening.py
       - name: Focused validation
@@ -107,6 +109,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/temp-bannerlord-source-dialog-hardening.yml tools/temp_bannerlord_source_dialog_hardening.py
+          git rm .github/workflows/temp-bannerlord-source-dialog-hardening.yml tools/temp_bannerlord_source_dialog_hardening.py tools/temp_fix_bannerlord_source_dialog_hardening.py
           git commit -m "Clean Bannerlord source hardening harness"
           git push origin HEAD:feature/bannerlord-plugin
