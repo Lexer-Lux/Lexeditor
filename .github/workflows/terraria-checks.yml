@@ -7,12 +7,14 @@ on:
       - 'games/terraria/**'
       - 'codex/terraria/**'
       - 'tests/test_terraria_build_metadata.py'
+      - 'tests/test_terraria_local_mod_state.py'
       - '.github/workflows/terraria-checks.yml'
   pull_request:
     paths:
       - 'games/terraria/**'
       - 'codex/terraria/**'
       - 'tests/test_terraria_build_metadata.py'
+      - 'tests/test_terraria_local_mod_state.py'
       - '.github/workflows/terraria-checks.yml'
 
 permissions:
@@ -30,7 +32,7 @@ jobs:
       - name: Python parser and service tests
         run: |
           python -m compileall -q games/terraria
-          python -m unittest tests.test_terraria_build_metadata
+          python -m unittest tests.test_terraria_build_metadata tests.test_terraria_local_mod_state
       - name: Editor JavaScript syntax
         shell: bash
         run: |
