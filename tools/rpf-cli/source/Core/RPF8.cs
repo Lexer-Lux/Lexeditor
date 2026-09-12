@@ -236,33 +236,51 @@ namespace RDR2_RPF_Tool.Core
         public Dictionary<string, Entry> Entries = new Dictionary<string, Entry>();
         public byte[] Names;
         public bool IsTemp = false;
+        private string ownedTempDirectory;
 
         public static RPF8 Load(string path)
         {
             RPF8 rpf8 = new RPF8();
             rpf8.Rpf8StreamFile = FStream.Open(path, FileMode.Open, FileAccess.Read);
             rpf8.FilePath = path;
-            rpf8.Load();
-            rpf8.FilePath = Path.GetFullPath(rpf8.FilePath).Replace(Path.GetFullPath(Path.GetDirectoryName(rpf8.FilePath)), "").TrimStart('\\');
-            return rpf8;
+            try
+            {
+                rpf8.Load();
+                rpf8.FilePath = Path.GetFileName(path);
+                return rpf8;
+            }
+            catch
+            {
+                rpf8.Destroy();
+                throw;
+            }
         }
 
 
         public static RPF8 Load(string VirtualPath, byte[] bytes)
         {
-            string TempPath = Path.Combine(Path.GetTempPath(), Assembly.GetExecutingAssembly().GetCustomAttribute<AssemblyTitleAttribute>().Title, Path.GetDirectoryName(VirtualPath), DateTime.Now.ToString("yyyy-dd-M--HH-mm-ss"), Path.GetFileName(VirtualPath));
-
-            if (!Directory.Exists(Path.GetDirectoryName(TempPath)))
+            // The virtual archive name is metadata, never a writable path.
+            // Each load owns a unique directory, including concurrent loads of
+            // the same nested archive and failures before a reader is returned.
+            string directory = Path.Combine(Path.GetTempPath(), "Lexeditor-RpfCli",
+                Guid.NewGuid().ToString("N"));
+            string path = Path.Combine(directory, "archive.rpf");
+            Directory.CreateDirectory(directory);
+            try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(TempPath));
+                File.WriteAllBytes(path, bytes);
+                var rpf8 = RPF8.Load(path);
+                rpf8.IsTemp = true;
+                rpf8.ownedTempDirectory = directory;
+                rpf8.FilePath = VirtualPath;
+                return rpf8;
             }
-
-            File.WriteAllBytes(TempPath, bytes);
-
-            var rpf8 = RPF8.Load(TempPath);
-            rpf8.IsTemp = true;
-            rpf8.FilePath = VirtualPath;
-            return rpf8;
+            catch
+            {
+                File.Delete(path);
+                Directory.Delete(directory, false);
+                throw;
+            }
         }
 
 
@@ -319,6 +337,11 @@ namespace RDR2_RPF_Tool.Core
                 if (IsTemp)
                 {
                     File.Delete(path);
+                    if (ownedTempDirectory != null)
+                    {
+                        Directory.Delete(ownedTempDirectory, false);
+                        ownedTempDirectory = null;
+                    }
                 }
             }
         }

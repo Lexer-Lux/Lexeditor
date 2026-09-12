@@ -89,7 +89,9 @@ def test_runtime_routes_reachable_exactly_once(service, route, action):
     ({"Content-Length": "99999999"}, 413), ({"Transfer-Encoding": "chunked"}, 400),
 ])
 def test_untrusted_or_invalid_requests_cannot_start_patcher(service, headers, status):
-    assert request(service, "/api/runtime/install", headers=headers)[0] == status
+    # These headers must be rejected before reading a body. Sending body bytes
+    # races the early close on Windows and can hide the response behind a reset.
+    assert request(service, "/api/runtime/install", body=None, headers=headers)[0] == status
     assert not service[2]
 
 

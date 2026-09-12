@@ -34,7 +34,7 @@ function el(tag, attrs={}, ...children){
   return node;
 }
 const panel=o=>el("section",{},el("h2",{},o.title),o.identity||null,o.body);
-window.LexeditorUI={el,clone:structuredClone,columnPreferences:()=>({}),recordId:id=>String(id),infoHelp:t=>t,
+const stub={el,clone:structuredClone,columnPreferences:()=>({}),recordId:id=>String(id),infoHelp:t=>t,
   detailPanel:panel,detailSection:panel,detailField:o=>el("label",{},o.label,o.control),
   provenanceControl:o=>el("span",{},o.control,el("button",{type:"button",class:"test-restore",onclick:()=>o.apply(o.vanilla)},"Restore vanilla")),
   columnList:o=>el("div",{},...o.rows.map(row=>el("button",{type:"button","data-row":row.id,onclick:()=>o.select(row.id)},row.name))),
@@ -55,6 +55,28 @@ window.LexeditorUI={el,clone:structuredClone,columnPreferences:()=>({}),recordId
     return el("div",{},...controls);
   },
   dataMap:o=>({page:0,controls:[],content:el("div",{},...o.rows.map(row=>el("p",{},row.controls," ",row.status," ",row.notes)))}),
+  // These three were missing, so FF7's boot died inside the mock rather than
+  // in the plugin, and every test here timed out waiting for a load that had
+  // already thrown. They mirror the shared components closely enough for the
+  // structure these tests assert.
+  subtabBar:o=>el("div",{class:"lex-subtab-bar",role:"tablist"},
+    ...(o.tabs||[]).map(tab=>{const b=el("button",{class:"lex-subtab-button"+(tab.id===o.active?" active":""),
+      role:"tab","aria-selected":String(tab.id===o.active),onclick:()=>o.change?.(tab.id)},tab.label||tab.id);return b;})),
+  tabbedPanel:o=>el("div",{class:"lex-tabbed-panel "+(o.className||"")},
+    LexeditorUI.subtabBar({tabs:o.tabs,active:o.active,change:o.change}),
+    // The shared component names this option "content". Reading only "body"
+    // meant every tabbed panel rendered its tabs and dropped what was in them,
+    // so tests looked for content that the double had silently discarded.
+    el("div",{class:"lex-tabbed-panel-content"},...(()=>{const v=o.content!==undefined?o.content:o.body;return (Array.isArray(v)?v:[v]).filter(Boolean)})())),
+  integrationStatus:state=>el("span",{class:"lex-integration-status "+String(state||"")},String(state||"")),
+  readonlyField:value=>{const f=el("output",{class:"lex-readonly-field"},String(value??"—"));return f;},
+  infoIcon:()=>el("span",{class:"test-info-icon"}),
+  toggleRow:o=>el("div",{class:"test-toggle-row"},...(o.toggles||[]).map(t=>el("label",{},el("input",{type:"checkbox",checked:!!t.checked,disabled:!!t.disabled,"aria-label":t.label,onchange:e=>t.change&&t.change(e.target.checked,e)}),t.label))),
+  modLoaderSection:o=>el("section",{class:"test-mod-loader"},o&&o.title||"Mods"),
+  playThemeSound:()=>{},showToast:()=>{},copyText:async()=>true,
+  openGameFolder:()=>{},callWindow:async()=>null,confirmAction:async()=>true,
+  showAlert:async()=>true,refreshReferences:()=>{},autoFitControlText:()=>{},
+  soundCoverageTable:rows=>el("div",{class:"test-sound-coverage"},String((rows||[]).length)),
   sharedSettings:()=>({developerMode:false}),configureThemeSounds:()=>{},finishPluginLoading:()=>{window.testLoaded=true},
   EditHistory:class{constructor(o){this.options=o}observe(){}clear(){}},
   mountShell:o=>{
@@ -69,6 +91,15 @@ window.LexeditorUI={el,clone:structuredClone,columnPreferences:()=>({}),recordId
     return {refresh:()=>{window.testDirty=o.dirtyCount()}};
   }
 };
+// A component this double does not carry used to surface as "undefined is not
+// a function" inside a click handler, so the page silently kept its previous
+// contents and the test failed on a later assertion that had nothing to do
+// with it. Asking for a missing component now says which one by name.
+window.LexeditorUI=new Proxy(stub,{get(target,key){
+  if(key in target)return target[key];
+  if(typeof key!=="string")return undefined;
+  throw new Error("verify_ff7_ui's LexeditorUI double has no "+key+"; add it to the stub");
+}});
 })();
 '''
 
@@ -131,6 +162,9 @@ class PageTests(unittest.TestCase):
         self.click("Data Map")
         self.assertIn("Characters", self.page.locator("main").inner_text())
         self.click("Info")
+        # A script error leaves the previous view on screen, so the assertion
+        # below would report a missing label when the real fault was a throw.
+        self.assertEqual(self.errors, [])
         self.assertIn("Game root", self.page.locator("main").inner_text())
         self.click("Tweaks")
         self.assertIn("FFNx.toml", self.page.locator("main").inner_text())

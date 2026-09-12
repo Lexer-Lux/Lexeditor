@@ -52,7 +52,10 @@ def main() -> int:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval("navigate('formulae')")
-            wait_eval(cdp, "state.tab==='formulae'&&document.querySelectorAll('.formula-card').length===6&&document.querySelectorAll('.formula-rework').length===4", 30)
+            # Wait for the page, not for a fixed number of cards. FF8 has gained
+            # formulae since this was written, and pinning the count made every
+            # new one break a check that is about layout and editing.
+            wait_eval(cdp, "state.tab==='formulae'&&document.querySelectorAll('.formula-card').length>=document.querySelectorAll('.formula-rework').length+2&&document.querySelectorAll('.formula-rework').length>0", 30)
             result = cdp.eval("""(() => ({
               cards:[...document.querySelectorAll('.formula-card>h2')].map(node=>node.textContent.trim()),
               groups:[...document.querySelectorAll('.formula-subheading')].map(node=>node.textContent.trim()),
@@ -74,7 +77,12 @@ def main() -> int:
                 overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth};
             })()"""
             geometry_1600 = cdp.eval(geometry_script)
-            assert result["cards"] == ["PHYSICAL DAMAGE", "PHYSICAL ACCURACY", "MELEE DAMAGE (REWORK)", "MAGIC DAMAGE (REWORK)", "STATUS INFLICTION (REWORK)", "SPELL HEALING (REWORK)"], result
+            # The transcribed formulae must still be here and still lead; the
+            # reworks that follow them are a growing list.
+            leading = ["PHYSICAL DAMAGE", "PHYSICAL ACCURACY"]
+            assert result["cards"][:len(leading)] == leading, result
+            for title in ("MELEE DAMAGE", "MAGIC DAMAGE", "STATUS INFLICTION", "SPELL HEALING"):
+                assert any(title in card for card in result["cards"]), (title, result["cards"])
             assert result["reworkControl"] == {"checked": False, "inside": True}, result
             assert cdp.eval("document.querySelector('[aria-label=\"Formulae Rework\"]').disabled") is True
             assert result["groups"].count("FORMULA") == 2, result
@@ -107,7 +115,7 @@ def main() -> int:
             cdp.eval("saveAll()", True)
             wait_eval(cdp, "dirtyCount()===0", 20)
             cdp.eval("reloadEditable().then(()=>navigate('formulae'))", True)
-            wait_eval(cdp, "state.tab==='formulae'&&state.data.settings.formulaeRework===false&&document.querySelectorAll('.formula-card').length===6&&document.querySelectorAll('.formula-rework').length===4", 20)
+            wait_eval(cdp, "state.data.settings.formulaeRework===false&&state.tab==='formulae'&&document.querySelectorAll('.formula-card').length>=document.querySelectorAll('.formula-rework').length+2&&document.querySelectorAll('.formula-rework').length>0", 20)
             saved_value = cdp.eval("state.data.weapons.rows.find(row=>Number(row.id)===Number(state.formula.weaponId)).fields.find(value=>value.field==='attack_power').value")
             assert int(saved_value) == int(edit["next"]), (saved_value, edit)
             cdp.call("Emulation.setDeviceMetricsOverride", {

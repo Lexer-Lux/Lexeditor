@@ -73,6 +73,12 @@ BY_KEY = {table.key: table for table in TABLES}
 ENTRY_SIZE = 8
 
 
+def _integer(value: object, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"Refine {label} must be a whole number")
+    return value
+
+
 def _bounds(data: bytes, table: Table) -> None:
     if table.binary_offset + table.binary_size > len(data) \
             or table.message_offset + table.message_size > len(data):
@@ -128,7 +134,11 @@ def apply_edits(data: bytes, edits: list[dict]) -> tuple[bytes, int]:
     seen = set()
     allowed = {"text", "outputQuantity", "inputId", "inputQuantity", "outputId"}
     for edit in edits:
-        table_key, slot = str(edit["table"]), int(edit["id"])
+        if not isinstance(edit, dict) or not {"table", "id"} <= edit.keys():
+            raise ValueError("Refine recipe edit needs a table and ID")
+        table_key, slot = edit["table"], _integer(edit["id"], "recipe ID")
+        if not isinstance(table_key, str):
+            raise ValueError("Refine recipe table must be text")
         key = (table_key, slot)
         if table_key not in BY_KEY or not 0 <= slot < BY_KEY[table_key].count or key in seen:
             raise ValueError(f"Invalid or duplicate refine recipe: {key}")
@@ -149,11 +159,12 @@ def apply_edits(data: bytes, edits: list[dict]) -> tuple[bytes, int]:
             edit = replacements.get(row["id"], {})
             merged = {**row, **edit}
             for field in ("outputQuantity", "inputId", "inputQuantity", "outputId"):
-                value = int(merged[field])
+                value = _integer(merged[field], field)
                 if not 0 <= value <= 255:
                     raise ValueError(f"Refine {field} must be 0 to 255")
                 merged[field] = value
-            merged["text"] = str(merged["text"])
+            if not isinstance(merged["text"], str):
+                raise ValueError("Refine recipe text must be text")
             if any(merged[field] != row[field] for field in allowed):
                 changed += 1
             text_changed |= merged["text"] != row["text"]
@@ -191,4 +202,5 @@ def apply_edits(data: bytes, edits: list[dict]) -> tuple[bytes, int]:
                                for i in range(table.count)]
             if rebuilt_offsets != original_offsets:
                 raise ValueError("Refine text offsets changed without a text edit")
+        _table_rows(bytes(result), table)
     return bytes(result), changed

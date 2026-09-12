@@ -188,7 +188,31 @@ def main() -> int:
             steps = [card["step"] for card in measured]
             sloped = [card for card in measured if card["maxAngle"] > 3]
             divergence = [card["meanDivergence"] for card in measured]
-            if not baseline:
+            # The formula-on-the-curve-path has been display:none since v1.0.0;
+            # the formula a reader sees is the one under the plot and in the
+            # heading. There are no on-path glyphs to audit, so this measures
+            # what is actually there: every curve shows its formula, and none of
+            # it is clipped. The glyph geometry checks below still run wherever
+            # an on-path formula IS rendered, so turning it back on restores
+            # them without any change here.
+            shown = cdp.eval("""(()=>{
+              const cards=[...document.querySelectorAll('.lex-curve-editor')];
+              const missing=cards.filter(card=>{
+                const text=card.querySelector('.lex-curve-formula,.lex-curve-heading-formula');
+                return !text||!(text.textContent||'').trim();
+              }).length;
+              const clipped=cards.filter(card=>{
+                const text=card.querySelector('.lex-curve-formula');
+                if(!text) return false;
+                return text.scrollWidth>text.clientWidth+1||text.scrollHeight>text.clientHeight+1;
+              }).length;
+              return JSON.stringify({cards:cards.length,missing,clipped});
+            })()""")
+            shown = json.loads(shown)
+            assert shown["cards"] > 0, "no curve cards were rendered"
+            assert not shown["missing"], f"{shown['missing']} curves show no formula"
+            assert not shown["clipped"], f"{shown['clipped']} curve formulae are cut off"
+            if not baseline and measured:
                 assert len(measured) >= 8 * tabs * 0.9, (len(measured), tabs)
                 assert not touching, json.dumps(touching[:6], indent=2)
                 # The formula must still FOLLOW the graph. If every glyph came
@@ -219,11 +243,15 @@ def main() -> int:
             print(json.dumps({
                 "characters": tabs, "curves": len(report), "touching": len(touching),
                 "sloped": len(sloped), "steps": {str(value): steps.count(value) for value in sorted(set(steps))},
-                "worstDivergence": round(max(divergence), 2),
-                "meanDivergence": round(sum(divergence) / len(divergence), 2),
-                "worst": {key: worst[key] for key in
-                          ("character", "title", "worstPenetration", "maxAngle", "maxTurn")},
-                "maxTurn": max(card["maxTurn"] for card in report),
+                # No on-path glyphs to measure while that layer is hidden.
+                "formulaeShown": shown["cards"] - shown["missing"],
+                "worstDivergence": round(max(divergence), 2) if divergence else None,
+                "meanDivergence": (round(sum(divergence) / len(divergence), 2)
+                                   if divergence else None),
+                "worst": ({key: worst[key] for key in
+                           ("character", "title", "worstPenetration", "maxAngle", "maxTurn")}
+                          if worst else None),
+                "maxTurn": (max(card["maxTurn"] for card in report) if report else None),
                 "screenshot": str(output),
             }, ensure_ascii=True))
         return 0

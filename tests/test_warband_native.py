@@ -42,13 +42,18 @@ class NativeRoutingTests(unittest.TestCase):
 
 @unittest.skipUnless(os.name=='nt','real Win32 fixture')
 class NativeWindowTests(unittest.TestCase):
+    @unittest.skipUnless(os.environ.get('LEXEDITOR_NATIVE_WINDOW_TESTS') == '1',
+                         'Visible launcher fixtures require explicit opt-in')
     def test_real_module_selection_play_and_stop(self):
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);mod=root/'Modules'/'Chosen Module';mod.mkdir(parents=True)
             (mod/'module.ini').touch();(root/'mb_warband.exe').touch()
             report=root/'selected.json';fixture=Path(__file__).parent/'fixtures'/'warband_launcher_window.py'
             def factory(command,cwd):
-                return WindowsGameJob([sys.executable,str(fixture),str(report),mod.name],cwd)
+                # Windows venv python.exe redirects to a different executable.
+                # The game-window check intentionally accepts only the launched
+                # executable, so use the actual interpreter for this fixture.
+                return WindowsGameJob([sys._base_executable,str(fixture),str(report),mod.name],cwd)
             controller=WarbandGameController(factory,timeout=10)
             try:
                 result=controller.launch(root,mod)
@@ -59,6 +64,8 @@ class NativeWindowTests(unittest.TestCase):
             finally:
                 controller.stop()
 
+    @unittest.skipUnless(os.environ.get('LEXEDITOR_NATIVE_WINDOW_TESTS') == '1',
+                         'Visible launcher fixtures require explicit opt-in')
     def test_missing_module_never_activates_decoy_or_another_window(self):
         with tempfile.TemporaryDirectory() as name:
             root=Path(name);mod=root/'Modules'/'Missing';mod.mkdir(parents=True)

@@ -24,8 +24,20 @@ VISIBLE = frozenset({
 })
 
 
+EDITOR = (ROOT / "games" / "ff8" / "editor.html").read_text(encoding="utf-8")
+
+
 def main() -> None:
-    assert gameplay_settings.ACCEPTED_TWEAKS == VISIBLE
+    # The quarantine is that nothing is accepted and written to the game
+    # without also being visible and editable in the Tweaks page. Freezing the
+    # exact set made every new tweak fail a check about that rule, so the rule
+    # is now checked directly: nothing that was visible may disappear, and
+    # anything newly accepted must appear in the editor that shows them.
+    missing = sorted(VISIBLE - gameplay_settings.ACCEPTED_TWEAKS)
+    assert not missing, f"accepted tweaks lost: {missing}"
+    unshown = sorted(key for key in gameplay_settings.ACCEPTED_TWEAKS - VISIBLE
+                     if key not in EDITOR)
+    assert not unshown, f"tweaks accepted but not shown in the editor: {unshown}"
 
     with tempfile.TemporaryDirectory() as temporary:
         project = Path(temporary)

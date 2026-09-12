@@ -86,6 +86,11 @@ class ProjectManager:
                 pass  # discovery is a convenience, never a hard failure
         candidates.extend(Path(value).expanduser().resolve() for value in entry.get("known", [])
                           if isinstance(value, str) and value)
+        # A removed mod must stay removed. Discovery would otherwise hand the
+        # same folder back on the next snapshot, so removal is recorded rather
+        # than merely dropped from the known list.
+        forgotten = {os.path.normcase(str(Path(value).expanduser().resolve()))
+                     for value in entry.get("forgotten", []) if isinstance(value, str) and value}
         seen: set[str] = set()
         rows = []
         for root in candidates:
@@ -93,6 +98,8 @@ class ProjectManager:
             if key in seen:
                 continue
             seen.add(key)
+            if key in forgotten and key != os.path.normcase(str(current)):
+                continue
             problems = self._problems(root, spec.required_paths, spec.required_any)
             rows.append({"path": str(root), "name": display_names.get(key) or root.name or plugin.name,
                          "valid": not problems, "problems": problems,
@@ -113,7 +120,13 @@ class ProjectManager:
             known = [value for value in entry.get("known", []) if isinstance(value, str)]
             if os.path.normcase(str(root)) not in {os.path.normcase(value) for value in known}:
                 known.append(str(root))
-            payload[plugin_id] = {"current": str(root), "known": known}
+            # Choosing a folder again undoes an earlier removal.
+            forgotten = [value for value in entry.get("forgotten", [])
+                         if isinstance(value, str)
+                         and os.path.normcase(str(Path(value).expanduser().resolve()))
+                         != os.path.normcase(str(root))]
+            payload[plugin_id] = {"current": str(root), "known": known,
+                                  "forgotten": forgotten}
             self._write(payload)
         return self.snapshot(plugin_id)
 
@@ -158,6 +171,89 @@ class ProjectManager:
                      for value in entry.get("known", []) if isinstance(value, str)]
             if os.path.normcase(str(current)) == os.path.normcase(str(root)):
                 current = target
-            payload[plugin_id] = {"current": str(current), "known": known}
+            payload[plugin_id] = {"current": str(current), "known": known,
+                                  "forgotten": entry.get("forgotten", [])}
+            self._write(payload)
+        return self.snapshot(plugin_id)
+
+    def contents(self, plugin_id: str, root_value: str = "") -> dict:
+        """Count what this game's loader recognises inside one mod folder.
+
+        Adding a mod used to say nothing about whether the folder made sense,
+        so a player found out it had loaded nothing only when the game looked
+        unchanged. This walks the folder once and reports, per declared
+        category, how many files the loader will pick up - plus how many it
+        will ignore, which is the number that explains a mod doing nothing.
+        """
+        _plugin, spec = self._spec(plugin_id)
+        if root_value:
+            root = Path(root_value).expanduser().resolve()
+        else:
+            with self._lock:
+                payload = self._read()
+            entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
+            root = Path(entry.get("current") or spec.default_root).expanduser().resolve()
+        categories = [(label, tuple(suffix.lower() for suffix in suffixes))
+                      for label, suffixes in (spec.content_types or ())]
+        known = {suffix: label for label, suffixes in categories for suffix in suffixes}
+        counts = {label: 0 for label, _suffixes in categories}
+        unrecognized = 0
+        total = 0
+        bytes_seen = 0
+        if not root.is_dir():
+            return {"path": str(root), "exists": False, "declared": bool(categories),
+                    "categories": [], "unrecognized": 0, "files": 0, "bytes": 0}
+        for folder, folders, files in os.walk(root):
+            folders[:] = [name for name in folders if name not in IGNORED_NAMES]
+            for name in files:
+                total += 1
+                try:
+                    bytes_seen += os.path.getsize(os.path.join(folder, name))
+                except OSError:
+                    pass
+                label = known.get(Path(name).suffix.lower())
+                if label is None:
+                    unrecognized += 1
+                else:
+                    counts[label] += 1
+        return {
+            "path": str(root),
+            "exists": True,
+            "declared": bool(categories),
+            "categories": [{"label": label, "count": counts[label],
+                            "suffixes": list(suffixes)}
+                           for label, suffixes in categories],
+            "unrecognized": unrecognized,
+            "files": total,
+            "bytes": bytes_seen,
+        }
+
+    def forget(self, plugin_id: str, root_value: str) -> dict:
+        """Stop listing one mod. Nothing on disk is touched.
+
+        Lexeditor keeps a list of mod folders, which is not the same thing as
+        owning them: a folder may be someone else's mod, or live under the
+        game's own directory. Removing an entry therefore only stops Lexeditor
+        loading and listing it. Deleting the files stays the player's decision,
+        made in their file manager.
+        """
+        _plugin, spec = self._spec(plugin_id)
+        root = Path(root_value).expanduser().resolve()
+        key = os.path.normcase(str(root))
+        with self._lock:
+            payload = self._read()
+            entry = payload.get(plugin_id, {}) if isinstance(payload.get(plugin_id), dict) else {}
+            known = [value for value in entry.get("known", [])
+                     if isinstance(value, str)
+                     and os.path.normcase(str(Path(value).expanduser().resolve())) != key]
+            forgotten = [value for value in entry.get("forgotten", []) if isinstance(value, str)]
+            if key not in {os.path.normcase(str(Path(value).expanduser().resolve()))
+                           for value in forgotten}:
+                forgotten.append(str(root))
+            current = Path(entry.get("current") or spec.default_root).expanduser().resolve()
+            if os.path.normcase(str(current)) == key:
+                current = spec.default_root.resolve()
+            payload[plugin_id] = {"current": str(current), "known": known,
+                                  "forgotten": forgotten}
             self._write(payload)
         return self.snapshot(plugin_id)

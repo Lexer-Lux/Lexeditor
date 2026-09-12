@@ -63,6 +63,9 @@ def depth_delta(text):
     return depth
 
 
+ITEM_RE = re.compile(r"\bitm_([a-z0-9_]+)\b", re.I)
+
+
 def parse_troops(path):
     """Find every troop entry.
 
@@ -104,6 +107,10 @@ def parse_troops(path):
             'plural': plural,
             'level': lvl.group(1) if lvl else '',
             'faction': facs[0] if facs else '',
+            # Equipment, in the order the troop lists it. A troop has no mesh of
+            # its own; what it has is the items it carries, and those resolve to
+            # meshes the editor already knows how to draw.
+            'items': list(dict.fromkeys(f'itm_{name}' for name in ITEM_RE.findall(body))),
             'flags': ' '.join(sorted(set(re.findall(r'\btf_[a-z0-9_]+', body)))),
         })
 

@@ -15,7 +15,24 @@ DIST=ROOT/'dist'
 VERSION='0.1.0'
 RESOURCE_EXTENSIONS={'.html','.css','.js','.json','.csv','.txt','.md','.xml','.svg','.png','.jpg','.jpeg','.webp','.ico','.icns','.ttf','.otf','.woff','.woff2','.toml','.ini','.py','.ps1','.cmd','.bat'}
 # Helpers with no proven redistribution grant are never copied into an installer.
-FORBIDDEN_PARTS={'__pycache__','.git','worklog','codex','baseline','game-data','out'}
+FORBIDDEN_PARTS={'__pycache__','.git','worklog','codex','baseline','game-data','out',
+                 '_scratch','.venv','.build','build','vcpkg','.vcpkg','buildtrees',
+                 'node_modules','.pytest_cache'}
+
+
+def resource_files(root: Path) -> list[Path]:
+    """Select app resources without traversing disposable development trees."""
+    files = []
+    for folder in ('ui', 'assets', 'games'):
+        for directory, names, leaves in os.walk(root / folder, followlinks=False):
+            names[:] = [name for name in names if name not in FORBIDDEN_PARTS
+                        and not name.startswith('ffnx_')
+                        and not (Path(directory) / name).is_symlink()]
+            for name in leaves:
+                path = Path(directory) / name
+                if not path.is_symlink() and not name.startswith('ffnx_') and path.suffix.lower() in RESOURCE_EXTENSIONS:
+                    files.append(path)
+    return sorted(files)
 
 
 def run(*args: str) -> None:
@@ -41,14 +58,8 @@ def build_app() -> Path:
     generated=ROOT/'build/distribution';generated.mkdir(parents=True,exist_ok=True)
     notices=generated/'distribution-notices.json';notices.write_text(json.dumps(package_notices(),ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
     datas=[]
-    for folder in ['ui','assets','games']:
-        for path in (ROOT/folder).rglob('*'):
-            relative=path.relative_to(ROOT)
-            if not path.is_file() or path.is_symlink() or FORBIDDEN_PARTS.intersection(relative.parts):continue
-            if path.suffix.lower() not in RESOURCE_EXTENSIONS:continue
-            # Reverse-engineering driver trees are source evidence, not app assets.
-            if any(part.startswith('ffnx_') for part in relative.parts):continue
-            datas.append((str(path),str(relative.parent)))
+    for path in resource_files(ROOT):
+        datas.append((str(path), str(path.relative_to(ROOT).parent)))
     datas.append((str(notices),'ui'))
     modules=['games.'+p.parent.name+'.plugin' for p in (ROOT/'games').glob('*/plugin.py')]
     sys.path.insert(0,str(ROOT))

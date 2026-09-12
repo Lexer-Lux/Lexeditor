@@ -31,6 +31,11 @@
       "structure": "Edit one Lexeditor project with overlays under StreamingAssets/ (especially StreamingAssets/Data/). Deploy Project copies those overlays into <FF9>\\Lexeditor\\ while preserving other Memoria mods and unrelated Memoria.ini settings.",
       "overriding": "Lexeditor does not stack or semantically merge multiple FFIX projects. Other Memoria mods may coexist and Memoria resolves them according to its FolderNames ordering; conflicts with the same underlying content therefore follow Memoria's own resolution rules."
     },
+    "palworld": {
+      "loader": "Pocketpair's official Palworld v0.7+ mod loader and Workshop package model. Lexeditor authors compatible packages and PalSchema raw-table patches, builds a clean snapshot, can create one owned unregistered client test package, and can stage/activate a server-compatible package for the Windows dedicated server. Client activation remains read-only; dedicated-server activation is an explicit stale-guarded reversible PalModSettings.ini transaction. Lexeditor does not publish to Steam or install/replace PalSchema or UE4SS.",
+      "structure": "One selected Lexeditor project is rooted at Info.json. Build Package creates <project>/build/official-package from Info.json, Thumbnail and declared InstallRule targets while excluding Lexeditor recovery artifacts. Client local testing uses one owned random 10-digit folder under workshop/content/1623730. Server deployment requires IsServer=true and uses <PalServer>/Mods/Workshop/Lexeditor-<PackageName>; server activation recovery state stays under the project, never inside the package.",
+      "overriding": "The official loader identifies packages by PackageName. Lexeditor refuses client or server deployment when another source folder already uses the same PackageName and refuses to overwrite externally modified owned state. PalSchema raw patches apply named DataTable row/property values rather than whole assets; when several runtime patches target the same field, Lexeditor does not claim a separate conflict winner beyond PalSchema's runtime order."
+    },
     "rdr": {
       "loader": "De novo Lexeditor deployment through RedHook / Ultimate ASI Loader's update-folder override mechanism.",
       "structure": "Lexeditor edits one project (C:\\RDRMod by default); game-data replacements live under <project>\\mod\\ in archive-relative trees. Deploy Project rebuilds affected RPF6 archive copies under <RDR>\\update\\... while leaving the installed source archives untouched.",
@@ -50,6 +55,11 @@
       "loader": "Warband's native module system. WSE2 is Lexeditor's optional enhanced runtime helper, not a multi-mod overlay loader.",
       "structure": "Each installed mod is its own folder under <Warband>\\Modules\\ with module.ini. Lexeditor can also edit and build a Module System source project before it becomes an installed module.",
       "overriding": "Warband selects one module at launch. Lexeditor does not stack several modules or apply a cross-module priority order; resources and dependencies declared by the selected module follow Warband's own module rules."
+    },
+    "chrono-trigger": {
+      "loader": "CTExt. Lexeditor uses an already-installed CTExt runtime for explicit loose-file deployment and activation; it never installs or replaces the CTExt DLLs automatically.",
+      "structure": "One selected Lexeditor project is a CTExt-compatible archive-relative overlay containing Game/... and Localize/... paths. External projects can be mirrored into <Chrono Trigger>/mods/<project-name>; a source project already directly under mods/<name> is used in place and is never deleted by Lexeditor.",
+      "overriding": "CTExt owns runtime mod load order through ctext.json. Lexeditor appends or removes only its selected project entry, preserves unrelated entries, and never semantically merges separate projects; within the selected project, loose files replace the corresponding resources.bin resources while the installed archive remains immutable."
     }
   }
 }

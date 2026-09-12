@@ -51,6 +51,11 @@ class ModProjectSpec:
     required_any: tuple[tuple[str, ...], ...] = ()
     # Roots the plugin can find on disk, beyond the ones already chosen.
     discover: DiscoverProjectsFunction | None = None
+    # What this game's loader actually recognises inside a mod folder, as
+    # {category label: (suffix, ...)}. Adding a mod reports these counts so a
+    # player can tell at a glance whether the folder was understood, instead of
+    # finding out later that nothing loaded.
+    content_types: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 @dataclass(frozen=True)

@@ -1,5 +1,6 @@
 """Static contract for Lexeditor issue 3 list-detail pagination."""
 
+import re
 from pathlib import Path
 
 
@@ -99,7 +100,11 @@ require("masterDetail(master,itemDetail" not in RDR
         and "masterDetail(master,shopDetail" not in RDR
         and "masterDetail(master,missionDetail" not in RDR,
         "RDR still assembles scrolling list-detail views")
-require("pagedListDetail({rows:filtered" in WARBAND and "pageSizes:{items:20,troops:20,upgrades:20}" in WARBAND,
+# The option order inside the call is not the contract; passing the filtered
+# rows to the shared preset is. Matching "pagedListDetail({rows:" pinned the
+# first key, so adding any option ahead of it broke a check about paging.
+require(re.search(r"pagedListDetail\(\{[^}]*rows:filtered", WARBAND)
+        and "pageSizes:{items:20,troops:20,upgrades:20}" in WARBAND,
         "Warband Items must inherit shared fitted paging")
 require('splitKey:`warband-${view}`' in WARBAND and "pageSize:200" not in WARBAND,
         "Warband Troops and Upgrades must not retain the old 200-row scrolling table")

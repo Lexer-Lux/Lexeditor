@@ -85,8 +85,12 @@ def main() -> None:
         page.evaluate('__panels()');page.wait_for_timeout(100)
         restored = int(divider.get_attribute('aria-valuenow'))
         assert abs(restored-moved) <= 1, (restored,moved)
+        # Double-click must NOT reset the split. A divider is dragged, and a
+        # drag that begins with two quick presses would throw the layout away
+        # instead of moving it; two contracts record that decision. Right-click
+        # is the reset, and the next line is what proves it.
         divider.dblclick();page.wait_for_timeout(100)
-        assert abs(float(page.evaluate('localStorage.getItem("lexeditor:list-detail:regression")'))-42)<.1
+        assert float(page.evaluate('localStorage.getItem("lexeditor:list-detail:regression")')) > 42
         divider.focus();page.keyboard.press('ArrowLeft');divider.click(button='right');page.wait_for_timeout(100)
         assert abs(float(page.evaluate('localStorage.getItem("lexeditor:list-detail:regression")'))-42)<.1
         page.set_viewport_size({'width':650,'height':800});page.wait_for_timeout(150)
@@ -146,6 +150,15 @@ def main() -> None:
           return {cancel,error,current:h.current,canForward:h.canForward,visible};
         }''')
         assert result['cancel'] and result['error'] and not result['canForward'] and result['current']=='Data Map',result
+        # An omitted lower bound must not turn into zero during number formatting.
+        page.evaluate("document.querySelector('#main').append(LexeditorUI.el('input',{id:'no-lower-bound',type:'number',max:100000,value:-12}))")
+        number = page.locator('#no-lower-bound[inputmode="decimal"]')
+        number.wait_for()
+        assert number.input_value() == '-12'
+        number.focus()
+        number.fill('-20')
+        number.blur()
+        assert number.input_value() == '-20'
         assert not errors, errors
         results={'new_button':'pass','whole_header_sort':'pass','selection_retained':'pass',
           'divider_keyboard_persistence_doubleclick_contextmenu_stack':'pass','units_integer_bounds':'pass',

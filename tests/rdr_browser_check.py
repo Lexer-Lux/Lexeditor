@@ -102,19 +102,18 @@ def run(output: Path, executable: str | None) -> None:
                 amount = fields.filter(has_text="Amount").first
                 expect(amount.locator("input[type=number]")).to_have_value("3")
                 assert amount.locator(".lex-info-help").count() == 0, "storage metadata became an info bubble"
-                # pagedListDetail finishes split sizing through its layout lifecycle.
-                # DOM presence is not enough: measuring during that brief zero-width
-                # phase makes this visual regression flaky on busy hosted runners.
-                page.wait_for_function("""() => {
+                # Read geometry from the current DOM in the same browser task
+                # that checks readiness. A locator resolved after a separate wait
+                # can refer to a detail node detached by the next fit render.
+                geometry = page.wait_for_function("""() => {
                   const rows=[...document.querySelectorAll('.record-detail .lex-detail-field')];
                   const field=rows.find(row=>row.textContent.includes('Amount'));
                   const label=field?.querySelector('.lex-detail-field-label');
-                  return !!field && !!label && field.getBoundingClientRect().width>0 && label.getBoundingClientRect().width>0;
-                }""")
-                geometry = amount.evaluate("""e=>{
-                  const b=e.getBoundingClientRect(), l=e.querySelector('.lex-detail-field-label').getBoundingClientRect();
+                  if (!field || !label) return false;
+                  const b=field.getBoundingClientRect(), l=label.getBoundingClientRect();
+                  if (!field.isConnected || b.width<=0 || l.width<=0) return false;
                   return {field:b.width,label:l.width,ratio:l.width/b.width};
-                }""")
+                }""").json_value()
                 assert 0.075 <= geometry["ratio"] <= 0.125, (width, "RDR1 bypassed shared ~10% label lane", geometry)
                 page.screenshot(path=str(output / f"rdr-items-{width}.png"), full_page=True)
 

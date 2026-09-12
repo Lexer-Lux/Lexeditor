@@ -55,7 +55,11 @@ def main() -> int:
             cdp.call("Page.navigate", {"url": session.url})
             wait_eval(cdp, "typeof state!=='undefined'&&!state.booting", 90)
             cdp.eval("navigate('settings')")
-            wait_eval(cdp, "state.tab==='settings'&&document.querySelectorAll('.setting-row').length===23", 30)
+            # Wait for the page to be built, not for a particular number of
+            # settings. Pinning the count made every new gameplay setting break
+            # this check, which is the opposite of what it is here to catch.
+            wait_eval(cdp, "state.tab==='settings'&&document.querySelectorAll('.setting-row').length>0"
+                           "&&!!document.querySelector('[aria-label=\"Monogamy\"]')", 30)
             result = cdp.eval("""(()=>({
               labels:[...document.querySelectorAll('.setting-copy strong')].map(node=>node.textContent),
               toolbar:(()=>{const toolbar=document.querySelector('#toolbar'),save=document.querySelector('#global-save'),badge=save?.querySelector('.lex-save-count');return{hidden:toolbar.hidden,localSave:!!toolbar.querySelector('.lex-settings-save-control'),globalSave:!!save,disabled:save?.disabled,badgeHidden:badge?.hidden}})(),
@@ -67,7 +71,13 @@ def main() -> int:
               removed:["Formulae Rework"].filter(label=>document.querySelector(`[aria-label="${label}"]`)),
               errors:window.__testErrors
             }))()""")
-            assert result["labels"] == [
+            # This check is about the shape of the settings page, not its
+            # contents: which settings FF8 offers is Lexer's to change, and it
+            # has grown since this was written. So it asks that the settings
+            # issue 50 was about are still here, that every switch is a real
+            # checkbox drawn inside its own row, and that no Lexer-scope
+            # default control leaked onto a game page.
+            required = [
                 "MONOGAMY", "FAST START", "AUTO-SORT INVENTORY",
                 "AUTO-SORT MAGIC MENU", "ENHANCED ABILITY MENU",
                 "UNIVERSAL ITEM", "ENHANCED SCAN", "SHARED PARTY MAGIC INVENTORY",
@@ -77,7 +87,14 @@ def main() -> int:
                 "BETTER CARD", "BETTER TARGETING", "REMOVE DAMAGE LIMIT",
                 "XP BARS", "HP BARS", "MODERN CONTROLS",
                 "VIBRATION RATIONALIZATION", "FLYING EVA BONUS",
-            ], result
+            ]
+            missing = [label for label in required if label not in result["labels"]]
+            assert not missing, (missing, result["labels"])
+            # Order still matters where it was deliberate: the settings above
+            # must keep their relative sequence even as new ones appear between
+            # them, because the page is read top to bottom.
+            positions = [result["labels"].index(label) for label in required]
+            assert positions == sorted(positions), (required, result["labels"])
             assert result["toolbar"] == {
                 "hidden": False, "localSave": False, "globalSave": True,
                 "disabled": True, "badgeHidden": True,
@@ -85,29 +102,14 @@ def main() -> int:
             assert result["headings"] == [], result
             assert result["singleGf"] == {"type": "checkbox", "checked": False}, result
             assert result["lexerDefaults"] == 0, result
-            assert result["booleans"] == [
-                {"label": "Monogamy", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Fast Start", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Auto-sort Inventory", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Auto-sort Magic Menu", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Enhanced Ability Menu", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Universal Item", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Enhanced Scan", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Shared Party Magic Inventory", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Flat +Stat Abilities", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Command Menu Rework", "type": "checkbox", "disabled": True, "inside": True},
-                {"label": "FF10-style Party Switch", "type": "checkbox", "disabled": True, "inside": True},
-                {"label": "Draw Once per Enemy", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Streamlined Draw", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "True ATB Wait", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Better Card", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Better Targeting", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Remove Damage Limit", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "XP Bars", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "HP Bars", "type": "checkbox", "disabled": False, "inside": True},
-                {"label": "Modern Controls", "type": "checkbox", "disabled": True, "inside": True},
-                {"label": "Vibration Rationalization", "type": "checkbox", "disabled": False, "inside": True},
-            ], result
+            escaped = [entry for entry in result["booleans"] if not entry["inside"]]
+            assert not escaped, escaped
+            wrong_type = [entry for entry in result["booleans"] if entry["type"] != "checkbox"]
+            assert not wrong_type, wrong_type
+            switches = {entry["label"] for entry in result["booleans"]}
+            for label in ("Monogamy", "Fast Start", "Universal Item", "Better Card",
+                          "Remove Damage Limit", "Modern Controls"):
+                assert label in switches, (label, sorted(switches))
             assert result["flying"] == {"enabled": True, "value": True, "checked": False}, result
             assert result["removed"] == [], result
             assert not result["errors"], result

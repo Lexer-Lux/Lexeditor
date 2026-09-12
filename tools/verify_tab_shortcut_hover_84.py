@@ -100,7 +100,7 @@ def main() -> int:
         assert before["visibility"] == "hidden" and float(before["opacity"]) == 0
         assert abs(before["label"]["center"] - before["center"]) <= 0.5
         assert hovered["visibility"] == "visible" and hovered["opacity"] > 0
-        assert hovered["overlap"] == 0 and hovered["badgeInside"]
+        assert hovered["overlap"] == 0 and hovered["badgeInside"], hovered
         assert abs(hovered["leftInset"] - hovered["rightInset"]) <= 0.5
         assert after == "hidden"
         print({"hiddenAtRest": True, "visibleOnHover": True,

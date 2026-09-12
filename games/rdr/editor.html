@@ -22,7 +22,7 @@
     .header-actions{display:flex;align-items:center;gap:7px}.lex-history-button,.save{height:36px;color:#e7d4ba;border:1px solid #62443a;background:#2d1c17}.save{width:38px;padding:0;cursor:pointer;font-size:18px}.save:disabled{opacity:.35;cursor:default}
     #toolbar{display:flex;align-items:center;gap:9px;min-height:54px;padding:8px 16px;border-bottom:1px solid var(--lex-border);background:#1b1815;box-shadow:0 2px 8px #0006}#toolbar input,#toolbar select,#toolbar button{height:36px;padding:7px 10px;color:var(--lex-text);border:1px solid #5b4b3d;border-radius:2px;background:#29241f}#toolbar input{min-width:330px}#toolbar label{display:flex;align-items:center;gap:6px;color:var(--lex-muted)}#toolbar label input{min-width:auto;height:auto}.count{margin-left:auto;color:var(--lex-muted)}
     main{padding:var(--lex-panel-gap);min-height:calc(100vh - 112px)}
-    body:has(.rdr-split){display:flex;height:100vh;min-height:0;flex-direction:column;overflow:hidden}body:has(.rdr-split)>#lexeditor-shell,body:has(.rdr-split)>#toolbar{flex:0 0 auto}body:has(.rdr-split)>main{flex:1 1 auto;height:auto;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}.lex-master-detail.rdr-split{height:100%}.rdr-record-list{--lex-fitted-row-height:28px;border:1px solid var(--lex-border);border-radius:6px;background:var(--lex-panel);overflow:auto;min-height:0;max-height:100%}.rdr-listhead,.rdr-record-row{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1.05fr) minmax(0,.7fr) minmax(0,.8fr);gap:6px;padding:6px 10px;align-items:center}.rdr-listhead{position:sticky;top:0;z-index:1;color:var(--lex-highlight);border-bottom:1px solid var(--lex-border);background:var(--lex-panel-2);font-size:10px;text-transform:uppercase}.rdr-record-list .lex-list-row{height:var(--lex-fitted-row-height);padding:0;border-bottom:1px solid #ffffff0a;cursor:pointer}.rdr-record-list .lex-list-row:hover{background:var(--lex-panel-2)}.rdr-record-list .lex-list-row.sel{color:white;background:var(--lex-accent)}.rdr-record-cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rdr-record-name{color:var(--lex-highlight);font:400 14px/1 var(--lex-heading-font)}.rdr-record-id{color:var(--lex-muted);font:10px/1 Consolas,monospace}.rdr-record-type,.rdr-record-source{color:var(--lex-muted);font-size:10.5px}.rdr-record-list .sel .rdr-record-cell{color:white}.badge{padding:1px 5px;color:#c9b79f;border:1px solid #5b4b3d;border-radius:2px;font:10px/1.3 "Segoe UI",sans-serif;text-transform:uppercase}.badge.project{color:#d7e9ce;border-color:#5e8155;background:#243620}.badge.binary{color:#c9c0b5;background:#282522}
+    body:has(.rdr-split){display:flex;height:100vh;min-height:0;flex-direction:column;overflow:hidden}body:has(.rdr-split)>#lexeditor-shell,body:has(.rdr-split)>#toolbar{flex:0 0 auto}body:has(.rdr-split)>main{flex:1 1 auto;height:auto;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}.lex-master-detail.rdr-split{height:100%}.rdr-record-list{--lex-fitted-row-height:28px;border:1px solid var(--lex-border);border-radius:6px;background:var(--lex-panel);overflow:auto;min-height:0;max-height:100%}.rdr-listhead,.rdr-record-row{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1.05fr) minmax(0,.7fr) minmax(0,.8fr);gap:6px;padding:6px 10px;align-items:baseline}.rdr-mission-row{grid-template-columns:minmax(0,1.15fr) minmax(0,1.25fr) minmax(0,.7fr) minmax(0,.9fr)}.rdr-record-list .lex-list-row .rdr-record-row{height:100%;align-content:center}.rdr-listhead{position:sticky;top:0;z-index:1;color:var(--lex-highlight);border-bottom:1px solid var(--lex-border);background:var(--lex-panel-2);font-size:10px;text-transform:uppercase}.rdr-record-list .lex-list-row{height:var(--lex-fitted-row-height);padding:0;border-bottom:1px solid #ffffff0a;cursor:pointer}.rdr-record-list .lex-list-row:hover{background:var(--lex-panel-2)}.rdr-record-list .lex-list-row.sel{color:white;background:var(--lex-accent)}.rdr-record-cell{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rdr-record-name{color:var(--lex-highlight);font:400 14px/1 var(--lex-heading-font)}.rdr-record-id{color:var(--lex-muted);font:10px/1 Consolas,monospace}.rdr-record-type,.rdr-record-source{color:var(--lex-muted);font-size:10.5px}.rdr-record-list .sel .rdr-record-cell{color:white}.badge{padding:1px 5px;color:#c9b79f;border:1px solid #5b4b3d;border-radius:2px;font:10px/1.3 "Segoe UI",sans-serif;text-transform:uppercase}.badge.project{color:#d7e9ce;border-color:#5e8155;background:#243620}.badge.binary{color:#c9c0b5;background:#282522}
     .record-detail{display:flex;flex-direction:column;height:100%;min-width:0;overflow:auto;padding:12px 14px;border:1px solid var(--lex-border);border-radius:6px;background:var(--lex-panel)}.record-detail .detail-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:10px 4px 12px;border-bottom:1px solid #2a2419}.record-detail h2{margin:0;color:#f0d7b4;font:400 25px/1.05 var(--lex-heading-font)}.record-detail .lex-detail-field{border-bottom:1px solid #2a2419}.record-detail .lex-detail-field-label{color:var(--lex-highlight);font-size:13px;letter-spacing:.4px;text-transform:uppercase}.record-detail .lex-detail-field-label small{display:block;margin-top:3px;color:var(--lex-muted);font-size:10px;letter-spacing:0;text-transform:none}.record-detail .lex-detail-field-control{min-width:0;color:var(--lex-text)}.record-detail .lex-detail-field-control code{display:block;overflow:hidden;color:#d8c7b0;text-overflow:ellipsis;white-space:nowrap}.record-detail .lex-detail-field-control input:not([type=checkbox]),.record-detail .lex-detail-field-control select{width:100%;min-width:0;padding:7px 8px;color:var(--lex-text);border:1px solid #5b4b3d;background:#29241f}.record-detail .lex-detail-field-control input[type=checkbox]{width:18px;height:18px;accent-color:var(--lex-accent)}.empty{display:grid;height:100%;place-items:center;color:var(--lex-muted);text-align:center}.binary-note{padding:16px;border:1px solid #574b40;background:#211d19;color:#c7b7a3}
     .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}.card{padding:16px;border:1px solid var(--lex-border);background:#1a1816}.card h2{margin:0 0 12px;color:#ebd3b1;font:400 23px var(--lex-heading-font)}.path-row{display:grid;grid-template-columns:155px minmax(0,1fr);gap:10px;padding:7px 0;border-bottom:1px solid #342e29}.path-row code{overflow:hidden;color:#d4c3ad;text-overflow:ellipsis}.ok{color:#8cbb7e}.error{color:#e3786e}.manifest{margin-top:12px;padding:10px;color:#ae9f8c;border:1px solid #3f3730;background:#121110;font:12px/1.45 Consolas,monospace;white-space:pre-wrap}
     .field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1px;border:1px solid #463b32;background:#463b32}.field{display:grid;grid-template-columns:minmax(120px,1fr) minmax(120px,1fr);align-items:center;gap:12px;min-height:54px;padding:8px 10px;background:#1b1815}.field label{min-width:0;color:#cdbb9f;overflow-wrap:anywhere}.field small{display:block;color:var(--lex-muted)}.field input:not([type=checkbox]),.field select{width:100%;min-width:0;padding:7px 8px;color:var(--lex-text);border:1px solid #5b4b3d;background:#29241f}.field input[type=checkbox]{width:18px;height:18px;accent-color:var(--lex-accent)}.source-note{margin:10px 4px 12px;padding:10px;border-left:3px solid var(--lex-highlight);background:#211d19;color:#cbbba6}.source-note strong{color:#f1d5ab}.settings-layout{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.settings-section{min-width:0;border:1px solid var(--lex-border);background:#1a1816}.settings-section h2{margin:0;padding:10px 12px;color:#ecd2ae;border-bottom:2px solid var(--lex-accent);font:400 22px var(--lex-heading-font)}.settings-section .field{grid-template-columns:minmax(120px,1fr) minmax(100px,42%)}.loot-layout{display:grid;grid-template-columns:minmax(300px,1fr) minmax(360px,1.35fr);gap:14px}.loot-table{width:100%;border-collapse:collapse}.loot-table th,.loot-table td{padding:8px;border-bottom:1px solid #3e352e;text-align:left}.loot-table input{width:100%;padding:6px;color:var(--lex-text);border:1px solid #5b4b3d;background:#29241f}.asi-badge{display:inline-block;margin-left:8px;padding:2px 7px;color:#fff4df;border:1px solid #c99a50;background:#6e491d;font:700 10px "Segoe UI",sans-serif;text-transform:uppercase}.mono{font-family:Consolas,monospace}.stack{display:flex;flex-direction:column;gap:14px}
@@ -37,12 +37,20 @@
   <script src="/shared/framework.js"></script>
   <script>
   "use strict";
-  const {el,list,pagedListDetail,pager,provenanceControl,clone,showAlert}=LexeditorUI;
+  const {el,list,pagedListDetail,pager,provenanceControl,clone,showAlert,infoHelp}=LexeditorUI;
   const $=selector=>document.querySelector(selector);
-  const state={booting:true,tab:"items",activeSource:"mine",files:{rows:[],counts:{}},dashboard:null,status:"Ready",items:null,itemSelected:"",itemQuery:"",itemSource:"",itemPage:0,itemPageSize:20,itemEdits:{},shops:null,shopSelected:"",shopQuery:"",shopName:"",shopCategory:"",shopPage:0,shopPageSize:20,shopEdits:{},missions:null,missionSelected:"",missionQuery:"",missionArea:"",missionPage:0,missionPageSize:20,missionEdits:{},vanilla:{items:null,shops:null,missions:null},settings:null,settingEdits:{},loot:null,lootDocument:null,lootDirty:false,dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,dataMapSort:["filename",1]};
+  const state={booting:true,modOnly:false,tab:"items",activeSource:"mine",files:{rows:[],counts:{}},dashboard:null,status:"Ready",items:null,itemSelected:"",itemQuery:"",itemSource:"",itemPage:0,itemPageSize:20,itemEdits:{},shops:null,shopSelected:"",shopQuery:"",shopName:"",shopCategory:"",shopPage:0,shopPageSize:20,shopEdits:{},missions:null,missionSelected:"",missionQuery:"",missionArea:"",missionPage:0,missionPageSize:20,missionEdits:{},vanilla:{items:null,shops:null,missions:null},settings:null,settingEdits:{},loot:null,lootDocument:null,lootDirty:false,dataMap:null,mapQuery:"",mapStatus:"",mapPage:0,dataMapSort:["filename",1]};
   const PAGE_SIZE=250;
 
   async function api(path,options){const response=await fetch(path,options);const value=await response.json();if(value.error)throw new Error(value.error);return value;}
+  // "Mod contents only" keeps the rows this project has actually changed. RDR
+  // already records every edit against the record's id, so the filter is that
+  // record set and nothing else.
+  function modOnlySpec(edits,resetPage){
+    return {available:state.activeSource==="mine",value:state.modOnly===true,
+      changed:row=>Object.prototype.hasOwnProperty.call(edits,String(row.id)),
+      change:value=>{state.modOnly=value;resetPage();render()}};
+  }
   function dirtyCount(){return state.activeSource==="mine"?Object.keys(state.itemEdits).length+Object.keys(state.shopEdits).length+Object.keys(state.missionEdits).length+Object.keys(state.settingEdits).length+(state.lootDirty?1:0):0;}
   function setStatus(text){state.status=text;}
   function historyCapture(){return {itemEdits:clone(state.itemEdits),shopEdits:clone(state.shopEdits),missionEdits:clone(state.missionEdits),settingEdits:clone(state.settingEdits),lootDocument:clone(state.lootDocument),lootDirty:state.lootDirty};}
@@ -55,7 +63,10 @@
   function editItem(item,field,value){const key=`${item.id}|${field.field}`;if(value===field.value)delete state.itemEdits[key];else state.itemEdits[key]=value;shell.refresh();}
   function selectItem(item){state.itemSelected=item.id;renderItems();}
   function recordCell(className,value,title=value){return el("span",{class:`rdr-record-cell ${className}`,title:String(title||"")},String(value||"—"));}
-  function detailField(label,value,help=""){const control=value instanceof Node?value:el("span",{},String(value??"—"));return LexeditorUI.detailField({label,control,description:help||""});}
+  // `description` is prose under the row; `help` is the shared info bubble that
+  // every other plugin's fields carry. RDR's rows had neither, so nothing on
+  // the page explained what any of it edits.
+  function detailField(label,value,help="",bubble=""){const control=value instanceof Node?value:el("span",{},String(value??"—"));return LexeditorUI.detailField({label,control,description:help||"",help:bubble?LexeditorUI.infoHelp(bubble):null});}
   function applyControlValue(control,value){if(control.type==="checkbox")control.checked=String(value).toLowerCase()==="true";else control.value=String(value);control.dispatchEvent(new Event(control.type==="checkbox"||control.tagName==="SELECT"?"change":"input",{bubbles:true}));}
   function sourceControl(control,current,vanilla,apply,format){if(state.activeSource!=="mine"||vanilla===undefined)return control;return provenanceControl({control,current,vanilla,internal:true,format,apply:value=>{apply(value);applyControlValue(control,value);shell.refresh()}})}
   function itemRow(item){return el("div",{class:"rdr-record-row"},recordCell("rdr-record-name",item.friendlyName||item.name||`Item ${item.index}`),recordCell("rdr-record-id",item.name||`#${item.index}`),recordCell("rdr-record-type",item.type),recordCell("rdr-record-source",item.sourceLabel));}
@@ -71,18 +82,36 @@
   function itemDetail(){
     const item=(state.items?.rows||[]).find(row=>row.id===state.itemSelected);
     if(!item)return el("div",{class:"lex-detail empty"},el("div",{},el("h2",{},"Select an inventory item"),el("p",{},"Edits become full XML overrides in C:\\RDRMod. The installed content.rpf stays unchanged.")));
-    return el("div",{class:"lex-detail record-detail item-detail"},
-      el("div",{class:"detail-head"},el("h2",{},item.name||`Item ${item.index}`),el("span",{class:`badge${item.project?" project":""}`},item.project?"Project":"Vanilla")),
-      detailField("Record type",item.type),detailField("Dataset",item.sourceLabel),
-      detailField("Vanilla source",el("code",{title:item.sourcePath},item.sourcePath)),
-      detailField("Project override",el("code",{title:item.projectPath},item.projectPath)),
-      ...item.fields.map(field=>detailField(field.field,scalarControl(item,field))));
+    // An item's name is the heading, so the heading is where it is typed. It
+    // used to be two ordinary rows further down - NAME and FRIENDLYNAME - so
+    // the name a reader sees at the top was the one copy they could not
+    // change. NAME is the record's key and the override's filename, so it
+    // stays read-only, under the heading where the other identities go.
+    const fieldNamed=wanted=>item.fields.find(field=>String(field.field).toLowerCase()===wanted);
+    const friendly=fieldNamed("friendlyname");
+    const rest=item.fields.filter(field=>!["name","friendlyname"].includes(String(field.field).toLowerCase()));
+    return LexeditorUI.detailPanel({className:"record-detail item-detail",
+      title:(friendly?itemValue(item,friendly):"")||item.friendlyName||item.name||`Item ${item.index}`,
+      renameLabel:"Item name",
+      renameRecord:state.activeSource==="mine"&&friendly?value=>editItem(item,friendly,value):undefined,
+      identity:LexeditorUI.recordId(item.index),
+      meta:item.name||"",
+      actions:el("span",{class:`badge${item.project?" project":""}`},item.project?"Project":"Vanilla"),
+      body:[
+        detailField("Record type",item.type,"","The XML element this record comes from. It decides which fields the game reads."),
+        detailField("Dataset",item.sourceLabel,"","Which shipped data file this item was defined in: the base game or one of its DLC."),
+        detailField("Vanilla source",el("code",{title:item.sourcePath},item.sourcePath),"","The untouched file inside the installed content.rpf. Lexeditor never writes here."),
+        detailField("Project override",el("code",{title:item.projectPath},item.projectPath),"","Where your edit is written, as a full XML override. The game loads this instead of the vanilla file."),
+        // No bubble on the data fields themselves. A generic note repeated on
+        // every scalar is noise, and the four rows above already say where the
+        // value comes from and where an edit is written.
+        ...rest.map(field=>detailField(field.field,scalarControl(item,field)))]});
   }
   function renderItems(){
     const rows=matchingItems();
     $("#toolbar").replaceChildren();
     const sourceFilter=el("select",{"aria-label":"Filter items by source",onchange:event=>{state.itemSource=event.target.value;state.itemPage=0;renderItems();}},el("option",{value:"",selected:!state.itemSource},"Base game and DLC"),...(state.items?.sources||[]).map(source=>el("option",{value:source.id,selected:source.id===state.itemSource},source.label)));
-    $("#main").replaceChildren(pagedListDetail({rows,key:item=>item.id,slots:false,page:state.itemPage,pageSize:state.itemPageSize,selected:state.itemSelected,noun:"items",splitKey:"rdr-items",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(state.itemEdits,()=>{state.itemPage=0}),rows,key:item=>item.id,slots:false,page:state.itemPage,pageSize:state.itemPageSize,selected:state.itemSelected,noun:"items",splitKey:"rdr-items",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
       search:{key:"rdr-items",value:state.itemQuery,placeholder:"Search RDR inventory items…",change:value=>{state.itemQuery=value;state.itemPage=0;renderItems();}},filters:[sourceFilter],
       master:({rows,selected,select})=>list({rows,key:item=>item.id,selected,selectedClass:"sel",select,class:"rdr-record-list",header:el("div",{class:"rdr-listhead"},el("span",{},"Name"),el("span",{},"ID"),el("span",{},"Type"),el("span",{},"Source")),rowClass:"rdr-record-entry",render:itemRow,"aria-label":"RDR inventory items"}),
       detail:()=>itemDetail(),sync:next=>{state.itemPage=next.page;state.itemPageSize=next.pageSize;state.itemSelected=next.selected||"";},change:next=>{state.itemPage=next.page;state.itemPageSize=next.pageSize;state.itemSelected=next.selected||"";renderItems();}}));shell.refresh();
@@ -125,7 +154,7 @@
     $("#toolbar").replaceChildren();
     const shopFilter=el("select",{"aria-label":"Filter shop stock by shop",onchange:event=>{state.shopName=event.target.value;state.shopPage=0;renderShops();}},el("option",{value:"",selected:!state.shopName},"All shops"),...shopNames.map(name=>el("option",{value:name,selected:name===state.shopName},name)));
     const categoryFilter=el("select",{"aria-label":"Filter shop stock by type",onchange:event=>{state.shopCategory=event.target.value;state.shopPage=0;renderShops();}},el("option",{value:"",selected:!state.shopCategory},"All stock types"),...categories.map(category=>el("option",{value:category,selected:category===state.shopCategory},category)));
-    $("#main").replaceChildren(pagedListDetail({rows,key:item=>item.id,slots:false,page:state.shopPage,pageSize:state.shopPageSize,selected:state.shopSelected,noun:"items",splitKey:"rdr-shops",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(state.shopEdits,()=>{state.shopPage=0}),rows,key:item=>item.id,slots:false,page:state.shopPage,pageSize:state.shopPageSize,selected:state.shopSelected,noun:"items",splitKey:"rdr-shops",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
       search:{key:"rdr-shops",value:state.shopQuery,placeholder:"Search RDR shop stock…",change:value=>{state.shopQuery=value;state.shopPage=0;renderShops();}},filters:[shopFilter,categoryFilter],
       master:({rows,selected,select})=>list({rows,key:item=>item.id,selected,selectedClass:"sel",select,class:"rdr-record-list",header:el("div",{class:"rdr-listhead"},el("span",{},"Item"),el("span",{},"Shop"),el("span",{},"Type"),el("span",{},"Qty / Stock")),rowClass:"rdr-record-entry",render:shopRow,"aria-label":"RDR shop inventory"}),
       detail:()=>shopDetail(),sync:next=>{state.shopPage=next.page;state.shopPageSize=next.pageSize;state.shopSelected=next.selected||"";},change:next=>{state.shopPage=next.page;state.shopPageSize=next.pageSize;state.shopSelected=next.selected||"";renderShops();}}));shell.refresh();
@@ -141,7 +170,7 @@
   function missionValue(mission,reward){const key=`${mission.id}|${reward}`;return Object.prototype.hasOwnProperty.call(state.missionEdits,key)?state.missionEdits[key]:String(mission.rewards[reward]);}
   function editMission(mission,reward,value){const key=`${mission.id}|${reward}`;if(value===String(mission.rewards[reward]))delete state.missionEdits[key];else state.missionEdits[key]=value;shell.refresh();}
   function selectMission(mission){state.missionSelected=mission.id;renderMissions();}
-  function missionRow(mission){return el("div",{class:"rdr-record-row"},recordCell("rdr-record-name",mission.name),recordCell("rdr-record-id",`#${mission.id} · ${mission.scriptName}`),recordCell("rdr-record-type",missionArea(mission)),recordCell("rdr-record-source",`$${mission.rewards.cash} / F${mission.rewards.fame} / H${mission.rewards.honor}`));}
+  function missionRow(mission){return el("div",{class:"rdr-record-row rdr-mission-row"},recordCell("rdr-record-id",`#${mission.id} · ${mission.scriptName}`),recordCell("rdr-record-name",mission.name),recordCell("rdr-record-type",missionArea(mission)),recordCell("rdr-record-source",`$${mission.rewards.cash} / F${mission.rewards.fame} / H${mission.rewards.honor}`));}
   function missionDetail(){
     const mission=(state.missions?.missions||[]).find(row=>row.id===state.missionSelected);
     if(!mission)return el("div",{class:"lex-detail empty"},el("div",{},el("h2",{},"No mission selected")));
@@ -162,9 +191,9 @@
     const areas=[...new Set((state.missions?.missions||[]).map(missionArea))].sort((a,b)=>a.localeCompare(b));
     $("#toolbar").replaceChildren();
     const areaFilter=el("select",{"aria-label":"Filter missions by area",onchange:event=>{state.missionArea=event.target.value;state.missionPage=0;renderMissions();}},el("option",{value:"",selected:!state.missionArea},"All areas"),...areas.map(area=>el("option",{value:area,selected:area===state.missionArea},area)));
-    $("#main").replaceChildren(pagedListDetail({rows,key:mission=>mission.id,slots:false,page:state.missionPage,pageSize:state.missionPageSize,selected:state.missionSelected,noun:"missions",splitKey:"rdr-missions",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
+    $("#main").replaceChildren(pagedListDetail({modOnly:modOnlySpec(state.missionEdits,()=>{state.missionPage=0}),rows,key:mission=>mission.id,slots:false,page:state.missionPage,pageSize:state.missionPageSize,selected:state.missionSelected,noun:"missions",splitKey:"rdr-missions",className:"rdr-split",defaultSplit:44,fit:{rowSelector:".rdr-record-entry",headerSelector:".rdr-listhead",minRowHeight:32},
       search:{key:"rdr-missions",value:state.missionQuery,placeholder:"Search Story missions…",change:value=>{state.missionQuery=value;state.missionPage=0;renderMissions();}},filters:[areaFilter],
-      master:({rows,selected,select})=>list({rows,key:mission=>mission.id,selected,selectedClass:"sel",select,class:"rdr-record-list",header:el("div",{class:"rdr-listhead"},el("span",{},"Mission"),el("span",{},"ID / Script"),el("span",{},"Area"),el("span",{},"Cash / Fame / Honor")),rowClass:"rdr-record-entry",render:missionRow,"aria-label":"RDR Story mission rewards"}),
+      master:({rows,selected,select})=>list({rows,key:mission=>mission.id,selected,selectedClass:"sel",select,class:"rdr-record-list",header:el("div",{class:"rdr-listhead rdr-mission-row"},el("span",{},"ID / Script"),el("span",{},"Mission"),el("span",{},"Area"),el("span",{},"Cash / Fame / Honor")),rowClass:"rdr-record-entry",render:missionRow,"aria-label":"RDR Story mission rewards"}),
       detail:()=>missionDetail(),sync:next=>{state.missionPage=next.page;state.missionPageSize=next.pageSize;state.missionSelected=next.selected||"";},change:next=>{state.missionPage=next.page;state.missionPageSize=next.pageSize;state.missionSelected=next.selected||"";renderMissions();}}));shell.refresh();
   }
 
@@ -191,10 +220,10 @@
     $("#main").replaceChildren(el("div",{class:"settings-layout"},...sections));shell.refresh();
   }
 
-  function lootNumber(parent,key,label,step="1",minimum="0",maximum="100000"){
-    return el("div",{class:"field"},el("label",{},label),el("input",{type:"number",step,min:minimum,max:maximum,value:String(parent[key]),oninput:event=>{parent[key]=event.target.value.trim()===""?"":Number(event.target.value);state.lootDirty=true;shell.refresh();}}));
+  function lootNumber(parent,key,label,step="1",minimum="0",maximum="100000",note=""){
+    return el("div",{class:"field"},el("label",{},label,note?infoHelp(note):null),el("input",{type:"number",step,min:minimum,max:maximum,value:String(parent[key]),oninput:event=>{parent[key]=event.target.value.trim()===""?"":Number(event.target.value);state.lootDirty=true;shell.refresh();}}));
   }
-  function lootFlag(parent,key,label){return el("div",{class:"field"},el("label",{},label),el("input",{type:"checkbox",checked:!!parent[key],onchange:event=>{parent[key]=event.target.checked;state.lootDirty=true;shell.refresh();},"aria-label":label}));}
+  function lootFlag(parent,key,label,note=""){return el("div",{class:"field"},el("label",{},label,note?infoHelp(note):null),el("input",{type:"checkbox",checked:!!parent[key],onchange:event=>{parent[key]=event.target.checked;state.lootDirty=true;shell.refresh();},"aria-label":label}));}
   function renderLoot(){
     $("#toolbar").replaceChildren(el("span",{},"Corpse loot from the installed WSC context"),el("span",{class:"count"},state.loot?.file||""));
     if(!state.loot?.available||!state.lootDocument){$("#main").replaceChildren(el("div",{class:"empty"},el("div",{},el("h2",{},"Loot ASI override is unavailable"),el("p",{},state.loot?.reason||"The project file could not be loaded."))));shell.refresh();return;}
@@ -207,12 +236,20 @@
       el("thead",{},el("tr",{},el("th",{},"Item enum"),el("th",{},"Quantity"),el("th",{},"Weight"))),
       el("tbody",{},...bonusRows));
     const source=el("section",{class:"card"},
-      el("h2",{},"Corpse bonus item",el("span",{class:"asi-badge"},"ASI override")),
-      el("div",{class:"source-note"},el("strong",{},"This is not an RPF replacement. "),"LexerRDR.asi owns this schema-versioned project file. Only the five item IDs proven in Function_117 are accepted."),
-      lootNumber(bonus,"chancePercent","Bonus roll chance (%)","1","0","100"),bonusTable);
-    const moneyCard=el("section",{class:"card"},el("h2",{},"Money paths",el("span",{class:"asi-badge"},"ASI override")),el("div",{class:"source-note"},`Function_123: ${money.decoratorPaths.map(path=>`${path.decorator} = ${path.operation}`).join(" · ")}`),el("div",{class:"field-grid"},lootNumber(base.range,"minimum","Base minimum","0.01"),lootNumber(base.range,"maximum","Base maximum","0.01"),lootFlag(base,"applyStatScale","Apply stat scale"),lootFlag(base,"applyItem17Multiplier","Apply item 17 multiplier"),lootFlag(base,"applyFinalMultiplier","Apply final multiplier")));
-    const evidence=el("section",{class:"card"},el("h2",{},"Installed-script evidence"),el("div",{class:"path-row"},el("b",{},"Archive"),el("code",{},doc.source?.archive||"Not supplied")),el("div",{class:"path-row"},el("b",{},"Script"),el("code",{},doc.source?.script||"Not supplied")),el("pre",{class:"manifest"},(doc.source?.functions||[]).map(fn=>`${fn.name} @ ${fn.positionHex} / ${fn.positionDecimal}\n${fn.role}`).join("\n\n")));
-    $("#main").replaceChildren(el("div",{class:"stack"},el("div",{class:"loot-layout"},source,moneyCard),evidence));shell.refresh();
+      el("h2",{},"Corpse bonus item",el("span",{class:"asi-badge"},"ASI override"),
+        infoHelp("Not an RPF replacement: LexerRDR.asi owns this schema-versioned project file, and it accepts only the five item IDs proven in Function_117.")),
+      lootNumber(bonus,"chancePercent","Bonus roll chance (%)","1","0","100","How often looting a body rolls for a bonus item at all. At 0 no body ever yields one; at 100 every body rolls, and the table below then decides which item comes up."),bonusTable);
+    const moneyCard=el("section",{class:"card"},el("h2",{},"Money paths",el("span",{class:"asi-badge"},"ASI override")),el("div",{class:"source-note"},`Function_123: ${money.decoratorPaths.map(path=>`${path.decorator} = ${path.operation}`).join(" · ")}`),el("div",{class:"field-grid"},lootNumber(base.range,"minimum","Base minimum","0.01",undefined,undefined,"The low end of the money a body carries before any multiplier below is applied. The game picks a value between this and the maximum."),lootNumber(base.range,"maximum","Base maximum","0.01",undefined,undefined,"The high end of that same range. Set it equal to the minimum to give every body the same amount."),lootFlag(base,"applyStatScale","Apply stat scale","Multiply the rolled amount by the game's own difficulty and progression scale, so late-game bodies carry more. Off pays the raw roll everywhere."),lootFlag(base,"applyItem17Multiplier","Apply item 17 multiplier","Honour the multiplier the game attaches to item slot 17, which is how it grants a player bonus to money found. Off ignores that bonus."),lootFlag(base,"applyFinalMultiplier","Apply final multiplier","Apply the last multiplier in the chain, after the other two. This is the one to turn off to see the raw roll.")));
+    const evidence=el("details",{class:"card loot-evidence"},el("summary",{},"Which script this is reading"),el("div",{class:"path-row"},el("b",{},"Archive"),el("code",{},doc.source?.archive||"Not supplied")),el("div",{class:"path-row"},el("b",{},"Script"),el("code",{},doc.source?.script||"Not supplied")),el("pre",{class:"manifest"},(doc.source?.functions||[]).map(fn=>`${fn.name} @ ${fn.positionHex} / ${fn.positionDecimal}\n${fn.role}`).join("\n\n")));
+    // Two questions come up on this page every time: where the ordinary
+    // per-enemy drop list is edited, and whether enemies carry drop tables of
+    // their own somewhere else. Both are answered here rather than left for
+    // the reader to conclude from the absence of a table.
+    const scope=el("section",{class:"card"},
+      el("h2",{},"What this tab covers",
+        infoHelp("Red Dead Redemption has no per-enemy drop table in its data files. What a body yields is decided in script: Function_117 rolls the bonus item and Function_123 decides the money. LexerRDR.asi patches those two functions, and the two cards on this page are their inputs. There is nowhere else an enemy's drops are defined, which is why there is no enemy list here.")),
+      el("p",{},"Loot in this game is script logic, not a data table. The two cards below are the inputs to the two script functions that decide what a body yields; there is no per-enemy drop list in the game's files to edit."));
+    $("#main").replaceChildren(el("div",{class:"stack"},scope,el("div",{class:"loot-layout"},source,moneyCard),evidence));shell.refresh();
   }
 
   async function renderDataMap(){
@@ -233,7 +270,9 @@
   }
 
   function renderProject(){
-    $("#toolbar").replaceChildren(el("span",{},"Read-only game source and Git-backed project overrides"));
+    // No "read only" banner. Every read-only value already carries the shared
+    // lock mark, so the banner restated in words what the controls show.
+    $("#toolbar").replaceChildren();
     const sources=state.dashboard.manifest?.sources||{};
     const statusCard=el("section",{class:"card"},el("h2",{},"Preparation"),state.dashboard.problems.length?el("div",{class:"error"},...state.dashboard.problems.map(problem=>el("div",{},problem))):el("div",{class:"ok"},`${state.files.counts.all||0} tuning files, ${state.items?.counts?.all||0} items, and ${state.shops?.counts?.items||0} shop entries prepared. Installed archives are read-only.`),el("pre",{class:"manifest"},Object.keys(sources).length?`${Object.entries(sources).map(([label,source])=>`${label}: ${source.path}\nSHA-256: ${source.sha256}`).join("\n\n")}\n\nPrepared: ${state.dashboard.manifest.preparedAt}\nInventory files: ${state.dashboard.manifest.fileCounts?.inventory||0}\nShop dictionaries: ${state.dashboard.manifest.fileCounts?.gringoUnpacked||0}`:"Preparation manifest is not available."));
     const redHook=state.dashboard.redHook;
@@ -281,10 +320,17 @@
       el("div",{class:"path-row"},el("b",{},"Update-folder target"),el("code",{title:deployment.updateRoot||""},deployment.updateRoot||"Unavailable")),
       ...deploymentRows,
       ...Object.entries(state.dashboard.paths).filter(([name])=>["Editable overrides","Inventory overrides","Shop overrides","Settings","Loot ASI override","Mission ASI override"].includes(name)).map(([name,path])=>el("div",{class:"path-row"},el("b",{},name),el("code",{title:path},path))));
-    $("#main").replaceChildren(el("div",{class:"cards"},statusCard,redHookCard,shopTestCard,missionTestCard,deliveryCard));shell.refresh();
+    $("#main").replaceChildren(el("div",{class:"cards"},statusCard,redHookCard,shopTestCard,missionTestCard,deliveryCard),
+      LexeditorUI.modLoaderSection({
+        loader:"RedHook, the community runtime for the PC release. It loads the plugin's overrides when the game starts.",
+        output:"Edits are written as Git-backed override files in the project folder, which RedHook reads over the stock data.",
+        order:"RedHook applies overrides after the base data. Two mods overriding the same file conflict; the later one wins.",
+        safety:"Installed game source data is read only. Every edit is stored as a separate override rather than a rewrite.",
+        removal:"Remove the override files, or uninstall RedHook to return the game to stock.",
+      }));shell.refresh();
   }
 
-  async function openRedHook(){try{await api("/api/redhook/open",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});setStatus("Opened the official RedHook page");}catch(error){setStatus(`Could not open RedHook: ${error.message}`);alert(state.status);}}
+  async function openRedHook(){try{await api("/api/redhook/open",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});setStatus("Opened the official RedHook page");}catch(error){setStatus(`Could not open RedHook: ${error.message}`);showAlert({title:"Could not open RedHook",message:String(error.message||error)});}}
   async function configureRedHook(){await api("/api/redhook/configure",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.dashboard=await api("/api/dashboard");}
   async function stageShopTest(){
     try{setStatus("Staging deterministic shop price test…");const result=await api("/api/shop-test/stage",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});state.shops=await api("/api/shops");state.dashboard=await api("/api/dashboard");setStatus(result.message||"Shop test staged");renderProject();}

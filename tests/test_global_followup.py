@@ -26,14 +26,14 @@ class FollowupTests(unittest.TestCase):
         text=(ROOT/'games/rdr2/editor.html').read_text(encoding='utf-8')
         self.assertNotIn('Clamped to -2.00..2.00',text)
         self.assertNotIn('Clamped to 0.30..8.00',text)
-        self.assertIn('Editor range: ${range.min} to ${range.max}',text)
-        self.assertIn('Apply requirement: ${boundary}',text)
-    def test_design_review_is_opt_in_and_has_no_write_or_launch(self):
-        text=(ROOT/'ui/design-review.js').read_text(encoding='utf-8')
-        for forbidden in ('fetch(', 'pywebview', 'localStorage', 'sessionStorage', '/api/'):
-            self.assertNotIn(forbidden,text)
+        # 1.2 puts bounds on the control and keeps only behavior in its help.
+        self.assertIn('{min:range.min}',text)
+        self.assertIn('{max:range.max}',text)
+        self.assertIn('Changing this setting requires: ${boundary}',text)
+    def test_blank_keeps_graphs_without_removed_design_review_assets(self):
         blank=(ROOT/'games/blank/editor.html').read_text(encoding='utf-8')
-        self.assertIn('id:"design",label:"Design Review"',blank)
+        self.assertNotIn('design-review.js',blank)
+        self.assertNotIn('design-review.css',blank)
         self.assertIn('id:"graphs",label:"Graphs"',blank)
         self.assertIn('curveEditor(',blank)
     def test_guide_edits_sources_not_generated_bundle(self):
