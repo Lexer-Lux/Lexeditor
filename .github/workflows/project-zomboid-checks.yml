@@ -22,34 +22,9 @@ on:
       - '.github/workflows/project-zomboid-checks.yml'
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  regenerate-credits:
-    if: github.event_name == 'pull_request' && github.head_ref == 'project-zomboid-plugin'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 2
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Regenerate offline credits and restore workflow
-        shell: bash
-        run: |
-          python tools/generate_credits.py
-          git checkout HEAD^ -- .github/workflows/project-zomboid-checks.yml
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ui/credits.json .github/workflows/project-zomboid-checks.yml
-          if git diff --cached --quiet; then
-            exit 0
-          fi
-          git commit -m "Regenerate offline credits for Project Zomboid"
-          git push origin HEAD:project-zomboid-plugin
-
   project-zomboid:
     strategy:
       fail-fast: false
