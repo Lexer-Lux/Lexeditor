@@ -5986,7 +5986,11 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 .lex-toggle { justify-content:flex-start !important; gap:7px; padding-inline:7px; }
 .lex-toggle-row > .lex-toggle { width:fit-content; justify-self:start; }
 .lex-toggle-rail { flex:0 0 14px; width:14px; min-width:14px; }
-.lex-toggle-name { flex:0 1 auto; }
+/* The name takes the rest of its box, so the space after it is the box's
+   own padding rather than whatever the grid track had left over. That is
+   what makes the gap before the switch and the gap after the name the
+   same on every flag in the row. */
+.lex-toggle-name { flex:1 1 auto; min-width:0; }
 .lex-reference-values .lex-boolean-mark { overflow:visible; }
 .lex-shell-header button:is(:active,.lex-command-pressed) { background:var(--lex-accent) !important; color:var(--lex-accent-text) !important; }
 .lex-control-held button[data-shortcut-key] { position:relative; }
@@ -5997,8 +6001,22 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 .lex-curve-plot::before { font-size:clamp(24px,calc(110cqw / var(--lex-curve-title-chars,10)),110px); }
 
-.lex-toggle-row { display:flex; flex-wrap:wrap; }
-.lex-toggle-row > .lex-toggle { width:max-content; max-width:100%; }
+/* Flag boxes share the row and use all of it. Sized to their own content
+   they came out different widths with a band of dead space on the right,
+   which is the state that reads as a broken row rather than a set of
+   switches. The basis is the wrap threshold: boxes that no longer fit at
+   that width move to the next line and share it in turn. */
+/* Flag boxes are one set, so they are one width and they use the whole row.
+   Sized to their own content they came out ragged with a band of dead space
+   on the right; laid out as wrapping flex items the one left alone on the
+   last line stretched to seven times its neighbours. Equal grid tracks do
+   both: every box the same width, and the row filled across. */
+.lex-toggle-row {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--lex-toggle-basis,11em)),1fr));
+  gap:var(--lex-panel-gap,12px);
+}
+.lex-toggle-row > .lex-toggle { min-width:0; max-width:100%; width:auto; justify-self:stretch; }
 
 .lex-ui-scale {display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;margin:0 7px 0 0;color:var(--lex-text);font:12px/1 system-ui,sans-serif;text-shadow:none;}
 .lex-ui-scale input[type="range"] {width:64px;min-width:0;max-width:64px;height:18px;min-height:0;margin:0;padding:0;accent-color:var(--lex-accent);border:0;box-shadow:none;}

@@ -17,7 +17,11 @@ class InGameTimeTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("enable_ff8_ingame_time", source)
-        self.assertIn("draw_main_menu_clock", source)
+        # The clock is drawn by hooking the native PLAY-time renderer rather
+        # than by a function of our own, which is why the hook is named for
+        # the menu it intercepts.
+        self.assertIn("main_menu_clock_hook", source)
+        self.assertIn("g_clock_renderer", source)
         self.assertIn("std::time(nullptr)", source)
         self.assertIn("localtime_s", source)
         self.assertNotIn("played_time_secs", source)
@@ -42,9 +46,20 @@ class InGameTimeTests(unittest.TestCase):
         source = (ROOT / "games/ff8/ffnx_status_bars/ffnx-src/lexeditor_ff8_bars.cpp").read_text(
             encoding="utf-8"
         )
-        self.assertIn("if (!enable_ff8_xp_bars && !enable_ff8_ingame_time) return;", source)
+        # The clock installs without XP bars. The gate has since grown to
+        # cover the HP and GF bars too, so it is checked by what it means
+        # rather than by one exact spelling that keeps moving.
+        gate = "if (!ff8 || (!enable_ff8_xp_bars && !enable_ff8_hp_bars"
+        self.assertIn(gate, source)
+        self.assertIn("!enable_ff8_gf_hp_bars && !enable_ff8_ingame_time))", source)
         self.assertIn("if (!enable_ff8_xp_bars) return;", source)
-        self.assertIn("enable_ff8_ingame_time && g_capture.surface == XpSurface::main_menu", source)
+        # The clock is not an overlay surface any more; it hooks the native
+        # PLAY-time renderer. What still has to hold is the ordering: the
+        # clock is installed before the XP-bars early return, so turning XP
+        # bars off cannot take the clock with it.
+        clock = source.index("replace_call(0x004C1C6E")
+        xp_only = source.index("if (!enable_ff8_xp_bars) return;")
+        self.assertLess(clock, xp_only)
 
 
 if __name__ == "__main__":

@@ -4049,11 +4049,21 @@ function itemTagsCell(it){
         const input=el("input",{type:"number",min:"0",max:"1",step:"any",value:runtime===undefined?"":fmtCompactNumber(runtime),placeholder:"Unavailable",
           class:it.key in state.alcoholEdits?"edited":"",disabled:!available,
           title:available?"Actual drunkenness added when consumed. 1.0 causes immediate blackout. This runtime value is separate from Rockstar's coarse drink-class tag.":(state.alcohol.reason||"No verified per-drink strength is available for this item."),
+          // Recorded as it is typed, not only on blur. Chromium withholds the
+          // change event here - the number box is rebuilt around the reader
+          // between keystrokes - so an edit made by typing was silently lost
+          // and Save stayed grey. Blur still does the correcting.
+          oninput:event=>{
+            const value=event.target.valueAsNumber;
+            if(!Number.isFinite(value)||value<0||value>1)return;
+            state.alcoholEdits[it.key]=value;renderToolbarOnly();},
           onchange:event=>{
             const value=event.target.valueAsNumber;
             if(!Number.isFinite(value)||value<0||value>1){
+              delete state.alcoholEdits[it.key];
               event.target.value=runtime===undefined?"":fmtCompactNumber(runtime);
-              toast("Drunkenness must be a number from 0 to 1.",true);return;
+              toast("Drunkenness must be a number from 0 to 1.",true);
+              renderToolbarOnly();return;
             }
             state.alcoholEdits[it.key]=value;renderToolbarOnly();}});
         wrap.append(el("label",{class:"alcohol-strength"},"Drunkenness",input,

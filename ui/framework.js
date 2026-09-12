@@ -3552,7 +3552,10 @@ ${contents.path}`});
       element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`, "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓")));
       const create = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
-        disabled: !modSupport?.canManage,
+        // Adding or finding a project is not mod-library work and never was:
+        // a plugin says whether it can create one through canCreate. Gating
+        // these on a mod adapter took the action away from every game that
+        // does not have one, Blank included.
         hidden: !value.canCreate, onclick: async () => {
           closeMenu();
           const projectName = await askProjectName(options.plugin.name || options.plugin.id, options.projectCreatePrompt || {});
@@ -3567,7 +3570,6 @@ ${contents.path}`});
       }, "➕ Add a Mod");
       const browse = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
-        disabled: !modSupport?.canManage,
         onclick: () => { closeMenu(); guarded(async () => {
           const result = options.browseProject
             ? await options.browseProject()
@@ -4753,6 +4755,10 @@ ${contents.path}`});
     };
     const setDeveloperMode = enabled => {
       developerMode = !!enabled;
+      // Restarting the plugin is a developer action, the same as the GitHub
+      // workspace beside it and the Ctrl+Shift+R that reaches it. It was the
+      // one of the three that stayed on screen for everybody.
+      restart.hidden = !developerMode;
       if (!developerMode) {
         githubWorkspace?.hide();
         github.hidden = true;
@@ -4760,6 +4766,9 @@ ${contents.path}`});
         initializeGitHub();
       }
     };
+    // Hidden until the first answer arrives, rather than visible until it is
+    // taken away.
+    restart.hidden = true;
     const initializeDeveloperMode = async () => {
       try {
         const value = rememberSharedSettings(await callWindow("lexeditor_settings"));
@@ -7176,6 +7185,15 @@ ${contents.path}`});
   });
 
   const dataMapState = new Map();
+  // How much of a file Lexeditor can reach. Structured editing is the whole
+  // record set; a view is readable but not writable; source is the bytes and
+  // nothing above them; unavailable is a file that is named and not read.
+  const COVERAGE_LABELS = {
+    structured: "Structured editable",
+    view: "Read-only view",
+    source: "Source only",
+    unavailable: "Unavailable",
+  };
   const dataMap = options => {
     const plugin = document.body.dataset.lexPlugin || "plugin";
     const stateKey = options.searchKey || `${plugin}-data-map`;
@@ -7185,12 +7203,17 @@ ${contents.path}`});
     const status = row => Object.hasOwn(labels,row.status) ? row.status : "not-integrated";
     const label = row => labels[status(row)];
     const coverage = row => row.coverage;
+    // Coverage is answered by the shared map itself. A plugin may still take
+    // the change if it wants to persist it, but it does not have to, and the
+    // filter works the same either way.
+    const wantedCoverage = options.coverage ?? saved.coverage ?? "";
     const keyOf = row => row.id || `${row.filename}\u001f${row.controls || ""}`;
     const query = String(options.query || "").trim().toLocaleLowerCase();
     const wanted = options.status || "";
     const [sortKey, direction] = options.sort || ["filename", 1];
     const filtered = (options.rows || []).filter(row => (!wanted ||
       status(row)===wanted) &&
+      (!wantedCoverage || coverage(row)===wantedCoverage) &&
       (!query || [row.filename,row.controls,row.notes,label(row)].some(value=>String(value||"").toLocaleLowerCase().includes(query))))
       .sort((a,b)=>direction*String(sortKey==="status"?label(a):a[sortKey]||"").localeCompare(
         String(sortKey==="status"?label(b):b[sortKey]||""),undefined,{numeric:true}));
@@ -7198,6 +7221,23 @@ ${contents.path}`});
       onchange:event=>options.changeStatus?.(event.target.value)},
       ...[["","All integration states"],...Object.entries(labels)].map(([value,text])=>{
         const option=element("option",{value},text);option.selected=value===wanted;return option;
+      }));
+    // Integration state and coverage are two different questions about a file:
+    // whether Lexeditor has wired it up at all, and how much of it can be
+    // reached once it has. A reader looking for "what can I actually edit here"
+    // is asking the second, so it has a filter of its own.
+    const coverageFilter = element("select", {"aria-label":"Filter files by coverage",
+      onchange:event=>{
+        saved.coverage=event.target.value;
+        if(options.changeCoverage){options.changeCoverage(event.target.value);return}
+        // A plugin that does not take the change still gets a working filter:
+        // the map rebuilds itself in place from the selection it just stored.
+        const replacement=dataMap(options);
+        content.replaceWith(replacement.content);
+      }},
+      ...[["","All coverage"],...Object.entries(COVERAGE_LABELS)].map(([value,text])=>{
+        const option=element("option",{value},text);
+        option.selected=value===wantedCoverage;return option;
       }));
     const detail = row => {
       const body = [element("p",{class:"lex-data-map-scope"},row.controls || "No mapped interface"),
@@ -7227,7 +7267,7 @@ ${contents.path}`});
       className:"lex-data-map lex-data-map-view",splitKey:`${stateKey}-split`,rowsKey:`${stateKey}-rows`,
       defaultSplit:54,minLeft:280,minRight:240,
       search:{key:stateKey,value:options.query || "",label:"Search the data map",
-        placeholder:"Search filenames, systems, or notes…",change:options.changeQuery},filters:[statusFilter],
+        placeholder:"Search filenames, systems, or notes…",change:options.changeQuery},filters:[statusFilter,coverageFilter],
       sync:next=>{Object.assign(saved,next);page=next.page},
       change:next=>{Object.assign(saved,next);options.changePage?.(next.page)},
       emptyDetail:()=>detailPanel({className:"lex-data-map-detail",title:"Data Map",body:[element("p",{},"No files match this filter.")]}),
@@ -7710,6 +7750,14 @@ ${contents.path}`});
       // and, on the longest names, painted over the name itself. Watching the
       // name means the rail follows every re-fit.
       nameObserver?.observe(holder);
+      // A sorted column's rail is not a type code beside a name; it is the
+      // sort arrow, and it belongs in the field's own gutter at the left edge
+      // where the CSS already puts it. Nudging it up against a right-aligned
+      // label pushed it twenty pixels into the row.
+      if (field.hasAttribute("data-lex-sort")) {
+        if (rail.style.left) rail.style.left = "";
+        continue;
+      }
       const text = [...holder.childNodes].find(node =>
         node.nodeType === Node.TEXT_NODE && node.textContent.trim());
       if (!text) continue;
