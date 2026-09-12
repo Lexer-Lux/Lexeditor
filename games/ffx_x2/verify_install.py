@@ -157,6 +157,43 @@ def inspect_install(game_root: Path, specs: Iterable[dict] = STRUCTURED_SPECS,
     }
 
 
+def _launch_ready(report: dict) -> bool:
+    launch_state = report.get("launch", {})
+    return bool(
+        launch_state.get("ready")
+        and all(game.get("ready") for game in launch_state.get("games", {}).values())
+    )
+
+
+def acceptance_checks(report: dict) -> dict[str, bool]:
+    """Return the real-install evidence gates required before this PR leaves draft."""
+    archives = report.get("archives", {})
+    archive_hashes_ready = bool(report.get("archiveHashesIncluded")) and all(
+        state.get("ready")
+        and isinstance(state.get("sha256"), str)
+        and len(state["sha256"]) == 64
+        for state in archives.values()
+    )
+    return {
+        "archivesAndStructuredValidated": bool(report.get("ok")),
+        "archiveHashesReady": archive_hashes_ready,
+        "fahrenheitReady": _launch_ready(report),
+    }
+
+
+def finalize_report(report: dict, require_fahrenheit: bool) -> dict:
+    """Add CLI/result state without weakening the stricter draft-exit evidence flag."""
+    result = dict(report)
+    checks = acceptance_checks(result)
+    result["acceptanceChecks"] = checks
+    result["acceptanceReady"] = all(checks.values())
+    result["fahrenheitRequired"] = bool(require_fahrenheit)
+    result["verificationPassed"] = bool(
+        result.get("ok") and (checks["fahrenheitReady"] if require_fahrenheit else True)
+    )
+    return result
+
+
 def _human_report(report: dict, require_fahrenheit: bool) -> str:
     lines = [f"FFX/X-2 install: {report['gameRoot']}"]
     for game in ("x", "x2"):
@@ -176,14 +213,17 @@ def _human_report(report: dict, require_fahrenheit: bool) -> str:
             lines.append(f"  {row['key']}: OK — {', '.join(details)}")
         else:
             lines.append(f"  {row['key']}: FAIL — {row.get('error', 'unavailable')}")
-    launch_state = report["launch"]
-    launch_ready = bool(
-        launch_state.get("ready")
-        and all(game.get("ready") for game in launch_state.get("games", {}).values())
-    )
+    launch_ready = _launch_ready(report)
     lines.append(f"  Fahrenheit launch prerequisites: {'OK' if launch_ready else 'NOT READY'}")
-    accepted = report["ok"] and (launch_ready if require_fahrenheit else True)
-    lines.append(f"Result: {'PASS' if accepted else 'FAIL'}")
+    verification_passed = bool(
+        report.get("verificationPassed",
+                   report.get("ok") and (launch_ready if require_fahrenheit else True))
+    )
+    lines.append(f"Verification result: {'PASS' if verification_passed else 'FAIL'}")
+    if "acceptanceReady" in report:
+        lines.append(
+            f"Draft-exit evidence: {'READY' if report['acceptanceReady'] else 'NOT READY'}"
+        )
     return "\n".join(lines)
 
 
@@ -198,21 +238,16 @@ def main(argv: list[str] | None = None) -> int:
                         help="Also stream the complete FFX_Data.vbf and FFX2_Data.vbf through SHA-256")
     args = parser.parse_args(argv)
 
-    report = inspect_install(args.game_root, hash_archives=args.hash_archives)
-    launch_state = report["launch"]
-    launch_ready = bool(
-        launch_state.get("ready")
-        and all(game.get("ready") for game in launch_state.get("games", {}).values())
+    report = finalize_report(
+        inspect_install(args.game_root, hash_archives=args.hash_archives),
+        args.require_fahrenheit,
     )
-    accepted = bool(report["ok"] and (launch_ready if args.require_fahrenheit else True))
-    report["acceptanceReady"] = accepted
-    report["fahrenheitRequired"] = bool(args.require_fahrenheit)
 
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
         print(_human_report(report, args.require_fahrenheit))
-    return 0 if accepted else 1
+    return 0 if report["verificationPassed"] else 1
 
 
 if __name__ == "__main__":
