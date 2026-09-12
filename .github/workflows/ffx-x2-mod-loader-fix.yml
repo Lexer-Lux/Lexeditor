@@ -1,0 +1,70 @@
+name: FFX-X2 mod loader fix
+
+on:
+  push:
+    branches: [feature/ffx-x2-plugin]
+    paths:
+      - '.github/workflows/ffx-x2-mod-loader-fix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Wire shared mod loader into FFX-X2 dashboard
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          editor_path = Path('games/ffx_x2/editor.html')
+          editor = editor_path.read_text(encoding='utf-8')
+
+          flow = '<div class="ffxx2-flow"><span>Installed VBF</span><i></i><span>Structured edit / extraction</span><i></i><span>Project EFL overlay</span><i></i><span>Fahrenheit</span></div></div>'
+          flow_with_loader = '<div class="ffxx2-flow"><span>Installed VBF</span><i></i><span>Structured edit / extraction</span><i></i><span>Project EFL overlay</span><i></i><span>Fahrenheit</span></div><div id="ffxx2-mod-loader" style="margin-top:12px"></div></div>'
+          if editor.count(flow) != 1:
+              raise RuntimeError(f'expected one dashboard flow anchor, found {editor.count(flow)}')
+          editor = editor.replace(flow, flow_with_loader, 1)
+
+          show_error = "function showError(error){$('error').textContent=error?String(error.message||error):''}"
+          mod_loader = '''function renderModLoaderInfo(){
+            const host=$('ffxx2-mod-loader');
+            if(!host||host.childElementCount)return;
+            host.append(LexeditorUI.modLoaderSection({
+              loader:"Fahrenheit's External File Loader (EFL) loads this plugin's file-only overlay.",
+              output:"Project files mirror Fahrenheit virtual paths under <project>/efl/x/ and <project>/efl/x2/, then deploy under <game>/fahrenheit/mods/lexeditor-ffx-x2/.",
+              order:"Fahrenheit load order applies; when two mods provide the same virtual path, the later entry wins.",
+              safety:"Lexeditor never patches or rebuilds the installed FFX/FFX-2 VBF archives. It owns only its deployment folder and exact load-order entry.",
+              removal:"Use Revert to remove the Lexeditor-owned deployment. Revert refuses if the deployed state changed outside Lexeditor.",
+            }));
+          }
+          renderModLoaderInfo();
+          ''' + show_error
+          if editor.count(show_error) != 1:
+              raise RuntimeError(f'expected one showError anchor, found {editor.count(show_error)}')
+          editor = editor.replace(show_error, mod_loader, 1)
+          editor_path.write_text(editor, encoding='utf-8')
+
+          test_path = Path('tests/test_ffx_x2_browser_check.py')
+          test = test_path.read_text(encoding='utf-8')
+          browser_anchor = '                expect(page.locator("#ffxx2-play-controls")).to_have_count(1)\n'
+          browser_assertions = browser_anchor + '                expect(page.locator("#ffxx2-mod-loader .lex-detail-field")).to_have_count(5)\n                expect(page.locator("#ffxx2-mod-loader")).to_contain_text("MOD LOADER")\n                expect(page.locator("#ffxx2-mod-loader")).to_contain_text("Fahrenheit")\n'
+          if test.count(browser_anchor) != 1:
+              raise RuntimeError(f'expected one browser assertion anchor, found {test.count(browser_anchor)}')
+          test = test.replace(browser_anchor, browser_assertions, 1)
+          test_path.write_text(test, encoding='utf-8')
+          PY
+          git diff --check
+          python tools/verify_shared_ui_contract.py
+          python -m py_compile tests/test_ffx_x2_browser_check.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/ffx_x2/editor.html tests/test_ffx_x2_browser_check.py
+          git commit -m "Add shared FFX-X2 mod loader details"
+          git push origin HEAD:feature/ffx-x2-plugin
