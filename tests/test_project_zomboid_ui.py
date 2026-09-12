@@ -11,13 +11,14 @@ EDITOR = ROOT / "games" / "project_zomboid" / "editor.html"
 class ProjectZomboidUiContractTests(unittest.TestCase):
     def test_editor_exposes_every_structured_script_adapter(self):
         text = EDITOR.read_text(encoding="utf-8")
-        for tab in ("items", "evolved", "crafts", "fluids", "vehicles", "sounds", "models", "mannequins"):
+        for tab in ("items", "evolved", "crafts", "fixing", "fluids", "vehicles", "sounds", "models", "mannequins"):
             with self.subTest(tab=tab):
                 self.assertIn(f'data-tab="{tab}"', text)
-        for endpoint in ("/api/items", "/api/evolvedrecipes", "/api/craftrecipes", "/api/fluids", "/api/vehicles", "/api/sounds", "/api/models", "/api/mannequins"):
+        for endpoint in ("/api/items", "/api/evolvedrecipes", "/api/craftrecipes", "/api/fixings", "/api/fluids", "/api/vehicles", "/api/sounds", "/api/models", "/api/mannequins"):
             with self.subTest(endpoint=endpoint):
                 self.assertIn(endpoint, text)
         for renderer, save in (
+            ("renderFixings", "/api/fixings/save"),
             ("renderVehicles", "/api/vehicles/save"),
             ("renderSounds", "/api/sounds/save"),
             ("renderModels", "/api/models/save"),
