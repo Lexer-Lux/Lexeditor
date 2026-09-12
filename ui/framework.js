@@ -2283,12 +2283,13 @@
     });
     root.append(overlay);
     const apply = relation => {
-      const relationKey = relation.key || [
-        relation.dependency.id || relation.dependency.getAttribute("aria-label") || "dependency",
+      const owner = normalized.find(row => row.dependent === relation.dependent);
+      const relationKey = owner.key || [
+        owner.dependency.id || owner.dependency.getAttribute("aria-label") || "dependency",
         relation.dependent.id || relation.dependent.getAttribute("aria-label") || "dependent",
       ].join("->");
-      const enabled = relation.dependency.type === "checkbox"
-        ? relation.dependency.checked : !relation.dependency.disabled;
+      const enabled = normalized.filter(row => row.dependent === relation.dependent).every(row =>
+        row.dependency.type === "checkbox" ? row.dependency.checked : !row.dependency.disabled);
       const target = relation.dependent;
       if (!enabled) {
         if (target.type === "checkbox") {

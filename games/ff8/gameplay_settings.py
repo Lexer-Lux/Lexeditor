@@ -21,6 +21,7 @@ from . import better_card
 from . import fixed_command_menu
 from . import true_atb_wait_issue_63
 from . import flying_eva
+from . import gf_hp_casting
 from . import character_growth
 from . import luck_accuracy
 from . import modern_controls_issue_65
@@ -77,7 +78,7 @@ ACCEPTED_TWEAKS = frozenset({
     "modernControls", "vibrationConsolidation", "betterTargeting",
     "damageLimitRemoval", "fastStart", "xpBars", "hpBars", "gfHpBars", "inGameTime",
     "flatStatAbilities", "maxSpellEnabled", "noMagicConsumption", "dropsAfterMug",
-    "dropChance",
+    "dropChance", "gfHpCasting",
 })
 MIN_FLYING_EVA_BONUS = 0
 MAX_FLYING_EVA_BONUS = 100
@@ -347,6 +348,8 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
     if not isinstance(in_game_time, bool):
         in_game_time = DEFAULT_INGAME_TIME
     no_magic_consumption = data.get("noMagicConsumption") is True
+    gf_casting = data.get("gfHpCasting") is True
+    gf_costs = gf_hp_casting.costs(data.get("gfHpCastingCosts"))
     drops_after_mug = data.get("dropsAfterMug") is True
     drop_chance_enabled = data.get("dropChance") is True
     flat_stat_abilities_enabled = data.get(
@@ -401,6 +404,8 @@ def load(project_root: Path | None = None, game_root: Path | None = None,
         "gfHpBars": gf_hp_bars,
         "inGameTime": in_game_time,
         "noMagicConsumption": no_magic_consumption,
+        "gfHpCasting": gf_casting,
+        "gfHpCastingCosts": gf_costs,
         "dropsAfterMug": drops_after_mug,
         "dropChance": drop_chance_enabled,
         "dropChanceWeights": drop_chance.metadata(),
@@ -945,7 +950,14 @@ def save(data: dict, game_root: Path | None = None,
         raise ValueError("GF HP Bars requires Monogamy")
     if fixed_command_menu_enabled and not single_gf:
         raise ValueError("Fixed Command Menu requires Monogamy")
+    gf_casting = _boolean(data.get("gfHpCasting", False), "GF HP Casting")
+    gf_costs = gf_hp_casting.costs(data.get("gfHpCastingCosts"))
+    if gf_casting and not (single_gf and no_magic_consumption):
+        raise ValueError("GF HP Casting requires Monogamy and No Magic Consumption")
     executable = _verify_executable(game)
+    if gf_casting:
+        with executable.open("rb") as stream:
+            gf_hp_casting.verify_executable(stream)
     drop_chance_plan = (
         drop_chance.discover_path(executable) if drop_chance_enabled else None
     )
@@ -973,6 +985,7 @@ def save(data: dict, game_root: Path | None = None,
         drop_chance_enabled=drop_chance_enabled,
         drop_chance_plan=drop_chance_plan,
     )
+    hext += gf_hp_casting.build_hext(gf_casting, gf_costs)
     settings_data = {
         "autoSortInventory": auto_sort,
         "autoSortMagic": auto_sort_magic,
@@ -999,6 +1012,8 @@ def save(data: dict, game_root: Path | None = None,
         "gfHpBars": gf_hp_bars,
         "inGameTime": in_game_time,
         "noMagicConsumption": no_magic_consumption,
+        "gfHpCasting": gf_casting,
+        "gfHpCastingCosts": gf_costs,
         "dropsAfterMug": drops_after_mug,
         "dropChance": drop_chance_enabled,
         "flatStatAbilities": flat_stat_abilities_enabled,
