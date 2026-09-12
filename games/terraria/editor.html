@@ -20,7 +20,7 @@
     .terraria-map th,.terraria-localization-table th{background:var(--lex-panel-muted,#eceff1)}
     .terraria-status{font-weight:700;text-transform:uppercase;font-size:.8em;letter-spacing:.04em}
     .terraria-build-card{display:grid;gap:9px}
-    .terraria-build-row,.terraria-localization-toolbar,.terraria-localization-create,.terraria-source-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .terraria-build-row,.terraria-localization-toolbar,.terraria-localization-create,.terraria-source-toolbar,.terraria-source-create{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .terraria-build-button{padding:8px 14px;border:1px solid var(--lex-border);border-radius:var(--lex-radius);color:var(--lex-text);background:var(--lex-panel-2);font:700 13px/1 var(--lex-font);cursor:pointer}
     .terraria-build-button:hover:not(:disabled){color:var(--lex-accent-text);border-color:var(--lex-accent);background:var(--lex-accent)}
     .terraria-build-button:disabled{opacity:.45;cursor:default}
@@ -28,7 +28,7 @@
     .terraria-build-log{max-height:260px;margin:0;padding:10px;overflow:auto;white-space:pre-wrap;background:var(--lex-bg);border:1px solid var(--lex-border);font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
     .terraria-localization-toolbar select,.terraria-source-toolbar select{min-width:320px;max-width:100%}
     .terraria-localization-toolbar input{min-width:220px}
-    .terraria-localization-create input{min-width:220px;flex:1}
+    .terraria-localization-create input,.terraria-source-create input{min-width:220px;flex:1}
     .terraria-localization-prefix{font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--lex-muted)}
     .terraria-localization-table input{width:100%;min-width:260px}
     .terraria-localization-key{max-width:430px;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
@@ -45,7 +45,7 @@
   const {el,detailPanel,detailSection,detailField,readonlyField}=LexeditorUI;
   let tab="metadata",saved=null,current=null,mapRows=[],buildInfo=null,buildResult=null,building=false;
   let localizationFiles=[],locSaved=null,locCurrent=null,locLoading=false,locFilter="",locNewKey="",locNewValue="";
-  let sourceFiles=[],sourceSaved=null,sourceCurrent=null,sourceLoading=false,error="";
+  let sourceFiles=[],sourceSaved=null,sourceCurrent=null,sourceLoading=false,sourceNewPath="",error="";
 
   const clone=value=>JSON.parse(JSON.stringify(value));
   async function request(path,options={}){
@@ -184,17 +184,37 @@
     const meta=`${locCurrent.culture||"unknown culture"}${locCurrent.prefix?` · prefix ${locCurrent.prefix}`:""} · ${locCurrent.entries.length} flattened leaves${query?` · ${visible.length} shown`:""}`;
     return el("div",{class:"terraria-page"},...warnings(),toolbar,...notes,createForm,el("div",{class:"terraria-note"},meta),visible.length?table:el("div",{class:"terraria-note"},query?"No localization entries match this filter.":"This localization file currently has no scalar leaf entries."),el("div",{class:"terraria-note"},"Lexeditor edits existing single-line string leaves and can append new dotted string keys. It preserves comments, object nesting, dotted source keys, whitespace, line endings and untouched HJSON verbatim; multiline/complex HJSON and key deletion remain preservation-only."));
   }
+  async function createSourceFile(){
+    if(sourceLoading||dirtyCount())return;
+    const path=sourceNewPath.trim();
+    if(!path){error="Enter a project-relative .cs path.";render();return}
+    sourceLoading=true;error="";render();
+    try{
+      const created=await request("/api/source/create",{method:"POST",body:JSON.stringify({path,text:""})});
+      sourceSaved=clone(created);sourceCurrent=clone(created);sourceNewPath="";
+      const [source,map]=await Promise.all([request("/api/source"),request("/api/data-map")]);
+      sourceFiles=source.files;mapRows=map.rows;
+    }catch(exc){error=String(exc.message||exc)}
+    sourceLoading=false;render();
+  }
+  function sourceCreateForm(){
+    return el("div",{class:"terraria-note terraria-source-create"},
+      el("strong",{},"New C# file"),
+      el("input",{type:"text",value:sourceNewPath,placeholder:"Content/Items/MyItem.cs",disabled:sourceLoading||dirtyCount()>0,oninput:event=>{sourceNewPath=event.target.value}}),
+      el("button",{class:"terraria-build-button",type:"button",disabled:sourceLoading||dirtyCount()>0,onclick:createSourceFile},"CREATE"));
+  }
   function sourcePanel(){
-    if(!sourceFiles.length)return el("div",{class:"terraria-page"},...warnings(),el("div",{class:"terraria-note"},"No C# source files are present in this source project."));
+    const createForm=sourceCreateForm();
+    if(!sourceFiles.length)return el("div",{class:"terraria-page"},...warnings(),createForm,el("div",{class:"terraria-note"},"No C# source files are present yet. Create a project-relative .cs file above."));
     const selectedPath=sourceCurrent?.path||sourceFiles[0].path;
     const selector=el("select",{disabled:sourceLoading||sourceDirty(),onchange:event=>loadSourceFile(event.target.value)});
     for(const file of sourceFiles){const label=`${file.path}${file.error?" · error":""}`;const option=el("option",{value:file.path},label);option.selected=file.path===selectedPath;selector.append(option)}
     const toolbar=el("div",{class:"terraria-note terraria-source-toolbar"},el("strong",{},"C# source"),selector,sourceLoading?el("span",{},"Loading…"):el("span",{class:"terraria-status"},sourceCurrent?`${sourceCurrent.lines} lines · ${sourceCurrent.bytes} bytes`:"NO FILE"));
-    if(!sourceCurrent)return el("div",{class:"terraria-page"},...warnings(),toolbar,el("div",{class:"terraria-note"},"Select a readable UTF-8 .cs file."));
+    if(!sourceCurrent)return el("div",{class:"terraria-page"},...warnings(),createForm,toolbar,el("div",{class:"terraria-note"},"Select a readable UTF-8 .cs file."));
     const editor=el("textarea",{class:"terraria-source-editor",spellcheck:false,value:sourceCurrent.text,oninput:event=>{sourceCurrent.text=event.target.value;shell?.refresh?.()},onkeydown:event=>{
       if(event.key!=="Tab")return;event.preventDefault();const target=event.target,start=target.selectionStart,end=target.selectionEnd;target.setRangeText("\t",start,end,"end");sourceCurrent.text=target.value;shell?.refresh?.();
     }});
-    return el("div",{class:"terraria-page"},...warnings(),toolbar,editor,el("div",{class:"terraria-note"},"This is a raw C# text editor, not a structured C# model. Lexeditor preserves UTF-8 BOM state and the file's existing newline style, refuses stale writes, and leaves syntax/semantic validation to tModLoader's compiler during Build Mod."));
+    return el("div",{class:"terraria-page"},...warnings(),createForm,toolbar,editor,el("div",{class:"terraria-note"},"This is a raw C# text editor, not a structured C# model. File creation is immediate and never overwrites an existing path; subsequent text edits use Save/Discard. Lexeditor preserves UTF-8 BOM state and existing newline style, refuses stale writes, and leaves syntax/semantic validation to tModLoader's compiler during Build Mod."));
   }
   function dataMapPanel(){
     const table=el("table",{class:"terraria-map"},el("thead",{},el("tr",{},...["PATH","FAMILY","COVERAGE"].map(label=>el("th",{},label)))),el("tbody",{},...mapRows.map(row=>el("tr",{},el("td",{},row.path),el("td",{},row.family),el("td",{class:"terraria-status"},row.status)))));
@@ -249,7 +269,7 @@
     if(building||dirtyCount()||!buildInfo?.available)return;building=true;buildResult=null;error="";render();
     try{buildResult=await request("/api/build",{method:"POST",body:"{}"});buildInfo=await request("/api/build")}catch(exc){error=String(exc.message||exc);try{buildInfo=await request("/api/build")}catch(_ignored){}}finally{building=false;render()}
   }
-  async function discard(){current=clone(saved);locCurrent=clone(locSaved);sourceCurrent=clone(sourceSaved);locNewKey="";locNewValue="";error="";render()}
+  async function discard(){current=clone(saved);locCurrent=clone(locSaved);sourceCurrent=clone(sourceSaved);locNewKey="";locNewValue="";sourceNewPath="";error="";render()}
   function navigate(value){tab=value;render()}
   const shell=LexeditorUI.mountShell({
     host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"terraria",name:"Terraria",themeName:"terraria",theme:{accent:"#77b255"}},
