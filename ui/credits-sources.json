@@ -146,6 +146,27 @@
       "thanks": [],
       "licenses": []
     },
+    "palworld": {
+      "contributions": [
+        {
+          "name": "Pocketpair / Palworld Mod Uploader",
+          "role": "Official interoperability reference for Palworld v0.7+ mod packages, Info.json fields and loader InstallRule behavior.",
+          "url": "https://github.com/pocketpairjp/PalworldModUploader"
+        },
+        {
+          "name": "Okaetsu / PalSchema",
+          "role": "Reference for PalSchema raw DataTable patch structure, JSONC parsing, wildcard/filter behavior and targeted field application.",
+          "url": "https://github.com/Okaetsu/PalSchema"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Palworld / PalSchema references — source and license notes",
+          "sourcePath": "games/palworld/THIRD_PARTY.md"
+        }
+      ]
+    },
     "warband": {
       "contributions": [
         {

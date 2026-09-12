@@ -8,7 +8,7 @@ import sys
 
 SERVICE_MODULES = frozenset({
     'games.blank.server', 'games.ff7.server', 'games.ff7r.server', 'games.ff7r.themed_server',
-    'games.ff8.server', 'games.ff9.server', 'games.rdr.server', 'games.rdr2.server',
+    'games.ff8.server', 'games.ff9.server', 'games.palworld.full_server', 'games.rdr.server', 'games.rdr2.server',
     'games.warband.server',
 })
 
@@ -73,8 +73,11 @@ def open_path(path: Path) -> None:
         # Never pass a file path through a shell.
         subprocess.Popen(['open' if sys.platform == 'darwin' else 'xdg-open', str(target)],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+<<<<<<< HEAD
 
 
 if __name__ == '__main__':
     if not dispatch_service(sys.argv[1:]):
         raise SystemExit('An allowed plugin service is required.')
+=======
+>>>>>>> origin/feature/palworld-plugin
