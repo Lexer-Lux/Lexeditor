@@ -5031,7 +5031,17 @@ ${contents.path}`});
     if (!root.isConnected) return;
     const base = root.lexHeadingTemplate || root.style.getPropertyValue("--lex-column-list-template");
     root.lexHeadingTemplate = base;
-    const tracks = base.match(/(?:[^\s(]+\([^)]*\)|[^\s]+)/g) || [];
+    const tracks = [];
+    let depth = 0, start = 0;
+    for (let index = 0; index <= base.length; index++) {
+      const character = base[index];
+      if (character === '(') depth++;
+      if (character === ')') depth--;
+      if (index === base.length || (!depth && /\s/.test(character))) {
+        if (index > start) tracks.push(base.slice(start, index));
+        start = index + 1;
+      }
+    }
     const heads = [...root.querySelectorAll(":scope > .lex-column-list-header > .lex-column-list-head-cell")];
     if (tracks.length !== heads.length) return;
     const fitted = heads.map((head, index) => {
@@ -5047,11 +5057,18 @@ ${contents.path}`});
       const width = Math.ceil(probe.offsetWidth + 2);
       probe.remove();
       const track = tracks[index], range = /^minmax\((.*),\s*([^,]+)\)$/.exec(track);
-      if (range) return `minmax(max(${width}px, ${range[1]}), ${range[2]})`;
+      // Intrinsic sizes are valid grid bounds, but are not CSS math values.
+      // Their natural size already includes the unwrapped heading.
+      if (range) {
+        if (/^(?:min-content|max-content|auto)$/.test(range[1].trim())) return track;
+        const candidate = `minmax(max(${width}px, ${range[1]}), ${range[2]})`;
+        return CSS.supports('grid-template-columns', candidate) ? candidate : track;
+      }
       if (/^[\d.]+(?:px|em|rem|ch|%)$/.test(track)) return `max(${width}px, ${track})`;
       if (/^[\d.]+fr$/.test(track)) return `minmax(${width}px, ${track})`;
       return track;
     }).join(" ");
+    if (!CSS.supports('grid-template-columns', fitted)) return;
     columnHeadingWidths.set(root.lexHeadingKey, fitted);
     if (root.style.getPropertyValue("--lex-column-list-template") !== fitted)
       root.style.setProperty("--lex-column-list-template", fitted);
