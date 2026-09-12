@@ -87,6 +87,8 @@ def main():
    page.keyboard.press('m');page.keyboard.up('Control')
    assert page.locator('#plugin-data-map').evaluate('(e)=>e.classList.contains("active")')
    page.locator('button[data-tab=one]').click();page.wait_for_timeout(400)
+   page.mouse.move(1400,880)
+   assert page.locator('.lex-toggle-rail').evaluate_all('nodes=>nodes.every(e=>getComputedStyle(e).opacity==="1")')
    gaps=page.locator('.lex-toggle').evaluate_all("""nodes=>nodes.map(e=>{const box=e.getBoundingClientRect(),rail=e.querySelector('.lex-toggle-rail')?.getBoundingClientRect(),name=e.querySelector('.lex-toggle-name');if(!rail||!name)return null;const range=document.createRange();range.selectNodeContents(name);const right=Math.max(...[...range.getClientRects()].map(r=>r.right));return {left:rail.left-box.left,right:box.right-right}}).filter(Boolean)""")
    assert gaps and all(abs(row['left']-row['right'])<3 for row in gaps),gaps
    copy_edges=page.evaluate("""()=>{

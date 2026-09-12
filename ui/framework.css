@@ -5079,13 +5079,9 @@ body:has(.lex-data-map-view) .lex-master-detail.lex-data-map-view{height:100%}
 
 
 /* LEXEDITOR_TOGGLE_RAIL_CONTRACT_20260910 */
-/* One contract for every type rail in the editor, flags included. Pointing at
-   the PROPERTY brings its type codes up; pointing at an individual RAIL swaps
-   that one code for its help mark. A row of flags used to paint eight
-   permanent "BOOL" labels, and the pass that fixed that overcorrected: the
-   rail stayed dark until a switch was pointed at and then went straight to the
-   question mark, so the type code it is there to show was never readable. */
-.lex-toggle-rail { opacity:0; cursor:help; }
+/* Keep the type marker visible so its reserved width is not an empty left
+   margin. Pointing at the marker swaps its type for the available help. */
+.lex-toggle-rail { opacity:1; cursor:help; }
 .lex-detail-field:is(:hover,:focus-within) .lex-toggle-rail,
 .lex-toggle:is(:hover,:focus-within) > .lex-toggle-rail { opacity:1; }
 /* The code is the rail's resting content, whatever the switch around it is
