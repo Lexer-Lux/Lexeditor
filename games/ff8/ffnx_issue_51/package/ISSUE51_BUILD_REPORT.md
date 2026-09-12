@@ -3,14 +3,14 @@
 ## Artifact and source
 
 - FFNx base: `c056db2783f376a340fcefa6a48cc33618998876`
-- Editor build revision: `a1b76a19379e0356782a0c0dcbb3ba4e264ab93b`
-- Actions build run: `34042052122`
+- Editor build revision: `28fe408a377462d06786b5544a4f36901092bc60`
+- Actions build run: `34700395103`
 - Supported private game SHA-256: `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`
 - Identity: `Lexeditor issue 51 shared magic core; base=c056db2783f376a340fcefa6a48cc33618998876; runtime=on; hooks=28`
-- Driver SHA-256: `b44009f4421f278ea10afc6f53e3f9e21cfdffbdcfd7332da89d01a61c41b250`
-- Driver size: 38805504 bytes; PE32 x86 DLL
-- PDB SHA-256: `9f6b45dba6b5768ef859b9b12a9561e94e5048985b573cce0dbe0f5fd33956ce` (build artifact, not installed)
-- Complete source patch SHA-256: `6d733cd2f9d92996c4a5d698282ac58df757535195b69348490afdd93a64cc74`
+- Driver SHA-256: `6f8b3b67397a9fce8eff7f0258ba8c4fc1bcb4f9702bc31ecfc932bac84fce24`
+- Driver size: 38834688 bytes; PE32 x86 DLL
+- PDB SHA-256: `2153d09ef8b63f9ddf43667854931eea98f085515f60d5e706cfc3fa76cf7918` (build artifact, not installed)
+- Complete source patch SHA-256: `d76453ec477436961955cadc9a2b680ad6769d5c00c9ea7b0cc4a16cfd928bc7`
 - GPL licence SHA-256: `230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809`
 - Steamworks library unchanged: `abfedd473b3f4a9597bbdc90d20f4b6f696bb2ebb937a03177461df695430ad6`
 - Existing matching-base shader set retained: 163 files;
@@ -24,10 +24,13 @@ Party Switch retires the outgoing model through native event 69 before event
 66 loads its replacement. Native saved/kernel names are resolved and measured
 before drawing. Cancellation keeps the turn; invalidated reserves reload the
 original character; the HUD cache is refreshed after a completed replacement.
-Red HP bars use row y+14, not padded glyph dimensions. The independent blue
-GF HP bar uses row y+1, fills left-to-right, and uses live charging HP rather
-than stale saved HP. Existing XP, targeting, startup and modern-controls code
-is retained. Party Switch explicitly relinquishes and re-registers the replaced
+HP and GF HP use two thin rails, with separate anchors, directions and colors.
+GF HP requires one junctioned GF and reads live charging HP during a summon.
+Menu XP bars follow native character and GF widgets. Active and reserve main
+menu rows show progress below names; character details and GF details show it
+below the level row. GF lists show progress below each level. Each capture
+keeps its native viewport and clears after drawing. Post-battle XP code remains.
+Party Switch explicitly relinquishes and re-registers the replaced
 actor's shared-stock mirror, rather than copying its private record over the
 canonical pool. Shared Magic works with the configured stock cap (1–255);
 lossless migration refuses overflow. No Magic Consumption hooks only field and

@@ -43,8 +43,10 @@ Menu XP capture follows native widgets and their active sprite viewport:
 The old callback-16 hook identified the save browser, not the main-menu rows.
 It and the fixed Status coordinates have been removed from canonical source.
 `tools/verify_ff8_xp_widgets.py` checks native call targets and executes the
-character and GF list widgets to verify the level-row coordinates. Source
-changes still require a new packaged driver and live visual acceptance.
+character and GF list/detail widgets to verify the level-row coordinates.
+`tools/verify_ff8_menu_xp_capture.py` compiles capture/projection checks.
+Windows build 34700395103 is packaged and installed locally. Live visual
+acceptance remains necessary.
 
 The post-battle dispatch call at `004A3E59` invokes renderer
 `004A4950`. Its controller calls the native XP updater at `004A4461`, writes

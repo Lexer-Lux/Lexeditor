@@ -72,7 +72,10 @@ def verify_compilation_patch(candidate: bytes, complete: bytes) -> None:
     require(set(expected) - set(actual) <= SUPPORT_FILES,
             'Candidate patch is missing production source')
     for name, body in actual.items():
-        require(body == expected[name], f'Candidate compiled different source: {name}')
+        # sections() normalizes CRLF, but Git blob IDs still describe the
+        # original line endings. Compare every hunk and mode, not those IDs.
+        content = lambda value: re.sub(r'^index [0-9a-f]+\.\.[0-9a-f]+(?: [0-7]+)?\n', '', value, flags=re.M)
+        require(content(body) == content(expected[name]), f'Candidate compiled different source: {name}')
     require(SUPPORT_FILES <= set(expected), 'Full provenance is missing build/test support')
 
 
@@ -102,6 +105,9 @@ def package(candidate: Path, ffnx_source: Path, *, driver_sha256: str,
         complete_patch = work / 'ISSUE51_DERIVATIVE_SOURCE.patch'
         prepare(ffnx_source, complete_patch)
         verify_compilation_patch((candidate / complete_patch.name).read_bytes(), complete_patch.read_bytes())
+        if sections((candidate / complete_patch.name).read_bytes()).keys() == sections(complete_patch.read_bytes()).keys():
+            # Keep the exact complete build patch, including its line endings.
+            complete_patch.write_bytes((candidate / complete_patch.name).read_bytes())
         verify_linked(ffnx_source / 'tools/verify_issue51_runtime_artifact.py', driver)
         image, _ = runtime_package._pe_exports(driver)
         runtime_package._reject_unloadable_manifest(image)
@@ -154,10 +160,13 @@ Party Switch retires the outgoing model through native event 69 before event
 66 loads its replacement. Native saved/kernel names are resolved and measured
 before drawing. Cancellation keeps the turn; invalidated reserves reload the
 original character; the HUD cache is refreshed after a completed replacement.
-Red HP bars use row y+14, not padded glyph dimensions. The independent blue
-GF HP bar uses row y+1, fills left-to-right, and uses live charging HP rather
-than stale saved HP. Existing XP, targeting, startup and modern-controls code
-is retained. Party Switch explicitly relinquishes and re-registers the replaced
+HP and GF HP use two thin rails, with separate anchors, directions and colors.
+GF HP requires one junctioned GF and reads live charging HP during a summon.
+Menu XP bars follow native character and GF widgets. Active and reserve main
+menu rows show progress below names; character details and GF details show it
+below the level row. GF lists show progress below each level. Each capture
+keeps its native viewport and clears after drawing. Post-battle XP code remains.
+Party Switch explicitly relinquishes and re-registers the replaced
 actor's shared-stock mirror, rather than copying its private record over the
 canonical pool. Shared Magic works with the configured stock cap (1–255);
 lossless migration refuses overflow. No Magic Consumption hooks only field and
