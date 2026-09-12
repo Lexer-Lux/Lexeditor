@@ -69,7 +69,14 @@ def run(browser_path: str | None) -> None:
               const shell={refresh(){}};
               const noteFieldEdit=()=>{};
               window.cardsContract={state,get capturedMount(){return capturedMount;},get capturedDetail(){return capturedDetail;}};
-              window.cardsUI=FF8CardsUI({el,state,rowOf,filtered,showPaged,sharedDetail,detailSection,detailField,numberControl,selectControl,sourceControl,referenceValues,infoHelp,shell,noteFieldEdit});
+              window.cardsUI=FF8CardsUI({
+                el,state,rowOf,filtered,showPaged,sharedDetail,detailSection,detailField,
+                numberControl,selectControl,sourceControl,referenceValues,infoHelp,shell,noteFieldEdit,
+                subtabBar:LexeditorUI.subtabBar,
+                detailPanel:LexeditorUI.detailPanel,
+                recordId:LexeditorUI.recordId,
+                columnList:LexeditorUI.columnList,
+              });
               cardsUI.render();
             }''')
 
