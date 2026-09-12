@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import core, craftrecipe, evolvedrecipe, fluid, model, sound, vehicle, zedscript
+from . import core, craftrecipe, evolvedrecipe, fluid, mannequin, model, sound, vehicle, zedscript
 
 
 def read(root: Path) -> dict:
@@ -18,6 +18,7 @@ def read(root: Path) -> dict:
     vehicles = vehicle.read(root)
     sounds = sound.read(root)
     models = model.read(root)
+    mannequins = mannequin.read(root)
     inventory = zedscript.inventory(root)
     by_path: dict[str, set[str]] = {}
     for row in inventory["rows"]:
@@ -29,8 +30,9 @@ def read(root: Path) -> dict:
     vehicle_paths = {row["path"] for row in vehicles["rows"]}
     sound_paths = {row["path"] for row in sounds["rows"]}
     model_paths = {row["path"] for row in models["rows"]}
+    mannequin_paths = {row["path"] for row in mannequins["rows"]}
     errors = {
-        row["path"] for result in (items, evolved, crafts, fluids, vehicles, sounds, models, inventory)
+        row["path"] for result in (items, evolved, crafts, fluids, vehicles, sounds, models, mannequins, inventory)
         for row in result.get("errors", []) if isinstance(row, dict) and row.get("path")
     }
 
@@ -51,6 +53,8 @@ def read(root: Path) -> dict:
             editors.append("Sounds")
         if relative in model_paths:
             editors.append("Models")
+        if relative in mannequin_paths:
+            editors.append("Mannequins")
         kinds = sorted(by_path.get(relative, set()), key=str.casefold)
         if relative in errors:
             status = "partial" if editors else "recognized"
