@@ -6,6 +6,7 @@ on:
     paths:
       - 'games/ffx_x2/**'
       - 'tests/test_ffx_x2_*.py'
+      - 'worklog/acceptance/ffx-x2/**'
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
@@ -24,6 +25,7 @@ on:
     paths:
       - 'games/ffx_x2/**'
       - 'tests/test_ffx_x2_*.py'
+      - 'worklog/acceptance/ffx-x2/**'
       - 'runtime_bootstrap.py'
       - 'plugin_api.py'
       - 'service_session.py'
@@ -63,6 +65,18 @@ jobs:
         run: python -m pip install pytest
       - name: Python syntax
         run: python -m compileall -q games/ffx_x2
+      - name: Acceptance PowerShell syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          $path = (Resolve-Path 'worklog/acceptance/ffx-x2/run-verifier.ps1').Path
+          [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+          if ($errors.Count) {
+            $errors | Format-List
+            exit 1
+          }
       - name: Editor JavaScript syntax
         shell: bash
         run: >-
