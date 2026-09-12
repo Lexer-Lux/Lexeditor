@@ -6,7 +6,9 @@ import struct
 
 from games.ffx_x2 import treasures
 from games.ffx_x2.plugin import _write_fixture_vbf
-from games.ffx_x2.verify_install import acceptance_checks, finalize_report, inspect_install
+from games.ffx_x2.verify_install import (
+    EXPECTED_STRUCTURED_KEYS, acceptance_checks, finalize_report, inspect_install,
+)
 
 
 def _treasure_table() -> bytes:
@@ -45,6 +47,27 @@ def _treasure_spec() -> tuple[dict, ...]:
         "archivePath": treasures.ARCHIVE_PATH,
         "builder": treasures.payload,
     },)
+
+
+def _complete_acceptance_report() -> dict:
+    return {
+        "contract": "Lexeditor.ffx-x2-install-verification",
+        "gameRoot": "fixture",
+        "ok": True,
+        "archiveHashesIncluded": True,
+        "archives": {
+            "x": {"ready": True, "sha256": "a" * 64},
+            "x2": {"ready": True, "sha256": "b" * 64},
+        },
+        "structured": [
+            {"key": key, "status": "validated", "tableSha256": f"{index:x}" * 64}
+            for index, key in enumerate(EXPECTED_STRUCTURED_KEYS, 1)
+        ],
+        "launch": {
+            "ready": True,
+            "games": {"x": {"ready": True}, "x2": {"ready": True}},
+        },
+    }
 
 
 def test_verify_install_validates_raw_vbf_path_and_structured_table(tmp_path: Path):
@@ -88,7 +111,7 @@ def test_verify_install_optionally_hashes_complete_vbfs(tmp_path: Path):
         assert report["archives"][game]["sha256"] == hashlib.sha256(target.read_bytes()).hexdigest()
 
 
-def test_draft_exit_readiness_requires_hashes_and_fahrenheit(tmp_path: Path):
+def test_strict_baseline_requires_hashes_all_tables_and_fahrenheit(tmp_path: Path):
     game_root = tmp_path / "game"
     source = _treasure_table()
     raw_path = treasures.ARCHIVE_PATH.removeprefix("FFX_Data/")
@@ -102,44 +125,57 @@ def test_draft_exit_readiness_requires_hashes_and_fahrenheit(tmp_path: Path):
     assert unhashed["verificationPassed"] is True
     assert unhashed["acceptanceReady"] is False
     assert unhashed["acceptanceChecks"] == {
-        "archivesAndStructuredValidated": True,
+        "archivesAndStructuredValidated": False,
         "archiveHashesReady": False,
         "fahrenheitReady": True,
     }
 
-    hashed = finalize_report(
+    partial_hashed = finalize_report(
         inspect_install(game_root, specs=_treasure_spec(), hash_archives=True),
         require_fahrenheit=True,
     )
-    assert hashed["verificationPassed"] is True
-    assert hashed["acceptanceReady"] is True
-    assert hashed["generatedAt"].endswith("Z")
-    assert "T" in hashed["generatedAt"]
-    assert all(hashed["acceptanceChecks"].values())
+    assert partial_hashed["verificationPassed"] is True
+    assert partial_hashed["acceptanceReady"] is False
+    assert partial_hashed["acceptanceChecks"]["archivesAndStructuredValidated"] is False
+    assert partial_hashed["acceptanceChecks"]["archiveHashesReady"] is True
 
-    (game_root / "fahrenheit" / "bin" / "fhstage1.dll").unlink()
-    missing_loader = finalize_report(
-        inspect_install(game_root, specs=_treasure_spec(), hash_archives=True),
-        require_fahrenheit=False,
-    )
+    complete = finalize_report(_complete_acceptance_report(), require_fahrenheit=True)
+    assert complete["verificationPassed"] is True
+    assert complete["acceptanceReady"] is True
+    assert complete["generatedAt"].endswith("Z")
+    assert "T" in complete["generatedAt"]
+    assert all(complete["acceptanceChecks"].values())
+
+    missing_loader = _complete_acceptance_report()
+    missing_loader["launch"]["ready"] = False
+    missing_loader["launch"]["games"]["x2"]["ready"] = False
+    missing_loader = finalize_report(missing_loader, require_fahrenheit=False)
     assert missing_loader["verificationPassed"] is True
     assert missing_loader["acceptanceReady"] is False
     assert missing_loader["acceptanceChecks"]["archiveHashesReady"] is True
     assert missing_loader["acceptanceChecks"]["fahrenheitReady"] is False
 
 
-def test_draft_exit_readiness_rejects_incomplete_maps():
+def test_strict_baseline_rejects_incomplete_or_malformed_maps():
     checks = acceptance_checks({
         "ok": True,
         "archiveHashesIncluded": True,
         "archives": {},
+        "structured": [],
         "launch": {"ready": True, "games": {}},
     })
     assert checks == {
-        "archivesAndStructuredValidated": True,
+        "archivesAndStructuredValidated": False,
         "archiveHashesReady": False,
         "fahrenheitReady": False,
     }
+
+    malformed = _complete_acceptance_report()
+    malformed["archives"]["x"]["sha256"] = "z" * 64
+    malformed["structured"][0]["tableSha256"] = "not-a-hash"
+    checks = acceptance_checks(malformed)
+    assert checks["archiveHashesReady"] is False
+    assert checks["archivesAndStructuredValidated"] is False
 
 
 def test_verify_install_fails_closed_when_claimed_table_is_missing(tmp_path: Path):
