@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from . import paths
 from .content_pack import ContentPackStore, deploy, deployment_status, loader_status, revert
+from .source_data import load_base_objects
 
 LEXEDITOR_ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
@@ -20,14 +21,52 @@ MAX_REQUEST_BYTES = 1024 * 1024
 POST_ROUTES = {"/api/objects/save", "/api/deployment/deploy", "/api/deployment/revert"}
 
 
+def objects_dataset() -> dict:
+    """Combine read-only vanilla values, when available, with project-owned overrides."""
+    payload = ContentPackStore(paths.PROJECT_ROOT).objects()
+    base_rows, source = load_base_objects(paths.GAME_ROOT)
+    patched = {row["id"]: row for row in payload["rows"]}
+    rows = []
+    for object_id in sorted(set(base_rows) | set(patched), key=str.casefold):
+        base = base_rows.get(object_id)
+        patch = patched.get(object_id, {})
+        rows.append({
+            "id": object_id,
+            "name": base["name"] if base else object_id,
+            "internalName": base["internalName"] if base else object_id,
+            "description": base["description"] if base else "",
+            "baseFields": dict(base["baseFields"]) if base else {},
+            "sourcePresent": base is not None,
+            "fields": dict(patch.get("fields", {})),
+            "present": list(patch.get("present", [])),
+            "unsupportedFieldCount": int(patch.get("unsupportedFieldCount", 0)),
+        })
+    payload["rows"] = rows
+    payload["baseSource"] = source
+    payload["source"] = "vanilla-unpacked+project-patches" if source.get("available") else "project-patches"
+    return payload
+
+
 def data_map() -> dict:
     project_ready = (paths.PROJECT_ROOT / "manifest.json").is_file() and (paths.PROJECT_ROOT / "content.json").is_file()
+    _base, source = load_base_objects(paths.GAME_ROOT)
+    if source.get("available"):
+        notes = (
+            "Lexeditor reads vanilla Data/Objects values from the read-only StardewXnbHack JSON export and writes only "
+            "field-level Content Patcher overrides into the selected project. Coverage is partial because only Price, "
+            "Edibility, and IsDrink are editable so far."
+        )
+    else:
+        notes = (
+            "Lexeditor edits field-level Content Patcher overrides in the selected project. Vanilla values become visible "
+            "when StardewXnbHack's Content (unpacked)/Data/Objects.json export is present; Lexeditor does not modify the XNB."
+        )
     rows = [{
         "filename": "Content/Data/Objects.xnb",
         "controls": "Content Patcher Data/Objects fields: Price, Edibility, IsDrink",
-        "notes": "Lexeditor edits field-level Content Patcher overrides in the selected project. Base XNB decoding is not integrated yet, so the editor lists project-patched object IDs rather than claiming full vanilla coverage.",
+        "notes": notes,
         "status": "partial", "coverage": "structured", "openable": project_ready,
-        "sourceAvailable": False, "target": "objects", "dataset": "objects", "datasetKey": "objects",
+        "sourceAvailable": bool(source.get("available")), "target": "objects", "dataset": "objects", "datasetKey": "objects",
     }]
     for target, label in (
         ("Data/BigCraftables", "Big craftables"), ("Data/Crops", "Crops"),
@@ -44,10 +83,12 @@ def data_map() -> dict:
 
 
 def dashboard() -> dict:
+    _base, source = load_base_objects(paths.GAME_ROOT)
     return {
         "game": {"root": str(paths.GAME_ROOT), "ready": not paths.game_problems()},
         "project": {"root": str(paths.PROJECT_ROOT)},
         "loader": loader_status(paths.GAME_ROOT),
+        "source": source,
         "deployment": deployment_status(paths.GAME_ROOT, paths.PROJECT_ROOT),
         "problems": paths.game_problems(),
         "scaffold": False,
@@ -95,7 +136,7 @@ class Handler(BaseHTTPRequestHandler):
                 })
             elif path == "/api/dashboard": self.json_response(dashboard())
             elif path == "/api/datamap": self.json_response(data_map())
-            elif path == "/api/objects": self.json_response(ContentPackStore(paths.PROJECT_ROOT).objects())
+            elif path == "/api/objects": self.json_response(objects_dataset())
             elif path == "/api/deployment": self.json_response(deployment_status(paths.GAME_ROOT, paths.PROJECT_ROOT))
             else: self.json_response({"error": "Not found"}, 404)
         except FileNotFoundError as error: self.json_response({"error": str(error)}, 409)
@@ -122,8 +163,9 @@ class Handler(BaseHTTPRequestHandler):
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
             if not isinstance(payload, dict): raise ValueError("The request must be a JSON object")
             if path == "/api/objects/save":
-                result = ContentPackStore(paths.PROJECT_ROOT).save_objects(
+                ContentPackStore(paths.PROJECT_ROOT).save_objects(
                     str(payload.get("sha256", "")), payload.get("edits", []))
+                result = objects_dataset()
             elif path == "/api/deployment/deploy": result = deploy(paths.GAME_ROOT, paths.PROJECT_ROOT)
             else: result = revert(paths.GAME_ROOT, paths.PROJECT_ROOT)
             self.json_response(result)
