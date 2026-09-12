@@ -180,7 +180,8 @@ def initialize_project(root: Path) -> None:
     manifest = _json(manifest_path)
     name = root.name.strip() or "Stardew Project"
     slug = re.sub(r"[^A-Za-z0-9]+", "", name) or "Project"
-    suffix = hashlib.sha256(name.encode("utf-8")).hexdigest()[:8]
+    identity_seed = os.path.normcase(str(root))
+    suffix = hashlib.sha256(identity_seed.encode("utf-8")).hexdigest()[:8]
     manifest["Name"] = name
     manifest["UniqueID"] = f"Lexer.Lexeditor.{slug}.{suffix}"
     _atomic_json(manifest_path, manifest)
