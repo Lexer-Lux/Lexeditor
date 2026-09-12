@@ -120,8 +120,9 @@ class StardewContentPackTests(unittest.TestCase):
             log.write_text(
                 "[SMAPI] SMAPI 4.5.2 with Stardew Valley 1.6.15 build 24354 on Windows 11\n"
                 "[SMAPI] Loaded 2 mods:\n"
-                "[SMAPI] Content Patcher 2.9.1 by Pathoschild\n"
-                f"[Content Patcher] Loaded content pack {manifest['Name']} ({manifest['UniqueID']}).\n",
+                "[SMAPI]    Content Patcher 2.9.1 by Pathoschild | Loads content packs\n"
+                "[SMAPI] Loaded 1 content packs:\n"
+                f"[SMAPI]    {manifest['Name']} 1.0.0 by Lexer | for Content Patcher\n",
                 encoding="utf-8",
             )
             accepted = acceptance_status(game, self.project)
@@ -130,6 +131,7 @@ class StardewContentPackTests(unittest.TestCase):
             self.assertEqual(accepted["gameVersion"], "1.6.15")
             self.assertTrue(accepted["contentPatcherSeen"])
             self.assertTrue(accepted["projectMentioned"])
+            self.assertTrue(accepted["projectLoaded"])
             self.assertTrue(accepted["objectsXnbUnchanged"])
 
             xnb.write_bytes(b"mutated-installed-objects")
