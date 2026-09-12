@@ -49,6 +49,7 @@ STRUCTURED_SPECS = (
     {"game": "x2", "key": "ffx2-abilities", "archivePath": ffx2_abilities.ARCHIVE_PATH, "builder": ffx2_abilities.payload},
     {"game": "x2", "key": "ffx2-accessories", "archivePath": ffx2_accessories.ARCHIVE_PATH, "builder": ffx2_accessories.payload},
 )
+EXPECTED_STRUCTURED_KEYS = tuple(str(spec["key"]) for spec in STRUCTURED_SPECS)
 
 
 def _find_entry(index: VBFIndex, game: str, archive_path: str):
@@ -69,6 +70,14 @@ def _sha256_file(path: Path) -> str:
                 break
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _is_sha256(value) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value.casefold())
+    )
 
 
 def inspect_install(game_root: Path, specs: Iterable[dict] = STRUCTURED_SPECS,
@@ -173,12 +182,27 @@ def acceptance_checks(report: dict) -> dict[str, bool]:
     archive_hashes_ready = bool(report.get("archiveHashesIncluded")) and all(
         game in archives
         and archives[game].get("ready")
-        and isinstance(archives[game].get("sha256"), str)
-        and len(archives[game]["sha256"]) == 64
+        and _is_sha256(archives[game].get("sha256"))
         for game in ARCHIVE_FILES
     )
+    rows = report.get("structured", [])
+    by_key = {
+        str(row.get("key")): row
+        for row in rows
+        if isinstance(row, dict) and row.get("key") is not None
+    }
+    structured_ready = (
+        len(rows) == len(EXPECTED_STRUCTURED_KEYS)
+        and len(by_key) == len(EXPECTED_STRUCTURED_KEYS)
+        and all(
+            key in by_key
+            and by_key[key].get("status") == "validated"
+            and _is_sha256(by_key[key].get("tableSha256"))
+            for key in EXPECTED_STRUCTURED_KEYS
+        )
+    )
     return {
-        "archivesAndStructuredValidated": bool(report.get("ok")),
+        "archivesAndStructuredValidated": bool(report.get("ok") and structured_ready),
         "archiveHashesReady": archive_hashes_ready,
         "fahrenheitReady": _launch_ready(report),
     }
