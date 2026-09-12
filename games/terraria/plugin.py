@@ -23,18 +23,38 @@ MOD_SOURCES_ROOT = TMODLOADER_SAVE_ROOT / "ModSources"
 DEFAULT_PROJECT_ROOT = MOD_SOURCES_ROOT / "LexeditorTerrariaMod"
 
 
-def _mod_id(name: str) -> str:
-    value = re.sub(r"[^A-Za-z0-9_]", "", name.replace(" ", "_"))
-    if not value:
-        value = "LexeditorTerrariaMod"
-    if value[0].isdigit():
-        value = "Mod_" + value
-    return value
+_CSHARP_KEYWORDS = frozenset({
+    "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char", "checked",
+    "class", "const", "continue", "decimal", "default", "delegate", "do", "double", "else",
+    "enum", "event", "explicit", "extern", "false", "finally", "fixed", "float", "for", "foreach",
+    "goto", "if", "implicit", "in", "int", "interface", "internal", "is", "lock", "long",
+    "namespace", "new", "null", "object", "operator", "out", "override", "params", "private",
+    "protected", "public", "readonly", "ref", "return", "sbyte", "sealed", "short", "sizeof",
+    "stackalloc", "static", "string", "struct", "switch", "this", "throw", "true", "try",
+    "typeof", "uint", "ulong", "unchecked", "unsafe", "ushort", "using", "virtual", "void",
+    "volatile", "while",
+})
+_TMODLOADER_RESERVED_NAMES = frozenset({"mod", "modloader", "tmodloader"})
+_MOD_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def validate_mod_name(name: str) -> None:
+    """Enforce tModLoader's source-folder/internal-name boundary before mutation."""
+    if not _MOD_IDENTIFIER.fullmatch(name):
+        raise ValueError(
+            "tModLoader mod names must be C# identifiers: start with a letter or underscore "
+            "and use only ASCII letters, digits, or underscores"
+        )
+    if name in _CSHARP_KEYWORDS:
+        raise ValueError(f"tModLoader mod name cannot be the C# keyword {name}")
+    if name.casefold() in _TMODLOADER_RESERVED_NAMES:
+        raise ValueError(f"tModLoader reserves the mod name {name}")
 
 
 def initialize_project(root: Path) -> None:
     """Turn the packaged skeleton into one valid tModLoader source project."""
-    mod_id = _mod_id(root.name)
+    validate_mod_name(root.name)
+    mod_id = root.name
     replacements = {
         "__LEXEDITOR_DISPLAY_NAME__": root.name,
         "__LEXEDITOR_ID__": mod_id,
@@ -107,6 +127,7 @@ PLUGIN = GamePlugin(
         required_paths=("build.txt",),
         template_root=TEMPLATE_ROOT,
         initialize=initialize_project,
+        validate_name=validate_mod_name,
         discover=discover_projects,
     ),
     installation=GameInstallSpec(
