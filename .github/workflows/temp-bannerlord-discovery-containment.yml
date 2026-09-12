@@ -1,0 +1,32 @@
+name: Temporary Bannerlord discovery containment
+
+on:
+  push:
+    branches: [feature/bannerlord-plugin]
+    paths:
+      - '.github/workflows/temp-bannerlord-discovery-containment.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/bannerlord-plugin
+      - name: Apply discovery containment patch
+        run: python tools/temp_bannerlord_discovery_containment.py
+      - name: Validate focused Bannerlord discovery paths
+        run: |
+          python -m compileall -q games/bannerlord
+          python -m unittest tests.test_bannerlord_discovery_containment tests.test_bannerlord_plugin tests.test_bannerlord_moduledata tests.test_bannerlord_gauntlet -v
+      - name: Commit discovery containment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add games/bannerlord/paths.py games/bannerlord/module_data.py games/bannerlord/module_xml_data.py games/bannerlord/gauntlet_data.py games/bannerlord/server.py codex/bannerlord/project-memory.md tests/test_bannerlord_discovery_containment.py
+          git rm .github/workflows/temp-bannerlord-discovery-containment.yml tools/temp_bannerlord_discovery_containment.py
+          git commit -m "Contain Bannerlord discovery paths"
+          git push origin HEAD:feature/bannerlord-plugin
