@@ -6125,3 +6125,19 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-save-preview li div{white-space:pre-wrap}
 
 .lex-multi-edit-notice{padding:8px;border-bottom:1px solid var(--lex-border);font-size:14px;grid-column:1/-1}
+
+/* Tweaks pages always have their own scroll area and a reachable pager. */
+body:has(> main .lex-tweaks-paged) { display:flex; flex-direction:column; }
+body:has(> main .lex-tweaks-paged) > :not(main) { flex-shrink:0; }
+body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
+.lex-tweaks-paged { display:flex !important; flex-direction:column; height:100%; min-height:0; min-width:0; overflow:hidden; }
+.lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; }
+.lex-tweaks-pages { flex:0 0 auto; min-width:0; }
+.lex-tweak-card-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--lex-tweak-card-width,320px)),1fr)); gap:var(--lex-panel-gap,12px); align-items:start; }
+.lex-tweak-off-page { display:none !important; }
+.lex-tweaks-scroll > .settings-view { height:auto; overflow:visible; }
+.lex-platform-config:has(> .lex-tweaks-paged) { display:flex; flex-direction:column; height:100%; min-height:0; }
+.lex-platform-config > .lex-tweaks-paged { flex:1 1 0; }
+
+.lex-detail-panel > .lex-tweaks-paged { flex:1 1 0; }
+.lex-tweaks-scroll > .lex-detail-panel-body { height:auto; overflow:visible; }

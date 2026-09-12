@@ -12,14 +12,20 @@ try:
   page.goto(f'http://127.0.0.1:{server.server_port}/')
   page.wait_for_function("!document.body.innerText.includes('Preparing Final Fantasy VIII')")
   page.locator('nav [data-tab="settings"]').click()
-  toggle=page.get_by_label('GF HP Casting',exact=True);toggle.wait_for()
-  page.get_by_label('Monogamy',exact=True).check();page.get_by_label('No Magic Consumption',exact=True).check();toggle.check()
+  def control(label, exact=True):
+   field=page.get_by_label(label,exact=exact)
+   index=field.evaluate("n=>Array.from(n.closest('.settings-view').children).indexOf(n.closest('.settings-view > *'))")
+   page_number=page.locator('.lex-tweaks-pages .lex-page-number')
+   page_number.fill(str(index//6+1));page_number.press('Enter')
+   return field
+  toggle=control('GF HP Casting');toggle.wait_for()
+  control('Monogamy').check();control('No Magic Consumption').check();control('GF HP Casting').check()
   page.locator('nav [data-tab="magic"]').click()
   field=page.get_by_role('spinbutton',name='GF HP cost for Aero');field.wait_for();field.fill('321');assert field.input_value()=='321'
-  page.locator('nav [data-tab="settings"]').click();page.get_by_label('Monogamy',exact=True).uncheck()
+  page.locator('nav [data-tab="settings"]').click();control('Monogamy').uncheck()
   assert toggle.is_disabled() and not toggle.is_checked()
-  page.get_by_label('No Magic Consumption',exact=True).uncheck();page.get_by_label('Monogamy',exact=True).check();assert toggle.is_disabled()
-  page.get_by_label('No Magic Consumption',exact=True).check();assert not toggle.is_disabled() and toggle.is_checked()
+  control('No Magic Consumption').uncheck();control('Monogamy').check();assert toggle.is_disabled()
+  control('No Magic Consumption').check();assert not toggle.is_disabled() and toggle.is_checked()
   page.locator('nav [data-tab="magic"]').click();assert page.get_by_role('spinbutton',name='GF HP cost for Aero').input_value()=='321'
   assert not errors,errors
   browser.close()

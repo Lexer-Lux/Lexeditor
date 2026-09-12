@@ -791,7 +791,7 @@
     return element("section", {
       ...(options.attrs || {}),
       class: ["lex-detail-panel", "lex-detail", heading ? "" : "no-heading", options.className || ""].filter(Boolean).join(" "),
-    }, heading, element("div", {class: "lex-detail-panel-body"}, options.body || []));
+    }, heading, options.paginate ? paginateSettings(element("div", {class:"lex-detail-panel-body"}, options.body || [])) : element("div", {class: "lex-detail-panel-body"}, options.body || []));
   };
 
   // A panel can own local navigation without turning those choices into
@@ -2404,45 +2404,41 @@
   //
   // A page may also divide itself with subtabs. A bar with fewer than two tabs
   // is not drawn, which is the same rule every other subtab bar follows.
-  const settingsColumns = (sections, options = {}) => {
-    const lane = element("div", {class: "lex-settings-lane"});
-    const root = element("div", {
-      class: ["lex-settings-columns", "lex-tweaks-columns", options.className || ""].filter(Boolean).join(" "),
-    }, (options.tabs || []).length > 1 ? subtabBar({
-      tabs: options.tabs,
-      active: options.activeTab,
-      label: options.tabsLabel || "Tweak groups",
-      className: "lex-settings-subtabs",
-      change: options.changeTab,
-    }) : null, lane);
-    if (options.columnWidth)
-      root.style.setProperty("--lex-settings-column-width", options.columnWidth);
-    const cards = (sections || []).filter(Boolean);
-    let dealt = 0;
-    let frame = 0;
-    const deal = () => {
-      frame = 0;
-      if (!lane.isConnected) return;
-      const width = lane.clientWidth || root.clientWidth;
-      const target = parseFloat(getComputedStyle(root)
-        .getPropertyValue("--lex-settings-column-width")) || 320;
-      const count = Math.max(1, Math.min(cards.length, Math.floor(width / target) || 1));
-      if (count === dealt) return;
-      const columns = Array.from({length: count}, () =>
-        element("div", {class: "lex-settings-column"}));
-      cards.forEach((card, index) => columns[index % count].append(card));
-      lane.replaceChildren(...columns);
-      dealt = count;
+  // Keep controls mounted so dependencies and unsaved values span pages.
+  const paginateSettings = (content, options = {}) => {
+    const cards = [...content.children], size = options.pageSize || 6;
+    let page = 0;
+    const footer = element("div", {class:"lex-tweaks-pages"});
+    const scroll = element("div", {class:"lex-tweaks-scroll", tabindex:"-1"}, content);
+    const root = element("div", {class:"lex-tweaks-paged"}, scroll, footer);
+    const render = () => {
+      const visible = cards.filter(card => !card.hidden);
+      const pages = Math.max(1, Math.ceil(visible.length / size));
+      page = Math.min(page, pages - 1);
+      cards.forEach(card => card.classList.add("lex-tweak-off-page"));
+      visible.slice(page * size, (page + 1) * size).forEach(card => card.classList.remove("lex-tweak-off-page"));
+      const focused = footer.contains(document.activeElement) ? document.activeElement : null;
+      const selection = focused && [focused.selectionStart, focused.selectionEnd];
+      const label = focused?.getAttribute("aria-label");
+      footer.replaceChildren(pager({page, pages, total:visible.length, pageSize:size,
+        search:options.search, change:value => {page=value;render();scroll.scrollTop=0;}}));
+      if (label && focused?.matches("input")) {
+        const replacement = [...footer.querySelectorAll("input")].find(input=>input.getAttribute("aria-label")===label);
+        replacement?.focus();
+        if (selection && selection[0] !== null) replacement?.setSelectionRange(...selection);
+      }
     };
-    if (typeof ResizeObserver === "function") {
-      const observer = new ResizeObserver(() => {
-        if (!frame) frame = requestAnimationFrame(deal);
-      });
-      observer.observe(root);
-      root.lexSettingsObserver = observer;
-    }
-    requestAnimationFrame(deal);
-    deal();
+    root.refreshPages = () => {page=0;render();};
+    render();return root;
+  };
+  const settingsColumns = (sections, options = {}) => {
+    const content = element("div", {class:"lex-tweak-card-grid"}, ...(sections || []).filter(Boolean));
+    const root = paginateSettings(content, options);
+    root.classList.add("lex-settings-columns");
+    if(options.className) root.classList.add(...options.className.split(/\s+/));
+    if(options.columnWidth) content.style.setProperty("--lex-tweak-card-width",options.columnWidth);
+    if((options.tabs || []).length > 1) root.prepend(subtabBar({tabs:options.tabs,active:options.activeTab,
+      label:options.tabsLabel || "Tweak groups",change:options.changeTab}));
     return root;
   };
 
@@ -6949,7 +6945,7 @@ ${contents.path}`});
       sectionNode.hidden = fields.every(field => field.hidden);
       return sectionNode;
     });
-    const fieldCount = config.sections.reduce((total, section) => total + section.fields.length, 0);
+    let paged;
     const applySearch = value => {
       options.search(value);
       const normalized = String(value).toLocaleLowerCase();
@@ -6960,18 +6956,18 @@ ${contents.path}`});
         for (const field of fields) field.hidden = !!normalized && !field.dataset.platformSearch.includes(normalized);
         section.hidden = fields.every(field => field.hidden);
       }
+      paged.refreshPages();
     };
-    const commandBar = pager({
-      page:0, pages:1, total:fieldCount, pageSize:Math.max(1,fieldCount), noun:"settings",
+    paged = paginateSettings(element("div", {class:"lex-platform-config-sections"}, ...sections), {
       search:{key:`platform-${config.runtime || "settings"}`,value:options.query || "",label:`Search ${config.runtime} settings`,change:applySearch},
     });
     return element("section", {class: "lex-platform-config"},
       options.showHeader === false ? null : element("header", {class: "lex-platform-config-head"},
         element("div", {}, element("h2", {}, `${config.runtime} settings`), element("p", {}, config.message), element("code", {}, config.path))),
-      element("div", {class: "lex-platform-config-sections"}, ...sections), commandBar)
+      paged)
   };
 
-  window.LexeditorUI = {pendingChangeList,uiScaleControl, element, el: element, confirmAction, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
+  window.LexeditorUI = {pendingChangeList,uiScaleControl, element, el: element, confirmAction, paginateSettings, settingsColumns, pagerToggle, pagerSelect, reshadeSection, callWindow, newButton, modLoaderSection, infoHelp, controlHelp, installControlHelp, creditsPanel, unitField, readonlyField, formatNumber, numberValue, magnitudeValue, recordId, detailPanel, tabbedPanel, detailSection, detailNote, detailField, detailGroup, detailRow, multiNumberRow, subtabBar, toggleRow, autoFitControlText, showToast, copyText, curveEditor, refreshReferences, closeButton, hoverable, settingsIcon, infoIcon, folderIcon, searchIcon, saveIcon, settingsSaveControl, bottomSearch, beginSearcher, finishSearcher, decorateSearchCandidate, openGameFolder, finishPluginLoading, configureThemeSounds, playThemeSound, sharedSettings, soundCoverageTable, clone, applyTheme, EditHistory, NavigationHistory, installBrowserHistoryGuard, installExtendedMouseHistory, bindSettingDependencies, showAlert, confirmUnsavedExit, confirmDiscardChanges, createWindowActions, installWindowFrame, openSettings, mountShell, list, columnList, columnPreferences, hasEnabledProperty, panelLayout, listDetail, masterDetail, fitListPage, pagedListDetail, pager, referenceDisplay, provenanceControl, booleanMark, enabledMark, integrationStatus, dataMap, platformConfigView};
 })();
 
 

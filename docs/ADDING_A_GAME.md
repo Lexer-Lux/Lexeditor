@@ -336,6 +336,15 @@ reference: a master switch that owns the page, dependent controls disabled until
 is on, bounded values with units, selects for fixed choices, and related switches
 grouped into one property.
 
+All Tweaks lists must use pagination. Use `LexeditorUI.settingsColumns` for
+setting cards, `paginateSettings` for an existing group container, or
+`detailPanel({paginate:true, ...})` for a settings detail page. The shared control
+keeps six groups per page and provides an inner scroll area for tall groups.
+Keep the pager outside that scroll area. Never rely on the outer window to
+scroll: the desktop shell can prevent it. Check every page, the last control in
+a tall group, and edit retention at small window sizes and large UI scales.
+Run `python tools/verify_tweaks_pagination.py` for the shared reachability check.
+
 Credits and Mod Loading are shared Info-page sections; do not hand-build per-game
 copies. A plugin still has to supply their data, and discovery will reject it if it
 does not. The Mod Loader section is enforced: every plugin must call

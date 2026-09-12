@@ -217,7 +217,7 @@
     $("#toolbar").replaceChildren(el("span",{},state.settings?.available?"LexerRDR.ini — project settings for LexerRDR.asi":"LexerRDR.ini is not available"),el("span",{class:"count"},state.settings?.file||""),LexeditorUI.settingsSaveControl({pendingChanges:()=>(state.settings?.sections||[]).flatMap(section=>section.settings.filter(setting=>Object.prototype.hasOwnProperty.call(state.settingEdits,settingKey(section,setting))).map(setting=>({label:`${section.name} / ${setting.key}`,before:setting.value,after:settingValue(section,setting)}))),dirtyCount:()=>Object.keys(state.settingEdits).length,save:saveSettings,discard:discardSettings,readonly:()=>!state.settings?.available}));
     if(!state.settings?.available){$("#main").replaceChildren(el("div",{class:"empty"},el("div",{},el("h2",{},"LexerRDR.ini is missing"),el("p",{},state.settings?.reason||"The runtime settings file must be present before its values can be edited."))));shell.refresh();return;}
     const sections=state.settings.sections.map(section=>el("section",{class:"settings-section"},el("h2",{},section.name),section.help?el("div",{class:"source-note"},section.help):null,...section.settings.map(setting=>el("div",{class:"field"},el("label",{},setting.key,setting.help?el("small",{},setting.help):null),settingControl(section,setting)))));
-    $("#main").replaceChildren(el("div",{class:"settings-layout"},...sections));shell.refresh();
+    $("#main").replaceChildren(LexeditorUI.settingsColumns(sections));shell.refresh();
   }
 
   function lootNumber(parent,key,label,step="1",minimum="0",maximum="100000",note=""){

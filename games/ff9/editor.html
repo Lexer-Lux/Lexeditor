@@ -270,7 +270,7 @@
     const tabs=[{id:"memoria",label:"Memoria"},{id:"improved",label:"Improved Interface"},{id:"eat",label:"Better Eat"},{id:"xp",label:"XP Bars"},{id:"hpmp",label:"HP/MP Bars"},{id:"row",label:"Row Rework"}];
     setToolbar([subtabBar({tabs,active:state.tweak,label:"Tweaks",change:id=>{state.tweak=id;tweaks()}})]);
     if(state.tweak==="memoria"){
-      $("#main").replaceChildren(detailPanel({className:"ff9-detail ff9-tweaks",
+      $("#main").replaceChildren(detailPanel({paginate:true,className:"ff9-detail ff9-tweaks",
         title:"Memoria",meta:"Handled by the Memoria launcher",body:[
           detailSection({title:"WHERE THESE SETTINGS LIVE",body:[
             detailField({label:"EDITOR",control:readonlyField("Memoria's own launcher. Lexeditor does not duplicate it.")}),
@@ -300,7 +300,7 @@
     // The bespoke card is gone: Tweaks is the shared settings page every game
     // uses, so the switch, the deployment state and the ReShade section all
     // read the same here as anywhere else.
-    $("#main").replaceChildren(detailPanel({className:"ff9-detail ff9-tweaks",title,
+    $("#main").replaceChildren(detailPanel({paginate:true,className:"ff9-detail ff9-tweaks",title,
       identity:enabled?"ON":"OFF",meta:"Memoria runtime tweaks",body:[
         detailSection({title:"TWEAK",body:[
           detailField({label:"WHAT IT DOES",control:readonlyField(description)}),

@@ -185,7 +185,7 @@
   }
   function tweaksPanel(){
     const gate=!tweaks.enabled||activeSource!=="mine";
-    return detailPanel({className:"blank-detail blank-tweaks",title:"Tweaks",icon:blankIcon(),
+    return detailPanel({paginate:true,className:"blank-detail blank-tweaks",title:"Tweaks",icon:blankIcon(),
       identity:tweaks.enabled?"ON":"OFF",meta:"Reference tweak page: switches, bounded values and dependent controls",
       body:[
         detailSection({title:"MASTER",body:[

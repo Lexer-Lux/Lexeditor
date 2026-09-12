@@ -335,15 +335,17 @@
   }
   function discardSettings(){state.settingEdits={};setStatus("Restored the last saved settings");renderSettings();shell.refresh()}
   function renderSettings(){
-    const rows=settingRows(),selected=rows.find(row=>String(row.line)===state.selectedSetting)||rows[0];if(selected)state.selectedSetting=String(selected.line);
+    const rows=settingRows();
+    state.settingsPage=Math.min(state.settingsPage||0,Math.max(0,Math.ceil(rows.length/40)-1));
+    const pageRows=rows.slice(state.settingsPage*40,(state.settingsPage+1)*40),selected=rows.find(row=>String(row.line)===state.selectedSetting)||rows[0];if(selected)state.selectedSetting=String(selected.line);
     // No plugin Save button in the bar: the shell's own Save owns every
     // unsaved change in the editor, and a second one beside it asks the reader
     // which of the two they meant.
     $("#toolbar").replaceChildren();
-    const master=list({rows,key:row=>String(row.line),selected:state.selectedSetting,select:selectSetting,render:row=>el("div",{},el("b",{},row.key),el("div",{class:"sub"},row.section))});
+    const master=list({rows:pageRows,key:row=>String(row.line),selected:state.selectedSetting,select:selectSetting,render:row=>el("div",{},el("b",{},row.key),el("div",{class:"sub"},row.section))});
     const detail=el("div",{class:"lex-detail detail"},selected?el("div",{},el("h2",{},selected.key),el("div",{class:"detail-grid"},el("div",{class:"label"},"Section"),el("div",{},selected.section),el("div",{class:"label"},"Value"),el("input",{value:effectiveSetting(selected),oninput:event=>{if(event.target.value===selected.value)delete state.settingEdits[selected.line];else state.settingEdits[selected.line]=event.target.value;shell.refresh();}}),el("div",{class:"label"},"Description"),el("div",{},selected.description||"No description."))):"No matching setting.");
     const layout=masterDetail(master,detail,"",{splitKey:"warband-settings",defaultSplit:38});
-    const bottom=pager({page:0,pages:1,total:rows.length,pageSize:Math.max(1,rows.length),noun:"settings",search:{key:"warband-settings",value:state.filters.settings,placeholder:"Search settings…",change:value=>{state.filters.settings=value;renderSettings();}}});
+    const bottom=pager({page:state.settingsPage,pages:Math.ceil(rows.length/40),total:rows.length,pageSize:40,change:value=>{state.settingsPage=value;renderSettings();},noun:"settings",search:{key:"warband-settings",value:state.filters.settings,placeholder:"Search settings…",change:value=>{state.filters.settings=value;state.settingsPage=0;renderSettings();}}});
     $("#main").replaceChildren(layout,bottom);
   }
 
