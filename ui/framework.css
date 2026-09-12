@@ -6035,3 +6035,6 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 .lex-subtab-button:has(> .lex-info-help) { display:flex;align-items:center;justify-content:center; }
 .lex-subtab-button > .lex-info-help { flex:0 0 18px;position:relative; }
 .lex-subtab-button:has(> .lex-info-help) > .lex-tab-label { flex:0 1 auto;min-width:0; }
+
+/* Titles contribute to column minima and must not split inside a word. */
+.lex-column-list-head-cell .header-label { white-space:nowrap;overflow-wrap:normal;word-break:normal; }

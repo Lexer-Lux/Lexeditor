@@ -4935,6 +4935,38 @@ ${contents.path}`});
     editor.select?.();
   };
 
+  // Column minima include the rendered heading, not only the body values.
+  const columnHeadingWidths = new Map();
+  const fitColumnHeadings = root => {
+    if (!root.isConnected) return;
+    const base = root.lexHeadingTemplate || root.style.getPropertyValue("--lex-column-list-template");
+    root.lexHeadingTemplate = base;
+    const tracks = base.match(/(?:[^\s(]+\([^)]*\)|[^\s]+)/g) || [];
+    const heads = [...root.querySelectorAll(":scope > .lex-column-list-header > .lex-column-list-head-cell")];
+    if (tracks.length !== heads.length) return;
+    const fitted = heads.map((head, index) => {
+      const probe = head.cloneNode(true);
+      probe.removeAttribute("id");
+      probe.style.cssText = "position:fixed;visibility:hidden;width:max-content;min-width:max-content;max-width:none;white-space:nowrap;";
+      probe.querySelectorAll("*").forEach(node => {
+        node.style.whiteSpace = "nowrap";
+        node.style.maxWidth = "none";
+        node.style.flexShrink = "0";
+      });
+      head.parentElement.append(probe);
+      const width = Math.ceil(probe.offsetWidth + 2);
+      probe.remove();
+      const track = tracks[index], range = /^minmax\((.*),\s*([^,]+)\)$/.exec(track);
+      if (range) return `minmax(max(${width}px, ${range[1]}), ${range[2]})`;
+      if (/^[\d.]+(?:px|em|rem|ch|%)$/.test(track)) return `max(${width}px, ${track})`;
+      if (/^[\d.]+fr$/.test(track)) return `minmax(${width}px, ${track})`;
+      return track;
+    }).join(" ");
+    columnHeadingWidths.set(root.lexHeadingKey, fitted);
+    if (root.style.getPropertyValue("--lex-column-list-template") !== fitted)
+      root.style.setProperty("--lex-column-list-template", fitted);
+  };
+
   const columnList = options => {
     const preferredColumns = options.columnPreferences?.active?.();
     // The generic enabled column is not a user-choosable column, so it is
@@ -5149,6 +5181,12 @@ ${contents.path}`});
         return cell;
       }),
     });
+    root.lexHeadingTemplate = template;
+    root.lexHeadingKey = JSON.stringify([template, options.class, header.textContent]);
+    const cachedHeadingTemplate = columnHeadingWidths.get(root.lexHeadingKey);
+    if (cachedHeadingTemplate) root.style.setProperty("--lex-column-list-template", cachedHeadingTemplate);
+    requestAnimationFrame(() => fitColumnHeadings(root));
+    document.fonts?.ready.then(() => fitColumnHeadings(root));
     return root;
   };
 
