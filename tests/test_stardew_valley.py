@@ -26,6 +26,17 @@ class StardewContentPackTests(unittest.TestCase):
 
     def tearDown(self): self.temp.cleanup()
 
+    def test_project_declares_supported_runtime_versions(self):
+        manifest = json.loads((self.project / "manifest.json").read_text(encoding="utf-8"))
+        content = json.loads((self.project / "content.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["MinimumApiVersion"], "4.4.0")
+        self.assertEqual(manifest["MinimumGameVersion"], "1.6.15")
+        self.assertEqual(manifest["ContentPackFor"], {
+            "UniqueID": "Pathoschild.ContentPatcher",
+            "MinimumVersion": "2.9.0",
+        })
+        self.assertEqual(content["Format"], "2.9.0")
+
     def test_object_edit_preserves_unknown_data_and_rejects_stale_save(self):
         content = json.loads((self.project / "content.json").read_text(encoding="utf-8"))
         content["CustomRoot"] = {"keep": True}
