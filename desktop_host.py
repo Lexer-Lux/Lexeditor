@@ -147,6 +147,11 @@ class HostApi:
         # every line has been used.
         self._shown_quotes: set[str] = set()
         self._projects = projects or ProjectManager(plugins)
+        self._mod_library_lock = threading.RLock()
+        self._mod_uploads = {}
+        self._managed_mod_results = {}
+        self._session_project_path = None
+        self._library_move_progress = None
         self._window_state_path = window_state_path
         self._session: PluginSession | None = None
         self._session_identity: dict | None = None
@@ -965,6 +970,11 @@ class HostApi:
 
     def launch_game(self, plugin_id: str) -> dict:
         """Start the configured game without opening a command window."""
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
+            root, _executable = self._game_executable(plugin_id)
+            with self._mod_library_lock:
+                adapter.recover(root)
         controller = self._game_controller(plugin_id)
         if controller is not None:
             root, _executable = self._game_executable(plugin_id)
@@ -1035,7 +1045,281 @@ class HostApi:
 
     def mod_projects(self, plugin_id: str) -> dict:
         """Return known editable projects for the shared header selector."""
-        return self._projects.snapshot(plugin_id)
+        result = self._projects.snapshot(plugin_id)
+        for row in result["projects"]:
+            row["readOnly"] = self._managed_project_locked(plugin_id, Path(row["path"]))
+        return result
+
+    def _managed_project_locked(self, plugin_id: str, path: Path) -> bool:
+        policy = self._plugins[plugin_id].managed_mod
+        if policy is None:
+            return False
+        managed = Path(self.mod_library_location()["root"]) / plugin_id / policy.folder_name
+        return (path.resolve() == managed.resolve() and
+                not self._github.visible_repository(LEXEDITOR_REPOSITORY))
+
+    def copy_library_mod(self, plugin_id: str, source: str, name: str) -> dict:
+        from mod_library import ModLibrary
+        if not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        library = ModLibrary(Path(self.mod_library_location()["root"]))
+        source_path = Path(source).resolve()
+        if source_path.parent != (library.root / plugin_id).resolve():
+            raise ValueError("Choose a mod in this game's library")
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is None:
+            raise ValueError("This game does not support editable mod copies yet")
+        with self._mod_library_lock:
+            target = library.import_mod(plugin_id, source_path, adapter, name, prepare_editable=True)
+            project = self._projects.select(plugin_id, str(target))
+        return self._restart_for_project(plugin_id, project)
+
+    def mod_library_status(self, plugin_id: str) -> dict:
+        from mod_library import documents_folder
+        plugin = self._plugins[plugin_id]
+        adapter = plugin.mod_adapter
+        root = self._settings.snapshot().get("modLibraryPath") or str(documents_folder() / "Mods")
+        author = bool(adapter and self._github.visible_repository(LEXEDITOR_REPOSITORY))
+        return {"root": root, "verified": bool(adapter and adapter.verified),
+                "canManage": bool(adapter and (adapter.verified or author)),
+                "authorTest": bool(adapter and not adapter.verified and author),
+                "message": getattr(adapter, "message", "Mod management is not supported for this game yet."),
+                "packageTypes": list(getattr(adapter, "package_types", ()))}
+
+    def mod_library_location(self) -> dict:
+        from mod_library import documents_folder
+        journal = self._settings.path.parent / "mod-library-move.json"
+        move = json.loads(journal.read_text(encoding="utf-8")) if journal.is_file() else None
+        return {"root": self._settings.snapshot().get("modLibraryPath") or str(documents_folder() / "Mods"),
+                "move": move}
+
+    def _save_library_move(self, move: dict) -> None:
+        target = self._settings.path.parent / "mod-library-move.json"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        pending = target.with_suffix(".tmp")
+        pending.write_text(json.dumps(move, indent=2) + "\n", encoding="utf-8")
+        pending.replace(target)
+
+    def recover_mod_library_move(self) -> dict:
+        from mod_library import ModLibrary
+        restart_plugin = None
+        with self._mod_library_lock:
+            status = self.mod_library_location()
+            move = status.get("move")
+            if not move:
+                return status
+            if self._session_uses_library(Path(move["source"])):
+                if self._dirty_count:
+                    raise ValueError("Save the current mod before recovering its library move")
+                restart_plugin = self._plugin_id
+            result = ModLibrary.recover_move(move, lambda target:
+                self._projects.relocate_library(Path(move["source"]), target, self._settings.set_mod_library_path))
+            self._save_library_move(result)
+            status = self.mod_library_location()
+        if restart_plugin and result.get("phase") == "committed":
+            status["url"] = self.open_plugin(restart_plugin)["url"]
+        return status
+
+    def remove_mod_library_recovery(self) -> dict:
+        from mod_library import ModLibrary
+        with self._mod_library_lock:
+            status = self.mod_library_location()
+            move = status.get("move")
+            if not move:
+                raise ValueError("No library recovery copy is registered")
+            if self._session_uses_library(Path(move["source"])):
+                raise ValueError("Reopen the active editor before removing its old library folder")
+            ModLibrary.remove_move_recovery(move, Path(status["root"]))
+            (self._settings.path.parent / "mod-library-move.json").unlink()
+            return self.mod_library_location()
+
+    def choose_mod_library_location(self) -> dict:
+        current = self.mod_library_location()["root"]
+        parent = self._choose_folder(str(Path(current).parent))
+        return {"source": current, "destination": str(Path(parent) / "Mods") if parent else "",
+                "cancelled": not bool(parent)}
+
+    def move_mod_library(self, source: str, destination: str) -> dict:
+        from mod_library import ModLibrary
+        current = Path(self.mod_library_location()["root"]).resolve()
+        if Path(source).resolve() != current:
+            raise ValueError("The library location changed. Review the move again.")
+        if not Path(destination).is_absolute():
+            raise ValueError("Choose an absolute destination")
+        restart_plugin = self._plugin_id if self._session_uses_library(current) else None
+        if restart_plugin and self._dirty_count:
+            raise ValueError("Save the current mod before moving its library")
+        self._library_move_progress = {"completed": 0, "total": 0, "file": "Preparing copy", "running": True}
+        def progress(done, total, name):
+            self._library_move_progress = {"completed": done, "total": total, "file": name, "running": True}
+        try:
+            with self._mod_library_lock:
+                result = ModLibrary(current).relocate(Path(destination), lambda target:
+                    self._projects.relocate_library(current, target, self._settings.set_mod_library_path),
+                    progress=progress, journal=self._save_library_move)
+            if restart_plugin:
+                opened = self.open_plugin(restart_plugin)
+                result["url"] = opened["url"]
+            return result
+        finally:
+            self._library_move_progress = {**(self._library_move_progress or {}), "running": False}
+
+    def _session_uses_library(self, root: Path) -> bool:
+        path = self._session_project_path
+        return bool(self._session and path and (root.resolve() == path.resolve() or root.resolve() in path.resolve().parents))
+
+    def mod_library_move_progress(self) -> dict:
+        return self._library_move_progress or {"running": False}
+
+    def inspect_mod_package(self, plugin_id: str, source: str, data_root: str = "", selected: list[str] | None = None) -> dict:
+        from mod_library import ModLibrary
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is None:
+            raise ValueError("Mod management is not supported for this game yet")
+        return ModLibrary(Path(self.mod_library_status(plugin_id)["root"])).inspect(
+            Path(source), adapter, data_root, selected)
+
+    def import_mod_package(self, plugin_id: str, source: str, name: str,
+                           data_root: str = "", selected: list[str] | None = None) -> dict:
+        from mod_library import ModLibrary
+        adapter = self._plugins[plugin_id].mod_adapter
+        if adapter is None or not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        with self._mod_library_lock:
+            target = ModLibrary(Path(self.mod_library_status(plugin_id)["root"])).import_mod(
+                plugin_id, Path(source), adapter, name, data_root, selected)
+        return {"path": str(target), "name": name}
+
+    def choose_mod_package(self, plugin_id: str, kind: str = "folder") -> dict:
+        if not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        if kind == "folder":
+            selected = self._choose_folder()
+        elif kind == "zip":
+            import webview
+            selection = self._bound_window().create_file_dialog(webview.OPEN_DIALOG,
+                allow_multiple=False, file_types=("ZIP archives (*.zip)",))
+            selected = selection[0] if selection else ""
+        else:
+            raise ValueError("Choose a folder or ZIP archive")
+        return {"source": str(selected), "cancelled": not bool(selected)}
+
+    def begin_mod_upload(self, plugin_id: str) -> dict:
+        import tempfile
+        import uuid
+        if not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        with self._mod_library_lock:
+            if len(self._mod_uploads) >= 2:
+                raise ValueError("Close the other package preview first")
+            token = uuid.uuid4().hex
+            temporary = tempfile.TemporaryDirectory(prefix="lexeditor-mod-drop-")
+            self._mod_uploads[token] = {"temporary": temporary, "files": {}, "bytes": 0}
+            return {"token": token, "root": temporary.name}
+
+    def upload_mod_chunk(self, token: str, name: str, offset: int, encoded: str) -> dict:
+        import base64
+        from mod_library import relative_path, MAX_FILES, MAX_BYTES
+        if len(encoded) > 6 * 1024 * 1024:
+            raise ValueError("Upload chunk is too large")
+        relative = relative_path(name)
+        block = base64.b64decode(encoded, validate=True)
+        with self._mod_library_lock:
+            state = self._mod_uploads[token]
+            key = relative.as_posix().casefold()
+            previous = state["files"].get(key)
+            if (previous and (previous["name"] != name or previous["size"] != offset)) or (not previous and offset != 0):
+                raise ValueError("Duplicate file or invalid upload position")
+            if state["bytes"] + len(block) > MAX_BYTES or (not previous and len(state["files"]) >= MAX_FILES):
+                raise ValueError("The package exceeds the import limit")
+            target = Path(state["temporary"].name) / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("ab" if previous else "xb") as output:
+                output.write(block)
+            state["files"][key] = {"name": name, "size": offset + len(block)}
+            state["bytes"] += len(block)
+            return {"bytes": state["bytes"]}
+
+    def end_mod_upload(self, token: str) -> dict:
+        with self._mod_library_lock:
+            state = self._mod_uploads.pop(token, None)
+            if state:
+                state["temporary"].cleanup()
+        return {"closed": True}
+
+    def mod_library_entries(self, plugin_id: str) -> dict:
+        from mod_library import metadata
+        status = self.mod_library_status(plugin_id)
+        root = Path(status["root"]) / plugin_id
+        game = self._installations.snapshot(plugin_id).get("root")
+        active = []
+        if game and plugin_id == "ff7r":
+            marker = Path(game) / "End/Content/Paks/~mods/LexeditorLibrary/deployment.json"
+            if marker.is_file():
+                deployment = json.loads(marker.read_text(encoding="utf-8"))
+                active = deployment.get("modIds", [Path(path).name for path in deployment.get("mods", [])])
+        entries = []
+        for child in sorted(root.iterdir()) if root.is_dir() else []:
+            if child.is_dir() and not child.name.startswith(".") and not child.is_symlink():
+                try:
+                    info = metadata(child)
+                    policy = self._plugins[plugin_id].managed_mod
+                    locked = bool(policy and child.name == policy.folder_name and
+                                  not self._github.visible_repository(LEXEDITOR_REPOSITORY))
+                    entries.append({"path": str(child), "name": info["name"], "readOnly": locked,
+                                    "version": info["version"], "enabled": child.name in active})
+                except (OSError, ValueError) as error:
+                    entries.append({"path": str(child), "name": child.name, "error": str(error)})
+        return {**status, "entries": entries, "managedUpdate": self._managed_mod_results.get(plugin_id)}
+
+    def update_managed_mod(self, plugin_id: str) -> dict:
+        from managed_mods import update_mod, refresh_active_mod
+        from mod_library import ModLibrary
+        plugin = self._plugins[plugin_id]
+        if plugin.managed_mod is None or plugin.mod_adapter is None:
+            return {"updated": False, "message": "No managed release is configured for this game."}
+        author = bool(self._github.visible_repository(LEXEDITOR_REPOSITORY))
+        if not author and self.game_process_status(plugin_id).get("running"):
+            return {"updated": False, "message": "Close the game to update its managed mod."}
+        try:
+            with self._mod_library_lock:
+                result = update_mod(ModLibrary(Path(self.mod_library_location()["root"])),
+                    plugin_id, plugin.mod_adapter, plugin.managed_mod,
+                    self._settings.path.parent / "managed-mods" / (plugin_id + ".json"), author=author)
+                game = self._installations.snapshot(plugin_id).get("root")
+                if not author and game:
+                    try:
+                        result["deploymentRefreshed"] = refresh_active_mod(
+                            ModLibrary(Path(self.mod_library_location()["root"])),
+                            plugin_id, plugin.mod_adapter, plugin.managed_mod, Path(game))
+                    except Exception as error:
+                        result["error"] = str(error)
+                        result["message"] = (
+                            "The library update finished, but activation failed. "
+                            "The previous game deployment was kept. Opening the plugin will retry activation.")
+        except Exception as error:
+            result = {"updated": False, "error": str(error), "message": "The managed mod update did not finish."}
+        self._managed_mod_results[plugin_id] = result
+        return result
+
+    def activate_library_mods(self, plugin_id: str, paths: list[str]) -> dict:
+        from mod_library import relative_path
+        status = self.mod_library_status(plugin_id)
+        if not status["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
+        game = self._installations.snapshot(plugin_id).get("root")
+        if not game:
+            raise ValueError("Locate the game first")
+        current = self.game_process_status(plugin_id)
+        if current.get("running"):
+            raise ValueError("Close the game before changing active mods")
+        library = (Path(status["root"]) / relative_path(plugin_id)).resolve()
+        roots = [Path(path).resolve() for path in paths]
+        if len(set(roots)) != len(roots) or any(path.parent != library for path in roots):
+            raise ValueError("Choose each mod once from this game's library")
+        with self._mod_library_lock:
+            self._plugins[plugin_id].mod_adapter.activate(roots, Path(game))
+        return self.mod_library_entries(plugin_id)
 
     def _choose_folder(self, directory: str = "") -> str:
         import webview
@@ -1061,6 +1345,8 @@ class HostApi:
 
     def browse_mod_project(self, plugin_id: str) -> dict:
         """Select an existing editable project with the native folder picker."""
+        if not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
         current = self._projects.snapshot(plugin_id)
         selected = self._choose_folder(current.get("current", ""))
         if not selected:
@@ -1071,6 +1357,8 @@ class HostApi:
 
     def create_mod_project(self, plugin_id: str, name: str) -> dict:
         """Clone the plugin's valid starter into a new selected folder."""
+        if not self.mod_library_status(plugin_id)["canManage"]:
+            raise ValueError("Mod management is not supported for this game yet")
         current = Path(self._projects.snapshot(plugin_id)["current"])
         selected = self._choose_folder(str(current.parent))
         if not selected:
@@ -1182,6 +1470,8 @@ class HostApi:
         return self._restart_for_project(plugin_id, project) if was_current else project
 
     def rename_mod_project(self, plugin_id: str, path: str, name: str) -> dict:
+        if self._managed_project_locked(plugin_id, Path(path)):
+            raise ValueError("This mod updates automatically. Make an editable copy instead of renaming it.")
         """Rename one editable project and restart it when it is active."""
         before = self._projects.snapshot(plugin_id)
         was_current = os.path.normcase(before.get("current", "")) == os.path.normcase(str(Path(path).resolve()))
@@ -1198,6 +1488,8 @@ class HostApi:
                 raise RuntimeError("\n".join(problems))
             if plugin.session_factory is None:
                 raise RuntimeError(f"{plugin.name} has not moved to the shared UI host")
+            if plugin.managed_mod is not None:
+                self.update_managed_mod(plugin_id)
             if self._enforce_installations and plugin.installation is not None:
                 self._installations.prepare(plugin_id)
             environment = (
@@ -1211,6 +1503,8 @@ class HostApi:
                     raise RuntimeError("\n".join((current or {}).get(
                         "problems", [f"{plugin.name} has no valid editable project"])))
                 environment[plugin.projects.root_env] = project["current"]
+                environment["LEXEDITOR_MOD_READ_ONLY"] = "1" if self._managed_project_locked(
+                    plugin_id, Path(project["current"])) else "0"
             fonts = self.download_fonts(plugin_id)
             session = plugin.session_factory(environment) if environment else plugin.session_factory()
             try:
@@ -1220,6 +1514,7 @@ class HostApi:
                 raise
             previous = self._session
             self._session = session
+            self._session_project_path = Path(environment[plugin.projects.root_env]) if plugin.projects else None
             self._session_identity = identity
             self._plugin_id = plugin_id
             self._dirty_count = 0

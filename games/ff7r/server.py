@@ -506,6 +506,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
+            if os.environ.get("LEXEDITOR_MOD_READ_ONLY") == "1" and (path == "/api/save" or path.endswith("/save")):
+                return self.send_json({"error": "This mod updates automatically. Make an editable copy to keep your changes."}, status=403)
             payload = self.read_json()
             if path == "/api/save":
                 asset = str(payload.get("asset", ""))

@@ -141,6 +141,10 @@ class GamePlugin:
     helper_status_for_root: Callable[[Path | None], dict] | None = None
     helper_install_for_root: Callable[[Path], dict] | None = None
     helper_pinned: str = ""
+    # Explicit mod-loader adapter; editable project support alone is not proof
+    # that imported packages can be enabled and removed in the game.
+    mod_adapter: object | None = None
+    managed_mod: object | None = None
 
 
 

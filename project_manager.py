@@ -9,6 +9,7 @@ import shutil
 import threading
 
 from plugin_api import GamePlugin
+from mod_library import metadata
 
 
 ROOT = Path(os.environ.get("LOCALAPPDATA", Path(__file__).resolve().parent / "out")) / "Lexeditor"
@@ -44,6 +45,32 @@ class ProjectManager:
         temporary = self.path.with_suffix(self.path.suffix + ".tmp")
         temporary.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         temporary.replace(self.path)
+
+    def relocate_library(self, old: Path, new: Path, save_setting) -> None:
+        def remap(value):
+            if not isinstance(value, str):
+                return value
+            try:
+                return str(new / Path(value).resolve().relative_to(old.resolve()))
+            except ValueError:
+                return value
+        with self._lock:
+            before = self._read()
+            after = json.loads(json.dumps(before))
+            for entry in after.values():
+                if not isinstance(entry, dict):
+                    continue
+                if "current" in entry:
+                    entry["current"] = remap(entry["current"])
+                for key in ("known", "forgotten"):
+                    if isinstance(entry.get(key), list):
+                        entry[key] = [remap(value) for value in entry[key]]
+            self._write(after)
+            try:
+                save_setting(new)
+            except Exception:
+                self._write(before)
+                raise
 
     @staticmethod
     def _problems(root: Path, required_paths: tuple[str, ...],
@@ -101,12 +128,20 @@ class ProjectManager:
             if key in forgotten and key != os.path.normcase(str(current)):
                 continue
             problems = self._problems(root, spec.required_paths, spec.required_any)
-            rows.append({"path": str(root), "name": display_names.get(key) or root.name or plugin.name,
+            try:
+                info = metadata(root)
+            except (OSError, ValueError):
+                info = {}
+            rows.append({"path": str(root), "name": info.get("name") or display_names.get(key) or root.name or plugin.name,
+                         "version": info.get("version", ""),
                          "valid": not problems, "problems": problems,
                          "current": key == os.path.normcase(str(current))})
         return {"pluginId": plugin_id, "current": str(current),
                 "environment": spec.root_env, "projects": rows,
-                "canCreate": spec.template_root.is_dir()}
+                "canCreate": spec.template_root.is_dir(),
+                "modSupport": {"verified": bool(plugin.mod_adapter and plugin.mod_adapter.verified),
+                    "message": getattr(plugin.mod_adapter, "message", "Mod management is not supported for this game yet."),
+                    "packageTypes": list(getattr(plugin.mod_adapter, "package_types", ()))}}
 
     def select(self, plugin_id: str, root_value: str) -> dict:
         _plugin, spec = self._spec(plugin_id)

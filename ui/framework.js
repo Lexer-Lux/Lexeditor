@@ -3414,6 +3414,7 @@ ${contents.path}`});
     const box = element("div", {class: "lex-project-control", hidden: true}, trigger, menu);
     host.append(box);
     let snapshot = null;
+    let modSupport = null;
     const closeMenu = () => { menu.hidden = true; trigger.setAttribute("aria-expanded", "false"); };
     // One name column for the whole menu, taken from the longest name in it, so
     // every row's description starts on the same edge. Measured rather than
@@ -3458,7 +3459,7 @@ ${contents.path}`});
       const activeSource = String(options.projectActiveSource?.() || "mine");
       const selectedReference = sources.find(row => String(row.key) === activeSource);
       const selectedSource = activeSource === "mine" && current ? {
-        key:"mine", label:current.name, path:current.path || "", readOnly:false,
+        key:"mine", label:current.name, path:current.path || "", readOnly:current.readOnly === true,
         enabled:current.enabled !== false,
       } : selectedReference;
       const canChoose = Boolean(value);
@@ -3489,7 +3490,7 @@ ${contents.path}`});
           else if (!row.current) guarded(() => callWindow("select_mod_project", options.plugin.id, row.path));
         },
       }, element("span", {class: "lex-project-source-mode", "aria-label":"Editable"}, "📝"),
-      element("span", {class: "lex-project-menu-name"}, row.name),
+      element("span", {class: "lex-project-menu-name"}, row.name, row.version ? ` · ${row.version}` : ""),
       element("span", {class: "lex-project-menu-path"}, row.path),
       element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`,
         "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓"));
@@ -3551,6 +3552,7 @@ ${contents.path}`});
       element("span", {class:`lex-project-source-status ${row.enabled === false ? "disabled" : "enabled"}`, "aria-label":row.enabled === false ? "Disabled" : "Enabled"}, row.enabled === false ? "×" : "✓")));
       const create = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
+        disabled: !modSupport?.canManage,
         hidden: !value.canCreate, onclick: async () => {
           closeMenu();
           const projectName = await askProjectName(options.plugin.name || options.plugin.id, options.projectCreatePrompt || {});
@@ -3565,6 +3567,7 @@ ${contents.path}`});
       }, "➕ Add a Mod");
       const browse = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
+        disabled: !modSupport?.canManage,
         onclick: () => { closeMenu(); guarded(async () => {
           const result = options.browseProject
             ? await options.browseProject()
@@ -3575,20 +3578,43 @@ ${contents.path}`});
       }, "🔍 Find a Mod");
       const manage = element("button", {
         class: "lex-project-menu-action", type: "button", role: "menuitem",
+        disabled: !modSupport?.canManage,
         hidden: !options.manageProjectSources,
         onclick: () => { closeMenu(); options.manageProjectSources?.(); },
       }, "Load Order…");
       menu.replaceChildren(...sourceRows, ...projects,
-        element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, create, browse, manage));
+        ...(!modSupport?.canManage ? [element("p", {class:"lex-dialog-status"}, modSupport?.message || "Mod management is not supported for this game yet.")] : []),
+        element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, create, browse, manage,
+          element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…")));
       measureNameColumn();
     };
     trigger.onclick = event => { event.stopPropagation(); toggleMenu(); };
+    let copyPromptOpen = false;
+    const protectManagedEdit = async event => {
+      const current = snapshot?.projects?.find(row => row.current);
+      if (!current?.readOnly || copyPromptOpen || !event.target.closest?.("main") ||
+          !event.target.matches?.("input,select,textarea,[contenteditable='true']")) return;
+      if (event.type === "keydown" && ["Tab","Escape","Shift","Control","Alt"].includes(event.key)) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      copyPromptOpen = true;
+      try {
+        const agreed = await confirmAction({title:"Make an editable copy?",
+          message:"This mod updates automatically, so direct edits would be lost. Make a copy with a new name to create your own version. You have my blessing.", confirmLabel:"Make a copy"});
+        if (!agreed) return;
+        const copyName = await askProjectName(options.plugin.name, {value:`${current.name} Copy`,
+          createLabel:"Create copy", description:"Choose a name for your independent editable copy. It will be stored in the mod library."});
+        if (copyName) await guarded(() => callWindow("copy_library_mod", options.plugin.id, current.path, copyName));
+      } finally { copyPromptOpen = false; }
+    };
+    document.addEventListener("pointerdown", protectManagedEdit, true);
+    document.addEventListener("keydown", protectManagedEdit, true);
     menu.onclick = event => event.stopPropagation();
     document.addEventListener("click", closeMenu);
     document.addEventListener("keydown", event => { if (event.key === "Escape") closeMenu(); });
     let loadAttempts = 0;
     const load = async () => {
       try {
+        modSupport = await callWindow("mod_library_status", options.plugin.id);
         const value = options.projectSnapshot
           ? await options.projectSnapshot()
           : await callWindow("mod_projects", options.plugin.id);
@@ -3609,6 +3635,164 @@ ${contents.path}`});
     return box;
   };
 
+  const openModLibrary = async pluginId => {
+    const backdrop = element("div", {class:"lex-dialog-backdrop"});
+    const dialog = element("section", {class:"lex-dialog", role:"dialog", "aria-modal":"true", "aria-label":"Mod library"});
+    const message = element("p", {role:"status"}, "Loading mod library…");
+    const content = element("div", {style:"max-height:65vh;overflow:auto;min-width:0"});
+    let uploadToken = null, uploading = false, canManage = false;
+    const close = () => {
+      backdrop.remove();
+      if (uploadToken) callWindow("end_mod_upload", uploadToken).catch(() => {});
+    };
+    dialog.append(element("h2", {}, "Mod library"), closeButton({onclick:close}), message, content);
+    backdrop.append(dialog); document.body.append(backdrop);
+    const failure = error => { message.textContent = String(error?.message || error); };
+    dialog.addEventListener("dragover", event => { event.preventDefault(); });
+    dialog.addEventListener("drop", async event => {
+      event.preventDefault();
+      if (!canManage || uploading) return;
+      uploading = true;
+      try {
+        if (uploadToken) await callWindow("end_mod_upload", uploadToken);
+        const upload = await callWindow("begin_mod_upload", pluginId);
+        uploadToken = upload.token;
+        const items = [...event.dataTransfer.items];
+        const dropped = [];
+        const visit = async (entry, parent = "") => {
+          if (entry.isFile) {
+            const file = await new Promise((resolve,reject) => entry.file(resolve,reject));
+            dropped.push({file, path:parent + file.name});
+          } else if (entry.isDirectory) {
+            const reader = entry.createReader();
+            for (;;) {
+              const children = await new Promise((resolve,reject) => reader.readEntries(resolve,reject));
+              if (!children.length) break;
+              for (const child of children) await visit(child, parent + entry.name + "/");
+            }
+          }
+        };
+        for (const item of items) {
+          const entry = item.webkitGetAsEntry?.();
+          if (entry) await visit(entry);
+          else { const file = item.getAsFile(); if (file) dropped.push({file,path:file.name}); }
+        }
+        if (!dropped.length) throw Error("Drop a folder or ZIP archive.");
+        for (const {file,path} of dropped) {
+          for (let offset = 0; offset < file.size || offset === 0; offset += 3 * 1024 * 1024) {
+            message.textContent = `Reading ${path}: ${Math.min(offset,file.size).toLocaleString()} / ${file.size.toLocaleString()} bytes`;
+            const data = await new Promise((resolve,reject) => {
+              const reader = new FileReader(); reader.onload = () => resolve(String(reader.result).split(",")[1]);
+              reader.onerror = () => reject(reader.error); reader.readAsDataURL(file.slice(offset,offset + 3 * 1024 * 1024));
+            });
+            await callWindow("upload_mod_chunk", uploadToken, path, offset, data);
+            if (!backdrop.isConnected) return;
+          }
+        }
+        const source = dropped.length === 1 && dropped[0].path.toLowerCase().endsWith(".zip")
+          ? `${upload.root}/${dropped[0].path}` : upload.root;
+        await inspect(source);
+      } catch (error) { failure(error); }
+      finally { uploading = false; }
+    });
+    const inspect = async source => {
+      let selected = null, rootValue = "", revision = 0;
+      const root = element("select", {"aria-label":"Package data folder"});
+      const name = element("input", {type:"text", "aria-label":"Mod name"});
+      const files = element("div", {style:"max-height:30vh;overflow:auto"});
+      const result = element("p", {role:"status"});
+      const add = element("button", {type:"button", disabled:true}, "Import mod");
+      const refresh = async (rebuild = false) => {
+        const request = ++revision;
+        add.disabled = true; result.textContent = "Checking package…";
+        try {
+          const report = await callWindow("inspect_mod_package", pluginId, source, rootValue, selected);
+          if (request !== revision) return;
+          if (!root.options.length) {
+            const folders = new Set([""]);
+            for (const path of report.files) {
+              const parts = path.split("/"); parts.pop();
+              while (parts.length) { folders.add(parts.join("/")); parts.pop(); }
+            }
+            root.replaceChildren(...[...folders].sort().map(value => element("option", {value}, value || "Package root")));
+          }
+          if (!name.value) name.value = report.metadata.name;
+          if (rebuild) {
+            files.replaceChildren(...report.rootFiles.map(path => {
+              const box = element("input", {type:"checkbox", checked:true, value:path});
+              box.onchange = () => {
+                selected = [...files.querySelectorAll("input:checked")].map(node => node.value);
+                refresh();
+              };
+              return element("label", {style:"display:block"}, box, path);
+            }));
+          }
+          result.textContent = report.valid
+            ? `${report.packages.length} PAK package(s) checked. Import does not activate the mod.`
+            : report.problems.join("\n");
+          result.style.whiteSpace = "pre-line";
+          add.disabled = !report.valid;
+        } catch (error) { if (request === revision) result.textContent = String(error?.message || error); }
+      };
+      root.onchange = () => { rootValue = root.value; selected = null; refresh(true); };
+      add.onclick = async () => {
+        add.disabled = true;
+        try {
+          await callWindow("import_mod_package", pluginId, source, name.value, rootValue, selected);
+          await render();
+        } catch (error) { failure(error); add.disabled = false; }
+      };
+      content.replaceChildren(element("p", {}, source), element("label", {}, "Data folder", root),
+        element("label", {}, "Name", name), files, result,
+        element("div", {class:"lex-dialog-actions"}, element("button", {type:"button", onclick:render}, "Back"), add));
+      await refresh(true);
+    };
+    const render = async () => {
+      try {
+        const state = await callWindow("mod_library_entries", pluginId);
+        canManage = state.canManage;
+        message.textContent = state.authorTest ? "Author test build: game loading has not been verified." : state.message;
+        if (state.managedUpdate?.message) message.textContent += ` ${state.managedUpdate.message}`;
+        if (state.managedUpdate?.error) message.textContent += ` ${state.managedUpdate.error}`;
+        const rows = state.entries.map(row => {
+          const box = element("input", {type:"checkbox", checked:row.enabled, disabled:!state.canManage || !!row.error, value:row.path});
+          const copy = element("button", {type:"button", disabled:!state.canManage || !!row.error, onclick:async event => {
+            event.preventDefault();
+            const agreed = await confirmAction({title:"Create an editable copy?",
+              message:"Managed mods update automatically. Your named copy will be independent, so updates cannot replace your edits. You have my blessing.", confirmLabel:"Make a copy"});
+            if (!agreed) return;
+            const name = await askProjectName("mod", {value:`${row.name} Copy`,
+              createLabel:"Create copy", description:"Choose a name for your independent editable copy. It will be stored in the mod library."});
+            if (!name) return;
+            copy.disabled = true;
+            try {
+              const result = await callWindow("copy_library_mod", pluginId, row.path, name);
+              if (result?.url) { window.__lexeditorNavigating = true; location.href = result.url; }
+            } catch (error) { failure(error); copy.disabled = false; }
+          }}, "Make editable copy…");
+          return element("div", {style:"display:flex;gap:8px;align-items:center"},
+            element("label", {}, box, `${row.readOnly ? "🔒 " : ""}${row.name}${row.version ? ` · ${row.version}` : ""}${row.error ? ` — ${row.error}` : ""}`), copy);
+        });
+        const choose = kind => async () => {
+          try { const value = await callWindow("choose_mod_package", pluginId, kind); if (value && !value.cancelled) await inspect(value.source); }
+          catch (error) { failure(error); }
+        };
+        const apply = element("button", {type:"button", disabled:!state.canManage, onclick:async () => {
+          apply.disabled = true;
+          try {
+            await callWindow("activate_library_mods", pluginId, rows.flatMap(row => [...row.querySelectorAll("input:checked")].map(box => box.value)));
+            await render(); message.textContent = "Active mod files updated. Launch the game to test them.";
+          } catch (error) { failure(error); apply.disabled = false; }
+        }}, "Apply enabled mods");
+        content.replaceChildren(element("p", {}, state.root), element("p", {}, "Drop a folder or ZIP here, or use Import below."), ...rows,
+          element("div", {class:"lex-dialog-actions"},
+            element("button", {type:"button", disabled:!state.canManage, onclick:choose("folder")}, "Import folder…"),
+            element("button", {type:"button", disabled:!state.canManage, onclick:choose("zip")}, "Import ZIP…"), apply));
+      } catch (error) { failure(error); }
+    };
+    await render();
+  };
+
   const openSettings = async () => {
     document.querySelector(".lex-global-settings-backdrop")?.remove();
     const backdrop = element("div", {class: "lex-dialog-backdrop lex-global-settings-backdrop", "data-lex-history-control": true});
@@ -3620,6 +3804,7 @@ ${contents.path}`});
     const message = element("div", {class: "lex-dialog-status", "aria-live": "polite"}, "Loading settings…");
     let keyHandler = null;
     let settingsDirtyCount = () => 0;
+    let libraryMoveActive = false;
     let restoreSettings = () => {};
     const fitDialog = () => {
       dialog.classList.remove("lex-settings-must-scroll");
@@ -3627,6 +3812,7 @@ ${contents.path}`});
         dialog.scrollHeight > Math.max(320, window.innerHeight - 24));
     };
     const close = () => {
+      if (libraryMoveActive) return;
       if (keyHandler) document.removeEventListener("keydown", keyHandler);
       window.removeEventListener("resize", fitDialog);
       backdrop.remove();
@@ -3850,6 +4036,63 @@ ${contents.path}`});
         heading,
         element("div", {class:"lex-settings-columns"}, userLane, developerLane),
       ];
+      const libraryPath = element("span", {}, "Loading library location…");
+      let libraryStatus = null;
+      const libraryRecover = element("button", {type:"button", hidden:true, onclick:async () => {
+        try {
+          const recovered = await callWindow("recover_mod_library_move");
+          if (recovered?.url) { window.location.href = recovered.url; return; }
+          await refreshLibraryLocation();
+        } catch (error) { libraryPath.textContent = String(error?.message || error); }
+      }}, "Recover move");
+      const libraryCleanup = element("button", {type:"button", hidden:true, onclick:async () => {
+        const approved = await confirmAction({title:"Remove the old library copy?",
+          message:`Remove the verified recovery copy at ${libraryStatus?.move?.source}? The active library at ${libraryStatus?.root} will stay. Cleanup will stop if either copy has changed.`,
+          confirmLabel:"Remove recovery copy"});
+        if (!approved) return;
+        try { await callWindow("remove_mod_library_recovery"); await refreshLibraryLocation(); }
+        catch (error) { libraryPath.textContent = String(error?.message || error); }
+      }}, "Remove recovery copy…");
+      const libraryMove = element("button", {type:"button", onclick:async () => {
+        let progressTimer = null;
+        try {
+          if (settingsDirtyCount()) throw Error("Save your settings before moving the mod library.");
+          const plan = await callWindow("choose_mod_library_location");
+          if (!plan || plan.cancelled) return;
+          const approved = await confirmAction({title:"Move mod library?",
+            message:`Move all managed mods from ${plan.source} to ${plan.destination}? This may take a while. An editor using that library will restart. The old folder will stay as a recovery copy. External projects will stay where they are.`,
+            confirmLabel:"Move"});
+          if (!approved) return;
+          libraryMove.disabled = true;
+          libraryMoveActive = true;
+          libraryPath.textContent = "Copying and checking mod files…";
+          progressTimer = setInterval(async () => {
+            try {
+              const progress = await callWindow("mod_library_move_progress");
+              if (progress?.running) libraryPath.textContent = `${progress.completed} / ${progress.total} files — ${progress.file}`;
+            } catch (_) {}
+          }, 750);
+          const result = await callWindow("move_mod_library", plan.source, plan.destination);
+          clearInterval(progressTimer); progressTimer = null;
+          if (result?.url) { window.__lexeditorNavigating = true; location.href = result.url; return; }
+          libraryPath.textContent = `${result.root} — recovery copy: ${result.recovery}`;
+          await refreshLibraryLocation();
+        } catch (error) { libraryPath.textContent = String(error?.message || error); }
+        finally { libraryMoveActive = false; if (progressTimer) clearInterval(progressTimer); libraryMove.disabled = false; }
+      }}, "Move…");
+      dialogChildren.push(element("section", {class:"lex-dialog-status"},
+        element("strong", {}, "Mod library "), libraryPath, libraryMove, libraryRecover, libraryCleanup));
+      const refreshLibraryLocation = async () => {
+        const value = await callWindow("mod_library_location");
+        libraryStatus = value;
+        libraryPath.textContent = value?.root || "Restart Lexeditor to use the mod library.";
+        libraryMove.disabled = !value?.root;
+        libraryRecover.hidden = !value?.move || ["committed", "retry"].includes(value.move.phase);
+        libraryCleanup.hidden = value?.move?.phase !== "committed";
+        if (value?.move) libraryPath.textContent += ` — ${value.move.phase === "committed" ? "Recovery copy" : "Move recovery"}: ${value.move.source}`;
+        fitDialog();
+      };
+      refreshLibraryLocation().catch(error => { libraryPath.textContent = String(error?.message || error); libraryMove.disabled = true; });
       dialogChildren.push(message, element("div", {class: "lex-dialog-actions"}, save));
       dialog.replaceChildren(...dialogChildren);
       // Editing any control has to re-arm the save button. Without this the

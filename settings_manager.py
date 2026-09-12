@@ -138,6 +138,7 @@ class SettingsStore:
         } if isinstance(raw_preferences, dict) else {}
         return {
             "updateCheckFrequency": frequency,
+            "modLibraryPath": payload.get("modLibraryPath", "") if isinstance(payload.get("modLibraryPath", ""), str) else "",
             "hoverableAltClick": payload.get("hoverableAltClick", defaults["hoverableAltClick"]) is True,
             "panelTabTarget": "focus" if payload.get("panelTabTarget", defaults["panelTabTarget"]) == "focus" else "hover",
             "pageWrapAround": payload.get("pageWrapAround", defaults["pageWrapAround"]) is not False,
@@ -226,10 +227,22 @@ class SettingsStore:
                 "mainMenuHeightPercent": main_menu_height_percent,
                 "soundEnabled": bool(sound_enabled),
                 "viewPreferences": stored["viewPreferences"],
+                "modLibraryPath": stored["modLibraryPath"],
             }
             if sound_volume_percent is not None:
                 payload["soundVolumePercent"] = max(0.0, min(100.0, float(sound_volume_percent)))
             self._write(payload)
+        return self.snapshot()
+
+    def set_mod_library_path(self, path: Path) -> dict:
+        """Called after a verified library move, not by ordinary preference save."""
+        path = Path(path)
+        if not path.is_absolute():
+            raise ValueError("The mod library path must be absolute")
+        with self._lock:
+            value = self._read()
+            value["modLibraryPath"] = str(path.resolve())
+            self._write(value)
         return self.snapshot()
 
     def save_packaged_defaults(self, values: dict) -> dict:
