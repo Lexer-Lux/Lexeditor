@@ -1,0 +1,11 @@
+{
+  "Name": "Lexeditor Stardew Project",
+  "Author": "Lexer",
+  "Version": "0.1.0",
+  "Description": "Stardew Valley content pack created with Lexeditor.",
+  "UniqueID": "Lexer.Lexeditor.StardewTemplate",
+  "UpdateKeys": [],
+  "ContentPackFor": {
+    "UniqueID": "Pathoschild.ContentPatcher"
+  }
+}
