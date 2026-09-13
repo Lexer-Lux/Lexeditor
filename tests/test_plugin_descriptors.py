@@ -40,6 +40,25 @@ class Startup(unittest.TestCase):
         self.assertEqual(len(plugins), len(folders))
 
 
+    def test_every_plugin_service_is_one_the_runtime_will_start(self):
+        """The allowlist and the plugins must agree.
+
+        A plugin whose service module is not listed imports, validates, and
+        opens its window, then fails the moment someone clicks the game. That
+        is too late to find out.
+        """
+        import app
+        from runtime_bootstrap import SERVICE_MODULES
+
+        for plugin_id, plugin in sorted(app.discover_plugins().items()):
+            with self.subTest(plugin=plugin_id):
+                session = plugin.session_factory()
+                self.assertIn(session.module, SERVICE_MODULES,
+                              f"{plugin_id} runs {session.module}, which the runtime refuses")
+                self.assertTrue((ROOT / Path(session.module.replace(".", "/") + ".py")).is_file(),
+                                f"{session.module} has no file behind it")
+
+
 class PluginDescriptors(unittest.TestCase):
     def test_every_plugin_exports_one_and_validates(self):
         found = list(plugins())

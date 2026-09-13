@@ -2602,7 +2602,7 @@
               ? `ReShade ${store.version}${store.variant === "addon" ? " with add-on support" : ""}`
               : "a copy"} ready to install.`
           : "No. Lexeditor can download ReShade, or take a copy you already have."),
-      help: infoHelp("One ReShade, kept by Lexeditor and installed per game under the loader name that game's renderer needs. A game's own DLL of that name is never overwritten. The add-on build is the one fetched, because a preset whose passes run through an add-on renders nothing without it."),
+      help: infoHelp("One ReShade, kept by Lexeditor and installed per game under the loader name that game's renderer needs. A game's own DLL of that name is never overwritten. The version is pinned and its bytes are checked on arrival, and the add-on build is the one fetched, because a preset whose passes run through an add-on renders nothing without it."),
     }));
     rows.push(detailField({label: "Install", control: installRow}));
     const enable = element("input", {

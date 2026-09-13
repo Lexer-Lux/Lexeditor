@@ -150,6 +150,18 @@ LOADER_LICENCE = "BSD-3-Clause"
 LOADER_VARIANTS = {"addon": "_Addon", "plain": ""}
 DEFAULT_LOADER_VARIANT = "addon"
 
+# The pinned build, and the exact bytes it must arrive as.
+#
+# Lexeditor pins its helpers: a version nobody chose is a version nobody
+# tested, and a preset authored against one ReShade and played on another is
+# the situation the pin exists to prevent. The panel still reports when
+# upstream moves; moving is a decision, made here, with a new hash beside it.
+PINNED_LOADER = "6.8.0"
+PINNED_LOADER_SHA256 = {
+    "addon": "0cee63f9c9f13f3ac909c5b4903f4dbb4b719a7ab3b4f13b0deaf83c814b94f7",
+    "plain": "b2945c29e7095491a901746b400e58db9b1592ab092bacf2a888ce37f02d08da",
+}
+
 
 def loader_state() -> dict:
     """What this machine's copy of ReShade is, as recorded when it arrived."""
@@ -218,7 +230,7 @@ def loader_upstream(*, fetch=None) -> dict:
     """One helper row for ReShade: what is here, what is out there."""
     mine = store_state()
     row = {"helper": "ReShade", "plugin": "Every game", "pluginId": "",
-           "pinned": "", "licence": LOADER_LICENCE, "installable": True,
+           "pinned": PINNED_LOADER, "licence": LOADER_LICENCE, "installable": True,
            "variant": mine["variant"] or DEFAULT_LOADER_VARIANT,
            "installed": mine["present"],
            "installedVersion": mine["version"],
@@ -230,8 +242,11 @@ def loader_upstream(*, fetch=None) -> dict:
         return {**row, "error": str(error), "behind": False}
     row.update(upstream)
     row["releaseNotes"] = f"{LOADER_SOURCE}/releases/tag/{upstream['tag']}"
-    row["behind"] = bool(mine["present"] and mine["version"]
-                         and _version_key(mine["version"]) < _version_key(upstream["latest"]))
+    # Behind the pin is this machine's problem and the button fixes it.
+    row["behind"] = bool(mine["present"] and mine["version"] != PINNED_LOADER)
+    # Upstream being ahead of the pin is a decision for whoever moves the pin.
+    row["upstreamAhead"] = bool(
+        _version_key(upstream["latest"]) > _version_key(PINNED_LOADER))
     if mine["present"] and not mine["version"]:
         # Adopted by hand: there is a DLL but nothing said which build it is.
         row["installedStatus"] = "installed, version unknown"
@@ -240,11 +255,14 @@ def loader_upstream(*, fetch=None) -> dict:
 
 def install_loader(version: str = "", *, variant: str = DEFAULT_LOADER_VARIANT,
                    fetch=None) -> dict:
-    """Fetch one ReShade build and make it Lexeditor's copy.
+    """Fetch the pinned ReShade build and make it Lexeditor's copy.
 
     The setup program is a zip with an executable header, so the loader DLL is
     read straight out of it. Nothing is run, and nothing is installed into a
     game here: this only fills the store that install() copies from.
+
+    Only the pinned version installs, and only if its bytes hash to what is
+    recorded above. Everything else is refused rather than quietly accepted.
     """
     import hashlib
     import io as _io
@@ -252,10 +270,15 @@ def install_loader(version: str = "", *, variant: str = DEFAULT_LOADER_VARIANT,
     from datetime import datetime, timezone
 
     fetch = fetch or _fetch
-    suffix = LOADER_VARIANTS.get(str(variant or "").lower())
+    name = str(variant or "").lower()
+    suffix = LOADER_VARIANTS.get(name)
     if suffix is None:
         raise ValueError(f"Unknown ReShade variant: {variant}")
-    wanted = str(version or "").lstrip("vV") or latest_loader(fetch=fetch)["latest"]
+    wanted = str(version or "").lstrip("vV") or PINNED_LOADER
+    if wanted != PINNED_LOADER:
+        raise ValueError(
+            f"Lexeditor pins ReShade {PINNED_LOADER}; it will not install {wanted}. "
+            "Change the pin, with its hash, to move.")
     url = LOADER_DOWNLOAD.format(version=wanted, variant=suffix)
     payload = fetch(url)
     try:
@@ -264,14 +287,18 @@ def install_loader(version: str = "", *, variant: str = DEFAULT_LOADER_VARIANT,
     except (zipfile.BadZipFile, KeyError) as error:
         raise ValueError(
             f"{url} is not a ReShade setup carrying {STORE_DLL}: {error}") from error
-    if b"ReShade" not in dll:
-        raise ValueError(f"The file taken from {url} is not ReShade.")
+    digest = hashlib.sha256(dll).hexdigest()
+    expected = PINNED_LOADER_SHA256[name]
+    if digest != expected:
+        raise ValueError(
+            f"{url} did not deliver the pinned ReShade {wanted} {name} build. "
+            f"Expected {expected}, got {digest}. Nothing was installed.")
     STORE.mkdir(parents=True, exist_ok=True)
     store_dll().write_bytes(dll)
     recorded = {
         "version": wanted,
-        "variant": str(variant).lower(),
-        "sha256": hashlib.sha256(dll).hexdigest(),
+        "variant": name,
+        "sha256": digest,
         "bytes": len(dll),
         "download": url,
         "source": LOADER_SOURCE,

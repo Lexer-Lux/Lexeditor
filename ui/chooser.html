@@ -251,7 +251,12 @@
       if(helper.installable){
         const action=document.createElement("button");
         action.type="button";action.className="lexer-helper-install";
-        action.textContent=helper.installed?(helper.behind?`Update to ${helper.latest}`:"Re-download"):`Download ${helper.latest||"ReShade"}`;
+        // The button installs the pin, never whatever upstream published
+        // today, so it says the pinned version and not the latest one.
+        const pinned=helper.pinned||helper.latest||"";
+        action.textContent=helper.installed
+          ?(helper.behind?`Install the pinned ${pinned}`:"Re-download the pinned build")
+          :`Download ${helper.helper||"helper"}${pinned?` ${pinned}`:""}`;
         action.onclick=async()=>{
           action.disabled=true;const was=action.textContent;action.textContent="Downloading…";
           try{

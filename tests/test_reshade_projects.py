@@ -352,36 +352,76 @@ def test_a_real_reshade_dll_is_recognised_past_two_megabytes(tmp_path):
     assert rp.installed_renderer(game) == "dx11"
 
 
+def _pin(monkeypatch, payloads):
+    """Pin the fake builds these tests fetch, the way the real ones are pinned."""
+    import hashlib
+    import io as _io
+    import zipfile
+    digests = {}
+    for name, payload in payloads.items():
+        with zipfile.ZipFile(_io.BytesIO(payload)) as archive:
+            digests[name] = hashlib.sha256(archive.read(rp.STORE_DLL)).hexdigest()
+    monkeypatch.setattr(rp, "PINNED_LOADER_SHA256", digests)
+
+
 def test_the_loader_is_taken_out_of_the_setup_program(tmp_path, monkeypatch):
     store = tmp_path/"store"
     monkeypatch.setattr(rp, "STORE", store)
     payload = _setup_exe({rp.STORE_DLL: b"ReShade loader bytes",
                           "ReShade32.dll": b"ReShade 32"})
-    state = rp.install_loader("6.8.0", fetch=lambda url: payload)
-    assert state["present"] and state["version"] == "6.8.0"
+    _pin(monkeypatch, {"addon": payload})
+    state = rp.install_loader(fetch=lambda url: payload)
+    assert state["present"] and state["version"] == rp.PINNED_LOADER
     assert state["variant"] == "addon"
     assert rp.store_dll().read_bytes() == b"ReShade loader bytes"
     # What arrived is recorded, so the next check can say whether it is behind.
     recorded = rp.loader_state()
-    assert recorded["download"].endswith("ReShade_Setup_6.8.0_Addon.exe")
-    assert recorded["sha256"]
+    assert recorded["download"].endswith(f"ReShade_Setup_{rp.PINNED_LOADER}_Addon.exe")
+    assert recorded["sha256"] == rp.PINNED_LOADER_SHA256["addon"]
+
+
+def test_only_the_pinned_version_installs(tmp_path, monkeypatch):
+    """A helper nobody chose the version of is a helper nobody tested."""
+    monkeypatch.setattr(rp, "STORE", tmp_path/"store")
+    payload = _setup_exe({rp.STORE_DLL: b"ReShade loader"})
+    _pin(monkeypatch, {"addon": payload})
+    with pytest.raises(ValueError) as refused:
+        rp.install_loader("9.9.9", fetch=lambda url: payload)
+    assert rp.PINNED_LOADER in str(refused.value)
+    assert not rp.store_dll().is_file()
+    # Naming the pin explicitly is the same as asking for the default.
+    rp.install_loader(rp.PINNED_LOADER, fetch=lambda url: payload)
+    assert rp.store_dll().is_file()
+
+
+def test_a_build_that_is_not_the_pinned_bytes_is_refused(tmp_path, monkeypatch):
+    """The pin is the hash, not the version number in the URL."""
+    monkeypatch.setattr(rp, "STORE", tmp_path/"store")
+    _pin(monkeypatch, {"addon": _setup_exe({rp.STORE_DLL: b"the reviewed ReShade"})})
+    substitute = _setup_exe({rp.STORE_DLL: b"ReShade, but not the one reviewed"})
+    with pytest.raises(ValueError) as refused:
+        rp.install_loader(fetch=lambda url: substitute)
+    assert "Nothing was installed" in str(refused.value)
+    assert not rp.store_dll().is_file()
 
 
 def test_the_plain_build_is_a_deliberate_choice(tmp_path, monkeypatch):
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
     payload = _setup_exe({rp.STORE_DLL: b"ReShade loader"})
-    rp.install_loader("6.8.0", variant="plain", fetch=lambda url: payload)
-    assert rp.loader_state()["download"].endswith("ReShade_Setup_6.8.0.exe")
+    _pin(monkeypatch, {"plain": payload, "addon": payload})
+    rp.install_loader(variant="plain", fetch=lambda url: payload)
+    assert rp.loader_state()["download"].endswith(f"ReShade_Setup_{rp.PINNED_LOADER}.exe")
     with pytest.raises(ValueError):
-        rp.install_loader("6.8.0", variant="nightly", fetch=lambda url: payload)
+        rp.install_loader(variant="nightly", fetch=lambda url: payload)
 
 
 def test_something_that_is_not_reshade_is_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
+    _pin(monkeypatch, {"addon": _setup_exe({rp.STORE_DLL: b"ReShade"})})
     with pytest.raises(ValueError):
-        rp.install_loader("6.8.0", fetch=lambda url: b"not a zip at all")
+        rp.install_loader(fetch=lambda url: b"not a zip at all")
     with pytest.raises(ValueError):
-        rp.install_loader("6.8.0", fetch=lambda url: _setup_exe(
+        rp.install_loader(fetch=lambda url: _setup_exe(
             {rp.STORE_DLL: b"some other DLL entirely"}))
     assert not rp.store_dll().is_file()
 
@@ -393,24 +433,51 @@ def test_the_newest_tag_wins_not_the_first_one(monkeypatch):
     assert latest["tag"] == "v6.10.0"
 
 
-def test_the_helper_row_says_when_the_copy_is_behind(tmp_path, monkeypatch):
+def test_the_row_separates_being_behind_the_pin_from_upstream_moving(tmp_path, monkeypatch):
+    """Two different facts, and only one of them is this machine's to fix."""
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
-    listing = json.dumps([{"name": "v6.9.0"}]).encode("utf-8")
+    payload = _setup_exe({rp.STORE_DLL: b"ReShade"})
+    _pin(monkeypatch, {"addon": payload})
+    listing = json.dumps([{"name": "v99.0.0"}]).encode("utf-8")
     row = rp.loader_upstream(fetch=lambda url: listing)
-    assert not row["installed"] and not row["behind"]
-    rp.install_loader("6.8.0", fetch=lambda url: _setup_exe({rp.STORE_DLL: b"ReShade"}))
+    assert not row["installed"] and row["pinned"] == rp.PINNED_LOADER
+    assert row["upstreamAhead"], "a newer upstream release is still reported"
+    rp.install_loader(fetch=lambda url: payload)
     row = rp.loader_upstream(fetch=lambda url: listing)
-    assert row["installed"] and row["behind"] and row["installedVersion"] == "6.8.0"
-    assert row["releaseNotes"] == "https://github.com/crosire/reshade/releases/tag/v6.9.0"
+    # On the pin: nothing to do here, whatever upstream has published.
+    assert row["installed"] and not row["behind"]
+    assert row["installedVersion"] == rp.PINNED_LOADER
+    assert row["releaseNotes"] == "https://github.com/crosire/reshade/releases/tag/v99.0.0"
+
+
+def test_a_copy_that_is_not_the_pin_reads_as_behind(tmp_path, monkeypatch):
+    store = tmp_path/"store"
+    monkeypatch.setattr(rp, "STORE", store)
+    store.mkdir()
+    rp.store_dll().write_bytes(b"ReShade from somewhere else")
+    (store/rp.LOADER_STATE).write_text(json.dumps({"version": "6.1.0", "variant": "addon"}),
+                                       encoding="utf-8")
+    row = rp.loader_upstream(fetch=lambda url: json.dumps([{"name": "v6.8.0"}]).encode())
+    assert row["installed"] and row["behind"]
 
 
 def test_a_failed_upstream_check_still_reports_the_local_copy(tmp_path, monkeypatch):
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
-    rp.install_loader("6.8.0", fetch=lambda url: _setup_exe({rp.STORE_DLL: b"ReShade"}))
+    payload = _setup_exe({rp.STORE_DLL: b"ReShade"})
+    _pin(monkeypatch, {"addon": payload})
+    rp.install_loader(fetch=lambda url: payload)
 
     def refuse(url):
         raise OSError("no network")
 
     row = rp.loader_upstream(fetch=refuse)
-    assert row["installed"] and row["installedVersion"] == "6.8.0"
+    assert row["installed"] and row["installedVersion"] == rp.PINNED_LOADER
     assert row["error"] and not row["behind"]
+    assert row["pinned"] == rp.PINNED_LOADER
+
+
+def test_the_shipped_pin_names_a_hash_for_every_variant():
+    """The pin is only a pin if every build it offers has recorded bytes."""
+    assert set(rp.PINNED_LOADER_SHA256) == set(rp.LOADER_VARIANTS)
+    for name, digest in rp.PINNED_LOADER_SHA256.items():
+        assert len(digest) == 64 and all(c in "0123456789abcdef" for c in digest), name
