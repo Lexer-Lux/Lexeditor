@@ -2585,9 +2585,22 @@
       }, "Remove ReShade from this game"));
     } else {
       const renderer = element("select", {"aria-label": "Renderer to load through"});
+      // A loader name already taken by something that is not ReShade - a
+      // DirectX fix, a mod loader - is not ours to overwrite, so it is shown
+      // as taken rather than offered and then refused.
+      const taken = new Map((data.occupiedLoaders || []).map(entry => [entry.renderer, entry]));
       for (const name of data.renderers || []) {
-        renderer.append(element("option", {value: name}, name));
+        const entry = taken.get(name);
+        const option = element("option", {value: name},
+          entry ? `${name} — taken by ${entry.dll}` : name);
+        if (entry) option.disabled = true;
+        renderer.append(option);
       }
+      // A plugin that knows which loader its game wants says so; otherwise
+      // the first name nothing else has claimed.
+      const wanted = [spec.preferredRenderer, ...(data.renderers || [])]
+        .find(name => name && !taken.has(name));
+      if (wanted) renderer.value = wanted;
       installRow.append(renderer, element("button", {
         type: "button", class: "lex-dialog-action primary",
         onclick: () => act("install_reshade", renderer.value),
@@ -2605,6 +2618,14 @@
       help: infoHelp("One ReShade, kept by Lexeditor and installed per game under the loader name that game's renderer needs. A game's own DLL of that name is never overwritten. The version is pinned and its bytes are checked on arrival, and the add-on build is the one fetched, because a preset whose passes run through an add-on renders nothing without it."),
     }));
     rows.push(detailField({label: "Install", control: installRow}));
+    if ((data.occupiedLoaders || []).length) {
+      rows.push(detailField({
+        label: "Already taken",
+        control: readonlyField((data.occupiedLoaders || [])
+          .map(entry => `${entry.dll} (${entry.renderer})`).join(", ")),
+        help: infoHelp("These loader names are in use by something that is not ReShade, which usually means a fix or mod loader the player installed. Lexeditor never overwrites one, so pick a free renderer instead."),
+      }));
+    }
     const enable = element("input", {
       type: "checkbox", checked: manifest.enabled === true,
       disabled: !presets.length,

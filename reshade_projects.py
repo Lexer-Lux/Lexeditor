@@ -121,6 +121,26 @@ def is_reshade(path: Path) -> bool:
     return data[:2] == b"MZ" and RESHADE_MARKER in data
 
 
+def occupied_loaders(game_root: Path | None) -> list[dict]:
+    """Loader names already taken in this game by something that is not ReShade.
+
+    A player who fixed their own game keeps a wrapper under one of these names
+    - a DirectX 12 fix, a mod loader, a frame-rate patch. Lexeditor will not
+    overwrite one, and saying which are taken beforehand is better than
+    refusing after the choice is made.
+    """
+    if not game_root:
+        return []
+    root = Path(game_root)
+    taken = []
+    for renderer, dll in sorted(RENDERER_DLLS.items()):
+        candidate = root / dll
+        if candidate.is_file() and not is_reshade(candidate):
+            taken.append({"renderer": renderer, "dll": dll,
+                          "bytes": candidate.stat().st_size})
+    return taken
+
+
 def installed_renderer(game_root: Path | None) -> str:
     """Name the ReShade loader already present in the game folder, if any."""
     if not game_root:
@@ -845,6 +865,7 @@ def snapshot(project_root: Path, game_root: Path | None = None) -> dict:
         "shaders": shaders,
         "installedRenderer": renderer,
         "reshadeInstalled": bool(renderer),
+        "occupiedLoaders": occupied_loaders(game_root),
         "store": store_state(),
         "renderers": sorted(RENDERER_DLLS),
         "repositories": repositories(),

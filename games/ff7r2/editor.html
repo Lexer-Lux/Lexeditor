@@ -108,7 +108,8 @@
       // Every game's Tweaks page offers the same ReShade section: one ReShade
       // kept by Lexeditor, the shader collection shared by every game, and a
       // preset that travels with the mod.
-      LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade}));
+      LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade,
+        preferredRenderer:game.renderer||"dxgi"}));
   }
 
   function render(){
