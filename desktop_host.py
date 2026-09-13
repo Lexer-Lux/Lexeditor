@@ -11,7 +11,7 @@ import sys
 import threading
 import time
 import webbrowser
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from cover_art import CoverArtCache
 from font_manager import font_status, install_missing_fonts
@@ -1423,14 +1423,31 @@ class HostApi:
         return {**self._restart_for_project(plugin_id, project),
                 "contents": self._projects.contents(plugin_id, str(Path(selected) / name))}
 
+    def _reshade_root(self, plugin_id: str) -> Path | None:
+        """Where this game's ReShade loader belongs.
+
+        Beside the executable, not at the top of the installation. Rebirth and
+        Remake keep theirs four folders down in End/Binaries/Win64, so a DLL
+        dropped at the root is never loaded and the game starts as if nothing
+        had been installed - which is exactly what happened.
+        """
+        root = self._installations.snapshot(plugin_id).get("root")
+        if not root:
+            return None
+        root = Path(root)
+        plugin = self._plugins.get(plugin_id)
+        launch = getattr(getattr(plugin, "installation", None), "launch_path", "") or ""
+        parent = PurePosixPath(launch.replace("\\", "/")).parent
+        beside = root / Path(*parent.parts) if parent.parts and str(parent) != "." else root
+        return beside if beside.is_dir() else root
+
     def mod_reshade(self, plugin_id: str) -> dict:
         """Report the ReShade preset the current mod ships, if it ships one."""
         import reshade_projects
 
         snapshot = self._projects.snapshot(plugin_id)
-        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
-        return reshade_projects.snapshot(
-            Path(snapshot["current"]), Path(game_root) if game_root else None)
+        game_root = self._reshade_root(plugin_id) if hasattr(self, "_installations") else None
+        return reshade_projects.snapshot(Path(snapshot["current"]), game_root)
 
     def save_mod_reshade(self, plugin_id: str, manifest: dict) -> dict:
         """Write the mod's ReShade manifest and report the new state."""
@@ -1447,17 +1464,17 @@ class HostApi:
         """Put Lexeditor's one ReShade into this game, under its loader name."""
         import reshade_projects
 
-        root = self._installations.snapshot(plugin_id).get("root")
+        root = self._reshade_root(plugin_id)
         if not root:
             raise ValueError("Add this game before installing ReShade for it.")
-        reshade_projects.install(Path(root), renderer)
+        reshade_projects.install(root, renderer)
         return self.mod_reshade(plugin_id)
 
     def uninstall_reshade(self, plugin_id: str) -> dict:
         """Remove ReShade from this game. A game's own loader is left alone."""
         import reshade_projects
 
-        root = self._installations.snapshot(plugin_id).get("root")
+        root = self._reshade_root(plugin_id)
         if not root:
             raise ValueError("This game has no folder to remove ReShade from.")
         reshade_projects.uninstall(Path(root))
