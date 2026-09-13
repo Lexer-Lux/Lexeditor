@@ -526,6 +526,15 @@ CATALOGUE = [
 
 ARCHIVE_SUFFIXES = (".fx", ".fxh", ".png", ".jpg", ".jpeg", ".bmp", ".dds", ".txt", ".md")
 
+# Files each repository ships but ReShade's own package list refuses to
+# install, copied from that list. GrainSpread is the reason this exists: it
+# does not compile, and every launch reported an error for a shader nobody
+# asked for.
+DENIED_EFFECTS = {
+    "SweetFX": ("Template.fx",),
+    "FXShaders": ("GrainSpread.fx",),
+}
+
 
 def _slug(name: str) -> str:
     return "".join(character if character.isalnum() else "-"
@@ -605,6 +614,7 @@ def install_repository(name: str, *, fetch=_fetch) -> dict:
     if package is None:
         raise ValueError(f"No catalogued shader package called {name!r}")
     payload = fetch(package["download"])
+    denied = set(DENIED_EFFECTS.get(package["name"], ()))
     target = shaders_root() / _slug(package["name"])
     if target.exists():
         shutil.rmtree(target, ignore_errors=True)
@@ -621,6 +631,8 @@ def install_repository(name: str, *, fetch=_fetch) -> dict:
             relative = Path(*parts[1:])
             if relative.suffix.lower() not in ARCHIVE_SUFFIXES:
                 continue
+            if relative.name in denied:
+                continue
             destination = target / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(archive.read(member))
@@ -631,7 +643,8 @@ def install_repository(name: str, *, fetch=_fetch) -> dict:
         "path": str(target),
     }])
     return {"name": package["name"], "path": str(target),
-            "shaders": len(_listing(target, SHADER_SUFFIXES))}
+            "shaders": len(_listing(target, SHADER_SUFFIXES)),
+            "skipped": sorted(denied)}
 
 
 def install_collection(*, fetch=_fetch, include_optional: bool = False) -> list[dict]:

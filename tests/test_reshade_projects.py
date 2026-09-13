@@ -529,3 +529,33 @@ def test_a_game_dll_that_is_not_reshade_is_never_overwritten(tmp_path, monkeypat
     rp.install(game, "dxgi")
     assert [row["renderer"] for row in rp.uninstall(game)["removed"]] == ["dxgi"]
     assert (game/"d3d12.dll").read_bytes() == theirs
+
+
+def test_files_upstream_refuses_to_install_are_not_installed(tmp_path, monkeypatch):
+    """ReShade's own package list names files a repository ships but excludes.
+
+    GrainSpread is why: it does not compile, and shipping it made every launch
+    report a failed effect nobody had asked for.
+    """
+    store = tmp_path/"store"
+    monkeypatch.setattr(rp, "STORE", store)
+    payload = _archive({"Shaders/NeoBloom.fx": "// bloom",
+                        "Shaders/GrainSpread.fx": "// does not compile",
+                        "Shaders/FocalDOF.fx": "// dof"})
+    result = rp.install_repository("FXShaders", fetch=lambda url: payload)
+    installed = Path(result["path"])
+    assert (installed/"Shaders"/"NeoBloom.fx").is_file()
+    assert not (installed/"Shaders"/"GrainSpread.fx").exists()
+    assert result["skipped"] == ["GrainSpread.fx"]
+
+
+def test_nothing_a_listed_effect_depends_on_is_denied():
+    """A deny list that removed a shader some effect needs would be a bug."""
+    named = set()
+    for package in rp.CATALOGUE:
+        for files in package["effects"].values():
+            named.update(name.strip() for name in files.split(",") if ".fx" in name)
+    for package_name, denied in rp.DENIED_EFFECTS.items():
+        assert package_name in {package["name"] for package in rp.CATALOGUE}
+        for name in denied:
+            assert name not in named, f"{name} is denied but a listed effect needs it"
