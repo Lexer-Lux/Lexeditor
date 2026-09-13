@@ -21,6 +21,9 @@ from service_session import LocalPluginSession
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
 DEFAULT_PROJECT = PLUGIN_ROOT / "_projects"
+# A created project starts as this folder copied. It must be an absolute path:
+# the shell validates every plugin at startup and refuses a relative one.
+PROJECT_TEMPLATE = PLUGIN_ROOT / "_project_template"
 
 # The loader Rebirth wants. Named here rather than left to the page, because
 # picking d3d12 is the one choice that cannot work in this game.
@@ -57,6 +60,7 @@ PLUGIN = GamePlugin(
         default_root=DEFAULT_PROJECT,
         required_paths=(),
         required_any=(("reshade",),),
+        template_root=PROJECT_TEMPLATE,
         content_types=(
             ("ReShade presets", (".ini", ".fx")),
         ),
