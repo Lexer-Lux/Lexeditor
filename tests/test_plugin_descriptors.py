@@ -1,9 +1,11 @@
-"""Every plugin the shell will load must survive the shell's own validation.
+"""The app must start.
 
-This exists because a plugin shipped that the app refused at startup with
-"has a relative project template". The check was there; nothing ran it over
-the plugins in the repository, so the failure waited for a person to open the
-program. It runs here now.
+Two plugin registries refused a new plugin in a row - a relative project
+template, then a missing Mod Loading entry - and both were caught by a person
+opening the program rather than by this suite. Every one of those checks lives
+behind app.discover_plugins, so that is what this runs: whatever the shell
+validates at startup, in the order it validates it, against the plugins
+actually in the repository.
 """
 import importlib
 from pathlib import Path
@@ -19,6 +21,23 @@ def plugins():
     for path in sorted((ROOT / "games").glob("*/plugin.py")):
         module = importlib.import_module("games." + path.parent.name + ".plugin")
         yield path.parent.name, getattr(module, "PLUGIN", None)
+
+
+class Startup(unittest.TestCase):
+    def test_the_app_discovers_and_accepts_every_plugin(self):
+        """Exactly what happens when Lexeditor opens, minus the window.
+
+        This covers the descriptor validation, the credits bundle and the mod
+        loading document at once, because discover_plugins is where the shell
+        checks all three. A plugin added without one of them fails here now
+        instead of in a dialog.
+        """
+        import app
+
+        plugins = app.discover_plugins()
+        self.assertTrue(plugins)
+        folders = {path.parent.name for path in (ROOT / "games").glob("*/plugin.py")}
+        self.assertEqual(len(plugins), len(folders))
 
 
 class PluginDescriptors(unittest.TestCase):

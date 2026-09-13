@@ -55,6 +55,11 @@
       "loader": "CTExt. Lexeditor uses an already-installed CTExt runtime for explicit loose-file deployment and activation; it never installs or replaces the CTExt DLLs automatically.",
       "structure": "One selected Lexeditor project is a CTExt-compatible archive-relative overlay containing Game/... and Localize/... paths. External projects can be mirrored into <Chrono Trigger>/mods/<project-name>; a source project already directly under mods/<name> is used in place and is never deleted by Lexeditor.",
       "overriding": "CTExt owns runtime mod load order through ctext.json. Lexeditor appends or removes only its selected project entry, preserves unrelated entries, and never semantically merges separate projects; within the selected project, loose files replace the corresponding resources.bin resources while the installed archive remains immutable."
+    },
+    "ff7r2": {
+      "loader": "Lexeditor installs ReShade into Rebirth's End/Binaries/Win64 folder as dxgi.dll, the loader Rebirth's DirectX 12 renderer accepts. The game already ships a d3d12.dll of its own, the Agility SDK's, and Lexeditor refuses to overwrite a DLL that is not ReShade. Nothing is loaded into the game's packages: this plugin covers presentation only.",
+      "structure": "A Rebirth project holds a reshade/ folder with the preset .ini, an optional shaders/ folder for shaders the author wrote, and the by-hand install note. The shader packages the preset depends on are named in reshade.json rather than copied, and live once per machine in Lexeditor's own ReShade folder. Rebirth's installed files are read but never written, apart from the loader DLL and ReShade.ini.",
+      "overriding": "ReShade applies one preset at a time, chosen in its own overlay, so two presets do not merge. A Rebirth PAK mod from elsewhere is untouched by this plugin and continues to load through Unreal's own order."
     }
   }
 }

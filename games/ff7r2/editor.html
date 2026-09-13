@@ -75,9 +75,22 @@
     ]});
   }
 
+  // Every plugin explains its loader in the same five fields, because it is
+  // the first thing anyone installing a mod needs to know.
+  function loaderCard(){
+    return LexeditorUI.modLoaderSection({
+      loader:"ReShade, installed into End/Binaries/Win64 as dxgi.dll. Rebirth already ships its own d3d12.dll, the Agility SDK's, and Lexeditor will not overwrite a DLL that is not ReShade.",
+      output:"The preset .ini in the project's reshade folder, plus the by-hand install note. Shader packages are named, never copied, and live once per machine.",
+      order:"ReShade applies one preset at a time, chosen in its own overlay. Presets do not merge, and a PAK mod from elsewhere is untouched by this plugin.",
+      safety:"Rebirth's own files are read, never written. The only things placed in the game folder are the loader DLL and ReShade.ini.",
+      removal:"Remove ReShade from this game on the Tweaks page, which deletes the loader only if it is ReShade.",
+    });
+  }
+
   function tweaks(){
     return LexeditorUI.settingsColumns([
       whereCard(),
+      loaderCard(),
       // Every game's Tweaks page offers the same ReShade section: one ReShade
       // kept by Lexeditor, the shader collection shared by every game, and a
       // preset that travels with the mod.
