@@ -12,9 +12,6 @@
     main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
     :root{--lex-accent:#3f7fd0;--lex-accent-text:#f2f7ff;--lex-highlight:#2a4a72}
     .ff7r2-tweaks{height:100%}
-    /* One card per row: the page has two cards and no reason to squeeze
-       them into the two-lane grid the busier plugins need. */
-    .ff7r2-tweaks.lex-settings-columns{grid-template-columns:minmax(0,1fr)}
     .ff7r2-tweaks{--lex-detail-label-width:clamp(130px,15%,240px)}
   </style>
 </head>
@@ -95,7 +92,7 @@
       // kept by Lexeditor, the shader collection shared by every game, and a
       // preset that travels with the mod.
       LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade}),
-    ],{className:"ff7r2-tweaks",columns:1});
+    ],{className:"ff7r2-tweaks"});
   }
 
   function render(){

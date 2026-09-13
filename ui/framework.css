@@ -6173,7 +6173,12 @@ body:has(> .lex-shell-header) > main {min-height:0;}
 body:has(> main .lex-tweaks-paged) { display:flex; flex-direction:column; }
 body:has(> main .lex-tweaks-paged) > :not(main) { flex-shrink:0; }
 body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
-.lex-tweaks-paged { display:flex !important; flex-direction:column; height:100%; min-height:0; min-width:0; overflow:hidden; }
+.lex-tweaks-paged { display:flex !important; flex-direction:column; height:100%; min-height:0; min-width:0; overflow:hidden;
+  /* Stretch, not start. This is a column, so align-items is the width,
+     and .lex-settings-columns sets start for its grid form - which left
+     the dealt cards shrunk to their content with the rest of the page
+     empty beside them. */
+  align-items:stretch; }
 .lex-tweaks-scroll { flex:1 1 0; min-height:0; overflow:auto; overscroll-behavior:contain; }
 .lex-tweaks-pages { flex:0 0 auto; min-width:0; }
 /* Dealt columns, not a grid: a grid row takes the height of its tallest
