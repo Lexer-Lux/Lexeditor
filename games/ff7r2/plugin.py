@@ -78,6 +78,8 @@ PLUGIN = GamePlugin(
         default_roots=(
             Path(r"C:\Program Files (x86)\Steam\steamapps\common\FINAL FANTASY VII REBIRTH"),
         ),
+        # ReShade loads from beside the renderer, not the installation root.
+        reshade_root="End/Binaries/Win64",
         launch_path=EXECUTABLE,
     ),
 )

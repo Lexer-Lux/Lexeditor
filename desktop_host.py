@@ -1424,22 +1424,30 @@ class HostApi:
                 "contents": self._projects.contents(plugin_id, str(Path(selected) / name))}
 
     def _reshade_root(self, plugin_id: str) -> Path | None:
-        """Where this game's ReShade loader belongs.
+        """Where this game's ReShade loader belongs, as the game declares it.
 
-        Beside the executable, not at the top of the installation. Rebirth and
-        Remake keep theirs four folders down in End/Binaries/Win64, so a DLL
-        dropped at the root is never loaded and the game starts as if nothing
-        had been installed - which is exactly what happened.
+        Every plugin states this itself. Lexeditor used to work it out from
+        the launch path, which put the DLL at the top of Rebirth's folder
+        where nothing would ever load it, and then reported success.
+
+        A game that declares a folder it does not have is an error, not a
+        reason to fall back to the root: falling back is how the file ended up
+        somewhere useless in the first place.
         """
         root = self._installations.snapshot(plugin_id).get("root")
         if not root:
             return None
         root = Path(root)
         plugin = self._plugins.get(plugin_id)
-        launch = getattr(getattr(plugin, "installation", None), "launch_path", "") or ""
-        parent = PurePosixPath(launch.replace("\\", "/")).parent
-        beside = root / Path(*parent.parts) if parent.parts and str(parent) != "." else root
-        return beside if beside.is_dir() else root
+        declared = getattr(getattr(plugin, "installation", None), "reshade_root", "") or ""
+        if not declared:
+            return root
+        target = root / Path(*PurePosixPath(declared.replace("\\", "/")).parts)
+        if not target.is_dir():
+            raise ValueError(
+                f"{plugin_id} says ReShade belongs in {declared}, which this "
+                f"installation does not have. Nothing was written.")
+        return target
 
     def mod_reshade(self, plugin_id: str) -> dict:
         """Report the ReShade preset the current mod ships, if it ships one."""

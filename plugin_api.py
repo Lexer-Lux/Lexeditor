@@ -75,6 +75,15 @@ class GameInstallSpec:
     # that runs its own updater. Lexeditor pins helper versions, so it starts
     # the game directly and keeps that decision.
     launch_path: str = ""
+    # Where a renderer wrapper - ReShade - has to sit for this game to load
+    # it: the folder holding the executable that actually renders, relative to
+    # the installation root. Declared per game and never guessed. Lexeditor
+    # inferred it once from launch_path, wrote the DLL where nothing would
+    # load it, and reported success.
+    #
+    # "" means the installation root, which is a statement, not a default: a
+    # game whose renderer wrapper belongs somewhere else must say so.
+    reshade_root: str = ""
 
 
 @dataclass(frozen=True)
@@ -204,6 +213,13 @@ def validate_plugin(plugin: GamePlugin) -> None:
                 for login in repository.authorized_logins
         ):
             raise ValueError(f"{plugin.plugin_id} has invalid authorized GitHub logins")
+    if plugin.installation is not None:
+        declared = plugin.installation.reshade_root
+        if declared:
+            path = Path(declared)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(
+                    f"{plugin.plugin_id} has an unsafe ReShade folder: {declared}")
     if plugin.projects is not None:
         projects = plugin.projects
         if not projects.root_env or not projects.default_root.is_absolute():
