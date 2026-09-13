@@ -15,12 +15,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from runtime_bootstrap import user_data_dir
 from service_session import LocalPluginSession
 
 
 ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_ROOT = Path(__file__).resolve().parent
-DEFAULT_PROJECT = PLUGIN_ROOT / "_projects"
+# Beside the other plugins' mods, in the user's own data folder. Never inside
+# the installed application, which is read-only once Lexeditor is installed.
+DEFAULT_PROJECT = user_data_dir() / "mods" / "ff7r2" / "My Preset"
 # A created project starts as this folder copied. It must be an absolute path:
 # the shell validates every plugin at startup and refuses a relative one.
 PROJECT_TEMPLATE = PLUGIN_ROOT / "_project_template"
@@ -58,8 +61,10 @@ PLUGIN = GamePlugin(
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FF7R2_PROJECT",
         default_root=DEFAULT_PROJECT,
+        # Nothing is required. A preset project starts empty and earns its
+        # reshade folder when a preset is saved; demanding one up front only
+        # produced a complaint about a folder nobody had made yet.
         required_paths=(),
-        required_any=(("reshade",),),
         template_root=PROJECT_TEMPLATE,
         content_types=(
             ("ReShade presets", (".ini", ".fx")),
