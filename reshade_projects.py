@@ -96,17 +96,29 @@ def _listing(root: Path, suffixes: tuple[str, ...]) -> list[str]:
     return sorted(found)
 
 
+# ReShade's name as Windows stores it in a version resource. A DLL that merely
+# mentions ReShade in ASCII - a wrapper, a loader, a game that credits it - has
+# no reason to carry the wide form, and this decides whether Lexeditor is
+# allowed to overwrite or delete a file inside someone's game.
+RESHADE_MARKER = "ReShade".encode("utf-16-le")
+
+
 def is_reshade(path: Path) -> bool:
     """Is this file ReShade's loader?
 
-    ReShade's own DLL carries its name; a game's real d3d11.dll does not. The
-    whole file is searched, not a window at the front: in ReShade 6.8 the name
-    first appears 4.3 MB in, so a two-megabyte read rejected the real loader.
+    Two things must hold: it is a Windows binary, and its version resource
+    names ReShade. The whole file is searched, not a window at the front: in
+    ReShade 6.8 the name first appears 4.3 MB in, so a two-megabyte read
+    rejected the real loader.
+
+    An ASCII match alone is not enough. Rebirth ships a d3d12.dll of its own,
+    and the cost of being wrong here is a deleted or overwritten game file.
     """
     try:
-        return b"ReShade" in Path(path).read_bytes()
+        data = Path(path).read_bytes()
     except OSError:
         return False
+    return data[:2] == b"MZ" and RESHADE_MARKER in data
 
 
 def installed_renderer(game_root: Path | None) -> str:

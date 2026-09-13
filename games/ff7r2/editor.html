@@ -12,7 +12,20 @@
     main{flex:1;min-height:0;padding:var(--lex-panel-gap)}
     :root{--lex-accent:#3f7fd0;--lex-accent-text:#f2f7ff;--lex-highlight:#2a4a72}
     .ff7r2-tweaks{height:100%}
-    .ff7r2-tweaks{--lex-detail-label-width:clamp(130px,15%,240px)}
+    .ff7r2-tweaks{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(min(100%,520px),1fr));
+      align-content:start;
+      align-items:start;
+      gap:var(--lex-panel-gap,12px);
+      height:100%;
+      overflow:auto;
+      --lex-detail-label-width:clamp(130px,15%,240px);
+    }
+    /* The ReShade card carries every control on the page, so it gets a lane of
+       its own on any window wide enough to give it one. */
+    .ff7r2-tweaks > :last-child{grid-column:1/-1}
+    @media (min-width:1400px){.ff7r2-tweaks > :last-child{grid-column:auto}}
   </style>
 </head>
 <body>
@@ -84,15 +97,18 @@
     });
   }
 
+  // Three cards, laid out here rather than through the shared pager. That
+  // pager measures how many cards fit and deals the rest onto later pages,
+  // which on this page put ReShade - the only part with controls - behind a
+  // page button on a screen that was otherwise two thirds empty.
   function tweaks(){
-    return LexeditorUI.settingsColumns([
+    return el("div",{class:"ff7r2-tweaks"},
       whereCard(),
       loaderCard(),
       // Every game's Tweaks page offers the same ReShade section: one ReShade
       // kept by Lexeditor, the shader collection shared by every game, and a
       // preset that travels with the mod.
-      LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade}),
-    ],{className:"ff7r2-tweaks"});
+      LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade}));
   }
 
   function render(){

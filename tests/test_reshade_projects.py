@@ -11,6 +11,16 @@ import pytest
 import reshade_projects as rp
 
 
+
+def _fake_dll(name: str = "ReShade") -> bytes:
+    """A Windows binary whose version resource names something.
+
+    is_reshade requires both, because an ASCII mention of ReShade is something
+    any wrapper might carry and the cost of being wrong is a deleted game file.
+    """
+    return b"MZ" + bytes(64) + name.encode("utf-16-le") + bytes(32)
+
+
 def test_missing_folder_reports_nothing_rather_than_failing(tmp_path):
     snapshot = rp.snapshot(tmp_path)
     assert snapshot["hasFolder"] is False
@@ -70,7 +80,7 @@ def test_ready_needs_reshade_actually_installed(tmp_path):
 
     game = tmp_path / "game"
     game.mkdir()
-    (game / "dxgi.dll").write_bytes(b"\x00" * 64 + b"ReShade" + b"\x00" * 64)
+    (game / "dxgi.dll").write_bytes(_fake_dll())
     live = rp.snapshot(tmp_path, game)
     assert live["installedRenderer"] == "dxgi"
     assert live["ready"] is True
@@ -98,7 +108,7 @@ def test_only_a_real_reshade_dll_is_adopted(tmp_path, monkeypatch):
 def test_install_never_overwrites_a_games_own_loader(tmp_path, monkeypatch):
     store = tmp_path / "store"
     store.mkdir()
-    (store / rp.STORE_DLL).write_bytes(b"ReShade" + b"\x00" * 64)
+    (store / rp.STORE_DLL).write_bytes(_fake_dll())
     monkeypatch.setattr(rp, "STORE", store)
 
     game = tmp_path / "game"
@@ -117,7 +127,7 @@ def test_install_never_overwrites_a_games_own_loader(tmp_path, monkeypatch):
 def test_install_and_uninstall_round_trip(tmp_path, monkeypatch):
     store = tmp_path / "store"
     store.mkdir()
-    (store / rp.STORE_DLL).write_bytes(b"ReShade" + b"\x00" * 64)
+    (store / rp.STORE_DLL).write_bytes(_fake_dll())
     monkeypatch.setattr(rp, "STORE", store)
 
     game = tmp_path / "game"
@@ -206,7 +216,7 @@ def test_installing_also_tells_reshade_where_the_shaders_are(tmp_path, monkeypat
     # empty effect list, which is indistinguishable from the mod not working.
     store = tmp_path/"store"; store.mkdir()
     monkeypatch.setattr(rp, "STORE", store)
-    (store/rp.STORE_DLL).write_bytes(b"ReShade 6 loader")
+    (store/rp.STORE_DLL).write_bytes(_fake_dll())
     game = tmp_path/"game"; game.mkdir()
     shaders = tmp_path/"quint"; (shaders/"Shaders").mkdir(parents=True)
     (shaders/"Textures").mkdir()
@@ -344,7 +354,7 @@ def test_a_real_reshade_dll_is_recognised_past_two_megabytes(tmp_path):
     one it had installed itself.
     """
     dll = tmp_path/"d3d11.dll"
-    dll.write_bytes(b"\x00" * 3_000_000 + b"ReShade 6.8" + b"\x00" * 1000)
+    dll.write_bytes(b"MZ" + bytes(3_000_000) + _fake_dll()[2:] + bytes(1000))
     assert rp.is_reshade(dll)
     assert not rp.is_reshade(tmp_path/"missing.dll")
     game = tmp_path/"game"; game.mkdir()
@@ -367,13 +377,13 @@ def _pin(monkeypatch, payloads):
 def test_the_loader_is_taken_out_of_the_setup_program(tmp_path, monkeypatch):
     store = tmp_path/"store"
     monkeypatch.setattr(rp, "STORE", store)
-    payload = _setup_exe({rp.STORE_DLL: b"ReShade loader bytes",
-                          "ReShade32.dll": b"ReShade 32"})
+    payload = _setup_exe({rp.STORE_DLL: _fake_dll(),
+                          "ReShade32.dll": _fake_dll("ReShade 32")})
     _pin(monkeypatch, {"addon": payload})
     state = rp.install_loader(fetch=lambda url: payload)
     assert state["present"] and state["version"] == rp.PINNED_LOADER
     assert state["variant"] == "addon"
-    assert rp.store_dll().read_bytes() == b"ReShade loader bytes"
+    assert rp.store_dll().read_bytes() == _fake_dll()
     # What arrived is recorded, so the next check can say whether it is behind.
     recorded = rp.loader_state()
     assert recorded["download"].endswith(f"ReShade_Setup_{rp.PINNED_LOADER}_Addon.exe")
@@ -383,7 +393,7 @@ def test_the_loader_is_taken_out_of_the_setup_program(tmp_path, monkeypatch):
 def test_only_the_pinned_version_installs(tmp_path, monkeypatch):
     """A helper nobody chose the version of is a helper nobody tested."""
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
-    payload = _setup_exe({rp.STORE_DLL: b"ReShade loader"})
+    payload = _setup_exe({rp.STORE_DLL: _fake_dll()})
     _pin(monkeypatch, {"addon": payload})
     with pytest.raises(ValueError) as refused:
         rp.install_loader("9.9.9", fetch=lambda url: payload)
@@ -397,8 +407,8 @@ def test_only_the_pinned_version_installs(tmp_path, monkeypatch):
 def test_a_build_that_is_not_the_pinned_bytes_is_refused(tmp_path, monkeypatch):
     """The pin is the hash, not the version number in the URL."""
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
-    _pin(monkeypatch, {"addon": _setup_exe({rp.STORE_DLL: b"the reviewed ReShade"})})
-    substitute = _setup_exe({rp.STORE_DLL: b"ReShade, but not the one reviewed"})
+    _pin(monkeypatch, {"addon": _setup_exe({rp.STORE_DLL: _fake_dll("ReShade reviewed")})})
+    substitute = _setup_exe({rp.STORE_DLL: _fake_dll("ReShade substitute")})
     with pytest.raises(ValueError) as refused:
         rp.install_loader(fetch=lambda url: substitute)
     assert "Nothing was installed" in str(refused.value)
@@ -407,7 +417,7 @@ def test_a_build_that_is_not_the_pinned_bytes_is_refused(tmp_path, monkeypatch):
 
 def test_the_plain_build_is_a_deliberate_choice(tmp_path, monkeypatch):
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
-    payload = _setup_exe({rp.STORE_DLL: b"ReShade loader"})
+    payload = _setup_exe({rp.STORE_DLL: _fake_dll()})
     _pin(monkeypatch, {"plain": payload, "addon": payload})
     rp.install_loader(variant="plain", fetch=lambda url: payload)
     assert rp.loader_state()["download"].endswith(f"ReShade_Setup_{rp.PINNED_LOADER}.exe")
@@ -417,12 +427,12 @@ def test_the_plain_build_is_a_deliberate_choice(tmp_path, monkeypatch):
 
 def test_something_that_is_not_reshade_is_refused(tmp_path, monkeypatch):
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
-    _pin(monkeypatch, {"addon": _setup_exe({rp.STORE_DLL: b"ReShade"})})
+    _pin(monkeypatch, {"addon": _setup_exe({rp.STORE_DLL: _fake_dll()})})
     with pytest.raises(ValueError):
         rp.install_loader(fetch=lambda url: b"not a zip at all")
     with pytest.raises(ValueError):
         rp.install_loader(fetch=lambda url: _setup_exe(
-            {rp.STORE_DLL: b"some other DLL entirely"}))
+            {rp.STORE_DLL: b"MZ some other DLL entirely"}))
     assert not rp.store_dll().is_file()
 
 
@@ -436,7 +446,7 @@ def test_the_newest_tag_wins_not_the_first_one(monkeypatch):
 def test_the_row_separates_being_behind_the_pin_from_upstream_moving(tmp_path, monkeypatch):
     """Two different facts, and only one of them is this machine's to fix."""
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
-    payload = _setup_exe({rp.STORE_DLL: b"ReShade"})
+    payload = _setup_exe({rp.STORE_DLL: _fake_dll()})
     _pin(monkeypatch, {"addon": payload})
     listing = json.dumps([{"name": "v99.0.0"}]).encode("utf-8")
     row = rp.loader_upstream(fetch=lambda url: listing)
@@ -454,7 +464,7 @@ def test_a_copy_that_is_not_the_pin_reads_as_behind(tmp_path, monkeypatch):
     store = tmp_path/"store"
     monkeypatch.setattr(rp, "STORE", store)
     store.mkdir()
-    rp.store_dll().write_bytes(b"ReShade from somewhere else")
+    rp.store_dll().write_bytes(_fake_dll())
     (store/rp.LOADER_STATE).write_text(json.dumps({"version": "6.1.0", "variant": "addon"}),
                                        encoding="utf-8")
     row = rp.loader_upstream(fetch=lambda url: json.dumps([{"name": "v6.8.0"}]).encode())
@@ -463,7 +473,7 @@ def test_a_copy_that_is_not_the_pin_reads_as_behind(tmp_path, monkeypatch):
 
 def test_a_failed_upstream_check_still_reports_the_local_copy(tmp_path, monkeypatch):
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
-    payload = _setup_exe({rp.STORE_DLL: b"ReShade"})
+    payload = _setup_exe({rp.STORE_DLL: _fake_dll()})
     _pin(monkeypatch, {"addon": payload})
     rp.install_loader(fetch=lambda url: payload)
 
@@ -481,3 +491,41 @@ def test_the_shipped_pin_names_a_hash_for_every_variant():
     assert set(rp.PINNED_LOADER_SHA256) == set(rp.LOADER_VARIANTS)
     for name, digest in rp.PINNED_LOADER_SHA256.items():
         assert len(digest) == 64 and all(c in "0123456789abcdef" for c in digest), name
+
+
+def test_only_a_windows_binary_naming_reshade_counts(tmp_path):
+    """This decides whether a file inside someone's game may be deleted.
+
+    Rebirth ships a d3d12.dll of its own, and an ASCII mention of ReShade is
+    something any wrapper or loader might carry. The version resource is the
+    discriminator, so the wide form is what is required.
+    """
+    real = tmp_path/"real.dll"
+    real.write_bytes(_fake_dll())
+    assert rp.is_reshade(real)
+
+    mentions = tmp_path/"mentions.dll"
+    mentions.write_bytes(b"MZ" + b"this wrapper works alongside ReShade" * 8)
+    assert not rp.is_reshade(mentions), "an ASCII mention is not the loader"
+
+    not_a_binary = tmp_path/"notes.txt"
+    not_a_binary.write_bytes("ReShade".encode("utf-16-le"))
+    assert not rp.is_reshade(not_a_binary)
+    assert not rp.is_reshade(tmp_path/"absent.dll")
+
+
+def test_a_game_dll_that_is_not_reshade_is_never_overwritten(tmp_path, monkeypatch):
+    store = tmp_path/"store"; store.mkdir()
+    monkeypatch.setattr(rp, "STORE", store)
+    rp.store_dll().write_bytes(_fake_dll())
+    game = tmp_path/"game"; game.mkdir()
+    theirs = b"MZ" + b"the game's own d3d12, which happens to mention ReShade"
+    (game/"d3d12.dll").write_bytes(theirs)
+    with pytest.raises(ValueError) as refused:
+        rp.install(game, "dx12")
+    assert "will not overwrite" in str(refused.value)
+    assert (game/"d3d12.dll").read_bytes() == theirs
+    # And uninstall leaves it alone for the same reason.
+    rp.install(game, "dxgi")
+    assert [row["renderer"] for row in rp.uninstall(game)["removed"]] == ["dxgi"]
+    assert (game/"d3d12.dll").read_bytes() == theirs
