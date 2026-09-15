@@ -94,7 +94,8 @@ def run(browser_path: str | None) -> None:
             }''')
             assert page.locator('.ff8-card-preview').count() == 1
             assert page.locator('.ff8-card-preview img').get_attribute('src') == '/assets/cards/0.png'
-            assert page.locator('.ff8-card-rank.right').inner_text() == 'A'
+            right_rank = page.locator('.ff8-card-rank[style*="--ff8-rank-area:right"]')
+            assert right_rank.inner_text() == 'A'
             print('PASS card list stays mounted and artwork/rank preview uses production classes')
 
             page.get_by_role('button', name='PLAYERS').click()
