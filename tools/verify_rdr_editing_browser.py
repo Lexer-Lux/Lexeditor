@@ -60,7 +60,8 @@ def main():
                     # assigning state.missionSelected is immediately reconciled by
                     # pagedListDetail, which can return to the empty detail state.
                     page.locator('.rdr-record-list .rdr-record-entry').first.click()
-                    page.locator('.mission-detail input[type=number]').first.fill('')
+                    cash_field = page.locator('.mission-detail .lex-detail-field').filter(has_text='CASH REWARD')
+                    cash_field.locator('input').first.fill('')
                     requests = []
                     page.on('request', lambda request: requests.append(request.url) if request.method == 'POST' else None)
                     page.evaluate('saveAll()')
