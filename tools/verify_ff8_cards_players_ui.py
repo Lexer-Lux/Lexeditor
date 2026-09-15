@@ -98,7 +98,7 @@ def run(browser_path: str | None) -> None:
             assert right_rank.inner_text() == 'A'
             print('PASS card list stays mounted and artwork/rank preview uses production classes')
 
-            page.get_by_role('button', name='PLAYERS').click()
+            page.locator('.lex-subtab-button').filter(has_text='PLAYERS').click()
             page.wait_for_selector('.ff8-card-players .lex-column-list-row')
             rows = page.locator('.ff8-card-players .lex-column-list-row')
             assert rows.count() == 2
