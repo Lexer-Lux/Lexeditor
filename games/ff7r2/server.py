@@ -3,7 +3,7 @@
 It serves the page and the shared UI, answers where the game is, and runs
 Shader Injector: install, switch on and off, remove, settings, and clearing the
 game's shader cache. Every ReShade action goes through the desktop host, which
-owns the one copy of ReShade and the machine's shader repositories.
+owns the one copy of ReShade and Lexeditor's effects.
 """
 
 from __future__ import annotations

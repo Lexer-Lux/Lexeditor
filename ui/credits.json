@@ -51,26 +51,6 @@
         "name": "AMD / FidelityFX CAS",
         "role": "The Contrast Adaptive Sharpening algorithm Lexeditor's Sharpen effect implements.",
         "url": "https://github.com/GPUOpen-Effects/FidelityFX-CAS"
-      },
-      {
-        "name": "crosire / reshade-shaders",
-        "role": "Debanding and the depth buffer viewer in the shared shader collection.",
-        "url": "https://github.com/crosire/reshade-shaders"
-      },
-      {
-        "name": "CeeJayDK / SweetFX",
-        "role": "Colour grading, sharpening, SMAA, grain, vignette and the before/after split in the shared shader collection.",
-        "url": "https://github.com/CeeJayDK/SweetFX"
-      },
-      {
-        "name": "luluco250 / FXShaders",
-        "role": "Bloom and depth of field in the shared shader collection.",
-        "url": "https://github.com/luluco250/FXShaders"
-      },
-      {
-        "name": "mj-ehsan / NiceGuy Shaders",
-        "role": "Screen-space ambient occlusion in the shared shader collection.",
-        "url": "https://github.com/mj-ehsan/NiceGuy-Shaders"
       }
     ],
     "licenses": [

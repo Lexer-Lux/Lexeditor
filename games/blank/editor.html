@@ -241,7 +241,7 @@
        tabsLabel:"Blank tweak groups",
        changeTab:value=>{tweakGroup=value;render()}});
   }
-  let reshade={manifest:{enabled:false,preset:"",repositories:[]},presets:[],shaders:[],
+  let reshade={manifest:{enabled:false,preset:""},presets:[],shaders:[],
     reshadeInstalled:false,installedRenderer:"",path:"",hasFolder:false,ready:false};
   async function loadReshade(){
     try{reshade=await LexeditorUI.callWindow?.("mod_reshade","blank")||reshade}
