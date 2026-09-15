@@ -27,6 +27,7 @@ VENDORED_HELPERS=(
     'tools/reshade/6.8.0/ReShade_Setup_6.8.0.exe',
     'tools/reshade/6.8.0/LICENSE.md',
     'tools/reshade/shaders/Lexerian/Colors.fx',
+    'tools/reshade/shaders/Lexerian/Bloom.fx',
     'games/ff7r2/runtime/shader-injector-2-2-1-maximum-dood.zip',
     'games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt',
 )
