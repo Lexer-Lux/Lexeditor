@@ -17,6 +17,7 @@ import json
 from pathlib import Path, PureWindowsPath
 import struct
 import tempfile
+import threading
 
 from . import (field_background, field_dialogue, field_encounters, field_scripts,
                field_walkmesh, paths, runtime_layout)
@@ -548,6 +549,56 @@ def _encounter_source_paths(key: str, dataset: str) -> tuple[Path | None, Path |
         resolved.append(next((root / relative for root in roots
                               if (root / relative).is_file()), baseline))
     return resolved[0], resolved[1]
+
+
+_card_scan = {"thread": None, "keys": None, "scanned": 0, "total": 0, "error": None}
+_card_scan_lock = threading.Lock()
+
+
+def _card_player_scan() -> None:
+    """Find every area with a Triple Triad player, once per game install.
+
+    Players are only ever edited in place, never added, so the set of areas
+    comes from the game's own scripts and is cached against the same
+    fingerprint as the map index.
+    """
+    try:
+        destination = paths.BASELINE_ROOT / "field/card-players.json"
+        fingerprint = _fingerprint()
+        if destination.is_file():
+            try:
+                cached = json.loads(destination.read_text(encoding="utf-8"))
+                if cached.get("source") == fingerprint and isinstance(cached.get("keys"), list):
+                    _card_scan.update(keys=cached["keys"], scanned=len(ensure_index()["rows"]),
+                                      total=len(ensure_index()["rows"]))
+                    return
+            except (OSError, ValueError, TypeError):
+                pass
+        rows = ensure_index()["rows"]
+        _card_scan.update(total=len(rows), scanned=0)
+        keys = []
+        for row in rows:
+            jsm, sym, _ = ensure_map_baseline(row["key"])
+            if jsm is not None and _parse_card_players(
+                    jsm.read_bytes(), sym.read_bytes() if sym is not None else b""):
+                keys.append(row["key"])
+            _card_scan["scanned"] += 1
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps({"source": fingerprint, "keys": keys}, indent=2) + "\n",
+                               encoding="utf-8")
+        _card_scan["keys"] = keys
+    except Exception as error:
+        _card_scan["error"] = str(error)
+
+
+def card_player_areas() -> dict:
+    """Which areas have card players; starts the one-time scan if needed."""
+    with _card_scan_lock:
+        if _card_scan["keys"] is None and _card_scan["error"] is None and _card_scan["thread"] is None:
+            _card_scan["thread"] = threading.Thread(target=_card_player_scan, daemon=True)
+            _card_scan["thread"].start()
+    return {"ready": _card_scan["keys"] is not None, "keys": _card_scan["keys"] or [],
+            "scanned": _card_scan["scanned"], "total": _card_scan["total"], "error": _card_scan["error"]}
 
 
 def index_rows(dataset: str = "current") -> dict:

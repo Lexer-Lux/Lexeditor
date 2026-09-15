@@ -4737,14 +4737,32 @@ ${contents.path}`});
       location.href = destination.href;
       return true;
     };
-    restart.onclick = () => confirmUnsavedExit(options, restartPlugin, {
-      title: "Unsaved changes",
-      question: "Save before restarting this plugin?",
-      discardLabel: "Restart Without Saving",
-      saveLabel: "Save and Restart",
-      exitError: "Could not restart the plugin",
-      pendingLabel: "Restarting plugin…",
-    });
+    // One restart at a time. A second click while the first was still starting
+    // the new service started a third, which shut down the service the page
+    // had just been sent to: "Failed to fetch", and a page left pointing at it.
+    let restarting = false;
+    restart.onclick = async () => {
+      if (restarting) return;
+      restarting = true;
+      restart.disabled = true;
+      restart.classList.add("busy");
+      try {
+        await confirmUnsavedExit(options, restartPlugin, {
+          title: "Unsaved changes",
+          question: "Save before restarting this plugin?",
+          discardLabel: "Restart Without Saving",
+          saveLabel: "Save and Restart",
+          exitError: "Could not restart the plugin",
+          pendingLabel: "Restarting plugin…",
+        });
+      } finally {
+        if (!window.__lexeditorNavigating) {
+          restarting = false;
+          restart.disabled = false;
+          restart.classList.remove("busy");
+        }
+      }
+    };
     const closeLexeditor = () => callWindow("window_close");
     const requestWindowClose = () => confirmUnsavedExit(options, closeLexeditor);
     window.__lexeditorRequestWindowClose = requestWindowClose;

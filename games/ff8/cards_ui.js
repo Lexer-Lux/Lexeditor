@@ -78,7 +78,7 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
       .ff8-card-element img{width:22px;height:22px;object-fit:contain}
       .ff8-card-element.none{border:1px solid currentColor;font-size:22px}
       .ff8-card-power{
-        position:absolute;right:6px;bottom:4px;
+        position:absolute;right:6px;bottom:4px;cursor:default;user-select:none;
         color:#fff;font:700 clamp(17px,1.7vw,22px)/1 var(--lex-font,"FF8 Menu",Arial,sans-serif)}
       .ff8-card-element-picker{
         position:fixed;inset:auto;margin:0;padding:5px;z-index:1000;width:260px;
@@ -210,8 +210,34 @@ window.FF8CardsUI = ({el, state, rowOf, filtered, showPaged, sharedDetail,
     ...fields.map(field => ({key: field, label: labels[field], pinned: false, numeric: true}))
   ], detail, "74px minmax(240px,1fr)", {}, false);
   let render = () => null;
+  // Only areas that really have a card player are listed. Finding them reads
+  // every area's script once per install, so the list says how far along it is.
+  let playerAreas = null, playerAreasPolling = false;
+  const loadPlayerAreas = async () => {
+    if (playerAreasPolling) return;
+    playerAreasPolling = true;
+    try {
+      while (true) {
+        const response = await fetch("/api/card-players");
+        playerAreas = await response.json();
+        if (state.tab === "cards" && mode === "players") render();
+        if (playerAreas.ready || playerAreas.error) break;
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch (error) {
+      playerAreas = {ready:false, error:error.message || String(error), keys:[]};
+      if (state.tab === "cards" && mode === "players") render();
+    } finally { playerAreasPolling = false; }
+  };
   const renderPlayers = () => {
-    const maps = state.data.fields?.rows || [];
+    if (!playerAreas?.ready) {
+      if (!playerAreas?.error) loadPlayerAreas();
+      const text = playerAreas?.error ? `Could not find card players: ${playerAreas.error}`
+        : `Finding card players… ${playerAreas?.scanned || 0} of ${playerAreas?.total || "?"} areas read`;
+      return detailPanel({className:"ff8-card-player-detail",title:"Card players",body:[el("p",{},text)]});
+    }
+    const withPlayers = new Set(playerAreas.keys);
+    const maps = (state.data.fields?.rows || []).filter(row => withPlayers.has(row.key));
     const query = playerView.query.toLocaleLowerCase();
     const rows = maps.filter(row => `${row.name} ${row.key}`.toLocaleLowerCase().includes(query));
     const detail = row => {

@@ -245,6 +245,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.json_response(world_map.rows(query.get("dataset", ["current"])[0]))
             elif path == "/api/fields":
                 self.json_response(field_data.index_rows(query.get("dataset", ["current"])[0]))
+            elif path == "/api/card-players":
+                self.json_response(field_data.card_player_areas())
             elif path == "/api/field":
                 self.json_response(field_data.map_rows(
                     query.get("map", [""])[0], query.get("dataset", ["current"])[0]))
