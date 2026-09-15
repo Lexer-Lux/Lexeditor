@@ -865,28 +865,108 @@ def executable_bits(path: Path) -> int | None:
     return PE_MACHINES.get(int.from_bytes(signature[4:6], "little"))
 
 
-def loader_bits(folder: Path, executable: Path | None = None) -> int:
-    """Which ReShade build a game can load: its executable's, never a guess.
+GRAPHICS_IMPORTS = frozenset({
+    "d3d8.dll", "d3d9.dll", "d3d10.dll", "d3d10_1.dll", "d3d11.dll", "d3d12.dll",
+    "dxgi.dll", "ddraw.dll", "opengl32.dll", "vulkan-1.dll",
+})
 
-    A 32-bit game cannot load ReShade64, and FF7, FF8, Chrono Trigger and
-    Warband are 32-bit. The declared executable decides when there is one;
-    otherwise every executable in the folder must agree, and a folder holding
-    both - Warband ships 32-bit and 64-bit side by side - is refused.
+
+def executable_imports(path: Path) -> set[str]:
+    """The DLL names a Windows executable imports, from its own import table."""
+    import mmap
+
+    def u16(at):
+        return int.from_bytes(data[at:at + 2], "little")
+
+    def u32(at):
+        return int.from_bytes(data[at:at + 4], "little")
+
+    try:
+        with open(path, "rb") as handle, mmap.mmap(handle.fileno(), 0, access=mmap.ACCESS_READ) as data:
+            if data[:2] != b"MZ":
+                return set()
+            header = u32(0x3C)
+            if data[header:header + 4] != b"PE\0\0":
+                return set()
+            coff = header + 4
+            optional = coff + 20
+            magic = u16(optional)
+            if magic not in (0x10B, 0x20B):
+                return set()
+            directory = optional + (96 if magic == 0x10B else 112) + 8
+            imports = u32(directory)
+            if not imports:
+                return set()
+            table = optional + u16(coff + 16)
+            spans = []
+            for index in range(u16(coff + 2)):
+                entry = table + 40 * index
+                spans.append((u32(entry + 12), max(u32(entry + 8), u32(entry + 16)), u32(entry + 20)))
+
+            def offset(rva):
+                for start, size, raw in spans:
+                    if start <= rva < start + size:
+                        return raw + (rva - start)
+                return None
+
+            names: set[str] = set()
+            cursor = offset(imports)
+            while cursor is not None and cursor + 20 <= len(data) and any(data[cursor:cursor + 20]):
+                at = offset(u32(cursor + 12))
+                if at is not None:
+                    end = data.find(b"\0", at, at + 260)
+                    if end > at:
+                        names.add(bytes(data[at:end]).decode("ascii", "replace").lower())
+                cursor += 20
+                if len(names) > 1024:
+                    break
+            return names
+    except (OSError, ValueError, IndexError):
+        return set()
+
+
+def renders(path: Path) -> bool:
+    """Does this executable draw anything? A launcher imports no graphics API."""
+    return bool(executable_imports(path) & GRAPHICS_IMPORTS)
+
+
+def loader_bits(folder: Path, executable: Path | None = None) -> int:
+    """Which ReShade build this game loads, from what the player's install runs.
+
+    A 32-bit game cannot load ReShade64 and a 64-bit one cannot load
+    ReShade32, so the build follows the executable that actually renders:
+
+    1. the executable Play starts, when it is in this folder and renders;
+    2. otherwise the executables here that render, when they agree - FF7's
+       launcher draws nothing and hands off to a 64-bit game beside it;
+    3. otherwise, with no import table readable, the executable Play starts,
+       or every executable here if they agree.
+
+    Only a folder whose rendering executables disagree, where Play starts none
+    of them, is refused.
     """
-    if executable is not None:
-        bits = executable_bits(Path(executable))
-        if bits is None:
-            raise ValueError(f"{Path(executable).name} is not a Windows executable Lexeditor can read.")
-        return bits
-    found = {executable_bits(path) for path in Path(folder).glob("*.exe")} - {None}
-    if len(found) == 1:
-        return found.pop()
-    if not found:
-        raise ValueError(
-            f"There is no Windows executable in {folder} to tell 32-bit from 64-bit ReShade.")
+    folder = Path(folder).resolve()
+    play = Path(executable).resolve() if executable else None
+    if play is not None and play.parent == folder and play.is_file():
+        bits = executable_bits(play)
+        if bits and renders(play):
+            return bits
+    executables = sorted(folder.glob("*.exe"))
+    drawing = {executable_bits(path) for path in executables if renders(path)} - {None}
+    if len(drawing) == 1:
+        return drawing.pop()
+    if not drawing:
+        if play is not None and play.is_file() and executable_bits(play):
+            return executable_bits(play)
+        found = {executable_bits(path) for path in executables} - {None}
+        if len(found) == 1:
+            return found.pop()
+        if not found:
+            raise ValueError(
+                f"There is no Windows executable in {folder} to tell 32-bit from 64-bit ReShade.")
     raise ValueError(
-        f"{folder} holds both 32-bit and 64-bit executables. The game's plugin must declare "
-        "which one ReShade loads into.")
+        f"{folder} holds 32-bit and 64-bit executables, and the one Play starts does not "
+        "decide between them.")
 
 
 def install(game_root: Path, renderer: str, executable: Path | None = None) -> dict:

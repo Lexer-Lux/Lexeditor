@@ -1467,18 +1467,26 @@ class HostApi:
         return target
 
     def _reshade_executable(self, plugin_id: str, folder: Path) -> Path | None:
-        """The game's declared executable, when it is the one beside ReShade.
+        """The executable Play starts, which is the build ReShade has to match.
 
-        It decides between the 32-bit and 64-bit loader. Without it, every
-        executable in the folder must agree, and a mixed folder is refused.
+        A plugin's own controller decides when it has one - Warband starts WSE2
+        once Lexeditor manages it - and otherwise the installation's launch
+        executable. Nothing is asked of the player: this is what their install
+        runs, and a launcher that draws nothing hands over to the executable
+        beside it that does.
         """
-        plugin = self._plugins.get(plugin_id)
-        launch = getattr(getattr(plugin, "installation", None), "launch_path", "") or ""
-        root = self._installations.snapshot(plugin_id).get("root")
-        if not launch or not root:
+        try:
+            root, executable = self._game_executable(plugin_id)
+            controller = self._game_controller(plugin_id)
+        except (RuntimeError, ValueError, KeyError):
             return None
-        executable = Path(root) / Path(*PurePosixPath(launch.replace("\\", "/")).parts)
-        return executable if executable.is_file() and executable.parent == Path(folder) else None
+        chooser = getattr(controller, "executable", None)
+        if callable(chooser):
+            try:
+                executable = Path(chooser(root))
+            except (RuntimeError, ValueError, OSError):
+                pass
+        return executable if executable.is_file() else None
 
     def mod_reshade(self, plugin_id: str) -> dict:
         """Report the ReShade preset the current mod ships, if it ships one."""

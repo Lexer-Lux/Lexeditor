@@ -22,14 +22,42 @@ def _fake_dll(name: str = "ReShade") -> bytes:
     return b"MZ" + bytes(64) + name.encode("utf-16-le") + bytes(32)
 
 
-def _exe(folder, bits=64, name="game.exe"):
-    """The smallest Windows executable header that says 32-bit or 64-bit."""
-    header = bytearray(0x80)
-    header[0:2] = b"MZ"
-    header[0x3C:0x40] = (0x40).to_bytes(4, "little")
-    header[0x40:0x44] = b"PE\0\0"
-    header[0x44:0x46] = (0x8664 if bits == 64 else 0x014C).to_bytes(2, "little")
-    (folder / name).write_bytes(bytes(header))
+def _exe(folder, bits=64, name="game.exe", imports=()):
+    """A Windows executable with a real header and, optionally, an import table.
+
+    Enough of a PE file for executable_bits() and executable_imports() to read
+    exactly the way they read a game's: a 32-bit or 64-bit machine field, and
+    one section holding import descriptors for the named DLLs.
+    """
+    pe32 = bits == 32
+    optional_size = 224 if pe32 else 240
+    optional = 0x58
+    table = optional + optional_size
+    raw, rva = 0x400, 0x1000
+    body = bytearray(20 * (len(imports) + 1))
+    for index, dll in enumerate(imports):
+        name_rva = rva + len(body)
+        body.extend(dll.encode("ascii") + b"\0")
+        body[index * 20 + 12:index * 20 + 16] = name_rva.to_bytes(4, "little")
+    image = bytearray(raw + len(body))
+    image[0:2] = b"MZ"
+    image[0x3C:0x40] = (0x40).to_bytes(4, "little")
+    image[0x40:0x44] = b"PE\0\0"
+    image[0x44:0x46] = (0x014C if pe32 else 0x8664).to_bytes(2, "little")
+    image[0x46:0x48] = (1).to_bytes(2, "little")
+    image[0x54:0x56] = optional_size.to_bytes(2, "little")
+    image[optional:optional + 2] = (0x10B if pe32 else 0x20B).to_bytes(2, "little")
+    directory = optional + (96 if pe32 else 112) + 8
+    if imports:
+        image[directory:directory + 4] = rva.to_bytes(4, "little")
+        image[directory + 4:directory + 8] = len(body).to_bytes(4, "little")
+    image[table:table + 8] = b".idata\0\0"
+    image[table + 8:table + 12] = len(body).to_bytes(4, "little")
+    image[table + 12:table + 16] = rva.to_bytes(4, "little")
+    image[table + 16:table + 20] = len(body).to_bytes(4, "little")
+    image[table + 20:table + 24] = raw.to_bytes(4, "little")
+    image[raw:raw + len(body)] = body
+    (folder / name).write_bytes(bytes(image))
     return folder / name
 
 
@@ -567,7 +595,7 @@ def test_a_folder_with_both_builds_needs_the_declared_executable(tmp_path, monke
     game = tmp_path/"game"; game.mkdir()
     _exe(game, 32, "mb_warband.exe")
     wse2 = _exe(game, 64, "mb_warband_wse2_x64.exe")
-    with pytest.raises(ValueError, match="both 32-bit and 64-bit"):
+    with pytest.raises(ValueError, match="32-bit and 64-bit"):
         rp.install(game, "dx9")
     assert not (game/"d3d9.dll").exists()
     rp.install(game, "dx9", executable=wse2)
@@ -656,3 +684,40 @@ def test_nothing_a_listed_effect_depends_on_is_denied():
         assert package_name in {package["name"] for package in rp.CATALOGUE}
         for name in denied:
             assert name not in named, f"{name} is denied but a listed effect needs it"
+
+
+def test_imports_are_read_from_the_executable_itself(tmp_path):
+    game = _exe(tmp_path, 64, "game.exe", imports=("KERNEL32.dll", "d3d11.dll"))
+    assert rp.executable_imports(game) == {"kernel32.dll", "d3d11.dll"}
+    assert rp.renders(game)
+    launcher = _exe(tmp_path, 32, "launcher.exe", imports=("KERNEL32.dll", "USER32.dll"))
+    assert not rp.renders(launcher)
+    assert rp.executable_imports(tmp_path / "missing.exe") == set()
+
+
+def test_a_launcher_hands_over_to_the_game_that_renders(tmp_path):
+    """FF7's Steam launcher is 32-bit and draws nothing; the game it starts is 64-bit."""
+    launcher = _exe(tmp_path, 32, "FFVII_LAUNCHER.exe", imports=("KERNEL32.dll",))
+    _exe(tmp_path, 64, "FFVII.exe", imports=("d3d11.dll",))
+    assert rp.loader_bits(tmp_path, launcher) == 64
+    assert rp.loader_bits(tmp_path) == 64
+
+
+def test_the_executable_play_starts_decides_between_two_renderers(tmp_path):
+    """Warband ships 32-bit and 64-bit games side by side; Play starts one of them."""
+    wse2 = _exe(tmp_path, 32, "mb_warband_wse2.exe", imports=("d3d9.dll",))
+    x64 = _exe(tmp_path, 64, "mb_warband_wse2_x64.exe", imports=("d3d9.dll",))
+    assert rp.loader_bits(tmp_path, wse2) == 32
+    assert rp.loader_bits(tmp_path, x64) == 64
+    launcher = _exe(tmp_path, 32, "wse2_launcher.exe", imports=("KERNEL32.dll",))
+    with pytest.raises(ValueError, match="32-bit and 64-bit"):
+        rp.loader_bits(tmp_path, launcher)
+
+
+def test_warband_play_names_the_executable_it_starts(tmp_path):
+    from games.warband.game_launch import WarbandGameController, play_executable
+    (tmp_path / "mb_warband.exe").write_bytes(b"MZ")
+    assert play_executable(tmp_path).name == "mb_warband.exe"
+    (tmp_path / "mb_warband_wse2.exe").write_bytes(b"MZ")
+    assert play_executable(tmp_path).name == "mb_warband_wse2.exe"
+    assert WarbandGameController().executable(tmp_path).name == "mb_warband_wse2.exe"
