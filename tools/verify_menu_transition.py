@@ -37,6 +37,15 @@ api=Api({'ff7':PLUGIN},enforce_installations=False,auto_scan=False,settings=Sett
 window=webview.create_window('Lexeditor transition check',CHOOSER.as_uri(),js_api=api,width=1200,height=800,frameless=True,easy_drag=False,background_color='#171a1f')
 api.bind_window(window)
 result={'passed':False}
+
+def wait_dirty(predicate, message, timeout=5):
+    deadline=time.monotonic()+timeout
+    while time.monotonic()<deadline:
+        if predicate(api._dirty_count):
+            return
+        time.sleep(.05)
+    raise AssertionError(f'{message}: dirtyCount={api._dirty_count}')
+
 def run():
     cdp=None
     try:
@@ -74,16 +83,14 @@ def run():
                         if message.get('id')==ident:
                             return message.get('result',{}).get('result',{}).get('value')
                 child_eval("(()=>{const input=document.querySelector('input[type=number]');input.value=Number(input.value)+1;input.dispatchEvent(new Event('input',{bubbles:true}));})()")
-                time.sleep(.2)
-                assert api._dirty_count>0, 'Edited field did not reach the native host'
+                wait_dirty(lambda value:value>0,'Edited field did not reach the native host')
                 cdp.eval('window.__lexeditorRequestWindowClose()')
                 time.sleep(.2)
                 assert child_eval("!!document.querySelector('.lex-exit-dialog')"), 'Native close missed the unsaved prompt'
                 child_eval("[...document.querySelectorAll('.lex-exit-dialog button')].find(b=>/cancel/i.test(b.textContent)).click()")
                 # Restore the edit in memory. No project save is used in this check.
                 child_eval("(()=>{const input=document.querySelector('input[type=number]');input.value=Number(input.value)-1;input.dispatchEvent(new Event('input',{bubbles:true}));})()")
-                time.sleep(.2)
-                assert api._dirty_count==0
+                wait_dirty(lambda value:value==0,'Restored field did not clear the native dirty count')
                 result['nativeClosePrompt']=True
             cdp.call('Input.dispatchMouseEvent',{'type':'mousePressed','x':80,'y':20,'button':'left','clickCount':1})
             cdp.call('Input.dispatchMouseEvent',{'type':'mouseReleased','x':80,'y':20,'button':'left','clickCount':1})
