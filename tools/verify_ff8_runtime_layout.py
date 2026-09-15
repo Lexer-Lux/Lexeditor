@@ -30,8 +30,8 @@ def main() -> int:
         source_hext.write_text("source patch\n", encoding="utf-8")
 
         result = runtime_layout.compose(project, active)
-        assert Path(result["projectRoot"]) == project
-        assert Path(result["runtimeRoot"]) == active
+        assert Path(result["projectRoot"]) == project.resolve()
+        assert Path(result["runtimeRoot"]) == active.resolve()
         assert (active / "direct" / "menu" / "price.bin").read_bytes() == b"source-price"
         runtime_hext = active / "hext" / "ff8" / "en_nv" / "000000__editable-mod__patch.txt"
         assert runtime_hext.read_text() == "source patch\n"
@@ -39,7 +39,7 @@ def main() -> int:
         manifest = json.loads((active / runtime_layout.COMPOSITION_FILE).read_text())
         assert len(manifest["mods"]) == 1
         assert manifest["mods"][0]["id"] == "editable-mod"
-        assert manifest["mods"][0]["path"] == str(project)
+        assert Path(manifest["mods"][0]["path"]) == project.resolve()
         assert manifest["conflicts"] == []
         assert all(row["winner"] == "editable-mod" for row in manifest["files"])
         assert all(row["claimants"] == ["editable-mod"] for row in manifest["files"])
@@ -75,7 +75,10 @@ def main() -> int:
 
         source_direct.unlink()
         competing.unlink()
-        vanilla_kernel = (paths.BASELINE_ROOT / "main" / "kernel.bin").read_bytes()
+        baseline_kernel = paths.BASELINE_ROOT / "main" / "kernel.bin"
+        if not baseline_kernel.is_file():
+            raise FileNotFoundError(f"Installed FF8 extracted baseline is missing: {baseline_kernel}")
+        vanilla_kernel = baseline_kernel.read_bytes()
         section2 = int.from_bytes(vanilla_kernel[8:12], "little")
         first = bytearray(vanilla_kernel)
         second = bytearray(vanilla_kernel)

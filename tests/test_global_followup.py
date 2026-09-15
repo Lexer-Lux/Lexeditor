@@ -6,7 +6,12 @@ import unittest
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
+from plugin_api import GamePlugin, ModProjectSpec, validate_plugin
 from tools import generate_credits
+
+def _noop():return []
+
+def _launch():return 0
 
 class FollowupTests(unittest.TestCase):
     def test_credits_check_is_read_only_and_rejects_drift(self):
@@ -22,6 +27,15 @@ class FollowupTests(unittest.TestCase):
                 with self.assertRaises(SystemExit) as raised:generate_credits.main(['--check'])
                 self.assertEqual(raised.exception.code,1)
                 self.assertEqual(dest.read_text(encoding='utf-8'),'changed by a fixture')
+    def test_windows_project_root_is_absolute_even_on_non_windows_ci(self):
+        plugin=GamePlugin(
+            plugin_id='windows-project-fixture',name='Fixture',subtitle='Fixture',description='Fixture',accent='#fff',
+            check=_noop,launch=_launch,
+            projects=ModProjectSpec(
+                root_env='LEXEDITOR_FIXTURE_PROJECT',default_root=Path('C:/FixtureMod'),template_root=ROOT,
+            ),
+        )
+        validate_plugin(plugin)
     def test_obsolete_camera_clamps_not_reintroduced_in_help(self):
         text=(ROOT/'games/rdr2/editor.html').read_text(encoding='utf-8')
         self.assertNotIn('Clamped to -2.00..2.00',text)

@@ -1,0 +1,14 @@
+{
+  "Name": "Lexeditor Stardew Project",
+  "Author": "Lexer",
+  "Version": "0.1.0",
+  "Description": "Stardew Valley content pack created with Lexeditor.",
+  "UniqueID": "Lexer.Lexeditor.StardewTemplate",
+  "MinimumApiVersion": "4.4.0",
+  "MinimumGameVersion": "1.6.15",
+  "UpdateKeys": [],
+  "ContentPackFor": {
+    "UniqueID": "Pathoschild.ContentPatcher",
+    "MinimumVersion": "2.9.0"
+  }
+}

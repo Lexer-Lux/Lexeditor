@@ -63,22 +63,27 @@ def main() -> int:
     for token in ('lex-information-panel ff8-information', "runtime.version"):
         require(ff8, token, ff8_path)
 
-    # RDR2 is deliberately NOT here. Its settings are saved by the one global
-    # save button along with every other edit, so the editor has a single place
-    # to press; a second save control on that tab is what
-    # verify_rdr2_tweaks_shared_save exists to prevent. Warband and RDR keep
-    # their own control because their settings save independently.
-    adopters = {
-        "games/warband/editor.html": ("Object.keys(state.settingEdits).length", "save:saveSettings", "discard:discardSettings"),
-        "games/rdr/editor.html": ("Object.keys(state.settingEdits).length", "save:saveSettings", "discard:discardSettings"),
+    # RDR keeps a settings-only control because those edits save independently.
+    # RDR2 and Warband deliberately do not: their shell Save owns settings along
+    # with every other editable surface, so a second button would present two
+    # different Save controls for the same pending changes.
+    rdr_path = ROOT / "games" / "rdr" / "editor.html"
+    rdr = rdr_path.read_text(encoding="utf-8")
+    require(rdr, "LexeditorUI.settingsSaveControl({", rdr_path)
+    for token in ("Object.keys(state.settingEdits).length", "save:saveSettings", "discard:discardSettings"):
+        require(rdr, token, rdr_path)
 
-    }
-    for relative, tokens in adopters.items():
-        path = ROOT / relative
-        source = path.read_text(encoding="utf-8")
-        require(source, "LexeditorUI.settingsSaveControl({", path)
-        for token in tokens:
-            require(source, token, path)
+    warband_path = ROOT / "games" / "warband" / "editor.html"
+    warband = warband_path.read_text(encoding="utf-8")
+    if "LexeditorUI.settingsSaveControl({" in warband:
+        raise AssertionError("Warband Tweaks must use the plugin-wide Save control, not a second settings save control")
+    for token in (
+        "Object.keys(state.settingEdits).length+itemDirtyCount()",
+        "if(Object.keys(state.settingEdits).length)",
+        '$("#toolbar").replaceChildren();',
+        "save:saveAll",
+    ):
+        require(warband, token, warband_path)
 
     if "settingsSaveControl" in ff8:
         raise AssertionError(

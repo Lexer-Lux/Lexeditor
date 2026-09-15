@@ -79,9 +79,19 @@ class CoverageTests(unittest.TestCase):
             self.assertEqual(rows['projectile_speed_multipliers.csv']['coverage'],'view')
             self.assertTrue(all(row.get('target') for row in rows.values() if row['coverage']=='structured'))
 
+    def test_stardew_marks_project_patch_editor_partial_until_xnb_read_exists(self):
+        from games.stardew_valley import server
+        with tempfile.TemporaryDirectory() as name,patch.object(server.paths,'PROJECT_ROOT',Path(name)):
+            rows=server.data_map()['rows']
+            objects=next(row for row in rows if row.get('target')=='objects')
+            self.assertEqual(objects['coverage'],'structured')
+            self.assertEqual(objects['status'],'partial')
+            self.assertFalse(objects['sourceAvailable'])
+            self.assertFalse(objects['openable'])
+
     def test_all_plugins_use_shared_data_map(self):
         root=Path(__file__).resolve().parents[1]
-        for game in ('blank','warband','ff7','ff8','ff9','rdr','rdr2'):
+        for game in ('blank','warband','ff7','ff8','ff9','rdr','rdr2','stardew_valley'):
             text=(root/'games'/game/'editor.html').read_text(encoding='utf-8')
             self.assertIn('LexeditorUI.dataMap(',text,game)
         self.assertIn('games.ff7.server',(root/'games/ff7_2013/plugin.py').read_text(encoding='utf-8'))

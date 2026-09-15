@@ -49,6 +49,14 @@ require((ROOT / "tools" / "brf-sync" / "LICENSE").is_file(),
 require((ROOT / "tools" / "brf-sync" / "SOURCE.md").is_file(),
         "the bundled BRF tool source record is missing")
 
+# The static preview contract above is self-contained. Alpha preservation is an
+# installed-game acceptance check: atlas_path() cannot create anything when the
+# source font.dds was never supplied to this runner. Fail with the real missing
+# prerequisite so the sweep reports SKIPPED; if font.dds exists and conversion
+# is broken, the assertions below still fail normally.
+if not FONT_TEXTURE.is_file():
+    raise FileNotFoundError(f"Installed Warband font texture is missing: {FONT_TEXTURE}")
+
 generated = atlas_path()
 require(generated is not None and generated.is_file(), "the Warband alpha atlas was not generated")
 with Image.open(FONT_TEXTURE) as source, Image.open(generated) as converted:

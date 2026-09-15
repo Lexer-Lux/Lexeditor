@@ -175,10 +175,9 @@ def verify_blank() -> dict:
             wait_eval(cdp, "document.body.dataset.lexPlugin==='blank'&&!!document.querySelector('.blank-layout')", 30)
             gallery = cdp.eval("""(()=>({panels:document.querySelectorAll('.blank-layout>.lex-panel-layout-pane').length,dividers:document.querySelectorAll('.blank-layout>.lex-panel-layout-divider').length,fields:document.querySelectorAll('.lex-detail-field').length,errors:window.__lexErrors||[]}))()""")
             assert gallery["panels"] == 1 and gallery["dividers"] == 0 and gallery["fields"] >= 11, gallery
-            # Compare Tweaks with whichever ordinary tab sits before it, rather
-            # than naming one. Blank has no "editable" tab any more, so this
-            # dereferenced null and the whole check died before asserting
-            # anything.
+            # Tweaks is an ordinary page again. Compare it with a nearby
+            # ordinary tab and prove it does not inherit Settings' separated
+            # chrome treatment.
             special_tab = cdp.eval("""(()=>{
               const tabs=[...document.querySelectorAll('nav button[data-tab]')];
               const tweaks=tabs.find(tab=>tab.dataset.tab==='tweaks');
@@ -194,7 +193,8 @@ def verify_blank() -> dict:
             })()""")
             special_tab = json.loads(special_tab)
             assert not special_tab.get("missing"), "no ordinary tab before Tweaks to compare with"
-            assert special_tab["special"] and special_tab["gap"] >= 9 and special_tab["normal"] != special_tab["tweaks"], special_tab
+            assert (not special_tab["special"] and abs(special_tab["gap"]) <= 1
+                    and special_tab["normal"] == special_tab["tweaks"]), special_tab
             stacks = cdp.eval("""(()=>[...document.querySelectorAll('.lex-detail-field')].filter(row=>/^\\d-REF VALUE$/.test(row.querySelector('.lex-detail-field-label')?.textContent.trim()||'')).map(row=>{const rowBox=row.getBoundingClientRect(),strip=row.querySelector('.lex-reference-values'),buttons=[...strip.querySelectorAll('.lex-reference-value')],boxes=buttons.map(button=>button.getBoundingClientRect());return{label:row.querySelector('.lex-detail-field-label').textContent.trim(),height:rowBox.height,count:Number(strip.dataset.referenceCount),indexes:buttons.map(button=>Number(button.dataset.referenceIndex)),tags:buttons.map(button=>button.querySelector('.lex-reference-tag').textContent.trim()),colors:buttons.map(button=>getComputedStyle(button.querySelector('.lex-reference-tag')).color),contained:boxes.every(box=>box.top>=rowBox.top-1&&box.bottom<=rowBox.bottom+1),vertical:boxes.every((box,index)=>index===0||(box.top>boxes[index-1].top&&Math.abs(box.left-boxes[0].left)<2))}}))()""")
             assert [entry["label"] for entry in stacks] == ["1-REF VALUE", "2-REF VALUE", "3-REF VALUE"], stacks
             expected_colors = ["rgb(98, 183, 79)", "rgb(214, 75, 75)", "rgb(79, 143, 232)", "rgb(214, 184, 63)"]

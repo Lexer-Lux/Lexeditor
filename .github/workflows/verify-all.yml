@@ -28,8 +28,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  runner-contract:
+    name: Verifier runner contract
+    runs-on: windows-2022
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verifier runner regressions
+        run: python -m unittest tests.test_verify_all -v
+
   sweep:
     name: Shard ${{ matrix.shard }} of 8
+    needs: runner-contract
     runs-on: windows-2022
     timeout-minutes: 45
     strategy:
