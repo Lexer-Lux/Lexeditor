@@ -104,10 +104,11 @@ def run(browser_path: str | None) -> None:
             assert rows.count() == 2
             first_text = rows.nth(0).inner_text()
             assert 'Queen' in first_text and 'talk' in first_text and 'Rare card' in first_text and 'Literal' in first_text
-            inputs = page.locator('.ff8-card-players .lex-column-list-row input[type=number]')
-            assert inputs.count() == 2
-            assert inputs.nth(1).is_disabled()
-            inputs.nth(0).fill('7')
+            rare = page.get_by_label('Queen Rare card', exact=True)
+            region = page.get_by_label('Queen Region rule', exact=True)
+            assert rare.count() == 1 and region.count() == 1
+            assert not rare.is_disabled() and region.is_disabled()
+            rare.fill('7')
             page.get_by_role('button', name='SAVE PLAYERS').click()
             page.wait_for_function('window.cardSave !== null')
             assert page.evaluate('window.cardSave') == {'edits':[{'map':'balamb','player':0,'param':0,'value':7}]}
