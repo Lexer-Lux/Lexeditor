@@ -72,16 +72,18 @@ def main() -> int:
             steam_roots=(),
         )
         assert cache.wait(10), "cover-art workers did not finish"
-        for plugin_id in plugins:
+        for plugin_id, plugin in plugins.items():
             state = cache.snapshot(plugin_id)
             assert state["state"] == "ready", state
             path = Path(state["uri"].removeprefix("file:///"))
             assert path.is_file(), (plugin_id, state)
-            if plugin_id == "blank":
-                # Blank is packaged art rather than the synthetic Steam JPEG.
-                # Its exact source resolution is not a chooser contract; the
-                # chooser deliberately owns a 2:3 box. Preserve that shape and
-                # minimum useful dimensions without freezing one historical PNG.
+            if plugin.cover_art is not None:
+                # Packaged covers keep their source resolution. The chooser
+                # owns the 2:3 presentation box; the cache must not resample a
+                # valid bundled image just to mimic Steam's 600x900 endpoint.
+                with Image.open(plugin.cover_art) as image:
+                    expected_size = image.size
+                assert (state["width"], state["height"]) == expected_size, (plugin_id, state)
                 assert state["width"] >= 300 and state["height"] >= 450, state
                 assert abs(state["width"] / state["height"] - 2 / 3) < .01, state
             else:
@@ -96,9 +98,9 @@ def main() -> int:
             steam_roots=(),
         )
         assert cache.wait(10), "offline cover-art workers did not finish"
-        assert cache.snapshot("blank")["state"] == "ready"
-        assert all(cache.snapshot(plugin_id)["state"] == "missing"
-                   for plugin_id in plugins if plugin_id != "blank")
+        for plugin_id, plugin in plugins.items():
+            expected = "ready" if plugin.cover_art is not None else "missing"
+            assert cache.snapshot(plugin_id)["state"] == expected, (plugin_id, cache.snapshot(plugin_id))
 
     with tempfile.TemporaryDirectory(prefix="lexeditor-local-steam-art-", ignore_cleanup_errors=True) as temp:
         root = Path(temp)
@@ -113,7 +115,10 @@ def main() -> int:
         )
         assert cache.wait(10)
         state = cache.snapshot("ff7")
-        assert state["state"] == "ready" and state["width"] == 600 and not calls, state
+        if plugins["ff7"].cover_art is not None:
+            assert state["state"] == "ready" and not calls, state
+        else:
+            assert state["state"] == "ready" and state["width"] == 600 and not calls, state
 
     print("Main-menu box-art cache, offline fallback, status, and font contracts passed")
     return 0
