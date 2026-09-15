@@ -36,6 +36,31 @@
         "name": "Lexend Project authors",
         "role": "Bundled Lexend interface font.",
         "url": "https://github.com/googlefonts/lexend"
+      },
+      {
+        "name": "crosire / ReShade",
+        "role": "The post-processing loader Lexeditor bundles, pinned to 6.8.0, and installs per game.",
+        "url": "https://github.com/crosire/reshade"
+      },
+      {
+        "name": "crosire / reshade-shaders",
+        "role": "Debanding and the depth buffer viewer in the shared shader collection.",
+        "url": "https://github.com/crosire/reshade-shaders"
+      },
+      {
+        "name": "CeeJayDK / SweetFX",
+        "role": "Colour grading, sharpening, SMAA, grain, vignette and the before/after split in the shared shader collection.",
+        "url": "https://github.com/CeeJayDK/SweetFX"
+      },
+      {
+        "name": "luluco250 / FXShaders",
+        "role": "Bloom and depth of field in the shared shader collection.",
+        "url": "https://github.com/luluco250/FXShaders"
+      },
+      {
+        "name": "mj-ehsan / NiceGuy Shaders",
+        "role": "Screen-space ambient occlusion in the shared shader collection.",
+        "url": "https://github.com/mj-ehsan/NiceGuy-Shaders"
       }
     ],
     "licenses": [
@@ -46,6 +71,10 @@
       {
         "name": "Lexend — source notice",
         "sourcePath": "ui/assets/fonts/SOURCE.md"
+      },
+      {
+        "name": "ReShade — BSD 3-Clause License",
+        "sourcePath": "tools/reshade/6.8.0/LICENSE.md"
       }
     ]
   },
@@ -128,6 +157,27 @@
         {
           "name": "FF7R references and tools — source/license notices",
           "sourcePath": "games/ff7r/THIRD_PARTY.md"
+        }
+      ]
+    },
+    "ff7r2": {
+      "contributions": [
+        {
+          "name": "David Matos (frostbone25) / Shader Injector",
+          "role": "The D3D12 shader-replacement mod Lexeditor bundles for Rebirth, pinned to the 2.2.1 Maximum quality release.",
+          "url": "https://github.com/frostbone25/ShaderInjector"
+        },
+        {
+          "name": "Microsoft / DirectX Shader Compiler",
+          "role": "dxc, dxcompiler and dxil, shipped inside the Shader Injector release to recompile its shaders.",
+          "url": "https://github.com/microsoft/DirectXShaderCompiler"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Shader Injector — MIT License",
+          "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt"
         }
       ]
     },

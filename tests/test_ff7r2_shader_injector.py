@@ -2,7 +2,9 @@
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
+import time
 import zipfile
 
 import pytest
@@ -198,3 +200,84 @@ def test_clearing_the_shader_cache_removes_only_the_cache(tmp_path):
     assert si.clear_shader_cache(tmp_path)["removed"] == ["D3DDriverByteCodeBlob_V1_D2_S3_R4.ushaderprecache"]
     assert (saved / "SaveData.sav").read_bytes() == b"precious"
     assert si.shader_cache(tmp_path)["files"] == []
+
+
+# ---- first-time setup ----------------------------------------------------------------
+
+def _cache(tmp_path, age_seconds):
+    saved = tmp_path.joinpath(*si.CACHE_FOLDER)
+    saved.mkdir(parents=True, exist_ok=True)
+    cache = saved / "D3DDriverByteCodeBlob_V1_D2_S3_R4.ushaderprecache"
+    cache.write_bytes(b"x" * 10)
+    stamp = time.time() - age_seconds
+    os.utime(cache, (stamp, stamp))
+    return cache
+
+
+def test_first_time_setup_asks_to_purge_a_cache_older_than_the_install(tmp_path, game):
+    package = _package(tmp_path)
+    cache = _cache(tmp_path, age_seconds=86400)
+    si.install(game, package)
+    notice = si.status(game, package, documents=tmp_path)["setupNotice"]
+    assert notice and notice["action"] == "clear_shader_cache"
+    assert notice["actionLabel"] == "Clear shader cache"
+    si.clear_shader_cache(tmp_path)
+    assert si.status(game, package, documents=tmp_path)["setupNotice"] is None
+    # The game rebuilt the cache after the install: nothing more to ask.
+    cache.write_bytes(b"rebuilt")
+    assert si.status(game, package, documents=tmp_path)["setupNotice"] is None
+
+
+def test_nothing_is_asked_before_it_is_installed(tmp_path, game):
+    _cache(tmp_path, age_seconds=86400)
+    assert si.status(game, _package(tmp_path), documents=tmp_path)["setupNotice"] is None
+
+
+def test_a_repair_keeps_the_original_install_time(tmp_path, game):
+    package = _package(tmp_path)
+    si.install(game, package)
+    first = json.loads((game / si.MANIFEST).read_text(encoding="utf-8"))["installedAt"]
+    si.install(game, package)
+    assert json.loads((game / si.MANIFEST).read_text(encoding="utf-8"))["installedAt"] == first
+
+
+def test_a_hand_install_is_dated_by_its_dll(tmp_path, game):
+    package = _package(tmp_path)
+    (game / si.DLL).write_bytes(package.files[si.DLL])
+    assert si.install_time(game) == (game / si.DLL).stat().st_mtime
+
+
+def test_the_shell_sees_it_as_rebirths_helper(tmp_path):
+    root = tmp_path / "Rebirth"
+    (root / si.INSTALL_FOLDER).mkdir(parents=True)
+    package = _package(tmp_path)
+    before = si.helper_status(root, package, documents=tmp_path)
+    assert not before["installed"] and before["pinned"] == si.VERSION
+    si.install(root / si.INSTALL_FOLDER, package)
+    after = si.helper_status(root, package, documents=tmp_path)
+    assert after["installed"] and after["version"] == si.VERSION and after["integrity"] == "verified"
+    si.set_enabled(root / si.INSTALL_FOLDER, False, package)
+    assert si.helper_status(root, package, documents=tmp_path)["installed"], "switched off is still set up"
+    assert si.helper_status(None)["message"]
+
+
+def test_upstream_is_information_not_an_install_target():
+    newer = si.upstream_release(lambda url: {"tag_name": "2.3.0", "published_at": "2026-10-01"})
+    assert newer["behind"] and newer["latest"] == "2.3.0" and newer["pinned"] == si.VERSION
+    assert not si.upstream_release(lambda url: {"tag_name": "2.2.1.0"})["behind"]
+
+    def offline(url):
+        raise OSError("offline")
+
+    broken = si.upstream_release(offline)
+    assert broken["error"] and not broken["behind"]
+
+
+def test_the_plugin_puts_it_into_first_time_setup_and_the_updates_drawer():
+    from games.ff7r2.plugin import PLUGIN
+    assert PLUGIN.helper_name == "Shader Injector"
+    assert PLUGIN.helper_pinned == si.VERSION
+    assert PLUGIN.helper_status_for_root is si.helper_status
+    assert PLUGIN.helper_install_for_root is si.helper_install
+    assert PLUGIN.helper_upstream is si.upstream_release
+    assert PLUGIN.helper_actions["clear_shader_cache"] is si.clear_cache_action

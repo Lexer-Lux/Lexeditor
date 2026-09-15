@@ -150,6 +150,10 @@ class GamePlugin:
     helper_status_for_root: Callable[[Path | None], dict] | None = None
     helper_install_for_root: Callable[[Path], dict] | None = None
     helper_pinned: str = ""
+    # Named follow-up steps a helper's first-time setup can ask for, such as
+    # purging a shader cache the helper cannot work with. The shell shows the
+    # step beside the game with its button; it never runs one by itself.
+    helper_actions: dict[str, Callable[[Path | None], dict]] | None = None
     # Explicit mod-loader adapter; editable project support alone is not proof
     # that imported packages can be enabled and removed in the game.
     mod_adapter: object | None = None

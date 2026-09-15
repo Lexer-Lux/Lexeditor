@@ -36,6 +36,31 @@
         "name": "Lexend Project authors",
         "role": "Bundled Lexend interface font.",
         "url": "https://github.com/googlefonts/lexend"
+      },
+      {
+        "name": "crosire / ReShade",
+        "role": "The post-processing loader Lexeditor bundles, pinned to 6.8.0, and installs per game.",
+        "url": "https://github.com/crosire/reshade"
+      },
+      {
+        "name": "crosire / reshade-shaders",
+        "role": "Debanding and the depth buffer viewer in the shared shader collection.",
+        "url": "https://github.com/crosire/reshade-shaders"
+      },
+      {
+        "name": "CeeJayDK / SweetFX",
+        "role": "Colour grading, sharpening, SMAA, grain, vignette and the before/after split in the shared shader collection.",
+        "url": "https://github.com/CeeJayDK/SweetFX"
+      },
+      {
+        "name": "luluco250 / FXShaders",
+        "role": "Bloom and depth of field in the shared shader collection.",
+        "url": "https://github.com/luluco250/FXShaders"
+      },
+      {
+        "name": "mj-ehsan / NiceGuy Shaders",
+        "role": "Screen-space ambient occlusion in the shared shader collection.",
+        "url": "https://github.com/mj-ehsan/NiceGuy-Shaders"
       }
     ],
     "licenses": [
@@ -48,6 +73,11 @@
         "name": "Lexend — source notice",
         "sourcePath": "ui/assets/fonts/SOURCE.md",
         "text": "# Lexend source record\n\nLexeditor bundles the unmodified Lexend variable font as its neutral interface\nfont.\n\n- Family: Lexend\n- Font version: 1.007\n- Weight axis: 100 through 900; default 400\n- Local file: `Lexend-Variable.ttf`\n- Original file: `ofl/lexend/Lexend[wght].ttf`\n- File size: 175,756 bytes\n- SHA-256: `3ADD53E641FBC81DA64DA4BB254285E2831B52B029527BC0714E2B9610832EE6`\n- Distribution source: `https://github.com/google/fonts`\n- Pinned Google Fonts commit: `e2332cf862ac3145c0ee5f24f04f4c1819b2410b`\n- Upstream project: `https://github.com/googlefonts/lexend`\n- Upstream source commit recorded by Google Fonts:\n  `20491885ca2cf7ffc556432973e7bdbc701952b5`\n- License: SIL Open Font License 1.1 (`OFL.txt`)\n\nThe local filename is shorter for stable CSS addressing. The font bytes and\ninternal font names are unchanged.\n"
+      },
+      {
+        "name": "ReShade — BSD 3-Clause License",
+        "sourcePath": "tools/reshade/6.8.0/LICENSE.md",
+        "text": "Copyright 2014 Patrick Mours. All rights reserved.\n\nRedistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:\n\n  * Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.\n  * Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.\n  * Neither the name of the copyright holder nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.\n\nTHIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS \"AS IS\" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.\n"
       }
     ]
   },
@@ -151,6 +181,28 @@
           "name": "FF7R references and tools — source/license notices",
           "sourcePath": "games/ff7r/THIRD_PARTY.md",
           "text": "# Third-party references and tools\n\n## FF7 Remake Data Editor\n\nThe narrow `DataObject` package reader/writer in this plugin is a clean Python\nimplementation based on the documented behavior and MIT-licensed source of\nJordan Tucker's **FF7 Remake Data Editor**:\n\n- https://github.com/jordanbtucker/ff7r-data-editor\n- License: MIT\n\nThat project established the FF7R DataObject `.uasset` name/export-table shape,\nthe `.uexp` property type codes and fixed-row layout, and the safe same-size\nediting model used here. Lexeditor does not bundle its application or proprietary\ngame data.\n\n## FF7R Text Tool\n\nThe `GameContents/Text/<language>/*_TxtRes` reader/writer is a clean Python\nimplementation based on the documented behavior and MIT-licensed source of\nMatyaModding's **ff7r-text-tool**:\n\n- https://github.com/matyamod/ff7r-text-tool\n- License: MIT\n\nThat project documents the FF7R text-resource entry/sub-entry layout, Unreal\nFString encoding, name-map references and the paired `.uasset` serialized-size\nfield required when variable-length text changes. Lexeditor does not bundle the\ntool or any extracted game text.\n\n## FF7R Font Mod Tools\n\nThe local-only menu-font theming path is a narrow Python implementation based on\nthe documented layouts and MIT-licensed source of MatyaModding's\n**FF7R-font-mod-tools**:\n\n- https://github.com/matyamod/FF7R-font-mod-tools\n- License: MIT\n\nThat project documents the `GameContents/Menu/Resident/Font/JP/SystemFont*4K`\nglyph UEXP record shape and the matching\n`GameContents/Menu/Billboard/Common/U_Com_JP_SystemFont*4K-01` 2048x2048 BC5\nbitmap-atlas layout. Lexeditor validates those exact installed assets, decodes\n`SystemFontNormal` only into the user's private cache, and uses the resulting\natlas/glyph metrics for editor chrome. It does not bundle or publish Square Enix\nfont assets.\n\n## repak\n\nLexeditor downloads a pinned release of **repak** only when the user chooses to\ninstall the FF7R archive helper:\n\n- https://github.com/trumank/repak\n- License: dual Apache-2.0 / MIT\n- Pinned release: v0.2.3\n\nrepak reads the installed Unreal Engine PAK indexes/files on demand and packs the\nseparate Lexeditor project tree into a mod PAK. FF7R's `../../../` mount point is\npassed explicitly when listing, extracting and packing. repak is not committed\ninto this repository.\n\n## Improved Keyboard and Mouse Controls / Native Mod Loader research\n\nThe FF7R native-runtime probe uses independently implemented compatibility checks\ninformed by TheUnlocked's maintained, MIT-licensed **ff7r-kbm-hook**:\n\n- https://github.com/TheUnlocked/ff7r-kbm-hook\n- License: MIT\n\nThat project provides public evidence for the Native Mod Loader `Init()` export\ncontract and current FF7R byte signatures around map control and raw-input\ninitialization. Lexeditor uses those signatures only as compatibility probes. It\ndoes not copy the hook implementation and does not treat those known addresses as\nthe cutscene-speed or minimap-toggle hook sites required by #413/#414.\n\n## FinalFantasy7Remake-Menu interoperability research\n\nThe guarded HP runtime implementation is informed by public interoperability\ninformation in xCENTx's **FinalFantasy7Remake-Menu** repository:\n\n- https://github.com/xCENTx/FinalFantasy7Remake-Menu\n- No repository license file was present when this reference was recorded.\n\nLexeditor does not copy or bundle that project's implementation. It uses factual\nprocess-layout information (the `AGameState` / `APlayerStats` field layout and a\nRIP-relative game-state lookup instruction shape) as a research reference, then\nindependently validates the installed executable at runtime. No fixed RVA from\nthat project is shipped or trusted.\n\n## EndGameProj generated Remake API research\n\nPublic generated Remake headers in narknon's **EndGameProj** are used only as\ninteroperability/research evidence for reflected type, property, enum and function\nnames such as `EGameSpeed_CUT`, `AEndGameState::SetGameSpeed`, ATB DataObject\nfields, and menu widget settings:\n\n- https://github.com/narknon/EndGameProj\n\nThese generated declarations are not bundled into Lexeditor and are not treated\nas current installed-build offsets or validated hook addresses. Installed-game\nprobes must still establish the concrete target before a runtime mutation can be\nenabled.\n"
+        }
+      ]
+    },
+    "ff7r2": {
+      "contributions": [
+        {
+          "name": "David Matos (frostbone25) / Shader Injector",
+          "role": "The D3D12 shader-replacement mod Lexeditor bundles for Rebirth, pinned to the 2.2.1 Maximum quality release.",
+          "url": "https://github.com/frostbone25/ShaderInjector"
+        },
+        {
+          "name": "Microsoft / DirectX Shader Compiler",
+          "role": "dxc, dxcompiler and dxil, shipped inside the Shader Injector release to recompile its shaders.",
+          "url": "https://github.com/microsoft/DirectXShaderCompiler"
+        }
+      ],
+      "thanks": [],
+      "licenses": [
+        {
+          "name": "Shader Injector — MIT License",
+          "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt",
+          "text": "MIT License\n\nCopyright (c) 2026 David Matos\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
         }
       ]
     },
@@ -541,47 +593,6 @@
       ],
       "thanks": [],
       "licenses": []
-    },
-    "ff7r2": {
-      "contributions": [
-        {
-          "name": "David Matos (frostbone25) / Shader Injector",
-          "role": "The D3D12 shader-replacement mod Lexeditor vendors for Rebirth, pinned to the 2.2.1 Maximum quality release.",
-          "url": "https://github.com/frostbone25/ShaderInjector"
-        },
-        {
-          "name": "Microsoft / DirectX Shader Compiler",
-          "role": "dxc, dxcompiler and dxil, shipped inside the Shader Injector release to recompile its shaders.",
-          "url": "https://github.com/microsoft/DirectXShaderCompiler"
-        },
-        {
-          "name": "crosire / ReShade",
-          "role": "The post-processing loader Lexeditor installs for Rebirth.",
-          "url": "https://github.com/crosire/reshade"
-        },
-        {
-          "name": "CeeJayDK / SweetFX",
-          "role": "Colour grading, sharpening, SMAA, grain and vignette in the bundled shader collection.",
-          "url": "https://github.com/CeeJayDK/SweetFX"
-        },
-        {
-          "name": "luluco250 / FXShaders",
-          "role": "Bloom and depth of field in the bundled shader collection.",
-          "url": "https://github.com/luluco250/FXShaders"
-        },
-        {
-          "name": "mj-ehsan / NiceGuy Shaders",
-          "role": "Screen-space ambient occlusion in the bundled shader collection.",
-          "url": "https://github.com/mj-ehsan/NiceGuy-Shaders"
-        }
-      ],
-      "licenses": [
-        {
-          "name": "Shader Injector — MIT License",
-          "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt",
-          "text": "MIT License\n\nCopyright (c) 2026 David Matos\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
-        }
-      ]
     }
   }
 }

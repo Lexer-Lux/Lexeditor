@@ -255,8 +255,8 @@
         // today, so it says the pinned version and not the latest one.
         const pinned=helper.pinned||helper.latest||"";
         action.textContent=helper.installed
-          ?(helper.behind?`Install the pinned ${pinned}`:"Re-download the pinned build")
-          :`Download ${helper.helper||"helper"}${pinned?` ${pinned}`:""}`;
+          ?(helper.behind?`Install the pinned ${pinned}`:"Reinstall the bundled build")
+          :`Install ${helper.helper||"helper"}${pinned?` ${pinned}`:""}`;
         action.onclick=async()=>{
           action.disabled=true;const was=action.textContent;action.textContent="Downloading…";
           try{
@@ -400,9 +400,25 @@
         const result=await window.pywebview.api.install_helper(plugin.id);
         if(!result?.installed)throw new Error((result?.problems||[])[0]||"The helper did not report itself installed.");
         closeDialog();await load();
+        // Installed is not always set up: show the remaining step straight away.
+        const refreshed=chooser.plugins.find(row=>row.id===plugin.id);
+        if(refreshed?.helperNotice)statusDialog(refreshed);
       }catch(error){
         dialogProgress.hidden=true;
         setDialog(plugin.name,String(error?.message||error),[button("TRY AGAIN",()=>installHelper(plugin)),button("CLOSE",closeDialog,true)]);
+      }
+    }
+    async function runHelperAction(plugin,action){
+      dialogProgress.textContent="Working…";dialogProgress.hidden=false;
+      try{
+        const result=await window.pywebview.api.run_helper_action(plugin.id,action);
+        closeDialog();await load();
+        const refreshed=chooser.plugins.find(row=>row.id===plugin.id);
+        if(refreshed?.helperNotice){statusDialog(refreshed);return;}
+        if(refreshed)setDialog(refreshed.name,result?.result?.message||"Done.",[button("OPEN",()=>openGame(refreshed)),button("CLOSE",closeDialog,true)]);
+      }catch(error){
+        dialogProgress.hidden=true;
+        setDialog(plugin.name,String(error?.message||error),[button("TRY AGAIN",()=>runHelperAction(plugin,action)),button("CLOSE",closeDialog,true)]);
       }
     }
     async function locate(plugin){
@@ -418,6 +434,13 @@
     function statusDialog(plugin){
       chooser.active=plugin.id;
       if(plugin.status==="added"&&!plugin.scanInProgress&&plugin.canOpen){
+        // A helper that is in but still needs one step - Shader Injector needs
+        // Rebirth's old shader cache purged - says so here, with the button,
+        // rather than letting the game open into something that will not work.
+        const notice=plugin.helperNotice;
+        if(notice){
+          setDialog(notice.title||plugin.name,notice.message,[button(String(notice.actionLabel||"Continue").toUpperCase(),()=>runHelperAction(plugin,notice.action)),button("OPEN ANYWAY",()=>openGame(plugin),true),button("CLOSE",closeDialog,true)]);return;
+        }
         setDialog(plugin.name,"The game is ready.",[button("OPEN",()=>openGame(plugin)),button("CLOSE",closeDialog,true)]);return;
       }
       const scanning=plugin.scanInProgress;
@@ -435,7 +458,7 @@
       if(plugin.status==="not-added"&&!plugin.scanInProgress){
         setDialog("",`Do you have ${plugin.name} installed?`,[button("YES",()=>scan(plugin)),button("NO",()=>noGame(plugin))]);return;
       }
-      if(plugin.status==="added"&&plugin.canOpen&&!plugin.scanInProgress){openGame(plugin);return;}
+      if(plugin.status==="added"&&plugin.canOpen&&!plugin.scanInProgress&&!plugin.helperNotice){openGame(plugin);return;}
       statusDialog(plugin);
     }
     // The name sits in the fixed row gap above its card, so a long name must

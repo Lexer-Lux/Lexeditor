@@ -160,8 +160,8 @@ STORE = Path(os.environ.get("LOCALAPPDATA", "")) / "Lexeditor" / "reshade"
 STORE_DLL = "ReShade64.dll"
 
 
-def store_dll() -> Path:
-    return STORE / STORE_DLL
+def store_dll(bits: int = 64) -> Path:
+    return STORE / (STORE_DLL32 if int(bits) == 32 else STORE_DLL)
 
 
 # ReShade itself. The binary is BSD-3, so Lexeditor may fetch and keep a copy;
@@ -193,6 +193,26 @@ PINNED_LOADER_SHA256 = {
     "addon": "0cee63f9c9f13f3ac909c5b4903f4dbb4b719a7ab3b4f13b0deaf83c814b94f7",
     "plain": "b2945c29e7095491a901746b400e58db9b1592ab092bacf2a888ce37f02d08da",
 }
+PINNED_LOADER32_SHA256 = {
+    "addon": "da430e0a9c6eecefa0d1b27d05e16c426fb5d04e808b194d914eaac4b31bc0f8",
+    "plain": "538998f66c0197adcdeadfe8e5ea19dd6ca3253e40399476d291f385ce518b88",
+}
+STORE_DLL32 = "ReShade32.dll"
+
+# Vendored. Both pinned setup programs ship inside Lexeditor, so ReShade is
+# installed without touching the network, and a release build carries them
+# (tools/build_distribution.py names them explicitly). A setup is the exact
+# file reshade.me publishes; its hash and each loader's inside it are pinned.
+VENDORED_RESHADE = Path(__file__).resolve().parent / "tools" / "reshade" / PINNED_LOADER
+VENDORED_SETUPS = {
+    "addon": f"ReShade_Setup_{PINNED_LOADER}_Addon.exe",
+    "plain": f"ReShade_Setup_{PINNED_LOADER}.exe",
+}
+PINNED_SETUP_SHA256 = {
+    "addon": "afe4c8f13048306307983b8b3d41d5bf00a86820440b0e57dea10950e1176445",
+    "plain": "207aea16205fbf952bc8fe1879966672454cf04002e7ad34237c7990a5b3c0b4",
+}
+RESHADE_LICENSE = VENDORED_RESHADE / "LICENSE.md"
 
 
 def loader_state() -> dict:
@@ -209,14 +229,16 @@ def loader_state() -> dict:
 
 def store_state() -> dict:
     dll = store_dll()
+    dll32 = store_dll(32)
     recorded = loader_state()
     return {"path": str(dll), "present": dll.is_file(),
+            "path32": str(dll32), "present32": dll32.is_file(),
             "bytes": dll.stat().st_size if dll.is_file() else 0,
             "version": str(recorded.get("version", "")),
             "variant": str(recorded.get("variant", "")),
             "sha256": str(recorded.get("sha256", "")),
             "installedAt": str(recorded.get("installedAt", "")),
-            "source": LOADER_SOURCE, "licence": LOADER_LICENCE}
+            "source": LOADER_SOURCE, "licence": LOADER_LICENCE, "pinned": PINNED_LOADER}
 
 
 def _version_key(version: str) -> tuple:
@@ -286,53 +308,62 @@ def loader_upstream(*, fetch=None) -> dict:
 
 
 def install_loader(version: str = "", *, variant: str = DEFAULT_LOADER_VARIANT,
-                   fetch=None) -> dict:
-    """Fetch the pinned ReShade build and make it Lexeditor's copy.
+                   setup: Path | None = None) -> dict:
+    """Make the pinned ReShade Lexeditor's copy, from the setup it ships with.
 
-    The setup program is a zip with an executable header, so the loader DLL is
-    read straight out of it. Nothing is run, and nothing is installed into a
-    game here: this only fills the store that install() copies from.
+    Nothing is downloaded: both pinned setups are vendored beside this file. A
+    setup is a small executable with a zip on the end holding the 64-bit and
+    32-bit loaders, and both are read straight out of it. Nothing is run, and
+    nothing is installed into a game here.
 
-    Only the pinned version installs, and only if its bytes hash to what is
-    recorded above. Everything else is refused rather than quietly accepted.
+    The setup, and each loader inside it, must hash to the pin.
     """
     import hashlib
-    import io as _io
     import zipfile
     from datetime import datetime, timezone
 
-    fetch = fetch or _fetch
     name = str(variant or "").lower()
-    suffix = LOADER_VARIANTS.get(name)
-    if suffix is None:
+    if name not in LOADER_VARIANTS:
         raise ValueError(f"Unknown ReShade variant: {variant}")
     wanted = str(version or "").lstrip("vV") or PINNED_LOADER
     if wanted != PINNED_LOADER:
         raise ValueError(
             f"Lexeditor pins ReShade {PINNED_LOADER}; it will not install {wanted}. "
             "Change the pin, with its hash, to move.")
-    url = LOADER_DOWNLOAD.format(version=wanted, variant=suffix)
-    payload = fetch(url)
+    setup = Path(setup) if setup else VENDORED_RESHADE / VENDORED_SETUPS[name]
+    if not setup.is_file():
+        raise ValueError(f"The bundled ReShade setup is missing: {setup}")
+    digest = hashlib.sha256(setup.read_bytes()).hexdigest()
+    if digest != PINNED_SETUP_SHA256[name]:
+        raise ValueError(
+            f"{setup.name} is not the pinned ReShade {wanted} {name} setup. "
+            f"Expected {PINNED_SETUP_SHA256[name]}, got {digest}. Nothing was installed.")
+    loaders: dict[int, tuple[bytes, str]] = {}
     try:
-        with zipfile.ZipFile(_io.BytesIO(payload)) as archive:
-            dll = archive.read(STORE_DLL)
+        with zipfile.ZipFile(setup) as archive:
+            for bits, member, pins in ((64, STORE_DLL, PINNED_LOADER_SHA256),
+                                       (32, STORE_DLL32, PINNED_LOADER32_SHA256)):
+                dll = archive.read(member)
+                found = hashlib.sha256(dll).hexdigest()
+                if found != pins[name]:
+                    raise ValueError(
+                        f"{member} inside {setup.name} is not the pinned {name} build. "
+                        f"Expected {pins[name]}, got {found}. Nothing was installed.")
+                loaders[bits] = (dll, found)
     except (zipfile.BadZipFile, KeyError) as error:
         raise ValueError(
-            f"{url} is not a ReShade setup carrying {STORE_DLL}: {error}") from error
-    digest = hashlib.sha256(dll).hexdigest()
-    expected = PINNED_LOADER_SHA256[name]
-    if digest != expected:
-        raise ValueError(
-            f"{url} did not deliver the pinned ReShade {wanted} {name} build. "
-            f"Expected {expected}, got {digest}. Nothing was installed.")
+            f"{setup.name} is not a ReShade setup carrying both loaders: {error}") from error
     STORE.mkdir(parents=True, exist_ok=True)
-    store_dll().write_bytes(dll)
+    for bits, (dll, _found) in loaders.items():
+        store_dll(bits).write_bytes(dll)
     recorded = {
         "version": wanted,
         "variant": name,
-        "sha256": digest,
-        "bytes": len(dll),
-        "download": url,
+        "sha256": loaders[64][1],
+        "sha256_32": loaders[32][1],
+        "bytes": len(loaders[64][0]),
+        "setup": setup.name,
+        "setupSha256": digest,
         "source": LOADER_SOURCE,
         "licence": LOADER_LICENCE,
         "installedAt": datetime.now(timezone.utc).isoformat(),
@@ -815,17 +846,67 @@ def configure(game_root: Path, project_root: Path | None = None) -> dict:
     }
 
 
-def install(game_root: Path, renderer: str) -> dict:
-    """Place Lexeditor's ReShade in one game, under the loader name it needs."""
+PE_MACHINES = {0x014C: 32, 0x8664: 64}
+
+
+def executable_bits(path: Path) -> int | None:
+    """32 or 64, read from a Windows executable's own header."""
+    try:
+        with open(path, "rb") as handle:
+            head = handle.read(0x40)
+            if len(head) < 0x40 or head[:2] != b"MZ":
+                return None
+            handle.seek(int.from_bytes(head[0x3C:0x40], "little"))
+            signature = handle.read(6)
+    except OSError:
+        return None
+    if len(signature) < 6 or signature[:4] != b"PE\0\0":
+        return None
+    return PE_MACHINES.get(int.from_bytes(signature[4:6], "little"))
+
+
+def loader_bits(folder: Path, executable: Path | None = None) -> int:
+    """Which ReShade build a game can load: its executable's, never a guess.
+
+    A 32-bit game cannot load ReShade64, and FF7, FF8, Chrono Trigger and
+    Warband are 32-bit. The declared executable decides when there is one;
+    otherwise every executable in the folder must agree, and a folder holding
+    both - Warband ships 32-bit and 64-bit side by side - is refused.
+    """
+    if executable is not None:
+        bits = executable_bits(Path(executable))
+        if bits is None:
+            raise ValueError(f"{Path(executable).name} is not a Windows executable Lexeditor can read.")
+        return bits
+    found = {executable_bits(path) for path in Path(folder).glob("*.exe")} - {None}
+    if len(found) == 1:
+        return found.pop()
+    if not found:
+        raise ValueError(
+            f"There is no Windows executable in {folder} to tell 32-bit from 64-bit ReShade.")
+    raise ValueError(
+        f"{folder} holds both 32-bit and 64-bit executables. The game's plugin must declare "
+        "which one ReShade loads into.")
+
+
+def install(game_root: Path, renderer: str, executable: Path | None = None) -> dict:
+    """Place Lexeditor's ReShade in one game, under the loader name it needs.
+
+    The build matches the game's executable, and comes out of the bundled
+    setup the first time it is needed, so there is no separate download step.
+    """
     game_root = Path(game_root)
     dll_name = RENDERER_DLLS.get(str(renderer).lower())
     if not dll_name:
         raise ValueError(f"Unknown renderer: {renderer}")
     if not game_root.is_dir():
         raise ValueError(f"No game folder at {game_root}")
-    source = store_dll()
+    bits = loader_bits(game_root, executable)
+    source = store_dll(bits)
     if not source.is_file():
-        raise ValueError("Lexeditor has no ReShade to install yet")
+        install_loader()
+    if not source.is_file():
+        raise ValueError(f"Lexeditor could not prepare the {bits}-bit ReShade loader.")
     target = game_root / dll_name
     # A game's own d3d11.dll is not ours to replace. Only an existing ReShade
     # may be overwritten, and only by another ReShade.
@@ -835,7 +916,8 @@ def install(game_root: Path, renderer: str) -> dict:
                 f"{dll_name} already exists in this game and is not ReShade. "
                 "Lexeditor will not overwrite it.")
     shutil.copy2(source, target)
-    result = {"installed": True, "renderer": str(renderer).lower(), "path": str(target)}
+    result = {"installed": True, "renderer": str(renderer).lower(), "path": str(target),
+              "bits": bits}
     # A loader with no search paths compiles nothing, so the two steps are one.
     try:
         result["configured"] = configure(game_root)

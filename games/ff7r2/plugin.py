@@ -15,6 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from plugin_api import GameInstallSpec, GamePlugin, ModProjectSpec
+from games.ff7r2 import shader_injector
 from runtime_bootstrap import user_data_dir
 from service_session import LocalPluginSession
 
@@ -58,6 +59,15 @@ PLUGIN = GamePlugin(
     check=check,
     launch=launch,
     session_factory=Ff7r2Session,
+    # Shader Injector is this game's bundled helper: installed during first-time
+    # setup, listed in the Updates drawer, never updated by itself. The one
+    # setup step it can ask for is purging a shader cache older than itself.
+    helper_name="Shader Injector",
+    helper_pinned=shader_injector.VERSION,
+    helper_status_for_root=shader_injector.helper_status,
+    helper_install_for_root=shader_injector.helper_install,
+    helper_upstream=shader_injector.upstream_release,
+    helper_actions={"clear_shader_cache": shader_injector.clear_cache_action},
     projects=ModProjectSpec(
         root_env="LEXEDITOR_FF7R2_PROJECT",
         default_root=DEFAULT_PROJECT,

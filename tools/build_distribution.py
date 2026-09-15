@@ -18,6 +18,17 @@ RESOURCE_EXTENSIONS={'.html','.css','.js','.json','.csv','.txt','.md','.xml','.s
 FORBIDDEN_PARTS={'__pycache__','.git','worklog','codex','baseline','game-data','out',
                  '_scratch','.venv','.build','build','vcpkg','.vcpkg','buildtrees',
                  'node_modules','.pytest_cache'}
+# Bundled helpers with a proven redistribution grant. resource_files() never
+# copies executables or archives, so each is named here: the pinned ReShade
+# setups (BSD-3-Clause) and Shader Injector's release (MIT), with licences.
+# Anything not listed stays out of the installer.
+VENDORED_HELPERS=(
+    'tools/reshade/6.8.0/ReShade_Setup_6.8.0_Addon.exe',
+    'tools/reshade/6.8.0/ReShade_Setup_6.8.0.exe',
+    'tools/reshade/6.8.0/LICENSE.md',
+    'games/ff7r2/runtime/shader-injector-2-2-1-maximum-dood.zip',
+    'games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt',
+)
 
 
 def resource_files(root: Path) -> list[Path]:
@@ -69,6 +80,12 @@ def build_app() -> Path:
     # Include text/license provenance, not executables, game DLLs or private exports.
     for path in [ROOT/'tools/magic-rdr/README.md',ROOT/'tools/brf-sync/LICENSE',ROOT/'tools/brf-sync/SOURCE.md']:
         if path.exists():datas.append((str(path),str(path.relative_to(ROOT).parent)))
+    for relative in VENDORED_HELPERS:
+        path=ROOT/relative
+        if not path.is_file():
+            raise FileNotFoundError(f'Bundled helper is missing: {relative}')
+        entry=(str(path),str(path.relative_to(ROOT).parent))
+        if entry not in datas:datas.append(entry)
     icon=ROOT/'ui/assets/lexeditor.ico'
     if not icon.is_file():icon=None
     spec=generated/'Lexeditor.spec'

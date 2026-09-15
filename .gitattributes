@@ -5,3 +5,6 @@ games/ff8/ffnx_issue_51/package/** -text
 # The vendored Shader Injector release is SHA-256 locked, and its licence text
 # is compared byte for byte against the credits. Line endings must not change.
 games/ff7r2/runtime/** -text
+
+# ReShade setups are SHA-256 pinned and their licence is compared byte for byte.
+tools/reshade/** -text

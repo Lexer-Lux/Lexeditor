@@ -28,6 +28,10 @@
     .ff7r2-tweaks.reshade > :last-child{grid-column:1/-1}
     @media (min-width:1400px){.ff7r2-tweaks.reshade > :last-child{grid-column:auto}}
     .ff7r2-warning input{color:#9a5b00}
+    /* First-time setup's remaining step, above both subtabs, with its button. */
+    .ff7r2-notice{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 14px;border:1px solid var(--lex-accent);background:var(--lex-panel)}
+    .ff7r2-notice-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+    .ff7r2-notice-text strong{font-weight:600}
   </style>
 </head>
 <body>
@@ -102,6 +106,17 @@
 
   function megabytes(bytes){return `${(Number(bytes||0)/1048576).toLocaleString(undefined,{maximumFractionDigits:0})} MB`}
 
+  async function clearShaderCache(){
+    const cache=injector?.shaderCache||{files:[],bytes:0,folder:""};
+    if(!cache.files.length)return;
+    const ok=await LexeditorUI.confirmAction({title:"Clear the shader cache?",
+      message:`Deletes ${cache.files.length} cache file${cache.files.length===1?"":"s"} (${megabytes(cache.bytes)}) from\n${cache.folder}\n\nThe game rebuilds it on the next start. Close the game first.`,
+      confirmLabel:"Clear cache"});
+    if(ok)injectorAction("clear-cache",{},result=>result.failed.length
+      ?`Could not delete ${result.failed.length}: ${result.failed[0].error}`
+      :`Cleared ${result.removed.length} cache file${result.removed.length===1?"":"s"}.`);
+  }
+
   function injectorStatusCard(){
     const state=injector||{available:false,reason:"Reading Shader Injector…"};
     if(!state.available){
@@ -168,14 +183,7 @@
     }
     const cache=state.shaderCache||{files:[],bytes:0,folder:""};
     const clear=el("button",{type:"button",class:"lex-dialog-action",disabled:injectorBusy||!cache.files.length,
-      onclick:async()=>{
-        const ok=await LexeditorUI.confirmAction({title:"Clear the shader cache?",
-          message:`Deletes ${cache.files.length} cache file${cache.files.length===1?"":"s"} (${megabytes(cache.bytes)}) from\n${cache.folder}\n\nThe game rebuilds it on the next start. Close the game first.`,
-          confirmLabel:"Clear cache"});
-        if(ok)injectorAction("clear-cache",{},result=>result.failed.length
-          ?`Could not delete ${result.failed.length}: ${result.failed[0].error}`
-          :`Cleared ${result.removed.length} cache file${result.removed.length===1?"":"s"}.`);
-      }},"Clear shader cache");
+      onclick:clearShaderCache},"Clear shader cache");
     return LexeditorUI.detailPanel({title:"SHADER INJECTOR",body:[
       detailSection({title:"INSTALLATION",body:rows}),
       detailSection({title:"GAME SHADER CACHE",body:[
@@ -282,7 +290,14 @@
         // preset that travels with the mod.
         LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade,
           preferredRenderer:game.renderer||"dxgi"})];
-    return el("div",{class:"ff7r2-page"},bar,
+    // Setup is not finished while the shader cache predates the injector, so
+    // the step and its button sit above both subtabs until it is done.
+    const notice=injector?.setupNotice;
+    const banner=notice?el("div",{class:"ff7r2-notice",role:"status"},
+      el("div",{class:"ff7r2-notice-text"},el("strong",{},notice.title),el("span",{},notice.message)),
+      el("button",{type:"button",class:"lex-dialog-action primary",disabled:injectorBusy,
+        onclick:clearShaderCache},notice.actionLabel)):null;
+    return el("div",{class:"ff7r2-page"},bar,...(banner?[banner]:[]),
       el("div",{class:`ff7r2-tweaks ${tweakTab}`},...cards));
   }
 

@@ -27,6 +27,7 @@ import hashlib
 import io
 import json
 import os
+import re
 from pathlib import Path, PurePosixPath
 import zipfile
 
@@ -166,10 +167,13 @@ def install(root: Path, package: Package | None = None) -> dict:
     if not active.is_file() and not parked.is_file():
         active.write_bytes(package.files[DLL])
         written.append(DLL)
+    # The first install's time is kept: it is what "the cache predates the
+    # install" is measured against, and a repair should not reset it.
+    installed_at = _manifest(root).get("installedAt") or datetime.now(timezone.utc).isoformat()
     (root / MANIFEST).write_text(json.dumps({
         "name": "Shader Injector", "version": VERSION, "variant": VARIANT,
         "source": SOURCE, "archiveSha256": package.archive_sha256,
-        "installedAt": datetime.now(timezone.utc).isoformat(),
+        "installedAt": installed_at,
         "files": package.hashes,
     }, indent=2) + "\n", encoding="utf-8")
     return {"written": sorted(written), "kept": sorted(kept)}
@@ -524,6 +528,66 @@ def clear_shader_cache(documents: Path | None = None) -> dict:
     return {"removed": removed, "failed": failed}
 
 
+def _manifest(root: Path) -> dict:
+    try:
+        value = json.loads((Path(root) / MANIFEST).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def install_time(root: Path) -> float | None:
+    """When Shader Injector went into this folder, as an epoch time.
+
+    The install record when Lexeditor made one; otherwise the DLL's own date,
+    which is when a hand install from the archive put it there.
+    """
+    stamp = _manifest(root).get("installedAt")
+    if stamp:
+        try:
+            return datetime.fromisoformat(str(stamp)).timestamp()
+        except ValueError:
+            pass
+    for name in (DLL, DISABLED_DLL):
+        path = Path(root) / name
+        if path.is_file():
+            return path.stat().st_mtime
+    return None
+
+
+def setup_notice(root: Path, installed: bool, documents: Path | None = None) -> dict | None:
+    """What first-time setup still needs after the install: a fresh shader cache.
+
+    A cache older than the install was compiled by a game that never had the
+    injector in it. Rebirth then loads nearly every shader from that cache, so
+    the injector sees almost nothing compiled and replaces almost nothing. The
+    game rebuilds the cache on the next start after it is cleared; once it is
+    newer than the install, this goes quiet on its own.
+    """
+    if not installed:
+        return None
+    since = install_time(root)
+    cache = shader_cache(documents)
+    if since is None or not cache["files"]:
+        return None
+    folder = Path(cache["folder"])
+    newest = max((folder / item["name"]).stat().st_mtime for item in cache["files"])
+    if newest >= since:
+        return None
+    size = f"{cache['bytes'] / 1048576:,.0f} MB"
+    return {
+        "title": "Purge the shader cache first",
+        "message": ("Shader Injector can only replace shaders it watches the game compile, and "
+                    f"Rebirth's {size} shader cache was built before it was installed, so the game "
+                    "would skip compiling almost all of them. Clear the cache with the game closed; "
+                    "Rebirth rebuilds it the next time it starts."),
+        "action": "clear_shader_cache",
+        "actionLabel": "Clear shader cache",
+        "bytes": cache["bytes"],
+        "folder": cache["folder"],
+    }
+
+
 def status(root: Path, package: Package | None = None, documents: Path | None = None) -> dict:
     """Everything the Shader Injector subtab shows."""
     package = package or default_package()
@@ -553,4 +617,100 @@ def status(root: Path, package: Package | None = None, documents: Path | None = 
         "keyNames": {str(code): name for code, name in sorted(KEY_NAMES.items())},
         "conflicts": hotkey_conflicts(root, settings["values"]) if root.is_dir() else [],
         "shaderCache": shader_cache(documents),
+        "setupNotice": setup_notice(root, installed, documents),
     }
+
+
+# --------------------------------------------------------------------------
+# The shell's helper contract: first-time setup, the Updates drawer, and the
+# one setup step this helper can ask for.
+
+LATEST_RELEASE_API = "https://api.github.com/repos/frostbone25/ShaderInjector/releases/latest"
+
+
+def _game_folder(game_root: Path | None) -> Path | None:
+    if game_root is None:
+        return None
+    folder = Path(game_root) / INSTALL_FOLDER
+    return folder if folder.is_dir() else None
+
+
+def helper_status(game_root: Path | None, package: Package | None = None,
+                  documents: Path | None = None) -> dict:
+    """What the shell reads to decide whether Rebirth is set up."""
+    base = {"runtime": "Shader Injector", "pinned": VERSION, "packageVersion": VERSION,
+            "source": SOURCE, "releaseNotes": RELEASE, "installed": False, "version": "",
+            "autoUpdate": False}
+    folder = _game_folder(game_root)
+    if folder is None:
+        return {**base, "message": "Final Fantasy VII Rebirth has not been located."}
+    try:
+        state = status(folder, package, documents)
+    except (OSError, ValueError) as error:
+        return {**base, "message": f"Shader Injector could not be verified: {error}", "error": str(error)}
+    ready = state["installed"] and not state["missingFiles"]
+    if state["foreignDll"]:
+        message = ("dsound.dll in the game folder belongs to another mod, so Shader Injector cannot "
+                   "be installed. Move that file out of the way, then Install/Repair.")
+    elif not state["installed"]:
+        message = f"Install the bundled Shader Injector {VERSION} to finish setting up this game."
+    elif state["missingFiles"]:
+        message = (f"{len(state['missingFiles'])} Shader Injector files are missing. "
+                   "Use Install/Repair to restore them.")
+    else:
+        message = f"Pinned Shader Injector {VERSION} verified{'' if state['enabled'] else ', switched off'}."
+    return {**base, "installed": ready, "version": VERSION if state["installed"] else "",
+            "integrity": "verified" if ready else "mismatch" if state["installed"] else "missing",
+            "enabled": state["enabled"], "gameRoot": str(folder), "message": message,
+            "setupNotice": state["setupNotice"]}
+
+
+def helper_install(game_root: Path, package: Package | None = None) -> dict:
+    folder = _game_folder(game_root)
+    if folder is None:
+        raise ValueError("Locate Final Fantasy VII Rebirth before installing Shader Injector.")
+    result = install(folder, package)
+    return {**helper_status(game_root, package), **result, "changed": bool(result["written"])}
+
+
+def clear_cache_action(game_root: Path | None) -> dict:
+    """The setup step first-time setup offers beside the game."""
+    result = clear_shader_cache()
+    if result["failed"]:
+        first = result["failed"][0]
+        raise ValueError(f"Could not delete {first['name']}: {first['error']}. Close the game first.")
+    return {**result, "message": "Cleared the shader cache. Rebirth rebuilds it the next time it starts."}
+
+
+def _version_tuple(text: str) -> tuple[int, ...] | None:
+    match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?", str(text).strip())
+    if not match:
+        return None
+    parts = [int(part) for part in match.groups() if part is not None]
+    return tuple(parts + [0] * (4 - len(parts)))
+
+
+def _fetch_json(url: str) -> dict:
+    import urllib.request
+    request = urllib.request.Request(url, headers={"User-Agent": "Lexeditor-ShaderInjector/1"})
+    with urllib.request.urlopen(request, timeout=15) as response:
+        raw = response.read(1024 * 1024 + 1)
+    if len(raw) > 1024 * 1024:
+        raise RuntimeError("Shader Injector release metadata is too large.")
+    return json.loads(raw)
+
+
+def upstream_release(fetch_json=None) -> dict:
+    """Latest is information, never an install target or a moving pin."""
+    base = {"runtime": "Shader Injector", "pinned": VERSION, "packageVersion": VERSION, "source": SOURCE}
+    try:
+        payload = (fetch_json or _fetch_json)(LATEST_RELEASE_API)
+        latest = str(payload.get("tag_name", ""))
+        parsed = _version_tuple(latest)
+        if parsed is None or payload.get("draft") or payload.get("prerelease"):
+            raise RuntimeError("Upstream did not return a stable Shader Injector release.")
+        return {**base, "latest": latest, "published": str(payload.get("published_at", "")),
+                "releaseNotes": SOURCE + "/releases/tag/" + latest,
+                "behind": parsed > _version_tuple(VERSION)}
+    except Exception as error:
+        return {**base, "error": str(error), "behind": False}

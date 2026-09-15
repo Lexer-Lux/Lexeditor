@@ -508,6 +508,8 @@ class HostApi:
                 "helperName": plugin.helper_name or helper.get("runtime") or "",
                 "helperInstalled": bool(helper.get("installed")),
                 "helperInstallable": plugin.helper_install is not None or plugin.helper_install_for_root is not None,
+                # A step setup still needs once the helper is in, with its button.
+                "helperNotice": helper.get("setupNotice") if helper.get("installed") else None,
             }
             if plugin.session_factory is None:
                 problems = problems + ["Shared UI session is not implemented"]
@@ -791,6 +793,21 @@ class HostApi:
             "canOpen": snapshot.get("canOpen"),
             "problems": snapshot.get("problems", []),
         }
+
+    def run_helper_action(self, plugin_id: str, action: str) -> dict:
+        """Run one named setup step a helper asked for, then re-check the game."""
+        plugin = self._plugins.get(plugin_id)
+        if plugin is None:
+            raise ValueError(f"Unknown Lexeditor plugin: {plugin_id}")
+        step = (plugin.helper_actions or {}).get(str(action))
+        if step is None:
+            raise ValueError(f"{plugin.name} has no setup step called {action}")
+        current = self._installations.snapshot(plugin_id)
+        result = step(Path(current["root"]) if current.get("root") else None) or {}
+        snapshot = self._installations.snapshot(plugin_id)
+        helper = snapshot.get("helper") or {}
+        return {"result": result, "helperNotice": helper.get("setupNotice"),
+                "status": snapshot.get("status"), "canOpen": snapshot.get("canOpen")}
 
     def helper_versions(self, refresh: bool = False) -> dict:
         """Report every plugin helper whose upstream has a newer release.
@@ -1449,6 +1466,20 @@ class HostApi:
                 f"installation does not have. Nothing was written.")
         return target
 
+    def _reshade_executable(self, plugin_id: str, folder: Path) -> Path | None:
+        """The game's declared executable, when it is the one beside ReShade.
+
+        It decides between the 32-bit and 64-bit loader. Without it, every
+        executable in the folder must agree, and a mixed folder is refused.
+        """
+        plugin = self._plugins.get(plugin_id)
+        launch = getattr(getattr(plugin, "installation", None), "launch_path", "") or ""
+        root = self._installations.snapshot(plugin_id).get("root")
+        if not launch or not root:
+            return None
+        executable = Path(root) / Path(*PurePosixPath(launch.replace("\\", "/")).parts)
+        return executable if executable.is_file() and executable.parent == Path(folder) else None
+
     def mod_reshade(self, plugin_id: str) -> dict:
         """Report the ReShade preset the current mod ships, if it ships one."""
         import reshade_projects
@@ -1475,7 +1506,7 @@ class HostApi:
         root = self._reshade_root(plugin_id)
         if not root:
             raise ValueError("Add this game before installing ReShade for it.")
-        reshade_projects.install(root, renderer)
+        reshade_projects.install(root, renderer, self._reshade_executable(plugin_id, root))
         return self.mod_reshade(plugin_id)
 
     def uninstall_reshade(self, plugin_id: str) -> dict:
