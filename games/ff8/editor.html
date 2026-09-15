@@ -72,7 +72,7 @@
        Nothing reserved room for it, so it sat on the first field. */
     .gf-panel>.lex-detail-section-title{position:static;margin:0 0 4px}
     .gf-panel-content{padding-top:7px}.gf-compat-table,.gf-ability-table{overflow:auto}
-    .lex-column-pointer-cell{position:relative;overflow:visible}.lex-column-list-row.selected .lex-column-pointer-cell .lex-column-cell-content::before{position:absolute;z-index:5;right:calc(100% + 4px);top:50%;width:24px;height:16px;content:"";background:url("/assets/icons/0.png") center/contain no-repeat;filter:drop-shadow(1px 1px #111);image-rendering:pixelated;transform:translateY(-50%);pointer-events:none}
+    .lex-column-pointer-cell{position:relative;overflow:visible}.lex-column-list-row.selected .lex-column-pointer-cell .lex-column-cell-content::before{position:relative;z-index:5;flex:0 0 24px;width:24px;height:16px;margin:0 4px 0 -28px;content:"";background:url("/assets/icons/0.png") center/contain no-repeat;filter:drop-shadow(1px 1px #111);image-rendering:pixelated;pointer-events:none}
     .lex-shell-header nav button.active::before{content:none!important}.lex-shell-header nav button.active .lex-tab-label::before{position:absolute;z-index:5;right:calc(100% + 5px);top:50%;width:36px;height:24px;margin:0;border:0!important;content:"";background:url("/assets/icons/0.png") center/contain no-repeat;image-rendering:pixelated;transform:translateY(-50%);pointer-events:none}.lex-shell-header nav .lex-tab-label{position:relative;display:inline-block}
     .lex-column-list-head-cell.sorted{color:#fff;background:#4a4a4a}.lex-sort-indicator{width:18px;height:12px;margin-right:-2px;overflow:hidden;opacity:.75;color:transparent;background:url("/assets/icons/0.png") center/contain no-repeat;image-rendering:pixelated;text-shadow:none}.lex-sort-indicator.ascending{transform:rotate(-30deg)}.lex-sort-indicator.descending{transform:rotate(30deg)}
     .ff8-portrait-tab.active::after{left:-26px;width:48px;height:32px}
@@ -121,7 +121,7 @@
     .ff8-magic-label{display:inline-flex;min-width:0;align-items:center;gap:4px}
     .ff8-magic-label .ff8-concept-icon{width:1.25em;height:1.25em}
     .lex-info-help{font-family:var(--lex-symbol-font)!important;font-size:13px!important;line-height:1!important;text-shadow:none!important}
-    .lex-column-list-row.selected .lex-column-pointer-cell .lex-column-cell-content::before{right:calc(100% + 8px);width:28px;height:19px}
+    .lex-column-list-row.selected .lex-column-pointer-cell .lex-column-cell-content::before{flex-basis:28px;width:28px;height:19px;margin:0 8px 0 -36px}
     .weapon-detail{overflow:hidden!important}
     .detail>.lex-detail-panel-body>.lex-detail-section{margin-top:12px}
     /* Canonical FF8 surface and edge-caption rules. All FF8 panels use the
