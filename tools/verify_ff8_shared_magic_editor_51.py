@@ -310,7 +310,7 @@ def main() -> int:
             real_atomic = gameplay_settings._atomic_text
 
             def fail_settings(target: Path, text: str) -> None:
-                if Path(target) == gameplay_settings.settings_path(project):
+                if Path(target).resolve() == gameplay_settings.settings_path(project).resolve():
                     raise OSError("injected settings failure")
                 real_atomic(target, text)
 
