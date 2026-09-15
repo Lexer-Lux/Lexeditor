@@ -282,6 +282,29 @@ def test_a_repository_with_no_folder_says_why_nothing_happens(tmp_path, monkeypa
     assert "No shader folder" in result["reason"]
 
 
+def test_the_hud_addon_matches_the_build_and_leaves_with_reshade(tmp_path):
+    game = tmp_path/"game"; game.mkdir()
+    for bits in (32, 64):
+        result = rp.install_hud_addon(game, bits)
+        assert Path(result["path"]).name == rp.HUD_ADDON_FILES[bits]
+        assert (game/rp.HUD_ADDON_FILES[bits]).read_bytes()[:2] == b"MZ"
+    # A copy that is no longer ours, and the player's saved groups, stay.
+    (game/rp.HUD_ADDON_FILES[32]).write_bytes(b"MZ someone else's build")
+    (game/"ReshadeEffectShaderToggler.ini").write_text("[General]\n")
+    removed = rp.uninstall(game)["removedAddons"]
+    assert [entry["addon"] for entry in removed] == [rp.HUD_ADDON_FILES[64]]
+    assert (game/rp.HUD_ADDON_FILES[32]).is_file()
+    assert (game/"ReshadeEffectShaderToggler.ini").is_file()
+
+
+def test_every_lexerian_effect_ships():
+    from tools.build_distribution import VENDORED_HELPERS
+    root = Path(rp.__file__).resolve().parent
+    shipped = {(root/path).resolve() for path in VENDORED_HELPERS}
+    for effect in rp.BUNDLED_SHADERS.iterdir():
+        assert effect.resolve() in shipped, effect.name
+
+
 def test_lexeditors_own_effects_are_always_searched(tmp_path, monkeypatch):
     monkeypatch.setattr(rp, "STORE", tmp_path/"store")
     assert (rp.BUNDLED_SHADERS/"Colors.fx").is_file()

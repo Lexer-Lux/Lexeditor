@@ -17,10 +17,13 @@ redistribution, so a mod that bundled them would not be safe to publish.
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import os
 from pathlib import Path
 import shutil
+import zipfile
 
 MANIFEST_NAME = "reshade.json"
 RESHADE_DIR = "reshade"
@@ -158,6 +161,37 @@ def installed_renderer(game_root: Path | None) -> str:
 # decision and not one a mod editor should make quietly on their behalf.
 STORE = Path(os.environ.get("LOCALAPPDATA", "")) / "Lexeditor" / "reshade"
 STORE_DLL = "ReShade64.dll"
+
+
+# ReshadeEffectShaderToggler (MIT): an add-on that runs effects at a chosen
+# point in the game's rendering, such as just before the HUD is drawn, so depth
+# of field and friends leave the HUD alone. Pinned and bundled like ReShade.
+HUD_ADDON_VERSION = "1.3.23.633"
+HUD_ADDON_ARCHIVE = (Path(__file__).resolve().parent / "tools" / "reshade" / "addons"
+                     / f"REST-{HUD_ADDON_VERSION}" / f"ReshadeEffectShaderToggler-{HUD_ADDON_VERSION}.zip")
+HUD_ADDON_SHA256 = "79aaf38002e103034527eeb09553cbc422b44989d22258e905652131904afa6d"
+HUD_ADDON_FILES = {64: "ReshadeEffectShaderToggler.addon64", 32: "ReshadeEffectShaderToggler.addon32"}
+
+
+def _hud_addon_bytes(bits: int) -> bytes:
+    data = HUD_ADDON_ARCHIVE.read_bytes()
+    if hashlib.sha256(data).hexdigest() != HUD_ADDON_SHA256:
+        raise ValueError("The bundled Effect Shader Toggler add-on does not match its pinned build.")
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        return archive.read(HUD_ADDON_FILES[bits])
+
+
+def install_hud_addon(game_root: Path, bits: int) -> dict:
+    """Put the add-on that matches ReShade's build beside it.
+
+    It does nothing until a shader group is set up in its ReShade tab, so it is
+    safe to install with every ReShade.
+    """
+    payload = _hud_addon_bytes(bits)
+    target = Path(game_root) / HUD_ADDON_FILES[bits]
+    if not (target.is_file() and target.read_bytes() == payload):
+        target.write_bytes(payload)
+    return {"installed": True, "path": str(target), "version": HUD_ADDON_VERSION}
 
 
 def store_dll(bits: int = 64) -> Path:
@@ -1004,6 +1038,10 @@ def install(game_root: Path, renderer: str, executable: Path | None = None) -> d
     shutil.copy2(source, target)
     result = {"installed": True, "renderer": str(renderer).lower(), "path": str(target),
               "bits": bits}
+    try:
+        result["hudAddon"] = install_hud_addon(game_root, bits)
+    except Exception as error:
+        result["hudAddon"] = {"installed": False, "reason": str(error)}
     # A loader with no search paths compiles nothing, so the two steps are one.
     try:
         result["configured"] = configure(game_root)
@@ -1027,7 +1065,18 @@ def uninstall(game_root: Path) -> dict:
         except OSError:
             continue
         removed.append({"renderer": renderer, "path": str(target)})
-    return {"removed": removed}
+    # The add-on goes with ReShade, but only a copy that is still ours; its
+    # saved shader groups (the .ini) are the player's and stay.
+    addons = []
+    for bits, name in HUD_ADDON_FILES.items():
+        target = game_root / name
+        if target.is_file() and target.read_bytes() == _hud_addon_bytes(bits):
+            try:
+                target.unlink()
+            except OSError:
+                continue
+            addons.append({"addon": name, "path": str(target)})
+    return {"removed": removed, "removedAddons": addons}
 
 
 def snapshot(project_root: Path, game_root: Path | None = None) -> dict:
