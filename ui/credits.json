@@ -545,6 +545,16 @@
     "ff7r2": {
       "contributions": [
         {
+          "name": "David Matos (frostbone25) / Shader Injector",
+          "role": "The D3D12 shader-replacement mod Lexeditor vendors for Rebirth, pinned to the 2.2.1 Maximum quality release.",
+          "url": "https://github.com/frostbone25/ShaderInjector"
+        },
+        {
+          "name": "Microsoft / DirectX Shader Compiler",
+          "role": "dxc, dxcompiler and dxil, shipped inside the Shader Injector release to recompile its shaders.",
+          "url": "https://github.com/microsoft/DirectXShaderCompiler"
+        },
+        {
           "name": "crosire / ReShade",
           "role": "The post-processing loader Lexeditor installs for Rebirth.",
           "url": "https://github.com/crosire/reshade"
@@ -563,6 +573,13 @@
           "name": "mj-ehsan / NiceGuy Shaders",
           "role": "Screen-space ambient occlusion in the bundled shader collection.",
           "url": "https://github.com/mj-ehsan/NiceGuy-Shaders"
+        }
+      ],
+      "licenses": [
+        {
+          "name": "Shader Injector — MIT License",
+          "sourcePath": "games/ff7r2/runtime/SHADER-INJECTOR-LICENSE.txt",
+          "text": "MIT License\n\nCopyright (c) 2026 David Matos\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.\n"
         }
       ]
     }
