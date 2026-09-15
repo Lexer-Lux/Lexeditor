@@ -84,6 +84,8 @@ class GameInstallSpec:
     # "" means the installation root, which is a statement, not a default: a
     # game whose renderer wrapper belongs somewhere else must say so.
     reshade_root: str = ""
+    # The loader name ReShade goes in under for this game ("dxgi", "d3d9", ...).
+    reshade_renderer: str = ""
 
 
 @dataclass(frozen=True)
@@ -144,6 +146,10 @@ class GamePlugin:
     # Executable names this game runs as. The shell uses them so a game it did
     # not start itself is still reported as running, and can still be stopped.
     process_names: tuple[str, ...] = ()
+    # False for a game Lexeditor must not start itself - one that only runs
+    # properly through its store launcher. Play is then greyed out; Stop still
+    # works on a copy the player started.
+    can_launch: bool = True
     game_process_factory: Callable[[], GameProcessController] | None = None
     # Root-aware helper hooks prevent installing into an import-time default
     # after the user locates a different game folder. Legacy hooks remain valid.

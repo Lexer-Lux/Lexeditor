@@ -2558,110 +2558,72 @@
     return root;
   };
 
+  // One game's ReShade: a switch for the whole thing, then each of Lexeditor's
+  // effects with its own switch and its controls, read from the shader itself.
+  // A game with no defaults set has no ReShade for players, so nothing renders.
   const reshadeSection = spec => {
     const data = spec?.snapshot || {};
-    const manifest = data.manifest || {};
-    const presets = data.presets || [];
-    const apply = changes => spec.save?.({...manifest, ...changes});
-    const rows = [];
-    const store = data.store || {};
+    if (!data.available) return null;
     const act = (method, ...args) => spec.act?.(method, ...args);
-    const installRow = element("div", {class: "lex-reshade-actions"});
-    if (data.reshadeInstalled) {
-      installRow.append(element("button", {
-        type: "button", class: "lex-dialog-action",
-        onclick: () => act("uninstall_reshade"),
-      }, "Remove ReShade from this game"));
-    } else {
-      const renderer = element("select", {"aria-label": "Renderer to load through"});
-      // A loader name already taken by something that is not ReShade - a
-      // DirectX fix, a mod loader - is not ours to overwrite, so it is shown
-      // as taken rather than offered and then refused.
-      const taken = new Map((data.occupiedLoaders || []).map(entry => [entry.renderer, entry]));
-      for (const name of data.renderers || []) {
-        const entry = taken.get(name);
-        const option = element("option", {value: name},
-          entry ? `${name} — taken by ${entry.dll}` : name);
-        if (entry) option.disabled = true;
-        renderer.append(option);
+    const ready = data.gameFound !== false;
+    const master = element("label", {class: "lex-reshade-master"},
+      element("input", {type: "checkbox", role: "switch", checked: !!data.installed, disabled: !ready,
+        "aria-label": "ReShade on or off",
+        onchange: event => act("set_reshade_enabled", event.target.checked)}),
+      element("span", {class: "lex-reshade-master-label"}, data.installed ? "ReShade is on" : "ReShade is off"));
+    const buttons = element("div", {class: "lex-reshade-actions"},
+      element("button", {type: "button", class: "lex-dialog-action", disabled: !ready,
+        onclick: () => act("reset_reshade_defaults")}, "Back to defaults"),
+      data.developerMode ? element("button", {type: "button", class: "lex-dialog-action primary", disabled: !ready,
+        onclick: () => act("save_reshade_defaults")}, "Save as defaults") : null);
+    const head = element("div", {class: "lex-reshade-head"}, master, buttons);
+    const notes = [];
+    if (data.error) notes.push(element("p", {class: "lex-reshade-error"}, data.error));
+    if (data.developerMode && !data.hasDefaults) {
+      notes.push(element("p", {class: "lex-reshade-note"}, "No defaults for this game yet. Players will not see ReShade until you save some."));
+    }
+    const control = (effect, row) => {
+      const value = effect.values?.[row.name];
+      const set = next => act("set_reshade_value", effect.file, row.name, next);
+      if (row.widget === "checkbox") {
+        return element("input", {type: "checkbox", checked: !!value, disabled: !ready, "aria-label": row.label,
+          onchange: event => set(event.target.checked)});
       }
-      // A plugin that knows which loader its game wants says so; otherwise
-      // the first name nothing else has claimed.
-      const wanted = [spec.preferredRenderer, ...(data.renderers || [])]
-        .find(name => name && !taken.has(name));
-      if (wanted) renderer.value = wanted;
-      installRow.append(renderer, element("button", {
-        type: "button", class: "lex-dialog-action primary",
-        onclick: () => act("install_reshade", renderer.value),
-      }, "Install ReShade into this game"));
-    }
-    rows.push(detailField({
-      label: "ReShade installed",
-      control: readonlyField(data.reshadeInstalled
-        ? `Yes, loading through ${data.installedRenderer}`
-        : `Not in this game yet. ReShade ${store.pinned || ""} ships with Lexeditor and installs in the build that matches the game.`),
-      help: infoHelp("One ReShade, bundled with Lexeditor and installed per game under the loader name that game's renderer needs, in the 32-bit or 64-bit build that matches the game. A game's own DLL of that name is never overwritten. The bundled build is pinned and checked before it is used, and it is the add-on build, because a preset whose passes run through an add-on renders nothing without it."),
-    }));
-    rows.push(detailField({label: "Install", control: installRow}));
-    if ((data.occupiedLoaders || []).length) {
-      rows.push(detailField({
-        label: "Already taken",
-        control: readonlyField((data.occupiedLoaders || [])
-          .map(entry => `${entry.dll} (${entry.renderer})`).join(", ")),
-        help: infoHelp("These loader names are in use by something that is not ReShade, which usually means a fix or mod loader the player installed. Lexeditor never overwrites one, so pick a free renderer instead."),
-      }));
-    }
-    const enable = element("input", {
-      type: "checkbox", checked: manifest.enabled === true,
-      disabled: !presets.length,
-      "aria-label": "Ship a ReShade preset with this mod",
-      onchange: event => apply({enabled: event.target.checked}),
-    });
-    rows.push(detailField({
-      label: "Use a preset", dataType: "BOOL", control: enable,
-      help: infoHelp(presets.length
-        ? "Turns this mod's preset on. The preset file travels with the mod; the ReShade install does not."
-        : "This mod's reshade folder holds no .ini preset yet, so there is nothing to turn on."),
-    }));
-    if (presets.length) {
-      const select = element("select", {
-        disabled: manifest.enabled !== true,
-        "aria-label": "ReShade preset",
-        onchange: event => apply({preset: event.target.value}),
+      if (row.widget === "combo") {
+        const select = element("select", {disabled: !ready, "aria-label": row.label,
+          onchange: event => set(Number(event.target.value))});
+        row.items.forEach((item, index) => {
+          const option = element("option", {value: String(index)}, item);
+          option.selected = index === Number(value);
+          select.append(option);
+        });
+        return select;
+      }
+      const step = row.step ?? (row.type === "int" ? 1 : 0.01);
+      const digits = String(step).includes(".") ? String(step).split(".")[1].length : 0;
+      const number = element("input", {type: "number", min: row.min, max: row.max, step, value: Number(value).toFixed(digits),
+        disabled: !ready, "aria-label": `${row.label} value`, onchange: event => set(Number(event.target.value))});
+      const slider = element("input", {type: "range", min: row.min, max: row.max, step, value, disabled: !ready,
+        "aria-label": row.label,
+        oninput: event => { number.value = Number(event.target.value).toFixed(digits); },
+        onchange: event => set(Number(event.target.value))});
+      return element("div", {class: "lex-reshade-slider"}, slider, number);
+    };
+    const effects = (data.effects || []).map(effect => {
+      const toggle = element("label", {class: "lex-reshade-effect-toggle"},
+        element("input", {type: "checkbox", checked: !!effect.enabled, disabled: !ready,
+          "aria-label": `${effect.label} on or off`,
+          onchange: event => act("set_reshade_effect", effect.file, event.target.checked)}),
+        element("span", {}, effect.label));
+      return detailSection({
+        title: toggle,
+        help: effect.tooltip ? infoHelp(effect.tooltip) : null,
+        className: `lex-reshade-effect${effect.enabled ? "" : " off"}`,
+        body: effect.controls.map(row => detailField({label: row.label, control: control(effect, row),
+          help: row.tooltip ? infoHelp(row.tooltip) : null})),
       });
-      for (const name of presets) {
-        const option = element("option", {value: name}, name);
-        option.selected = name === manifest.preset;
-        select.append(option);
-      }
-      rows.push(detailField({label: "Preset", control: select}));
-    }
-    // Someone who downloads this mod may never have used Lexeditor. The note
-    // tells them what to copy and where to put the preset, in plain text,
-    // beside the preset itself.
-    rows.push(detailField({
-      label: "By-hand install note",
-      control: element("div", {class: "lex-reshade-actions"},
-        element("button", {type: "button", class: "lex-dialog-action",
-          onclick: () => act("write_reshade_note")},
-          `Write ${data.exportNote || "INSTALL-RESHADE.txt"}`)),
-      help: infoHelp("Writes a plain-text note into the mod's reshade folder naming the loader DLL and where the preset goes, and copies Lexeditor's effects beside it so the mod works without Lexeditor. It never mentions Lexeditor, because the reader may not have it."),
-    }));
-    rows.push(detailField({
-      label: "Status",
-      control: readonlyField(data.ready
-        ? "Ready. This mod's preset will be applied."
-        : !data.reshadeInstalled ? "ReShade is not installed for this game."
-        : manifest.enabled !== true ? "Turned off for this mod."
-        : !manifest.preset ? "No preset chosen."
-        : !presets.includes(manifest.preset)
-          ? `The manifest names ${manifest.preset}, which is not in the mod's reshade folder.`
-        : "Not ready."),
-    }));
-    rows.push(detailField({
-      label: "Folder", control: readonlyField(data.path || "No mod project selected"),
-    }));
-    return detailSection({title: "RESHADE", body: rows});
+    });
+    return detailSection({title: "RESHADE", className: "lex-reshade", body: [head, ...notes, ...effects]});
   };
 
   const showAlert = options => {
@@ -3538,17 +3500,20 @@ ${contents.path}`});
         hidden: !options.manageProjectSources,
         onclick: () => { closeMenu(); options.manageProjectSources?.(); },
       }, "Load Order…");
+      // A game without mod management says so where the mod buttons would be,
+      // instead of offering buttons it cannot back up.
       menu.replaceChildren(...sourceRows, ...projects,
-        ...(!modSupport?.canManage ? [element("p", {class:"lex-dialog-status"}, modSupport?.message || "Mod management is not supported for this game yet.")] : []),
-        element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, create, browse, manage,
-          element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…")));
+        modSupport && !modSupport.canManage
+          ? element("p", {class:"lex-dialog-status"}, modSupport.message || "Mod management is not supported for this game yet.")
+          : element("div", {class: "lex-project-menu-actions", role: "group", "aria-label": "Mod project actions"}, create, browse, manage,
+            element("button", {type:"button", class:"lex-project-menu-action", onclick:() => { closeMenu(); openModLibrary(options.plugin.id); }}, "Mod library…")));
       measureNameColumn();
     };
     trigger.onclick = event => { event.stopPropagation(); toggleMenu(); };
     let copyPromptOpen = false;
     const protectManagedEdit = async event => {
       const current = snapshot?.projects?.find(row => row.current);
-      if (!current?.readOnly || copyPromptOpen || !event.target.closest?.("main") ||
+      if (!current?.readOnly || current.vanilla || copyPromptOpen || !event.target.closest?.("main") ||
           !event.target.matches?.("input,select,textarea,[contenteditable='true']")) return;
       if (event.type === "keydown" && ["Tab","Escape","Shift","Control","Alt"].includes(event.key)) return;
       event.preventDefault(); event.stopImmediatePropagation();
@@ -3582,7 +3547,11 @@ ${contents.path}`});
           return;
         }
         box.hidden = true;
-      } catch (_error) { box.hidden = true; }
+      } catch (_error) {
+        // A game with no mod projects at all is simply the unmodded game.
+        if (modSupport && !modSupport.canManage) render({projects:[{name:"Vanilla", path:"Unmodded game", valid:true, current:true, readOnly:true, vanilla:true}]});
+        else box.hidden = true;
+      }
     };
     if (options.projectSnapshot) load();
     else if (window.pywebview?.api) load();
@@ -4821,19 +4790,27 @@ ${contents.path}`});
       if (saveBusy || save.disabled) return;
       confirmDiscardChanges(options);
     };
-    let gameRunning = false;
-    const renderGameProcess = running => {
+    let gameRunning = false, gameCanLaunch = true, gameBusy = false;
+    const renderGameProcess = (running, canLaunch = gameCanLaunch) => {
       gameRunning = !!running;
+      gameCanLaunch = canLaunch !== false;
       game.replaceChildren(gameRunning ? stopIcon() : playIcon());
-      game.title = gameRunning ? "Stop game" : "Launch game";
+      game.title = gameRunning ? "Stop game" : gameCanLaunch ? "Launch game" : "Start this game from Steam";
       game.setAttribute("aria-label", game.title);
       game.classList.toggle("running", gameRunning);
+      // Play is greyed out for a game Lexeditor cannot start; Stop always works.
+      if (!gameBusy) game.disabled = !gameRunning && !gameCanLaunch;
     };
     const refreshGameProcess = async () => {
-      try { renderGameProcess((await callWindow("game_process_status", options.plugin.id))?.running); }
+      try {
+        const status = await callWindow("game_process_status", options.plugin.id);
+        renderGameProcess(status?.running, status?.canLaunch);
+      }
       catch (_error) { game.hidden = true; }
     };
     game.onclick = async () => {
+      if (!gameRunning && !gameCanLaunch) return;
+      gameBusy = true;
       game.disabled = true;
       try {
         const launching = !gameRunning;
@@ -4843,7 +4820,7 @@ ${contents.path}`});
         if (launching && result?.running) options.afterLaunch?.(result);
       } catch (error) {
         showAlert({title: gameRunning ? "Could not stop the game" : "Could not launch the game", message: error.message || String(error)});
-      } finally { game.disabled = false; }
+      } finally { gameBusy = false; game.disabled = !gameRunning && !gameCanLaunch; }
     };
     if (window.pywebview?.api) refreshGameProcess();
     else window.addEventListener("pywebviewready", refreshGameProcess, {once: true});

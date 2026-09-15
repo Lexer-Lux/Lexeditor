@@ -116,6 +116,19 @@
     .lexer-panel-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
     .lexer-panel-head h2 { margin:0; font:900 15px/1 var(--lex-heading-font,var(--lex-font)); letter-spacing:.08em; }
     .lexer-panel-note { margin:0; color:var(--lex-muted); font-size:11px; line-height:1.45; }
+    .lexer-panel { width:100vw; }
+    .lexer-dev-body { display:grid; grid-template-columns:minmax(0,2fr) minmax(280px,1fr); gap:18px; flex:1 1 auto; min-height:0; }
+    @media (max-width:900px){ .lexer-dev-body { grid-template-columns:1fr; overflow:auto; } }
+    .lexer-dev-body > section { display:flex; flex-direction:column; gap:10px; min-height:0; }
+    .lexer-dev-body h3 { margin:0; font:800 12px/1 var(--lex-heading-font,var(--lex-font)); letter-spacing:.1em; color:var(--lex-muted); }
+    .lexer-dev-table-wrap { overflow:auto; min-height:0; }
+    .lexer-dev-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .lexer-dev-table th { position:sticky; top:0; text-align:left; padding:6px 10px; color:var(--lex-muted); background:var(--lex-panel); font-size:10px; letter-spacing:.08em; }
+    .lexer-dev-table td { padding:7px 10px; border-top:1px solid var(--lex-border); vertical-align:top; }
+    .lexer-dev-table td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
+    .lexer-dev-task { display:block; white-space:nowrap; }
+    .lexer-dev-task.done { color:var(--lex-muted); }
+    .lexer-dev-task.todo { color:var(--lex-text); font-weight:600; }
     .lexer-panel-list { display:flex; overflow:auto; flex:1 1 auto; flex-direction:column; gap:9px; margin:0; padding:0; list-style:none; }
     .lexer-helper { display:grid; gap:3px; padding:10px 11px; border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); }
     .lexer-helper.behind { border-color:var(--lex-highlight); }
@@ -169,14 +182,22 @@
     <button id="home-twitter" class="home-social-button home-social-twitter" type="button" title="Open @LexerLux on Twitter" aria-label="Open @LexerLux on Twitter"><svg class="twitter-bird" viewBox="0 0 24 24" aria-hidden="true"><path d="M21.6 6.1c-.7.3-1.5.5-2.3.6.8-.5 1.4-1.3 1.7-2.2-.8.5-1.6.8-2.6 1a4 4 0 0 0-6.9 2.8c0 .3 0 .6.1.9A11.4 11.4 0 0 1 3.3 5c-.4.6-.6 1.3-.6 2 0 1.4.7 2.7 1.8 3.4-.7 0-1.3-.2-1.8-.5v.1a4 4 0 0 0 3.2 4c-.3.1-.7.1-1 .1-.3 0-.5 0-.8-.1a4 4 0 0 0 3.8 2.8A8.1 8.1 0 0 1 2.9 18H2a11.4 11.4 0 0 0 6.2 1.8c7.4 0 11.5-6.2 11.5-11.5v-.5c.7-.5 1.4-1.1 1.9-1.7Z"/></svg><svg class="twitter-x" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 2H22l-6.8 7.8L23.2 22h-6.3l-4.9-6.4L6.4 22H3.2l7.3-8.4L2.8 2h6.4l4.4 5.8L18.9 2Zm-1.1 17.8h1.7L8.3 4.1H6.5l11.3 15.7Z"/></svg></button>
   </div>
   </div>
-  <aside id="lexer-panel" class="lexer-panel" aria-label="Helper versions" hidden>
+  <aside id="lexer-panel" class="lexer-panel" aria-label="Developer" hidden>
     <div class="lexer-panel-head">
-      <h2>HELPER VERSIONS</h2>
-      <button id="lexer-panel-close" type="button" title="Close" aria-label="Close helper versions">✕</button>
+      <h2>DEVELOPER</h2>
+      <button id="lexer-panel-close" type="button" title="Close" aria-label="Close developer page">✕</button>
     </div>
-    <p class="lexer-panel-note">Every Lexeditor helper is version-pinned with self-updating disabled. This panel reports what upstream has published; nothing here installs anything.</p>
-    <ul id="lexer-panel-list" class="lexer-panel-list"></ul>
-    <div class="lexer-panel-actions"><button id="lexer-panel-refresh" type="button">Check again</button></div>
+    <div class="lexer-dev-body">
+      <section class="lexer-dev-games">
+        <h3>GAMES</h3>
+        <div class="lexer-dev-table-wrap"><table id="lexer-dev-games" class="lexer-dev-table"></table></div>
+      </section>
+      <section class="lexer-dev-helpers">
+        <h3>HELPERS</h3>
+        <ul id="lexer-panel-list" class="lexer-panel-list"></ul>
+        <div class="lexer-panel-actions"><button id="lexer-panel-refresh" type="button">Check again</button></div>
+      </section>
+    </div>
   </aside>
   <div id="loading-screen" class="loading-screen"><blockquote id="loading-quote" class="loading-quote"></blockquote><span class="loading-pulse" aria-hidden="true"></span></div>
   <div id="modal" class="modal-backdrop" hidden>
@@ -301,8 +322,29 @@
           {className:"lexer-helper",textContent:String(error?.message||error)}));
       }
     }
+    // Every game, what is left to do for it, and how far along it is.
+    async function loadDeveloperOverview(){
+      const table=document.querySelector("#lexer-dev-games");
+      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
+      try{
+        const rows=(await window.pywebview.api.developer_overview())?.games||[];
+        const head=document.createElement("tr");
+        for(const name of ["GAME","STATUS","TASKS","DONE"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
+        table.replaceChildren(head,...rows.map(row=>{
+          const tr=document.createElement("tr");
+          const tasks=document.createElement("td");
+          tasks.append(...row.tasks.map(task=>Object.assign(document.createElement("span"),
+            {className:`lexer-dev-task ${task.done?"done":"todo"}`,textContent:`${task.done?"✓":"○"} ${task.label}`})));
+          const done=row.tasks.filter(task=>task.done).length;
+          tr.append(cell(row.name),cell(row.status),tasks,cell(row.tasks.length?`${Math.round(done/row.tasks.length*100)}%`:"—","num"));
+          return tr;
+        }));
+      }catch(error){
+        const tr=document.createElement("tr");tr.append(cell(String(error?.message||error)));table.replaceChildren(tr);
+      }
+    }
     function setLexerPanel(open){
-      if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);}
+      if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);loadDeveloperOverview();}
       else{lexerPanel.classList.remove("open");setTimeout(()=>{lexerPanel.hidden=true;},240);}
       lexerButton.setAttribute("aria-expanded",String(!!open));
     }
@@ -388,6 +430,8 @@
     restartButton.onclick=restartLexeditor;
     async function finishEditorLoading(){loadingScreen.classList.add("closing");await new Promise(resolve=>setTimeout(resolve,320));loadingScreen.hidden=true;loadingScreen.classList.remove("closing");}
     async function openGame(plugin){
+      // The editor opens over this page, so a dialog left up stays on top of it.
+      closeDialog();
       if(plugin.resident){await resumeResident(plugin);return;}
       if(chooser.opening)return;chooser.opening=true;
       const loadingStartedAt=Date.now();

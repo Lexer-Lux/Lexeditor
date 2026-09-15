@@ -154,6 +154,7 @@ PLUGIN = GamePlugin(
         # The launcher sits at the root; the renderer is the 64-bit build
         # under x64, and that is where a wrapper has to be.
         reshade_root="x64",
+        reshade_renderer="dxgi",
         launch_path="FF9_Launcher.exe",
         steam_app_id="377840",
         install_dir_names=("FINAL FANTASY IX",),

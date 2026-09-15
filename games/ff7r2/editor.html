@@ -46,8 +46,7 @@
   // Which presentation tool the Tweaks page shows. One level of subtabs only.
   let tweakTab="reshade";
   let game={found:false,root:"",renderer:"dxgi",binaries:""};
-  let reshade={manifest:{enabled:false,preset:""},presets:[],shaders:[],
-    reshadeInstalled:false,installedRenderer:"",path:"",hasFolder:false,ready:false};
+  let reshade={available:false,effects:[]};
   let injector=null, injectorDraft=null, injectorBusy=false;
 
   async function loadGame(){
@@ -58,22 +57,12 @@
     try{reshade=await LexeditorUI.callWindow?.("mod_reshade",PLUGIN)||reshade}
     catch(_error){/* the browser preview has no desktop host */}
   }
-  // Install, remove, download and "choose the DLL" each answer with a fresh
-  // snapshot, except adopt, which is about the machine rather than this game.
+  // Every ReShade change answers with the game's fresh ReShade state.
   async function actReshade(method,...args){
     try{
-      const value=method==="adopt_reshade"
-        ? await LexeditorUI.callWindow?.(method)
-        : await LexeditorUI.callWindow?.(method,PLUGIN,...args);
-      if(value&&value.error)throw new Error(value.error);
-      if(value&&value.manifest)reshade=value;else await loadReshade();
+      const value=await LexeditorUI.callWindow?.(method,PLUGIN,...args);
+      if(value&&value.effects)reshade=value;else await loadReshade();
     }catch(error){LexeditorUI.showToast?.(error.message||String(error),true);}
-    render();
-  }
-  async function saveReshade(manifest){
-    try{const value=await LexeditorUI.callWindow?.("save_mod_reshade",PLUGIN,manifest);
-      if(value)reshade=value}
-    catch(error){LexeditorUI.showToast?.(error.message||String(error),true)}
     render();
   }
 
@@ -250,46 +239,26 @@
       detailSection({title:"SETTINGS FILE",body:fileRows}), ...sections]});
   }
 
-  // ---- ReShade tab -----------------------------------------------------------
-  function whereCard(){
-    return LexeditorUI.detailPanel({title:"THE GAME",body:[
-      detailSection({title:"INSTALLATION",body:[
-        detailField({label:"FOLDER",control:readonlyField(
-          game.found?game.root:"Not located yet. Find Final Fantasy VII Rebirth from the main menu.")}),
-        detailField({label:"LOADER",control:readonlyField("DXGI"),
-          help:infoHelp("Rebirth already has a d3d12.dll of its own, and Lexeditor will not overwrite a DLL that is not ReShade. Install through dxgi.")}),
-        detailField({label:"COVERAGE",control:readonlyField(
-          "Presentation only. Rebirth's packages are not read here."),
-          help:infoHelp("This plugin installs and configures ReShade and Shader Injector for Rebirth. Nothing claims to edit the game's data.")}),
-      ]}),
-    ]});
-  }
-
-  // Every plugin explains its loader in the same five fields, because it is
-  // the first thing anyone installing a mod needs to know.
+  // Every plugin names its loaders in the same five fields.
   function loaderCard(){
     return LexeditorUI.modLoaderSection({
-      loader:"Two loaders beside ff7rebirth_.exe in End/Binaries/Win64: ReShade as dxgi.dll, and Shader Injector as dsound.dll with its ShaderInjector folder. Rebirth's own d3d12.dll, or a DirectX 12 fix under that name, is never overwritten.",
-      output:"The preset .ini in the project's reshade folder, plus the by-hand install note. Shader Injector's settings live in ShaderInjector.ini beside the executable.",
-      order:"Shader Injector replaces the game's shaders as they are created; ReShade then works on the finished frame. They stack rather than compete.",
-      safety:"Rebirth's own files are never written. Lexeditor only places the two loaders, their settings files and the ShaderInjector folder, and never replaces a DLL it did not put there.",
-      removal:"Remove each from its own tab. Shader Injector keeps any shader files you edited; ReShade deletes its loader only if it is ReShade.",
+      loader:"ReShade as dxgi.dll; Shader Injector as dsound.dll.",
+      output:"ReShadePreset.ini and ShaderInjector.ini beside the game.",
+      order:"Shader Injector first, then ReShade.",
+      safety:"Never overwrites a DLL Lexeditor did not put there.",
+      removal:"Switch each off on its own tab.",
     });
   }
 
   function tweaks(){
     const bar=LexeditorUI.subtabBar({tabs:[
-      {id:"reshade",label:"ReShade",help:"Post-processing over the finished frame: presets, shader packages, the loader."},
-      {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own lighting, shadow and water shaders. Install, switch on or off, and edit its settings."},
+      {id:"reshade",label:"ReShade",help:"Effects over the finished frame."},
+      {id:"injector",label:"Shader Injector",help:"Replaces Rebirth's own shaders."},
     ],active:tweakTab,label:"Presentation tools",change:id=>{tweakTab=id;render()}});
+    const section=LexeditorUI.reshadeSection({snapshot:reshade,act:actReshade});
     const cards=tweakTab==="injector"
-      ? [injectorStatusCard(),injectorSettingsCard()].filter(Boolean)
-      : [whereCard(),loaderCard(),
-        // Every game's Tweaks page offers the same ReShade section: one ReShade
-        // kept by Lexeditor, the shader collection shared by every game, and a
-        // preset that travels with the mod.
-        LexeditorUI.reshadeSection({snapshot:reshade,save:saveReshade,act:actReshade,
-          preferredRenderer:game.renderer||"dxgi"})];
+      ? [injectorStatusCard(),injectorSettingsCard(),loaderCard()].filter(Boolean)
+      : [section||LexeditorUI.detailNote("ReShade is not set up for this game yet.")];
     // Setup is not finished while the shader cache predates the injector, so
     // the step and its button sit above both subtabs until it is done.
     const notice=injector?.setupNotice;

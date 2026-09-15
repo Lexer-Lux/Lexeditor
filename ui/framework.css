@@ -6241,3 +6241,20 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 }
 .lexer-helper-install:hover:not(:disabled) { opacity: 1; }
 .lexer-helper-install:disabled { opacity: 0.5; cursor: default; }
+
+/* ReShade on a Tweaks page: one big switch, then each effect with its own. */
+.lex-reshade-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:10px 0 14px; }
+.lex-reshade-master { display:flex; align-items:center; gap:12px; cursor:pointer; }
+.lex-reshade-master input { appearance:none; position:relative; width:64px; height:34px; margin:0; border-radius:17px; background:var(--lex-panel-2, #3a3a3a); border:1px solid var(--lex-border); cursor:pointer; transition:background .15s; }
+.lex-reshade-master input::after { content:""; position:absolute; top:3px; left:3px; width:26px; height:26px; border-radius:50%; background:var(--lex-text); transition:transform .15s; }
+.lex-reshade-master input:checked { background:var(--lex-accent); }
+.lex-reshade-master input:checked::after { transform:translateX(30px); }
+.lex-reshade-master input:focus-visible { outline:2px solid var(--lex-highlight); outline-offset:2px; }
+.lex-reshade-master-label { font-weight:700; font-size:1.15em; }
+.lex-reshade-note, .lex-reshade-error { margin:0 0 10px; }
+.lex-reshade-error { color:#c0392b; }
+.lex-reshade-effect-toggle { display:inline-flex; align-items:center; gap:8px; cursor:pointer; }
+.lex-reshade-effect.off .lex-detail-section-content { opacity:.55; }
+.lex-reshade-slider { display:flex; align-items:center; gap:8px; width:100%; }
+.lex-reshade-slider input[type="range"] { flex:1 1 auto; min-width:0; }
+.lex-reshade-slider input[type="number"] { flex:0 0 5.5em; width:5.5em; }

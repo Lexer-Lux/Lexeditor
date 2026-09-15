@@ -238,6 +238,8 @@ PLUGIN = GamePlugin(
     managed_mod=ManagedModSpec("Lexer-Lux/Lexers-Mod-For-FF7R-1", "Lexers-Mod-FF7R-1.zip"),
     plugin_id="ff7r",
     name=DISPLAY_NAME,
+    # Remake runs through Steam; Lexeditor only stops a copy that is running.
+    can_launch=False,
     subtitle="FF7 Remake",
     description="Edit FF7 Remake gameplay DataObjects and localized text, then build project overlays as mod PAKs.",
     accent="#1d6fb8",
@@ -279,6 +281,7 @@ PLUGIN = GamePlugin(
         ),
         # ReShade loads from beside the renderer, not the installation root.
         reshade_root="End/Binaries/Win64",
+        reshade_renderer="dxgi",
         launch_path="End/Binaries/Win64/ff7remake_.exe",
     ),
 )

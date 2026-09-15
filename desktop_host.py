@@ -809,6 +809,29 @@ class HostApi:
         return {"result": result, "helperNotice": helper.get("setupNotice"),
                 "status": snapshot.get("status"), "canOpen": snapshot.get("canOpen")}
 
+    def developer_overview(self) -> dict:
+        """Every game and what is still left to set up for it. Developer Mode only."""
+        if not self._developer():
+            raise ValueError("The developer page needs Developer Mode.")
+        games = []
+        for managed in self._installations.rows(bypass=not self._enforce_installations):
+            plugin = managed["plugin"]
+            if plugin.plugin_id == "blank":
+                continue
+            installation = managed["installation"]
+            helper = installation.get("helper") or {}
+            located = installation.get("status") != "not-added"
+            tasks = [{"label": "Game located", "done": located}]
+            if plugin.helper_name:
+                tasks.append({"label": f"{plugin.helper_name} installed", "done": bool(helper.get("installed"))})
+            if plugin.installation is not None:
+                tasks.append({"label": "ReShade defaults set",
+                              "done": self._reshade_defaults(plugin.plugin_id).is_file()})
+            games.append({"id": plugin.plugin_id, "name": plugin.name,
+                          "status": installation.get("statusText") or installation.get("status", ""),
+                          "tasks": tasks})
+        return {"games": sorted(games, key=lambda row: row["name"].lower())}
+
     def helper_versions(self, refresh: bool = False) -> dict:
         """Report every plugin helper whose upstream has a newer release.
 
@@ -1023,26 +1046,30 @@ class HostApi:
         started game sit invisible behind a Play button while the helper
         manager refused to work because that same process existed.
         """
+        can_launch = getattr(self._plugins[plugin_id], "can_launch", True)
         controller = self._game_controller(plugin_id)
         if controller is not None:
-            return controller.status()
+            return {**controller.status(), "canLaunch": can_launch}
         with self._lock:
             process = self._game_processes.get(plugin_id)
             running = process is not None and process.poll() is None
             if process is not None and not running:
                 self._game_processes.pop(plugin_id, None)
             if running:
-                return {"running": True, "pid": process.pid, "owned": True}
+                return {"running": True, "pid": process.pid, "owned": True, "canLaunch": can_launch}
         external = self._external_game_processes(plugin_id)
         return {
             "running": bool(external),
             "pid": external[0]["pid"] if external else None,
             "owned": False,
             "processes": external,
+            "canLaunch": can_launch,
         }
 
     def launch_game(self, plugin_id: str) -> dict:
         """Start the configured game without opening a command window."""
+        if not getattr(self._plugins[plugin_id], "can_launch", True):
+            raise ValueError(f"Start {self._plugins[plugin_id].name} from Steam. Lexeditor cannot launch it.")
         adapter = self._plugins[plugin_id].mod_adapter
         if adapter is not None and hasattr(adapter, "recover") and not self.game_process_status(plugin_id).get("running"):
             root, _executable = self._game_executable(plugin_id)
@@ -1488,55 +1515,104 @@ class HostApi:
                 pass
         return executable if executable.is_file() else None
 
+    def _reshade_defaults(self, plugin_id: str) -> Path:
+        """The game's ReShade defaults: a preset kept beside its plugin."""
+        import inspect
+        import reshade_effects
+
+        plugin = self._plugins[plugin_id]
+        return Path(inspect.getfile(plugin.check)).resolve().parent / reshade_effects.DEFAULTS_NAME
+
+    def _developer(self) -> bool:
+        return bool(self._github.visible_repository(LEXEDITOR_REPOSITORY))
+
     def mod_reshade(self, plugin_id: str) -> dict:
-        """Report the ReShade preset the current mod ships, if it ships one."""
+        """This game's ReShade: on or off, and every effect with its values.
+
+        A game with no defaults set has no ReShade for players at all; in
+        Developer Mode it shows, so the defaults can be made.
+        """
+        import reshade_effects
         import reshade_projects
 
-        snapshot = self._projects.snapshot(plugin_id)
-        game_root = self._reshade_root(plugin_id) if hasattr(self, "_installations") else None
-        return reshade_projects.snapshot(Path(snapshot["current"]), game_root)
+        defaults = self._reshade_defaults(plugin_id)
+        developer = self._developer()
+        error = ""
+        try:
+            root = self._reshade_root(plugin_id)
+        except ValueError as problem:
+            root, error = None, str(problem)
+        installed = reshade_projects.installed_renderer(root) if root else ""
+        if installed:
+            # ReShade.ini must name Lexeditor's effects, whatever an older
+            # Lexeditor or a hand edit left in it.
+            try:
+                reshade_projects.configure(root)
+            except (OSError, ValueError) as problem:
+                error = str(problem)
+        state = reshade_effects.state(root, defaults)
+        return {**state, "manifest": {}, "installed": bool(installed), "renderer": installed,
+                "gameFound": root is not None, "developerMode": developer,
+                "available": state["hasDefaults"] or developer, "error": error}
 
-    def save_mod_reshade(self, plugin_id: str, manifest: dict) -> dict:
-        """Write the mod's ReShade manifest and report the new state."""
-        import reshade_projects
-
-        snapshot = self._projects.snapshot(plugin_id)
-        root = Path(snapshot["current"])
-        reshade_projects.write_manifest(root, manifest or {})
-        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
-        return reshade_projects.snapshot(
-            root, Path(game_root) if game_root else None)
-
-    def install_reshade(self, plugin_id: str, renderer: str) -> dict:
-        """Put Lexeditor's one ReShade into this game, under its loader name."""
+    def set_reshade_enabled(self, plugin_id: str, enabled: bool) -> dict:
+        """Turn ReShade on or off for this game."""
+        import reshade_effects
         import reshade_projects
 
         root = self._reshade_root(plugin_id)
         if not root:
-            raise ValueError("Add this game before installing ReShade for it.")
-        reshade_projects.install(root, renderer, self._reshade_executable(plugin_id, root))
+            raise ValueError("Add this game before turning ReShade on.")
+        defaults = self._reshade_defaults(plugin_id)
+        if enabled:
+            if not defaults.is_file() and not self._developer():
+                raise ValueError("ReShade is not set up for this game yet.")
+            plugin = self._plugins[plugin_id]
+            renderer = getattr(plugin.installation, "reshade_renderer", "") or "dxgi"
+            reshade_projects.install(root, renderer, self._reshade_executable(plugin_id, root))
+            reshade_effects.ensure_preset(root, defaults)
+        else:
+            reshade_projects.uninstall(Path(root))
         return self.mod_reshade(plugin_id)
 
-    def uninstall_reshade(self, plugin_id: str) -> dict:
-        """Remove ReShade from this game. A game's own loader is left alone."""
-        import reshade_projects
+    def set_reshade_effect(self, plugin_id: str, file: str, enabled: bool) -> dict:
+        import reshade_effects
 
         root = self._reshade_root(plugin_id)
         if not root:
-            raise ValueError("This game has no folder to remove ReShade from.")
-        reshade_projects.uninstall(Path(root))
+            raise ValueError("Add this game first.")
+        reshade_effects.set_enabled(root, str(file), bool(enabled))
         return self.mod_reshade(plugin_id)
 
-    def write_reshade_note(self, plugin_id: str) -> dict:
-        """Write the by-hand install note into the mod's reshade folder."""
-        import reshade_projects
+    def set_reshade_value(self, plugin_id: str, file: str, name: str, value) -> dict:
+        import reshade_effects
 
-        snapshot = self._projects.snapshot(plugin_id)
-        root = Path(snapshot["current"])
-        game_root = self._installations.snapshot(plugin_id).get("root")             if hasattr(self, "_installations") else None
-        path = reshade_projects.write_export_note(
-            root, Path(game_root) if game_root else None)
-        return {**self.mod_reshade(plugin_id), "notePath": path}
+        root = self._reshade_root(plugin_id)
+        if not root:
+            raise ValueError("Add this game first.")
+        reshade_effects.set_value(root, str(file), str(name), value)
+        return self.mod_reshade(plugin_id)
+
+    def reset_reshade_defaults(self, plugin_id: str) -> dict:
+        import reshade_effects
+
+        root = self._reshade_root(plugin_id)
+        if not root:
+            raise ValueError("Add this game first.")
+        reshade_effects.reset(root, self._reshade_defaults(plugin_id))
+        return self.mod_reshade(plugin_id)
+
+    def save_reshade_defaults(self, plugin_id: str) -> dict:
+        """Make the current look this game's defaults. Developer Mode only."""
+        import reshade_effects
+
+        if not self._developer():
+            raise ValueError("Only Developer Mode can change a game's defaults.")
+        root = self._reshade_root(plugin_id)
+        if not root:
+            raise ValueError("Add this game first.")
+        reshade_effects.save_defaults(root, self._reshade_defaults(plugin_id))
+        return self.mod_reshade(plugin_id)
 
     def adopt_reshade(self) -> dict:
         """Take a ReShade DLL the user picks as Lexeditor's one copy."""
