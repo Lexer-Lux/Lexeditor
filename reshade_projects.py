@@ -572,6 +572,10 @@ def _slug(name: str) -> str:
                    for character in str(name).lower()).strip("-")
 
 
+# Lexeditor's own effects, shipped with the app rather than downloaded.
+BUNDLED_SHADERS = Path(__file__).resolve().parent / "tools" / "reshade" / "shaders" / "Lexerian"
+
+
 def shaders_root() -> Path:
     """Where installed shader repositories live. One per machine, not per mod."""
     return STORE / "shaders"
@@ -770,6 +774,8 @@ def shader_paths(project_root: Path | None) -> tuple[list[Path], list[Path]]:
     """
     effects: list[Path] = []
     textures: list[Path] = []
+    if BUNDLED_SHADERS.is_dir():
+        effects.append(BUNDLED_SHADERS)
     for entry in repositories():
         folder = entry.get("path") or ""
         if not folder:

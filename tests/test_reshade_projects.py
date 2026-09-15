@@ -273,12 +273,20 @@ def test_installing_also_tells_reshade_where_the_shaders_are(tmp_path, monkeypat
 def test_a_repository_with_no_folder_says_why_nothing_happens(tmp_path, monkeypatch):
     store = tmp_path/"store"; store.mkdir()
     monkeypatch.setattr(rp, "STORE", store)
+    monkeypatch.setattr(rp, "BUNDLED_SHADERS", tmp_path/"no-bundled-shaders")
     game = tmp_path/"game"; game.mkdir()
     # Named but never fetched: this is the state that leaves ReShade empty.
     rp.write_repositories([{"name": "iMMERSE", "version": "1.2"}])
     result = rp.configure(game)
     assert not result["ready"]
     assert "No shader folder" in result["reason"]
+
+
+def test_lexeditors_own_effects_are_always_searched(tmp_path, monkeypatch):
+    monkeypatch.setattr(rp, "STORE", tmp_path/"store")
+    assert (rp.BUNDLED_SHADERS/"Colors.fx").is_file()
+    effects, _ = rp.shader_paths(None)
+    assert rp.BUNDLED_SHADERS in effects
 
 
 def test_configure_keeps_settings_it_does_not_own(tmp_path, monkeypatch):
