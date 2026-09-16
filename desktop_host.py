@@ -830,7 +830,40 @@ class HostApi:
             games.append({"id": plugin.plugin_id, "name": plugin.name,
                           "status": installation.get("statusText") or installation.get("status", ""),
                           "tasks": tasks})
-        return {"games": sorted(games, key=lambda row: row["name"].lower())}
+        return {"games": sorted(games, key=lambda row: row["name"].lower()),
+                "sharedUi": self._shared_ui_budget()}
+
+    def _shared_ui_budget(self) -> list[dict]:
+        """How far each plugin still reaches into the shared components.
+
+        Recorded counts against live ones, so the developer page shows the
+        conversion work left rather than only failing a test when it grows.
+        """
+        import json
+        import sys
+
+        root = Path(__file__).resolve().parent
+        sys.path.insert(0, str(root / "tools"))
+        try:
+            from verify_shared_ui_budget import counts
+            live = counts()
+        except Exception:
+            return []
+        try:
+            recorded = json.loads((root / "ui" / "shared-ui-budget.json").read_text(encoding="utf-8"))["files"]
+        except (OSError, ValueError, KeyError):
+            recorded = {}
+        rows = []
+        for name in sorted(set(live) | set(recorded)):
+            now = live.get(name, {"sharedSelectors": 0, "handBuiltRows": 0})
+            was = recorded.get(name, {"sharedSelectors": 0, "handBuiltRows": 0})
+            rows.append({"file": name,
+                         "sharedSelectors": now["sharedSelectors"], "handBuiltRows": now["handBuiltRows"],
+                         "recordedSelectors": was.get("sharedSelectors", 0),
+                         "recordedRows": was.get("handBuiltRows", 0),
+                         "over": now["sharedSelectors"] > was.get("sharedSelectors", 0)
+                                 or now["handBuiltRows"] > was.get("handBuiltRows", 0)})
+        return sorted(rows, key=lambda row: -(row["sharedSelectors"] + row["handBuiltRows"]))
 
     def helper_versions(self, refresh: bool = False) -> dict:
         """Report every plugin helper whose upstream has a newer release.

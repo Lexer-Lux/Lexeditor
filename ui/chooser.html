@@ -129,6 +129,8 @@
     .lexer-dev-task { display:block; white-space:nowrap; }
     .lexer-dev-task.done { color:var(--lex-muted); }
     .lexer-dev-task.todo { color:var(--lex-text); font-weight:600; }
+    .lexer-dev-table tr.over td { color:#e08a80; }
+    .lexer-dev-table tr.total td { border-top:2px solid var(--lex-border); font-weight:700; }
     .lexer-panel-list { display:flex; overflow:auto; flex:1 1 auto; flex-direction:column; gap:9px; margin:0; padding:0; list-style:none; }
     .lexer-helper { display:grid; gap:3px; padding:10px 11px; border:1px solid var(--lex-border); border-radius:5px; background:var(--lex-panel-2); }
     .lexer-helper.behind { border-color:var(--lex-highlight); }
@@ -191,6 +193,8 @@
       <section class="lexer-dev-games">
         <h3>GAMES</h3>
         <div class="lexer-dev-table-wrap"><table id="lexer-dev-games" class="lexer-dev-table"></table></div>
+        <h3>SHARED UI BUDGET</h3>
+        <div class="lexer-dev-table-wrap"><table id="lexer-dev-budget" class="lexer-dev-table"></table></div>
       </section>
       <section class="lexer-dev-helpers">
         <h3>HELPERS</h3>
@@ -327,7 +331,9 @@
       const table=document.querySelector("#lexer-dev-games");
       const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
       try{
-        const rows=(await window.pywebview.api.developer_overview())?.games||[];
+        const overview=await window.pywebview.api.developer_overview();
+        renderBudget(overview?.sharedUi||[]);
+        const rows=overview?.games||[];
         const head=document.createElement("tr");
         for(const name of ["GAME","STATUS","TASKS","DONE"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
         table.replaceChildren(head,...rows.map(row=>{
@@ -342,6 +348,28 @@
       }catch(error){
         const tr=document.createElement("tr");tr.append(cell(String(error?.message||error)));table.replaceChildren(tr);
       }
+    }
+    // What each plugin still writes for itself instead of asking the shared UI.
+    // Recorded counts may fall, never rise; a file over its recorded count is
+    // what fails the tests, and it is marked here.
+    function renderBudget(rows){
+      const table=document.querySelector("#lexer-dev-budget");
+      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
+      const head=document.createElement("tr");
+      for(const name of ["FILE","SHARED SELECTORS","HAND-BUILT ROWS"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
+      const count=(now,was)=>now===was?String(now):`${now} (was ${was})`;
+      const body=(rows||[]).map(row=>{
+        const tr=document.createElement("tr");
+        tr.append(cell(row.file),cell(count(row.sharedSelectors,row.recordedSelectors),"num"),
+          cell(count(row.handBuiltRows,row.recordedRows),"num"));
+        if(row.over)tr.classList.add("over");
+        return tr;
+      });
+      const totals=document.createElement("tr");totals.className="total";
+      totals.append(cell(`${(rows||[]).length} files`),
+        cell(String((rows||[]).reduce((sum,row)=>sum+row.sharedSelectors,0)),"num"),
+        cell(String((rows||[]).reduce((sum,row)=>sum+row.handBuiltRows,0)),"num"));
+      table.replaceChildren(head,...body,totals);
     }
     function setLexerPanel(open){
       if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);loadDeveloperOverview();}

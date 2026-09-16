@@ -1437,7 +1437,7 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
 .lex-curve-plot { container-type:size; }
 .lex-curve-plot > .lex-curve-svg { position:relative; z-index:1; }
 
-.lex-curve-plot { position:relative;grid-area:plot;min-width:0;aspect-ratio:2/1;padding:28px 22px 30px 46px; }
+.lex-curve-plot { position:relative;grid-area:plot;min-width:0;aspect-ratio:2/1;padding:14px 11px 15px 23px; }
 .lex-curve-svg { display:block;width:100%;height:100%;overflow:visible;border:1px solid var(--lex-border);background:color-mix(in srgb,var(--lex-bg) 58%,var(--lex-panel)); }
 .lex-curve-grid-lines { fill:none;stroke:color-mix(in srgb,var(--lex-border) 42%,transparent);stroke-width:1;vector-effect:non-scaling-stroke; }
 .lex-curve-fill { fill:var(--lex-curve-fill,color-mix(in srgb,var(--lex-accent) 22%,transparent));stroke:none; }
@@ -1450,10 +1450,10 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
 /* Axis labels live in the plot margin, outside the SVG drawing. The graph is
    the inner bordered rectangle; the surrounding plot padding is its margin. */
 .lex-curve-plot {
-  --lex-curve-margin-left:46px;
-  --lex-curve-margin-bottom:30px;
-  --lex-curve-margin-top:28px;
-  --lex-curve-margin-right:22px;
+  --lex-curve-margin-left:23px;
+  --lex-curve-margin-bottom:15px;
+  --lex-curve-margin-top:14px;
+  --lex-curve-margin-right:11px;
 }
 .lex-curve-axis { position:absolute;color:var(--lex-muted);font-size:.72em;line-height:1;white-space:nowrap; }
 /* Base placement only. A later block moves the scale numbers to the right-hand
@@ -1543,11 +1543,18 @@ input[type="checkbox"] { accent-color:var(--lex-accent); }
   line-height:1;
 }
 
-.lex-readonly-field:disabled {
+/* A value nobody can change has to read as one at a glance, not on inspection:
+   dimmer text, a flatter ground and a dashed edge, the same in every game. */
+.lex-readonly-field,
+.lex-readonly-field:disabled,
+:is(input,select,textarea):disabled,
+:is(input,select,textarea)[readonly] {
   opacity:1;
-  color:var(--lex-muted) !important;
-  -webkit-text-fill-color:var(--lex-muted);
-  background:color-mix(in srgb, var(--lex-panel-2) 72%, var(--lex-panel)) !important;
+  color:color-mix(in srgb, var(--lex-muted) 82%, var(--lex-bg)) !important;
+  -webkit-text-fill-color:color-mix(in srgb, var(--lex-muted) 82%, var(--lex-bg));
+  background:color-mix(in srgb, var(--lex-panel-2) 45%, var(--lex-bg)) !important;
+  border-style:dashed;
+  border-color:color-mix(in srgb, var(--lex-border) 70%, transparent);
   cursor:default;
 }
 

@@ -5269,10 +5269,14 @@ ${contents.path}`});
   // The rail doubles as the sort indicator when its row is not hovered.
   const setColumnSort = (key, direction) => {
     for (const node of document.querySelectorAll("[data-lex-property]")) {
+      const rail = node.querySelector(":scope > .lex-field-type-rail");
       if (node.dataset.lexProperty === String(key) && direction) {
         node.dataset.lexSort = direction > 0 ? "asc" : "desc";
+        // The arrow replaces the type marker, so it has to say what it means.
+        if (rail) rail.title = `The list is sorted by this property, ${direction > 0 ? "smallest first" : "largest first"}.`;
       } else {
         delete node.dataset.lexSort;
+        if (rail && rail.title.startsWith("The list is sorted")) rail.removeAttribute("title");
       }
     }
   };
@@ -7699,14 +7703,6 @@ ${contents.path}`});
       // and, on the longest names, painted over the name itself. Watching the
       // name means the rail follows every re-fit.
       nameObserver?.observe(holder);
-      // A sorted column's rail is not a type code beside a name; it is the
-      // sort arrow, and it belongs in the field's own gutter at the left edge
-      // where the CSS already puts it. Nudging it up against a right-aligned
-      // label pushed it twenty pixels into the row.
-      if (field.hasAttribute("data-lex-sort")) {
-        if (rail.style.left) rail.style.left = "";
-        continue;
-      }
       const text = [...holder.childNodes].find(node =>
         node.nodeType === Node.TEXT_NODE && node.textContent.trim());
       if (!text) continue;
