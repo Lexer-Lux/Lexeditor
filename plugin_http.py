@@ -48,6 +48,23 @@ class PluginRequestHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def send_page_module(self, root: Path, path: str) -> bool:
+        """Serve /<name>.js or /<name>.css from the plugin's own folder.
+
+        A plugin page is a page: its script and its stylesheet live in modules
+        beside it. Every plugin serves them the same way, so this is that route,
+        once. Returns False when the path is not one of them, so a caller can
+        carry on matching its own routes.
+        """
+        name = path.strip("/")
+        if "/" in name or not name.endswith((".js", ".css")):
+            return False
+        module = (Path(root) / name).resolve()
+        if module.parent != Path(root).resolve() or not module.is_file():
+            return False
+        self.send_file(module)
+        return True
+
     # The names plugins already used, kept so a page's own routes still read
     # the way that plugin writes them.
     json_response = send_json

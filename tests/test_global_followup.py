@@ -33,7 +33,7 @@ class FollowupTests(unittest.TestCase):
         self.assertIn('{max:range.max}',text)
         self.assertIn('Changing this setting requires: ${boundary}',text)
     def test_blank_keeps_graphs_without_removed_design_review_assets(self):
-        blank=(ROOT/'games/blank/editor.html').read_text(encoding='utf-8')
+        blank=plugin_ui('blank')
         self.assertNotIn('design-review.js',blank)
         self.assertNotIn('design-review.css',blank)
         # Blank's tabs are the component levels now; the graphs page lives on as

@@ -1,0 +1,23 @@
+    *{box-sizing:border-box}
+    body{display:flex;flex-direction:column;height:100vh;margin:0;overflow:hidden;color:var(--lex-text);background:var(--lex-bg);font:15px/1.35 var(--lex-font)}
+    main{flex:1;min-height:0;padding:var(--lex-panel-gap);overflow:hidden}
+    .ff7r-view{display:flex;flex-direction:column;height:100%;min-height:0;gap:var(--lex-panel-gap)}.ff7r-tweaks-view>.ff7r-tweaks{flex:1 1 auto;min-height:0}
+    .ff7r-toolbar{display:flex;gap:8px;align-items:center;min-height:38px;flex-wrap:wrap}
+    .ff7r-toolbar label{font-weight:700}.ff7r-toolbar select{min-width:180px;max-width:min(720px,70vw)}
+    .ff7r-toolbar input[type=search]{min-width:220px;flex:1}
+    .ff7r-layout{height:100%;min-height:0}.ff7r-table,.ff7r-detail{height:100%;min-height:0}
+    .ff7r-array{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;width:100%}
+    .ff7r-array label{display:flex;gap:5px;align-items:center;min-width:0}.ff7r-array label>span{min-width:2.5em;color:var(--lex-muted);font-size:.86em}
+    .ff7r-array input,.ff7r-array select{min-width:0;width:100%}
+    .ff7r-array-empty{display:block;min-height:1.6em;color:var(--lex-muted);font-style:italic}
+    .ff7r-loot-slot{display:grid;grid-template-columns:minmax(180px,2fr) minmax(90px,1fr);gap:8px;width:100%;align-items:end}
+    .ff7r-loot-slot label{display:flex;flex-direction:column;gap:3px;min-width:0}.ff7r-loot-slot label>span{font-size:.8em;color:var(--lex-muted);font-weight:700}
+    .ff7r-loot-slot select,.ff7r-loot-slot input{width:100%;min-width:0}
+    .ff7r-textarea{display:block;width:100%;min-height:110px;resize:vertical;font:inherit;line-height:1.35}
+    .ff7r-subtext{min-height:72px}
+    .ff7r-resolved{display:flex;flex-direction:column;gap:2px;min-width:0}
+    .ff7r-resolved small{color:var(--lex-muted);overflow-wrap:anywhere}
+    .ff7r-actions{display:flex;flex-wrap:wrap;gap:8px}.ff7r-actions button{padding:7px 12px}.ff7r-description{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;min-width:0}.ff7r-description-text{min-width:0;overflow-wrap:anywhere}.ff7r-description-edit{padding:4px 10px;white-space:nowrap}.ff7r-description-input{display:block;width:100%;min-width:0;resize:vertical;font:inherit;line-height:1.35}
+    .ff7r-message{white-space:pre-wrap;overflow-wrap:anywhere}.ff7r-error{color:var(--lex-danger,#b42318)}
+    @media(max-width:700px){.ff7r-loot-slot{grid-template-columns:1fr}}
+  

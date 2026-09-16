@@ -410,6 +410,8 @@ class Handler(PluginRequestHandler):
         try:
             if path == "/":
                 return self.send_file(PLUGIN_ROOT / "editor.html")
+            if self.send_page_module(PLUGIN_ROOT, path):
+                return
             if path.startswith("/shared/"):
                 shared = (ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()

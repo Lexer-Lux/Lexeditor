@@ -204,6 +204,9 @@ def save_editor_data(payload: object) -> dict:
 class Handler(PluginRequestHandler):
     server_version = "LexeditorFF7/2"
 
+    def module_response(self, path: str) -> bool:
+        return self.send_page_module(PLUGIN_ROOT, path)
+
     def editor_response(self):
         identity = {"id": PLUGIN_ID, "name": PLUGIN_NAME, "edition": PLUGIN_EDITION}
         html = (PLUGIN_ROOT / "editor.html").read_text(encoding="utf-8")
@@ -223,6 +226,8 @@ class Handler(PluginRequestHandler):
         try:
             if path == "/":
                 self.editor_response()
+            elif self.module_response(path):
+                return
             elif path.startswith("/shared/"):
                 shared = (LEXEDITOR_ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()

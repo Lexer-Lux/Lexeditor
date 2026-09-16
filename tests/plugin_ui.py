@@ -15,7 +15,7 @@ def plugin_ui(name: str) -> str:
     """The page and its modules, as one string, in load order."""
     plugin = ROOT / "games" / name
     page = (plugin / "editor.html").read_text(encoding="utf-8")
-    loaded = [plugin / module for module in re.findall(r'<script src="/([A-Za-z0-9_.-]+\.js)">', page)]
+    loaded = [plugin / module for module in re.findall(r'<script src="/?([A-Za-z0-9_.-]+\.js)">', page)]
     rest = [path for path in sorted(plugin.glob("*.js")) + sorted(plugin.glob("*.css"))
             if path not in loaded]
     return "\n".join([page] + [path.read_text(encoding="utf-8") for path in loaded + rest])

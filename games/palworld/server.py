@@ -287,8 +287,7 @@ class Handler(PluginRequestHandler):
         if path == "/":
             self.send_file(PLUGIN_ROOT / "editor.html")
             return
-        if path == "/editor.js":
-            self.send_file(PLUGIN_ROOT / "editor.js")
+        if self.send_page_module(PLUGIN_ROOT, path):
             return
         if path.startswith("/shared/"):
             shared = (ROOT / "ui").resolve()

@@ -576,6 +576,8 @@ class Handler(PluginRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
+            elif self.send_page_module(PLUGIN_ROOT, path):
+                return
             elif path == "/warband/troop_editor.js":
                 self.file_response(PLUGIN_ROOT / "troop_editor.js")
             elif path == "/warband/troop_trees.js":

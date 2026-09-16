@@ -51,6 +51,8 @@ class Handler(PluginRequestHandler):
                 self.send_json({"error": str(error)}, 500)
         elif path == "/":
             self.send_file(PLUGIN_ROOT / "editor.html")
+        elif self.send_page_module(PLUGIN_ROOT, path):
+            return
         elif path.startswith("/shared/"):
             shared = (ROOT / "ui").resolve()
             target = (shared / path.removeprefix("/shared/")).resolve()

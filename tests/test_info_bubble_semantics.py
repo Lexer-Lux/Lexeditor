@@ -40,7 +40,7 @@ def test_known_metadata_filler_is_gone_from_plugins():
         assert forbidden not in sources
 
 def test_ff9_has_real_semantic_help_for_core_relationships():
-    ff9 = text("games/ff9/editor.html")
+    ff9 = plugin_ui('ff9')
     for key in (
         '"characters:Strength"', '"characters:Magic"', '"leveling:BonusHP"',
         '"leveling:BonusMP"', '"items:AbilityIds"', '"items:BonusId"',
@@ -59,7 +59,7 @@ def test_rdr2_setting_help_does_not_append_visible_metadata():
 
 
 def test_rdr_uses_shared_detail_fields_and_semantic_reward_help():
-    rdr = text("games/rdr/editor.html")
+    rdr = plugin_ui('rdr')
     helper = rdr[rdr.index("function detailField"):rdr.index("function applyControlValue")]
     # RDR's rows now also carry the shared info bubble, so the helper forwards
     # both `description` (prose under the row) and `help` (the bubble). The

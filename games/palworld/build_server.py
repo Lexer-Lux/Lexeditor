@@ -37,11 +37,7 @@ class Handler(EditorHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
-        if path == "/build-ui-pre.js":
-            self.send_file(PLUGIN_ROOT / "build-ui-pre.js")
-            return
-        if path == "/build-ui.js":
-            self.send_file(PLUGIN_ROOT / "build-ui.js")
+        if self.send_page_module(PLUGIN_ROOT, path):
             return
         if path == "/api/plugin":
             self.send_json({

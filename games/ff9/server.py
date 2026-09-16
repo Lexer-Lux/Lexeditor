@@ -124,6 +124,8 @@ class Handler(PluginRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
+            elif self.send_page_module(PLUGIN_ROOT, path):
+                return
             elif path.startswith("/shared/"):
                 shared = (LEXEDITOR_ROOT / "ui").resolve()
                 target = (shared / path.removeprefix("/shared/")).resolve()

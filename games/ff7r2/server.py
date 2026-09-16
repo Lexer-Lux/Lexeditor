@@ -55,6 +55,8 @@ class Handler(PluginRequestHandler):
         path = urlparse(self.path).path
         if path == "/":
             self.send_file(PLUGIN_ROOT / "editor.html")
+        elif self.send_page_module(PLUGIN_ROOT, path):
+            return
         elif path.startswith("/shared/"):
             shared = (ROOT / "ui").resolve()
             target = (shared / path.removeprefix("/shared/")).resolve()

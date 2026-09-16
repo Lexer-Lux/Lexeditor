@@ -35,8 +35,8 @@ def plugin_ui(plugin):
     return "\n".join(parts)
 
 
-blank = text("games/blank/editor.html")
-warband = text("games/warband/editor.html")
+blank = plugin_ui(ROOT / "games" / "blank")
+warband = plugin_ui(ROOT / "games" / "warband")
 
 # Shared chrome is global by construction. Every real editor shell must load the
 # shared framework, and a game theme may not swap the info-bubble glyph back to
@@ -193,6 +193,25 @@ for plugin in sorted((ROOT / "games").iterdir()):
                 f"{plugin.name}/{path.name} sets its own --lex-font but not "
                 "--lex-font-size-adjust and --lex-text-nudge; the shared UI "
                 "cannot size text for a face it knows nothing about")
+
+# A page is a page. Its script and its stylesheet live in modules beside it, so
+# a game's code can be read, diffed and reviewed by the part it belongs to
+# instead of as one six-thousand-line file. The only inline script allowed is
+# the one-line transition boot in <head>, which has to run before anything is
+# loaded, and it is the shared one every page carries.
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not (plugin / "editor.html").is_file():
+        continue
+    page = (plugin / "editor.html").read_text(encoding="utf-8")
+    inline_scripts = [block for block in re.findall(r"<script(?![^>]*\bsrc=)[^>]*>(.*?)</script>", page, re.S)
+                      if "lexTransition" not in block]
+    require(not inline_scripts,
+            f"{plugin.name}/editor.html keeps "
+            f"{sum(len(block.splitlines()) for block in inline_scripts)} lines of script inline; "
+            "a page loads its script from a module beside it")
+    require(not re.search(r"<style[^>]*>", page),
+            f"{plugin.name}/editor.html keeps its styles inline; "
+            "a page links a stylesheet beside it")
 
 # One shape for a plugin's UI files. A game that invents its own arrangement is
 # a game whose pages drift: the next one copies whatever it finds.
