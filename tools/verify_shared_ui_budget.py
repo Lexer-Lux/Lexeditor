@@ -31,7 +31,7 @@ HAND_BUILT = re.compile(r"""el\(\s*["'](?:table|thead|tbody|tr|td|th)["']|"""
 def counts() -> dict[str, dict[str, int]]:
     found: dict[str, dict[str, int]] = {}
     for path in sorted((ROOT / "games").rglob("*")):
-        if path.suffix.lower() not in (".html", ".js") or not path.is_file():
+        if path.suffix.lower() not in (".html", ".js", ".css") or not path.is_file():
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         row = {"sharedSelectors": len(SHARED_CLASS.findall(text)),

@@ -39,6 +39,23 @@ Before coding, write down the intended scope in the PR or Worklog:
 Do not merge a plugin just because CI is green. Parser, browser, installed-runtime,
 deployment and in-game acceptance are different evidence levels.
 
+## The plugin's UI files
+
+One shape, checked by `tools/verify_shared_ui_contract.py`:
+
+- `editor.html` — the page. Every plugin with a UI has exactly this file, under
+  exactly this name.
+- `<name>.js` / `<name>.css` — a module of that page, named for what it holds
+  (`cards_ui.js`, `troop_trees.js`, `game-appearance.css`), and loaded by the
+  page or served by the plugin. A module nothing loads is deleted, not kept.
+- No theme file. A theme is tokens handed to `mountShell`. A stylesheet may set
+  tokens and style the game's own classes; a selector naming a shared class
+  (`.lex-…`) is counted by `tools/verify_shared_ui_budget.py`, and that count
+  may fall but never rise.
+
+Every shared component is listed in `ui/component-catalog.js` and shown in
+Blank. A component exported without being catalogued fails the tests.
+
 ## 1. Research before writing parsers
 
 This is usually the highest-leverage step. **Do not start by reverse-engineering a

@@ -17,7 +17,11 @@
       "sharedSelectors": 0,
       "handBuiltRows": 11
     },
-    "games/ff7r/theme.js": {
+    "games/ff7r/game-appearance.css": {
+      "sharedSelectors": 11,
+      "handBuiltRows": 0
+    },
+    "games/ff7r/game-appearance.js": {
       "sharedSelectors": 1,
       "handBuiltRows": 0
     },

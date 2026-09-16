@@ -170,6 +170,35 @@ for plugin in sorted((ROOT / "games").iterdir()):
             f"{plugin.name} has a Tweaks page but does not offer the shared "
             "ReShade section")
 
+# One shape for a plugin's UI files. A game that invents its own arrangement is
+# a game whose pages drift: the next one copies whatever it finds.
+#
+#   editor.html   the page. Every plugin with a UI has exactly this name.
+#   <page>.js     a module of that page, named for what it holds, loaded by it.
+#   <page>.css    the same, for styles a page of this game needs.
+#
+# A theme is not a file: it is tokens handed to mountShell. A stylesheet may set
+# tokens and style the game's own classes, never a shared component's.
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not plugin.is_dir() or plugin.name.startswith("__"):
+        continue
+    pages = sorted(path for path in plugin.glob("*.html"))
+    modules = sorted(path for path in plugin.glob("*.js")) + sorted(plugin.glob("*.css"))
+    if not pages and not modules:
+        continue
+    require([path.name for path in pages] == ["editor.html"],
+            f"{plugin.name} has {[path.name for path in pages] or 'no page'}; a plugin's page is editor.html")
+    page = (plugin / "editor.html").read_text(encoding="utf-8")
+    server = (plugin / "server.py").read_text(encoding="utf-8") if (plugin / "server.py").is_file() else ""
+    themed = (plugin / "themed_server.py").read_text(encoding="utf-8") if (plugin / "themed_server.py").is_file() else ""
+    for module in modules:
+        require(module.name in page or module.name in server or module.name in themed,
+                f"{plugin.name}/{module.name} is not loaded by its page or served by its plugin; "
+                "a module belongs to the page that uses it")
+        require(not module.stem.startswith("theme"),
+                f"{plugin.name}/{module.name} is a theme file; a theme is tokens passed to "
+                "mountShell, and game-derived assets belong in a module named for what they are")
+
 # Property geometry / labels / metadata.
 # Pin the single definition, not the number. Three separate declarations of
 # this width existed at once and only the last one was live, so edits to the

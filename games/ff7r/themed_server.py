@@ -71,9 +71,9 @@ class Handler(base.Handler):
             if path == "/":
                 return self.send_text(themed_editor_html(), "text/html")
             if path == "/theme/ff7r.css":
-                return self.send_file(base.PLUGIN_ROOT / "theme.css")
+                return self.send_file(base.PLUGIN_ROOT / "game-appearance.css")
             if path == "/theme/ff7r.js":
-                return self.send_file(base.PLUGIN_ROOT / "theme.js")
+                return self.send_file(base.PLUGIN_ROOT / "game-appearance.js")
             if path == "/api/theme":
                 return self.send_json(themed_payload(scan=query.get("scan") == ["1"]))
             if path == "/theme-assets/font-atlas.png":
