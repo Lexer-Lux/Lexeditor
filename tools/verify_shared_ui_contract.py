@@ -170,6 +170,21 @@ for plugin in sorted((ROOT / "games").iterdir()):
             f"{plugin.name} has a Tweaks page but does not offer the shared "
             "ReShade section")
 
+# A game that brings its own face states what the face does to text. Without
+# this, the shared UI is sized for Lexend and every other font rides high, gets
+# clipped, or is patched back into place with per-plugin paddings.
+for plugin in sorted((ROOT / "games").iterdir()):
+    if not plugin.is_dir() or plugin.name.startswith("__"):
+        continue
+    for path in sorted(plugin.glob("*.html")) + sorted(plugin.glob("*.css")):
+        text = path.read_text(encoding="utf-8", errors="replace")
+        if "--lex-font:" not in text and "--lex-font :" not in text:
+            continue
+        require("--lex-font-size-adjust" in text and "--lex-text-nudge" in text,
+                f"{plugin.name}/{path.name} sets its own --lex-font but not "
+                "--lex-font-size-adjust and --lex-text-nudge; the shared UI "
+                "cannot size text for a face it knows nothing about")
+
 # One shape for a plugin's UI files. A game that invents its own arrangement is
 # a game whose pages drift: the next one copies whatever it finds.
 #

@@ -6445,16 +6445,12 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
 /* More of the same: a plain list and its rows, so a game's own palette reaches
    them without a game naming the classes. */
-.lex-list, .lex-detail { background: var(--lex-surface-bg, transparent); box-shadow: var(--lex-surface-shadow, none); }
-.lex-list-row:not(.lex-column-list-row) { padding: var(--lex-list-row-padding, 7px 10px); }
-.lex-list-row.selected { color: var(--lex-row-selected-fg, inherit); background: var(--lex-row-selected-bg, var(--lex-highlight)); }
-.lex-column-list-row:hover { background: var(--lex-row-hover-bg, color-mix(in srgb, var(--lex-highlight) 25%, transparent)); }
-.lex-detail-panel-heading { padding: var(--lex-detail-heading-padding, 4px 18px 4px 4px); }
-.lex-detail-panel-icon { border: 1px solid var(--lex-detail-icon-border, var(--lex-border)); }
-
-/* More of the same: a plain list and its rows, so a game's own palette reaches
-   them without a game naming the classes. */
-.lex-list, .lex-detail { background: var(--lex-surface-bg, transparent); box-shadow: var(--lex-surface-shadow, none); }
+.lex-list, .lex-detail {
+  border: var(--lex-surface-border, 1px solid var(--lex-border));
+  border-color: var(--lex-surface-border-color, var(--lex-border));
+  background: var(--lex-surface-bg, var(--lex-panel));
+  box-shadow: var(--lex-surface-shadow, none);
+}
 .lex-list-row:not(.lex-column-list-row) { padding: var(--lex-list-row-padding, 7px 10px); }
 .lex-list-row.selected { color: var(--lex-row-selected-fg, inherit); background: var(--lex-row-selected-bg, var(--lex-highlight)); }
 .lex-column-list-row:hover { background: var(--lex-row-hover-bg, color-mix(in srgb, var(--lex-highlight) 25%, transparent)); }
@@ -6479,6 +6475,62 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   height: var(--lex-new-button-height, 30px);
 }
 .lex-settings-dialog { width: var(--lex-settings-dialog-width, min(720px, 96vw)); }
+
+/* ---- Font metrics ------------------------------------------------------
+   Every game brings its own face: FF8's menu font, Warband's bitmap glyphs,
+   FF7 Remake's Candara. They differ in x-height and in where the ink sits in
+   the line box, so text tuned for one face rides high or clips in another -
+   which is why every plugin grew its own paddings and fixed heights.
+
+   Instead: the shared UI sizes text boxes from the font, and a game states
+   what its face does. Three tokens, set once beside the font:
+
+     --lex-font-size-adjust  normalise x-height against the default face
+                             (a number, or `none`)
+     --lex-text-nudge        move the ink, not the box, for a face that sits
+                             high or low in its line box
+     --lex-text-line         the line box text-bearing boxes use
+
+   A game that sets --lex-font without these is the game that files a bug about
+   clipped text, so tools/verify_shared_ui_contract.py asks for them. */
+:root {
+  --lex-font-size-adjust: none;
+  --lex-text-nudge: 0px;
+  --lex-text-line: 1.35;
+}
+
+body { font-size-adjust: var(--lex-font-size-adjust, none); }
+
+/* Text-bearing boxes follow the face rather than a pixel guess, and never clip
+   by a fixed height. */
+.lex-column-list-cell,
+.lex-column-list-head-cell,
+.lex-detail-field-label,
+.lex-detail-field-control,
+.lex-readonly-field,
+.lex-detail-panel-title,
+.lex-shell-header nav button,
+.lex-subtab-button,
+.lex-list-row {
+  line-height: var(--lex-text-line, 1.35);
+  min-height: 0;
+}
+
+/* The nudge moves the ink inside its box, so boxes stay aligned with each
+   other while the glyphs sit where the face wants them. */
+.lex-column-cell-content,
+.lex-tab-label,
+.lex-subtab-button > span,
+.lex-detail-field-label {
+  translate: 0 var(--lex-text-nudge, 0px);
+}
+
+/* A control is as tall as its text needs, with room, rather than a pixel
+   height that a taller face overflows. */
+.lex-subtab-button {
+  height: auto;
+  min-height: max(var(--lex-subtab-min-height, 2.1em), 26px);
+}
 
 /* ---- The window chrome as a skin ---------------------------------------
    FF8 draws a PlayStation menu: bevelled buttons, a pointing-hand marker on the
@@ -6547,3 +6599,92 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 
 /* The data map fills its page rather than scrolling the page behind it. */
 .lex-data-map-view { height: 100%; overflow: hidden; }
+
+/* ---- The rest of the skin ----------------------------------------------
+   FF8 draws a PlayStation menu and used to repaint every shared class to get
+   it: bevelled borders on the panels, a grey slab behind every input, a
+   pointing hand for the selected row and the sorted column, an outlined title
+   straddling each section's top border. None of that is FF8-specific machinery
+   - it is paint - so it lives here as tokens whose defaults are today's look,
+   and a game states its own values beside its palette. */
+body { text-shadow: var(--lex-text-shadow, none); }
+
+/* The controls inside a field or a cell: one surface, set once. */
+.lex-detail-field-control :is(input, select, textarea),
+.lex-source-control :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea),
+.lex-editable-table :is(input, select) {
+  color: var(--lex-input-fg, inherit);
+  border: var(--lex-input-border, 1px solid var(--lex-border));
+  border-color: var(--lex-input-border-color, var(--lex-border));
+  border-radius: var(--lex-input-radius, var(--lex-radius));
+  background: var(--lex-input-bg, var(--lex-panel-2));
+  box-shadow: var(--lex-input-shadow, none);
+  text-shadow: var(--lex-input-text-shadow, none);
+}
+.lex-detail-field-label, .lex-detail-field-control { padding: var(--lex-field-padding, 8px 10px); }
+
+/* A section's title: where it sits relative to the section's top border, and
+   what it is drawn with. */
+.lex-detail-section-title {
+  color: var(--lex-section-title-fg, var(--lex-text));
+  border-bottom: var(--lex-section-title-border, 1px solid var(--lex-border));
+  background: var(--lex-section-title-bg, transparent);
+  font: var(--lex-section-title-font, 750 .86em/1 var(--lex-heading-font));
+  text-shadow: var(--lex-section-title-shadow, none);
+  -webkit-text-stroke: var(--lex-section-title-stroke, 0);
+}
+
+/* The mark on the selected row and on the sorted column, the same surface the
+   active tab already has. Default: nothing drawn, as before. */
+.lex-column-list-row.selected .lex-column-pointer-cell > .lex-column-cell-content::before {
+  content: var(--lex-row-marker-content, none);
+  flex: 0 0 var(--lex-row-marker-width, 24px);
+  width: var(--lex-row-marker-width, 24px);
+  height: var(--lex-row-marker-height, 16px);
+  margin: 0 var(--lex-row-marker-gap, 4px) 0 calc(-1 * (var(--lex-row-marker-width, 24px) + var(--lex-row-marker-gap, 4px)));
+  background: var(--lex-row-marker-image, none) center / contain no-repeat;
+  filter: var(--lex-row-marker-filter, none);
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+.lex-sort-indicator {
+  background: var(--lex-sort-marker-image, none) center / contain no-repeat;
+  color: var(--lex-sort-marker-fg, inherit);
+  opacity: var(--lex-sort-marker-opacity, 1);
+  filter: var(--lex-sort-marker-filter, none);
+  width: var(--lex-sort-marker-width, auto);
+  height: var(--lex-sort-marker-height, auto);
+  image-rendering: pixelated;
+}
+.lex-sort-indicator.ascending { transform: var(--lex-sort-marker-ascending, none); }
+.lex-sort-indicator.descending { transform: var(--lex-sort-marker-descending, none); }
+
+/* The pager, the round shell buttons and the running-game pill. */
+.lex-pager {
+  color: var(--lex-pager-fg, var(--lex-muted));
+  border: var(--lex-pager-border, 0);
+  border-top: var(--lex-pager-border-top, 1px solid var(--lex-border));
+  background: var(--lex-pager-bg, var(--lex-panel));
+}
+.lex-pager button, .lex-page-number {
+  color: var(--lex-pager-button-fg, inherit);
+  border: var(--lex-pager-button-border, 1px solid var(--lex-border));
+  border-color: var(--lex-pager-button-border-color, var(--lex-border));
+  border-radius: var(--lex-pager-button-radius, var(--lex-radius));
+  background: var(--lex-pager-button-bg, var(--lex-panel-2));
+}
+.lex-settings-button, .lex-help-button, .lex-developer-button {
+  border-radius: var(--lex-round-button-radius, var(--lex-radius));
+}
+.lex-game-process.running {
+  color: var(--lex-process-running-fg, var(--lex-accent));
+  background: var(--lex-process-running-bg, var(--lex-panel-2));
+}
+
+/* The curve editor's own ink. */
+.lex-curve-svg {
+  border: var(--lex-curve-border, 1px solid var(--lex-border));
+  background: var(--lex-curve-bg, color-mix(in srgb, var(--lex-bg) 58%, var(--lex-panel)));
+}
+.lex-curve-line { stroke: var(--lex-curve-stroke, var(--lex-highlight)); filter: var(--lex-curve-line-filter, none); }
+.lex-curve-grid-lines { stroke: var(--lex-curve-grid, color-mix(in srgb, var(--lex-border) 42%, transparent)); }
