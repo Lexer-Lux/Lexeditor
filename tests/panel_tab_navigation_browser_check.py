@@ -17,6 +17,7 @@ def main():
   assert SettingsStore(Path(tmp)/'settings.json').snapshot()['panelTabTarget']=='focus'
  with sync_playwright() as pw:
   b=pw.chromium.launch(headless=True);p=b.new_page()
+  errors=[];p.on('pageerror',lambda error:errors.append(str(error)))
   p.route('http://fixture/',lambda r:r.fulfill(content_type='text/html',body='<body><main style="display:flex;gap:20px"><div id="a"></div><div id="b"></div></main></body>'));p.goto('http://fixture/')
   p.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
   p.add_style_tag(content='#a .lex-tabbed-panel,#b .lex-tabbed-panel{height:300px;width:300px}.lex-tabbed-panel-content{overflow:auto}')
@@ -48,7 +49,8 @@ def main():
   p.add_style_tag(content='#magic{width:700px;height:650px}.magic-detail{height:100%}')
   fn=ff8[ff8.index('  function magicDetail('):ff8.index('  function abilityIcon(')]
   p.add_script_tag(content="""const {el,detailField,detailSection,tabbedPanel,multiNumberRow,infoHelp}=LexeditorUI;
-   const state={};const row={id:11,name:'Aero',fields:[]};
+   const state={data:{settings:{}}};const row={id:11,name:'Aero',fields:[]};
+   function compactMagicFields(){return el('div',{},'Attack data')}
    function fieldSourceControl(){return el('input',{type:'number',value:0})}
    function magicComposite(){return el('div',{},'Composite values')}
    function magicLabel(){return 'Aero'}
@@ -57,12 +59,21 @@ def main():
    document.body.insertAdjacentHTML('beforeend','<div id=magic></div>');
   """+fn+"renderKernel();")
   p.wait_for_timeout(100)
+  assert not errors,errors
   assert p.locator('#magic .lex-detail-field-label').filter(has_text='TARGET INFO').count()==1
   p.locator('#magic [role=tab]').filter(has_text='Junction').click()
   assert p.locator('#magic .lex-detail-field-label').filter(has_text='TARGET INFO').count()==0
   assert p.locator('#magic .lex-detail-field-label').filter(has_text='JUNCTION (STATS)').count()==1
   assert p.locator('#magic .lex-subtab-bar').bounding_box()['width']>650
-  assert abs(p.locator('#magic .lex-subtab-bar').bounding_box()['y']+p.locator('#magic .lex-subtab-bar').bounding_box()['height']-(p.locator('#magic').bounding_box()['y']+650))<8
+  # The tabs end at the bottom of their panel, and the panel reaches the
+  # bottom of the detail body it sits in - its content edge, inside the body's
+  # own padding - so the bar is on the panel's bottom edge, not floating above it.
+  edges=p.evaluate("""()=>{const bar=document.querySelector('#magic .lex-subtab-bar').getBoundingClientRect();
+    const panel=document.querySelector('#magic .lex-tabbed-panel');const body=panel.parentElement;
+    const b=body.getBoundingClientRect(),s=getComputedStyle(body);
+    return {bar:bar.bottom,panel:panel.getBoundingClientRect().bottom,
+            content:b.bottom-parseFloat(s.paddingBottom)-parseFloat(s.borderBottomWidth)}}""")
+  assert abs(edges['bar']-edges['panel'])<1 and abs(edges['panel']-edges['content'])<2,edges
   p.locator('#magic').screenshot(path='C:/Users/Lexer/AppData/Local/Temp/lexeditor-magic-tabs.png')
   b.close()
  print('Bottom panel tabs, hovered/focused routing, forward/reverse wrap, redraw focus, dialog navigation and setting persistence passed.')

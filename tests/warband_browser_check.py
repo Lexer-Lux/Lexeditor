@@ -5,6 +5,9 @@ import io
 import os
 import json
 from pathlib import Path
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import inline_modules
 import sys
 import tempfile
 
@@ -61,8 +64,7 @@ def main():
                     html=html.replace('<head>','<head><base href="http://127.0.0.1:9/">',1)
                     html=html.replace('<link rel="stylesheet" href="/shared/framework.css">','<style>'+(ROOT/'ui/framework.css').read_text(encoding="utf-8")+'</style>')
                     html=html.replace('<script src="/shared/framework.js"></script>','<script>'+stub+'</script><script>'+(ROOT/'ui/framework.js').read_text(encoding="utf-8")+'</script>')
-                    html=html.replace('<script src="/warband/troop_trees.js"></script>','<script>'+(ROOT/'games/warband/troop_trees.js').read_text(encoding="utf-8")+'</script>')
-                    html=html.replace('<script src="/warband/troop_editor.js"></script>','<script>'+(ROOT/'games/warband/troop_editor.js').read_text(encoding="utf-8")+'</script>')
+                    html=inline_modules('warband',html)
                     page.set_content(html,wait_until='domcontentloaded');page.wait_for_function('!state.booting')
                     page.wait_for_function('document.querySelector(".warband-item-thumbnail img")?.naturalWidth>0')
                     assert page.locator('.warband-item-detail [data-lex-property="id"] input').count()==1

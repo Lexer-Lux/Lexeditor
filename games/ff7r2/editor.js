@@ -7,6 +7,8 @@
   let game={found:false,root:"",renderer:"dxgi",binaries:""};
   let reshade={available:false,effects:[]};
   let injector=null, injectorDraft=null, injectorBusy=false;
+  // What the Data Map shows and where the reader has got to in it.
+  const state={dataMap:{rows:[]},mapQuery:"",mapStatus:"",mapPage:0,mapSort:["filename",1]};
 
   async function loadGame(){
     try{const response=await fetch("/api/game");if(response.ok)game=await response.json()}
@@ -229,8 +231,27 @@
       el("div",{class:`ff7r2-tweaks ${tweakTab}`},...cards));
   }
 
+  async function loadDataMap(){
+    try{const response=await fetch("/api/datamap");if(response.ok)state.dataMap=await response.json()}
+    catch(_error){state.dataMap={rows:[]}}
+  }
+
+  function dataMapView(){
+    const view=LexeditorUI.dataMap({rows:state.dataMap?.rows||[],query:state.mapQuery,status:state.mapStatus,
+      page:state.mapPage,sort:state.mapSort,pageSize:100,
+      open:row=>{if(row.target)navigate(row.target)},
+      changeQuery:value=>{state.mapQuery=value;state.mapPage=0;render()},
+      changeStatus:value=>{state.mapStatus=value;state.mapPage=0;render()},
+      changePage:page=>{state.mapPage=page;render()},
+      changeSort:key=>{const [active,direction]=state.mapSort;state.mapSort=[key,active===key?-direction:1];render()}});
+    state.mapPage=view.page;
+    // The map fills the page itself; its filters live in its own pager.
+    return view.content;
+  }
+
   function render(){
     const main=document.querySelector("#main");
+    if(tab==="datamap"){main.replaceChildren(dataMapView());shell.refresh?.();return}
     const scroller=main.querySelector(".ff7r2-tweaks");
     const scroll=scroller?scroller.scrollTop:0;
     main.replaceChildren(tweaks());
@@ -244,10 +265,11 @@
     plugin:{id:PLUGIN,name:"Final Fantasy VII Rebirth",themeName:"ff7r2",
       theme:{accent:"#3f7fd0","accent-text":"#f2f7ff"}},
     tabs:[{id:"tweaks",label:"Tweaks"}],
-    activeTab:()=>tab,navigate,dirtyCount:()=>0});
+    activeTab:()=>tab,navigate,dirtyCount:()=>0,
+    help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open the FF7 Rebirth Data Map"});
 
   (async()=>{
-    await Promise.all([loadGame(),loadReshade(),loadInjector()]);
+    await Promise.all([loadGame(),loadReshade(),loadInjector(),loadDataMap()]);
     render();
     LexeditorUI.finishPluginLoading();
   })();

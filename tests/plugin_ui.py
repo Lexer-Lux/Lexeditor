@@ -21,5 +21,26 @@ def plugin_ui(name: str) -> str:
     return "\n".join([page] + [path.read_text(encoding="utf-8") for path in loaded + rest])
 
 
+def inline_modules(name: str, html: str) -> str:
+    """Inline the modules a plugin page loads from beside itself.
+
+    A check that loads a page with set_content has no server behind it, so a
+    page that names its script and stylesheet by path would load neither. Each
+    local module is put where its tag stood, keeping the page's load order.
+    Shared framework tags are left for the check to replace as it chooses.
+    """
+    plugin = ROOT / "games" / name
+
+    def script(match):
+        body = (plugin / Path(match[1]).name).read_text(encoding="utf-8")
+        return "<script>" + body.replace("</script", "<\\/script") + "</script>"
+
+    def sheet(match):
+        return "<style>" + (plugin / Path(match[1]).name).read_text(encoding="utf-8") + "</style>"
+
+    html = re.sub(r'<script src="(?!/shared/)/?([A-Za-z0-9_./-]+\.js)"></script>', script, html)
+    return re.sub(r'<link rel="stylesheet" href="(?!/shared/)/?([A-Za-z0-9_./-]+\.css)">', sheet, html)
+
+
 def plugins_with_ui() -> list[str]:
     return sorted(path.parent.name for path in (ROOT / "games").glob("*/editor.html"))

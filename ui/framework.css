@@ -6255,8 +6255,10 @@ body:has(> .lex-shell-header) > main {min-height:0;}
   right:28px!important;
 }
 
-/* Panel tabs occupy the bottom edge. Page navigation stays in the shell. */
-.lex-tabbed-panel > .lex-subtab-bar,
+/* Panel tabs occupy the bottom edge. Page navigation stays in the shell.
+   The Tweaks rule below once shared this selector, which carried every tabbed
+   panel's tabs to the top along with the page bar it meant to move. */
+.lex-tabbed-panel > .lex-subtab-bar { order:100; margin-top:auto; margin-bottom:0; }
 /* The tweak page's own subtab bar sits where every other page's does: at
    the top, full width. It was ordered last and pushed to the bottom, which
    put the same control in a different place on this page than on all the

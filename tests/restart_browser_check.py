@@ -50,7 +50,7 @@ window.pywebview.api.loading_quote=()=>new Promise(()=>{{}});
         page.get_by_role('textbox',name='New mod name',exact=True).fill('Restart sample')
         page.get_by_role('button',name='Create Sample',exact=True).click()
         page.get_by_role('button',name='Active mod project',exact=True).get_by_text('Restart sample',exact=True).wait_for()
-        page.locator('nav button[data-tab=subtabs]').click()
+        page.evaluate("navigate('subtabs')")
         number=page.locator('.lex-detail-field[data-lex-type=INT] input[type=number]').first
         number.fill('102');number.dispatch_event('change')
         page.locator('#plugin-restart').click()
@@ -61,7 +61,7 @@ window.pywebview.api.loading_quote=()=>new Promise(()=>{{}});
         page.wait_for_url(lambda url:str(url).startswith(host._session.url) and host._session is not previous,timeout=20000)
         page.locator('.lex-detail-field').first.wait_for()
         assert previous.wait_closed() and host._session.process.poll() is None
-        page.locator('nav button[data-tab=subtabs]').click()
+        page.evaluate("navigate('subtabs')")
         assert page.locator('.lex-detail-field[data-lex-type=INT] input[type=number]').first.input_value()=='25'
         # A clean restart failure must be visible, not an unhandled rejection.
         page.evaluate("window.__realRestart=window.pywebview.api.restart_plugin;window.pywebview.api.restart_plugin=async()=>{throw Error('Test restart failed')};void 0")
@@ -77,7 +77,7 @@ window.pywebview.api.loading_quote=()=>new Promise(()=>{{}});
         page.get_by_role('button',name='Save and Restart',exact=True).click()
         page.wait_for_url(lambda url:str(url).startswith(host._session.url) and host._session is not previous,timeout=20000)
         page.locator('.lex-detail-field').first.wait_for()
-        page.locator('nav button[data-tab=subtabs]').click()
+        page.evaluate("navigate('subtabs')")
         assert page.locator('.lex-detail-field[data-lex-type=INT] input[type=number]').first.input_value()=='103'
         assert json.loads(Path(project_path).read_text())['projects']['Restart sample']['demo']['value']==103
         page.get_by_role('button',name='Active mod project',exact=True).get_by_text('Restart sample',exact=True).wait_for()
@@ -86,7 +86,7 @@ window.pywebview.api.loading_quote=()=>new Promise(()=>{{}});
         number.fill('104');number.dispatch_event('change');previous=host._session
         page.locator('#plugin-restart').click();page.get_by_role('button',name='Restart Without Saving',exact=True).click()
         page.wait_for_url(lambda url:str(url).startswith(host._session.url) and host._session is not previous,timeout=20000)
-        page.locator('.lex-detail-field').first.wait_for();page.locator('nav button[data-tab=subtabs]').click()
+        page.locator('.lex-detail-field').first.wait_for();page.evaluate("navigate('subtabs')")
         assert page.locator('.lex-detail-field[data-lex-type=INT] input[type=number]').first.input_value()=='103'
         # A failed disk save cannot clear the dirty edit or start a replacement.
         page.route('**/api/projects',lambda route:route.fulfill(status=500,json={'error':'Test disk full'}))
