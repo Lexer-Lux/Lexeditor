@@ -6454,7 +6454,14 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
   border-color: var(--lex-shell-button-border, var(--lex-border));
   background: var(--lex-shell-button-bg, var(--lex-panel-2));
 }
-.lex-column-list-header { background: var(--lex-list-header-bg, var(--lex-panel-2)); }
+.lex-column-list-header {
+  color: var(--lex-list-header-fg, inherit);
+  background: var(--lex-list-header-bg, var(--lex-panel-2));
+  font: var(--lex-list-header-font, inherit);
+  letter-spacing: var(--lex-list-header-letter-spacing, normal);
+  text-transform: var(--lex-list-header-transform, none);
+  border-bottom: var(--lex-list-header-border, 0);
+}
 .lex-column-list-cell { border-bottom: 1px solid var(--lex-list-cell-border, var(--lex-border)); }
 .lex-detail-panel-title { color: var(--lex-detail-title-fg, inherit); }
 .lex-detail-panel-id { color: var(--lex-detail-id-fg, var(--lex-muted)); }
@@ -6477,6 +6484,9 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
    already were; a game sets the token on its own container. */
 .lex-column-list-cell {
   padding: var(--lex-cell-padding, 6px 10px);
+  /* A cell of plain values centres its content; a cell holding a stack
+     of controls - RDR2's tags, effects and recipes - starts at the top. */
+  align-items: var(--lex-cell-align, center);
   /* FF8 draws a GF portrait that fills its cell's height. Nothing can
      size itself against a cell unless the cell says it is a container. */
   container-type: var(--lex-cell-container, normal);
@@ -6636,6 +6646,7 @@ body { text-shadow: var(--lex-text-shadow, none); }
 /* The controls inside a field or a cell: one surface, set once. */
 .lex-detail-field-control :is(input, select, textarea),
 .lex-source-control :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea),
+.lex-column-list-cell :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea),
 .lex-editable-table :is(input, select) {
   color: var(--lex-input-fg, inherit);
   border: var(--lex-input-border, 1px solid var(--lex-border));

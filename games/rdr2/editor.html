@@ -85,37 +85,26 @@
                 border-radius: 4px; cursor: pointer; font-weight: 600; }
   button.save:disabled { background: #4a4436; color: #8a8272; cursor: default; }
   main { padding: var(--lex-panel-gap); overflow-x: hidden; }
-  table { border-collapse: collapse; width: 100%; }
-  /* Fixed pixel columns (not %) so each cell gets the width its content needs;
-     the table keeps a min-width and its wrapper scrolls horizontally when the
-     viewport is narrower, instead of squishing columns into overlap. */
-  table.item-table { table-layout: fixed; width:100%; min-width:1980px; }
-  table.item-table th:nth-child(1) { width: 220px; } /* name */
-  table.item-table th:nth-child(2) { width: 215px; } /* description */
-  table.item-table th:nth-child(3) { width: 165px; } /* buy: input + V/K/1899 ref */
-  table.item-table th:nth-child(4) { width: 155px; } /* purchase output: input + ref */
-  table.item-table th:nth-child(5) { width: 165px; } /* sell: input + ref */
-  table.item-table th:nth-child(6) { width: 300px; } /* carry cap rules */
-  table.item-table th:nth-child(7) { width: 120px; } /* recipe */
-  table.item-table th:nth-child(8) { width: 115px; } /* used in recipes */
-  table.item-table th:nth-child(9) { width: 160px; } /* effects */
-  table.item-table th:nth-child(10) { width: 300px; } /* tags */
   .item-table-scroll { overflow-x:auto; overflow-y:visible; width:100%; }
-  th { text-align: left; color: var(--accent2); font-size: 12px; text-transform: uppercase;
-       letter-spacing: .5px; padding: 6px 10px; border-bottom: 2px solid var(--border);
-       background: var(--bg); }
-  td { padding: 4px 10px; border-bottom: 1px solid #2a2419; vertical-align: top; }
-  tr:hover td { background: #201a12; }
-  td input { background: var(--panel); color: var(--text); border: 1px solid var(--border);
-             padding: 3px 7px; border-radius: 3px; width: 90px; font-size: 13px; }
-  td textarea { box-sizing:border-box; width:100%; height:64px; min-height:64px; max-height:64px; resize:none; overflow:auto; background:var(--panel);
-                color:var(--text); border:1px solid var(--border); padding:5px 7px; border-radius:3px;
-                font:12px/1.3 var(--rdr-font-body); }
-  td textarea.edited { border-color:var(--accent2); color:var(--accent2); }
-  td input.wide { width: 100%; min-width: 220px; }
-  td input.edited { border-color: var(--accent2); color: var(--accent2); }
-  td select { background: var(--panel); color: var(--text); border: 1px solid var(--border);
-              padding: 3px 5px; border-radius: 3px; font-size: 13px; }
+  /* Every table on this page is the shared list, so its look is a set of values
+     stated once rather than rules about <th> and <td>. */
+  :root {
+    --lex-head-cell-padding: 6px 10px;
+    --lex-cell-padding: 4px 10px;
+    --lex-cell-align: start;
+    --lex-list-header-fg: var(--accent2);
+    --lex-list-header-bg: var(--bg);
+    --lex-list-header-font: 12px/1.3 var(--rdr-font-body);
+    --lex-list-header-transform: uppercase;
+    --lex-list-header-letter-spacing: .5px;
+    --lex-list-header-border: 2px solid var(--border);
+    --lex-list-cell-border: #2a2419;
+    --lex-row-hover-bg: #201a12;
+    --lex-input-fg: var(--text);
+    --lex-input-bg: var(--panel);
+    --lex-input-border: 1px solid var(--border);
+    --lex-input-radius: 3px;
+  }
   .key { font-family: Consolas, monospace; font-size: 12.5px; }
   .cat { color:#776d5d; font-size:11px; }
   .chip { display: inline-flex; align-items: center; gap: 4px; background: var(--panel2);
@@ -1108,9 +1097,6 @@ function filterRerender(ev,rerender){
   else restore();
 }
 
-function sortHead(tab,key,label,rerender,help){const cur=state.sorts[tab];const active=cur?.key===key;
-  const heading=el("span",{class:"header-label"},label,help?fieldHelp(help):"",active?el("span",{class:"lex-ui-symbol"},cur.dir>0?" ▼":" ▲"):"");
-  return el("th",{class:`sortable${active?" sorted":""}`,onclick:()=>{state.sorts[tab]={key,dir:active?-cur.dir:1};rerender();}},heading);}
 function sortedRows(tab,rows,getters){const s=state.sorts[tab];if(!s||!getters[s.key])return rows;return [...rows].sort((a,b)=>{const av=getters[s.key](a),bv=getters[s.key](b);return s.dir*(typeof av==="number"&&typeof bv==="number"?av-bv:String(av??"").localeCompare(String(bv??"")));});}
 function purchaseYieldValue(it){
   const cost=it?.buy?.find(c=>c.costtype==="COST_TYPE_PRICE"&&c.parts.some(p=>p.item==="CURRENCY_CASH"));
@@ -2936,7 +2922,7 @@ async function createModelRenderer(canvas,geometry){
 }
 
 async function itemDescriptionCell(it){
-  if(isRO()&&!it.descriptionKey){const area=el("textarea",{readonly:"readonly",title:"This catalog record has no description field."});area.value="N/A";return el("td",{},area);}
+  if(isRO()&&!it.descriptionKey){const area=el("textarea",{readonly:"readonly",title:"This catalog record has no description field."});area.value="N/A";return el("div",{},area);}
   const shared=it.descriptionKey&&state.catalog.items.filter(x=>x.descriptionKey===it.descriptionKey).length>1;
   const generatedDescriptionKey=/^0x[0-9a-f]{8}$/i.test(it.key)
     ? `LEX_DESC_${it.key.slice(2).toUpperCase()}`
@@ -3364,6 +3350,7 @@ function renderShopItemPicker(items,m){
         localizedValue(it.nameKey)||"No localized name"),itemLink(it.key))}]}));
 }
 
+const NAME_CELL_FOR=it=>el("span",{},el("span",{class:"record-name"},originDisplayName(localizedValue(it.nameKey)||"No localized name",it)),itemLink(it.key,false));
 function shopListing(shop,item){return shop.items.find(row=>row.item===item);}
 function newShopListing(item,placement=null){
   const destination=placement?.destination;
@@ -3452,13 +3439,22 @@ function renderShopInventory(shop,q,m){
   const soldBy=exact?state.shops.shops.filter(candidate=>candidate.items.some(row=>row.item===exact.key)):[];
   if(exact)m.append(el("div",{class:"hint"},el("b",{},"Sold by: "),...soldBy.length?soldBy.map((candidate,index)=>shopLink(candidate.type,`${index?" · ":""}${shopLabel(candidate.type)}`)):["no standard shop inventory"]));
   m.append(el("div",{class:"hint"},el("b",{},`${shopLabel(shop.type)}: `),"each row is something this shop can sell to the player. Price and purchase output are global catalog values shared by every shop; requirements belong to this listing only."));
-  const table=el("table",{class:"shop-table"},el("thead",{},el("tr",{},sortHead("shops-buy","name","Item",renderShops),sortHead("shops-buy","price","Global buy price",renderShops),sortHead("shops-buy","qty","Purchase output",renderShops,"What one purchase ultimately provides. Bundle containers show both the raw purchased container and the usable items produced when it opens."),sortHead("shops-buy","requirements","Availability requirements",renderShops),el("th",{}))));const body=el("tbody");
-  rows.slice(0,600).forEach(({row,it})=>{if(!it)return;body.append(el("tr",{},
-    el("td",{},el("span",{class:"record-name"},originDisplayName(localizedValue(it.nameKey)||"No localized name",it)),itemLink(it.key,false)),
-    buyPriceCell(it,cashParts(it.buy,"buy"),shopPriceRef(it,"buy")),purchaseQuantityCell(it),
-    el("td",{class:"requirements"},row.requirements.length?row.requirements.map(r=>`${r.type}: ${r.key}${r.state?` = ${r.state}`:""}`).join(" · "):"Always available in this inventory"),
-    el("td",{},el("span",{class:"del",title:"Remove from this shop inventory",onclick:()=>{shop.items.splice(shop.items.indexOf(row),1);state.shopDirty.add(shop.type);renderShops();}},"×"))));});
-  table.append(body);m.append(table,el("div",{class:"addrow"},newButton({title:"Add item to this shop",onclick:()=>pickIdentifier("Catalog item",state.catalog.items.map(x=>x.key).sort(),"",v=>{if(!shop.items.some(x=>x.item===v)){shop.items.push(newShopListing(v));state.shopDirty.add(shop.type);}renderShops();})})));
+  const table=columnList({class:"shop-table","aria-label":"Shop inventory",
+    rows:rows.slice(0,600).filter(entry=>entry.it),key:({row})=>row.item,editable:true,
+    template:"31% 165px 155px minmax(0,1fr) 40px",
+    columns:[{key:"name",label:"Item",sortValue:({it})=>localizedValue(it.nameKey)||it.key,
+        render:({it})=>NAME_CELL_FOR(it)},
+      {key:"price",label:"Global buy price",sortValue:({it})=>cashOf(it,"buy")??Infinity,
+        render:({it})=>buyPriceCell(it,cashParts(it.buy,"buy"),shopPriceRef(it,"buy"))},
+      {key:"qty",sortValue:({it})=>effectivePurchaseYieldOf(it),
+        label:()=>el("span",{},"Purchase output",fieldHelp("What one purchase ultimately provides. Bundle containers show both the raw purchased container and the usable items produced when it opens.")),
+        render:({it})=>purchaseQuantityCell(it)},
+      {key:"requirements",label:"Availability requirements",cellClass:"requirements",
+        sortValue:({row})=>row.requirements.map(r=>`${r.type}:${r.key}:${r.state}`).join("|"),
+        render:({row})=>row.requirements.length?row.requirements.map(r=>`${r.type}: ${r.key}${r.state?` = ${r.state}`:""}`).join(" · "):"Always available in this inventory"},
+      {key:"remove",label:"",sortable:false,render:({row})=>el("span",{class:"del",title:"Remove from this shop inventory",
+        onclick:()=>{shop.items.splice(shop.items.indexOf(row),1);state.shopDirty.add(shop.type);renderShops();}},"×")}]});
+  m.append(table,el("div",{class:"addrow"},newButton({title:"Add item to this shop",onclick:()=>pickIdentifier("Catalog item",state.catalog.items.map(x=>x.key).sort(),"",v=>{if(!shop.items.some(x=>x.item===v)){shop.items.push(newShopListing(v));state.shopDirty.add(shop.type);}renderShops();})})));
 }
 function renderAllShopInventories(shops,q,m){
   const grouped=new Map();
@@ -3466,21 +3462,36 @@ function renderAllShopInventories(shops,q,m){
   let rows=sortedRows("shops-buy-all",[...grouped.values()],{name:x=>localizedValue(x.it.nameKey)||x.it.key,price:x=>cashOf(x.it,"buy")??Infinity,qty:x=>effectivePurchaseYieldOf(x.it),shops:x=>x.listings.map(v=>shopLabel(v.shop.type)).sort().join("|")});
   $("#toolbar").insertBefore(el("span",{class:"count"},`${rows.length} matching items`),$("#toolbar").lastChild);
   m.append(el("div",{class:"hint"},el("b",{},"Global catalog prices: "),"an item's buy price and purchase output are shared by every shop. Shop membership and availability requirements are edited separately below."));
-  const table=el("table",{class:"shop-table"},el("thead",{},el("tr",{},sortHead("shops-buy-all","name","Item",renderShops),sortHead("shops-buy-all","price","Global buy price",renderShops),sortHead("shops-buy-all","qty","Purchase output",renderShops),sortHead("shops-buy-all","shops","Sold by / availability",renderShops))));
-  const body=el("tbody");
-  rows.slice(0,1000).forEach(({it,listings})=>{body.append(el("tr",{},
-    el("td",{},el("span",{class:"record-name"},originDisplayName(localizedValue(it.nameKey)||"No localized name",it)),itemLink(it.key,false)),
-    buyPriceCell(it,cashParts(it.buy,"buy"),shopPriceRef(it,"buy")),purchaseQuantityCell(it),
-    el("td",{class:"requirements"},...listings.sort((a,b)=>shopLabel(a.shop.type).localeCompare(shopLabel(b.shop.type))).map(({shop,row},index)=>el("div",{},el("button",{class:"table-link",onclick:()=>{state.filters.shopType=shop.type;renderShops();}},shopLabel(shop.type))," — ",row.requirements.length?row.requirements.map(r=>`${r.type}: ${r.key}${r.state?` = ${r.state}`:""}`).join(" · "):"always available",el("span",{class:"del",title:`Remove from ${shopLabel(shop.type)}`,onclick:()=>{shop.items.splice(shop.items.indexOf(row),1);state.shopDirty.add(shop.type);renderShops();}}," ×"))))));});
-  table.append(body);m.append(table);
+  m.append(columnList({class:"shop-table","aria-label":"Items sold by shop",
+    rows:rows.slice(0,1000),key:({it})=>it.key,editable:true,
+    template:"31% 165px 155px minmax(0,1fr)",
+    columns:[{key:"name",label:"Item",sortValue:({it})=>localizedValue(it.nameKey)||it.key,
+        render:({it})=>NAME_CELL_FOR(it)},
+      {key:"price",label:"Global buy price",sortValue:({it})=>cashOf(it,"buy")??Infinity,
+        render:({it})=>buyPriceCell(it,cashParts(it.buy,"buy"),shopPriceRef(it,"buy"))},
+      {key:"qty",label:"Purchase output",sortValue:({it})=>effectivePurchaseYieldOf(it),
+        render:({it})=>purchaseQuantityCell(it)},
+      {key:"shops",label:"Sold by / availability",cellClass:"requirements",
+        sortValue:({listings})=>listings.map(v=>shopLabel(v.shop.type)).sort().join("|"),
+        render:({listings})=>el("span",{},...listings.sort((a,b)=>shopLabel(a.shop.type).localeCompare(shopLabel(b.shop.type))).map(({shop,row})=>
+          el("div",{},el("button",{class:"table-link",onclick:()=>{state.filters.shopType=shop.type;renderShops();}},shopLabel(shop.type))," — ",
+            row.requirements.length?row.requirements.map(r=>`${r.type}: ${r.key}${r.state?` = ${r.state}`:""}`).join(" · "):"always available",
+            el("span",{class:"del",title:`Remove from ${shopLabel(shop.type)}`,
+              onclick:()=>{shop.items.splice(shop.items.indexOf(row),1);state.shopDirty.add(shop.type);renderShops();}}," ×"))))}]}));
 }
 function renderShopSellPrices(q,m){
   let rows=state.catalog.items.filter(it=>(cashOf(it,"sell")!==null||q)&&shopItemMatches(it,q));
   rows=sortedRows("shops-sell",rows,{name:it=>localizedValue(it.nameKey)||it.key,price:it=>cashOf(it,"sell")??Infinity});
   $("#toolbar").insertBefore(el("span",{class:"count"},`${rows.length} matching items${rows.length>600?" (showing 600)":""}`),$("#toolbar").lastChild);
   m.append(el("div",{class:"hint"},el("b",{},"BUYS: "),"The price field is the only proven global sellability control. It is editable. Merchant-specific acceptance cannot be derived from PDATA; its exceptions are displayed read-only and never mean that a blank merchant rejects an item."));
-  const table=el("table",{class:"shop-table"},el("thead",{},el("tr",{},sortHead("shops-sell","name","Item",renderShops),sortHead("shops-sell","price","Sell price",renderShops),el("th",{},"What is known"))));const body=el("tbody");
-  rows.slice(0,600).forEach(it=>body.append(el("tr",{},el("td",{},el("span",{class:"record-name"},originDisplayName(localizedValue(it.nameKey)||"No localized name",it)),itemLink(it.key,false)),sellPriceCell(it,cashParts(it.sell,"sell"),shopPriceRef(it,"sell")),globalSaleStatusCell(it))));table.append(body);m.append(table);
+  m.append(columnList({class:"shop-table","aria-label":"Sell prices",
+    rows:rows.slice(0,600),key:it=>it.key,editable:true,
+    template:"31% 165px minmax(0,1fr)",
+    columns:[{key:"name",label:"Item",sortValue:it=>localizedValue(it.nameKey)||it.key,
+        render:it=>NAME_CELL_FOR(it)},
+      {key:"price",label:"Sell price",sortValue:it=>cashOf(it,"sell")??Infinity,
+        render:it=>sellPriceCell(it,cashParts(it.sell,"sell"),shopPriceRef(it,"sell"))},
+      {key:"known",label:"What is known",sortable:false,render:it=>globalSaleStatusCell(it)}]}));
 }
 
 function merchantAccepted(shop,item){
@@ -3502,10 +3513,10 @@ async function saveShopBuyerOverrides(){
 }
 function globalSaleStatusCell(it){
   const payout=cashOf(it,"sell");
-  if(payout===null)return el("td",{class:"requirements"},"Not normally sellable — no SELL_SHOP_DEFAULT record");
+  if(payout===null)return el("div",{class:"requirements"},"Not normally sellable — no SELL_SHOP_DEFAULT record");
   const explicit=state.shopBuyers?.shops?.filter(shop=>merchantAccepted(shop,it.key)).map(shopLabel)||[];
   const text=`Globally sellable for $${fmtMoney(payout)}. Merchant category coverage is not yet recovered from compiled scripts.`;
-  return el("td",{class:"requirements",title:"The editor knows the global catalog sale switch and payout. It does not pretend the sparse PDATA list tells us who normally accepts the item."},text,explicit.length?el("div",{class:"subtle"},"Explicit PDATA: "+explicit.join(", ")):null);
+  return el("div",{class:"requirements",title:"The editor knows the global catalog sale switch and payout. It does not pretend the sparse PDATA list tells us who normally accepts the item."},text,explicit.length?el("div",{class:"subtle"},"Explicit PDATA: "+explicit.join(", ")):null);
 }
 
 async function saveShops(){if(isRO()||!state.shopDirty.size)return;const edits=[...state.shopDirty].map(shopSaveEdit);
@@ -5136,14 +5147,12 @@ async function renderMatrix() {
     return el("span",{class:`header-label yield-sort${active?" sorted":""}`,
       onclick:()=>{state.sorts.matrix={key,dir:active?-cur.dir:1};renderMatrix();}},
       label, active?el("span",{class:"lex-ui-symbol"},cur.dir>0?" ▼":" ▲"):""); };
-  const table = el("table", {}, el("thead", {}, el("tr", {},
-    sortHead("matrix","damage","Damage quality",renderMatrix,"Kill cleanliness/appropriateness resolved using damagecleanlinessdata.meta; independent of the animal's starting star quality."),
-    sortHead("matrix","skin","Skin quality",renderMatrix,"The animal's inherent quality: Poor=1 star, Good=2, Perfect=3. Rare and Legendary are separate special values, not zero-star Poor."),
-    // The yields render as a nested grid inside one colspan cell, so the headers have to
-    // use that same grid or "Item given"/"Qty" float free of the controls they label.
-    el("th",{colspan:"3",class:"yield-head"},el("div",{class:"yield-row"},
-      el("span",{}),yieldSortLabel("item","Item given"),yieldSortLabel("qty","Qty"),el("span",{}))))));
-  const tbody = el("tbody");
+  // The yields render as a nested grid inside one cell, so that column's own
+  // heading uses the same grid or "Item given"/"Qty" float free of the controls
+  // they label.
+  const yieldHead=()=>el("div",{class:"yield-head"},el("div",{class:"yield-row"},
+    el("span",{}),yieldSortLabel("item","Item given"),yieldSortLabel("qty","Qty"),el("span",{})));
+  const matrixRows=[];
   const stars = q => { const n = {Poor:1, Good:2, Perfect:3}[q]; if(n===undefined)return el("span",{class:"stars",title:`Special skin quality: ${q}`},q.toUpperCase());return el("span", { class:"stars", title:q },
     el("span", {class:"on"}, "★".repeat(n)), el("span", {class:"off"}, "★".repeat(3-n))); };
   const qualSel = (row, field) => el("span", {}, el("select", { onchange: ev => { row[field] = ev.target.value; state.matrixDirty.add(a.key); renderMatrix(); } },
@@ -5187,13 +5196,16 @@ async function renderMatrix() {
           (value,ev)=>applyYieldReference(ev.currentTarget.querySelector(".vtag")?vr:kr))));
     });
     yields.append(el("div",{class:"addrow"},newButton({title:"Add yield",onclick:()=>{a.rows.push({damage:group.damage,skin:group.skin,item:"",qty:1});state.matrixDirty.add(a.key);renderMatrix();}})));
-    tbody.append(el("tr", {},
-      el("td", {}, groupQualSel("damage")),
-      el("td", {}, groupQualSel("skin")),
-      el("td",{colspan:"3"},yields)));
+    matrixRows.push({group,yields,qual:groupQualSel});
   });
-  table.append(tbody);
-  m.append(table);
+  m.append(columnList({class:"matrix-table","aria-label":"Yields by quality",
+    rows:matrixRows,key:({group})=>`${group.damage}|${group.skin}`,editable:true,localSort:false,
+    template:"minmax(140px,1fr) minmax(140px,1fr) minmax(0,3fr)",
+    columns:[{key:"damage",label:()=>el("span",{},"Damage quality",fieldHelp("Kill cleanliness/appropriateness resolved using damagecleanlinessdata.meta; independent of the animal's starting star quality.")),
+        render:row=>row.qual("damage")},
+      {key:"skin",label:()=>el("span",{},"Skin quality",fieldHelp("The animal's inherent quality: Poor=1 star, Good=2, Perfect=3. Rare and Legendary are separate special values, not zero-star Poor.")),
+        render:row=>row.qual("skin")},
+      {key:"yields",label:yieldHead,sortable:false,render:row=>row.yields}]}));
   m.append(el("div", { class: "addrow", style: "margin-top:10px" },
     newButton({title:"Add matrix row",onclick: () => {
       a.rows.push({ damage: "Poor", skin: "Poor", item: "", qty: 1 });
@@ -5675,17 +5687,27 @@ function renderProjectileSpeeds(data,sectionTabs){
     data.runtimeSwitching?"The ASI applies the selected cartridge multiplier at runtime.":data.runtimeStatus);
   const q=(state.filters.velocityQ||"").toUpperCase();
   const rows=data.cartridges.filter(row=>!q||row.ammo.includes(q)||row.uses.some(use=>use.weapon.includes(q)||use.damageMode.includes(q)));
-  const table=el("table",{},el("thead",{},el("tr",{},el("th",{},"Cartridge"),el("th",{},data.runtimeSwitching?"Multiplier":"Multiplier (inactive)"),el("th",{},data.runtimeSwitching?"Effective speed":"Current runtime speed"),el("th",{},"Real weapon / damage-mode mappings"))));
-  const body=el("tbody");
-  rows.forEach(row=>{
-    const value=edits[row.ammo]??row.multiplier, effective=(Number(data.baseSpeed)*Number(value));
-    const input=el("input",{class:`weapon-value${row.ammo in edits?" edited":""}`,type:"number",min:"0.05",max:"10",step:"0.01",value,
-      disabled:(!data.runtimeSwitching||isRO())?true:undefined,onchange:ev=>{const n=Number(ev.target.value);if(Number.isFinite(n)&&n>=0.05&&n<=10)edits[row.ammo]=n;renderToolbarOnly();}});
-    const shownSpeed=data.runtimeSwitching?effective:Number(data.baseSpeed);
-    body.append(el("tr",{},el("td",{class:"key"},weaponRecordLink("ammo",row.ammo)),el("td",{},input),el("td",{},Number.isFinite(shownSpeed)?shownSpeed.toFixed(2):"—"),
-      el("td",{},...row.uses.map(use=>el("div",{class:"n"},weaponRecordLink("weapons",use.weapon),` / ${use.damageMode}`)))));
-  });
-  table.append(body);m.append(status,el("div",{class:"weapon-fieldscroll"},table));
+  const speedOf=row=>{
+    const value=edits[row.ammo]??row.multiplier;
+    return data.runtimeSwitching?Number(data.baseSpeed)*Number(value):Number(data.baseSpeed);
+  };
+  const table=columnList({class:"velocity-table","aria-label":"Cartridge speeds",
+    rows,key:row=>row.ammo,editable:true,
+    template:"minmax(160px,1fr) 120px 150px minmax(0,2fr)",
+    columns:[{key:"ammo",label:"Cartridge",cellClass:"key",render:row=>weaponRecordLink("ammo",row.ammo)},
+      {key:"multiplier",label:data.runtimeSwitching?"Multiplier":"Multiplier (inactive)",
+        sortValue:row=>Number(edits[row.ammo]??row.multiplier),
+        render:row=>el("input",{class:`weapon-value${row.ammo in edits?" edited":""}`,type:"number",min:"0.05",max:"10",step:"0.01",
+          value:edits[row.ammo]??row.multiplier,"aria-label":`Speed multiplier for ${row.ammo}`,
+          disabled:(!data.runtimeSwitching||isRO())?true:undefined,
+          onchange:ev=>{const n=Number(ev.target.value);if(Number.isFinite(n)&&n>=0.05&&n<=10)edits[row.ammo]=n;renderToolbarOnly();}})},
+      {key:"speed",label:data.runtimeSwitching?"Effective speed":"Current runtime speed",
+        sortValue:row=>speedOf(row),
+        render:row=>Number.isFinite(speedOf(row))?speedOf(row).toFixed(2):"—"},
+      {key:"uses",label:"Real weapon / damage-mode mappings",
+        sortValue:row=>row.uses.map(use=>use.weapon).join("|"),
+        render:row=>el("span",{},...row.uses.map(use=>el("div",{class:"n"},weaponRecordLink("weapons",use.weapon),` / ${use.damageMode}`)))}]});
+  m.append(status,el("div",{class:"weapon-fieldscroll"},table));
 }
 
 async function saveProjectileSpeeds(){
@@ -5789,17 +5811,20 @@ function weaponDetail(d,section,record,f){
   const order=[...WEAPON_FIELD_CATEGORIES.map(group=>group.key),"unidentified"];
   const groups=el("div",{class:"weapon-field-groups"});
   [...grouped.values()].sort((a,b)=>order.indexOf(a.key)-order.indexOf(b.key)).forEach(group=>{
-    const table=el("table",{},el("thead",{},el("tr",{},sortHead("weapons","field","Field",renderWeapons),sortHead("weapons","value","My value",renderWeapons,"Value with V / WR references beside the control (shared refField layout)."))));
-    const tbody=el("tbody");
-    group.rows.forEach(row=>{const key=`${row.targetType||section}|${row.targetName||record.name}|${row.path.join(".")}`,cur=edits[key]?.value??row.value;
-      const setValue=value=>{edits[key]={path:row.path,kind:row.kind,value,targetType:row.targetType,targetName:row.targetName};renderToolbarOnly();};
-      const control=weaponValueControl(d,section,row,cur,key in edits,setValue);
-      const help=weaponFieldHelp(row.field);
-      tbody.append(el("tr",{},el("td",{class:"key"},el("div",{class:"weapon-field-name"},row.field,help?fieldHelp(help):"")),
-        el("td",{},refField(control,[["V","vtag",vv[row.field]],["WR","ucotag",wv[row.field]]],cur,
-          (value,ev)=>{const target=ev.currentTarget.closest("tr").querySelector(".weapon-value");if(target){target.value=value;target.dispatchEvent(new Event("change",{bubbles:true}));}},String))));
-    });
-    table.append(tbody);
+    const editKey=row=>`${row.targetType||section}|${row.targetName||record.name}|${row.path.join(".")}`;
+    const table=columnList({class:"weapon-field-table","aria-label":`${group.label} fields`,
+      rows:group.rows,key:editKey,editable:true,localSort:false,
+      template:"minmax(180px,1fr) minmax(0,1.6fr)",
+      columns:[{key:"field",label:"Field",cellClass:"key",
+          render:row=>{const help=weaponFieldHelp(row.field);
+            return el("div",{class:"weapon-field-name"},row.field,help?fieldHelp(help):"");}},
+        {key:"value",label:()=>el("span",{},"My value",fieldHelp("Value with V / WR references beside the control (shared refField layout).")),
+          render:row=>{const key=editKey(row),cur=edits[key]?.value??row.value;
+            const setValue=value=>{edits[key]={path:row.path,kind:row.kind,value,targetType:row.targetType,targetName:row.targetName};renderToolbarOnly();};
+            const control=weaponValueControl(d,section,row,cur,key in edits,setValue);
+            return refField(control,[["V","vtag",vv[row.field]],["WR","ucotag",wv[row.field]]],cur,
+              (value,ev)=>{const target=ev.currentTarget.closest('[role="row"]').querySelector(".weapon-value");
+                if(target){target.value=value;target.dispatchEvent(new Event("change",{bubbles:true}));}},String);}}]});
     const details=el("details",{class:"weapon-field-group","data-group":group.key},
       el("summary",{},el("span",{},group.label),el("span",{class:"weapon-group-count"},`${group.rows.length} field${group.rows.length===1?"":"s"}`)),
       el("p",{class:"weapon-group-description"},group.description),table);
@@ -5855,12 +5880,18 @@ async function renderAI() {
     const refByPath={};refData.fields.forEach(x=>refByPath[x.path.join(".")]=x.value);
     const rows=sortedRows("ai",data.fields.filter(x=>!q||x.context.toUpperCase().includes(q)||x.field.toUpperCase().includes(q)),{context:x=>x.context,field:x=>x.field,value:x=>x.value}).slice(0,1000);
     tb.insertBefore(el("span",{class:"count"},`${rows.length}${data.fields.length>1000?` shown of ${data.fields.length}`:" fields"}`),tb.querySelector(".savebar"));
-    const table=el("table",{},el("thead",{},el("tr",{},sortHead("ai","context","Profile / context",renderAI),sortHead("ai","field","Field",renderAI),sortHead("ai","value","Value",renderAI))));const body=el("tbody");
-    rows.forEach(row=>{const key=row.path.join("."),cur=edits[key]?.value??row.value,rv=refByPath[key];
-      const inp=el("input",{value:cur,class:key in edits?"edited":"",onchange:ev=>{edits[key]={path:row.path,kind:row.kind,value:ev.target.value};renderToolbarOnly();}});
-      body.append(el("tr",{},el("td",{class:"key"},row.context),el("td",{class:"key"},row.field),
-        el("td",{}, refField(inp, rv===undefined?null:[["UCO","ucotag",rv]], cur, (v,ev)=>applyToInput(ev,v), String))));});
-    table.append(body);m.append(table);return;
+    m.append(columnList({class:"ai-field-table","aria-label":"AI fields",
+      rows,key:row=>row.path.join("."),editable:true,localSort:false,
+      template:"minmax(180px,1fr) minmax(180px,1fr) minmax(0,1.4fr)",
+      columns:[{key:"context",label:"Profile / context",cellClass:"key"},
+        {key:"field",label:"Field",cellClass:"key"},
+        {key:"value",label:"Value",render:row=>{
+          const key=row.path.join("."),cur=edits[key]?.value??row.value,rv=refByPath[key];
+          const inp=el("input",{value:cur,class:key in edits?"edited":"",
+            "aria-label":`${row.context} ${row.field}`,
+            onchange:ev=>{edits[key]={path:row.path,kind:row.kind,value:ev.target.value};renderToolbarOnly();}});
+          return refField(inp, rv===undefined?null:[["UCO","ucotag",rv]], cur, (v,ev)=>applyToInput(ev,v), String);}}]}));
+    return;
   }
   const text=state.datamap.sections.map(s=>s.lines.join("\n")).join("\n");
   layer.terms.forEach(term=>{
@@ -5954,22 +5985,18 @@ async function renderMobModels(){
   tb.append(el("span",{class:"count"},`${rows.length} observed`));
   if(!rows.length){m.append(el("div",{class:"hint"},"No observed models match this group and filter."));return;}
   const getters={model:r=>r.model,hp:r=>r.observedHealth??Infinity,archetype:r=>r.candidates.length===1?r.candidates[0]:""};
-  const table=el("table",{},el("thead",{},el("tr",{},
-    sortHead("mob-models","model","Model",renderMobModels),
-    sortHead("mob-models","hp","Observed HP",renderMobModels,"What the running game actually gave this model. Blank means MobProbe has not seen it."),
-    el("th",{},"Possible health profiles"),
-    ...MOB_MODEL_STATS.map(c=>el("th",{},c[1])))));
-  const body=el("tbody");
-  sortedRows("mob-models",rows,getters).forEach(r=>{
-    const chosen=r.candidates.length===1?r.candidates[0]:"";
-    const tr=el("tr",{},
-      el("td",{class:"key"},r.model),
-      el("td",{},r.observedHealth??el("span",{class:"subtle"},r.probeStatus||"not probed")),
-      el("td",{class:"requirements"},r.candidates.length?r.candidates.flatMap((name,index)=>[index?", ":"",mobArchetypeLink("health",name)]):"No exact HP match"));
-    MOB_MODEL_STATS.forEach(c=>tr.append(el("td",{},chosen?statOf(chosen,c[0]):"—")));
-    body.append(tr);
-  });
-  table.append(body);m.append(table);
+  m.append(columnList({class:"mob-model-table","aria-label":"Mob models",
+    rows:sortedRows("mob-models",rows,getters),key:r=>r.model,localSort:false,
+    template:`minmax(180px,1fr) 130px minmax(0,1.4fr) repeat(${MOB_MODEL_STATS.length},minmax(0,.7fr))`,
+    columns:[{key:"model",label:"Model",cellClass:"key"},
+      {key:"hp",label:()=>el("span",{},"Observed HP",fieldHelp("What the running game actually gave this model. Blank means MobProbe has not seen it.")),
+        render:r=>r.observedHealth??el("span",{class:"subtle"},r.probeStatus||"not probed")},
+      {key:"candidates",label:"Possible health profiles",cellClass:"requirements",
+        render:r=>r.candidates.length
+          ?el("span",{},...r.candidates.flatMap((name,index)=>[index?", ":"",mobArchetypeLink("health",name)]))
+          :"No exact HP match"},
+      ...MOB_MODEL_STATS.map(c=>({key:c[0],label:c[1],
+        render:r=>{const chosen=r.candidates.length===1?r.candidates[0]:"";return chosen?statOf(chosen,c[0]):"—";}}))]}));
 }
 
 async function renderMobArchetypes(){
@@ -5997,36 +6024,37 @@ async function renderMobArchetypes(){
   const fieldOf=(record,name)=>record.fields.find(x=>x.field===name);
   const getters={name:r=>r.name};
   columns.forEach(col=>{getters[col[0]]=r=>{const hit=fieldOf(r,col[0]);if(!hit)return "";const n=parseFloat(hit.value);return Number.isFinite(n)&&String(n)!==""?n:hit.value;};});
-  const table=el("table",{},el("thead",{},el("tr",{},sortHead("mobs","name","Record",renderMobs),
-    ...columns.map(col=>sortHead("mobs",col[0],col[1],renderMobs,col[2]||undefined)))));
-  const body=el("tbody");
-  sortedRows("mobs",rows,getters).forEach(record=>{
-    const tr=el("tr",{},el("td",{class:"key"},record.name));
-    columns.forEach(col=>{
-      const field=fieldOf(record,col[0]);
-      if(!field){tr.append(el("td",{},"—"));return;}
-      const editKey=`${layer.file}|${field.path.join(".")}`;
-      const cur=(editKey in state.mobEdits)?state.mobEdits[editKey].value:field.value;
-      const numeric=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(String(field.value)),boolean=/^(true|false)$/i.test(String(field.value));
-      const choices=[...new Set([...data.records.flatMap(r=>r.fields.filter(x=>x.field===field.field).map(x=>String(x.value))),String(cur)])].sort();
-      const input=el(!numeric&&!boolean?"select":"input",{type:boolean?"checkbox":numeric?"number":"text",...(boolean?{checked:String(cur).toLowerCase()==="true"}:{value:cur}),...(numeric?{step:"any"}:{}),style:"width:110px",class:(editKey in state.mobEdits)?"edited":"",
-        title:`${field.field} (${field.kind})`,
-        onchange:ev=>{
-          const value=boolean?String(ev.target.checked):ev.target.value;
-          if(numeric&&(!value.trim()||!Number.isFinite(Number(value)))){ev.target.setCustomValidity("Enter a finite number");ev.target.reportValidity();return;}
-          ev.target.setCustomValidity("");
-          if(value===field.value)delete state.mobEdits[editKey];
-          else state.mobEdits[editKey]={file:layer.file,path:field.path,kind:field.kind,value};
-          ev.target.classList.toggle("edited",editKey in state.mobEdits);
-          renderToolbarOnly();
-        }});
-      if(!numeric&&!boolean)input.replaceChildren(...choices.map(value=>el("option",{value,selected:value===String(cur)},value)));
-      if(isRO())input.disabled=true;
-      tr.append(el("td",{},input));
-    });
-    body.append(tr);
-  });
-  table.append(body);m.append(table);
+  const statControl=(record,col)=>{
+    const field=fieldOf(record,col[0]);
+    if(!field)return "—";
+    const editKey=`${layer.file}|${field.path.join(".")}`;
+    const cur=(editKey in state.mobEdits)?state.mobEdits[editKey].value:field.value;
+    const numeric=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(String(field.value)),boolean=/^(true|false)$/i.test(String(field.value));
+    const choices=[...new Set([...data.records.flatMap(r=>r.fields.filter(x=>x.field===field.field).map(x=>String(x.value))),String(cur)])].sort();
+    const input=el(!numeric&&!boolean?"select":"input",{type:boolean?"checkbox":numeric?"number":"text",...(boolean?{checked:String(cur).toLowerCase()==="true"}:{value:cur}),
+      class:editKey in state.mobEdits?"edited":"",
+      "aria-label":`${record.name} ${field.field}`,
+      title:`${field.field} (${field.kind})`,
+      onchange:ev=>{
+        const value=boolean?String(ev.target.checked):ev.target.value;
+        if(numeric&&(!value.trim()||!Number.isFinite(Number(value)))){ev.target.setCustomValidity("Enter a finite number");ev.target.reportValidity();return;}
+        ev.target.setCustomValidity("");
+        if(value===field.value)delete state.mobEdits[editKey];
+        else state.mobEdits[editKey]={file:layer.file,path:field.path,kind:field.kind,value};
+        ev.target.classList.toggle("edited",editKey in state.mobEdits);
+        renderToolbarOnly();
+      }});
+    if(!numeric&&!boolean)input.replaceChildren(...choices.map(value=>el("option",{value,selected:value===String(cur)},value)));
+    if(isRO())input.disabled=true;
+    return input;
+  };
+  m.append(columnList({class:"mob-table","aria-label":"Mob archetypes",
+    rows:sortedRows("mobs",rows,getters),key:record=>record.name,editable:true,localSort:false,
+    template:`minmax(180px,1fr) repeat(${columns.length},minmax(0,.8fr))`,
+    columns:[{key:"name",label:"Record",cellClass:"key"},
+      ...columns.map(col=>({key:col[0],
+        label:col[2]?()=>el("span",{},col[1],fieldHelp(col[2])):col[1],
+        render:record=>statControl(record,col)}))]}));
 }
 
 async function saveMobs(){
@@ -6163,20 +6191,52 @@ async function renderBountyHunters(){
   const top=el("section",{class:"bounty-trigger"},el("h2",{},"Encounter trigger"));
   for(const s of d.settings)top.append(bountyNumber(setting(s.id),s.label,s.help,vsetting(s.id)));m.append(top);
   const tierHelp="Rockstar stores five rows labelled WANTED_CLEAN, WANTED_LEVEL1, WANTED_LEVEL2, WANTED_LEVEL3 and WANTED_LEVEL4+. These are the player's current wanted/search state, not bounty-dollar ranges. Clean means no active wanted level; it does not mean the regional bounty balance is zero. ‘Wanted 4+’ means level 4 and any higher engine tier.";
-  const cool=el("table",{},el("thead",{},el("tr",{},el("th",{},"Cooldown event"),el("th",{},"Wanted tier ",fieldHelp(tierHelp)),el("th",{},"Min hours"),el("th",{},"Max hours")))),cb=el("tbody");
-  for(const r of d.cooldowns){const mk=k=>r.ids[k]?bountyNumber({id:r.ids[k],value:safeDisplay(r[k],"")},"","",vcool(r.ids[k])):el("span",{},"—");cb.append(el("tr",{},el("td",{class:"key"},r.eventLabel,fieldHelp(r.help)),el("td",{class:"key wanted-tier-cell"},r.level,fieldHelp(r.levelHelp)),el("td",{},mk("min")),el("td",{},mk("max"))));}cool.append(cb);m.append(el("section",{},el("h2",{},"Encounter spacing"),
+  const bound=(r,k)=>r.ids[k]?bountyNumber({id:r.ids[k],value:safeDisplay(r[k],"")},"","",vcool(r.ids[k])):el("span",{},"—");
+  const cool=columnList({class:"cooldown-table","aria-label":"Encounter spacing",
+    rows:d.cooldowns,key:(r,index)=>`${r.eventLabel}:${r.level}:${index}`,editable:true,localSort:false,
+    template:"minmax(220px,1.4fr) minmax(160px,1fr) 120px 120px",
+    columns:[{key:"event",label:"Cooldown event",cellClass:"key",
+        render:r=>el("span",{},r.eventLabel,fieldHelp(r.help))},
+      {key:"level",label:()=>el("span",{},"Wanted tier ",fieldHelp(tierHelp)),cellClass:"key wanted-tier-cell",
+        render:r=>el("span",{},r.level,fieldHelp(r.levelHelp))},
+      {key:"min",label:"Min hours",render:r=>bound(r,"min")},
+      {key:"max",label:"Max hours",render:r=>bound(r,"max")}]});
+  m.append(el("section",{},el("h2",{},"Encounter spacing"),
     el("div",{class:"hint bounty-tier-explainer"},el("b",{},"Wanted tier is current pursuit state, not bounty value. "),
       "Clean means no active wanted/search level; Arthur can still owe a regional bounty, so the bounty-acquired and hunter-encounter cooldown tables legitimately contain Clean rows. Min and Max are the stored randomized delay range in in-game hours."),
     scrollableCrimeTable(cool)));
   const poolHelp="Fixed responders are always requested by that phase. Random responders are alternatives selected by their relative Weight. Chance is a separate 0–1 gate, used here for police dogs.";
-  const pt=el("table",{},el("thead",{},el("tr",{},el("th",{},"Phase"),el("th",{},"Group scale"),el("th",{},"Pool ",fieldHelp(poolHelp)),el("th",{},"Responder"),el("th",{},"Min"),el("th",{},"Max"),el("th",{},"Chance ",fieldHelp("A normalized probability used when this group is evaluated; for example, 0.2 means a 20% chance.")),el("th",{},"Weight ",fieldHelp("Relative selection weight inside the random pool. It is compared with the other weights in the same phase; it is not an independent percentage."))))),pb=el("tbody");
-  for(const p of d.phases){const rows=p.groups.length?p.groups:[null];for(let i=0;i<rows.length;i++){const g=rows[i];const cell=k=>g?.ids[k]?bountyNumber({id:g.ids[k],value:safeDisplay(g[k],"").replace(/f$/i,"")},"","",vphase(g.ids[k])):el("span",{},"—");const scale=i===0&&p.multiplierId?bountyNumber({id:p.multiplierId,value:safeDisplay(p.multiplier,"").replace(/f$/i,"")},"",p.multiplierHelp,vphase(p.multiplierId)):i===0?el("span",{},"—"):el("span",{},"");pb.append(el("tr",{},el("td",{class:"key"},i===0?p.label:""),el("td",{},scale),el("td",{},g?(g.bucket==="fixed"?"Fixed":"Random"):"No new group"),el("td",{},g?g.presetLabel:"Reuses available hunters"),el("td",{},cell("min")),el("td",{},cell("max")),el("td",{},cell("chance")),el("td",{},cell("weight"))));}}pt.append(pb);m.append(el("section",{},el("h2",{},"Escalation composition"),scrollableCrimeTable(pt)));
-  const deps=el("table",{},el("thead",{},el("tr",{},el("th",{},"Responder"),el("th",{},"Weapons / weights"),el("th",{},"Combat profile"),el("th",{},"Mounted tactics")))),db=el("tbody");
-  d.presets.forEach(p=>db.append(el("tr",{},
-    el("td",{class:"key"},p.label,el("span",{class:"setting-source"},p.preset)),
-    el("td",{},p.loadouts.map(x=>safeDisplay(x.name,"Loadout")+(x.weight?` (${x.weight})`:"")).join(", ")),
-    el("td",{},mobArchetypeLink("combat",safeDisplay(p.combatInfo))),el("td",{},safeDisplay(p.chaseProfile)))));
-  deps.append(db);m.append(el("section",{},el("h2",{},"Equipment and tactics (shared law dependencies)"),
+  // One row per group, and the phase's own label and scale ride on the first
+  // of its rows, as they did in the table this replaced.
+  const phaseRows=d.phases.flatMap(p=>(p.groups.length?p.groups:[null]).map((g,index)=>({p,g,first:index===0})));
+  const groupCell=(g,k)=>g?.ids[k]?bountyNumber({id:g.ids[k],value:safeDisplay(g[k],"").replace(/f$/i,"")},"","",vphase(g.ids[k])):el("span",{},"—");
+  const pt=columnList({class:"phase-table","aria-label":"Escalation composition",
+    rows:phaseRows,key:(row,index)=>`${row.p.label}:${index}`,editable:true,localSort:false,
+    template:"minmax(140px,1fr) 120px 110px minmax(160px,1fr) 90px 90px 100px 100px",
+    columns:[{key:"phase",label:"Phase",cellClass:"key",render:row=>row.first?row.p.label:""},
+      {key:"scale",label:"Group scale",render:row=>row.first&&row.p.multiplierId
+        ?bountyNumber({id:row.p.multiplierId,value:safeDisplay(row.p.multiplier,"").replace(/f$/i,"")},"",row.p.multiplierHelp,vphase(row.p.multiplierId))
+        :el("span",{},row.first?"—":"")},
+      {key:"pool",label:()=>el("span",{},"Pool ",fieldHelp(poolHelp)),
+        render:row=>row.g?(row.g.bucket==="fixed"?"Fixed":"Random"):"No new group"},
+      {key:"responder",label:"Responder",render:row=>row.g?row.g.presetLabel:"Reuses available hunters"},
+      {key:"min",label:"Min",render:row=>groupCell(row.g,"min")},
+      {key:"max",label:"Max",render:row=>groupCell(row.g,"max")},
+      {key:"chance",label:()=>el("span",{},"Chance ",fieldHelp("A normalized probability used when this group is evaluated; for example, 0.2 means a 20% chance.")),
+        render:row=>groupCell(row.g,"chance")},
+      {key:"weight",label:()=>el("span",{},"Weight ",fieldHelp("Relative selection weight inside the random pool. It is compared with the other weights in the same phase; it is not an independent percentage.")),
+        render:row=>groupCell(row.g,"weight")}]});
+  m.append(el("section",{},el("h2",{},"Escalation composition"),scrollableCrimeTable(pt)));
+  const deps=columnList({class:"responder-table","aria-label":"Responder equipment and tactics",
+    rows:d.presets,key:p=>p.preset,localSort:false,
+    template:"minmax(180px,1fr) minmax(0,1.6fr) minmax(160px,1fr) minmax(140px,1fr)",
+    columns:[{key:"label",label:"Responder",cellClass:"key",
+        render:p=>el("span",{},p.label,el("span",{class:"setting-source"},p.preset))},
+      {key:"loadouts",label:"Weapons / weights",
+        render:p=>p.loadouts.map(x=>safeDisplay(x.name,"Loadout")+(x.weight?` (${x.weight})`:"")).join(", ")},
+      {key:"combat",label:"Combat profile",render:p=>mobArchetypeLink("combat",safeDisplay(p.combatInfo))},
+      {key:"chase",label:"Mounted tactics",render:p=>safeDisplay(p.chaseProfile)}]});
+  m.append(el("section",{},el("h2",{},"Equipment and tactics (shared law dependencies)"),
     el("div",{class:"subtle"},d.scopeNote),scrollableCrimeTable(deps)));
 }
 
@@ -6196,15 +6256,31 @@ async function ensureHonorActions(){if(!state.honorActions)state.honorActions=no
 async function renderHonorActions(){
   const d=await ensureHonorActions(),m=$("#main");m.innerHTML="";
   if(!d.available)return noData("Honor runtime controls are unavailable for this profile.");
-  const table=(title,rows,tier)=>{const t=el("table",{},el("thead",{},el("tr",{},el("th",{},tier?"Vanilla amount":"Honor event"),el("th",{},"Enabled"),tier?el("th",{},"Replacement amount"):""))),b=el("tbody");
-    rows.forEach(r=>{const edit=state.honorActionEdits[r.id]||{},enabled=edit.enabled??r.enabled;
-      const cb=el("input",{type:"checkbox",onchange:e=>{state.honorActionEdits[r.id]={...(state.honorActionEdits[r.id]||{}),enabled:e.target.checked};refreshGlobalSave();}});cb.checked=enabled;
-      const amount=tier?el("input",{type:"number",step:"1",value:edit.amount??r.amount,
+  const table=(title,rows,tier)=>{
+    const enabledBox=r=>{
+      const edit=state.honorActionEdits[r.id]||{};
+      const box=el("input",{type:"checkbox","aria-label":`${safeDisplay(r.label,r.id)} enabled`,
+        onchange:e=>{state.honorActionEdits[r.id]={...(state.honorActionEdits[r.id]||{}),enabled:e.target.checked};refreshGlobalSave();}});
+      box.checked=edit.enabled??r.enabled;
+      return box;
+    };
+    const amountBox=r=>{
+      const edit=state.honorActionEdits[r.id]||{};
+      return el("input",{type:"number",step:"1",value:edit.amount??r.amount,
         "aria-label":`Replacement for vanilla honor amount ${safeDisplay(r.vanilla)}`,
         title:"Editable replacement applied to every honor action that uses this vanilla amount.",
         class:("amount" in edit)?"edited":"",
-        onchange:e=>{state.honorActionEdits[r.id]={...(state.honorActionEdits[r.id]||{}),amount:Number(e.target.value)};refreshGlobalSave();}}):"";
-      b.append(el("tr",{},el("td",{class:"key"},tier?safeDisplay(r.vanilla):safeDisplay(r.label,humanizeId(r.id,"Honor event")),el("span",{class:"setting-source"},safeDisplay(r.id,"honor_control"))),el("td",{class:"bool-cell"},cb),tier?el("td",{},amount):""));});t.append(b);return el("section",{class:"honor-card"},el("h2",{},title),t);};
+        onchange:e=>{state.honorActionEdits[r.id]={...(state.honorActionEdits[r.id]||{}),amount:Number(e.target.value)};refreshGlobalSave();}});
+    };
+    const list=columnList({class:"honor-table","aria-label":title,
+      rows,key:r=>r.id,editable:true,localSort:false,
+      template:tier?"minmax(160px,1fr) 110px minmax(160px,1fr)":"minmax(220px,1fr) 110px",
+      columns:[{key:"name",label:tier?"Vanilla amount":"Honor event",cellClass:"key",
+          render:r=>el("span",{},tier?safeDisplay(r.vanilla):safeDisplay(r.label,humanizeId(r.id,"Honor event")),
+            el("span",{class:"setting-source"},safeDisplay(r.id,"honor_control")))},
+        {key:"enabled",label:"Enabled",cellClass:"bool-cell",render:enabledBox},
+        ...(tier?[{key:"amount",label:"Replacement amount",render:amountBox}]:[])]});
+    return el("section",{class:"honor-card"},el("h2",{},title),list);};
   // Amounts used to be buried below all 21 event toggles, which made the page
   // look toggle-only. Put the editable table first and state its proven shared
   // scope instead of inventing independent per-event values the game lacks.
@@ -6254,31 +6330,31 @@ function dispatchSection() {
     "are per level. CAUTION: the Crime Tweaks author deliberately shipped vanilla ",
     "dispatch.meta citing a camp-respawn-after-escape bug with modified ones — ours is ",
     "vanilla-identical until you edit, and we should test carefully after changes."));
-  const table = el("table", {}, el("thead", {}, el("tr", {},
-    sortHead("dispatch","setting","Setting",renderCrime),sortHead("dispatch","field","Field",renderCrime),sortHead("dispatch","value","Value",renderCrime))));
-  const tbody = el("tbody");
   const dispatchRows=sortedRows("dispatch",st.dispatch.rows,{setting:r=>dispatchLabel(r.group),field:r=>r.field,value:r=>+r.value});
-  for (const r of dispatchRows) {
-    const ek = r.group + "|" + r.field;
-    const cur = isRO() ? r.value : (state.dispatchEdits[ek] ?? r.value);
-    const vRow = vd && vd.rows.find(x => x.group === r.group && x.field === r.field);
-    const inp = el("input", { type: "number", step: "any", value: cur, style: "width:100px",
-      class: ek in state.dispatchEdits ? "edited" : "",
-      onchange: ev => {
-        const v = ev.target.value;
-        if (v === r.value) delete state.dispatchEdits[ek];
-        else state.dispatchEdits[ek] = v;
-        ev.target.classList.toggle("edited", ek in state.dispatchEdits);
+  const dispatchValue=r=>{
+    const ek=r.group+"|"+r.field;
+    const cur=isRO()?r.value:(state.dispatchEdits[ek]??r.value);
+    const vRow=vd&&vd.rows.find(x=>x.group===r.group&&x.field===r.field);
+    const inp=el("input",{type:"number",step:"any",value:cur,style:"width:100px",
+      "aria-label":`${dispatchLabel(r.group)} ${r.field}`,
+      class:ek in state.dispatchEdits?"edited":"",
+      onchange:ev=>{
+        const v=ev.target.value;
+        if(v===r.value)delete state.dispatchEdits[ek];
+        else state.dispatchEdits[ek]=v;
+        ev.target.classList.toggle("edited",ek in state.dispatchEdits);
         renderToolbarOnly();
-      } });
-    tbody.append(el("tr", {},
-      el("td", { class: "cat" }, dispatchLabel(r.group)),
-      el("td", { class: "key" }, DISPATCH_FIELD_LABELS[r.field] || r.field.replace("WantedLevel", "WL "),
-        DISPATCH_FIELD_HELP[r.field] ? fieldHelp(DISPATCH_FIELD_HELP[r.field]) : ""),
-      el("td", {}, refField(inp, vRow?[["V","vtag",vRow.value]]:null, cur, (v,ev)=>applyToInput(ev,v), String))));
-  }
-  table.append(tbody);
-  wrap.append(table);
+      }});
+    return refField(inp, vRow?[["V","vtag",vRow.value]]:null, cur, (v,ev)=>applyToInput(ev,v), String);
+  };
+  wrap.append(columnList({class:"dispatch-table","aria-label":"Dispatch settings",
+    rows:dispatchRows,key:r=>r.group+"|"+r.field,editable:true,localSort:false,
+    template:"minmax(180px,1fr) minmax(200px,1.2fr) minmax(160px,1fr)",
+    columns:[{key:"setting",label:"Setting",cellClass:"cat",render:r=>dispatchLabel(r.group)},
+      {key:"field",label:"Field",cellClass:"key",
+        render:r=>el("span",{},DISPATCH_FIELD_LABELS[r.field]||r.field.replace("WantedLevel","WL "),
+          DISPATCH_FIELD_HELP[r.field]?fieldHelp(DISPATCH_FIELD_HELP[r.field]):"")},
+      {key:"value",label:"Value",render:dispatchValue}]}));
   return wrap;
 }
 
@@ -6328,62 +6404,70 @@ async function renderCrime() {
     "(your window to stop them), witnesses spawned, minimum/forced wanted level, and ",
     el("b", {}, "Off"), " to disable the crime entirely. NOTE: your Crime Tweaks mod ",
     "replaces this same file — when MyOverhaul is installed, load order decides."));
-  const table = el("table", {}, el("thead", {}, el("tr", {},
-    sortHead("crime","name","Name / crime",renderCrime,"The editable name is an editor-only identification label, stored in this RDR2 plugin's labels.json; it does not rename game UI text."),
-    ...CRIME_COLS.map(c => sortHead("crime",c[0],c[1],renderCrime,c[3])),sortHead("crime","severity","Severity",renderCrime,"Qualitative severity class used by crime escalation and law-response rules."))));
-  const tbody = el("tbody");
   const vc = state.store.vanilla?.crime;
   const cc = state.store.crimeTweaks?.crime;
-  for (const c of rows) {
-    const vRow = vc && vc.crimes.find(x => x.key === c.key);
-    const ctRow = cc && cc.crimes.find(x => x.key === c.key);
-    const cells = CRIME_COLS.map(([field, label, kind]) => {
-      const ek = c.key + "|" + field;
-      const raw = isRO() ? c[field] : (state.crimeEdits[ek] ?? c[field]);
-      if (raw === null || raw === undefined) return el("td", { class: "cat" }, "—");
-      if (kind === "bool") {
-        const cb = el("input", { type: "checkbox",
-          onchange: ev => {
-            const v = ev.target.checked ? "true" : "false";
-            if (v === c[field]) delete state.crimeEdits[ek]; else state.crimeEdits[ek] = v;
-            renderToolbarOnly();
-          } });
-        cb.checked = String(raw) === "true";
-        return el("td", { class: "bool-cell" }, refField(cb,
-          [["V","vtag",vRow?.[field]],["CT","cttag",ctRow?.[field]]], raw,
-          (v)=>{cb.checked=String(v)==="true";cb.dispatchEvent(new Event("change"));}, v=>String(v),
-          { bool: true }));
-      }
-      const isMoney = kind === "money";
-      const inp = el("input", { type: "number", step: isMoney ? "0.01" : "any",
-        value: isMoney ? fmtMoney(+raw) : (+raw % 1 ? (+raw).toFixed(2) : String(+raw)),
-        style: "width:70px", class: ek in state.crimeEdits ? "edited" : "",
+  const vanillaRow = c => vc && vc.crimes.find(x => x.key === c.key);
+  const tweakRow = c => cc && cc.crimes.find(x => x.key === c.key);
+  const fieldControl = (c, [field, label, kind]) => {
+    const ek = c.key + "|" + field;
+    const raw = isRO() ? c[field] : (state.crimeEdits[ek] ?? c[field]);
+    const vRow = vanillaRow(c), ctRow = tweakRow(c);
+    if (raw === null || raw === undefined) return "—";
+    if (kind === "bool") {
+      const cb = el("input", { type: "checkbox", "aria-label": `${c.key} ${label}`,
         onchange: ev => {
-          const v = isMoney ? String(Math.round(parseFloat(ev.target.value || "0") * 100))
-                            : String(+ev.target.value || 0);
-          if (v === String(+c[field])) delete state.crimeEdits[ek];
-          else state.crimeEdits[ek] = v;
-          ev.target.classList.toggle("edited", ek in state.crimeEdits);
+          const v = ev.target.checked ? "true" : "false";
+          if (v === c[field]) delete state.crimeEdits[ek]; else state.crimeEdits[ek] = v;
           renderToolbarOnly();
         } });
-      return el("td", {}, refField(inp, [["V","vtag",vRow?.[field]],["CT","cttag",ctRow?.[field]]], raw,
-        (v,ev)=>applyToInput(ev,isMoney?fmtMoney(+v):String(+v)), v=>isMoney?"$"+fmtMoney(+v):String(+v)));
-    });
+      cb.checked = String(raw) === "true";
+      return refField(cb, [["V","vtag",vRow?.[field]],["CT","cttag",ctRow?.[field]]], raw,
+        (v)=>{cb.checked=String(v)==="true";cb.dispatchEvent(new Event("change"));}, v=>String(v),
+        { bool: true });
+    }
+    const isMoney = kind === "money";
+    const inp = el("input", { type: "number", step: isMoney ? "0.01" : "any",
+      value: isMoney ? fmtMoney(+raw) : (+raw % 1 ? (+raw).toFixed(2) : String(+raw)),
+      style: "width:70px", class: ek in state.crimeEdits ? "edited" : "",
+      "aria-label": `${c.key} ${label}`,
+      onchange: ev => {
+        const v = isMoney ? String(Math.round(parseFloat(ev.target.value || "0") * 100))
+                          : String(+ev.target.value || 0);
+        if (v === String(+c[field])) delete state.crimeEdits[ek];
+        else state.crimeEdits[ek] = v;
+        ev.target.classList.toggle("edited", ek in state.crimeEdits);
+        renderToolbarOnly();
+      } });
+    return refField(inp, [["V","vtag",vRow?.[field]],["CT","cttag",ctRow?.[field]]], raw,
+      (v,ev)=>applyToInput(ev,isMoney?fmtMoney(+v):String(+v)), v=>isMoney?"$"+fmtMoney(+v):String(+v));
+  };
+  const severityControl = c => {
     const sevEk = c.key + "|severity";
-    const severityValue=isRO()?c.severity:(state.crimeEdits[sevEk]??c.severity);
-    const sev = el("select", { class: "key", style: "width:90px",disabled:isRO(),
+    const severityValue = isRO() ? c.severity : (state.crimeEdits[sevEk] ?? c.severity);
+    const vRow = vanillaRow(c), ctRow = tweakRow(c);
+    const sev = el("select", { class: "key", style: "width:90px", disabled: isRO(),
+      "aria-label": `${c.key} severity`,
       onchange: ev => {
         if (ev.target.value === c.severity) delete state.crimeEdits[sevEk];
         else state.crimeEdits[sevEk] = ev.target.value;
         ev.target.classList.toggle("edited", sevEk in state.crimeEdits);
         renderToolbarOnly();
       } },...["None","Low","Medium","High"].map(value=>{const option=el("option",{value},value);if(value===severityValue)option.selected=true;return option;}));
-    tbody.append(el("tr", {},el("td", { class: "key" },humanNameInput("crimes",c.key),c.key.replace("CRIME_", "")), ...cells,
-      el("td", {}, refField(sev, [["V","vtag",vRow?.severity],["CT","cttag",ctRow?.severity]], severityValue,
-        (v,ev)=>applyToInput(ev,v), v=>String(v)))));
-  }
-  table.append(tbody);
-  m.append(table);
+    return refField(sev, [["V","vtag",vRow?.severity],["CT","cttag",ctRow?.severity]], severityValue,
+      (v,ev)=>applyToInput(ev,v), v=>String(v));
+  };
+  m.append(columnList({class:"crime-table","aria-label":"Crimes",
+    rows,key:c=>c.key,editable:true,localSort:false,
+    template:`minmax(220px,1.4fr) repeat(${CRIME_COLS.length},minmax(0,.9fr)) 120px`,
+    columns:[{key:"name",label:()=>el("span",{},"Name / crime",fieldHelp("The editable name is an editor-only identification label, stored in this RDR2 plugin's labels.json; it does not rename game UI text.")),
+        cellClass:"key",
+        render:c=>el("span",{},humanNameInput("crimes",c.key),c.key.replace("CRIME_",""))},
+      ...CRIME_COLS.map(col=>({key:col[0],
+        label:col[3]?()=>el("span",{},col[1],fieldHelp(col[3])):col[1],
+        cellClass:col[2]==="bool"?"bool-cell":"",
+        render:c=>fieldControl(c,col)})),
+      {key:"severity",label:()=>el("span",{},"Severity",fieldHelp("Qualitative severity class used by crime escalation and law-response rules.")),
+        render:severityControl}]}));
   installTabContext();
 }
 
