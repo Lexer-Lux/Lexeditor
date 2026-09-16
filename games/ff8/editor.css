@@ -419,6 +419,13 @@
     .setting-control {min-width:0}
     .setting-control:not(.boolean) {width:clamp(120px,11vw,180px)}
     .setting-control.boolean {align-self:start;justify-self:end}
+    /* Only the title shares a line with the control; the description takes the
+       card's full width instead of the title's narrow column. */
+    .setting-row:has(> .setting-copy) {row-gap:0}
+    .setting-row > .setting-copy {display:contents}
+    .setting-row > .setting-copy > strong {grid-column:1;grid-row:1;align-self:center}
+    .setting-row > .setting-copy > :not(strong) {grid-column:1 / -1;grid-row:2;max-width:none}
+    .setting-row > .setting-control {grid-column:2;grid-row:1}
     .tweak-value input[type="checkbox"] {appearance:none;width:24px;height:24px;min-height:24px;margin:0;padding:0;border:2px solid;border-color:#292929 #aaa #aaa #292929;background:#333;box-shadow:none}
     .tweak-value input[type="checkbox"]:checked {background:#333 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 12.5 9.2 18 20 5.5' fill='none' stroke='%23aa2432' stroke-width='3.2' stroke-linecap='square'/%3E%3C/svg%3E") center/17px 17px no-repeat}
     @media(max-width:1050px) {
@@ -696,8 +703,7 @@
     .field-background-editor {display:grid;align-content:start;gap:8px;min-width:0}
     .field-background-picker {display:grid;grid-template-columns:auto minmax(80px,1fr) auto auto;align-items:center;gap:7px}
     .field-background-picker input {width:100%;min-width:0}
-    .field-background-picker input,.field-background-actions a {min-height:29px;padding:3px 7px;color:#fff;border:2px solid;border-color:#292929 #aaa #aaa #292929;background:#3b3b3b;font:inherit}
-    .field-background-actions a {display:grid;place-items:center;text-decoration:none}
+    .field-background-picker input {min-height:29px;padding:3px 7px;color:#fff;border:2px solid;border-color:#292929 #aaa #aaa #292929;background:#3b3b3b;font:inherit}
     .field-background-filters {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
     .field-background-filter {min-width:0}
     .field-background-filter strong {display:block;margin-bottom:4px}

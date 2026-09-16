@@ -36,6 +36,16 @@ def main():
     assert not metrics['scrollers'],metrics
     assert metrics['cards'] and max(metrics['cards'])<=metrics['bottom']+1,metrics
    print('Tweaks pages its cards at 1350, 900 and 700 pixels: no scrollbar, nothing clipped.')
+   # Every page fits, not only the one the fit was measured on, and the wheel
+   # turns pages because there is nothing to scroll.
+   pages=page.evaluate("document.querySelector('.lex-tweaks-pages .lex-page-total').textContent")
+   assert int(pages)>1,pages
+   for number in range(2,int(pages)+1):
+    page.hover('.lex-tweaks-scroll');page.mouse.wheel(0,120);page.wait_for_timeout(300)
+    assert page.evaluate("document.querySelector('.lex-tweaks-pages .lex-page-number').value")==str(number)
+    fit=page.evaluate("(s=>[s.scrollHeight,s.clientHeight])(document.querySelector('.lex-tweaks-scroll'))")
+    assert fit[0]<=fit[1]+1,(number,fit)
+   print('Every tweaks page fits, and the wheel turns them.')
    browser.close()
  finally:server.shutdown();server.server_close();thread.join(timeout=2)
 if __name__=='__main__':main()

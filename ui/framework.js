@@ -2489,36 +2489,70 @@
   // The fit is measured the way the row fitter measures a table: lay the cards
   // out, read the grid, take as many whole grid rows as the box holds. A caller
   // that genuinely wants a fixed count still passes pageSize.
+  // A paged surface with nothing to scroll turns its pages with the wheel.
+  // High-resolution wheels emit many small events for one gesture, so the
+  // first page turn locks until that event stream is quiet. A surface that
+  // can still scroll keeps the wheel for scrolling (canScroll).
+  const wheelPages = (node, step, canScroll = () => false) => {
+    let wheelDelta = 0;
+    let wheelLocked = false;
+    let wheelQuietTimer = 0;
+    node.addEventListener("wheel", event => {
+      if (event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) ||
+          event.target.closest?.("input,select,textarea,[contenteditable=true]") || canScroll()) return;
+      const scale = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? Math.max(1, node.clientHeight) : 1;
+      const delta = event.deltaY * scale;
+      if (!delta) return;
+      event.preventDefault();
+      clearTimeout(wheelQuietTimer);
+      wheelQuietTimer = setTimeout(() => {
+        wheelDelta = 0;
+        wheelLocked = false;
+      }, 180);
+      if (wheelLocked) return;
+      wheelDelta += delta;
+      if (Math.abs(wheelDelta) < 24) return;
+      wheelLocked = true;
+      step(wheelDelta > 0 ? 1 : -1);
+    }, {passive:false});
+  };
+
   const paginateSettings = (content, options = {}) => {
     const cards = [...content.children];
-    let size = options.pageSize || cards.length || 1;
+    const size = options.pageSize || 0;
     let page = 0;
-    let measuring = false;
+    // Where each page starts, as an index into the visible cards. Cards differ
+    // in height, so one count per page was only ever right for the page it was
+    // measured on: a page of tall cards ran under the pager.
+    let starts = [0];
+    let pagedCount = -1;
     const footer = element("div", {class:"lex-tweaks-pages"});
     const scroll = element("div", {class:"lex-tweaks-scroll", tabindex:"-1"}, content);
     const root = element("div", {class:"lex-tweaks-paged"}, scroll, footer);
 
-    // How many cards fit, with every card on screen so the grid reports its
-    // real column count and row heights. Cards differ in height, so the rows
-    // are measured rather than assumed: walk the laid-out cards and stop at
-    // the last one whose bottom still clears the box.
-    const measure = () => {
-      if (options.pageSize || measuring || !scroll.isConnected) return size;
-      measuring = true;
-      const visible = cards.filter(card => !card.hidden);
-      const box = scroll.clientHeight;
-      let fits = visible.length;
-      if (box > 0 && visible.length) {
-        // Deal the whole set, then read how many cards are above the fold.
-        // Columns pack independently, so this is a count of cards rather than
-        // of rows and there is no row boundary to respect.
-        deal(visible);
-        const top = content.getBoundingClientRect().top;
-        fits = visible.filter(card =>
-          card.getBoundingClientRect().bottom - top <= box + 0.5).length;
+    // Fill each page until one more card would overflow the box. A caller
+    // that genuinely wants a fixed count passes pageSize.
+    const overflows = () => scroll.scrollHeight > scroll.clientHeight + 1;
+    const paginate = visible => {
+      pagedCount = visible.length;
+      if (size || !scroll.isConnected || scroll.clientHeight <= 0) {
+        const per = size || visible.length || 1;
+        starts = Array.from({length: Math.max(1, Math.ceil(visible.length / per))}, (_, index) => index * per);
+        return;
       }
-      measuring = false;
-      return Math.max(1, fits);
+      const next = [0];
+      for (let from = 0; from < visible.length;) {
+        let count = 1;
+        while (from + count < visible.length) {
+          deal(visible.slice(from, from + count + 1));
+          if (overflows()) break;
+          count += 1;
+        }
+        from += count;
+        if (from < visible.length) next.push(from);
+      }
+      starts = next;
     };
 
     // How many columns the width allows, and the deal itself. Cards go round
@@ -2559,14 +2593,16 @@
 
     const render = () => {
       const visible = cards.filter(card => !card.hidden);
-      const pages = Math.max(1, Math.ceil(visible.length / size));
-      page = Math.min(page, pages - 1);
-      deal(visible.slice(page * size, (page + 1) * size));
+      if (visible.length !== pagedCount) paginate(visible);
+      const pages = starts.length;
+      page = Math.max(0, Math.min(page, pages - 1));
+      const from = starts[page], to = starts[page + 1] ?? visible.length;
+      deal(visible.slice(from, to));
       const focused = footer.contains(document.activeElement) ? document.activeElement : null;
       const selection = focused && [focused.selectionStart, focused.selectionEnd];
       const label = focused?.getAttribute("aria-label");
-      footer.replaceChildren(pager({page, pages, total:visible.length, pageSize:size,
-        search:options.search, change:value => {page=value;render();scroll.scrollTop=0;}}));
+      footer.replaceChildren(pager({page, pages, total:visible.length, range:[from + 1, to],
+        search:options.search, change:turn}));
       if (label && focused?.matches("input")) {
         const replacement = [...footer.querySelectorAll("input")].find(input=>input.getAttribute("aria-label")===label);
         replacement?.focus();
@@ -2574,39 +2610,22 @@
       }
     };
 
+    const turn = value => {page = value; render(); scroll.scrollTop = 0;};
+    // Re-break the pages for the box as it is now, keeping the first card on
+    // screen on screen.
     const refit = () => {
-      let wanted = measure();
-      if (wanted !== size) {
-        const first = page * size;
-        size = wanted;
-        page = Math.floor(first / size);
-        render();
-      }
-      // The measurement is taken with every card laid out, and a grid row is
-      // as tall as its tallest card, so hiding the tail can leave the kept
-      // cards arranged differently. Correct against what is actually on
-      // screen rather than trusting the first estimate.
-      const total = () => cards.filter(card => !card.hidden).length;
-      const clampPage = () => {
-        page = Math.min(page, Math.max(0, Math.ceil(total() / size) - 1));
-      };
-      for (let guard = 0; guard < 8; guard += 1) {
-        if (scroll.scrollHeight <= scroll.clientHeight + 1 || size <= 1) break;
-        size -= 1; clampPage(); render();
-      }
-      // And the other direction: the estimate can be short by a row, which
-      // leaves a band of empty panel under the last card and an extra page
-      // that did not need to exist. Grow until one more card would overflow.
-      for (let guard = 0; guard < 8; guard += 1) {
-        if (size >= total()) break;
-        size += 1; clampPage(); render();
-        if (scroll.scrollHeight > scroll.clientHeight + 1) {
-          size -= 1; clampPage(); render();
-          break;
-        }
-      }
+      const visible = cards.filter(card => !card.hidden);
+      const anchor = visible[starts[page]] || null;
+      paginate(visible);
+      const at = anchor ? visible.indexOf(anchor) : 0;
+      page = Math.max(0, starts.findLastIndex(start => start <= at));
+      render();
     };
-    root.refreshPages = () => {page=0;refit();render();};
+    wheelPages(scroll, direction => {
+      const target = page + direction;
+      if (target >= 0 && target < starts.length) turn(target);
+    }, overflows);
+    root.refreshPages = () => {page=0;pagedCount=-1;refit();};
     root.lexFitPage = refit;
     render();
     if ((options.tabs || []).length > 1) root.prepend(subtabBar({
@@ -6299,8 +6318,8 @@ ${contents.path}`});
     }, text);
     const total = Math.max(0, Number(options.total) || 0);
     const pageSize = Math.max(1, Number(options.pageSize) || 1);
-    const first = total ? page * pageSize + 1 : 0;
-    const last = total ? Math.min(total, first + pageSize - 1) : 0;
+    const first = !total ? 0 : options.range ? options.range[0] : page * pageSize + 1;
+    const last = !total ? 0 : options.range ? options.range[1] : Math.min(total, first + pageSize - 1);
     const controls = element("div", {class: "lex-pager-controls"},
       button("<<", 0, page <= 0, "First page"),
       button("<", page - 1, page <= 0, "Previous page"),
@@ -6754,31 +6773,8 @@ ${contents.path}`});
       class: "lex-barrel-grid", style: `--lex-barrels:${masterNodes.length}`,
     }, ...masterNodes);
     const masterNode = element("div", {class: "lex-barrelled-master"}, barrelGrid);
-    // A fitted master has no vertical scroll range, so use its wheel as the
-    // quickest page control. High-resolution wheels emit many small events for
-    // one gesture; lock after the first page until that event stream is quiet.
-    let wheelDelta = 0;
-    let wheelLocked = false;
-    let wheelQuietTimer = 0;
-    masterNode.addEventListener("wheel", event => {
-      if (event.ctrlKey || event.shiftKey || Math.abs(event.deltaX) > Math.abs(event.deltaY) ||
-          event.target.closest?.("input,select,textarea,[contenteditable=true]")) return;
-      const scale = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16
-        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? Math.max(1, masterNode.clientHeight) : 1;
-      const delta = event.deltaY * scale;
-      if (!delta) return;
-      event.preventDefault();
-      clearTimeout(wheelQuietTimer);
-      wheelQuietTimer = setTimeout(() => {
-        wheelDelta = 0;
-        wheelLocked = false;
-      }, 180);
-      if (wheelLocked) return;
-      wheelDelta += delta;
-      if (Math.abs(wheelDelta) < 24) return;
-      wheelLocked = true;
-      changePage(page + (wheelDelta > 0 ? 1 : -1));
-    }, {passive:false});
+    // A fitted master has no vertical scroll range, so its wheel turns pages.
+    wheelPages(masterNode, direction => changePage(page + direction));
     const barrelPanelMinimum = Math.max(160, Number(options.minLeft) || 280) * barrels +
       7 * (barrels - 1);
     const root = leadingNode ? panelLayout([leadingNode, masterNode, detailNode],
