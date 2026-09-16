@@ -361,8 +361,25 @@ body.lex-save-busy .lex-save-icon.saving {
 }
 
 .lex-new-button-plus {
-  font: 800 20px/1 var(--lex-symbol-font);
+  /* Drawn, not typed. A font's plus sits on the maths axis, above the middle of
+     its line box, so however the box is centred the mark reads high. Two bars
+     are centred on the button itself. */
+  position: relative;
+  width: 14px;
+  height: 14px;
+  font-size: 0;
 }
+.lex-new-button-plus::before,
+.lex-new-button-plus::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  content: "";
+  background: currentColor;
+  translate: -50% -50%;
+}
+.lex-new-button-plus::before { width: 14px; height: 2px; }
+.lex-new-button-plus::after { width: 2px; height: 14px; }
 
 .lex-new-button:disabled {
   opacity: .4;

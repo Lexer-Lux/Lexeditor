@@ -43,7 +43,12 @@
     .blank-graphs .lex-curve-formula{display:none}
     .blank-components{height:100%}
     .blank-sample{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;padding:12px;border:1px dashed var(--lex-border);overflow-x:auto}
-    .blank-sample>*{flex:1 1 320px}
+    /* A sample is shown at the size the component really is. Only the wide
+       ones - lists, panels, pages - take the width of the row. */
+    .blank-sample>*{flex:0 0 auto;max-width:100%}
+    .blank-sample.wide>*{flex:1 1 320px}
+    .blank-sample>svg{width:var(--blank-glyph,24px);height:var(--blank-glyph,24px)}
+    .blank-sample.glyph{--blank-glyph:28px;align-items:center}
     .blank-sample-missing{margin:0;padding:12px;color:var(--lex-muted)}
     .blank-games{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
     .blank-game{display:grid;width:64px;gap:3px;justify-items:center;font-size:10px;line-height:1.2;text-align:center}
@@ -306,12 +311,16 @@
     catalogue.usageLoaded=true;
     try{const response=await fetch("/shared/component-usage.json");catalogue.usage=(await response.json()).components||{};}
     catch(_error){catalogue.usage={};}
+    // How many games there are, so a component every one of them uses can say
+    // so instead of listing the lot.
+    catalogue.pluginCount=Math.max(1,...Object.values(catalogue.usage||{}).map(list=>list.length));
     render();
     // The home screen's own game rows, so a component's games are recognisable
     // rather than a list of folder names.
     try{
       const games=await LexeditorUI.callWindow("plugins");
       catalogue.games=Object.fromEntries((games||[]).map(game=>[game.id,game]));
+      catalogue.pluginCount=Math.max(catalogue.pluginCount||0,(games||[]).length);
       await Promise.all((games||[]).map(async game=>{
         try{const art=await LexeditorUI.callWindow("cover_art_data_uri",game.id);
           if(art?.uri)catalogue.games[game.id].uri=art.uri;}catch(_error){}
@@ -339,13 +348,19 @@
     const body=[detailSection({title:"WHAT IT IS",body:[
       detailField({label:"SUMMARY",control:readonlyField(row.summary||"")}),
       detailField({label:"LEVEL",control:readonlyField(row.level)}),
-      detailField({label:"USED BY",control:row.usedBy.length
-        ? el("div",{class:"blank-games"},...row.usedBy.map(gameCard))
-        : readonlyField("No game uses this yet."),
+      detailField({label:"USED BY",control:!row.usedBy.length
+        ? readonlyField("No game uses this yet.")
+        : row.usedBy.length>=(catalogue.pluginCount||Infinity)
+          ? readonlyField("All games.")
+          : el("div",{class:"blank-games"},...row.usedBy.map(gameCard)),
         help:infoHelp("Read from the plugins themselves, not a list anyone maintains.")}),
     ]})];
+    // A glyph is a few pixels across in use; a list is a page wide. The sample
+    // box follows the component rather than stretching everything to fit.
+    const glyph=/icon$|^infoIcon$|Mark$/.test(row.id);
+    const wide=["organism","template"].includes(row.level)&&!glyph;
     body.push(detailSection({title:"SAMPLE",body:[row.hasSample
-      ? el("div",{class:"blank-sample"},row.sample())
+      ? el("div",{class:`blank-sample${wide?" wide":""}${glyph?" glyph":""}`},row.sample())
       : el("p",{class:"blank-sample-missing"},row.level==="utility"
         ? "Nothing to draw: this one is code a page calls, not a control."
         : "No sample yet. Add one in ui/component-catalog.js.")]}));
@@ -376,7 +391,7 @@
   // catalogue entry borrows the page rather than keeping a second copy of it.
   function attachLocalSamples(){
     const local={panelLayout:()=>galleryPanel("Panel layout"),tabbedPanel:()=>subtabPanel(),
-      curveEditor:()=>graphsPanel(),reshadeSection:()=>tweaksPanel(),
+      curveEditor:()=>graphsPanel(),modLoaderSection:()=>tweaksPanel(),
       listDetail:()=>panelLayout([pagedTablePane(),recordPanel()],"blank-layout",{layoutKey:"blank-sample-two",defaultSizes:[50,50]}),
       masterDetail:()=>panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-sample-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980}),
       dataMap:()=>dataMapPanel()};

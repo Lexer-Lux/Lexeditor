@@ -132,3 +132,13 @@ automatically as `waiting`. Changing status does not authorize unrelated work.
   mods, saves, required game data, and diagnostic evidence that is still needed.
 - Do not open visible test windows during a routine check. Native window
   fixtures require explicit user approval; headless checks are the default.
+
+## Editing files from a shell
+
+- Do not pass code containing quotes or backslashes through a bash heredoc.
+  Escaping inside `<<'PY' ... PY` fails on the outer shell first, which reads as
+  ``unexpected EOF while looking for matching `'``. Write the patch script to
+  the scratchpad with the file-writing tool, then run it: `python
+  <scratchpad>/patch.py`. Same for one-off checks longer than a single line.
+- A patch script asserts what it expects to find before replacing it, so a
+  changed file fails loudly instead of silently matching nothing.
