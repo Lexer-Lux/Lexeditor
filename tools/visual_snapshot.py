@@ -1,6 +1,6 @@
 """Screenshot every tab of every plugin, opened the way the app opens them.
 
-    python tools/visual_snapshot.py <output-folder> [plugin ...]
+    python tools/visual_snapshot.py <output-folder> [--styles] [plugin ...]
 
 Run it from a checkout (the current one, or an older worktree) to capture how
 that version looks with the installed games and the current mod projects. Two
@@ -10,8 +10,15 @@ DOM assertion can say.
 Each plugin is opened through the desktop host's own open_plugin, so the page
 gets the same game paths, project and fonts it gets in the app. Nothing is
 saved; the page is only looked at.
+
+With --styles, each view also records the computed style and box of every
+visible element (<plugin>-<tab>.styles.json). tools/style_compare.py lists
+what differs between two runs, which is how a CSS refactor proves it changed
+nothing it did not mean to.
 """
 from __future__ import annotations
+
+import json
 
 import sys
 import time
@@ -26,6 +33,52 @@ from app import discover_plugins  # noqa: E402
 from desktop_host import HostApi  # noqa: E402
 
 SIZE = {"width": 1600, "height": 900}
+STYLES = False
+
+# The properties that decide how an element looks and where it sits.
+PROPERTIES = """
+display position top right bottom left float z-index box-sizing
+margin-top margin-right margin-bottom margin-left
+padding-top padding-right padding-bottom padding-left
+border-top-width border-right-width border-bottom-width border-left-width
+border-top-style border-right-style border-bottom-style border-left-style
+border-top-color border-right-color border-bottom-color border-left-color
+border-top-left-radius border-top-right-radius border-bottom-left-radius border-bottom-right-radius
+outline-style outline-width outline-color box-shadow
+background-color background-image background-position background-size
+color opacity visibility filter mix-blend-mode
+font-family font-size font-weight font-style line-height letter-spacing word-spacing
+text-transform text-align text-decoration-line text-shadow text-overflow white-space
+overflow-wrap word-break vertical-align
+overflow-x overflow-y
+flex-direction flex-wrap flex-grow flex-shrink flex-basis order
+align-items align-self align-content justify-content justify-items justify-self
+grid-template-columns grid-template-rows grid-column-start grid-column-end
+grid-row-start grid-row-end grid-auto-flow column-gap row-gap
+min-width max-width min-height max-height
+transform cursor pointer-events user-select
+""".split()
+
+CAPTURE = """props => {
+  const out = {};
+  const walk = (node, path) => {
+    const style = getComputedStyle(node);
+    if (style.display === 'none') return;
+    const box = node.getBoundingClientRect();
+    const entry = {box: [box.x, box.y, box.width, box.height].map(v => Math.round(v * 2) / 2)};
+    for (const name of props) entry[name] = style.getPropertyValue(name);
+    out[path] = entry;
+    const counts = {};
+    for (const child of node.children) {
+      if (child.matches('script,style,link,template,svg *')) continue;
+      const key = child.tagName.toLowerCase() + ([...child.classList].filter(c => !/^(active|selected|sel|hover|focus|lex-value-modified)$/.test(c)).sort().map(c => '.' + c).join(''));
+      counts[key] = (counts[key] || 0) + 1;
+      walk(child, path + ' > ' + key + (counts[key] > 1 ? ':' + counts[key] : ''));
+    }
+  };
+  walk(document.body, 'body');
+  return out;
+}"""
 
 
 def settle(page, ms=700):
@@ -74,6 +127,10 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
             page.mouse.move(2, SIZE["height"] - 2)
             settle(page, 200)
             page.screenshot(path=str(out / f"{plugin_id}-{tab or 'page'}.png"))
+            if STYLES:
+                styles = page.evaluate(CAPTURE, PROPERTIES)
+                (out / f"{plugin_id}-{tab or 'page'}.styles.json").write_text(
+                    json.dumps(styles, indent=0, sort_keys=True), encoding="utf-8")
         # Page-level subtabs are part of the look too: shoot each on the last tab
         # only when a plugin has them on its first screen.
     except Exception as error:  # noqa: BLE001
@@ -86,10 +143,15 @@ def shoot_plugin(browser, api, plugin_id: str, out: Path) -> list[str]:
 
 
 def main() -> int:
-    out = Path(sys.argv[1]).resolve()
+    global STYLES
+    args = sys.argv[1:]
+    if "--styles" in args:
+        STYLES = True
+        args.remove("--styles")
+    out = Path(args[0]).resolve()
     out.mkdir(parents=True, exist_ok=True)
     plugins = discover_plugins()
-    wanted = sys.argv[2:] or [pid for pid in sorted(plugins) if pid != "ff7_2013"]
+    wanted = args[1:] or [pid for pid in sorted(plugins) if pid != "ff7_2013"]
     api = HostApi(plugins)
     notes = []
     with sync_playwright() as play:
