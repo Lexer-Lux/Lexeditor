@@ -3,6 +3,9 @@ import sys,tempfile,re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 sys.path.insert(0,str(ROOT))
 from settings_manager import SettingsStore
 
@@ -40,8 +43,8 @@ def main():
   p.keyboard.press('Shift+Tab');p.wait_for_timeout(50);assert p.evaluate('active.b')=='one'
   p.evaluate("document.body.insertAdjacentHTML('beforeend','<div role=dialog><input id=d1><input id=d2></div>')")
   p.locator('#d1').focus();p.keyboard.press('Tab');assert p.locator('#d2').evaluate('(e)=>e===document.activeElement')
-  ff8=(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8')
-  p.add_style_tag(content=re.search(r'<style>(.*?)</style>',ff8,re.S).group(1))
+  ff8=plugin_ui('ff8')
+  p.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_style_tag(content='#magic{width:700px;height:650px}.magic-detail{height:100%}')
   fn=ff8[ff8.index('  function magicDetail('):ff8.index('  function abilityIcon(')]
   p.add_script_tag(content="""const {el,detailField,detailSection,tabbedPanel,multiNumberRow,infoHelp}=LexeditorUI;

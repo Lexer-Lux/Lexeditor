@@ -102,8 +102,14 @@ class Handler(PluginRequestHandler):
         try:
             if path == "/":
                 self.file_response(PLUGIN_ROOT / "editor.html")
-            elif path == "/cards_ui.js":
-                self.file_response(PLUGIN_ROOT / "cards_ui.js")
+            elif path.endswith((".js", ".css")) and "/" not in path.lstrip("/"):
+                # The page is a page: its script and its stylesheet live in
+                # modules beside it, named for what they hold.
+                module = (PLUGIN_ROOT / path.lstrip("/")).resolve()
+                if module.parent != PLUGIN_ROOT.resolve() or not module.is_file():
+                    self.json_response({"error": "Not found"}, 404)
+                else:
+                    self.file_response(module)
             elif path in ("/assets/licenses/FF8UltimateEditor-GPL-3.0.txt", "/assets/licenses/FFNx-GPL-3.0.txt", "/assets/licenses/Deling-GPL-3.0.txt", "/assets/licenses/OpenVIII-MIT.txt"):
                 self.file_response(PLUGIN_ROOT / path.lstrip("/"))
             elif path == "/assets/ff8-menu.ttf":

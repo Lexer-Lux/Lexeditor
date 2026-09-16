@@ -36,15 +36,18 @@ def usage() -> dict[str, list[str]]:
     # there is one Blank shows, whoever wrote the file.
     sources.append(("blank", ROOT / "ui" / "component-catalog.js"))
     for name, plugin in sources:
-        for path in ([plugin] if plugin.is_file() else sorted(plugin.rglob("*"))):
-            if path.suffix.lower() not in (".html", ".js") or not path.is_file():
-                continue
-            text = path.read_text(encoding="utf-8", errors="replace")
-            # Both spellings a plugin can use: LexeditorUI.name(, and the name
-            # pulled out of the shared object by destructuring.
-            destructured = set()
+        paths = [plugin] if plugin.is_file() else [
+            path for path in sorted(plugin.rglob("*"))
+            if path.suffix.lower() in (".html", ".js") and path.is_file()]
+        texts = [path.read_text(encoding="utf-8", errors="replace") for path in paths]
+        # A page destructures the shared UI once, in one module, and calls those
+        # names from every other module beside it, so the names are collected for
+        # the whole plugin before its files are read for calls.
+        destructured = set()
+        for text in texts:
             for block in re.findall(r"=\s*LexeditorUI\s*;|\{([^{}]*)\}\s*=\s*LexeditorUI", text):
                 destructured.update(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", block or ""))
+        for text in texts:
             for component in names:
                 if f"LexeditorUI.{component}" in text or f"UI.{component}(" in text or (
                         component in destructured

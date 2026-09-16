@@ -3,6 +3,9 @@ import sys,re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 
 def main():
  with sync_playwright() as pw:
@@ -12,7 +15,7 @@ def main():
   page.goto('http://fixture/')
   page.set_content('<main id="main" style="height:800px"></main>')
   page.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  css=re.search(r'<style>(.*?)</style>',(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8'),re.S).group(1)
+  css=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')
   page.add_style_tag(content=css)
   page.add_style_tag(content=':root{--lex-text:#fff;--lex-panel:#626262;--lex-panel-2:#4f4f4f;--lex-border:#929292;--lex-highlight:#fff;--lex-accent:#aa2432;--lex-panel-gap:8px}')
   page.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))

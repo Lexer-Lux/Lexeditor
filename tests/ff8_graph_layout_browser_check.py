@@ -3,12 +3,15 @@ import re,tempfile
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 FRAMEWORK_CSS=(ROOT/'ui/framework.css').read_text(encoding='utf-8')
 FRAMEWORK_JS=(ROOT/'ui/framework.js').read_text(encoding='utf-8')
 GRAPH_CSS=(ROOT/'ui/ff8-graph-design-a.css').read_text(encoding='utf-8')
 GRAPH_JS=(ROOT/'ui/ff8-graph-design-a.js').read_text(encoding='utf-8')
 def main():
- css=re.search(r'<style>(.*?)</style>',(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8'),re.S).group(1)
+ css=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')
  with sync_playwright() as pw:
   browser=pw.chromium.launch(headless=True);page=browser.new_page(viewport={'width':2048,'height':1100})
   page.set_content('<base href="http://127.0.0.1:9/"><link id="lex-ff8-graph-design-a-style"><style>'+FRAMEWORK_CSS+css+GRAPH_CSS+'</style><style>:root{--lex-border:#929292;--lex-text:#fff;--lex-panel:#626262;--ff8-menu-surface:#626262}body{padding:12px}#mount{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;height:1000px}</style><main id="mount"></main>')

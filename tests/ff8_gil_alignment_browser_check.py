@@ -3,9 +3,12 @@ import base64, os, re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 def main():
     font=Path(os.environ['LOCALAPPDATA'])/'Lexeditor/game-data/ff8/generated/ff8-menu.ttf'
-    css=re.search(r'<style>(.*?)</style>',(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8'),re.S).group(1)
+    css=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8')
     css=css.replace('/assets/ff8-menu.ttf?v=4','data:font/ttf;base64,'+base64.b64encode(font.read_bytes()).decode())
     with sync_playwright() as pw:
         browser=pw.chromium.launch(headless=True);page=browser.new_page()

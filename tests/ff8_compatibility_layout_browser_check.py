@@ -3,12 +3,15 @@ import re
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from plugin_ui import plugin_ui
 def main():
  with sync_playwright() as pw:
   b=pw.chromium.launch(headless=True);p=b.new_page()
   p.route('http://fixture/',lambda r:r.fulfill(body='<div id="fixture"></div>',content_type='text/html'));p.goto('http://fixture/')
   p.add_style_tag(content=(ROOT/'ui/framework.css').read_text(encoding='utf-8'))
-  p.add_style_tag(content=re.search(r'<style>(.*?)</style>',(ROOT/'games/ff8/editor.html').read_text(encoding='utf-8'),re.S).group(1))
+  p.add_style_tag(content=(ROOT/'games/ff8/editor.css').read_text(encoding='utf-8'))
   p.add_script_tag(content=(ROOT/'ui/framework.js').read_text(encoding='utf-8'))
   p.evaluate('''()=>{const U=LexeditorUI;for(const magic of [false,true]){const host=U.el('div',{class:magic?'magic-compat-column':'',style:'height:800px;width:300px'});host.append(U.columnList({class:'gf-compat-table ff8-record-list',rows:Array.from({length:16},(_,id)=>({id})),key:r=>r.id,template:'minmax(135px,1fr) 90px',columns:[{key:'id',label:'GF',render:r=>U.hoverable({class:'gf-entity-label',content:[U.el('span',{class:'gf-link-portrait-slot'},U.el('img',{class:'gf-link-portrait',src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="60"><rect width="40" height="60" fill="silver"/></svg>'})),U.el('span',{},'Alexander')]})},{key:'value',label:'Change',render:()=>U.el('input',{value:'0'})}]}));document.querySelector('#fixture').append(host)}}''')
   for height in [600,800,1000]:
