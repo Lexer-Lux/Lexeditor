@@ -100,10 +100,10 @@ index 8eb43c8..fff731e 100644
 +
 +endif()
 diff --git a/misc/FFNx.toml b/misc/FFNx.toml
-index d0b1566..b40c493 100644
+index d0b1566..9694273 100644
 --- a/misc/FFNx.toml
 +++ b/misc/FFNx.toml
-@@ -568,6 +568,33 @@ disable_animated_textures_on_field = ""
+@@ -568,6 +568,36 @@ disable_animated_textures_on_field = ""
  #~~~~~~~~~~~~~~~~~~~~~~~~~~~
  enable_devtools = false
  
@@ -115,6 +115,9 @@ index d0b1566..b40c493 100644
 +
 +# Manual analog world-map camera. Battle inputs are unchanged.
 +enable_ff8_modern_controls = false
++
++# Battle camera turn rate as a multiple of the shipped speed, 0.2 to 4.
++ff8_modern_controls_camera_speed = 1.0
 +
 +# Skip the FFNx startup logo in FF8. Used with the native credits completion patch.
 +enable_ff8_fast_start = false
@@ -203,10 +206,10 @@ index 8cf533e..5809890 100644
  		}
 diff --git a/src/battle_camera.h b/src/battle_camera.h
 new file mode 100644
-index 0000000..2bbb6a6
+index 0000000..1a521c4
 --- /dev/null
 +++ b/src/battle_camera.h
-@@ -0,0 +1,61 @@
+@@ -0,0 +1,123 @@
 +#pragma once
 +#include <algorithm>
 +#include <cmath>
@@ -241,14 +244,67 @@ index 0000000..2bbb6a6
 +    return static_cast<std::int16_t>(std::clamp<long>(rounded, -32768, 32767));
 +}
 +
++// How fast the stick turns the camera, as a multiple of the shipped rate. One
++// is what the tweak has always done. The bounds are what stays usable: below a
++// fifth of the rate the stick reads as unresponsive, above four times it
++// overshoots the target before the reader lets go.
++constexpr float MIN_SPEED_SCALE = 0.2f;
++constexpr float MAX_SPEED_SCALE = 4.0f;
++constexpr float DEFAULT_SPEED_SCALE = 1.0f;
++
++inline float speed_scale(float value) {
++    if (!(value > 0.0f)) return DEFAULT_SPEED_SCALE;
++    return std::clamp(value, MIN_SPEED_SCALE, MAX_SPEED_SCALE);
++}
++
++// How far the camera may swing. FF8's battlefield is a plane with nothing under
++// it, and the shipped clamp allowed seventy-seven degrees below level, so the
++// scene ended up drawn from inside the terrain.
++//
++// Level is the fallback floor, not the rule. The rule is the scene's own: FF8
++// hands the camera back at a pose it chose for this battle, and that pose is
++// the lowest angle the game itself considers correct here. Some scenes sit
++// slightly below level and clamping those to level would lift the camera off
++// the pose the game just set. So the floor is whichever is lower, level or the
++// pose FF8 last handed back, and it is re-learned every time the reader lets
++// go of the stick.
++constexpr float MIN_PITCH = 0.0f;
++constexpr float MAX_PITCH = 1.35f;
++
++// The floor this battle is using. The caller keeps one and passes it in; it
++// costs a float and a flag and it is what makes the clamp per-scene rather
++// than per-game.
++struct Floor {
++    float pitch = MIN_PITCH;
++    bool known = false;
++};
++
++inline float pitch_of(const Vec3s &position, const Vec3s &look_at) {
++    const float dy = static_cast<float>(position.y) - look_at.y;
++    const float horizontal = std::hypot(static_cast<float>(position.x) - look_at.x,
++                                        static_cast<float>(position.z) - look_at.z);
++    return std::atan2(dy, horizontal);
++}
++
 +// Orbit position around the handed-back idle look-at point. There is no
 +// persistent yaw/pitch state: every step starts from FF8's current idle pose,
 +// so a native action camera can take ownership and return without a stale snap.
 +inline bool orbit(Vec3s &position, const Vec3s &look_at, int raw_x, int raw_y,
-+                  float yaw_speed = 0.035f, float pitch_speed = 0.025f) {
++                  float yaw_speed = 0.035f, float pitch_speed = 0.025f,
++                  float scale = DEFAULT_SPEED_SCALE, Floor *floor = nullptr) {
 +    const float input_x = axis(raw_x);
 +    const float input_y = axis(raw_y);
-+    if (input_x == 0.0f && input_y == 0.0f) return false;
++    if (input_x == 0.0f && input_y == 0.0f) {
++        // Nobody is holding the stick, so this pose is FF8's own. Learn the
++        // scene's floor from it: whichever is lower, level or where the game
++        // put the camera.
++        if (floor) {
++            const float resting = pitch_of(position, look_at);
++            floor->pitch = std::min(MIN_PITCH, resting);
++            floor->known = true;
++        }
++        return false;
++    }
 +
 +    const float dx = static_cast<float>(position.x) - look_at.x;
 +    const float dy = static_cast<float>(position.y) - look_at.y;
@@ -257,9 +313,18 @@ index 0000000..2bbb6a6
 +    const float radius = std::hypot(horizontal, dy);
 +    if (radius < 1.0f) return false;
 +
-+    float yaw = std::atan2(dx, dz) + input_x * yaw_speed;
-+    float pitch = std::atan2(dy, horizontal) - input_y * pitch_speed;
-+    pitch = std::clamp(pitch, -1.35f, 1.35f);
++    const float rate = speed_scale(scale);
++    float yaw = std::atan2(dx, dz) + input_x * yaw_speed * rate;
++    // Pushing the stick up tilts the view up, so the camera drops: the
++    // non-inverted convention. It used to raise the camera, which read inverted.
++    float pitch = std::atan2(dy, horizontal) + input_y * pitch_speed * rate;
++    // The scene's floor if one has been learned, level otherwise, and never
++    // above where the camera already is - a pose that is somehow lower still
++    // may be raised but is not yanked up on its own.
++    const float current_pitch = std::atan2(dy, horizontal);
++    const float scene_floor = (floor && floor->known) ? floor->pitch : MIN_PITCH;
++    const float floor_pitch = std::min(scene_floor, current_pitch);
++    pitch = std::clamp(pitch, floor_pitch, MAX_PITCH);
 +
 +    const float projected = radius * std::cos(pitch);
 +    position.x = word(static_cast<float>(look_at.x) + projected * std::sin(yaw));
@@ -270,10 +335,10 @@ index 0000000..2bbb6a6
 +} // namespace lexeditor_battle_camera
 diff --git a/src/camera_axis.h b/src/camera_axis.h
 new file mode 100644
-index 0000000..19567b0
+index 0000000..f526b18
 --- /dev/null
 +++ b/src/camera_axis.h
-@@ -0,0 +1,50 @@
+@@ -0,0 +1,51 @@
 +#pragma once
 +#include <algorithm>
 +
@@ -294,7 +359,8 @@ index 0000000..19567b0
 +    return step;
 +}
 +inline int yaw_step(int raw, int &remainder) { return axis_step(raw, remainder); }
-+inline int pitch_step(int raw, int &remainder) { return axis_step(raw, remainder); }
++// Non-inverted: stick up tilts the view up, the opposite sign of the raw axis.
++inline int pitch_step(int raw, int &remainder) { return -axis_step(raw, remainder); }
 +inline unsigned wrap_yaw(int yaw) { return static_cast<unsigned>(yaw) & 0xFFFu; }
 +inline int clamp_pitch(int pitch) { return std::clamp(pitch, -0x200, 0); }
 +
@@ -325,16 +391,17 @@ index 0000000..19567b0
 +};
 +}
 diff --git a/src/cfg.cpp b/src/cfg.cpp
-index c313df7..a19dc06 100644
+index c313df7..d003bfe 100644
 --- a/src/cfg.cpp
 +++ b/src/cfg.cpp
-@@ -119,6 +119,15 @@ std::string override_mod_path;
+@@ -119,6 +119,16 @@ std::string override_mod_path;
  std::string direct_mode_path;
  std::string save_path;
  bool enable_devtools;
 +bool enable_ff8_party_switch;
 +bool enable_ff8_no_magic_consumption;
 +bool enable_ff8_modern_controls;
++double ff8_modern_controls_camera_speed;
 +bool enable_ff8_fast_start;
 +bool enable_ff8_better_targeting;
 +bool enable_ff8_xp_bars;
@@ -344,13 +411,14 @@ index c313df7..a19dc06 100644
  long devtools_hotkey;
  double speedhack_step;
  double speedhack_max;
-@@ -290,6 +299,15 @@ void read_cfg()
+@@ -290,6 +300,16 @@ void read_cfg()
  	direct_mode_path = config["direct_mode_path"].value_or("");
  	save_path = config["save_path"].value_or("");
  	enable_devtools = config["enable_devtools"].value_or(false);
 +	enable_ff8_party_switch = config["enable_ff8_party_switch"].value_or(false);
 +	enable_ff8_no_magic_consumption = config["enable_ff8_no_magic_consumption"].value_or(false);
 +	enable_ff8_modern_controls = config["enable_ff8_modern_controls"].value_or(false);
++	ff8_modern_controls_camera_speed = config["ff8_modern_controls_camera_speed"].value_or(1.0);
 +	enable_ff8_fast_start = config["enable_ff8_fast_start"].value_or(false);
 +	enable_ff8_better_targeting = config["enable_ff8_better_targeting"].value_or(false);
 +	enable_ff8_xp_bars = config["enable_ff8_xp_bars"].value_or(false);
@@ -361,16 +429,17 @@ index c313df7..a19dc06 100644
  	speedhack_step = config["speedhack_step"].value_or(0.5);
  	speedhack_max = config["speedhack_max"].value_or(8.0);
 diff --git a/src/cfg.h b/src/cfg.h
-index 056c681..15170d9 100644
+index 056c681..b6eaa1e 100644
 --- a/src/cfg.h
 +++ b/src/cfg.h
-@@ -141,6 +141,15 @@ extern std::string override_mod_path;
+@@ -141,6 +141,16 @@ extern std::string override_mod_path;
  extern std::string direct_mode_path;
  extern std::string save_path;
  extern bool enable_devtools;
 +extern bool enable_ff8_party_switch;
 +extern bool enable_ff8_no_magic_consumption;
 +extern bool enable_ff8_modern_controls;
++extern double ff8_modern_controls_camera_speed;
 +extern bool enable_ff8_fast_start;
 +extern bool enable_ff8_better_targeting;
 +extern bool enable_ff8_xp_bars;
@@ -9572,10 +9641,10 @@ index 0000000..468b241
 +}
 diff --git a/src/ff8/shared_magic_runtime.cpp b/src/ff8/shared_magic_runtime.cpp
 new file mode 100644
-index 0000000..4e423e3
+index 0000000..324cb46
 --- /dev/null
 +++ b/src/ff8/shared_magic_runtime.cpp
-@@ -0,0 +1,1689 @@
+@@ -0,0 +1,1703 @@
 +/****************************************************************************/
 +// Lexeditor shared party Magic for FF8 1.2 US-English Nvidia.
 +// This file is part of the GPL-3.0-or-later FFNx derivative.
@@ -9590,6 +9659,8 @@ index 0000000..4e423e3
 +#include "../cfg.h"
 +#include "../globals.h"
 +#include "../log.h"
++#include "../common.h"
++#include "../lexeditor_ff8_toast.h"
 +#include "../common.h"
 +
 +#include <windows.h>
@@ -9706,6 +9777,8 @@ index 0000000..4e423e3
 +bool g_canonical_snapshot_valid = false;
 +MergeError g_warning = MergeError::none;
 +std::string g_activation_toast;
++// Lexeditor's own in-game messages go to the FF8-style box in
++// lexeditor_ff8_toast.cpp, which owns the queue and the drawing.
 +bool g_warning_started = false;
 +bool g_warning_updating = false;
 +std::uint32_t g_internal_depth = 0;
@@ -10065,6 +10138,12 @@ index 0000000..4e423e3
 +        // disable sharing for this process, and let the original loader run.
 +        g_activation_toast = migration_warning_template(result.error, g_stock_limit);
 +        append_runtime_log((g_activation_toast + "\n").c_str());
++        {
++            const std::string message =
++                migration_warning_template(result.error, g_stock_limit);
++            lexeditor_ff8_toast_push(message.c_str(), true);
++            append_runtime_log((message + "\n").c_str());
++        }
 +        g_requested = false;
 +        g_warning = MergeError::none;
 +        g_warning_started = false;
@@ -11067,6 +11146,10 @@ index 0000000..4e423e3
 +
 +void ff8_shared_magic_heartbeat()
 +{
++    // Nothing to drain here any more: the message box owns the queue,
++    // holds each sentence long enough to read, and draws it the way FF8
++    // draws its own. FFNx's popup fades on a decay tuned for one word.
++
 +    // The loader has returned. Use the renderer overlay, never the menu controller.
 +    if (!g_activation_toast.empty() && get_popup_time() == 0) {
 +        show_popup_msg(TEXTCOLOR_RED, "%s", g_activation_toast.c_str());
@@ -16442,10 +16525,10 @@ index 528b8f6..c9614eb 100644
              }
 diff --git a/src/lexeditor_ff8_bars.cpp b/src/lexeditor_ff8_bars.cpp
 new file mode 100644
-index 0000000..77cc594
+index 0000000..c0f7432
 --- /dev/null
 +++ b/src/lexeditor_ff8_bars.cpp
-@@ -0,0 +1,536 @@
+@@ -0,0 +1,542 @@
 +#include "lexeditor_ff8_bars.h"
 +
 +#include <algorithm>
@@ -16499,7 +16582,11 @@ index 0000000..77cc594
 +BattleRowRenderer g_battle_row_renderer = nullptr;
 +GlyphRenderer g_hp_glyph_renderer = nullptr, g_atb_glyph_renderer = nullptr;
 +struct HpCapture {
-+    float left = 0, right = 0, top = 0;
++    // left: visible start of the name; name_right: end of its 96-pixel area.
++    // hp_left/hp_right: where the HP digits were actually drawn; digit: the
++    // widest digit, so the bar can span a full four-digit field.
++    float left = 0, right = 0, top = 0, name_right = 0;
++    float hp_left = 0, hp_right = 0, digit = 0;
 +    sprite_viewport viewport{};
 +    std::uint16_t current = 0, maximum = 0;
 +    std::uint32_t gf_current = 0, gf_maximum = 0;
@@ -16523,8 +16610,15 @@ index 0000000..77cc594
 +    if (count == 0 || count > 64) return;
 +    const auto *sprite = table + (entry & 0xFFFF);
 +    for (unsigned i = 0; i < count; ++i, sprite += 8) {
-+        const float right = x + static_cast<std::int8_t>(sprite[5]) + sprite[4];
-+        if (!hp) g_hp_row->right = std::max(g_hp_row->right, right);
++        const float left = x + static_cast<std::int8_t>(sprite[5]);
++        const float right = left + sprite[4];
++        if (!hp) {
++            g_hp_row->right = std::max(g_hp_row->right, right);
++        } else {
++            g_hp_row->hp_left = g_hp_row->hp_visible ? std::min(g_hp_row->hp_left, left) : left;
++            g_hp_row->hp_right = std::max(g_hp_row->hp_right, right);
++            g_hp_row->digit = std::max(g_hp_row->digit, static_cast<float>(sprite[4]));
++        }
 +    }
 +    g_hp_row->viewport = **g_active_viewport;
 +    if (hp) g_hp_row->hp_visible = true;
@@ -16590,7 +16684,8 @@ index 0000000..77cc594
 +        // 004B0C0B reads the name area's origin. 004B0CCF..004B0CF0
 +        // right-aligns the name inside its 96-pixel area using row+0x4A.
 +        // Use that visible name edge, not the empty area's left edge.
-+        capture.left = *reinterpret_cast<const std::uint16_t *>(row + 8) + 96.0f
++        capture.name_right = *reinterpret_cast<const std::uint16_t *>(row + 8) + 96.0f;
++        capture.left = capture.name_right
 +            - *reinterpret_cast<const std::uint16_t *>(row + 0x4A);
 +        capture.top = *reinterpret_cast<const std::int16_t *>(row + 0xA);
 +        capture.maximum = *reinterpret_cast<const std::uint16_t *>(row + 0x1C);
@@ -16648,25 +16743,26 @@ index 0000000..77cc594
 +    return newRenderer.projectGamePointToScreen(0.0f, value)[1] * ImGui::GetIO().DisplaySize.y;
 +}
 +
-+void draw_bar(float x, float y, float width, float height, float fraction, ImU32 fill)
++// FF8's own menu HP gauge, measured from the game at 3x: a colour line one
++// native pixel tall over a black track two pixels tall, so the line carries a
++// one-pixel black shadow and the lost part of the bar stays black. x, y and
++// width are screen units; pixel is one native pixel in screen units.
++//
++// The old bar inset its fill by a pixel on every side. Menu XP bars are one
++// native pixel tall, so the inset ate the whole fill and every XP bar was a
++// black strip.
++void draw_gauge(float x, float y, float width, float pixel, float fraction, ImU32 fill)
 +{
 +    ImDrawList *draw = ImGui::GetForegroundDrawList();
-+    const ImVec2 minimum(scale_x(x), scale_y(y));
-+    const ImVec2 maximum(scale_x(x + width), scale_y(y + height));
-+    if (maximum.x <= minimum.x || maximum.y <= minimum.y) {
++    const float left = scale_x(x), right = scale_x(x + width);
++    const float top = scale_y(y), line = scale_y(y + pixel), bottom = scale_y(y + 2.0f * pixel);
++    if (right <= left || line <= top) {
 +        return;
 +    }
-+    const float inset = std::max(1.0f, scale_y(1.0f) - scale_y(0.0f));
 +    fraction = std::clamp(fraction, 0.0f, 1.0f);
-+
-+    draw->AddRectFilled(minimum, maximum, IM_COL32(0, 0, 0, 220));
-+    // The surrounding native panel supplies its own edge. No overlay outline.
++    draw->AddRectFilled(ImVec2(left, top), ImVec2(right, bottom), IM_COL32(0, 0, 0, 255));
 +    if (fraction > 0.0f) {
-+        const ImVec2 fill_min(minimum.x + inset, minimum.y + inset);
-+        const ImVec2 fill_max(
-+            fill_min.x + (maximum.x - minimum.x - 2.0f * inset) * fraction,
-+            maximum.y - inset);
-+        draw->AddRectFilled(fill_min, fill_max, fill);
++        draw->AddRectFilled(ImVec2(left, top), ImVec2(left + (right - left) * fraction, line), fill);
 +    }
 +}
 +
@@ -16810,7 +16906,7 @@ index 0000000..77cc594
 +{
 +    for(std::size_t i=0;i<g_menu_xp_count;++i) {
 +        const auto &row=g_menu_xp[i]; const auto &v=row.viewport;
-+        draw_bar(row.x*v.scale_x+v.offset_x,row.y*v.scale_y+v.offset_y,
++        draw_gauge(row.x*v.scale_x+v.offset_x,row.y*v.scale_y+v.offset_y,
 +            row.width*v.scale_x, v.scale_y,row.fraction,IM_COL32(224,192,48,255));
 +    }
 +    g_menu_xp_count=0;
@@ -16839,9 +16935,8 @@ index 0000000..77cc594
 +        const auto &viewport = row.viewport;
 +        const float x = row.rect[0] * viewport.scale_x + viewport.offset_x;
 +        const float bottom = (row.rect[1] + row.rect[3]) * viewport.scale_y + viewport.offset_y;
-+        const float height = std::min(4.0f, row.rect[3] * viewport.scale_y);
-+        draw_bar(x + viewport.scale_x, bottom - height - viewport.scale_y,
-+            std::max(0.0f, (row.rect[2] - 2.0f) * viewport.scale_x), height,
++        draw_gauge(x + viewport.scale_x, bottom - 3.0f * viewport.scale_y,
++            std::max(0.0f, (row.rect[2] - 2.0f) * viewport.scale_x), viewport.scale_y,
 +            xp_fraction(exp, character), IM_COL32(224, 192, 48, 255));
 +    }
 +}
@@ -16857,42 +16952,36 @@ index 0000000..77cc594
 +        return;
 +    }
 +    for (const auto &row : g_hp_rows) {
-+        if (!row.atb_visible || row.right <= row.left ||
++        // Only rows the native HUD drew this frame.
++        if (!(row.hp_visible || row.atb_visible) ||
 +            row.viewport.scale_x <= 0 || row.viewport.scale_y <= 0) continue;
 +        const auto &v = row.viewport;
-+        const float full_width = (row.right - row.left) * v.scale_x;
++        // A gauge spans the thing it measures and fills by current/max. It
++        // used to be anchored at the ATB gauge's far end and shortened by
++        // max/9999, so a 479-HP character got a two-pixel stub floating past
++        // the end of the ATB frame instead of a bar under its HP.
 +        auto draw_line = [&](std::uint32_t current, std::uint32_t maximum,
-+                             float native_y, bool from_left, ImU32 color) {
-+            if (!maximum) return;
-+            const float width = full_width * std::min(1.0f, maximum / 9999.0f);
-+            const float x = (from_left ? row.left : row.right) * v.scale_x + v.offset_x;
-+            const float top = native_y * v.scale_y + v.offset_y;
-+            const float left = scale_x(from_left ? x : x - width);
-+            const float right = scale_x(from_left ? x + width : x);
-+            if (right <= left) return;
-+            auto *draw = ImGui::GetForegroundDrawList();
-+            const float fraction = std::min(1.0f, current / static_cast<float>(maximum));
-+            const float filled = (right - left) * fraction;
-+            // Match the menu HP gauge: two thin parallel lines with a clear
-+            // gap. The unfilled part stays transparent, without a black track.
-+            // HP and GF HP share geometry; only anchor, direction and color differ.
-+            for (int rail = 0; rail < 2; ++rail) {
-+                const float y = top + rail * 2.0f * v.scale_y;
-+                if (fraction > 0) draw->AddRectFilled(
-+                    ImVec2(from_left ? left : right - filled, scale_y(y)),
-+                    ImVec2(from_left ? left + filled : right, scale_y(y + v.scale_y)), color);
-+            }
-+
++                             float native_left, float native_right, float native_y, ImU32 color) {
++            if (!maximum || native_right <= native_left) return;
++            draw_gauge(native_left * v.scale_x + v.offset_x, native_y * v.scale_y + v.offset_y,
++                (native_right - native_left) * v.scale_x, v.scale_y,
++                current / static_cast<float>(maximum), color);
 +        };
 +        // Native rows are 15 pixels high (004B0FF6) and spaced by 15
-+        // (004B1978). Text starts at row_y+2 and is 12 pixels high. Glyph
-+        // atlas cells can contain transparent padding beyond that row.
-+        // Anchor the first red rail to its final pixel, never to atlas-cell bounds.
-+        if (enable_ff8_hp_bars && row.hp_visible)
-+            draw_line(row.current, row.maximum, row.top + 14.0f, false, IM_COL32(236, 0, 0, 255));
-+        // Both blue rails fit above the name, whose text starts at row_y+2.
-+        if (enable_ff8_gf_hp_bars)
-+            draw_line(row.gf_current, row.gf_maximum, row.top - 1.0f, true, IM_COL32(48, 128, 255, 255));
++        // (004B1978). Text starts at row_y+2 and is 12 pixels high, so the
++        // gauge starts on the row's last pixel, under the HP digits. The
++        // number is right-aligned; the bar spans a full four-digit field
++        // ending where the digits end, so every row's bar has one length.
++        if (enable_ff8_hp_bars && row.hp_visible && row.hp_right > row.hp_left) {
++            const float field = std::max(row.hp_right - row.hp_left, 4.0f * row.digit);
++            draw_line(row.current, row.maximum, row.hp_right - field, row.hp_right,
++                row.top + 14.0f, IM_COL32(236, 0, 0, 255));
++        }
++        // The blue gauge takes the two pixels above the name, whose text
++        // starts at row_y+2, and spans the name's own area.
++        if (enable_ff8_gf_hp_bars && row.name_right > row.left)
++            draw_line(row.gf_current, row.gf_maximum, row.left, row.name_right,
++                row.top, IM_COL32(48, 128, 255, 255));
 +    }
 +}
 +
@@ -18122,10 +18211,10 @@ index 0000000..cd7bdc9
 +void lexeditor_ff8_gf_spellbooks_install();
 diff --git a/src/lexeditor_ff8_modern_controls.cpp b/src/lexeditor_ff8_modern_controls.cpp
 new file mode 100644
-index 0000000..df25bd4
+index 0000000..ee8e88b
 --- /dev/null
 +++ b/src/lexeditor_ff8_modern_controls.cpp
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,322 @@
 +#include "lexeditor_ff8_modern_controls.h"
 +#include "camera_axis.h"
 +#include "battle_camera.h"
@@ -18142,6 +18231,7 @@ index 0000000..df25bd4
 +
 +extern int right_stick_x;
 +extern int right_stick_y;
++extern HWND gameHwnd;
 +extern int ff8_get_analog_value(std::int8_t, int, std::int8_t);
 +
 +namespace {
@@ -18177,6 +18267,71 @@ index 0000000..df25bd4
 +constexpr std::uintptr_t kBattleLivePosition = 0x00B8B7F0;
 +constexpr std::uintptr_t kBattleIdlePosition = 0x00B8B800;
 +constexpr std::uintptr_t kBattleIdleLookAt = 0x00B8B808;
++
++// Battle bindings (FF8_EN.exe 064d466b...). The per-frame battle input at
++// 004A84E0 reads the keyscan three times - held into +0x10, newly pressed
++// into +0x12, repeating into +0x14 of the battle input block - each through
++// the button-layout translator 004A2D60. What comes out is FF8's own function
++// bits after the player's button layout: L2 0x01, R2 0x02, R1 0x08. The
++// battle loop at 004A85CC counts a flee while L2 and R2 are both held; R1 is
++// the gunblade trigger and Shot's fire button.
++constexpr std::uintptr_t kBattleHeldCall = 0x004A8505;
++constexpr std::uintptr_t kBattlePressedCall = 0x004A8521;
++constexpr std::uintptr_t kBattleRepeatCall = 0x004A853D;
++constexpr std::uintptr_t kBattleKeyTranslate = 0x004A2D60;
++constexpr int kL2Function = 0x01, kR2Function = 0x02, kR1Function = 0x08;
++// Shot registers its widget in slot 6 of the table at 01D76628 (20-byte
++// entries, update callback first) and clears it on close (004ADBAC). Its
++// update ends Shot through its own path when the request byte is set
++// (004AD92B: state 8, countdown 0xFFFF, request cleared).
++constexpr std::uintptr_t kShotWidgetUpdate = 0x01D766A0;
++constexpr std::uintptr_t kShotUpdate = 0x004AD8D0;
++constexpr std::uintptr_t kShotEndRequest = 0x01D7675B;
++
++using KeyTranslate = int(__cdecl *)(int);
++KeyTranslate original_translate = nullptr;
++bool bindings_installed = false;
++
++struct BattleButtons { bool fire = false, flee = false, back = false; };
++BattleButtons buttons_now, buttons_before;
++std::uint32_t buttons_frame = ~0u;
++
++void read_battle_buttons() {
++    if (buttons_frame == frame_counter) return;
++    buttons_frame = frame_counter;
++    buttons_before = buttons_now;
++    // The mouse and keyboard only count while FF8 is the window in front.
++    const bool focused = GetForegroundWindow() == gameHwnd;
++    const auto down = [&](int key) { return focused && (GetAsyncKeyState(key) & 0x8000) != 0; };
++    const float left = use_sdl_gamepad ? sdlgamepad.leftTrigger : gamepad.leftTrigger;
++    const float right = use_sdl_gamepad ? sdlgamepad.rightTrigger : gamepad.rightTrigger;
++    const bool b = use_sdl_gamepad ? sdlgamepad.IsPressed(SDL_GAMEPAD_BUTTON_EAST)
++                                   : gamepad.IsPressed(XINPUT_GAMEPAD_B);
++    buttons_now.fire = right > 0.5f || down(VK_LBUTTON);
++    buttons_now.flee = left > 0.5f || down(VK_RBUTTON);
++    buttons_now.back = b || down(VK_BACK);
++}
++
++// channel: 0 held, 1 newly pressed, 2 repeating.
++int translate_battle_keys(int keyscan, int channel) {
++    int bits = original_translate(keyscan);
++    if (!lexeditor_ff8_modern_controls_battle_active()) return bits;
++    read_battle_buttons();
++    const bool fire_edge = buttons_now.fire && !buttons_before.fire;
++    // The right trigger is also FF8's R2. Alone, that is half a flee and
++    // nothing else, so it is withheld while the trigger means "fire".
++    if (buttons_now.fire && !buttons_now.flee) bits &= ~kR2Function;
++    if (channel == 0 ? buttons_now.fire : fire_edge) bits |= kR1Function;
++    if (channel == 0 && buttons_now.flee) bits |= kL2Function | kR2Function;
++    if (channel == 1 && buttons_now.back && !buttons_before.back &&
++        *reinterpret_cast<const std::uintptr_t *>(kShotWidgetUpdate) == kShotUpdate) {
++        *reinterpret_cast<std::uint8_t *>(kShotEndRequest) = 1;
++    }
++    return bits & 0xFFFF;
++}
++int __cdecl translate_held(int keyscan) { return translate_battle_keys(keyscan, 0); }
++int __cdecl translate_pressed(int keyscan) { return translate_battle_keys(keyscan, 1); }
++int __cdecl translate_repeat(int keyscan) { return translate_battle_keys(keyscan, 2); }
 +
 +lexeditor_battle_camera::Vec3s read_vec(std::uintptr_t address) {
 +    lexeditor_battle_camera::Vec3s value{};
@@ -18276,7 +18431,16 @@ index 0000000..df25bd4
 +
 +    auto position = read_vec(kBattleIdlePosition);
 +    const auto look_at = read_vec(kBattleIdleLookAt);
-+    if (!lexeditor_battle_camera::orbit(position, look_at, right_stick_x, right_stick_y)) return;
++    // The reader's own turn rate, and this scene's floor. orbit() clamps the
++    // rate to a usable range, so a nonsense value in the config cannot make the
++    // camera unusable, and it re-learns the floor from FF8's own pose whenever
++    // the stick is centred - which is also what makes a new battle start from
++    // that battle's floor rather than the last one's.
++    static lexeditor_battle_camera::Floor camera_floor;
++    if (!lexeditor_battle_camera::orbit(
++            position, look_at, right_stick_x, right_stick_y, 0.035f, 0.025f,
++            static_cast<float>(ff8_modern_controls_camera_speed),
++            &camera_floor)) return;
 +
 +    // Native has already handed ownership back to the idle/default pose. Move
 +    // both copies together so the current frame and the next native idle copy
@@ -18300,7 +18464,8 @@ index 0000000..df25bd4
 +
 +bool lexeditor_ff8_modern_controls_battle_active() {
 +    const auto *mode = getmode_cached();
-+    return battle_installed && enable_ff8_modern_controls && mode && mode->driver_mode == MODE_BATTLE;
++    return (battle_installed || bindings_installed) && enable_ff8_modern_controls && mode &&
++        mode->driver_mode == MODE_BATTLE;
 +}
 +
 +bool lexeditor_ff8_modern_controls_take_square_press() {
@@ -18326,7 +18491,7 @@ index 0000000..df25bd4
 +}
 +
 +void lexeditor_ff8_modern_controls_install() {
-+    if (!ff8 || !enable_ff8_modern_controls || world_installed || battle_installed) return;
++    if (!ff8 || !enable_ff8_modern_controls || world_installed || battle_installed || bindings_installed) return;
 +
 +    const unsigned char first[] = {0xE8, 0xD7, 0x7E, 0x01, 0x00};
 +    const unsigned char second[] = {0xE8, 0x6F, 0x6A, 0x01, 0x00};
@@ -18347,6 +18512,24 @@ index 0000000..df25bd4
 +        battle_installed = true;
 +    } else {
 +        ffnx_warning("Lexeditor Modern Controls: unsupported battle-camera call site; battle camera changes not installed.\n");
++    }
++
++    // Each call site is E8 rel32 to 004A2D60; anything else is not this game.
++    const auto calls_translator = [](std::uintptr_t site) {
++        const auto *code = reinterpret_cast<const unsigned char *>(site);
++        std::int32_t rel = 0;
++        std::memcpy(&rel, code + 1, sizeof rel);
++        return code[0] == 0xE8 && site + 5 + rel == kBattleKeyTranslate;
++    };
++    if (calls_translator(kBattleHeldCall) && calls_translator(kBattlePressedCall) &&
++        calls_translator(kBattleRepeatCall)) {
++        original_translate = reinterpret_cast<KeyTranslate>(kBattleKeyTranslate);
++        replace_call(kBattleHeldCall, reinterpret_cast<void *>(&translate_held));
++        replace_call(kBattlePressedCall, reinterpret_cast<void *>(&translate_pressed));
++        replace_call(kBattleRepeatCall, reinterpret_cast<void *>(&translate_repeat));
++        bindings_installed = true;
++    } else {
++        ffnx_warning("Lexeditor Modern Controls: unsupported battle input call sites; battle bindings not installed.\n");
 +    }
 +
 +    if (world_installed || battle_installed) {
@@ -19062,19 +19245,229 @@ index 0000000..a12ef0a
 @@ -0,0 +1,2 @@
 +#pragma once
 +void lexeditor_ff8_stock_tweaks_install();
+diff --git a/src/lexeditor_ff8_toast.cpp b/src/lexeditor_ff8_toast.cpp
+new file mode 100644
+index 0000000..dc2a235
+--- /dev/null
++++ b/src/lexeditor_ff8_toast.cpp
+@@ -0,0 +1,168 @@
++#include "lexeditor_ff8_toast.h"
++
++#include <algorithm>
++#include <cstdint>
++#include <string>
++
++// windows.h defines min and max as macros, which breaks every std::min and
++// std::clamp below - including the ones inside the layout header.
++#define NOMINMAX
++#define WIN32_LEAN_AND_MEAN
++#include <windows.h>
++
++#include <imgui.h>
++
++#include "common.h"
++#include "globals.h"
++#include "renderer.h"
++#include "toast_layout.h"
++#include "toast_queue.h"
++
++const char *const LEXEDITOR_SUMMON_UNAVAILABLE_REASON =
++    "No GF is junctioned to this character. Junction one on the Junction "
++    "screen to use Summon.";
++
++namespace {
++
++lexeditor_toast::Queue g_queue;
++
++// FF8's window: a dark blue gradient behind a pale double edge. These are the
++// colours the game's own window reads as on screen, not a theme of ours; a
++// message that looked like an overlay would defeat the point of this file.
++constexpr ImU32 kFillTop = IM_COL32(12, 24, 96, 232);
++constexpr ImU32 kFillBottom = IM_COL32(4, 8, 40, 232);
++constexpr ImU32 kEdgeOuter = IM_COL32(24, 32, 72, 255);
++constexpr ImU32 kEdgeInner = IM_COL32(200, 208, 232, 255);
++constexpr ImU32 kText = IM_COL32(255, 255, 255, 255);
++constexpr ImU32 kTextWarning = IM_COL32(255, 216, 136, 255);
++constexpr ImU32 kTextShadow = IM_COL32(0, 0, 0, 200);
++
++// One line of FF8 text is about this tall in the game's own pixels, and its
++// font is close enough to fixed width to size a box from a character count.
++constexpr float kLineHeight = 20.0f;
++constexpr float kCharWidth = 9.0f;
++
++// The battle patch's refusal flag. Lexeditor's command-eligibility Hext patch
++// raises it when a greyed Summon is pressed, and we lower it once the reason
++// has been said. The address lives inside FF8's own image, so it is read only
++// after the page it sits on is confirmed committed: a build running without
++// that patch must not fault here.
++constexpr std::uintptr_t kSummonRefusedFlag = 0x0279F4F0;
++
++bool flag_readable()
++{
++    static int state = -1;
++    if (state < 0) {
++        MEMORY_BASIC_INFORMATION info{};
++        const SIZE_T got = VirtualQuery(
++            reinterpret_cast<LPCVOID>(kSummonRefusedFlag), &info, sizeof(info));
++        const DWORD readable = PAGE_READWRITE | PAGE_READONLY |
++            PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE;
++        state = (got == sizeof(info) && info.State == MEM_COMMIT &&
++                 (info.Protect & readable) != 0) ? 1 : 0;
++    }
++    return state == 1;
++}
++
++// Game pixels to window pixels, through the same projection the status bars
++// use, so a toast keeps its place under widescreen and letterboxing alike.
++float project_x(float value)
++{
++    return newRenderer.projectGamePointToScreen(value, 0.0f)[0] *
++        ImGui::GetIO().DisplaySize.x;
++}
++
++float project_y(float value)
++{
++    return newRenderer.projectGamePointToScreen(0.0f, value)[1] *
++        ImGui::GetIO().DisplaySize.y;
++}
++
++ImU32 with_alpha(ImU32 colour, float alpha)
++{
++    const ImU32 scaled = static_cast<ImU32>(
++        std::clamp(alpha, 0.0f, 1.0f) * static_cast<float>((colour >> IM_COL32_A_SHIFT) & 0xFF));
++    return (colour & ~IM_COL32_A_MASK) | (scaled << IM_COL32_A_SHIFT);
++}
++
++}  // namespace
++
++void lexeditor_ff8_toast_push(const char *text, bool warning)
++{
++    if (text == nullptr || *text == '\0') return;
++    g_queue.push(text, warning ? lexeditor_toast::Tone::warning
++                               : lexeditor_toast::Tone::normal);
++}
++
++bool lexeditor_ff8_toast_enabled()
++{
++    return g_queue.showing() || g_queue.pending() > 0;
++}
++
++void lexeditor_ff8_toast_poll_battle()
++{
++    if (!flag_readable()) return;
++    volatile std::uint8_t *flag = reinterpret_cast<volatile std::uint8_t *>(kSummonRefusedFlag);
++    if (*flag == 0) return;
++    *flag = 0;
++    lexeditor_ff8_toast_push(LEXEDITOR_SUMMON_UNAVAILABLE_REASON, true);
++}
++
++void lexeditor_ff8_toast_draw()
++{
++    lexeditor_ff8_toast_poll_battle();
++
++    const std::uint32_t now = static_cast<std::uint32_t>(GetTickCount64());
++    const lexeditor_toast::Toast *toast = g_queue.update(now);
++    if (toast == nullptr) return;
++
++    lexeditor_toast::Metrics metrics;
++    metrics.width = static_cast<float>(game_width > 0 ? game_width : 640);
++    metrics.height = static_cast<float>(game_height > 0 ? game_height : 480);
++    // FF8 renders at 640x480 and everything above is written for that frame,
++    // so a different height scales the text with it rather than leaving a
++    // box of the wrong proportions.
++    const float scale = metrics.height / 480.0f;
++    metrics.line_height = kLineHeight * scale;
++    metrics.char_width = kCharWidth * scale;
++
++    std::size_t columns = 0;
++    for (const std::string &line : toast->lines) {
++        columns = std::max(columns, line.size());
++    }
++    const lexeditor_toast::Box box =
++        lexeditor_toast::layout(metrics, toast->lines.size(), columns);
++    const float alpha = lexeditor_toast::fade(g_queue.progress(now));
++    if (alpha <= 0.0f) return;
++
++    ImDrawList *draw = ImGui::GetForegroundDrawList();
++    const ImVec2 minimum(project_x(box.x), project_y(box.y));
++    const ImVec2 maximum(project_x(box.x + box.width), project_y(box.y + box.height));
++    if (maximum.x <= minimum.x || maximum.y <= minimum.y) return;
++    const float rounding = std::max(2.0f, (maximum.y - minimum.y) * 0.06f);
++
++    // Body first, then the two edges from the outside in, the way the game's
++    // window is built up.
++    draw->AddRectFilledMultiColor(minimum, maximum,
++        with_alpha(kFillTop, alpha), with_alpha(kFillTop, alpha),
++        with_alpha(kFillBottom, alpha), with_alpha(kFillBottom, alpha));
++    draw->AddRect(minimum, maximum, with_alpha(kEdgeOuter, alpha), rounding, 0, 3.0f);
++    draw->AddRect(ImVec2(minimum.x + 1.0f, minimum.y + 1.0f),
++                  ImVec2(maximum.x - 1.0f, maximum.y - 1.0f),
++                  with_alpha(kEdgeInner, alpha), rounding, 0, 1.5f);
++
++    const float line_height = project_y(box.y + metrics.line_height) - project_y(box.y);
++    const float font_size = std::max(8.0f, line_height * 0.86f);
++    const ImU32 colour = with_alpha(
++        toast->tone == lexeditor_toast::Tone::warning ? kTextWarning : kText, alpha);
++    const ImU32 shadow = with_alpha(kTextShadow, alpha);
++    float y = project_y(box.text_y);
++    const float x = project_x(box.text_x);
++    for (const std::string &line : toast->lines) {
++        // FF8 draws its text over a one-pixel shadow. Without it the pale
++        // glyphs disappear into the lighter top of the gradient.
++        draw->AddText(nullptr, font_size, ImVec2(x + 1.0f, y + 1.0f), shadow, line.c_str());
++        draw->AddText(nullptr, font_size, ImVec2(x, y), colour, line.c_str());
++        y += line_height;
++    }
++}
+diff --git a/src/lexeditor_ff8_toast.h b/src/lexeditor_ff8_toast.h
+new file mode 100644
+index 0000000..81ad8b9
+--- /dev/null
++++ b/src/lexeditor_ff8_toast.h
+@@ -0,0 +1,29 @@
++#pragma once
++
++// Lexeditor's own in-game messages, drawn as FF8 draws its own message boxes
++// rather than through FFNx's debug popup.
++//
++// FFNx's popup was the only surface available and it is the wrong one: it
++// fades on an accelerating decay tuned for one-word notices, so a sentence is
++// gone before it can be read, and it looks like the injector rather than like
++// the game.
++
++#include <cstdint>
++
++// Queue one message. Safe from any thread the game already calls us on, and
++// safe before the renderer exists: nothing is drawn until draw() runs.
++void lexeditor_ff8_toast_push(const char *text, bool warning = false);
++
++// Draw whatever is showing, inside FFNx's active ImGui frame.
++void lexeditor_ff8_toast_draw();
++
++// Tell the renderer whether FFNx must create an ImGui frame for us.
++bool lexeditor_ff8_toast_enabled();
++
++// Watch the battle patch's refusal flag and say why Summon was refused.
++// Does nothing unless Lexeditor's command-eligibility patch is loaded.
++void lexeditor_ff8_toast_poll_battle();
++
++// The sentence a refused Summon shows. Kept beside the code that shows it, and
++// asserted against the Python that greys the command.
++extern const char *const LEXEDITOR_SUMMON_UNAVAILABLE_REASON;
 diff --git a/src/overlay.cpp b/src/overlay.cpp
-index b2cc508..b922155 100644
+index b2cc508..a4046c0 100644
 --- a/src/overlay.cpp
 +++ b/src/overlay.cpp
-@@ -28,6 +28,7 @@
+@@ -28,6 +28,8 @@
  #include "cfg.h"
  #include "world.h"
  #include "lighting_debug.h"
 +#include "lexeditor_ff8_bars.h"
++#include "lexeditor_ff8_toast.h"
  
  #define IMGUI_VIEW_ID 255
  
-@@ -218,6 +219,9 @@ void Overlay::Render(ImDrawData* drawData)
+@@ -218,6 +220,9 @@ void Overlay::Render(ImDrawData* drawData)
  bool Overlay::init(bgfx::ProgramHandle program, int width, int height)
  {
      mem_edit.Open = false;
@@ -19084,15 +19477,16 @@ index b2cc508..b922155 100644
  
      if (!IMGUI_CHECKVERSION())
          return false;
-@@ -327,6 +331,7 @@ void Overlay::draw()
+@@ -327,6 +332,8 @@ void Overlay::draw()
  {
      Update();
      ImGui::NewFrame();
 +    lexeditor_ff8_bars_draw();
++    lexeditor_ff8_toast_draw();
  
      // This is a placeholder UI
      if (visible)
-@@ -380,7 +385,7 @@ void Overlay::MouseMove(MouseEventArgs e)
+@@ -380,7 +387,7 @@ void Overlay::MouseMove(MouseEventArgs e)
  
  void Overlay::KeyUp(KeyEventArgs e)
  {
@@ -19102,28 +19496,29 @@ index b2cc508..b922155 100644
  }
  
 diff --git a/src/renderer.cpp b/src/renderer.cpp
-index ce629d7..cffef14 100644
+index ce629d7..672ec37 100644
 --- a/src/renderer.cpp
 +++ b/src/renderer.cpp
-@@ -38,6 +38,8 @@
+@@ -38,6 +38,9 @@
  #include "log.h"
  #include "cfg.h"
  #include "utils.h"
 +bool lexeditor_ff8_hide_startup_frame();
 +#include "lexeditor_ff8_bars.h"
++#include "lexeditor_ff8_toast.h"
  #include "renderer.h"
  
  CMRC_DECLARE(FFNx);
-@@ -404,7 +406,7 @@ void Renderer::destroyAll()
+@@ -404,7 +407,7 @@ void Renderer::destroyAll()
              bgfx::destroy(handle);
      }
  
 -    if (enable_devtools)
-+    if (enable_devtools || lexeditor_ff8_bars_enabled())
++    if (enable_devtools || lexeditor_ff8_bars_enabled() || lexeditor_ff8_toast_enabled())
          overlay.destroy();
  };
  
-@@ -442,8 +444,35 @@ void Renderer::resetState()
+@@ -442,8 +445,35 @@ void Renderer::resetState()
      resetViewMatrixFlag();
  };
  
@@ -19159,21 +19554,21 @@ index ce629d7..cffef14 100644
      /*  y0    y2
       x0 +-----+ x2
          |    /|
-@@ -1029,7 +1058,7 @@ void Renderer::init()
+@@ -1029,7 +1059,7 @@ void Renderer::init()
  
      bgfx::frame();
  
 -    if (enable_devtools)
-+    if (enable_devtools || lexeditor_ff8_bars_enabled())
++    if (enable_devtools || lexeditor_ff8_bars_enabled() || lexeditor_ff8_toast_enabled())
      {
          backendProgramHandles[RendererProgram::OVERLAY] = bgfx::createProgram(
              getShader(vertexOverlayPath.c_str()),
-@@ -1454,7 +1483,7 @@ void Renderer::discardAllBindings()
+@@ -1454,7 +1484,7 @@ void Renderer::discardAllBindings()
  
  void Renderer::drawOverlay()
  {
 -    if (enable_devtools)
-+    if (enable_devtools || lexeditor_ff8_bars_enabled())
++    if (enable_devtools || lexeditor_ff8_bars_enabled() || lexeditor_ff8_toast_enabled())
          overlay.draw();
  }
  
@@ -19269,6 +19664,82 @@ index 0000000..c3c89a0
 +    }
 +};
 +} // namespace lexeditor_reptile_atb
+diff --git a/src/toast_layout.h b/src/toast_layout.h
+new file mode 100644
+index 0000000..db3b403
+--- /dev/null
++++ b/src/toast_layout.h
+@@ -0,0 +1,70 @@
++#pragma once
++// Where a Lexeditor toast sits on screen, and how it fades.
++//
++// Separated from the drawing for the same reason the queue is: this part can
++// be reasoned about and tested without a device, a frame, or a running game.
++// Everything here is in the game's own pixels - FF8 renders at a fixed size
++// and the renderer projects those coordinates onto the window - so a box laid
++// out here lands in the same place whatever the window is doing.
++
++#include <algorithm>
++#include <cstddef>
++
++namespace lexeditor_toast {
++
++// FF8's own message boxes sit a little above the bottom edge, indented from
++// both sides, and are padded inside by about one character.
++constexpr float BOTTOM_MARGIN = 0.08f;   // of the game's height
++constexpr float SIDE_MARGIN = 0.06f;     // of the game's width
++constexpr float PADDING_CHARS = 1.0f;
++constexpr float PADDING_LINES = 0.5f;
++// The last fraction of the hold fades out, and the first fraction fades in, so
++// a message never appears or vanishes between one frame and the next.
++constexpr float FADE_IN = 0.05f;
++constexpr float FADE_OUT = 0.12f;
++
++struct Metrics {
++    float width = 640.0f;        // the game's own frame, in its own pixels
++    float height = 480.0f;
++    float line_height = 20.0f;   // one line of text
++    float char_width = 9.0f;     // one character at that size
++};
++
++struct Box {
++    float x = 0.0f, y = 0.0f, width = 0.0f, height = 0.0f;
++    float text_x = 0.0f, text_y = 0.0f;
++};
++
++// Size the box to the text, then place it bottom-centre. A box wider than the
++// frame allows is clamped rather than allowed to hang off the edge, which is
++// the case a long sentence in a small window produces.
++inline Box layout(const Metrics &metrics, std::size_t lines, std::size_t columns)
++{
++    const float padding_x = metrics.char_width * PADDING_CHARS;
++    const float padding_y = metrics.line_height * PADDING_LINES;
++    const float limit = metrics.width * (1.0f - 2.0f * SIDE_MARGIN);
++    Box box;
++    box.width = std::min(limit,
++        static_cast<float>(columns) * metrics.char_width + 2.0f * padding_x);
++    box.height = static_cast<float>(lines ? lines : 1) * metrics.line_height
++        + 2.0f * padding_y;
++    box.x = (metrics.width - box.width) * 0.5f;
++    box.y = metrics.height * (1.0f - BOTTOM_MARGIN) - box.height;
++    if (box.y < 0.0f) box.y = 0.0f;
++    box.text_x = box.x + padding_x;
++    box.text_y = box.y + padding_y;
++    return box;
++}
++
++// Opacity from 0 to 1 for a message that is `progress` of the way through its
++// hold. Flat in the middle: the point of the queue was that a sentence stays
++// readable, so only the ends move.
++inline float fade(float progress)
++{
++    progress = std::clamp(progress, 0.0f, 1.0f);
++    if (progress < FADE_IN) return progress / FADE_IN;
++    if (progress > 1.0f - FADE_OUT) return (1.0f - progress) / FADE_OUT;
++    return 1.0f;
++}
++
++}  // namespace lexeditor_toast
 diff --git a/src/vehicle_drive.h b/src/vehicle_drive.h
 new file mode 100644
 index 0000000..c79e739

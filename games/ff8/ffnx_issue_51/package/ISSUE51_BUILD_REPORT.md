@@ -3,14 +3,14 @@
 ## Artifact and source
 
 - FFNx base: `c056db2783f376a340fcefa6a48cc33618998876`
-- Editor build revision: `28fe408a377462d06786b5544a4f36901092bc60`
-- Actions build run: `34700395103`
+- Editor build revision: `e7a3e40fb4c32d6fde02c096aae822a683ef6e77`
+- Actions build run: `35159257215`
 - Supported private game SHA-256: `064d466b5fe2ba901fd44abf19f37c0fd6a2db40aabd95c9e5959195b6589570`
 - Identity: `Lexeditor issue 51 shared magic core; base=c056db2783f376a340fcefa6a48cc33618998876; runtime=on; hooks=28`
-- Driver SHA-256: `6f8b3b67397a9fce8eff7f0258ba8c4fc1bcb4f9702bc31ecfc932bac84fce24`
-- Driver size: 38834688 bytes; PE32 x86 DLL
-- PDB SHA-256: `2153d09ef8b63f9ddf43667854931eea98f085515f60d5e706cfc3fa76cf7918` (build artifact, not installed)
-- Complete source patch SHA-256: `d76453ec477436961955cadc9a2b680ad6769d5c00c9ea7b0cc4a16cfd928bc7`
+- Driver SHA-256: `b38a52a2582dc250caef68b15e41f6d8daa153098b0bb1bddbd00cec51cfc4f3`
+- Driver size: 38850560 bytes; PE32 x86 DLL
+- PDB SHA-256: `bb0a063894233821dbc5997e02d4cadd7c2b688c806f3d34048177b9b1bb9007` (build artifact, not installed)
+- Complete source patch SHA-256: `27de2b4685ce1ad4359954d8293a18e5fb14f08db971d8ecbcea4f11d961fd83`
 - GPL licence SHA-256: `230184f60bae2feaf244f10a8bac053c8ff33a183bcc365b4d8b876d2b7f4809`
 - Steamworks library unchanged: `abfedd473b3f4a9597bbdc90d20f4b6f696bb2ebb937a03177461df695430ad6`
 - Existing matching-base shader set retained: 163 files;
@@ -24,8 +24,14 @@ Party Switch retires the outgoing model through native event 69 before event
 66 loads its replacement. Native saved/kernel names are resolved and measured
 before drawing. Cancellation keeps the turn; invalidated reserves reload the
 original character; the HUD cache is refreshed after a completed replacement.
-HP and GF HP use two thin rails, with separate anchors, directions and colors.
-GF HP requires one junctioned GF and reads live charging HP during a summon.
+Every bar is FF8's menu gauge: a one-pixel colour line on a two-pixel black
+track. Battle HP spans a four-digit field under the drawn HP digits; GF HP
+spans the name above it; both fill by current/max. Menu XP bars now show their
+fill. GF HP requires one junctioned GF and reads live charging HP during a summon.
+Modern Controls: the camera's vertical axis is no longer inverted; in battle,
+RT or the left mouse button is R1 (trigger, Shot), LT or the right mouse button
+holds L2+R2 (flee), and B or Backspace ends Shot. The camera speed setting is
+declared in the derivative config.
 Menu XP bars follow native character and GF widgets. Active and reserve main
 menu rows show progress below names; character details and GF details show it
 below the level row. GF lists show progress below each level. Each capture
