@@ -45,6 +45,11 @@
     .blank-sample{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;padding:12px;border:1px dashed var(--lex-border);overflow-x:auto}
     .blank-sample>*{flex:1 1 320px}
     .blank-sample-missing{margin:0;padding:12px;color:var(--lex-muted)}
+    .blank-games{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
+    .blank-game{display:grid;width:64px;gap:3px;justify-items:center;font-size:10px;line-height:1.2;text-align:center}
+    .blank-game-cover,.blank-game-fallback{width:64px;aspect-ratio:2/3;border:1px solid var(--lex-border);object-fit:cover}
+    .blank-game-fallback{display:grid;place-items:center;background:var(--lex-panel-2);color:var(--lex-muted);font:800 22px/1 var(--lex-heading-font,var(--lex-font))}
+    .blank-game-name{overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow-wrap:anywhere}
   </style>
 </head>
 <body>
@@ -64,7 +69,7 @@
   let saved={rows:clone(rows),demo:clone(demo)};
   let modOnly=false;
   const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,edit:(row,value)=>{row.name=String(value)}},{key:"category",label:"Category",sortable:true,choices:categories,edit:(row,value)=>{row.category=String(value)}},{key:"value",label:"Value",numeric:true,min:0,max:255,step:1,sortable:true,edit:(row,value)=>{row.value=Math.max(0,Math.min(255,Number(value)||0))}}];
-  const catalogue={selected:null,page:0,query:"",usage:null,usageLoaded:false};
+  const catalogue={selected:null,page:0,query:"",usage:null,usageLoaded:false,games:null};
   let tab="organism",subtab="controls",selected=0,sort={key:"name",dir:1},query="",page=0,pageSize=12,activeSource="mine";
   const prefs=columnPreferences("blank-records",columns,()=>render());
   const activeRows=()=>activeSource==="vanilla"?vanillaRows:rows;
@@ -302,6 +307,27 @@
     try{const response=await fetch("/shared/component-usage.json");catalogue.usage=(await response.json()).components||{};}
     catch(_error){catalogue.usage={};}
     render();
+    // The home screen's own game rows, so a component's games are recognisable
+    // rather than a list of folder names.
+    try{
+      const games=await LexeditorUI.callWindow("plugins");
+      catalogue.games=Object.fromEntries((games||[]).map(game=>[game.id,game]));
+      await Promise.all((games||[]).map(async game=>{
+        try{const art=await LexeditorUI.callWindow("cover_art_data_uri",game.id);
+          if(art?.uri)catalogue.games[game.id].uri=art.uri;}catch(_error){}
+      }));
+      render();
+    }catch(_error){catalogue.games=null;}
+  }
+  // A plugin folder name is what the scan reports; the game is what Lexeditor
+  // knows it as, cover art included.
+  function gameCard(pluginId){
+    const game=catalogue.games?.[pluginId.replace(/_/g,"-")]||catalogue.games?.[pluginId]||null;
+    const name=game?.name||pluginId;
+    const art=game?.uri
+      ? el("img",{class:"blank-game-cover",src:game.uri,alt:""})
+      : el("span",{class:"blank-game-fallback","aria-hidden":"true"},name.slice(0,1).toUpperCase());
+    return el("span",{class:"blank-game",title:name},art,el("span",{class:"blank-game-name"},name));
   }
   function componentRows(level){
     const entries=(window.LexeditorComponentCatalog?.entries||[]).filter(entry=>entry.level===level);
@@ -313,12 +339,16 @@
     const body=[detailSection({title:"WHAT IT IS",body:[
       detailField({label:"SUMMARY",control:readonlyField(row.summary||"")}),
       detailField({label:"LEVEL",control:readonlyField(row.level)}),
-      detailField({label:"USED BY",control:readonlyField(row.usedBy.length?row.usedBy.join(", "):"No game uses this yet."),
+      detailField({label:"USED BY",control:row.usedBy.length
+        ? el("div",{class:"blank-games"},...row.usedBy.map(gameCard))
+        : readonlyField("No game uses this yet."),
         help:infoHelp("Read from the plugins themselves, not a list anyone maintains.")}),
     ]})];
     body.push(detailSection({title:"SAMPLE",body:[row.hasSample
       ? el("div",{class:"blank-sample"},row.sample())
-      : el("p",{class:"blank-sample-missing"},"No sample yet. Add one in ui/component-catalog.js.")]}));
+      : el("p",{class:"blank-sample-missing"},row.level==="utility"
+        ? "Nothing to draw: this one is code a page calls, not a control."
+        : "No sample yet. Add one in ui/component-catalog.js.")]}));
     return detailPanel({className:"blank-detail",title:row.id,meta:row.level,body});
   }
   function componentsPanel(level){
