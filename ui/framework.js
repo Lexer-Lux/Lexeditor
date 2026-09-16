@@ -4510,6 +4510,10 @@ ${contents.path}`});
       const rightSettings = isSpecialTab(right);
       if (leftSettings !== rightSettings) return leftSettings ? 1 : -1;
       const rank = tab => tab.id === "tweaks" ? 2 : (tab.id === "misc" || /^misc\.?$/i.test(String(tab.label))) ? 1 : 0;
+      // A page whose order carries meaning - Blank's component levels run from
+      // whole pages down to single controls - says so with `order`.
+      const stated = tab => Number.isFinite(tab.order) ? tab.order : null;
+      if (stated(left) !== null && stated(right) !== null && stated(left) !== stated(right)) return stated(left) - stated(right);
       return rank(left) - rank(right) || String(left.label).localeCompare(String(right.label), undefined, {sensitivity: "base"});
     });
     for (const [tabIndex, tab] of orderedTabs.entries()) {

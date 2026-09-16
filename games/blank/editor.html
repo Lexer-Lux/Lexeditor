@@ -65,7 +65,7 @@
   let modOnly=false;
   const columns=[{key:"id",label:"ID",numberedId:true,sortable:true},{key:"name",label:"Name",sortable:true,edit:(row,value)=>{row.name=String(value)}},{key:"category",label:"Category",sortable:true,choices:categories,edit:(row,value)=>{row.category=String(value)}},{key:"value",label:"Value",numeric:true,min:0,max:255,step:1,sortable:true,edit:(row,value)=>{row.value=Math.max(0,Math.min(255,Number(value)||0))}}];
   const catalogue={selected:null,page:0,query:"",usage:null,usageLoaded:false};
-  let tab="one",subtab="controls",selected=0,sort={key:"name",dir:1},query="",page=0,pageSize=12,activeSource="mine";
+  let tab="organism",subtab="controls",selected=0,sort={key:"name",dir:1},query="",page=0,pageSize=12,activeSource="mine";
   const prefs=columnPreferences("blank-records",columns,()=>render());
   const activeRows=()=>activeSource==="vanilla"?vanillaRows:rows;
   const selectedRow=()=>activeRows().find(value=>value.id===selected)||activeRows()[0];
@@ -342,6 +342,20 @@
       emptyDetail:()=>detailPanel({className:"blank-detail",title:"Components",
         body:[el("p",{},"No component matches this search.")]})});
   }
+  // Blank's own pages are the live samples for the heavier components: the
+  // catalogue entry borrows the page rather than keeping a second copy of it.
+  function attachLocalSamples(){
+    const local={panelLayout:()=>galleryPanel("Panel layout"),tabbedPanel:()=>subtabPanel(),
+      curveEditor:()=>graphsPanel(),reshadeSection:()=>tweaksPanel(),
+      listDetail:()=>panelLayout([pagedTablePane(),recordPanel()],"blank-layout",{layoutKey:"blank-sample-two",defaultSizes:[50,50]}),
+      masterDetail:()=>panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-sample-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980}),
+      dataMap:()=>dataMapPanel()};
+    for(const [id,build] of Object.entries(local)){
+      const entry=window.LexeditorComponentCatalog?.entries.find(row=>row.id===id);
+      if(entry&&typeof entry.sample!=="function")entry.sample=build;
+    }
+  }
+  attachLocalSamples();
   function render(){let layout;const levels=["atom","molecule","organism","template","utility"];if(levels.includes(tab))layout=panelLayout([componentsPanel(tab)],"blank-layout",{layoutKey:`blank-${tab}`,defaultSizes:[100]});else if(tab==="datamap")layout=dataMapPanel();else if(tab==="info")layout=panelLayout([informationPanel()],"blank-layout",{layoutKey:"blank-info",defaultSizes:[100]});else if(tab==="graphs")layout=panelLayout([graphsPanel()],"blank-layout",{layoutKey:"blank-graphs",defaultSizes:[100]});else if(tab==="one")layout=panelLayout([galleryPanel()],"blank-layout",{layoutKey:"blank-one",defaultSizes:[100]});else if(tab==="three")layout=panelLayout([pagedTablePane(),recordPanel(),inspectorPanel()],"blank-layout blank-three-layout",{layoutKey:"blank-three",defaultSizes:[38,34,28],minSizes:[300,320,260],stackAt:980});else if(tab==="subtabs")layout=panelLayout([subtabPanel()],"blank-layout",{layoutKey:"blank-subtabs",defaultSizes:[100]});else if(tab==="tweaks")layout=panelLayout([tweaksPanel()],"blank-layout",{layoutKey:"blank-tweaks",defaultSizes:[100]});else layout=pagedTwoPanel();document.querySelector("#main").replaceChildren(layout);refreshShell()}
   function navigate(value){tab=value;render()}
   const editHistory=new EditHistory({capture:()=>({rows,demo}),restore:snapshot=>{rows=clone(snapshot.rows);demo=clone(snapshot.demo)},render:async()=>render(),enabled:()=>activeSource==="mine",changed:()=>refreshShell()});
@@ -382,7 +396,7 @@
     document.body.append(dialog);dialog.showModal();
   });
   void loadReshade().then(()=>render());
-  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"atom",label:"Atoms"},{id:"molecule",label:"Molecules"},{id:"organism",label:"Organisms"},{id:"template",label:"Templates"},{id:"utility",label:"Utilities"},{id:"one",label:"1 Panel"},{id:"two",label:"2 Panels"},{id:"three",label:"3 Panels"},{id:"subtabs",label:"Tabbed Panel"},{id:"tweaks",label:"Tweaks"},{id:"graphs",label:"Graphs"}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{await saveSample();saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot,projectCreatePrompt:{createLabel:"Create Sample",description:"Save a Blank sample project on this computer."},createProject:createSample,browseProject:browseSamples,projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
+  const shell=LexeditorUI.mountShell({host:"#lexeditor-shell",brand:"LEXEDITOR",plugin:{id:"blank",name:"Blank Game",themeName:"blank",theme:{accent:"#72ff1e","accent-text":"#102008"}},tabs:[{id:"template",label:"Templates",order:0},{id:"organism",label:"Organisms",order:1},{id:"molecule",label:"Molecules",order:2},{id:"atom",label:"Atoms",order:3},{id:"utility",label:"Utilities",order:4}],activeTab:()=>tab,navigate,help:()=>navigate("datamap"),helpActive:()=>tab==="datamap",helpTitle:"Open Blank Data Map",dirtyCount,readonly:()=>activeSource!=="mine",history:editHistory,save:async()=>{await saveSample();saved={rows:clone(rows),demo:clone(demo)};editHistory.clear()},discard:async()=>{rows=clone(saved.rows);demo=clone(saved.demo);editHistory.clear();render()},projectSnapshot,projectCreatePrompt:{createLabel:"Create Sample",description:"Save a Blank sample project on this computer."},createProject:createSample,browseProject:browseSamples,projectSources:()=>[{key:"vanilla",label:"Vanilla",path:"Packaged unchanged sample data"}],projectActiveSource:()=>activeSource,selectProjectSource:async value=>{activeSource=String(value||"mine");selected=0;page=0;render()},info:()=>navigate("info"),infoActive:()=>tab==="info",infoTitle:"Open Blank setup and runtime information"});
   async function restoreSample(){
     try{
       const response=await fetch("/api/projects");

@@ -34,7 +34,9 @@ class FollowupTests(unittest.TestCase):
         blank=(ROOT/'games/blank/editor.html').read_text(encoding='utf-8')
         self.assertNotIn('design-review.js',blank)
         self.assertNotIn('design-review.css',blank)
-        self.assertIn('id:"graphs",label:"Graphs"',blank)
+        # Blank's tabs are the component levels now; the graphs page lives on as
+        # the curve editor's sample in the catalogue.
+        self.assertIn('curveEditor:()=>graphsPanel()',blank)
         self.assertIn('curveEditor(',blank)
     def test_guide_edits_sources_not_generated_bundle(self):
         text=(ROOT/'docs/ADDING_A_GAME.md').read_text(encoding='utf-8')
