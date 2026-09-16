@@ -195,6 +195,8 @@
         <div class="lexer-dev-table-wrap"><table id="lexer-dev-games" class="lexer-dev-table"></table></div>
         <h3>SHARED UI BUDGET</h3>
         <div class="lexer-dev-table-wrap"><table id="lexer-dev-budget" class="lexer-dev-table"></table></div>
+        <h3>COPIED CODE</h3>
+        <div class="lexer-dev-table-wrap"><table id="lexer-dev-code" class="lexer-dev-table"></table></div>
       </section>
       <section class="lexer-dev-helpers">
         <h3>HELPERS</h3>
@@ -333,6 +335,7 @@
       try{
         const overview=await window.pywebview.api.developer_overview();
         renderBudget(overview?.sharedUi||[]);
+        renderCodeBudget(overview?.sharedCode||[]);
         const rows=overview?.games||[];
         const head=document.createElement("tr");
         for(const name of ["GAME","STATUS","TASKS","DONE"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
@@ -370,6 +373,25 @@
         cell(String((rows||[]).reduce((sum,row)=>sum+row.sharedSelectors,0)),"num"),
         cell(String((rows||[]).reduce((sum,row)=>sum+row.handBuiltRows,0)),"num"));
       table.replaceChildren(head,...body,totals);
+    }
+    // Plugin Python that is a second copy of another plugin's function. Same
+    // ratchet as the UI budget: it may fall, never rise.
+    function renderCodeBudget(rows){
+      const table=document.querySelector("#lexer-dev-code");
+      const cell=(text,className="")=>Object.assign(document.createElement("td"),{textContent:text,className});
+      const head=document.createElement("tr");
+      for(const name of ["PLUGIN","COPIED LINES"])head.append(Object.assign(document.createElement("th"),{textContent:name}));
+      const body=(rows||[]).filter(row=>row.copiedLines||row.recorded).map(row=>{
+        const tr=document.createElement("tr");
+        tr.append(cell(row.plugin),cell(row.copiedLines===row.recorded?String(row.copiedLines)
+          :`${row.copiedLines} (was ${row.recorded})`,"num"));
+        if(row.over)tr.classList.add("over");
+        return tr;
+      });
+      const total=document.createElement("tr");total.className="total";
+      total.append(cell(`${body.length} plugins`),
+        cell(String((rows||[]).reduce((sum,row)=>sum+row.copiedLines,0)),"num"));
+      table.replaceChildren(head,...body,total);
     }
     function setLexerPanel(open){
       if(open){lexerPanel.hidden=false;requestAnimationFrame(()=>lexerPanel.classList.add("open"));loadHelperVersions(false);loadDeveloperOverview();}

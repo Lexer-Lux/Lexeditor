@@ -2430,6 +2430,20 @@ body[data-lex-github-open="true"] > :not(.lex-shell-header):not(.lex-github-work
   cursor: row-resize;
   justify-self: stretch;
 }
+/* The handle follows the edge it drags: on its side for a stacked layout. */
+.lex-panel-layout-vertical > .lex-panel-layout-divider::before {
+  width: 24px;
+  height: 10px;
+  background-size: 6px 5px;
+}
+.lex-panel-layout-vertical > .lex-panel-layout-divider > .lex-barrel-control {
+  top: auto;
+  right: auto;
+  bottom: calc(100% - 21px);
+  left: 50%;
+  flex-direction: row;
+  translate: -50% 0;
+}
 
 .lex-panel-layout-divider::before {
   position: absolute;

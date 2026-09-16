@@ -1,0 +1,11 @@
+{
+  "note": "Copied lines per plugin. May fall, never rise. See tools/verify_shared_code_budget.py.",
+  "plugins": {
+    "ff7r": 14,
+    "ff8": 14,
+    "ff9": 23,
+    "palworld": 47,
+    "rdr2": 10,
+    "warband": 14
+  }
+}

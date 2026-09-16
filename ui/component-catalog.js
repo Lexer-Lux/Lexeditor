@@ -218,7 +218,14 @@
     {id: "openSettings", level: "organism", summary: "The shared settings dialog.",
       sample: () => sampleButton("Open settings", () => UI.openSettings())},
     {id: "sharedSettings", level: "organism", summary: "The settings every game has in common, as this page sees them.",
-      sample: () => UI.readonlyField(JSON.stringify(UI.sharedSettings() || {}).slice(0, 120) || "No settings loaded here.")},
+      sample: () => {
+        const settings = UI.sharedSettings();
+        const rows = Object.entries(settings || {}).slice(0, 6);
+        if (!rows.length) return UI.detailNote("No shared settings on this page yet; the desktop host provides them.");
+        return UI.detailSection({title: "AS THIS PAGE SEES THEM", body: rows.map(([name, value]) =>
+          UI.detailField({label: name.toUpperCase(),
+            control: UI.readonlyField(typeof value === "object" ? JSON.stringify(value).slice(0, 60) : String(value))}))});
+      }},
     {id: "openGameFolder", level: "organism", summary: "Opens this game's folder in the file browser.",
       sample: () => sampleButton("Open the game folder", () => UI.openGameFolder("blank"))},
 

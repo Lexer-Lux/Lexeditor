@@ -831,7 +831,29 @@ class HostApi:
                           "status": installation.get("statusText") or installation.get("status", ""),
                           "tasks": tasks})
         return {"games": sorted(games, key=lambda row: row["name"].lower()),
-                "sharedUi": self._shared_ui_budget()}
+                "sharedUi": self._shared_ui_budget(),
+                "sharedCode": self._shared_code_budget()}
+
+    def _shared_code_budget(self) -> list[dict]:
+        """Plugin Python that is a second copy of another plugin's function."""
+        import json
+        import sys
+
+        root = Path(__file__).resolve().parent
+        sys.path.insert(0, str(root / "tools"))
+        try:
+            from verify_shared_code_budget import counts
+            live = counts()
+        except Exception:
+            return []
+        try:
+            recorded = json.loads((root / "ui" / "shared-code-budget.json").read_text(encoding="utf-8"))["plugins"]
+        except (OSError, ValueError, KeyError):
+            recorded = {}
+        rows = [{"plugin": name, "copiedLines": live.get(name, 0), "recorded": recorded.get(name, 0),
+                 "over": live.get(name, 0) > recorded.get(name, 0)}
+                for name in sorted(set(live) | set(recorded))]
+        return sorted(rows, key=lambda row: -row["copiedLines"])
 
     def _shared_ui_budget(self) -> list[dict]:
         """How far each plugin still reaches into the shared components.

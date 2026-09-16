@@ -367,8 +367,9 @@
   function componentRows(level){
     const entries=(window.LexeditorComponentCatalog?.entries||[]).filter(entry=>entry.level===level);
     return entries.map(entry=>{const usedBy=catalogue.usage?.[entry.id]||[];
-      return {...entry,usedBy,games:usedBy.length,sample_:typeof entry.sample==="function",
-        hasSample:typeof entry.sample==="function"};});
+      const total=Object.keys(catalogue.games||{}).length;
+      return {...entry,usedBy,games:total?`${usedBy.length}/${total}`:String(usedBy.length),
+        sample_:typeof entry.sample==="function",hasSample:typeof entry.sample==="function"};});
   }
   // "Five games use it" means nothing without knowing how many should. An
   // expectation turns silence into a named gap.
@@ -418,10 +419,10 @@
       change:next=>{Object.assign(catalogue,next);render()},
       master:({rows:listed,selected,select})=>columnList({rows:listed,key:row=>row.id,selected,select,
         template:"minmax(140px,1fr) 78px 64px",
-        columns:[{key:"id",label:"Component"},
-          {key:"games",label:"Games",numeric:true},
-          {key:"sample_",label:LexeditorUI.enabledMark,headerTitle:"Has a sample",
-            width:"max-content",align:"center",render:row=>LexeditorUI.booleanMark(row.sample_)}]}),
+        columns:[{key:"sample_",label:"Live",headerTitle:"Has a live sample below",
+            width:"max-content",align:"center",render:row=>LexeditorUI.booleanMark(row.sample_)},
+          {key:"id",label:"Component"},
+          {key:"games",label:"Games",numeric:true}]}),
       detail:componentDetail,
       emptyDetail:()=>detailPanel({className:"blank-detail",title:"Components",
         body:[el("p",{},"No component matches this search.")]})});
