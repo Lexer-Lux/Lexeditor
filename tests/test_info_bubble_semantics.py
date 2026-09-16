@@ -78,4 +78,6 @@ def test_rdr_uses_shared_detail_fields_and_semantic_reward_help():
     # fixed label lane or the legacy private generic Detail-row classes.
     assert ".detail-field{display:grid" not in rdr
     assert ".detail-field{grid-template-columns" not in rdr
-    assert ".record-detail .lex-detail-field-label" in rdr
+    # The label is styled through the shared token now, not by naming the
+    # shared class: see tools/verify_shared_ui_budget.py.
+    assert "--lex-field-label-fg" in rdr

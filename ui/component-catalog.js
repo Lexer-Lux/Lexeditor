@@ -82,6 +82,7 @@
           {label: "Power", control: el("input", {type: "number", value: "128"})},
           {label: "Ranged", control: el("input", {type: "checkbox", checked: true})}]}))},
     {id: "pendingChangeList", level: "utility", summary: "The list of unsaved changes a save button shows before it saves."},
+    {id: "panelIcon", level: "utility", summary: "A panel's icon box, for a page that draws a preview into it."},
     {id: "sectionParts", level: "utility", summary: "The title and content of a section, by name, for a page that rearranges one."},
     {id: "shellTextNodes", level: "utility", summary: "Every piece of the shell's own text, for a game that redraws it in its own font."},
     {id: "dismissDialogs", level: "utility", summary: "Closes any shared dialog that is open."},

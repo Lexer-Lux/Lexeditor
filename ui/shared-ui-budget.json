@@ -6,11 +6,11 @@
       "handBuiltRows": 17
     },
     "games/rdr/editor.html": {
-      "sharedSelectors": 15,
+      "sharedSelectors": 0,
       "handBuiltRows": 11
     },
     "games/rdr2/editor.html": {
-      "sharedSelectors": 45,
+      "sharedSelectors": 0,
       "handBuiltRows": 230
     }
   }

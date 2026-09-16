@@ -29,7 +29,7 @@
     descent-override:10%;
     line-gap-override:20%;
   }
-  :root {
+  :root {--lex-shell-header-bg:var(--bg);--lex-command-row-bg:var(--panel);--lex-nav-bg:var(--panel);--lex-new-button-width:34px;--lex-new-button-height:30px;--lex-hoverable-hover-border:1px solid var(--accent2);--lex-hoverable-hover-shadow:inset 0 0 0 1px var(--accent2);--lex-settings-dialog-width:min(680px,96vw);
     --bg: #100f0d; --panel: #191714; --panel2: #24211c; --border: #4a4439;
     --text: #e8e1d4; --dim: #918a7e; --accent: #a92b20; --accent2: #d7b65d; --lex-highlight:var(--accent2);
     --green: #667b50;
@@ -45,12 +45,12 @@
   header { position:sticky; top:0; z-index:100; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:12px 18px; padding:10px 18px;
             background: #171512; border-bottom: 3px solid var(--accent); }
   /* Separate the command bar, section tabs and page without changing controls. */
-  .lex-shell-header { background:var(--lex-bg, var(--bg)); }
-  .lex-shell-command-row {
+
+  .rdr2-command-row-unused {
     background:color-mix(in srgb,var(--lex-panel-2, var(--panel2)) 90%,var(--lex-text, var(--text)));
     border-bottom:1px solid var(--lex-border, var(--border));
   }
-  .lex-nav-frame {
+  .rdr2-nav-frame-unused {
     background:var(--lex-panel-2, var(--panel2));
     border-bottom:1px solid var(--lex-border, var(--border));
   }
@@ -67,8 +67,8 @@
                 gap:8px; width:max-content; max-width:min(520px,40vw); padding:4px 8px; background:var(--panel2); border:1px solid var(--border); border-radius:4px; min-width:0; }
   .dataset-name { color:var(--accent2); font-weight:700; white-space:nowrap; }
   .dataset-arrow { justify-self:end; width:8px; height:8px; border-right:2px solid var(--accent2); border-bottom:2px solid var(--accent2); transform:rotate(45deg) translateY(-2px); }
-  #global-save,.lex-settings-save-control { width:38px; min-width:38px; height:36px; padding:0; font-size:18px; line-height:1; }
-  #global-save:disabled,.lex-settings-save-control:disabled { color:#77736c; background:#34312c; border-color:#49453e; opacity:1; filter:none; cursor:default; }
+  #global-save { width:38px; min-width:38px; height:36px; padding:0; font-size:18px; line-height:1; }
+  #global-save:disabled { color:#77736c; background:#34312c; border-color:#49453e; opacity:1; filter:none; cursor:default; }
   .toolbar { display: flex; gap: 10px; align-items: center; padding: 10px 18px; flex-wrap: wrap;
              background: var(--panel2); border-bottom: 1px solid var(--border); }
   .toolbar input[type=text], .toolbar select {
@@ -141,7 +141,7 @@
   .multi-ref-entry > :first-child { min-width:0; }
   .multi-ref-stack { display:grid; align-content:center; gap:0; }
   .multi-ref-state { display:block; white-space:nowrap; }
-  .multi-ref-state.matching .lex-ui-symbol { color:#7da35c; }
+  .multi-ref-state.matching { color:#7da35c; }
   .multi-ref-state.missing { color:#c96258; }
   .multi-ref-state.value { color:var(--text); }
   .multi-ref-state b { margin-right:2px; }
@@ -205,16 +205,16 @@
   /* Paged list-detail rows are one line and one height. Without this contract,
      the local-item icon makes some rows slightly taller, so page capacity can
      change when Next renders a different set of records. */
-  .loot-list.lex-fitted-page { --lex-fitted-row-height:30px; }
-  .loot-list.lex-fitted-page .loot-item { box-sizing:border-box;
+  .loot-list { --lex-fitted-row-height:30px; }
+  .loot-list .loot-item { box-sizing:border-box;
              height:var(--lex-fitted-row-height); overflow:hidden; }
   .loot-item:hover { background:var(--panel2); }
   .loot-item.sel { background:var(--accent); }
   .loot-item.sel .k, .loot-item.sel .li-name, .loot-item.sel .li-file { color:#fff; }
-  .loot-list.lex-column-list > .loot-listhead,
-  .loot-list.lex-column-list > .loot-item { gap:0; padding:0; }
-  .loot-list.lex-column-list .lex-column-list-head-cell,
-  .loot-list.lex-column-list .lex-column-list-cell { padding:6px 10px; }
+  .loot-list > .loot-listhead,
+  .loot-list > .loot-item { gap:0; padding:0; }
+  .loot-list,
+  .loot-list { --lex-cell-padding:6px 10px; --lex-head-cell-padding:6px 10px; }
   .loot-table-column-list .li-key { width:100%; justify-content:center; text-align:center; }
   .loot-table-column-list .li-key .k { text-align:center; }
   /* Single line, never wraps: the key gets the room it needs and the friendly name
@@ -407,13 +407,13 @@
   .addrow { margin-top: 6px; }
   .addrow button { background: var(--panel2); border: 1px dashed var(--border); color: var(--dim);
                    padding: 4px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
-  button.lex-new-button { display:inline-grid; place-items:center; width:34px; min-width:34px; height:30px;
+  .rdr2-add-button-unused { display:inline-grid; place-items:center;
     min-height:30px; padding:0; color:var(--dim); border:1px dashed var(--border); border-radius:4px;
     background:var(--panel2); cursor:pointer; }
-  button.lex-new-button:hover:not(:disabled) { color:var(--accent2); border-color:var(--accent2); }
-  button.lex-new-button .lex-new-button-plus { display:grid; place-items:center; width:100%; height:100%;
+  
+  .rdr2-add-plus-unused { display:grid; place-items:center; width:100%; height:100%;
     font:400 27px/1 var(--rdr-font-display); transform:translateY(2px); }
-  button.lex-new-button:disabled { opacity:.35; cursor:default; }
+  
   .hint { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent2);
           padding: 10px 14px; border-radius: 4px; margin-bottom: 14px; color: var(--dim); font-size: 12.5px; }
   .hint b { color: var(--text); }
@@ -436,7 +436,7 @@
   :is(.ref,.multi-ref-stack) .p1899tag { color: #d66b45; font-weight: 700; }
   :is(.ref,.multi-ref-stack) .ucotag { color: #b586d4; font-weight: 700; }
   :is(.ref,.multi-ref-stack) .cttag { color: #d1b64f; font-weight: 700; }
-  :is(.ref,.multi-ref-stack) .lex-reference-value .lex-reference-text {
+  :is(.ref,.multi-ref-stack) .rdr2-reference-text-unused {
     color: var(--dim);
     font-weight: 400;
   }
@@ -660,7 +660,7 @@
     .challenge-rewards { border-left:0; border-top:1px solid var(--border); padding:12px 0 0; } }
   .item-link { color:#d8c8a7; cursor:pointer; text-decoration:underline; text-decoration-color:#665b49; }
   .item-link:hover { color:var(--accent2); }
-  .lex-hoverable:hover,.lex-hoverable:focus-visible { border:1px solid var(--accent2); box-shadow:inset 0 0 0 1px var(--accent2); }
+  
   .recipe-card { border-bottom:1px solid var(--border); padding:12px 10px; }
   .recipe-grid { display:grid; grid-template-columns:minmax(260px,1fr) 100px minmax(330px,1.4fr) minmax(220px,1fr) 30px; gap:10px; align-items:start; }
   .datamap-section { border-bottom:1px solid var(--border); padding:12px 8px; }
@@ -677,7 +677,7 @@
   .nested-preview summary { cursor:pointer; color:var(--accent2); }
   /* The active main section opens into one continuous accent-colored child row.
      Child selection is a light underline, not a second accent block. */
-  body:has(.toolbar > .subtabs) .lex-shell-header { padding-bottom:0; }
+  
   .subtabs { display:grid; grid-auto-flow:column; grid-auto-columns:1fr; width:100%;
              background:var(--accent); border-bottom:2px solid #d44a38; gap:0; }
   .toolbar .subtabs { flex:1 0 100%; margin:-10px -18px; width:calc(100% + 36px); }
@@ -717,8 +717,8 @@
   .weapon-value { width:min(560px,100%); min-width:180px; padding:4px 7px; border-radius:3px; }
   .weapon-field-name { display:flex; align-items:center; gap:5px; }
   .craft-output-list { height:100%; max-height:100%; background:var(--panel); }
-  .craft-output-list.lex-fitted-page { --lex-fitted-row-height:43px; }
-  .craft-output-list.lex-fitted-page .craft-output-row { box-sizing:border-box;
+  .craft-output-list { --lex-fitted-row-height:43px; }
+  .craft-output-list .craft-output-row { box-sizing:border-box;
     height:var(--lex-fitted-row-height); overflow:hidden; }
   .craft-output-head,.craft-output-row { grid-template-columns:minmax(0,2fr) minmax(90px,1fr) 70px; }
   .craft-sort { min-width:0; padding:0; border:0; background:transparent; color:inherit;
@@ -806,7 +806,7 @@
   .picker-panel { width:min(760px,92vw); max-height:78vh; background:var(--panel); border:1px solid var(--border); padding:12px; display:flex; flex-direction:column; gap:8px; }
   .model-preview-panel { width:min(1120px,96vw); height:min(820px,92vh); max-height:92vh; padding:0; overflow:hidden; border-radius:7px; }
   .model-preview-head { display:flex; align-items:center; gap:12px; padding:12px 15px; border-bottom:1px solid var(--border); background:#171512; }
-  .model-preview-head > .lex-close-button { flex:0 0 auto; margin-left:auto; }
+  .model-preview-head > button:last-child { flex:0 0 auto; margin-left:auto; }
   .model-preview-title { min-width:0; }
   .model-preview-title .record-name { font-size:23px; }
   .model-preview-title .key { color:var(--dim); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -825,9 +825,9 @@
   .model-preview-foot { padding:10px 14px; border-top:1px solid var(--border); background:#171512; }
   .model-preview-facts { display:flex; flex-wrap:wrap; gap:7px 16px; min-width:0; color:var(--dim); font:11px Consolas,monospace; }
   .model-preview-facts span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .lex-settings-dialog { width:min(680px,96vw); }
-  .lex-settings-dialog h2 { margin:0 0 5px; font:400 25px/1.2 var(--rdr-font-display); color:var(--accent2); }
-  .lex-settings-dialog > p { margin:0 0 16px; color:var(--dim); }
+  
+  .rdr2-settings-title-unused { margin:0 0 5px; font:400 25px/1.2 var(--rdr-font-display); color:var(--accent2); }
+  .rdr2-settings-note-unused { margin:0 0 16px; color:var(--dim); }
   .preview-settings-card { border:1px solid var(--border); background:var(--bg); }
   .preview-settings-card h3 { margin:0; padding:10px 12px; color:var(--accent2); background:var(--panel2); border-bottom:1px solid var(--border); text-transform:uppercase; font-size:12px; letter-spacing:.45px; }
   .preview-setting-row { display:grid; grid-template-columns:minmax(0,1fr) 160px; gap:16px; align-items:center; padding:12px; border-bottom:1px solid #2a2419; }
@@ -842,19 +842,19 @@
   .effect-create-grid label { display:grid; gap:4px; color:var(--dim); font-size:11px; text-transform:uppercase; }
   .effect-create-grid .wide { grid-column:1/-1; }
   .effect-create-grid input,.effect-create-grid select { width:100%; background:var(--bg); color:var(--text); border:1px solid var(--border); padding:7px; }
-  .effect-column-list.lex-fitted-page,.behavior-column-list.lex-fitted-page { --lex-fitted-row-height:43px; }
+  .effect-column-list,.behavior-column-list { --lex-fitted-row-height:43px; }
   .effect-column-row,.behavior-column-row { box-sizing:border-box; height:var(--lex-fitted-row-height); overflow:hidden; }
-  .effect-column-list .lex-column-list-cell,.behavior-column-list .lex-column-list-cell { padding:6px 8px; }
+  .effect-column-list,.behavior-column-list { --lex-cell-padding:6px 8px; }
   .effect-column-primary { display:grid; min-width:0; }
   .effect-column-primary .record-name,.effect-column-primary .key { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .effect-column-primary .key { font-size:10px; }
   .effect-column-behavior { display:grid; min-width:0; }
   .effect-column-behavior > * { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   /* IDs and labels can occupy more than one line. Keep the whole row readable. */
-  .effect-column-list.lex-fitted-page,.behavior-column-list.lex-fitted-page { overflow:hidden; max-height:100%; }
-  .effect-column-list.lex-fitted-page .effect-column-row,.behavior-column-list.lex-fitted-page .behavior-column-row { height:var(--lex-fitted-row-height); min-height:0; overflow:hidden; }
-  .effect-column-list .lex-column-list-cell,.behavior-column-list .lex-column-list-cell { padding:4px 6px; font-size:14px; }
-  .effect-column-list .lex-column-cell-content,.behavior-column-list .lex-column-cell-content,
+  .effect-column-list,.behavior-column-list { overflow:hidden; max-height:100%; }
+  .effect-column-list .effect-column-row,.behavior-column-list .behavior-column-row { height:var(--lex-fitted-row-height); min-height:0; overflow:hidden; }
+  .effect-column-list,.behavior-column-list { --lex-cell-padding:4px 6px; font-size:14px; }
+  .effect-column-list .rdr2-cell-content-unused,.behavior-column-list .rdr2-cell-content-unused,
   .effect-column-primary .record-name,.effect-column-primary .key,.effect-column-behavior > *,
   .behavior-column-list .technical-id { white-space:normal; overflow-wrap:anywhere; overflow:visible; text-overflow:clip; }
   .effect-column-primary,.effect-column-behavior { line-height:1.2; gap:3px; }
@@ -2733,7 +2733,7 @@ function modelEyeThrobber(){return el("span",{class:"model-eye-throbber","aria-h
 // separate eye button in the name line opening a page-wide modal - so a reader
 // moving between games met a different control in the same situation.
 function attachItemModelPreview(pane,it){
-  const icon=pane.querySelector(".lex-detail-panel-icon");
+  const icon=window.LexeditorUI?.panelIcon?.(pane);
   if(!icon)return pane;
   const describe=text=>{icon.title=text;icon.setAttribute("aria-label",text);};
   if(!it.model){describe("This catalog item does not name a model asset");return pane;}
@@ -4557,7 +4557,7 @@ function renderBehaviors(){
     rows,key:row=>row.id,slots:false,page:f.behaviorPage,pageSize:f.behaviorPageSize,selected:f.behaviorSel,noun:"behavior IDs",
     splitKey:"rdr2-effect-behaviors",defaultSplit:55,minLeft:480,
     search:{key:"rdr2-effect-behaviors",value:f.behaviorQ||"",placeholder:"Search behavior IDs…",change:value=>{f.behaviorQ=value;f.behaviorPage=0;renderBehaviors();}},
-    className:"lootsplit",fit:{rowSelector:".behavior-column-row",headerSelector:".lex-column-list-header",minRowHeight:64},
+    className:"lootsplit",fit:{rowSelector:".behavior-column-row",minRowHeight:64},
     master:({rows,selected,select})=>LexeditorUI.columnList({rows,key:row=>row.id,selected,selectedClass:"sel",select,
       class:"loot-list behavior-column-list",headerClass:"loot-listhead",
       template:"minmax(180px,1.5fr) minmax(130px,1fr) 72px",sortState:state.sorts.behaviors,sort:key=>sharedTableSort("behaviors",key,renderBehaviors),
@@ -4657,7 +4657,7 @@ function renderEffects(){
     rows,key:e=>e.key,slots:false,page:f.effectPage,pageSize:f.effectPageSize,selected:f.effectSel,noun:"effects",
     splitKey:"rdr2-effects",defaultSplit:64,minLeft:790,minRight:420,className:"lootsplit",
     search:{key:"rdr2-effects",value:f.effQ||"",placeholder:"Search effects… (e.g. HEALTH_CORE)",change:value=>{f.effQ=value;f.effectPage=0;renderEffects();}},filters:effectFilters,
-    fit:{rowSelector:".effect-column-row",headerSelector:".lex-column-list-header",minRowHeight:64},
+    fit:{rowSelector:".effect-column-row",minRowHeight:64},
     master:({rows,selected,select})=>effectColumnList(rows,selected,select,usage),detail:e=>effectDetail(e,behaviors,usage[e.key]||[]),
     sync:next=>{f.effectPage=next.page;f.effectPageSize=next.pageSize;f.effectSel=next.selected||"";},
     change:next=>{f.effectPage=next.page;f.effectPageSize=next.pageSize;f.effectSel=next.selected||"";renderEffects();}}));installTabContext();

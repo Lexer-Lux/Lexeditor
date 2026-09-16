@@ -6461,5 +6461,24 @@ body > main:has(.lex-tweaks-paged) { flex:1 1 0; min-height:0; overflow:auto; }
 .lex-detail-panel-heading { padding: var(--lex-detail-heading-padding, 4px 18px 4px 4px); }
 .lex-detail-panel-icon { border: 1px solid var(--lex-detail-icon-border, var(--lex-border)); }
 
+/* Paintable parts of a list, a field and the add button. Defaults are what they
+   already were; a game sets the token on its own container. */
+.lex-column-list-cell { padding: var(--lex-cell-padding, 6px 10px); }
+.lex-column-list-head-cell { padding: var(--lex-head-cell-padding, 6px 10px); }
+.lex-brand-button { color: var(--lex-brand-fg, inherit); }
+.lex-detail-field { border-bottom: var(--lex-field-border, 0); }
+.lex-detail-field-label { color: var(--lex-field-label-fg, inherit); }
+.lex-detail-field-control { color: var(--lex-field-control-fg, inherit); }
+.lex-hoverable:hover, .lex-hoverable:focus-visible {
+  border: var(--lex-hoverable-hover-border, 1px solid var(--lex-highlight));
+  box-shadow: var(--lex-hoverable-hover-shadow, none);
+}
+.lex-new-button {
+  width: var(--lex-new-button-width, 32px);
+  min-width: var(--lex-new-button-width, 32px);
+  height: var(--lex-new-button-height, 30px);
+}
+.lex-settings-dialog { width: var(--lex-settings-dialog-width, min(720px, 96vw)); }
+
 /* The data map fills its page rather than scrolling the page behind it. */
 .lex-data-map-view { height: 100%; overflow: hidden; }
